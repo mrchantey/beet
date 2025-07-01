@@ -16,10 +16,9 @@ impl Plugin for ClientIslandCodegenPlugin {
 			Update,
 			(
 				collect_client_islands.before(ExportArtifactsSet),
-				compile_wasm.after(ExportArtifactsSet),
+				compile_wasm.after(ExportArtifactsSet).before(TemplateSet),
 			)
-				.chain()
-				.before(TemplateSet),
+				.chain(),
 		);
 	}
 }

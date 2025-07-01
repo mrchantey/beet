@@ -29,8 +29,8 @@ pub fn update_file_expr_hash(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut query: Populated<
-		(Entity, &TemplateFile, &mut FileExprHash),
-		Changed<TemplateFile>,
+		(Entity, &SourceFile, &mut FileExprHash),
+		Changed<SourceFile>,
 	>,
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
@@ -41,13 +41,13 @@ pub fn update_file_expr_hash(
 	// dont hash literal attribute values
 	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<AttributeLit>)>,
 ) -> Result {
-	for (entity, template_file, mut hash) in query.iter_mut() {
+	for (entity, source_file, mut hash) in query.iter_mut() {
 		let mut hasher = RapidHasher::default_const();
 		HashNonTemplateRust {
 			macros: &macros,
 			hasher: &mut hasher,
 		}
-		.hash(template_file)?;
+		.hash(source_file)?;
 		for node in children
 			.iter_descendants(entity)
 			.flat_map(|child| template_roots.iter_descendants(child))
@@ -99,9 +99,10 @@ mod test {
 			.add_systems(Update, update_file_expr_hash);
 		let entity = app
 			.world_mut()
-			.spawn((TemplateFile::new(WsPathBuf::new(file!())), children![
-				related! {TemplateRoot[bundle]}
-			]))
+			.spawn((
+				SourceFile::new(WsPathBuf::new(file!()).into_abs()),
+				children![related! {TemplateRoot[bundle]}],
+			))
 			.id();
 		// reset macro idxs for testing
 		if remove_macro_idxs {

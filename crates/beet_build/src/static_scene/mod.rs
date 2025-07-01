@@ -1,7 +1,3 @@
-mod hash_non_template_rust;
-pub(self) use hash_non_template_rust::*;
-mod file_expr_hash;
-pub use file_expr_hash::*;
 #[cfg(feature = "css")]
 mod parse_lightning;
 #[cfg(feature = "css")]
@@ -14,10 +10,9 @@ mod templates_to_nodes_md;
 pub use templates_to_nodes_md::*;
 mod templates_to_nodes_rs;
 pub use templates_to_nodes_rs::*;
-mod template_file;
-pub use template_file::*;
 mod build_file_templates;
 pub mod error;
+#[allow(unused_imports)]
 use build_file_templates::*;
 mod static_scene_plugin;
 pub use static_scene_plugin::*;

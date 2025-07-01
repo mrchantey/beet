@@ -1,13 +1,18 @@
-use super::TemplateFile;
+use crate::prelude::*;
 use beet_bevy::prelude::When;
 use beet_bevy::prelude::WorldMutExt;
-use beet_fs::prelude::*;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 
 
-/// Create a [`TemplateFile`] for each file specified in the [`WorkspaceConfig`].
+/// Marker type for the root of the static scene.
+#[derive(Debug, Clone, Default, Component)]
+pub struct StaticSceneRoot;
+
+
+/// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
 /// will incrementally load changed files.
 #[cfg_attr(test, allow(dead_code))]
@@ -15,51 +20,28 @@ pub(super) fn load_all_template_files(
 	mut commands: Commands,
 	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
-	config.get_files()?.into_iter().for_each(|path| {
-		commands.spawn(TemplateFile::new(path));
-	});
-	Ok(())
-}
-
-/// When a file is changed
-pub(super) fn load_changed_template_files(
-	mut events: EventReader<WatchEvent>,
-	mut commands: Commands,
-	config: When<Res<WorkspaceConfig>>,
-	query: Query<(Entity, &TemplateFile)>,
-) -> bevy::prelude::Result {
-	for ev in events
-		.read()
-		// we only care about files that a builder will want to save
-		.filter(|ev| config.passes(&ev.path))
-	{
-		let ws_path = ev.path.into_ws_path()?;
-
-		// recursively remove existing TemplateFile entities
-		for (entity, _) in query
-			.iter()
-			.filter(|(_, template_file)| template_file.path() == &ws_path)
-		{
-			commands.entity(entity).despawn();
-			tracing::debug!(
-				"Removed TemplateFile entity for changed file: {}",
-				ws_path.display()
-			);
-		}
-		commands.spawn(TemplateFile::new(ws_path));
-	}
+	commands.spawn((
+		StaticSceneRoot,
+		Children::spawn(SpawnIter(
+			config
+				.get_files()?
+				.into_iter()
+				.map(|path| SourceFile::new(path)),
+		)),
+	));
 	Ok(())
 }
 
 
-/// if any [`TemplateFile`] has been added, export the template scene
+
+/// if any [`SourceFile`] has been added, export the template scene
 /// to the [`WorkspaceConfig::scene_file`].
 #[allow(dead_code)]
 pub(super) fn export_template_scene(
 	world: &mut World,
 ) -> bevy::prelude::Result {
 	let changed_files =
-		world.query_filtered_once::<&TemplateFile, Added<TemplateFile>>();
+		world.query_filtered_once::<&SourceFile, Changed<SourceFile>>();
 
 	if changed_files.is_empty() {
 		// no changes, do nothing

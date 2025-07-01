@@ -8,19 +8,19 @@ use bevy::prelude::*;
 /// as [`CombinatorToNodeTokens`].
 pub fn templates_to_nodes_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &TemplateFile), Added<TemplateFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 			&& ex == "md"
 		{
-			let file = ReadFile::to_string(path.into_abs())?;
+			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((
 				ChildOf(entity),
 				StaticRoot,
-				MacroIdx::new(path.path().clone(), LineCol::default()),
+				MacroIdx::new(path.into_ws_path()?, LineCol::default()),
 				CombinatorTokens::new(rsx_str),
 			));
 		}

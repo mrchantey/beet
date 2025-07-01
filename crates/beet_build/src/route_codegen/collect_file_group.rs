@@ -159,7 +159,11 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((RouteCodegenPlugin, ParseRsxTokensPlugin));
+		app.add_plugins((
+			BuildPlugin,
+			RouteCodegenPlugin,
+			ParseRsxTokensPlugin,
+		));
 		app.world_mut().spawn(FileGroup::test_site_docs());
 		app.update();
 		app

@@ -12,18 +12,18 @@ pub fn templates_to_nodes_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<(Entity, &TemplateFile), Added<TemplateFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
 		{
-			let file = ReadFile::to_string(path.into_abs())?;
+			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
 				parent: entity,
 				commands: &mut commands,
-				file: &*path,
+				file: &path.into_ws_path()?,
 				macros: &*macros,
 			}
 			.visit_file(&file);

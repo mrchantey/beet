@@ -14,18 +14,34 @@ pub struct ExportArtifactsSet;
 pub struct BuildPlugin;
 
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct BeforeParseTokens;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct AfterParseTokens;
+
+
+
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_event::<WatchEvent>()
 			.configure_sets(
 				Update,
-				ExportArtifactsSet
-					.after(ParseRsxTokensSet)
-					.before(TemplateSet),
+				(
+					BeforeParseTokens.before(ParseRsxTokensSet),
+					AfterParseTokens
+						.after(BeforeParseTokens)
+						.after(ParseRsxTokensSet),
+					ExportArtifactsSet
+						.after(AfterParseTokens)
+						.before(TemplateSet),
+				),
 			)
 			.add_systems(
 				Update,
-				export_codegen_files.in_set(ExportArtifactsSet),
+				(
+					touch_changed_source_files.before(BeforeParseTokens),
+					export_codegen_files.in_set(ExportArtifactsSet),
+				),
 			);
 	}
 }

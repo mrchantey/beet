@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use beet_parse::prelude::*;
-use beet_template::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Debug, Default)]
@@ -18,7 +16,7 @@ impl Plugin for RouteCodegenPlugin {
 						modify_file_route_tokens,
 					)
 						.chain()
-						.before(ParseRsxTokensSet),
+						.in_set(BeforeParseTokens),
 					(
 						parse_route_tree,
 						(
@@ -33,12 +31,10 @@ impl Plugin for RouteCodegenPlugin {
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),
 					)
-						.after(ParseRsxTokensSet)
-						.before(ExportArtifactsSet),
+						.in_set(AfterParseTokens),
 					#[cfg(not(test))]
 					compile_router.after(ExportArtifactsSet),
-				)
-					.before(TemplateSet),
+				),
 			);
 	}
 }

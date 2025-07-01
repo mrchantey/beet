@@ -11,17 +11,19 @@ pub fn parse_route_file_md(
 	mut commands: Commands,
 	group_codegen: Query<&CodegenFileSendit, With<FileGroupSendit>>,
 	parents: Query<&ChildOf>,
-	mut query: Populated<(Entity, &mut RouteFile), Added<RouteFile>>,
+	mut query: Populated<
+		(Entity, &SourceFile, &mut RouteFile),
+		Changed<FileExprHash>,
+	>,
 ) -> Result {
-	for (entity, mut route_file) in query.iter_mut().filter(|(_, file)| {
-		file.origin_path
-			.extension()
-			.map_or(false, |ext| ext == "md")
-	}) {
+	for (entity, source_file, mut route_file) in
+		query.iter_mut().filter(|(_, source, _)| {
+			source.extension().map_or(false, |ext| ext == "md")
+		}) {
 		let mut parent = commands.entity(entity);
-		let file_str = ReadFile::to_string(&route_file.origin_path)?;
+		let file_str = ReadFile::to_string(&source_file)?;
 
-		let ws_path = route_file.origin_path.into_ws_path()?;
+		let ws_path = source_file.into_ws_path()?;
 		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file_str);
 
@@ -31,7 +33,7 @@ pub fn parse_route_file_md(
 		else {
 			return Err(format!(
 				"RouteFile has no CodegenFile for route file: {}",
-				route_file.origin_path.display()
+				source_file.display()
 			)
 			.into());
 		};
@@ -60,7 +62,7 @@ pub fn parse_route_file_md(
 				method: HttpMethod::Get,
 			},
 		});
-		trace!("Parsed route file: {}", route_file.origin_path.display());
+		trace!("Parsed route file: {}", source_file.display());
 		route_file.mod_path = route_codegen_path;
 		// here the markdown will be generated in its own codegen
 		parent.with_child((

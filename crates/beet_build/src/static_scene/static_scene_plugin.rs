@@ -2,7 +2,6 @@ use super::*;
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_fs::process::WatchEvent;
-use beet_parse::prelude::*;
 use beet_template::prelude::*;
 use bevy::prelude::*;
 
@@ -49,7 +48,6 @@ impl Plugin for StaticScenePlugin {
 				Update,
 				(
 					(
-						load_changed_template_files,
 						// style roundtrip breaks without resolving templates,
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?
@@ -61,7 +59,7 @@ impl Plugin for StaticScenePlugin {
 						),
 					)
 						.chain()
-						.before(ParseRsxTokensSet),
+						.in_set(BeforeParseTokens),
 					(
 						update_file_expr_hash,
 						(
@@ -72,12 +70,10 @@ impl Plugin for StaticScenePlugin {
 						)
 							.chain(),
 					)
-						.after(ParseRsxTokensSet)
-						.before(ExportArtifactsSet),
+						.in_set(AfterParseTokens),
 					#[cfg(not(test))]
 					export_template_scene.in_set(ExportArtifactsSet),
 				)
-					.before(TemplateSet),
 			);
 	}
 }

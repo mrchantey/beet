@@ -11,16 +11,15 @@ use syn::Visibility;
 pub fn parse_route_file_rs(
 	_: TempNonSendMarker, // spawning !send
 	mut commands: Commands,
-	query: Populated<(Entity, &RouteFile), Added<RouteFile>>,
+	query: Populated<(Entity, &SourceFile, &RouteFile), Changed<FileExprHash>>,
 ) -> Result<()> {
-	for (entity, route_file) in query.iter().filter(|(_, file)| {
-		file.origin_path
-			.extension()
-			.map_or(false, |ext| ext == "rs")
-	}) {
+	for (entity, source_file, route_file) in
+		query.iter().filter(|(_, file, _)| {
+			file.extension().map_or(false, |ext| ext == "rs")
+		}) {
 		let mut parent = commands.entity(entity);
 
-		let file_str = ReadFile::to_string(&route_file.origin_path)?;
+		let file_str = ReadFile::to_string(&source_file)?;
 
 		// collect all public functions, including handlers and
 		// possibly their meta functions

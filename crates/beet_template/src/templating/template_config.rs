@@ -110,11 +110,11 @@ impl WorkspaceConfig {
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.filter.passes(path)
 	}
-	pub fn get_files(&self) -> Result<Vec<WsPathBuf>, FsError> {
+	pub fn get_files(&self) -> Result<Vec<AbsPathBuf>, FsError> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())?
 			.into_iter()
 			.filter(|path| self.filter.passes(path))
-			.map(|path| WsPathBuf::new_cwd_rel(path))
+			.map(|path| AbsPathBuf::new(path))
 			.collect()
 	}
 }

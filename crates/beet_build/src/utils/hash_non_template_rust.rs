@@ -1,11 +1,11 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;
 use std::hash::Hash;
 use std::hash::Hasher;
-use beet_utils::prelude::*;
 
 
 /// Hash all the parts of a rust file that are not part of an rsx! macro.
@@ -14,16 +14,15 @@ pub(super) struct HashNonTemplateRust<'a, H> {
 	pub hasher: &'a mut H,
 }
 impl<H: Hasher> HashNonTemplateRust<'_, H> {
-	pub fn hash(&mut self, file: &TemplateFile) -> Result<()> {
-		let path = file.path();
-		match path.extension() {
+	pub fn hash(&mut self, file: &SourceFile) -> Result<()> {
+		match file.extension() {
 			Some(ex) if ex == "rs" => {
-				let file_content = ReadFile::to_string(path.into_abs())?;
+				let file_content = ReadFile::to_string(file)?;
 				let parsed_file =
 					syn::parse_file(&file_content).map_err(|err| {
 						anyhow::anyhow!(
 							"Failed to parse file: {}\n{}",
-							path.display(),
+							file.display(),
 							err
 						)
 					})?;
