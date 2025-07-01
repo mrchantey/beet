@@ -14,7 +14,7 @@ pub fn templates_to_nodes_rs(
 	mut commands: Commands,
 	query: Populated<
 		(Entity, &SourceFile),
-		(With<StaticFile>, Changed<SourceFile>),
+		(With<SnippetFile>, Changed<SourceFile>),
 	>,
 ) -> Result {
 	for (entity, path) in query.iter() {
@@ -60,7 +60,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
 				ChildOf(self.parent),
-				StaticRoot,
+				RsxSnippetRoot,
 				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
 				RstmlTokens::new(tokens),
 			));

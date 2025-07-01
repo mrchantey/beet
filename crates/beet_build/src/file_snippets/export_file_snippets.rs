@@ -11,16 +11,14 @@ pub struct StaticSceneRoot;
 
 /// Added alongside each [`SourceFile`] to distinguish them from a [`RouteFile`]
 #[derive(Debug, Clone, Default, Component)]
-pub struct StaticFile;
+pub struct SnippetFile;
 
 /// if any [`SourceFile`] has been added, export the template scene
 /// to the [`WorkspaceConfig::scene_file`].
 #[allow(dead_code)]
-pub(super) fn export_template_scene(
-	world: &mut World,
-) -> bevy::prelude::Result {
+pub(super) fn export_file_snippets(world: &mut World) -> bevy::prelude::Result {
 	let changed_files = world
-		.query_filtered_once::<&SourceFile, (With<StaticFile>, Changed<SourceFile>)>(
+		.query_filtered_once::<&SourceFile, (With<SnippetFile>, Changed<SourceFile>)>(
 		);
 
 	if changed_files.is_empty() {

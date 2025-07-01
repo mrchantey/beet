@@ -68,7 +68,7 @@ pub fn parse_route_file_md(
 		route_file.mod_path = route_codegen_path;
 		// here the markdown will be generated in its own codegen
 		parent.with_child((
-			StaticRoot,
+			RsxSnippetRoot,
 			MacroIdx::new(ws_path, LineCol::default()),
 			CombinatorTokens::new(rsx_str),
 			CombinatorRouteCodegen { meta }.sendit(),

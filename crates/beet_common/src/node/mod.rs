@@ -28,7 +28,7 @@ mod html_constants;
 pub use html_constants::*;
 
 
-/// Added to the [`StaticScenePlugin`] and the [`TemplatePlugin`] for static scene
+/// Added to the [`FileSnippetPlugin`] and the [`TemplatePlugin`] for static scene
 /// serde.
 /// This plugin is not unique, so can be added in multiple places.
 pub struct NodeTypesPlugin;
@@ -39,7 +39,7 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 		app
 			// idxs & roots
 			.register_type::<BeetRoot>()
-			.register_type::<StaticRoot>()
+			.register_type::<RsxSnippetRoot>()
 			.register_type::<InstanceRoot>()
 			.register_type::<ResolvedRoot>()
 			.register_type::<MacroIdx>()

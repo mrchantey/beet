@@ -1,12 +1,12 @@
 mod apply_lang_partials;
 mod apply_on_spawn_template;
-mod apply_static_nodes;
+mod apply_rsx_snippets;
 mod apply_style_id_attributes;
 mod html_fragment;
 mod template_config;
 mod template_plugin;
 pub use apply_on_spawn_template::*;
-pub use apply_static_nodes::*;
+pub use apply_rsx_snippets::*;
 use apply_style_id_attributes::*;
 pub use html_fragment::*;
 pub use template_config::*;

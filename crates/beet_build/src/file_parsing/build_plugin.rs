@@ -54,7 +54,7 @@ impl Plugin for BuildPlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		
+
 		if !self.skip_load_workspace {
 			#[cfg(not(test))]
 			app.add_systems(Startup, load_workspace_source_files);
@@ -71,7 +71,7 @@ impl Plugin for BuildPlugin {
 				ParseRsxTokensPlugin::default(),
 				RouteCodegenPlugin::default(),
 				ClientIslandCodegenPlugin::default(),
-				StaticScenePlugin::default(),
+				FileSnippetPlugin::default(),
 			))
 			.configure_sets(
 				Update,

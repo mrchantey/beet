@@ -87,7 +87,7 @@ fn set_app(template_config: TemplateConfig) {
 		app.add_plugins((TemplatePlugin, template_config.clone()));
 
 		#[cfg(all(not(test), feature = "build"))]
-		app.add_plugins(beet_build::prelude::StaticScenePlugin);
+		app.add_plugins(beet_build::prelude::BuildPlugin::default());
 
 		app
 	});

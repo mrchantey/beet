@@ -6,13 +6,11 @@ use bevy::prelude::*;
 
 /// Load static scene if it exists.
 #[cfg(feature = "serde")]
-pub fn load_static_scene(world: &mut World) -> Result {
+pub fn load_file_snippets(world: &mut World) -> Result {
 	use beet_bevy::prelude::WorldMutExt;
 	use beet_utils::prelude::ReadFile;
 	if let Some(config) = world.get_resource::<WorkspaceConfig>() {
-		if let Ok(file) =
-			ReadFile::to_string(config.scene_file().into_abs())
-		{
+		if let Ok(file) = ReadFile::to_string(config.scene_file().into_abs()) {
 			world.load_scene(file)?;
 		}
 	}
@@ -28,7 +26,7 @@ pub fn spawn_templates(world: &mut World) -> Result {
 		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
 	while query.iter(world).next().is_some() {
 		// println!("Running spawn_templates system");
-		if let Ok(result) = world.run_system_cached(apply_static_nodes) {
+		if let Ok(result) = world.run_system_cached(apply_rsx_snippets) {
 			result?;
 		};
 		world.run_system_cached(apply_on_spawn_template)??;
@@ -36,13 +34,13 @@ pub fn spawn_templates(world: &mut World) -> Result {
 	Ok(())
 }
 
-pub(super) fn apply_static_nodes(
+pub(super) fn apply_rsx_snippets(
 	mut commands: Commands,
 	instances: Populated<
 		(Entity, &MacroIdx),
 		(Added<InstanceRoot>, Without<ResolvedRoot>),
 	>,
-	static_trees: Query<(Entity, &MacroIdx), With<StaticRoot>>,
+	rsx_snippets: Query<(Entity, &MacroIdx), With<RsxSnippetRoot>>,
 	children: Query<&Children>,
 	// types that we want to deny clone for the root only, not children
 	deny_root: Query<Option<&ChildOf>>,
@@ -51,10 +49,10 @@ pub(super) fn apply_static_nodes(
 ) -> Result {
 	for (instance_root, static_root, idx) in
 		instances.iter().filter_map(|(instance, idx)| {
-			static_trees
+			rsx_snippets
 				.iter()
 				.find(|(_, static_idx)| *static_idx == idx)
-				.map(|(static_tree, idx)| (instance, static_tree, idx))
+				.map(|(rsx_snippets, idx)| (instance, rsx_snippets, idx))
 		}) {
 		trace!("Applying static nodes for{}", idx);
 
@@ -113,7 +111,7 @@ pub(super) fn apply_static_nodes(
 			.entity(static_root)
 			.clone_with(instance_root, |builder| {
 				builder
-					.deny::<(BeetRoot, StaticRoot)>()
+					.deny::<(BeetRoot, RsxSnippetRoot)>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -138,7 +136,7 @@ pub(super) fn apply_static_nodes(
 	Ok(())
 }
 
-/// A system queued after [`apply_static_nodes`],
+/// A system queued after [`apply_rsx_snippets`],
 fn apply_template_locations(
 	In((macro_idx, entity, mut instance_exprs)): In<(
 		MacroIdx,
@@ -219,7 +217,7 @@ mod test {
 		world.entity_mut(main).add_child(child);
 
 		let _tree = world
-			.spawn((rsx! {<span/>}, StaticRoot))
+			.spawn((rsx! {<span/>}, RsxSnippetRoot))
 			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
 			.id();
@@ -238,11 +236,11 @@ mod test {
 			.to_be("<main><span/></main>");
 	}
 
-	fn parse(instance: impl Bundle, static_node: impl Bundle) -> String {
+	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
 		let _tree = world
-			.spawn((static_node, StaticRoot))
+			.spawn((RsxSnippetRoot, rsx_snippet))
 			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
 			.id();
@@ -256,7 +254,7 @@ mod test {
 
 	#[test]
 	#[should_panic = "Not all ExprIdx were applied.."]
-	fn static_node_missing_idx() {
+	fn rsx_snippet_missing_idx() {
 		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
 	}
 	#[test]
@@ -380,11 +378,11 @@ mod test {
 			.id();
 
 		let _tree1 = world
-			.spawn((rsx! {<span>{}</span>}, StaticRoot))
+			.spawn((rsx! {<span>{}</span>}, RsxSnippetRoot))
 			.insert(idx1)
 			.id();
 		let _tree2 = world
-			.spawn((rsx! {<span>{}</span>}, StaticRoot))
+			.spawn((rsx! {<span>{}</span>}, RsxSnippetRoot))
 			.insert(idx2)
 			.id();
 

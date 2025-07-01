@@ -9,7 +9,7 @@ use std::path::Path;
 
 /// Adde to an entity used to represent an file included
 /// in the [`WorkspaceConfig`]. These are loaded for different
-/// purposes by [`StaticScenePlugin`] and [`RouteCodegenPlugin`].
+/// purposes by [`FileSnippetPlugin`] and [`RouteCodegenPlugin`].
 #[derive(Debug, Clone, PartialEq, Eq, Component, Deref)]
 // #[component(immutable)]
 #[require(FileExprHash)]
@@ -39,7 +39,7 @@ pub(super) fn load_workspace_source_files(
 		config
 			.get_files()?
 			.into_iter()
-			.map(|path| (StaticFile, SourceFile::new(path))),
+			.map(|path| (SnippetFile, SourceFile::new(path))),
 	)),));
 	Ok(())
 }

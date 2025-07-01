@@ -20,12 +20,12 @@ markdown = ["dep:pulldown-cmark"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [[test]]
-name="style_roundtrip"
-path = "tests/style_roundtrip.rs"
+name="lang_snippets"
+path = "tests/lang_snippets.rs"
 required-features = ["css"]
 [[test]]
-name="static_scene_roundtrip"
-path = "tests/static_scene_roundtrip.rs"
+name="rsx_snippets"
+path = "tests/rsx_snippets.rs"
 required-features = ["css"]
 
 [dependencies]

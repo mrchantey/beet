@@ -17,7 +17,7 @@ impl Plugin for TemplatePlugin {
 			.set(bevy::ecs::error::panic)
 			.ok();
 		#[cfg(feature = "serde")]
-		app.add_systems(Startup, load_static_scene);
+		app.add_systems(Startup, load_file_snippets);
 
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()

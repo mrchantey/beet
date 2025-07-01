@@ -2,7 +2,7 @@
 //! to an instance, using two seperate apps.
 //!
 //! This could also be considered the integration test for
-//! [`apply_static_nodes`]
+//! [`apply_rsx_snippets`]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
@@ -27,7 +27,7 @@ fn expressions() {
 		.to_contain("MacroIdx")
 		.to_contain("NodeTag")
 		.to_contain("ExprIdx")
-		.to_contain("StaticRoot");
+		.to_contain("RsxSnippetRoot");
 
 	// println!(
 	// 	"children: {:#?}",
@@ -95,7 +95,7 @@ fn nested_template() {
 
 	// create root static node
 	app.world_mut().spawn((
-		StaticRoot,
+		RsxSnippetRoot,
 		common_idx(),
 		RstmlTokens::new(quote! {
 			<html>
@@ -105,7 +105,7 @@ fn nested_template() {
 	));
 	// create nested static node
 	app.world_mut().spawn((
-		StaticRoot,
+		RsxSnippetRoot,
 		common_idx_nested(),
 		RstmlTokens::new(quote! {
 			<after>"value: "{}</after>
@@ -140,11 +140,11 @@ fn nested_template() {
 
 
 
-// create a common idx for matching in apply_static_nodes
+// create a common idx for matching in apply_rsx_snippets
 fn common_idx() -> MacroIdx {
 	MacroIdx::new_file_line_col(file!(), line!(), column!())
 }
-// create a common idx for matching in apply_static_nodes
+// create a common idx for matching in apply_rsx_snippets
 fn common_idx_nested() -> MacroIdx {
 	MacroIdx::new_file_line_col(file!(), line!(), column!())
 }
@@ -157,7 +157,7 @@ fn build_scene(tokens: TokenStream) -> String {
 	});
 	let _entity = app
 		.world_mut()
-		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))
+		.spawn((RsxSnippetRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();
 	app.update();
 

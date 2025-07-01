@@ -10,9 +10,9 @@ mod templates_to_nodes_md;
 pub use templates_to_nodes_md::*;
 mod templates_to_nodes_rs;
 pub use templates_to_nodes_rs::*;
-mod build_file_templates;
+mod export_file_snippets;
 pub mod error;
 #[allow(unused_imports)]
-pub use build_file_templates::*;
-mod static_scene_plugin;
-pub use static_scene_plugin::*;
+pub use export_file_snippets::*;
+mod file_snippet_plugin;
+pub use file_snippet_plugin::*;
