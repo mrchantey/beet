@@ -7,13 +7,13 @@
 mod static_scene;
 mod client_island_codegen;
 mod route_codegen;
-mod utils;
+mod file_parsing;
 
 pub mod prelude {
 	pub use crate::static_scene::*;
 	pub use crate::client_island_codegen::*;
 	pub use crate::route_codegen::*;
-	pub use crate::utils::*;
+	pub use crate::file_parsing::*;
 }
 pub mod exports {
 	pub use proc_macro2;

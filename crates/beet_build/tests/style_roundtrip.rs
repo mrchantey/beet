@@ -10,8 +10,14 @@ use sweet::prelude::*;
 fn works() {
 	let mut app = App::new();
 
-	app.add_plugins((BuildPlugin, StaticScenePlugin, TemplatePlugin));
-
+	app.add_plugins((
+		BuildPlugin {
+			skip_load_workspace: true,
+			..default()
+		},
+		// TemplatePlugin::default(),
+	))
+	.insert_resource(BuildFlags::only(BuildFlag::FileSnippets));
 
 	let entity = app
 		.world_mut()

@@ -1,9 +1,7 @@
 use crate::prelude::*;
-use beet_bevy::prelude::When;
 use beet_bevy::prelude::WorldMutExt;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
-use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 
 
@@ -14,29 +12,6 @@ pub struct StaticSceneRoot;
 /// Added alongside each [`SourceFile`] to distinguish them from a [`RouteFile`]
 #[derive(Debug, Clone, Default, Component)]
 pub struct StaticFile;
-
-
-/// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
-/// This will run once for the initial load, afterwards [`handle_changed_files`]
-/// will incrementally load changed files.
-#[cfg_attr(test, allow(dead_code))]
-pub(super) fn load_all_template_files(
-	mut commands: Commands,
-	config: When<Res<WorkspaceConfig>>,
-) -> bevy::prelude::Result {
-	commands.spawn((
-		StaticSceneRoot,
-		Children::spawn(SpawnIter(
-			config
-				.get_files()?
-				.into_iter()
-				.map(|path| (StaticFile, SourceFile::new(path))),
-		)),
-	));
-	Ok(())
-}
-
-
 
 /// if any [`SourceFile`] has been added, export the template scene
 /// to the [`WorkspaceConfig::scene_file`].

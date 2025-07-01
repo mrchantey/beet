@@ -151,7 +151,6 @@ pub fn collect_file_group(
 mod test {
 	use crate::prelude::*;
 	use beet_bevy::prelude::WorldMutExt;
-	use beet_parse::prelude::ParseRsxTokensPlugin;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -159,11 +158,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((
-			BuildPlugin,
-			RouteCodegenPlugin,
-			ParseRsxTokensPlugin,
-		));
+		app.add_plugins(BuildPlugin::default());
 		app.world_mut().spawn(FileGroup::test_site_docs());
 		app.update();
 		app

@@ -88,6 +88,10 @@ pub fn apply_style_ids(
 	for (id, (entity, tag, _partial, portal_sources, scope)) in
 		query.iter().enumerate()
 	{
+		println!(
+			"Applying style id {} to entity {:?} with tag {:?} and scope {:?}",
+			id, entity, tag, scope
+		);
 		// only local style tags
 		if tag.as_str() != "style"
 			|| scope.map(|s| s == &StyleScope::Global).unwrap_or(false)
@@ -112,7 +116,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((BuildPlugin, ParseRsxTokensPlugin, StaticScenePlugin));
+		app.add_plugins(BuildPlugin::default());
 
 		let entity = app
 			.world_mut()

@@ -21,7 +21,6 @@ impl Plugin for TemplatePlugin {
 
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
-			.register_type::<LangPartial>()
 			.add_systems(
 				Update,
 				(

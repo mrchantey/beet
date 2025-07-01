@@ -25,7 +25,7 @@ enum SubCommands {
 async fn main() -> Result {
 	init_tracing(bevy::log::Level::DEBUG);
 	match Cli::parse().command {
-		SubCommands::Build(cmd) => cmd.build().await,
-		SubCommands::Run(cmd) => cmd.run().await,
+		SubCommands::Build(cmd) => cmd.run(RunMode::Once).await,
+		SubCommands::Run(cmd) => cmd.run(RunMode::Watch).await,
 	}
 }

@@ -47,6 +47,24 @@ impl Default for FsWatcher {
 
 
 impl FsWatcher {
+	/// Sets the cwd for the watcher.
+	pub fn with_cwd(mut self, cwd: PathBuf) -> Self {
+		self.cwd = cwd;
+		self
+	}
+
+	/// Sets the filter for the watcher.
+	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
+		self
+	}
+
+	/// Sets the debounce time for the watcher.
+	pub fn with_debounce(mut self, debounce: Duration) -> Self {
+		self.debounce = debounce;
+		self
+	}
+
 	/// It is not valid to watch an empty path, it
 	/// will never be triggered!
 	pub fn assert_path_exists(&self) -> Result<()> {

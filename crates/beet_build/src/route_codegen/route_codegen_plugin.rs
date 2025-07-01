@@ -38,7 +38,10 @@ impl Plugin for RouteCodegenPlugin {
 						.in_set(AfterParseTokens),
 					#[cfg(not(test))]
 					compile_router.after(ExportArtifactsSet),
-				),
+				)
+					.run_if(|flags: Res<BuildFlags>| {
+						flags.contains(BuildFlag::Routes)
+					}),
 			);
 	}
 }

@@ -87,7 +87,10 @@ fn simple_template() {
 #[test]
 fn nested_template() {
 	let mut app = App::new();
-	app.add_plugins((BuildPlugin, ParseRsxTokensPlugin, StaticScenePlugin));
+	app.add_plugins(BuildPlugin {
+		skip_load_workspace: true,
+		..default()
+	});
 
 
 	// create root static node
@@ -148,7 +151,10 @@ fn common_idx_nested() -> MacroIdx {
 
 fn build_scene(tokens: TokenStream) -> String {
 	let mut app = App::new();
-	app.add_plugins((BuildPlugin, ParseRsxTokensPlugin, StaticScenePlugin));
+	app.add_plugins(BuildPlugin {
+		skip_load_workspace: true,
+		..default()
+	});
 	let _entity = app
 		.world_mut()
 		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))

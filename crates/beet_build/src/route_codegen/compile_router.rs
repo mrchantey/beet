@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::When;
 use beet_fs::cargo::CargoBuildCmd;
 use bevy::prelude::*;
 use std::process::Command;
@@ -11,7 +12,7 @@ use std::process::Command;
 
 /// After Codegen, build the router binary and run it once.
 pub fn compile_router(
-	cmd: Res<CargoBuildCmd>,
+	cmd: When<Res<CargoBuildCmd>>,
 	// any changed child FileExprHash results in changed RouteCodegenRoot
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
 ) -> Result {

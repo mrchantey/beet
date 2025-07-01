@@ -1,5 +1,18 @@
 # Beet Build
 
+
+
+```mermaid
+flowchart TD
+	A[File Changed] --> B[SourceFile]
+	B --> C[ParseRsxTokens]
+	C --> D[GenerateLangSnippets]
+	C --> E[Generate RsxSnippets]
+	C --> F[HashFileExprs]
+	F -- changed --> G[Generate Routes]
+```
+
+
 Plugins for building a beet application, currently only for building websites.
 The build process includes reactively passing information between the cli and the application.
 

@@ -86,7 +86,6 @@ pub fn collect_combinator_route(
 mod test {
 	use crate::prelude::*;
 	use beet_bevy::prelude::WorldMutExt;
-	use beet_parse::prelude::ParseRsxTokensPlugin;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use quote::quote;
@@ -95,12 +94,10 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((
-			BuildPlugin,
-			RouteCodegenPlugin,
-			ParseRsxTokensPlugin,
-		));
-		app.world_mut().spawn((FileGroup::test_site_docs(),));
+		app.add_plugins(BuildPlugin::default())
+			.insert_resource(BuildFlags::only(BuildFlag::Routes))
+			.world_mut()
+			.spawn((FileGroup::test_site_docs(),));
 		app.update();
 		app
 		.world_mut()

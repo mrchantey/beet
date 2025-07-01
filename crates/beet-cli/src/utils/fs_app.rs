@@ -18,7 +18,7 @@ use std::time::Duration;
 ///
 /// ```
 pub struct FsApp {
-	watcher: FsWatcher,
+pub	watcher: FsWatcher,
 }
 
 

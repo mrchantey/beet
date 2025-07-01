@@ -15,8 +15,6 @@ pub struct StaticScenePlugin;
 
 impl Plugin for StaticScenePlugin {
 	fn build(&self, app: &mut App) {
-		#[cfg(not(test))]
-		app.add_systems(Startup, load_all_template_files);
 		app
 			.add_systems(
 				Update,
