@@ -7,12 +7,13 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
-/// Create a [`TemplateFile`] for each file specified in the [`StaticSceneConfig`].
+/// Create a [`TemplateFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
 /// will incrementally load changed files.
+#[cfg_attr(test, allow(dead_code))]
 pub(super) fn load_all_template_files(
 	mut commands: Commands,
-	config: When<Res<StaticSceneConfig>>,
+	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
 	config.get_files()?.into_iter().for_each(|path| {
 		commands.spawn(TemplateFile::new(path));
@@ -24,7 +25,7 @@ pub(super) fn load_all_template_files(
 pub(super) fn load_changed_template_files(
 	mut events: EventReader<WatchEvent>,
 	mut commands: Commands,
-	config: When<Res<StaticSceneConfig>>,
+	config: When<Res<WorkspaceConfig>>,
 	query: Query<(Entity, &TemplateFile)>,
 ) -> bevy::prelude::Result {
 	for ev in events
@@ -51,8 +52,8 @@ pub(super) fn load_changed_template_files(
 }
 
 
-/// if any [`TemplateFile`] has changed, export the template scene.
-/// This does nothing without a [`StaticSceneConfig`] resource
+/// if any [`TemplateFile`] has changed, export the template scene
+/// to the [`WorkspaceConfig::scene_file`].
 #[allow(dead_code)]
 pub(super) fn export_template_scene(
 	world: &mut World,
@@ -84,7 +85,7 @@ pub(super) fn export_template_scene(
 	}
 
 	// should really only be one of these
-	if let Some(config) = world.get_resource::<StaticSceneConfig>() {
+	if let Some(config) = world.get_resource::<WorkspaceConfig>() {
 		let scene = world.build_scene();
 		FsExt::write_if_diff(config.scene_file().into_abs(), &scene)?;
 	}

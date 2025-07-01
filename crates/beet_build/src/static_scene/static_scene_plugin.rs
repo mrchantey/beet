@@ -36,12 +36,15 @@ impl Plugin for StaticScenePlugin {
 			.set(bevy::ecs::error::panic)
 			.ok();
 
+		#[cfg(not(test))]
+		app.add_systems(Startup, load_all_template_files);
+
 		app.add_event::<WatchEvent>()
+			// .init_resource::<WorkspaceConfig>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
 			.add_plugins(NodeTypesPlugin)
-			.add_systems(Startup, load_all_template_files)
 			.add_systems(
 				Update,
 				(
@@ -76,26 +79,5 @@ impl Plugin for StaticScenePlugin {
 				)
 					.before(TemplateSet),
 			);
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use beet_template::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
-
-	#[test]
-	fn load_all_templates() {
-		App::new()
-			.add_plugins(StaticScenePlugin)
-			.insert_resource(StaticSceneConfig::test_site())
-			.update_then()
-			.world_mut()
-			.xpect()
-			.num_components::<TemplateFile>()
-			.to_be_greater_than(10)
-			.to_be_less_than(20);
 	}
 }

@@ -11,37 +11,6 @@ pub struct RunBuild {
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
 	build_cmd: CargoBuildCmd,
-	/// Determine the config location and which builds steps to run
-	#[command(flatten)]
-	build_args: BuildArgs,
-}
-
-impl RunBuild {
-	/// Run once
-	pub async fn build(self) -> Result {
-		App::new()
-			.insert_resource(self.build_cmd)
-			.add_plugins(self.build_args)
-			.run_once()
-			.into_result()
-	}
-
-
-	/// Run in watch mode with a file watcher
-	pub async fn run(self) -> Result {
-		App::new()
-			.insert_resource(self.build_cmd)
-			.add_plugins(self.build_args)
-			.run_async(FsApp::default().runner())
-			.await
-			.into_result()
-	}
-}
-
-
-
-#[derive(Debug, Clone, Parser)]
-struct BuildArgs {
 	/// Location of the beet.toml config file
 	#[arg(long)]
 	beet_config: Option<PathBuf>,
@@ -50,7 +19,7 @@ struct BuildArgs {
 	#[arg(long = "static")]
 	r#static: bool,
 	/// Only execute the provided build steps,
-	/// options are `templates`, `routes`, `server`, `static`, `client-islands`
+	/// options are `routes`, `static-scene`, `client-islands`
 	#[arg(long, value_delimiter = ',', value_parser = parse_build_only)]
 	only: Vec<BuildOnly>,
 }
@@ -58,16 +27,35 @@ struct BuildArgs {
 fn parse_build_only(s: &str) -> Result<BuildOnly, String> {
 	BuildOnly::from_str(s)
 }
+
+
+impl RunBuild {
+	/// Run once
+	pub async fn build(self) -> Result {
+		App::new().add_plugins(self).run_once().into_result()
+	}
+
+
+	/// Run in watch mode with a file watcher
+	pub async fn run(self) -> Result {
+		App::new()
+			.add_plugins(self)
+			.run_async(FsApp::default().runner())
+			.await
+			.into_result()
+	}
+}
+
 /// Insert resources and plugins to reflect the [`only`] options,
 /// inserting all if [`only`] is empty.
-impl Plugin for BuildArgs {
+impl Plugin for RunBuild {
 	fn build(&self, app: &mut App) {
 		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
 			self.beet_config.as_deref(),
 		)
 		.unwrap_or_exit();
 
-		app.add_plugins((
+		app.insert_resource(self.build_cmd.clone()).add_plugins((
 			config.template_config,
 			ParseRsxTokensPlugin::default(),
 			ExportArtifactsPlugin::default(),

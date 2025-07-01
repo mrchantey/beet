@@ -12,7 +12,7 @@ pub struct ClientIslandCodegenPlugin;
 
 impl Plugin for ClientIslandCodegenPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(
+		app.init_resource::<WorkspaceConfig>().add_systems(
 			Update,
 			(
 				collect_client_islands.before(ExportArtifactsSet),

@@ -8,7 +8,7 @@ Export the `LangPartials` and static trees collected by statically analyzing fil
 
 Triggers:
 - Startup - `load_all_template_files`
-- Any watched file changes: `load_changed_template_files`
+- Any watched file changes - `load_changed_template_files`
 
 ## Route Codegen
 Export the routes specified in `beet.toml` into their respective paths, for example generating collection code for routes in `src/pages/..` into files in `src/codegen/..`, see [RouteCodegenPlugin](crates/beet_build/src/route_codegen/route_codegen_plugin.rs#L7).

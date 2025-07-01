@@ -9,10 +9,8 @@ use std::path::Path;
 pub struct TemplateConfig {
 	#[cfg_attr(feature = "serde", serde(default))]
 	pub html_constants: HtmlConstants,
-	#[cfg_attr(feature = "serde", serde(flatten))]
-	pub server_output_config: ServerOutputConfig,
-	#[cfg_attr(feature = "serde", serde(default))]
-	pub static_scene_config: StaticSceneConfig,
+	#[cfg_attr(feature = "serde", serde(flatten, default))]
+	pub workspace_config: WorkspaceConfig,
 }
 
 impl Plugin for TemplateConfig {
@@ -20,8 +18,7 @@ impl Plugin for TemplateConfig {
 	fn build(&self, app: &mut App) {
 		app
 			.insert_resource(self.html_constants.clone())
-			.insert_resource(self.server_output_config.clone())
-			.insert_resource(self.static_scene_config.clone())
+			.insert_resource(self.workspace_config.clone())
 			;
 	}
 }
@@ -32,57 +29,76 @@ impl TemplateConfig {
 	}
 }
 
-
-#[derive(Debug, Default, Clone, PartialEq, Resource)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ServerOutputConfig {
-	/// Location of the html directory, defaults to 'target/client'
-	#[cfg_attr(feature = "serde", serde(default = "default_html_dir"))]
-	pub html_dir: WsPathBuf,
-	/// Directory for temp static files like client islands.
-	#[cfg_attr(feature = "serde", serde(default = "default_static_dir"))]
-	pub static_dir: WsPathBuf,
-}
-#[allow(unused)]
-fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
-#[allow(unused)]
-fn default_static_dir() -> WsPathBuf { WsPathBuf::new("target") }
-
 /// Config for the scene containing all information that can be statically extracted
 /// from files, including html, parsed styles etc.
 #[derive(Debug, Clone, PartialEq, Resource)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StaticSceneConfig {
+pub struct WorkspaceConfig {
 	/// Filter for files that should be parsed,
 	/// excludes 'target' and 'node_modules' directories by default
-	filter: GlobFilter,
+	#[cfg_attr(feature = "serde", serde(default = "default_filter"))]
+	pub filter: GlobFilter,
 	/// The root directory for files including templates
-	root_dir: WsPathBuf,
+	#[cfg_attr(feature = "serde", serde(default = "default_root_dir"))]
+	pub root_dir: WsPathBuf,
 	/// The location for the generated template scene file
+	#[cfg_attr(feature = "serde", serde(default = "default_scene_file"))]
 	pub scene_file: WsPathBuf,
+	/// Location of the html directory, defaults to 'target/client'
+	#[cfg_attr(feature = "serde", serde(default = "default_html_dir"))]
+	pub html_dir: WsPathBuf,
+	/// Directory for temp static files like client islands.
+	#[cfg_attr(
+		feature = "serde",
+		serde(default = "default_client_islands_path")
+	)]
+	pub client_islands_path: WsPathBuf,
+}
+#[allow(unused)]
+fn default_filter() -> GlobFilter {
+	GlobFilter::default()
+		.with_include("*/crates/beet_design/src/**/*")
+		.with_include("*/crates/beet_site/src/**/*")
+		.with_include("*/crates/beet_router/src/test_site/**/*")
+		.with_exclude("*/target/*")
+		.with_exclude("*/.cache/*")
+		.with_exclude("*/node_modules/*")
+}
+#[allow(unused)]
+fn default_root_dir() -> WsPathBuf {
+	#[cfg(test)]
+	{
+		WsPathBuf::new("crates/beet_router/src/test_site")
+	}
+	#[cfg(not(test))]
+	{
+		WsPathBuf::default()
+	}
+}
+#[allow(unused)]
+fn default_scene_file() -> WsPathBuf {
+	WsPathBuf::new("target/template_scene.ron")
+}
+#[allow(unused)]
+fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
+#[allow(unused)]
+fn default_client_islands_path() -> WsPathBuf {
+	WsPathBuf::new("target/client_islands.ron")
 }
 
-impl Default for StaticSceneConfig {
+impl Default for WorkspaceConfig {
 	fn default() -> Self {
 		Self {
-			filter: GlobFilter::default()
-				// TODO move to beet.toml
-				.with_include("*/crates/beet_design/src/**/*")
-				.with_include("*/crates/beet_site/src/**/*")
-				.with_include("*/crates/beet_router/src/test_site/**/*")
-				.with_exclude("*/target/*")
-				.with_exclude("*/.cache/*")
-				.with_exclude("*/node_modules/*"),
-			scene_file: WsPathBuf::new("target/template_scene.ron"),
-			#[cfg(test)]
-			root_dir: WsPathBuf::new("crates/beet_router/src/test_site"),
-			#[cfg(not(test))]
-			root_dir: WsPathBuf::default(),
+			filter: default_filter(),
+			root_dir: default_root_dir(),
+			scene_file: default_scene_file(),
+			html_dir: default_html_dir(),
+			client_islands_path: default_client_islands_path(),
 		}
 	}
 }
 
-impl StaticSceneConfig {
+impl WorkspaceConfig {
 	pub fn test_site() -> Self {
 		let mut this = Self::default();
 		this.root_dir = WsPathBuf::new("crates/beet_router/src/test_site");

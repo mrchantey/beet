@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::When;
 use beet_common::node::HtmlConstants;
 use beet_fs::cargo::CargoBuildCmd;
 use beet_template::prelude::*;
@@ -8,9 +9,9 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn compile_wasm(
-	html_constants: Res<HtmlConstants>,
-	cmd: Res<CargoBuildCmd>,
-	settings: Res<ServerOutputConfig>,
+	html_constants: When<Res<HtmlConstants>>,
+	cmd: When<Res<CargoBuildCmd>>,
+	config: When<Res<WorkspaceConfig>>,
 	// this system only runs if the `CollectClientIslandPlugin` is added to
 	// an entity
 	_query: Populated<(), Added<CollectClientIslands>>,
@@ -21,9 +22,9 @@ pub fn compile_wasm(
 
 	debug!("Compiling wasm binary");
 	cmd.spawn()?;
-	wasm_bindgen(&html_constants, &settings.html_dir, &exe_path)?;
+	wasm_bindgen(&html_constants, &config.html_dir, &exe_path)?;
 	if cmd.release {
-		wasm_opt(&html_constants, &settings.html_dir)?;
+		wasm_opt(&html_constants, &config.html_dir)?;
 	}
 	Ok(())
 }

@@ -7,7 +7,6 @@ use sweet::bevy::CoreAppExtSweet;
 fn main() {
 	let scene = App::new()
 		.add_plugins((ParseRsxTokensPlugin, StaticScenePlugin))
-		.init_resource::<StaticSceneConfig>()
 		.update_then()
 		.build_scene();
 

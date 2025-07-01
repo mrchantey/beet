@@ -88,14 +88,16 @@ fn simple_template() {
 fn nested_template() {
 	let mut app = App::new();
 	app.add_plugins((ParseRsxTokensPlugin, StaticScenePlugin));
+
+	
 	// create root static node
 	app.world_mut().spawn((
 		StaticRoot,
 		common_idx(),
 		RstmlTokens::new(quote! {
-		<html>
+			<html>
 			<SomeCapitalizedTagToIndicateATemplate/>
-		</html>
+			</html>
 		}),
 	));
 	// create nested static node

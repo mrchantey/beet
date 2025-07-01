@@ -9,10 +9,9 @@ use bevy::prelude::*;
 pub fn load_static_scene(world: &mut World) -> Result {
 	use beet_bevy::prelude::WorldMutExt;
 	use beet_utils::prelude::ReadFile;
-	if let Some(static_scene_config) = world.get_resource::<StaticSceneConfig>()
-	{
+	if let Some(config) = world.get_resource::<WorkspaceConfig>() {
 		if let Ok(file) =
-			ReadFile::to_string(static_scene_config.scene_file().into_abs())
+			ReadFile::to_string(config.scene_file().into_abs())
 		{
 			world.load_scene(file)?;
 		}
@@ -29,7 +28,7 @@ pub fn spawn_templates(world: &mut World) -> Result {
 		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
 	while query.iter(world).next().is_some() {
 		// println!("Running spawn_templates system");
-		if let Ok(result) = world.run_system_cached(apply_static_nodes){
+		if let Ok(result) = world.run_system_cached(apply_static_nodes) {
 			result?;
 		};
 		world.run_system_cached(apply_on_spawn_template)??;
