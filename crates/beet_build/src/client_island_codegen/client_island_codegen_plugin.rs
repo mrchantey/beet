@@ -1,6 +1,7 @@
 use super::*;
 use crate::prelude::*;
 use beet_bevy::prelude::*;
+use beet_template::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,7 +18,8 @@ impl Plugin for ClientIslandCodegenPlugin {
 				collect_client_islands.before(ExportArtifactsSet),
 				compile_wasm.after(ExportArtifactsSet),
 			)
-				.chain(),
+				.chain()
+				.before(TemplateSet),
 		);
 	}
 }

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_parse::prelude::*;
+use beet_template::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Debug, Default)]
@@ -42,7 +43,8 @@ impl Plugin for RouteCodegenPlugin {
 					)
 						.chain()
 						.after(ExportArtifactsSet),
-				),
+				)
+					.before(TemplateSet),
 			);
 	}
 }

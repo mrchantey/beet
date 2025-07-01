@@ -28,7 +28,6 @@ impl Plugin for CodegenPlugin {
 			Update,
 			ExportArtifactsSet
 				.after(ParseRsxTokensSet)
-				// ensure beet_build plugins play nice with [`TemplatePlugin`]
 				.before(TemplateSet),
 		)
 		.add_systems(Update, export_codegen_files.in_set(ExportArtifactsSet));

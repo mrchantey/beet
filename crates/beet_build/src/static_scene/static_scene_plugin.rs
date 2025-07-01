@@ -70,7 +70,8 @@ impl Plugin for StaticScenePlugin {
 						.before(ExportArtifactsSet),
 					#[cfg(not(test))]
 					export_template_scene.in_set(ExportArtifactsSet),
-				),
+				)
+					.before(TemplateSet),
 			);
 	}
 }
