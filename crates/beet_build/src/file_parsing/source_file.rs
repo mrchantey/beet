@@ -3,6 +3,7 @@ use beet_bevy::prelude::When;
 use beet_fs::process::WatchEvent;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 use std::path::Path;
 
@@ -48,9 +49,12 @@ pub(super) fn load_workspace_source_files(
 	mut commands: Commands,
 	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
-	for path in config.get_files()?.into_iter() {
-		commands.spawn(SourceFile::new(path));
-	}
+	commands.spawn((Children::spawn(SpawnIter(
+		config
+			.get_files()?
+			.into_iter()
+			.map(|path| SourceFile::new(path)),
+	)),));
 	Ok(())
 }
 

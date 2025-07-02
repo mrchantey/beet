@@ -112,7 +112,7 @@ impl WorkspaceConfig {
 		let mut path = idx.file.clone();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
 		let snippet_file_name =
-			format!("rsx-{}:{}.ron", file_stem, idx.start.to_string());
+			format!("{}:{}.rsx.ron", file_stem, idx.start.to_string());
 		path.set_file_name(snippet_file_name);
 		self.snippets_dir.join(path)
 	}
@@ -121,16 +121,10 @@ impl WorkspaceConfig {
 	/// we need the index because some files may have multiple LangSnippets
 	/// and we dont always have the span.
 	/// using [`Self::snippets_dir`] as the base.
-	pub fn lang_snippet_path(
-		&self,
-		path: &WsPathBuf,
-		index: u64,
-	) -> WsPathBuf {
+	pub fn lang_snippet_path(&self, path: &WsPathBuf, index: u64) -> WsPathBuf {
 		let mut path = path.clone();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
-		let extension = "ron";
-		let snippet_file_name =
-			format!("lang-{}-{}.{}", file_stem, index, extension);
+		let snippet_file_name = format!("{}-{}.lang.ron", file_stem, index);
 		path.set_file_name(snippet_file_name);
 		self.snippets_dir.join(path)
 	}

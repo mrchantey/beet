@@ -46,7 +46,9 @@ pub fn spawn_templates(world: &mut World) -> Result {
 		if let Ok(result) = world.run_system_cached(apply_rsx_snippets) {
 			result?;
 		};
-		world.run_system_cached(apply_on_spawn_template)??;
+		if let Ok(result) = world.run_system_cached(apply_on_spawn_template) {
+			result?;
+		}
 	}
 	Ok(())
 }

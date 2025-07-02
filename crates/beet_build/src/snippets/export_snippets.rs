@@ -18,16 +18,24 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	}
 	tracing::info!("Exporting {} snippets", snippets.len());
 
+	let scene = world.build_scene();
+	let path = world
+		.resource::<WorkspaceConfig>()
+		.snippets_dir()
+		.join("snippets.ron")
+		.into_abs();
+	tracing::info!("Writing one big snippet scene to {}", path.display());
+	FsExt::write_if_diff(path, &scene)?;
 
-	for (path, entities) in snippets.into_iter() {
-		let scene = DynamicSceneBuilder::from_world(world)
-			.extract_entities(entities.into_iter())
-			.build();
+	// for (path, entities) in snippets.into_iter() {
+	// 	let scene = DynamicSceneBuilder::from_world(world)
+	// 		.extract_entities(entities.into_iter())
+	// 		.build();
 
-		let scene = world.build_scene_with(scene);
-		tracing::trace!("Writing rsx snippet to {}", path.display());
-		FsExt::write_if_diff(path, &scene)?;
-	}
+	// 	let scene = world.build_scene_with(scene);
+	// 	tracing::trace!("Writing rsx snippet to {}", path.display());
+	// 	FsExt::write_if_diff(path, &scene)?;
+	// }
 
 	Ok(())
 }

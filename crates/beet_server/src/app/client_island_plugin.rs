@@ -20,7 +20,7 @@ impl<T> Default for ClientIslandPlugin<T> {
 
 impl ClientIslandPlugin<()> {
 	pub fn route_info(route_info: &RouteInfo) -> RouteInfo {
-		let path = format!("/__client_islands/{}", route_info.path);
+		let path = format!("/__client_islands{}", route_info.path);
 		RouteInfo::new(path, route_info.method)
 	}
 }
@@ -73,7 +73,7 @@ where
 			&route_info.path.to_string_lossy(),
 			routing::on(
 				route_info.method.into_axum_method(),
-				async |e| -> AppResult<String> {
+				async move |e| -> AppResult<String> {
 					let bundle = handler.into_bundle_result(e).await?;
 					let islands =
 						ClientIsland::collect(bundle).map_err(|e| {

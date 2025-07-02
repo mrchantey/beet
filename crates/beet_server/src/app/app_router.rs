@@ -217,6 +217,7 @@ where
 
 	pub async fn render_route(&self, route: &RouteInfo) -> Result<String> {
 		let router = self.router.clone().with_state(self.state.clone());
+
 		let res = router
 			.clone()
 			.oneshot(
@@ -345,7 +346,7 @@ where
 			.watch()?;
 			while let Some(ev) = rx.recv().await? {
 				if ev.has_mutate() {
-					println!("html files changed, reloading wasm...");
+					debug!("html files changed, reloading wasm...");
 					reload.reload();
 					// println!("{}", events);
 					// this2.print_start();
