@@ -5,8 +5,8 @@ use bevy::log::tracing_subscriber::EnvFilter;
 
 const DEFAULT_FILTER: &str = "wgpu=error,naga=warn,bevy_app=warn";
 
-
-pub fn init_tracing(level: tracing::Level) {
+/// Opinionated tracing defaults for bevy
+pub fn init_pretty_tracing(level: tracing::Level) {
 	let sub = tracing_subscriber::fmt()
 		.compact()
 		.with_level(true)

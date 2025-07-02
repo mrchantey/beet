@@ -84,6 +84,7 @@ fn set_app(template_config: TemplateConfig) {
 	// insert config here!
 	ReactiveApp::set_create_app(move || {
 		let mut app = App::new();
+		init_pretty_tracing(bevy::log::Level::DEBUG);
 		app.add_plugins((TemplatePlugin, template_config.clone()));
 
 		#[cfg(all(not(test), feature = "build"))]

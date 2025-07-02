@@ -17,8 +17,7 @@ pub struct BuildConfig {
 	#[serde(flatten)]
 	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
-	#[serde(default)]
-	pub collect_client_islands: CollectClientIslands,
+	pub client_island_codegen: CollectClientIslands,
 }
 
 
@@ -26,7 +25,7 @@ impl NonSendPlugin for BuildConfig {
 	fn build(self, app: &mut App) {
 		app.add_non_send_plugin(self.route_codegen)
 			.add_plugins(self.template_config);
-		app.world_mut().spawn(self.collect_client_islands);
+		app.world_mut().spawn(self.client_island_codegen);
 	}
 }
 

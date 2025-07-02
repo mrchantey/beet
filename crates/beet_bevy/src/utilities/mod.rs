@@ -1,6 +1,8 @@
 mod bevyhow;
 mod on_spawn;
 mod bundle_iter;
+mod tracing;
+pub use tracing::*;
 pub use bundle_iter::*;
 pub use on_spawn::*;
 pub use bevyhow::*;
