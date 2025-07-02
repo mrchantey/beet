@@ -6,9 +6,13 @@ use syn::ItemMod;
 /// Add a pub mod #name; for each collection to the root codegen file
 /// with a matching package name.
 pub fn reexport_collections(
-	mut roots: Query<
+	mut roots: Populated<
 		(&mut CodegenFile, &Children),
-		(With<RouteCodegenRoot>, Without<RouteFileCollection>),
+		(
+			Changed<RouteCodegenRoot>,
+			// disjoint queries
+			Without<RouteFileCollection>,
+		),
 	>,
 	collections: Query<(&CodegenFile, &RouteFileCollection)>,
 ) -> Result {

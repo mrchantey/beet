@@ -27,7 +27,7 @@ pub struct RouteFile {
 	pub index: usize,
 	/// The local path to the rust file containing the routes.
 	/// By default this is the [`SourceFile`] relative to the
-	/// [`CodegenFile::output_dir`] but may be modified with `bypass_change_detection`, 
+	/// [`CodegenFile::output_dir`] but may be modified with `bypass_change_detection`,
 	/// for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
@@ -87,15 +87,21 @@ impl CollectionIndexCounter {
 pub(super) fn update_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
+	mut roots: Query<&mut RouteCodegenRoot>,
 	changed_exprs: Populated<(Entity, &SourceFile), Changed<FileExprHash>>,
-	mut collections: Query<(Entity, &mut RouteFileCollection, &CodegenFile)>,
+	mut collections: Query<(
+		Entity,
+		&mut RouteFileCollection,
+		&CodegenFile,
+		Option<&ChildOf>,
+	)>,
 	children: Query<&Children>,
 	mut route_files: Query<(&SourceFileRef, &mut RouteFile)>,
 ) -> Result {
 	for (file_entity, file) in changed_exprs.iter() {
-		for (collection_entity, mut collection, codegen) in collections
+		for (collection_entity, mut collection, codegen, parent) in collections
 			.iter_mut()
-			.filter(|(_, collection, _)| collection.passes_filter(file))
+			.filter(|(_, collection, _, _)| collection.passes_filter(file))
 		{
 			// check if there is a match, if so mark as changed.
 			// otherwise create a new RouteFile
@@ -106,6 +112,12 @@ pub(super) fn update_route_files(
 					{
 						collection.set_changed();
 						route_file.set_changed();
+						parent
+							.map(|parent| roots.get_mut(parent.parent()).ok())
+							.flatten()
+							.map(|mut root| {
+								root.set_changed();
+							});
 						true
 					}
 					_ => false,

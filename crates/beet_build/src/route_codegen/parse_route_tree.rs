@@ -38,10 +38,7 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	// the trigger for this system is any changed collection,
-	// there is generally only one root so running for 'all roots' is acceptable
-	_: Populated<(), Changed<RouteFileCollection>>,
-	mut query: Query<(Entity, &mut CodegenFile), With<RouteCodegenRoot>>,
+	mut query: Populated<(Entity, &mut CodegenFile), Changed<RouteCodegenRoot>>,
 	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
