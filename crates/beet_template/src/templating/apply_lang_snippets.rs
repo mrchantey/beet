@@ -1,29 +1,35 @@
 use crate::prelude::*;
-use beet_bevy::bevybail;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use beet_utils::prelude::ReadFile;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
 
 /// For trees with [`PortalTo<LangSnippet>`], insert a single element at the top
 /// of the tree, to be hoisted to the head.
-pub fn apply_lang_partials(
+pub fn apply_lang_snippets(
 	mut commands: Commands,
-	partials: Query<(Entity, &LangSnippet)>,
+	snippets: Query<(Entity, &LangSnippet, &LangSnippetPath)>,
 	parents: Query<&ChildOf>,
 	roots: Query<(), With<HtmlDocument>>,
-	query: Populated<(Entity, &NodePortal), Added<PortalTo<LangSnippet>>>,
-	node_location: NodeLocation,
+	query: Populated<
+		(Entity, &LangSnippetPath),
+		(Added<LangSnippetPath>, Without<LangSnippet>),
+	>,
 ) -> Result {
 	let mut root_content = HashMap::<Entity, HashMap<Entity, String>>::new();
 
-	for (entity, portal) in query.iter() {
-		let Ok(partial) = partials.get(**portal) else {
-			bevybail!(
-				"Failed to find a matching LangSnippet for NodePortal: {}",
-				node_location.stringify(**portal)
-			);
+	for (entity, instance_path) in query.iter() {
+		let snippet = match snippets
+			.iter()
+			.find(|(_, _, snippet_path)| *snippet_path == instance_path)
+		{
+			Some(snippet) => snippet,
+			None => {
+				let _file = ReadFile::to_string(instance_path.0.clone())?;
+				todo!("load snippet scene, needs world?");
+			}
 		};
 
 		let Some(root_ancestor) = parents
@@ -40,7 +46,7 @@ pub fn apply_lang_partials(
 		root_content
 			.entry(root_ancestor)
 			.or_default()
-			.insert(partial.0, partial.1.0.clone());
+			.insert(snippet.0, snippet.1.0.clone());
 	}
 
 	for (root, partials) in root_content.into_iter() {
@@ -52,7 +58,7 @@ pub fn apply_lang_partials(
 				.clone_and_spawn_with(|builder| {
 					builder
 						.allow::<(NodeTag, StyleId)>()
-						.deny::<(LangSnippet, NodePortalTarget)>();
+						.deny::<(LangSnippet, LangSnippetPath)>();
 				})
 				.insert((ChildOf(root), ElementNode::open(), children![
 					TextNode::new(contents)
@@ -69,6 +75,7 @@ pub fn apply_lang_partials(
 mod test {
 	use crate::prelude::*;
 	use beet_common::prelude::*;
+	use beet_utils::prelude::WsPathBuf;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -77,23 +84,17 @@ mod test {
 	#[test]
 	fn global_style() {
 		let mut world = World::new();
-		let partial = world
-			.spawn((
-				NodeTag::new("style"),
-				LangSnippet::new("body { color: red; }"),
-				StyleScope::Global,
-				HtmlHoistDirective::Body,
-			))
-			.id();
-		let tree = world
-			.spawn((
-				HtmlDocument,
-				NodePortal::new(partial),
-				PortalTo::<LangSnippet>::default(),
-			))
-			.id();
+		let path = LangSnippetPath(WsPathBuf::new("some-path.ron"));
+		world.spawn((
+			NodeTag::new("style"),
+			LangSnippet::new("body { color: red; }"),
+			StyleScope::Global,
+			path.clone(),
+			HtmlHoistDirective::Body,
+		));
+		let tree = world.spawn((HtmlDocument, path)).id();
 		world
-			.run_system_once(super::apply_lang_partials)
+			.run_system_once(super::apply_lang_snippets)
 			.unwrap()
 			.unwrap();
 		world
@@ -105,24 +106,21 @@ mod test {
 	#[test]
 	fn deduplicates_nested_roots() {
 		let mut world = World::new();
-		let partial = world
-			.spawn((
-				NodeTag::new("style"),
-				LangSnippet::new("body { color: red; }"),
-			))
-			.id();
+		let path = LangSnippetPath(WsPathBuf::new("some-path.ron"));
+
+		world.spawn((
+			NodeTag::new("style"),
+			LangSnippet::new("body { color: red; }"),
+			path.clone(),
+		));
 		let tree = world
 			.spawn((HtmlDocument, children![
-				(NodePortal::new(partial), PortalTo::<LangSnippet>::default()),
-				(
-					InstanceRoot,
-					NodePortal::new(partial),
-					PortalTo::<LangSnippet>::default()
-				)
+				path.clone(),
+				(InstanceRoot, path)
 			]))
 			.id();
 		world
-			.run_system_once(super::apply_lang_partials)
+			.run_system_once(super::apply_lang_snippets)
 			.unwrap()
 			.unwrap();
 		world

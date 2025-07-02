@@ -82,7 +82,7 @@ impl Plugin for BuildPlugin {
 				ParseRsxTokensPlugin::default(),
 				// RouteCodegenPlugin::default(),
 				// ClientIslandCodegenPlugin::default(),
-				// FileSnippetPlugin::default(),
+				FileSnippetPlugin::default(),
 			))
 			.configure_sets(
 				Update,
@@ -100,14 +100,21 @@ impl Plugin for BuildPlugin {
 			.add_systems(
 				Update,
 				(
-					(parse_file_watch_events, (parse_files_rs, parse_files_md))
+					(
+						// style roundtrip breaks without resolving templates,
+						// im not sure if this should be here, doesnt it indicate
+						// we're relying on exprs in templates?
+						// we should remove it!
+						spawn_templates,
+						parse_file_watch_events,
+						(parse_files_rs, parse_files_md),
+					)
 						.chain()
 						.before(BeforeParseTokens),
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
 						.before(AfterParseTokens),
-					(export_rsx_snippets, export_codegen_files)
-						.in_set(ExportArtifactsSet),
+					export_codegen_files.in_set(ExportArtifactsSet),
 				),
 			);
 	}

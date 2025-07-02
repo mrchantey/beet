@@ -1,6 +1,5 @@
 use super::*;
 use crate::prelude::*;
-use beet_template::prelude::*;
 use bevy::prelude::*;
 
 /// Plugin containing all systems for exporting a scene including:
@@ -19,21 +18,14 @@ impl Plugin for FileSnippetPlugin {
 			Update,
 			(
 				(
-					// style roundtrip breaks without resolving templates,
-					// im not sure if this should be here, doesnt it indicate
-					// we're relying on exprs in templates?
-					spawn_templates,
-				)
-					.chain()
-					.in_set(BeforeParseTokens),
-				(
-					extract_lang_partials,
-					apply_style_ids,
+					extract_lang_snippets,
 					#[cfg(feature = "css")]
 					parse_lightning,
 				)
 					.chain()
 					.in_set(AfterParseTokens),
+				(export_rsx_snippets, export_lang_snippets)
+					.in_set(ExportArtifactsSet),
 			),
 		);
 	}

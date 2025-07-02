@@ -4,8 +4,6 @@ pub use event_observer::*;
 pub use on_spawn_template::*;
 pub mod beet_root;
 pub use beet_root::*;
-pub mod node_portal;
-pub use node_portal::*;
 pub mod expr_idx;
 pub use expr_idx::*;
 mod into_template_bundle;
@@ -65,11 +63,11 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<FileSpanOf<ElementNode>>()
 			// directives - script/style
 			.register_type::<LangSnippet>()
+			.register_type::<LangSnippetPath>()
 			.register_type::<LangContent>()
 			.register_type::<StyleId>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()
-			.register_type::<PortalTo<LangSnippet>>()
 			// directives - client island
 			.register_type::<TemplateSerde>()
 			.register_type::<ClientLoadDirective>()
@@ -78,8 +76,6 @@ impl bevy::app::Plugin for NodeTypesPlugin {
     	.register_type::<SlotChild>()
 			.register_type::<SlotTarget>()
 			// directives - other
-			.register_type::<NodePortal>()
-			.register_type::<NodePortalTarget>()
 			.register_type::<HtmlHoistDirective>()
 			// attributes
 			.register_type::<AttributeOf>()

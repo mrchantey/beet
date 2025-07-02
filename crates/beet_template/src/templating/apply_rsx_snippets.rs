@@ -10,8 +10,7 @@ pub fn load_file_snippets(world: &mut World) -> Result {
 	use beet_bevy::prelude::WorldMutExt;
 	use beet_utils::prelude::ReadFile;
 	if let Some(config) = world.get_resource::<WorkspaceConfig>() {
-		if let Ok(file) =
-			ReadFile::to_string(config.rsx_snippets_dir().into_abs())
+		if let Ok(file) = ReadFile::to_string(config.snippets_dir().into_abs())
 		{
 			world.load_scene(file)?;
 		}

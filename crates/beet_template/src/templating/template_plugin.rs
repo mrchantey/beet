@@ -27,7 +27,7 @@ impl Plugin for TemplatePlugin {
 					spawn_templates,
 					apply_style_id_attributes,
 					apply_slots,
-					apply_lang_partials,
+					apply_lang_snippets,
 					apply_text_node_parents,
 					(
 						#[cfg(target_arch = "wasm32")]

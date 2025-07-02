@@ -43,8 +43,8 @@ pub struct WorkspaceConfig {
 	#[cfg_attr(feature = "serde", serde(default = "default_root_dir"))]
 	pub root_dir: WsPathBuf,
 	/// The location for the generated template scene file
-	#[cfg_attr(feature = "serde", serde(default = "default_rsx_snippets_dir"))]
-	pub rsx_snippets_dir: WsPathBuf,
+	#[cfg_attr(feature = "serde", serde(default = "default_snippets_dir"))]
+	pub snippets_dir: WsPathBuf,
 	/// Location of the html directory, defaults to 'target/client'
 	#[cfg_attr(feature = "serde", serde(default = "default_html_dir"))]
 	pub html_dir: WsPathBuf,
@@ -77,9 +77,7 @@ fn default_root_dir() -> WsPathBuf {
 	}
 }
 #[allow(unused)]
-fn default_rsx_snippets_dir() -> WsPathBuf {
-	WsPathBuf::new("target/rsx_snippets")
-}
+fn default_snippets_dir() -> WsPathBuf { WsPathBuf::new("target/rsx_snippets") }
 #[allow(unused)]
 fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
 #[allow(unused)]
@@ -92,7 +90,7 @@ impl Default for WorkspaceConfig {
 		Self {
 			filter: default_filter(),
 			root_dir: default_root_dir(),
-			rsx_snippets_dir: default_rsx_snippets_dir(),
+			snippets_dir: default_snippets_dir(),
 			html_dir: default_html_dir(),
 			client_islands_path: default_client_islands_path(),
 		}
@@ -106,20 +104,35 @@ impl WorkspaceConfig {
 		this
 	}
 
-	pub fn rsx_snippets_dir(&self) -> &WsPathBuf { &self.rsx_snippets_dir }
+	pub fn snippets_dir(&self) -> &WsPathBuf { &self.snippets_dir }
 
 	/// Create a file path in the format of `path/to/file:line:col.rs`,
-	/// using [`WorkspaceConfig::rsx_snippets_dir.into_abs()`].
+	/// using [`Self::snippets_dir`] as the base.
 	pub fn rsx_snippet_path(&self, idx: &MacroIdx) -> WsPathBuf {
 		let mut path = idx.file.clone();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
-		let extension = "ron";
-		let snippet_file_name = format!(
-			"{}:{}:{}.{}",
-			file_stem, idx.start.line, idx.start.col, extension
-		);
+		let snippet_file_name =
+			format!("rsx-{}:{}.ron", file_stem, idx.start.to_string());
 		path.set_file_name(snippet_file_name);
-		self.rsx_snippets_dir.join(path)
+		self.snippets_dir.join(path)
+	}
+
+	/// Create a file path in the format of `path/to/file.ron`,
+	/// we need the index because some files may have multiple LangSnippets
+	/// and we dont always have the span.
+	/// using [`Self::snippets_dir`] as the base.
+	pub fn lang_snippet_path(
+		&self,
+		path: &WsPathBuf,
+		index: u64,
+	) -> WsPathBuf {
+		let mut path = path.clone();
+		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
+		let extension = "ron";
+		let snippet_file_name =
+			format!("lang-{}-{}.{}", file_stem, index, extension);
+		path.set_file_name(snippet_file_name);
+		self.snippets_dir.join(path)
 	}
 
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
