@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_bevy::bevyhow;
-use beet_common::Sendit;
 use beet_common::as_beet::*;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
@@ -11,17 +10,15 @@ use syn::ItemFn;
 /// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
 /// tokenize it and append to the [`CodegenFile`].
 pub fn tokenize_combinator_route(world: &mut World) -> Result {
-	let mut query =
-		world.query_filtered::<Entity, (
-			With<CodegenFileSendit>,
-			Added<CombinatorRouteCodegenSendit>
-		)>();
+	let mut query = world
+		.query_filtered::<Entity, (With<CodegenFile>, Added<CombinatorRouteCodegen>)>(
+		);
 	for entity in query.iter(world).collect::<Vec<_>>() {
 		let tokens = tokenize_bundle(world, entity)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
 			.entity_mut(entity)
-			.get_mut::<CodegenFileSendit>()
+			.get_mut::<CodegenFile>()
 			.unwrap() // checked in query filter
 			.add_item::<ItemFn>(syn::parse_quote!(
 				pub fn get() -> impl Bundle{
@@ -35,26 +32,29 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 
 /// Added to the root of route files that have been parsed into a tree via
 /// [`CombinatorTokens`], ie `.md` and `.rsx` files.
-#[derive(Debug, Clone, Sendit)]
-#[sendit(derive(Component))]
+#[derive(Debug, Clone, Component)]
 pub struct CombinatorRouteCodegen {
 	/// Optional metadata, this is the frontmatter of markdown files
-	pub meta: Option<Block>,
+	pub meta: Option<Unspan<Block>>,
+}
+
+impl CombinatorRouteCodegen {
+	/// Create a new [`CombinatorRouteCodegen`] with the given metadata
+	pub fn new(meta: Option<Block>) -> Self {
+		Self {
+			meta: meta.map(|val| Unspan::new(&val)),
+		}
+	}
 }
 
 /// insert the config function into the codegen file if it exists
 pub fn collect_combinator_route(
-	_: TempNonSendMarker,
 	mut query: Populated<
-		(
-			Entity,
-			&mut CodegenFileSendit,
-			&CombinatorRouteCodegenSendit,
-		),
-		Added<CombinatorRouteCodegenSendit>,
+		(Entity, &mut CodegenFile, &CombinatorRouteCodegen),
+		Added<CombinatorRouteCodegen>,
 	>,
 	parents: Query<&ChildOf>,
-	file_groups: Query<&FileGroupSendit>,
+	file_groups: Query<&FileGroup>,
 ) -> Result {
 	for (entity, mut codegen_file, combinator_codegen) in query.iter_mut() {
 		let file_group = parents
@@ -101,7 +101,7 @@ mod test {
 		app.update();
 		app
 		.world_mut()
-		.query_filtered_once::<&CodegenFileSendit, With<CombinatorRouteCodegenSendit>>(
+		.query_filtered_once::<&CodegenFile, With<CombinatorRouteCodegen>>(
 		)[0]
 		.build_output()
 		.unwrap()

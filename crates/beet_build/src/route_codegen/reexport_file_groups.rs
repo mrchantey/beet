@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 use syn::ItemMod;
@@ -7,12 +6,11 @@ use syn::ItemMod;
 /// Add a pub mod #name; for each file group to the root codegen file
 /// with a matching package name.
 pub fn reexport_file_groups(
-	_: TempNonSendMarker,
 	mut roots: Query<
-		(&mut CodegenFileSendit, &Children),
-		(With<RouteCodegenRoot>, Without<FileGroupSendit>),
+		(&mut CodegenFile, &Children),
+		(With<RouteCodegenRoot>, Without<FileGroup>),
 	>,
-	file_groups: Query<(&CodegenFileSendit, &FileGroupSendit)>,
+	file_groups: Query<(&CodegenFile, &FileGroup)>,
 ) -> Result {
 	for (mut codegen, children) in roots.iter_mut() {
 		let codegen_name = codegen.pkg_name.clone();

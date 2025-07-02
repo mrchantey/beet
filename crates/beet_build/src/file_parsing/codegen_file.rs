@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::as_beet::*;
-use beet_parse::exports::SendWrapper;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -11,10 +10,9 @@ use syn::Item;
 
 
 
-/// Call [`CodegenFile::build_and_write`] for every [`Added`] [`CodegenFileSendit`]
+/// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
 pub(super) fn export_codegen_files(
-	_: TempNonSendMarker,
-	query: Populated<&CodegenFileSendit, Added<CodegenFileSendit>>,
+	query: Populated<&CodegenFile, Changed<CodegenFile>>,
 ) -> bevy::prelude::Result {
 	let num_files = query.iter().count();
 	info!("Exporting {} codegen files...", num_files);
@@ -30,8 +28,7 @@ pub(super) fn export_codegen_files(
 
 /// Every codegen file is created via this struct. It contains
 /// several utilities and standards that make the whole thing nicer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Sendit)]
-#[sendit(derive(Component))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Component)]
 pub struct CodegenFile {
 	/// The output codegen file location.
 	pub output: AbsPathBuf,
@@ -42,7 +39,7 @@ pub struct CodegenFile {
 		rename = "import_tokens",
 		with = "syn_item_vec_serde"
 	)]
-	pub imports: Vec<Item>,
+	pub imports: Vec<Unspan<Item>>,
 	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
@@ -51,18 +48,14 @@ pub struct CodegenFile {
 	// List of all root level items to be included in the file.
 	// These are usually appended to as this struct is passed around.
 	#[serde(default, with = "syn_item_vec_serde")]
-	pub items: Vec<Item>,
+	pub items: Vec<Unspan<Item>>,
 }
 
-impl Default for CodegenFileSendit {
-	fn default() -> Self { Self(SendWrapper::new(CodegenFile::default())) }
-}
-
-fn default_imports() -> Vec<Item> {
-	vec![syn::parse_quote!(
+fn default_imports() -> Vec<Unspan<Item>> {
+	vec![Unspan::new(&syn::parse_quote!(
 		#[allow(unused_imports)]
 		use beet::prelude::*;
-	)]
+	))]
 }
 
 impl Default for CodegenFile {
@@ -102,7 +95,7 @@ impl CodegenFile {
 	}
 
 	pub fn with_import(mut self, item: Item) -> Self {
-		self.imports.push(item);
+		self.imports.push(Unspan::new(&item));
 		self
 	}
 
@@ -114,7 +107,7 @@ impl CodegenFile {
 	}
 
 	pub fn add_item<T: Into<syn::Item>>(&mut self, item: T) {
-		self.items.push(item.into());
+		self.items.push(Unspan::new(&item.into()));
 	}
 
 	pub fn build_output(&self) -> Result<syn::File> {

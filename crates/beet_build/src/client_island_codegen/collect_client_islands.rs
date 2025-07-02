@@ -53,9 +53,8 @@ impl CollectClientIslands {
 
 
 pub(super) fn collect_client_islands(
-	_: TempNonSendMarker,
 	config: When<Res<WorkspaceConfig>>,
-	mut query: Populated<&mut CodegenFileSendit, Added<CollectClientIslands>>,
+	mut query: Populated<&mut CodegenFile, Added<CollectClientIslands>>,
 ) -> Result {
 	for mut codegen_file in query.iter_mut() {
 		let client_island_map =

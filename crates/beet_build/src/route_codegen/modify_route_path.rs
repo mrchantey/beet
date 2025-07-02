@@ -56,7 +56,6 @@ impl ModifyRoutePath {
 }
 
 pub fn modify_file_route_tokens(
-	_: TempNonSendMarker,
 	parents: Query<&ChildOf>,
 	modifiers: Query<&ModifyRoutePath>,
 	mut query: Populated<

@@ -14,30 +14,30 @@ impl Plugin for RouteCodegenPlugin {
 			.add_systems(
 				Update,
 				(
-					(
-						spawn_route_files,
-						(parse_route_file_rs, parse_route_file_md),
-						modify_file_route_tokens,
-					)
-						.chain()
-						.in_set(BeforeParseTokens),
-					(
-						parse_route_tree,
-						(
-							(
-								reexport_file_groups,
-								add_client_codegen_to_actions_export,
-							),
-							collect_file_group,
-						)
-							.chain(),
-						collect_client_action_group,
-						(collect_combinator_route, tokenize_combinator_route)
-							.chain(),
-					)
-						.in_set(AfterParseTokens),
-					#[cfg(not(test))]
-					compile_router.after(ExportArtifactsSet),
+					// (
+					spawn_route_files,
+					// 	(parse_route_file_rs, parse_route_file_md),
+					// 	modify_file_route_tokens,
+					// )
+					// 	.chain()
+					// 	.in_set(BeforeParseTokens),
+					// (
+					// 	parse_route_tree,
+					// 	(
+					// 		(
+					// 			reexport_file_groups,
+					// 			add_client_codegen_to_actions_export,
+					// 		),
+					// 		collect_file_group,
+					// 	)
+					// 		.chain(),
+					// 	collect_client_action_group,
+					// 	(collect_combinator_route, tokenize_combinator_route)
+					// 		.chain(),
+					// )
+					// 	.in_set(AfterParseTokens),
+					// #[cfg(not(test))]
+					// compile_router.after(ExportArtifactsSet),
 				)
 					.run_if(|flags: Res<BuildFlags>| {
 						flags.contains(BuildFlag::Routes)
@@ -78,10 +78,9 @@ impl Default for RouteCodegenConfig {
 
 impl NonSendPlugin for RouteCodegenConfig {
 	fn build(self, app: &mut App) {
-		let mut root = app.world_mut().spawn((
-			RouteCodegenRoot::default(),
-			self.codegen_file.clone().sendit(),
-		));
+		let mut root = app
+			.world_mut()
+			.spawn((RouteCodegenRoot::default(), self.codegen_file.clone()));
 		root.with_children(|mut parent| {
 			for group in self.file_groups {
 				group.spawn(&mut parent);
@@ -94,5 +93,5 @@ impl NonSendPlugin for RouteCodegenConfig {
 /// This component will be marked Changed when recompilation
 /// is required.
 #[derive(Debug, Clone, Default, Component)]
-#[require(CodegenFileSendit)]
+#[require(CodegenFile)]
 pub struct RouteCodegenRoot;

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use beet_utils::prelude::AbsPathBuf;
 use bevy::prelude::*;
 use syn::Item;
@@ -8,7 +7,7 @@ use syn::ItemUse;
 
 
 #[derive(Debug, Clone, Component)]
-#[require(CodegenFileSendit)]
+#[require(CodegenFile)]
 pub struct CollectClientActions {
 	/// Collapse single child functions into their parent mod
 	pub collapse_nodes: bool,
@@ -45,9 +44,8 @@ impl Default for CollectClientActions {
 
 
 pub fn add_client_codegen_to_actions_export(
-	_: TempNonSendMarker,
 	query: Populated<&ChildOf, Added<CollectClientActions>>,
-	mut codegens: Query<&mut CodegenFileSendit>,
+	mut codegens: Query<&mut CodegenFile>,
 ) -> Result {
 	for child in query.iter() {
 		let mut codegen = codegens.get_mut(child.parent())?;
@@ -64,13 +62,12 @@ pub fn add_client_codegen_to_actions_export(
 }
 
 pub fn collect_client_action_group(
-	_: TempNonSendMarker,
 	mut query: Populated<
-		(&mut CodegenFileSendit, &CollectClientActions, &ChildOf),
+		(&mut CodegenFile, &CollectClientActions, &ChildOf),
 		Added<CollectClientActions>,
 	>,
 	children: Query<&Children>,
-	methods: Query<(&RouteFileMethod, &RouteFileMethodSynSendit)>,
+	methods: Query<(&RouteFileMethod, &RouteFileMethodSyn)>,
 ) {
 	for (mut codegen_file, collect, childof) in query.iter_mut() {
 		let child_methods = children
@@ -95,14 +92,11 @@ pub fn collect_client_action_group(
 
 struct Builder<'w, 's, 'a, 'b, 'c> {
 	collect: &'a CollectClientActions,
-	query: Query<'w, 's, (&'b RouteFileMethod, &'c RouteFileMethodSynSendit)>,
+	query: Query<'w, 's, (&'b RouteFileMethod, &'c RouteFileMethodSyn)>,
 }
 
 impl Builder<'_, '_, '_, '_, '_> {
-	fn get(
-		&self,
-		entity: Entity,
-	) -> (&RouteFileMethod, &RouteFileMethodSynSendit) {
+	fn get(&self, entity: Entity) -> (&RouteFileMethod, &RouteFileMethodSyn) {
 		self.query.get(entity).expect(
 			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
 		)
@@ -190,9 +184,7 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn mod_tree(
-		methods: Vec<(RouteFileMethod, RouteFileMethodSynSendit)>,
-	) -> String {
+	fn mod_tree(methods: Vec<(RouteFileMethod, RouteFileMethodSyn)>) -> String {
 		let mut world = World::new();
 		world.spawn_batch(methods);
 
@@ -204,7 +196,7 @@ mod test {
 		let tree = RouteFileMethodTree::from_methods(methods);
 
 		let mut query =
-			world.query::<(&RouteFileMethod, &RouteFileMethodSynSendit)>();
+			world.query::<(&RouteFileMethod, &RouteFileMethodSyn)>();
 		let query = query.query(&world);
 		let builder = Builder {
 			collect: &CollectClientActions::default(),
@@ -221,8 +213,7 @@ mod test {
 			RouteFileMethod::new("/bazz"),
 			RouteFileMethodSyn::new(syn::parse_quote!(
 				fn get() {}
-			))
-			.sendit(),
+			)),
 		)])
 		.xpect()
 		.to_be_str(
@@ -251,36 +242,31 @@ mod test {
 				RouteFileMethod::new("bazz"),
 				RouteFileMethodSyn::new(syn::parse_quote!(
 					fn get() {}
-				))
-				.sendit(),
+				)),
 			),
 			(
 				RouteFileMethod::new("foo/bar"),
 				RouteFileMethodSyn::new(syn::parse_quote!(
 					fn get() {}
-				))
-				.sendit(),
+				)),
 			),
 			(
 				RouteFileMethod::new("foo/boo"),
 				RouteFileMethodSyn::new(syn::parse_quote!(
 					fn get() {}
-				))
-				.sendit(),
+				)),
 			),
 			(
 				RouteFileMethod::new("foo/boo"),
 				RouteFileMethodSyn::new(syn::parse_quote!(
 					fn post() {}
-				))
-				.sendit(),
+				)),
 			),
 			(
 				RouteFileMethod::new("foo/bing/bong"),
 				RouteFileMethodSyn::new(syn::parse_quote!(
 					fn post() {}
-				))
-				.sendit(),
+				)),
 			),
 		])
 		.xpect()

@@ -7,9 +7,8 @@ use bevy::prelude::*;
 
 
 pub fn parse_route_file_md(
-	_: TempNonSendMarker,
 	mut commands: Commands,
-	group_codegen: Query<&CodegenFileSendit, With<FileGroupSendit>>,
+	group_codegen: Query<&CodegenFile, With<FileGroup>>,
 	parents: Query<&ChildOf>,
 	mut query: Populated<
 		(Entity, &SourceFile, &mut RouteFile),
@@ -71,8 +70,8 @@ pub fn parse_route_file_md(
 			RsxSnippetRoot,
 			MacroIdx::new(ws_path, LineCol::default()),
 			CombinatorTokens::new(rsx_str),
-			CombinatorRouteCodegen { meta }.sendit(),
-			group_codegen.clone_info(route_codegen_path_abs).sendit(),
+			CombinatorRouteCodegen::new(meta),
+			group_codegen.clone_info(route_codegen_path_abs),
 		));
 	}
 	Ok(())

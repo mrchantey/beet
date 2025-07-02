@@ -80,9 +80,9 @@ impl Plugin for BuildPlugin {
 			.add_plugins((
 				NodeTypesPlugin,
 				ParseRsxTokensPlugin::default(),
-				// RouteCodegenPlugin::default(),
-				// ClientIslandCodegenPlugin::default(),
 				SnippetsPlugin::default(),
+				RouteCodegenPlugin::default(),
+				// ClientIslandCodegenPlugin::default(),
 			))
 			.configure_sets(
 				Update,

@@ -8,8 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Config included in the `beet.toml` file for a file group.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Sendit)]
-#[sendit(derive(Component))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileGroupConfig {
 	/// Exclude the routes in this group from the route tree.
 	/// Usually this should be true for pages and false for actions.
@@ -34,14 +33,11 @@ impl FileGroupConfig {
 				None
 			};
 
-		let mut entity = spawner.spawn((
-			self.file_group.sendit(),
-			self.codegen.sendit(),
-			self.modify_route,
-		));
+		let mut entity =
+			spawner.spawn((self.file_group, self.codegen, self.modify_route));
 		if let Some(client_actions_codegen) = client_actions_codegen {
 			entity.with_child((
-				client_actions_codegen.sendit(),
+				client_actions_codegen,
 				CollectClientActions::default(),
 			));
 		}
@@ -50,9 +46,8 @@ impl FileGroupConfig {
 
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Sendit)]
-#[sendit(derive(Component))]
-#[sendit(require(CodegenFileSendit))]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Component)]
+#[require(CodegenFile)]
 pub struct FileGroup {
 	/// Optionally set the group name, used for codegen file names
 	/// like `FooRouterPlugin`, otherwise falls back to the
@@ -71,9 +66,9 @@ pub struct FileGroup {
 	/// Specify the meta type, used for the file group codegen and individual
 	/// route codegen like `.md` and `.rsx` files.
 	#[serde(default = "unit_type", with = "syn_type_serde")]
-	pub meta_type: syn::Type,
+	pub meta_type: Unspan<syn::Type>,
 	#[serde(default = "unit_type", with = "syn_type_serde")]
-	pub router_state_type: syn::Type,
+	pub router_state_type: Unspan<syn::Type>,
 	#[serde(default)]
 	pub category: FileGroupCategory,
 }
@@ -99,7 +94,7 @@ impl FileGroupCategory {
 	}
 }
 
-fn unit_type() -> syn::Type { syn::parse_str("()").unwrap() }
+fn unit_type() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
 
 impl Default for FileGroup {
 	fn default() -> Self {
@@ -155,16 +150,14 @@ impl FileGroup {
 		(
 			Self::new(
 				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
-			)
-			.sendit(),
+			),
 			CodegenFile::new(
 				WsPathBuf::new(
 					"crates/beet_router/src/test_site/codegen/mod.rs",
 				)
 				.into_abs(),
 			)
-			.with_pkg_name("test_site")
-			.sendit(),
+			.with_pkg_name("test_site"),
 		)
 	}
 	#[cfg(test)]
@@ -178,16 +171,14 @@ impl FileGroup {
 				GlobFilter::default()
 					.with_include("*.rs")
 					.with_exclude("*mod.rs"),
-			)
-			.sendit(),
+			),
 			CodegenFile::new(
 				WsPathBuf::new(
 					"crates/beet_router/src/test_site/codegen/pages.rs",
 				)
 				.into_abs(),
 			)
-			.with_pkg_name("test_site")
-			.sendit(),
+			.with_pkg_name("test_site"),
 		)
 	}
 	#[cfg(test)]
@@ -197,16 +188,14 @@ impl FileGroup {
 				WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
 					.into_abs(),
 			)
-			.with_filter(GlobFilter::default().with_include("*.md"))
-			.sendit(),
+			.with_filter(GlobFilter::default().with_include("*.md")),
 			CodegenFile::new(
 				WsPathBuf::new(
 					"crates/beet_router/src/test_site/codegen/test_docs.rs",
 				)
 				.into_abs(),
 			)
-			.with_pkg_name("test_site")
-			.sendit(),
+			.with_pkg_name("test_site"),
 		)
 	}
 }

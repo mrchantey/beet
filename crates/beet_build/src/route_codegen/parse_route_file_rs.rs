@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use beet_net::prelude::*;
 use beet_utils::prelude::ReadFile;
 use bevy::prelude::*;
@@ -9,7 +8,6 @@ use syn::Visibility;
 
 
 pub fn parse_route_file_rs(
-	_: TempNonSendMarker, // spawning !send
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile, &RouteFile), Changed<FileExprHash>>,
 ) -> Result<()> {
@@ -58,7 +56,7 @@ pub fn parse_route_file_rs(
 				.unwrap_or_default();
 
 			parent.with_child((
-				RouteFileMethodSyn::new(func.clone()).sendit(),
+				RouteFileMethodSyn::new(func.clone()),
 				RouteFileMethod {
 					route_info: RouteInfo::new(
 						route_file.route_path.clone(),

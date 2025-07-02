@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_bevy::bevyhow;
-use beet_common::prelude::TempNonSendMarker;
 use beet_common::prelude::TokenizeSelf;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
@@ -12,10 +11,9 @@ use syn::parse_quote;
 /// Call [`CodegenFile::add_item`] for every [`RouteFileMethod`] in the
 /// [`RouteFile`] children.
 pub fn collect_file_group(
-	_: TempNonSendMarker,
 	mut query: Populated<
-		(&mut CodegenFileSendit, &FileGroupSendit, &Children),
-		Added<FileGroupSendit>,
+		(&mut CodegenFile, &FileGroup, &Children),
+		Added<FileGroup>,
 	>,
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
@@ -163,7 +161,7 @@ mod test {
 		app.update();
 		app
 			.world_mut()
-			.query_filtered_once::<&CodegenFileSendit, With<FileGroupSendit>>()[0]
+			.query_filtered_once::<&CodegenFile, With<FileGroup>>()[0]
 			.build_output()
 			.unwrap()
 			.to_token_stream()

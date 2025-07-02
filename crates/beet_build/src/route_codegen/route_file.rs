@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use beet_net::prelude::RoutePath;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
@@ -66,12 +65,8 @@ impl RouteFile {
 
 /// Search the directory of each [`FileGroup`] and parse each file
 pub fn spawn_route_files(
-	_: TempNonSendMarker,
 	mut commands: Commands,
-	query: Populated<
-		(Entity, &FileGroupSendit, &CodegenFileSendit),
-		Added<FileGroupSendit>,
-	>,
+	query: Populated<(Entity, &FileGroup, &CodegenFile), Added<FileGroup>>,
 ) -> Result {
 	for (entity, group, codegen) in query.iter() {
 		let mut entity = commands.entity(entity);

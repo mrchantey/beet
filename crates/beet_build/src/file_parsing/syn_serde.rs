@@ -1,3 +1,4 @@
+use beet_common::prelude::Unspan;
 use quote::ToTokens;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -7,7 +8,6 @@ use syn::Expr;
 use syn::Item;
 use syn::Type;
 
-
 /// Macro to generate serialization and deserialization helpers for syn types
 macro_rules! syn_serde_mod {
 	($mod_name:ident, $ty:ty) => {
@@ -16,7 +16,7 @@ macro_rules! syn_serde_mod {
 		pub mod $mod_name {
 			use super::*;
 			pub fn serialize<S>(
-				val: &$ty,
+				val: &Unspan<$ty>,
 				serializer: S,
 			) -> Result<S::Ok, S::Error>
 			where
@@ -25,18 +25,20 @@ macro_rules! syn_serde_mod {
 				let val_str = val.to_token_stream().to_string();
 				val_str.serialize(serializer)
 			}
-			pub fn deserialize<'de, D>(deserializer: D) -> Result<$ty, D::Error>
+			pub fn deserialize<'de, D>(
+				deserializer: D,
+			) -> Result<Unspan<$ty>, D::Error>
 			where
 				D: Deserializer<'de>,
 			{
 				let val_str = String::deserialize(deserializer)?;
-				syn::parse_str::<$ty>(&val_str)
+				Unspan::<$ty>::parse_str(&val_str)
 					.map_err(|e| serde::de::Error::custom(e.to_string()))
 			}
 			pub mod option {
 				use super::*;
 				pub fn serialize<S>(
-					val: &Option<$ty>,
+					val: &Option<Unspan<$ty>>,
 					serializer: S,
 				) -> Result<S::Ok, S::Error>
 				where
@@ -52,13 +54,13 @@ macro_rules! syn_serde_mod {
 				}
 				pub fn deserialize<'de, D>(
 					deserializer: D,
-				) -> Result<Option<$ty>, D::Error>
+				) -> Result<Option<Unspan<$ty>>, D::Error>
 				where
 					D: Deserializer<'de>,
 				{
 					let opt = Option::<String>::deserialize(deserializer)?;
 					opt.map(|val_str| {
-						syn::parse_str::<$ty>(&val_str).map_err(|e| {
+						Unspan::<$ty>::parse_str(&val_str).map_err(|e| {
 							serde::de::Error::custom(e.to_string())
 						})
 					})
@@ -73,18 +75,17 @@ syn_serde_mod!(syn_type_serde, Type);
 syn_serde_mod!(syn_item_serde, Item);
 syn_serde_mod!(syn_expr_serde, Expr);
 
-/// Serialization and deserialization helpers for Vec<syn::Item>
+/// Serialization and deserialization helpers for Vec<Unspan<syn::Item>>
 pub mod syn_item_vec_serde {
 	use super::*;
 
 	pub fn serialize<S>(
-		items: &[Item],
+		items: &[Unspan<Item>],
 		serializer: S,
 	) -> Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
-		// Convert each Item to a String, then serialize the Vec<String>
 		let string_items: Vec<String> = items
 			.iter()
 			.map(|item| item.to_token_stream().to_string())
@@ -92,16 +93,17 @@ pub mod syn_item_vec_serde {
 		string_items.serialize(serializer)
 	}
 
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Item>, D::Error>
+	pub fn deserialize<'de, D>(
+		deserializer: D,
+	) -> Result<Vec<Unspan<Item>>, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		// Deserialize to Vec<String> and then parse each string
 		let string_items = Vec::<String>::deserialize(deserializer)?;
 		string_items
 			.into_iter()
 			.map(|s| {
-				syn::parse_str::<Item>(&s).map_err(|e| {
+				Unspan::<Item>::parse_str(&s).map_err(|e| {
 					serde::de::Error::custom(format!(
 						"Failed to parse item: {}",
 						e
@@ -112,11 +114,10 @@ pub mod syn_item_vec_serde {
 	}
 }
 
-
-
 #[cfg(test)]
 mod test {
 	use super::syn_item_serde;
+	use beet_common::prelude::*;
 	use beet_utils::prelude::*;
 	use quote::ToTokens;
 	use serde::Deserialize;
@@ -124,42 +125,35 @@ mod test {
 	use sweet::prelude::*;
 	use syn::Item;
 
-	// Import the module we're testing
-
 	#[derive(Debug, Serialize, Deserialize)]
 	struct ItemWrapper {
 		#[serde(with = "syn_item_serde")]
-		item: Item,
+		item: Unspan<Item>,
 	}
 
 	#[sweet::test]
 	fn test_item_serde_roundtrip() {
-		// Create a simple Item to test with
-		let code = "fn test_function() { println!(\"Hello, world!\"); }";
-		let original_item = syn::parse_str::<Item>(code)
-			.expect("Failed to parse test function");
+		let original_item: Item = syn::parse_quote!(
+			fn test_function() {
+				println!("Hello, world!");
+			}
+		);
 
-		// Create a wrapper with our item
 		let wrapper = ItemWrapper {
-			item: original_item,
+			item: Unspan::new(&original_item),
 		};
 
-		// Serialize to JSON
 		let serialized = serde_json::to_string(&wrapper).unwrap();
 
-		// Deserialize back
 		let deserialized: ItemWrapper =
 			serde_json::from_str(&serialized).unwrap();
 
-		// Convert both to strings for comparison
 		let original_string = wrapper.item.to_token_stream().to_string();
 		let deserialized_string =
 			deserialized.item.to_token_stream().to_string();
 
-		// They should match
 		expect(deserialized_string).to_be(original_string);
 
-		// Deserialization should fail with invalid syntax
 		let invalid_json = r#"{"item": "fn invalid syntax {"}"#;
 		serde_json::from_str::<ItemWrapper>(invalid_json)
 			.xpect()
@@ -176,9 +170,10 @@ mod test {
 			}
 		};
 
-		let wrapper = ItemWrapper { item: complex_item };
+		let wrapper = ItemWrapper {
+			item: Unspan::new(&complex_item),
+		};
 
-		// Verify we can serialize and deserialize without errors
 		serde_json::to_string(&wrapper)
 			.unwrap()
 			.xmap(|json| serde_json::from_str::<ItemWrapper>(&json))

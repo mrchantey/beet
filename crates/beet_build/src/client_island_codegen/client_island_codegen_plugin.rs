@@ -48,6 +48,6 @@ impl Default for ClientIslandCodegenConfig {
 impl NonSendPlugin for ClientIslandCodegenConfig {
 	fn build(self, app: &mut App) {
 		app.world_mut()
-			.spawn((self.codegen_file.sendit(), self.collect_client_islands));
+			.spawn((self.codegen_file, self.collect_client_islands));
 	}
 }

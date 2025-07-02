@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
@@ -39,12 +38,8 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	_: TempNonSendMarker,
-	mut query: Populated<
-		(Entity, &mut CodegenFileSendit),
-		With<RouteCodegenRoot>,
-	>,
-	file_groups: Query<(Entity, &FileGroupSendit)>,
+	mut query: Populated<(Entity, &mut CodegenFile), With<RouteCodegenRoot>>,
+	file_groups: Query<(Entity, &FileGroup)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
 ) {

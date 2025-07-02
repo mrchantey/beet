@@ -40,6 +40,8 @@ impl Default for TemplateMacros {
 /// Update the [`FileExprHash`] component for all template files if it changed.
 /// Use change detection to trigger extra work based on the hash change.
 pub fn update_file_expr_hash(
+	// even though our tokens are Unspan, we're interactig with ParseRsxTokens
+	// which also handles !Send tokens, so we must ensure main thread.
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut query: Populated<

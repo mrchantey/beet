@@ -9,6 +9,8 @@ use syn::visit::Visit;
 /// For a given rust file, extract tokens from `rsx!` macros and insert them
 /// as [`RstmlTokens`].
 pub fn parse_files_rs(
+	// even though our tokens are Unspan, they will be parsed by ParseRsxTokens
+	// which also handles !Send tokens, so we must ensure main thread.
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,

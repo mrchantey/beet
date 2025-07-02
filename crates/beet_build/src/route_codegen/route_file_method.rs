@@ -7,11 +7,10 @@ use syn::Ident;
 use syn::ItemFn;
 
 /// The signature of a route file method
-#[derive(Debug, Clone, Deref, Sendit)]
-#[sendit(derive(Component))]
-pub struct RouteFileMethodSyn(ItemFn);
+#[derive(Debug, Clone, Deref, Component)]
+pub struct RouteFileMethodSyn(Unspan<ItemFn>);
 impl RouteFileMethodSyn {
-	pub fn new(func: ItemFn) -> Self { Self(func) }
+	pub fn new(func: ItemFn) -> Self { Self(func.into()) }
 }
 /// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
