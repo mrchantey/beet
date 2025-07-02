@@ -59,7 +59,7 @@ pub fn modify_file_route_tokens(
 	modifiers: Query<&ModifyRoutePath>,
 	mut query: Populated<
 		(Entity, &mut RouteFileMethod),
-		Added<RouteFileMethod>,
+		Changed<RouteFileMethod>,
 	>,
 ) {
 	for (entity, mut route) in query.iter_mut() {

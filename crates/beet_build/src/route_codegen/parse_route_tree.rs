@@ -38,7 +38,10 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	mut query: Populated<(Entity, &mut CodegenFile), With<RouteCodegenRoot>>,
+	// the trigger for this system is any changed collection,
+	// there is generally only one root so running for 'all roots' is acceptable
+	_: Populated<(), Changed<RouteFileCollection>>,
+	mut query: Query<(Entity, &mut CodegenFile), With<RouteCodegenRoot>>,
 	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
@@ -47,7 +50,9 @@ pub fn parse_route_tree(
 		let child_methods = children
 			.iter_descendants(entity)
 			.filter_map(|e| collections.get(e).ok())
-			.filter(|(_, collection)| collection.category.include_in_route_tree())
+			.filter(|(_, collection)| {
+				collection.category.include_in_route_tree()
+			})
 			.map(|(e, _)| {
 				children
 					.iter_descendants(e)

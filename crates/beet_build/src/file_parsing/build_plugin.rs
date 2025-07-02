@@ -48,8 +48,12 @@ impl BuildPlugin {
 }
 
 
+/// Runs before rsx tokens have been resolved into entity trees,
+/// used for importing and preparing token streams.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct BeforeParseTokens;
+/// Runs after rsx tokens have been resolved into entity trees,
+/// and the new [`FileExprHash`] has been calculated.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct AfterParseTokens;
 /// System set for exporting codegen files, Static Trees, Lang Partials, etc.

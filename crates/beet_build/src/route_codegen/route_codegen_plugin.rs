@@ -15,15 +15,15 @@ impl Plugin for RouteCodegenPlugin {
 			.add_systems(
 				Update,
 				(
-					// (
-					update_route_files,
-					(parse_route_file_rs, parse_route_file_md),
+					(
+						update_route_files,
+						(parse_route_file_rs, parse_route_file_md),
 						modify_file_route_tokens,
-					// )
-					// 	.chain()
-					// 	.in_set(BeforeParseTokens),
+						parse_route_tree,
+					)
+						.chain()
+						.in_set(AfterParseTokens),
 					// (
-					// 	parse_route_tree,
 					// 	(
 					// 		(
 					// 			reexport_collections,
