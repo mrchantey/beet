@@ -17,8 +17,8 @@ impl Plugin for RouteCodegenPlugin {
 				(
 					// (
 					update_route_files,
-						(parse_route_file_rs, parse_route_file_md),
-					// 	modify_file_route_tokens,
+					(parse_route_file_rs, parse_route_file_md),
+						modify_file_route_tokens,
 					// )
 					// 	.chain()
 					// 	.in_set(BeforeParseTokens),

@@ -169,7 +169,11 @@ impl RouteFileCollection {
 				WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
 					.into_abs(),
 			)
-			.with_filter(GlobFilter::default().with_include("*.md")),
+			.with_filter(
+				GlobFilter::default()
+					.with_include("*.md")
+					.with_include("*.mdx"),
+			),
 			CodegenFile::new(
 				WsPathBuf::new(
 					"crates/beet_router/src/test_site/codegen/test_docs.rs",

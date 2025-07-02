@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_net::prelude::RoutePath;
-use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
 use bevy::platform::collections::HashMap;
@@ -15,6 +14,7 @@ use syn::parse_quote;
 
 
 /// A file that belongs to a [`RouteFileCollection`], spawned as its child.
+/// A [`Changed<RouteFile>`] represents a change in the [`SourceFile`] that it references.
 /// The number of child [`RouteFileMethod`] that will be spawned
 /// will be either 1 or 0..many, depending on whether the file
 /// is a 'single file route':
@@ -27,14 +27,13 @@ pub struct RouteFile {
 	pub index: usize,
 	/// The local path to the rust file containing the routes.
 	/// By default this is the [`SourceFile`] relative to the
-	/// [`CodegenFile::output_dir`] but may be modified, for example [`parse_route_file_md`]
+	/// [`CodegenFile::output_dir`] but may be modified with `bypass_change_detection`, 
+	/// for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
-	/// The [`SourceFile`] path, used for efficient match checking
-	pub abs_path: AbsPathBuf,
 	/// The [`SourceFile`] relative to [`RouteFileCollection::src`],
 	/// Used for per-file codegen.
-	pub collection_path: PathBuf,
+	pub source_file_collection_rel: PathBuf,
 	/// The route path for the file, derived from the file path
 	/// relative to the [`RouteFileCollection::src`].
 	pub route_path: RoutePath,
@@ -91,7 +90,7 @@ pub(super) fn update_route_files(
 	changed_exprs: Populated<(Entity, &SourceFile), Changed<FileExprHash>>,
 	mut collections: Query<(Entity, &mut RouteFileCollection, &CodegenFile)>,
 	children: Query<&Children>,
-	mut route_files: Query<&mut RouteFile>,
+	mut route_files: Query<(&SourceFileRef, &mut RouteFile)>,
 ) -> Result {
 	for (file_entity, file) in changed_exprs.iter() {
 		for (collection_entity, mut collection, codegen) in collections
@@ -102,7 +101,9 @@ pub(super) fn update_route_files(
 			// otherwise create a new RouteFile
 			if !children.iter_direct_descendants(collection_entity).any(
 				|child| match route_files.get_mut(child) {
-					Ok(mut route_file) if route_file.abs_path == **file => {
+					Ok((source_file_ref, mut route_file))
+						if **source_file_ref == file_entity =>
+					{
 						collection.set_changed();
 						route_file.set_changed();
 						true
@@ -117,7 +118,7 @@ pub(super) fn update_route_files(
 					PathExt::create_relative(&collection.src, &file)?
 						.xmap(RoutePath::from_file_path)?;
 
-				let collection_path =
+				let source_file_collection_rel =
 					PathExt::create_relative(&collection.src, &file)?;
 
 
@@ -128,10 +129,9 @@ pub(super) fn update_route_files(
 					SourceFileRef(file_entity),
 					RouteFile {
 						index,
-						collection_path,
+						source_file_collection_rel,
 						mod_path,
 						route_path,
-						abs_path: (**file).clone(),
 					},
 				));
 			}
@@ -158,16 +158,16 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::without_fs());
 
-		let index_path = WsPathBuf::new(
-			"crates/beet_router/src/test_site/pages/docs/index.rs",
-		);
-
 		let group = app
 			.world_mut()
 			.spawn(RouteFileCollection::test_site_pages())
 			.id();
-		app.world_mut()
-			.spawn(SourceFile::new(index_path.into_abs()));
+		app.world_mut().spawn(SourceFile::new(
+			WsPathBuf::new(
+				"crates/beet_router/src/test_site/pages/docs/index.rs",
+			)
+			.into_abs(),
+		));
 
 		app.update();
 

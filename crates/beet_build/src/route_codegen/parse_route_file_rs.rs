@@ -9,13 +9,21 @@ use syn::Visibility;
 
 pub fn parse_route_file_rs(
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile, &RouteFile), Changed<FileExprHash>>,
-) -> Result<()> {
+	source_files: Query<&SourceFile>,
+	query: Populated<(Entity, &SourceFileRef, &RouteFile), Changed<RouteFile>>,
+) -> Result {
 	for (entity, source_file, route_file) in
-		query.iter().filter(|(_, file, _)| {
-			file.extension().map_or(false, |ext| ext == "rs")
+		query.iter().filter(|(_, _, route_file)| {
+			route_file
+				.source_file_collection_rel
+				.extension()
+				.map_or(false, |ext| ext == "rs")
 		}) {
+		let source_file = source_files.get(**source_file)?;
 		let mut parent = commands.entity(entity);
+		// discard any existing children, we could
+		// possibly do a diff but these changes already result in recompile
+		// so not super perf critical
 		parent.despawn_related::<Children>();
 
 		let file_str = ReadFile::to_string(&source_file)?;
@@ -74,7 +82,9 @@ pub fn parse_route_file_rs(
 #[cfg(test)]
 mod test {
 	use super::super::*;
+	use crate::prelude::*;
 	use beet_net::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -82,6 +92,14 @@ mod test {
 	#[test]
 	fn works() {
 		let mut world = World::new();
+
+		world.spawn(SourceFile::new(
+			WsPathBuf::new(
+				"crates/beet_router/src/test_site/pages/docs/index.rs",
+			)
+			.into_abs(),
+		));
+
 
 		let collection =
 			world.spawn(RouteFileCollection::test_site_pages()).id();
