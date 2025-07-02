@@ -178,4 +178,21 @@ mod test {
 		expect(&snippet.0).to_be("div{color:blue;}");
 		expect(&snippet_path.0).to_be(&path);
 	}
+	#[test]
+	fn global_no_styleid() {
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin::without_fs());
+
+		let entity = app
+			.world_mut()
+			.spawn(rsx! {<style scope:global>div{color:blue;}</style>})
+			.get::<Children>()
+			.unwrap()[0];
+		app.update();
+		app.world()
+			.entity(entity)
+			.get::<StyleId>()
+			.xpect()
+			.to_be_none();
+	}
 }

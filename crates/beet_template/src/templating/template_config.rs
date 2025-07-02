@@ -77,7 +77,7 @@ fn default_root_dir() -> WsPathBuf {
 	}
 }
 #[allow(unused)]
-fn default_snippets_dir() -> WsPathBuf { WsPathBuf::new("target/rsx_snippets") }
+fn default_snippets_dir() -> WsPathBuf { WsPathBuf::new("target/snippets") }
 #[allow(unused)]
 fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
 #[allow(unused)]

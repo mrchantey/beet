@@ -11,12 +11,17 @@ use bevy::prelude::*;
 pub struct StaticSceneRoot;
 
 
-pub(super) fn export_rsx_snippets(world: &mut World) -> bevy::prelude::Result {
-	let snippets = world.run_system_once(collect_rsx_snippets)?;
+pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
+	let rsx_snippets = world.run_system_once(collect_rsx_snippets)?;
+	let lang_snippets = world.run_system_once(collect_lang_snippets)?;
+	let snippets = lang_snippets
+		.into_iter()
+		.chain(rsx_snippets.into_iter())
+		.collect::<Vec<_>>();
 	if snippets.is_empty() {
 		return Ok(());
 	}
-	tracing::info!("Exporting {} rsx snippets", snippets.len());
+	tracing::info!("Exporting {} snippets", snippets.len());
 
 
 	for (path, entities) in snippets.into_iter() {
@@ -49,6 +54,22 @@ fn collect_rsx_snippets(
 		})
 		.collect()
 }
+/// Collect all changed [`LangSnippet`], returning the output path
+/// and all entities that are part of the snippet.
+fn collect_lang_snippets(
+	query: Query<(Entity, &LangSnippetPath), Changed<LangSnippet>>,
+	children: Query<&Children>,
+) -> Vec<(AbsPathBuf, Vec<Entity>)> {
+	query
+		.into_iter()
+		.map(|(entity, path)| {
+			(
+				path.into_abs(),
+				children.iter_descendants_inclusive(entity).collect(),
+			)
+		})
+		.collect()
+}
 
 
 #[cfg(test)]
@@ -56,12 +77,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_common::node::MacroIdx;
 	use beet_router::as_beet::WorkspaceConfig;
-	use beet_utils::prelude::*;
+	use beet_template::as_beet::*;
+	// use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn rsx_snippets() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin {
 			skip_load_workspace: true,
@@ -92,5 +114,35 @@ mod test {
 		let saved = ReadFile::to_string(snippet_path).unwrap();
 		// non-empty scene file
 		expect(saved.len()).to_be_greater_than(1000);
+	}
+	#[test]
+	fn lang_snippets() {
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin {
+			skip_load_workspace: true,
+			skip_write_to_fs: false,
+			..default()
+		});
+
+		let path = WorkspaceConfig::default()
+			.lang_snippet_path(&WsPathBuf::new(file!()), 0)
+			.into_abs();
+
+		let _entity = app
+			.world_mut()
+			.spawn(rsx! {<style>div{color:blue;}</style>})
+			.id();
+
+		FsExt::remove(&path).ok();
+
+		app.update();
+
+		let saved = ReadFile::to_string(path).unwrap();
+		// non-empty scene file
+		expect(saved.len()).to_be_greater_than(200);
+		#[cfg(feature = "css")]
+		expect(&saved).to_contain("div[data-beet-style-id-0]");
+		#[cfg(not(feature = "css"))]
+		expect(&saved).to_contain("div{color:blue;}");
 	}
 }

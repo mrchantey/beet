@@ -24,7 +24,7 @@ impl Plugin for FileSnippetPlugin {
 				)
 					.chain()
 					.in_set(AfterParseTokens),
-				(export_rsx_snippets, export_lang_snippets)
+				(export_snippets, export_lang_snippets)
 					.in_set(ExportArtifactsSet),
 			),
 		);
