@@ -1,4 +1,5 @@
 use beet_common::node::HtmlConstants;
+use beet_common::node::MacroIdx;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::path::Path;
@@ -77,13 +78,13 @@ fn default_root_dir() -> WsPathBuf {
 }
 #[allow(unused)]
 fn default_rsx_snippets_dir() -> WsPathBuf {
-	WsPathBuf::new("target/template_scene.ron")
+	WsPathBuf::new("target/rsx_snippets")
 }
 #[allow(unused)]
 fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
 #[allow(unused)]
 fn default_client_islands_path() -> WsPathBuf {
-	WsPathBuf::new("target/rsx_snippets")
+	WsPathBuf::new("target/client_islands.ron")
 }
 
 impl Default for WorkspaceConfig {
@@ -106,6 +107,20 @@ impl WorkspaceConfig {
 	}
 
 	pub fn rsx_snippets_dir(&self) -> &WsPathBuf { &self.rsx_snippets_dir }
+
+	/// Create a file path in the format of `path/to/file:line:col.rs`,
+	/// using [`WorkspaceConfig::rsx_snippets_dir.into_abs()`].
+	pub fn rsx_snippet_path(&self, idx: &MacroIdx) -> WsPathBuf {
+		let mut path = idx.file.clone();
+		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
+		let extension = "ron";
+		let snippet_file_name = format!(
+			"{}:{}:{}.{}",
+			file_stem, idx.start.line, idx.start.col, extension
+		);
+		path.set_file_name(snippet_file_name);
+		self.rsx_snippets_dir.join(path)
+	}
 
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.filter.passes(path)

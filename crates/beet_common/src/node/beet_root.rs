@@ -109,10 +109,6 @@ impl MacroIdx {
 			start: LineCol::new(line, col),
 		}
 	}
-	/// Create a file path in the format of `path/to/file.rs:line:col`
-	pub fn as_fs_path(&self) -> WsPathBuf {
-		self.file.join(self.start.to_string())
-	}
 
 	#[cfg(feature = "tokens")]
 	pub fn new_from_tokens(

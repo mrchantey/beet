@@ -20,17 +20,13 @@ pub(super) fn export_rsx_snippets(world: &mut World) -> bevy::prelude::Result {
 
 
 	for (path, entities) in snippets.into_iter() {
-		if let Some(config) = world.get_resource::<WorkspaceConfig>() {
-			let scene = DynamicSceneBuilder::from_world(world)
-				.extract_entities(entities.into_iter())
-				.build();
+		let scene = DynamicSceneBuilder::from_world(world)
+			.extract_entities(entities.into_iter())
+			.build();
 
-			let scene = world.build_scene_with(scene);
-
-			let out_path =
-				config.rsx_snippets_dir().join(path).with_extension("ron");
-			FsExt::write_if_diff(out_path, &scene)?;
-		}
+		let scene = world.build_scene_with(scene);
+		tracing::trace!("Writing rsx snippet to {}", path.display());
+		FsExt::write_if_diff(path, &scene)?;
 	}
 
 	Ok(())
@@ -39,14 +35,15 @@ pub(super) fn export_rsx_snippets(world: &mut World) -> bevy::prelude::Result {
 /// Collect all changed [`RsxSnippetRoot`]s, returning the output path
 /// and all entities that are part of the snippet.
 fn collect_rsx_snippets(
+	config: Res<WorkspaceConfig>,
 	query: Query<(Entity, &MacroIdx), Changed<RsxSnippetRoot>>,
 	children: Query<&Children>,
-) -> Vec<(WsPathBuf, Vec<Entity>)> {
+) -> Vec<(AbsPathBuf, Vec<Entity>)> {
 	query
 		.into_iter()
 		.map(|(entity, idx)| {
 			(
-				idx.as_fs_path(),
+				config.rsx_snippet_path(idx).into_abs(),
 				children.iter_descendants_inclusive(entity).collect(),
 			)
 		})
@@ -56,9 +53,9 @@ fn collect_rsx_snippets(
 
 #[cfg(test)]
 mod test {
-	use std::path::Path;
-
 	use crate::prelude::*;
+	use beet_common::node::MacroIdx;
+	use beet_router::as_beet::WorkspaceConfig;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -74,15 +71,26 @@ mod test {
 
 		let test_site_index =
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
+
+		let snippet_path = WorkspaceConfig::default()
+			.rsx_snippet_path(&MacroIdx::new_file_line_col(
+				&test_site_index.to_string_lossy(),
+				7,
+				8,
+			))
+			.into_abs();
+
 		let _entity = app
 			.world_mut()
 			.spawn(SourceFile::new(test_site_index.into_abs()))
 			.id();
 
+		FsExt::remove(&snippet_path).ok();
+
 		app.update();
 
-		let path = Path::new("target").join(test_site_index);
-		let saved = ReadFile::to_string(path).unwrap();
-		println!("Saved file: {}", saved);
+		let saved = ReadFile::to_string(snippet_path).unwrap();
+		// non-empty scene file
+		expect(saved.len()).to_be_greater_than(1000);
 	}
 }
