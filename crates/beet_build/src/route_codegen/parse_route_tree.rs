@@ -39,15 +39,15 @@ use syn::parse_quote;
 /// ```
 pub fn parse_route_tree(
 	mut query: Populated<(Entity, &mut CodegenFile), With<RouteCodegenRoot>>,
-	file_groups: Query<(Entity, &FileGroup)>,
+	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
 ) {
 	for (entity, mut codegen) in query.iter_mut() {
 		let child_methods = children
 			.iter_descendants(entity)
-			.filter_map(|e| file_groups.get(e).ok())
-			.filter(|(_, group)| group.category.include_in_route_tree())
+			.filter_map(|e| collections.get(e).ok())
+			.filter(|(_, collection)| collection.category.include_in_route_tree())
 			.map(|(e, _)| {
 				children
 					.iter_descendants(e)

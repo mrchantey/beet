@@ -25,10 +25,10 @@ impl Plugin for RouteCodegenPlugin {
 					// 	parse_route_tree,
 					// 	(
 					// 		(
-					// 			reexport_file_groups,
+					// 			reexport_collections,
 					// 			add_client_codegen_to_actions_export,
 					// 		),
-					// 		collect_file_group,
+					// 		collect_route_files,
 					// 	)
 					// 		.chain(),
 					// 	collect_client_action_group,
@@ -52,9 +52,9 @@ pub struct RouteCodegenConfig {
 	/// The root codegen, containing the route mod tree and other utilities.
 	#[serde(flatten)]
 	pub codegen_file: CodegenFile,
-	/// Additional file groups to be included in the codegen.
-	#[serde(default, rename = "file_group")]
-	pub file_groups: Vec<FileGroupConfig>,
+	/// Collections to be included in the codegen.
+	#[serde(default, rename = "collection")]
+	pub collections: Vec<RouteFileConfig>,
 }
 
 
@@ -71,7 +71,7 @@ impl Default for RouteCodegenConfig {
 	fn default() -> Self {
 		Self {
 			codegen_file: default_codegen_file(),
-			file_groups: Vec::new(),
+			collections: Vec::new(),
 		}
 	}
 }
@@ -82,8 +82,8 @@ impl NonSendPlugin for RouteCodegenConfig {
 			.world_mut()
 			.spawn((RouteCodegenRoot::default(), self.codegen_file.clone()));
 		root.with_children(|mut parent| {
-			for group in self.file_groups {
-				group.spawn(&mut parent);
+			for collection in self.collections {
+				collection.spawn(&mut parent);
 			}
 		});
 	}

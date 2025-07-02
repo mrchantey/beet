@@ -10,25 +10,25 @@ use syn::parse_quote;
 
 /// Call [`CodegenFile::add_item`] for every [`RouteFileMethod`] in the
 /// [`RouteFile`] children.
-pub fn collect_file_group(
+pub fn collect_route_files(
 	mut query: Populated<
-		(&mut CodegenFile, &FileGroup, &Children),
-		Added<FileGroup>,
+		(&mut CodegenFile, &RouteFileCollection, &Children),
+		Added<RouteFileCollection>,
 	>,
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
 ) -> Result {
-	for (mut codegen_file, file_group, group_children) in query.iter_mut() {
+	for (mut codegen_file, collection, collection_children) in query.iter_mut() {
 		let mut route_infos = Vec::<TokenStream>::new();
 		let mut route_handlers = Vec::<TokenStream>::new();
 		let mut route_metas = Vec::<syn::Path>::new();
 		let mut contains_file_meta = false;
 
-		for (route_file, route_file_children) in group_children
+		for (route_file, route_file_children) in collection_children
 			.iter()
 			.filter_map(|child| route_files.get(child).ok())
 		{
-			codegen_file.add_item(route_file.item_mod(file_group.category));
+			codegen_file.add_item(route_file.item_mod(collection.category));
 			let mod_ident = route_file.mod_ident();
 
 			for method in route_file_children
@@ -38,7 +38,7 @@ pub fn collect_file_group(
 				let method_name =
 					method.route_info.method.to_string_lowercase();
 
-				if method.meta == RouteFileMethodMeta::FileGroup {
+				if method.meta == RouteFileMethodMeta::Collection {
 					contains_file_meta = true;
 				}
 
@@ -46,8 +46,8 @@ pub fn collect_file_group(
 				let route_info = method.route_info.self_token_stream();
 				let meta_ident = method.meta.ident(&mod_ident, &method_name);
 
-				match file_group.category {
-					FileGroupCategory::Pages => {
+				match collection.category {
+					RouteFileCategory::Page => {
 						// All page routes are BundleRoutes, so use add_bundle_route
 						// for middleware support
 						route_handlers.push(parse_quote! {
@@ -59,7 +59,7 @@ pub fn collect_file_group(
 								);
 						});
 					}
-					FileGroupCategory::Actions => {
+					RouteFileCategory::Action => {
 						// Action routes may be any kind of route
 						route_handlers.push(quote! {
 								router = plugin.add_route(router,#route_info, #mod_ident::#http_method);
@@ -72,8 +72,8 @@ pub fn collect_file_group(
 		}
 
 
-		let group_name = if let Some(group_name) = &file_group.name {
-			group_name.clone()
+		let collection_name = if let Some(name) = &collection.name {
+			name.clone()
 		} else {
 			codegen_file
 				.output
@@ -83,7 +83,7 @@ pub fn collect_file_group(
 		};
 
 		let router_plugin_ident =
-			quote::format_ident!("{}Plugin", group_name.to_upper_camel_case());
+			quote::format_ident!("{}Plugin", collection_name.to_upper_camel_case());
 
 		codegen_file.add_item::<syn::ItemStruct>(parse_quote! {
 			#[derive(Debug, Default, Clone)]
@@ -108,9 +108,9 @@ pub fn collect_file_group(
 				#default_meta
 			}
 		});
-		let meta_ty = &file_group.meta_type;
-		let router_state_type = &file_group.router_state_type;
-		let is_static = file_group.category.include_in_route_tree();
+		let meta_ty = &collection.meta_type;
+		let router_state_type = &collection.router_state_type;
+		let is_static = collection.category.include_in_route_tree();
 
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
 			#[cfg(not(target_arch = "wasm32"))]
@@ -157,11 +157,11 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
-		app.world_mut().spawn(FileGroup::test_site_docs());
+		app.world_mut().spawn(RouteFileCollection::test_site_docs());
 		app.update();
 		app
 			.world_mut()
-			.query_filtered_once::<&CodegenFile, With<FileGroup>>()[0]
+			.query_filtered_once::<&CodegenFile, With<RouteFileCollection>>()[0]
 			.build_output()
 			.unwrap()
 			.to_token_stream()

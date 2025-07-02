@@ -54,13 +54,15 @@ pub fn collect_combinator_route(
 		Added<CombinatorRouteCodegen>,
 	>,
 	parents: Query<&ChildOf>,
-	file_groups: Query<&FileGroup>,
+	collections: Query<&RouteFileCollection>,
 ) -> Result {
 	for (entity, mut codegen_file, combinator_codegen) in query.iter_mut() {
-		let file_group = parents
+		let collection = parents
 			.iter_ancestors(entity)
-			.find_map(|e| file_groups.get(e).ok())
-			.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
+			.find_map(|e| collections.get(e).ok())
+			.ok_or_else(|| {
+				bevyhow!("failed to find parent RouteFileCollection")
+			})?;
 		let meta_block = match &combinator_codegen.meta {
 			Some(meta) => quote! {
 				#meta.map_err(|err|{
@@ -69,7 +71,7 @@ pub fn collect_combinator_route(
 			},
 			None => quote!(Default::default()),
 		};
-		let meta_type = &file_group.meta_type;
+		let meta_type = &collection.meta_type;
 		codegen_file.add_item::<ItemFn>(syn::parse_quote!(
 			#[allow(unused)]
 			pub fn meta()-> #meta_type{
@@ -97,7 +99,7 @@ mod test {
 		app.add_plugins(BuildPlugin::default())
 			.insert_resource(BuildFlags::only(BuildFlag::Routes))
 			.world_mut()
-			.spawn((FileGroup::test_site_docs(),));
+			.spawn((RouteFileCollection::test_site_docs(),));
 		app.update();
 		app
 		.world_mut()

@@ -27,7 +27,7 @@ Triggers:
 Export the routes specified in `RouteCodegenConfig` into their respective paths, for example generating collection code for routes in `src/pages/..` into files in `src/codegen/..`, see [RouteCodegenPlugin](crates/beet_build/src/route_codegen/route_codegen_plugin.rs#L7).
 
 Triggers:
-- Startup - `RouteCodegenConfig::file_groups`
+- Startup - `RouteCodegenConfig::collections`
 - A `FileExprHash` for a file specified in [`RouteCodegenConfig`] changes.
 
 ## Recompile Server

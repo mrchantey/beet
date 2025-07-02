@@ -7,13 +7,13 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Config included in the `beet.toml` file for a file group.
+/// Config included in the `beet.toml` file for a collection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FileGroupConfig {
-	/// Exclude the routes in this group from the route tree.
+pub struct RouteFileConfig {
+	/// Exclude the routes in this collection from the route tree.
 	/// Usually this should be true for pages and false for actions.
 	#[serde(flatten)]
-	pub file_group: FileGroup,
+	pub collection: RouteFileCollection,
 	#[serde(flatten)]
 	pub codegen: CodegenFile,
 	#[serde(flatten)]
@@ -21,10 +21,10 @@ pub struct FileGroupConfig {
 }
 
 
-impl FileGroupConfig {
+impl RouteFileConfig {
 	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
 		let client_actions_codegen =
-			if self.file_group.category == FileGroupCategory::Actions {
+			if self.collection.category == RouteFileCategory::Action {
 				let codegen = self.codegen.clone_info(
 					CollectClientActions::path(&self.codegen.output),
 				);
@@ -34,7 +34,7 @@ impl FileGroupConfig {
 			};
 
 		let mut entity =
-			spawner.spawn((self.file_group, self.codegen, self.modify_route));
+			spawner.spawn((self.collection, self.codegen, self.modify_route));
 		if let Some(client_actions_codegen) = client_actions_codegen {
 			entity.with_child((
 				client_actions_codegen,
@@ -44,11 +44,11 @@ impl FileGroupConfig {
 	}
 }
 
-/// Definition for a group of files that should be collected together.
-/// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
+/// Definition for a group of route files that should be collected together,
+/// including pages and actions.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Component)]
 #[require(CodegenFile)]
-pub struct FileGroup {
+pub struct RouteFileCollection {
 	/// Optionally set the group name, used for codegen file names
 	/// like `FooRouterPlugin`, otherwise falls back to the
 	/// [`CodegenFile::output`] filename.
@@ -70,33 +70,33 @@ pub struct FileGroup {
 	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub router_state_type: Unspan<syn::Type>,
 	#[serde(default)]
-	pub category: FileGroupCategory,
+	pub category: RouteFileCategory,
 }
 
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FileGroupCategory {
+pub enum RouteFileCategory {
 	/// Files contain public functions named after the http methods,
 	/// and will be included in the route tree.
 	#[default]
-	Pages,
+	Page,
 	/// Files contain arbitary axum routes,
 	/// and will be excluded from the route tree.
-	Actions,
+	Action,
 }
 
-impl FileGroupCategory {
+impl RouteFileCategory {
 	pub fn include_in_route_tree(&self) -> bool {
 		match self {
-			Self::Pages => true,
-			Self::Actions => false,
+			Self::Page => true,
+			Self::Action => false,
 		}
 	}
 }
 
 fn unit_type() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
 
-impl Default for FileGroup {
+impl Default for RouteFileCollection {
 	fn default() -> Self {
 		Self {
 			name: None,
@@ -110,7 +110,7 @@ impl Default for FileGroup {
 	}
 }
 
-impl FileGroup {
+impl RouteFileCollection {
 	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
 			src,
@@ -210,7 +210,7 @@ mod test {
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::new(
+			RouteFileCollection::new(
 				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
 			)
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))

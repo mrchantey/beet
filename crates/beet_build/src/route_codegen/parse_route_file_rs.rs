@@ -83,10 +83,10 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-		let group = world.spawn(FileGroup::test_site_pages()).id();
+		let collection = world.spawn(RouteFileCollection::test_site_pages()).id();
 		world.run_system_once(spawn_route_files).unwrap().unwrap();
 		world.run_system_once(parse_route_file_rs).unwrap().unwrap();
-		let file = world.entity(group).get::<Children>().unwrap()[0];
+		let file = world.entity(collection).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let route_method = world
 			.entity(route)
@@ -97,7 +97,7 @@ mod test {
 		route_method
 			.meta
 			.xpect()
-			.to_be(RouteFileMethodMeta::FileGroup);
+			.to_be(RouteFileMethodMeta::Collection);
 		route_method
 			.route_info
 			.method

@@ -11,7 +11,7 @@ use syn::ItemMod;
 use syn::parse_quote;
 
 
-/// A file that belongs to a [`FileGroup`], spawned as its child.
+/// A file that belongs to a [`RouteFileCollection`], spawned as its child.
 /// The number of child [`RouteFileMethod`] that will be spawned
 /// will be either 1 or 0..many, depending on whether the file
 /// is a 'single file route':
@@ -28,11 +28,11 @@ pub struct RouteFile {
 	/// [`CodegenFile::output_dir`] but may be modified, for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
-	/// The [`SourceFile`] relative to [`FileGroup::src`],
+	/// The [`SourceFile`] relative to [`RouteFileCollection::src`],
 	/// Used for per-file codegen.
-	pub group_path: PathBuf,
+	pub collection_path: PathBuf,
 	/// The route path for the file, derived from the file path
-	/// relative to the [`FileGroup::src`].
+	/// relative to the [`RouteFileCollection::src`].
 	pub route_path: RoutePath,
 }
 
@@ -43,12 +43,12 @@ impl RouteFile {
 	}
 	/// The module import for the generated code.
 	/// For Actions this will only export in non-wasm builds
-	pub fn item_mod(&self, category: FileGroupCategory) -> ItemMod {
+	pub fn item_mod(&self, category: RouteFileCategory) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
 		let target: Option<Attribute> = match category {
-			FileGroupCategory::Pages => None,
-			FileGroupCategory::Actions => Some(parse_quote! {
+			RouteFileCategory::Page => None,
+			RouteFileCategory::Action => Some(parse_quote! {
 				#[cfg(not(target_arch = "wasm32"))]
 			}),
 		};
@@ -63,25 +63,28 @@ impl RouteFile {
 	}
 }
 
-/// Search the directory of each [`FileGroup`] and parse each file
+/// Search the directory of each [`RouteFileCollection`] and parse each file
 pub fn spawn_route_files(
 	mut commands: Commands,
-	query: Populated<(Entity, &FileGroup, &CodegenFile), Added<FileGroup>>,
+	query: Populated<
+		(Entity, &RouteFileCollection, &CodegenFile),
+		Added<RouteFileCollection>,
+	>,
 ) -> Result {
-	for (entity, group, codegen) in query.iter() {
+	for (entity, collection, codegen) in query.iter() {
 		let mut entity = commands.entity(entity);
-		for (index, abs_path) in group.collect_files()?.into_iter().enumerate()
+		for (index, abs_path) in collection.collect_files()?.into_iter().enumerate()
 		{
 			let mod_path =
 				PathExt::create_relative(&codegen.output_dir()?, &abs_path)?;
-			let route_path = PathExt::create_relative(&group.src, &abs_path)?
+			let route_path = PathExt::create_relative(&collection.src, &abs_path)?
 				.xmap(RoutePath::from_file_path)?;
 
-			let group_path = PathExt::create_relative(&group.src, &abs_path)?;
+			let collection_path = PathExt::create_relative(&collection.src, &abs_path)?;
 
 			entity.with_child((SourceFile::new(abs_path), RouteFile {
 				index,
-				group_path,
+				collection_path,
 				mod_path,
 				route_path,
 			}));
@@ -107,7 +110,7 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-		let group = world.spawn(FileGroup::test_site_pages()).id();
+		let group = world.spawn(RouteFileCollection::test_site_pages()).id();
 		world.run_system_once(spawn_route_files).unwrap().unwrap();
 		let file = world.entity(group).get::<Children>().unwrap()[0];
 		let source_file = world.entity(file).get::<SourceFile>().unwrap();

@@ -62,9 +62,9 @@ pub enum RouteFileMethodMeta {
 	/// A config method exists for this route file, ie `my_route::config()`.
 	File,
 	/// No config method exists for this route file, fall back to
-	/// the group level or default.
+	/// the collection level or default.
 	#[default]
-	FileGroup,
+	Collection,
 }
 
 impl RouteFileMethodMeta {
@@ -77,7 +77,7 @@ impl RouteFileMethodMeta {
 				syn::parse_quote!(#mod_ident::#meta_ident)
 			}
 			RouteFileMethodMeta::File => syn::parse_quote!(#mod_ident::meta),
-			RouteFileMethodMeta::FileGroup => syn::parse_quote!(Self::meta),
+			RouteFileMethodMeta::Collection => syn::parse_quote!(Self::meta),
 		}
 	}
 }

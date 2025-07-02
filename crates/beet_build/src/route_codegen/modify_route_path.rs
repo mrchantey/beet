@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
-use beet_common::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;

@@ -8,7 +8,7 @@ use bevy::prelude::*;
 
 pub fn parse_route_file_md(
 	mut commands: Commands,
-	group_codegen: Query<&CodegenFile, With<FileGroup>>,
+	collection_codegen: Query<&CodegenFile, With<RouteFileCollection>>,
 	parents: Query<&ChildOf>,
 	mut query: Populated<
 		(Entity, &SourceFile, &mut RouteFile),
@@ -28,9 +28,9 @@ pub fn parse_route_file_md(
 		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file_str);
 
-		let Some(group_codegen) = parents
+		let Some(collection_codegen) = parents
 			.iter_ancestors(entity)
-			.find_map(|e| group_codegen.get(e).ok())
+			.find_map(|e| collection_codegen.get(e).ok())
 		else {
 			return Err(format!(
 				"RouteFile has no CodegenFile for route file: {}",
@@ -39,24 +39,24 @@ pub fn parse_route_file_md(
 			.into());
 		};
 
-		let group_codegen_dir = group_codegen
+		let collection_codegen_dir = collection_codegen
 			.output
 			.parent()
 			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
-		// relative to the group codegen dir
-		let mut route_codegen_path = route_file.group_path.clone();
+		// relative to the collection codegen dir
+		let mut route_codegen_path = route_file.collection_path.clone();
 		route_codegen_path.set_extension("rs");
 
 		let route_codegen_path_abs = AbsPathBuf::new_unchecked(
-			group_codegen_dir.join(&route_codegen_path),
+			collection_codegen_dir.join(&route_codegen_path),
 		);
 
 		parent.with_child(RouteFileMethod {
 			meta: if meta.is_some() {
 				RouteFileMethodMeta::File
 			} else {
-				RouteFileMethodMeta::FileGroup
+				RouteFileMethodMeta::Collection
 			},
 			route_info: RouteInfo {
 				path: route_file.route_path.clone(),
@@ -71,7 +71,7 @@ pub fn parse_route_file_md(
 			MacroIdx::new(ws_path, LineCol::default()),
 			CombinatorTokens::new(rsx_str),
 			CombinatorRouteCodegen::new(meta),
-			group_codegen.clone_info(route_codegen_path_abs),
+			collection_codegen.clone_info(route_codegen_path_abs),
 		));
 	}
 	Ok(())
@@ -90,10 +90,10 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-		let group = world.spawn(FileGroup::test_site_docs()).id();
+		let collection = world.spawn(RouteFileCollection::test_site_docs()).id();
 		world.run_system_once(spawn_route_files).unwrap().unwrap();
 		world.run_system_once(parse_route_file_md).unwrap().unwrap();
-		let file = world.entity(group).get::<Children>().unwrap()[0];
+		let file = world.entity(collection).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let method = world
 			.entity(route)
