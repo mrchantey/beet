@@ -9,7 +9,7 @@ use syn::Item;
 use syn::ItemFn;
 use syn::parse_quote;
 
-/// Create a tree of routes from a list of [`FuncTokens`]`,
+/// Create a tree of routes from a list of [`FuncTokens`],
 /// that can then be converted to an [`ItemMod`] to be used in the router.
 ///
 /// ## Example

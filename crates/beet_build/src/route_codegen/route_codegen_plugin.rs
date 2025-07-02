@@ -21,6 +21,10 @@ impl Plugin for RouteCodegenPlugin {
 							// create the child routes
 							(parse_route_file_rs, parse_route_file_md),
 							modify_route_file_tokens,
+							(
+								collect_combinator_route_meta,
+								tokenize_combinator_route,
+							),
 							collect_route_files,
 							// update root codegen file
 							reexport_collections,
@@ -30,11 +34,6 @@ impl Plugin for RouteCodegenPlugin {
 						(
 							add_client_codegen_to_actions_export,
 							collect_client_action_group,
-							(
-								collect_combinator_route,
-								tokenize_combinator_route,
-							)
-								.chain(),
 						),
 					)
 						.in_set(AfterParseTokens),

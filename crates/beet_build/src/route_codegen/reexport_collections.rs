@@ -3,7 +3,7 @@ use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 use syn::ItemMod;
 
-/// Add a pub mod #name; for each collection to the root codegen file
+/// Add a `pub mod #name;` for each collection to the root codegen file
 /// with a matching package name.
 pub fn reexport_collections(
 	mut roots: Populated<

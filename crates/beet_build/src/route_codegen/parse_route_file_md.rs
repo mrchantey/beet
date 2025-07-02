@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
 use beet_net::prelude::*;
-use beet_parse::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -16,14 +14,14 @@ pub fn parse_route_file_md(
 		Changed<RouteFile>,
 	>,
 ) -> Result {
-	for (entity, source_file, mut route_file) in
+	for (entity, source_file_ref, mut route_file) in
 		query.iter_mut().filter(|(_, _, route_file)| {
 			route_file
 				.source_file_collection_rel
 				.extension()
 				.map_or(false, |ext| ext == "md" || ext == "mdx")
 		}) {
-		let source_file = source_files.get(**source_file)?;
+		let source_file = source_files.get(**source_file_ref)?;
 		let mut parent = commands.entity(entity);
 
 		// discard any existing children, we could
@@ -33,9 +31,7 @@ pub fn parse_route_file_md(
 
 		let file_str = ReadFile::to_string(&source_file)?;
 
-		let ws_path = source_file.into_ws_path()?;
 		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
-		let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file_str);
 
 		let Some(collection_codegen) = parents
 			.iter_ancestors(entity)
@@ -76,11 +72,10 @@ pub fn parse_route_file_md(
 		trace!("Parsed route file: {}", source_file.display());
 		route_file.bypass_change_detection().mod_path = route_codegen_path;
 		// here the markdown will be generated in its own codegen
+		
 		parent.with_child((
-			RsxSnippetRoot,
-			MacroIdx::new(ws_path, LineCol::default()),
-			CombinatorTokens::new(rsx_str),
 			CombinatorRouteCodegen::new(meta),
+			SourceFileRef(**source_file_ref),
 			collection_codegen.clone_info(route_codegen_path_abs),
 		));
 	}
