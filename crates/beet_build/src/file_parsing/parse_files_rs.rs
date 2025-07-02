@@ -80,7 +80,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		app.add_plugins(BuildPlugin::without_fs());
 		let test_site_index =
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
 		let entity = app

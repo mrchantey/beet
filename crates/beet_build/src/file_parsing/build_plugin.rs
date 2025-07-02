@@ -17,15 +17,15 @@ pub struct BuildConfig {
 	#[serde(flatten)]
 	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
-	pub client_island_codegen: ClientIslandCodegenConfig,
+	pub collect_client_islands: CollectClientIslands,
 }
 
 
 impl NonSendPlugin for BuildConfig {
 	fn build(self, app: &mut App) {
 		app.add_non_send_plugin(self.route_codegen)
-			.add_non_send_plugin(self.client_island_codegen)
 			.add_plugins(self.template_config);
+		app.world_mut().spawn(self.collect_client_islands);
 	}
 }
 
@@ -118,7 +118,15 @@ impl Plugin for BuildPlugin {
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
 						.before(AfterParseTokens),
-					export_codegen_files.in_set(ExportArtifactsSet),
+					(
+						export_codegen_files,
+						compile_server,
+						collect_client_islands,
+						compile_wasm,
+						run_server,
+					)
+						.chain()
+						.in_set(ExportArtifactsSet),
 				),
 			);
 	}

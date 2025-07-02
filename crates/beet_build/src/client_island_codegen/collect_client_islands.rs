@@ -10,14 +10,21 @@ use serde::Deserialize;
 use serde::Serialize;
 use syn::Type;
 
+/// Marker for collecting client islands.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Component,
 )]
-pub struct CollectClientIslands;
+pub struct CollectClientIslands {
+	#[serde(flatten)]
+	/// These imports will be added to the head of the wasm imports file.
+	/// This will be required for any components with a client island directive.
+	/// By default this will include `use beet::prelude::*;`
+	pub codegen: CodegenFile,
+}
 
 
 impl CollectClientIslands {
-	pub fn load_impl(island_map: &ClientIslandMap) -> TokenStream {
+	pub fn load_islands_impl(island_map: &ClientIslandMap) -> TokenStream {
 		let islands = island_map.iter().map(|(route_info, islands)| {
 			let route_info = route_info.self_token_stream();
 			let islands = islands.iter().map(|island| {
@@ -52,26 +59,36 @@ impl CollectClientIslands {
 }
 
 
-pub(super) fn collect_client_islands(
+pub fn collect_client_islands(
+	_: Query<(), Changed<RouteCodegenRoot>>,
 	config: When<Res<WorkspaceConfig>>,
-	mut query: Populated<&mut CodegenFile, Added<CollectClientIslands>>,
+	mut query: Query<&mut CollectClientIslands>,
 ) -> Result {
-	for mut codegen_file in query.iter_mut() {
+	for mut collect_islands in query.iter_mut() {
 		let client_island_map =
 			ClientIslandMap::read(&config.client_islands_path.into_abs())?;
 
-		let islands_impl = CollectClientIslands::load_impl(&client_island_map);
+		let load_islands =
+			CollectClientIslands::load_islands_impl(&client_island_map);
 
-		codegen_file.add_item::<syn::ItemStruct>(syn::parse_quote! {
-			pub struct ClientIslandPlugin;
-		});
-		codegen_file.add_item::<syn::ItemImpl>(syn::parse_quote! {
-			impl Plugin for ClientIslandPlugin {
-				fn build(&self, app: &mut App) {
-					#islands_impl
+		collect_islands.codegen.clear_items();
+
+		collect_islands.codegen.add_item::<syn::ItemStruct>(
+			syn::parse_quote! {
+				pub struct ClientIslandPlugin;
+			},
+		);
+		collect_islands
+			.codegen
+			.add_item::<syn::ItemImpl>(syn::parse_quote! {
+				impl Plugin for ClientIslandPlugin {
+					fn build(&self, app: &mut App) {
+						#load_islands
+					}
 				}
-			}
-		});
+			});
+
+		collect_islands.codegen.build_and_write()?;
 	}
 	Ok(())
 }
@@ -106,7 +123,7 @@ mod test {
 			},
 		])]);
 
-		CollectClientIslands::load_impl(&map)
+		CollectClientIslands::load_islands_impl(&map)
 			.to_string()
 			.xpect()
 			.to_be_str(

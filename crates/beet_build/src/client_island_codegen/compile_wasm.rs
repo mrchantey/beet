@@ -9,12 +9,10 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn compile_wasm(
+	_query: Populated<(), Changed<RouteCodegenRoot>>,
 	html_constants: When<Res<HtmlConstants>>,
 	cmd: When<Res<CargoBuildCmd>>,
 	config: When<Res<WorkspaceConfig>>,
-	// this system only runs if the `CollectClientIslandPlugin` is added to
-	// an entity
-	_query: Populated<(), Added<CollectClientIslands>>,
 ) -> Result {
 	let mut cmd = cmd.clone();
 	cmd.target = Some("wasm32-unknown-unknown".to_string());

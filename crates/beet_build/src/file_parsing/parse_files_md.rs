@@ -43,7 +43,7 @@ mod test {
 	#[test]
 	fn parse_md() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		app.add_plugins(BuildPlugin::without_fs());
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(
@@ -66,7 +66,7 @@ mod test {
 	#[test]
 	fn parse_mdx() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		app.add_plugins(BuildPlugin::without_fs());
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(

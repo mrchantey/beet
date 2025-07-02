@@ -17,10 +17,6 @@ pub(super) fn export_codegen_files(
 	let num_files = query.iter().count();
 	info!("Exporting {} codegen files...", num_files);
 	for codegen_file in query.iter() {
-		trace!(
-			"Exporting codegen file:\n{}",
-			codegen_file.output.to_string_lossy()
-		);
 		codegen_file.build_and_write()?;
 	}
 	Ok(())
@@ -105,6 +101,7 @@ impl CodegenFile {
 			anyhow::anyhow!("Output path must have a parent directory")
 		})
 	}
+	pub fn clear_items(&mut self) { self.items.clear(); }
 
 	pub fn add_item<T: Into<syn::Item>>(&mut self, item: T) {
 		self.items.push(Unspan::new(&item.into()));
@@ -125,10 +122,13 @@ impl CodegenFile {
 		})
 	}
 
+	/// Builds the output file and writes it to the specified path
+	/// if it has changed.
 	pub fn build_and_write(&self) -> Result<()> {
 		let output_tokens = self.build_output()?;
 		// ideally we'd use rustfmt instead
 		let output_str = prettyplease::unparse(&output_tokens);
+		trace!("Exporting codegen file:\n{}", self.output.to_string_lossy());
 
 		FsExt::write_if_diff(&self.output, &output_str)?;
 		Ok(())
