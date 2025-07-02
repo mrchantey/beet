@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use beet_common::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
@@ -102,8 +101,8 @@ impl Default for RouteFileCollection {
 			name: None,
 			pkg_name: None,
 			category: Default::default(),
-			src: AbsPathBuf::default(),
-			filter: GlobFilter::default(),
+			src: Default::default(),
+			filter: Default::default(),
 			meta_type: unit_type(),
 			router_state_type: unit_type(),
 		}
@@ -123,26 +122,8 @@ impl RouteFileCollection {
 		self
 	}
 
-	/// Perform a [`ReadDir`], returning all files in the directory
-	/// relative this src
-	pub fn collect_files(&self) -> Result<Vec<AbsPathBuf>> {
-		let items = ReadDir {
-			files: true,
-			recursive: true,
-			..Default::default()
-		}
-		.read(&self.src)?
-		.into_iter()
-		.filter_map(|path| {
-			if self.filter.passes(&path) {
-				// should be path+self.src?
-				Some(AbsPathBuf::new(path))
-			} else {
-				None
-			}
-		})
-		.collect::<Result<Vec<_>, FsError>>()?;
-		Ok(items)
+	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
+		path.starts_with(&self.src) && self.filter.passes(path)
 	}
 
 	#[cfg(test)]
@@ -209,15 +190,30 @@ mod test {
 
 	#[test]
 	fn works() {
-		expect(
-			RouteFileCollection::new(
-				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
-			)
-			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-			.collect_files()
-			.unwrap()
-			.len(),
+		let collection = RouteFileCollection::new(
+			WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
 		)
-		.to_be(2);
+		.with_filter(GlobFilter::default().with_include("*.mockup.rs"));
+
+		collection
+			.passes_filter(
+				&WsPathBuf::new(
+					"crates/beet_router/src/test_site/index.mockup.rs",
+				)
+				.into_abs(),
+			)
+			.xpect()
+			.to_be_true();
+		collection
+			.passes_filter(&WsPathBuf::new("foobar/index.mockup.rs").into_abs())
+			.xpect()
+			.to_be_false();
+		collection
+			.passes_filter(
+				&WsPathBuf::new("crates/beet_router/src/test_site/index.rs")
+					.into_abs(),
+			)
+			.xpect()
+			.to_be_false();
 	}
 }

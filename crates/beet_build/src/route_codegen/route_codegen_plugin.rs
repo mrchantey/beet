@@ -1,3 +1,4 @@
+use super::*;
 use crate::prelude::*;
 use beet_bevy::prelude::NonSendPlugin;
 use beet_utils::prelude::*;
@@ -15,7 +16,7 @@ impl Plugin for RouteCodegenPlugin {
 				Update,
 				(
 					// (
-					spawn_route_files,
+					update_route_files,
 					// 	(parse_route_file_rs, parse_route_file_md),
 					// 	modify_file_route_tokens,
 					// )

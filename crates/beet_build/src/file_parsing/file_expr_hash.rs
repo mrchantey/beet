@@ -167,4 +167,25 @@ mod test {
 	}
 
 	// TODO combinator attributes
+
+
+
+	#[test]
+	fn doesnt_change() {
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin::without_fs());
+
+		let index_path = WsPathBuf::new(
+			"crates/beet_router/src/test_site/pages/docs/index.rs",
+		);
+		let mut query = app
+			.world_mut()
+			.query_filtered::<(), Changed<FileExprHash>>();
+		app.world_mut()
+			.spawn(SourceFile::new(index_path.into_abs()));
+
+		expect(query.iter(app.world()).count()).to_be(1);
+		app.update();
+		expect(query.iter(app.world()).count()).to_be(0);
+	}
 }

@@ -1,7 +1,10 @@
 use crate::prelude::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_net::prelude::RoutePath;
+use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use std::path::PathBuf;
@@ -19,7 +22,6 @@ use syn::parse_quote;
 /// - `foo.rs`: 0 or more
 /// - `foo.rsx: 0 or more
 #[derive(Component)]
-// Requires non-default SourceFile
 pub struct RouteFile {
 	/// The index of the file in the group, used for generating unique identifiers.
 	pub index: usize,
@@ -28,6 +30,8 @@ pub struct RouteFile {
 	/// [`CodegenFile::output_dir`] but may be modified, for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
+	/// The [`SourceFile`] path, used for efficient match checking
+	pub abs_path: AbsPathBuf,
 	/// The [`SourceFile`] relative to [`RouteFileCollection::src`],
 	/// Used for per-file codegen.
 	pub collection_path: PathBuf,
@@ -63,31 +67,66 @@ impl RouteFile {
 	}
 }
 
-/// Search the directory of each [`RouteFileCollection`] and parse each file
-pub fn spawn_route_files(
+#[derive(Default, Resource)]
+pub(super) struct CollectionIndexCounter(HashMap<Entity, usize>);
+
+impl CollectionIndexCounter {
+	/// Get the next index for the given collection entity,
+	/// incrementing the counter for the next call.
+	pub fn next(&mut self, entity: Entity) -> usize {
+		let index = self.0.entry(entity).or_default();
+		let current_index = *index;
+		*index += 1;
+		current_index
+	}
+}
+
+/// When a [`FileExprHash`] changes, create a corresponding [`RouteFile`]
+/// for each file group that it matches if it doesnt exist,
+/// otherwise mark it as changed
+pub(super) fn update_route_files(
+	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
-	query: Populated<
-		(Entity, &RouteFileCollection, &CodegenFile),
-		Added<RouteFileCollection>,
-	>,
+	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
+	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
+	children: Query<&Children>,
+	mut route_files: Query<&mut RouteFile>,
 ) -> Result {
-	for (entity, collection, codegen) in query.iter() {
-		let mut entity = commands.entity(entity);
-		for (index, abs_path) in collection.collect_files()?.into_iter().enumerate()
+	for file in changed_exprs.iter() {
+		for (collection_entity, collection, codegen) in collections
+			.iter()
+			.filter(|(_, collection, _)| collection.passes_filter(file))
 		{
-			let mod_path =
-				PathExt::create_relative(&codegen.output_dir()?, &abs_path)?;
-			let route_path = PathExt::create_relative(&collection.src, &abs_path)?
-				.xmap(RoutePath::from_file_path)?;
+			if !children.iter_direct_descendants(collection_entity).any(
+				|child| match route_files.get_mut(child) {
+					Ok(mut route_file) if route_file.abs_path == **file => {
+						route_file.set_changed();
+						true
+					}
+					_ => false,
+				},
+			) {
+				// no existing route file found, create a new one
+				let mod_path =
+					PathExt::create_relative(&codegen.output_dir()?, &file)?;
+				let route_path =
+					PathExt::create_relative(&collection.src, &file)?
+						.xmap(RoutePath::from_file_path)?;
 
-			let collection_path = PathExt::create_relative(&collection.src, &abs_path)?;
+				let collection_path =
+					PathExt::create_relative(&collection.src, &file)?;
 
-			entity.with_child((SourceFile::new(abs_path), RouteFile {
-				index,
-				collection_path,
-				mod_path,
-				route_path,
-			}));
+
+				let index = index_counter.next(collection_entity);
+
+				commands.spawn((ChildOf(collection_entity), RouteFile {
+					index,
+					collection_path,
+					mod_path,
+					route_path,
+					abs_path: (**file).clone(),
+				}));
+			}
 		}
 	}
 	Ok(())
@@ -97,28 +136,40 @@ pub fn spawn_route_files(
 
 #[cfg(test)]
 mod test {
-	use std::ops::Deref;
-	use std::path::PathBuf;
-
 	use crate::prelude::*;
-	use beet_utils::utils::PipelineTarget;
+	use crate::route_codegen::update_route_files;
+	use beet_utils::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
+	use std::ops::Deref;
+	use std::path::PathBuf;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin::without_fs());
 
-		let group = world.spawn(RouteFileCollection::test_site_pages()).id();
-		world.run_system_once(spawn_route_files).unwrap().unwrap();
-		let file = world.entity(group).get::<Children>().unwrap()[0];
-		let source_file = world.entity(file).get::<SourceFile>().unwrap();
-		let route_file = world.entity(file).get::<RouteFile>().unwrap();
-
-		source_file.to_string_lossy().xpect().to_end_with(
-			"/beet/crates/beet_router/src/test_site/pages/docs/index.rs",
+		let index_path = WsPathBuf::new(
+			"crates/beet_router/src/test_site/pages/docs/index.rs",
 		);
+
+		let group = app
+			.world_mut()
+			.spawn(RouteFileCollection::test_site_pages())
+			.id();
+		app.world_mut()
+			.spawn(SourceFile::new(index_path.into_abs()));
+
+		app.update();
+
+		app.world_mut()
+			.run_system_once(update_route_files)
+			.unwrap()
+			.unwrap();
+		let file = app.world().entity(group).get::<Children>().unwrap()[0];
+		let route_file = app.world().entity(file).get::<RouteFile>().unwrap();
+
 		route_file
 			.mod_path
 			.xref()
