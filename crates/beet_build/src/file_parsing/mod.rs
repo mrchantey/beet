@@ -1,3 +1,7 @@
+mod parse_files_md;
+pub use parse_files_md::*;
+mod parse_files_rs;
+pub use parse_files_rs::*;
 mod source_file;
 pub use source_file::*;
 mod hash_non_template_rust;

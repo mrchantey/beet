@@ -23,11 +23,6 @@ impl Plugin for FileSnippetPlugin {
 					// im not sure if this should be here, doesnt it indicate
 					// we're relying on exprs in templates?
 					spawn_templates,
-					(
-						templates_to_nodes_rs,
-						templates_to_nodes_md,
-						templates_to_nodes_rsx,
-					),
 				)
 					.chain()
 					.in_set(BeforeParseTokens),

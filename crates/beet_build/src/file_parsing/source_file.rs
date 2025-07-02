@@ -47,7 +47,7 @@ pub(super) fn load_workspace_source_files(
 
 
 /// Notify bevy Mutation system that a file has changed.
-pub(super) fn touch_changed_source_files(
+pub(super) fn parse_file_watch_events(
 	mut events: EventReader<WatchEvent>,
 	config: When<Res<WorkspaceConfig>>,
 	mut query: Query<&mut SourceFile>,

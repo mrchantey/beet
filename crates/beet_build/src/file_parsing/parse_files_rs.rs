@@ -8,14 +8,11 @@ use syn::visit::Visit;
 
 /// For a given rust file, extract tokens from `rsx!` macros and insert them
 /// as [`RstmlTokens`].
-pub fn templates_to_nodes_rs(
+pub fn parse_files_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<
-		(Entity, &SourceFile),
-		(With<SnippetFile>, Changed<SourceFile>),
-	>,
+	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
@@ -65,5 +62,37 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 				RstmlTokens::new(tokens),
 			));
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_router::as_beet::render_fragment;
+	use beet_utils::prelude::WsPathBuf;
+	use bevy::ecs::system::RunSystemOnce;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin::default());
+		let test_site_index =
+			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
+		let entity = app
+			.world_mut()
+			.spawn(SourceFile::new(test_site_index.into_abs()))
+			.id();
+
+		app.update();
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
+		app.world_mut()
+			.run_system_once_with(render_fragment, child)
+			.unwrap()
+			.xpect()
+			// only the output of the snippet, not the instance
+			.to_be_str("party time!");
 	}
 }

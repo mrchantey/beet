@@ -69,9 +69,9 @@ impl Plugin for BuildPlugin {
 			.add_plugins((
 				NodeTypesPlugin,
 				ParseRsxTokensPlugin::default(),
-				RouteCodegenPlugin::default(),
-				ClientIslandCodegenPlugin::default(),
-				FileSnippetPlugin::default(),
+				// RouteCodegenPlugin::default(),
+				// ClientIslandCodegenPlugin::default(),
+				// FileSnippetPlugin::default(),
 			))
 			.configure_sets(
 				Update,
@@ -88,7 +88,15 @@ impl Plugin for BuildPlugin {
 			.add_systems(
 				Update,
 				(
-					touch_changed_source_files.before(BeforeParseTokens),
+					(
+						parse_file_watch_events,
+						(
+							parse_files_rs,
+							parse_files_md,
+						),
+					)
+						.chain()
+						.before(BeforeParseTokens),
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
 						.before(AfterParseTokens),
