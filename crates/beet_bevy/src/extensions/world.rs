@@ -159,8 +159,15 @@ pub impl<W: IntoWorld> W {
 	}
 	#[cfg(feature = "bevy_scene")]
 	fn load_scene(&mut self, scene: impl AsRef<str>) -> Result {
+		self.load_scene_with(scene, &mut Default::default())
+	}
+	#[cfg(feature = "bevy_scene")]
+	fn load_scene_with(
+		&mut self,
+		scene: impl AsRef<str>,
+		entity_map: &mut bevy::ecs::entity::EntityHashMap<Entity>,
+	) -> Result {
 		let scene = scene.as_ref();
-		use bevy::ecs::entity::EntityHashMap;
 		let world = self.into_world_mut();
 		let scene = {
 			use serde::de::DeserializeSeed;
@@ -175,7 +182,7 @@ pub impl<W: IntoWorld> W {
 				.deserialize(&mut deserializer)
 				.map_err(|e| deserializer.span_error(e))
 		}?;
-		scene.write_to_world(world, &mut EntityHashMap::default())?;
+		scene.write_to_world(world, entity_map)?;
 
 		Ok(())
 	}

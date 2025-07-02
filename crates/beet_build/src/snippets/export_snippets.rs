@@ -6,11 +6,6 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 
 
-/// Marker type for the root of the static scene.
-#[derive(Debug, Clone, Default, Component)]
-pub struct StaticSceneRoot;
-
-
 pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	let rsx_snippets = world.run_system_once(collect_rsx_snippets)?;
 	let lang_snippets = world.run_system_once(collect_lang_snippets)?;
