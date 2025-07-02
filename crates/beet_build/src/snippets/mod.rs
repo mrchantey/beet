@@ -9,5 +9,5 @@ pub use parse_lightning::*;
 mod extract_lang_snippets;
 use extract_lang_snippets::*;
 pub mod error;
-mod file_snippet_plugin;
-pub use file_snippet_plugin::*;
+mod snippets_plugin;
+pub use snippets_plugin::*;

@@ -17,7 +17,7 @@ Plugins for building a beet application, currently only for building websites.
 The build process includes reactively passing information between the cli and the application.
 
 ## File Snippets
-Export the lang snippets and rsx snippets collected by statically analyzing files, see [FileSnippetPlugin](src/file_snippets/file_snippet_plugin.rs#L15).
+Export the lang snippets and rsx snippets collected by statically analyzing files, see [SnippetsPlugin](src/file_snippets/file_snippet_plugin.rs#L15).
 
 Triggers:
 - Startup - `load_all_template_files`

@@ -4,13 +4,13 @@
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(let_chains, if_let_guard, result_flattening, exit_status_error)]
 
-mod file_snippets;
+mod snippets;
 mod client_island_codegen;
 mod route_codegen;
 mod file_parsing;
 
 pub mod prelude {
-	pub use crate::file_snippets::*;
+	pub use crate::snippets::*;
 	pub use crate::client_island_codegen::*;
 	pub use crate::route_codegen::*;
 	pub use crate::file_parsing::*;

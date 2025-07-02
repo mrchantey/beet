@@ -9,10 +9,10 @@ use bevy::prelude::*;
 /// This plugin is usually added in combination with:
 /// - [`NodeTokensPlugin`](beet_parse::prelude::NodeTokensPlugin)
 #[derive(Debug, Default)]
-pub struct FileSnippetPlugin;
+pub struct SnippetsPlugin;
 
 
-impl Plugin for FileSnippetPlugin {
+impl Plugin for SnippetsPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,

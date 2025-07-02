@@ -7,7 +7,7 @@ use lightningcss::stylesheet::StyleSheet;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
-
+/// Parse css using lightningcss, applying styleid to selectors as required.
 pub fn parse_lightning(
 	constants: Res<HtmlConstants>,
 	mut commands: Commands,

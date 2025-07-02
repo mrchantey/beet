@@ -195,4 +195,27 @@ mod test {
 			.xpect()
 			.to_be_none();
 	}
+	#[test]
+	fn file_src() {
+		let mut app = App::new();
+		app.add_plugins(BuildPlugin::without_fs());
+
+		let entity = app
+			.world_mut()
+			.spawn((
+				NodeTag(String::from("style")),
+				ElementNode { self_closing: true },
+				LangContent::File(WsPathBuf::new(
+					"crates/beet_router/src/test_site/components/style.css",
+				)),
+			))
+			.id();
+		app.update();
+		app.world()
+			.entity(entity)
+			.get::<StyleId>()
+			.unwrap()
+			.xpect()
+			.to_be(&StyleId::new(0));
+	}
 }

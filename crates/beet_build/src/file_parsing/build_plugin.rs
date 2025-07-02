@@ -82,7 +82,7 @@ impl Plugin for BuildPlugin {
 				ParseRsxTokensPlugin::default(),
 				// RouteCodegenPlugin::default(),
 				// ClientIslandCodegenPlugin::default(),
-				FileSnippetPlugin::default(),
+				SnippetsPlugin::default(),
 			))
 			.configure_sets(
 				Update,
@@ -148,7 +148,7 @@ pub enum BuildFlag {
 	/// Generate Router Codegen
 	Routes,
 	/// Generate File Snippet Scenes
-	FileSnippets,
+	Snippets,
 	/// Generate Client Islands Codegen
 	ClientIslands,
 	CompileServer,
@@ -160,7 +160,7 @@ impl std::fmt::Display for BuildFlag {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			BuildFlag::Routes => write!(f, "routes"),
-			BuildFlag::FileSnippets => write!(f, "file-snippets"),
+			BuildFlag::Snippets => write!(f, "snippets"),
 			BuildFlag::ClientIslands => write!(f, "client-islands"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
 			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
@@ -174,7 +174,7 @@ impl FromStr for BuildFlag {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s.to_lowercase().as_str() {
 			"routes" => Ok(BuildFlag::Routes),
-			"file-snippets" => Ok(BuildFlag::FileSnippets),
+			"snippets" => Ok(BuildFlag::Snippets),
 			"client-islands" => Ok(BuildFlag::ClientIslands),
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),

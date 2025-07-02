@@ -26,7 +26,7 @@ mod html_constants;
 pub use html_constants::*;
 
 
-/// Added to the [`FileSnippetPlugin`] and the [`TemplatePlugin`] for static scene
+/// Added to the [`SnippetsPlugin`] and the [`TemplatePlugin`] for static scene
 /// serde.
 /// This plugin is not unique, so can be added in multiple places.
 pub struct NodeTypesPlugin;

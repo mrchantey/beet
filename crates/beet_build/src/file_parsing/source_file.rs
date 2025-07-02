@@ -9,7 +9,7 @@ use std::path::Path;
 
 /// Adde to an entity used to represent an file included
 /// in the [`WorkspaceConfig`]. These are loaded for different
-/// purposes by [`FileSnippetPlugin`] and [`RouteCodegenPlugin`].
+/// purposes by [`SnippetsPlugin`] and [`RouteCodegenPlugin`].
 #[derive(Debug, Clone, PartialEq, Eq, Component, Deref)]
 // #[component(immutable)]
 #[require(FileExprHash)]

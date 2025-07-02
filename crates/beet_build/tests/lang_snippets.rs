@@ -14,7 +14,7 @@ fn works() {
 		BuildPlugin::without_fs(),
 		// TemplatePlugin::default(),
 	))
-	.insert_resource(BuildFlags::only(BuildFlag::FileSnippets));
+	.insert_resource(BuildFlags::only(BuildFlag::Snippets));
 
 	let entity = app
 		.world_mut()
