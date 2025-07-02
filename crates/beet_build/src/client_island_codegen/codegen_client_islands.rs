@@ -59,7 +59,7 @@ impl CollectClientIslands {
 }
 
 
-pub fn collect_client_islands(
+pub fn codegen_client_islands(
 	_: Query<(), Changed<RouteCodegenRoot>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut query: Query<&mut CollectClientIslands>,
@@ -87,6 +87,14 @@ pub fn collect_client_islands(
 					}
 				}
 			});
+
+		let num_islands: usize =
+			client_island_map.values().map(|v| v.len()).sum();
+		let num_routes = client_island_map.len();
+
+		debug!(
+			"Exporting {num_islands} client islands for {num_routes} routes",
+		);
 
 		collect_islands.codegen.build_and_write()?;
 	}

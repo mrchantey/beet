@@ -23,7 +23,7 @@ pub struct RouteFileConfig {
 impl RouteFileConfig {
 	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
 		let client_actions_codegen =
-			if self.collection.category == RouteFileCategory::Action {
+			if self.collection.category == RouteCollectionCategory::Actions {
 				let codegen = self.codegen.clone_info(
 					CollectClientActions::path(&self.codegen.output),
 				);
@@ -69,26 +69,26 @@ pub struct RouteFileCollection {
 	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub router_state_type: Unspan<syn::Type>,
 	#[serde(default)]
-	pub category: RouteFileCategory,
+	pub category: RouteCollectionCategory,
 }
 
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub enum RouteFileCategory {
+pub enum RouteCollectionCategory {
 	/// Files contain public functions named after the http methods,
 	/// and will be included in the route tree.
 	#[default]
-	Page,
+	Pages,
 	/// Files contain arbitary axum routes,
 	/// and will be excluded from the route tree.
-	Action,
+	Actions,
 }
 
-impl RouteFileCategory {
+impl RouteCollectionCategory {
 	pub fn include_in_route_tree(&self) -> bool {
 		match self {
-			Self::Page => true,
-			Self::Action => false,
+			Self::Pages => true,
+			Self::Actions => false,
 		}
 	}
 }

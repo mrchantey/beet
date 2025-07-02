@@ -14,36 +14,45 @@ impl Plugin for RouteCodegenPlugin {
 		app.init_non_send_resource::<RouteCodegenConfig>()
 			.add_systems(
 				Update,
-				(
+				// not a perfect ordering, some of these, ie action codegen, arent actually dependent on preceeding
+				// systems but legibility is more valuable than perf at this stage
+				((
+					update_route_files,
+					// create the child routes
+					(parse_route_file_rs, parse_route_file_md),
+					modify_route_file_tokens,
+					(collect_combinator_route_meta, tokenize_combinator_route),
+					collect_route_files,
+					// update root codegen file
+					reexport_collections,
+					parse_route_tree,
+					// action codegen
 					(
-						(
-							update_route_files,
-							// create the child routes
-							(parse_route_file_rs, parse_route_file_md),
-							modify_route_file_tokens,
-							(
-								collect_combinator_route_meta,
-								tokenize_combinator_route,
-							),
-							collect_route_files,
-							// update root codegen file
-							reexport_collections,
-							parse_route_tree,
-						)
-							.chain(),
-						(
-							add_client_codegen_to_actions_export,
-							collect_client_action_group,
-						),
-					)
-						.in_set(AfterParseTokens)
+						add_client_codegen_to_actions_export,
+						collect_client_action_group,
+					),
+					export_codegen_files,
 				)
-					.run_if(|flags: Res<BuildFlags>| {
-						flags.contains(BuildFlag::Routes)
-					}),
+					.chain()
+					.in_set(AfterParseTokens))
+				.run_if(BuildFlags::should_run(BuildFlag::Routes)),
 			);
 	}
 }
+
+
+/// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
+fn export_codegen_files(
+	query: Populated<&CodegenFile, Changed<CodegenFile>>,
+) -> bevy::prelude::Result {
+	let num_files = query.iter().count();
+	info!("Exporting {} codegen files...", num_files);
+	for codegen_file in query.iter() {
+		codegen_file.build_and_write()?;
+	}
+	Ok(())
+}
+
 
 /// The codegen builder for routes in a beet site.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -89,7 +98,7 @@ impl NonSendPlugin for RouteCodegenConfig {
 }
 /// Marker type indicating the (usually `mod.rs`) file
 /// containing reexports and static route trees.
-/// This component will be marked Changed when recompilation
+/// This component is marked [`Changed`] when recompilation
 /// is required.
 #[derive(Debug, Clone, Default, Component)]
 #[require(CodegenFile)]

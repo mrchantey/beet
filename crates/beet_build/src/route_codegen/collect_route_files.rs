@@ -48,7 +48,7 @@ pub fn collect_route_files(
 				let meta_ident = method.meta.ident(&mod_ident, &method_name);
 
 				match collection.category {
-					RouteFileCategory::Page => {
+					RouteCollectionCategory::Pages => {
 						// All page routes are BundleRoutes, so use add_bundle_route
 						// for middleware support
 						route_handlers.push(parse_quote! {
@@ -60,7 +60,7 @@ pub fn collect_route_files(
 								);
 						});
 					}
-					RouteFileCategory::Action => {
+					RouteCollectionCategory::Actions => {
 						// Action routes may be any kind of route
 						route_handlers.push(quote! {
 								router = plugin.add_route(router,#route_info, #mod_ident::#http_method);

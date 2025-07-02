@@ -22,7 +22,7 @@ pub struct RunBuild {
 	/// Only execute the provided build steps,
 	/// options are `routes`, `static-scene`, `client-islands`
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
-	flags: Vec<BuildFlag>,
+	only: Vec<BuildFlag>,
 }
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
@@ -44,10 +44,10 @@ impl RunBuild {
 		let cwd = config.template_config.workspace.root_dir.into_abs();
 		let filter = config.template_config.workspace.filter.clone();
 
-		let build_flags = if self.flags.is_empty() {
+		let build_flags = if self.only.is_empty() {
 			BuildFlags::All
 		} else {
-			BuildFlags::Only(self.flags)
+			BuildFlags::Only(self.only)
 		};
 
 		app.insert_resource(build_flags)

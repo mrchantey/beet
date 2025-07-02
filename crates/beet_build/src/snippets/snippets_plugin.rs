@@ -24,9 +24,9 @@ impl Plugin for SnippetsPlugin {
 				)
 					.chain()
 					.in_set(AfterParseTokens),
-				(export_snippets, export_lang_snippets)
-					.in_set(ExportArtifactsSet),
-			),
+				export_snippets.in_set(ExportArtifactsSet),
+			)
+				.run_if(BuildFlags::should_run(BuildFlag::Snippets)),
 		);
 	}
 }

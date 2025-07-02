@@ -46,12 +46,12 @@ impl RouteFile {
 	}
 	/// The module import for the generated code.
 	/// For Actions this will only export in non-wasm builds
-	pub fn item_mod(&self, category: RouteFileCategory) -> ItemMod {
+	pub fn item_mod(&self, category: RouteCollectionCategory) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
 		let target: Option<Attribute> = match category {
-			RouteFileCategory::Page => None,
-			RouteFileCategory::Action => Some(parse_quote! {
+			RouteCollectionCategory::Pages => None,
+			RouteCollectionCategory::Actions => Some(parse_quote! {
 				#[cfg(not(target_arch = "wasm32"))]
 			}),
 		};

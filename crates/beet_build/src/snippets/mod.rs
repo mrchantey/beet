@@ -1,7 +1,5 @@
 mod export_snippets;
 pub use export_snippets::*;
-mod export_lang_snippets;
-use export_lang_snippets::*;
 #[cfg(feature = "css")]
 mod parse_lightning;
 #[cfg(feature = "css")]

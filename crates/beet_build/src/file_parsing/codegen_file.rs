@@ -10,18 +10,6 @@ use syn::Item;
 
 
 
-/// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
-pub(super) fn export_codegen_files(
-	query: Populated<&CodegenFile, Changed<CodegenFile>>,
-) -> bevy::prelude::Result {
-	let num_files = query.iter().count();
-	info!("Exporting {} codegen files...", num_files);
-	for codegen_file in query.iter() {
-		codegen_file.build_and_write()?;
-	}
-	Ok(())
-}
-
 /// Every codegen file is created via this struct. It contains
 /// several utilities and standards that make the whole thing nicer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Component)]

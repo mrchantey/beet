@@ -17,6 +17,7 @@ pub struct BuildConfig {
 	#[serde(flatten)]
 	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
+	#[serde(default)]
 	pub collect_client_islands: CollectClientIslands,
 }
 
@@ -119,11 +120,18 @@ impl Plugin for BuildPlugin {
 						.after(ParseRsxTokensSet)
 						.before(AfterParseTokens),
 					(
-						export_codegen_files,
-						compile_server,
-						collect_client_islands,
-						compile_wasm,
-						run_server,
+						compile_server.run_if(BuildFlags::should_run(
+							BuildFlag::CompileServer,
+						)),
+						codegen_client_islands.run_if(BuildFlags::should_run(
+							BuildFlag::ClientIslands,
+						)),
+						compile_wasm.run_if(BuildFlags::should_run(
+							BuildFlag::CompileWasm,
+						)),
+						run_server.run_if(BuildFlags::should_run(
+							BuildFlag::RunServer,
+						)),
 					)
 						.chain()
 						.in_set(ExportArtifactsSet),
@@ -153,9 +161,14 @@ impl BuildFlags {
 			Self::Only(flags) => flags.contains(&flag),
 		}
 	}
+
+	/// A predicate system for run_if conditions,
+	pub fn should_run(flag: BuildFlag) -> impl Fn(Res<Self>) -> bool {
+		move |flags| flags.contains(flag)
+	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildFlag {
 	/// Generate Router Codegen
 	Routes,
@@ -165,6 +178,7 @@ pub enum BuildFlag {
 	ClientIslands,
 	CompileServer,
 	CompileWasm,
+	RunServer,
 }
 
 
@@ -176,6 +190,7 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::ClientIslands => write!(f, "client-islands"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
 			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
+			BuildFlag::RunServer => write!(f, "run-server"),
 		}
 	}
 }
@@ -190,6 +205,7 @@ impl FromStr for BuildFlag {
 			"client-islands" => Ok(BuildFlag::ClientIslands),
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),
+			"run-server" => Ok(BuildFlag::RunServer),
 			_ => Err(format!("Unknown only field: {}", s)),
 		}
 	}

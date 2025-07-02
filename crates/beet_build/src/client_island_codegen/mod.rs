@@ -1,6 +1,6 @@
-mod collect_client_islands;
+mod codegen_client_islands;
 mod compile_wasm;
 pub use compile_wasm::*;
-pub use collect_client_islands::*;
+pub use codegen_client_islands::*;
 
 
