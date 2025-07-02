@@ -11,7 +11,7 @@ use syn::ItemFn;
 /// tokenize it and append to the [`CodegenFile`].
 pub fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query = world
-		.query_filtered::<Entity, (With<CodegenFile>, Added<CombinatorRouteCodegen>)>(
+		.query_filtered::<Entity, (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
 		);
 	for entity in query.iter(world).collect::<Vec<_>>() {
 		let tokens = tokenize_bundle(world, entity)?;
@@ -51,7 +51,7 @@ impl CombinatorRouteCodegen {
 pub fn collect_combinator_route(
 	mut query: Populated<
 		(Entity, &mut CodegenFile, &CombinatorRouteCodegen),
-		Added<CombinatorRouteCodegen>,
+		Changed<CombinatorRouteCodegen>,
 	>,
 	parents: Query<&ChildOf>,
 	collections: Query<&RouteFileCollection>,
@@ -88,6 +88,7 @@ pub fn collect_combinator_route(
 mod test {
 	use crate::prelude::*;
 	use beet_bevy::prelude::WorldMutExt;
+	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use quote::quote;
@@ -96,10 +97,17 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default())
-			.insert_resource(BuildFlags::only(BuildFlag::Routes))
+		app.add_plugins(BuildPlugin::without_fs())
 			.world_mut()
-			.spawn((RouteFileCollection::test_site_docs(),));
+			.spawn(RouteFileCollection::test_site_docs());
+		app.world_mut().spawn(SourceFile::new(
+			WsPathBuf::new(
+				"crates/beet_router/src/test_site/test_docs/hello.md",
+			)
+			.into_abs(),
+		));
+
+
 		app.update();
 		app
 		.world_mut()

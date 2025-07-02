@@ -44,12 +44,14 @@ mod test {
 	fn parse_md() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
-		let test_site_index = WsPathBuf::new(
-			"crates/beet_router/src/test_site/test_docs/hello.md",
-		);
 		let entity = app
 			.world_mut()
-			.spawn(SourceFile::new(test_site_index.into_abs()))
+			.spawn(SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/test_docs/hello.md",
+				)
+				.into_abs(),
+			))
 			.id();
 
 		app.update();
@@ -65,12 +67,14 @@ mod test {
 	fn parse_mdx() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
-		let test_site_index = WsPathBuf::new(
-			"crates/beet_router/src/test_site/test_docs/index.mdx",
-		);
 		let entity = app
 			.world_mut()
-			.spawn(SourceFile::new(test_site_index.into_abs()))
+			.spawn(SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/test_docs/index.mdx",
+				)
+				.into_abs(),
+			))
 			.id();
 
 		app.update();
@@ -80,6 +84,8 @@ mod test {
 			.unwrap()
 			.xpect()
 			// only the output of the snippet, not the instance
-			.to_be("<h1>Docs</h1><p>Docs are good for your health</p><div>1 + 1 is</div>");
+			.to_be(
+				"<h1>Docs</h1><p>Docs are good for your health</p><div>1 + 1 is</div>",
+			);
 	}
 }

@@ -54,7 +54,7 @@ impl ModifyRoutePath {
 	}
 }
 
-pub fn modify_file_route_tokens(
+pub fn modify_route_file_tokens(
 	parents: Query<&ChildOf>,
 	modifiers: Query<&ModifyRoutePath>,
 	mut query: Populated<
@@ -109,7 +109,7 @@ mod test {
 					)]),
 			))
 			.id();
-		world.run_system_once(modify_file_route_tokens).unwrap();
+		world.run_system_once(modify_route_file_tokens).unwrap();
 		world
 			.get::<RouteFileMethod>(entity)
 			.unwrap()
@@ -117,6 +117,6 @@ mod test {
 			.path
 			.to_string()
 			.xpect()
-			.to_be("/design/modify_route_path");
+			.to_be("/design/modify_route_file_tokens");
 	}
 }

@@ -5,7 +5,8 @@ use syn::Item;
 use syn::ItemMod;
 use syn::ItemUse;
 
-
+/// Added as a child of any [`RouteFileCollection`] with a [`RouteFileCategory::Action`],
+/// meaning a client actions codegen will be created.
 #[derive(Debug, Clone, Component)]
 #[require(CodegenFile)]
 pub struct CollectClientActions {
@@ -44,11 +45,11 @@ impl Default for CollectClientActions {
 
 
 pub fn add_client_codegen_to_actions_export(
-	query: Populated<&ChildOf, Added<CollectClientActions>>,
-	mut codegens: Query<&mut CodegenFile>,
+	query: Populated<&ChildOf, Changed<CollectClientActions>>,
+	mut collection_codegen: Query<&mut CodegenFile, With<RouteFileCollection>>,
 ) -> Result {
 	for child in query.iter() {
-		let mut codegen = codegens.get_mut(child.parent())?;
+		let mut codegen = collection_codegen.get_mut(child.parent())?;
 
 		let ident = CollectClientActions::ident(&codegen.output);
 		codegen.add_item::<ItemMod>(syn::parse_quote! {
@@ -64,7 +65,7 @@ pub fn add_client_codegen_to_actions_export(
 pub fn collect_client_action_group(
 	mut query: Populated<
 		(&mut CodegenFile, &CollectClientActions, &ChildOf),
-		Added<CollectClientActions>,
+		Changed<CollectClientActions>,
 	>,
 	children: Query<&Children>,
 	methods: Query<(&RouteFileMethod, &RouteFileMethodSyn)>,

@@ -13,12 +13,13 @@ use syn::parse_quote;
 pub fn collect_route_files(
 	mut query: Populated<
 		(&mut CodegenFile, &RouteFileCollection, &Children),
-		Added<RouteFileCollection>,
+		Changed<RouteFileCollection>,
 	>,
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
 ) -> Result {
-	for (mut codegen_file, collection, collection_children) in query.iter_mut() {
+	for (mut codegen_file, collection, collection_children) in query.iter_mut()
+	{
 		let mut route_infos = Vec::<TokenStream>::new();
 		let mut route_handlers = Vec::<TokenStream>::new();
 		let mut route_metas = Vec::<syn::Path>::new();
@@ -82,8 +83,10 @@ pub fn collect_route_files(
 				.ok_or_else(|| bevyhow!("failed"))?
 		};
 
-		let router_plugin_ident =
-			quote::format_ident!("{}Plugin", collection_name.to_upper_camel_case());
+		let router_plugin_ident = quote::format_ident!(
+			"{}Plugin",
+			collection_name.to_upper_camel_case()
+		);
 
 		codegen_file.add_item::<syn::ItemStruct>(parse_quote! {
 			#[derive(Debug, Default, Clone)]
@@ -149,6 +152,7 @@ pub fn collect_route_files(
 mod test {
 	use crate::prelude::*;
 	use beet_bevy::prelude::WorldMutExt;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -156,7 +160,13 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		app.add_plugins(BuildPlugin::without_fs());
+		app.world_mut().spawn(SourceFile::new(
+			WsPathBuf::new(
+				"crates/beet_router/src/test_site/test_docs/hello.md",
+			)
+			.into_abs(),
+		));
 		app.world_mut().spawn(RouteFileCollection::test_site_docs());
 		app.update();
 		app

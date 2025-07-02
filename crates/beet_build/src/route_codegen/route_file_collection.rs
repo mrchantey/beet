@@ -32,10 +32,10 @@ impl RouteFileConfig {
 				None
 			};
 
-		let mut entity =
+		let mut collection_entity =
 			spawner.spawn((self.collection, self.codegen, self.modify_route));
 		if let Some(client_actions_codegen) = client_actions_codegen {
-			entity.with_child((
+			collection_entity.with_child((
 				client_actions_codegen,
 				CollectClientActions::default(),
 			));

@@ -16,31 +16,30 @@ impl Plugin for RouteCodegenPlugin {
 				Update,
 				(
 					(
-						update_route_files,
-						// create the child routes
-						(parse_route_file_rs, parse_route_file_md),
-						modify_file_route_tokens,
-						// update root codegen file
-						reexport_collections,
-						parse_route_tree,
+						(
+							update_route_files,
+							// create the child routes
+							(parse_route_file_rs, parse_route_file_md),
+							modify_route_file_tokens,
+							collect_route_files,
+							// update root codegen file
+							reexport_collections,
+							parse_route_tree,
+						)
+							.chain(),
+						(
+							add_client_codegen_to_actions_export,
+							collect_client_action_group,
+							(
+								collect_combinator_route,
+								tokenize_combinator_route,
+							)
+								.chain(),
+						),
 					)
-						.chain()
 						.in_set(AfterParseTokens),
-					// (
-					// 	(
-					// 		(
-					// 			add_client_codegen_to_actions_export,
-					// 		),
-					// 		collect_route_files,
-					// 	)
-					// 		.chain(),
-					// 	collect_client_action_group,
-					// 	(collect_combinator_route, tokenize_combinator_route)
-					// 		.chain(),
-					// )
-					// 	.in_set(AfterParseTokens),
-					// #[cfg(not(test))]
-					// compile_router.after(ExportArtifactsSet),
+					#[cfg(not(test))]
+					compile_router.after(ExportArtifactsSet),
 				)
 					.run_if(|flags: Res<BuildFlags>| {
 						flags.contains(BuildFlag::Routes)
