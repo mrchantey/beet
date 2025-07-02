@@ -11,10 +11,7 @@ fn works() {
 	let mut app = App::new();
 
 	app.add_plugins((
-		BuildPlugin {
-			skip_load_workspace: true,
-			..default()
-		},
+		BuildPlugin::without_fs(),
 		// TemplatePlugin::default(),
 	))
 	.insert_resource(BuildFlags::only(BuildFlag::FileSnippets));

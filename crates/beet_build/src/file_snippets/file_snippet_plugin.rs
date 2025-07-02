@@ -34,8 +34,6 @@ impl Plugin for FileSnippetPlugin {
 				)
 					.chain()
 					.in_set(AfterParseTokens),
-				#[cfg(not(test))]
-				export_file_snippets.in_set(ExportArtifactsSet),
 			),
 		);
 	}

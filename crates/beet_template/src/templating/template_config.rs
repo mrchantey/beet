@@ -42,8 +42,8 @@ pub struct WorkspaceConfig {
 	#[cfg_attr(feature = "serde", serde(default = "default_root_dir"))]
 	pub root_dir: WsPathBuf,
 	/// The location for the generated template scene file
-	#[cfg_attr(feature = "serde", serde(default = "default_scene_file"))]
-	pub scene_file: WsPathBuf,
+	#[cfg_attr(feature = "serde", serde(default = "default_rsx_snippets_dir"))]
+	pub rsx_snippets_dir: WsPathBuf,
 	/// Location of the html directory, defaults to 'target/client'
 	#[cfg_attr(feature = "serde", serde(default = "default_html_dir"))]
 	pub html_dir: WsPathBuf,
@@ -76,14 +76,14 @@ fn default_root_dir() -> WsPathBuf {
 	}
 }
 #[allow(unused)]
-fn default_scene_file() -> WsPathBuf {
+fn default_rsx_snippets_dir() -> WsPathBuf {
 	WsPathBuf::new("target/template_scene.ron")
 }
 #[allow(unused)]
 fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
 #[allow(unused)]
 fn default_client_islands_path() -> WsPathBuf {
-	WsPathBuf::new("target/client_islands.ron")
+	WsPathBuf::new("target/rsx_snippets")
 }
 
 impl Default for WorkspaceConfig {
@@ -91,7 +91,7 @@ impl Default for WorkspaceConfig {
 		Self {
 			filter: default_filter(),
 			root_dir: default_root_dir(),
-			scene_file: default_scene_file(),
+			rsx_snippets_dir: default_rsx_snippets_dir(),
 			html_dir: default_html_dir(),
 			client_islands_path: default_client_islands_path(),
 		}
@@ -105,7 +105,7 @@ impl WorkspaceConfig {
 		this
 	}
 
-	pub fn scene_file(&self) -> &WsPathBuf { &self.scene_file }
+	pub fn rsx_snippets_dir(&self) -> &WsPathBuf { &self.rsx_snippets_dir }
 
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.filter.passes(path)

@@ -98,7 +98,7 @@ impl AppRouter<()> {
 	pub fn test() -> Self {
 		let mut template_config = TemplateConfig::default();
 		// dont apply static
-		template_config.workspace.scene_file =
+		template_config.workspace.rsx_snippets_dir =
 			WsPathBuf::new("doesnt-exist.ron");
 		set_app(template_config.clone());
 		Self {

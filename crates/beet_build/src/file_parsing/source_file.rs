@@ -39,7 +39,7 @@ pub(super) fn load_workspace_source_files(
 		config
 			.get_files()?
 			.into_iter()
-			.map(|path| (SnippetFile, SourceFile::new(path))),
+			.map(|path| SourceFile::new(path)),
 	)),));
 	Ok(())
 }

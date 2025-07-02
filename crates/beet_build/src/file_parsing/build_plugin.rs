@@ -35,6 +35,16 @@ pub struct BuildPlugin {
 	/// Disable loading the workspace source files, useful for
 	/// testing or manually loading files.
 	pub skip_load_workspace: bool,
+	pub skip_write_to_fs: bool,
+}
+impl BuildPlugin {
+	/// Do not read workspace files, and do not write any files to the filesystem.
+	pub fn without_fs() -> Self {
+		Self {
+			skip_load_workspace: true,
+			skip_write_to_fs: true,
+		}
+	}
 }
 
 
@@ -59,6 +69,7 @@ impl Plugin for BuildPlugin {
 			#[cfg(not(test))]
 			app.add_systems(Startup, load_workspace_source_files);
 		}
+		let write_to_fs = !self.skip_write_to_fs;
 
 		app.add_event::<WatchEvent>()
 			.init_resource::<WorkspaceConfig>()
@@ -82,25 +93,21 @@ impl Plugin for BuildPlugin {
 						.after(ParseRsxTokensSet),
 					ExportArtifactsSet
 						.after(AfterParseTokens)
-						.before(TemplateSet),
+						.before(TemplateSet)
+						.run_if(move || write_to_fs),
 				),
 			)
 			.add_systems(
 				Update,
 				(
-					(
-						parse_file_watch_events,
-						(
-							parse_files_rs,
-							parse_files_md,
-						),
-					)
+					(parse_file_watch_events, (parse_files_rs, parse_files_md))
 						.chain()
 						.before(BeforeParseTokens),
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
 						.before(AfterParseTokens),
-					export_codegen_files.in_set(ExportArtifactsSet),
+					(export_rsx_snippets, export_codegen_files)
+						.in_set(ExportArtifactsSet),
 				),
 			);
 	}

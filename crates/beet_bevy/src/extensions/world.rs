@@ -138,11 +138,14 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&self) -> String {
+		self.build_scene_with(DynamicScene::from_world(self.into_world()))
+	}
+	#[cfg(feature = "bevy_scene")]
+	fn build_scene_with(&self, scene: DynamicScene) -> String {
 		use bevy::scene::ron;
 		use bevy::scene::serde::SceneSerializer;
 
 		let world = self.into_world();
-		let scene = DynamicScene::from_world(world);
 		let type_registry = world.resource::<AppTypeRegistry>();
 		let type_registry = type_registry.read();
 		let scene_serializer = SceneSerializer::new(&scene, &type_registry);
