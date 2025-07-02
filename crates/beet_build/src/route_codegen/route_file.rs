@@ -83,23 +83,27 @@ impl CollectionIndexCounter {
 
 /// When a [`FileExprHash`] changes, create a corresponding [`RouteFile`]
 /// for each file group that it matches if it doesnt exist,
-/// otherwise mark it as changed
+/// otherwise mark it as changed.
+/// A [`Changed<RouteFile>`] will also result in a [`Changed<RouteFileCollection>`]
 pub(super) fn update_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
-	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
-	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
+	changed_exprs: Populated<(Entity, &SourceFile), Changed<FileExprHash>>,
+	mut collections: Query<(Entity, &mut RouteFileCollection, &CodegenFile)>,
 	children: Query<&Children>,
 	mut route_files: Query<&mut RouteFile>,
 ) -> Result {
-	for file in changed_exprs.iter() {
-		for (collection_entity, collection, codegen) in collections
-			.iter()
+	for (file_entity, file) in changed_exprs.iter() {
+		for (collection_entity, mut collection, codegen) in collections
+			.iter_mut()
 			.filter(|(_, collection, _)| collection.passes_filter(file))
 		{
+			// check if there is a match, if so mark as changed.
+			// otherwise create a new RouteFile
 			if !children.iter_direct_descendants(collection_entity).any(
 				|child| match route_files.get_mut(child) {
 					Ok(mut route_file) if route_file.abs_path == **file => {
+						collection.set_changed();
 						route_file.set_changed();
 						true
 					}
@@ -119,13 +123,17 @@ pub(super) fn update_route_files(
 
 				let index = index_counter.next(collection_entity);
 
-				commands.spawn((ChildOf(collection_entity), RouteFile {
-					index,
-					collection_path,
-					mod_path,
-					route_path,
-					abs_path: (**file).clone(),
-				}));
+				commands.spawn((
+					ChildOf(collection_entity),
+					SourceFileRef(file_entity),
+					RouteFile {
+						index,
+						collection_path,
+						mod_path,
+						route_path,
+						abs_path: (**file).clone(),
+					},
+				));
 			}
 		}
 	}

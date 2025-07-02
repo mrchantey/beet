@@ -25,6 +25,20 @@ impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
+/// Types like [`RouteFile`] exist outside of the [`SourceFile`] tree,
+/// but need to reference it to get its rsx children.
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = SourceFileRefTarget)]
+pub struct SourceFileRef(pub Entity);
+
+/// All references to this [`SourceFile`]
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = SourceFileRef,linked_spawn)]
+pub struct SourceFileRefTarget(Vec<Entity>);
+
+
 
 
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
