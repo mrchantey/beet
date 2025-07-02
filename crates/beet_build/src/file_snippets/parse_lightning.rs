@@ -14,12 +14,12 @@ pub fn parse_lightning(
 	query: Populated<
 		(
 			Entity,
-			&LangPartial,
+			&LangSnippet,
 			&NodeTag,
 			Option<&StyleId>,
 			Option<&FileSpanOf<ElementNode>>,
 		),
-		Added<LangPartial>,
+		Added<LangSnippet>,
 	>,
 ) -> Result {
 	let output = query
@@ -30,11 +30,12 @@ pub fn parse_lightning(
 		.map(|(entity, partial, _tag, styleid, span)| {
 			// Parse the stylesheet
 			let mut stylesheet =
-				StyleSheet::parse(&partial, ParserOptions::default())
-					.map_err(|e| Error::LightningCss {
+				StyleSheet::parse(&partial, ParserOptions::default()).map_err(
+					|e| Error::LightningCss {
 						span: span.map(|s| s.value.clone()),
 						err: e.to_string(),
-					})?;
+					},
+				)?;
 			if let Some(styleid) = styleid {
 				let class_name = constants.style_id_attribute(*styleid);
 				stylesheet.rules.0.iter_mut().for_each(|rule| {
@@ -78,7 +79,7 @@ pub fn parse_lightning(
 	// only local style tags
 
 	for (entity, css) in output {
-		commands.entity(entity).insert(LangPartial::new(css));
+		commands.entity(entity).insert(LangSnippet::new(css));
 	}
 	Ok(())
 }
@@ -102,7 +103,7 @@ mod test {
 		let global = app
 			.world_mut()
 			.spawn((
-				LangPartial("div { color: red; }".to_string()),
+				LangSnippet("div { color: red; }".to_string()),
 				NodeTag("style".into()),
 				// no styleid indicates global
 			))
@@ -110,7 +111,7 @@ mod test {
 		let local = app
 			.world_mut()
 			.spawn((
-				LangPartial("div { color: red; }".to_string()),
+				LangSnippet("div { color: red; }".to_string()),
 				NodeTag("style".into()),
 				StyleId::new(7),
 			))
@@ -120,16 +121,16 @@ mod test {
 
 		app.world()
 			.entity(global)
-			.get::<LangPartial>()
+			.get::<LangSnippet>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangPartial("div {\n  color: red;\n}\n".to_string()));
+			.to_be(&LangSnippet("div {\n  color: red;\n}\n".to_string()));
 		app.world()
 			.entity(local)
-			.get::<LangPartial>()
+			.get::<LangSnippet>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangPartial(
+			.to_be(&LangSnippet(
 				"div[data-beet-style-id-7] {\n  color: red;\n}\n".to_string(),
 			));
 	}

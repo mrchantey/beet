@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 
 
-/// Added to each [`LangPartial`] and each [`NodePortalTarget`] source,
+/// Added to each [`LangSnippet`] and each [`NodePortalTarget`] source,
 /// in the case of a [`StyleScope::Local`].
 /// The propagation of style ids to each element in a template is performed
 /// at a later stage.

@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 /// Deduplicate `script` and `style` tags by replacing the
-/// [`LangContent`] directive with a [`NodePortal`] to a shared [`LangPartial`].
+/// [`LangContent`] directive with a [`NodePortal`] to a shared [`LangSnippet`].
 pub fn extract_lang_partials(
 	mut commands: Commands,
 	query: Populated<
@@ -44,7 +44,7 @@ pub fn extract_lang_partials(
 			}
 		};
 
-		let mut target = commands.spawn((tag.clone(), LangPartial(content)));
+		let mut target = commands.spawn((tag.clone(), LangSnippet(content)));
 		scope.map(|scope| {
 			target.insert(scope.clone());
 		});
@@ -62,14 +62,14 @@ pub fn extract_lang_partials(
 				.remove::<ElementNode>()
 				.remove::<Children>()
 				.remove::<Attributes>()
-				.insert(PortalTo::<LangPartial>::default())
+				.insert(PortalTo::<LangSnippet>::default())
 				.insert(NodePortal::new(target));
 		}
 	}
 	Ok(())
 }
 
-/// For each style [`LangPartial`] with a [`StyleScope::Local`],
+/// For each style [`LangSnippet`] with a [`StyleScope::Local`],
 /// assign a unique [`StyleId`] to the entity and each
 /// [`NodePortalTarget`].
 pub fn apply_style_ids(
@@ -78,11 +78,11 @@ pub fn apply_style_ids(
 		(
 			Entity,
 			&NodeTag,
-			&LangPartial,
+			&LangSnippet,
 			&NodePortalTarget,
 			Option<&StyleScope>,
 		),
-		Added<LangPartial>,
+		Added<LangSnippet>,
 	>,
 ) {
 	for (id, (entity, tag, _partial, portal_sources, scope)) in
@@ -132,7 +132,7 @@ mod test {
 		let expected = "div{color:blue;}";
 
 		app.world()
-			.get::<LangPartial>(**portal)
+			.get::<LangSnippet>(**portal)
 			.unwrap()
 			.0
 			.clone()

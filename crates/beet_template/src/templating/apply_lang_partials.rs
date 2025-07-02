@@ -6,14 +6,14 @@ use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
 
-/// For trees with [`PortalTo<LangPartial>`], insert a single element at the top
+/// For trees with [`PortalTo<LangSnippet>`], insert a single element at the top
 /// of the tree, to be hoisted to the head.
 pub fn apply_lang_partials(
 	mut commands: Commands,
-	partials: Query<(Entity, &LangPartial)>,
+	partials: Query<(Entity, &LangSnippet)>,
 	parents: Query<&ChildOf>,
 	roots: Query<(), With<HtmlDocument>>,
-	query: Populated<(Entity, &NodePortal), Added<PortalTo<LangPartial>>>,
+	query: Populated<(Entity, &NodePortal), Added<PortalTo<LangSnippet>>>,
 	node_location: NodeLocation,
 ) -> Result {
 	let mut root_content = HashMap::<Entity, HashMap<Entity, String>>::new();
@@ -21,7 +21,7 @@ pub fn apply_lang_partials(
 	for (entity, portal) in query.iter() {
 		let Ok(partial) = partials.get(**portal) else {
 			bevybail!(
-				"Failed to find a matching LangPartial for NodePortal: {}",
+				"Failed to find a matching LangSnippet for NodePortal: {}",
 				node_location.stringify(**portal)
 			);
 		};
@@ -52,7 +52,7 @@ pub fn apply_lang_partials(
 				.clone_and_spawn_with(|builder| {
 					builder
 						.allow::<(NodeTag, StyleId)>()
-						.deny::<(LangPartial, NodePortalTarget)>();
+						.deny::<(LangSnippet, NodePortalTarget)>();
 				})
 				.insert((ChildOf(root), ElementNode::open(), children![
 					TextNode::new(contents)
@@ -80,7 +80,7 @@ mod test {
 		let partial = world
 			.spawn((
 				NodeTag::new("style"),
-				LangPartial::new("body { color: red; }"),
+				LangSnippet::new("body { color: red; }"),
 				StyleScope::Global,
 				HtmlHoistDirective::Body,
 			))
@@ -89,7 +89,7 @@ mod test {
 			.spawn((
 				HtmlDocument,
 				NodePortal::new(partial),
-				PortalTo::<LangPartial>::default(),
+				PortalTo::<LangSnippet>::default(),
 			))
 			.id();
 		world
@@ -108,16 +108,16 @@ mod test {
 		let partial = world
 			.spawn((
 				NodeTag::new("style"),
-				LangPartial::new("body { color: red; }"),
+				LangSnippet::new("body { color: red; }"),
 			))
 			.id();
 		let tree = world
 			.spawn((HtmlDocument, children![
-				(NodePortal::new(partial), PortalTo::<LangPartial>::default()),
+				(NodePortal::new(partial), PortalTo::<LangSnippet>::default()),
 				(
 					InstanceRoot,
 					NodePortal::new(partial),
-					PortalTo::<LangPartial>::default()
+					PortalTo::<LangSnippet>::default()
 				)
 			]))
 			.id();

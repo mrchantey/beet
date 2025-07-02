@@ -12,10 +12,10 @@ use std::path::PathBuf;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Component)]
 // #[component(immutable)]
-pub struct LangPartial(pub String);
+pub struct LangSnippet(pub String);
 
-impl LangPartial {
-	/// Create a new [`LangPartial`] from a `String`.
+impl LangSnippet {
+	/// Create a new [`LangSnippet`] from a `String`.
 	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
 }
 

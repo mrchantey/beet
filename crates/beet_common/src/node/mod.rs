@@ -64,12 +64,12 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<FileSpanOf<CommentNode>>()
 			.register_type::<FileSpanOf<ElementNode>>()
 			// directives - script/style
-			.register_type::<LangPartial>()
+			.register_type::<LangSnippet>()
 			.register_type::<LangContent>()
 			.register_type::<StyleId>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()
-			.register_type::<PortalTo<LangPartial>>()
+			.register_type::<PortalTo<LangSnippet>>()
 			// directives - client island
 			.register_type::<TemplateSerde>()
 			.register_type::<ClientLoadDirective>()

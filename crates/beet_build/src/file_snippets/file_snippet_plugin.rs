@@ -4,7 +4,7 @@ use beet_template::prelude::*;
 use bevy::prelude::*;
 
 /// Plugin containing all systems for exporting a scene including:
-/// - [`LangPartial`]
+/// - [`LangSnippet`]
 /// - [`StaticNodeRoot`]
 ///  from files.
 /// This plugin is usually added in combination with:
