@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 /// The fs loaded and deduplicated [`LangContent`], existing seperately from the
 /// originating tree(s).
+/// Created alongside a [`NodeTag`], [`LangSnippetPath`] and optionally a [`StyleId`]
 #[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Component)]

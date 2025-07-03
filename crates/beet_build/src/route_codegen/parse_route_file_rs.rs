@@ -12,19 +12,18 @@ pub fn parse_route_file_rs(
 	source_files: Query<&SourceFile>,
 	query: Populated<(Entity, &SourceFileRef, &RouteFile), Changed<RouteFile>>,
 ) -> Result {
-	for (entity, source_file, route_file) in
+	for (route_file_entity, source_file_ref, route_file) in
 		query.iter().filter(|(_, _, route_file)| {
 			route_file
 				.source_file_collection_rel
 				.extension()
 				.map_or(false, |ext| ext == "rs")
 		}) {
-		let source_file = source_files.get(**source_file)?;
-		let mut parent = commands.entity(entity);
+		let source_file = source_files.get(**source_file_ref)?;
 		// discard any existing children, we could
 		// possibly do a diff but these changes already result in recompile
 		// so not super perf critical
-		parent.despawn_related::<Children>();
+		commands.entity(route_file_entity).despawn_related::<Children>();
 
 		let file_str = ReadFile::to_string(&source_file)?;
 
@@ -63,7 +62,8 @@ pub fn parse_route_file_rs(
 				})
 				.unwrap_or_default();
 
-			parent.with_child((
+			commands.spawn((
+				ChildOf(route_file_entity),
 				RouteFileMethodSyn::new(func.clone()),
 				RouteFileMethod {
 					route_info: RouteInfo::new(

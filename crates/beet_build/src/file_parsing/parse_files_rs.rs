@@ -20,7 +20,9 @@ pub fn parse_files_rs(
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
 		{
-			commands.entity(entity).despawn_related::<Children>();
+			commands
+				.entity(entity)
+				.despawn_related::<SourceFileRefTarget>();
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {

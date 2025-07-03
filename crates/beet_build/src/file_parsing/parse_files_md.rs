@@ -17,7 +17,7 @@ pub fn parse_files_md(
 		{
 			commands
 				.entity(source_file_entity)
-				.despawn_related::<Children>();
+				.despawn_related::<SourceFileRefTarget>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
@@ -84,7 +84,11 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<SourceFileRefTarget>().unwrap()[0];
+		let child = app
+			.world()
+			.entity(entity)
+			.get::<SourceFileRefTarget>()
+			.unwrap()[0];
 		app.world_mut()
 			.run_system_once_with(render_fragment, child)
 			.unwrap()
