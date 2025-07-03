@@ -17,7 +17,15 @@ pub fn compile_server(
 ) -> Result {
 	debug!("Building native binary");
 	cmd.spawn()?;
+	Ok(())
+}
 
+
+/// After compiling server (if required) export the static files.
+pub fn export_server_ssg(
+	_query: Populated<(), Changed<SourceFileRoot>>,
+	cmd: When<Res<CargoBuildCmd>>,
+) -> Result {
 	// run once to export static
 	let exe_path = cmd.exe_path();
 	debug!(

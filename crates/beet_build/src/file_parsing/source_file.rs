@@ -42,7 +42,8 @@ pub struct SourceFileRef(pub Entity);
 pub struct SourceFileRefTarget(Vec<Entity>);
 
 
-/// Parent of every [`SourceFile`] entity.
+/// Parent of every [`SourceFile`] entity, any changed child [`SourceFile`]
+/// will result in this being marked [`Changed`]
 #[derive(Component)]
 pub struct SourceFileRoot;
 
@@ -74,7 +75,7 @@ pub(super) fn parse_file_watch_events(
 	mut commands: Commands,
 	mut events: EventReader<WatchEvent>,
 	config: When<Res<WorkspaceConfig>>,
-	roots: Query<Entity, With<SourceFileRoot>>,
+	mut roots: Query<(Entity, &mut SourceFileRoot)>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> bevy::prelude::Result {
 	for ev in events
@@ -87,11 +88,15 @@ pub(super) fn parse_file_watch_events(
 		let matches =
 			existing.iter_mut().filter(|(_, file)| ***file == ev.path);
 
+		for (_, mut src_file_root) in roots.iter_mut() {
+			src_file_root.set_changed();
+		}
+
 		match ev.kind {
 			EventKind::Create(CreateKind::File) => {
-				for root in roots.iter() {
+				for (root_entity, _) in roots.iter() {
 					commands.spawn((
-						ChildOf(root),
+						ChildOf(root_entity),
 						SourceFile::new(ev.path.clone()),
 					));
 				}

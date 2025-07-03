@@ -122,6 +122,9 @@ impl Plugin for BuildPlugin {
 						compile_server.run_if(BuildFlags::should_run(
 							BuildFlag::CompileServer,
 						)),
+						export_server_ssg.run_if(BuildFlags::should_run(
+							BuildFlag::ExportSsg,
+						)),
 						codegen_client_islands.run_if(BuildFlags::should_run(
 							BuildFlag::ClientIslands,
 						)),
@@ -176,6 +179,7 @@ pub enum BuildFlag {
 	/// Generate Client Islands Codegen
 	ClientIslands,
 	CompileServer,
+	ExportSsg,
 	CompileWasm,
 	RunServer,
 }
@@ -188,6 +192,7 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::Snippets => write!(f, "snippets"),
 			BuildFlag::ClientIslands => write!(f, "client-islands"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
+			BuildFlag::ExportSsg => write!(f, "export-ssg"),
 			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
 			BuildFlag::RunServer => write!(f, "run-server"),
 		}
@@ -203,6 +208,7 @@ impl FromStr for BuildFlag {
 			"snippets" => Ok(BuildFlag::Snippets),
 			"client-islands" => Ok(BuildFlag::ClientIslands),
 			"compile-server" => Ok(BuildFlag::CompileServer),
+			"export-ssg" => Ok(BuildFlag::ExportSsg),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),
 			"run-server" => Ok(BuildFlag::RunServer),
 			_ => Err(format!("Unknown flag: {}", s)),

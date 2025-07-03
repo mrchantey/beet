@@ -11,20 +11,27 @@ pub fn load_all_file_snippets(world: &mut World) -> Result {
 	use beet_utils::prelude::ReadFile;
 	let config = world.resource::<WorkspaceConfig>();
 	use beet_utils::prelude::ReadDir;
+
+
+
 	let files = ReadDir::files_recursive(config.snippets_dir().into_abs())?;
 	let num_files = files.len();
 	let start = std::time::Instant::now();
 	// TODO fine-grained loading with watcher
 
 	// TODO store this in a resource for hooking up with fine-grained loading
-	let mut snippet_entity_map = Default::default();
 
-	for file in files {
-		let file = ReadFile::to_string(file)?;
-		{
-			world.load_scene_with(file, &mut snippet_entity_map)?;
-		}
-	}
+	// temp until fine-grained loading is implemented
+	let file = config.snippets_dir().into_abs().join("snippets.ron");
+	let file = ReadFile::to_string(file)?;
+	world.load_scene(file)?;
+	// let mut snippet_entity_map = Default::default();
+	// for file in files {
+	// 	let file = ReadFile::to_string(file)?;
+	// 	{
+	// world.load_scene_with(file, &mut snippet_entity_map)?;
+	// 	}
+	// }
 	debug!(
 		"Loaded {} file snippets in {}ms",
 		num_files,
