@@ -85,7 +85,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
 	use beet_utils::prelude::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -103,8 +102,8 @@ mod test {
 
 		let collection =
 			world.spawn(RouteFileCollection::test_site_pages()).id();
-		world.run_system_once(update_route_files).unwrap().unwrap();
-		world.run_system_once(parse_route_file_rs).unwrap().unwrap();
+		world.run_system_cached(update_route_files).unwrap().unwrap();
+		world.run_system_cached(parse_route_file_rs).unwrap().unwrap();
 		let file = world.entity(collection).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let route_method = world

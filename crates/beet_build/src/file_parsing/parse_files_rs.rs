@@ -20,6 +20,8 @@ pub fn parse_files_rs(
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
 		{
+			trace!("rust source file changed: {}", path.display());
+
 			commands
 				.entity(entity)
 				.despawn_related::<SourceFileRefTarget>();
@@ -75,7 +77,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_router::as_beet::render_fragment;
 	use beet_utils::prelude::WsPathBuf;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -97,7 +98,7 @@ mod test {
 			.get::<SourceFileRefTarget>()
 			.unwrap()[0];
 		app.world_mut()
-			.run_system_once_with(render_fragment, child)
+			.run_system_cached_with(render_fragment, child)
 			.unwrap()
 			.xpect()
 			// only the output of the snippet, not the instance

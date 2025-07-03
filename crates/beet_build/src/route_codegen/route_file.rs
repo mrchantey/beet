@@ -159,7 +159,6 @@ mod test {
 	use crate::prelude::*;
 	use crate::route_codegen::update_route_files;
 	use beet_utils::prelude::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use std::ops::Deref;
 	use std::path::PathBuf;
@@ -184,7 +183,7 @@ mod test {
 		app.update();
 
 		app.world_mut()
-			.run_system_once(update_route_files)
+			.run_system_cached(update_route_files)
 			.unwrap()
 			.unwrap();
 		let file = app.world().entity(group).get::<Children>().unwrap()[0];

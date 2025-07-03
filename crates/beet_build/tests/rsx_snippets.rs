@@ -8,8 +8,6 @@
 use beet_build::prelude::*;
 use beet_parse::prelude::*;
 use beet_template::as_beet::*;
-// use bevy::ecs::system::RunSystemOnce;
-use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -183,6 +181,6 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	app.update();
 
 	app.world_mut()
-		.run_system_once_with(render_fragment, root)
+		.run_system_cached_with(render_fragment, root)
 		.unwrap()
 }

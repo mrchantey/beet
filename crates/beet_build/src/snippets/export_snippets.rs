@@ -2,13 +2,12 @@ use beet_bevy::prelude::*;
 use beet_common::prelude::*;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
-use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 
 
 pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
-	let rsx_snippets = world.run_system_once(collect_rsx_snippets)?;
-	let lang_snippets = world.run_system_once(collect_lang_snippets)?;
+	let rsx_snippets = world.run_system_cached(collect_rsx_snippets)?;
+	let lang_snippets = world.run_system_cached(collect_lang_snippets)?;
 	let snippets = lang_snippets
 		.into_iter()
 		.chain(rsx_snippets.into_iter())
@@ -18,7 +17,6 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	}
 	tracing::info!("Exporting {} snippets", snippets.len());
 
-	// doesnt work because snippets may relate?
 	#[cfg(not(test))]
 	{
 		let scene = world.build_scene();
@@ -32,6 +30,8 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	}
 
 	// currently disabled until full roundtrip is stablized
+	// doesnt work because rsx snippets are somehow relating to each other?
+	// maybe templates..
 	#[cfg(test)]
 	for (path, entities) in snippets.into_iter() {
 		let scene = DynamicSceneBuilder::from_world(world)
@@ -53,6 +53,7 @@ fn collect_rsx_snippets(
 	query: Query<(Entity, &MacroIdx), Changed<RsxSnippetRoot>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
+	debug!("{} rsx snippets changed", query.iter().count());
 	query
 		.into_iter()
 		.map(|(entity, idx)| {
@@ -69,6 +70,7 @@ fn collect_lang_snippets(
 	query: Query<(Entity, &LangSnippetPath), Changed<LangSnippet>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
+	debug!("{} lang snippets changed", query.iter().count());
 	query
 		.into_iter()
 		.map(|(entity, path)| {

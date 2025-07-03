@@ -89,7 +89,6 @@ pub fn modify_route_file_tokens(
 mod test {
 	use crate::prelude::*;
 	use beet_utils::dir;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -109,7 +108,7 @@ mod test {
 					)]),
 			))
 			.id();
-		world.run_system_once(modify_route_file_tokens).unwrap();
+		world.run_system_cached(modify_route_file_tokens).unwrap();
 		world
 			.get::<RouteFileMethod>(entity)
 			.unwrap()
