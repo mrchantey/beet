@@ -122,7 +122,7 @@ mod test {
 
 	struct Plugin1;
 	impl RouterPlugin for Plugin1 {
-		type State = ();
+		type State = AppRouterState;
 		type Meta = ();
 		fn is_static(&self) -> bool { true }
 		fn routes(&self) -> Vec<RouteInfo> { vec![route_info()] }

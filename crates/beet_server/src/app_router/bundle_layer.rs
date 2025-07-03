@@ -124,7 +124,7 @@ mod test {
 
 	impl BundleLayerHandler for MyMiddleware {
 		type Extractors = QueryParams<LayerParams>;
-		type State = ();
+		type State = AppRouterState;
 		type Output = Response;
 		type Meta = ();
 

@@ -38,6 +38,7 @@ impl Default for AppRouterArgs {
 	}
 }
 
+
 #[derive(Default, Subcommand)]
 enum RouterMode {
 	/// Do not add static routes to the router, instead loading them from
@@ -62,7 +63,7 @@ impl AppRouterArgs {
 }
 
 /// An Axum Server with file based routing and a live reload dev server.
-pub struct AppRouter<S = ()> {
+pub struct AppRouter<S = AppRouterState> {
 	pub router: Router<S>,
 	/// The Router state, added to the router when calling [`Self::serve`].
 	pub state: S,
@@ -75,7 +76,7 @@ pub struct AppRouter<S = ()> {
 	template_config: TemplateConfig,
 }
 
-impl Default for AppRouter<()> {
+impl Default for AppRouter<AppRouterState> {
 	fn default() -> Self { Self::new(Default::default()) }
 }
 
@@ -84,7 +85,6 @@ fn set_app(template_config: TemplateConfig) {
 	// insert config here!
 	ReactiveApp::set_create_app(move || {
 		let mut app = App::new();
-		init_pretty_tracing(bevy::log::Level::DEBUG);
 		app.add_plugins((TemplatePlugin, template_config.clone()));
 
 		#[cfg(all(not(test), feature = "build"))]
@@ -94,7 +94,7 @@ fn set_app(template_config: TemplateConfig) {
 	});
 }
 
-impl AppRouter<()> {
+impl AppRouter<AppRouterState> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
 		let mut template_config = TemplateConfig::default();
@@ -113,14 +113,13 @@ impl AppRouter<()> {
 	}
 }
 
-impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
+impl<S: DerivedAppState> AppRouter<S> {
 	pub fn new(state: S) -> Self {
 		let args = AppRouterArgs::parse();
 		let template_config = BeetConfigFile::try_load_or_default::<
 			TemplateConfig,
 		>(args.beet_config.as_deref())
 		.unwrap_or_exit();
-		set_app(template_config.clone());
 		Self {
 			args,
 			template_config,
@@ -157,12 +156,10 @@ impl<S> AppRouter<S> {
 	}
 }
 
-impl<'a, S> AppRouter<S>
-where
-	S: 'static + Send + Sync + Clone,
-{
+impl<'a, S: DerivedAppState> AppRouter<S> {
 	#[tokio::main]
 	pub async fn run(self) -> Result<()> {
+		init_pretty_tracing(bevy::log::Level::DEBUG);
 		match self.args.mode {
 			Some(RouterMode::ExportStatic) => self.export_static().await,
 			_ => self.serve().await,

@@ -17,8 +17,8 @@ pub use beet_route::*;
 mod bundle_route_stable;
 #[cfg(not(feature = "nightly"))]
 pub use bundle_route_stable::*;
-mod app_state;
-pub use app_state::*;
+mod app_router_state;
+pub use app_router_state::*;
 #[cfg(feature = "nightly")]
 mod bundle_route_nightly;
 #[cfg(feature = "nightly")]

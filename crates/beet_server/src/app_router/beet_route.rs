@@ -1,4 +1,4 @@
-use crate::app::HttpMethodExt;
+use crate::app_router::HttpMethodExt;
 use axum::Router;
 use axum::routing;
 use beet_net::prelude::RouteInfo;
