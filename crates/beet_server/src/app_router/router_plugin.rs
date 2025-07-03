@@ -86,7 +86,7 @@ impl<T: RouterPlugin> IntoRoutePlugins<T::State, T> for T {
 			app_router.static_routes.extend(self.routes());
 			app_router.router = self.add_routes_with(
 				app_router.router.clone(),
-				&ClientIslandPlugin::<T>::default(),
+				&ClientIslandRouterPlugin::<T>::default(),
 			);
 		}
 		app_router.router = self.add_routes(app_router.router.clone());

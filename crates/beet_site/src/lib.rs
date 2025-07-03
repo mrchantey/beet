@@ -5,13 +5,13 @@ pub mod codegen;
 pub mod components;
 pub mod layouts;
 
-// #[path = "codegen/client_islands.rs"]
-// pub mod client_islands;
+#[path = "codegen/client_islands.rs"]
+pub mod client_islands;
 
 pub use codegen::actions;
 
 pub mod prelude {
-	// pub use super::client_islands::*;
+	pub use super::client_islands::*;
 	pub use super::codegen::actions;
 	pub use super::codegen::actions::ActionsPlugin;
 	pub use super::codegen::docs::DocsPlugin;

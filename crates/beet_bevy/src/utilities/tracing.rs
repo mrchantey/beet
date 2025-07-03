@@ -3,8 +3,6 @@ use bevy::log::tracing_subscriber;
 use bevy::log::tracing_subscriber::EnvFilter;
 
 
-const DEFAULT_FILTER: &str = "wgpu=error,naga=warn,bevy_app=warn";
-
 /// Opinionated tracing defaults for bevy
 pub fn init_pretty_tracing(level: tracing::Level) {
 	let sub = tracing_subscriber::fmt()
@@ -19,7 +17,10 @@ pub fn init_pretty_tracing(level: tracing::Level) {
 		.with_env_filter(
 			tracing_subscriber::EnvFilter::try_from_default_env()
 				.unwrap_or_else(|_| {
-					EnvFilter::builder().parse_lossy(&DEFAULT_FILTER)
+					EnvFilter::builder().parse_lossy(&format!(
+						"{}=debug,tower_http=debug,axum::rejection=trace,wgpu=error,naga=warn,bevy_app=warn",
+						env!("CARGO_CRATE_NAME")
+					))
 				})
 				.add_directive(level.into()),
 		);

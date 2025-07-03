@@ -151,6 +151,8 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 
 	#[tokio::main]
 	pub async fn run(self) -> Result<()> {
+		// lambda does its own tracing thing
+		#[cfg(not(feature = "lambda"))]
 		init_pretty_tracing(bevy::log::Level::DEBUG);
 		match self.args.mode {
 			Some(RouterMode::ExportStatic) => self.export_static().await,
@@ -242,7 +244,7 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		route: &RouteInfo,
 	) -> Result<Vec<ClientIsland>> {
 		// convert /foobar into /__client_islands/foobar
-		let route_info = ClientIslandPlugin::route_info(route);
+		let route_info = ClientIslandRouterPlugin::route_info(route);
 		let ron = self.render_route(&route_info).await?;
 
 		let islands: Vec<ClientIsland> =
@@ -304,7 +306,6 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		run_lambda(router).await?;
 		#[cfg(not(feature = "lambda"))]
 		{
-			init_axum_tracing();
 			let listener =
 				tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
 			tracing::info!("\nlistening on http://{}", listener.local_addr()?);

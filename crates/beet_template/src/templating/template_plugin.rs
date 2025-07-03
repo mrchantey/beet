@@ -18,7 +18,7 @@ impl Plugin for TemplatePlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		#[cfg(feature = "serde")]
+		#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
 		app.add_systems(
 			Startup,
 			load_all_file_snippets

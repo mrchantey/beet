@@ -1,9 +1,9 @@
 mod bundle_layer;
 mod bundle_layer_plugin;
-mod client_island_plugin;
+mod client_island_router_plugin;
 mod router_plugin;
 pub use bundle_layer::*;
-pub use client_island_plugin::*;
+pub use client_island_router_plugin::*;
 pub use router_plugin::*;
 mod app_router;
 pub use app_router::*;

@@ -8,10 +8,10 @@ use beet_router::prelude::ClientIsland;
 use std::marker::PhantomData;
 
 
-pub struct ClientIslandPlugin<T> {
+pub struct ClientIslandRouterPlugin<T> {
 	phantom: PhantomData<T>,
 }
-impl<T> Default for ClientIslandPlugin<T> {
+impl<T> Default for ClientIslandRouterPlugin<T> {
 	fn default() -> Self {
 		Self {
 			phantom: PhantomData,
@@ -19,7 +19,7 @@ impl<T> Default for ClientIslandPlugin<T> {
 	}
 }
 
-impl ClientIslandPlugin<()> {
+impl ClientIslandRouterPlugin<()> {
 	pub fn route_info(route_info: &RouteInfo) -> RouteInfo {
 		let path = format!("/__client_islands{}", route_info.path);
 		RouteInfo::new(path, route_info.method)
@@ -31,7 +31,7 @@ impl ClientIslandPlugin<()> {
 // }
 
 
-impl<T> RouterPlugin for ClientIslandPlugin<T>
+impl<T> RouterPlugin for ClientIslandRouterPlugin<T>
 where
 	T: RouterPlugin,
 {
@@ -69,7 +69,7 @@ where
 		H: BundleRoute<M, State = Self::State>,
 		H::Extractors: 'static + Send + Sync + FromRequestParts<Self::State>,
 	{
-		let route_info = ClientIslandPlugin::route_info(&route_info);
+		let route_info = ClientIslandRouterPlugin::route_info(&route_info);
 		router.route(
 			&route_info.path.to_string_lossy(),
 			routing::on(

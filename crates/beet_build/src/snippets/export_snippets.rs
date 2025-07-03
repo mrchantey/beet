@@ -18,7 +18,7 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	}
 	tracing::info!("Exporting {} snippets", snippets.len());
 
-	// temp - one big file
+	// doesnt work because snippets may relate?
 	#[cfg(not(test))]
 	{
 		let scene = world.build_scene();
