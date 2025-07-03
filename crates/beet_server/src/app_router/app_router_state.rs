@@ -45,14 +45,23 @@ use tokio::sync::RwLock;
 /// 	}
 /// }
 ///
-/// let router = AppRouter::new(MyState::default())
+/// let router = AppRouter::new(MyState::default());
 ///
 /// ```
 pub struct AppRouterState {
 	pub template_config: Option<TemplateConfig>,
-	/// The app used to instantiate and render bundles.
-	/// This should include the [`TemplatePlugin`].
 	plugin: Box<dyn ClonePlugin>,
+}
+
+impl AppRouterState {
+	pub fn test() -> Self {
+		Self {
+			template_config: Some(TemplateConfig::default()),
+			plugin: Box::new(|app: &mut App| {
+				app.insert_resource(TemplateFlags::None);
+			}),
+		}
+	}
 }
 
 impl AsRef<AppRouterState> for AppRouterState {

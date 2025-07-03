@@ -14,10 +14,12 @@ impl HtmlFragment {
 	/// There are several transformations involved in the process,
 	/// for example resolving slots, so we reuse a [`TemplateApp`]
 	/// and run a full update cycle.
+	/// The app disables loading snippets.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+		app.add_plugins(TemplatePlugin)
+			.insert_resource(TemplateFlags::None);
 		let entity = app.world_mut().spawn(bundle).id();
 		app.update();
 		let html = app

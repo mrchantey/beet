@@ -17,9 +17,10 @@ pub struct ClientIsland {
 
 
 impl ClientIsland {
-	pub fn collect(bundle: impl Bundle) -> Result<Vec<Self>, RunSystemError> {
-		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+	pub fn collect(
+		app: &mut App,
+		bundle: impl Bundle,
+	) -> Result<Vec<Self>, RunSystemError> {
 		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
 		app.update();
 		app.world_mut()
@@ -73,7 +74,11 @@ mod test {
 
 	#[test]
 	fn works() {
-		ClientIsland::collect(rsx! {
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin::default());
+		app.insert_resource(TemplateFlags::None);
+
+		ClientIsland::collect(&mut app, rsx! {
 			<MyTemplate foo=3 client:only />
 		})
 		.unwrap()

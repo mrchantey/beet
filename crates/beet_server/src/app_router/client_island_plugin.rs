@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use axum::Router;
 use axum::extract::FromRequestParts;
+use axum::extract::State;
 use axum::routing;
 use beet_common::exports::ron;
 use beet_router::prelude::ClientIsland;
@@ -73,15 +74,18 @@ where
 			&route_info.path.to_string_lossy(),
 			routing::on(
 				route_info.method.into_axum_method(),
-				async move |e| -> AppResult<String> {
+				async move |state: State<Self::State>,
+				            e|
+				            -> AppResult<String> {
 					let bundle = handler.into_bundle_result(e).await?;
 					let islands =
-						ClientIsland::collect(bundle).map_err(|e| {
-							AppError::internal_error(format!(
-								"Failed to collect client islands: {}",
-								e
-							))
-						})?;
+						ClientIsland::collect(&mut state.create_app(), bundle)
+							.map_err(|e| {
+								AppError::internal_error(format!(
+									"Failed to collect client islands: {}",
+									e
+								))
+							})?;
 					let islands =
 						ron::ser::to_string(&islands).map_err(|e| {
 							AppError::internal_error(format!(

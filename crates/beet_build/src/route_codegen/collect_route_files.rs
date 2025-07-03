@@ -134,10 +134,10 @@ pub fn collect_route_files(
 				}
 
 				fn add_routes_with(&self,
-					mut router: beet::exports::axum::Router<#router_state_type>,
+					mut router: beet::exports::axum::Router<Self::State>,
 					plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
 				)
-					-> beet::exports::axum::Router<#router_state_type> {
+					-> beet::exports::axum::Router<Self::State> {
 						#(#route_handlers)*
 					router
 				}
@@ -192,7 +192,7 @@ mod test {
 				impl TestDocsPlugin {}
 				#[cfg(not(target_arch = "wasm32"))]
 				impl RouterPlugin for TestDocsPlugin {
-					type State = ();
+					type State = AppRouterState;
 					type Meta = ();
 					fn is_static(&self) -> bool {
 						true
@@ -208,9 +208,9 @@ mod test {
 					}
 					fn add_routes_with(
 						&self,
-						mut router: beet::exports::axum::Router<()>,
+						mut router: beet::exports::axum::Router<Self::State>,
 						plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
-					) -> beet::exports::axum::Router<()> {
+					) -> beet::exports::axum::Router<Self::State> {
 						router = plugin.add_bundle_route(
 							router,
 							RouteInfo {

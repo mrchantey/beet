@@ -64,13 +64,15 @@ pub struct RouteFileCollection {
 	pub filter: GlobFilter,
 	/// Specify the meta type, used for the file group codegen and individual
 	/// route codegen like `.md` and `.rsx` files.
-	#[serde(default = "unit_type", with = "syn_type_serde")]
+	#[serde(default = "default_meta", with = "syn_type_serde")]
 	pub meta_type: Unspan<syn::Type>,
-	#[serde(default = "unit_type", with = "syn_type_serde")]
+	#[serde(default = "default_state", with = "syn_type_serde")]
 	pub router_state_type: Unspan<syn::Type>,
 	#[serde(default)]
 	pub category: RouteCollectionCategory,
 }
+fn default_meta() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
+fn default_state() -> Unspan<syn::Type> { Unspan::parse_str("AppRouterState").unwrap() }
 
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -93,7 +95,6 @@ impl RouteCollectionCategory {
 	}
 }
 
-fn unit_type() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
 
 impl Default for RouteFileCollection {
 	fn default() -> Self {
@@ -103,8 +104,8 @@ impl Default for RouteFileCollection {
 			category: Default::default(),
 			src: Default::default(),
 			filter: Default::default(),
-			meta_type: unit_type(),
-			router_state_type: unit_type(),
+			meta_type: default_meta(),
+			router_state_type: default_state(),
 		}
 	}
 }

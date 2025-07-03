@@ -104,7 +104,7 @@ mod test {
 					state.render_bundle(my_route(e))
 				}),
 			)
-			.with_state(AppRouterState::default());
+			.with_state(AppRouterState::test());
 		let response = router
 			.oneshot(
 				axum::http::Request::builder()

@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 
 
 pub trait RouterPlugin: Sized {
-	type State: 'static + Send + Sync + Clone;
+	type State: DerivedAppState;
 	type Meta: 'static + Send + Sync + Clone;
 
 	/// Layer this plugin with a [`BundleLayer`].
@@ -129,7 +129,7 @@ mod test {
 
 	struct Plugin1;
 	impl RouterPlugin for Plugin1 {
-		type State = ();
+		type State = AppRouterState;
 		type Meta = ();
 		fn is_static(&self) -> bool { unimplemented!() }
 		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
@@ -144,7 +144,7 @@ mod test {
 	}
 	struct Plugin2;
 	impl RouterPlugin for Plugin2 {
-		type State = ();
+		type State = AppRouterState;
 		type Meta = ();
 		fn is_static(&self) -> bool { unimplemented!() }
 		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
@@ -160,7 +160,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		fn foo<M>(_: impl IntoRoutePlugins<(), M>) {}
+		fn foo<M>(_: impl IntoRoutePlugins<AppRouterState, M>) {}
 		foo((Plugin1, Plugin2));
 	}
 }

@@ -146,13 +146,13 @@ mod test {
 							world.spawn((
 								ClientOnlyDirective,
 								DomIdx(0u32),
-								TemplateSerde::parse::<beet_build::client_island_codegen::collect_client_islands::test::Foo>("(7)")
+								TemplateSerde::parse::<beet_build::client_island_codegen::codegen_client_islands::test::Foo>("(7)")
 								.unwrap()
 								.into_node_bundle()
 							));
 							world.spawn((
 								DomIdx(1u32),
-								TemplateSerde::parse::<beet_build::client_island_codegen::collect_client_islands::test::Foo>("(8)")
+								TemplateSerde::parse::<beet_build::client_island_codegen::codegen_client_islands::test::Foo>("(8)")
 									.unwrap()
 									.into_node_bundle()
 							));
