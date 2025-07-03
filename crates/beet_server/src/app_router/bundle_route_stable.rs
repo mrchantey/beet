@@ -14,7 +14,7 @@ impl<E, B, S, Func, Fut> BundleRoute<(E, B, S, BundleRouteToAsyncResultMarker)>
 where
 	E: 'static + Send + FromRequestParts<S>,
 	B: Bundle,
-	S: 'static + Send + Sync + Clone,
+	S: DerivedAppState,
 	Func: 'static + Send + Sync + Clone + Fn(E) -> Fut,
 	Fut: Future<Output = AppResult<B>> + Send + 'static,
 {
@@ -35,7 +35,7 @@ impl<E, B, S, Func, Fut> BundleRoute<(B, E, S, BundleRouteToAsyncBundleMarker)>
 where
 	E: 'static + Send + FromRequestParts<S>,
 	B: Bundle,
-	S: 'static + Send + Sync + Clone,
+	S: DerivedAppState,
 	Func: 'static + Send + Sync + Clone + Fn(E) -> Fut,
 	Fut: Future<Output = B> + Send + 'static,
 {
@@ -55,7 +55,7 @@ impl<E, B, S, Func> BundleRoute<(B, E, S, BundleRouteToBundleMarker)> for Func
 where
 	E: 'static + Send + FromRequestParts<S>,
 	B: Bundle,
-	S: 'static + Send + Sync + Clone,
+	S: DerivedAppState,
 	Func: 'static + Send + Sync + Clone + Fn(E) -> B,
 {
 	type Bundle = B;
@@ -74,7 +74,7 @@ impl<E, B, S, Func> BundleRoute<(B, E, S, BundleRouteToResultMarker)> for Func
 where
 	E: 'static + Send + FromRequestParts<S>,
 	B: Bundle,
-	S: 'static + Send + Sync + Clone,
+	S: DerivedAppState,
 	Func: 'static + Send + Sync + Clone + Fn(E) -> AppResult<B>,
 {
 	type Bundle = B;

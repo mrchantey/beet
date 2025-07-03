@@ -9,7 +9,7 @@ pub struct ArticleLayout;
 #[cfg(not(target_arch = "wasm32"))]
 impl BundleLayerHandler for ArticleLayout {
 	type Extractors = ();
-	type State = ();
+	type State = AppRouterState;
 	type Output = Response;
 	type Meta = ArticleMeta;
 

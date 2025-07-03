@@ -142,12 +142,12 @@ impl Plugin for BuildPlugin {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
 pub enum BuildFlags {
-	/// Generate all build artifacts.
+	/// Run with all flags enabled.
 	#[default]
 	All,
-	/// Parse files but do not generate any output.
+	/// Run with no flags enabled.
 	None,
-	/// Only generate the specified build artifacts.
+	/// Only run with the specified flags.
 	Only(Vec<BuildFlag>),
 }
 
@@ -161,7 +161,7 @@ impl BuildFlags {
 		}
 	}
 
-	/// A predicate system for run_if conditions,
+	/// A predicate system for run_if conditions
 	pub fn should_run(flag: BuildFlag) -> impl Fn(Res<Self>) -> bool {
 		move |flags| flags.contains(flag)
 	}
@@ -205,7 +205,7 @@ impl FromStr for BuildFlag {
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),
 			"run-server" => Ok(BuildFlag::RunServer),
-			_ => Err(format!("Unknown only field: {}", s)),
+			_ => Err(format!("Unknown flag: {}", s)),
 		}
 	}
 }

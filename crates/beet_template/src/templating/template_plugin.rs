@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use super::*;
 use crate::prelude::*;
 use beet_bevy::prelude::WorldMutExt;
@@ -17,10 +19,16 @@ impl Plugin for TemplatePlugin {
 			.set(bevy::ecs::error::panic)
 			.ok();
 		#[cfg(feature = "serde")]
-		app.add_systems(Startup, load_all_file_snippets);
-
+		app.add_systems(
+			Startup,
+			load_all_file_snippets
+				.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
+		);
+		if !app.is_plugin_added::<TemplateConfig>() {
+			app.add_plugins(TemplateConfig::default());
+		}
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
-			.init_resource::<HtmlConstants>()
+			.init_resource::<TemplateFlags>()
 			.add_systems(
 				Update,
 				(
@@ -69,6 +77,60 @@ fn debug(world: &mut World) {
 				dom_idx,
 				component.name()
 			);
+		}
+	}
+}
+
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+pub enum TemplateFlags {
+	/// Run with all flags enabled.
+	#[default]
+	All,
+	/// Run with no flags enabled.
+	None,
+	/// Only run with the specified flags.
+	Only(Vec<TemplateFlag>),
+}
+
+impl TemplateFlags {
+	pub fn only(flag: TemplateFlag) -> Self { Self::Only(vec![flag]) }
+	pub fn contains(&self, flag: TemplateFlag) -> bool {
+		match self {
+			Self::All => true,
+			Self::None => false,
+			Self::Only(flags) => flags.contains(&flag),
+		}
+	}
+
+	/// A predicate system for run_if conditions
+	pub fn should_run(flag: TemplateFlag) -> impl Fn(Res<Self>) -> bool {
+		move |flags| flags.contains(flag)
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemplateFlag {
+	/// Load snippets from the file system.
+	LoadSnippets,
+}
+
+
+impl std::fmt::Display for TemplateFlag {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			TemplateFlag::LoadSnippets => write!(f, "snippets"),
+		}
+	}
+}
+
+impl FromStr for TemplateFlag {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s.to_lowercase().as_str() {
+			"load-snippets" => Ok(TemplateFlag::LoadSnippets),
+			_ => Err(format!("Unknown flag: {}", s)),
 		}
 	}
 }

@@ -12,7 +12,7 @@ use bevy::prelude::*;
 pub trait BundleLayerHandler: 'static + Send + Sync + Clone {
 	/// The extractors that this layer will use
 	type Extractors: 'static + Send + Sync + FromRequestParts<Self::State>;
-	type State: 'static + Send + Sync + Clone;
+	type State: DerivedAppState;
 	/// The output type of the layer, which must implement [`IntoResponse`]
 	type Output: IntoResponse;
 	type Meta: 'static + Send + Sync + Clone;
@@ -105,8 +105,8 @@ where
 mod test {
 	use super::*;
 	use axum::extract::Query as QueryParams;
-	use axum::response::IntoResponse;
-	use axum::response::Response;
+	use axum::extract::State;
+	use axum::response::Html;
 	use serde::Deserialize;
 	use sweet::prelude::*;
 
@@ -123,25 +123,24 @@ mod test {
 	struct MyMiddleware;
 
 	impl BundleLayerHandler for MyMiddleware {
-		type Extractors = QueryParams<LayerParams>;
+		type Extractors = (State<Self::State>, QueryParams<LayerParams>);
 		type State = AppRouterState;
-		type Output = Response;
+		type Output = Html<String>;
 		type Meta = ();
 
 		fn handle_bundle_route(
 			&self,
-			params: Self::Extractors,
+			(state, params): Self::Extractors,
 			bundle: impl Bundle,
 			_meta: Self::Meta,
 		) -> impl Send + Sync + Future<Output = Self::Output> {
 			async move {
-				BundleResponse::new(rsx! {
+				state.render_bundle(rsx! {
 					<div>
 						<span>name: {params.name.clone()}</span>
 						{bundle}
 					</div>
 				})
-				.into_response()
 			}
 		}
 	}

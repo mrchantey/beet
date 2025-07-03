@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
+use axum::extract::State;
+use axum::response::Html;
 use axum::routing::MethodFilter;
 use axum::routing::{
 	self,
@@ -10,7 +12,7 @@ use bevy::prelude::*;
 /// Methods that accept a tuple of extractors and return a bundle.
 pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 	type Bundle: Bundle;
-	type State: 'static + Send + Sync + Clone;
+	type State: DerivedAppState;
 	type Extractors: 'static + Send + FromRequestParts<Self::State>;
 	fn into_bundle_result(
 		self,
@@ -49,13 +51,16 @@ where
 	) -> Router<Self::State> {
 		router.route(
 			&route_info.path.to_string_lossy(),
-		routing::on(
-			route_info.method.into_axum_method(),
-			async move |extractors: R::Extractors| -> AppResult<BundleResponse<R::Bundle>> {
-				let bundle = self.into_bundle_result(extractors).await?;
-				Ok(BundleResponse::new(bundle))
-			},
-		)		)
+			routing::on(
+				route_info.method.into_axum_method(),
+				async move |state: State<Self::State>,
+				            extractors: R::Extractors|
+				            -> AppResult<Html<String>> {
+					let bundle = self.into_bundle_result(extractors).await?;
+					Ok(state.render_bundle(bundle))
+				},
+			),
+		)
 	}
 }
 
@@ -90,11 +95,16 @@ mod test {
 	async fn works() {
 		// this machinery is usually done by the AppRouter
 
+		use axum::extract::State;
 		use axum::routing::get;
-		let router: Router = Router::new().route(
-			"/test",
-			get(async move |e| BundleResponse::new(my_route(e))),
-		);
+		let router: Router = Router::new()
+			.route(
+				"/test",
+				get(async move |state: State<AppRouterState>, e| {
+					state.render_bundle(my_route(e))
+				}),
+			)
+			.with_state(AppRouterState::default());
 		let response = router
 			.oneshot(
 				axum::http::Request::builder()

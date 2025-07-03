@@ -3,6 +3,7 @@ use axum::Router;
 use beet_router::prelude::ClientIsland;
 use beet_router::prelude::ClientIslandMap;
 use beet_template::as_beet::bevybail;
+use bevy::app::Plugins;
 use bevy::prelude::*;
 use std::path::PathBuf;
 // use beet_router::types::RouteFunc;
@@ -72,59 +73,47 @@ pub struct AppRouter<S = AppRouterState> {
 	pub static_routes: Vec<RouteInfo>,
 	/// cli arguments passed in.
 	pub args: AppRouterArgs,
-	/// Config file containing html constants and workspace paths.
-	template_config: TemplateConfig,
 }
 
 impl Default for AppRouter<AppRouterState> {
 	fn default() -> Self { Self::new(Default::default()) }
 }
 
-// so dirty we need cleaner solution, ReactiveApp in general sucks
-fn set_app(template_config: TemplateConfig) {
-	// insert config here!
-	ReactiveApp::set_create_app(move || {
-		let mut app = App::new();
-		app.add_plugins((TemplatePlugin, template_config.clone()));
-
-		#[cfg(all(not(test), feature = "build"))]
-		app.add_plugins(beet_build::prelude::BuildPlugin::default());
-
-		app
-	});
-}
-
 impl AppRouter<AppRouterState> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
-		let mut template_config = TemplateConfig::default();
-		// dont apply static
-		template_config.workspace.snippets_dir =
-			WsPathBuf::new("doesnt-exist.ron");
-		set_app(template_config.clone());
 		Self {
 			router: default(),
 			static_routes: default(),
 			state: default(),
 			tracing: Level::WARN,
 			args: default(),
-			template_config,
 		}
+		.add_bevy_plugins(|app: &mut App| {
+			app.insert_resource(TemplateFlags::None);
+		})
 	}
 }
 
 impl<S: DerivedAppState> AppRouter<S> {
-	pub fn new(state: S) -> Self {
+	fn app_state(&self) -> &AppRouterState { self.state.as_ref() }
+	fn app_state_mut(&mut self) -> &mut AppRouterState { self.state.as_mut() }
+	pub fn new(mut state: S) -> Self {
 		let args = AppRouterArgs::parse();
-		let template_config = BeetConfigFile::try_load_or_default::<
-			TemplateConfig,
-		>(args.beet_config.as_deref())
-		.unwrap_or_exit();
+		let app_state = state.as_mut();
+		if app_state.template_config.is_none() {
+			app_state.template_config = Some(
+				BeetConfigFile::try_load_or_default::<TemplateConfig>(
+					args.beet_config.as_deref(),
+				)
+				.unwrap_or_exit(),
+			);
+		}
+
 		Self {
 			args,
-			template_config,
-			router: Router::new(),
-			static_routes: Vec::new(),
+			router: default(),
+			static_routes: default(),
 			state,
 			#[cfg(debug_assertions)]
 			tracing: Level::INFO,
@@ -134,16 +123,13 @@ impl<S: DerivedAppState> AppRouter<S> {
 	}
 }
 
-impl<S> AppRouter<S> {
+impl<'a, S: DerivedAppState> AppRouter<S> {
 	/// Add any axum route or bundle route to the router.
 	pub fn add_route<M>(
 		mut self,
 		info: impl Into<RouteInfo>,
 		route: impl IntoBeetRoute<M, State = S>,
-	) -> Self
-	where
-		S: 'static + Send + Sync + Clone,
-	{
+	) -> Self {
 		self.router = route.add_beet_route(self.router, info.into());
 		self
 	}
@@ -154,9 +140,15 @@ impl<S> AppRouter<S> {
 		plugin.add_to_router(&mut self);
 		self
 	}
-}
+	pub fn add_bevy_plugins<M>(
+		mut self,
+		plugins: impl 'static + Clone + Send + Sync + Plugins<M>,
+	) -> Self {
+		self.app_state_mut().set_plugins(plugins);
+		self
+	}
 
-impl<'a, S: DerivedAppState> AppRouter<S> {
+
 	#[tokio::main]
 	pub async fn run(self) -> Result<()> {
 		init_pretty_tracing(bevy::log::Level::DEBUG);
@@ -168,12 +160,11 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 
 	/// Export static html files and client islands.
 	pub async fn export_static(self) -> Result {
-		let html_dir = self.template_config.workspace.html_dir.into_abs();
-		let static_dir = self
-			.template_config
-			.workspace
-			.client_islands_path
-			.into_abs();
+		let template_config =
+			self.app_state().template_config.clone().unwrap_or_default();
+		let html_dir = template_config.workspace.html_dir.into_abs();
+		let static_dir =
+			template_config.workspace.client_islands_path.into_abs();
 
 		self.static_routes
 			.iter()
@@ -267,7 +258,9 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
 	pub async fn serve(self) -> Result<()> {
-		let html_dir = self.template_config.workspace.html_dir.into_abs();
+		let template_config =
+			self.app_state().template_config.clone().unwrap_or_default();
+		let html_dir = template_config.workspace.html_dir.into_abs();
 
 		#[allow(unused_mut)]
 		let mut router = self

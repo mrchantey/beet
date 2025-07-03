@@ -15,16 +15,17 @@ impl HtmlFragment {
 	/// for example resolving slots, so we reuse a [`TemplateApp`]
 	/// and run a full update cycle.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
-		ReactiveApp::with(|app| {
-			let entity = app.world_mut().spawn(bundle).id();
-			app.update();
-			let html = app
-				.world_mut()
-				.run_system_cached_with(render_fragment, entity)
-				.unwrap();
-			app.world_mut().despawn(entity);
-			html
-		})
+		// TODO bench caching and reusing the app
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		let entity = app.world_mut().spawn(bundle).id();
+		app.update();
+		let html = app
+			.world_mut()
+			.run_system_cached_with(render_fragment, entity)
+			.unwrap();
+		app.world_mut().despawn(entity);
+		html
 	}
 }
 /// A parallelizable system to render all HTML fragments in the world.
