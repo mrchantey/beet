@@ -1,11 +1,13 @@
 mod bevyhow;
-mod on_spawn;
 mod bundle_iter;
+mod on_spawn;
 mod tracing;
-pub use tracing::*;
+mod garbage_collect;
+pub use garbage_collect::*;
+pub use bevyhow::*;
 pub use bundle_iter::*;
 pub use on_spawn::*;
-pub use bevyhow::*;
+pub use tracing::*;
 mod non_send_plugin;
 pub use non_send_plugin::*;
 mod maybe;

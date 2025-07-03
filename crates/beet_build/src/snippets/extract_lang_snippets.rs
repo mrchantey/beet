@@ -113,6 +113,7 @@ pub(super) fn extract_lang_snippets(
 		hoist.map(|hoist| {
 			lang_entity.insert(hoist.clone());
 		});
+		let lang_entity = lang_entity.id();
 
 		for rsx_entity in rsx_entities.iter() {
 			// these entities are now just portals to the shared content
@@ -123,7 +124,10 @@ pub(super) fn extract_lang_snippets(
 				.remove::<ElementNode>()
 				.remove::<Children>()
 				.remove::<Attributes>()
-				.insert(snippet_path.clone());
+				.insert(snippet_path.clone())
+				// despawning the last of these entities will
+				// remove the lang entity
+				.with_child(GarbageCollectRef(lang_entity));
 			style_id.map(|id| {
 				entity.insert(id);
 			});
