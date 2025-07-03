@@ -51,6 +51,7 @@ pub fn update_file_expr_hash(
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
+	source_file_refs: Query<&SourceFileRefTarget>,
 	macro_idxs: Query<&MacroIdx>,
 	attributes: Query<&Attributes>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
@@ -64,7 +65,7 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(source_file)?;
-		for node in children
+		for node in source_file_refs
 			.iter_descendants(entity)
 			.flat_map(|child| template_roots.iter_descendants(child))
 			.flat_map(|en| children.iter_descendants_inclusive(en))
@@ -117,7 +118,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				SourceFile::new(WsPathBuf::new(file!()).into_abs()),
-				children![related! {TemplateRoot[bundle]}],
+				related! {SourceFileRefTarget[related! {TemplateRoot[bundle]}]},
 			))
 			.id();
 		// reset macro idxs for testing

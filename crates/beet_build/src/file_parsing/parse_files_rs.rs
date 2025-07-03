@@ -24,7 +24,7 @@ pub fn parse_files_rs(
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
-				parent: entity,
+				source_file: entity,
 				commands: &mut commands,
 				file: &path.into_ws_path()?,
 				macros: &*macros,
@@ -37,7 +37,7 @@ pub fn parse_files_rs(
 
 /// Spawn an [`RstmlTokens`] for each `rsx!` macro in the file.
 struct RsxSynVisitor<'a, 'w, 's> {
-	parent: Entity,
+	source_file: Entity,
 	commands: &'a mut Commands<'w, 's>,
 	/// Used for creating [`FileSpan`] in several places.
 	/// We must use workspace relative paths because locations are created
@@ -58,7 +58,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
-				ChildOf(self.parent),
+				SourceFileRef(self.source_file),
 				RsxSnippetRoot,
 				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
 				RstmlTokens::new(tokens),
@@ -89,7 +89,11 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
+		let child = app
+			.world()
+			.entity(entity)
+			.get::<SourceFileRefTarget>()
+			.unwrap()[0];
 		app.world_mut()
 			.run_system_once_with(render_fragment, child)
 			.unwrap()

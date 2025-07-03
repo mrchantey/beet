@@ -1,5 +1,8 @@
 use crate::prelude::*;
 use beet_bevy::prelude::When;
+use beet_fs::exports::notify::EventKind;
+use beet_fs::exports::notify::event::CreateKind;
+use beet_fs::exports::notify::event::RemoveKind;
 use beet_fs::process::WatchEvent;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
@@ -39,7 +42,9 @@ pub struct SourceFileRef(pub Entity);
 pub struct SourceFileRefTarget(Vec<Entity>);
 
 
-
+/// Parent of every [`SourceFile`] entity.
+#[derive(Component)]
+pub struct SourceFileRoot;
 
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
@@ -49,31 +54,61 @@ pub(super) fn load_workspace_source_files(
 	mut commands: Commands,
 	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
-	commands.spawn((Children::spawn(SpawnIter(
-		config
-			.get_files()?
-			.into_iter()
-			.map(|path| SourceFile::new(path)),
-	)),));
+	commands.spawn((
+		SourceFileRoot,
+		Children::spawn(SpawnIter(
+			config
+				.get_files()?
+				.into_iter()
+				.map(|path| SourceFile::new(path)),
+		)),
+	));
 	Ok(())
 }
 
 
 
-/// Notify bevy Mutation system that a file has changed.
+/// Update [`SourceFile`] entities based on file watch events,
+/// including marking as [`Changed`] on modification.
 pub(super) fn parse_file_watch_events(
+	mut commands: Commands,
 	mut events: EventReader<WatchEvent>,
 	config: When<Res<WorkspaceConfig>>,
-	mut query: Query<&mut SourceFile>,
+	roots: Query<Entity, With<SourceFileRoot>>,
+	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> bevy::prelude::Result {
 	for ev in events
 		.read()
 		// we only care about files that a builder will want to save
 		.filter(|ev| config.passes(&ev.path))
 	{
-		tracing::debug!("SourceFile Changed: {}", ev.path.display());
-		for mut file in query.iter_mut().filter(|file| ***file == ev.path) {
-			file.set_changed();
+		tracing::debug!("SourceFile event: {}", ev);
+
+		let matches =
+			existing.iter_mut().filter(|(_, file)| ***file == ev.path);
+
+		match ev.kind {
+			EventKind::Create(CreateKind::File) => {
+				for root in roots.iter() {
+					commands.spawn((
+						ChildOf(root),
+						SourceFile::new(ev.path.clone()),
+					));
+				}
+			}
+			EventKind::Remove(RemoveKind::File) => {
+				for (entity, _) in matches {
+					commands.entity(entity).despawn();
+				}
+			}
+			EventKind::Modify(_) => {
+				for (_, mut file) in matches {
+					file.set_changed();
+				}
+			}
+			other => {
+				tracing::warn!("Unhandled file event: {:?}", other);
+			}
 		}
 	}
 	Ok(())

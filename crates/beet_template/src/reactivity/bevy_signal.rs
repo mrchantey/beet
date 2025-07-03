@@ -132,7 +132,7 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		app.world_mut()
-			.run_system_once(spawn_templates)
+			.run_system_once(apply_snippets_to_instances)
 			.unwrap()
 			.unwrap();
 		let text = app.world().entity(div).get::<Children>().unwrap()[0];
@@ -169,7 +169,7 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		app.world_mut()
-			.run_system_once(spawn_templates)
+			.run_system_once(apply_snippets_to_instances)
 			.unwrap()
 			.unwrap();
 		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];

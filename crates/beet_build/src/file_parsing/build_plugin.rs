@@ -109,7 +109,7 @@ impl Plugin for BuildPlugin {
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?
 						// we should remove it!
-						spawn_templates,
+						apply_snippets_to_instances,
 						parse_file_watch_events,
 						(parse_files_rs, parse_files_md),
 					)

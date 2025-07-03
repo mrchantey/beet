@@ -32,7 +32,7 @@ impl Plugin for TemplatePlugin {
 			.add_systems(
 				Update,
 				(
-					spawn_templates,
+					apply_snippets_to_instances,
 					apply_style_id_attributes,
 					apply_slots,
 					apply_lang_snippets,

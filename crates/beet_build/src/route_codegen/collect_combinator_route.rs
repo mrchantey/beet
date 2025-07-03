@@ -72,7 +72,18 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 		.map(|(entity, source_file)| (entity, **source_file))
 		.collect::<Vec<_>>()
 	{
-		let tokens = tokenize_bundle(world, source_file_ref)?;
+		let tokens_root = world
+			.entity(source_file_ref)
+			.get::<SourceFileRefTarget>()
+			.expect("SourceFileRefTarget should exist")
+			.iter()
+			.find(|entity| world.entity(*entity).contains::<BeetRoot>())
+			.ok_or_else(|| {
+				bevyhow!("SourceFile has no children with a BeetRoot")
+			})?;
+
+
+		let tokens = tokenize_bundle(world, tokens_root)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
 			.entity_mut(entity)
@@ -113,7 +124,7 @@ mod test {
 
 
 		app.update();
-			app
+		app
 			.world_mut()
 			.query_filtered_once::<&CodegenFile, With<CombinatorRouteCodegen>>(
 			)[0]
@@ -140,50 +151,46 @@ mod test {
 				}
 
 				pub fn get() -> impl Bundle {
-					related! {
-						Children [
-							(
-								BeetRoot,
-								RsxSnippetRoot,
-								MacroIdx {
-									file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
-									start: LineCol { line: 1u32, col: 0u32 }
-								},
-								FragmentNode,
-								related! {
-									Children [
-										(
-											NodeTag(String::from("h1")),
-											ElementNode { self_closing: false },
-											related! {
-												Children [
-													TextNode(String::from("Hello"))
-												]
-											}
-										),
-										(
-											NodeTag(String::from("p")),
-											ElementNode { self_closing: false },
-											related! {
-												Children [
-													TextNode(String::from("This page is all about saying hello"))
-												]
-											}
-										),
-										(
-											NodeTag(String::from("main")),
-											ElementNode { self_closing: false },
-											related! {
-												Children [
-													TextNode(String::from("## Nested Heading\n\tnested markdown doesnt work yet"))
-												]
-											}
-										)
-									]
-								}
-							)
-						]
-					}
+					(
+						BeetRoot,
+						RsxSnippetRoot,
+						MacroIdx {
+							file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
+							start: LineCol { line: 1u32, col: 0u32 }
+						},
+						FragmentNode,
+						related! {
+							Children [
+								(
+									NodeTag(String::from("h1")),
+									ElementNode { self_closing: false },
+									related! {
+										Children [
+											TextNode(String::from("Hello"))
+										]
+									}
+								),
+								(
+									NodeTag(String::from("p")),
+									ElementNode { self_closing: false },
+									related! {
+										Children [
+											TextNode(String::from("This page is all about saying hello"))
+										]
+									}
+								),
+								(
+									NodeTag(String::from("main")),
+									ElementNode { self_closing: false },
+									related! {
+										Children [
+											TextNode(String::from("## Nested Heading\n\tnested markdown doesnt work yet"))
+										]
+									}
+								)
+							]
+						}
+					)
 				}
 		}.to_string());
 	}

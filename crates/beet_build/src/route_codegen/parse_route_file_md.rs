@@ -5,16 +5,16 @@ use bevy::prelude::*;
 
 
 pub fn parse_route_file_md(
-	mut commands: Commands,
-	source_files: Query<&SourceFile>,
-	collection_codegen: Query<&CodegenFile, With<RouteFileCollection>>,
-	parents: Query<&ChildOf>,
 	mut query: Populated<
 		(Entity, &SourceFileRef, &mut RouteFile),
 		Changed<RouteFile>,
 	>,
+	mut commands: Commands,
+	source_files: Query<&SourceFile>,
+	collection_codegen: Query<&CodegenFile, With<RouteFileCollection>>,
+	parents: Query<&ChildOf>,
 ) -> Result {
-	for (entity, source_file_ref, mut route_file) in
+	for (route_file_entity, source_file_ref, mut route_file) in
 		query.iter_mut().filter(|(_, _, route_file)| {
 			route_file
 				.source_file_collection_rel
@@ -22,19 +22,20 @@ pub fn parse_route_file_md(
 				.map_or(false, |ext| ext == "md" || ext == "mdx")
 		}) {
 		let source_file = source_files.get(**source_file_ref)?;
-		let mut parent = commands.entity(entity);
+		commands
+			.entity(route_file_entity)
+			.despawn_related::<Children>();
 
 		// discard any existing children, we could
 		// possibly do a diff but these changes already result in recompile
 		// so not super perf critical
-		parent.despawn_related::<Children>();
 
 		let file_str = ReadFile::to_string(&source_file)?;
 
 		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 
 		let Some(collection_codegen) = parents
-			.iter_ancestors(entity)
+			.iter_ancestors(route_file_entity)
 			.find_map(|e| collection_codegen.get(e).ok())
 		else {
 			return Err(format!(
@@ -57,8 +58,10 @@ pub fn parse_route_file_md(
 		let route_codegen_path_abs = AbsPathBuf::new_unchecked(
 			collection_codegen_dir.join(&route_codegen_path),
 		);
+		trace!("Parsed route file: {}", source_file.display());
+		route_file.bypass_change_detection().mod_path = route_codegen_path;
 
-		parent.with_child(RouteFileMethod {
+		commands.spawn((ChildOf(route_file_entity), RouteFileMethod {
 			meta: if meta.is_some() {
 				RouteFileMethodMeta::File
 			} else {
@@ -68,12 +71,10 @@ pub fn parse_route_file_md(
 				path: route_file.route_path.clone(),
 				method: HttpMethod::Get,
 			},
-		});
-		trace!("Parsed route file: {}", source_file.display());
-		route_file.bypass_change_detection().mod_path = route_codegen_path;
+		}));
 		// here the markdown will be generated in its own codegen
-		
-		parent.with_child((
+		commands.spawn((
+			ChildOf(route_file_entity),
 			CombinatorRouteCodegen::new(meta),
 			SourceFileRef(**source_file_ref),
 			collection_codegen.clone_info(route_codegen_path_abs),

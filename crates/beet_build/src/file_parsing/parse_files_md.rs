@@ -10,17 +10,19 @@ pub fn parse_files_md(
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
 ) -> Result {
-	for (entity, path) in query.iter() {
+	for (source_file_entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 		// TODO md should not 
 			&& (ex == "md" || ex == "mdx")
 		{
-			commands.entity(entity).despawn_related::<Children>();
+			commands
+				.entity(source_file_entity)
+				.despawn_related::<Children>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((
-				ChildOf(entity),
+				SourceFileRef(source_file_entity),
 				RsxSnippetRoot,
 				MacroIdx::new(path.into_ws_path()?, LineCol::default()),
 				CombinatorTokens::new(rsx_str),
@@ -55,7 +57,11 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
+		let child = app
+			.world()
+			.entity(entity)
+			.get::<SourceFileRefTarget>()
+			.unwrap()[0];
 		app.world_mut()
 			.run_system_once_with(render_fragment, child)
 			.unwrap()
@@ -78,7 +84,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
+		let child = app.world().entity(entity).get::<SourceFileRefTarget>().unwrap()[0];
 		app.world_mut()
 			.run_system_once_with(render_fragment, child)
 			.unwrap()

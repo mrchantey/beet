@@ -89,7 +89,10 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).id();
 
-		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.run_system_once(apply_snippets_to_instances)
+			.unwrap()
+			.unwrap();
 		world.run_system_once(apply_slots).ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)
@@ -111,13 +114,15 @@ mod test {
 	}
 	#[test]
 	fn attribute_blocks() {
-		#[derive(Default,Buildable, AttributeBlock)]
+		#[derive(Default, Buildable, AttributeBlock)]
 		struct MyAttributeBlock {
 			class: String,
 		}
 
 		#[template]
-		fn MyTemplate(#[field(flatten)] attrs: MyAttributeBlock) -> impl Bundle {
+		fn MyTemplate(
+			#[field(flatten)] attrs: MyAttributeBlock,
+		) -> impl Bundle {
 			rsx! {<div {attrs}/>}
 		}
 
