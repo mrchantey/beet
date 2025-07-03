@@ -168,18 +168,24 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		let static_dir =
 			template_config.workspace.client_islands_path.into_abs();
 
-		self.static_routes
+		let html = self
+			.static_routes
 			.iter()
-			.map(async |route| -> Result {
+			.map(async |route| -> Result<(AbsPathBuf, String)> {
 				let html_dir = html_dir.clone();
 				let html = self.render_route(route).await?;
 				let route_path =
 					html_dir.join(&route.path.as_relative()).join("index.html");
-				FsExt::write(&route_path, html)?;
-				Ok(())
+
+				Ok((route_path, html))
 			})
 			.xmap(futures::future::try_join_all)
 			.await?;
+		// write files all at once to avoid triggering file watcher multiple times
+		for (path, html) in html {
+			FsExt::write(path, html)?;
+		}
+
 
 		let islands = self
 			.static_routes
@@ -289,18 +295,21 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 			_ => None,
 		};
 
-		router = router.layer(
-			tower_http::trace::TraceLayer::new_for_http()
-				.make_span_with(
-					tower_http::trace::DefaultMakeSpan::new()
-						.level(self.tracing),
-				)
-				.on_response(
-					tower_http::trace::DefaultOnResponse::new()
-						.level(self.tracing),
-				),
-		);
 
+		#[cfg(not(debug_assertions))]
+		{
+			router = router.layer(
+				tower_http::trace::TraceLayer::new_for_http()
+					.make_span_with(
+						tower_http::trace::DefaultMakeSpan::new()
+							.level(self.tracing),
+					)
+					.on_response(
+						tower_http::trace::DefaultOnResponse::new()
+							.level(self.tracing),
+					),
+			);
+		}
 
 		#[cfg(feature = "lambda")]
 		run_lambda(router).await?;
@@ -331,13 +340,14 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		let reload_handle = tokio::spawn(async move {
 			let mut rx = FsWatcher {
 				cwd: html_dir.to_path_buf(),
+				// debounce: std::time::Duration::from_millis(100),
 				// no filter because any change in the html dir should trigger a reload
 				..Default::default()
 			}
 			.watch()?;
 			while let Some(ev) = rx.recv().await? {
 				if ev.has_mutate() {
-					debug!("html files changed, reloading wasm...");
+					// debug!("html files changed, reloading wasm...");
 					reload.reload();
 					// println!("{}", events);
 					// this2.print_start();

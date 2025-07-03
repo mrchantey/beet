@@ -93,6 +93,13 @@ pub fn update_file_expr_hash(
 			}
 		}
 		let new_hash = hasher.finish();
+
+		let status = if hash.0 == new_hash {
+			"SAME"
+		} else {
+			"CHANGED"
+		};
+		debug!("FileExprHash {status} {}", source_file.path());
 		hash.set_if_neq(FileExprHash::new(new_hash));
 	}
 	Ok(())

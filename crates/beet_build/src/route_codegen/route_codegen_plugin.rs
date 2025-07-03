@@ -17,7 +17,7 @@ impl Plugin for RouteCodegenPlugin {
 				// not a perfect ordering, some of these, ie action codegen, arent actually dependent on preceeding
 				// systems but legibility is more valuable than perf at this stage
 				((
-					update_route_files,
+					(reset_changed_codegen, update_route_files),
 					// create the child routes
 					(parse_route_file_rs, parse_route_file_md),
 					modify_route_file_tokens,
@@ -34,7 +34,7 @@ impl Plugin for RouteCodegenPlugin {
 					export_codegen_files,
 				)
 					.chain()
-					.in_set(AfterParseTokens))
+					.in_set(ProcessChangedSnippets))
 				.run_if(BuildFlags::should_run(BuildFlag::Routes)),
 			);
 	}

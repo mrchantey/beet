@@ -80,28 +80,61 @@ impl CollectionIndexCounter {
 	}
 }
 
+
+
+/// When a [`FileExprHash`] changes, for every [`RouteFileCollection`]
+/// that matches the file:
+/// - mark the collection as changed
+/// - mark the root as changed if it exists
+/// - reset collection and root codegen
+pub fn reset_changed_codegen(
+	mut roots: Query<
+		(&mut RouteCodegenRoot, &mut CodegenFile),
+		// divergent queries
+		Without<RouteFileCollection>,
+	>,
+	mut collections: Query<(
+		&mut RouteFileCollection,
+		&mut CodegenFile,
+		Option<&ChildOf>,
+	)>,
+	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
+) {
+	for file in changed_exprs.iter() {
+		for (mut collection, mut collection_codegen, parent) in collections
+			.iter_mut()
+			.filter(|(collection, _, _)| collection.passes_filter(file))
+		{
+			parent
+				.map(|parent| roots.get_mut(parent.parent()).ok())
+				.flatten()
+				.map(|(mut root, mut root_codegen)| {
+					root.set_changed();
+					root_codegen.clear_items();
+				});
+			collection.set_changed();
+			collection_codegen.clear_items();
+		}
+	}
+}
+
+
 /// When a [`FileExprHash`] changes, create a corresponding [`RouteFile`]
 /// for each file group that it matches if it doesnt exist,
 /// otherwise mark it as changed.
-/// A [`Changed<RouteFile>`] will also result in a [`Changed<RouteFileCollection>`]
+/// A [`Changed<FileExprHash>`] will also result in a [`Changed<RouteFileCollection>`]
 pub(super) fn update_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
-	mut roots: Query<&mut RouteCodegenRoot>,
 	changed_exprs: Populated<(Entity, &SourceFile), Changed<FileExprHash>>,
-	mut collections: Query<(
-		Entity,
-		&mut RouteFileCollection,
-		&CodegenFile,
-		Option<&ChildOf>,
-	)>,
+	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
 	children: Query<&Children>,
 	mut route_files: Query<(&SourceFileRef, &mut RouteFile)>,
 ) -> Result {
 	for (file_entity, file) in changed_exprs.iter() {
-		for (collection_entity, mut collection, codegen, parent) in collections
-			.iter_mut()
-			.filter(|(_, collection, _, _)| collection.passes_filter(file))
+		for (collection_entity, collection, codegen) in collections
+			.iter()
+			.filter(|(_, collection, _)| collection.passes_filter(file))
 		{
 			// check if there is a match, if so mark as changed.
 			// otherwise create a new RouteFile
@@ -110,14 +143,11 @@ pub(super) fn update_route_files(
 					Ok((source_file_ref, mut route_file))
 						if **source_file_ref == file_entity =>
 					{
-						collection.set_changed();
+						// we're currently never hitting this because
+						// we are removing all SourceFileRef on change,
+						// could be solved by using two relations, SourceFileSnippets etc
+						debug!("Marking RouteFile changed: {}", file.path(),);
 						route_file.set_changed();
-						parent
-							.map(|parent| roots.get_mut(parent.parent()).ok())
-							.flatten()
-							.map(|mut root| {
-								root.set_changed();
-							});
 						true
 					}
 					_ => false,
@@ -135,6 +165,8 @@ pub(super) fn update_route_files(
 
 
 				let index = index_counter.next(collection_entity);
+
+				debug!("Creating new RouteFile: {}", file.path());
 
 				commands.spawn((
 					ChildOf(collection_entity),

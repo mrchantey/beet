@@ -51,11 +51,11 @@ impl BuildPlugin {
 /// Runs before rsx tokens have been resolved into entity trees,
 /// used for importing and preparing token streams.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct BeforeParseTokens;
+pub struct ImportSnippets;
 /// Runs after rsx tokens have been resolved into entity trees,
 /// and the new [`FileExprHash`] has been calculated.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct AfterParseTokens;
+pub struct ProcessChangedSnippets;
 /// System set for exporting codegen files, Static Trees, Lang Partials, etc.
 /// This set should be configured to run after all importing and processing.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
@@ -91,12 +91,12 @@ impl Plugin for BuildPlugin {
 			.configure_sets(
 				Update,
 				(
-					BeforeParseTokens.before(ParseRsxTokensSet),
-					AfterParseTokens
-						.after(BeforeParseTokens)
+					ImportSnippets.before(ParseRsxTokensSet),
+					ProcessChangedSnippets
+						.after(ImportSnippets)
 						.after(ParseRsxTokensSet),
 					ExportArtifactsSet
-						.after(AfterParseTokens)
+						.after(ProcessChangedSnippets)
 						.before(TemplateSet)
 						.run_if(move || write_to_fs),
 				),
@@ -114,10 +114,10 @@ impl Plugin for BuildPlugin {
 						(parse_files_rs, parse_files_md),
 					)
 						.chain()
-						.before(BeforeParseTokens),
+						.before(ImportSnippets),
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
-						.before(AfterParseTokens),
+						.before(ProcessChangedSnippets),
 					(
 						compile_server.run_if(BuildFlags::should_run(
 							BuildFlag::CompileServer,

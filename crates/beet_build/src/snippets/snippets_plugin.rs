@@ -23,7 +23,7 @@ impl Plugin for SnippetsPlugin {
 					parse_lightning,
 				)
 					.chain()
-					.in_set(AfterParseTokens),
+					.in_set(ProcessChangedSnippets),
 				export_snippets.in_set(ExportArtifactsSet),
 			)
 				.run_if(BuildFlags::should_run(BuildFlag::Snippets)),
