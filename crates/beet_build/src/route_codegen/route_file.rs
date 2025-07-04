@@ -143,9 +143,6 @@ pub(super) fn update_route_files(
 					Ok((source_file_ref, mut route_file))
 						if **source_file_ref == file_entity =>
 					{
-						// we're currently never hitting this because
-						// we are removing all SourceFileRef on change,
-						// could be solved by using two relations, SourceFileSnippets etc
 						debug!("Marking RouteFile changed: {}", file.path(),);
 						route_file.set_changed();
 						true

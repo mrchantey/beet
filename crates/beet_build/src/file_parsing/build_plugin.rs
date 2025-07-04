@@ -111,7 +111,7 @@ impl Plugin for BuildPlugin {
 						// we should remove it!
 						apply_snippets_to_instances,
 						parse_file_watch_events,
-						(parse_files_rs, parse_files_md),
+						(import_rsx_snippets_rs, import_rsx_snippets_md),
 					)
 						.chain()
 						.before(ImportSnippets),

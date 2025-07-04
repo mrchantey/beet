@@ -72,16 +72,16 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 		.map(|(entity, source_file)| (entity, **source_file))
 		.collect::<Vec<_>>()
 	{
-		let tokens_root = world
+		let snippets = world
 			.entity(source_file_ref)
-			.get::<SourceFileRefTarget>()
-			.expect("SourceFileRefTarget should exist")
-			.iter()
-			.find(|entity| world.entity(*entity).contains::<BeetRoot>())
-			.ok_or_else(|| {
-				bevyhow!("SourceFile has no children with a BeetRoot")
-			})?;
+			.get::<RsxSnippets>()
+			.expect("Combinator Source File should have RsxSnippets");
 
+		assert!(
+			snippets.len() == 1,
+			"Combinator Source File should have exactly one RsxSnippet"
+		);
+		let tokens_root = snippets[0];
 
 		let tokens = tokenize_bundle(world, tokens_root)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);

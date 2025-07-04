@@ -9,11 +9,11 @@ use std::hash::Hasher;
 
 
 /// Hash all the parts of a rust file that are not part of an rsx! macro.
-pub(super) struct HashNonTemplateRust<'a, H> {
+pub(super) struct HashNonSnippetRust<'a, H> {
 	pub macros: &'a TemplateMacros,
 	pub hasher: &'a mut H,
 }
-impl<H: Hasher> HashNonTemplateRust<'_, H> {
+impl<H: Hasher> HashNonSnippetRust<'_, H> {
 	pub fn hash(&mut self, file: &SourceFile) -> Result<()> {
 		match file.extension() {
 			Some(ex) if ex == "rs" => {
@@ -93,7 +93,7 @@ mod test {
 
 	fn hash(tokens: TokenStream) -> u64 {
 		let mut hasher = RapidHasher::default_const();
-		HashNonTemplateRust {
+		HashNonSnippetRust {
 			hasher: &mut hasher,
 			macros: &TemplateMacros::default(),
 		}

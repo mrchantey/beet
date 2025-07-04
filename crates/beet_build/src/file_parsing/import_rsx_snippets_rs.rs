@@ -8,7 +8,7 @@ use syn::visit::Visit;
 
 /// For a given rust file, extract tokens from `rsx!` macros and insert them
 /// as [`RstmlTokens`].
-pub fn parse_files_rs(
+pub fn import_rsx_snippets_rs(
 	// even though our tokens are Unspan, they will be parsed by ParseRsxTokens
 	// which also handles !Send tokens, so we must ensure main thread.
 	_: TempNonSendMarker,
@@ -22,9 +22,7 @@ pub fn parse_files_rs(
 		{
 			trace!("rust source file changed: {}", path.display());
 
-			commands
-				.entity(entity)
-				.despawn_related::<SourceFileRefTarget>();
+			commands.entity(entity).despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
@@ -62,7 +60,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
-				SourceFileRef(self.source_file),
+				RsxSnippetOf(self.source_file),
 				RsxSnippetRoot,
 				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
 				RstmlTokens::new(tokens),
@@ -92,11 +90,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app
-			.world()
-			.entity(entity)
-			.get::<SourceFileRefTarget>()
-			.unwrap()[0];
+		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

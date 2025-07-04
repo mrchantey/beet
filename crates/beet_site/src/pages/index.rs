@@ -2,18 +2,22 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 pub fn get() -> impl Bundle {
+
+	let foo = 1;
+
 	rsx! {
 		<BeetContext>
 			<ContentLayout>
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
-				<h1>Beet</h1>
+				<h1>Beet {foo}</h1>
 				<p>"🦄 A very bevy metaframework 🦄"</p>
 				<Link
 					class="primary-action"
 					href="https://github.com/mrchantey/beet/blob/main/CONTRIBUTING.md"
 					style:cascade
 					>Contributing</Link>
+				<p>"🚧 Mind your step! Beet is under construction, this site is currently for testing and feedback purposes only 🚧"</p>
 				<p>"🚧 Mind your step! Beet is under construction, this site is currently for testing and feedback purposes only 🚧"</p>
 				// <Link
 				// 	class="primary-action"

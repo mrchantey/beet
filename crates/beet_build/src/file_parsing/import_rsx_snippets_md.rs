@@ -6,7 +6,7 @@ use bevy::prelude::*;
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert
 /// as [`CombinatorToNodeTokens`].
-pub fn parse_files_md(
+pub fn import_rsx_snippets_md(
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
 ) -> Result {
@@ -19,12 +19,12 @@ pub fn parse_files_md(
 
 			commands
 				.entity(source_file_entity)
-				.despawn_related::<SourceFileRefTarget>();
+				.despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((
-				SourceFileRef(source_file_entity),
+				RsxSnippetOf(source_file_entity),
 				RsxSnippetRoot,
 				MacroIdx::new(path.into_ws_path()?, LineCol::default()),
 				CombinatorTokens::new(rsx_str),
@@ -58,11 +58,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app
-			.world()
-			.entity(entity)
-			.get::<SourceFileRefTarget>()
-			.unwrap()[0];
+		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
@@ -85,11 +81,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app
-			.world()
-			.entity(entity)
-			.get::<SourceFileRefTarget>()
-			.unwrap()[0];
+		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

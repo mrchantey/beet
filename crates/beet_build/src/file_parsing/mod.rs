@@ -1,11 +1,11 @@
-mod parse_files_md;
-pub use parse_files_md::*;
-mod parse_files_rs;
-pub use parse_files_rs::*;
+mod import_rsx_snippets_md;
+pub use import_rsx_snippets_md::*;
+mod import_rsx_snippets_rs;
+pub use import_rsx_snippets_rs::*;
 mod source_file;
 pub use source_file::*;
-mod hash_non_template_rust;
-use hash_non_template_rust::*;
+mod hash_non_snippet_rust;
+use hash_non_snippet_rust::*;
 mod file_expr_hash;
 pub use file_expr_hash::*;
 mod build_plugin;

@@ -42,6 +42,20 @@ pub struct SourceFileRef(pub Entity);
 pub struct SourceFileRefTarget(Vec<Entity>);
 
 
+/// Reference to the [`SourceFile`] of this rsx snippet.
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = RsxSnippets)]
+pub struct RsxSnippetOf(pub Entity);
+
+/// Rsx snippets of this [`SourceFile`], we use non-parent relations
+/// to avoid missing parent in fine-grained scene exports.
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = RsxSnippetOf,linked_spawn)]
+pub struct RsxSnippets(Vec<Entity>);
+
+
 /// Parent of every [`SourceFile`] entity, any changed child [`SourceFile`]
 /// will result in this being marked [`Changed`]
 #[derive(Component)]
