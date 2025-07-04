@@ -31,7 +31,6 @@ impl Plugin for RouteCodegenPlugin {
 						add_client_codegen_to_actions_export,
 						collect_client_action_group,
 					),
-					export_codegen_files,
 				)
 					.chain()
 					.in_set(ProcessChangedSnippets))
@@ -42,7 +41,7 @@ impl Plugin for RouteCodegenPlugin {
 
 
 /// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
-fn export_codegen_files(
+pub fn export_route_codegen(
 	query: Populated<&CodegenFile, Changed<CodegenFile>>,
 ) -> bevy::prelude::Result {
 	let num_files = query.iter().count();

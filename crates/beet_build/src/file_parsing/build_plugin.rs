@@ -78,6 +78,7 @@ impl Plugin for BuildPlugin {
 		app.add_event::<WatchEvent>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<BuildFlags>()
+			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
@@ -118,16 +119,19 @@ impl Plugin for BuildPlugin {
 					update_file_expr_hash
 						.after(ParseRsxTokensSet)
 						.before(ProcessChangedSnippets),
+					// compile and export steps
 					(
+						export_route_codegen
+							.run_if(BuildFlags::should_run(BuildFlag::Routes)),
 						compile_server.run_if(BuildFlags::should_run(
 							BuildFlag::CompileServer,
 						)),
 						export_server_ssg.run_if(BuildFlags::should_run(
 							BuildFlag::ExportSsg,
 						)),
-						codegen_client_islands.run_if(BuildFlags::should_run(
-							BuildFlag::ClientIslands,
-						)),
+						export_client_island_codegen.run_if(
+							BuildFlags::should_run(BuildFlag::ClientIslands),
+						),
 						compile_wasm.run_if(BuildFlags::should_run(
 							BuildFlag::CompileWasm,
 						)),

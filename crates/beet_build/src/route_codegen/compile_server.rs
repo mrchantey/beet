@@ -11,10 +11,18 @@ use std::process::Command;
 
 
 /// After Codegen, build the router binary and run it once.
-pub fn compile_server(
+pub(crate) fn compile_server(
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
+	mut handle: ResMut<ServerHandle>,
 	cmd: When<Res<CargoBuildCmd>>,
 ) -> Result {
+	// if the server is already running, kill it
+	// before the snippets are exported because
+	// because recompilation means it would contain stale instances.
+	if let Some(child) = &mut handle.0 {
+		child.kill()?;
+	}
+
 	debug!("Building native binary");
 	cmd.spawn()?;
 	Ok(())
@@ -39,14 +47,23 @@ pub fn export_server_ssg(
 	Ok(())
 }
 
-
+/// A handle to the server process
+// this must be Option so that run_server can take the chile
 #[derive(Default, Resource)]
 pub(crate) struct ServerHandle(Option<std::process::Child>);
 
+impl Drop for ServerHandle {
+	fn drop(&mut self) {
+		if let Some(child) = &mut self.0 {
+			debug!("Killing server process");
+			let _result = child.kill();
+		}
+	}
+}
 /// Run the server, holding a handle to the process.
 pub(crate) fn run_server(
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
-	mut handle: Local<ServerHandle>,
+	mut handle: ResMut<ServerHandle>,
 	cmd: When<Res<CargoBuildCmd>>,
 ) -> Result {
 	if let Some(child) = &mut handle.0 {

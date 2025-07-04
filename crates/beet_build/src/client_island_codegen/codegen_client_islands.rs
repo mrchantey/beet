@@ -59,7 +59,7 @@ impl CollectClientIslands {
 }
 
 
-pub fn codegen_client_islands(
+pub fn export_client_island_codegen(
 	_: Query<(), Changed<RouteCodegenRoot>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut query: Query<&mut CollectClientIslands>,

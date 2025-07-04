@@ -30,6 +30,7 @@ impl AsRef<Path> for SourceFile {
 
 /// Types like [`RouteFile`] exist outside of the [`SourceFile`] tree,
 /// but need to reference it to get its rsx children.
+/// This entity will be despawned when the [`SourceFile`] is despawned.
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = SourceFileRefTarget)]
