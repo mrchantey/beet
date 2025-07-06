@@ -23,7 +23,6 @@ _test_lightningcss = ["dep:lightningcss"]
 [dependencies]
 bevy.workspace = true
 anyhow.workspace = true
-sweet.workspace = true
 beet_rsx.workspace = true
 beet_bevy.workspace = true
 beet_common.workspace = true

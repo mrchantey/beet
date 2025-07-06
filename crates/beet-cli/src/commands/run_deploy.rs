@@ -35,20 +35,21 @@ impl RunDeploy {
 
 	pub async fn run(mut self) -> Result {
 		self.build.build_cmd.release = true;
+		// we need to build the native and wasm binaries in release mode,
+		// and export the html
 		self.build.clone().run(RunMode::Once).await?;
 
 		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
 			self.build.beet_config.as_deref(),
 		)
 		.unwrap_or_exit();
-		let html_dir = config.template_config.workspace.html_dir.into_abs();
 
 		self.lambda_build()?;
 		if !self.dry_run {
 			if self.sst {
 				self.sst_deploy()?;
 			}
-			self.lambda_deploy(&html_dir)?;
+			self.lambda_deploy(&config)?;
 		}
 		Ok(())
 	}
@@ -57,8 +58,9 @@ impl RunDeploy {
 		let mut cmd = Command::new("cargo");
 		cmd.arg("lambda")
 			.arg("build")
+			.arg("--no-default-features")
 			.arg("--features")
-			.arg("beet/lambda")
+			.arg("deploy")
 			.arg("--release")
 			// this is where sst expects the boostrap to be located
 			.arg("--lambda-dir")
@@ -91,7 +93,7 @@ impl RunDeploy {
 
 	/// Deploy to lambda, using best effort to determine the binary name
 	#[allow(unused)]
-	fn lambda_deploy(&self, html_dir: &AbsPathBuf) -> Result<()> {
+	fn lambda_deploy(&self, config: &BuildConfig) -> Result<()> {
 		let mut cmd = Command::new("cargo");
 
 		let binary_name = if let Some(bin) = &self.build.build_cmd.bin {
@@ -102,11 +104,30 @@ impl RunDeploy {
 			None
 		};
 
+		let html_dir = config
+			.template_config
+			.workspace
+			.html_dir
+			// .into_abs()
+			.to_string();
+		let snippets_dir = config
+			.template_config
+			.workspace
+			.snippets_dir()
+			// .into_abs()
+			.to_string();
+
+
 		cmd.arg("lambda")
 			.arg("deploy")
 			.arg("--enable-function-url")
 			.arg("--include")
-			.arg(&html_dir.to_string_lossy().to_string());
+			.arg(&html_dir)
+			.arg("--include")
+			.arg(&snippets_dir)
+			// this is where sst expects the boostrap to be located
+			.arg("--lambda-dir")
+			.arg("target/lambda/crates");
 
 		if let Some(bin) = &binary_name {
 			cmd.arg("--binary-name").arg(&bin);
@@ -122,6 +143,16 @@ impl RunDeploy {
 		if let Some(name) = &self.function_name {
 			cmd.arg(name);
 		}
+
+		// Print the full command before executing
+		let cmd_str = format!(
+			"cargo {}",
+			cmd.get_args()
+				.map(|a| a.to_string_lossy())
+				.collect::<Vec<_>>()
+				.join(" ")
+		);
+		println!("🌱 Deploying Lambda Binary: {cmd_str}");
 
 		cmd.spawn()?.wait()?.exit_ok()?;
 

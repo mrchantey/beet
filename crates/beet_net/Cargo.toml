@@ -10,8 +10,10 @@ description.workspace = true
 repository.workspace = true
 
 [features]
-default = ["serde"]
+default = ["serde", "openssl"]
 serde = ["dep:serde", "dep:serde_json"]
+openssl = ["reqwest/default"]
+rustls = ["reqwest/rustls-tls"]
 tokens = [
 	"serde",
 	"beet_common/tokens",
@@ -49,12 +51,8 @@ proc-macro2-diagnostics = { workspace = true, optional = true }
 
 #💡 Native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-reqwest = { version = "0.12" }
-# rustls keeps triggering recompilation so sucks for dev, but zig fails to get openssl 
-# so rustls is required for zig/cargo-lambda
-# reqwest = { version = "0.12", default-features = false, features = [
-# 	"rustls-tls",
-# ] }
+reqwest = { version = "0.12", default-features = false }
+
 
 #💡 Web
 [target.'cfg(target_arch = "wasm32")'.dependencies]

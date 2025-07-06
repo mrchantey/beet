@@ -109,7 +109,9 @@ beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 sweet = { path = "crates/sweet", version = "0.4.1" }
 beet_bevy = { path = "crates/beet_bevy", version = "0.0.6-dev.1" }
 beet_fs = { path = "crates/beet_fs", version = "0.0.6-dev.1" }
-beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1" }
+beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1", default-features = false, features = [
+	"serde",
+] }
 beet_server_utils = { path = "crates/beet_server_utils", version = "0.0.6-dev.1" }
 sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.1" }
 beet_web = { path = "crates/beet_web", version = "0.0.6-dev.1" }
@@ -241,6 +243,7 @@ default = ["flow"]
 web-server = ["server", "router", "design", "net", "serde"]
 web-client = ["rsx", "router", "design", "web", "net", "serde"]
 #💡 fine-grained
+openssl = ["beet_net/openssl"]
 serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_bevy/rand"]
 connect = ["dep:beet_connect"]
@@ -258,9 +261,9 @@ server = [
 	"router",
 	"beet_router/axum",
 	"dep:beet_server",
-	"dep:beet_server_utils",
+	# "dep:beet_server_utils",
 ]
-lambda = ["server", "beet_server/lambda"]
+lambda = ["server", "beet_server/lambda", "beet_net/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
 build = ["parse", "dep:beet_build", "beet_server?/build"]
@@ -307,6 +310,7 @@ beet_spatial = { workspace = true, optional = true }
 #💡 utils
 beet_utils.workspace = true
 beet_bevy = { workspace = true }
+# lambda incompatible with openssl, must enable either openssl or rustls manually
 beet_net = { workspace = true, optional = true }
 beet_server_utils = { workspace = true, optional = true }
 beet_fs = { workspace = true, optional = true }

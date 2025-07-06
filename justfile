@@ -59,6 +59,9 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+lambda-build:
+	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
+
 
 deploy-site *args:
 	just cli deploy 										\
