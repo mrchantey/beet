@@ -1,20 +1,15 @@
 use beet::prelude::*;
-use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Node, Serialize, Deserialize)]
-pub struct Calculator {
-	#[field(default = 0)]
-	initial: i32,
-}
-
-fn calculator(props: Calculator) -> WebNode {
-	let (get, set) = signal(props.initial);
+#[template]
+#[derive(Serialize, Deserialize)]
+pub fn Calculator(#[field(default = 0)] initial: i32) -> impl Bundle {
+	let (get, set) = signal(initial);
 
 
 	let get2 = get.clone();
-	let onclick = move |_| {
+	let onclick = move |_: Trigger<OnClick>| {
 		#[allow(unused)]
 		let set = set.clone();
 		#[allow(unused)]

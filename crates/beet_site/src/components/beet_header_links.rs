@@ -5,14 +5,12 @@ use beet::prelude::*;
 
 
 
-#[derive(Node)]
-pub struct BeetHeaderLinks;
-
-fn beet_header_links(_: BeetHeaderLinks) -> WebNode {
+#[template]
+pub fn BeetHeaderLinks() -> impl Bundle {
 	rsx! {
-		<Link 
-			variant=ButtonVariant::Text 
-			href=paths::docs::index()
+		<Link
+			variant=ButtonVariant::Text
+			href=routes::docs::index()
 			>
 			Docs
 		</Link>

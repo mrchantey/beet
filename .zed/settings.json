@@ -3,11 +3,22 @@
 // For a full list of overridable settings, and general information on folder-specific settings,
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
-  "lsp": {
-    "rust-analyzer": {
-      "cargo": {
-        // "features": "all"
-      }
-    }
-  }
+	"lsp": {
+		"rust-analyzer": {
+			"cargo": {
+				// "features": "all"
+			}
+		}
+	},
+	"file_scan_exclusions": [
+		"**/.git",
+		".gitattributes",
+		"LICENSE-APACHE.txt",
+		"LICENSE-MIT.txt",
+		"**/node_modules",
+		"**/target",
+		"**/.DS_Store",
+		"**/*.log",
+		"**/Cargo.lock"
+	]
 }

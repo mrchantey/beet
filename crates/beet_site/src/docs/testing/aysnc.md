@@ -1,10 +1,10 @@
----
-title: Async
-description: Running async tests
-draft: true
-sidebar:
-  order: 3
----
++++
+title = "Async"
+description = "Running async tests"
+draft = true
+[sidebar]
+order = 3
++++
 
 ## `#[tokio::test]` (native)
 

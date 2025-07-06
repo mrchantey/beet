@@ -17,15 +17,20 @@ name = "beet"
 path = "src/main.rs"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet = { workspace = true, features = ["router", "build"] }
+beet = { workspace = true, features = ["build", "fs", "server"] }
 # beet_router = { workspace = true, features = ["parser"] }
 anyhow.workspace = true
 ron.workspace = true
-sweet = { workspace = true, features = ["fs", "server"] }
 clap.workspace = true
 tokio.workspace = true
 rapidhash.workspace = true
+bevy.workspace = true
 
+#💡 Automod
+syn.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+prettyplease.workspace = true
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true

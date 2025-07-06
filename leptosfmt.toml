@@ -11,11 +11,9 @@ attr_value_brace_style = "WhenRequired"
 # Macro names which will be formatted
 macro_names = [
 	"rsx",
-	"rsx_template",
-	"web_tokens",
+	"rsx_tokens",
 	"beet::rsx",
-	"beet::rsx_template",
-	"beet::web_tokens",
+	"beet::rsx_tokens",
 ]
 # "Preserve", "SelfClosing" or "NonSelfClosing"
 closing_tag_style = "Preserve"

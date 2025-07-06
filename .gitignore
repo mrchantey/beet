@@ -12,4 +12,4 @@ tests/expect.rs
 
 **/codegen
 
-ws_rsx/beet_query/test.db
+crates/beet_query/test.db

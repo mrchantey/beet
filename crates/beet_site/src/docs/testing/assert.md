@@ -1,10 +1,10 @@
----
-title: On Assert
-description: The dark side of assert
-draft: true
-sidebar:
-  order: 99
----
++++
+title = "On Assert"
+description = "The dark side of assert"
+draft = true
+[sidebar]
+order = 99
++++
 
 First of all let me assert that `assert!` does have a place, but its absolutely not in tests. The TLDR is that it provides a simple way to collect error locations but strikes at rust's achilles heel, *compile times*, and the same information can be achieve lazily through runtime backtracing.
 
@@ -24,8 +24,8 @@ _I dont consider myself a benching wizard, if you see a way this approach could 
 For some real world context, here's some 'back of a napkin' calculations i did by grepping a few rust repos i had laying around:
 | Repo         | `assert!` Lines [^3] | `assert!` Compile Time | `expect` Compile Time |
 | ------------ | -------------------- | ---------------------- | --------------------- |
-| bevy         | 7,000                | 30s                    | 0.3s                   |
-| wasm-bindgen | 3,000                | 15s                    | 0.15s                  |
+| bevy         | 7,000                | 30s                    | 0.3s                  |
+| wasm-bindgen | 3,000                | 15s                    | 0.15s                 |
 | rust         | 50,000               | 250s                   | 2.5s                  |
 
 [^3]: A very coarse grep of `assert!` or `assert_`
@@ -61,7 +61,7 @@ Creating a file with `n` number of lines with an assert! wrapper function called
 | 10,000  | 0.70s            | 0.07ms             |
 | 20,000  | 1.06s            | 0.05ms             |
 | 100,000 | 5.37s            | 0.05ms             |
-| 500,000 | 44.**00s**           | 0.09ms             |
+| 500,000 | 44.**00s**       | 0.09ms             |
 
 [^1]: Compile times are retrieved from the output of `cargo build`, `Finished dev [unoptimized + debuginfo] target(s) in 0.33 secs`
 [^2]: Time per line is simply ` line count / compile time`

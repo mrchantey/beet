@@ -1,14 +1,10 @@
-use crate::prelude::*;
 use beet::prelude::*;
-use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::*;
 
-#[derive(Node, Serialize, Deserialize)]
-pub struct Broken;
-
-fn broken(_props: Broken) -> WebNode {
+#[template]
+#[derive(Serialize, Deserialize)]
+pub fn Broken() -> impl Bundle {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -24,11 +20,10 @@ fn broken(_props: Broken) -> WebNode {
 }
 
 
-#[derive(Node)]
-struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> WebNode {
-	let onclick = move |_| {
-		sweet::log!("clicked");
+#[template]
+fn RejectsNeg() -> impl Bundle {
+	let onclick = move |_: Trigger<OnClick>| {
+		beet::log!("clicked");
 	};
 
 	rsx! {

@@ -12,15 +12,20 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
 
-sweet = { workspace = true, features = ["web"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet = { workspace = true, features = ["web-server"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+beet = { workspace = true, features = ["web-client"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
-[build-dependencies]
-anyhow.workspace = true
-beet = { workspace = true, features = ["web-server", "build"] }
-sweet = { workspace = true, features = ["fs"] }
+[dev-dependencies]
+sweet.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

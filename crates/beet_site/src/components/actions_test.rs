@@ -1,14 +1,10 @@
-use crate::prelude::*;
 use beet::prelude::*;
-use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::*;
 
-#[derive(Node, Serialize, Deserialize)]
-pub struct ActionTest;
-
-fn action_test(_props: ActionTest) -> WebNode {
+#[template]
+#[derive(Serialize, Deserialize)]
+pub fn ActionTest() -> impl Bundle {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -24,17 +20,18 @@ fn action_test(_props: ActionTest) -> WebNode {
 }
 
 
-#[derive(Node)]
-pub struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> WebNode {
+#[template]
+pub fn RejectsNeg() -> impl Bundle {
+	#[allow(unused_variables)]
 	let (val, _set_val) = signal(0);
+	#[allow(unused_variables)]
 	let (get, set) = signal("Ready".to_string());
 
-	let onclick = move |_| {
-		let val = val.clone();
-		let set = set.clone();
+	let onclick = move |_: Trigger<OnClick>| {
+		#[cfg(target_arch = "wasm32")]
 		spawn_local(async move {
-			let result = actions::error_handling::reject_neg(val()).await;
+			let result =
+				crate::actions::error_handling::reject_neg(val()).await;
 			match result {
 				Ok(_) => set("Success".into()),
 				Err(e) => set(format!("Error: {}", e)),

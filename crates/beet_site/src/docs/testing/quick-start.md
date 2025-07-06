@@ -1,10 +1,10 @@
----
-title: Quick Start
-description: Getting up and running with sweet.
-draft: true
-sidebar:
-  order: 1
----
++++
+title = "Quick Start"
+description = "Getting up and running with sweet."
+draft = true
+[sidebar]
+order = 1
++++
 
 Configure sweet by adding two lines to your entrypoint:
 

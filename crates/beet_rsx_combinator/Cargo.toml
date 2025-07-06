@@ -1,0 +1,23 @@
+[package]
+name = "beet_rsx_combinator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors = ["Victor Porof <victor.porof@gmail.com>", "Peter Hayman"]
+readme = "README.md"
+description = "JSX-like parser combinator for Rust"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+# combine 2 is >5 years old but its a tough one to upgrade
+combine = "2.5"
+itertools = "0.14"
+thiserror.workspace = true
+
+[dev-dependencies]
+sweet.workspace = true

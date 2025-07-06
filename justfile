@@ -28,10 +28,9 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p ws_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
-	mkdir -p ws_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron ws_flow/beet_ml/assets/ml/default.bert.ron
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
@@ -73,7 +72,7 @@ remove-site:
 	npx sst remove --stage production --config infra/sst.config.ts
 
 mod *args:
-	sweet mod --exclude *codegen* {{args}}
+	just sweet mod --exclude */codegen/* {{args}}
 
 # Run and watch a workspace example
 run example *args:
@@ -93,6 +92,23 @@ run-p crate example *args:
 run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
+run-csr:
+	just watch just build-csr
+
+build-csr:
+	cargo run --example csr
+	cargo build --example csr --target-dir=target --features=rsx --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
+	sweet serve target/examples/csr
+	
+run-hydration:
+	just watch just build-hydration
+
+build-hydration:
+	cargo run --example hydration
+	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
+	sweet serve target/examples/hydration
 
 doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
@@ -103,15 +119,15 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	ws_rsx/beet_rsx/**/*.rs 					\
-	ws_rsx/beet_rsx/**/**/*.rs 				\
-	ws_rsx/beet_rsx/**/**/**/*.rs 		\
-	ws_rsx/beet_design/**/*.rs 				\
-	ws_rsx/beet_design/**/**/*.rs 		\
-	ws_rsx/beet_design/**/**/**/*.rs 	\
-	ws_rsx/beet_router/**/*.rs 				\
-	ws_rsx/beet_router/**/**/*.rs 		\
-	ws_rsx/beet_router/**/**/**/*.rs 	\
+	crates/beet_rsx/**/*.rs 					\
+	crates/beet_rsx/**/**/*.rs 				\
+	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_design/**/*.rs 				\
+	crates/beet_design/**/**/*.rs 		\
+	crates/beet_design/**/**/**/*.rs 	\
+	crates/beet_router/**/*.rs 				\
+	crates/beet_router/**/**/*.rs 		\
+	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -148,8 +164,9 @@ run-test-site:
 	sweet serve target/test_site
 # --templates-root-dir crates \
 
+#just cli watch -p beet_site {{args}}
 run-site *args:
-	just cli watch -p beet_site {{args}}
+	just cli run -p beet_site {{args}}
 
 build-site *args:
 	just cli build -p beet_site {{args}}
@@ -157,7 +174,7 @@ build-site *args:
 
 #💡 Test
 
-# it keeps asking for bigger stacks?
+# it keeps asking for bigger stacks? a mold thing?
 min-stack := 'RUST_MIN_STACK=134217728'
 # min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'
@@ -175,29 +192,26 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
-# upstream from sweet_test
+# upstream from sweet
 test-fs *args:
-	just watch 'cargo test -p sweet_fs --lib {{args}}'
-# upstream from sweet_test
-test-utils *args:
-	just watch 'cargo test -p sweet_utils --lib --features=serde {{args}}'
-
-
-# just test-flow runs out of space
-test-build *args:
-	{{min-stack}} cargo test -p beet_common 					--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_parser 			--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
+	just watch 'cargo test -p beet_fs --lib -- --nocapture {{args}}'
+# upstream from sweet
+test-beet-utils *args:
+	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
 
 test-rsx *args:
-	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_router 	--features=serde 																					{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_common_macros		--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx					 	 	 																								{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_site 						--all-features																			{{args}} -- {{test-threads}}
 	
 test-flow *args:
 	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
@@ -207,29 +221,35 @@ test-flow *args:
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 
-test-sweet *args:
-	{{min-stack}} cargo test -p sweet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_net 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_server 						--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_test 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
-	{{min-stack}} cargo test -p sweet_utils 						--all-features 													 	{{args}} -- {{test-threads}}
+#{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
+test-utils *args:
+	{{min-stack}} cargo test -p beet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_net 								--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_server_utils 			--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_bevy   {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_test   {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_web   	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_bevy   	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet   			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_web   	{{args}} -- {{test-threads}}
 
 test-all-lib *args:
 	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
 test-all-doc *args:
 	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
+test-all:
+	just test-utils
+	just test-flow
+	just test-rsx
+
 # rebuilding bevy_render for wasm results in 'no space left on device'
-test-all *args:
+test-all-old *args:
 	just test-ci
 	just test-all-lib 																																								{{args}}
 	just test-all-doc 																																								{{args}}
-	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_rsx	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 
@@ -240,15 +260,13 @@ test-all *args:
 # cargo test --workspace --all-features -- {{args}}
 
 test crate *args:
-	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
+	sweet test -p {{crate}} --lib --watch {{args}}
+test-int crate test *args:
+	sweet test -p {{crate}} --watch --test {{test}} {{args}}
 test-e2e crate *args:
 	just watch cargo test -p {{crate}} --lib --features=e2e -- 														--e2e	--watch {{args}}
 test-doc crate *args:
 	just watch cargo test -p {{crate}} --doc 																														{{args}}
-test-integration crate test_name *args:
-	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
-test-feat crate *args:
-	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
 test-wasm crate *args:
 	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- 								--watch {{args}}
 test-wasm-feat crate *args:
@@ -258,18 +276,24 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
 	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
+clear-rust-analyzer:
+	rm -rf $CARGO_TARGET_DIR/rust-analyzer
+
+clear-ice:
+	rm -f rustc-ice-*
+
 clear-artifacts:
+	just clear-ice
 	rm -rf target
-	rm -rf ws_rsx/beet_router/src/test_site/codegen
-	rm -rf ws_rsx/beet_design/src/codegen
+	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge
-purge:
+clear-all:
 	just clear-artifacts
 	cargo clean
-	rm -rf ./target
-	rm -rf $CARGO_TARGET_DIR/rust-analyzer
+	rm -rf $CARGO_TARGET_DIR
 # rm -rf ./Cargo.lock
 
 pws *args:
@@ -280,8 +304,8 @@ tree:
 
 #💡 Misc
 
-expand crate example *args:
-	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
+expand crate test *args:
+	just watch 'cargo expand -p {{crate}} --test {{test}} {{args}}'
 
 patch:
 	cargo set-version --bump patch
@@ -293,14 +317,14 @@ publish crate *args:
 publish-all *args:
 	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Sweet Crates'
-	just publish sweet_utils				{{args}} | true
-	just publish sweet_fs						{{args}} | true
-	just publish sweet_test_macros	{{args}} | true
-	just publish sweet_test					{{args}} | true
-	just publish sweet_server				{{args}} | true
-	just publish sweet_web					{{args}} | true
-	just publish sweet_bevy					{{args}} | true
-	just publish sweet_net					{{args}} | true
+	just publish beet_utils				{{args}} | true
+	just publish beet_fs						{{args}} | true
+	just publish sweet_macros	{{args}} | true
+	just publish sweet					{{args}} | true
+	just publish beet_server_utils				{{args}} | true
+	just publish beet_web					{{args}} | true
+	just publish beet_bevy					{{args}} | true
+	just publish beet_net					{{args}} | true
 	just publish sweet 							{{args}} | true
 	just publish sweet-cli					{{args}} | true
 	@echo 'Publishing Flow Crates'
@@ -312,10 +336,11 @@ publish-all *args:
 	just publish beet_examples        {{args}} || true
 	@echo 'Publishing Rsx Build Crates'
 	just publish beet_common      		{{args}} || true
-	just publish beet_rsx_parser      {{args}} || true
+	just publish beet_parse      			{{args}} || true
+	just publish beet_build      			{{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx             {{args}} || true
+	just publish beet_rsx        {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_connect      		{{args}} || true
@@ -353,7 +378,7 @@ sweet *args:
 	cargo run -p sweet-cli -- {{args}}
 
 # Install the sweet cli
-install-sweet-cli *args:
+install-sweet *args:
 	cargo install --path crates/sweet-cli {{args}}
 
 
@@ -361,8 +386,8 @@ install-sweet-cli *args:
 # The latest version can be found at https://googlechromelabs.github.io/chrome-for-testing/
 # Previous versions can be found at
 install-chromedriver:
-	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chrome-linux64.zip -P ~/chrome-for-testing
-	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
+	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chrome-linux64.zip -P ~/chrome-for-testing
+	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
 	mkdir -p ~/chrome-for-testing
 	unzip ~/chrome-for-testing/chrome-linux64.zip -d ~/chrome-for-testing
 	unzip ~/chrome-for-testing/chromedriver-linux64.zip -d ~/chrome-for-testing

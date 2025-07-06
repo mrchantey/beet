@@ -1,0 +1,59 @@
+[package]
+name = "beet_examples"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+# this feature is always enabled by beet if this crate is included 
+# but we use it to ensure no bevy_default for workspace tests
+bevy_default = [
+	"bevy/default",
+	"beet_flow/bevy_default",
+	"beet_ml?/bevy_default",
+	"beet_spatial/bevy_default",
+	# "beet_bevy/bevy_default",
+]
+ml = ["dep:beet_ml"]
+
+[dependencies]
+beet_flow = { workspace = true, features = ["reflect"] }
+beet_ml = { workspace = true, features = [
+	"candle",
+	"spatial",
+], optional = true }
+beet_spatial = { workspace = true, features = [] }
+beet_utils = { workspace = true, features = ["rand"] }
+
+
+serde.workspace = true
+serde_json.workspace = true
+# beet = { workspace = true, features = ["reflect"] }
+bevy = { workspace = true }
+# bevy-inspector-egui = "0.25.0"
+log.workspace = true
+pretty_env_logger.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+sweet.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+console_log.workspace = true
+web-sys.workspace = true
+wasm-bindgen.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

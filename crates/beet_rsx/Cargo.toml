@@ -1,0 +1,72 @@
+[package]
+name = "beet_rsx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[features]
+default = ["nightly"]
+# default = ["nightly", "bevy_default"]
+nightly = []
+serde = ["dep:serde", "beet_bevy/bevy_scene"]
+bevy_default = ["bevy/bevy_text"]
+tokens = ["beet_common/tokens"]
+
+[dependencies]
+beet_rsx_macros.workspace = true
+beet_common.workspace = true
+beet_utils.workspace = true
+beet_bevy.workspace = true
+
+#💡 utils
+send_wrapper.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+extend.workspace = true
+strum.workspace = true
+rapidhash.workspace = true
+strum_macros.workspace = true
+prettyplease.workspace = true
+http.workspace = true
+
+# temp until proper bevy reactivity
+flume.workspace = true
+
+#💡 html
+html-escape = { version = "0.2", optional = true }
+
+#💡 serde
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
+
+#💡 bevy
+bevy = { workspace = true }
+
+#💡 native
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet_fs.workspace = true
+tokio.workspace = true
+
+#💡 wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+beet_web.workspace = true
+console_log.workspace = true
+js-sys.workspace = true
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+web-sys.workspace = true
+console_error_panic_hook.workspace = true
+
+[dev-dependencies]
+beet_rsx = { path = "", features = ["tokens"] }
+serde.workspace = true
+sweet.workspace = true

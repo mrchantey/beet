@@ -1,26 +1,29 @@
-#![feature(more_qualified_paths)]
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 
-#[path = "codegen/client_actions.rs"]
-pub mod client_actions;
+pub mod codegen;
 pub mod components;
-#[cfg(not(target_arch = "wasm32"))]
-#[path = "codegen/docs.rs"]
-pub mod docs;
-#[cfg(not(target_arch = "wasm32"))]
-#[path = "codegen/pages.rs"]
-pub mod pages;
-#[path = "codegen/route_tree.rs"]
-pub mod route_tree;
-#[cfg(not(target_arch = "wasm32"))]
-#[path = "codegen/server_actions.rs"]
-pub mod server_actions;
+pub mod layouts;
+
+// doesnt have to be wasm, but at least not run when compiling server
+// because stale references
+#[path = "codegen/client_islands.rs"]
 #[cfg(target_arch = "wasm32")]
-#[path = "codegen/wasm.rs"]
-pub mod wasm;
+pub mod client_islands;
+
+pub use codegen::actions;
 
 pub mod prelude {
+	#[cfg(target_arch = "wasm32")]
+	pub use super::client_islands::*;
+	pub use super::codegen::actions;
+	pub use super::codegen::actions::ActionsPlugin;
+	pub use super::codegen::docs::DocsPlugin;
+	pub use super::codegen::pages::*;
+	pub use super::layouts::*;
+	// pub use super::types::*;
 	pub use super::*;
-	pub use crate::client_actions::root as actions;
+	pub use crate::codegen::route_path_tree;
+	pub use crate::codegen::routes;
 	pub use crate::components::*;
-	pub use crate::route_tree::root as paths;
 }

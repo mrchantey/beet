@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use beet::prelude::*;
-use bevy::prelude::*;
 use sweet::prelude::EntityWorldMutwExt;
 
 #[action(trigger_count)]

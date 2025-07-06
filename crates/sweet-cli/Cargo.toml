@@ -1,0 +1,35 @@
+[package]
+name = "sweet-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[[bin]]
+name = "sweet"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+beet_server_utils.workspace = true
+beet_utils.workspace = true
+beet_fs.workspace = true
+beet_server.workspace = true
+sweet.workspace = true
+rapidhash.workspace = true
+
+#💡 parsing
+proc-macro2.workspace = true
+syn.workspace = true
+quote.workspace = true
+prettyplease.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio.workspace = true
+clap.workspace = true

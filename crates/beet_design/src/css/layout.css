@@ -1,0 +1,33 @@
+:root {
+	/* spacing */
+	--bt-spacing-xs: 0.5rem;
+	--bt-spacing-sm: 0.75rem;
+	--bt-spacing: 1rem;
+	--bt-spacing-lg: 1.5rem;
+	--bt-spacing-xl: 2rem;
+	/* border */
+	--bt-border-radius: 0.5rem;
+	--bt-border-radius-sm: 0.25rem;
+	--bt-border: var(--bt-border-width) solid var(--bt-color-border);
+	--bt-border-width: 0.0625rem;
+	--bt-border-width-xs: calc(var(--bt-border-width) * 0.5);
+	--bt-border-width-sm: calc(var(--bt-border-width) * 0.75);
+	--bt-border-width-lg: calc(var(--bt-border-width) * 2);
+	--bt-border-width-xl: calc(var(--bt-border-width) * 4);
+  --bt-outline-width: 0.125rem;
+	
+	/* animation */
+  --bt-transition: 0.2s ease-in-out;
+
+	/* layout */
+	--bt-md-primary-tab-container-height: 32px;
+	--bt-header-height: 48px;
+	--bt-subheader-height: 48px;
+	--bt-footer-height: 32px;
+	--bt-max-page-width: 48rem;
+	--bt-max-header-width: 56rem;
+	/* using vw instead of 100% is consistent even when scrollbar appears */
+	--bt-content-padding-width: calc(max((100dvw - var(--bt-max-header-width)) * 0.5, 1.em));
+	--bt-main-height: calc(100dvh - var(--bt-header-height) - var(--bt-footer-height));
+	--bt-main-height-subheader: calc(100dvh - var(--bt-header-height) - var(--bt-footer-height) - var(--bt-subheader-height));
+}

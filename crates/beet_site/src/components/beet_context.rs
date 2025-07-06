@@ -1,12 +1,11 @@
-use beet::design::exports::*;
+use beet::exports::Argb;
+use beet::exports::ThemeBuilder;
 use beet::prelude::*;
 
 /// Provide the Beet Theme and Brand context to the application.
-#[derive(Node)]
-pub struct BeetContext {}
-
-fn beet_context(_: BeetContext) -> WebNode {
-	set_context(Brand {
+#[template]
+pub fn BeetContext() -> impl Bundle {
+	ReactiveApp::insert_resource(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),
 		site_url: "https://beetrs.dev".into(),

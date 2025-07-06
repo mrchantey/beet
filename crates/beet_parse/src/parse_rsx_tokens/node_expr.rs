@@ -1,0 +1,128 @@
+//! Types for all parts of a node tree that are expressions.
+//! All of these types contain the completely unparsed version of
+//! their expression, to be be modified in the tokenization stage,
+//! for example adding #[allow(unused_braces)] to block nodes
+//! and appending `.into_node_bundle()`
+use beet_common::as_beet::*;
+use bevy::prelude::*;
+use proc_macro2::TokenStream;
+use quote::quote;
+use send_wrapper::SendWrapper;
+use syn::Expr;
+
+/// An expression in some part of the tree
+/// Almost all tokenizations must pass through this type
+/// including:
+/// - `rsx!` macro expresisons
+/// - combinator expressions, first represented as [`CombinatorExpr`]
+/// - template spawn funcs: `<MyTemplate/>`
+///
+/// Cases where this is not used:
+/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_node_bundle` and `.into_attribute_bundle`
+///
+/// The parsed output depends on the context in which this expression is used:
+///
+/// ## Node Blocks
+///
+/// Block Nodes that are expressions, any [`NodeExpr`] without an [`AttributeOf`]
+/// is a block node.
+///
+/// ```ignore
+/// rsx!{<div>{my_expr}</div>};
+/// // templates also evaluate to blocks
+/// rsx!{<MyTemplate/>};
+/// ```
+/// ## Attribute Blocks
+///
+/// any [`NodeExpr`] with an [`AttributeOf`] *without* an [`AttributeKey`]
+/// is an attribute block.
+/// This is known as the spread attribute in JSX, although rstml
+/// doesn't require the `...` prefix.
+/// ```ignore
+/// rsx!{<span {props} />};
+/// ```
+/// ## Attribute Values
+///
+/// An expression that is used as the value of an attribute.
+/// any [`NodeExpr`] with an [`AttributeOf`] *and* an [`AttributeKey`]
+/// is an attribute value.
+/// If the entity also has an [`AttributeLit`] this will be an [`Expr::Lit`].
+/// ```ignore
+/// rsx!{<span key={value} />};
+/// ```
+#[derive(Debug, Clone, Deref, Component, ToTokens)]
+#[component(immutable)]
+pub struct NodeExpr(pub SendWrapper<Expr>);
+
+impl NodeExpr {
+	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
+	pub fn new_block(value: syn::Block) -> Self {
+		Self::new(syn::Expr::Block(syn::ExprBlock {
+			block: value,
+			attrs: Vec::new(),
+			label: None,
+		}))
+	}
+	pub fn new_ident(ident: syn::Ident) -> Self {
+		Self::new(syn::Expr::Path(syn::ExprPath {
+			attrs: Vec::new(),
+			qself: None,
+			path: ident.into(),
+		}))
+	}
+
+
+	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
+	/// ensure blocks have `#[allow(unused_braces)]`
+	pub fn inner_parsed(&self) -> Expr {
+		match self.borrow().clone() {
+			syn::Expr::Block(mut block) => {
+				block.attrs.push(syn::parse_quote! {
+					#[allow(unused_braces)]
+				});
+				Expr::Block(block)
+			}
+			expr => expr,
+		}
+	}
+
+	/// Called when this expression is in the position of a block attribute,
+	/// ie `<div {my_expr} />`.
+	pub fn node_bundle_tokens(&self) -> TokenStream {
+		let parsed = self.inner_parsed();
+		quote! { OnSpawnTemplate::new_insert(#parsed.into_node_bundle()) }
+	}
+	/// Called when this expression is in the position of a block attribute,
+	/// ie `<div key={my_expr} />`.
+	pub fn attribute_bundle_tokens(&self) -> TokenStream {
+		let parsed = self.inner_parsed();
+		quote! { OnSpawnTemplate::new_insert(#parsed.into_attribute_bundle()) }
+	}
+}
+
+/// The partially parsed equivalent of a [`RsxParsedExpression`](beet_rsx_combinator::types::RsxParsedExpression),
+/// eventually collected into a [`NodeExpr`]
+///
+/// [`beet_rsx_combinator`] is very different from macro/tokens based parsers.
+/// A fundamental concept is support for mixed expressions `let foo = <div/>;`
+/// which means we need to parse `let foo =` seperately from `<div/>`. So the
+/// element is added in a similar way to [`rstml`] so that we can still
+/// apply scoped styles etc, but the hierarchy is not exactly correct, as
+/// elements are parsed in the order they are defined not applied.
+/// It can later be combined into a single expression
+/// `let foo = (NodeTag("div"),ElementNode{self_closing=true});`
+///
+#[derive(Default, Component, Deref, DerefMut, ToTokens)]
+pub struct CombinatorExpr(pub Vec<CombinatorExprPartial>);
+
+/// A section of a [`CombinatorExpr`],
+/// a 1:1 mapping from [`RsxTokensOrElement`](beet_rsx_combinator::types::RsxTokensOrElement)
+#[derive(ToTokens)]
+pub enum CombinatorExprPartial {
+	/// partial expressions must be a string as it may not be a valid
+	/// TokenTree at this stage, for instance {let foo = <bar/>} will be split into
+	/// `{let foo =` + `<bar/>` + `}`, unclosed braces are not a valid [`TokenStream`]
+	Tokens(String),
+	/// Reference to the entity containing the [`NodeTag`], [`ElementNode`] etc
+	Element(Entity),
+}

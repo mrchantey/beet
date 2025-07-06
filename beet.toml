@@ -2,38 +2,73 @@
 # and a test site used for internal testing.
 #
 # It contains some custom parts to handle the internal nature
-# of the beet site, an external project will be significantly simpler.
+# of the beet site, an external starter project will be significantly simpler.
 
+[route_codegen]
 package_name = "beet_site"
-src_path = "crates/beet_site/src"
-docs_route = "/docs"
-wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
-file_group_routes = ["beet_design_mockups"]
+output = "crates/beet_site/src/codegen/mod.rs"
 
-[[file_group]]
-name = "test_site_pages"
-path = "ws_rsx/beet_router/src/test_site/pages"
-output = "ws_rsx/beet_router/src/test_site/codegen/pages.rs"
-include = ["*.rs"]
-exclude = ["*mod.rs"]
-package_name = "beet_router"
-import_tokens = ["use crate::as_beet::*;"]
+[[route_codegen.collection]]
+name = "pages"
+package_name = "beet_site"
+path = "crates/beet_site/src/pages"
+output = "crates/beet_site/src/codegen/pages/mod.rs"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
 
+[[route_codegen.collection]]
+name = "docs"
+package_name = "beet_site"
+path = "crates/beet_site/src/docs"
+output = "crates/beet_site/src/codegen/docs/mod.rs"
+base_route = "/docs"
+meta_type = "ArticleMeta"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
 
-[[file_group]]
+[[route_codegen.collection]]
+name = "actions"
+package_name = "beet_site"
+path = "crates/beet_site/src/actions"
+output = "crates/beet_site/src/codegen/actions/mod.rs"
+base_route = "/actions"
+category = "Actions"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
+
+# example of how to perform codegen for a workspace crate
+[[route_codegen.collection]]
 name = "beet_design_mockups"
 # preset = "mockup"
 package_name = "beet_design"
-path = "ws_rsx/beet_design/src"
-output = "ws_rsx/beet_design/src/codegen/mockups.rs"
+path = "crates/beet_design/src"
+meta_type = "ArticleMeta"
+output = "crates/beet_design/src/codegen/mockups.rs"
 include = ["*.mockup.*"]
 base_route = "/design"
 replace_route = [{ from = ".mockup", to = "" }]
+import_tokens = ["#[allow(unused_imports)]use crate::prelude::*;"]
+
+# [[route_codegen.collection]]
+# package_name = "beet_router"
+# name = "test_site_pages"
+# path = "crates/beet_router/src/test_site/pages"
+# output = "crates/beet_router/src/test_site/codegen/pages.rs"
+# include = ["*.rs"]
+# exclude = ["*mod.rs"]
+# import_tokens = ["use crate::as_beet::*;"]
+
+
+[client_island_codegen]
+package_name = "beet_site"
+output = "crates/beet_site/src/codegen/client_islands.rs"
 import_tokens = [
+	"#[allow(unused_imports)]use beet::design as beet_design;",
 	"#[allow(unused_imports)]use beet::prelude::*;",
-	"use beet_router::as_beet::*;",
 ]
-
-
-# [wasm]
-# import_tokens = ["use beet::design as beet_design;", "use beet::prelude::*;"]

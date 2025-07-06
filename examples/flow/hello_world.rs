@@ -1,6 +1,5 @@
 //! A basic behavior tree sequence example
 use beet::prelude::*;
-use bevy::prelude::*;
 // flush_trigger test utils
 use sweet::prelude::EntityWorldMutwExt;
 
