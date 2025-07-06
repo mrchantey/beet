@@ -53,10 +53,17 @@ pub fn update_file_expr_hash(
 	children: Query<&Children>,
 	rsx_snippets: Query<&RsxSnippets>,
 	macro_idxs: Query<&MacroIdx>,
-	attributes: Query<&Attributes>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
+	attributes: Query<&Attributes>,
 	// dont hash literal attribute values, they can be updated via snippets
 	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<AttributeLit>)>,
+	// hash all template attributes, they are currently used to build functions
+	// should change when bevy has native templates
+	template_attrs: Query<(
+		Option<&AttributeKey>,
+		Option<&AttributeLit>,
+		Option<&NodeExpr>,
+	)>,
 ) -> Result {
 	for (entity, source_file, mut hash) in query.iter_mut() {
 		let mut hasher = RapidHasher::default_const();
@@ -65,28 +72,43 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(source_file)?;
-		for snippet in rsx_snippets
+		for node in rsx_snippets
 			.iter_descendants(entity)
 			.flat_map(|child| template_roots.iter_descendants_inclusive(child))
 			.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
 			// hash macro idxs
-			if let Ok(idx) = macro_idxs.get(snippet) {
+			if let Ok(idx) = macro_idxs.get(node) {
 				idx.hash(&mut hasher);
 			}
 
 			// has template tags
-			if let Ok(tag) = template_tags.get(snippet) {
+			if let Ok(tag) = template_tags.get(node) {
 				tag.to_string().hash(&mut hasher);
+				// hash all template attributes
+				for (key, lit, expr) in attributes
+					.iter_descendants(node)
+					.filter_map(|entity| template_attrs.get(entity).ok())
+				{
+					if let Some(key) = key {
+						key.to_string().hash(&mut hasher);
+					}
+					if let Some(lit) = lit {
+						lit.to_string().hash(&mut hasher);
+					}
+					if let Some(expr) = expr {
+						expr.to_token_stream().to_string().hash(&mut hasher);
+					}
+				}
 			}
 
 			// hash block nodes
-			if let Ok(expr) = node_exprs.get(snippet) {
+			if let Ok(expr) = node_exprs.get(node) {
 				expr.to_token_stream().to_string().hash(&mut hasher);
 			}
 			// hash attribute expressions
 			for expr in attributes
-				.iter_descendants(snippet)
+				.iter_descendants(node)
 				.filter_map(|entity| attr_exprs.get(entity).ok())
 			{
 				expr.to_token_stream().to_string().hash(&mut hasher);
@@ -182,6 +204,9 @@ mod test {
 		expect(hash(rsx_tokens! {<Foo>{1}</Foo>}))
 			.not()
 			.to_be(hash(rsx_tokens! {<Foo>{2}</Foo>}));
+		expect(hash(rsx_tokens! {<Foo bar=1/>}))
+			.not()
+			.to_be(hash(rsx_tokens! {<Foo bar=2/>}));
 
 		// diff nested
 		expect(hash(
