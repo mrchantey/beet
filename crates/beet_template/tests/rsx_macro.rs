@@ -22,7 +22,7 @@ fn rsx_macro() {
 		.get::<Children>()
 		.unwrap()[0];
 	app.world_mut()
-		.run_system_once(spawn_templates)
+		.run_system_once(apply_snippets_to_instances)
 		.unwrap()
 		.unwrap();
 	app.world_mut()

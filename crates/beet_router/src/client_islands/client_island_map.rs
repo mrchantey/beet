@@ -28,8 +28,7 @@ impl ClientIslandMap {
 		Self { islands }
 	}
 
-	pub fn write(&self, target_dir: &AbsPathBuf) -> Result {
-		let path = target_dir.join("client_islands.ron");
+	pub fn write(&self, path: &AbsPathBuf) -> Result {
 		FsExt::write(
 			&path,
 			ron::ser::to_string_pretty(self, default())?,
@@ -37,8 +36,7 @@ impl ClientIslandMap {
 		Ok(())
 	}
 
-	pub fn read(target_dir: &AbsPathBuf) -> Result<Self> {
-		let path = target_dir.join("client_islands.ron");
+	pub fn read(path: &AbsPathBuf) -> Result<Self> {
 		let content = ReadFile::to_bytes(&path)?;
 		let islands: Self = ron::de::from_bytes(&content)?;
 		Ok(islands)

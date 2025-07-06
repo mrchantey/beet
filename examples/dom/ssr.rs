@@ -8,8 +8,9 @@ use axum::extract::State;
 use beet::prelude::*;
 
 fn main() -> Result {
-	AppRouter::<AppState>::new(AppState {
+	AppRouter::new(AppState {
 		started: std::time::Instant::now(),
+		router_state: AppRouterState::default(),
 	})
 	.add_route("/", my_route)
 	.run()
@@ -18,6 +19,15 @@ fn main() -> Result {
 #[derive(Clone)]
 struct AppState {
 	started: std::time::Instant,
+	router_state: AppRouterState,
+}
+
+// axum convention for wrapping state
+impl AsRef<AppRouterState> for AppState {
+	fn as_ref(&self) -> &AppRouterState { &self.router_state }
+}
+impl AsMut<AppRouterState> for AppState {
+	fn as_mut(&mut self) -> &mut AppRouterState { &mut self.router_state }
 }
 
 #[derive(serde::Deserialize)]

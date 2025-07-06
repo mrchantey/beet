@@ -166,10 +166,7 @@ run-test-site:
 
 #just cli watch -p beet_site {{args}}
 run-site *args:
-	just cli build -p beet_site --only=static-scene,routes
-	cargo run -p beet_site -- export-static
-	just cli build -p beet_site --only=client-islands
-	cargo run -p beet_site
+	just cli run -p beet_site {{args}}
 
 build-site *args:
 	just cli build -p beet_site {{args}}

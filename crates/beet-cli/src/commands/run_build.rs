@@ -3,6 +3,7 @@ use beet::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 
 
 /// Build the project
@@ -11,37 +12,6 @@ pub struct RunBuild {
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
 	build_cmd: CargoBuildCmd,
-	/// Determine the config location and which builds steps to run
-	#[command(flatten)]
-	build_args: BuildArgs,
-}
-
-impl RunBuild {
-	/// Run once
-	pub async fn build(self) -> Result {
-		App::new()
-			.insert_resource(self.build_cmd)
-			.add_plugins(self.build_args)
-			.run_once()
-			.into_result()
-	}
-
-
-	/// Run in watch mode with a file watcher
-	pub async fn run(self) -> Result {
-		App::new()
-			.insert_resource(self.build_cmd)
-			.add_plugins(self.build_args)
-			.run_async(FsApp::default().runner())
-			.await
-			.into_result()
-	}
-}
-
-
-
-#[derive(Debug, Clone, Parser)]
-struct BuildArgs {
 	/// Location of the beet.toml config file
 	#[arg(long)]
 	beet_config: Option<PathBuf>,
@@ -50,75 +20,57 @@ struct BuildArgs {
 	#[arg(long = "static")]
 	r#static: bool,
 	/// Only execute the provided build steps,
-	/// options are `templates`, `routes`, `server`, `static`, `client-islands`
-	#[arg(long, value_delimiter = ',', value_parser = parse_build_only)]
-	only: Vec<BuildOnly>,
+	/// options are `routes`, `static-scene`, `client-islands`
+	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
+	only: Vec<BuildFlag>,
 }
 
-fn parse_build_only(s: &str) -> Result<BuildOnly, String> {
-	BuildOnly::from_str(s)
+fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
+
+
+pub enum RunMode {
+	Once,
+	Watch,
 }
-/// Insert resources and plugins to reflect the [`only`] options,
-/// inserting all if [`only`] is empty.
-impl Plugin for BuildArgs {
-	fn build(&self, app: &mut App) {
+
+
+impl RunBuild {
+	pub async fn run(self, run_mode: RunMode) -> Result {
+		let mut app = App::new();
 		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
 			self.beet_config.as_deref(),
 		)
 		.unwrap_or_exit();
+		let cwd = config.template_config.workspace.root_dir.into_abs();
+		let filter = config.template_config.workspace.filter.clone();
 
-		app.add_plugins((
-			config.template_config,
-			NodeTokensPlugin::default(),
-			CodegenPlugin::default(),
-		));
+		let build_flags = if self.only.is_empty() {
+			BuildFlags::All
+		} else {
+			BuildFlags::Only(self.only)
+		};
 
-		// selectively load plugins
-		let all = self.only.is_empty();
+		app.insert_resource(build_flags)
+			.insert_resource(self.build_cmd)
+			.add_non_send_plugin(config)
+			.add_plugins(BuildPlugin::default());
 
-		if all || self.only.contains(&BuildOnly::Routes) {
-			app.add_plugins(RouteCodegenPlugin::default())
-				.add_non_send_plugin(config.route_codegen);
+		match run_mode {
+			RunMode::Once => app.run_once(),
+			RunMode::Watch => {
+				app.run_async(
+					FsApp {
+						watcher: FsWatcher {
+							cwd: cwd.0,
+							filter,
+							debounce: Duration::from_millis(100),
+						},
+					}
+					.runner(),
+				)
+				.await
+			}
 		}
-		if all || self.only.contains(&BuildOnly::StaticScene) {
-			app.add_plugins(StaticScenePlugin::default());
-		}
-		if all || self.only.contains(&BuildOnly::ClientIslands) {
-			app.add_plugins(ClientIslandCodegenPlugin::default())
-				.add_non_send_plugin(config.client_island_codegen);
-		}
-	}
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BuildOnly {
-	/// Router codegen
-	Routes,
-	StaticScene,
-	ClientIslands,
-}
-
-
-impl std::fmt::Display for BuildOnly {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			BuildOnly::Routes => write!(f, "routes"),
-			BuildOnly::StaticScene => write!(f, "static-scene"),
-			BuildOnly::ClientIslands => write!(f, "client-islands"),
-		}
-	}
-}
-
-impl FromStr for BuildOnly {
-	type Err = String;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s.to_lowercase().as_str() {
-			"routes" => Ok(BuildOnly::Routes),
-			"static-scene" => Ok(BuildOnly::StaticScene),
-			"client-islands" => Ok(BuildOnly::ClientIslands),
-			_ => Err(format!("Unknown only field: {}", s)),
-		}
+		.into_result()
 	}
 }

@@ -4,8 +4,6 @@ pub use event_observer::*;
 pub use on_spawn_template::*;
 pub mod beet_root;
 pub use beet_root::*;
-pub mod node_portal;
-pub use node_portal::*;
 pub mod expr_idx;
 pub use expr_idx::*;
 mod into_template_bundle;
@@ -28,7 +26,7 @@ mod html_constants;
 pub use html_constants::*;
 
 
-/// Added to the [`StaticScenePlugin`] and the [`TemplatePlugin`] for static scene
+/// Added to the [`SnippetsPlugin`] and the [`TemplatePlugin`] for static scene
 /// serde.
 /// This plugin is not unique, so can be added in multiple places.
 pub struct NodeTypesPlugin;
@@ -39,7 +37,7 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 		app
 			// idxs & roots
 			.register_type::<BeetRoot>()
-			.register_type::<StaticRoot>()
+			.register_type::<RsxSnippetRoot>()
 			.register_type::<InstanceRoot>()
 			.register_type::<ResolvedRoot>()
 			.register_type::<MacroIdx>()
@@ -64,21 +62,20 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<FileSpanOf<CommentNode>>()
 			.register_type::<FileSpanOf<ElementNode>>()
 			// directives - script/style
-			.register_type::<LangPartial>()
+			.register_type::<LangSnippet>()
+			.register_type::<LangSnippetPath>()
 			.register_type::<LangContent>()
 			.register_type::<StyleId>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()
-			.register_type::<PortalTo<LangPartial>>()
 			// directives - client island
+			.register_type::<TemplateSerde>()
 			.register_type::<ClientLoadDirective>()
 			.register_type::<ClientOnlyDirective>()
 			// directives - slots
-            .register_type::<SlotChild>()
+    	.register_type::<SlotChild>()
 			.register_type::<SlotTarget>()
 			// directives - other
-			.register_type::<NodePortal>()
-			.register_type::<NodePortalTarget>()
 			.register_type::<HtmlHoistDirective>()
 			// attributes
 			.register_type::<AttributeOf>()

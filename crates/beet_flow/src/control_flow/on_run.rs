@@ -10,6 +10,7 @@ use std::fmt::Debug;
 /// - If [`Self::action`] is [`Entity::PLACEHOLDER`], the entity this was triggered on will be used.
 /// - If the action is local and the trigger is global, ie `commands.trigger(OnRunAction::local(()))`
 /// 	this will result in a panic.
+/// For long-running actions see the [`Running`] component.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRunAction<T = ()> {
 	/// The payload of the run.
@@ -101,6 +102,7 @@ impl<T> OnRunAction<T> {
 ///
 /// It is not allowed to trigger this directly because that would
 /// break the routing model of beet, instead see [OnRunAction].
+/// For long-running actions see the [`Running`] component.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRun<T = ()> {
 	/// The payload of the run.

@@ -138,11 +138,14 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&self) -> String {
+		self.build_scene_with(DynamicScene::from_world(self.into_world()))
+	}
+	#[cfg(feature = "bevy_scene")]
+	fn build_scene_with(&self, scene: DynamicScene) -> String {
 		use bevy::scene::ron;
 		use bevy::scene::serde::SceneSerializer;
 
 		let world = self.into_world();
-		let scene = DynamicScene::from_world(world);
 		let type_registry = world.resource::<AppTypeRegistry>();
 		let type_registry = type_registry.read();
 		let scene_serializer = SceneSerializer::new(&scene, &type_registry);
@@ -156,8 +159,15 @@ pub impl<W: IntoWorld> W {
 	}
 	#[cfg(feature = "bevy_scene")]
 	fn load_scene(&mut self, scene: impl AsRef<str>) -> Result {
+		self.load_scene_with(scene, &mut Default::default())
+	}
+	#[cfg(feature = "bevy_scene")]
+	fn load_scene_with(
+		&mut self,
+		scene: impl AsRef<str>,
+		entity_map: &mut bevy::ecs::entity::EntityHashMap<Entity>,
+	) -> Result {
 		let scene = scene.as_ref();
-		use bevy::ecs::entity::EntityHashMap;
 		let world = self.into_world_mut();
 		let scene = {
 			use serde::de::DeserializeSeed;
@@ -172,7 +182,7 @@ pub impl<W: IntoWorld> W {
 				.deserialize(&mut deserializer)
 				.map_err(|e| deserializer.span_error(e))
 		}?;
-		scene.write_to_world(world, &mut EntityHashMap::default())?;
+		scene.write_to_world(world, entity_map)?;
 
 		Ok(())
 	}

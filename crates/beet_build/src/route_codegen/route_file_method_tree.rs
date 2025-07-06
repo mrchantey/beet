@@ -12,7 +12,7 @@ pub struct RouteFileMethodTree {
 	pub name: String,
 	/// A list of entities with a [`RouteFileMethod`] component
 	/// that are associated with this route. These usually
-	/// originate from a single file but may come from sepearate file groups
+	/// originate from a single file but may come from sepearate collections
 	/// if they share the same route path.
 	pub funcs: Vec<Entity>,
 	/// Children mapped by their [`RouteTreeBuilder::name`].

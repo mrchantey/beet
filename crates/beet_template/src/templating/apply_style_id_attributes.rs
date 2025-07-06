@@ -106,7 +106,10 @@ mod test {
 		let mut world = World::new();
 		world.init_resource::<HtmlConstants>();
 		let entity = world.spawn((HtmlDocument, bundle)).id();
-		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.run_system_once(apply_snippets_to_instances)
+			.unwrap()
+			.unwrap();
 		world
 			.run_system_once(super::apply_style_id_attributes)
 			.unwrap();

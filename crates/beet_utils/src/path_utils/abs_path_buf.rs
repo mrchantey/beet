@@ -36,7 +36,7 @@ macro_rules! abs_file {
 /// For these reasons the path is serialized and deserialized relative to the workspace root,
 /// using [`FsExt::workspace_root`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AbsPathBuf(PathBuf);
+pub struct AbsPathBuf(pub PathBuf);
 
 impl Default for AbsPathBuf {
 	fn default() -> Self {

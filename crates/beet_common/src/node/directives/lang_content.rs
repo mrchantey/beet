@@ -8,16 +8,26 @@ use std::path::PathBuf;
 
 /// The fs loaded and deduplicated [`LangContent`], existing seperately from the
 /// originating tree(s).
+/// Created alongside a [`NodeTag`], [`LangSnippetPath`] and optionally a [`StyleId`]
 #[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Component)]
 // #[component(immutable)]
-pub struct LangPartial(pub String);
+pub struct LangSnippet(pub String);
 
-impl LangPartial {
-	/// Create a new [`LangPartial`] from a `String`.
+impl LangSnippet {
+	/// Create a new [`LangSnippet`] from a `String`.
 	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
 }
+
+/// The replacement for [`LangContent`] after the lang snippet has been
+/// extracted, referencing the path to the snippet scene file.
+#[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[reflect(Component)]
+// #[component(immutable)]
+pub struct LangSnippetPath(pub WsPathBuf);
+
 
 
 /// The content of a script or style template, either as inner text or a file path.

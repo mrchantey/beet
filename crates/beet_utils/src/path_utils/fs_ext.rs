@@ -4,7 +4,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-/// The workspace relative directory for this file, 
+/// The workspace relative directory for this file,
 /// internally using the `file!()` macro.
 /// ## Example
 ///
@@ -112,13 +112,34 @@ impl FsExt {
 
 
 	/// Write a file, ensuring the path exists
-	pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult<()> {
+	pub fn write(
+		path: impl AsRef<Path>,
+		data: impl AsRef<[u8]>,
+	) -> FsResult<()> {
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)
 				.map_err(|err| FsError::io(parent, err))?;
 		}
 		fs::write(path, data).map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
+
+	/// Write a file only if the data is different from the existing file,
+	/// if the file does not exist, it will be created.
+	pub fn write_if_diff(
+		path: impl AsRef<Path>,
+		data: impl AsRef<[u8]>,
+	) -> FsResult<()> {
+		let path = path.as_ref();
+		match fs::read(path) {
+			Ok(existing_data) if existing_data == data.as_ref() => {
+				return Ok(());
+			}
+			_ => {
+				Self::write(path, data)?;
+			}
+		}
 		Ok(())
 	}
 }

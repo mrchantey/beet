@@ -180,6 +180,7 @@ impl<T: ResultPayload> OnChildResult<T> {
 /// The default payload for [`OnResult`], this specifies the result of an action.
 /// The Success/Failure pattern is commonly used by control flow actions in
 /// the behavior tree pattern.
+/// For long-running actions see the [`Running`] component.
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub enum RunResult {
 	/// The action was successful.

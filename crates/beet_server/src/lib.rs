@@ -8,7 +8,7 @@
 
 // #![deny(missing_docs)]
 
-mod app;
+mod app_router;
 mod axum_utils;
 #[cfg(feature = "lambda")]
 mod lambda_utils;
@@ -16,7 +16,7 @@ mod lambda_utils;
 pub mod prelude {
 	pub use axum::Router;
 
-	pub use crate::app::*;
+	pub use crate::app_router::*;
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;

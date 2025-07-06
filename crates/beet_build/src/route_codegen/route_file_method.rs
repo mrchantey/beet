@@ -7,11 +7,10 @@ use syn::Ident;
 use syn::ItemFn;
 
 /// The signature of a route file method
-#[derive(Debug, Clone, Deref, Sendit)]
-#[sendit(derive(Component))]
-pub struct RouteFileMethodSyn(ItemFn);
+#[derive(Debug, Clone, Deref, Component)]
+pub struct RouteFileMethodSyn(Unspan<ItemFn>);
 impl RouteFileMethodSyn {
-	pub fn new(func: ItemFn) -> Self { Self(func) }
+	pub fn new(func: ItemFn) -> Self { Self(func.into()) }
 }
 /// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
@@ -63,9 +62,9 @@ pub enum RouteFileMethodMeta {
 	/// A config method exists for this route file, ie `my_route::config()`.
 	File,
 	/// No config method exists for this route file, fall back to
-	/// the group level or default.
+	/// the collection level or default.
 	#[default]
-	FileGroup,
+	Collection,
 }
 
 impl RouteFileMethodMeta {
@@ -78,7 +77,7 @@ impl RouteFileMethodMeta {
 				syn::parse_quote!(#mod_ident::#meta_ident)
 			}
 			RouteFileMethodMeta::File => syn::parse_quote!(#mod_ident::meta),
-			RouteFileMethodMeta::FileGroup => syn::parse_quote!(Self::meta),
+			RouteFileMethodMeta::Collection => syn::parse_quote!(Self::meta),
 		}
 	}
 }

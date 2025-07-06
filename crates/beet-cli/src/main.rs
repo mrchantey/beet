@@ -1,5 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+use beet::prelude::init_pretty_tracing;
 use beet_cli::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
@@ -23,9 +24,9 @@ enum SubCommands {
 
 #[tokio::main]
 async fn main() -> Result {
-	init_tracing(bevy::log::Level::DEBUG);
+	init_pretty_tracing(bevy::log::Level::DEBUG);
 	match Cli::parse().command {
-		SubCommands::Build(cmd) => cmd.build().await,
-		SubCommands::Run(cmd) => cmd.run().await,
+		SubCommands::Build(cmd) => cmd.run(RunMode::Once).await,
+		SubCommands::Run(cmd) => cmd.run(RunMode::Watch).await,
 	}
 }

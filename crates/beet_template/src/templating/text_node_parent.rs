@@ -227,7 +227,10 @@ mod test {
 			})
 			.get::<Children>()
 			.unwrap()[0];
-		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.run_system_once(apply_snippets_to_instances)
+			.unwrap()
+			.unwrap();
 		world.run_system_once(apply_slots).unwrap().unwrap();
 
 		world

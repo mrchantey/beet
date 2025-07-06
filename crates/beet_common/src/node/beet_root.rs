@@ -12,7 +12,7 @@ use bevy::prelude::*;
 /// This allows for some very important functionality:
 ///
 /// - Rearranging a Html Document while maintaining the same root node.
-/// - The root of the macro in [`StaticRoot`] can safely change between
+/// - The root of the macro in [`RsxSnippetRoot`] can safely change between
 ///   a fragment and not.
 /// - Avoiding [`ExprIdx`], [`ChildOf`], etc collisions when applying
 ///  [`StaticNodeRoot`] to an [`InstanceRoot`].
@@ -45,7 +45,7 @@ pub struct BeetRoot;
 #[require(BeetRoot)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct StaticRoot;
+pub struct RsxSnippetRoot;
 
 
 
@@ -76,7 +76,7 @@ pub struct ResolvedRoot;
 
 
 
-/// Placed at the root of each [`StaticRoot`] and [`InstanceRoot`], with a [`LineCol`] representing
+/// Placed at the root of each [`RsxSnippetRoot`] and [`InstanceRoot`], with a [`LineCol`] representing
 /// the start of the macro in the source file. Only a change in start [`LineCol`],
 /// not internal size or end [`LineCol`], will change the hash.
 /// Combining this with [`ExprIdx`] we can uniquely identify

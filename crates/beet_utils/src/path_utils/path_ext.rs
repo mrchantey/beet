@@ -36,8 +36,23 @@ impl PathExt {
 
 	/// Wraps [`std::path::absolute`] error with a [`FsError`],
 	/// outputting the path that caused the error.
+	///
+	/// On wasm platforms this will just ensure the path begins with a `/`
 	pub fn absolute(path: impl AsRef<Path>) -> FsResult<PathBuf> {
-		std::path::absolute(path.as_ref()).map_err(|e| FsError::io(path, e))
+		let path = path.as_ref();
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			std::path::absolute(path).map_err(|e| FsError::io(path, e))
+		}
+		#[cfg(target_arch = "wasm32")]
+		{
+			let path_str = path.to_string_lossy();
+			if path_str.starts_with('/') {
+				Ok(path.to_path_buf())
+			} else {
+				Ok(PathBuf::from(format!("/{}", path_str)))
+			}
+		}
 	}
 
 	/// Create a relative path from a source to a destination:

@@ -1,6 +1,6 @@
-# Sweet Test
+# Sweet
 
-A pretty cross platform test runner.
+A cross platform extension of the default test runner.
 
 # Usage
 

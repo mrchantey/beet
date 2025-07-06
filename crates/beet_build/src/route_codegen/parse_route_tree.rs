@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::TempNonSendMarker;
 use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
@@ -10,7 +9,7 @@ use syn::Item;
 use syn::ItemFn;
 use syn::parse_quote;
 
-/// Create a tree of routes from a list of [`FuncTokens`]`,
+/// Create a tree of routes from a list of [`FuncTokens`],
 /// that can then be converted to an [`ItemMod`] to be used in the router.
 ///
 /// ## Example
@@ -39,20 +38,18 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	_: TempNonSendMarker,
-	mut query: Populated<
-		(Entity, &mut CodegenFileSendit),
-		With<RouteCodegenRoot>,
-	>,
-	file_groups: Query<(Entity, &FileGroupSendit)>,
+	mut query: Populated<(Entity, &mut CodegenFile), Changed<RouteCodegenRoot>>,
+	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
 ) {
 	for (entity, mut codegen) in query.iter_mut() {
 		let child_methods = children
 			.iter_descendants(entity)
-			.filter_map(|e| file_groups.get(e).ok())
-			.filter(|(_, group)| group.category.include_in_route_tree())
+			.filter_map(|e| collections.get(e).ok())
+			.filter(|(_, collection)| {
+				collection.category.include_in_route_tree()
+			})
 			.map(|(e, _)| {
 				children
 					.iter_descendants(e)
