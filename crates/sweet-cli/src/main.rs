@@ -19,7 +19,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-	BenchAssert(BenchAssert),
 	TestServer(TestServer),
 	TestWasm(TestWasm),
 	Run(CargoRun),
@@ -32,7 +31,6 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
 	match Cli::parse().command {
-		Commands::BenchAssert(cmd) => cmd.run(),
 		Commands::TestServer(cmd) => cmd.run(),
 		Commands::TestWasm(cmd) => cmd.run(),
 		Commands::Run(cmd) => cmd.run().await,

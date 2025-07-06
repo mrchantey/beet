@@ -1,8 +1,3 @@
-use anyhow::Result;
-use clap::Parser;
-use std::fs;
-use std::process::Command;
-
 /// Measure the compilation time for the assert! macro
 ///
 /// For context of an average large project:
@@ -36,37 +31,38 @@ use std::process::Command;
 /// 10000 lines of 'assert' comilied in 55.00s, each line added 5.50ms
 /// 20000 lines of 'expect' comilied in 1.06s, each line added 0.05ms * this is incorrect, it actually took 10 mins
 /// 100000... no way dude
-#[derive(Debug, Parser)]
-pub struct BenchAssert {
-	#[arg(long, default_value_t = 1000)] // 1000 is the most gracious
+use anyhow::Result;
+use std::fs;
+use std::process::Command;
+
+
+#[derive(Debug)]
+struct BenchAssert {
 	iterations: usize,
-	#[arg(long)]
-	expect_only: bool,
-	#[arg(long)]
-	assert_only: bool,
-	/// no detectable difference
-	#[arg(long)]
 	release: bool,
-	/// no detectable difference
-	#[arg(long)]
 	run: bool,
 }
 
-const BENCH_DIR: &str = "./tests";
+const BENCH_DIR: &str = "./tests/benches/temp";
+
+fn main() -> Result<()> {
+	BenchAssert {
+		// 1000 is the most generous to assert!
+		iterations: 1000,
+		// no detectable difference
+		release: true,
+		// no detectable difference
+		run: false,
+	}
+	.run()
+}
+
 
 impl BenchAssert {
-	pub fn run(self) -> Result<()> {
+	fn run(self) -> Result<()> {
 		fs::create_dir_all(BENCH_DIR)?;
-
-		if self.expect_only {
-			self.run_expect()?;
-		} else if self.assert_only {
-			self.run_assert()?;
-		} else {
-			self.run_expect()?;
-			self.run_assert()?;
-		}
-
+		self.run_expect()?;
+		self.run_assert()?;
 		Ok(())
 	}
 
