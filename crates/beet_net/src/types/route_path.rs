@@ -21,11 +21,16 @@ impl std::fmt::Display for RoutePath {
 	}
 }
 
+
 impl From<String> for RoutePath {
 	fn from(value: String) -> Self { Self(PathBuf::from(value)) }
 }
 impl From<&str> for RoutePath {
 	fn from(value: &str) -> Self { Self(PathBuf::from(value)) }
+}
+
+impl From<PathBuf> for RoutePath {
+	fn from(value: PathBuf) -> Self { Self(value) }
 }
 
 impl Into<PathBuf> for RoutePath {
