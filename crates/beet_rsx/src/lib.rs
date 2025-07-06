@@ -4,7 +4,7 @@
 #![feature(let_chains)]
 // #![deny(missing_docs)]
 //!
-pub use beet_template_macros::*;
+pub use beet_rsx_macros::*;
 pub mod reactivity;
 pub mod templating;
 #[cfg(target_arch = "wasm32")]
@@ -12,7 +12,7 @@ pub mod wasm;
 
 #[rustfmt::skip]
 pub mod prelude {
-	pub use beet_template_macros::*;
+	pub use beet_rsx_macros::*;
 	pub use crate::reactivity::*;
 	pub use crate::templating::*;
 	#[cfg(target_arch = "wasm32")]
@@ -25,7 +25,7 @@ pub mod exports {
 
 // rsx macros expect 'beet'
 // so import this
-// `use beet_template::as_beet::*;`
+// `use beet_rsx::as_beet::*;`
 // #[cfg(debug_assertions)]
 /// Internal use only
 pub mod as_beet {

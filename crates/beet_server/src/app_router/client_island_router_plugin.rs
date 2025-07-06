@@ -107,7 +107,7 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_router::prelude::*;
-	use beet_template::as_beet::*;
+	use beet_rsx::as_beet::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;

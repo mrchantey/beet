@@ -62,8 +62,8 @@ members = [
 	"crates/beet_query",
 	"crates/beet_query/macros",
 	"crates/beet_router",
-	"crates/beet_template",
-	"crates/beet_template/macros",
+	"crates/beet_rsx",
+	"crates/beet_rsx/macros",
 	"crates/beet_server",
 
 	## 💡 Sweet
@@ -102,8 +102,8 @@ beet_design = { path = "crates/beet_design", version = "0.0.6-dev.1" }
 beet_query = { path = "crates/beet_query", version = "0.0.6-dev.1" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-dev.1" }
 beet_router = { path = "crates/beet_router", version = "0.0.6-dev.1" }
-beet_template = { path = "crates/beet_template", version = "0.0.6-dev.1" }
-beet_template_macros = { path = "crates/beet_template/macros", version = "0.0.6-dev.1" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.1" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 
 sweet = { path = "crates/sweet", version = "0.4.1" }
@@ -117,8 +117,11 @@ beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.1" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = [
-	"std",            # std for reflect PathBuf
-	"multi_threaded",
+	"std", # std for reflect PathBuf
+	# for most oneshot apps multi-threaded coldstart is much slower than
+	# any potential performance gain, even more prominent for linear pipelines,
+	# instead we should par_iter inside systems
+	# "multi_threaded", 
 	# "track_location",
 	"configurable_error_handler",
 	"bevy_log",
@@ -236,7 +239,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow"]
 #💡 helper features
 web-server = ["server", "router", "design", "net", "serde"]
-web-client = ["template", "router", "design", "web", "net", "serde"]
+web-client = ["rsx", "router", "design", "web", "net", "serde"]
 #💡 fine-grained
 serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_bevy/rand"]
@@ -244,12 +247,12 @@ connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_build?/css"]
-design = ["template", "css", "dep:beet_design"]
-router = ["template", "dep:beet_router"]
+design = ["rsx", "css", "dep:beet_design"]
+router = ["rsx", "dep:beet_router"]
 query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
-template = ["dep:beet_template"]
-# fs = ["beet_template?/fs"]
+rsx = ["dep:beet_rsx"]
+# fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 server = [
 	"router",
@@ -287,14 +290,14 @@ web = ["dep:beet_web"]
 [dependencies]
 beet_examples = { workspace = true, optional = true }
 bevy = { workspace = true }
-#💡 template
+#💡 rsx
 beet_common = { workspace = true }
 beet_build = { workspace = true, optional = true }
 beet_parse = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
-beet_template = { workspace = true, optional = true }
+beet_rsx = { workspace = true, optional = true }
 beet_query = { workspace = true, optional = true }
 #💡 flow
 beet_flow = { workspace = true, optional = true }
@@ -347,7 +350,7 @@ web-sys.workspace = true
 [[example]]
 name = "csr"
 path = "examples/dom/csr.rs"
-required-features = ["template"]
+required-features = ["rsx"]
 
 [[example]]
 name = "ssr"

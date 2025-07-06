@@ -21,16 +21,16 @@ pub mod as_beet {
 	pub use bevy::prelude::*;
 	pub mod beet {
 		pub use crate as router;
-		pub use beet_template as template;
+		pub use beet_rsx as template;
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_net::prelude::*;
-			pub use beet_template::prelude::*;
+			pub use beet_rsx::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;
-			pub use beet_template::exports::*;
+			pub use beet_rsx::exports::*;
 		}
 	}
 }

@@ -33,8 +33,8 @@ pub use beet_server_utils as server_utils;
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
-#[cfg(feature = "template")]
-pub use beet_template as template;
+#[cfg(feature = "rsx")]
+pub use beet_rsx as rsx;
 pub use beet_utils as utils;
 pub use beet_utils::elog;
 pub use beet_utils::log;
@@ -74,8 +74,8 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
-	#[cfg(feature = "template")]
-	pub use crate::template::prelude::*;
+	#[cfg(feature = "rsx")]
+	pub use crate::rsx::prelude::*;
 	pub use crate::utils::prelude::*;
 	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use crate::web::prelude::*;
@@ -93,8 +93,8 @@ pub mod exports {
 	pub use crate::router::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::exports::*;
-	#[cfg(feature = "template")]
-	pub use crate::template::exports::*;
+	#[cfg(feature = "rsx")]
+	pub use crate::rsx::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;

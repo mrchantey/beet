@@ -1,6 +1,6 @@
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -88,7 +88,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_common::node::MacroIdx;
 	use beet_router::as_beet::WorkspaceConfig;
-	use beet_template::as_beet::*;
+	use beet_rsx::as_beet::*;
 	// use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

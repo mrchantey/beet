@@ -1,6 +1,6 @@
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
@@ -63,7 +63,7 @@ mod test {
 	use serde::Serialize;
 	use sweet::prelude::*;
 
-	use beet_template::as_beet::*;
+	use beet_rsx::as_beet::*;
 
 	#[template]
 	#[derive(Serialize, Deserialize)]

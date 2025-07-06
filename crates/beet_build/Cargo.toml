@@ -20,17 +20,17 @@ markdown = ["dep:pulldown-cmark"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [[test]]
-name="lang_snippets"
+name = "lang_snippets"
 path = "tests/lang_snippets.rs"
 required-features = ["css"]
 [[test]]
-name="rsx_snippets"
+name = "rsx_snippets"
 path = "tests/rsx_snippets.rs"
 required-features = ["css"]
 
 [dependencies]
 #💡 Internal
-beet_template = { workspace = true, features = ["tokens"] }
+beet_rsx = { workspace = true, features = ["tokens"] }
 beet_common.workspace = true
 beet_net = { workspace = true, features = ["tokens"] }
 beet_fs.workspace = true

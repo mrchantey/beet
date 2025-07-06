@@ -7,7 +7,7 @@ use axum::handler::Handler;
 use axum::response::Html;
 use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::app::Plugins;
 use bevy::ecs::system::ScheduleSystem;
 use bevy::prelude::*;

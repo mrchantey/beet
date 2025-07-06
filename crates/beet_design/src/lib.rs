@@ -33,7 +33,7 @@ pub mod prelude {
 	pub use crate::macros::*;
 	pub use crate::mockups::*;
 	pub use crate::types::*;
-	// pub(crate) use beet_template::as_beet::*;
+	// pub(crate) use beet_rsx::as_beet::*;
 	#[allow(unused)]
 	pub(crate) use beet::prelude::*;
 	#[allow(unused)]
@@ -46,7 +46,7 @@ pub mod prelude {
 			pub use beet_router::prelude::*;
 			#[cfg(not(target_arch = "wasm32"))]
 			pub use beet_server::prelude::*;
-			pub use beet_template::prelude::*;
+			pub use beet_rsx::prelude::*;
 			pub use beet_utils::prelude::*;
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;

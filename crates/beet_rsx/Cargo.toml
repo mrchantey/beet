@@ -1,5 +1,5 @@
 [package]
-name = "beet_template"
+name = "beet_rsx"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -22,7 +22,7 @@ bevy_default = ["bevy/bevy_text"]
 tokens = ["beet_common/tokens"]
 
 [dependencies]
-beet_template_macros.workspace = true
+beet_rsx_macros.workspace = true
 beet_common.workspace = true
 beet_utils.workspace = true
 beet_bevy.workspace = true
@@ -67,6 +67,6 @@ web-sys.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
-beet_template = { path = "", features = ["tokens"] }
+beet_rsx = { path = "", features = ["tokens"] }
 serde.workspace = true
 sweet.workspace = true

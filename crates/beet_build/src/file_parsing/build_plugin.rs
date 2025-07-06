@@ -4,7 +4,7 @@ use beet_bevy::prelude::*;
 use beet_common::prelude::*;
 use beet_fs::process::WatchEvent;
 use beet_parse::prelude::*;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;

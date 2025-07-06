@@ -3,7 +3,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
-use beet_template::as_beet::*;
+use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 use sweet::prelude::*;
 

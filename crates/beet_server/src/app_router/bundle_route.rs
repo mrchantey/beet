@@ -70,7 +70,7 @@ mod test {
 	use axum::Router;
 	use axum::extract::Query as QueryParams;
 	use beet_common::prelude::*;
-	use beet_template::prelude::*;
+	use beet_rsx::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	use sweet::prelude::*;

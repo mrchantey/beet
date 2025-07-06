@@ -717,11 +717,11 @@ dependencies = [
  "beet_parse",
  "beet_query",
  "beet_router",
+ "beet_rsx",
  "beet_server",
  "beet_server_utils",
  "beet_sim",
  "beet_spatial",
- "beet_template",
  "beet_utils",
  "beet_web",
  "bevy",
@@ -782,7 +782,7 @@ dependencies = [
  "beet_net",
  "beet_parse",
  "beet_router",
- "beet_template",
+ "beet_rsx",
  "beet_utils",
  "bevy",
  "flume",
@@ -872,8 +872,8 @@ dependencies = [
  "beet_common",
  "beet_net",
  "beet_router",
+ "beet_rsx",
  "beet_server",
- "beet_template",
  "beet_utils",
  "bevy",
  "chrono",
@@ -1087,7 +1087,7 @@ dependencies = [
  "beet_common",
  "beet_net",
  "beet_router",
- "beet_template",
+ "beet_rsx",
  "beet_utils",
  "bevy",
  "clap",
@@ -1110,6 +1110,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_rsx"
+version = "0.0.6-dev.1"
+dependencies = [
+ "anyhow",
+ "beet_bevy",
+ "beet_common",
+ "beet_fs",
+ "beet_rsx",
+ "beet_rsx_macros",
+ "beet_utils",
+ "beet_web",
+ "bevy",
+ "console_error_panic_hook",
+ "console_log",
+ "extend",
+ "flume",
+ "html-escape",
+ "http 1.3.1",
+ "js-sys",
+ "prettyplease",
+ "rapidhash",
+ "ron",
+ "send_wrapper",
+ "serde",
+ "strum",
+ "strum_macros",
+ "sweet",
+ "thiserror 1.0.69",
+ "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "beet_rsx_combinator"
 version = "0.0.6-dev.1"
 dependencies = [
@@ -1117,6 +1152,22 @@ dependencies = [
  "itertools 0.14.0",
  "sweet",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "beet_rsx_macros"
+version = "0.0.6-dev.1"
+dependencies = [
+ "anyhow",
+ "beet_bevy",
+ "beet_common",
+ "beet_parse",
+ "beet_utils",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "sweet",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1130,7 +1181,7 @@ dependencies = [
  "beet_fs",
  "beet_net",
  "beet_router",
- "beet_template",
+ "beet_rsx",
  "beet_utils",
  "bevy",
  "bytes",
@@ -1218,57 +1269,6 @@ dependencies = [
  "strum_macros",
  "sweet",
  "web-sys",
-]
-
-[[package]]
-name = "beet_template"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_bevy",
- "beet_common",
- "beet_fs",
- "beet_template",
- "beet_template_macros",
- "beet_utils",
- "beet_web",
- "bevy",
- "console_error_panic_hook",
- "console_log",
- "extend",
- "flume",
- "html-escape",
- "http 1.3.1",
- "js-sys",
- "prettyplease",
- "rapidhash",
- "ron",
- "send_wrapper",
- "serde",
- "strum",
- "strum_macros",
- "sweet",
- "thiserror 1.0.69",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
-name = "beet_template_macros"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_bevy",
- "beet_common",
- "beet_parse",
- "beet_utils",
- "proc-macro2",
- "proc-macro2-diagnostics",
- "quote",
- "sweet",
- "syn 2.0.101",
 ]
 
 [[package]]

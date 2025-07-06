@@ -52,4 +52,4 @@ impl OnSpawnTemplate {
 
 
 
-// implemented and tested in beet_template
+// implemented and tested in beet_rsx

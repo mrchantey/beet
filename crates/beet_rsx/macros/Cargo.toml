@@ -1,5 +1,5 @@
 [package]
-name = "beet_template_macros"
+name = "beet_rsx_macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

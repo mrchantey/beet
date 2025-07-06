@@ -24,9 +24,9 @@ pub mod prelude {
 	pub(crate) use internal::*;
 	#[allow(unused_imports)]
 	mod internal {
-		pub use beet_template::as_beet::*;
+		pub use beet_rsx::as_beet::*;
 		pub use beet_net::prelude::*;
-		pub use beet_template::prelude::*;
+		pub use beet_rsx::prelude::*;
 		pub use beet_utils::prelude::*;
 	}
 }

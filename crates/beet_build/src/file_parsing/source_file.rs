@@ -4,7 +4,7 @@ use beet_fs::exports::notify::EventKind;
 use beet_fs::exports::notify::event::CreateKind;
 use beet_fs::exports::notify::event::RemoveKind;
 use beet_fs::process::WatchEvent;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;

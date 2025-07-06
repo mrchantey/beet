@@ -2,7 +2,7 @@ use crate::prelude::*;
 use axum::Router;
 use beet_router::prelude::ClientIsland;
 use beet_router::prelude::ClientIslandMap;
-use beet_template::as_beet::bevybail;
+use beet_rsx::as_beet::bevybail;
 use bevy::app::Plugins;
 use bevy::prelude::*;
 use std::path::PathBuf;

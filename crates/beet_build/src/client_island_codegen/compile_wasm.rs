@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_bevy::prelude::When;
 use beet_common::node::HtmlConstants;
 use beet_fs::cargo::CargoBuildCmd;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use std::path::Path;

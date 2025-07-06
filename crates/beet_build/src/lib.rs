@@ -25,17 +25,17 @@ pub mod as_beet {
 	pub mod beet {
 		pub use crate as build;
 		pub use beet_parse as parse;
-		pub use beet_template as template;
+		pub use beet_rsx as rsx;
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_utils::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_parse::prelude::*;
-			pub use beet_template::prelude::*;
+			pub use beet_rsx::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;
-			pub use beet_template::exports::*;
+			pub use beet_rsx::exports::*;
 		}
 	}
 }

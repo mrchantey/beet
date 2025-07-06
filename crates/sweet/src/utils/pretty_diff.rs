@@ -165,8 +165,8 @@ mod test {
 		let left = "";
 		let right = "polymerase";
 		let expected = format!(
-			"{SIGN_LEFT}\n\n\n{SIGN_RIGHT}\n{green_heavy}polymerase{reset}\n",
-			green_heavy = GREEN_HEAVY,
+			"{SIGN_LEFT}\n\n\n{SIGN_RIGHT}\n{red_heavy}polymerase{reset}\n",
+			red_heavy = RED_HEAVY,
 			reset = RESET,
 		);
 
@@ -178,8 +178,8 @@ mod test {
 		let left = "polyacrylamide";
 		let right = "";
 		let expected = format!(
-			"{SIGN_LEFT}\n{red_heavy}polyacrylamide{reset}\n\n{SIGN_RIGHT}\n\n",
-			red_heavy = RED_HEAVY,
+			"{SIGN_LEFT}\n{green_heavy}polyacrylamide{reset}\n\n{SIGN_RIGHT}\n\n",
+			green_heavy = GREEN_HEAVY,
 			reset = RESET,
 		);
 
@@ -191,7 +191,7 @@ mod test {
 		let left = "polymerase";
 		let right = "polyacrylamide";
 		let expected = format!(
-			"{SIGN_LEFT}\n{red_light}poly{reset}{red_heavy}me{reset}{red_light}ra{reset}{red_heavy}s{reset}{red_light}e{reset}\n\n{SIGN_RIGHT}\n{green_light}poly{reset}{green_heavy}ac{reset}{green_light}r{reset}{green_heavy}yl{reset}{green_light}a{reset}{green_heavy}mid{reset}{green_light}e{reset}\n",
+			"{SIGN_LEFT}\n{green_light}poly{reset}{green_heavy}me{reset}{green_light}ra{reset}{green_heavy}s{reset}{green_light}e{reset}\n\n{SIGN_RIGHT}\n{red_light}poly{reset}{red_heavy}ac{reset}{red_light}r{reset}{red_heavy}yl{reset}{red_light}a{reset}{red_heavy}mid{reset}{red_light}e{reset}\n",
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
 			red_heavy = RED_HEAVY,

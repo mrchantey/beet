@@ -7,7 +7,7 @@ use bevy::prelude::*;
 /// In this example we dont need to set any of the Head values
 /// they will fallback to Brand values.
 /// ```
-/// # use beet_template::as_beet::*;
+/// # use beet_rsx::as_beet::*;
 /// # use beet_design::prelude::*;
 /// # use bevy::prelude::*;
 ///

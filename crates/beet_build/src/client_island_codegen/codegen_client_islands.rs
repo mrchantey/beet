@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_bevy::prelude::When;
 use beet_common::prelude::*;
 use beet_router::prelude::ClientIslandMap;
-use beet_template::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
