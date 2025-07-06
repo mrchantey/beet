@@ -64,9 +64,9 @@ mod test {
 		let delay = 0.5;
 		let start = Instant::now();
 		TestServer {
-			build_server: "echo 'building server'".into(),
-			run_server: "echo 'running server'".into(),
-			run_test: "echo 'running tests'".into(),
+			build_server: "true".into(),
+			run_server: "true".into(),
+			run_test: "true".into(),
 			delay_secs: Some(delay),
 		}
 		.run()

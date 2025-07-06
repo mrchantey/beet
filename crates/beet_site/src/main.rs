@@ -19,6 +19,5 @@ fn main() {
 	App::new()
 		.add_plugins((TemplatePlugin, ClientIslandPlugin))
 		.set_runner(ReactiveApp::runner)
-		// .add_resource(SiteUrl::new("https://beetrs.dev"))
 		.run();
 }

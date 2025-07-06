@@ -11,18 +11,18 @@ use std::time::Duration;
 pub struct RunBuild {
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
-	build_cmd: CargoBuildCmd,
+	pub(crate) build_cmd: CargoBuildCmd,
 	/// Location of the beet.toml config file
 	#[arg(long)]
-	beet_config: Option<PathBuf>,
+	pub(crate) beet_config: Option<PathBuf>,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
-	r#static: bool,
+	pub(crate) r#static: bool,
 	/// Only execute the provided build steps,
 	/// options are `routes`, `static-scene`, `client-islands`
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
-	only: Vec<BuildFlag>,
+	pub(crate) only: Vec<BuildFlag>,
 }
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }

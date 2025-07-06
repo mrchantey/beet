@@ -2,7 +2,7 @@
 
 // TODO get these from Cargo.toml or beet.toml
 const appName = "BeetServer";
-const domainName = "beetrs.dev";
+const domainName = "beetrsx.dev";
 const lambdaHandler = "./crates/beet_site/";
 
 export default $config({

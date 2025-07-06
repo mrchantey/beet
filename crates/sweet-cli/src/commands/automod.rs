@@ -391,7 +391,7 @@ mod test {
 		expect(&insert_lib).to_contain("pub mod foo;");
 		expect(&insert_lib).to_contain("pub use crate::foo::*;");
 
-		let insert_mod = insert("crates/sweet-cli/src/bench/foo.rs").unwrap();
+		let insert_mod = insert("crates/sweet-cli/src/commands/foo.rs").unwrap();
 		expect(&insert_mod).to_contain("mod foo;");
 		expect(&insert_mod).to_contain("pub use foo::*;");
 	}
@@ -417,12 +417,12 @@ mod test {
 
 
 		let remove_mod =
-			remove("crates/sweet-cli/src/bench/bench_assert.rs").unwrap();
+			remove("crates/sweet-cli/src/commands/automod.rs").unwrap();
 		expect(&remove_mod)
 			.not()
-			.to_contain("pub mod bench_assert;");
+			.to_contain("pub mod automod;");
 		expect(&remove_mod)
 			.not()
-			.to_contain("pub use bench_assert::*;");
+			.to_contain("pub use automod::*;");
 	}
 }
