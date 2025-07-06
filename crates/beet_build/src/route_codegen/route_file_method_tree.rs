@@ -46,18 +46,26 @@ impl RouteFileMethodTree {
 	}
 
 
-	/// Create a tree of `mod` items, mapping each leaf node.
+	/// Create a tree [`syn::Item`], if it has children then wrap in a module
+	/// of the same name as the node.
 	pub fn mod_tree(&self, map_item: impl Fn(&Self) -> Item + Clone) -> Item {
-		if self.children.is_empty() {
-			map_item(self)
+		self.mod_tree_inner(map_item, true)
+	}
+	pub fn mod_tree_inner(
+		&self,
+		map_item: impl Fn(&Self) -> Item + Clone,
+		root: bool,
+	) -> Item {
+		let item = map_item(self);
+		if !root && self.children.is_empty() {
+			item
 		} else {
 			let children = self
 				.children
 				.iter()
-				.map(|child| child.mod_tree(map_item.clone()));
+				.map(|child| child.mod_tree_inner(map_item.clone(), false));
 			let ident =
 				syn::Ident::new(&self.name, proc_macro2::Span::call_site());
-			let item = map_item(self);
 			syn::parse_quote!(
 				#[allow(missing_docs)]
 				pub mod #ident {

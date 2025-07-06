@@ -177,6 +177,51 @@ mod test {
 		world
 	}
 
+	fn parse(methods: Vec<RouteFileMethod>) -> String {
+		let mut world = World::new();
+		world.spawn_batch(methods);
+		let tree = RouteFileMethodTree::from_methods(
+			world
+				.query_once::<(Entity, &RouteFileMethod)>()
+				.iter()
+				.copied()
+				.collect(),
+		);
+		let mut query = world.query::<&RouteFileMethod>();
+		let query = query.query(&world);
+		let mod_item = Parser { query }.routes_mod_tree(&tree);
+		mod_item.to_token_stream().to_string()
+	}
+
+	#[test]
+	fn single() {
+		let expected: ItemMod = syn::parse_quote! {
+			#[allow(missing_docs)]
+			pub mod routes {
+				#[allow(unused_imports)]
+				use super::*;
+				 /// Get the local route path
+				 pub fn index() -> &'static str { "/" }
+			}
+		};
+		parse(vec![RouteFileMethod::new("/")])
+			.xpect()
+			.to_be_str(expected.to_token_stream().to_string());
+	}
+	#[test]
+	fn empty() {
+		let expected: ItemMod = syn::parse_quote! {
+			#[allow(missing_docs)]
+			pub mod routes {
+				#[allow(unused_imports)]
+				use super::*;
+			}
+		};
+		parse(vec![])
+			.xpect()
+			.to_be_str(expected.to_token_stream().to_string());
+	}
+
 	#[test]
 	fn creates_mod() {
 		let mut world = world();
