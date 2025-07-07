@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn compile_client(
-	_query: Populated<(), Changed<RouteCodegenRoot>>,
+	_query: Populated<(), Changed<FileExprHash>>,
 	html_constants: When<Res<HtmlConstants>>,
 	cmd: When<Res<CargoBuildCmd>>,
 	manifest: When<Res<CargoManifest>>,

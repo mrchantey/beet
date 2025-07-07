@@ -88,6 +88,7 @@ impl CollectionIndexCounter {
 /// - mark the root as changed if it exists
 /// - reset collection and root codegen
 pub fn reset_changed_codegen(
+	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
 	mut roots: Query<
 		(&mut RouteCodegenRoot, &mut CodegenFile),
 		// divergent queries
@@ -98,13 +99,19 @@ pub fn reset_changed_codegen(
 		&mut CodegenFile,
 		Option<&ChildOf>,
 	)>,
-	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
 ) {
 	for file in changed_exprs.iter() {
-		for (mut collection, mut collection_codegen, parent) in collections
-			.iter_mut()
-			.filter(|(collection, _, _)| collection.passes_filter(file))
-		{
+		for (mut collection, mut collection_codegen, parent) in
+			collections.iter_mut().filter(|(collection, _, _)| {
+				let passes = collection.passes_filter(file);
+				println!(
+					"File: {} passes filter: {}\n{:?}",
+					file.path(),
+					passes,
+					collection
+				);
+				passes
+			}) {
 			parent
 				.map(|parent| roots.get_mut(parent.parent()).ok())
 				.flatten()

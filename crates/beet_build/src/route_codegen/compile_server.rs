@@ -5,14 +5,9 @@ use bevy::prelude::*;
 use std::process::Command;
 
 
-
-
-
-
-
 /// After Codegen, build the router binary and run it once.
 pub(crate) fn compile_server(
-	_query: Populated<(), Changed<RouteCodegenRoot>>,
+	_query: Populated<(), Changed<FileExprHash>>,
 	mut handle: ResMut<ServerHandle>,
 	cmd: When<Res<CargoBuildCmd>>,
 ) -> Result {
@@ -63,7 +58,7 @@ impl Drop for ServerHandle {
 }
 /// Run the server, holding a handle to the process.
 pub(crate) fn run_server(
-	_query: Populated<(), Changed<RouteCodegenRoot>>,
+	_query: Populated<(), Changed<FileExprHash>>,
 	mut handle: ResMut<ServerHandle>,
 	cmd: When<Res<CargoBuildCmd>>,
 	manifest: When<Res<CargoManifest>>,
