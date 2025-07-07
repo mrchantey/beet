@@ -112,12 +112,12 @@ impl NodeExpr {
 /// It can later be combined into a single expression
 /// `let foo = (NodeTag("div"),ElementNode{self_closing=true});`
 ///
-#[derive(Default, Component, Deref, DerefMut, ToTokens)]
+#[derive(Default, Clone, Deref, DerefMut, Component, ToTokens)]
 pub struct CombinatorExpr(pub Vec<CombinatorExprPartial>);
 
 /// A section of a [`CombinatorExpr`],
 /// a 1:1 mapping from [`RsxTokensOrElement`](beet_rsx_combinator::types::RsxTokensOrElement)
-#[derive(ToTokens)]
+#[derive(Clone, ToTokens)]
 pub enum CombinatorExprPartial {
 	/// partial expressions must be a string as it may not be a valid
 	/// TokenTree at this stage, for instance {let foo = <bar/>} will be split into

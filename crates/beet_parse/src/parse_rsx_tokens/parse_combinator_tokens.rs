@@ -190,7 +190,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			RsxChild::Element(el) => self.rsx_element(el),
 			RsxChild::Text(text) => self.rsx_text(text),
 			RsxChild::CodeBlock(code_block) => {
-				let entity = self.commands.spawn(self.expr_idx.next()).id();
+				let entity = self.commands.spawn((BlockNode,self.expr_idx.next())).id();
 				self.rsx_parsed_expression(entity, code_block)?;
 				entity.xok()
 			}
@@ -231,7 +231,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					FileSpanOf::<AttributeOf>::new(self.default_file_span()),
 				));
 				match value {
-					RsxAttributeValue::Default => {}
+					RsxAttributeValue::Default => {
+						// key only attribute
+					}
 					RsxAttributeValue::Boolean(val) => {
 						let val = val.0;
 						entity.insert((
@@ -371,6 +373,38 @@ mod test {
 			.to_string(),
 		);
 	}
+
+	#[test]
+	fn block() {
+		r#"{"hello"}"#.xmap(parse).to_be_str(
+			quote! {
+				(
+					BeetRoot,
+					InstanceRoot,
+					MacroIdx {
+						file: WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),
+						start: LineCol { line: 1u32, col: 0u32 }
+					},
+					FragmentNode,
+					related! {
+						Children [
+							(
+								ExprIdx(0u32),
+								BlockNode,
+								OnSpawnTemplate::new_insert(
+									#[allow(unused_braces)]{ "hello" }.into_node_bundle()
+								)
+							)
+						]
+					}
+				)
+			}
+			.to_string(),
+		);
+	}
+
+
+
 	#[test]
 	fn element_attributes_default() {
 		"<br foo />".xmap(parse).to_be_str(

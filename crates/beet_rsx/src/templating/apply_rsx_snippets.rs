@@ -190,9 +190,9 @@ fn apply_template_locations(
 				"
 				Error resolving rsx snippet for macro at {macro_idx}
 				The instance is missing an ExprIdx found in the snippet.
-				Expected idx: 	{idx}
 				Instance idxs: 	{instance_keys:?}
-				Consumed idxs: 		{consumed_keys:?}
+				Consumed idxs: 	{consumed_keys:?}
+				Expected idx: 	{idx}
 				"
 			);
 		});
@@ -221,11 +221,12 @@ fn apply_template_locations(
 			"
 Error resolving rsx snippet for macro at {macro_idx}
 Not all ExprIdx were applied.
-The rsx snippet is missing the following idxs found in the instance: {:?}
+The rsx snippet is missing idxs found in the instance:
 Instance idxs: 	{instance_keys:?}
 Consumed idxs: 	{consumed_keys:?}
+Remaining idxs: {:?}
 ",
-			instance_exprs.keys(),
+			instance_exprs.keys().map(|idx| idx.0).collect::<Vec<_>>()
 		);
 	}
 }
@@ -275,6 +276,8 @@ mod test {
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
+
+		// convert an instance to a snippet with the same MacroIdx
 		let _snippet = world
 			.spawn((RsxSnippetRoot, rsx_snippet))
 			.remove::<InstanceRoot>()
@@ -443,4 +446,6 @@ mod test {
 			.xpect()
 			.to_be("<main><span/></main>");
 	}
+
+
 }

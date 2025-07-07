@@ -24,12 +24,32 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 		.into()
 }
 
-/// Mostly used for testing, this macro expands to a tokens respresentation
+/// used for testing, this macro expands to a tokens respresentation
 /// of a bundle
 #[proc_macro]
 pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	tokenize_rstml_tokens(tokens.into(), source_file)
+		.unwrap_or_else(err_tokens)
+		.into()
+}
+/// used for testing, create combinator instance from a string literal
+#[proc_macro]
+pub fn rsx_combinator(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	let lit_str = syn::parse::<syn::LitStr>(tokens.into())
+		.expect("expected a string literal");
+	tokenize_combinator(&lit_str.value(), source_file)
+		.unwrap_or_else(err_tokens)
+		.into()
+}
+/// used for testing, create combinator tokens from a string literal
+#[proc_macro]
+pub fn rsx_combinator_tokens(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	let lit_str = syn::parse::<syn::LitStr>(tokens.into())
+		.expect("expected a string literal");
+	tokenize_combinator_tokens(&lit_str.value(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
@@ -78,10 +98,10 @@ pub fn derive_buildable(
 /// is applied as [`Attributes`](beet_common::prelude::Attributes) of the entity.
 /// Use [`#[field(flatten)]`] for the key to be discarded, and the value to be
 /// applied by calling `into_node_bundle`. This allows for a nested [`AttributeBlock`].
-/// 
-/// 
-/// 
-/// 
+///
+///
+///
+///
 #[proc_macro_derive(AttributeBlock, attributes(field))]
 pub fn derive_attribute_block(
 	input: proc_macro::TokenStream,

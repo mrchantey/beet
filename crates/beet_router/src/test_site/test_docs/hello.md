@@ -6,7 +6,7 @@ order = 2
 
 # Hello
 
-This page is all about saying hello
+This page is all about saying {"hello"}
 
 <main>
 	## Nested Heading

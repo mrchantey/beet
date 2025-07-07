@@ -96,6 +96,11 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			});
 		world.entity_mut(instance_root).insert(InstanceRoot);
 
+		// let foo = world
+		// 	.component_names_related::<Children>(instance_root)
+		// 	.iter_to_string_indented();
+		// println!("Children of instance root: \n{}", foo);
+
 		let tokens = tokenize_bundle(world, instance_root)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
@@ -188,7 +193,11 @@ mod test {
 									ElementNode { self_closing: false },
 									related! {
 										Children [
-											TextNode(String::from("This page is all about saying hello"))
+											TextNode(String::from("This page is all about saying")),
+											(
+												ExprIdx(0u32),
+												BlockNode,
+												OnSpawnTemplate::new_insert(#[allow(unused_braces)]{"hello" }.into_node_bundle()))
 										]
 									}
 								),
