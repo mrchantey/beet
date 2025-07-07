@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use std::path::Path;
 use std::process::Command;
 
-pub fn compile_wasm(
+pub fn compile_client(
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
 	html_constants: When<Res<HtmlConstants>>,
 	cmd: When<Res<CargoBuildCmd>>,
@@ -18,8 +18,10 @@ pub fn compile_wasm(
 	let mut cmd = cmd.clone();
 	cmd.target = Some("wasm32-unknown-unknown".to_string());
 	let exe_path = cmd.exe_path(manifest.package_name());
+	cmd.no_default_features = true;
+	cmd.push_feature("client");
 
-	debug!("Compiling wasm binary");
+	debug!("Building client binary");
 	cmd.spawn()?;
 	wasm_bindgen(&html_constants, &config.html_dir, &exe_path)?;
 	if cmd.release {

@@ -107,6 +107,15 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
+	pub fn push_feature(&mut self, feature: impl Into<String>) {
+		let feature = feature.into();
+		if let Some(features) = &mut self.features {
+			features.push_str(&format!(",{}", feature));
+		} else {
+			self.features = Some(feature);
+		}
+	}
+
 	/// Best effort attempt to retrieve the path to the executable.
 	/// For packages, binaries and examples that name is used to resolve the
 	/// executable name, otherwise the crate name is used.

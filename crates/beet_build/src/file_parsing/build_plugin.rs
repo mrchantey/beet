@@ -151,7 +151,7 @@ impl Plugin for BuildPlugin {
 						export_client_island_codegen.run_if(
 							BuildFlags::should_run(BuildFlag::ClientIslands),
 						),
-						compile_wasm.run_if(BuildFlags::should_run(
+						compile_client.run_if(BuildFlags::should_run(
 							BuildFlag::CompileWasm,
 						)),
 						run_server.run_if(BuildFlags::should_run(

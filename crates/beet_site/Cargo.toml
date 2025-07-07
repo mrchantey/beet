@@ -13,15 +13,17 @@ categories.workspace = true
 keywords.workspace = true
 
 
-# beet cli calls build --no-default-features features=deploy
-# this is required for disabling openssl (faster dev builds but incompatible with lambda)
+# the beet cli uses 'client' and 'deploy' to build
+# the client and lambda binaries
 [features]
-default = ["beet/openssl"]
-deploy = ["beet/lambda"]
+default = ["beet/web-server", "beet/openssl"]
+deploy = ["beet/web-server", "beet/lambda"]
+client = ["beet/web-client"]
 
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
+beet.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet = { workspace = true, features = ["web-server"] }

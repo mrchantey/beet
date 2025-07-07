@@ -23,7 +23,7 @@ pub(crate) fn compile_server(
 		child.kill()?;
 	}
 
-	debug!("Building native binary");
+	debug!("Building server binary");
 	cmd.spawn()?;
 	Ok(())
 }
@@ -38,7 +38,7 @@ pub fn export_server_ssg(
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
 	debug!(
-		"Running native binary to generate static files \nExecuting {}",
+		"Running server binary to generate static files \n{}",
 		exe_path.display()
 	);
 	Command::new(&exe_path)
@@ -74,7 +74,7 @@ pub(crate) fn run_server(
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
 	debug!(
-		"Running native binary to generate static files \nExecuting {}",
+		"Running server binary to generate static files \n{}",
 		exe_path.display()
 	);
 	let child = Command::new(&exe_path).spawn()?;

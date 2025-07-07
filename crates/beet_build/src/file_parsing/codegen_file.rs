@@ -121,6 +121,9 @@ impl CodegenFile {
 		FsExt::write_if_diff(&self.output, &output_str)?;
 		Ok(())
 	}
+
+	// this is legacy from when client islands use std::any::type_name
+	// we can remove it after scenes-as-islands
 	fn crate_alias(&self) -> Result<Option<syn::Item>> {
 		if let Some(pkg_name) = &self.pkg_name {
 			let pkg_name: Expr = syn::parse_str(pkg_name)?;
