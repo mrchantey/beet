@@ -30,8 +30,9 @@ pub fn parse_route_file_md(
 		// possibly do a diff but these changes already result in recompile
 		// so not super perf critical
 
+		// loading the file a second time is not ideal, we should probably
+		// cache the meta from the first parse
 		let file_str = ReadFile::to_string(&source_file)?;
-
 		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 
 		let Some(collection_codegen) = parents

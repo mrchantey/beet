@@ -81,9 +81,22 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			snippets.len() == 1,
 			"Combinator Source File should have exactly one RsxSnippet"
 		);
-		let tokens_root = snippets[0];
+		let snippet_root = snippets[0];
 
-		let tokens = tokenize_bundle(world, tokens_root)?;
+
+		// this is a snippet but we need an instance, the only difference being
+		// RsxSnippetRoot vs InstanceRoot
+		let instance_root = world
+			.entity_mut(snippet_root)
+			.clone_and_spawn_with(|builder| {
+				builder
+					.deny::<RsxSnippetRoot>()
+					.linked_cloning(true)
+					.add_observers(true);
+			});
+		world.entity_mut(instance_root).insert(InstanceRoot);
+
+		let tokens = tokenize_bundle(world, instance_root)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
 			.entity_mut(entity)
@@ -153,7 +166,7 @@ mod test {
 				pub fn get() -> impl Bundle {
 					(
 						BeetRoot,
-						RsxSnippetRoot,
+						InstanceRoot,
 						MacroIdx {
 							file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
 							start: LineCol { line: 1u32, col: 0u32 }

@@ -101,17 +101,10 @@ pub fn reset_changed_codegen(
 	)>,
 ) {
 	for file in changed_exprs.iter() {
-		for (mut collection, mut collection_codegen, parent) in
-			collections.iter_mut().filter(|(collection, _, _)| {
-				let passes = collection.passes_filter(file);
-				println!(
-					"File: {} passes filter: {}\n{:?}",
-					file.path(),
-					passes,
-					collection
-				);
-				passes
-			}) {
+		for (mut collection, mut collection_codegen, parent) in collections
+			.iter_mut()
+			.filter(|(collection, _, _)| collection.passes_filter(file))
+		{
 			parent
 				.map(|parent| roots.get_mut(parent.parent()).ok())
 				.flatten()
