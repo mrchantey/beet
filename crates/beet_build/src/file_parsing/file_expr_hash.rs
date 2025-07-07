@@ -184,20 +184,25 @@ mod test {
 		//same
 		expect(hash(rsx_tokens! {<div>{1}</div>}))
 			.to_be(hash(rsx_tokens! {<div>{1}</div>}));
-		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
-			.to_be(hash(rsx_combinator_tokens! {"<div>{1}</div>"}));
-
 		//dif inner
 		expect(hash(rsx_tokens! {<div>{1}</div>}))
 			.not()
 			.to_be(hash(rsx_tokens! {<div>{2}</div>}));
-		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
-			.not()
-			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));
 		// diff num
 		expect(hash(rsx_tokens! {<div>foo </div>}))
 		.not()
 		.to_be(hash(rsx_tokens! {<div>bar {2}</div>}));
+	}
+	#[test]
+	fn combinator_blocks() {
+		//same
+		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
+			.to_be(hash(rsx_combinator_tokens! {"<div>{1}</div>"}));
+		//dif inner
+		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
+			.not()
+			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));
+		// diff num
 		expect(hash(rsx_combinator_tokens! {"<div></div>"}))
 			.not()
 			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));

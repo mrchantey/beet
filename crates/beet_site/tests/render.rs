@@ -22,6 +22,16 @@ async fn root() {
 	index.xref().xpect().to_contain("data-beet-dom-idx");
 	index.xref().xpect().to_contain("A very bevy metaframework");
 }
+#[sweet::test]
+async fn mdx() {
+	let router = router().set_bevy_plugins(|app: &mut App| {
+		app.insert_resource(TemplateFlags::All);
+	});
+	let _index = router.render_route(&"/docs".into()).await.unwrap();
+	println!("{}", _index);
+	// index.xref().xpect().to_contain("data-beet-dom-idx");
+	// index.xref().xpect().to_contain("A very bevy metaframework");
+}
 
 
 #[sweet::test]
