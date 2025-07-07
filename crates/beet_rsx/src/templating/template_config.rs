@@ -58,9 +58,6 @@ pub struct WorkspaceConfig {
 #[allow(unused)]
 fn default_filter() -> GlobFilter {
 	GlobFilter::default()
-		.with_include("*/crates/beet_design/src/**/*")
-		.with_include("*/crates/beet_site/src/**/*")
-		.with_include("*/crates/beet_router/src/test_site/**/*")
 		.with_exclude("*/target/*")
 		.with_exclude("*/.cache/*")
 		.with_exclude("*/node_modules/*")

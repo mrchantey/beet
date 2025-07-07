@@ -2,9 +2,9 @@ use bevy::prelude::*;
 
 /// A component containing a method that will run after spawn, giving LitNodes
 /// a chance to be applied:
-/// 
+///
 /// 1. A Bundle is inserted on the entity
-/// 2. Component Hooks are run for the insert 
+/// 2. Component Hooks are run for the insert
 /// 3. Observers are run for the insert
 /// 4. Bundle Effects are run
 /// 5. OnSpawnTemplate component is moved to its correct location in the static tree
@@ -23,14 +23,13 @@ impl OnSpawnTemplate {
 		Self(Box::new(func))
 	}
 
-	/// Insert this bundle into the entity on spawn
+	/// Insert this bundle into the entity on spawn.
 	pub fn new_insert(bundle: impl Bundle) -> Self {
 		Self::new(move |mut entity: EntityCommands| {
 			entity.insert(bundle);
 			Ok(())
 		})
 	}
-
 
 	/// Convenience for getting the method from inside a system,
 	/// this component should be removed when this is called

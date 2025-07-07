@@ -29,16 +29,14 @@ pub fn tokenize_element_attributes(
 
 			let mut attr_components = Vec::new();
 			match (key, value) {
-				// 1: Events
+				// 1. Key with value
 				(Some((key_str, key)), Some(mut value))
-					if is_event(&key_str, &value) =>
+				=>
 				{
-					tokenize_event_handler(&key_str, key.span(), &mut value)?;
-					attr_components.push(quote! {AttributeKey::new(#key)});
-					entity_components.push(value.node_bundle_tokens());
-				}
-				// 2. Key with value
-				(Some((_, key)), Some(value)) => {
+					if is_event(&key_str, &value){
+						// event syntax sugar (inferred trigger types)
+						tokenize_event_handler(&key_str, key.span(), &mut value)?;
+					}
 					attr_components.push(quote! {AttributeKey::new(#key)});
 					attr_components.push(value.attribute_bundle_tokens());
 				}
@@ -169,21 +167,28 @@ mod test {
 		}
 		.xmap(parse)
 		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-					related!(Attributes [(
-						AttributeKey::new("onclick"),
-						ExprIdx(0u32)
-					)])
-				)]}
-			)}
+			quote! {
+				(
+					BeetRoot,
+					InstanceRoot,
+					MacroIdx {
+						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),
+						start: LineCol { line: 1u32, col: 0u32 }
+					},
+					FragmentNode,
+					related! {
+						Children[(
+							NodeTag(String::from("span")),
+							ElementNode { self_closing: true },
+							related!(Attributes[(
+								AttributeKey::new("onclick"),
+								OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_attribute_bundle()),
+								ExprIdx(0u32)
+							)])
+						)]
+					}
+				)
+			}
 			.to_string(),
 		);
 		quote! {
@@ -221,34 +226,43 @@ mod test {
 		}
 		.xmap(parse)
 		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx (0u32),
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle()),
-					related!(Attributes[
-						AttributeKey::new("hidden"),
-						(
-							AttributeKey::new("class"),
-							OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
-						),
-						(
-							AttributeKey::new("onmousemove"),
-							OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
-						),
-						(
-							AttributeKey::new("onclick"),
-							ExprIdx(1u32)
-						)
-					])
-				)]}
-			)}
+			quote! {
+				(
+					BeetRoot,
+					InstanceRoot,
+					MacroIdx {
+						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),
+						start: LineCol { line: 1u32, col: 0u32 }
+					},
+					FragmentNode,
+					related! {
+						Children[(
+							ExprIdx(0u32),
+							NodeTag(String::from("span")),
+							ElementNode { self_closing: true },
+							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
+							related!(Attributes[
+								AttributeKey::new("hidden"),
+								(
+									AttributeKey::new("class"),
+									OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
+								),
+								(
+									AttributeKey::new("onmousemove"),
+									OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
+								),
+								(
+									AttributeKey::new("onclick"),
+									OnSpawnTemplate::new_insert(
+										#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_attribute_bundle()
+									),
+									ExprIdx(1u32)
+								)
+							])
+						)]
+					}
+				)
+			}
 			.to_string(),
 		);
 	}

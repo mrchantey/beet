@@ -31,7 +31,6 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	// TODO fine-grained loading with watcher
 
 	// TODO store this in a resource for hooking up with fine-grained loading
-
 	let mut snippet_entity_map = Default::default();
 	for file in files {
 		let file = ReadFile::to_string(file)?;
@@ -95,10 +94,12 @@ pub(super) fn apply_rsx_snippets(
 		let mut instance_expr_map = HashMap::new();
 
 		for child in children.iter_descendants_inclusive(instance_root) {
+			// onspawntemplate in block node position
 			if let Ok((idx, mut template)) = on_spawn_templates.get_mut(child) {
 				instance_expr_map.insert(*idx, template.take());
 			}
 			for attr in attributes.iter_direct_descendants(child) {
+				// onspawntemplate in attribute position
 				if let Ok((idx, mut template)) =
 					on_spawn_templates.get_mut(attr)
 				{
@@ -331,6 +332,17 @@ mod test {
 		.xpect()
 		.to_be("<div><span key=\"7\"></span><br/></div>");
 	}
+	#[test]
+	fn events() {
+		// didnt panic
+		parse(
+			rsx! {<main onclick={||{}}/>},
+			rsx! {<main oninput={||{}}/>},
+		)
+		.xpect()
+		.to_be("<main oninput/>");
+	}
+
 	#[test]
 	fn attribute_blocks() {
 		#[derive(Buildable, AttributeBlock)]

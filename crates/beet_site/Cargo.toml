@@ -13,11 +13,11 @@ categories.workspace = true
 keywords.workspace = true
 
 
-# the beet cli uses 'client' and 'deploy' to build
-# the client and lambda binaries
 [features]
 default = ["beet/web-server", "beet/openssl"]
+# used by beet cli for building prod server
 deploy = ["beet/web-server", "beet/lambda"]
+# used by beet cli for building client
 client = ["beet/web-client"]
 
 [dependencies]
@@ -25,11 +25,7 @@ anyhow.workspace = true
 serde.workspace = true
 beet.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet = { workspace = true, features = ["web-server"] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-beet = { workspace = true, features = ["web-client"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]

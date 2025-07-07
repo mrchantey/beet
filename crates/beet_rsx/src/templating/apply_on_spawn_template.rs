@@ -10,6 +10,7 @@ pub fn apply_on_spawn_template(
 	roots: Populated<Entity, Added<InstanceRoot>>,
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
+	event_attrs: Query<&AttributeKey, Without<AttributeLit>>,
 	mut query: Query<(Entity, &mut OnSpawnTemplate), Added<OnSpawnTemplate>>,
 ) -> Result {
 	for root in roots.iter() {
@@ -22,9 +23,19 @@ pub fn apply_on_spawn_template(
 			// only elements, not templates, will have attributes
 			for attr in attributes.iter_direct_descendants(entity) {
 				if let Ok((attr_entity, mut on_spawn)) = query.get_mut(attr) {
-					// println!("Running onspawn for attribute");
 					commands.entity(attr_entity).remove::<OnSpawnTemplate>();
-					on_spawn.take().call(commands.entity(attr_entity))?;
+					match event_attrs.get(attr_entity) {
+						Ok(event_key) if event_key.starts_with("on") => {
+							// event attributes are an EntityObserver which should
+							// be applied to the element not the attribute entity
+							on_spawn.take().call(commands.entity(entity))?;
+						}
+						_ => {
+							on_spawn
+								.take()
+								.call(commands.entity(attr_entity))?;
+						}
+					}
 				}
 			}
 		}

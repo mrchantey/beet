@@ -2,7 +2,7 @@ use beet::prelude::*;
 use beet_site::prelude::*;
 
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "client"))]
 fn main() -> Result {
 	AppRouter::default()
 		.add_plugins((
@@ -14,7 +14,7 @@ fn main() -> Result {
 		.run()
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "client")]
 fn main() {
 	App::new()
 		.add_plugins((TemplatePlugin, ClientIslandPlugin))

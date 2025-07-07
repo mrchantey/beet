@@ -8,6 +8,16 @@
 package_name = "beet_site"
 output = "crates/beet_site/src/codegen/mod.rs"
 
+
+[workspace.filter]
+include = [
+	"*/crates/beet_design/src/**/*",
+	"*/crates/beet_site/src/**/*",
+	"*/crates/beet_router/src/test_site/**/*",
+]
+exclude = ["*/target/*", "*/.cache/*", "*/node_modules/*"]
+
+
 [[route_codegen.collection]]
 name = "pages"
 package_name = "beet_site"
