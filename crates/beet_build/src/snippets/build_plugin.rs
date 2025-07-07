@@ -104,7 +104,6 @@ impl Plugin for BuildPlugin {
 			.add_plugins((
 				NodeTypesPlugin,
 				ParseRsxTokensPlugin::default(),
-				SnippetsPlugin::default(),
 				RouteCodegenPlugin::default(),
 				// ClientIslandCodegenPlugin::default(),
 			))
@@ -140,6 +139,17 @@ impl Plugin for BuildPlugin {
 						.before(ProcessChangedSnippets),
 					// compile and export steps
 					(
+						extract_lang_snippets,
+						#[cfg(feature = "css")]
+						parse_lightning,
+					)
+						.chain()
+						.in_set(ProcessChangedSnippets)
+						.run_if(BuildFlags::should_run(BuildFlag::Snippets)),
+					(
+						export_snippets.run_if(BuildFlags::should_run(
+							BuildFlag::Snippets,
+						)),
 						export_route_codegen
 							.run_if(BuildFlags::should_run(BuildFlag::Routes)),
 						compile_server.run_if(BuildFlags::should_run(
