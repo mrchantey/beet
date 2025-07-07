@@ -95,13 +95,14 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 					.add_observers(true);
 			});
 		world.entity_mut(instance_root).insert(InstanceRoot);
+		let tokens = tokenize_bundle(world, instance_root)?;
+		world.entity_mut(instance_root).despawn();
 
 		// let foo = world
 		// 	.component_names_related::<Children>(instance_root)
 		// 	.iter_to_string_indented();
 		// println!("Children of instance root: \n{}", foo);
 
-		let tokens = tokenize_bundle(world, instance_root)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
 			.entity_mut(entity)
