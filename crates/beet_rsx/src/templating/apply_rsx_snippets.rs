@@ -78,14 +78,20 @@ pub(super) fn apply_rsx_snippets(
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
-	for (instance_root, snippet_root, idx) in
-		instances.iter().filter_map(|(instance, idx)| {
-			rsx_snippets
-				.iter()
-				.find(|(_, snippet_root_idx)| *snippet_root_idx == idx)
-				.map(|(rsx_snippets, idx)| (instance, rsx_snippets, idx))
-		}) {
-		trace!("Applying snippets for {}", idx);
+	for (instance_root, snippet_root, macro_idx) in
+		instances
+			.iter()
+			.filter_map(|(instance, instance_macro_idx)| {
+				rsx_snippets
+					.iter()
+					.find(|(_, snippet_macro_idx)| {
+						*snippet_macro_idx == instance_macro_idx
+					})
+					.map(|(rsx_snippets, macro_idx)| {
+						(instance, rsx_snippets, macro_idx)
+					})
+			}) {
+		trace!("Applying snippets for {} at {}", instance_root, macro_idx);
 
 		// take all [`OnSpawnTemplate`] methods from the instance,
 		// then entirely clear it.
@@ -95,15 +101,15 @@ pub(super) fn apply_rsx_snippets(
 
 		for child in children.iter_descendants_inclusive(instance_root) {
 			// onspawntemplate in block node position
-			if let Ok((idx, mut template)) = on_spawn_templates.get_mut(child) {
-				instance_expr_map.insert(*idx, template.take());
+			if let Ok((idx, mut on_spawn)) = on_spawn_templates.get_mut(child) {
+				instance_expr_map.insert(*idx, on_spawn.take());
 			}
 			for attr in attributes.iter_direct_descendants(child) {
 				// onspawntemplate in attribute position
-				if let Ok((idx, mut template)) =
+				if let Ok((idx, mut on_spawn)) =
 					on_spawn_templates.get_mut(attr)
 				{
-					instance_expr_map.insert(*idx, template.take());
+					instance_expr_map.insert(*idx, on_spawn.take());
 				}
 			}
 		}
@@ -160,7 +166,7 @@ pub(super) fn apply_rsx_snippets(
 		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
 			apply_template_locations,
-			(idx.clone(), instance_root, instance_expr_map),
+			(macro_idx.clone(), instance_root, instance_expr_map),
 		);
 	}
 	for (entity, _) in instances.iter() {
@@ -456,6 +462,4 @@ mod test {
 			.xpect()
 			.to_be("<main><span/></main>");
 	}
-
-
 }

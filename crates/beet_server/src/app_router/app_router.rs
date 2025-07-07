@@ -80,7 +80,8 @@ impl Default for AppRouter<AppRouterState> {
 }
 
 impl AppRouter<AppRouterState> {
-	/// The default app router parses cli arguments which is not desired in tests.
+	/// The default app router parses cli arguments, trying to consume
+	/// test args if present
 	pub fn test() -> Self {
 		Self {
 			router: default(),
@@ -89,7 +90,10 @@ impl AppRouter<AppRouterState> {
 			tracing: Level::WARN,
 			args: default(),
 		}
-		.add_bevy_plugins(|app: &mut App| {
+		.set_bevy_plugins(|app: &mut App| {
+			// usually we dont want to load snippets in tests,
+			// but this can be overridden by calling set_bevy_plugins
+			// later
 			app.insert_resource(TemplateFlags::None);
 		})
 	}
@@ -140,7 +144,7 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		plugin.add_to_router(&mut self);
 		self
 	}
-	pub fn add_bevy_plugins<M>(
+	pub fn set_bevy_plugins<M>(
 		mut self,
 		plugins: impl 'static + Clone + Send + Sync + Plugins<M>,
 	) -> Self {
