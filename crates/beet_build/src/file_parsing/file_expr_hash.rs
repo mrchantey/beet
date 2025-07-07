@@ -190,11 +190,11 @@ mod test {
 			.to_be(hash(rsx_tokens! {<div>{2}</div>}));
 		// diff num
 		expect(hash(rsx_tokens! {<div>foo </div>}))
-		.not()
-		.to_be(hash(rsx_tokens! {<div>bar {2}</div>}));
+			.not()
+			.to_be(hash(rsx_tokens! {<div>bar {2}</div>}));
 	}
 	#[test]
-	fn combinator_blocks() {
+	fn combinator() {
 		//same
 		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
 			.to_be(hash(rsx_combinator_tokens! {"<div>{1}</div>"}));
@@ -206,6 +206,10 @@ mod test {
 		expect(hash(rsx_combinator_tokens! {"<div></div>"}))
 			.not()
 			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));
+		// diff attribute
+		expect(hash(rsx_combinator_tokens! {"<div foo={let a = 2;a}/>"}))
+			.not()
+			.to_be(hash(rsx_combinator_tokens! {"<div foo={let a = 3;a}/>"}));
 	}
 	#[test]
 	fn templates() {

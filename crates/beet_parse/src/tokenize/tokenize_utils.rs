@@ -1,29 +1,9 @@
-use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
-
-/// Gets the first 'expression' for an attribute, searching in the following order:
-/// - [`NodeExpr`]
-/// - [`tokenize_combinator_exprs`]
-pub fn first_attribute_expr(
-	world: &World,
-	attr_entity: Entity,
-) -> Result<Option<NodeExpr>> {
-	if let Some(attr) =world.entity(attr_entity).get::<NodeExpr>()
-	{
-		Ok(Some(attr.clone()))
-	} else if let Some(expr) =	
-		tokenize_combinator_exprs_mapped(world, attr_entity,tokenize_bundle)?
-	{
-	Ok(Some(expr))
-	} else {
-		Ok(None)
-	}
-}
 
 
 /// bundle impl limit

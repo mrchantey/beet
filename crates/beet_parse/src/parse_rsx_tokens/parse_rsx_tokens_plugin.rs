@@ -23,9 +23,14 @@ impl Plugin for ParseRsxTokensPlugin {
 			)
 			.add_systems(
 				Update,
-				(parse_combinator_tokens, parse_rstml_tokens)
-					.in_set(ParseRsxTokensSet)
-					.before(ExtractDirectivesSet),
+				(
+					(parse_combinator_tokens, parse_rstml_tokens)
+						.in_set(ParseRsxTokensSet)
+						.before(ExtractDirectivesSet),
+					collapse_combinator_exprs
+						.in_set(ParseRsxTokensSet)
+						.after(ExtractDirectivesSet),
+				),
 			)
 			.add_plugins((
 				extract_rsx_directives_plugin,

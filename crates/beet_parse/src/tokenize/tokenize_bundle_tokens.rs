@@ -19,7 +19,6 @@ pub fn tokenize_bundle_tokens(
 	tokenize_web_nodes(world, &mut items, entity)?;
 	tokenize_web_directives(world, &mut items, entity)?;
 	tokenize_node_exprs_tokens(world, &mut items, entity)?;
-	tokenize_combinator_exprs_tokens(world,&mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
 	
@@ -36,17 +35,6 @@ fn tokenize_node_exprs_tokens(
 	}
 	Ok(())
 }
-fn tokenize_combinator_exprs_tokens(
-	world: &World,
-		items: &mut Vec<TokenStream>,
-	entity: Entity,
-) -> Result<()> {
-	if let Some(expr) = tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle_tokens)?{
-		items.push(expr.self_token_stream());
-	}
-	Ok(())
-}
-
 
 fn tokenize_attribute_tokens(
 	world: &World,
@@ -63,10 +51,6 @@ fn tokenize_attribute_tokens(
 	if let Some(attr_expr) = entity.get::<NodeExpr>() {
 		items.push(attr_expr.self_token_stream());
 	}
-	let attr_entity = entity.id();
-	// we dont care if its an attr block, just self tokenizing
-	tokenize_combinator_exprs_tokens(world,&mut items, attr_entity)?;
-
 	unbounded_bundle(items).xok()
 }
 
@@ -350,34 +334,39 @@ mod test {
 								start: LineCol { line: 1u32, col: 0u32 }
 							},
 							FragmentNode,
-							related! { Children[
-								(
-									NodeTag(String::from("br")),
-									ElementNode { self_closing: true },
-									related! {
-										Attributes[
-											(
-												AttributeKey(String::from("foo")),
-												NodeExpr(SendWrapper::new(syn::parse_quote!({
-													let class = "bar";
-													(
-														NodeTag(String::from("div")),
-														ElementNode { self_closing: true },
-														related! {
-															Attributes[
-																(
-																	AttributeKey(String::from("class")),
-																	NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
-																)
-															]
-														}
-													)
-												})))
-											)
-										]
-									}
-								)
-							]}
+							related! {
+								Children[
+									(
+										NodeTag(String::from("br")),
+										ElementNode { self_closing: true },
+										related! {
+											Attributes[
+												(
+													AttributeKey(String::from("foo")),
+													NodeExpr(SendWrapper::new(syn::parse_quote!({
+														let class = "bar";
+														(
+															NodeTag(String::from("div")),
+															ElementNode { self_closing: true },
+															related!(
+																Attributes[
+																	(
+																		AttributeKey::new("class"),
+																		OnSpawnTemplate::new_insert(
+																			#[allow(unused_braces)] { class }.into_attribute_bundle()
+																		),
+																		ExprIdx(1u32)
+																	)
+																]
+															)
+														)
+													})))
+												)
+											]
+										}
+									)
+								]
+							}
 						)
 					}
 			.to_string().replace(" ", "")

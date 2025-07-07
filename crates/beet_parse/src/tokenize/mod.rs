@@ -9,8 +9,6 @@ mod tokenize_rstml;
 pub use tokenize_rstml::*;
 mod tokenize_template;
 pub use tokenize_template::*;
-mod tokenize_expr;
-pub use tokenize_expr::*;
 mod tokenize_bundle_tokens;
 pub use tokenize_bundle_tokens::*;
 mod tokenize_bundle;

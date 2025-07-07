@@ -20,7 +20,6 @@ pub fn tokenize_bundle(
 	tokenize_element_attributes(world,&mut items, entity)?;
 	tokenize_template(world,&mut items, entity)?;
 	tokenize_node_exprs(world,&mut items, entity)?;
-	tokenize_combinator_exprs(world,&mut items, entity)?;
 	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
 	items
 		.xmap(unbounded_bundle)
@@ -34,18 +33,6 @@ fn tokenize_node_exprs(
 ) -> Result<()> {
 	if let Some(block) = world.entity(entity).get::<NodeExpr>() {
 		items.push(block.node_bundle_tokens());
-	}
-	Ok(())
-}
-fn tokenize_combinator_exprs(
-	world: &World,
-	items: &mut Vec<TokenStream>,
-	entity: Entity,
-) -> Result<()> {
-	if let Some(expr) =
-		tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle)?
-	{
-		items.push(expr.node_bundle_tokens());
 	}
 	Ok(())
 }

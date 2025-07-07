@@ -1,3 +1,4 @@
+use crate::prelude::NodeExpr;
 use crate::tokenize::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
@@ -24,18 +25,19 @@ pub fn tokenize_element_attributes(
 				},
 			);
 
-			let value = first_attribute_expr(world, attr_entity)?;
-
+			let value = world.entity(attr_entity).get::<NodeExpr>().cloned();
 
 			let mut attr_components = Vec::new();
 			match (key, value) {
 				// 1. Key with value
-				(Some((key_str, key)), Some(mut value))
-				=>
-				{
-					if is_event(&key_str, &value){
+				(Some((key_str, key)), Some(mut value)) => {
+					if is_event(&key_str, &value) {
 						// event syntax sugar (inferred trigger types)
-						tokenize_event_handler(&key_str, key.span(), &mut value)?;
+						tokenize_event_handler(
+							&key_str,
+							key.span(),
+							&mut value,
+						)?;
 					}
 					attr_components.push(quote! {AttributeKey::new(#key)});
 					attr_components.push(value.attribute_bundle_tokens());

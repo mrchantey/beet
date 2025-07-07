@@ -32,7 +32,7 @@ pub fn tokenize_template(
 				},
 			);
 
-			let value = first_attribute_expr(world, attr_entity)?;
+			let value = world.entity(attr_entity).get::<NodeExpr>().cloned();
 
 			match (key, value) {
 				// 1: Events

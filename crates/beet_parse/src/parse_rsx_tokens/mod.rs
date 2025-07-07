@@ -8,3 +8,5 @@ mod collected_elements;
 pub use collected_elements::*;
 mod parse_rstml_tokens;
 pub use parse_rstml_tokens::*;
+mod combinator_expr;
+pub use combinator_expr::*;
