@@ -33,9 +33,10 @@ pub(crate) fn compile_server(
 pub fn export_server_ssg(
 	_query: Populated<(), Changed<SourceFileRoot>>,
 	cmd: When<Res<CargoBuildCmd>>,
+	manifest: When<Res<CargoManifest>>,
 ) -> Result {
 	// run once to export static
-	let exe_path = cmd.exe_path();
+	let exe_path = cmd.exe_path(manifest.package_name());
 	debug!(
 		"Running native binary to generate static files \nExecuting {}",
 		exe_path.display()
@@ -65,12 +66,13 @@ pub(crate) fn run_server(
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
 	mut handle: ResMut<ServerHandle>,
 	cmd: When<Res<CargoBuildCmd>>,
+	manifest: When<Res<CargoManifest>>,
 ) -> Result {
 	if let Some(child) = &mut handle.0 {
 		child.kill()?;
 	}
 	// run once to export static
-	let exe_path = cmd.exe_path();
+	let exe_path = cmd.exe_path(manifest.package_name());
 	debug!(
 		"Running native binary to generate static files \nExecuting {}",
 		exe_path.display()

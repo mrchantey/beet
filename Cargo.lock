@@ -786,6 +786,7 @@ dependencies = [
  "beet_rsx",
  "beet_utils",
  "bevy",
+ "cargo-manifest",
  "flume",
  "futures",
  "heck 0.4.1",
@@ -1046,7 +1047,7 @@ name = "beet_query"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_net",
  "beet_query_macros",
  "beet_utils",
@@ -2672,6 +2673,17 @@ dependencies = [
  "serde_json",
  "serde_plain",
  "tracing",
+]
+
+[[package]]
+name = "cargo-manifest"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d8af896b707212cd0e99c112a78c9497dd32994192a463ed2f7419d29bd8c6"
+dependencies = [
+ "serde",
+ "thiserror 2.0.12",
+ "toml",
 ]
 
 [[package]]
@@ -7358,7 +7370,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8896,6 +8908,7 @@ version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
+ "indexmap 2.9.0",
  "serde",
  "serde_spanned",
  "toml_datetime",

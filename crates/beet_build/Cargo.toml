@@ -62,6 +62,7 @@ serde_json.workspace = true
 
 #💡 Parsing
 prettyplease.workspace = true
+cargo-manifest = "0.19"
 pulldown-cmark = { version = "0.13", optional = true }
 
 #💡 style

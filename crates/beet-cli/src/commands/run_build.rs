@@ -20,7 +20,7 @@ pub struct RunBuild {
 	#[arg(long = "static")]
 	pub(crate) r#static: bool,
 	/// Only execute the provided build steps,
-	/// options are `routes`, `static-scene`, `client-islands`
+	/// options are "routes", "snippets", "client-islands", "compile-server", "export-ssg", "compile-wasm", "run-server"
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
 }

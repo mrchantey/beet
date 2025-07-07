@@ -6,8 +6,10 @@ use beet_fs::process::WatchEvent;
 use beet_parse::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
+use cargo_manifest::Manifest;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 
@@ -18,13 +20,30 @@ pub struct BuildConfig {
 	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
 	pub client_island_codegen: CollectClientIslands,
+	/// The path to the Cargo.toml file, defaults to `Cargo.toml`
+	#[serde(default = "default_manifest_path")]
+	manifest_path: PathBuf,
 }
 
 
+#[derive(Resource, Deref)]
+pub struct CargoManifest(Manifest);
+
+impl CargoManifest {
+	pub fn package_name(&self) -> Option<&str> {
+		self.0.package.as_ref().map(|p| p.name.as_str())
+	}
+}
+
+fn default_manifest_path() -> PathBuf { PathBuf::from("Cargo.toml") }
+
 impl NonSendPlugin for BuildConfig {
 	fn build(self, app: &mut App) {
+		let manifest = Manifest::from_path(self.manifest_path).unwrap();
+
 		app.add_non_send_plugin(self.route_codegen)
-			.add_plugins(self.template_config);
+			.add_plugins(self.template_config)
+			.insert_resource(CargoManifest(manifest));
 		app.world_mut().spawn(self.client_island_codegen);
 	}
 }

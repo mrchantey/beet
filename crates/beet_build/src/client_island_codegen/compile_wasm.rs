@@ -12,11 +12,12 @@ pub fn compile_wasm(
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
 	html_constants: When<Res<HtmlConstants>>,
 	cmd: When<Res<CargoBuildCmd>>,
+	manifest: When<Res<CargoManifest>>,
 	config: When<Res<WorkspaceConfig>>,
 ) -> Result {
 	let mut cmd = cmd.clone();
 	cmd.target = Some("wasm32-unknown-unknown".to_string());
-	let exe_path = cmd.exe_path();
+	let exe_path = cmd.exe_path(manifest.package_name());
 
 	debug!("Compiling wasm binary");
 	cmd.spawn()?;

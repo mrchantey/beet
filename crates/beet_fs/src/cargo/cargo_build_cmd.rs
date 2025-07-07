@@ -1,8 +1,8 @@
 use anyhow::Result;
+use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
-use bevy::prelude::*;
 
 /// Verbatim clone of cargo build/run args
 #[derive(Debug, Clone, Parser)]
@@ -108,8 +108,13 @@ impl Default for CargoBuildCmd {
 
 impl CargoBuildCmd {
 	/// Best effort attempt to retrieve the path to the executable.
+	/// For packages, binaries and examples that name is used to resolve the
+	/// executable name, otherwise the crate name is used.
 	/// In the case of a wasm target, the path will have a `.wasm` extension.
-	pub fn exe_path(&self) -> PathBuf {
+	/// ## Panics
+	///
+	/// Panics if no crate name provided and no package, bin or example is set.
+	pub fn exe_path(&self, crate_name: Option<&str>) -> PathBuf {
 		let target_dir = std::env::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".to_string());
 		let mut path = PathBuf::from(target_dir);
@@ -130,9 +135,14 @@ impl CargoBuildCmd {
 		// package examples are not nested under package name
 		} else if let Some(pkg) = &self.package {
 			path.push(pkg);
-		}
-		if let Some(bin) = &self.bin {
+		} else if let Some(bin) = &self.bin {
 			path.push(bin);
+		} else if let Some(crate_name) = crate_name {
+			path.push(crate_name);
+		} else {
+			panic!(
+				"No crate name provided and no package, bin or example is set."
+			);
 		}
 
 		if let Some("wasm32-unknown-unknown") = self.target.as_deref() {
