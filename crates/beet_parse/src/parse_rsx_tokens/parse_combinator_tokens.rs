@@ -257,6 +257,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					}
 					RsxAttributeValue::Element(value) => {
 						let id = entity.id();
+						// get ExprIdx before evaluating element
 						let expr_id = self.expr_idx.next();
 						let child = self.rsx_element(value)?;
 						self.commands.entity(id).insert((

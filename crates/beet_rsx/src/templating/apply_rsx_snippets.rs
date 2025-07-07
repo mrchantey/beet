@@ -317,6 +317,16 @@ mod test {
 		.to_be("<div><span>7</span><br/></div>");
 	}
 	#[test]
+	fn combinator_block_nodes() {
+		parse(
+			rsx_combinator! {"<main>{7}</main>"},
+			// because ExprIdx matches, this should be replace with 7
+			rsx_combinator! {"<div><span>{()}</span><br/></div>"},
+		)
+		.xpect()
+		.to_be("<div><span>7</span><br/></div>");
+	}
+	#[test]
 	fn iterators() {
 		parse(
 			rsx! {<main>{["a","b","c"]}</main>},

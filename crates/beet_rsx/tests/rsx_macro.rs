@@ -10,10 +10,7 @@ use sweet::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn rsx_macro() {
-	use bevy::ecs::system::RunSystemOnce;
-
 	let (get, set) = signal(String::new());
-
 
 	let mut app = App::new();
 	let button = app
@@ -22,7 +19,7 @@ fn rsx_macro() {
 		.get::<Children>()
 		.unwrap()[0];
 	app.world_mut()
-		.run_system_once(apply_snippets_to_instances)
+		.run_system_cached(apply_snippets_to_instances)
 		.unwrap()
 		.unwrap();
 	app.world_mut()
