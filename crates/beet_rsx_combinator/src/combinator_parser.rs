@@ -24,10 +24,13 @@ impl CombinatorParser {
 	/// ```
 	///
 	pub fn parse<'a>(
-		s: &'a str,
+		tokens: &'a str,
 	) -> Result<RsxChildren, CombinatorParserError<'a>> {
+		if tokens.is_empty() {
+			return Ok(RsxChildren::default());
+		}
 		let (children, remaining) =
-			parser(rsx_children).skip(parser(js_whitespace)).parse(s)?;
+			parser(rsx_children).skip(parser(js_whitespace)).parse(tokens)?;
 		if !remaining.trim().is_empty() {
 			return Err(CombinatorParserError::RemainingText(remaining));
 		}
@@ -56,6 +59,14 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
+	#[test]
+	pub fn empty() {
+		CombinatorParser::parse("")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("");
+	}
 	#[test]
 	pub fn top_level_expression() {
 		CombinatorParser::parse("let a = <br/>; a")
