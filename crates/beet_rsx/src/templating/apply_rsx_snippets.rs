@@ -4,7 +4,7 @@ use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-/// Load static scene if it exists.
+/// Load snippet scene if it exists.
 // temp whole file until fine-grained loading is implemented
 #[cfg(feature = "serde")]
 pub fn load_all_file_snippets(world: &mut World) -> Result {
@@ -78,14 +78,14 @@ pub(super) fn apply_rsx_snippets(
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
-	for (instance_root, static_root, idx) in
+	for (instance_root, snippet_root, idx) in
 		instances.iter().filter_map(|(instance, idx)| {
 			rsx_snippets
 				.iter()
-				.find(|(_, static_idx)| *static_idx == idx)
+				.find(|(_, snippet_root_idx)| *snippet_root_idx == idx)
 				.map(|(rsx_snippets, idx)| (instance, rsx_snippets, idx))
 		}) {
-		trace!("Applying static nodes for{}", idx);
+		trace!("Applying snippets for {}", idx);
 
 		// take all [`OnSpawnTemplate`] methods from the instance,
 		// then entirely clear it.
@@ -139,9 +139,9 @@ pub(super) fn apply_rsx_snippets(
 				TemplateOf,
 			)>();
 
-		// apply the static tree
+		// apply the snippet tree
 		commands
-			.entity(static_root)
+			.entity(snippet_root)
 			.clone_with(instance_root, |builder| {
 				builder
 					.deny::<(BeetRoot, RsxSnippetRoot)>()
@@ -149,7 +149,7 @@ pub(super) fn apply_rsx_snippets(
 					.add_observers(true);
 			});
 
-		// if the static root is a ChildOf that would override the instance,
+		// if the snippet root is a ChildOf that would override the instance,
 		// we need to reapply it.
 		if let Ok(child_of) = deny_root.get(instance_root) {
 			if let Some(child_of) = child_of {
@@ -182,21 +182,21 @@ fn apply_template_locations(
 	expr_idxs: Query<&ExprIdx>,
 	templates: Query<&TemplateNode>,
 ) {
-	let all_keys = instance_exprs.keys().cloned().collect::<Vec<_>>();
-	let mut taken_keys = Vec::new();
+	let instance_keys = instance_exprs.keys().cloned().collect::<Vec<_>>();
+	let mut consumed_keys = Vec::new();
 	let mut get_on_spawn = |idx: &ExprIdx| {
 		let out = instance_exprs.remove(idx).unwrap_or_else(|| {
 			panic!(
 				"
-				Error resolving static node for macro at {macro_idx}
-				The instance is missing an ExprIdx found in the static tree.
+				Error resolving rsx snippet for macro at {macro_idx}
+				The instance is missing an ExprIdx found in the snippet.
 				Expected idx: 	{idx}
-				Instance idxs: 	{all_keys:?}
-				Taken idxs: 		{taken_keys:?}
+				Instance idxs: 	{instance_keys:?}
+				Consumed idxs: 		{consumed_keys:?}
 				"
 			);
 		});
-		taken_keys.push(idx.clone());
+		consumed_keys.push(idx.clone());
 		out
 	};
 
@@ -206,7 +206,7 @@ fn apply_template_locations(
 		}
 		// an instance template node does not have attributes,
 		// they are instead applied as props.
-		// but a static template node does, we can ignore them
+		// but a snippet template node does, we can ignore them
 		let is_template = templates.get(child).is_ok();
 		if !is_template {
 			for attr in attributes.iter_direct_descendants(child) {
@@ -219,11 +219,11 @@ fn apply_template_locations(
 	if !instance_exprs.is_empty() {
 		panic!(
 			"
-Error resolving static node for macro at {macro_idx}
+Error resolving rsx snippet for macro at {macro_idx}
 Not all ExprIdx were applied.
-The static tree is missing the following idxs found in the instance: {:?}
-All idxs: 		{all_keys:?}
-Taken idxs: 	{taken_keys:?}
+The rsx snippet is missing the following idxs found in the instance: {:?}
+Instance idxs: 	{instance_keys:?}
+Consumed idxs: 	{consumed_keys:?}
 ",
 			instance_exprs.keys(),
 		);
@@ -249,7 +249,7 @@ mod test {
 		let main = world.entity(parent).get::<Children>().unwrap()[0];
 		world.entity_mut(main).add_child(child);
 
-		let _tree = world
+		let _snippet = world
 			.spawn((rsx! {<span/>}, RsxSnippetRoot))
 			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
@@ -275,7 +275,7 @@ mod test {
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
-		let _tree = world
+		let _snippet = world
 			.spawn((RsxSnippetRoot, rsx_snippet))
 			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
@@ -335,12 +335,9 @@ mod test {
 	#[test]
 	fn events() {
 		// didnt panic
-		parse(
-			rsx! {<main onclick={||{}}/>},
-			rsx! {<main oninput={||{}}/>},
-		)
-		.xpect()
-		.to_be("<main oninput/>");
+		parse(rsx! {<main onclick={||{}}/>}, rsx! {<main oninput={||{}}/>})
+			.xpect()
+			.to_be("<main oninput/>");
 	}
 
 	#[test]

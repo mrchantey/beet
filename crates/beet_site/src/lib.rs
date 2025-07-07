@@ -8,13 +8,13 @@ pub mod layouts;
 // doesnt have to be wasm, but at least not run when compiling server
 // because stale references
 #[path = "codegen/client_islands.rs"]
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "client")]
 pub mod client_islands;
 
 pub use codegen::actions;
 
 pub mod prelude {
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(feature = "client")]
 	pub use super::client_islands::*;
 	pub use super::codegen::actions;
 	pub use super::codegen::actions::ActionsPlugin;
