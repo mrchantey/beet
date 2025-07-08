@@ -106,7 +106,7 @@ pub fn collect_route_files(
 		};
 
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(not(feature = "client"))]
 			impl #router_plugin_ident {
 				#default_meta
 			}
@@ -116,7 +116,7 @@ pub fn collect_route_files(
 		let is_static = collection.category.include_in_route_tree();
 
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(not(feature = "client"))]
 			impl RouterPlugin for #router_plugin_ident {
 				type State = #router_state_type;
 				type Meta = #meta_ty;
@@ -188,9 +188,9 @@ mod test {
 				pub mod route0;
 				#[derive(Debug, Default, Clone)]
 				pub struct TestDocsPlugin;
-				#[cfg(not(target_arch = "wasm32"))]
+				#[cfg(not(feature = "client"))]
 				impl TestDocsPlugin {}
-				#[cfg(not(target_arch = "wasm32"))]
+				#[cfg(not(feature = "client"))]
 				impl RouterPlugin for TestDocsPlugin {
 					type State = AppRouterState;
 					type Meta = ();

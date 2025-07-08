@@ -49,10 +49,10 @@ impl RouteFile {
 	pub fn item_mod(&self, category: RouteCollectionCategory) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
-		let target: Option<Attribute> = match category {
+		let cfg: Option<Attribute> = match category {
 			RouteCollectionCategory::Pages => None,
 			RouteCollectionCategory::Actions => Some(parse_quote! {
-				#[cfg(not(target_arch = "wasm32"))]
+				#[cfg(not(feature = "client"))]
 			}),
 		};
 
@@ -60,7 +60,7 @@ impl RouteFile {
 		// this may change if we go for bevy reflect instead
 		syn::parse_quote! {
 			#[path = #path]
-			#target
+			#cfg
 			pub mod #ident;
 		}
 	}

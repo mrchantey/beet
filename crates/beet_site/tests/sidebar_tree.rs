@@ -8,8 +8,8 @@ use sweet::prelude::*;
 async fn works() {
 	let sidebar_tree =
 		route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
-	sidebar_tree[0].display_name.xref().xpect().to_be("Actions");
-	sidebar_tree[0].children[0].display_name.xref().xpect().to_be("Testing");
+	sidebar_tree[3].display_name.xref().xpect().to_be("Docs");
+	sidebar_tree[3].children[0].display_name.xref().xpect().to_be("Testing");
 
 	// println!("{:#?}", sidebar_tree);
 }

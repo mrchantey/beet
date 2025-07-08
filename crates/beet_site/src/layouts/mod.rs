@@ -1,6 +1,6 @@
 mod beet_sidebar_layout;
 pub use beet_sidebar_layout::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "client"))]
 mod article_layout;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "client"))]
 pub use article_layout::*;

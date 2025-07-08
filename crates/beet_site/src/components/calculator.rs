@@ -5,15 +5,10 @@ use serde::Serialize;
 #[template]
 #[derive(Serialize, Deserialize)]
 pub fn Calculator(#[field(default = 0)] initial: i32) -> impl Bundle {
+	#[allow(unused)]
 	let (get, set) = signal(initial);
 
-
-	let get2 = get.clone();
 	let onclick = move |_: Trigger<OnClick>| {
-		#[allow(unused)]
-		let set = set.clone();
-		#[allow(unused)]
-		let get = get2.clone();
 		#[cfg(target_arch = "wasm32")]
 		{
 			let val = get();
@@ -30,7 +25,7 @@ pub fn Calculator(#[field(default = 0)] initial: i32) -> impl Bundle {
 		<Button
 			variant=ButtonVariant::Outlined
 			onclick=onclick>
-			Server Cookie Count: {get.clone()}
+			Server Cookie Count: {get}
 		</Button>
 	</div>
 	<style>
