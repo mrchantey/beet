@@ -25,6 +25,7 @@ clap.workspace = true
 tokio.workspace = true
 rapidhash.workspace = true
 bevy.workspace = true
+heck.workspace = true
 
 #💡 Automod
 syn.workspace = true

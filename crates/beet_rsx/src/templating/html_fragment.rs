@@ -117,6 +117,10 @@ impl HtmlBuilder<'_, '_> {
 		if let Ok((element, tag, attributes, children)) =
 			self.elements.get(entity)
 		{
+			if element.self_closing && **tag == "style" {
+				panic!("self closing style tags are not allowed in HTML");
+			}
+
 			html.push_str(&format!("<{}", tag.0));
 			// add attributes
 			if let Some(attrs) = attributes {

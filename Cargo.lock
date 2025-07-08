@@ -743,6 +743,7 @@ dependencies = [
  "beet",
  "bevy",
  "clap",
+ "heck 0.4.1",
  "prettyplease",
  "proc-macro2",
  "quote",

@@ -18,8 +18,11 @@ pub fn apply_lang_snippets(
 		(Added<LangSnippetPath>, Without<LangSnippet>),
 	>,
 ) -> Result {
-	let mut root_content = HashMap::<Entity, HashMap<Entity, String>>::new();
+	// hashmap where key is root ancestor
+	// nested hashmap where key is the LangSnippet entity, value is the content
+	let mut root_snippets = HashMap::<Entity, HashMap<Entity, String>>::new();
 
+	// collect every
 	for (entity, instance_path) in query.iter() {
 		let snippet = match snippets
 			.iter()
@@ -27,6 +30,7 @@ pub fn apply_lang_snippets(
 		{
 			Some(snippet) => snippet,
 			None => {
+				// snippet not found, lazy load?
 				let _file = ReadFile::to_string(instance_path.0.clone())?;
 				todo!("load snippet scene, needs world?");
 			}
@@ -36,30 +40,26 @@ pub fn apply_lang_snippets(
 			.iter_ancestors_inclusive(entity)
 			.find(|e| roots.contains(*e))
 		else {
-			// if no HtmlDocument this must be a StaticNode
+			// if no root HtmlDocument this must be a StaticNode
 			continue;
-			// bevybail!(
-			// 	"NodePortal is not a descendant of a HtmlDocument: {}",
-			// 	node_location.stringify(**portal)
-			// );
 		};
-		root_content
+		root_snippets
 			.entry(root_ancestor)
 			.or_default()
 			.insert(snippet.0, snippet.1.0.clone());
 	}
 
-	for (root, partials) in root_content.into_iter() {
-		for (partial_entity, contents) in partials.into_iter() {
-			// insert as direct child of root
+	for (root, snippets) in root_snippets.into_iter() {
+		for (snippet_entity, contents) in snippets.into_iter() {
 			commands
-				.entity(partial_entity)
-				// just cloning NodeTag and StyleId
+				.entity(snippet_entity)
+				// just cloning NodeTag, StyleId, HoistDirective
 				.clone_and_spawn_with(|builder| {
 					builder
-						.allow::<(NodeTag, StyleId)>()
+						// .allow::<(NodeTag, StyleId)>()
 						.deny::<(LangSnippet, LangSnippetPath)>();
 				})
+				// insert as direct child of root
 				.insert((ChildOf(root), ElementNode::open(), children![
 					TextNode::new(contents)
 				]));
@@ -92,13 +92,13 @@ mod test {
 			path.clone(),
 			HtmlHoistDirective::Body,
 		));
-		let tree = world.spawn((HtmlDocument, path)).id();
+		let instance = world.spawn((HtmlDocument, path)).id();
 		world
 			.run_system_once(super::apply_lang_snippets)
 			.unwrap()
 			.unwrap();
 		world
-			.run_system_once_with(render_fragment, tree)
+			.run_system_once_with(render_fragment, instance)
 			.unwrap()
 			.xpect()
 			.to_be_str("<style>body { color: red; }</style>");
@@ -113,7 +113,7 @@ mod test {
 			LangSnippet::new("body { color: red; }"),
 			path.clone(),
 		));
-		let tree = world
+		let instance = world
 			.spawn((HtmlDocument, children![
 				path.clone(),
 				(InstanceRoot, path)
@@ -124,7 +124,7 @@ mod test {
 			.unwrap()
 			.unwrap();
 		world
-			.run_system_once_with(render_fragment, tree)
+			.run_system_once_with(render_fragment, instance)
 			.unwrap()
 			.xpect()
 			.to_be_str("<style>body { color: red; }</style>");

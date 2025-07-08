@@ -28,6 +28,8 @@ pub struct RunBuild {
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 
 
+
+
 pub enum RunMode {
 	Once,
 	Watch,
@@ -35,12 +37,18 @@ pub enum RunMode {
 
 
 impl RunBuild {
-	pub async fn run(self, run_mode: RunMode) -> Result {
-		let mut app = App::new();
-		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
+	pub fn load_config(&self) -> Result<BuildConfig> {
+		BeetConfigFile::try_load_or_default::<BuildConfig>(
 			self.beet_config.as_deref(),
 		)
-		.unwrap_or_exit();
+		.map_err(|e| bevyhow!("Failed to load beet config: {}", e))
+		.map(|config| config)
+	}
+
+
+	pub async fn run(self, run_mode: RunMode) -> Result {
+		let mut app = App::new();
+		let config = self.load_config().unwrap_or_exit();
 		let cwd = config.template_config.workspace.root_dir.into_abs();
 		let filter = config.template_config.workspace.filter.clone();
 

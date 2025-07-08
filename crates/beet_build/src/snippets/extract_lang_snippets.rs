@@ -98,7 +98,7 @@ pub(super) fn extract_lang_snippets(
 			None
 		};
 
-
+		// this should be a clone instead
 		let mut lang_entity = commands.spawn((
 			tag.clone(),
 			LangSnippet(content),
@@ -116,7 +116,7 @@ pub(super) fn extract_lang_snippets(
 		let lang_entity = lang_entity.id();
 
 		for rsx_entity in rsx_entities.iter() {
-			// these entities are now just portals to the shared content
+			// these entities are now just pointers to the shared content
 			let mut entity = commands.entity(*rsx_entity);
 			entity
 				.remove::<LangContent>()
@@ -221,5 +221,10 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be(&StyleId::new(0));
+		app.world()
+			.entity(entity)
+			.contains::<ElementNode>()
+			.xpect()
+			.to_be_false();
 	}
 }

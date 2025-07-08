@@ -4,6 +4,7 @@ use beet_bevy::prelude::*;
 use beet_common::prelude::*;
 use beet_fs::process::WatchEvent;
 use beet_parse::prelude::*;
+use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
@@ -25,6 +26,14 @@ pub struct BuildConfig {
 	manifest_path: PathBuf,
 }
 
+impl BuildConfig {
+	pub fn load_manifest(&self) -> Result<CargoManifest> {
+		Manifest::from_path(&self.manifest_path)
+			.map_err(|e| bevyhow!("Failed to load Cargo manifest: {}", e))
+			.map(|manifest| CargoManifest(manifest))
+	}
+}
+
 
 #[derive(Resource, Deref)]
 pub struct CargoManifest(Manifest);
@@ -39,11 +48,11 @@ fn default_manifest_path() -> PathBuf { PathBuf::from("Cargo.toml") }
 
 impl NonSendPlugin for BuildConfig {
 	fn build(self, app: &mut App) {
-		let manifest = Manifest::from_path(self.manifest_path).unwrap();
+		let manifest = self.load_manifest().unwrap_or_exit();
 
 		app.add_non_send_plugin(self.route_codegen)
 			.add_plugins(self.template_config)
-			.insert_resource(CargoManifest(manifest));
+			.insert_resource(manifest);
 		app.world_mut().spawn(self.client_island_codegen);
 	}
 }

@@ -115,6 +115,20 @@ impl CargoBuildCmd {
 			self.features = Some(feature);
 		}
 	}
+	/// ## Panics
+	///
+	/// Panics if no crate name provided and no package, bin or example is set.
+	pub fn binary_name(&self, pkg_name: Option<&str>) -> String {
+		if let Some(bin) = &self.bin {
+			bin.clone()
+		} else if let Some(example) = &self.example {
+			example.clone()
+		} else if let Some(pkg_name) = pkg_name {
+			pkg_name.to_string()
+		} else {
+			panic!("No binary or package name provided.");
+		}
+	}
 
 	/// Best effort attempt to retrieve the path to the executable.
 	/// For packages, binaries and examples that name is used to resolve the
@@ -123,7 +137,7 @@ impl CargoBuildCmd {
 	/// ## Panics
 	///
 	/// Panics if no crate name provided and no package, bin or example is set.
-	pub fn exe_path(&self, crate_name: Option<&str>) -> PathBuf {
+	pub fn exe_path(&self, pkg_name: Option<&str>) -> PathBuf {
 		let target_dir = std::env::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".to_string());
 		let mut path = PathBuf::from(target_dir);
@@ -146,8 +160,8 @@ impl CargoBuildCmd {
 			path.push(pkg);
 		} else if let Some(bin) = &self.bin {
 			path.push(bin);
-		} else if let Some(crate_name) = crate_name {
-			path.push(crate_name);
+		} else if let Some(pkg_name) = pkg_name {
+			path.push(pkg_name);
 		} else {
 			panic!(
 				"No crate name provided and no package, bin or example is set."
