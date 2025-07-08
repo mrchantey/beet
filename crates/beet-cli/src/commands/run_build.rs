@@ -46,6 +46,13 @@ impl RunBuild {
 	}
 
 
+	pub fn load_binary_name(&self) -> Result<String> {
+		let config = self.load_config()?;
+		let manifest = config.load_manifest()?;
+		let package_name = manifest.package_name();
+		Ok(self.build_cmd.binary_name(package_name))
+	}
+
 	pub async fn run(self, run_mode: RunMode) -> Result {
 		let mut app = App::new();
 		let config = self.load_config().unwrap_or_exit();

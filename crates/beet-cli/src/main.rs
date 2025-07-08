@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
 
-/// Sweet CLI
+/// 🌱 Beet CLI 🌱
 ///
 /// Various commands for testing and serving files.
 #[derive(Parser)]
@@ -21,7 +21,7 @@ enum SubCommands {
 	Run(RunBuild),
 	Build(RunBuild),
 	Deploy(RunDeploy),
-	Remove(RunRemove),
+	Infra(RunInfra),
 }
 
 #[tokio::main]
@@ -31,6 +31,6 @@ async fn main() -> Result {
 		SubCommands::Build(cmd) => cmd.run(RunMode::Once).await,
 		SubCommands::Run(cmd) => cmd.run(RunMode::Watch).await,
 		SubCommands::Deploy(cmd) => cmd.run().await,
-		SubCommands::Remove(cmd) => cmd.run().await,
+		SubCommands::Infra(cmd) => cmd.run().await,
 	}
 }

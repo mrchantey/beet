@@ -12,19 +12,13 @@ pub struct RunDeploy {
 	#[arg(long)]
 	pub region: Option<String>,
 	/// use a specificed name for the lambda function,
-	/// defaults to the package name
-	#[arg(long)]
-	pub function_name: Option<String>,
+	/// defaults to the package name. This must match sst.aws.Function(..,{name: THIS_FIELD })
 	/// Specify the IAM role that the lambda function should use
 	#[arg(long)]
 	pub iam_role: Option<String>,
 	/// Build but do not deploy
 	#[arg(long)]
 	pub dry_run: bool,
-	/// Also deploy sst infrastructure using a config file
-	/// located at `infra/sst.config.ts`
-	#[arg(long)]
-	pub sst: bool,
 }
 
 
@@ -46,9 +40,6 @@ impl RunDeploy {
 
 		self.lambda_build()?;
 		if !self.dry_run {
-			if self.sst {
-				self.sst_deploy()?;
-			}
 			self.lambda_deploy(&config)?;
 		}
 		Ok(())
@@ -73,36 +64,13 @@ impl RunDeploy {
 		cmd.spawn()?.wait()?.exit_ok()?;
 		Ok(())
 	}
-	fn sst_deploy(&self) -> Result<()> {
-		println!(
-			"🌱 Deploying Infrastructure with SST \
-🌱 Interrupting this step may result in dangling AWS Resources"
-		);
-		Command::new("npx")
-			.arg("sst")
-			.arg("deploy")
-			.arg("--stage")
-			.arg("production")
-			.arg("--config")
-			.arg("infra/sst.config.ts")
-			.spawn()?
-			.wait()?
-			.exit_ok()?
-			.xok()
-	}
 
 	/// Deploy to lambda, using best effort to determine the binary name
 	#[allow(unused)]
-	fn lambda_deploy(&self, config: &BuildConfig) -> Result<()> {
+	fn lambda_deploy(&self, config: &BuildConfig) -> Result {
 		let mut cmd = Command::new("cargo");
 
-		let binary_name = if let Some(bin) = &self.build.build_cmd.bin {
-			Some(bin)
-		} else if let Some(pkg) = &self.build.build_cmd.package {
-			Some(pkg)
-		} else {
-			None
-		};
+		let binary_name = self.build.load_binary_name()?;
 
 		let html_dir = config
 			.template_config
@@ -127,11 +95,9 @@ impl RunDeploy {
 			.arg(&snippets_dir)
 			// this is where sst expects the boostrap to be located
 			.arg("--lambda-dir")
-			.arg("target/lambda/crates");
-
-		if let Some(bin) = &binary_name {
-			cmd.arg("--binary-name").arg(&bin);
-		}
+			.arg("target/lambda/crates")
+			.arg("--binary-name")
+			.arg(&binary_name);
 
 		if let Some(iam_role) = &self.iam_role {
 			cmd.arg("--iam-role").arg(iam_role);
@@ -140,9 +106,8 @@ impl RunDeploy {
 			cmd.arg("--region").arg(region);
 		};
 
-		if let Some(name) = &self.function_name {
-			cmd.arg(name);
-		}
+		let function_name = RunInfra::lambda_func_name(&binary_name);
+		cmd.arg(&function_name);
 
 		// Print the full command before executing
 		let cmd_str = format!(
@@ -152,7 +117,7 @@ impl RunDeploy {
 				.collect::<Vec<_>>()
 				.join(" ")
 		);
-		println!("🌱 Deploying Lambda Binary: {cmd_str}");
+		println!("🌱 Deploying Lambda Binary to {function_name}\n{cmd_str}");
 
 		cmd.spawn()?.wait()?.exit_ok()?;
 
