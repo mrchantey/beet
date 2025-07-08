@@ -1,7 +1,7 @@
 use beet::prelude::*;
 use clap::Parser;
 use heck::ToKebabCase;
-use std::process::Command;
+use tokio::process::Command;
 
 
 
@@ -9,7 +9,7 @@ use std::process::Command;
 #[derive(Parser)]
 pub struct RunInfra {
 	/// The subcommand to run (deploy or remove)
-	#[arg(value_enum)]
+	#[arg(value_enum, default_value = "deploy")]
 	subcommand: SstSubcommand,
 	/// The stage to use
 	#[arg(long)]
@@ -62,6 +62,6 @@ impl RunInfra {
 		println!(
 			"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling AWS Resources"
 		);
-		cmd.spawn()?.wait()?.exit_ok()?.xok()
+		cmd.status().await?.exit_ok()?.xok()
 	}
 }

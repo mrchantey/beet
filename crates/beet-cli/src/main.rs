@@ -22,6 +22,7 @@ enum SubCommands {
 	Build(RunBuild),
 	Deploy(RunDeploy),
 	Infra(RunInfra),
+	New(RunNew),
 }
 
 #[tokio::main]
@@ -32,5 +33,6 @@ async fn main() -> Result {
 		SubCommands::Run(cmd) => cmd.run(RunMode::Watch).await,
 		SubCommands::Deploy(cmd) => cmd.run().await,
 		SubCommands::Infra(cmd) => cmd.run().await,
+		SubCommands::New(cmd) => cmd.run().await,
 	}
 }

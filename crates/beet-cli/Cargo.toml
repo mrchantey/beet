@@ -22,7 +22,7 @@ beet = { workspace = true, features = ["build", "fs", "server"] }
 anyhow.workspace = true
 ron.workspace = true
 clap.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["process"] }
 rapidhash.workspace = true
 bevy.workspace = true
 heck.workspace = true

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 use clap::Parser;
-use std::process::Command;
+use tokio::process::Command;
 
 /// Deploy to AWS Lambda in release mode.
 #[derive(Debug, Parser)]
@@ -38,14 +38,14 @@ impl RunDeploy {
 		)
 		.unwrap_or_exit();
 
-		self.lambda_build()?;
+		self.lambda_build().await?;
 		if !self.dry_run {
-			self.lambda_deploy(&config)?;
+			self.lambda_deploy(&config).await?;
 		}
 		Ok(())
 	}
 
-	fn lambda_build(&self) -> Result<()> {
+	async fn lambda_build(&self) -> Result<()> {
 		let mut cmd = Command::new("cargo");
 		cmd.arg("lambda")
 			.arg("build")
@@ -61,13 +61,12 @@ impl RunDeploy {
 			cmd.arg("--package").arg(pkg);
 		}
 		println!("🌱 Compiling lambda binary");
-		cmd.spawn()?.wait()?.exit_ok()?;
-		Ok(())
+		cmd.status().await?.exit_ok()?.xok()
 	}
 
 	/// Deploy to lambda, using best effort to determine the binary name
 	#[allow(unused)]
-	fn lambda_deploy(&self, config: &BuildConfig) -> Result {
+	async fn lambda_deploy(&self, config: &BuildConfig) -> Result {
 		let mut cmd = Command::new("cargo");
 
 		let binary_name = self.build.load_binary_name()?;
@@ -110,17 +109,8 @@ impl RunDeploy {
 		cmd.arg(&function_name);
 
 		// Print the full command before executing
-		let cmd_str = format!(
-			"cargo {}",
-			cmd.get_args()
-				.map(|a| a.to_string_lossy())
-				.collect::<Vec<_>>()
-				.join(" ")
-		);
-		println!("🌱 Deploying Lambda Binary to {function_name}\n{cmd_str}");
+		println!("🌱 Deploying Lambda Binary to {function_name}\n   {cmd:?}");
 
-		cmd.spawn()?.wait()?.exit_ok()?;
-
-		Ok(())
+		cmd.status().await?.exit_ok()?.xok()
 	}
 }
