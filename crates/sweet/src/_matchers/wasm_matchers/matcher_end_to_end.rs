@@ -1,5 +1,4 @@
 // use anyhow::Result;
-// use beet_web::prelude::*;
 // use web_sys::Document;
 // use web_sys::HtmlIFrameElement;
 

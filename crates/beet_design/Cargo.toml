@@ -25,11 +25,10 @@ _test_lightningcss = ["dep:lightningcss"]
 bevy.workspace = true
 anyhow.workspace = true
 beet_rsx.workspace = true
-beet_core.workspace = true
+beet_core = { workspace = true, features = ["web"] }
 beet_common.workspace = true
 beet_router.workspace = true
 beet_net.workspace = true
-beet_web.workspace = true
 beet_utils.workspace = true
 chrono.workspace = true
 heck.workspace = true

@@ -1,4 +1,4 @@
-use beet_web::prelude::html_escape;
+use beet_core::web::prelude::html_escape;
 
 use crate::prelude::*;
 

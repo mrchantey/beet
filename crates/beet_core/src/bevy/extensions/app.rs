@@ -7,8 +7,8 @@ use extend::ext;
 #[allow(async_fn_in_trait)]
 pub impl App {
 	#[cfg(target_arch = "wasm32")]
-	fn run_on_animation_frame(mut self) -> beet_web::AnimationFrame {
-		beet_web::AnimationFrame::new(move || {
+	fn run_on_animation_frame(mut self) -> crate::web::AnimationFrame {
+		crate::web::AnimationFrame::new(move || {
 			self.update();
 		})
 	}

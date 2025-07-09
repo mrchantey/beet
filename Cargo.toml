@@ -72,7 +72,6 @@ members = [
 	"crates/sweet/macros",
 	"crates/sweet",
 	"crates/beet_utils",
-	"crates/beet_web",
 	"crates/sweet/cli",
 
 	# "crates/emby",
@@ -110,7 +109,6 @@ beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1", default-features
 ] }
 beet_core = { path = "crates/beet_core", version = "0.0.6-dev.1" }
 sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.1" }
-beet_web = { path = "crates/beet_web", version = "0.0.6-dev.1" }
 beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.1" }
 
 #💡 local
@@ -282,7 +280,7 @@ bevy_default = [
 #💡 utils
 fs = ["beet_utils/fs"]
 net = ["dep:beet_net"]
-web = ["dep:beet_web"]
+web = ["beet_core/web"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -314,7 +312,6 @@ beet_utils.workspace = true
 # lambda incompatible with openssl, must enable either openssl or rustls manually
 beet_net = { workspace = true, optional = true }
 beet_core = { workspace = true, optional = true }
-beet_web = { workspace = true, optional = true }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

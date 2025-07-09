@@ -35,8 +35,6 @@ pub use beet_utils as utils;
 pub use beet_utils::elog;
 pub use beet_utils::log;
 pub use beet_utils::noop;
-#[cfg(feature = "web")]
-pub use beet_web as web;
 pub mod prelude {
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;

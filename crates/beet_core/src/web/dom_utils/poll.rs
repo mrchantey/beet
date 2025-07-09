@@ -1,4 +1,5 @@
-use crate::*;
+use super::performance_now;
+use super::wait_for_millis;
 use anyhow::Result;
 use std::time::Duration;
 

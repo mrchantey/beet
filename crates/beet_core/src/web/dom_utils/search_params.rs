@@ -1,4 +1,4 @@
-use crate::*;
+use super::super::extensions::ArrayExt;
 use web_sys::UrlSearchParams;
 use web_sys::window;
 

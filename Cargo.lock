@@ -722,7 +722,6 @@ dependencies = [
  "beet_sim",
  "beet_spatial",
  "beet_utils",
- "beet_web",
  "bevy",
  "console_error_panic_hook",
  "getrandom 0.3.2",
@@ -854,14 +853,15 @@ dependencies = [
  "axum-server",
  "beet_common_macros",
  "beet_utils",
- "beet_web",
  "bevy",
  "clap",
  "colorize",
+ "console_error_panic_hook",
  "extend",
  "futures",
  "getrandom 0.2.16",
  "glob",
+ "html-escape",
  "http 1.3.1",
  "js-sys",
  "rand 0.8.5",
@@ -873,6 +873,9 @@ dependencies = [
  "tower 0.5.2",
  "tower-http 0.6.2",
  "tower-livereload",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -887,7 +890,6 @@ dependencies = [
  "beet_rsx",
  "beet_server",
  "beet_utils",
- "beet_web",
  "bevy",
  "chrono",
  "heck 0.4.1",
@@ -1111,7 +1113,6 @@ dependencies = [
  "beet_rsx",
  "beet_rsx_macros",
  "beet_utils",
- "beet_web",
  "bevy",
  "console_error_panic_hook",
  "console_log",
@@ -1263,22 +1264,6 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
-name = "beet_web"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_utils",
- "console_error_panic_hook",
- "extend",
- "html-escape",
- "js-sys",
- "sweet",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

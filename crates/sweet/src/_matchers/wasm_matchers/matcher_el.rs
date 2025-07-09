@@ -1,5 +1,4 @@
 use crate::matchers::*;
-// use beet_web::prelude::*;
 use web_sys::HtmlElement;
 
 impl<T> Matcher<T>

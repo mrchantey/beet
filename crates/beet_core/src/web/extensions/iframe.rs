@@ -1,4 +1,4 @@
-use crate::*;
+use super::super::dom_utils::HtmlEventListener;
 use extend::ext;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlIFrameElement;

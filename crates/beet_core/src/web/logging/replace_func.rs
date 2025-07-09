@@ -1,4 +1,4 @@
-use crate::ClosureFnMutT1T2Ext;
+use super::super::extensions::ClosureFnMutT1T2Ext;
 use js_sys::Function;
 use js_sys::Reflect;
 use wasm_bindgen::JsCast;

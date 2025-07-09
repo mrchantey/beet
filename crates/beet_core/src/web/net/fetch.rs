@@ -1,4 +1,4 @@
-use crate::*;
+use super::super::extensions::ResultTJsValueExt;
 use anyhow::Result;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;

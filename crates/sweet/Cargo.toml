@@ -21,7 +21,6 @@ e2e = ["dep:fantoccini", "dep:serde_json", "beet_utils/tokio"]
 [dependencies]
 #💡 internal 
 beet_utils.workspace = true
-# beet_web.workspace = true
 sweet_macros.workspace = true
 #💡 misc 
 anyhow.workspace = true

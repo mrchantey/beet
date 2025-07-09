@@ -12,10 +12,17 @@ repository.workspace = true
 
 [features]
 default = ["bevy"]
-bevy = ["dep:bevy", "beet_common_macros", "dep:beet_web", "dep:js-sys"]
+bevy = ["dep:bevy", "beet_common_macros"]
 bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "dep:serde"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+web = [
+	"dep:wasm-bindgen",
+	"dep:wasm-bindgen-futures",
+	"dep:console_error_panic_hook",
+	"dep:web-sys",
+	"dep:js-sys",
+]
 
 server = [
 	"dep:http",
@@ -51,6 +58,9 @@ anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 
+# html utilities (available on all targets)
+html-escape = "0.2"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)
 clap = { workspace = true, optional = true }
@@ -71,8 +81,86 @@ tower-http = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-beet_web = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
+
+# web dependencies (WASM only)
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+console_error_panic_hook = { workspace = true, optional = true }
+
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+workspace = true
+optional = true
+features = [
+	"Text",
+	"Comment",
+	"Node",
+	"NodeList",
+	# File
+	"File",
+	"FileList",
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# HTML
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	'HtmlAnchorElement',
+	'HtmlButtonElement',
+	'HtmlCanvasElement',
+	'HtmlDivElement',
+	'HtmlHeadElement',
+	"HtmlInputElement",
+	'HtmlIFrameElement',
+	'HtmlLinkElement',
+	'HtmlParagraphElement',
+	'HtmlScriptElement',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	# JS
+	'console',
+	'Navigator',
+	'Performance',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'Response',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+	# Sockets
+	'BinaryType',
+	'FileReader',
+	'ErrorEvent',
+	'MessageEvent',
+	'ProgressEvent',
+	'WebSocket',
+	# Resize Observer
+	'ResizeObserver',
+	'ResizeObserverBoxOptions',
+	'ResizeObserverEntry',
+	'ResizeObserverOptions',
+	'ResizeObserverSize',
+	'DomRect',
+	'DomRectReadOnly',
+]
 
 
 [dev-dependencies]

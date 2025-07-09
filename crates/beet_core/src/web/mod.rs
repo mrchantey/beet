@@ -1,10 +1,8 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+//! Web utilities for WASM targets
 #![allow(async_fn_in_trait)]
 
-
 // we dont want rust-analyzer loading web-sys when working with native
-// so cfg this entire crate
+// so cfg this entire module
 
 #[cfg(target_arch = "wasm32")]
 mod dom_utils;
@@ -26,13 +24,13 @@ pub use self::net::*;
 
 pub mod prelude {
 	#[cfg(target_arch = "wasm32")]
-	pub use crate::dom_utils::*;
+	pub use super::dom_utils::*;
 	#[cfg(target_arch = "wasm32")]
-	pub use crate::extensions::*;
+	pub use super::extensions::*;
 	#[cfg(target_arch = "wasm32")]
-	pub use crate::logging::*;
+	pub use super::logging::*;
 	#[cfg(target_arch = "wasm32")]
-	pub use crate::net::*;
+	pub use super::net::*;
 	pub use html_escape;
 	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures::spawn_local;

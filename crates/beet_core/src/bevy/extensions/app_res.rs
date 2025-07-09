@@ -27,8 +27,8 @@ impl AppRes {
 #[ext]
 pub impl Rc<RefCell<App>> {
 	#[cfg(target_arch = "wasm32")]
-	fn run_on_animation_frame(self) -> beet_web::AnimationFrame {
-		beet_web::AnimationFrame::new(move || {
+	fn run_on_animation_frame(self) -> crate::web::AnimationFrame {
+		crate::web::AnimationFrame::new(move || {
 			self.borrow_mut().update();
 		})
 	}
@@ -37,7 +37,7 @@ pub impl Rc<RefCell<App>> {
 	fn run_forever(self) -> impl std::future::Future<Output = ()> {
 		async {
 			let _frame = self.run_on_animation_frame();
-			beet_web::loop_forever().await;
+			crate::web::loop_forever().await;
 		}
 	}
 

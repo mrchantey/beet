@@ -5,6 +5,8 @@
 pub mod bevy;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub mod server;
+#[cfg(feature = "web")]
+pub mod web;
 
 pub mod prelude {
 	#[cfg(feature = "bevy")]
@@ -14,4 +16,6 @@ pub mod prelude {
 	pub use crate::bevyhow;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
+	#[cfg(feature = "web")]
+	pub use crate::web::prelude::*;
 }
