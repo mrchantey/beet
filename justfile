@@ -71,8 +71,8 @@ deploy-site *args:
 # --region 					us-west-2 			\
 # --iam-role 				$AWS_IAM_ROLE 	\
 
-remove-site:
-	npx sst remove --stage production --config infra/sst.config.ts
+infra *args:
+	cd infra && npx sst {{args}}
 
 mod *args:
 	just sweet mod --exclude */codegen/* {{args}}

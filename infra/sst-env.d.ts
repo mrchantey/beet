@@ -5,15 +5,6 @@
 
 declare module "sst" {
   export interface Resource {
-    "BeetServerGateway": {
-      "type": "sst.aws.ApiGatewayV2"
-      "url": string
-    }
-    "BeetServerLambda": {
-      "name": string
-      "type": "sst.aws.Function"
-      "url": string
-    }
   }
 }
 /// <reference path="sst-env.d.ts" />

@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "The Unistack Metaframework 🦄"
@@ -36,7 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 
-exclude = ["crates/beet_mcp", "crates/beet_new_web"]
+exclude = ["infra", "crates/beet_mcp", "crates/beet_new_web"]
 
 members = [
 	"crates/beet_site",
@@ -77,32 +77,32 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.6-dev.1" }
+beet = { path = "", version = "0.0.6-dev.2" }
 
-beet_build = { path = "crates/beet_build", version = "0.0.6-dev.1" }
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.6-dev.1" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.6-dev.1" }
-beet_connect = { path = "crates/beet_connect", version = "0.0.6-dev.1" }
-beet_design = { path = "crates/beet_design", version = "0.0.6-dev.1" }
-beet_query = { path = "crates/beet_query", version = "0.0.6-dev.1" }
-beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-dev.1" }
-beet_router = { path = "crates/beet_router", version = "0.0.6-dev.1" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.1" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.1" }
-beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
+beet_build = { path = "crates/beet_build", version = "0.0.6-dev.2" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.6-dev.2" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.6-dev.2" }
+beet_connect = { path = "crates/beet_connect", version = "0.0.6-dev.2" }
+beet_design = { path = "crates/beet_design", version = "0.0.6-dev.2" }
+beet_query = { path = "crates/beet_query", version = "0.0.6-dev.2" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-dev.2" }
+beet_router = { path = "crates/beet_router", version = "0.0.6-dev.2" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.2" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.2" }
+beet_server = { path = "crates/beet_server", version = "0.0.6-dev.2" }
 
-beet_examples = { path = "crates/beet_examples", version = "0.0.6-dev.1" }
-beet_flow = { path = "crates/beet_flow", version = "0.0.6-dev.1" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-dev.1" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.1" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.1" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.1" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.6-dev.2" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.6-dev.2" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-dev.2" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.2" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.2" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.2" }
 
-beet_core = { path = "crates/beet_core", version = "0.0.6-dev.1" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.6-dev.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.6-dev.2" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.6-dev.2" }
 sweet = { path = "crates/sweet", version = "0.4.1" }
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.1" }
-beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.1" }
+sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.2" }
+beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.2" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = [
