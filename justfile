@@ -203,8 +203,6 @@ test-beet-utils *args:
 	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
 
 test-rsx *args:
-	{{min-stack}} cargo test -p beet_common_macros		--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
@@ -227,11 +225,11 @@ test-flow *args:
 #{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-utils *args:
 	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_core 								--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 
 test-all-lib *args:
@@ -316,15 +314,13 @@ publish crate *args:
 
 publish-all *args:
 	just publish beet_rsx_combinator  {{args}} || true
-	@echo 'Publishing Sweet Crates'
+	@echo 'Publishing Utility Crates'
 	just publish beet_utils						{{args}} | true
 	just publish sweet_macros					{{args}} | true
 	just publish sweet								{{args}} | true
-	just publish beet_core						{{args}} | true
-	just publish beet_bevy						{{args}} | true
-	just publish beet_core							{{args}} | true
-	just publish sweet 								{{args}} | true
 	just publish sweet-cli						{{args}} | true
+	just publish beet_core_macros			{{args}} | true
+	just publish beet_core						{{args}} | true
 	@echo 'Publishing Flow Crates'
 	just publish beet_flow_macros     {{args}} || true
 	just publish beet_flow            {{args}} || true
@@ -333,7 +329,6 @@ publish-all *args:
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
 	@echo 'Publishing Rsx Build Crates'
-	just publish beet_common      		{{args}} || true
 	just publish beet_parse      			{{args}} || true
 	just publish beet_build      			{{args}} || true
 	just publish beet_rsx_macros      {{args}} || true

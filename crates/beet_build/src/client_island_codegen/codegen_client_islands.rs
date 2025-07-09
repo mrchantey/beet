@@ -106,7 +106,6 @@ pub fn export_client_island_codegen(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_core::prelude::*;
 	use beet_router::prelude::*;
 	use quote::quote;
 	use serde::Serialize;

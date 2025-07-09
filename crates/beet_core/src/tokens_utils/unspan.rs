@@ -50,12 +50,13 @@ unsafe impl<T> Send for Unspan<T> {}
 unsafe impl<T> Sync for Unspan<T> {}
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 	use syn::Ident;
-
+	
 	#[test]
 	fn works() {
 		let foo: Ident = syn::parse_quote!(foo);

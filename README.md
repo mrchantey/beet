@@ -79,37 +79,4 @@ Top level crates that depend on several of the above.
 | 0.12   | 0.0.1  |
 
 ## Contributing
-
-## Wishlist
-
-Most of these are quite complex but if you'd like to have a go get in touch [on discord](https://discord.com/channels/691052431525675048/1034543904478998539/threads/1333204907414523964).
-
-### `beet_rsx`
-- [ ] escape html 
-- [ ] reactive graph
-- [ ] minify style
-
-
-### `beet_router`
-- [ ] markdown live reload
-- [ ] markdown rsx
-- [ ] markdown recursive parsing
-
-### `sweet`
-- [ ] native cli
-
-### `beet_common`
-- [ ] css parser / style tag location
-- [ ] markdown parser
-- [ ] file hashing
-
-### `beet_query`
-- [ ] sqlx
-
-
-### `beet_server`
-- [ ] sever signals
-
-### `infra`
-- [ ] serve static files on s3 instead of bundled in the lambda
 See [CONTRIBUTING.md](CONTRIBUTING.md)

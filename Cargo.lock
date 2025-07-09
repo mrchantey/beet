@@ -755,7 +755,10 @@ version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
+ "beet_parse",
+ "beet_router",
  "beet_rsx",
+ "beet_utils",
  "bevy",
  "cargo-manifest",
  "flume",

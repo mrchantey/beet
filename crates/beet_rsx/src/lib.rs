@@ -34,7 +34,6 @@ pub mod as_beet {
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_core::prelude::*;
-			pub use beet_core::prelude::*;
 			pub use beet_utils::prelude::*;
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;

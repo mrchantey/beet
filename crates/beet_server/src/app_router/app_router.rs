@@ -258,7 +258,7 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 		let ron = self.render_route(&route_info).await?;
 
 		let islands: Vec<ClientIsland> =
-			beet_common::exports::ron::de::from_str(&ron).map_err(|e| {
+			beet_core::exports::ron::de::from_str(&ron).map_err(|e| {
 				AppError::internal_error(format!(
 					"Failed to deserialize client islands: {}",
 					e

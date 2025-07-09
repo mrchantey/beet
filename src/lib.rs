@@ -5,7 +5,6 @@
 pub use beet_build as build;
 #[cfg(feature = "connect")]
 pub use beet_connect as connect;
-pub use beet_core as common;
 pub use beet_core as core;
 #[cfg(feature = "design")]
 pub use beet_design as design;
@@ -36,7 +35,6 @@ pub use beet_utils::noop;
 pub mod prelude {
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
-	pub use crate::common::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
 	pub use crate::core::prelude::*;
@@ -72,7 +70,6 @@ pub mod prelude {
 pub mod exports {
 	#[cfg(feature = "build")]
 	pub use crate::build::exports::*;
-	pub use crate::common::exports::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::exports::*;
 	#[cfg(feature = "router")]
@@ -81,6 +78,7 @@ pub mod exports {
 	pub use crate::rsx::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::exports::*;
+	pub use crate::core::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;

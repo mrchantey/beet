@@ -22,7 +22,7 @@ impl Plugin for SignalsPlugin {
 
 /// When building without `bevy_default` we assume the target is the web
 #[cfg(not(feature = "bevy_default"))]
-pub type TextSpan = beet_common::node::TextNode;
+pub type TextSpan = beet_core::node::TextNode;
 
 /// A component with a [`flume::Receiver`] that can be used to propagate changes
 /// throughout the app, for instance in [`receive_text_signals`].

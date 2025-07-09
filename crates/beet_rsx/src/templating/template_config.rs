@@ -173,7 +173,7 @@ impl BeetConfigFile {
 	fn from_file<T: serde::de::DeserializeOwned>(
 		path: impl AsRef<Path>,
 	) -> Result<T> {
-		Ok(beet_common::exports::toml::de::from_str(
+		Ok(beet_core::exports::toml::de::from_str(
 			&ReadFile::to_string(path)?,
 		)?)
 	}
