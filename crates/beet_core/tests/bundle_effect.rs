@@ -1,6 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-use beet_common::as_beet::*;
+use beet_core::as_beet::*;
 use sweet::prelude::*;
 
 

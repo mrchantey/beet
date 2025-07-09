@@ -1,4 +1,4 @@
-use beet_common::prelude::Unspan;
+use beet_core::prelude::Unspan;
 use quote::ToTokens;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -117,7 +117,7 @@ pub mod syn_item_vec_serde {
 #[cfg(test)]
 mod test {
 	use super::syn_item_serde;
-	use beet_common::prelude::*;
+	use beet_core::prelude::*;
 	use beet_utils::prelude::*;
 	use quote::ToTokens;
 	use serde::Deserialize;

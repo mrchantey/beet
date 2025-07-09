@@ -40,9 +40,9 @@
 //!   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
 use crate::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
-use beet_common::node::NodeTag;
-use beet_common::node::SlotChild;
-use beet_common::node::SlotTarget;
+use beet_core::node::NodeTag;
+use beet_core::node::SlotChild;
+use beet_core::node::SlotTarget;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 

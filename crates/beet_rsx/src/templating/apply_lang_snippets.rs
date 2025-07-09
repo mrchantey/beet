@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
 use beet_utils::prelude::ReadFile;
 use bevy::platform::collections::HashMap;
@@ -74,7 +74,7 @@ pub fn apply_lang_snippets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::prelude::*;
+	use beet_core::prelude::*;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;

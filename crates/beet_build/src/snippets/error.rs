@@ -1,4 +1,4 @@
-use beet_common::node::FileSpan;
+use beet_core::node::FileSpan;
 use beet_utils::prelude::*;
 // use beet_rsx::error::ParseError;
 use std::path::Path;

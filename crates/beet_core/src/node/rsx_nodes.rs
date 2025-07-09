@@ -1,4 +1,3 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 
@@ -66,7 +65,3 @@ impl TextNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct BlockNode;
-
-
-
-

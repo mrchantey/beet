@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::BundleExt;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Clone)]

@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use beet_common::ToTokens;
-use beet_common::as_beet::*;
-use beet_common::prelude::TokenizeSelf;
+use beet_core::ToTokens;
+use beet_core::as_beet::*;
+use beet_core::prelude::TokenizeSelf;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
@@ -43,10 +43,13 @@ pub fn collapse_combinator_exprs(world: &mut World) -> Result {
 	while let Some(entity) = query.iter(world).next() {
 		if let Some(expr) =
 			// here we are only tokenizing with tokenize_bundle,
-			// if at some point we want to tokenize_bundle_tokens for combinator exprs 
+			// if at some point we want to tokenize_bundle_tokens for combinator exprs
 			// we should introduce a marker component to the root, and decide which to use here
-			tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle)?
-		{
+			tokenize_combinator_exprs_mapped(
+				world,
+				entity,
+				tokenize_bundle,
+			)? {
 			world
 				.entity_mut(entity)
 				.remove::<CombinatorExpr>()

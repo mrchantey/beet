@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;

@@ -43,8 +43,6 @@ members = [
 	"crates/beet-cli",
 
 	"crates/beet_build",
-	"crates/beet_common",
-	"crates/beet_common/macros",
 	"crates/beet_rsx_combinator",
 	"crates/beet_parse",
 
@@ -68,6 +66,7 @@ members = [
 
 	## 💡 Sweet
 	"crates/beet_core",
+	"crates/beet_core/macros",
 	"crates/sweet/macros",
 	"crates/sweet",
 	"crates/beet_utils",
@@ -81,18 +80,8 @@ members = [
 beet = { path = "", version = "0.0.6-dev.1" }
 
 beet_build = { path = "crates/beet_build", version = "0.0.6-dev.1" }
-beet_common = { path = "crates/beet_common", version = "0.0.6-dev.1" }
-beet_common_macros = { path = "crates/beet_common/macros", version = "0.0.6-dev.1" }
 beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.6-dev.1" }
 beet_parse = { path = "crates/beet_parse", version = "0.0.6-dev.1" }
-
-beet_examples = { path = "crates/beet_examples", version = "0.0.6-dev.1" }
-beet_flow = { path = "crates/beet_flow", version = "0.0.6-dev.1" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-dev.1" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.1" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.1" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.1" }
-
 beet_connect = { path = "crates/beet_connect", version = "0.0.6-dev.1" }
 beet_design = { path = "crates/beet_design", version = "0.0.6-dev.1" }
 beet_query = { path = "crates/beet_query", version = "0.0.6-dev.1" }
@@ -102,8 +91,16 @@ beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.1" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 
-sweet = { path = "crates/sweet", version = "0.4.1" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.6-dev.1" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.6-dev.1" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-dev.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.1" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.1" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.1" }
+
 beet_core = { path = "crates/beet_core", version = "0.0.6-dev.1" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.6-dev.1" }
+sweet = { path = "crates/sweet", version = "0.4.1" }
 sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.1" }
 beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.1" }
 
@@ -289,7 +286,6 @@ web = ["beet_core/web"]
 beet_examples = { workspace = true, optional = true }
 bevy = { workspace = true }
 #💡 rsx
-beet_common = { workspace = true }
 beet_build = { workspace = true, optional = true }
 beet_parse = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }

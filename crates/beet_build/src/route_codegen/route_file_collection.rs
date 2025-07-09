@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::as_beet::*;
+use beet_core::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::prelude::*;
@@ -72,7 +72,9 @@ pub struct RouteFileCollection {
 	pub category: RouteCollectionCategory,
 }
 fn default_meta() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
-fn default_state() -> Unspan<syn::Type> { Unspan::parse_str("AppRouterState").unwrap() }
+fn default_state() -> Unspan<syn::Type> {
+	Unspan::parse_str("AppRouterState").unwrap()
+}
 
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]

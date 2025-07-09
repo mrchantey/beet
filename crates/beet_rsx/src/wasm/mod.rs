@@ -6,7 +6,7 @@ use event_playback::*;
 
 
 use crate::prelude::*;
-use beet_common::node::ClientOnlyDirective;
+use beet_core::node::ClientOnlyDirective;
 use bevy::prelude::*;
 use client_only::*;
 

@@ -1,5 +1,5 @@
 use crate::prelude::OnSpawn;
-use beet_common_macros::ImplBundle;
+use beet_core_macros::ImplBundle;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::relationship::Relationship;
 use bevy::prelude::*;

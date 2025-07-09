@@ -25,7 +25,7 @@ pub trait TemplateDirective: 'static + Sized + Component {
 /// ## Example
 /// ```rust
 /// # use bevy::prelude::*;
-/// # use beet_common::prelude::*;
+/// # use beet_core::prelude::*;
 /// App::new().add_plugins(extract_directive_plugin::<ClientLoadDirective>);
 /// ```
 pub fn extract_directive_plugin<T: TemplateDirective>(app: &mut App) {

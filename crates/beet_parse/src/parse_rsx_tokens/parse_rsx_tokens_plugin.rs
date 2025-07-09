@@ -1,5 +1,5 @@
 use super::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 use std::cell::RefCell;

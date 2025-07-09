@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::as_beet::*;
 use beet_core::prelude::bevyhow;
-use beet_common::as_beet::*;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
 use quote::quote;

@@ -19,13 +19,12 @@ default = ["nightly"]
 nightly = []
 serde = ["dep:serde", "beet_core/bevy_scene"]
 bevy_default = ["bevy/bevy_text"]
-tokens = ["beet_common/tokens"]
+tokens = ["beet_core/tokens"]
 
 [dependencies]
 beet_rsx_macros.workspace = true
-beet_common.workspace = true
-beet_utils.workspace = true
 beet_core.workspace = true
+beet_utils.workspace = true
 
 #💡 utils
 send_wrapper.workspace = true

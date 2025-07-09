@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_common::node::AttributeLit;
-use beet_common::node::IntoTemplateBundle;
+use beet_core::node::AttributeLit;
+use beet_core::node::IntoTemplateBundle;
 use bevy::prelude::*;
 use flume::Receiver;
 

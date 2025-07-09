@@ -1,6 +1,6 @@
 //
 
-use beet_common::node::AttributeLit;
+use beet_core::node::AttributeLit;
 use quote::ToTokens;
 
 /// For a given [`syn::Lit`], return its most sensible string representation.

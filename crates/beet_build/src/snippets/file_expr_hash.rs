@@ -1,7 +1,7 @@
 use super::HashNonSnippetRust;
 use crate::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use beet_router::as_beet::TemplateRoot;
 use bevy::prelude::*;

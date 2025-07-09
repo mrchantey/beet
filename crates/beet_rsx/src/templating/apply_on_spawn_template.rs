@@ -1,5 +1,5 @@
 use beet_core::prelude::HierarchyQueryExtExt;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 
@@ -46,7 +46,7 @@ pub fn apply_on_spawn_template(
 mod test {
 	use crate::as_beet::*;
 	use crate::templating::apply_slots;
-	use beet_common::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

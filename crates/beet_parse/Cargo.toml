@@ -18,9 +18,8 @@ default = ["html"]
 html = ["dep:beet_rsx_combinator"]
 
 [dependencies]
-beet_common = { workspace = true, features = ["serde", "tokens"] }
+beet_core = { workspace = true, features = ["serde", "tokens"] }
 beet_utils.workspace = true
-beet_core.workspace = true
 beet_rsx_combinator = { workspace = true, optional = true }
 
 ron.workspace = true

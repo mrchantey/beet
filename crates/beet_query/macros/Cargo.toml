@@ -19,7 +19,7 @@ proc-macro = true
 
 [dependencies]
 beet_utils.workspace = true
-beet_common = { workspace = true, features = ["tokens"] }
+beet_core = { workspace = true, features = ["tokens"] }
 
 
 heck.workspace = true

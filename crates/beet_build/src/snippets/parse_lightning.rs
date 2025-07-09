@@ -1,5 +1,5 @@
 use super::error::Error;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
@@ -90,7 +90,7 @@ pub fn parse_lightning(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

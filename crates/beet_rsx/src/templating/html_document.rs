@@ -1,7 +1,7 @@
 use super::*;
 use beet_core::prelude::bevyhow;
 use beet_core::prelude::HierarchyQueryExtExt;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 

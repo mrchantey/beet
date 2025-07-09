@@ -31,7 +31,6 @@ required-features = ["css"]
 [dependencies]
 #💡 Internal
 beet_rsx = { workspace = true, features = ["tokens"] }
-beet_common.workspace = true
 beet_core = { workspace = true, features = ["bevy_scene", "tokens"] }
 
 #💡 Utils

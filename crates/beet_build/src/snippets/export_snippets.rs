@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -86,7 +86,7 @@ fn collect_lang_snippets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::node::MacroIdx;
+	use beet_core::node::MacroIdx;
 	use beet_router::as_beet::WorkspaceConfig;
 	use beet_rsx::as_beet::*;
 	// use beet_utils::prelude::*;

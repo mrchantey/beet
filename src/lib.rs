@@ -3,9 +3,9 @@
 #![doc = include_str!("../README.md")]
 #[cfg(feature = "build")]
 pub use beet_build as build;
-pub use beet_common as common;
 #[cfg(feature = "connect")]
 pub use beet_connect as connect;
+pub use beet_core as common;
 pub use beet_core as core;
 #[cfg(feature = "design")]
 pub use beet_design as design;

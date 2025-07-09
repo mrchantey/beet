@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use super::*;
 use crate::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_core::prelude::WorldMutExt;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;

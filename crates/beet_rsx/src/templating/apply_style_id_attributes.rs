@@ -1,6 +1,6 @@
 use super::*;
 use beet_core::prelude::HierarchyQueryExtExt;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
@@ -96,7 +96,7 @@ impl ApplyAttributes<'_, '_> {
 mod test {
 	use crate::as_beet::*;
 	use crate::templating::apply_slots;
-	use beet_common::node::HtmlConstants;
+	use beet_core::node::HtmlConstants;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

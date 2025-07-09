@@ -1,5 +1,5 @@
-use beet_common::node::HtmlConstants;
-use beet_common::node::MacroIdx;
+use beet_core::node::HtmlConstants;
+use beet_core::node::MacroIdx;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::path::Path;

@@ -14,7 +14,7 @@ pub type TempNonSendMarker<'w> = Option<NonSend<'w, ()>>;
 // /// ## Example
 // /// ```rust
 // /// # use bevy::prelude::*;
-// /// # use beet_common::prelude::*;
+// /// # use beet_core::prelude::*;
 // ///
 // /// fn my_system(
 // /// 	_: TempNonSendMarker,

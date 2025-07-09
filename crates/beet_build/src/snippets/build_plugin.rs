@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use beet_rsx::as_beet::ResultExtDisplay;

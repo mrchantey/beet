@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::node::ClientOnlyDirective;
+use beet_core::node::ClientOnlyDirective;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;

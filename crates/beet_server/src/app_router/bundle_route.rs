@@ -69,7 +69,7 @@ mod test {
 	use crate::prelude::*;
 	use axum::Router;
 	use axum::extract::Query as QueryParams;
-	use beet_common::prelude::*;
+	use beet_core::prelude::*;
 	use beet_rsx::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;

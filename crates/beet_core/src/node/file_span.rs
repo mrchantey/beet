@@ -1,4 +1,5 @@
 use crate::as_beet::*;
+use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;
@@ -73,7 +74,7 @@ impl FileSpan {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_common::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let loc = FileSpan::new_with_start(file!(), line!(), column!());
 	/// ```
 	/// ## Panics

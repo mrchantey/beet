@@ -1,4 +1,4 @@
-use beet_common::as_beet::*;
+use beet_core::as_beet::*;
 
 fn main() {
 	let foo = FooSendit::new(Foo { _inner: true });

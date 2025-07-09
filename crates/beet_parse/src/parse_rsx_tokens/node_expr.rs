@@ -3,7 +3,7 @@
 //! their expression, to be be modified in the tokenization stage,
 //! for example adding #[allow(unused_braces)] to block nodes
 //! and appending `.into_node_bundle()`
-use beet_common::as_beet::*;
+use beet_core::as_beet::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;

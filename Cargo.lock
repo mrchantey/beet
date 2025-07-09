@@ -706,7 +706,6 @@ dependencies = [
  "axum 0.8.4",
  "beet",
  "beet_build",
- "beet_common",
  "beet_connect",
  "beet_core",
  "beet_design",
@@ -755,7 +754,6 @@ name = "beet_build"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
  "beet_core",
  "beet_rsx",
  "bevy",
@@ -785,44 +783,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_common"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_common",
- "beet_common_macros",
- "beet_core",
- "beet_utils",
- "bevy",
- "extend",
- "heck 0.4.1",
- "proc-macro2",
- "proc-macro2-diagnostics",
- "quote",
- "rapidhash",
- "ron",
- "send_wrapper",
- "serde",
- "sweet",
- "syn 2.0.101",
- "thiserror 1.0.69",
- "toml",
-]
-
-[[package]]
-name = "beet_common_macros"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_utils",
- "proc-macro2",
- "proc-macro2-diagnostics",
- "quote",
- "sweet",
- "syn 2.0.101",
-]
-
-[[package]]
 name = "beet_connect"
 version = "0.0.6-dev.1"
 dependencies = [
@@ -846,7 +806,7 @@ dependencies = [
  "axum 0.8.4",
  "axum-extra",
  "axum-server",
- "beet_common_macros",
+ "beet_core_macros",
  "beet_utils",
  "bevy",
  "clap",
@@ -856,6 +816,7 @@ dependencies = [
  "futures",
  "getrandom 0.2.16",
  "glob",
+ "heck 0.4.1",
  "html-escape",
  "http 1.3.1",
  "http-body-util",
@@ -865,7 +826,10 @@ dependencies = [
  "quote",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "rapidhash",
  "reqwest",
+ "ron",
+ "send_wrapper",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -873,6 +837,7 @@ dependencies = [
  "syn 2.0.101",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
  "tower 0.5.2",
  "tower-http 0.6.2",
  "tower-livereload",
@@ -883,11 +848,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_core_macros"
+version = "0.0.6-dev.1"
+dependencies = [
+ "anyhow",
+ "beet_utils",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "sweet",
+ "syn 2.0.101",
+]
+
+[[package]]
 name = "beet_design"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
  "beet_core",
  "beet_router",
  "beet_rsx",
@@ -990,7 +967,6 @@ name = "beet_parse"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
  "beet_core",
  "beet_rsx_combinator",
  "beet_utils",
@@ -1035,7 +1011,7 @@ name = "beet_query_macros"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
+ "beet_core",
  "beet_utils",
  "heck 0.4.1",
  "proc-macro2",
@@ -1051,7 +1027,6 @@ version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
- "beet_common",
  "beet_core",
  "beet_router",
  "beet_rsx",
@@ -1081,7 +1056,6 @@ name = "beet_rsx"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
  "beet_core",
  "beet_rsx",
  "beet_rsx_macros",
@@ -1123,7 +1097,6 @@ name = "beet_rsx_macros"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_common",
  "beet_core",
  "beet_parse",
  "beet_utils",
@@ -1141,7 +1114,6 @@ dependencies = [
  "anyhow",
  "axum 0.8.4",
  "beet_build",
- "beet_common",
  "beet_core",
  "beet_router",
  "beet_rsx",

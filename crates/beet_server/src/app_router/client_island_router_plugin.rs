@@ -3,7 +3,7 @@ use axum::Router;
 use axum::extract::FromRequestParts;
 use axum::extract::State;
 use axum::routing;
-use beet_common::exports::ron;
+use beet_core::exports::ron;
 use beet_router::prelude::ClientIsland;
 use std::marker::PhantomData;
 

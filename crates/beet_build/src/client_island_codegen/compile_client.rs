@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::node::HtmlConstants;
+use beet_core::node::HtmlConstants;
 use beet_core::prelude::When;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::CargoBuildCmd;

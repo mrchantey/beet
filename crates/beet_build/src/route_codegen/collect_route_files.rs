@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::bevyhow;
-use beet_common::prelude::TokenizeSelf;
+use beet_core::prelude::TokenizeSelf;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;

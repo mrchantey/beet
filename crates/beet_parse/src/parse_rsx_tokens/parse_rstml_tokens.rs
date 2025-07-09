@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
@@ -453,7 +453,6 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_common::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;

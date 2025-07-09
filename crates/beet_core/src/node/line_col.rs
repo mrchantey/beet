@@ -1,5 +1,5 @@
-use bevy::reflect::Reflect;
 use crate::as_beet::*;
+use bevy::reflect::Reflect;
 
 /// A location in a source file, the line is 1 indexed and the column is 0 indexed,
 /// which follows the behavior of [`proc_macro2::Span`]

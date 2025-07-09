@@ -1,4 +1,4 @@
-use beet_common::prelude::*;
+use beet_core::prelude::*;
 use proc_macro2::TokenStream;
 use syn::DeriveInput;
 use syn::Expr;
