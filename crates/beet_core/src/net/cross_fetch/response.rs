@@ -76,6 +76,7 @@ mod test {
 	}
 
 	#[sweet::test]
+	#[ignore = "flaky httpbin"]
 	async fn works() {
 		Request::new(format!("{HTTPBIN}/post"))
 			.method(HttpMethod::Post)
