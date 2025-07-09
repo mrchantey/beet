@@ -229,7 +229,7 @@ test-utils *args:
 	{{min-stack}} cargo test -p beet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_utils 								--features fs 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_net 								--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_server_utils 			--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
@@ -323,7 +323,7 @@ publish-all *args:
 	just publish beet_utils				{{args}} | true
 	just publish sweet_macros	{{args}} | true
 	just publish sweet					{{args}} | true
-	just publish beet_server_utils				{{args}} | true
+	just publish beet_core				{{args}} | true
 	just publish beet_web					{{args}} | true
 	just publish beet_bevy					{{args}} | true
 	just publish beet_net					{{args}} | true

@@ -69,7 +69,7 @@ members = [
 	## 💡 Sweet
 	"crates/beet_bevy",
 	"crates/beet_net",
-	"crates/beet_server_utils",
+	"crates/beet_core",
 	"crates/sweet/macros",
 	"crates/sweet",
 	"crates/beet_utils",
@@ -110,7 +110,7 @@ beet_bevy = { path = "crates/beet_bevy", version = "0.0.6-dev.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1", default-features = false, features = [
 	"serde",
 ] }
-beet_server_utils = { path = "crates/beet_server_utils", version = "0.0.6-dev.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.6-dev.1" }
 sweet_macros = { path = "crates/sweet/macros", version = "0.0.6-dev.1" }
 beet_web = { path = "crates/beet_web", version = "0.0.6-dev.1" }
 beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.1" }
@@ -199,11 +199,14 @@ http-body-util = "0.1"
 
 #💡 server
 axum = { version = "0.8", features = ["macros"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+axum-extra = "0.10"
 tower = "0.5"
 tower-livereload = { version = "0.9" }
 tower-http = { version = "0.6", features = [
 	"trace",
 	"fs",
+	"cors",
 	"normalize-path",
 	"set-header",
 ] }
@@ -263,12 +266,7 @@ parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = [
-	"router",
-	"beet_router/axum",
-	"dep:beet_server",
-	# "dep:beet_server_utils",
-]
+server = ["router", "beet_router/axum", "dep:beet_server", "beet_core/server"]
 lambda = ["server", "beet_server/lambda", "beet_net/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
@@ -318,7 +316,7 @@ beet_utils.workspace = true
 beet_bevy = { workspace = true }
 # lambda incompatible with openssl, must enable either openssl or rustls manually
 beet_net = { workspace = true, optional = true }
-beet_server_utils = { workspace = true, optional = true }
+beet_core = { workspace = true, optional = true }
 beet_web = { workspace = true, optional = true }
 
 

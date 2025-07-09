@@ -709,6 +709,7 @@ dependencies = [
  "beet_build",
  "beet_common",
  "beet_connect",
+ "beet_core",
  "beet_design",
  "beet_examples",
  "beet_flow",
@@ -719,7 +720,6 @@ dependencies = [
  "beet_router",
  "beet_rsx",
  "beet_server",
- "beet_server_utils",
  "beet_sim",
  "beet_spatial",
  "beet_utils",
@@ -862,6 +862,29 @@ dependencies = [
  "sweet",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "beet_core"
+version = "0.0.6-dev.1"
+dependencies = [
+ "anyhow",
+ "axum 0.8.4",
+ "axum-extra",
+ "axum-server",
+ "beet_utils",
+ "clap",
+ "colorize",
+ "extend",
+ "futures",
+ "glob",
+ "http 1.3.1",
+ "sweet",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.5.2",
+ "tower-http 0.6.2",
+ "tower-livereload",
 ]
 
 [[package]]
@@ -1183,29 +1206,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_server_utils"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "axum 0.8.4",
- "axum-extra",
- "axum-server",
- "beet_utils",
- "clap",
- "colorize",
- "extend",
- "futures",
- "glob",
- "http 1.3.1",
- "sweet",
- "thiserror 1.0.69",
- "tokio",
- "tower 0.5.2",
- "tower-http 0.6.2",
- "tower-livereload",
-]
-
-[[package]]
 name = "beet_sim"
 version = "0.0.6-dev.1"
 dependencies = [
@@ -1272,6 +1272,7 @@ dependencies = [
  "rapidhash",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "wasm-bindgen",
@@ -8456,8 +8457,8 @@ name = "sweet-cli"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
+ "beet_core",
  "beet_server",
- "beet_server_utils",
  "beet_utils",
  "clap",
  "prettyplease",

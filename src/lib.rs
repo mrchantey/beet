@@ -25,8 +25,7 @@ pub use beet_query as query;
 pub use beet_router as router;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub use beet_server as server;
-// #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-// pub use beet_server_utils as server_utils;
+pub use beet_core as core;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
@@ -40,6 +39,7 @@ pub use beet_utils::noop;
 #[cfg(feature = "web")]
 pub use beet_web as web;
 pub mod prelude {
+	pub use crate::core::prelude::*;
 	pub use crate::bevy::prelude::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;

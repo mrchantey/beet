@@ -1,0 +1,59 @@
+[package]
+name = "beet_core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Core utilities for beet ecosystem with optional server features"
+repository.workspace = true
+
+
+[features]
+default = []
+server = [
+	"dep:http",
+	"dep:axum",
+	"dep:axum-extra",
+	"dep:axum-server",
+	"dep:tower",
+	"dep:tower-http",
+	"dep:tower-livereload",
+	"dep:clap",
+	"dep:colorize",
+	"dep:glob",
+	"dep:futures",
+	"dep:tokio",
+	"beet_utils/fs",
+]
+rustls = ["server", "axum-server/tls-rustls"]
+
+[dependencies]
+beet_utils.workspace = true
+## utils
+anyhow.workspace = true
+thiserror.workspace = true
+extend.workspace = true
+
+# server-specific dependencies (optional)
+clap = { workspace = true, optional = true }
+colorize = { workspace = true, optional = true }
+glob = { workspace = true, optional = true }
+
+# async (server-specific)
+futures = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+# http (server-specific)
+http = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+axum-extra = { workspace = true, optional = true }
+axum-server = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+tower-livereload = { workspace = true, optional = true }
+
+
+[dev-dependencies]
+sweet.workspace = true

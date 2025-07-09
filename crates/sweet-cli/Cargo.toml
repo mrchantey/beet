@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
-beet_server_utils.workspace = true
+beet_core = { workspace = true, features = ["server"] }
 beet_utils = { workspace = true, features = ["fs"] }
 beet_server.workspace = true
 sweet.workspace = true
