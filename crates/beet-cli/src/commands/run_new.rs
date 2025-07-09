@@ -4,19 +4,23 @@ use tokio::process::Command;
 
 // simple cargo generate for now
 #[derive(Parser)]
-pub struct RunNew;
+pub struct RunNew {
+	/// Additional arguments to pass to cargo generate
+	#[clap(last = true)]
+	pub additional_args: Vec<String>,
+}
 
 impl RunNew {
 	pub async fn run(self) -> Result {
-		Command::new("cargo")
+		let mut command = Command::new("cargo");
+		command
 			.arg("generate")
-			.arg("mrchantey/beet_new_web")
-			.arg("--name")
-			.arg("beet_new_web")
-			.arg("--force")
-			.status()
-			.await?
-			.exit_ok()?
-			.xok()
+			.arg("--git")
+			.arg("https://github.com/mrchantey/beet")
+			.arg("--path")
+			.arg("crates/beet_new_web")
+			.args(&self.additional_args);
+
+		command.status().await?.exit_ok()?.xok()
 	}
 }

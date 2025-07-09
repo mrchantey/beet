@@ -36,7 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 
-exclude = ["crates/wasm-bundle-bench", "crates/beet_mcp"]
+exclude = ["crates/beet_mcp", "crates/beet_new_web"]
 
 members = [
 	"crates/beet_site",

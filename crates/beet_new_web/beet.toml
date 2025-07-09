@@ -1,0 +1,30 @@
+[route_codegen]
+output = "src/codegen/mod.rs"
+
+[client_island_codegen]
+package_name = "beet_new_web"
+output = "src/codegen/client_islands.rs"
+import_tokens = ["#[allow(unused_imports)]use beet::prelude::*;"]
+
+[[route_codegen.collection]]
+name = "pages"
+path = "src/pages"
+output = "src/codegen/pages/mod.rs"
+
+[[route_codegen.collection]]
+name = "docs"
+path = "src/docs"
+output = "src/codegen/docs/mod.rs"
+base_route = "/docs"
+meta_type = "DocsMeta"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
+
+[[route_codegen.collection]]
+name = "actions"
+path = "src/actions"
+output = "src/codegen/actions/mod.rs"
+base_route = "/actions"
+category = "Actions"

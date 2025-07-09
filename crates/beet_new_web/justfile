@@ -1,0 +1,7 @@
+# dev stuff not used in output
+#
+
+
+cli *args:
+	cargo run --manifest-path ../beet/Cargo.toml -p beet-cli {{args}}
+# 

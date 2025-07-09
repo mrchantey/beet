@@ -1,0 +1,5 @@
+[target.wasm32-unknown-unknown]
+# use sweet (deno) runner for cargo run and cargo test in wasm
+runner = 'sweet test-wasm'
+# enable wasm random backend
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]

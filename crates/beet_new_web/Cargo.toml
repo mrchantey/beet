@@ -1,0 +1,20 @@
+[package]
+name = "beet_new_web"
+version = "0.0.1"
+edition = "2024"
+
+[features]
+default = ["beet/web-server", "beet/openssl"]
+# used by beet cli for building prod server
+deploy = ["beet/web-server", "beet/lambda"]
+# used by beet cli for building client
+client = ["beet/web-client"]
+
+[dependencies]
+beet = { path = "../beet" }
+# we can remove this with client island scenes
+serde = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# enable wasm random backend
+getrandom = { version = "0.3", features = ["wasm_js"] }
