@@ -50,7 +50,6 @@ bevy = { workspace = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_fs.workspace = true
 tokio.workspace = true
 
 #💡 wasm

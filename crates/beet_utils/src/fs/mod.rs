@@ -1,12 +1,11 @@
-#![feature(exit_status_error)]
 pub mod cargo;
 pub mod process;
 pub mod terminal;
 pub mod prelude {
-	pub use crate::cargo::*;
-	pub use crate::exports;
-	pub use crate::process::*;
-	pub use crate::terminal;
+	pub use crate::fs::cargo::*;
+	pub use crate::fs::exports;
+	pub use crate::fs::process::*;
+	pub use crate::fs::terminal;
 }
 
 

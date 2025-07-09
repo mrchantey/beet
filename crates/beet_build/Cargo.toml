@@ -33,8 +33,7 @@ required-features = ["css"]
 beet_rsx = { workspace = true, features = ["tokens"] }
 beet_common.workspace = true
 beet_net = { workspace = true, features = ["tokens"] }
-beet_fs.workspace = true
-beet_utils.workspace = true
+beet_utils = { workspace = true, features = ["fs"] }
 beet_parse.workspace = true
 beet_router.workspace = true
 beet_bevy = { workspace = true, features = ["bevy_scene"] }

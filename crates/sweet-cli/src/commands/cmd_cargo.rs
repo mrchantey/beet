@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_fs::prelude::*;
+use beet_utils::fs::prelude::*;
 use beet_utils::prelude::*;
 use clap::Parser;
 
@@ -71,7 +71,7 @@ impl CargoCmdExtra {
 			.package
 			.as_ref()
 			// these crates are upstream of sweet test so do not support the watch command
-			.map(|p| ["beet_utils", "beet_fs"].contains(&p.as_str()))
+			.map(|p| ["beet_utils"].contains(&p.as_str()))
 			.unwrap_or(false);
 		if self.watch && self.build_cmd.lib && !is_upstream {
 			// watching

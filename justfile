@@ -197,7 +197,7 @@ test-ci *args:
 
 # upstream from sweet
 test-fs *args:
-	just watch 'cargo test -p beet_fs --lib -- --nocapture {{args}}'
+	just watch 'cargo test -p beet_utils --lib --features fs -- --nocapture {{args}}'
 # upstream from sweet
 test-beet-utils *args:
 	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
@@ -227,7 +227,7 @@ test-flow *args:
 #{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-utils *args:
 	{{min-stack}} cargo test -p beet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_utils 								--features fs 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_net 								--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server_utils 			--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
@@ -321,7 +321,6 @@ publish-all *args:
 	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Sweet Crates'
 	just publish beet_utils				{{args}} | true
-	just publish beet_fs						{{args}} | true
 	just publish sweet_macros	{{args}} | true
 	just publish sweet					{{args}} | true
 	just publish beet_server_utils				{{args}} | true

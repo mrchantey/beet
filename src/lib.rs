@@ -13,8 +13,6 @@ pub use beet_design as design;
 pub use beet_examples as examples;
 #[cfg(feature = "flow")]
 pub use beet_flow as flow;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use beet_fs as fs;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
 #[cfg(feature = "net")]
@@ -54,8 +52,6 @@ pub mod prelude {
 	pub use crate::examples::prelude::*;
 	#[cfg(feature = "flow")]
 	pub use crate::flow::prelude::*;
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub use crate::fs::prelude::*;
 	#[cfg(feature = "ml")]
 	pub use crate::ml::prelude::*;
 	#[cfg(feature = "net")]

@@ -68,7 +68,6 @@ members = [
 
 	## 💡 Sweet
 	"crates/beet_bevy",
-	"crates/beet_fs",
 	"crates/beet_net",
 	"crates/beet_server_utils",
 	"crates/sweet/macros",
@@ -108,7 +107,6 @@ beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 
 sweet = { path = "crates/sweet", version = "0.4.1" }
 beet_bevy = { path = "crates/beet_bevy", version = "0.0.6-dev.1" }
-beet_fs = { path = "crates/beet_fs", version = "0.0.6-dev.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1", default-features = false, features = [
 	"serde",
 ] }
@@ -286,7 +284,7 @@ bevy_default = [
 	"beet_sim?/bevy_default",
 ]
 #💡 utils
-fs = ["dep:beet_fs"]
+fs = ["beet_utils/fs"]
 net = ["dep:beet_net"]
 web = ["dep:beet_web"]
 
@@ -321,7 +319,6 @@ beet_bevy = { workspace = true }
 # lambda incompatible with openssl, must enable either openssl or rustls manually
 beet_net = { workspace = true, optional = true }
 beet_server_utils = { workspace = true, optional = true }
-beet_fs = { workspace = true, optional = true }
 beet_web = { workspace = true, optional = true }
 
 

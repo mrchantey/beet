@@ -336,7 +336,7 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 	fn get_reload(
 		html_dir: AbsPathBuf,
 	) -> (tower_livereload::LiveReloadLayer, JoinHandle<Result<()>>) {
-		use beet_fs::prelude::FsWatcher;
+		use beet_utils::fs::prelude::FsWatcher;
 
 		let livereload = tower_livereload::LiveReloadLayer::new();
 		let reload = livereload.reloader();

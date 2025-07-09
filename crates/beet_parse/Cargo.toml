@@ -42,7 +42,3 @@ proc-macro2-diagnostics.workspace = true
 [dev-dependencies]
 sweet.workspace = true
 beet_bevy = { workspace = true, features = ["bevy_scene"] }
-
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet_fs.workspace = true

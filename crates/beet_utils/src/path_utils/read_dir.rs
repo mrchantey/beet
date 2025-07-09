@@ -170,7 +170,7 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.path();
-		assert_eq!("../beet_fs", a.to_str().unwrap());
+		assert_eq!("../beet_utils", a.to_str().unwrap());
 		let _a =
 			std::fs::read_dir(std::env::current_dir().unwrap().join("../"))
 				.unwrap()
@@ -178,7 +178,7 @@ mod test {
 				.unwrap()
 				.unwrap()
 				.path();
-		// assert_eq!("../beet_fs", a.to_str().unwrap());
+		// assert_eq!("../beet_utils", a.to_str().unwrap());
 	}
 
 

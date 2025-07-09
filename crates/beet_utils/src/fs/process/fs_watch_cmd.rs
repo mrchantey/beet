@@ -1,5 +1,5 @@
 use super::FsWatcher;
-use crate::terminal;
+use crate::fs::terminal;
 use anyhow::Result;
 use clap::Parser;
 

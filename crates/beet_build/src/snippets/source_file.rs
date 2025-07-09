@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_bevy::prelude::When;
-use beet_fs::exports::notify::EventKind;
-use beet_fs::exports::notify::event::CreateKind;
-use beet_fs::exports::notify::event::RemoveKind;
-use beet_fs::process::WatchEvent;
+use beet_utils::fs::exports::notify::EventKind;
+use beet_utils::fs::exports::notify::event::CreateKind;
+use beet_utils::fs::exports::notify::event::RemoveKind;
+use beet_utils::fs::process::WatchEvent;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::spawn::SpawnIter;

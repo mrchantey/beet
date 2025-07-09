@@ -20,8 +20,7 @@ lambda = ["dep:lambda_http"]
 build = ["dep:beet_build"]
 
 [dependencies]
-beet_fs.workspace = true
-beet_utils.workspace = true
+beet_utils = { workspace = true }
 beet_net.workspace = true
 beet_common = { workspace = true, features = ["serde"] }
 beet_rsx.workspace = true

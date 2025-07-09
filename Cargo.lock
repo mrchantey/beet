@@ -712,7 +712,6 @@ dependencies = [
  "beet_design",
  "beet_examples",
  "beet_flow",
- "beet_fs",
  "beet_ml",
  "beet_net",
  "beet_parse",
@@ -780,7 +779,6 @@ dependencies = [
  "anyhow",
  "beet_bevy",
  "beet_common",
- "beet_fs",
  "beet_net",
  "beet_parse",
  "beet_router",
@@ -939,26 +937,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_fs"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_utils",
- "bevy",
- "clap",
- "crossterm",
- "ctrlc",
- "extend",
- "futures",
- "notify",
- "notify-debouncer-full",
- "serde",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
 name = "beet_ml"
 version = "0.0.6-dev.1"
 dependencies = [
@@ -1026,7 +1004,6 @@ dependencies = [
  "anyhow",
  "beet_bevy",
  "beet_common",
- "beet_fs",
  "beet_rsx_combinator",
  "beet_utils",
  "bevy",
@@ -1120,7 +1097,6 @@ dependencies = [
  "anyhow",
  "beet_bevy",
  "beet_common",
- "beet_fs",
  "beet_rsx",
  "beet_rsx_macros",
  "beet_utils",
@@ -1181,7 +1157,6 @@ dependencies = [
  "axum 0.8.4",
  "beet_build",
  "beet_common",
- "beet_fs",
  "beet_net",
  "beet_router",
  "beet_rsx",
@@ -1215,7 +1190,6 @@ dependencies = [
  "axum 0.8.4",
  "axum-extra",
  "axum-server",
- "beet_fs",
  "beet_utils",
  "clap",
  "colorize",
@@ -1282,10 +1256,15 @@ dependencies = [
  "beet_utils",
  "bevy",
  "clap",
+ "crossterm",
+ "ctrlc",
  "extend",
+ "futures",
  "getrandom 0.2.16",
  "glob",
  "js-sys",
+ "notify",
+ "notify-debouncer-full",
  "path-clean",
  "pathdiff",
  "rand 0.8.5",
@@ -8444,7 +8423,6 @@ version = "0.4.1"
 dependencies = [
  "anyhow",
  "backtrace",
- "beet_fs",
  "beet_utils",
  "bevy",
  "clap",
@@ -8478,7 +8456,6 @@ name = "sweet-cli"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_fs",
  "beet_server",
  "beet_server_utils",
  "beet_utils",

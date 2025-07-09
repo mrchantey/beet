@@ -2,7 +2,7 @@ use super::*;
 use crate::prelude::*;
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
-use beet_fs::process::WatchEvent;
+use beet_utils::fs::process::WatchEvent;
 use beet_parse::prelude::*;
 use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;

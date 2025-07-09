@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_bevy::prelude::When;
-use beet_fs::cargo::CargoBuildCmd;
+use beet_utils::fs::cargo::CargoBuildCmd;
 use bevy::prelude::*;
 use std::process::Command;
 

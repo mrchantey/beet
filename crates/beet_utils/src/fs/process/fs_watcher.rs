@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use clap::Parser;
 use notify::event::CreateKind;
 use notify::event::RemoveKind;
@@ -11,6 +11,7 @@ use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A file watcher with glob patterns. All matches against
@@ -83,7 +84,7 @@ impl FsWatcher {
 	///
 	/// ## Example
 	/// ```rust no_run
-	/// # use beet_fs::process::FsWatcher;
+	/// # use beet_utils::fs::process::FsWatcher;
 	/// # async fn foo()->anyhow::Result<()> {
 	///
 	/// let mut rx = FsWatcher::default().watch()?;
@@ -96,7 +97,10 @@ impl FsWatcher {
 	/// ```
 	pub fn watch(&self) -> Result<WatchEventReceiver> {
 		self.assert_path_exists()?;
+		#[cfg(not(target_arch = "wasm32"))]
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+		#[cfg(target_arch = "wasm32")]
+		panic!("File watching is not supported on wasm32");
 		let mut debouncer = new_debouncer(self.debounce, None, move |ev| {
 			if let Err(err) = tx.send(ev) {
 				eprintln!("{:?}", err);
@@ -104,15 +108,20 @@ impl FsWatcher {
 		})?;
 		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
 
-		Ok(WatchEventReceiver {
+		#[cfg(not(target_arch = "wasm32"))]
+		return Ok(WatchEventReceiver {
 			rx,
 			_tx: debouncer,
 			filter: self.filter.clone(),
-		})
+		});
+		
+		#[cfg(target_arch = "wasm32")]
+		unreachable!();
 	}
 }
 // TODO async iterator when stablizes
 // https://doc.rust-lang.org/std/async_iter/trait.AsyncIterator.html
+#[cfg(not(target_arch = "wasm32"))]
 pub struct WatchEventReceiver {
 	rx: UnboundedReceiver<DebounceEventResult>,
 	filter: GlobFilter,
@@ -120,6 +129,7 @@ pub struct WatchEventReceiver {
 	_tx: Debouncer<INotifyWatcher, NoCache>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl WatchEventReceiver {
 	pub async fn recv(&mut self) -> Result<Option<WatchEventVec>> {
 		while let Some(ev) = self.rx.recv().await {
