@@ -1,31 +1,108 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-pub fn get() -> impl Bundle {
 
+const WEB_UI_DEMO: &str = r#"
+#[template]
+fn Counter(input: u32) -> impl Bundle {
+	let (value, set_value) = signal(input);
+	rsx! {
+		<div>
+			<button onclick={move |_| set_value(value() + 1)}>
+				"Count: " {value}
+			</button>
+		</div>
+	}
+}
+"#;
+
+const SERVER_ACTIONS_DEMO: &str = r#"
+// actions/add.rs
+pub async fn get(input: JsonQuery<(i32, i32)>) -> Json<i32> {
+	Json(input.0 + input.1)
+}
+
+// components/server_counter.rs
+#[template]
+pub fn ServerCounter(initial: i32) -> impl Bundle {
+	let (get, set) = signal(initial);
+
+	let onclick = move |_: Trigger<OnClick>| {
+			spawn_local(async move {
+				set(actions::add(get(), 1).await.unwrap());
+			});
+	};
+
+	rsx! {
+		<div>
+			<Button
+				variant=ButtonVariant::Outlined
+				onclick=onclick>
+				Server Cookie Count: {get}
+			</Button>
+		</div>
+	}
+}
+"#;
+
+
+const BEHAVIOR_DEMO: &str = r#"
+#[template]
+fn SayHello(name: String) -> impl Bundle {
+	(
+		Name::new("My Behavior"),
+		Sequence,
+		RunOnSpawn,
+		children![
+			(
+				Name::new("Hello"),
+				ReturnWith(RunResult::Success)
+			),
+			(
+				Name::new(name),
+				ReturnWith(RunResult::Success)
+			)
+		]
+	)
+}
+"#;
+
+
+///jdks
+pub fn get() -> impl Bundle {
 	rsx! {
 		<BeetContext>
 			<ContentLayout>
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
 				<h1>Beet</h1>
-				<p>"🌱 A very bevy metaframework 🌱"</p>
-				<Link
-					class="primary-action"
-					href="https://github.com/mrchantey/beet/blob/main/CONTRIBUTING.md"
-					style:cascade
-					>Contributing</Link>
-				<p>"🚧 Mind your step! Beet is under construction, this site is currently for testing and feedback purposes only 🚧"</p>
-				// <Link
-				// 	class="primary-action"
-				// 	href=paths::docs::index()
-				// 	style:cascade
-				// 	>Get Started</Link>
-				<h6>Interactivity Tests</h6>
-				<div class="interactivity">
-				<Counter client:load initial=1 />
-				<Calculator client:load initial=1 />
-				</div>
+				<p>"🦄 The Unistack Metaframework 🦄"</p>
+				<Card style:cascade class="hero">
+				<p>"One unified architecture, zero glue. Use Bevy ECS at every layer of the stack."
+				<br/><br/>
+				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>				
+				"Beet is under construction, basic development workflows are incomplete and untested. If this project is of interest please come and say hi in the"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy/beet discord channel</a>.</p>
+					<footer>
+						<Link
+							style:cascade
+							variant=ButtonVariant::Outlined
+							href="https://github.com/mrchantey/beet"
+							>Github</Link>
+						<Link
+							style:cascade
+							variant=ButtonVariant::Primary
+							href=routes::docs::index()
+							>Get Started</Link>
+					</footer>
+				</Card>
+				<h2>"Very Bevy Web UI"</h2>
+					<ClientCounter client:load initial=1 />
+				<Code style:cascade content=WEB_UI_DEMO/>
+				<h2>"Very Bevy Server Actions"</h2>
+				<ServerCounter client:load initial=1 />
+				<Code style:cascade content=SERVER_ACTIONS_DEMO/>
+				<h2>"Very Bevy Behavior"</h2>
+				<Code style:cascade content=BEHAVIOR_DEMO/>
 				</div>
 			</ContentLayout>
 		</BeetContext>
@@ -37,20 +114,35 @@ pub fn get() -> impl Bundle {
 			padding-top: 3.em;
 			gap:1.em;
 		}
+		pre{
+			width: 45.em;
+			max-width: 45.em;
+		}
+		.hero{
+			width: 30.em;
+			max-width: 30.em;
+		}
+		.hero>footer{
+			display: flex;
+			flex-direction: row;
+			gap: 1.em;
+			justify-content: space-between;
+			align-items: stretch;
+		}
+		.hero>footer>a{
+			flex: 1;
+		}
 		h6{
 			padding-top: 2.em;
+		}
+		h2{
+			font-size: 1.4.em;
 		}
 		.interactivity{
 			display: flex;
 			flex-direction: row;
 			gap: 1.em;
 		}
-
-
-		.primary-action{
-			max-width:20.em;
-		}
-
 		</style>
 	}
 }

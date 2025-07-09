@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[template]
 #[derive(Serialize, Deserialize)]
-pub fn Counter(#[field(default = 0)] initial: i32) -> impl Bundle {
+pub fn ClientCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
 	rsx! {

@@ -222,7 +222,7 @@ val_string	= "foo"
 		// let yaml = r#"
 		// let foo = ArticleMeta {
 		// 	title: Some("Beet Site".into()),
-		// 	description: Some("A very bevy metaframework".into()),
+		// 	description: Some("The Unistack Metaframework".into()),
 		// 	draft: false,
 		// 	sidebar: SidebarInfo {
 		// 		label: Some("Beet Site".into()),

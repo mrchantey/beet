@@ -1,4 +1,4 @@
-use crate::timeout_reject;
+use crate::prelude::*;
 use anyhow::Result;
 use js_sys::Array;
 use js_sys::Promise;
@@ -9,7 +9,6 @@ use std::time::Duration;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::JsFuture;
-use wasm_bindgen_futures::spawn_local;
 
 
 pub async fn future_timeout<F, Fut, O>(fut: F, duration: Duration) -> Result<O>

@@ -12,10 +12,15 @@ repository.workspace = true
 [features]
 default = []
 
+[dependencies]
+html-escape = { version = "0.2" }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 beet_utils.workspace = true
 anyhow.workspace = true
 extend.workspace = true
+
+#💡 html
 
 js-sys.workspace = true
 wasm-bindgen.workspace = true

@@ -24,11 +24,16 @@ mod net;
 pub use self::net::*;
 
 
-#[cfg(target_arch = "wasm32")]
 pub mod prelude {
+	#[cfg(target_arch = "wasm32")]
 	pub use crate::dom_utils::*;
+	#[cfg(target_arch = "wasm32")]
 	pub use crate::extensions::*;
+	#[cfg(target_arch = "wasm32")]
 	pub use crate::logging::*;
+	#[cfg(target_arch = "wasm32")]
 	pub use crate::net::*;
+	pub use html_escape;
+	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures::spawn_local;
 }

@@ -41,9 +41,6 @@ http.workspace = true
 # temp until proper bevy reactivity
 flume.workspace = true
 
-#💡 html
-html-escape = { version = "0.2", optional = true }
-
 #💡 serde
 serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }

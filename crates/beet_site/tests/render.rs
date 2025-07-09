@@ -20,7 +20,7 @@ async fn root() {
 	let index = router.render_route(&"/".into()).await.unwrap();
 	// println!("{}", index);
 	index.xref().xpect().to_contain("data-beet-dom-idx");
-	index.xref().xpect().to_contain("A very bevy metaframework");
+	index.xref().xpect().to_contain("The Unistack Metaframework");
 }
 #[sweet::test]
 async fn mdx() {
@@ -28,9 +28,7 @@ async fn mdx() {
 		app.insert_resource(TemplateFlags::All);
 	});
 	let _index = router.render_route(&"/docs".into()).await.unwrap();
-	println!("{}", _index);
-	// index.xref().xpect().to_contain("data-beet-dom-idx");
-	// index.xref().xpect().to_contain("A very bevy metaframework");
+	// println!("{}", _index);
 }
 
 
