@@ -11,9 +11,6 @@ pub mod prelude {
 	pub use crate::server_actions::*;
 }
 
-pub mod exports {
-	pub use http;
-}
 
 /// Internal use only
 pub mod as_beet {
@@ -28,7 +25,7 @@ pub mod as_beet {
 			pub use beet_rsx::prelude::*;
 		}
 		pub mod exports {
-			pub use crate::exports::*;
+			// pub use crate::exports::*;
 			pub use beet_rsx::exports::*;
 		}
 	}

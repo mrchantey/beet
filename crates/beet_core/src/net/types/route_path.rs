@@ -1,7 +1,6 @@
 #[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use anyhow::Result;
-use beet_core_macros::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
 

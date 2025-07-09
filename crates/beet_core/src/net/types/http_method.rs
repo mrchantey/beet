@@ -1,7 +1,5 @@
-// #[cfg(feature = "tokens")]
-// use beet_core::as_beet::*;
+#[cfg(feature = "tokens")]
 use crate::as_beet::*;
-use beet_core_macros::ToTokens;
 use std::fmt;
 
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods

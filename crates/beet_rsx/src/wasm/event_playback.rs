@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use js_sys::Array;

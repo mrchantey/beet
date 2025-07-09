@@ -1,5 +1,4 @@
 use crate::as_beet::*;
-use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;

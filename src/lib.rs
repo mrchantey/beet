@@ -63,22 +63,18 @@ pub mod prelude {
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 	pub use crate::utils::prelude::*;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
-	pub use crate::web::prelude::*;
 	pub use bevy::prelude::*;
 }
 pub mod exports {
 	#[cfg(feature = "build")]
 	pub use crate::build::exports::*;
+	pub use crate::core::exports::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::exports::*;
-	#[cfg(feature = "router")]
-	pub use crate::router::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::exports::*;
-	pub use crate::core::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;
