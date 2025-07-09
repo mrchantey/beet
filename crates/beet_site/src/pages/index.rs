@@ -78,7 +78,7 @@ pub fn get() -> impl Bundle {
 				<h1>Beet</h1>
 				<p>"🦄 The Unistack Metaframework 🦄"</p>
 				<Card style:cascade class="hero">
-				<p>"One unified architecture, zero glue. Use Bevy ECS at every layer of the stack."
+				<p>"Build applications that grow using Bevy ECS at every layer of the stack. One unified architecture, zero glue."
 				<br/><br/>
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>				
 				"Beet is under construction, basic development workflows are incomplete and untested. If this project is of interest please come and say hi in the"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy/beet discord channel</a>.</p>
@@ -95,10 +95,16 @@ pub fn get() -> impl Bundle {
 							>Get Started</Link>
 					</footer>
 				</Card>
+				<h2>Very Bevy</h2>
+				<ul>
+				<li>"100% Open"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
+				<li>"100% Bevy"<br/>"Bevy primitives all the way down, including the beet cli!"</li>
+				</ul>
 				<h2>"Very Bevy Web UI"</h2>
 					<ClientCounter client:load initial=1 />
 				<Code style:cascade content=WEB_UI_DEMO/>
 				<h2>"Very Bevy Server Actions"</h2>
+				<p>"Pop open the dev tools to see your requests in flight!"</p>
 				<ServerCounter client:load initial=1 />
 				<Code style:cascade content=SERVER_ACTIONS_DEMO/>
 				<h2>"Very Bevy Behavior"</h2>
@@ -115,8 +121,8 @@ pub fn get() -> impl Bundle {
 			gap:1.em;
 		}
 		pre{
-			width: 45.em;
 			max-width: 45.em;
+			width: 45.em;
 		}
 		.hero{
 			width: 30.em;
@@ -131,12 +137,6 @@ pub fn get() -> impl Bundle {
 		}
 		.hero>footer>a{
 			flex: 1;
-		}
-		h6{
-			padding-top: 2.em;
-		}
-		h2{
-			font-size: 1.4.em;
 		}
 		.interactivity{
 			display: flex;
