@@ -61,6 +61,7 @@ path = "crates/beet_design/src"
 meta_type = "ArticleMeta"
 output = "crates/beet_design/src/codegen/mockups.rs"
 include = ["*.mockup.*"]
+exclude = ["*/codegen/*"]
 base_route = "/design"
 replace_route = [{ from = ".mockup", to = "" }]
 import_tokens = ["#[allow(unused_imports)]use crate::prelude::*;"]
