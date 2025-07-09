@@ -379,7 +379,7 @@ sweet *args:
 
 # Install the sweet cli
 install-sweet *args:
-	cargo install --path crates/sweet-cli {{args}}
+	cargo install --path crates/sweet/cli {{args}}
 
 
 # creates a directory ~/chrome-for-testing and installs chrome and chromedriver there.

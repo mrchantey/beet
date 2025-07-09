@@ -73,7 +73,7 @@ members = [
 	"crates/sweet",
 	"crates/beet_utils",
 	"crates/beet_web",
-	"crates/sweet-cli",
+	"crates/sweet/cli",
 
 	# "crates/emby",
 ]

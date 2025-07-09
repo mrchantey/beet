@@ -386,12 +386,12 @@ mod test {
 			Ok(file)
 		}
 
-		let insert_lib = insert("crates/sweet-cli/src/foo.rs").unwrap();
+		let insert_lib = insert("crates/sweet/cli/src/foo.rs").unwrap();
 		expect(&insert_lib).to_contain("pub mod foo;");
 		expect(&insert_lib).to_contain("pub use crate::foo::*;");
 
 		let insert_mod =
-			insert("crates/sweet-cli/src/commands/foo.rs").unwrap();
+			insert("crates/sweet/cli/src/commands/foo.rs").unwrap();
 		expect(&insert_mod).to_contain("mod foo;");
 		expect(&insert_mod).to_contain("pub use foo::*;");
 	}
@@ -409,7 +409,7 @@ mod test {
 			Ok(file)
 		}
 
-		let remove_lib = remove("crates/sweet-cli/src/automod").unwrap();
+		let remove_lib = remove("crates/sweet/cli/src/automod").unwrap();
 		expect(&remove_lib).not().to_contain("pub mod automod;");
 		expect(&remove_lib)
 			.not()
@@ -417,7 +417,7 @@ mod test {
 
 
 		let remove_mod =
-			remove("crates/sweet-cli/src/commands/automod.rs").unwrap();
+			remove("crates/sweet/cli/src/commands/automod.rs").unwrap();
 		expect(&remove_mod).not().to_contain("pub mod automod;");
 		expect(&remove_mod).not().to_contain("pub use automod::*;");
 	}
