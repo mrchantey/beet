@@ -1,6 +1,6 @@
 use super::*;
-use beet_bevy::bevyhow;
-use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::bevyhow;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 

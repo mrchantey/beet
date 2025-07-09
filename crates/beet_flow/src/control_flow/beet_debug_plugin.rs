@@ -1,9 +1,9 @@
 use super::PostTickSet;
 use crate::prelude::*;
+use beet_core::prelude::When;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use std::borrow::Cow;
-use beet_bevy::prelude::When;
 
 
 

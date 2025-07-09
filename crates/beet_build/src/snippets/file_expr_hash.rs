@@ -1,6 +1,6 @@
 use super::HashNonSnippetRust;
 use crate::prelude::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use beet_router::as_beet::TemplateRoot;
@@ -131,7 +131,7 @@ pub fn update_file_expr_hash(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use send_wrapper::SendWrapper;

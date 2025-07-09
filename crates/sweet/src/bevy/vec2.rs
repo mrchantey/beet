@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use ::bevy::prelude::*;
+use bevy::prelude::*;
 
 impl CloseTo for Vec2 {
 	fn default_epsilon() -> Self {

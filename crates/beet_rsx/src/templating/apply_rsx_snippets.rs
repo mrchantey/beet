@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use beet_core::prelude::HierarchyQueryExtExt;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
@@ -8,7 +8,7 @@ use bevy::prelude::*;
 // temp whole file until fine-grained loading is implemented
 #[cfg(feature = "serde")]
 pub fn load_all_file_snippets(world: &mut World) -> Result {
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::ReadFile;
 	let config = world.resource::<WorkspaceConfig>();
 
@@ -20,7 +20,7 @@ pub fn load_all_file_snippets(world: &mut World) -> Result {
 }
 #[cfg(feature = "serde")]
 pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::ReadFile;
 	let config = world.resource::<WorkspaceConfig>();
 	use beet_utils::prelude::ReadDir;

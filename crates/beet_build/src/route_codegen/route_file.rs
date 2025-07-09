@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_net::prelude::RoutePath;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;

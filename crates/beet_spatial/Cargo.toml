@@ -20,7 +20,7 @@ _doctest = []
 [dependencies]
 beet_flow = { workspace = true }
 beet_utils = { workspace = true, features = ["rand"] }
-beet_bevy = { workspace = true, features = ["rand"] }
+beet_core = { workspace = true, features = ["rand"] }
 # bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true

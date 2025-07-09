@@ -40,7 +40,7 @@ pub mod prelude {
 	pub(crate) mod beet {
 		pub mod prelude {
 			pub use crate::prelude::*;
-			pub use beet_bevy::prelude::*;
+			pub use beet_core::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_net::prelude::*;
 			pub use beet_router::prelude::*;

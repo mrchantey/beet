@@ -11,7 +11,12 @@ repository.workspace = true
 
 
 [features]
-default = []
+default = ["bevy"]
+bevy = ["dep:bevy", "beet_common_macros", "dep:beet_web", "dep:js-sys"]
+bevy_default = ["bevy", "bevy/default"]
+bevy_scene = ["bevy", "bevy/bevy_scene", "dep:serde"]
+rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+
 server = [
 	"dep:http",
 	"dep:axum",
@@ -29,13 +34,24 @@ server = [
 ]
 rustls = ["server", "axum-server/tls-rustls"]
 
+
 [dependencies]
 beet_utils.workspace = true
+beet_common_macros = { workspace = true, optional = true }
+
+# bevy dependencies (optional)
+bevy = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+rand_chacha = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
+
 ## utils
 anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)
 clap = { workspace = true, optional = true }
 colorize = { workspace = true, optional = true }
@@ -53,6 +69,10 @@ axum-server = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+beet_web = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
 
 
 [dev-dependencies]

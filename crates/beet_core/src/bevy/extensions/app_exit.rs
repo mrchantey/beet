@@ -1,6 +1,5 @@
+use crate::prelude::*;
 use bevy::app::AppExit;
-
-use crate::bevybail;
 
 #[extend::ext(name=AppExitExt)]
 pub impl AppExit {

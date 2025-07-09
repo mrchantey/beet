@@ -9,7 +9,7 @@ use bevy::prelude::*;
 ///
 /// This example will spawn an observer for the entity this bundle is applied to.
 /// ```
-/// # use beet_bevy::prelude::*;
+/// # use beet_core::prelude::*;
 /// # use bevy::prelude::*;
 ///
 /// #[derive(Event)]

@@ -21,7 +21,7 @@ use core::marker::PhantomData;
 /// ```rust
 /// use bevy::prelude::*;
 /// use bevy::ecs::system::RunSystemOnce;
-/// use beet_bevy::prelude::Maybe;
+/// use beet_core::prelude::Maybe;
 ///
 /// #[derive(Component)]
 /// struct A;

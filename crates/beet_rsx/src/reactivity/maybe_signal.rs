@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::prelude::BundleExt;
+use beet_core::prelude::BundleExt;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 

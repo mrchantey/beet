@@ -15,7 +15,7 @@ use bevy::prelude::*;
 ///
 /// ```
 /// # use bevy::prelude::*;
-/// # use beet_bevy::prelude::*;
+/// # use beet_core::prelude::*;
 /// # #[derive(Resource)]
 /// # struct SomeResource;
 /// // This system will fail if `SomeResource` is not present.

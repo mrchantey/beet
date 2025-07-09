@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 /// ## Panics
 ///
 /// If the entity has no parent of this relationship type
-/// 
+///
 /// This method will remove this entity, any other bundles attempting
 /// to access it after will panic.
 pub fn spawn_siblings<R, B>(

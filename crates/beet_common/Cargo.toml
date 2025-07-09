@@ -28,7 +28,7 @@ tokens = [
 
 [dependencies]
 beet_common_macros.workspace = true
-beet_bevy.workspace = true
+beet_core.workspace = true
 beet_utils.workspace = true
 rapidhash.workspace = true
 anyhow.workspace = true

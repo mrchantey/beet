@@ -156,7 +156,7 @@ impl<'a> Parser<'_, '_, 'a> {
 mod test {
 	use super::Parser;
 	use crate::prelude::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_net::prelude::RouteInfo;
 	use bevy::prelude::*;
 	use quote::ToTokens;

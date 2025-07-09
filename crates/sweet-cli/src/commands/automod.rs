@@ -1,8 +1,7 @@
 use anyhow::Result;
-use beet_utils::fs::exports::notify::EventKind;
-use beet_utils::fs::exports::notify::event::ModifyKind;
-use beet_utils::fs::exports::notify::event::RenameMode;
-use beet_utils::fs::prelude::*;
+use beet_utils::exports::notify::EventKind;
+use beet_utils::exports::notify::event::ModifyKind;
+use beet_utils::exports::notify::event::RenameMode;
 use beet_utils::prelude::*;
 use clap::Parser;
 use quote::quote;
@@ -391,7 +390,8 @@ mod test {
 		expect(&insert_lib).to_contain("pub mod foo;");
 		expect(&insert_lib).to_contain("pub use crate::foo::*;");
 
-		let insert_mod = insert("crates/sweet-cli/src/commands/foo.rs").unwrap();
+		let insert_mod =
+			insert("crates/sweet-cli/src/commands/foo.rs").unwrap();
 		expect(&insert_mod).to_contain("mod foo;");
 		expect(&insert_mod).to_contain("pub use foo::*;");
 	}
@@ -418,11 +418,7 @@ mod test {
 
 		let remove_mod =
 			remove("crates/sweet-cli/src/commands/automod.rs").unwrap();
-		expect(&remove_mod)
-			.not()
-			.to_contain("pub mod automod;");
-		expect(&remove_mod)
-			.not()
-			.to_contain("pub use automod::*;");
+		expect(&remove_mod).not().to_contain("pub mod automod;");
+		expect(&remove_mod).not().to_contain("pub use automod::*;");
 	}
 }

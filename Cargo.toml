@@ -67,7 +67,6 @@ members = [
 	"crates/beet_server",
 
 	## 💡 Sweet
-	"crates/beet_bevy",
 	"crates/beet_net",
 	"crates/beet_core",
 	"crates/sweet/macros",
@@ -106,7 +105,6 @@ beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 
 sweet = { path = "crates/sweet", version = "0.4.1" }
-beet_bevy = { path = "crates/beet_bevy", version = "0.0.6-dev.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.6-dev.1", default-features = false, features = [
 	"serde",
 ] }
@@ -254,7 +252,7 @@ web-client = [
 #💡 fine-grained
 openssl = ["beet_net/openssl"]
 serde = ["beet_utils/serde"]
-rand = ["beet_utils/rand", "beet_bevy/rand"]
+rand = ["beet_utils/rand", "beet_core/rand"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
@@ -271,10 +269,10 @@ lambda = ["server", "beet_server/lambda", "beet_net/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
 build = ["parse", "dep:beet_build", "beet_server?/build"]
-bevy_scene = ["beet_bevy/bevy_scene"]
+bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
-	"beet_bevy/bevy_default",
+	"beet_core/bevy_default",
 	"beet_examples?/bevy_default",
 	"beet_flow?/bevy_default",
 	"beet_ml?/bevy_default",
@@ -313,7 +311,6 @@ beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 #💡 utils
 beet_utils.workspace = true
-beet_bevy = { workspace = true }
 # lambda incompatible with openssl, must enable either openssl or rustls manually
 beet_net = { workspace = true, optional = true }
 beet_core = { workspace = true, optional = true }

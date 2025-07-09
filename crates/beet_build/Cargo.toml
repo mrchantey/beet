@@ -36,7 +36,7 @@ beet_net = { workspace = true, features = ["tokens"] }
 beet_utils = { workspace = true, features = ["fs"] }
 beet_parse.workspace = true
 beet_router.workspace = true
-beet_bevy = { workspace = true, features = ["bevy_scene"] }
+beet_core = { workspace = true, features = ["bevy_scene"] }
 
 #💡 Utils
 thiserror.workspace = true

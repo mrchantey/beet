@@ -705,7 +705,6 @@ dependencies = [
  "anyhow",
  "axum 0.8.4",
  "beet",
- "beet_bevy",
  "beet_build",
  "beet_common",
  "beet_connect",
@@ -754,31 +753,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_bevy"
-version = "0.0.6-dev.1"
-dependencies = [
- "anyhow",
- "beet_bevy",
- "beet_common_macros",
- "beet_utils",
- "beet_web",
- "bevy",
- "extend",
- "getrandom 0.2.16",
- "js-sys",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "serde",
- "sweet",
-]
-
-[[package]]
 name = "beet_build"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_net",
  "beet_parse",
  "beet_router",
@@ -815,9 +795,9 @@ name = "beet_common"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
  "beet_common_macros",
+ "beet_core",
  "beet_utils",
  "bevy",
  "extend",
@@ -872,13 +852,21 @@ dependencies = [
  "axum 0.8.4",
  "axum-extra",
  "axum-server",
+ "beet_common_macros",
  "beet_utils",
+ "beet_web",
+ "bevy",
  "clap",
  "colorize",
  "extend",
  "futures",
+ "getrandom 0.2.16",
  "glob",
  "http 1.3.1",
+ "js-sys",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
  "sweet",
  "thiserror 1.0.69",
  "tokio",
@@ -892,8 +880,8 @@ name = "beet_design"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_net",
  "beet_router",
  "beet_rsx",
@@ -935,7 +923,7 @@ name = "beet_flow"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
+ "beet_core",
  "beet_flow",
  "beet_flow_macros",
  "bevy",
@@ -1025,8 +1013,8 @@ name = "beet_parse"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_rsx_combinator",
  "beet_utils",
  "bevy",
@@ -1087,8 +1075,8 @@ version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_net",
  "beet_router",
  "beet_rsx",
@@ -1118,8 +1106,8 @@ name = "beet_rsx"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_rsx",
  "beet_rsx_macros",
  "beet_utils",
@@ -1161,8 +1149,8 @@ name = "beet_rsx_macros"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
  "beet_common",
+ "beet_core",
  "beet_parse",
  "beet_utils",
  "proc-macro2",
@@ -1233,7 +1221,7 @@ name = "beet_spatial"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
- "beet_bevy",
+ "beet_core",
  "beet_flow",
  "beet_spatial",
  "beet_utils",

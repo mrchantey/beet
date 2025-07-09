@@ -1,5 +1,5 @@
 use super::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::platform::collections::HashSet;

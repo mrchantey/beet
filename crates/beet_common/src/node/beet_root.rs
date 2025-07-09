@@ -1,6 +1,6 @@
 //! Types associated with the root node of a tree in beet.
 use crate::as_beet::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_utils::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;

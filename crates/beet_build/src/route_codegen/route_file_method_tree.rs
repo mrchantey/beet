@@ -120,7 +120,7 @@ impl RouteFileMethodTree {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_net::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

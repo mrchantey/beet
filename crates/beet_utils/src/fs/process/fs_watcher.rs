@@ -84,7 +84,7 @@ impl FsWatcher {
 	///
 	/// ## Example
 	/// ```rust no_run
-	/// # use beet_utils::fs::process::FsWatcher;
+	/// # use beet_utils::prelude::*;
 	/// # async fn foo()->anyhow::Result<()> {
 	///
 	/// let mut rx = FsWatcher::default().watch()?;

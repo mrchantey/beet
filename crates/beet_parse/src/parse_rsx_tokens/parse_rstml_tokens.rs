@@ -452,7 +452,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_bevy::prelude::*;
+	use beet_core::prelude::*;
 	use beet_common::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;

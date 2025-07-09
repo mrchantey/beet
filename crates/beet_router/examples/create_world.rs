@@ -2,7 +2,7 @@
 //!
 //! I get about 0.1ms average world creation time, seeing as several milliseconds is
 //! acceptable for a request, this seems an acceptable baseline.
-use beet_bevy::prelude::AppExt;
+use beet_core::prelude::AppExt;
 use bevy::prelude::*;
 
 

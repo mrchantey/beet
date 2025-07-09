@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use beet_core::prelude::HierarchyQueryExtExt;
 use beet_utils::prelude::ReadFile;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;

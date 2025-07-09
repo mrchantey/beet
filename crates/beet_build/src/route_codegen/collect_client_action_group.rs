@@ -178,7 +178,7 @@ impl Builder<'_, '_, '_, '_, '_> {
 mod test {
 	use super::Builder;
 	use crate::prelude::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::utils::PipelineTarget;
 	use bevy::prelude::*;
 	use quote::ToTokens;

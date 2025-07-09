@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;

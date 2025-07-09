@@ -3,7 +3,7 @@ pub use utils::log::*;
 pub use utils::sleep::*;
 pub mod arena;
 pub mod extensions;
-#[cfg(feature = "fs")]
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
 pub mod path_utils;
 pub mod utils;
@@ -12,8 +12,8 @@ pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::dir;
 	pub use crate::extensions::*;
-	#[cfg(feature = "fs")]
-	pub use crate::fs::prelude::*;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use crate::fs::*;
 	pub use crate::log;
 	pub use crate::log_kvp;
 	pub use crate::path_utils::*;
@@ -22,7 +22,7 @@ pub mod prelude {
 	pub use rand::Rng;
 }
 pub mod exports {
-	#[cfg(feature = "fs")]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::exports::*;
 	pub use glob;
 	#[cfg(target_arch = "wasm32")]

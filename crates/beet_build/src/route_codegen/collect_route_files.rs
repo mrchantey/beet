@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::bevyhow;
+use beet_core::prelude::bevyhow;
 use beet_common::prelude::TokenizeSelf;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
@@ -151,7 +151,7 @@ pub fn collect_route_files(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;

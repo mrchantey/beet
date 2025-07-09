@@ -8,7 +8,6 @@ use axum::extract::Request;
 use axum::http::Method;
 use axum::response::Response;
 use axum::routing::get;
-use beet_utils::fs::prelude::*;
 use beet_utils::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;

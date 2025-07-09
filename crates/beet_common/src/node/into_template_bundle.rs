@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::prelude::EntityObserver;
+use beet_core::prelude::EntityObserver;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;

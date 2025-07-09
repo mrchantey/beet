@@ -1,5 +1,5 @@
 // use crate::*;
-// use ::bevy::prelude::*;
+// use ::prelude::*;
 
 
 // cannot do simple CloseTo for Quat, sometimes values are flipped

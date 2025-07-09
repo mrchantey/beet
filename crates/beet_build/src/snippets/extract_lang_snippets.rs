@@ -1,4 +1,4 @@
-use beet_bevy::prelude::*;
+use beet_core::prelude::*;
 use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
@@ -139,7 +139,7 @@ pub(super) fn extract_lang_snippets(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use beet_bevy::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

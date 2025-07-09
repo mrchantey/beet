@@ -1,11 +1,11 @@
 use super::*;
 use crate::prelude::*;
-use beet_bevy::prelude::*;
 use beet_common::prelude::*;
-use beet_utils::fs::process::WatchEvent;
+use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;
+use beet_utils::prelude::WatchEvent;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
 use serde::Deserialize;

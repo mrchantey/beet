@@ -9,7 +9,7 @@ pub trait BundleExt {
 	/// ## Example
 	/// ```
 	/// # use bevy::prelude::*;
-	/// # use beet_bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let bundle = if true {
 	/// 	().any_bundle()

@@ -226,16 +226,14 @@ test-flow *args:
 
 #{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-utils *args:
-	{{min-stack}} cargo test -p beet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_utils 								--features fs 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_net 								--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_bevy   	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet   			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_web   	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_web  --lib --target wasm32-unknown-unknown  --all-features  	{{args}} -- {{test-threads}}
 
 test-all-lib *args:
 	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}

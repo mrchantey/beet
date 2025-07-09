@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use beet_bevy::prelude::NonSendPlugin;
+use beet_core::prelude::NonSendPlugin;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;

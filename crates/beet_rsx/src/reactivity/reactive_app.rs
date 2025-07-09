@@ -1,4 +1,4 @@
-use beet_bevy::prelude::AppExt;
+use beet_core::prelude::AppExt;
 use bevy::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;

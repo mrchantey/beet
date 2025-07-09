@@ -20,7 +20,7 @@ html = ["dep:beet_rsx_combinator"]
 [dependencies]
 beet_common = { workspace = true, features = ["serde", "tokens"] }
 beet_utils.workspace = true
-beet_bevy.workspace = true
+beet_core.workspace = true
 beet_rsx_combinator = { workspace = true, optional = true }
 
 ron.workspace = true
@@ -41,4 +41,4 @@ proc-macro2-diagnostics.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true
-beet_bevy = { workspace = true, features = ["bevy_scene"] }
+beet_core = { workspace = true, features = ["bevy_scene"] }

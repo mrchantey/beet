@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::PI;
-use beet_bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space
 #[derive(Default, Component, Reflect)]

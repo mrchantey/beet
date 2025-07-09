@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_utils::fs::prelude::*;
+use beet_utils::prelude::*;
 use clap::Parser;
 use std::process::Child;
 

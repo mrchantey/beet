@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_bevy::bevyhow;
+use beet_core::prelude::bevyhow;
 use beet_common::as_beet::*;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
@@ -121,7 +121,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_bevy::prelude::WorldMutExt;
+	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use quote::ToTokens;

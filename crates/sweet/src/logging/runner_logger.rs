@@ -18,7 +18,7 @@ fn clear() {
 	#[cfg(target_arch = "wasm32")]
 	web_sys::console::clear();
 	#[cfg(not(target_arch = "wasm32"))]
-	beet_utils::fs::prelude::terminal::clear().unwrap();
+	beet_utils::prelude::terminal::clear().unwrap();
 }
 
 impl RunnerLogger {
