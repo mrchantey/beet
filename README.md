@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>🦄 A Unistack Application Metaframework 🦄</strong>
+    <strong>🦄 The Unistack Metaframework 🦄</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
