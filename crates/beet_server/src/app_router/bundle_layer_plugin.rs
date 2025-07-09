@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 
 pub struct BundleLayerPlugin<L, R> {
 	pub layer: L,

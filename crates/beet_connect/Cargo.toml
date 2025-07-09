@@ -19,8 +19,8 @@ keywords.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 
-beet_net.workspace=true
-beet_utils.workspace=true
+beet_core = { workspace = true, features = ["net"] }
+beet_utils.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"

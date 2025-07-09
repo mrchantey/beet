@@ -1,7 +1,7 @@
 use crate::app_router::bundle_layer_plugin::BundleLayerPlugin;
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 
 
 pub trait RouterPlugin: Sized {

@@ -6,7 +6,7 @@ use axum::routing::MethodFilter;
 use axum::routing::{
 	self,
 };
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 /// Methods that accept a tuple of extractors and return a bundle.

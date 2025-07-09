@@ -21,7 +21,7 @@ build = ["dep:beet_build"]
 
 [dependencies]
 beet_utils = { workspace = true }
-beet_net.workspace = true
+beet_core = { workspace = true, features = ["server", "net"] }
 beet_common = { workspace = true, features = ["serde"] }
 beet_rsx.workspace = true
 beet_router = { workspace = true, features = ["axum"] }

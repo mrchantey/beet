@@ -1,7 +1,7 @@
 mod sidebar;
 mod sidebar_item;
-use beet_net::prelude::RoutePath;
-use beet_net::prelude::RoutePathTree;
+use beet_core::prelude::RoutePath;
+use beet_core::prelude::RoutePathTree;
 use beet_utils::prelude::GlobFilter;
 use beet_utils::utils::Pipeline;
 use heck::ToTitleCase;

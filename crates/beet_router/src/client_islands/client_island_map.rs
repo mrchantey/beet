@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -29,10 +29,7 @@ impl ClientIslandMap {
 	}
 
 	pub fn write(&self, path: &AbsPathBuf) -> Result {
-		FsExt::write(
-			&path,
-			ron::ser::to_string_pretty(self, default())?,
-		)?;
+		FsExt::write(&path, ron::ser::to_string_pretty(self, default())?)?;
 		Ok(())
 	}
 

@@ -15,8 +15,6 @@ pub use beet_examples as examples;
 pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
-#[cfg(feature = "net")]
-pub use beet_net as net;
 #[cfg(feature = "parse")]
 pub use beet_parse as parse;
 #[cfg(feature = "query")]
@@ -50,8 +48,6 @@ pub mod prelude {
 	pub use crate::flow::prelude::*;
 	#[cfg(feature = "ml")]
 	pub use crate::ml::prelude::*;
-	#[cfg(feature = "net")]
-	pub use crate::net::prelude::*;
 	#[cfg(feature = "parse")]
 	pub use crate::parse::prelude::*;
 	#[cfg(feature = "query")]

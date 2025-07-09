@@ -20,7 +20,7 @@ libsql = ["dep:libsql"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-beet_net.workspace = true
+beet_core = { workspace = true, features = ["net"] }
 beet_utils.workspace = true
 
 anyhow.workspace = true
@@ -28,7 +28,6 @@ thiserror.workspace = true
 beet_query_macros.workspace = true
 extend.workspace = true
 rapidhash.workspace = true
-once_cell.workspace = true
 serde_json.workspace = true
 
 sea-query = { version = "0.32" }

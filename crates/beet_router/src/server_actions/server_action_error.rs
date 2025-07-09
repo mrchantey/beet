@@ -1,4 +1,4 @@
-use beet_net::cross_fetch;
+use beet_core::net::cross_fetch;
 use http::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;

@@ -25,7 +25,7 @@ pub mod as_beet {
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_common::prelude::*;
-			pub use beet_net::prelude::*;
+			pub use beet_core::prelude::*;
 			pub use beet_rsx::prelude::*;
 		}
 		pub mod exports {

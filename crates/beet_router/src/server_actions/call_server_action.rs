@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use beet_net::cross_fetch;
-use beet_net::cross_fetch::Request;
-use beet_net::cross_fetch::ResponseInner;
-use beet_net::prelude::*;
+use beet_core::net::cross_fetch;
+use beet_core::net::cross_fetch::Request;
+use beet_core::net::cross_fetch::ResponseInner;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -130,7 +130,7 @@ mod test {
 	use axum::Router;
 	use axum::routing::get;
 	use axum::routing::post;
-	use beet_net::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 	use tokio::net::TcpListener;
 	use tokio::spawn;

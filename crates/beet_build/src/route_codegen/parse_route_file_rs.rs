@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::ReadFile;
 use bevy::prelude::*;
 use std::str::FromStr;
@@ -23,7 +23,9 @@ pub fn parse_route_file_rs(
 		// discard any existing children, we could
 		// possibly do a diff but these changes already result in recompile
 		// so not super perf critical
-		commands.entity(route_file_entity).despawn_related::<Children>();
+		commands
+			.entity(route_file_entity)
+			.despawn_related::<Children>();
 
 		let file_str = ReadFile::to_string(&source_file)?;
 
@@ -83,7 +85,7 @@ pub fn parse_route_file_rs(
 mod test {
 	use super::super::*;
 	use crate::prelude::*;
-	use beet_net::prelude::*;
+	use beet_core::prelude::*;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -102,8 +104,14 @@ mod test {
 
 		let collection =
 			world.spawn(RouteFileCollection::test_site_pages()).id();
-		world.run_system_cached(update_route_files).unwrap().unwrap();
-		world.run_system_cached(parse_route_file_rs).unwrap().unwrap();
+		world
+			.run_system_cached(update_route_files)
+			.unwrap()
+			.unwrap();
+		world
+			.run_system_cached(parse_route_file_rs)
+			.unwrap()
+			.unwrap();
 		let file = world.entity(collection).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let route_method = world

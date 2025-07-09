@@ -1,6 +1,7 @@
-use anyhow::Result;
 #[cfg(feature = "tokens")]
-use beet_common::as_beet::*;
+use crate::as_beet::*;
+use anyhow::Result;
+use beet_common_macros::ToTokens;
 use std::path::Path;
 use std::path::PathBuf;
 

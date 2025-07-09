@@ -1,4 +1,4 @@
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 

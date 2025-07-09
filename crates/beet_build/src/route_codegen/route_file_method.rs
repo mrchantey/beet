@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use beet_common::as_beet::*;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use syn::Ident;
 use syn::ItemFn;

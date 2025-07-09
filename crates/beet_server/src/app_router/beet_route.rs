@@ -1,7 +1,7 @@
 use crate::app_router::HttpMethodExt;
 use axum::Router;
 use axum::routing;
-use beet_net::prelude::RouteInfo;
+use beet_core::prelude::RouteInfo;
 
 
 /// Common trait for both vanilla axum handlers and handlers that return a bundle.

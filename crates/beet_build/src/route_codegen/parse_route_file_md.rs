@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -89,7 +89,7 @@ pub fn parse_route_file_md(
 mod test {
 	use super::super::*;
 	use crate::prelude::*;
-	use beet_net::prelude::*;
+	use beet_core::prelude::*;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

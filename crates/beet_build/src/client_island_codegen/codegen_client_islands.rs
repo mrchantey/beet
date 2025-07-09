@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::When;
 use beet_common::prelude::*;
+use beet_core::prelude::When;
 use beet_router::prelude::ClientIslandMap;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
@@ -106,7 +106,7 @@ pub fn export_client_island_codegen(
 mod test {
 	use crate::prelude::*;
 	use beet_common::prelude::*;
-	use beet_net::prelude::*;
+	use beet_core::prelude::*;
 	use beet_router::prelude::*;
 	use quote::quote;
 	use serde::Serialize;

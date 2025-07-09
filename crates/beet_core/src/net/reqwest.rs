@@ -1,8 +1,8 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use reqwest::Client;
 
 
-static REQWEST_CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
+static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(|| Client::new());
 
 
 /// A wrapper around the reqwest client. Calling `Client::new()` creates
@@ -20,8 +20,8 @@ impl ReqwestClient {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 	use beet_utils::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

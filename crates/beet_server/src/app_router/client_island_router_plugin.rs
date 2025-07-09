@@ -43,7 +43,7 @@ where
 		unimplemented!("ClientIslandPlugin should not be used directly")
 	}
 
-	fn routes(&self) -> Vec<beet_net::prelude::RouteInfo> {
+	fn routes(&self) -> Vec<beet_core::prelude::RouteInfo> {
 		unimplemented!("ClientIslandPlugin should not be used directly")
 	}
 
@@ -61,7 +61,7 @@ where
 	fn add_bundle_route<M, H>(
 		&self,
 		router: Router<Self::State>,
-		route_info: beet_net::prelude::RouteInfo,
+		route_info: beet_core::prelude::RouteInfo,
 		handler: H,
 		_meta: Self::Meta,
 	) -> Router<Self::State>

@@ -3,7 +3,7 @@ use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 
 /// A form of middleware, accepting a [`BundleRoute`] and wrapping it.

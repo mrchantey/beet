@@ -1,4 +1,4 @@
-use beet_net::cross_fetch;
+use beet_core::net::cross_fetch;
 use beet_utils::prelude::*;
 
 pub mod realtime;

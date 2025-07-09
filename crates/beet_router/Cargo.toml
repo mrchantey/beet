@@ -14,7 +14,7 @@ keywords.workspace = true
 
 [features]
 default = ["nightly", "serde", "actions"]
-actions = ["serde", "dep:beet_net"]
+actions = ["serde", "beet_core/net"]
 nightly = []
 axum = ["dep:axum", "dep:tower", "dep:tokio", "dep:http-body-util"]
 serde = [
@@ -35,7 +35,6 @@ beet_rsx.workspace = true
 beet_utils.workspace = true
 beet_common.workspace = true
 beet_core.workspace = true
-beet_net = { workspace = true, optional = true }
 
 bevy.workspace = true
 

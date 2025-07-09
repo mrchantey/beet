@@ -1,5 +1,5 @@
 use beet_common::prelude::*;
-use beet_net::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use syn::FnArg;
 use syn::Ident;
@@ -319,7 +319,7 @@ impl ParseClientAction {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::RouteInfo;
+	use beet_core::prelude::RouteInfo;
 use beet_utils::utils::PipelineTarget;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
