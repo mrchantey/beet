@@ -17,7 +17,6 @@ impl RunNew {
 			.arg("generate")
 			.arg("--git")
 			.arg("https://github.com/mrchantey/beet")
-			.arg("--path")
 			.arg("crates/beet_new_web")
 			.args(&self.additional_args);
 
