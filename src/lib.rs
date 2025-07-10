@@ -3,8 +3,8 @@
 #![doc = include_str!("../README.md")]
 #[cfg(feature = "build")]
 pub use beet_build as build;
-#[cfg(feature = "connect")]
-pub use beet_connect as connect;
+// #[cfg(feature = "connect")]
+// pub use beet_connect as connect;
 pub use beet_core as core;
 #[cfg(feature = "design")]
 pub use beet_design as design;
@@ -16,8 +16,8 @@ pub use beet_flow as flow;
 pub use beet_ml as ml;
 #[cfg(feature = "parse")]
 pub use beet_parse as parse;
-#[cfg(feature = "query")]
-pub use beet_query as query;
+// #[cfg(feature = "query")]
+// pub use beet_query as query;
 #[cfg(feature = "router")]
 pub use beet_router as router;
 #[cfg(feature = "rsx")]
@@ -35,8 +35,8 @@ pub use beet_utils::noop;
 pub mod prelude {
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
-	#[cfg(feature = "connect")]
-	pub use crate::connect::prelude::*;
+	// #[cfg(feature = "connect")]
+	// pub use crate::connect::prelude::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
@@ -48,8 +48,8 @@ pub mod prelude {
 	pub use crate::ml::prelude::*;
 	#[cfg(feature = "parse")]
 	pub use crate::parse::prelude::*;
-	#[cfg(feature = "query")]
-	pub use crate::query::prelude::*;
+	// #[cfg(feature = "query")]
+	// pub use crate::query::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]

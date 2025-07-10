@@ -15,7 +15,7 @@ deploy = ["beet/web-server", "beet/lambda"]
 client = ["beet/web-client"]
 
 [dependencies]
-beet = { path = "../beet" }
+beet = "0.0.6-rc.2"
 # we can remove this with client island scenes
 serde = "1"
 

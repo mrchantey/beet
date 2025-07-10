@@ -307,17 +307,25 @@ patch:
 
 publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}
-	sleep 2
+	sleep 1
 
 publish-all *args:
-	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Utility Crates'
 	just publish beet_utils						{{args}} | true
 	just publish sweet_macros					{{args}} | true
 	just publish sweet								{{args}} | true
-	just publish sweet-cli						{{args}} | true
 	just publish beet_core_macros			{{args}} | true
 	just publish beet_core						{{args}} | true
+	just publish sweet-cli						{{args}} | true
+	@echo 'Publishing Rsx Crates'
+	just publish beet_rsx_combinator  {{args}} || true
+	just publish beet_parse      			{{args}} || true
+	just publish beet_rsx_macros      {{args}} || true
+	just publish beet_rsx        			{{args}} || true
+	just publish beet_router          {{args}} || true
+	just publish beet_build      			{{args}} || true
+	just publish beet_server       		{{args}} || true
+	just publish beet_design 					{{args}} || true
 	@echo 'Publishing Flow Crates'
 	just publish beet_flow_macros     {{args}} || true
 	just publish beet_flow            {{args}} || true
@@ -325,23 +333,11 @@ publish-all *args:
 	just publish beet_ml              {{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
-	@echo 'Publishing Rsx Build Crates'
-	just publish beet_parse      			{{args}} || true
-	just publish beet_build      			{{args}} || true
-	just publish beet_rsx_macros      {{args}} || true
-	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx        {{args}} || true
-	just publish beet_router          {{args}} || true
-	just publish beet_server       		{{args}} || true
-	just publish beet_connect      		{{args}} || true
-	just publish beet_design 					{{args}} || true
-	@echo 'Publishing Build Crates'
-	@echo 'Publishing Misc Crates'
+	@echo 'Publishing Top Crates'
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
 
-
-
+#just publish beet_connect      		{{args}} || true
 # just publish beet_examples        {{args}} || true
 
 watch *command:
