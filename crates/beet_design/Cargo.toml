@@ -19,6 +19,7 @@ publish = true
 
 [features]
 client = []
+mockups = []
 _test_lightningcss = ["dep:lightningcss"]
 
 [dependencies]

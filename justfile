@@ -307,7 +307,6 @@ patch:
 
 publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}
-	sleep 1
 
 publish-all *args:
 	@echo 'Publishing Utility Crates'
