@@ -52,8 +52,8 @@ export default $config({
       name: resourceName("lambda"),
       // the rust runtime is not ready, we deploy ourselves
       runtime: "rust",
-      // we'll upload the real handler with cargo-lambda
-      handler: "./dummy",
+      // point to this dummy Cargo.toml
+      handler: "",
       url: true,
       timeout: "3 minutes",
       // memory: "1024 MB"

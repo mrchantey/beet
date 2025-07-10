@@ -2,12 +2,12 @@
 
 /// the function name matching the cargo lambda deploy step,
 /// by default binary name in kebab-case (underscores not allowed)
-let app_name = "beet-new-web";
+let appName = "beet-new-web";
 
 export default $config({
   app(input) {
     return {
-      name: app_name,
+      name: appName,
       removal: input?.stage === "production" ? "retain" : "remove",
       home: "aws",
       providers: {
@@ -18,15 +18,15 @@ export default $config({
     };
   },
   async run() {
-    console.log(
-      `🌱 Deploying Lambda function: ${app_name} - stage: ${$app.stage}`,
-    );
+    // consistent resource naming
+    let resourceName = (resourceType: string) =>
+      `${appName}-${resourceType}-${$app.stage}`;
 
-    let func = new sst.aws.Function(`${app_name}-lambda`, {
-      name: `${app_name}-lambda`,
+    let func = new sst.aws.Function(resourceName("lambda"), {
+      name: resourceName("lambda"),
       runtime: "rust",
-      // we'll upload the real handler with cargo-lambda
-      handler: "./dummy",
+      // point to this dummy Cargo.toml
+      handler: "",
       url: true,
       timeout: "3 minutes",
       permissions: [

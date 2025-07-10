@@ -109,7 +109,7 @@ impl RunInfra {
 		// .arg("infra/sst.config.ts")
 
 		println!(
-			"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling AWS Resources"
+			"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
 		);
 		cmd.status().await?.exit_ok()?.xok()
 	}

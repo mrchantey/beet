@@ -1,3 +1,7 @@
+[workspace]
+exclude = ["infra"]
+
+
 [package]
 name = "beet_new_web"
 version = "0.0.1"
