@@ -1,20 +1,22 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
-// TODO get these from Cargo.toml or beet.toml
-
 /// the function name matching the cargo lambda deploy step,
 /// by default binary name in kebab-case (underscores not allowed)
 // let app_name = "beet-new-web";
 
-const appName = "BeetServer";
-const domainName = "beetrsx.dev";
+// TODO get these from Cargo.toml/beet.toml
+const appName = "beet-site";
+const domainName = "beetstack.dev";
+// the production stage has no prefix and extra protections
+// against removal
+const prodStage = "prod";
 
 export default $config({
   app(input) {
     return {
       name: appName,
-      removal: input?.stage === "production" ? "retain" : "remove",
-      // protect: ["production"].includes(input?.stage),
+      removal: input?.stage === prodStage ? "retain" : "remove",
+      // protect: [prodStage].includes(input?.stage),
       home: "aws",
       providers: {
         aws: {
@@ -26,16 +28,12 @@ export default $config({
   async run() {
     console.log(`🌱 Deploying Infrastructure - stage: ${$app.stage}`);
 
-    let domainPrefix = $app.stage === "production" ? "" : `${$app.stage}.`;
+    let domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
 
-    let gateway = new sst.aws.ApiGatewayV2(`${appName}Gateway`, {
+    // 1. create the api gateway
+    let gateway = new sst.aws.ApiGatewayV2(`${appName}-${$app.stage}-gateway`, {
       domain: {
         name: `${domainPrefix}${domainName}`,
-        /*
-Cloudflare DNS requires two environment variables:
-- CLOUDFLARE_API_TOKEN = https://dash.cloudflare.com/profile/api-tokens > Create Token > edit zone DNS > Copy Token
-- CLOUDFLARE_DEFAULT_ACCOUNT_ID = https://dash.cloudflare.com/login > right click 'My Account' hamburger > Copy Account ID
-        */
         dns: sst.cloudflare.dns(),
       },
       cors: true,
@@ -46,10 +44,10 @@ Cloudflare DNS requires two environment variables:
         },
       },
     });
-
-    let func = new sst.aws.Function(`${appName}Lambda`, {
+    // 2. create the lambda function
+    let func = new sst.aws.Function(`${appName}-${$app.stage}-lambda`, {
       // this name *must* match beet deploy --function-name ...
-      name: `${appName}Lambda`,
+      name: `${appName}-${$app.stage}-lambda`,
       // the rust runtime is not ready, we deploy ourselves
       runtime: "rust",
       // we'll upload the real handler with cargo-lambda
@@ -75,7 +73,7 @@ Cloudflare DNS requires two environment variables:
       ],
     });
 
-    // else try func.arn
+    // 3. point the gateway's default route to the function
     let route = gateway.route("$default", func.arn);
   },
 });

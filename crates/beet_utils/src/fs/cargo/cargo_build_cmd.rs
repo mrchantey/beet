@@ -123,7 +123,10 @@ impl CargoBuildCmd {
 			bin.clone()
 		} else if let Some(example) = &self.example {
 			example.clone()
+		} else if let Some(pkg) = &self.package {
+			pkg.clone()
 		} else if let Some(pkg_name) = pkg_name {
+			// otherwise it must be the default crate name
 			pkg_name.to_string()
 		} else {
 			panic!("No binary or package name provided.");

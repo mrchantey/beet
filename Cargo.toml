@@ -300,8 +300,7 @@ beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 #💡 utils
 beet_utils.workspace = true
-# lambda incompatible with openssl, must enable either openssl or rustls manually
-beet_core = { workspace = true, optional = true }
+beet_core.workspace = true
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
