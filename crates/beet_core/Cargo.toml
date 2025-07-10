@@ -35,7 +35,6 @@ server = [
 	"dep:tower-http",
 	"dep:tower-livereload",
 	"dep:clap",
-	"dep:colorize",
 	"dep:glob",
 	"dep:futures",
 	"dep:tokio",
@@ -104,7 +103,6 @@ http = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)
 clap = { workspace = true, optional = true }
-colorize = { workspace = true, optional = true }
 glob = { workspace = true, optional = true }
 
 # async (server-specific)

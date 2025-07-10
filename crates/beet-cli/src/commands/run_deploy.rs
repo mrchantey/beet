@@ -56,7 +56,7 @@ impl RunDeploy {
 			// beet binaries should default to 'server' with 'openssl' but we need
 			// to disable that to specify 'deploy' feature
 			.arg("--no-default-features")
-			// force release, debug builds are generally way to big for lambda
+			// force release, debug builds are generally way to big for lambda (450 MB / 65 MB)
 			.arg("--release")
 			.arg("--features")
 			.arg("deploy")
@@ -145,7 +145,7 @@ impl RunDeploy {
 				}
 			});
 
-		let function_name = RunInfra::lambda_func_name(stage, &binary_name);
+		let function_name = RunInfra::lambda_func_name(&binary_name, stage);
 		cmd.arg(&function_name);
 
 		// Print the full command before executing

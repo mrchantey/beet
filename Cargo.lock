@@ -813,7 +813,6 @@ dependencies = [
  "beet_utils",
  "bevy",
  "clap",
- "colorize",
  "console_error_panic_hook",
  "extend",
  "futures",

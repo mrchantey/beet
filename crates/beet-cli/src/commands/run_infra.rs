@@ -107,3 +107,18 @@ impl RunInfra {
 		cmd.status().await?.exit_ok()?.xok()
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let binary_name = "test_binary";
+		RunInfra::lambda_func_name(binary_name, "dev")
+			.xpect()
+			.to_be("test-binary-dev-lambda");
+	}
+}

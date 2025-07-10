@@ -1,8 +1,7 @@
 use anyhow::Result;
-use colorize::AnsiColor;
+use beet_utils::prelude::*;
 use http::Uri;
 use std::fmt::Display;
-use beet_utils::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Address {
@@ -48,9 +47,6 @@ impl Address {
 			)),
 			port,
 		)
-	}
-	pub fn to_string_pretty(&self) -> String {
-		self.to_string().b_cyan().underlined().bold()
 	}
 }
 
