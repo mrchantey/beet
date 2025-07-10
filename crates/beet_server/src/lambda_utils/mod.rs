@@ -21,17 +21,9 @@ where
 	};
 	// required to enable CloudWatch error logging by the runtime
 	tracing::init_default_subscriber();
-	tracing::info!("listening for requests");
+	tracing::info!("🌱 listening for requests");
 
 	lambda_http::run(handler)
 		.await
 		.map_err(|err| anyhow::anyhow!("{}", err))
 }
-
-
-// pub async fn run<'a, R, S, E>(handler: S) -> Result<(), Error>
-// where
-//     S: Service<Request, Response = R, Error = E>,
-//     S::Future: Send + 'a,
-//     R: IntoResponse,
-//     E: std::fmt::Debug + Into<Diagnostic>,

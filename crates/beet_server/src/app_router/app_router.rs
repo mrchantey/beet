@@ -87,6 +87,7 @@ impl AppRouter<AppRouterState> {
 			router: default(),
 			static_routes: default(),
 			state: default(),
+			// we dont want tracing in tests
 			tracing: Level::WARN,
 			args: default(),
 		}
@@ -119,10 +120,7 @@ impl<S: DerivedAppState> AppRouter<S> {
 			router: default(),
 			static_routes: default(),
 			state,
-			#[cfg(debug_assertions)]
 			tracing: Level::INFO,
-			#[cfg(not(debug_assertions))]
-			tracing: Level::WARN,
 		}
 	}
 }

@@ -71,9 +71,6 @@ deploy-site *args:
 # --region 					us-west-2 			\
 # --iam-role 				$AWS_IAM_ROLE 	\
 
-infra *args:
-	cd infra && npx sst {{args}}
-
 mod *args:
 	just sweet mod --exclude */codegen/* {{args}}
 

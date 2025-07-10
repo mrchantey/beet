@@ -12,6 +12,9 @@ pub struct RunInfra {
 	/// The subcommand to run (deploy or remove)
 	#[arg(value_enum, default_value = "deploy")]
 	subcommand: SstSubcommand,
+	/// Rusty convention, an alias for `--stage prod`
+	#[arg(long)]
+	release: bool,
 	/// The stage to use, defaults to `dev`
 	#[arg(long, default_value = "dev")]
 	stage: String,
@@ -84,13 +87,17 @@ impl SstSubcommand {
 }
 
 impl RunInfra {
-	/// The name of the lambda function matching the one
-	/// in sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
+	/// binary-resource-stage convention to match
+	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
 	pub fn lambda_func_name(binary_name: &str, stage: &str) -> String {
-		format! {"{}-{}-lambda",binary_name.to_kebab_case(),stage}
+		format! {"{}-lambda-{}",binary_name.to_kebab_case(),stage}
 	}
 
-	pub async fn run(&self) -> Result {
+	pub async fn run(mut self) -> Result {
+		if self.release {
+			self.stage = "prod".to_string();
+		}
+
 		let mut args = vec!["sst", self.subcommand.as_str()];
 		args.push("--stage");
 		args.push(&self.stage);
@@ -119,6 +126,6 @@ mod test {
 		let binary_name = "test_binary";
 		RunInfra::lambda_func_name(binary_name, "dev")
 			.xpect()
-			.to_be("test-binary-dev-lambda");
+			.to_be("test-binary-lambda-dev");
 	}
 }

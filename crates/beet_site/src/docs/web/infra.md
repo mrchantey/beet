@@ -6,20 +6,24 @@ Beet comes with an [`sst`](https://sst.dev/) configuration for managing infrastr
 
 ## `beet infra`
 
-This command is a lightweight wrapper of `npx sst`, with some added conventions. TLDR is the infrastructure step is seperaate
+This command is a lightweight wrapper of `npx sst`, with some added conventions.
 
 **infra directory**
 
 Rust is currently not well supported in sst, for example it refuses to deploy without building a binary, but doesnt allow feature flags etc. The infra directory has some hacks to get around this, providing a dummy `Cargo.toml` and `bootstrap` file. For this reason `beet infra` will cd into the infra directory for all sst commands.
 
 
+**default stages**
+
+Beet will default to the `dev` stage, using `beet infra --release` will use the `prod` stage instead.
+
 ## Tips
 
-This is the cleanest way I've found for managing infrastructure, even so there are some things to be aware of that I found not completely obvious:
+SST is a great tool, but does take some practice to build up an intuition for how IaC works.
 
 ### Dangling Resources
 
-
+Its important to call `beet infra remove` before editing the `sst.config.ts` file to avoid resources not being cleaned up. Also I'd recommend not interrupting an sst command.
 
 ### State Mismatch
 

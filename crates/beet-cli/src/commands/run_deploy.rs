@@ -33,8 +33,10 @@ impl RunDeploy {
 
 	pub async fn run(self) -> Result {
 		// we need to build the native and wasm binaries,
-		// and export the html, matching the
-		self.build.clone().run(RunMode::Once).await?;
+		// and export the html
+		let mut build = self.build.clone();
+		build.build_cmd.release = true; // force release build
+		build.run(RunMode::Once).await?;
 
 		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
 			self.build.beet_config.as_deref(),
@@ -120,7 +122,6 @@ impl RunDeploy {
 			.arg(&html_dir)
 			.arg("--include")
 			.arg(&snippets_dir)
-			// this is where sst expects the boostrap to be located
 			.arg("--lambda-dir")
 			.arg("target/lambda/crates")
 			.arg("--binary-name")

@@ -26,12 +26,14 @@ export default $config({
     };
   },
   async run() {
-    console.log(`🌱 Deploying Infrastructure - stage: ${$app.stage}`);
-
     let domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
 
+    // consistent resource naming
+    let resourceName = (resourceType: string) =>
+      `${appName}-${resourceType}-${$app.stage}`;
+
     // 1. create the api gateway
-    let gateway = new sst.aws.ApiGatewayV2(`${appName}-${$app.stage}-gateway`, {
+    let gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
       domain: {
         name: `${domainPrefix}${domainName}`,
         dns: sst.cloudflare.dns(),
@@ -45,9 +47,9 @@ export default $config({
       },
     });
     // 2. create the lambda function
-    let func = new sst.aws.Function(`${appName}-${$app.stage}-lambda`, {
+    let func = new sst.aws.Function(resourceName("lambda"), {
       // this name *must* match beet deploy --function-name ...
-      name: `${appName}-${$app.stage}-lambda`,
+      name: resourceName("lambda"),
       // the rust runtime is not ready, we deploy ourselves
       runtime: "rust",
       // we'll upload the real handler with cargo-lambda

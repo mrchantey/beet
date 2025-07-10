@@ -8,7 +8,7 @@ pub fn BeetContext() -> impl Bundle {
 	ReactiveApp::insert_resource(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),
-		site_url: "https://beetrsx.dev".into(),
+		site_url: "https://beetstack.dev".into(),
 		version: env!("CARGO_PKG_VERSION").into(),
 	});
 	let theme = ThemeBuilder::with_source(Argb::new(255, 0, 255, 127)).build();
