@@ -311,6 +311,7 @@ publish-all *args:
 	just publish sweet								{{args}} | true
 	just publish beet_core_macros			{{args}} | true
 	just publish beet_core						{{args}} | true
+	just publish beet_connect					{{args}} | true
 	just publish sweet-cli						{{args}} | true
 	@echo 'Publishing Rsx Crates'
 	just publish beet_rsx_combinator  {{args}} || true

@@ -1,9 +1,8 @@
+// deno-lint-ignore-file no-explicit-any
 /// <reference path="./.sst/platform/config.d.ts" />
 
-/// the function name matching the cargo lambda deploy step,
-/// by default binary name in kebab-case (underscores not allowed)
-// let app_name = "beet-new-web";
-
+// the function name matching the cargo lambda deploy step,
+// by default binary name in kebab-case (underscores not allowed)
 // TODO get these from Cargo.toml/beet.toml
 const appName = "beet-site";
 const domainName = "beetstack.dev";
@@ -25,29 +24,29 @@ export default $config({
       },
     };
   },
-  async run() {
-    let domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
+  run() {
+    const domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
 
     // consistent resource naming
-    let resourceName = (resourceType: string) =>
+    const resourceName = (resourceType: string) =>
       `${appName}-${resourceType}-${$app.stage}`;
 
     // 1. create the api gateway
-    let gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
+    const gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
       domain: {
         name: `${domainPrefix}${domainName}`,
         dns: sst.cloudflare.dns(),
       },
       cors: true,
       transform: {
-        stage: (args) => {
+        stage: (args:any) => {
           args.name = "$default";
           args.autoDeploy = true;
         },
       },
     });
     // 2. create the lambda function
-    let func = new sst.aws.Function(resourceName("lambda"), {
+    const func = new sst.aws.Function(resourceName("lambda"), {
       // this name *must* match beet deploy --function-name ...
       name: resourceName("lambda"),
       // the rust runtime is not ready, we deploy ourselves
@@ -76,6 +75,6 @@ export default $config({
     });
 
     // 3. point the gateway's default route to the function
-    let route = gateway.route("$default", func.arn);
+    const _route = gateway.route("$default", func.arn);
   },
 });

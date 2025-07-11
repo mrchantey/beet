@@ -249,7 +249,7 @@ web-client = [
 openssl = ["beet_core/openssl"]
 serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_core/rand"]
-# connect = ["dep:beet_connect"]
+connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_build?/css"]
@@ -301,8 +301,8 @@ beet_parse = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
+beet_connect = { workspace = true, optional = true }
 # beet_query = { workspace = true, optional = true }
-# beet_connect = { workspace = true, optional = true }
 
 #💡 flow
 beet_flow = { workspace = true, optional = true }

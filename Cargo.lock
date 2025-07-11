@@ -706,6 +706,7 @@ dependencies = [
  "axum 0.8.4",
  "beet",
  "beet_build",
+ "beet_connect",
  "beet_core",
  "beet_design",
  "beet_examples",

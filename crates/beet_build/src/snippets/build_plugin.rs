@@ -2,6 +2,7 @@ use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::*;
+use beet_rsx::as_beet::AbsPathBuf;
 use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::WatchEvent;
@@ -12,9 +13,8 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-
 /// Config file usually located at `beet.toml`
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BuildConfig {
 	#[serde(flatten)]
 	pub template_config: TemplateConfig,
@@ -25,10 +25,28 @@ pub struct BuildConfig {
 	manifest_path: PathBuf,
 }
 
+impl Default for BuildConfig {
+	fn default() -> Self {
+		Self {
+			template_config: TemplateConfig::default(),
+			route_codegen: RouteCodegenConfig::default(),
+			client_island_codegen: CollectClientIslands::default(),
+			manifest_path: default_manifest_path(),
+		}
+	}
+}
+
 impl BuildConfig {
 	pub fn load_manifest(&self) -> Result<CargoManifest> {
-		Manifest::from_path(&self.manifest_path)
-			.map_err(|e| bevyhow!("Failed to load Cargo manifest: {}", e))
+		let path = AbsPathBuf::new(&self.manifest_path)?;
+		Manifest::from_path(&path)
+			.map_err(|e| {
+				bevyhow!(
+					"Failed to load Cargo manifest\nPath:{}\nError:{}",
+					path,
+					e
+				)
+			})
 			.map(|manifest| CargoManifest(manifest))
 	}
 }

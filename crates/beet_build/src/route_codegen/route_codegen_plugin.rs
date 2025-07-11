@@ -69,9 +69,6 @@ fn default_codegen_file() -> CodegenFile {
 	CodegenFile::new(
 		AbsPathBuf::new_workspace_rel("src/codegen/mod.rs").unwrap(),
 	)
-	.with_pkg_name(
-		std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "beet".to_string()),
-	)
 }
 
 impl Default for RouteCodegenConfig {
