@@ -9,6 +9,7 @@ fn main() -> Result {
 			PagesPlugin,
 			ActionsPlugin,
 			DocsPlugin.layer(ArticleLayout),
+			BlogPlugin.layer(ArticleLayout),
 			BeetDesignMockupsPlugin.layer(ArticleLayout),
 		))
 		.run()

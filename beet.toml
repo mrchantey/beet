@@ -41,6 +41,19 @@ import_tokens = [
 ]
 
 [[route_codegen.collection]]
+name = "blog"
+package_name = "beet_site"
+path = "crates/beet_site/src/blog"
+output = "crates/beet_site/src/codegen/blog/mod.rs"
+base_route = "/blog"
+meta_type = "ArticleMeta"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
+
+
+[[route_codegen.collection]]
 name = "actions"
 package_name = "beet_site"
 path = "crates/beet_site/src/actions"

@@ -3,7 +3,9 @@ title= "Docs"
 +++
 
 ## Quickstart
-In this quick start we will create a new website, deploy it to aws lambda and remove it. This tutorial requires the following tools:
+In this quick start we will create a new website, deploy it to aws lambda and remove it. 
+
+### Build Dependencies
 
 ```sh
 # install prebuilt binaries
@@ -12,11 +14,18 @@ cargo install cargo-binstall
 cargo binstall cargo-generate
 # building wasm
 cargo binstall wasm-opt wasm-bindgen-cli --version=0.2.100
-# infrastructure-as-code
-npm i -g sst
 ```
 
-Additionally aws credentials must be configured for the infrastructure steps.
+### Deploy Dependencies
+
+- [AWS credentials](./web/infra.md#aws-credentials) must be configured for the infrastructure steps.
+
+```sh
+# configuring infrastructure
+npm i -g sst
+# deploying to lambda (using a script also configures zig)
+curl -fsSL https://cargo-lambda.info/install.sh | sh
+```
 
 ### Setup
 

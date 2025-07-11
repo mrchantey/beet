@@ -3,6 +3,7 @@ use beet::exports::ThemeBuilder;
 use beet::prelude::*;
 
 /// Provide the Beet Theme and Brand context to the application.
+
 #[template]
 pub fn BeetContext() -> impl Bundle {
 	ReactiveApp::insert_resource(Brand {

@@ -68,7 +68,6 @@ fn SayHello(name: String) -> impl Bundle {
 "#;
 
 
-///jdks
 pub fn get() -> impl Bundle {
 	rsx! {
 		<BeetContext>
@@ -76,9 +75,9 @@ pub fn get() -> impl Bundle {
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
 				<h1>Beet</h1>
-				<p>"🦄 The Unistack Metaframework 🦄"</p>
+				<p><b>"Fullstack Bevy"</b></p>
 				<Card style:cascade class="hero">
-				<p>"Build applications that grow using Bevy ECS at every layer of the stack. One unified architecture, zero glue."
+				<p>"Build applications that grow with Bevy ECS at every layer of the stack."
 				<br/><br/>
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>				
 				"Beet is under construction, basic development workflows are incomplete and untested. If this project is of interest please come and say hi in the"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy/beet discord channel</a>.</p>

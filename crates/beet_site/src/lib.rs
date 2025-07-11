@@ -19,6 +19,7 @@ pub mod prelude {
 	pub use super::codegen::actions;
 	pub use super::codegen::actions::ActionsPlugin;
 	pub use super::codegen::docs::DocsPlugin;
+	pub use super::codegen::blog::BlogPlugin;
 	pub use super::codegen::pages::*;
 	pub use super::layouts::*;
 	// pub use super::types::*;

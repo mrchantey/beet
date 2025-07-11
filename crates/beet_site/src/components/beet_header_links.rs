@@ -14,5 +14,11 @@ pub fn BeetHeaderLinks() -> impl Bundle {
 			>
 			Docs
 		</Link>
+		<Link
+			variant=ButtonVariant::Text
+			href=routes::blog::index()
+			>
+			Blog
+		</Link>
 	}
 }
