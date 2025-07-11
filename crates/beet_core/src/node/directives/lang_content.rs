@@ -103,7 +103,7 @@ pub(crate) fn extract_lang_content(
 					continue 'iter_elements;
 				}
 				("src", Some(AttributeLit::String(value)))
-					if value.starts_with(".") =>
+					if NodeUtils::is_relative_url(value) =>
 				{
 					commands.entity(attr_entity).despawn();
 					commands

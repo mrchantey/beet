@@ -1,4 +1,28 @@
 //! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
+//! 
+//! ```
+//! // 
+//! SourceFileRoot
+//! ├── (SourceFile(foo.rs), FileExprHash)
+//! │   ├── (RsxSnippetRoot, RsxSnippetOf, RsxTokens)
+//! └── (SourceFile(foo.md), FileExprHash)
+//!     └── (RsxSnippetRoot, RsxSnippetOf, CombinatorTokens)
+//! 
+//! // route collections are a seperate tree
+//! RouteFileCollection
+//! ├── (SourceFileRef(foo.rs), CodegenFile RouteFile)
+//! │   │   // an entity for each route in a file (get, post, etc)
+//! │   ├── (RouteFileMethod)
+//! │   └── (RouteFileMethod)
+//! └── (SourceFileRef(foo.md), CodegenFile RouteFile)
+//!     │   // markdown files have a single 'get' route
+//!     ├── (RouteFileMethod)
+//!     │   // generate the rust code for markdown files
+//!     └── (SourceFileRef(foo.md), CodegenFile, CombinatorRouteCodegen)
+//! ```
+//! 
+//! 
+//! 
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]

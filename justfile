@@ -63,13 +63,6 @@ lambda-build:
 	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
 
 
-deploy-site *args:
-	just cli deploy 										\
-	--package 				beet_site 				\
-	--function-name 	BeetServerLambda	\
-	{{args}}
-# --region 					us-west-2 			\
-# --iam-role 				$AWS_IAM_ROLE 	\
 
 mod *args:
 	just sweet mod --exclude */codegen/* {{args}}
@@ -165,11 +158,14 @@ run-test-site:
 # --templates-root-dir crates \
 
 #just cli watch -p beet_site {{args}}
+build-site *args:
+	just cli build -p beet_site {{args}}
+
 run-site *args:
 	just cli run -p beet_site {{args}}
 
-build-site *args:
-	just cli build -p beet_site {{args}}
+deploy-site *args:
+	just cli deploy -p beet_site --release
 
 
 #💡 Test
