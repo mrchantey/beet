@@ -51,7 +51,7 @@ net = [
 	"dep:serde_urlencoded",
 ]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
-openssl = ["net", "reqwest?/default"]
+native-tls = ["net", "reqwest?/default"]
 tokens = [
 	"serde",
 	"dep:heck",

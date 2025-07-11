@@ -8,7 +8,7 @@ version = "0.0.1"
 edition = "2024"
 
 [features]
-default = ["beet/web-server", "beet/openssl"]
+default = ["beet/web-server", "beet/native-tls"]
 # used by beet cli for building prod server
 deploy = ["beet/web-server", "beet/lambda"]
 # used by beet cli for building client

@@ -55,7 +55,7 @@ impl RunDeploy {
 		// TODO we should support all lambda build featire
 		cmd.arg("lambda")
 			.arg("build")
-			// beet binaries should default to 'server' with 'openssl' but we need
+			// beet binaries should default to 'server' with 'native-tls' but we need
 			// to disable that to specify 'deploy' feature
 			.arg("--no-default-features")
 			// force release, debug builds are generally way to big for lambda (450 MB / 65 MB)

@@ -246,7 +246,7 @@ web-client = [
 	"beet_design/client",
 ]
 #💡 fine-grained
-openssl = ["beet_core/openssl"]
+native-tls = ["beet_core/native-tls"]
 serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_core/rand"]
 connect = ["dep:beet_connect"]

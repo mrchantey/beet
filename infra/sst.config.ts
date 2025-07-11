@@ -47,7 +47,7 @@ export default $config({
     });
     // 2. create the lambda function
     const func = new sst.aws.Function(resourceName("lambda"), {
-      // this name *must* match beet deploy --function-name ...
+      // this name *must* match RunInfra::lambda_func_name
       name: resourceName("lambda"),
       // the rust runtime is not ready, we deploy ourselves
       runtime: "rust",
