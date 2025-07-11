@@ -26,6 +26,17 @@ impl PathExt {
 			.map_err(|e| FsError::other(path.as_ref(), e))
 	}
 
+	/// Check if a path exists, returning an error if it does not.
+	pub fn assert_exists(path: impl AsRef<Path>) -> FsResult<()> {
+		let path = path.as_ref();
+		if !path.exists() {
+			return Err(FsError::FileNotFound {
+				path: path.to_path_buf(),
+			});
+		}
+		Ok(())
+	}
+
 	/// Wraps [`Path::canonicalize`] error with a [`FsError`],
 	/// outputting the path that caused the error.
 	pub fn canonicalize(path: impl AsRef<Path>) -> FsResult<PathBuf> {

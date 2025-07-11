@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::When;
+use beet_rsx::as_beet::PathExt;
 use beet_utils::prelude::CargoBuildCmd;
 use bevy::prelude::*;
 use std::process::Command;
@@ -36,6 +37,7 @@ pub fn export_server_ssg(
 		"Running server binary to generate static files \n{}",
 		exe_path.display()
 	);
+	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
 		.arg("export-static")
 		.status()?
@@ -72,6 +74,7 @@ pub(crate) fn run_server(
 		"Running server binary to generate static files \n{}",
 		exe_path.display()
 	);
+	PathExt::assert_exists(&exe_path)?;
 	let child = Command::new(&exe_path).spawn()?;
 	handle.0 = Some(child);
 

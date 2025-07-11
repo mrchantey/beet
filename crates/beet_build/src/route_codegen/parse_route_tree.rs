@@ -89,6 +89,7 @@ impl<'a> Parser<'_, '_, 'a> {
 		let route_tree = self.collect_route_node(tree);
 		syn::parse_quote!(
 			/// Collect the static route tree
+			#[allow(unused, missing_docs)]
 			pub fn route_path_tree() -> RoutePathTree {
 				#route_tree
 			}
@@ -156,8 +157,8 @@ impl<'a> Parser<'_, '_, 'a> {
 mod test {
 	use super::Parser;
 	use crate::prelude::*;
-	use beet_core::prelude::WorldMutExt;
 	use beet_core::prelude::RouteInfo;
+	use beet_core::prelude::WorldMutExt;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -290,6 +291,7 @@ mod test {
 
 		let expected: ItemFn = syn::parse_quote! {
 			#[doc = r" Collect the static route tree"]
+			#[allow(unused, missing_docs)]
 			pub fn route_path_tree() -> RoutePathTree {
 				RoutePathTree {
 					name: "routes".into(),
