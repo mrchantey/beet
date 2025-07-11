@@ -1,9 +1,5 @@
-# This is the config file for both the beet site
-# and a test site used for internal testing.
-#
-# It contains some custom parts to handle the internal nature
-# of the beet site, an external starter project will be significantly simpler.
-
+# This is the beet.toml for the beet_site and codegen testing
+# for a starter beet.toml see crates/beet_new_web/beet.toml
 [route_codegen]
 package_name = "beet_site"
 output = "crates/beet_site/src/codegen/mod.rs"
