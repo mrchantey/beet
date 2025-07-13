@@ -1,8 +1,9 @@
 use crate::as_beet::*;
+use bevy::ecs::component::Component;
 use http::request::Parts;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RouteInfo {
@@ -28,6 +29,15 @@ impl RouteInfo {
 			path: RoutePath::new(path),
 		}
 	}
+
+	/// Converts this `RouteInfo` into a `http::Request` with the given body.
+	pub fn into_request<T>(self, body: T) -> http::Result<http::Request<T>> {
+		http::Request::builder()
+			.method(self.method)
+			.uri(self.path)
+			.body(body)
+	}
+
 	pub fn from_parts(parts: &Parts) -> Self {
 		Self::new(parts.uri.path(), &parts.method)
 	}

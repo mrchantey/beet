@@ -78,6 +78,7 @@ impl Into<http::Method> for HttpMethod {
 	}
 }
 
+
 impl fmt::Display for HttpMethod {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "{}", match self {

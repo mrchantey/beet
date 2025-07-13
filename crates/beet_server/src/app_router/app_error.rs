@@ -1,5 +1,6 @@
 use axum::response::IntoResponse;
 use axum::response::Response;
+use bevy::ecs::system::RunSystemError;
 use http::StatusCode;
 
 
@@ -15,6 +16,15 @@ pub struct AppError {
 impl std::fmt::Display for AppError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}: {}", self.status_code, self.message)
+	}
+}
+
+impl From<RunSystemError> for AppError {
+	fn from(run_system_error: RunSystemError) -> AppError {
+		AppError::internal_error(format!(
+			"Failed to run system: {}",
+			run_system_error.to_string()
+		))
 	}
 }
 

@@ -22,18 +22,9 @@ impl<T> JsonQuery<T> {
 mod test {
 	use crate::prelude::*;
 	use axum::response::IntoResponse;
-	use http::Method;
-	use http::Request;
-	use http_body_util::BodyExt;
-	use tower::ServiceExt;
+	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
-	fn req(a: i32, b: i32) -> Request<String> {
-		Request::builder()
-			.uri(format!("/?data=[{a},{b}]"))
-			.method(Method::GET)
-			.body(Default::default())
-			.unwrap()
-	}
 
 	async fn add(data: JsonQuery<(i32, i32)>) -> impl IntoResponse {
 		let (a, b) = data.into_inner();
@@ -44,11 +35,12 @@ mod test {
 	async fn works() {
 		use axum::Router;
 		use axum::routing::get;
-		let router = Router::<()>::new().route("/", get(add));
-
-		let resp = router.oneshot(req(1, 2)).await.unwrap();
-		let body = resp.into_body().collect().await.unwrap().to_bytes();
-		let res = String::from_utf8(body.to_vec()).unwrap();
-		assert_eq!(res, "3");
+		Router::<()>::new()
+			.route("/", get(add))
+			.oneshot_str("/?data=[1,2]")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be("3");
 	}
 }

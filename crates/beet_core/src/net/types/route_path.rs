@@ -1,6 +1,8 @@
 #[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use anyhow::Result;
+use http::Uri;
+use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -44,6 +46,14 @@ impl std::ops::Deref for RoutePath {
 
 impl AsRef<Path> for RoutePath {
 	fn as_ref(&self) -> &Path { self.0.as_path() }
+}
+
+impl TryInto<Uri> for RoutePath {
+	type Error = InvalidUri;
+
+	fn try_into(self) -> Result<Uri, Self::Error> {
+		Uri::try_from(self.0.to_string_lossy().as_ref())
+	}
 }
 
 impl RoutePath {

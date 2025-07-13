@@ -111,7 +111,9 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.6-rc.3" }
 beet = { path = "", version = "0.0.6-rc.3" }
 
 #💡 local
-bevy = { version = "0.16", default-features = false, features = [
+## git for IntoPipeSystem: Clone
+bevy = { git = "https://github.com/mrchantey/bevy", branch = "bevy-0.16-patches", default-features = false, features = [
+	# bevy = { version = "0.16", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines,
