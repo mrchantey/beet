@@ -1,3 +1,28 @@
-.sst
-node_modules
-sst-env.d.ts
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# TypeScript
+*.js
+*.d.ts
+
+# Pulumi
+.pulumi/
+Pulumi.*.yaml
+
+# Build artifacts
+bootstrap
+bootstrap.zip
+*.tar.gz
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

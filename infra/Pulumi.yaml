@@ -1,0 +1,7 @@
+name: beet-site
+runtime: nodejs
+description: Beet infrastructure using Pulumi
+config:
+  pulumi:tags:
+    value:
+      project: beet-site
