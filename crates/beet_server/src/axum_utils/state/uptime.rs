@@ -46,11 +46,8 @@ mod test {
 	use axum::Router;
 	use axum::extract::State;
 	use axum::routing::get;
-	use http::Request;
 	use http::StatusCode;
-	use http_body_util::BodyExt;
 	use sweet::prelude::*;
-	use tower::util::ServiceExt;
 
 
 	async fn uptime(State(uptime): State<Uptime>) -> (StatusCode, String) {
@@ -65,16 +62,12 @@ mod test {
 	async fn works() {
 		use std::time::Duration;
 
-		let router = Router::new()
+		let mut router = Router::new()
 			.route("/", get(uptime))
 			.with_state(Uptime::new());
-		let req = Request::builder().uri("/").body(String::default()).unwrap();
 
 		tokio::time::sleep(Duration::from_millis(10)).await;
-		let res = router.oneshot(req).await.unwrap();
-		expect(res.status()).to_be(StatusCode::OK);
-		let body = res.into_body().collect().await.unwrap().to_bytes();
-		let time = String::from_utf8(body.to_vec()).unwrap();
+		let time = router.oneshot_str("/").await.unwrap();
 		let time: u64 = time.parse().unwrap();
 		expect(time).to_be_greater_or_equal_to(10);
 		expect(time).to_be_less_than(20);

@@ -28,6 +28,7 @@ web = [
 
 server = [
 	"dep:http",
+	"dep:http-body-util",
 	"dep:bytes",
 	"dep:axum",
 	"dep:axum-extra",
@@ -100,7 +101,7 @@ extend.workspace = true
 # html utilities (available on all targets)
 html-escape = "0.2"
 http = { workspace = true, optional = true }
-bytes = {workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)

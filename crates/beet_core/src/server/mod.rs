@@ -1,6 +1,8 @@
 pub mod address;
+#[cfg(feature = "net")]
 mod router_ext;
 pub use self::address::*;
+#[cfg(feature = "net")]
 pub use router_ext::*;
 pub mod tls;
 pub use self::tls::*;

@@ -2,14 +2,12 @@ use crate::prelude::*;
 use axum::Router;
 use beet_router::prelude::ClientIsland;
 use beet_router::prelude::ClientIslandMap;
-use beet_rsx::as_beet::bevybail;
 use bevy::app::Plugins;
 use bevy::prelude::*;
 use std::path::PathBuf;
 // use beet_router::types::RouteFunc;
 use clap::Parser;
 use clap::Subcommand;
-use http_body_util::BodyExt;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
 use tower::util::ServiceExt;
@@ -216,34 +214,18 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 	pub async fn render_route(&self, route: &RouteInfo) -> Result<String> {
 		let router = self.router.clone().with_state(self.state.clone());
 
-		let res = router
-			.clone()
-			.oneshot(
-				axum::http::Request::builder()
-					.uri(route.path.to_string_lossy().to_string())
-					.body(axum::body::Body::empty())
-					.unwrap(),
-			)
-			.await
-			.unwrap();
-		if !res.status().is_success() {
-			let status = res.status();
-			let body = res
-				.into_body()
-				.collect()
+		let html =
+			router
+				.clone()
+				.oneshot_str(route.clone())
 				.await
-				.unwrap_or_default()
-				.to_bytes()
-				.to_vec();
-			let msg = String::from_utf8(body)?;
-
-			bevybail!(
-				"Failed to render route {}\n{status}: {msg}",
-				route.path.to_string_lossy(),
-			);
-		}
-		let body = res.into_body().collect().await?.to_bytes().to_vec();
-		let html = String::from_utf8(body.to_vec())?;
+				.map_err(|e| {
+					bevyhow!(
+						"Failed to render route {}: {}",
+						route.path.to_string_lossy(),
+						e
+					)
+				})?;
 		Ok(html)
 	}
 

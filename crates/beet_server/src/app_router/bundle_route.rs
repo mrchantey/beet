@@ -74,7 +74,6 @@ mod test {
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	use sweet::prelude::*;
-	use tower::util::ServiceExt;
 
 	#[derive(Deserialize)]
 	struct RequestPayload {
@@ -93,11 +92,9 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		// this machinery is usually done by the AppRouter
-
 		use axum::extract::State;
 		use axum::routing::get;
-		let router: Router = Router::new()
+		let mut router: Router = Router::new()
 			.route(
 				"/test",
 				get(async move |state: State<AppRouterState>, e| {
@@ -105,22 +102,7 @@ mod test {
 				}),
 			)
 			.with_state(AppRouterState::test());
-		let response = router
-			.oneshot(
-				axum::http::Request::builder()
-					.uri("/test?name=world")
-					.body(axum::body::Body::empty())
-					.unwrap(),
-			)
-			.await
-			.unwrap();
-
-		let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-			.await
-			.unwrap();
-		String::from_utf8(body.to_vec())
-			.unwrap()
-			.xpect()
+		router.oneshot_str("/test?name=world").await.unwrap().xpect()
 			.to_be("<!DOCTYPE html><html><head></head><body><body><h1>hello world!</h1></body></body></html>");
 	}
 }
