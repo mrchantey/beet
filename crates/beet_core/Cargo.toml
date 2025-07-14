@@ -10,6 +10,17 @@ description = "Core utilities for the beet ecosystem"
 repository.workspace = true
 
 
+[[example]]
+name = "to_tokens"
+path = "examples/to_tokens.rs"
+required-features = ["tokens"]
+
+[[test]]
+name = "to_tokens"
+path = "tests/to_tokens.rs"
+required-features = ["tokens"]
+
+
 [features]
 default = ["bevy"]
 bevy = ["dep:bevy", "beet_core_macros"]
@@ -17,8 +28,9 @@ bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
 web = [
-	"dep:http",
+	"http",
 	"dep:wasm-bindgen",
 	"dep:wasm-bindgen-futures",
 	"dep:console_error_panic_hook",
@@ -27,9 +39,7 @@ web = [
 ]
 
 server = [
-	"dep:http",
-	"dep:http-body-util",
-	"dep:bytes",
+	"http",
 	"dep:axum",
 	"dep:axum-extra",
 	"dep:axum-server",
@@ -43,13 +53,10 @@ server = [
 	"beet_utils/fs",
 ]
 net = [
-	"dep:http",
+	"http",
 	"dep:reqwest",
 	"dep:serde",
 	"dep:serde_json",
-	"dep:http",
-	"dep:http-body-util",
-	"dep:url",
 	"dep:serde_urlencoded",
 ]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]

@@ -12,7 +12,7 @@ mod app_router;
 mod axum_utils;
 #[cfg(feature = "lambda")]
 mod lambda_utils;
-mod build_router;
+mod router_app;
 
 pub mod prelude {
 	pub use axum::Router;
@@ -21,7 +21,7 @@ pub mod prelude {
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
-	pub use crate::build_router::*;
+	pub use crate::router_app::*;
 
 	pub(crate) use internal::*;
 	#[allow(unused_imports)]

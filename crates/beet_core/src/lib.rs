@@ -2,6 +2,11 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(let_chains)]
 
+#[cfg(feature = "http")]
+mod http_utils;
+#[cfg(feature = "http")]
+pub use http_utils::http_resources;
+
 pub mod node;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
@@ -9,7 +14,7 @@ pub mod tokens_utils;
 pub use beet_core_macros::*;
 
 #[cfg(feature = "bevy")]
-pub mod bevy_utils;
+mod bevy_utils;
 #[cfg(feature = "net")]
 pub mod net;
 #[cfg(feature = "net")]
@@ -25,6 +30,8 @@ pub mod prelude {
 	pub use crate::bevybail;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevyhow;
+	#[cfg(feature = "http")]
+	pub use crate::http_utils::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::*;
 	pub use crate::node::*;
@@ -51,9 +58,9 @@ pub mod as_beet {
 
 
 pub mod exports {
-	#[cfg(feature = "net")]
+	#[cfg(feature = "http")]
 	pub use http;
-	#[cfg(feature = "net")]
+	#[cfg(feature = "http")]
 	pub use http_body_util;
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;

@@ -10,7 +10,6 @@ use clap::Parser;
 use clap::Subcommand;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
-use tower::util::ServiceExt;
 use tracing::Level;
 
 // use tower::Layer;

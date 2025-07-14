@@ -363,23 +363,6 @@ required-features = ["server"]
 name = "hydration"
 path = "examples/dom/hydration.rs"
 
-# 💡 Examples - rsx
-
-[[example]]
-name = "hello_rsx"
-path = "examples/rsx/hello_rsx.rs"
-required-features = ["rsx"]
-
-[[example]]
-name = "dom_rsx"
-path = "examples/rsx/dom_rsx.rs"
-required-features = ["rsx"]
-
-[[example]]
-name = "bevy_rsx"
-path = "examples/rsx/bevy_rsx.rs"
-required-features = ["rsx", "bevy_default"]
-
 # 💡 Examples - flow
 
 [[example]]

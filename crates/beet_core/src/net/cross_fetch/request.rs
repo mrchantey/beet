@@ -148,6 +148,7 @@ impl IntoUrl for &Cow<'_, str> {
 
 #[cfg(test)]
 mod test {
+	use crate::cross_fetch::Request;
 	use crate::cross_fetch::*;
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
