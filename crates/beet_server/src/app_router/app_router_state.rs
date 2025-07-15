@@ -151,6 +151,7 @@ pub trait DerivedAppState:
 		let mut app = App::new();
 		app.add_plugins((
 			this.template_config.clone().unwrap_or_default(),
+			AppRouterPlugin,
 			TemplatePlugin,
 		));
 		#[cfg(all(not(test), feature = "build"))]

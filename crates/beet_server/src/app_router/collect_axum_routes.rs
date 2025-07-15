@@ -8,16 +8,21 @@ use bevy::prelude::*;
 /// for each [`RouteInfo`] with either a [`RouteHandler`] or [`AsyncRouteHandler`],
 /// collect the route into the [`Router`].
 pub fn collect_axum_routes<S: DerivedAppState>(
-	mut router: Router<S>,
-	world: &mut World,
+	router: In<Router<S>>,
+	query: Query<(
+		Entity,
+		&RouteInfo,
+		Option<&RouteScene>,
+		Option<&RouteHandler>,
+		Option<&AsyncRouteHandler>,
+	)>,
+	layers: Query<&RouteLayer>,
+	parents: Query<&ChildOf>,
 ) -> Result<Router<S>> {
-	for (route_info, route_scene, handler, async_handler) in world
-		.query_once::<(
-			&RouteInfo,
-			Option<&RouteScene>,
-			Option<&RouteHandler>,
-			Option<&AsyncRouteHandler>,
-		)>() {
+	let mut router = router.0;
+	for (entity, route_info, route_scene, handler, async_handler) in
+		query.iter()
+	{
 		match (handler, async_handler) {
 			(Some(_), Some(_)) => {
 				bevybail!(
@@ -34,6 +39,10 @@ pub fn collect_axum_routes<S: DerivedAppState>(
 		let handler = handler.cloned();
 		let async_handler = async_handler.cloned();
 		let route_scene = route_scene.cloned();
+		let layers = parents
+			.iter_ancestors_inclusive(entity)
+			.filter_map(|e| layers.get(e).ok().cloned())
+			.collect::<Vec<_>>();
 
 		router = router.route(
 			&route_info.path.to_string_lossy(),
@@ -53,8 +62,13 @@ pub fn collect_axum_routes<S: DerivedAppState>(
 							))
 						})?;
 
-					let mut world =
-						std::mem::take(state.create_app().world_mut());
+					let mut world = {
+						let mut app = state.create_app();
+						for layer in layers {
+							layer.add_to_app(&mut app);
+						}
+						std::mem::take(app.world_mut())
+					};
 					world.insert_resource(request);
 					if let Some(route_scene) = route_scene {
 						world.load_scene(route_scene.ron).map_err(|err| {
@@ -95,7 +109,7 @@ pub fn collect_axum_routes<S: DerivedAppState>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::http_resources::Response;
+	use beet_core::http_resources::IntoResponse;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -105,17 +119,18 @@ mod test {
 		world.spawn(children![(
 			RouteInfo::get("/"),
 			RouteHandler::new(|mut commands: Commands| {
-				commands.insert_resource(Response::new_str("hello world!"));
+				commands.insert_resource("hello world!".into_response());
 			})
 		),]);
 
-		let mut router = collect_axum_routes(
-			Router::<AppRouterState>::default(),
-			&mut world,
-		)
-		.unwrap()
-		.with_state::<()>(AppRouterState::default());
-		router
+		world
+			.run_system_cached_with(
+				collect_axum_routes,
+				Router::<AppRouterState>::default(),
+			)
+			.unwrap()
+			.unwrap()
+			.with_state::<()>(AppRouterState::default())
 			.oneshot_str("/")
 			.await
 			.unwrap()

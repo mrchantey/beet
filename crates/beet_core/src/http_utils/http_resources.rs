@@ -59,17 +59,117 @@ pub struct Response {
 	pub body: Option<Bytes>,
 }
 
+
+
+
+pub struct Html(pub String);
+pub struct Css(pub String);
+pub struct Javascript(pub String);
+pub struct Json(pub String);
+pub struct Png(pub String);
+
+/// Allows for blanket implementation of `Into<Response>` for various types
+/// and their `Result` variants.
+pub trait IntoResponse {
+	fn into_response(self) -> Response;
+}
+
+impl<T: Into<Response>> IntoResponse for T {
+	fn into_response(self) -> Response { self.into() }
+}
+
+impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
+	fn into_response(self) -> Response {
+		match self {
+			Ok(t) => t.into_response(),
+			Err(e) => e.into_response(),
+		}
+	}
+}
+
+impl IntoResponse for BevyError {
+	fn into_response(self) -> Response {
+		// Log the error and do not return to the client
+		error!("BevyError: {}", self.to_string());
+		Response::from_parts(
+			http::response::Builder::new()
+				.status(StatusCode::INTERNAL_SERVER_ERROR)
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			// do not assume a bevy error message is safe to return to the client
+			Some(Bytes::from("Internal Bevy Error")),
+		)
+	}
+}
+
+impl<'a> IntoResponse for &'a str {
+	fn into_response(self) -> Response {
+		Response::ok_str(self, "text/plain; charset=utf-8")
+	}
+}
+
+impl IntoResponse for String {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self, "text/plain; charset=utf-8")
+	}
+}
+
+impl IntoResponse for Html {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self.0, "text/html; charset=utf-8")
+	}
+}
+
+impl IntoResponse for Css {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self.0, "text/css; charset=utf-8")
+	}
+}
+
+impl IntoResponse for Javascript {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self.0, "application/javascript; charset=utf-8")
+	}
+}
+
+impl IntoResponse for Json {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self.0, "application/json; charset=utf-8")
+	}
+}
+
+impl IntoResponse for Png {
+	fn into_response(self) -> Response {
+		Response::ok_str(&self.0, "image/png")
+	}
+}
+
 impl Response {
-	pub fn new(parts: response::Parts, body: Option<Bytes>) -> Self {
+	pub fn from_status_body(status: StatusCode, body: &[u8]) -> Self {
+		Self::from_parts(
+			http::response::Builder::new()
+				.status(status)
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			Some(Bytes::copy_from_slice(body)),
+		)
+	}
+
+
+	pub fn from_parts(parts: response::Parts, body: Option<Bytes>) -> Self {
 		Self { parts, body }
 	}
 
 	/// Create a response returning a string body with a 200 OK status.
-	pub fn new_str(body: &str) -> Self {
+	pub fn ok_str(body: &str, content_type: &str) -> Self {
 		Self {
 			parts: http::response::Builder::new()
 				.status(StatusCode::OK)
-				.header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+				.header(http::header::CONTENT_TYPE, content_type)
 				.body(())
 				.unwrap()
 				.into_parts()

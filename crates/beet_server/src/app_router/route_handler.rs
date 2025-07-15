@@ -20,9 +20,10 @@ type AsyncRouteHandlerFunc = dyn 'static
 
 /// The returned value from a [`RouteHandler`] or [`AsyncRouteHandler`] will be placed in this resource,
 /// including `Result` and `()` types.
-/// This will be used either for further processing by layers or to be returned as a response.
+/// This will be used either for further processing by layers or converting to a [`Response`]
+/// if it is a supported type.
 #[derive(Resource, Deref)]
-pub struct HandlerOutput<T>(pub T);
+pub struct RouteHandlerOutput<T>(pub T);
 
 
 /// A synchronous route handler component
@@ -57,7 +58,7 @@ impl RouteHandler {
 	{
 		RouteHandler(Arc::new(move |world: &mut World| {
 			let out = world.run_system_once(system.clone())?;
-			world.insert_resource(HandlerOutput(out));
+			world.insert_resource(RouteHandlerOutput(out));
 			Ok(())
 		}))
 	}
@@ -79,7 +80,7 @@ impl AsyncRouteHandler {
 			Box::pin(async move {
 				let fut = func(world);
 				let out = fut.await;
-				world.insert_resource(HandlerOutput(out));
+				world.insert_resource(RouteHandlerOutput(out));
 				Ok(())
 			})
 		}))

@@ -1,11 +1,14 @@
-use axum::response::IntoResponse;
 use axum::response::Response;
 use bevy::ecs::system::RunSystemError;
 use http::StatusCode;
+use tracing::error;
 
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
+
+/// A http error returned by the app router.
+/// The message *will be* returned to the client so ensure that no sensitive information is included.
 #[derive(Debug, Clone)]
 pub struct AppError {
 	/// The error message
@@ -21,10 +24,9 @@ impl std::fmt::Display for AppError {
 
 impl From<RunSystemError> for AppError {
 	fn from(run_system_error: RunSystemError) -> AppError {
-		AppError::internal_error(format!(
-			"Failed to run system: {}",
-			run_system_error.to_string()
-		))
+		error!("Run System Error: {}", run_system_error);
+		// dont leak message to the client
+		AppError::internal_error(format!("Internal Run System Error"))
 	}
 }
 
@@ -46,8 +48,18 @@ impl AppError {
 	}
 }
 
-impl IntoResponse for AppError {
+impl axum::response::IntoResponse for AppError {
 	fn into_response(self) -> Response {
 		(self.status_code, self.message).into_response()
+	}
+}
+
+
+impl beet_core::http_resources::IntoResponse for AppError {
+	fn into_response(self) -> beet_core::http_resources::Response {
+		beet_core::http_resources::Response::from_status_body(
+			self.status_code,
+			self.message.as_bytes(),
+		)
 	}
 }
