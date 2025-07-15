@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::HeaderMap;
+use http::StatusCode;
 use http::request;
 use http::response;
 
-/// Added to every route app before the request is processed.
+/// A generalized request [`Resource`] added to every route app before the
+/// request is processed.
 #[derive(Debug, Clone, Resource)]
 pub struct Request {
 	pub parts: request::Parts,
@@ -60,6 +62,20 @@ pub struct Response {
 impl Response {
 	pub fn new(parts: response::Parts, body: Option<Bytes>) -> Self {
 		Self { parts, body }
+	}
+
+	/// Create a response returning a string body with a 200 OK status.
+	pub fn new_str(body: &str) -> Self {
+		Self {
+			parts: http::response::Builder::new()
+				.status(StatusCode::OK)
+				.header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			body: Some(Bytes::copy_from_slice(body.as_bytes())),
+		}
 	}
 
 	pub fn into_http(self) -> http::Response<Bytes> {
