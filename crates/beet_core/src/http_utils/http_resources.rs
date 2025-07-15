@@ -20,6 +20,17 @@ impl Request {
 		Self { parts, body }
 	}
 
+	pub fn set_body<T: Into<Bytes>>(&mut self, body: T) -> &mut Self {
+		self.body = Some(body.into());
+		self
+	}
+
+	pub fn body_str(&self) -> Option<String> {
+		self.body
+			.as_ref()
+			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
+	}
+
 	pub fn from_http<T: Into<Bytes>>(request: http::Request<T>) -> Self {
 		let (parts, body) = request.into_parts();
 		let bytes = if HttpExt::has_body(&parts) {
