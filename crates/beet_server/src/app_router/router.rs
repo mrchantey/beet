@@ -140,6 +140,8 @@ pub fn collect_routes<R: AddRoute>(
 			.collect::<Vec<_>>();
 
 		router = router.add_route(route_info, move |request| {
+			let start_time = std::time::Instant::now();
+
 			let workspace_config = workspace_config.clone();
 			let html_constants = html_constants.clone();
 			let handler = handler.clone();
@@ -147,9 +149,7 @@ pub fn collect_routes<R: AddRoute>(
 			let route_scene = route_scene.clone();
 			let layers = layers.clone();
 
-			Box::pin(async move {
-				let start_time = std::time::Instant::now();
-
+			async move {
 				let mut world = {
 					let mut app = App::new();
 					app.add_plugins((AppRouterPlugin, TemplatePlugin))
@@ -177,7 +177,7 @@ pub fn collect_routes<R: AddRoute>(
 					})?;
 				}
 
-				world.run_schedule(Update);
+				world.try_run_schedule(BeforeRoute).ok();
 
 				if let Some(handler) = handler {
 					handler.run(&mut world)?;
@@ -186,18 +186,21 @@ pub fn collect_routes<R: AddRoute>(
 					async_handler.run(&mut world).await?;
 				}
 
-				world.run_schedule(Update);
-
-				trace!(
-					"Route handler completed in: {:.2?}",
-					start_time.elapsed()
-				);
+				world.try_run_schedule(AfterRoute).ok();
+				if !world.contains_resource::<Response>() {
+					world.try_run_schedule(CollectResponse).ok();
+				}
 
 				let response =
 					world.remove_resource::<Response>().unwrap_or_default();
 
+				debug!(
+					"Route handler completed in: {:.2?}",
+					start_time.elapsed()
+				);
+
 				Ok(response)
-			})
+			}
 		});
 	}
 

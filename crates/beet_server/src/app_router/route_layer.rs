@@ -1,12 +1,7 @@
 use crate::prelude::*;
 use bevy::app::Plugins;
-use bevy::ecs::system::ScheduleSystem;
+use bevy::ecs::system::IntoSystem;
 use bevy::prelude::*;
-
-
-pub trait IntoRouteLayer<M> {
-	fn into_route_layer(self) -> RouteLayer;
-}
 
 
 /// Plugins added to routes or their ancestors, to be added to the route app.
@@ -16,38 +11,30 @@ pub struct RouteLayer(ClonePluginContainer);
 
 
 impl RouteLayer {
-	pub fn new<M>(layer: impl IntoRouteLayer<M>) -> Self {
-		layer.into_route_layer()
-	}
-}
-
-
-pub struct PluginsIntoRouteLayerMarker;
-
-impl<P, M> IntoRouteLayer<(PluginsIntoRouteLayerMarker, M)> for P
-where
-	P: 'static + Send + Sync + Clone + Plugins<M>,
-{
-	fn into_route_layer(self) -> RouteLayer {
+	pub fn new<P, M>(plugins: P) -> Self
+	where
+		P: 'static + Send + Sync + Clone + Plugins<M>,
+	{
 		RouteLayer(ClonePluginContainer::new(move |app: &mut App| {
-			self.clone().add_to_app(app);
+			plugins.clone().add_to_app(app);
 		}))
 	}
-}
-pub struct ScheduleIntoRouteLayerMarker;
 
-impl<S, M> IntoRouteLayer<(ScheduleIntoRouteLayerMarker, M)> for S
-where
-	S: 'static + Send + Sync + Clone + IntoScheduleConfigs<ScheduleSystem, M>,
-{
-	fn into_route_layer(self) -> RouteLayer {
-		use std::sync::Arc;
-		let this = Arc::new(self);
-		RouteLayer(ClonePluginContainer::new({
-			let this = Arc::clone(&this);
-			move |app: &mut App| {
-				app.add_systems(Update, (*this).clone());
-			}
+	pub fn before_route<S, M>(system: S) -> Self
+	where
+		S: 'static + Send + Sync + Clone + IntoSystem<(), (), M>,
+	{
+		Self(ClonePluginContainer::new(move |app: &mut App| {
+			app.add_systems(BeforeRoute, system.clone());
+		}))
+	}
+
+	pub fn after_route<S, M>(system: S) -> Self
+	where
+		S: 'static + Send + Sync + Clone + IntoSystem<(), (), M>,
+	{
+		Self(ClonePluginContainer::new(move |app: &mut App| {
+			app.add_systems(AfterRoute, system.clone());
 		}))
 	}
 }
@@ -55,17 +42,40 @@ where
 
 #[cfg(test)]
 mod test {
-	// use crate::prelude::*;
+	use crate::prelude::*;
+	use beet_core::http_resources::*;
 	use bevy::prelude::*;
-	// use sweet::prelude::*;
+	use sweet::prelude::*;
 
-	#[test]
-	fn works() {
-		let app = App::new();
-		// app.add_systems(schedule, systems)
-		// let mut world = World::new();
-		// world.add_systems(U
+	#[sweet::test]
+	async fn beet_route_works() {
+		let mut world = World::new();
+		world.spawn((
+			RouteLayer::before_route(|mut req: ResMut<Request>| {
+				req.set_body("jimmy");
+			}),
+			children![(
+				RouteInfo::get("/"),
+				RouteHandler::new(
+					|req: Res<Request>, mut commands: Commands| {
+						let body = req.body_str().unwrap_or_default();
+						commands.insert_resource(
+							format!("hello {}", body).into_response(),
+						);
+					}
+				)
+			),],
+		));
 
-		// expect(true).to_be_false();
+		world
+			.run_system_cached_with(collect_routes, BeetRouter::default())
+			.unwrap()
+			.unwrap()
+			.oneshot("/")
+			.await
+			.unwrap()
+			.xmap(|res| res.body_str().unwrap())
+			.xpect()
+			.to_be("hello jimmy".to_string());
 	}
 }
