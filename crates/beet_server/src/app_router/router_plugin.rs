@@ -1,4 +1,3 @@
-use crate::app_router::bundle_layer_plugin::BundleLayerPlugin;
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use beet_core::prelude::*;
@@ -7,14 +6,6 @@ use beet_core::prelude::*;
 pub trait RouterPlugin: Sized {
 	type State: DerivedAppState;
 	type Meta: 'static + Send + Sync + Clone;
-
-	/// Layer this plugin with a [`BundleLayer`].
-	fn layer<L>(self, layer: L) -> BundleLayerPlugin<L, Self>
-	where
-		Self: Sized,
-	{
-		BundleLayerPlugin::new(layer, self)
-	}
 
 	/// Whether routes provided by this plugin are static.
 	/// Usually this should be `true` for pages and `false` for actions.
@@ -84,10 +75,6 @@ impl<T: RouterPlugin> IntoRoutePlugins<T::State, T> for T {
 	fn add_to_router(self, app_router: &mut AppRouter<T::State>) {
 		if self.is_static() {
 			app_router.static_routes.extend(self.routes());
-			app_router.router = self.add_routes_with(
-				app_router.router.clone(),
-				&ClientIslandRouterPlugin::<T>::default(),
-			);
 		}
 		app_router.router = self.add_routes(app_router.router.clone());
 	}

@@ -99,29 +99,13 @@ pub fn collect_routes<R: AddRoute>(
 		&RouteInfo,
 		Option<&RouteScene>,
 		Option<&RouteHandler>,
-		Option<&AsyncRouteHandler>,
 	)>,
 	layers: Query<&RouteLayer>,
 	parents: Query<&ChildOf>,
 ) -> Result<R> {
 	let mut router = router.0;
 
-	for (entity, route_info, route_scene, handler, async_handler) in
-		query.iter()
-	{
-		match (handler, async_handler) {
-			(Some(_), Some(_)) => {
-				bevybail!(
-					"Route cannot have both a sync and async handler\nRoute: {:?}",
-					route_info
-				);
-			}
-			(None, None) => continue,
-			_ => {
-				// exactly one handler is present
-			}
-		};
-
+	for (entity, route_info, route_scene, handler) in query.iter() {
 		let workspace_config = workspace_config
 			.as_ref()
 			.map(|res| (**res).clone())
@@ -132,7 +116,6 @@ pub fn collect_routes<R: AddRoute>(
 			.unwrap_or_default();
 
 		let handler = handler.cloned();
-		let async_handler = async_handler.cloned();
 		let route_scene = route_scene.cloned();
 		let layers = parents
 			.iter_ancestors_inclusive(entity)
@@ -145,7 +128,6 @@ pub fn collect_routes<R: AddRoute>(
 			let workspace_config = workspace_config.clone();
 			let html_constants = html_constants.clone();
 			let handler = handler.clone();
-			let async_handler = async_handler.clone();
 			let route_scene = route_scene.clone();
 			let layers = layers.clone();
 
@@ -180,10 +162,8 @@ pub fn collect_routes<R: AddRoute>(
 				world.try_run_schedule(BeforeRoute).ok();
 
 				if let Some(handler) = handler {
-					handler.run(&mut world)?;
-				}
-				if let Some(async_handler) = async_handler {
-					async_handler.run(&mut world).await?;
+					// if handler errors it is inserted into RouteHandlerOutput
+					world = handler.run(world).await
 				}
 
 				world.try_run_schedule(AfterRoute).ok();

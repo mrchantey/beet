@@ -230,20 +230,20 @@ impl<'a, S: DerivedAppState> AppRouter<S> {
 
 	pub(super) async fn get_client_islands(
 		&self,
-		route: &RouteInfo,
+		_: &RouteInfo,
 	) -> Result<Vec<ClientIsland>> {
 		// convert /foobar into /__client_islands/foobar
-		let route_info = ClientIslandRouterPlugin::route_info(route);
-		let ron = self.render_route(&route_info).await?;
+		// let route_info = ClientIslandRouterPlugin::route_info(route);
+		// let ron = self.render_route(&route_info).await?;
 
-		let islands: Vec<ClientIsland> =
-			beet_core::exports::ron::de::from_str(&ron).map_err(|e| {
-				AppError::internal_error(format!(
-					"Failed to deserialize client islands: {}",
-					e
-				))
-			})?;
-		Ok(islands)
+		// let islands: Vec<ClientIsland> =
+		// 	beet_core::exports::ron::de::from_str(&ron).map_err(|e| {
+		// 		AppError::internal_error(format!(
+		// 			"Failed to deserialize client islands: {}",
+		// 			e
+		// 		))
+		// 	})?;
+		todo!("ecs client island layers")
 	}
 
 	/// Server the provided router, adding

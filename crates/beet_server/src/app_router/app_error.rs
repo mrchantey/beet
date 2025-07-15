@@ -23,9 +23,9 @@ impl std::fmt::Display for AppError {
 
 impl From<RunSystemError> for AppError {
 	fn from(run_system_error: RunSystemError) -> AppError {
-		error!("Run System Error: {}", run_system_error);
+		error!("RunSystemError: {}", run_system_error);
 		// dont leak message to the client
-		AppError::internal_error(format!("Internal Run System Error"))
+		AppError::internal_error(format!("Internal RunSystemError"))
 	}
 }
 
