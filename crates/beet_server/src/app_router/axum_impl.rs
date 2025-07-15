@@ -38,6 +38,11 @@ impl<S: 'static + Send + Sync + Clone> AddRoute for axum::Router<S> {
 	}
 }
 
+impl axum::response::IntoResponse for AppError {
+	fn into_response(self) -> axum::response::Response {
+		(self.status_code, self.message).into_response()
+	}
+}
 
 
 

@@ -1,4 +1,3 @@
-use axum::response::Response;
 use bevy::ecs::system::RunSystemError;
 use http::StatusCode;
 use tracing::error;
@@ -51,13 +50,6 @@ impl AppError {
 		Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
 	}
 }
-
-impl axum::response::IntoResponse for AppError {
-	fn into_response(self) -> Response {
-		(self.status_code, self.message).into_response()
-	}
-}
-
 
 impl beet_core::http_resources::IntoResponse for AppError {
 	fn into_response(self) -> beet_core::http_resources::Response {
