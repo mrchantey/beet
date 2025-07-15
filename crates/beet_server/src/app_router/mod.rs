@@ -1,20 +1,20 @@
+mod app_router_plugin;
+#[cfg(feature = "axum")]
+mod axum_impl;
 mod bundle_layer;
 mod bundle_layer_plugin;
 mod client_island_router_plugin;
-mod router_plugin;
 mod route_layer;
-mod app_router_plugin;
+mod router_plugin;
 pub use app_router_plugin::*;
-pub use route_layer::*;
 pub use bundle_layer::*;
 pub use client_island_router_plugin::*;
+pub use route_layer::*;
 pub use router_plugin::*;
 mod app_router;
 pub use app_router::*;
 mod route_handler;
 pub use route_handler::*;
-mod collect_axum_routes;
-pub use collect_axum_routes::*;
 mod app_error;
 pub use app_error::*;
 mod beet_route;
@@ -31,3 +31,7 @@ mod bundle_route_nightly;
 pub use bundle_route_nightly::*;
 mod bundle_route;
 pub use bundle_route::*;
+mod router;
+// #[cfg(feature = "axum")]
+// pub use axum_impl::*;
+pub use router::*;

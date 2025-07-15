@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::app::Plugins;
 use bevy::ecs::system::ScheduleSystem;
 use bevy::prelude::*;
 
@@ -9,6 +10,7 @@ pub trait IntoRouteLayer<M> {
 
 
 /// Plugins added to routes or their ancestors, to be added to the route app.
+/// This type accepts any valid [`Plugins`] or [`System`]
 #[derive(Clone, Component, Deref)]
 pub struct RouteLayer(ClonePluginContainer);
 
@@ -20,14 +22,16 @@ impl RouteLayer {
 }
 
 
-pub struct PluginIntoRouteLayerMarker;
+pub struct PluginsIntoRouteLayerMarker;
 
-impl<P> IntoRouteLayer<PluginIntoRouteLayerMarker> for P
+impl<P, M> IntoRouteLayer<(PluginsIntoRouteLayerMarker, M)> for P
 where
-	P: 'static + Clone + Plugin,
+	P: 'static + Send + Sync + Clone + Plugins<M>,
 {
 	fn into_route_layer(self) -> RouteLayer {
-		RouteLayer(ClonePluginContainer::new(self))
+		RouteLayer(ClonePluginContainer::new(move |app: &mut App| {
+			self.clone().add_to_app(app);
+		}))
 	}
 }
 pub struct ScheduleIntoRouteLayerMarker;

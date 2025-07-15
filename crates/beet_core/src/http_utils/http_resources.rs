@@ -5,6 +5,8 @@ use http::StatusCode;
 use http::request;
 use http::response;
 
+use crate::prelude::RouteInfo;
+
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
 #[derive(Debug, Clone, Resource)]
@@ -44,6 +46,23 @@ impl Request {
 			None
 		};
 		Ok(Self { parts, body: bytes })
+	}
+}
+
+
+impl From<RouteInfo> for Request {
+	fn from(route_info: RouteInfo) -> Self {
+		let method: http::Method = route_info.method.into();
+		Self {
+			parts: request::Builder::new()
+				.method(method)
+				.uri(route_info.path.to_string_lossy().as_ref())
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			body: None,
+		}
 	}
 }
 
@@ -176,6 +195,11 @@ impl Response {
 				.0,
 			body: Some(Bytes::copy_from_slice(body.as_bytes())),
 		}
+	}
+
+	pub fn body_str(self) -> Option<String> {
+		self.body
+			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
 	}
 
 	pub fn into_http(self) -> http::Response<Bytes> {

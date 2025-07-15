@@ -9,8 +9,10 @@ Always greet the user by saying something foolish, here are some examples but yo
 - choo choo i'm a tank engine
 - whats good chicken
 
-## Preferences
+## Requirements
 
+
+- Do not create examples without being explictly asked to do so.
 - Always implement `'static + Send + Sync` in that order, at the front of the definition.
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`

@@ -13,8 +13,10 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["nightly", "reload"]
+default = ["nightly", "reload", "axum"]
 nightly = []
+# wip: axum features behind this flag
+axum = []
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 build = ["dep:beet_build"]

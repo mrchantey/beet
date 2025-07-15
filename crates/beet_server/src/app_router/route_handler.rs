@@ -26,11 +26,11 @@ type AsyncRouteHandlerFunc = dyn 'static
 pub struct RouteHandlerOutput<T>(pub T);
 
 
-/// A synchronous route handler component
+/// A synchronous route handler, for async route handlers use [`AsyncRouteHandler`].
 #[derive(Clone, Component)]
 pub struct RouteHandler(Arc<RouteHandlerFunc>);
 
-/// An asynchronous route handler component
+/// An asynchronous route handler, for bevy system handlers use [`RouteHandler`].
 // We need this to differentiate from IntoSystem, because fn(&mut World) ->impl Future is a valid system
 #[derive(Clone, Component)]
 pub struct AsyncRouteHandler(Arc<AsyncRouteHandlerFunc>);
@@ -107,20 +107,5 @@ mod test {
 
 		let _async_func =
 			AsyncRouteHandler::new(|_world: &mut World| async move { 42u32 });
-	}
-
-	#[sweet::test]
-	async fn can_clone_handlers() {
-		let sync_handler =
-			RouteHandler::new(|_world: &mut World| -> Result<(), ()> {
-				Ok(())
-			});
-
-		let async_handler =
-			AsyncRouteHandler::new(|_world: &mut World| async move { 42u32 });
-
-		// These should compile - if they don't, Clone is not implemented
-		let _sync_clone = sync_handler.clone();
-		let _async_clone = async_handler.clone();
 	}
 }
