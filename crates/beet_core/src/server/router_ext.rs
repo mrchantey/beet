@@ -3,7 +3,6 @@ use axum::Router;
 use bytes::Bytes;
 use http::StatusCode;
 use http_body_util::BodyExt;
-use serde::de::DeserializeOwned;
 use tower::ServiceExt;
 
 
@@ -41,7 +40,8 @@ pub impl Router {
 		let res = String::from_utf8(body.to_vec())?;
 		Ok(res)
 	}
-	async fn oneshot_json<T: DeserializeOwned>(
+	#[cfg(feature = "serde")]
+	async fn oneshot_json<T: serde::de::DeserializeOwned>(
 		&mut self,
 		req: impl Into<RouteInfo>,
 	) -> anyhow::Result<T> {

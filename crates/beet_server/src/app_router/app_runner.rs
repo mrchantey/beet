@@ -1,10 +1,12 @@
 #[cfg(not(feature = "lambda"))]
 use beet_core::prelude::*;
 use beet_rsx::as_beet::ResultExtDisplay;
+#[allow(unused_imports)]
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use tracing::Level;
 // use beet_router::types::RouteFunc;
+#[allow(unused_imports)]
 use crate::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
@@ -52,14 +54,14 @@ pub enum RouterMode {
 }
 
 impl AppRunner {
-	#[cfg(target_arch = "wasm32")]
-	pub fn from_url_params() -> anyhow::Result<Self> {
-		// TODO actually parse from search params
-		Ok(Self {
-			is_static: false,
-			html_dir: "".into(),
-		})
-	}
+	// #[cfg(target_arch = "wasm32")]
+	// pub fn from_url_params() -> anyhow::Result<Self> {
+	// 	// TODO actually parse from search params
+	// 	Ok(Self {
+	// 		is_static: false,
+	// 		html_dir: "".into(),
+	// 	})
+	// }
 
 	pub fn runner(mut app: App) -> AppExit {
 		app.init();
@@ -74,10 +76,16 @@ impl AppRunner {
 		}
 	}
 
+	#[allow(unused)]
 	fn run(self, app: App) -> Result {
 		#[cfg(not(feature = "lambda"))]
 		init_pretty_tracing(bevy::log::Level::DEBUG);
 
+		#[cfg(target_arch = "wasm32")]
+		{
+			todo!("wasm runner");
+		}
+		#[cfg(not(target_arch = "wasm32"))]
 		match self.mode.clone().unwrap_or_default() {
 			RouterMode::ExportHtml => self.export_html(app),
 			_ => {
@@ -92,6 +100,7 @@ impl AppRunner {
 	}
 
 	/// Export static html files and client islands.
+	#[cfg(not(target_arch = "wasm32"))]
 	#[tokio::main]
 	async fn export_html(self, mut app: App) -> Result {
 		let workspace_config = app.world().resource::<WorkspaceConfig>();

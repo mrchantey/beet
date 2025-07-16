@@ -1,30 +1,20 @@
 use beet_core::prelude::*;
-use beet_rsx::prelude::*;
-use bevy::ecs::system::RunSystemError;
-use bevy::ecs::system::RunSystemOnce;
+use bevy::ecs::component::Immutable;
+use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
+
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClientIsland {
 	pub template: TemplateSerde,
-	/// If the template is [`ClientOnlyDirective`], this will be true.
-	pub mount: bool,
+	/// Whether to create html elements instead of hydrating them,
+	/// if the template is [`ClientOnlyDirective`], this will be true.
+	pub mount_to_dom: bool,
 	pub dom_idx: DomIdx, // pub route: RouteInfo,
-}
-
-
-impl ClientIsland {
-	pub fn collect(
-		app: &mut App,
-		bundle: impl Bundle,
-	) -> Result<Vec<Self>, RunSystemError> {
-		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
-		app.update();
-		app.world_mut()
-			.run_system_once_with(collect_client_islands, entity)
-	}
 }
 
 pub fn collect_client_islands(
@@ -43,7 +33,7 @@ pub fn collect_client_islands(
 					ClientIsland {
 						template: template.clone(),
 						dom_idx: *dom_idx,
-						mount,
+						mount_to_dom: mount,
 						// route: RouteInfo::from_tracker(tracker),
 					}
 				})
@@ -51,6 +41,48 @@ pub fn collect_client_islands(
 		.collect()
 }
 
+#[derive(Debug, Clone, Reflect)]
+#[reflect(Component)]
+pub struct SpawnClientIsland<T, U = T>
+where
+	T: 'static + Send + Sync + IntoTemplateBundle<U>,
+	U: 'static + Send + Sync,
+{
+	value: T,
+	#[reflect(ignore)]
+	phantom: std::marker::PhantomData<U>,
+}
+
+
+impl<T, U> Component for SpawnClientIsland<T, U>
+where
+	T: 'static + Send + Sync + IntoTemplateBundle<U>,
+	U: 'static + Send + Sync,
+{
+	const STORAGE_TYPE: StorageType = StorageType::Table;
+	type Mutability = Immutable;
+
+
+	fn on_add() -> Option<bevy::ecs::component::ComponentHook> {
+		Some(|mut world, cx| {
+			let entity = cx.entity;
+			world.commands().queue(move |world: &mut World| -> Result {
+				let this = world.entity_mut(entity).take::<Self>().ok_or_else(
+					|| {
+						let name = std::any::type_name::<Self>();
+						bevyhow!(
+							"SpawnClientIsland<{}> component not found on entity: {:?}",
+							name,
+							entity
+						)
+					},
+				)?;
+				world.entity_mut(entity).insert(this.value.into_node_bundle());
+				Ok(())
+			});
+		})
+	}
+}
 
 
 #[cfg(test)]
@@ -71,13 +103,24 @@ mod test {
 		()
 	}
 
+	fn collect(
+		app: &mut App,
+		bundle: impl Bundle,
+	) -> Result<Vec<ClientIsland>> {
+		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
+		app.update();
+		app.world_mut()
+			.run_system_cached_with(collect_client_islands, entity)?
+			.xok()
+	}
+
 	#[test]
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(TemplatePlugin::default());
 		app.insert_resource(TemplateFlags::None);
 
-		ClientIsland::collect(&mut app, rsx! {
+		collect(&mut app, rsx! {
 			<MyTemplate foo=3 client:only />
 		})
 		.unwrap()
@@ -85,7 +128,7 @@ mod test {
 		.to_be(vec![ClientIsland {
 			template: TemplateSerde::new(&MyTemplate { foo: 3 }),
 			dom_idx: DomIdx::new(0),
-			mount: true,
+			mount_to_dom: true,
 		}]);
 	}
 }

@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::prelude::When;
+use beet_core::prelude::*;
 use beet_router::prelude::ClientIslandMap;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
@@ -32,7 +32,7 @@ impl CollectClientIslands {
 					.unwrap();
 				let ron = island.template.ron();
 				let idx = island.dom_idx.self_token_stream();
-				let mount_directive = if island.mount {
+				let mount_directive = if island.mount_to_dom {
 					quote! {ClientOnlyDirective,}
 				} else {
 					quote! {}
@@ -121,12 +121,12 @@ mod test {
 			ClientIsland {
 				template: TemplateSerde::new(&Foo(7)),
 				dom_idx: DomIdx(0),
-				mount: true,
+				mount_to_dom: true,
 			},
 			ClientIsland {
 				template: TemplateSerde::new(&Foo(8)),
 				dom_idx: DomIdx(1),
-				mount: false,
+				mount_to_dom: false,
 			},
 		])]);
 

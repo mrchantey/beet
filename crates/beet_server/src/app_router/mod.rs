@@ -1,9 +1,9 @@
 mod app_router_plugin;
 mod app_runner;
 mod route_instance;
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub use axum_runner::*;
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_runner;
 mod bundle_layer;
 mod client_island_layer;

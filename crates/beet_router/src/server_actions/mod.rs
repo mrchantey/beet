@@ -1,12 +1,12 @@
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod server_action_error_axum;
 // #[cfg(feature = "axum")]
 // pub use server_action_error_axum::*;
 mod server_action_error;
 pub use server_action_error::*;
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod json_query_axum;
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub use json_query_axum::*;
 mod json_query;
 pub use json_query::*;

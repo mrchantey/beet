@@ -41,7 +41,7 @@ impl Request {
 		Self { parts, body: bytes }
 	}
 
-	#[cfg(feature = "server")]
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub async fn from_axum<S: 'static + Send + Sync>(
 		request: axum::extract::Request,
 		state: &S,
@@ -209,7 +209,7 @@ impl Response {
 		)
 	}
 
-	#[cfg(feature = "server")]
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub fn into_axum(self) -> axum::response::Response {
 		axum::response::Response::from_parts(
 			self.parts,
@@ -225,7 +225,7 @@ impl Into<http::Response<Bytes>> for Response {
 	fn into(self) -> http::Response<Bytes> { self.into_http() }
 }
 
-#[cfg(feature = "server")]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 impl Into<axum::response::Response> for Response {
 	fn into(self) -> axum::response::Response { self.into_axum() }
 }

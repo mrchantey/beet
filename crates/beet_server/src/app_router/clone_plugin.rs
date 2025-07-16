@@ -10,8 +10,6 @@ use http::request::Parts;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-
 
 /// For when you need a [`ClonePlugin`] to actually implement [`Clone`].
 #[derive(Deref, DerefMut)]

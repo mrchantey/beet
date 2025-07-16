@@ -123,7 +123,7 @@ impl CallServerAction {
 
 
 #[cfg(test)]
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use axum::Json;

@@ -2,14 +2,14 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 
 mod app_router;
-#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
 #[cfg(feature = "lambda")]
 mod lambda_utils;
 
 pub mod prelude {
 	pub use crate::app_router::*;
-	#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
@@ -26,6 +26,6 @@ pub mod prelude {
 
 
 pub mod exports {
-	#[cfg(feature = "axum")]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use axum;
 }

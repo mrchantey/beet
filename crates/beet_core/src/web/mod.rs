@@ -16,10 +16,6 @@ pub use self::logging::*;
 mod extensions;
 #[cfg(target_arch = "wasm32")]
 pub use self::extensions::*;
-#[cfg(target_arch = "wasm32")]
-mod net;
-#[cfg(target_arch = "wasm32")]
-pub use self::net::*;
 
 
 pub mod prelude {
@@ -29,8 +25,6 @@ pub mod prelude {
 	pub use super::extensions::*;
 	#[cfg(target_arch = "wasm32")]
 	pub use super::logging::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use super::net::*;
 	pub use html_escape;
 	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures::spawn_local;
