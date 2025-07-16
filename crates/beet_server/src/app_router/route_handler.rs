@@ -44,9 +44,7 @@ impl BoxedBundle {
 	pub fn new(bundle: impl Bundle) -> Self {
 		Self(Box::new(move |world| world.spawn(bundle).id()))
 	}
-	pub fn run(self, world: &mut World) -> Entity {
-		(self.0)(world)
-	}
+	pub fn add_to_world(self, world: &mut World) -> Entity { (self.0)(world) }
 }
 
 impl RouteHandler {
@@ -149,12 +147,11 @@ mod test {
 		let mut world = World::new();
 		world = RouteHandler::new_bundle(|| ()).run(world).await;
 		world.resource::<RouteHandlerOutput<BoxedBundle>>();
-		
+
 		async fn foo(world: World) -> (World, ()) { (world, ()) }
-		
+
 		let mut world = World::new();
 		world = RouteHandler::new_async_bundle(foo).run(world).await;
 		world.resource::<RouteHandlerOutput<BoxedBundle>>();
-
 	}
 }

@@ -88,6 +88,22 @@ macro_rules! primitives_into_bundle {
 	}
 }
 
+/// Entities are convert into children of the entity they are inserted into.
+///
+/// `rsx!{<div>{entity}</div>}` spawns an entity with this OnSpawn effect,
+/// which becomes the parent of the entity passed in.
+impl IntoTemplateBundle<Self> for Entity {
+	fn into_node_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |spawned_entity| {
+			spawned_entity.insert(FragmentNode);
+			let id = spawned_entity.id();
+			spawned_entity.world_scope(|world| {
+				world.entity_mut(self).insert(ChildOf(id));
+			});
+		})
+	}
+}
+
 // Implement for primitives
 #[rustfmt::skip]
 primitives_into_bundle!(

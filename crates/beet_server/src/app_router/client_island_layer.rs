@@ -39,7 +39,7 @@ impl Default for ClientIslandLayer {
 fn client_island_layer(world: &mut World) -> Result {
 	let output = world.remove_resource::<RouteHandlerOutput<BoxedBundle>>()
 		.unwrap(/*checked*/);
-	let entity = output.0.run(world);
+	let entity = output.0.add_to_world(world);
 	world.entity_mut(entity).insert(HtmlDocument);
 	world.run_schedule(Update);
 	let islands =

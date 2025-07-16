@@ -74,6 +74,7 @@ fn handler_output_plugin<T: 'static + Send + Sync + IntoResponse>(
 			),
 			bundle_layer
 				.run_if(resource_exists::<RouteHandlerOutput<BoxedBundle>>),
+			documents_to_response,
 		),
 	);
 }
