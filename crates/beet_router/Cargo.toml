@@ -16,7 +16,13 @@ keywords.workspace = true
 default = ["nightly", "serde", "actions"]
 actions = ["serde", "beet_core/net"]
 nightly = []
-axum = ["dep:axum", "dep:tower", "dep:tokio", "dep:http-body-util"]
+axum = [
+	"dep:axum",
+	"dep:tower",
+	"dep:tokio",
+	"dep:http-body-util",
+	"beet_core/server",
+]
 serde = [
 	"beet_rsx/serde",
 	"beet_core/serde",

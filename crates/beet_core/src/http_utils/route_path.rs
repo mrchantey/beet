@@ -76,7 +76,8 @@ impl RoutePath {
 	pub fn new(path: impl Into<PathBuf>) -> Self {
 		let path_buf = path.into();
 		let path_str = path_buf.to_string_lossy();
-		if path_str.starts_with('/') {
+		// Only add a leading slash if there is no protocol (like http://, file://, etc.)
+		if path_str.contains("://") || path_str.starts_with('/') {
 			Self(path_buf)
 		} else {
 			Self(PathBuf::from(format!("/{}", path_str)))
