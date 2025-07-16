@@ -18,10 +18,6 @@ mod route_handler;
 pub use route_handler::*;
 mod app_error;
 pub use app_error::*;
-#[cfg(not(feature = "nightly"))]
-mod bundle_route_stable;
-#[cfg(not(feature = "nightly"))]
-pub use bundle_route_stable::*;
 mod clone_plugin;
 pub use clone_plugin::*;
 mod router;

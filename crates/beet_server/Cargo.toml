@@ -13,10 +13,9 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["nightly", "reload", "axum"]
-nightly = []
+default = ["axum","reload"]
 # wip: axum features behind this flag
-axum = []
+axum = ["dep:axum", "dep:tower", "dep:tower-http"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 build = ["dep:beet_build"]
@@ -30,7 +29,6 @@ beet_build = { workspace = true, features = ["css"], optional = true }
 
 bevy.workspace = true
 
-variadics_please.workspace = true
 extend.workspace = true
 clap.workspace = true
 thiserror.workspace = true
@@ -45,12 +43,15 @@ bytes.workspace = true
 
 futures.workspace = true
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+
+
 #💡 server
-tokio.workspace = true
-axum.workspace = true
-tower.workspace = true
+tokio = { workspace = true, default-features = true }
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
-tower-http.workspace = true
+tower-http = { workspace = true, optional = true }
 lambda_http = { version = "0.14", optional = true }
 
 [dev-dependencies]

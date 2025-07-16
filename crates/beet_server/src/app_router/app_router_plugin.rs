@@ -54,7 +54,8 @@ impl Plugin for AppRouterPlugin {
 				handler_output_plugin::<Javascript>,
 				handler_output_plugin::<Json>,
 				handler_output_plugin::<Png>,
-			));
+			))
+			.set_runner(AppRunner::runner);
 	}
 }
 

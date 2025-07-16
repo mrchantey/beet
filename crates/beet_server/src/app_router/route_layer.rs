@@ -55,18 +55,15 @@ mod test {
 		let mut world = World::new();
 		world.spawn((
 			RouteLayer::before_route(|mut req: ResMut<Request>| {
+				// edit the request body
 				req.set_body("jimmy");
 			}),
 			children![(
 				RouteInfo::get("/"),
-				RouteHandler::new(
-					|req: Res<Request>, mut commands: Commands| {
-						let body = req.body_str().unwrap_or_default();
-						commands.insert_resource(
-							format!("hello {}", body).into_response(),
-						);
-					}
-				)
+				RouteHandler::new(|req: Res<Request>| {
+					let body = req.body_str().unwrap_or_default();
+					format!("hello {}", body)
+				})
 			),],
 		));
 

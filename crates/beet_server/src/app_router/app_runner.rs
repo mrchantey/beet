@@ -5,11 +5,9 @@ use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use tracing::Level;
 // use beet_router::types::RouteFunc;
+use crate::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
-
-#[cfg(feature = "axum")]
-use crate::prelude::*;
 
 
 // use tower::Layer;
@@ -63,9 +61,17 @@ impl AppRunner {
 		})
 	}
 
-	pub fn runner(app: App) -> AppExit {
-		Self::parse().run(app).unwrap_or_exit();
-		AppExit::Success
+	pub fn runner(mut app: App) -> AppExit {
+		app.init();
+		app.update();
+		// allow setup to decide to exit
+		match app.should_exit() {
+			Some(exit) => return exit,
+			None => {
+				Self::parse().run(app).unwrap_or_exit();
+				AppExit::Success
+			}
+		}
 	}
 
 	fn run(self, app: App) -> Result {
@@ -73,11 +79,8 @@ impl AppRunner {
 		init_pretty_tracing(bevy::log::Level::DEBUG);
 
 		match self.mode.clone().unwrap_or_default() {
-			RouterMode::Ssg => {
-				todo!();
-			}
 			RouterMode::ExportHtml => self.export_html(app),
-			RouterMode::Ssr => {
+			_ => {
 				#[cfg(feature = "axum")]
 				{
 					AxumRunner::new(self).run(app)
@@ -132,5 +135,4 @@ impl AppRunner {
 		}
 		Ok(())
 	}
-
 }
