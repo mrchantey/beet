@@ -12,8 +12,8 @@ type RouteHandlerFunc = dyn 'static
 	+ Sync
 	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
-/// The returned value from a [`RouteHandler`] or [`AsyncRouteHandler`] will be placed in this resource,
-/// including `Result` and `()` types.
+/// The returned value from a [`RouteHandler`] will be placed in this resource,
+/// including [`Result`] and [`()`] types.
 /// This will be used either for further processing by layers or converting to a [`Response`]
 /// if it is a supported type.
 #[derive(Resource, Deref)]

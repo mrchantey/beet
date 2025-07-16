@@ -42,20 +42,9 @@ fn client_island_layer(world: &mut World) -> Result {
 	let entity = output.0.run(world);
 	world.entity_mut(entity).insert(HtmlDocument);
 	world.run_schedule(Update);
-	let islands = world
-		.run_system_cached_with(collect_client_islands, entity)
-		.map_err(|e| {
-			AppError::internal_error(format!(
-				"Failed to collect client islands: {}",
-				e
-			))
-		})?;
-	let islands = ron::ser::to_string(&islands).map_err(|e| {
-		AppError::internal_error(format!(
-			"Failed to serialize client islands: {}",
-			e
-		))
-	})?;
+	let islands =
+		world.run_system_cached_with(collect_client_islands, entity)?;
+	let islands = ron::ser::to_string(&islands)?;
 	world.insert_resource(islands.into_response());
 	Ok(())
 }

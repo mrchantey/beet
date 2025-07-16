@@ -1,162 +1,60 @@
 use crate::prelude::*;
-use axum::extract::FromRequestParts;
-use axum::response::IntoResponse;
-use axum::response::Response;
-use axum::routing;
 use beet_core::prelude::*;
+use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 
-/// A form of middleware, accepting a [`BundleRoute`] and wrapping it.
-/// This type will be stored in the [`BundleLayer`] alongside the inner
-/// [`BundleRoute`] and associated metadata.
-pub trait BundleLayerHandler: 'static + Send + Sync + Clone {
-	/// The extractors that this layer will use
-	type Extractors: 'static + Send + Sync + FromRequestParts<Self::State>;
-	type State: DerivedAppState;
-	/// The output type of the layer, which must implement [`IntoResponse`]
-	type Output: IntoResponse;
-	type Meta: 'static + Send + Sync + Clone;
+/// Added by the [`AppRouterPlugin`], this layer will convert any
+/// [`RouteHandlerOutput<BoxedBundle>`] into a [`HtmlDocument`] and return
+/// as [`Html`] response.
+/// This excludes any [`BoxedBundle`] consumed in the [`AfterRoute`] step, 
+/// for example by the [`ClientIslandLayer`].
+pub fn bundle_layer(world: &mut World) -> Result {
+	let output = world.remove_resource::<RouteHandlerOutput<BoxedBundle>>()
+		.unwrap(/*checked*/);
+	let entity = output.0.run(world);
+	world.entity_mut(entity).insert(HtmlDocument);
+	world.run_schedule(Update);
+	let html = world.run_system_cached_with(render_fragment, entity)?;
 
-	/// Specify whether this layer should be included
-	/// in ssg output.
-	fn is_static(&self) -> bool { true }
-
-	fn handle_bundle_route(
-		&self,
-		extractors: Self::Extractors,
-		bundle: impl Bundle,
-		meta: Self::Meta,
-	) -> impl Send + Sync + Future<Output = Self::Output>;
+	world.insert_resource(Html(html).into_response());
+	Ok(())
 }
 
-/// Wraps a [`BundleRoute`] with a [`BundleLayerHandler`].
-#[derive(Debug, Clone)]
-pub struct BundleLayer<L, R, M> {
-	/// The [`BundleLayerHandler`]
-	layer: L,
-	/// The inner [`BundleRoute`]
-	route: R,
-	/// The metadata for this [`BundleRoute`]
-	meta: M,
-}
-
-impl<L, R, M> BundleLayer<L, R, M> {
-	pub fn new(layer: L, route: R, meta: M) -> Self {
-		Self { layer, route, meta }
-	}
-}
-
-pub struct BundleLayerIntoBeetRouteMarker;
-
-impl<Layer, Route, Meta, RouteExtractors, LayerExtractors, State, Marker>
-	IntoBeetRoute<(
-		BundleLayerIntoBeetRouteMarker,
-		RouteExtractors,
-		LayerExtractors,
-		State,
-		Marker,
-	)> for BundleLayer<Layer, Route, Meta>
-where
-	RouteExtractors: 'static + Send + Sync + FromRequestParts<State>,
-	LayerExtractors: 'static + Send + Sync + FromRequestParts<State>,
-	State: 'static + Send + Sync + Clone,
-	Layer: BundleLayerHandler<
-			Extractors = LayerExtractors,
-			State = State,
-			Meta = Meta,
-		>,
-	Meta: 'static + Send + Sync + Clone,
-	Route: BundleRoute<Marker, Extractors = RouteExtractors, State = State>,
-{
-	type State = State;
-	fn add_beet_route(
-		self,
-		router: Router<Self::State>,
-		route_info: RouteInfo,
-	) -> Router<Self::State> {
-		router.route(
-			&route_info.path.to_string_lossy(),
-			routing::on(
-				route_info.method.into_axum_method(),
-				async move |layer_extractors,
-				            extractors|
-				            -> AppResult<Response> {
-					let bundle =
-						self.route.into_bundle_result(extractors).await?;
-					let res = self
-						.layer
-						.handle_bundle_route(
-							layer_extractors,
-							bundle,
-							self.meta,
-						)
-						.await
-						.into_response();
-					Ok(res)
-				},
-			),
-		)
-	}
-}
 
 
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use axum::extract::Query as QueryParams;
-	use axum::extract::State;
-	use axum::response::Html;
-	use serde::Deserialize;
+	use crate::prelude::*;
+	use beet_rsx::as_beet::*;
+	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	#[derive(Debug, Clone, Deserialize)]
-	struct BundleParams {
-		occupation: String,
-	}
-	#[derive(Debug, Clone, Deserialize)]
-	struct LayerParams {
-		name: String,
-	}
-
-	#[derive(Debug, Clone, Default)]
-	struct MyMiddleware;
-
-	impl BundleLayerHandler for MyMiddleware {
-		type Extractors = (State<Self::State>, QueryParams<LayerParams>);
-		type State = AppRouterState;
-		type Output = Html<String>;
-		type Meta = ();
-
-		fn handle_bundle_route(
-			&self,
-			(state, params): Self::Extractors,
-			bundle: impl Bundle,
-			_meta: Self::Meta,
-		) -> impl Send + Sync + Future<Output = Self::Output> {
-			async move {
-				state.render_bundle(rsx! {
-					<div>
-						<span>name: {params.name.clone()}</span>
-						{bundle}
-					</div>
-				})
-			}
+	#[template]
+	pub fn MyTemplate(foo: u32) -> impl Bundle {
+		rsx! {
+			<div>foo: {foo}</div>
 		}
-	}
-
-	fn my_bundle_route(params: QueryParams<BundleParams>) -> impl Bundle {
-		rsx! {<span>occupation: {params.occupation.clone()}</span>}
 	}
 
 	#[sweet::test]
 	async fn works() {
-		AppRouter::test()
-			.add_route("/", BundleLayer::new(MyMiddleware, my_bundle_route,()))
-			.render_route(&"/?name=pizzaguy&occupation=delivermepizza".into())
+		let mut world = World::new();
+		world.spawn((
+			RouteInfo::get("/"),
+			RouteHandler::new_bundle(|| {
+				rsx! {
+					<MyTemplate foo=42/>
+				}
+			}),
+		));
+
+		BeetRouter::route_str(&mut world, "/")
 			.await
 			.unwrap()
 			.xpect()
-			.to_be_str("<!DOCTYPE html><html><head></head><body><div><span>name: pizzaguy</span><span>occupation: delivermepizza</span></div></body></html>");
+			.to_be_str(
+				"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
+			);
 	}
 }

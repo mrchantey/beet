@@ -13,6 +13,6 @@ use material_colors::theme::Theme;
 pub fn DesignSystem(theme: Theme) -> impl Bundle {
 	rsx! {
 		<ColorScheme theme=theme />
-		<Css />
+		<BeetDesignCss />
 	}
 }
