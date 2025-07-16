@@ -1,15 +1,30 @@
 #[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use anyhow::Result;
+use bevy::prelude::*;
 use http::Uri;
 use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// Describes an absolute path to a route, beginning with `/`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RoutePath(pub PathBuf);
+
+/// A segment of a route path,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub enum RouteSegment {
+	/// A static segment, the `foo` in `/foo`
+	Static(String),
+	/// A dynamic segment, the `foo` in `/:foo`
+	Dynamic(String),
+	/// A wildcard segment, the `foo` in `/*foo`
+	Wildcard(String),
+}
 
 impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }
@@ -57,7 +72,16 @@ impl TryInto<Uri> for RoutePath {
 }
 
 impl RoutePath {
-	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
+	/// Creates a new [`RoutePath`] from a string, ensuring it starts with `/`
+	pub fn new(path: impl Into<PathBuf>) -> Self {
+		let path_buf = path.into();
+		let path_str = path_buf.to_string_lossy();
+		if path_str.starts_with('/') {
+			Self(path_buf)
+		} else {
+			Self(PathBuf::from(format!("/{}", path_str)))
+		}
+	}
 
 
 	/// when joining with other paths ensure that the path
@@ -140,7 +164,7 @@ mod test {
 
 	#[test]
 	fn route_path() {
-		expect(RoutePath::new("hello").to_string()).to_be("hello");
+		expect(RoutePath::new("hello").to_string()).to_be("/hello");
 
 		for (value, expected) in [
 			("hello", "/hello"),

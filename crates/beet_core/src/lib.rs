@@ -4,8 +4,6 @@
 
 #[cfg(feature = "http")]
 mod http_utils;
-#[cfg(feature = "http")]
-pub use http_utils::http_resources;
 
 pub mod node;
 #[cfg(feature = "tokens")]

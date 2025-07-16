@@ -1,4 +1,7 @@
+use beet_router::as_beet::SystemInput;
+use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
+use bevy::prelude::*;
 use http::StatusCode;
 use tracing::error;
 
@@ -21,11 +24,33 @@ impl std::fmt::Display for AppError {
 	}
 }
 
+// impl IntoResponse for BevyError {
+// 	fn into_response(self) -> Response { AppError::from(self).into_response() }
+// }
+
+impl From<BevyError> for AppError {
+	fn from(err: BevyError) -> AppError {
+		if let Some(inner) = err.downcast_ref::<AppError>() {
+			// If the error is already an AppError, return it directly
+			inner.clone()
+		} else {
+			// Otherwise, convert it to an AppError with internal server error status
+			AppError::internal_error(format!("Internal BevyError: {}", err))
+		}
+	}
+}
 impl From<RunSystemError> for AppError {
 	fn from(run_system_error: RunSystemError) -> AppError {
 		error!("RunSystemError: {}", run_system_error);
 		// dont leak message to the client
 		AppError::internal_error(format!("Internal RunSystemError"))
+	}
+}
+impl<T: SystemInput> From<RegisteredSystemError<T>> for AppError {
+	fn from(registered_system_error: RegisteredSystemError<T>) -> AppError {
+		error!("RegisteredSystemError: {}", registered_system_error);
+		// dont leak message to the client
+		AppError::internal_error(format!("Internal RegisteredSystemError"))
 	}
 }
 
@@ -51,9 +76,9 @@ impl AppError {
 	}
 }
 
-impl beet_core::http_resources::IntoResponse for AppError {
-	fn into_response(self) -> beet_core::http_resources::Response {
-		beet_core::http_resources::Response::from_status_body(
+impl beet_core::prelude::IntoResponse for AppError {
+	fn into_response(self) -> beet_core::prelude::Response {
+		beet_core::prelude::Response::from_status_body(
 			self.status_code,
 			self.message.as_bytes(),
 		)

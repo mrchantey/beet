@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use beet_core::http_resources::Request;
-use beet_core::http_resources::Response;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::collections::HashMap;
 use std::future::Future;
@@ -66,6 +65,21 @@ impl BeetRouter {
 	/// Get all registered routes
 	pub fn routes(&self) -> impl Iterator<Item = &RouteInfo> {
 		self.routes.keys()
+	}
+
+	/// For testing, collect all routes and return the base route as a string
+	#[cfg(test)]
+	pub async fn route_str(
+		world: &mut World,
+		route: impl Into<RouteInfo>,
+	) -> AppResult<String> {
+		world
+			.run_system_cached_with(collect_routes, BeetRouter::default())
+			.unwrap()?
+			.oneshot(route)
+			.await?
+			.xmap(|res| res.body_str().unwrap())
+			.xok()
 	}
 }
 
@@ -190,7 +204,7 @@ pub fn collect_routes<R: AddRoute>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::http_resources::IntoResponse;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -204,15 +218,10 @@ mod test {
 			})
 		),]);
 
-		world
-			.run_system_cached_with(collect_routes, BeetRouter::default())
-			.unwrap()
-			.unwrap()
-			.oneshot("/")
+		BeetRouter::route_str(&mut world, "/")
 			.await
 			.unwrap()
-			.xmap(|res| res.body_str().unwrap())
 			.xpect()
-			.to_be("hello world!".to_string());
+			.to_be_str("hello world!");
 	}
 }

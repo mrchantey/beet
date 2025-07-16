@@ -2,6 +2,7 @@ use super::*;
 use http::StatusCode;
 use serde::de::DeserializeOwned;
 
+
 #[cfg(target_arch = "wasm32")]
 type ResponseTy = web_sys::Response;
 #[cfg(not(target_arch = "wasm32"))]
@@ -58,6 +59,7 @@ impl ResponseInner for Response {
 
 #[cfg(test)]
 mod test {
+	use super::Request;
 	use crate::cross_fetch::*;
 	use crate::prelude::*;
 	use beet_utils::utils::PipelineTarget;

@@ -9,6 +9,7 @@ use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
 use beet_rsx::prelude::*;
 use bevy::app::Plugins;
+use bevy::ecs::schedule::ScheduleConfigs;
 use bevy::ecs::system::ScheduleSystem;
 use bevy::prelude::*;
 use http::StatusCode;
@@ -129,6 +130,35 @@ where
 		}
 	}
 	fn box_clone(&self) -> Box<dyn ClonePlugin> { Box::new(self.clone()) }
+}
+
+pub trait CloneScheduleSystem<M>: Clone {
+	fn into_schedule_system(self) -> ScheduleConfigs<ScheduleSystem>;
+}
+
+pub struct CloneScheduleSystemMarker;
+
+impl<T, M> CloneScheduleSystem<(CloneScheduleSystemMarker, M)> for T
+where
+	T: Clone + IntoScheduleConfigs<ScheduleSystem, M>,
+{
+	fn into_schedule_system(self) -> ScheduleConfigs<ScheduleSystem> {
+		self.into_configs()
+	}
+}
+
+
+pub struct ClosureCloneScheduleSystemMarker;
+
+impl<F, T, M> CloneScheduleSystem<(ClosureCloneScheduleSystemMarker, T, M)>
+	for F
+where
+	F: Clone + Fn() -> T,
+	T: IntoScheduleConfigs<ScheduleSystem, M>,
+{
+	fn into_schedule_system(self) -> ScheduleConfigs<ScheduleSystem> {
+		self().into_configs()
+	}
 }
 
 /// Helper trait for less verbose state definitions.

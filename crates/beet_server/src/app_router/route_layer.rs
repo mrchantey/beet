@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::app::Plugins;
-use bevy::ecs::system::IntoSystem;
 use bevy::prelude::*;
 
 
@@ -19,31 +18,36 @@ impl RouteLayer {
 			plugins.clone().add_to_app(app);
 		}))
 	}
-
-	pub fn before_route<S, M>(system: S) -> Self
-	where
-		S: 'static + Send + Sync + Clone + IntoSystem<(), (), M>,
-	{
+	/// Add a system to run after the route handler in the [`AfterRoute`] schedule.
+	/// This method accepts either systems which are [`Clone`], or closures
+	/// returing a system.
+	pub fn before_route<M>(
+		system: impl 'static + Send + Sync + CloneScheduleSystem<M>,
+	) -> Self {
 		Self(ClonePluginContainer::new(move |app: &mut App| {
-			app.add_systems(BeforeRoute, system.clone());
+			app.add_systems(BeforeRoute, system.clone().into_schedule_system());
 		}))
 	}
 
-	pub fn after_route<S, M>(system: S) -> Self
-	where
-		S: 'static + Send + Sync + Clone + IntoSystem<(), (), M>,
-	{
+	/// Add a system to run after the route handler in the [`AfterRoute`] schedule.
+	/// This method accepts either systems which are [`Clone`], or closures
+	/// returing a system.
+	pub fn after_route<M>(
+		system: impl 'static + Send + Sync + CloneScheduleSystem<M>,
+	) -> Self {
 		Self(ClonePluginContainer::new(move |app: &mut App| {
-			app.add_systems(AfterRoute, system.clone());
+			app.add_systems(AfterRoute, system.clone().into_schedule_system());
 		}))
 	}
 }
 
 
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::http_resources::*;
+use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -67,15 +71,10 @@ mod test {
 			),],
 		));
 
-		world
-			.run_system_cached_with(collect_routes, BeetRouter::default())
-			.unwrap()
-			.unwrap()
-			.oneshot("/")
+		BeetRouter::route_str(&mut world, "/")
 			.await
 			.unwrap()
-			.xmap(|res| res.body_str().unwrap())
 			.xpect()
-			.to_be("hello jimmy".to_string());
+			.to_be_str("hello jimmy");
 	}
 }

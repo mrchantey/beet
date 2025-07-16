@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use beet_core::http_resources::Request;
-use beet_core::http_resources::Response;
+use beet_core::prelude::*;
 use std::future::Future;
 
 impl<S: 'static + Send + Sync + Clone> AddRoute for axum::Router<S> {
@@ -49,7 +48,7 @@ impl axum::response::IntoResponse for AppError {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::http_resources::IntoResponse;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

@@ -1,6 +1,6 @@
 use crate::prelude::AppError;
 use crate::prelude::*;
-use beet_core::http_resources::*;
+use beet_core::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 pub struct AppRouterPlugin;

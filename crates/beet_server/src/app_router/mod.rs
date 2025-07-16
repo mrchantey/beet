@@ -2,12 +2,12 @@ mod app_router_plugin;
 #[cfg(feature = "axum")]
 mod axum_impl;
 mod bundle_layer;
-mod client_island_router_plugin;
+mod client_island_layer;
 mod route_layer;
 mod router_plugin;
 pub use app_router_plugin::*;
 pub use bundle_layer::*;
-pub use client_island_router_plugin::*;
+pub use client_island_layer::*;
 pub use route_layer::*;
 pub use router_plugin::*;
 mod app_router;

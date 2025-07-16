@@ -1,5 +1,6 @@
 use super::*;
-use crate::cross_fetch::Request;
+use super::Request;
+use super::Response;
 use crate::prelude::*;
 use beet_utils::utils::*;
 

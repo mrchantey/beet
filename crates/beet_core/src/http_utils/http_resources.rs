@@ -119,18 +119,7 @@ impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
 
 impl IntoResponse for BevyError {
 	fn into_response(self) -> Response {
-		// Log the error and do not return to the client
-		error!("BevyError: {}", self.to_string());
-		Response::from_parts(
-			http::response::Builder::new()
-				.status(StatusCode::INTERNAL_SERVER_ERROR)
-				.body(())
-				.unwrap()
-				.into_parts()
-				.0,
-			// do not assume a bevy error message is safe to return to the client
-			Some(Bytes::from("Internal Bevy Error")),
-		)
+		todo!("this should be AppError::from(self).into_response()")
 	}
 }
 
@@ -288,8 +277,7 @@ impl HttpExt {
 
 #[cfg(test)]
 mod test {
-	use crate::http_resources::Request;
-	use crate::http_resources::Response;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	use bytes::Bytes;
 	use sweet::prelude::*;

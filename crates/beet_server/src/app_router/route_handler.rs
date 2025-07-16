@@ -44,18 +44,8 @@ impl BoxedBundle {
 	pub fn new(bundle: impl Bundle) -> Self {
 		Self(Box::new(move |world| world.spawn(bundle).id()))
 	}
-
-	/// Convenience for use with queries, this *must* be used in combination
-	/// with `commands.entity(entity).remove::<BoxedBundle>()`
-	pub fn take(&mut self) -> Self {
-		std::mem::replace(
-			self,
-			Self(Box::new(|_| {
-				panic!(
-					"BoxedBundle has been taken, please call remove() when taking a bundle"
-				)
-			})),
-		)
+	pub fn run(self, world: &mut World) -> Entity {
+		(self.0)(world)
 	}
 }
 
