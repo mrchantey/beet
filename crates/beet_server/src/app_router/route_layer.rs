@@ -2,7 +2,6 @@ use crate::prelude::*;
 use bevy::app::Plugins;
 use bevy::prelude::*;
 
-
 /// Plugins added to routes or their ancestors, to be added to the route app.
 /// This type accepts any valid [`Plugins`] or [`System`]
 #[derive(Clone, Component, Deref)]
@@ -47,7 +46,7 @@ impl RouteLayer {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-use beet_core::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

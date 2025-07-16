@@ -19,10 +19,15 @@ type RouteHandlerFunc = dyn 'static
 #[derive(Resource, Deref)]
 pub struct RouteHandlerOutput<T>(pub T);
 
-/// An asynchronous route handler, for bevy system handlers use [`RouteHandler`].
-// We need this to differentiate from IntoSystem, because fn(&mut World) ->impl Future is a valid system
-#[derive(Clone, Component)]
-pub struct RouteHandler(Arc<RouteHandlerFunc>);
+
+/// A route layer that will always return the same html file for a given path,
+/// making it suitable for ssg. Static routes can still have
+/// client and server islands, but these are loaded from the html file
+/// instead of being rendered on each request.
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct StaticRoute;
+
 
 
 /// Each route may have any serializable metadata data associated with it,
@@ -46,6 +51,10 @@ impl BoxedBundle {
 	}
 	pub fn add_to_world(self, world: &mut World) -> Entity { (self.0)(world) }
 }
+/// An asynchronous route handler
+#[derive(Clone, Component)]
+pub struct RouteHandler(Arc<RouteHandlerFunc>);
+
 
 impl RouteHandler {
 	/// Create a new sync route handler from a system

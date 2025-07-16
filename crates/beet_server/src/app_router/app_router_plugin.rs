@@ -28,8 +28,8 @@ pub struct BeforeRoute;
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct AfterRoute;
 
-/// The final lifecycle schedule, transforming any valid [`RouteHandlerOutput`]
-/// into a [`Response`] if no response is present.
+/// The final lifecycle schedule that only runs if no [`Response`] is present,
+/// transforming any valid [`RouteHandlerOutput`] into a [`Response`].
 /// ## After
 /// - [`BeforeRoute`]
 /// - [`RouteHandler`]
@@ -39,7 +39,8 @@ pub struct CollectResponse;
 
 impl Plugin for AppRouterPlugin {
 	fn build(&self, app: &mut App) {
-		app
+		app.init_resource::<WorkspaceConfig>()
+			.init_resource::<HtmlConstants>()
 			// dont initialize empty, faster?
 			// .init_schedule(BeforeRoute)
 			// .init_schedule(AfterRoute)
