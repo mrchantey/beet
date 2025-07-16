@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use clap::Parser;
 use glob::PatternError;
-use std::path::Path;
 
 
 /// glob for watch patterns
@@ -19,6 +20,24 @@ pub struct GlobFilter {
 
 fn parse_glob_pattern(s: &str) -> Result<glob::Pattern, PatternError> {
 	glob::Pattern::new(s)
+}
+
+impl std::fmt::Display for GlobFilter {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let include = self
+			.include
+			.iter()
+			.map(|p| p.as_str())
+			.collect::<Vec<_>>()
+			.join(", ");
+		let exclude = self
+			.exclude
+			.iter()
+			.map(|p| p.as_str())
+			.collect::<Vec<_>>()
+			.join(", ");
+		write!(f, "include: [{}], exclude: [{}]", include, exclude)
+	}
 }
 
 #[cfg(feature = "serde")]
@@ -89,19 +108,29 @@ impl GlobFilter {
 		self.exclude.push(glob::Pattern::new(pattern).unwrap());
 		self
 	}
+	pub fn is_empty(&self) -> bool {
+		self.include.is_empty() && self.exclude.is_empty()
+	}
+
+	/// To pass a path must
+	/// 1. not be present in the exclude patterns
+	/// 2. be present in the include patterns or the include patterns are empty
 	/// Currently converts to string with forward slashes
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
-		// TODO this is presumptuous
-		let path_str = path.as_ref().to_string_lossy().replace('\\', "/");
-		// let path = Path::new(&path_str);
-		let pass_include =
-			self.include.iter().any(|watch| watch.matches(&path_str))
-				|| self.include.is_empty();
-		let pass_exclude = self
+		self.passes_include(&path) && self.passes_exclude(&path)
+	}
+	pub fn passes_include(&self, path: impl AsRef<Path>) -> bool {
+		self.include.is_empty()
+			|| self
+				.include
+				.iter()
+				.any(|watch| watch.matches_path(path.as_ref()))
+	}
+	pub fn passes_exclude(&self, path: impl AsRef<Path>) -> bool {
+		!self
 			.exclude
 			.iter()
-			.all(|watch| watch.matches(&path_str) == false);
-		pass_include && pass_exclude
+			.any(|watch| watch.matches_path(path.as_ref()))
 	}
 }
 
@@ -166,12 +195,21 @@ mod test {
 
 		// test backslashes
 
-		let watcher = GlobFilter::default().with_include("foo/bar");
+		let watcher = GlobFilter::default().with_include("*foo/bar*");
 
-		assert!(watcher.passes("foo/bar"));
-		// backslashes are normalized to forward slashes
-		assert!(watcher.passes("foo\\bar"));
+		assert!(watcher.passes_include("foo/bar"));
+		assert!(watcher.passes_exclude("foo/bar"));
 
+
+
+		let watcher =
+			GlobFilter::default().with_exclude("*apply_style_id_attributes*");
+		assert!(
+			false
+				== watcher.passes_exclude(
+					"templating::apply_style_id_attributes::test::nested_template"
+				)
+		);
 		// test multi exclude
 
 		let watcher = GlobFilter::default()

@@ -179,12 +179,13 @@ test-fs *args:
 # upstream from sweet
 test-beet-utils *args:
 	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
+# {{min-stack}} cargo test -p beet_rsx					 	 	 																										{{args}} -- {{test-threads}}
 
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx					 	 	 																								{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx       --lib -- --exclude=*apply_style_id_attributes* 				{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}

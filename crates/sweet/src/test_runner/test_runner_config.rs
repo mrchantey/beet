@@ -1,9 +1,9 @@
 use anyhow::Result;
+use beet_utils::prelude::GlobFilter;
 use clap::Parser;
 use clap::ValueEnum;
 use glob::Pattern;
 use glob::PatternError;
-use std::path::PathBuf;
 use std::str::FromStr;
 use test::ShouldPanic;
 use test::TestDesc;
@@ -19,11 +19,11 @@ extern crate test;
 pub struct TestRunnerConfig {
 	/// A glob pattern to match test names against, by default these are wrapped in stars
 	/// but that can be disabled by passing `--exact`.
-	#[arg(value_parser= parse_glob)]
-	pub filters: Vec<Pattern>,
-	/// This forces filters to match the full path of the test exactly.
-	#[arg(long)]
-	pub exact: bool,
+	#[command(flatten)]
+	pub filter: GlobFilter,
+	/// Shorthand for --include
+	#[arg(trailing_var_arg = true,value_parser = parse_glob)]
+	pub also_include: Vec<Pattern>,
 	#[arg(long)]
 	/// Runs only tests that are marked with the [ignore](test::ignore) attribute.
 	pub ignored: bool,
@@ -65,20 +65,9 @@ fn parse_glob(s: &str) -> Result<Pattern, PatternError> {
 
 impl TestRunnerConfig {
 	fn parse_inner(mut args: Self) -> Self {
-		if args.exact {
-			args.filters = args
-				.filters
-				.into_iter()
-				// remove the leading and trailing stars
-				.map(|m| {
-					let mut s = m.as_str().to_string();
-					s.remove(0);
-					s.pop();
-					Pattern::new(&s)
-				})
-				.collect::<Result<Vec<_>, _>>()
-				.unwrap();
-		}
+		args.filter
+			.include
+			.extend(std::mem::take(&mut args.also_include));
 		args
 	}
 
@@ -89,12 +78,6 @@ impl TestRunnerConfig {
 	/// Same as `clap::parse_from` but performing inner parsing step.
 	pub fn from_raw_args(args: impl Iterator<Item = String>) -> Self {
 		Self::parse_inner(Self::parse_from(args))
-	}
-
-	pub fn suite_passes_filter(&self, path: &PathBuf) -> bool {
-		let matchable_path = path.to_string_lossy();
-		self.filters.len() == 0
-			|| self.filters.iter().any(|a| a.matches(&matchable_path))
 	}
 
 	/// Checks against ignore, should_panic and filter flags.
@@ -147,18 +130,18 @@ impl TestRunnerConfig {
 
 
 	/// Checks both the file path and the full test name
-	///
+	/// If either the file path or the test name matches the include patterns,
+	/// and neither matches the exclude patterns, the filter passes.
 	/// for matcher `foo` the following will pass:
 	/// - path: `/src/foo/bar.rs`
 	/// - name: `crate::foo::test::it_works`
 	fn passes_filters(&self, desc: &TestDesc) -> bool {
-		if self.filters.len() == 0 {
-			return true;
-		}
-		let path = desc.source_file;
+		let file = desc.source_file;
 		let name = desc.name.to_string();
-		self.filters.iter().any(|a| a.matches(&path))
-			|| self.filters.iter().any(|a| a.matches(&name))
+
+		(self.filter.passes_include(&file) || self.filter.passes_include(&name))
+			&& self.filter.passes_exclude(&file)
+			&& self.filter.passes_exclude(&name)
 	}
 }
 
@@ -174,14 +157,8 @@ impl std::fmt::Display for TestRunnerConfig {
 		if self.format != OutputFormat::File {
 			messages.push(format!("format: {}", self.format));
 		}
-		if self.filters.len() > 0 {
-			let matches = self
-				.filters
-				.iter()
-				.map(|m| m.to_string())
-				.collect::<Vec<_>>()
-				.join(" ");
-			messages.push(format!("matching: {matches}"));
+		if !self.filter.is_empty() {
+			messages.push(format!("matching: {}", self.filter));
 		}
 		if self.quiet {
 			messages.push(format!("quiet: true"));
