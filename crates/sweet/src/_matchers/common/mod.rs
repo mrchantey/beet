@@ -46,3 +46,5 @@ pub use self::mock_func::*;
 mod sweet_error;
 #[allow(unused_imports)]
 pub use self::sweet_error::*;
+mod snapshot;
+pub use snapshot::*;

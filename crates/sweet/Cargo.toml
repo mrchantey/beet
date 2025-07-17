@@ -12,11 +12,12 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["bevy"]
+default = ["bevy", "serde", "nightly"]
 # allow for fn_traits, ie mock_fn(3);
 nightly = []
+serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 bevy = ["dep:bevy"]
-e2e = ["dep:fantoccini", "dep:serde_json", "beet_utils/tokio"]
+e2e = ["dep:fantoccini", "serde", "beet_utils/tokio"]
 
 [dependencies]
 #💡 internal 
@@ -50,6 +51,11 @@ thread_local = "1.1.8"
 bevy = { workspace = true, optional = true }
 
 
+#💡 serde
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_utils = { workspace = true, features = ["tokio", "fs"] }
@@ -57,7 +63,6 @@ beet_utils = { workspace = true, features = ["tokio", "fs"] }
 tokio.workspace = true
 pin-project-lite = "0.2.15"
 fantoccini = { version = "0.21.5", optional = true, features = ["rustls-tls"] }
-serde_json = { workspace = true, optional = true }
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]

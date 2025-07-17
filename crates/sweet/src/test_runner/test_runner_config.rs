@@ -38,6 +38,9 @@ pub struct TestRunnerConfig {
 	/// In watch mode we dont want an exit code, it just muddy's the output.
 	#[arg(short, long)]
 	pub watch: bool,
+	/// Save shapshots for tests that pass the filter, instead of matching them.
+	#[arg(short, long)]
+	pub snapshot: bool,
 	#[arg(short, long)]
 	pub quiet: bool,
 	/// The output format to use: 'file', 'case', 'vanilla'

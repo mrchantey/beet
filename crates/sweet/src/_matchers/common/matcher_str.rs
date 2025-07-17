@@ -36,18 +36,7 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 	}
 	/// Like `to_be`, but with pretty diffing
 	pub fn to_be_str(&self, other: impl AsRef<str>) -> &Self {
-		self.panic_if_negated();
-		let expected = other.as_ref();
-		let received = self.value.as_ref();
-		if received != expected {
-			let mut msg = String::new();
-			crate::utils::pretty_diff::write_inline_diff(
-				&mut msg, expected, received,
-			)
-			.unwrap();
-
-			self.assert(false, &msg);
-		};
+		self.assert_diff(other.as_ref(), self.value.as_ref());
 		self
 	}
 }

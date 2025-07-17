@@ -8389,6 +8389,8 @@ dependencies = [
  "pin-project-lite",
  "pretty_env_logger",
  "rayon",
+ "ron",
+ "serde",
  "serde_json",
  "sweet_macros",
  "thread_local",

@@ -9,6 +9,31 @@ use std::fmt::Debug;
 impl<T> Matcher<T> {
 	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 	#[allow(unused)]
+	pub(crate) fn assert_diff(
+		&self,
+		expected: impl AsRef<str>,
+		received: impl AsRef<str>,
+	) {
+		let expected = expected.as_ref();
+		let received = received.as_ref();
+
+
+		let result = expected == received;
+		let result = if self.negated { !result } else { result };
+		if !result {
+			let mut msg = String::new();
+			crate::utils::pretty_diff::write_inline_diff(
+				&mut msg, expected, received,
+			)
+			.unwrap();
+			self.panic_with_str(&msg);
+		}
+	}
+
+
+
+	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
+	#[allow(unused)]
 	pub(crate) fn assert(&self, result: bool, msg: &str) {
 		let result = if self.negated { !result } else { result };
 		if !result {
