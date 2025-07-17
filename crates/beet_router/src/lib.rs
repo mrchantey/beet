@@ -4,11 +4,9 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
 
-pub mod client_islands;
 pub mod server_actions;
 
 pub mod prelude {
-	pub use crate::client_islands::*;
 	pub use crate::server_actions::*;
 }
 

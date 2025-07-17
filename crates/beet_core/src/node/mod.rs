@@ -24,7 +24,8 @@ mod dom_idx;
 pub use dom_idx::*;
 mod html_constants;
 pub use html_constants::*;
-
+pub mod client_islands;
+pub use client_islands::*;
 
 /// Added to the [`SnippetsPlugin`] and the [`TemplatePlugin`] for static scene
 /// serde.

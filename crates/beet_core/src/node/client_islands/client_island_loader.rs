@@ -1,6 +1,5 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
-
 
 pub struct ClientIslandLoader {
 	pub current_url: String,
