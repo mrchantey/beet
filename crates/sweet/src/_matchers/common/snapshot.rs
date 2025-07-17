@@ -1,5 +1,4 @@
 use super::*;
-// use super::common::matcher
 use crate::prelude::*;
 use anyhow::Result;
 use beet_utils::prelude::AbsPathBuf;
@@ -8,32 +7,25 @@ use beet_utils::prelude::ReadFile;
 
 
 fn snapshot_location() -> Result<AbsPathBuf> {
-	let depth = 5;
-	let backtrace = backtrace::Backtrace::new_unresolved();
-	let frame = backtrace.frames().get(depth).ok_or_else(|| {
-		anyhow::anyhow!("Failed to get backtrace frame at depth {depth}")
-	})?;
-	let loc = BacktraceLocation::from_unresolved_frame(frame)
-		.expect("Failed to get backtrace location");
-
-	let ws_path = AbsPathBuf::new(loc.cwd_path)
-		.unwrap()
-		.into_ws_path()
-		.unwrap();
-
-	let save_path = format!(
-		".sweet/snapshots/{}:{}:{}.ron",
-		ws_path, loc.line_no, loc.col_no
-	);
+	let desc = SweetTestCollector::current_test_desc()
+		.ok_or_else(|| anyhow::anyhow!("No current test description found"))?;
 
 
-	let abs_save_path = AbsPathBuf::new_workspace_rel(save_path)?;
+	// use test name instead of linecol, which breaks on any file change
+	let file_name =
+		format!(".sweet/snapshots/{}::{}.ron", desc.source_file, desc.name);
+
+	let abs_save_path = AbsPathBuf::new_workspace_rel(file_name)?;
 	Ok(abs_save_path)
 }
 
 
 impl<T: Snapshot> Matcher<T> {
-	fn to_be_snapshot(&self) {
+	/// Compares the value to a snapshot, saving it if the `--snapshot` flag is used.
+	/// Snapshots are saved using test name so only one snapshot per test is allowed.
+	/// # Panics
+	/// If the snapshot file cannot be read or written.
+	pub fn to_be_snapshot(&self) {
 		let save_path = snapshot_location().unwrap();
 		let snapshot = self.value.to_snapshot();
 
