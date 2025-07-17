@@ -63,11 +63,13 @@ pub struct TestRunnerConfig {
 
 impl TestRunnerConfig {
 	fn parse_inner(mut args: Self) -> Self {
-		let ignored_args = ["--watch"];
 		args.filter.include.extend(
 			std::mem::take(&mut args.also_include)
 				.into_iter()
-				.filter(|p| !ignored_args.contains(&p.as_str())),
+				.filter(|p| {
+					!p.as_str().starts_with("--")
+						&& !p.as_str().starts_with("-")
+				}),
 		);
 		args.filter.wrap_all_with_wildcard();
 		args
