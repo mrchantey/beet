@@ -59,7 +59,6 @@ pub fn tokenize_bundle_with_errors(
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
-	use bevy::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
 
@@ -73,45 +72,8 @@ mod test {
 		}
 		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
-		.to_string()
 		.xpect()
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: false },
-					related!(Attributes[(
-						AttributeKey::new("hidden"),
-						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
-					)]),
-					related!{Children[(
-							ExprIdx(0u32),
-							NodeTag(String::from("MyComponent")),
-							FragmentNode,
-							TemplateNode,
-							ClientLoadDirective,
-							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-								let template = <MyComponent as Props>::Builder::default().foo("bar").build();
-								(
-									#[cfg(not(target_arch = "wasm32"))]
-									{ TemplateSerde::new(&template) },
-									#[cfg(target_arch = "wasm32")]
-									{ () },
-									TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-								)
-							}.into_node_bundle())
-						), (
-							NodeTag(String::from("div")),
-							ElementNode { self_closing: true }
-						)]}
-				)]}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 
 	#[test]
@@ -122,118 +84,39 @@ mod test {
 		}
 		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
-		.to_string()
 		.xpect()
-		.to_be_str(
-			quote! {
-				(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						),
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						)
-					]}
-				)
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.to_string()
 			.xpect()
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						ExprIdx(0u32),
-						BlockNode,
-						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.to_string()
 			.xpect()
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						NodeTag(String::from("input")),
-						ElementNode { self_closing: true },
-						related!(Attributes [
-							(
-								AttributeKey::new("hidden"),
-								OnSpawnTemplate::new_insert(val.into_attribute_bundle()),
-								ExprIdx(0u32)
-							)
-						])
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 	#[test]
-	fn lang_content() {
+	fn lang_content_empty() {
 		quote! {<style></style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.to_string()
 			.xpect()
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						NodeTag(String::from("style")),
-						ElementNode { self_closing: false }
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
+	}
+	#[test]
+	fn lang_content() {
 		quote! {<style>foo</style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.to_string()
 			.xpect()
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						NodeTag(String::from("style")),
-						ElementNode { self_closing: false },
-						LangContent::InnerText(String::from("foo"))
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 }

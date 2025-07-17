@@ -94,15 +94,13 @@ pub fn tokenize_template(
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
-	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> Matcher<String> {
+	fn parse(tokens: TokenStream) -> Matcher<TokenStream> {
 		tokenize_rstml(tokens, WsPathBuf::new(file!()))
 			.unwrap()
-			.to_string()
 			.xpect()
 	}
 
@@ -112,39 +110,6 @@ mod test {
 			<Foo bar client:load/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx {
-					file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_template.rs"),
-					start: LineCol { line: 1u32, col: 0u32 }
-				},
-				FragmentNode,
-				related! {
-					Children [
-						(
-							ExprIdx(0u32),
-							NodeTag(String::from("Foo")),
-							FragmentNode,
-							TemplateNode,
-							ClientLoadDirective,
-							SpawnClientIsland::new(
-								<Foo as Props>::Builder::default()
-									.bar(true)
-									.build()
-							),
-							TemplateRoot::spawn(
-								Spawn(<Foo as Props>::Builder::default()
-									.bar(true)
-									.build().into_node_bundle()
-								)
-							)
-						)
-					]
-				}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 }

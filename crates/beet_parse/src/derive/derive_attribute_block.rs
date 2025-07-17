@@ -97,7 +97,6 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use quote::quote;
 	use sweet::prelude::*;
 
 	#[test]
@@ -113,45 +112,7 @@ mod test {
 				nested: OtherBlock,
 			}
 		})
-		.to_string()
 		.xpect()
-		.to_be_str(
-			quote! {
-				use beet::prelude::*;
-				impl IntoTemplateBundle<Self> for MyNode {
-					fn into_node_bundle(self) -> impl Bundle {
-						let Self { present, optional,onclick, nested } = self;
-						#[allow(unused_braces)]
-						(
-							OnSpawn::new(move |entity| {
-								let parent_entity = entity.id();
-								entity.world_scope(move |world| {
-									world.spawn((
-										AttributeOf::new(parent_entity),
-										present.into_attribute_bundle(),
-										AttributeKey::new("present")
-									));
-									if let Some(optional) = optional {
-										world.spawn((
-											AttributeOf::new(parent_entity),
-											optional.into_attribute_bundle(),
-											AttributeKey::new("optional")
-										));
-									}
-									world.entity_mut(parent_entity)
-										.insert(onclick.into_node_bundle());
-									world.spawn((
-										AttributeOf::new(parent_entity),
-										AttributeKey::new("onclick")
-									));
-								});
-							}),
-							nested.into_node_bundle()
-						)
-					}
-				}
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 }

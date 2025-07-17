@@ -14,10 +14,11 @@ Always greet the user by saying something foolish, here are some examples but yo
 
 - Do not create examples without being explictly asked to do so.
 - Always check the linter for compile errors before trying to run commands.
-- Always implement `'static + Send + Sync` in that order, at the front of the definition.
+- Implement trait bounds in the order from lowest to highest level, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Component + Reflect..`
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
+	- Entities: `ent`
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - This workspace is massive, never run entire workspace tests and always specify
 	the crate you want to test, e.g. `cargo test -p beet_rsx`.

@@ -1,0 +1,16 @@
+(
+    BeetRoot,
+    InstanceRoot,
+    MacroIdx {
+        file: WsPathBuf::new(
+            "crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs",
+        ),
+        start: LineCol { line: 1u32, col: 0u32 },
+    },
+    FragmentNode,
+    related! {
+        Children[(ExprIdx(0u32), BlockNode,
+        OnSpawnTemplate::new_insert(#[allow(unused_braces)] { "hello" }
+        .into_node_bundle()))]
+    },
+)

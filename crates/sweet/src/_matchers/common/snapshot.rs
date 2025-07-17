@@ -5,6 +5,8 @@ use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::FsExt;
 use beet_utils::prelude::ReadFile;
 #[cfg(feature = "tokens")]
+use proc_macro2::TokenStream;
+#[cfg(feature = "tokens")]
 use quote::ToTokens;
 
 
@@ -78,8 +80,8 @@ pub struct ToTokensStringCompMarker;
 #[cfg(feature = "tokens")]
 impl<T: ToTokens> StringComp<ToTokensStringCompMarker> for T {
 	fn to_comp_string(&self) -> String {
-		// TODO format nicely
-		self.to_token_stream().to_string()
+		pretty_parse(self.to_token_stream())
+		// self.to_token_stream().to_string()
 	}
 }
 
@@ -88,6 +90,44 @@ impl<T: ToString> StringComp<Self> for Matcher<T> {
 	fn to_comp_string(&self) -> String { self.value.to_string() }
 }
 
+/// Attempt to parse the tokens with prettyplease,
+/// otherwise return the tokens as a string.
+#[cfg(feature = "tokens")]
+pub fn pretty_parse(tokens: TokenStream) -> String {
+	use syn::File;
+	match syn::parse2::<File>(tokens.clone()) {
+		Ok(file) => prettyplease::unparse(&file),
+		Err(_) => {
+			// ok its not a file, lets try again putting the tokens in a function
+			match syn::parse2::<File>(quote::quote! {
+				fn deleteme(){
+						#tokens
+				}
+			}) {
+				Ok(file) => {
+					let mut str = prettyplease::unparse(&file);
+					str = str.replace("fn deleteme() {\n", "");
+					if let Some(pos) = str.rfind("\n}") {
+						str.replace_range(pos..pos + 3, "");
+					}
+					str =
+						str.lines()
+							.map(|line| {
+								if line.len() >= 4 { &line[4..] } else { line }
+							})
+							.collect::<Vec<_>>()
+							.join("\n");
+					str
+				}
+				Err(_) =>
+				// ok still cant parse, just return the tokens as a string
+				{
+					tokens.to_string()
+				}
+			}
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {
@@ -98,4 +138,17 @@ mod test {
 
 	#[test]
 	fn bool() { expect(MyStruct(7)).to_be_snapshot(); }
+
+	#[cfg(feature = "tokens")]
+	#[test]
+	fn prettyparse() {
+		use quote::quote;
+		// valid file
+		pretty_parse(quote! {fn main(){let foo = bar;}})
+			.xpect()
+			.to_be("fn main() {\n    let foo = bar;\n}\n");
+		pretty_parse(quote! {let foo = bar; let bazz = boo;})
+			.xpect()
+			.to_be("let foo = bar;\nlet bazz = boo;");
+	}
 }
