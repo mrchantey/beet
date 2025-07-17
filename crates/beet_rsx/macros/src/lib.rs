@@ -64,11 +64,22 @@ pub fn derive_props(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
 /// Mark a function as a template function.
+/// This creates a struct of the same name, passing all prop attributes
+/// to the fields.
 ///
 /// ## Example
 ///
 /// ```rust ignore
 /// #[template]
+/// fn MyTemplate(hidden:bool) -> impl Bundle {
+/// 	rsx!{<div hidden={hidden}>hello world</div>}
+/// }
+/// ```
+/// Top level and field attributes are applied to the struct:
+///
+/// ```rust ignore
+/// #[template]
+/// #[derive(Clone)]
 /// fn MyTemplate(hidden:bool) -> impl Bundle {
 /// 	rsx!{<div hidden={hidden}>hello world</div>}
 /// }

@@ -1,26 +1,17 @@
 use crate::prelude::*;
 use beet_core::node::ClientOnlyDirective;
-use bevy::ecs::component::HookContext;
-use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
-// all client-only nodes need to render html
-// we cant use component::require because downstream crate
-pub(super) fn on_add_client_only(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(HtmlFragment::default());
-}
-
-pub(super) fn mount_html(
-	query: Populated<
-		&HtmlFragment,
-		(Added<HtmlFragment>, With<ClientOnlyDirective>),
-	>,
+pub(super) fn mount_client_only(
+	mut commands: Commands,
+	query: Populated<Entity, Added<ClientOnlyDirective>>,
 ) {
-	for html in query.iter() {
-		mount(&html.0);
+	for entity in query.iter() {
+		commands.queue(move |world: &mut World| -> Result {
+			let html = world.run_system_cached_with(render_fragment, entity)?;
+			mount(&html);
+			Ok(())
+		});
 	}
 }
 /// ensure all text nodes are collapsed, critical when mounting
@@ -42,8 +33,6 @@ fn mount_with_id(html: &str, id: &str) {
 	let element = document.get_element_by_id(id).unwrap();
 	element.set_inner_html(&html);
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -69,7 +58,7 @@ mod test {
 	}
 
 	#[template]
-	#[derive(serde::Serialize)]
+	#[derive(Reflect)]
 	fn Counter(initial: u32) -> impl Bundle {
 		let (get, set) = signal(initial);
 

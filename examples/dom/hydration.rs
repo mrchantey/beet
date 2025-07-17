@@ -1,9 +1,9 @@
-//! This example statically renders html content with a client:load directive.
-//! This instructs the browser to load the wasm, hooking up events and
-//! effects, but not re-rendering the page.
+//! This example statically renders html content with a client:load directive,
+//! which hydrates a static web page with a wasm module.
 //!
-//! To build, first export the html file, then build the wasm module.
+//! Building is usually done by the cli but it can also be done manually:
 //! ```sh
+//! # export the html file
 //! cargo run --example hydration
 //! cargo build --example hydration --target-dir=target --features=template --target wasm32-unknown-unknown
 //! wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
@@ -45,7 +45,7 @@ fn app() -> impl Bundle {
 
 
 #[template]
-#[derive(serde::Serialize)]
+#[derive(Reflect)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	rsx! {
