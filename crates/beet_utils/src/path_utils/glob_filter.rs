@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use clap::Parser;
+use glob::Pattern;
 use glob::PatternError;
 
 
@@ -9,18 +10,15 @@ use glob::PatternError;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all
-	#[arg(long, value_parser = parse_glob_pattern)]
+	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
 	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
 	pub include: Vec<glob::Pattern>,
 	/// glob for ignore patterns
-	#[arg(long, value_parser = parse_glob_pattern)]
+	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
 	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
 	pub exclude: Vec<glob::Pattern>,
 }
 
-fn parse_glob_pattern(s: &str) -> Result<glob::Pattern, PatternError> {
-	glob::Pattern::new(s)
-}
 
 impl std::fmt::Display for GlobFilter {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -76,6 +74,38 @@ mod serde_glob_vec {
 
 
 impl GlobFilter {
+	pub fn parse_glob_pattern(s: &str) -> Result<glob::Pattern, PatternError> {
+		glob::Pattern::new(s)
+	}
+
+	/// Wrap each pattern with wildcards if they dont already have them,
+	/// turning `foo/bar` into `*foo/bar*` which matches any path that contains `foo/bar`.
+	pub fn wrap_all_with_wildcard(&mut self) -> &mut Self {
+		self.include = self
+			.include
+			.iter()
+			.map(|p| Self::wrap_pattern_with_wildcard(p.as_str()))
+			.collect();
+		self.exclude = self
+			.exclude
+			.iter()
+			.map(|p| Self::wrap_pattern_with_wildcard(p.as_str()))
+			.collect();
+		self
+	}
+
+	fn wrap_pattern_with_wildcard(pattern: &str) -> Pattern {
+		let starts = pattern.starts_with('*');
+		let ends = pattern.ends_with('*');
+		Pattern::new(&match (starts, ends) {
+			(true, true) => pattern.to_string(),
+			(true, false) => format!("{pattern}*"),
+			(false, true) => format!("*{pattern}"),
+			(false, false) => format!("*{pattern}*"),
+		})
+		.expect("Failed to create glob pattern")
+	}
+
 	pub fn set_include(mut self, watch: Vec<&str>) -> Self {
 		self.include = watch
 			.iter()

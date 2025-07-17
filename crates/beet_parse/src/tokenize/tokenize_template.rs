@@ -67,33 +67,84 @@ pub fn tokenize_template(
 		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 
-	// we create an inner tuple, so that we can define the template
-	// and reuuse it for serialization
-	let mut inner_items = Vec::new();
+	// temp: we reuse the builder twice, once for the instance and onother used
+	// for the client island definition, eventually OnSpawnTemplate should
+	// be in a scene and we wont need this.
+	let template_def = quote! {
+			<#template_ident as Props>::Builder::default()
+			#(#prop_assignments)*
+			.build()
+	};
+
 	if entity.contains::<ClientLoadDirective>()
 		|| entity.contains::<ClientOnlyDirective>()
 	{
-		inner_items.push(quote! {
-			#[cfg(not(target_arch = "wasm32"))]
-			{TemplateSerde::new(&template)},
-			#[cfg(target_arch = "wasm32")]
-			{()}
+		entity_components.push(quote! {
+				SpawnClientIsland::new(#template_def)
 		});
 	}
-	// the output of a template is *children!*, ie the template is a fragment.
-	// this is important to avoid duplicate components like NodeTag
-	inner_items
-		.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
 
-	let items = unbounded_bundle(inner_items);
+	entity_components.push(
+		quote! {TemplateRoot::spawn(Spawn(#template_def.into_node_bundle()))},
+	);
 
-	let node_expr = NodeExpr::new_block(syn::parse_quote! {{
-		let template = <#template_ident as Props>::Builder::default()
-				#(#prop_assignments)*
-				.build();
-		#items
-	}});
-
-	entity_components.push(node_expr.node_bundle_tokens());
 	Ok(())
+}
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_utils::prelude::*;
+	use bevy::prelude::*;
+	use proc_macro2::TokenStream;
+	use quote::quote;
+	use sweet::prelude::*;
+
+	fn parse(tokens: TokenStream) -> Matcher<String> {
+		tokenize_rstml(tokens, WsPathBuf::new(file!()))
+			.unwrap()
+			.to_string()
+			.xpect()
+	}
+
+	#[test]
+	fn key_value() {
+		quote! {
+			<Foo bar client:load/>
+		}
+		.xmap(parse)
+		.to_be_str(
+			quote! {(
+				BeetRoot,
+				InstanceRoot,
+				MacroIdx {
+					file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_template.rs"),
+					start: LineCol { line: 1u32, col: 0u32 }
+				},
+				FragmentNode,
+				related! {
+					Children [
+						(
+							ExprIdx(0u32),
+							NodeTag(String::from("Foo")),
+							FragmentNode,
+							TemplateNode,
+							ClientLoadDirective,
+							SpawnClientIsland::new(
+								<Foo as Props>::Builder::default()
+									.bar(true)
+									.build()
+							),
+							TemplateRoot::spawn(
+								Spawn(<Foo as Props>::Builder::default()
+									.bar(true)
+									.build().into_node_bundle()
+								)
+							)
+						)
+					]
+				}
+			)}
+			.to_string(),
+		);
+	}
 }

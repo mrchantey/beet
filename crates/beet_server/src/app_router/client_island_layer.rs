@@ -91,6 +91,6 @@ mod test {
 			.await
 			.unwrap()
 			.xpect()
-			.to_be_str("[(template:(type_name:\"beet_server::app_router::client_island_layer::test::ClientTemplate\",ron:\"(foo:42)\"),mount:false,dom_idx:(0))]");
+			.to_be_str("[(template:(type_name:\"beet_server::app_router::client_island_layer::test::ClientTemplate\",ron:\"(foo:42)\"),mount_to_dom:false,dom_idx:(0))]");
 	}
 }

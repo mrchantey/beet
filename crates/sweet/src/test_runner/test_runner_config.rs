@@ -3,7 +3,6 @@ use beet_utils::prelude::GlobFilter;
 use clap::Parser;
 use clap::ValueEnum;
 use glob::Pattern;
-use glob::PatternError;
 use std::str::FromStr;
 use test::ShouldPanic;
 use test::TestDesc;
@@ -22,7 +21,7 @@ pub struct TestRunnerConfig {
 	#[command(flatten)]
 	pub filter: GlobFilter,
 	/// Shorthand for --include
-	#[arg(trailing_var_arg = true,value_parser = parse_glob)]
+	#[arg(trailing_var_arg = true,value_parser = GlobFilter::parse_glob_pattern)]
 	pub also_include: Vec<Pattern>,
 	#[arg(long)]
 	/// Runs only tests that are marked with the [ignore](test::ignore) attribute.
@@ -58,16 +57,16 @@ pub struct TestRunnerConfig {
 	// report_time: bool,
 	// pub logfile: Option<PathBuf>,
 }
-fn parse_glob(s: &str) -> Result<Pattern, PatternError> {
-	Pattern::new(&format!("*{s}*"))
-	// Ok(Pattern::new(s)?)
-}
 
 impl TestRunnerConfig {
 	fn parse_inner(mut args: Self) -> Self {
-		args.filter
-			.include
-			.extend(std::mem::take(&mut args.also_include));
+		let ignored_args = ["--watch"];
+		args.filter.include.extend(
+			std::mem::take(&mut args.also_include)
+				.into_iter()
+				.filter(|p| !ignored_args.contains(&p.as_str())),
+		);
+		args.filter.wrap_all_with_wildcard();
 		args
 	}
 
