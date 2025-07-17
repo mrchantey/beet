@@ -38,11 +38,7 @@
 //! 	slot children.
 //! - 'Slot Transfers' are supported, ie <slot name="header" slot="default"/>
 //!   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
-use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
-use beet_core::node::NodeTag;
-use beet_core::node::SlotChild;
-use beet_core::node::SlotTarget;
+use beet_core::prelude::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 

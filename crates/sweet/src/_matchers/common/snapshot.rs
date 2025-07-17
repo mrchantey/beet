@@ -21,21 +21,22 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 
 	let save_path = AbsPathBuf::new_workspace_rel(file_name)?;
 
-	if std::env::args().any(|arg| arg == "--snapshot") {
+	if std::env::args().any(|arg| arg == "--snap") {
 		FsExt::write(&save_path, received)?;
 		println!(
-			"Snapshot saved: {}\nRun tests again without --snapshot to compare",
+			"Snapshot saved: {}",
 			desc.name
 		);
 		Ok(None)
 	} else {
 		let expected = ReadFile::to_string(&save_path).unwrap_or_else(|_| {
 			panic!(
-				"Snapshot file not found: {}\n
-				please run test -- --snapshot to generate\n
+				"received: \n\n{}\n\n				
+				Snapshot file not found: {}\n
+				please run test -- --snap to generate\n
 				Snapshots should be commited to version control\n
 				",
-				&save_path
+				received, &save_path
 			)
 		});
 		Ok(Some(expected))
@@ -48,7 +49,7 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 // }
 
 impl<T> Matcher<T> {
-	/// Compares the value to a snapshot, saving it if the `--snapshot` flag is used.
+	/// Compares the value to a snapshot, saving it if the `--snap` flag is used.
 	/// Snapshots are saved using test name so only one snapshot per test is allowed.
 	/// # Panics
 	/// If the snapshot file cannot be read or written.
@@ -63,7 +64,6 @@ impl<T> Matcher<T> {
 	}
 }
 
-
 pub trait StringComp<M> {
 	fn to_comp_string(&self) -> String;
 }
@@ -77,13 +77,34 @@ impl<T: serde::Serialize> StringComp<Self> for T {
 
 pub struct ToTokensStringCompMarker;
 
+// we dont blanket ToTokens because collision with String
 #[cfg(feature = "tokens")]
-impl<T: ToTokens> StringComp<ToTokensStringCompMarker> for T {
-	fn to_comp_string(&self) -> String {
-		pretty_parse(self.to_token_stream())
-		// self.to_token_stream().to_string()
-	}
+macro_rules! impl_string_comp_for_tokens {
+	($($ty:ty),*) => {
+		$(
+			impl StringComp<ToTokensStringCompMarker> for $ty {
+				fn to_comp_string(&self) -> String {
+					pretty_parse(self.to_token_stream())
+				}
+			}
+		)*
+	};
 }
+
+#[cfg(feature = "tokens")]
+impl_string_comp_for_tokens!(
+	proc_macro2::TokenStream,
+	syn::File,
+	syn::Item,
+	syn::Expr,
+	syn::Stmt,
+	syn::Type,
+	syn::Pat,
+	syn::Ident,
+	syn::Block,
+	syn::Path,
+	syn::Attribute
+);
 
 #[cfg(not(feature = "serde"))]
 impl<T: ToString> StringComp<Self> for Matcher<T> {

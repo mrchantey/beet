@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
-/// A component containing a method that will run after spawn, giving LitNodes
-/// a chance to be applied:
+/// A component containing a method that will run after spawn, giving rsx snippets
+/// a chance to be applied. This is basically only added for NodeExprs,
+/// ie `<div foo={bar}/>` or `<div>{bar}</div>`.
 ///
+/// A kitchen sink ordering:
 /// 1. A Bundle is inserted on the entity
 /// 2. Component Hooks are run for the insert
 /// 3. Observers are run for the insert

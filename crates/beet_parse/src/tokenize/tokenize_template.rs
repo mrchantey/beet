@@ -76,17 +76,22 @@ pub fn tokenize_template(
 			.build()
 	};
 
-	if entity.contains::<ClientLoadDirective>()
+	// NodeExpr::new_block(value)
+
+	let inner = if entity.contains::<ClientLoadDirective>()
 		|| entity.contains::<ClientOnlyDirective>()
 	{
-		entity_components.push(quote! {
-				SpawnClientIsland::new(#template_def)
-		});
-	}
+		// this also adds a TemplateRoot::spawn() call, using a reflect clone
+		syn::parse_quote! {
+			ClientIslandRoot::new(#template_def)
+		}
+	} else {
+		syn::parse_quote! {
+			TemplateRoot::spawn(Spawn(#template_def.into_node_bundle()))
+		}
+	};
 
-	entity_components.push(
-		quote! {TemplateRoot::spawn(Spawn(#template_def.into_node_bundle()))},
-	);
+	entity_components.push(NodeExpr::new(inner).node_bundle_tokens());
 
 	Ok(())
 }

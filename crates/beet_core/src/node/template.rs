@@ -27,7 +27,7 @@ impl TemplateOf {
 }
 
 /// Assigned to the 'container' entity of a template, pointing to the bundle
-/// spawned by the template. 
+/// spawned by the template.
 /// This relationship will be replaced with a parent-child relationship
 /// in apply_slots.
 /// Points to the entity that was spawned by this template. This should
@@ -36,6 +36,7 @@ impl TemplateOf {
 #[derive(Component)]
 #[relationship_target(relationship = TemplateOf,linked_spawn)]
 pub struct TemplateRoot(Vec<Entity>);
+
 
 impl std::ops::Deref for TemplateRoot {
 	type Target = Entity;

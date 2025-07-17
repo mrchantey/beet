@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
+use bevy::reflect::Reflectable;
 
 
 
@@ -16,47 +17,119 @@ pub struct ClientIsland {
 	pub dom_idx: DomIdx, // pub route: RouteInfo,
 }
 
+/// A [`SceneFilter`] used to constrain the components serialized to the client scene,
+/// by default only:
+/// - [`ClientLoadDirective`]
+/// - [`ClientOnlyDirective`]
+/// - [`DomIdx`]
+/// - [`ClientIslandRoot<T>`]
+#[derive(Debug, Clone, Resource, Deref)]
+pub struct ClientIslandRegistry(SceneFilter);
 
+impl Default for ClientIslandRegistry {
+	fn default() -> Self {
+		Self(
+			SceneFilter::default()
+				.allow::<ClientLoadDirective>()
+				.allow::<ClientOnlyDirective>()
+				.allow::<DomIdx>(),
+		)
+	}
+}
+
+
+impl ClientIslandRegistry {
+	pub fn add<T: Component>(&mut self) -> &mut Self {
+		self.0 = self.0.clone().allow::<T>();
+		self
+	}
+	pub fn filter(&self) -> SceneFilter { self.0.clone() }
+}
+
+
+/// Added to any template with a client directive, ie [`ClientLoadDirective`],
+/// automatically registering the type for serialization in the client scene.
+/// This also adds a [`TemplateRoot`]
 #[derive(Debug, Clone, Reflect)]
 #[reflect(Component)]
-pub struct SpawnClientIsland<T, U = T>
+pub struct ClientIslandRoot<T, U = T>
 where
-	T: 'static + Send + Sync + IntoTemplateBundle<U>,
-	U: 'static + Send + Sync,
+	T: 'static
+		+ Send
+		+ Sync
+		+ FromReflect
+		+ Reflectable
+		+ IntoTemplateBundle<U>,
+	U: 'static + Send + Sync + TypePath,
 {
 	value: T,
 	#[reflect(ignore)]
 	phantom: std::marker::PhantomData<U>,
 }
 
-
-impl<T, U> Component for SpawnClientIsland<T, U>
+impl<T, U> ClientIslandRoot<T, U>
 where
-	T: 'static + Send + Sync + IntoTemplateBundle<U>,
-	U: 'static + Send + Sync,
+	T: 'static
+		+ Send
+		+ Sync
+		+ FromReflect
+		+ Reflectable
+		+ IntoTemplateBundle<U>,
+	U: 'static + Send + Sync + TypePath,
+{
+	/// Create a new [`ClientIslandRoot<T>`] with the given value,
+	/// alongside a [`TemplateRoot::spawn(T)`] using the same value.
+	pub fn new(value: T) -> impl Bundle {
+		Self {
+			value,
+			phantom: std::marker::PhantomData,
+		}
+	}
+}
+
+impl<T, U> IntoTemplateBundle<Self> for ClientIslandRoot<T, U>
+where
+	T: 'static
+		+ Send
+		+ Sync
+		+ FromReflect
+		+ Reflectable
+		+ IntoTemplateBundle<U>,
+	U: 'static + Send + Sync + TypePath,
+{
+	fn into_node_bundle(self) -> impl Bundle {
+		// perform a 'reflect clone'
+		let dynamic: Box<dyn PartialReflect> = self.value.to_dynamic();
+		let value2 = <T as FromReflect>::from_reflect(&*dynamic).unwrap();
+		(self, TemplateRoot::spawn(Spawn(value2.into_node_bundle())))
+	}
+}
+
+
+impl<T, U> Component for ClientIslandRoot<T, U>
+where
+	T: 'static
+		+ Send
+		+ Sync
+		+ FromReflect
+		+ Reflectable
+		+ IntoTemplateBundle<U>,
+	U: 'static + Send + Sync + TypePath,
 {
 	const STORAGE_TYPE: StorageType = StorageType::Table;
 	type Mutability = Immutable;
 
-
+	// self register for the scene
 	fn on_add() -> Option<bevy::ecs::component::ComponentHook> {
-		Some(|mut world, cx| {
-			let entity = cx.entity;
-			world.commands().queue(move |world: &mut World| -> Result {
-				let this = world.entity_mut(entity).take::<Self>().ok_or_else(
-					|| {
-						let name = std::any::type_name::<Self>();
-						bevyhow!(
-							"SpawnClientIsland<{}> component not found on entity: {:?}",
-							name,
-							entity
-						)
-					},
-				)?;
+		Some(|mut world, _| {
+			world.commands().queue(move |world: &mut World| {
+				// register the reflect type
 				world
-					.entity_mut(entity)
-					.insert(this.value.into_node_bundle());
-				Ok(())
+					.resource::<AppTypeRegistry>()
+					.write()
+					.register::<Self>();
+				// add to allow list
+				world.resource_mut::<ClientIslandRegistry>().add::<Self>();
 			});
 		})
 	}

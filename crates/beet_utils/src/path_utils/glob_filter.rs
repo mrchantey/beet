@@ -34,7 +34,7 @@ impl std::fmt::Display for GlobFilter {
 			.map(|p| p.as_str())
 			.collect::<Vec<_>>()
 			.join(", ");
-		write!(f, "include: [{}], exclude: [{}]", include, exclude)
+		write!(f, "include: {}\nexclude: {}", include, exclude)
 	}
 }
 

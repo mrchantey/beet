@@ -5,7 +5,11 @@ mod apply_style_id_attributes;
 mod html_fragment;
 mod template_config;
 mod template_plugin;
+#[cfg(feature = "scene")]
+mod apply_client_islands;
 pub use apply_on_spawn_template::*;
+#[cfg(feature = "scene")]
+pub use apply_client_islands::*;
 pub use apply_rsx_snippets::*;
 use apply_style_id_attributes::*;
 pub use html_fragment::*;
@@ -18,8 +22,6 @@ mod text_node_parent;
 pub use apply_dom_idx::*;
 pub use apply_lang_snippets::*;
 pub use text_node_parent::*;
-mod template;
-pub use template::*;
 mod apply_slots;
 #[allow(unused)]
 pub use apply_slots::*;

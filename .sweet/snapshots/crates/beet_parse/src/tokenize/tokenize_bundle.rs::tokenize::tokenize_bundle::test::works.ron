@@ -11,10 +11,9 @@
         }, related!(Attributes[(AttributeKey::new("hidden"),
         OnSpawnTemplate::new_insert(true.into_attribute_bundle()))]), related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("MyComponent")), FragmentNode,
-        TemplateNode, ClientLoadDirective, SpawnClientIsland::new(< MyComponent as
-        Props > ::Builder::default().foo("bar").build()), TemplateRoot::spawn(Spawn(<
-        MyComponent as Props > ::Builder::default().foo("bar").build()
-        .into_node_bundle()))), (NodeTag(String::from("div")), ElementNode {
-        self_closing : true })] })]
+        TemplateNode, ClientLoadDirective,
+        OnSpawnTemplate::new_insert(ClientIslandRoot::new(< MyComponent as Props >
+        ::Builder::default().foo("bar").build()).into_node_bundle())),
+        (NodeTag(String::from("div")), ElementNode { self_closing : true })] })]
     },
 )

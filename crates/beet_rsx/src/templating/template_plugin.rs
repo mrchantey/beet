@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use super::*;
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::prelude::WorldMutExt;
+use beet_core::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 
@@ -28,27 +28,27 @@ impl Plugin for TemplatePlugin {
 			app.add_plugins(TemplateConfig::default());
 		}
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
+			.init_resource::<ClientIslandRegistry>()
 			.init_resource::<TemplateFlags>()
 			.add_systems(
 				Update,
+				// almost all of these systems must be run in this sequence,
+				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(
 					apply_snippets_to_instances,
 					apply_style_id_attributes,
 					apply_slots,
 					apply_lang_snippets,
 					apply_text_node_parents,
-					(
-						#[cfg(target_arch = "wasm32")]
-						apply_client_island_dom_idx,
-						#[cfg(not(target_arch = "wasm32"))]
-						apply_root_dom_idx,
-						(
-							rearrange_html_document,
-							insert_hydration_scripts,
-							hoist_document_elements,
-						)
-							.chain(),
-					),
+					#[cfg(target_arch = "wasm32")]
+					apply_client_island_dom_idx,
+					#[cfg(not(target_arch = "wasm32"))]
+					apply_root_dom_idx,
+					rearrange_html_document,
+					#[cfg(feature = "scene")]
+					apply_client_islands,
+					insert_hydration_scripts,
+					hoist_document_elements,
 					insert_event_playback_attribute,
 					render_html_fragments,
 					// debug,

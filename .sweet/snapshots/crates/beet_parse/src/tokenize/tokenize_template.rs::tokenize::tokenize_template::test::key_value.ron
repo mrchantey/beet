@@ -8,8 +8,8 @@
     FragmentNode,
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("Foo")), FragmentNode,
-        TemplateNode, ClientLoadDirective, SpawnClientIsland::new(< Foo as Props >
-        ::Builder::default().bar(true).build()), TemplateRoot::spawn(Spawn(< Foo as
-        Props > ::Builder::default().bar(true).build().into_node_bundle())))]
+        TemplateNode, ClientLoadDirective,
+        OnSpawnTemplate::new_insert(ClientIslandRoot::new(< Foo as Props >
+        ::Builder::default().bar(true).build()).into_node_bundle()))]
     },
 )

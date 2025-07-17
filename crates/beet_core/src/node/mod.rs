@@ -5,7 +5,9 @@ pub use on_spawn_template::*;
 pub mod beet_root;
 pub use beet_root::*;
 pub mod expr_idx;
+pub mod template;
 pub use expr_idx::*;
+pub use template::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;
 pub mod rsx_nodes;
@@ -24,7 +26,9 @@ mod dom_idx;
 pub use dom_idx::*;
 mod html_constants;
 pub use html_constants::*;
+#[cfg(all(feature = "http", feature = "bevy_scene"))]
 pub mod client_islands;
+#[cfg(all(feature = "http", feature = "bevy_scene"))]
 pub use client_islands::*;
 
 /// Added to the [`SnippetsPlugin`] and the [`TemplatePlugin`] for static scene

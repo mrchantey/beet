@@ -40,7 +40,7 @@ pub struct TestRunnerConfig {
 	pub watch: bool,
 	/// Save shapshots for tests that pass the filter, instead of matching them.
 	#[arg(short, long)]
-	pub snapshot: bool,
+	pub snap: bool,
 	#[arg(short, long)]
 	pub quiet: bool,
 	/// The output format to use: 'file', 'case', 'vanilla'
@@ -162,7 +162,7 @@ impl std::fmt::Display for TestRunnerConfig {
 			messages.push(format!("format: {}", self.format));
 		}
 		if !self.filter.is_empty() {
-			messages.push(format!("matching: {}", self.filter));
+			messages.push(self.filter.to_string());
 		}
 		if self.quiet {
 			messages.push(format!("quiet: true"));
