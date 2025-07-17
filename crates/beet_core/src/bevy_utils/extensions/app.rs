@@ -6,7 +6,7 @@ use extend::ext;
 #[ext]
 #[allow(async_fn_in_trait)]
 pub impl App {
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_on_animation_frame(mut self) -> crate::web::AnimationFrame {
 		crate::web::AnimationFrame::new(move || {
 			self.update();
