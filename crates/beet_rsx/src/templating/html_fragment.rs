@@ -104,7 +104,7 @@ impl HtmlBuilder<'_, '_> {
 			html.push_str("<!DOCTYPE html>");
 		}
 		if let Ok(comment) = self.comments.get(entity) {
-			html.push_str(&format!("<!-- {} -->", comment.0));
+			html.push_str(&format!("<!--{}-->", comment.0));
 		}
 		if let Ok(text) = self.texts.get(entity) {
 			html.push_str(&text.0);
@@ -175,7 +175,7 @@ mod test {
 		rsx! {<!-- "howdy" -->}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<!-- howdy -->");
+			.to_be("<!--howdy-->");
 	}
 
 	#[test]
@@ -337,8 +337,7 @@ mod test {
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}
-			.xmap(HtmlDocument::parse_bundle)
-			.xpect()
-			.to_contain("<div data-beet-dom-idx=\"0\">foo</div>");
+			.xmap(HtmlDocument::parse_bundle).xpect()
+		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
 	}
 }

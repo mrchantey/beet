@@ -61,6 +61,7 @@ impl SweetError {
 		// 2025-07-16 had to add this to correct the backtrace depth after
 		// a fresh Cargo.lock, not sure what moved but this is so brittle
 		assertion_depth += 2;
+
 		// not sure why the windows backtrace is so much deeper
 		#[cfg(target_os = "windows")]
 		{

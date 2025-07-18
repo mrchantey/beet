@@ -1,21 +1,8 @@
-use crate::prelude::*;
+use crate::as_beet::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
 use bevy::reflect::Reflectable;
-
-
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClientIsland {
-	pub template: TemplateSerde,
-	/// Whether to create html elements instead of hydrating them,
-	/// if the template is [`ClientOnlyDirective`], this will be true.
-	pub mount_to_dom: bool,
-	pub dom_idx: DomIdx, // pub route: RouteInfo,
-}
 
 /// A [`SceneFilter`] used to constrain the components serialized to the client scene,
 /// by default only:
@@ -34,7 +21,7 @@ impl Default for ClientIslandRegistry {
 				.allow::<ClientOnlyDirective>()
 				.allow::<DomIdx>()
 				// required by apply_slots for debugging
-				.allow::<NodeTag>()
+				.allow::<NodeTag>(),
 		)
 	}
 }

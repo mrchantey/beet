@@ -41,3 +41,12 @@ impl DomIdx {
 	pub fn new(idx: u32) -> Self { Self(idx) }
 	pub fn inner(&self) -> u32 { self.0 }
 }
+
+/// Marker type indicating this entity will need a [`DomIdx`]
+/// assigned to it after the tree has been built.
+/// This is often a [`RequiredComponent`] ie [`EventTarget`] or [`ClientOnlyDirective`],
+/// or added to a parent OnSpawn (ie for signal attributes)
+#[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
+#[reflect(Default, Component)]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct RequiresDomIdx;

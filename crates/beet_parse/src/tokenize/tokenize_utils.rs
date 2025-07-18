@@ -69,6 +69,7 @@ tokenize_maybe_spanned![
 	ResolvedRoot,
 	MacroIdx,
 	ExprIdx,
+	RequiresDomIdx,
 ];
 tokenize_maybe_spanned![
 	tokenize_rsx_nodes,

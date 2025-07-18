@@ -11,6 +11,7 @@ use quote::ToTokens;
 
 
 // returns whether the assertion should be made
+#[allow(dead_code)]
 fn parse_snapshot(received: &str) -> Result<Option<String>> {
 	let desc = SweetTestCollector::current_test_desc()
 		.ok_or_else(|| anyhow::anyhow!("No current test description found"))?;
@@ -23,10 +24,7 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 
 	if std::env::args().any(|arg| arg == "--snap") {
 		FsExt::write(&save_path, received)?;
-		println!(
-			"Snapshot saved: {}",
-			desc.name
-		);
+		println!("Snapshot saved: {}", desc.name);
 		Ok(None)
 	} else {
 		let expected = ReadFile::to_string(&save_path).unwrap_or_else(|_| {
@@ -57,9 +55,17 @@ impl<T> Matcher<T> {
 	where
 		T: StringComp<M>,
 	{
-		let received = self.value.to_comp_string();
-		if let Some(expected) = parse_snapshot(&received).unwrap() {
-			self.assert_diff(&expected, &received);
+		#[cfg(target_arch = "wasm32")]
+		{
+			beet_utils::log!("snapshot not yet supported on wasm32");
+			return;
+		}
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			let received = self.value.to_comp_string();
+			if let Some(expected) = parse_snapshot(&received).unwrap() {
+				self.assert_diff(&expected, &received);
+			}
 		}
 	}
 }

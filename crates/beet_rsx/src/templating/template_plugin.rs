@@ -28,8 +28,6 @@ impl Plugin for TemplatePlugin {
 			app.add_plugins(TemplateConfig::default());
 		}
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
-			.register_type::<TextNodeParent>()
-			.register_type::<TextNodeMap>()
 			.init_resource::<ClientIslandRegistry>()
 			.init_resource::<TemplateFlags>()
 			.add_systems(
@@ -41,14 +39,14 @@ impl Plugin for TemplatePlugin {
 					apply_style_id_attributes,
 					apply_slots,
 					apply_lang_snippets,
-					apply_text_node_parents,
+					apply_requires_dom_idx,
 					#[cfg(target_arch = "wasm32")]
 					apply_client_island_dom_idx,
 					#[cfg(not(target_arch = "wasm32"))]
 					apply_root_dom_idx,
 					rearrange_html_document,
+					apply_reactive_text_nodes,
 					#[cfg(feature = "scene")]
-					apply_text_node_map,
 					apply_client_islands,
 					insert_hydration_scripts,
 					hoist_document_elements,

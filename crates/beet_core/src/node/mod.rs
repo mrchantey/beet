@@ -44,6 +44,7 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<MacroIdx>()
 			.register_type::<ExprIdx>()
 			.register_type::<DomIdx>()
+			.register_type::<RequiresDomIdx>()
 			// rsx nodes
 			.register_type::<NodeTag>()
 			.register_type::<TemplateNode>()
@@ -62,6 +63,9 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<FileSpanOf<DoctypeNode>>()
 			.register_type::<FileSpanOf<CommentNode>>()
 			.register_type::<FileSpanOf<ElementNode>>()
+			// directives - client island
+			.register_type::<ClientLoadDirective>()
+			.register_type::<ClientOnlyDirective>()
 			// directives - script/style
 			.register_type::<LangSnippet>()
 			.register_type::<LangSnippetPath>()
@@ -69,10 +73,6 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<StyleId>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()
-			// directives - client island
-			.register_type::<TemplateSerde>()
-			.register_type::<ClientLoadDirective>()
-			.register_type::<ClientOnlyDirective>()
 			// directives - slots
     	.register_type::<SlotChild>()
 			.register_type::<SlotTarget>()

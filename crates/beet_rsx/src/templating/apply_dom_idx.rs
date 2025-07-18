@@ -1,46 +1,44 @@
 use crate::prelude::*;
 use beet_core::as_beet::*;
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-
-
-/// Only [`ElementNodes`](ElementNode) matching one of the below filters
-/// require a [`DomIdx`]:
-/// - [`EventTarget`] for event binding
-/// - [`TextNodeParent`] for splitting child text nodes
-/// - [`ClientOnlyDirective`] for client islands
-/// - [`ClientLoadDirective`] for client islands
-/// - [`SignalReceiver`] attributes for updating element attributes (properties)
-#[derive(SystemParam)]
-pub struct RequiresIdx<'w, 's> {
-	requires_dom_idx_attr: Query<
-		'w,
-		's,
+/// Some cases cant just use a `#[requires(RequiresDomIdx)]` attribute,
+/// like SignalReceive<String> or its parent. This system applies the
+/// [RequiresDomIdx] attribute to those entities.
+pub fn apply_requires_dom_idx(
+	mut commands: Commands,
+	attributes: Query<(Entity, &Attributes)>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
+	dyn_text_nodes: Query<
 		Entity,
-		Or<(
-			Added<EventTarget>,
-			Added<TextNodeParent>,
-			Added<ClientOnlyDirective>,
-			Added<ClientLoadDirective>,
-		)>,
+		(With<TextNode>, With<SignalReceiver<String>>),
 	>,
-	attributes: Query<'w, 's, &'static Attributes>,
-	dyn_attrs:
-		Query<'w, 's, (), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
-}
-impl RequiresIdx<'_, '_> {
-	pub fn requires(&self, entity: Entity) -> bool {
-		self.requires_dom_idx_attr.contains(entity)
-			|| self
-				.attributes
-				.get(entity)
-				.map(|attrs| {
-					attrs.iter().any(|attr| self.dyn_attrs.contains(attr))
-				})
-				.unwrap_or(false)
+	parents: Query<&ChildOf>,
+	elements: Query<Entity, With<ElementNode>>,
+) -> Result {
+	for (entity, _) in attributes
+		.iter()
+		.filter(|(_, attrs)| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
+	{
+		commands.entity(entity).insert(RequiresDomIdx);
 	}
+
+	for entity in dyn_text_nodes.iter() {
+		let parent = parents
+			.iter_ancestors(entity)
+			.find(|e| elements.contains(*e))
+			.ok_or_else(|| {
+				bevyhow!(
+					"TextNode with SignalReceiver<String> must have an ElementNode parent"
+				)
+			})?;
+		commands.entity(entity).insert(RequiresDomIdx);
+		commands.entity(parent).insert(RequiresDomIdx);
+	}
+	Ok(())
 }
+
+
 /// Recursively applies a [`DomIdx`] to root nodes spawned *without* one,
 /// not counting roots that are spawned with one like client islands.
 #[allow(dead_code)]
@@ -49,7 +47,7 @@ pub(super) fn apply_root_dom_idx(
 	html_constants: Res<HtmlConstants>,
 	roots: Populated<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
-	requires_idx: RequiresIdx,
+	requires_idx: Query<(), Added<RequiresDomIdx>>,
 ) {
 	let mut id = 0;
 
@@ -58,10 +56,12 @@ pub(super) fn apply_root_dom_idx(
 		for entity in children
 			//dfs allows for client islands to accurately pick up the next index
 			.iter_descendants_depth_first(root)
-			.filter(|entity| requires_idx.requires(*entity))
+			.filter(|entity| requires_idx.contains(*entity))
 		{
-			// only 'dynamic' elements need a DomIdx
-			commands.entity(entity).insert(DomIdx::new(id));
+			commands
+				.entity(entity)
+				.remove::<RequiresDomIdx>()
+				.insert(DomIdx::new(id));
 
 			commands.spawn((
 				AttributeOf::new(entity),
@@ -82,16 +82,19 @@ pub(super) fn apply_client_island_dom_idx(
 	// definition of a root: any fragment or element without a parent
 	roots: Populated<(Entity, &DomIdx), (Added<DomIdx>, Without<ChildOf>)>,
 	children: Query<&Children>,
-	requires_idx: RequiresIdx,
+	requires_idx: Query<(), Added<RequiresDomIdx>>,
 ) {
 	for (root, idx) in roots.iter() {
 		let mut id = idx.inner() + 1; // start at the next index after the root
 		for entity in children
 			//dfs exclusive, root already has a DomIdx
 			.iter_descendants_depth_first(root)
-			.filter(|entity| requires_idx.requires(*entity))
+			.filter(|entity| requires_idx.contains(*entity))
 		{
-			commands.entity(entity).insert(DomIdx::new(id));
+			commands
+				.entity(entity)
+				.remove::<RequiresDomIdx>()
+				.insert(DomIdx::new(id));
 			commands.spawn((
 				AttributeOf::new(entity),
 				AttributeKey::new(html_constants.dom_idx_key.clone()),
@@ -130,18 +133,8 @@ mod test {
 			.run_system_once(apply_snippets_to_instances)
 			.unwrap()
 			.unwrap();
-		world
-			.run_system_once(super::super::apply_text_node_parents)
-			.unwrap();
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
 		world.get::<DomIdx>(div).unwrap().xpect().to_be(&DomIdx(0));
-
-		let children = world.get::<Children>(div).unwrap();
-		world
-			.get::<DomIdx>(children[1])
-			.unwrap()
-			.xpect()
-			.to_be(&DomIdx(1));
 	}
 }
