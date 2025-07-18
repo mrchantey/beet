@@ -19,7 +19,6 @@ pub struct BuildConfig {
 	#[serde(flatten)]
 	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
-	pub client_island_codegen: CollectClientIslands,
 	/// The path to the Cargo.toml file, defaults to `Cargo.toml`
 	#[serde(default = "default_manifest_path")]
 	manifest_path: PathBuf,
@@ -30,7 +29,6 @@ impl Default for BuildConfig {
 		Self {
 			template_config: TemplateConfig::default(),
 			route_codegen: RouteCodegenConfig::default(),
-			client_island_codegen: CollectClientIslands::default(),
 			manifest_path: default_manifest_path(),
 		}
 	}
@@ -70,7 +68,6 @@ impl NonSendPlugin for BuildConfig {
 		app.add_non_send_plugin(self.route_codegen)
 			.add_plugins(self.template_config)
 			.insert_resource(manifest);
-		app.world_mut().spawn(self.client_island_codegen);
 	}
 }
 
@@ -184,9 +181,6 @@ impl Plugin for BuildPlugin {
 						export_server_ssg.run_if(BuildFlags::should_run(
 							BuildFlag::ExportSsg,
 						)),
-						export_client_island_codegen.run_if(
-							BuildFlags::should_run(BuildFlag::ClientIslands),
-						),
 						compile_client.run_if(BuildFlags::should_run(
 							BuildFlag::CompileWasm,
 						)),
@@ -235,8 +229,6 @@ pub enum BuildFlag {
 	Routes,
 	/// Generate File Snippet Scenes
 	Snippets,
-	/// Generate Client Islands Codegen
-	ClientIslands,
 	CompileServer,
 	ExportSsg,
 	CompileWasm,
@@ -249,7 +241,6 @@ impl std::fmt::Display for BuildFlag {
 		match self {
 			BuildFlag::Routes => write!(f, "routes"),
 			BuildFlag::Snippets => write!(f, "snippets"),
-			BuildFlag::ClientIslands => write!(f, "client-islands"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
 			BuildFlag::ExportSsg => write!(f, "export-ssg"),
 			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
@@ -265,7 +256,6 @@ impl FromStr for BuildFlag {
 		match s.to_lowercase().as_str() {
 			"routes" => Ok(BuildFlag::Routes),
 			"snippets" => Ok(BuildFlag::Snippets),
-			"client-islands" => Ok(BuildFlag::ClientIslands),
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"export-ssg" => Ok(BuildFlag::ExportSsg),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),

@@ -1,8 +1,8 @@
 //! Example of Client-Side Rendering (CSR) with Beet and Bevy.
 //!
-//! Note that this approach is not recommended because the entire wasm
-//! app must be built and run before the HTML is rendered, resulting in a long time
-//! to first paint.
+//! Note that this approach is not recommended because the entire
+//! wasm app must be downloaded, parsed and run before the HTML is rendered,
+//! resulting in a long time to first paint. See hydration.rs for a faster alternative.
 //!
 //! Here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh
@@ -49,7 +49,7 @@ fn main() {
 
 #[template]
 // components with client directives must be serde
-#[derive(serde::Serialize)]
+#[derive(Reflect)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	let (style, set_style) = signal("display: block;");
