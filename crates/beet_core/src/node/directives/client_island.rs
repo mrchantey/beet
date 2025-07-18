@@ -106,14 +106,16 @@ where
 		Some(|mut world, cx| {
 			let entity = cx.entity;
 			world.commands().queue(move |world: &mut World| {
-				// register the reflect type
-				world
-					.resource::<AppTypeRegistry>()
-					.write()
-					.register::<Self>();
+				// if the registry is locked we're probably in a scene load,
+				// so we can skip the registration
+				if let Ok(mut registry) =
+					world.resource::<AppTypeRegistry>().internal.try_write()
+				{
+					// register the reflect type
+					registry.register::<Self>();
+				}
 				// add to allow list
 				world.resource_mut::<ClientIslandRegistry>().add::<Self>();
-
 				// spawn the template root
 				let this = world.entity(entity).get::<Self>().unwrap();
 				// perform a 'reflect clone'
