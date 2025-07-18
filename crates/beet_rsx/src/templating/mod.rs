@@ -1,17 +1,19 @@
+#[cfg(feature = "scene")]
+mod apply_client_islands;
 mod apply_lang_snippets;
 mod apply_on_spawn_template;
 mod apply_rsx_snippets;
 mod apply_style_id_attributes;
+mod apply_text_node_map;
 mod html_fragment;
 mod template_config;
 mod template_plugin;
 #[cfg(feature = "scene")]
-mod apply_client_islands;
-pub use apply_on_spawn_template::*;
-#[cfg(feature = "scene")]
 pub use apply_client_islands::*;
+pub use apply_on_spawn_template::*;
 pub use apply_rsx_snippets::*;
 use apply_style_id_attributes::*;
+pub use apply_text_node_map::*;
 pub use html_fragment::*;
 pub use template_config::*;
 pub use template_plugin::*;

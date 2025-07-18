@@ -78,11 +78,14 @@ impl Parser<'_, '_> {
 /// 'uncollapse' adjacent html text nodes.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct TextNodeParent {
 	pub text_nodes: Vec<TextNodeChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+// un
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct TextNodeChild {
 	/// The *post-collapse* index of this html TextNode.
 	pub child_index: usize,

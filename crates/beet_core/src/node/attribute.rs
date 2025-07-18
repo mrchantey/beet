@@ -81,6 +81,9 @@ impl std::fmt::Display for AttributeLit {
 impl Into<AttributeLit> for String {
 	fn into(self) -> AttributeLit { AttributeLit::String(self) }
 }
+impl Into<AttributeLit> for &String {
+	fn into(self) -> AttributeLit { AttributeLit::String(self.clone()) }
+}
 impl Into<AttributeLit> for &str {
 	fn into(self) -> AttributeLit { AttributeLit::String(self.to_string()) }
 }

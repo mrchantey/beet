@@ -18,8 +18,10 @@ pub struct HtmlConstants {
 	pub event_store: String,
 	/// Used for setting the style id on elements
 	pub style_id_key: String,
-	/// The client island scene is stored in a script tag with this type
+	/// The <script type="x"/> for the client island scene
 	pub client_islands_script_type: String,
+	/// The <script type="x"/> for the text node map
+	pub text_node_map_script_type: String,
 	/// Path to the wasm directory, defaults to `wasm`
 	pub wasm_dir: PathBuf,
 	/// Name of the wasm js and bin files, defaults to `main`
@@ -38,6 +40,7 @@ impl Default for HtmlConstants {
 			event_store: "_beet_event_store".into(),
 			style_id_key: "data-beet-style-id".into(),
 			client_islands_script_type: "beet/client-islands".into(),
+			text_node_map_script_type: "beet/text-node-map".into(),
 			wasm_dir: "wasm".into(),
 			wasm_name: "main".into(),
 			hoist_to_head_tags: vec![

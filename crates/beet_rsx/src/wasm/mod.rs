@@ -1,8 +1,8 @@
 mod dom_binding;
-mod load_client_islands;
+mod load_html_content;
 use beet_utils::log;
 pub use dom_binding::*;
-pub use load_client_islands::*;
+pub use load_html_content::*;
 mod client_only;
 mod event_playback;
 use crate::prelude::*;
@@ -24,6 +24,7 @@ pub fn wasm_template_plugin(app: &mut App) {
 			load_client_islands.run_if(run_once).before(TemplateSet),
 			(
 				mount_client_only,
+				load_text_node_map.run_if(run_once),
 				// the below could be 'parallel' but we're single-threaded anyway
 				event_playback.run_if(run_once),
 				bind_events,

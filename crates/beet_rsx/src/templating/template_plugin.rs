@@ -28,6 +28,8 @@ impl Plugin for TemplatePlugin {
 			app.add_plugins(TemplateConfig::default());
 		}
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
+			.register_type::<TextNodeParent>()
+			.register_type::<TextNodeMap>()
 			.init_resource::<ClientIslandRegistry>()
 			.init_resource::<TemplateFlags>()
 			.add_systems(
@@ -46,6 +48,7 @@ impl Plugin for TemplatePlugin {
 					apply_root_dom_idx,
 					rearrange_html_document,
 					#[cfg(feature = "scene")]
+					apply_text_node_map,
 					apply_client_islands,
 					insert_hydration_scripts,
 					hoist_document_elements,

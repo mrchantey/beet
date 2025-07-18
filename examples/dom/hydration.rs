@@ -45,7 +45,7 @@ fn main() {
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	rsx! {
-		<p>"Count: "{get}</p>
+		<p>"Count awesome: "{get}</p>
 		<button
 			onclick={move || set(get()+1)}
 		>"Increment"</button>

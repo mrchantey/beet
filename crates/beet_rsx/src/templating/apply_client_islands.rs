@@ -1,10 +1,8 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use bevy::scene::ron;
 use bevy::scene::serde::SceneSerializer;
-
-use crate::prelude::*;
-
 
 
 pub fn apply_client_islands(world: &mut World) -> Result {
@@ -64,7 +62,7 @@ pub fn apply_client_islands(world: &mut World) -> Result {
 
 /// Returns each [`HtmlDocument`] entity and a list of its [`ClientIsland`] entities
 fn document_islands(
-	query: Query<Entity, With<HtmlDocument>>,
+	query: Query<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
 	islands: Query<
 		Entity,
