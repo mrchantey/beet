@@ -32,7 +32,9 @@ impl Default for ClientIslandRegistry {
 			SceneFilter::default()
 				.allow::<ClientLoadDirective>()
 				.allow::<ClientOnlyDirective>()
-				.allow::<DomIdx>(),
+				.allow::<DomIdx>()
+				// required by apply_slots for debugging
+				.allow::<NodeTag>()
 		)
 	}
 }

@@ -81,11 +81,9 @@ pub(super) fn bind_text_nodes(
 		Entity,
 		(
 			Changed<TextNode>,
-			(
-				With<SignalReceiver<String>>,
-				Without<DomTextBinding>,
-				Without<AttributeOf>,
-			),
+			With<SignalReceiver<String>>,
+			Without<DomTextBinding>,
+			Without<AttributeOf>,
 		),
 	>,
 ) -> Result<()> {
@@ -99,8 +97,8 @@ pub(super) fn bind_text_nodes(
 				r#"
 TextNode {entity} has no parent ElementNode
 Please ensure that any text nodes are wrapped in an ElementNode:
-✅ # Good: rsx!{{<div>{{my_signal}}</div>}}
-❌ # Bad:	rsx!{{my_signal}}
+✅ rsx!{{<div>{{my_signal}}</div>}}
+❌ rsx!{{my_signal}}
 "#,
 			)
 			.into());

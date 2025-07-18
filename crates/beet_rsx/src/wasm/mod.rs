@@ -21,7 +21,7 @@ pub fn wasm_template_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			load_client_islands.before(TemplateSet),
+			load_client_islands.run_if(run_once).before(TemplateSet),
 			(
 				mount_client_only,
 				// the below could be 'parallel' but we're single-threaded anyway

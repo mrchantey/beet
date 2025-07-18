@@ -1,4 +1,5 @@
 use beet_utils::utils::Tree;
+use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
@@ -18,14 +19,6 @@ impl IntoWorld for App {
 	fn into_world_mut(&mut self) -> &mut World { self.world_mut() }
 }
 
-fn short_name(name: &str) -> String {
-	// Shorten the name to just the last part after the last `::`
-	name.split("::")
-		.last()
-		.map(|s| s.to_string())
-		.unwrap_or_else(|| name.to_string())
-}
-
 #[ext(name=WorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
@@ -33,7 +26,9 @@ pub impl<W: IntoWorld> W {
 		let world = self.into_world();
 		world
 			.inspect_entity(entity)
-			.map(|e| e.map(|c| short_name(c.name())).collect::<Vec<_>>())
+			.map(|ent| {
+				ent.map(|comp| self.pretty_name(comp)).collect::<Vec<_>>()
+			})
 			.unwrap_or_default()
 	}
 	fn direct_component_names_related<R: RelationshipTarget>(
@@ -50,13 +45,34 @@ pub impl<W: IntoWorld> W {
 					.filter_map(|entity| world.inspect_entity(entity).ok())
 					.map(|component_iter| {
 						component_iter
-							.map(|component| short_name(component.name()))
+							.map(|component| self.pretty_name(component))
 							.collect::<Vec<_>>()
 					})
 					.collect::<Vec<_>>()
 			})
 			.unwrap_or_default()
 	}
+
+	/// Try to get the short name of a component, otherwise return the full name.
+	fn pretty_name(&self, component: &ComponentInfo) -> String {
+		let id = component.type_id();
+		if let Some(id) = id {
+			let type_registry =
+				self.into_world().resource::<AppTypeRegistry>().read();
+			if let Some(info) = type_registry.get_type_info(id) {
+				return info.ty().short_path().to_string();
+			}
+		}
+		component.name().to_string()
+	}
+
+
+	fn log_component_names(&self, entity: Entity) {
+		let names = self.component_names_related::<Children>(entity);
+		let str = names.iter_to_string_indented();
+		beet_utils::log!("Component names for {entity}: \n{str}");
+	}
+
 	fn component_names_related<R: RelationshipTarget>(
 		&self,
 		entity: Entity,
@@ -76,7 +92,7 @@ pub impl<W: IntoWorld> W {
 				.inspect_entity(entity)
 				.map(|component_iter| {
 					component_iter
-						.map(|component| short_name(component.name()))
+						.map(|component| world.pretty_name(component))
 						.collect::<Vec<_>>()
 				})
 				.unwrap_or_default();
