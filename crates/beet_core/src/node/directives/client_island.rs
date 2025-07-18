@@ -87,24 +87,6 @@ where
 	}
 }
 
-impl<T, U> IntoTemplateBundle<Self> for ClientIslandRoot<T, U>
-where
-	T: 'static
-		+ Send
-		+ Sync
-		+ FromReflect
-		+ Reflectable
-		+ IntoTemplateBundle<U>,
-	U: 'static + Send + Sync + TypePath,
-{
-	fn into_node_bundle(self) -> impl Bundle {
-		// perform a 'reflect clone'
-		let dynamic: Box<dyn PartialReflect> = self.value.to_dynamic();
-		let value2 = <T as FromReflect>::from_reflect(&*dynamic).unwrap();
-		(self, TemplateRoot::spawn(Spawn(value2.into_node_bundle())))
-	}
-}
-
 
 impl<T, U> Component for ClientIslandRoot<T, U>
 where
@@ -121,7 +103,8 @@ where
 
 	// self register for the scene
 	fn on_add() -> Option<bevy::ecs::component::ComponentHook> {
-		Some(|mut world, _| {
+		Some(|mut world, cx| {
+			let entity = cx.entity;
 			world.commands().queue(move |world: &mut World| {
 				// register the reflect type
 				world
@@ -130,6 +113,16 @@ where
 					.register::<Self>();
 				// add to allow list
 				world.resource_mut::<ClientIslandRegistry>().add::<Self>();
+
+				// spawn the template root
+				let this = world.entity(entity).get::<Self>().unwrap();
+				// perform a 'reflect clone'
+				let dynamic: Box<dyn PartialReflect> = this.value.to_dynamic();
+				let value =
+					<T as FromReflect>::from_reflect(&*dynamic).unwrap();
+				world.entity_mut(entity).insert(TemplateRoot::spawn(Spawn(
+					value.into_node_bundle(),
+				)));
 			});
 		})
 	}

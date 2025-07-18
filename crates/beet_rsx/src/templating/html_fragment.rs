@@ -286,6 +286,7 @@ mod test {
 	}
 
 	#[template]
+	#[derive(Reflect)]
 	fn Template() -> impl Bundle {
 		rsx! {<div class="container"><span>hello</span></div>}
 	}
@@ -294,6 +295,16 @@ mod test {
 		rsx! {
 			"outer"
 			<Template/>
+		}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect()
+		.to_be("outer<div class=\"container\"><span>hello</span></div>");
+	}
+	#[test]
+	fn client_islands() {
+		rsx! {
+			"outer"
+			<Template client:load/>
 		}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
