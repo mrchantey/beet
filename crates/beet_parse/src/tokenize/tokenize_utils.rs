@@ -63,11 +63,10 @@ macro_rules! tokenize_maybe_spanned {
 
 tokenize_maybe_spanned![
 	tokenize_roots,
-	BeetRoot,
-	RsxSnippetRoot,
+	SnippetRoot,
+	StaticRoot,
 	InstanceRoot,
 	ResolvedRoot,
-	MacroIdx,
 	ExprIdx,
 	RequiresDomIdx,
 ];
@@ -110,10 +109,7 @@ pub(super) fn tokenize_maybe_spanned<T: Component + TokenizeSelf>(
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
 	let entity = world.entity(entity);
-	match (
-		entity.get::<T>(),
-		entity.get::<SpanOf<T>>(),
-	) {
+	match (entity.get::<T>(), entity.get::<SpanOf<T>>()) {
 		(Some(value), Some(span)) => {
 			let value = value.self_token_stream();
 			Ok(Some(quote::quote_spanned! { **span =>
@@ -137,9 +133,7 @@ pub(super) fn maybe_spanned_attr_key(
 		entity.get::<AttributeKey>(),
 		entity.get::<SpanOf<AttributeKey>>(),
 	) {
-		(Some(key), Some(span)) => {
-			Some((key.to_string(), span.clone().take()))
-		}
+		(Some(key), Some(span)) => Some((key.to_string(), span.clone().take())),
 		(Some(key), None) => Some((key.to_string(), Span::call_site())),
 		_ => None,
 	}

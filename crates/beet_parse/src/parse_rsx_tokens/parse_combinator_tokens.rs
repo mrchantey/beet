@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// or [`tokenize_bundle_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
-#[require(MacroIdx)]
+#[require(SnippetRoot)]
 pub struct CombinatorTokens(String);
 
 impl CombinatorTokens {
@@ -23,7 +23,7 @@ pub(super) fn parse_combinator_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &CombinatorTokens, &MacroIdx),
+		(Entity, &CombinatorTokens, &SnippetRoot),
 		Added<CombinatorTokens>,
 	>,
 ) -> bevy::prelude::Result {

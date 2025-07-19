@@ -27,7 +27,7 @@ pub(super) fn extract_lang_snippets(
 	mut commands: Commands,
 	mut id_counter: Local<LangSnippetId>,
 	config: Res<WorkspaceConfig>,
-	idxs: Query<&MacroIdx>,
+	idxs: Query<&SnippetRoot>,
 	parents: Query<&ChildOf>,
 	query: Populated<
 		(
@@ -67,7 +67,7 @@ pub(super) fn extract_lang_snippets(
 					.find_map(|e| idxs.get(e).ok())
 					.ok_or_else(|| {
 						bevyhow!(
-							"LangContent without parent MacroIdx: {:?}",
+							"LangContent without parent SnippetRoot: {:?}",
 							rsx_entities[0]
 						)
 					})?;

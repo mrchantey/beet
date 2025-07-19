@@ -1,5 +1,5 @@
 use beet_core::node::HtmlConstants;
-use beet_core::node::MacroIdx;
+use beet_core::node::SnippetRoot;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::path::Path;
@@ -105,7 +105,7 @@ impl WorkspaceConfig {
 
 	/// Create a file path in the format of `path/to/file:line:col.rs`,
 	/// using [`Self::snippets_dir`] as the base.
-	pub fn rsx_snippet_path(&self, idx: &MacroIdx) -> WsPathBuf {
+	pub fn rsx_snippet_path(&self, idx: &SnippetRoot) -> WsPathBuf {
 		let mut path = idx.file.clone();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
 		let snippet_file_name =

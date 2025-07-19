@@ -45,11 +45,11 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	Ok(())
 }
 
-/// Collect all changed [`RsxSnippetRoot`]s, returning the output path
+/// Collect all changed [`StaticRoot`]s, returning the output path
 /// and all entities that are part of the snippet.
 fn collect_rsx_snippets(
 	config: Res<WorkspaceConfig>,
-	query: Query<(Entity, &MacroIdx), Changed<RsxSnippetRoot>>,
+	query: Query<(Entity, &SnippetRoot), Changed<StaticRoot>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
 	debug!("{} rsx snippets changed", query.iter().count());
@@ -85,7 +85,7 @@ fn collect_lang_snippets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::node::MacroIdx;
+	use beet_core::node::SnippetRoot;
 	use beet_router::as_beet::WorkspaceConfig;
 	use beet_rsx::as_beet::*;
 	// use beet_utils::prelude::*;
@@ -105,7 +105,7 @@ mod test {
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
 
 		let snippet_path = WorkspaceConfig::default()
-			.rsx_snippet_path(&MacroIdx::new_file_line_col(
+			.rsx_snippet_path(&SnippetRoot::new_file_line_col(
 				&test_site_index.to_string_lossy(),
 				7,
 				8,

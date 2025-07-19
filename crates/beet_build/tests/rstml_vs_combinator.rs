@@ -10,8 +10,8 @@ use sweet::prelude::*;
 
 fn is_equal(a: impl Bundle, b: impl Bundle) {
 	let mut world = World::new();
-	let a = world.spawn(a).insert(MacroIdx::default()).id();
-	let b = world.spawn(b).insert(MacroIdx::default()).id();
+	let a = world.spawn(a).insert(SnippetRoot::default()).id();
+	let b = world.spawn(b).insert(SnippetRoot::default()).id();
 	let a = world
 		.component_names_related::<Children>(a)
 		.iter_to_string_indented();

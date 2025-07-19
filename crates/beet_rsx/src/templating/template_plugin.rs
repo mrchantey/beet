@@ -1,11 +1,10 @@
-use std::str::FromStr;
-
 use super::*;
 use crate::prelude::*;
-use beet_core::prelude::WorldMutExt;
 use beet_core::prelude::*;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
+use std::str::FromStr;
 
 /// System set for the [`TemplatePlugin`] to spawn templates.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
@@ -13,6 +12,11 @@ pub struct TemplateSet;
 
 #[derive(Default)]
 pub struct TemplatePlugin;
+
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct BuildTemplate;
+
+
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
@@ -52,7 +56,6 @@ impl Plugin for TemplatePlugin {
 					hoist_document_elements,
 					insert_event_playback_attribute,
 					render_html_fragments,
-					// debug,
 				)
 					.chain()
 					.in_set(TemplateSet),
@@ -61,27 +64,6 @@ impl Plugin for TemplatePlugin {
 		app.add_plugins(wasm_template_plugin);
 	}
 }
-
-#[allow(unused)]
-fn debug(world: &mut World) {
-	for (entity, dom_idx) in world
-		.query_once::<(Entity, &DomIdx)>()
-		.into_iter()
-		.map(|(e, t)| (e, t.clone()))
-		.collect::<Vec<_>>()
-		.into_iter()
-	{
-		for component in world.inspect_entity(entity).unwrap() {
-			beet_utils::log!(
-				"Entity: {:?}, DomIdx: {}, Component: {:?}",
-				entity,
-				dom_idx,
-				component.name()
-			);
-		}
-	}
-}
-
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
 pub enum TemplateFlags {

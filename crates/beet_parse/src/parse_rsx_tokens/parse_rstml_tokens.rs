@@ -63,7 +63,7 @@ impl RstmlConfig {
 
 /// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.
 #[derive(Debug, Clone, Deref, Component)]
-#[require(MacroIdx)]
+#[require(SnippetRoot)]
 pub struct RstmlTokens(SendWrapper<TokenStream>);
 impl RstmlTokens {
 	pub fn new(tokens: TokenStream) -> Self { Self(SendWrapper::new(tokens)) }
@@ -85,13 +85,13 @@ impl TokensDiagnostics {
 }
 
 
-/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`MacroIdx`]
+/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`SnippetRoot`]
 pub(super) fn parse_rstml_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
 	parser: NonSend<Parser<RstmlCustomNode>>,
-	query: Populated<(Entity, &MacroIdx, &RstmlTokens), Added<RstmlTokens>>,
+	query: Populated<(Entity, &SnippetRoot, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
 	for (entity, macro_idx, handle) in query.iter() {
 		let tokens = handle.clone().take();

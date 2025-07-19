@@ -11,12 +11,14 @@
 	],
 	"deno.enable": true,
 	"files.exclude": {
+		".sweet": true,
 		"**/.git": true,
 		".gitattributes": true,
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true
 	},
 	"search.exclude": {
+		".sweet": true,
 		"**/assets/": true,
 		"**.svg": true,
 		"Cargo.lock": true

@@ -24,9 +24,9 @@ pub fn import_rsx_snippets_md(
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((
+				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
+				StaticRoot,
 				RsxSnippetOf(source_file_entity),
-				RsxSnippetRoot,
-				MacroIdx::new(path.into_ws_path()?, LineCol::default()),
 				CombinatorTokens::new(rsx_str),
 			));
 		}

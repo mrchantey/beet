@@ -9,7 +9,7 @@ use bevy::prelude::*;
 /// rather than the root of a single macro.
 ///
 /// When recursing [`Children`] or [`TemplateRoot`] it is reccomended to use this type as the
-/// starting point, its very easy to create unexpected behavior by starting at something like [`BeetRoot`],
+/// starting point, its very easy to create unexpected behavior by starting at something like [`SnippetRoot`],
 /// which appears all over the place.
 ///
 /// Add this node to any bundle to have it rearranged into a valid HTML document structure.
@@ -77,7 +77,7 @@ pub(super) fn rearrange_html_document(
 pub(super) fn hoist_document_elements(
 	mut commands: Commands,
 	constants: Res<HtmlConstants>,
-	documents: Populated<(Entity, Option<&MacroIdx>), Added<HtmlDocument>>,
+	documents: Populated<(Entity, Option<&SnippetRoot>), Added<HtmlDocument>>,
 	children: Query<&Children>,
 	node_tags: Query<&NodeTag>,
 	directives: Query<&HtmlHoistDirective>,

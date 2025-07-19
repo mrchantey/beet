@@ -60,9 +60,9 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
+				SnippetRoot::new_from_tokens(self.file.clone(), &tokens),
+				StaticRoot,
 				RsxSnippetOf(self.source_file),
-				RsxSnippetRoot,
-				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
 				RstmlTokens::new(tokens),
 			));
 		}

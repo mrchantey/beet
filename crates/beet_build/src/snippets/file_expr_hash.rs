@@ -52,7 +52,7 @@ pub fn update_file_expr_hash(
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
 	rsx_snippets: Query<&RsxSnippets>,
-	macro_idxs: Query<&MacroIdx>,
+	macro_idxs: Query<&SnippetRoot>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	attributes: Query<&Attributes>,
 	// dont hash literal attribute values, they can be updated via snippets
@@ -154,9 +154,9 @@ mod test {
 		if remove_macro_idxs {
 			for entity in app
 				.world_mut()
-				.query_filtered_once::<Entity, With<MacroIdx>>()
+				.query_filtered_once::<Entity, With<SnippetRoot>>()
 			{
-				app.world_mut().entity_mut(entity).remove::<MacroIdx>();
+				app.world_mut().entity_mut(entity).remove::<SnippetRoot>();
 			}
 		}
 		app.update();

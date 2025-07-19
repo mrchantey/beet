@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
@@ -48,8 +48,8 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 
 
 
-/// When a [`MacroIdx`] is added to an entity,
-/// recusively apply each [`StaticNodeRoot`] and run [`OnSpawnTemplate`] methods
+/// When a [`SnippetRoot`] is added to an entity,
+/// recusively apply each [`StaticRoot`] and run [`OnSpawnTemplate`] methods
 pub fn apply_snippets_to_instances(world: &mut World) -> Result {
 	let mut query = world
 		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
@@ -68,10 +68,10 @@ pub fn apply_snippets_to_instances(world: &mut World) -> Result {
 pub(super) fn apply_rsx_snippets(
 	mut commands: Commands,
 	instances: Populated<
-		(Entity, &MacroIdx),
+		(Entity, &SnippetRoot),
 		(Added<InstanceRoot>, Without<ResolvedRoot>),
 	>,
-	rsx_snippets: Query<(Entity, &MacroIdx), With<RsxSnippetRoot>>,
+	rsx_snippets: Query<(Entity, &SnippetRoot), With<StaticRoot>>,
 	children: Query<&Children>,
 	// types that we want to deny clone for the root only, not children
 	deny_root: Query<Option<&ChildOf>>,
@@ -137,7 +137,7 @@ pub(super) fn apply_rsx_snippets(
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
 			.retain::<(
-				BeetRoot,
+				SnippetRoot,
 				InstanceRoot,
 				HtmlDocument,
 				HtmlFragment,
@@ -150,7 +150,7 @@ pub(super) fn apply_rsx_snippets(
 			.entity(snippet_root)
 			.clone_with(instance_root, |builder| {
 				builder
-					.deny::<(BeetRoot, RsxSnippetRoot)>()
+					.deny::<(SnippetRoot, StaticRoot)>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -178,7 +178,7 @@ pub(super) fn apply_rsx_snippets(
 /// A system queued after [`apply_rsx_snippets`],
 fn apply_template_locations(
 	In((macro_idx, entity, mut instance_exprs)): In<(
-		MacroIdx,
+		SnippetRoot,
 		Entity,
 		HashMap<ExprIdx, OnSpawnTemplate>,
 	)>,
@@ -251,15 +251,18 @@ mod test {
 	fn retains_parent() {
 		let mut world = World::new();
 
-		let child = world.spawn(rsx! {<div/>}).insert(MacroIdx::default()).id();
+		let child = world
+			.spawn(rsx! {<div/>})
+			.insert(SnippetRoot::default())
+			.id();
 		let parent = world.spawn(rsx! {<main></main>}).id();
 		let main = world.entity(parent).get::<Children>().unwrap()[0];
 		world.entity_mut(main).add_child(child);
 
 		let _snippet = world
-			.spawn((rsx! {<span/>}, RsxSnippetRoot))
+			.spawn((rsx! {<span/>}, StaticRoot))
 			.remove::<InstanceRoot>()
-			.insert(MacroIdx::default())
+			.insert(SnippetRoot::default())
 			.id();
 
 		world
@@ -281,13 +284,14 @@ mod test {
 
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
 		let mut world = World::new();
-		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
+		let instance =
+			world.spawn(instance).insert(SnippetRoot::default()).id();
 
-		// convert an instance to a snippet with the same MacroIdx
+		// convert an instance to a snippet with the same SnippetRoot
 		let _snippet = world
-			.spawn((RsxSnippetRoot, rsx_snippet))
+			.spawn((StaticRoot, rsx_snippet))
 			.remove::<InstanceRoot>()
-			.insert(MacroIdx::default())
+			.insert(SnippetRoot::default())
 			.id();
 
 		world
@@ -424,8 +428,8 @@ mod test {
 	fn bundle_templates() {
 		let bundle = MyTemplate { initial: 3 };
 
-		let idx1 = MacroIdx::new_file_line_col(file!(), line!(), column!());
-		let idx2 = MacroIdx::new_file_line_col(file!(), line!(), column!());
+		let idx1 = SnippetRoot::new_file_line_col(file!(), line!(), column!());
+		let idx2 = SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
 		let mut world = World::new();
 		let child = world
@@ -444,11 +448,11 @@ mod test {
 			.id();
 
 		let _tree1 = world
-			.spawn((rsx! {<span>{}</span>}, RsxSnippetRoot))
+			.spawn((rsx! {<span>{}</span>}, StaticRoot))
 			.insert(idx1)
 			.id();
 		let _tree2 = world
-			.spawn((rsx! {<span>{}</span>}, RsxSnippetRoot))
+			.spawn((rsx! {<span>{}</span>}, StaticRoot))
 			.insert(idx2)
 			.id();
 

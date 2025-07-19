@@ -37,11 +37,10 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
 			// idxs & roots
-			.register_type::<BeetRoot>()
-			.register_type::<RsxSnippetRoot>()
+			.register_type::<SnippetRoot>()
+			.register_type::<StaticRoot>()
 			.register_type::<InstanceRoot>()
 			.register_type::<ResolvedRoot>()
-			.register_type::<MacroIdx>()
 			.register_type::<ExprIdx>()
 			.register_type::<DomIdx>()
 			.register_type::<RequiresDomIdx>()

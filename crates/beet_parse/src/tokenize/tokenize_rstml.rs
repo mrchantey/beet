@@ -13,8 +13,8 @@ pub fn tokenize_rstml(
 		let entity = app
 			.world_mut()
 			.spawn((
+				SnippetRoot::new_from_tokens(source_file, &tokens),
 				InstanceRoot,
-				MacroIdx::new_from_tokens(source_file, &tokens),
 				RstmlTokens::new(tokens),
 			))
 			.id();
@@ -35,8 +35,8 @@ pub fn tokenize_rstml_tokens(
 		let entity = app
 			.world_mut()
 			.spawn((
+				SnippetRoot::new_from_tokens(source_file, &tokens),
 				InstanceRoot,
-				MacroIdx::new_from_tokens(source_file, &tokens),
 				RstmlTokens::new(tokens),
 			))
 			.id();

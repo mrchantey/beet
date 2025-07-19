@@ -16,8 +16,8 @@ pub fn tokenize_combinator(
 		let entity = app
 			.world_mut()
 			.spawn((
+				SnippetRoot::new(source_file, LineCol::default()),
 				InstanceRoot,
-				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
 			.id();
@@ -37,8 +37,8 @@ pub fn tokenize_combinator_tokens(
 		let entity = app
 			.world_mut()
 			.spawn((
+				SnippetRoot::new(source_file, LineCol::default()),
 				InstanceRoot,
-				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
 			.id();

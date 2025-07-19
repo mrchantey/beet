@@ -85,12 +85,12 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 
 
 		// this is a snippet but we need an instance, the only difference being
-		// RsxSnippetRoot vs InstanceRoot
+		// StaticRoot vs InstanceRoot
 		let instance_root = world
 			.entity_mut(snippet_root)
 			.clone_and_spawn_with(|builder| {
 				builder
-					.deny::<RsxSnippetRoot>()
+					.deny::<StaticRoot>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -171,9 +171,8 @@ mod test {
 
 				pub fn get() -> impl Bundle {
 					(
-						BeetRoot,
 						InstanceRoot,
-						MacroIdx {
+						SnippetRoot {
 							file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
 							start: LineCol { line: 1u32, col: 0u32 }
 						},

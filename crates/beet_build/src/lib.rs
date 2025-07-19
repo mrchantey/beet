@@ -1,13 +1,13 @@
 //! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
-//! 
+//!
 //! ```
-//! // 
+//! //
 //! SourceFileRoot
 //! ├── (SourceFile(foo.rs), FileExprHash)
-//! │   ├── (RsxSnippetRoot, RsxSnippetOf, RsxTokens)
+//! │   ├── (StaticRoot, RsxSnippetOf, RsxTokens)
 //! └── (SourceFile(foo.md), FileExprHash)
-//!     └── (RsxSnippetRoot, RsxSnippetOf, CombinatorTokens)
-//! 
+//!     └── (StaticRoot, RsxSnippetOf, CombinatorTokens)
+//!
 //! // route collections are a seperate tree
 //! RouteFileCollection
 //! ├── (SourceFileRef(foo.rs), CodegenFile RouteFile)
@@ -20,9 +20,9 @@
 //!     │   // generate the rust code for markdown files
 //!     └── (SourceFileRef(foo.md), CodegenFile, CombinatorRouteCodegen)
 //! ```
-//! 
-//! 
-//! 
+//!
+//!
+//!
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
@@ -48,10 +48,10 @@ pub mod as_beet {
 		pub use beet_rsx as rsx;
 		pub mod prelude {
 			pub use crate::prelude::*;
-			pub use beet_utils::prelude::*;
 			pub use beet_core::prelude::*;
 			pub use beet_parse::prelude::*;
 			pub use beet_rsx::prelude::*;
+			pub use beet_utils::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;

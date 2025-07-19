@@ -22,10 +22,10 @@ fn expressions() {
 		</div>
 	});
 	expect(&scene)
-		.to_contain("MacroIdx")
+		.to_contain("SnippetRoot")
 		.to_contain("NodeTag")
 		.to_contain("ExprIdx")
-		.to_contain("RsxSnippetRoot");
+		.to_contain("StaticRoot");
 
 	// println!(
 	// 	"children: {:#?}",
@@ -90,7 +90,7 @@ fn nested_template() {
 
 	// create root static node
 	app.world_mut().spawn((
-		RsxSnippetRoot,
+		StaticRoot,
 		common_idx(),
 		RstmlTokens::new(quote! {
 			<html>
@@ -100,7 +100,7 @@ fn nested_template() {
 	));
 	// create nested static node
 	app.world_mut().spawn((
-		RsxSnippetRoot,
+		StaticRoot,
 		common_idx_nested(),
 		RstmlTokens::new(quote! {
 			<after>"value: "{}</after>
@@ -136,12 +136,12 @@ fn nested_template() {
 
 
 // create a common idx for matching in apply_rsx_snippets
-fn common_idx() -> MacroIdx {
-	MacroIdx::new_file_line_col(file!(), line!(), column!())
+fn common_idx() -> SnippetRoot {
+	SnippetRoot::new_file_line_col(file!(), line!(), column!())
 }
 // create a common idx for matching in apply_rsx_snippets
-fn common_idx_nested() -> MacroIdx {
-	MacroIdx::new_file_line_col(file!(), line!(), column!())
+fn common_idx_nested() -> SnippetRoot {
+	SnippetRoot::new_file_line_col(file!(), line!(), column!())
 }
 
 fn build_scene(tokens: TokenStream) -> String {
@@ -149,7 +149,7 @@ fn build_scene(tokens: TokenStream) -> String {
 	app.add_plugins(BuildPlugin::without_fs());
 	let _entity = app
 		.world_mut()
-		.spawn((RsxSnippetRoot, common_idx(), RstmlTokens::new(tokens)))
+		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();
 	app.update();
 
@@ -176,7 +176,7 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	// 	OnSpawnTemplate::new(|_| {
 	// 		panic!("dsds");
 	// 	}),
-	// 	MacroIdx::new_file_line_col(file!(), line!(), column!()),
+	// 	SnippetRoot::new_file_line_col(file!(), line!(), column!()),
 	// ));
 	app.update();
 
