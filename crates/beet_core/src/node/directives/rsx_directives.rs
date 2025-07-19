@@ -9,6 +9,8 @@ pub fn extract_rsx_directives_plugin(app: &mut App) {
 		);
 }
 
+pub(crate) type RsxDirectives = (SlotChild, SlotTarget);
+
 /// Directive indicating a node should be moved to the slot with the given name.
 /// All nodes without this directive are moved to the default slot.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]

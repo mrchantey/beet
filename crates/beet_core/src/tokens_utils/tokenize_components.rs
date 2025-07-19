@@ -3,6 +3,14 @@ use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use variadics_please::all_tuples;
 
+// a group of all groups of components
+pub type RsxComponents = (
+	RootComponents,
+	RsxNodes,
+	WebNodes,
+	RsxDirectives,
+	WebDirectives,
+);
 
 pub trait TokenizeComponents {
 	fn tokenize_if_present(
@@ -56,45 +64,6 @@ where
 		};
 	}
 }
-
-
-// a group of all groups of components
-pub type RsxComponents = (
-	RootComponents,
-	RsxNodes,
-	WebNodes,
-	RsxDirectives,
-	WebDirectives,
-);
-
-type RootComponents = (
-	SnippetRoot,
-	StaticRoot,
-	InstanceRoot,
-	ResolvedRoot,
-	ExprIdx,
-	RequiresDomIdx,
-);
-
-type RsxNodes = (NodeTag, FragmentNode, TemplateNode, TextNode, BlockNode);
-
-type WebNodes = (DoctypeNode, CommentNode, ElementNode);
-
-type RsxDirectives = (SlotChild, SlotTarget);
-
-type WebDirectives = (
-	HtmlHoistDirective,
-	ClientLoadDirective,
-	ClientOnlyDirective,
-	StyleScope,
-	StyleCascade,
-	ScriptElement,
-	StyleElement,
-	CodeElement,
-	InnerText,
-);
-
-
 
 #[cfg(test)]
 mod test {

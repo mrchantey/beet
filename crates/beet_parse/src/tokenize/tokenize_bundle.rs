@@ -116,4 +116,12 @@ mod test {
 			.xpect()
 			.to_be_snapshot();
 	}
+	#[test]
+	fn inner_text_src() {
+		quote! {<code src="foo.rs"/>}
+			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.unwrap()
+			.xpect()
+			.to_be_snapshot();
+	}
 }

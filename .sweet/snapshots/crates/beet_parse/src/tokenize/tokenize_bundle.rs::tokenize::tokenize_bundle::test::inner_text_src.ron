@@ -1,0 +1,14 @@
+(
+    SnippetRoot {
+        file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),
+        start: LineCol { line: 1u32, col: 0u32 },
+    },
+    InstanceRoot,
+    FragmentNode,
+    related! {
+        Children[(CodeElement { lang : String::from("plaintext") },
+        InnerText(String::from("")), #[cfg(not(feature = "client"))] {
+        InnerText::new(include_str!("foo.rs")) } #[cfg(feature = "client")] {
+        InnerText::new(format!("<!-- FileInnerText({}) -->", "foo.rs")) })]
+    },
+)

@@ -4,6 +4,7 @@ use anyhow::Result;
 use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::FsExt;
 use beet_utils::prelude::ReadFile;
+use colorize::AnsiColor;
 #[cfg(feature = "tokens")]
 use proc_macro2::TokenStream;
 #[cfg(feature = "tokens")]
@@ -27,14 +28,15 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 		println!("Snapshot saved: {}", desc.name);
 		Ok(None)
 	} else {
-		let expected = ReadFile::to_string(&save_path).unwrap_or_else(|_| {
+		let expected = ReadFile::to_string(&save_path).unwrap_or_else(|_| {			
 			panic!(
-				"received: \n\n{}\n\n				
+				"Received: \n\n{}\n\n				
 				Snapshot file not found: {}\n
 				please run test -- --snap to generate\n
 				Snapshots should be commited to version control\n
 				",
-				received, &save_path
+				received.to_string().red(),
+				&save_path
 			)
 		});
 		Ok(Some(expected))

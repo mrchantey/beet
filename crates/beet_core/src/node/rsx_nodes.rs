@@ -2,6 +2,10 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
+
+pub(crate) type RsxNodes =
+	(NodeTag, FragmentNode, TemplateNode, TextNode, BlockNode);
+
 /// The tag of a node, ie 'div' or 'MyTemplate'
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, Deref, DerefMut)]
 #[reflect(Component)]

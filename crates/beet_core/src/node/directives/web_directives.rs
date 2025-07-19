@@ -11,8 +11,23 @@ pub fn extract_web_directives_plugin(app: &mut App) {
 		extract_directive_plugin::<StyleScope>,
 		extract_directive_plugin::<StyleCascade>,
 	))
-	.add_systems(Update, extract_lang_content.in_set(ExtractDirectivesSet));
+	.add_systems(Update, extract_lang_nodes.in_set(ExtractDirectivesSet));
 }
+
+
+pub(crate) type WebDirectives = (
+	HtmlHoistDirective,
+	ClientLoadDirective,
+	ClientOnlyDirective,
+	StyleScope,
+	StyleCascade,
+	ScriptElement,
+	StyleElement,
+	CodeElement,
+	InnerText,
+	FileInnerText,
+);
+
 
 /// Directive to indicate that the node should be inserted directly under some part of the
 /// body, regardless of where it is in the template.

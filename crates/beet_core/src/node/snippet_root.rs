@@ -4,6 +4,16 @@ use beet_utils::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
+pub(crate) type RootComponents = (
+	SnippetRoot,
+	StaticRoot,
+	InstanceRoot,
+	ResolvedRoot,
+	ExprIdx,
+	RequiresDomIdx,
+);
+
+
 /// Placed at the root of each [`StaticRoot`] and [`InstanceRoot`], with a [`LineCol`] representing
 /// the start of the macro in the source file. Only a change in start [`LineCol`],
 /// not internal size or end [`LineCol`], will change the hash.
@@ -118,7 +128,7 @@ pub struct InstanceRoot;
 pub struct ResolvedRoot;
 
 /// Utility for getting the closest [`SnippetRoot`] ancestor of the entity,
-/// 
+///
 #[derive(SystemParam)]
 pub struct NodeLocation<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
@@ -138,5 +148,3 @@ impl NodeLocation<'_, '_> {
 			.unwrap_or_else(|| format!("Entity without location: {entity:?}"))
 	}
 }
-
-
