@@ -30,13 +30,20 @@ use bevy::prelude::*;
 #[reflect(Component)]
 #[require(FragmentNode)]
 pub struct SnippetRoot {
-	/// The source file containing the template.
+	/// The source file containing the snippet.
 	pub file: WsPathBuf,
 	/// The index of the template in the file.
 	/// - For md and rsx files this is always be [`LineCol::default()`] as they are one big 'macro'.
 	/// - For rust files this is the top-down appearance of the `rsx!` macro.
 	pub start: LineCol,
 }
+
+impl std::fmt::Display for SnippetRoot {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}:{}", self.file, self.start)
+	}
+}
+
 impl SnippetRoot {
 	/// Create a new [`TemplateKey`] from a file and index.
 	pub fn new(file: WsPathBuf, start: LineCol) -> Self { Self { file, start } }
@@ -132,8 +139,3 @@ impl NodeLocation<'_, '_> {
 }
 
 
-impl std::fmt::Display for SnippetRoot {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}:{}", self.file, self.start)
-	}
-}
