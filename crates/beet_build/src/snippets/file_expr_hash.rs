@@ -52,7 +52,7 @@ pub fn update_file_expr_hash(
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
 	rsx_snippets: Query<&RsxSnippets>,
-	macro_idxs: Query<&SnippetRoot>,
+	snippet_roots: Query<&SnippetRoot>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	attributes: Query<&Attributes>,
 	// dont hash literal attribute values, they can be updated via snippets
@@ -78,7 +78,7 @@ pub fn update_file_expr_hash(
 			.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
 			// hash macro idxs
-			if let Ok(idx) = macro_idxs.get(node) {
+			if let Ok(idx) = snippet_roots.get(node) {
 				idx.hash(&mut hasher);
 			}
 
@@ -139,7 +139,7 @@ mod test {
 
 	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
 
-	fn hash_inner(bundle: impl Bundle, remove_macro_idxs: bool) -> u64 {
+	fn hash_inner(bundle: impl Bundle, remove_snippet_roots: bool) -> u64 {
 		let mut app = App::new();
 		app.init_resource::<TemplateMacros>()
 			.add_systems(Update, update_file_expr_hash);
@@ -151,7 +151,7 @@ mod test {
 			))
 			.id();
 		// reset macro idxs for testing
-		if remove_macro_idxs {
+		if remove_snippet_roots {
 			for entity in app
 				.world_mut()
 				.query_filtered_once::<Entity, With<SnippetRoot>>()
@@ -233,7 +233,7 @@ mod test {
 		.to_be(hash(rsx_tokens! {<Foo><Bar><Bazz>bar</Bazz></Bar></Foo>}));
 	}
 	#[test]
-	fn macro_idxs() {
+	fn snippet_roots() {
 		// different LineCol means different hash
 		expect(hash_inner(rsx_tokens! {<div>{1}</div>}, false))
 			.not()

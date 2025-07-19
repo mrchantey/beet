@@ -78,20 +78,19 @@ pub(super) fn apply_rsx_snippets(
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
-	for (instance_root, snippet_root, macro_idx) in
-		instances
-			.iter()
-			.filter_map(|(instance, instance_macro_idx)| {
-				rsx_snippets
-					.iter()
-					.find(|(_, snippet_macro_idx)| {
-						*snippet_macro_idx == instance_macro_idx
-					})
-					.map(|(rsx_snippets, macro_idx)| {
-						(instance, rsx_snippets, macro_idx)
-					})
-			}) {
-		trace!("Applying snippets for {} at {}", instance_root, macro_idx);
+	for (instance_root, static_root, snippet_root) in
+		instances.iter().filter_map(|(instance, instance_loc)| {
+			rsx_snippets
+				.iter()
+				.find(|(_, static_loc)| *static_loc == instance_loc)
+				.map(|(rsx_snippets, snippet_root)| {
+					(instance, rsx_snippets, snippet_root)
+				})
+		}) {
+		trace!(
+			"Applying snippets for {} at {}",
+			instance_root, snippet_root
+		);
 
 		// take all [`OnSpawnTemplate`] methods from the instance,
 		// then entirely clear it.
@@ -147,7 +146,7 @@ pub(super) fn apply_rsx_snippets(
 
 		// apply the snippet tree
 		commands
-			.entity(snippet_root)
+			.entity(static_root)
 			.clone_with(instance_root, |builder| {
 				builder
 					.deny::<(SnippetRoot, StaticRoot)>()
@@ -166,7 +165,7 @@ pub(super) fn apply_rsx_snippets(
 		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
 			apply_template_locations,
-			(macro_idx.clone(), instance_root, instance_expr_map),
+			(snippet_root.clone(), instance_root, instance_expr_map),
 		);
 	}
 	for (entity, _) in instances.iter() {
@@ -177,7 +176,7 @@ pub(super) fn apply_rsx_snippets(
 
 /// A system queued after [`apply_rsx_snippets`],
 fn apply_template_locations(
-	In((macro_idx, entity, mut instance_exprs)): In<(
+	In((snippet_root, entity, mut instance_exprs)): In<(
 		SnippetRoot,
 		Entity,
 		HashMap<ExprIdx, OnSpawnTemplate>,
@@ -194,11 +193,11 @@ fn apply_template_locations(
 		let out = instance_exprs.remove(idx).unwrap_or_else(|| {
 			panic!(
 				"
-				Error resolving rsx snippet for macro at {macro_idx}
-				The instance is missing an ExprIdx found in the snippet.
-				Instance idxs: 	{instance_keys:?}
-				Consumed idxs: 	{consumed_keys:?}
-				Expected idx: 	{idx}
+Error resolving static root for snippet at {snippet_root}
+The instance root is missing an ExprIdx found in the static root.
+Instance idxs: 	{instance_keys:?}
+Consumed idxs: 	{consumed_keys:?}
+Expected idx: 	{idx}
 				"
 			);
 		});
@@ -225,9 +224,9 @@ fn apply_template_locations(
 	if !instance_exprs.is_empty() {
 		panic!(
 			"
-Error resolving rsx snippet for macro at {macro_idx}
+Error resolving static root for snippet at {snippet_root}
 Not all ExprIdx were applied.
-The rsx snippet is missing idxs found in the instance:
+The static root is missing idxs found in the instance root:
 Instance idxs: 	{instance_keys:?}
 Consumed idxs: 	{consumed_keys:?}
 Remaining idxs: {:?}

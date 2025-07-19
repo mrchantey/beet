@@ -66,6 +66,37 @@ impl PathExt {
 		}
 	}
 
+
+
+
+	/// Returns true if the path does not start with any of the absolute URL prefixes:
+	/// - `/`
+	/// - `http://`
+	/// - `https://`
+	/// - `file://`
+	/// - `data:`
+	/// - etc
+	pub fn is_relative_url(url: &str) -> bool {
+		const ABS_PREFIXES: [&str; 15] = [
+			"/",
+			"http://",
+			"https://",
+			"file://",
+			"data:",
+			"mailto:",
+			"tel:",
+			"javascript:",
+			"ftp://",
+			"ws://",
+			"wss://",
+			"blob:",
+			"cid:",
+			"about:",
+			"chrome:",
+		];
+		!ABS_PREFIXES.iter().any(|prefix| url.starts_with(prefix))
+	}
+
 	/// Create a relative path from a source to a destination:
 	/// ## Example
 	/// ```rust
@@ -135,5 +166,12 @@ mod test {
 				.unwrap(),
 			PathBuf::from("../Cargo.toml")
 		);
+	}
+	#[test]
+	fn is_relative() {
+		assert_eq!(PathExt::is_relative_url("style.css"), true);
+		assert_eq!(PathExt::is_relative_url("../style.css"), true);
+		assert_eq!(PathExt::is_relative_url("/style.css"), false);
+		assert_eq!(PathExt::is_relative_url("https://example.com"), false);
 	}
 }

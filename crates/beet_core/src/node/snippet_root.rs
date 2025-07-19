@@ -117,7 +117,8 @@ pub struct InstanceRoot;
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ResolvedRoot;
 
-/// Print the closest [`SnippetRoot`] ancestor of the entity,
+/// Utility for getting the closest [`SnippetRoot`] ancestor of the entity,
+/// 
 #[derive(SystemParam)]
 pub struct NodeLocation<'w, 's> {
 	parents: Query<'w, 's, &'static ChildOf>,
@@ -125,14 +126,14 @@ pub struct NodeLocation<'w, 's> {
 }
 impl NodeLocation<'_, '_> {
 	/// Get the [`SnippetRoot`] of the closest ancestor of the entity.
-	pub fn get_macro_idx(&self, entity: Entity) -> Option<&SnippetRoot> {
+	pub fn get_snippet_root(&self, entity: Entity) -> Option<&SnippetRoot> {
 		self.parents
 			.iter_ancestors_inclusive(entity)
 			.find_map(|e| self.roots.get(e).ok())
 	}
 	/// Get the [`SnippetRoot`] of the closest ancestor of the entity.
 	pub fn stringify(&self, entity: Entity) -> String {
-		self.get_macro_idx(entity)
+		self.get_snippet_root(entity)
 			.map(|idx| idx.to_string())
 			.unwrap_or_else(|| format!("Entity without location: {entity:?}"))
 	}

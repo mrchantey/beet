@@ -27,10 +27,10 @@ pub(super) fn parse_combinator_tokens(
 		Added<CombinatorTokens>,
 	>,
 ) -> bevy::prelude::Result {
-	for (entity, tokens, macro_idx) in query.iter() {
+	for (entity, tokens, snippet_root) in query.iter() {
 		Builder {
 			verbatim_tags: &["script", "style", "code"],
-			file_path: &macro_idx.file,
+			file_path: &snippet_root.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
@@ -43,6 +43,8 @@ pub(super) fn parse_combinator_tokens(
 
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 struct Builder<'w, 's, 'a> {
+	// the content of these tags will not be parsed and instead inserted
+	// as a [`TextNode`]
 	verbatim_tags: &'a [&'a str],
 	file_path: &'a WsPathBuf,
 	expr_idx: ExprIdxBuilder,

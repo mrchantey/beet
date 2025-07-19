@@ -133,6 +133,7 @@ fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {
 /// we'll get this from proc_macro2::Span::source_file, when this issue resolves:
 /// https://github.com/dtolnay/proc-macro2/issues/499
 fn source_file(tokens: &proc_macro::TokenStream) -> WsPathBuf {
+
 	// cloning is cheap, its an immutable arc
 	tokens
 		.clone()

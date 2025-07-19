@@ -93,7 +93,7 @@ pub(super) fn parse_rstml_tokens(
 	parser: NonSend<Parser<RstmlCustomNode>>,
 	query: Populated<(Entity, &SnippetRoot, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
-	for (entity, macro_idx, handle) in query.iter() {
+	for (entity, snippet_root, handle) in query.iter() {
 		let tokens = handle.clone().take();
 		// this is the key to matching statically analyzed macros
 		// with instantiated ones
@@ -103,7 +103,7 @@ pub(super) fn parse_rstml_tokens(
 		let mut collected_elements = CollectedElements::default();
 
 		let children = RstmlToWorld {
-			file_path: &macro_idx.file,
+			file_path: &snippet_root.file,
 			rstml_config: &rstml_config,
 			collected_elements: &mut collected_elements,
 			diagnostics: &mut diagnostics,
