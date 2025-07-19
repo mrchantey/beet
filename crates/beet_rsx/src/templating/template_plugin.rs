@@ -43,6 +43,7 @@ impl Plugin for TemplatePlugin {
 					apply_style_id_attributes,
 					apply_slots,
 					apply_lang_snippets,
+					apply_unparsed_lang_nodes,
 					apply_requires_dom_idx,
 					#[cfg(target_arch = "wasm32")]
 					apply_client_island_dom_idx,

@@ -95,27 +95,8 @@ impl ApplyAttributes<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use crate::templating::apply_slots;
-	use beet_core::node::HtmlConstants;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
-
-
-	fn parse(bundle: impl Bundle) -> String {
-		let mut world = World::new();
-		world.init_resource::<HtmlConstants>();
-		let entity = world.spawn((HtmlDocument, bundle)).id();
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
-		world
-			.run_system_once(super::apply_style_id_attributes)
-			.unwrap();
-		world.run_system_once(apply_slots).ok();
-		world.run_system_once_with(render_fragment, entity).unwrap()
-	}
 
 	#[template]
 	fn MyTemplate() -> impl Bundle {
@@ -124,62 +105,60 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		parse(rsx! {<style {StyleId::new(0)}/><span/>})
+		HtmlDocument::parse_bundle(rsx! {<style {StyleId::new(0)}/><span/>})
 			.xpect()
-			.to_be_str("<style/><span data-beet-style-id-0/>");
+			.to_be_snapshot();
 	}
 	#[test]
 	fn deduplicates() {
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<div>
 			<style {StyleId::new(0)}/>
 			<style {StyleId::new(0)}/>
 			</div>
 		})
 		.xpect()
-		.to_be_str("<div data-beet-style-id-0><style/><style/></div>");
+		.to_be_snapshot();
 	}
 	#[test]
 	fn assigns_id_to_all() {
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<div>
 			<style {StyleId::new(0)}/>
 			<span/>
 			</div>
 		})
 		.xpect()
-		.to_be_str(
-			"<div data-beet-style-id-0><style/><span data-beet-style-id-0/></div>",
-		);
+		.to_be_snapshot();
 	}
 	#[test]
 	fn ignores_templates() {
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<style {StyleId::new(0)}/>
 			<MyTemplate/>
 		})
 		.xpect()
-		.to_be_str("<style/><div/>");
+		.to_be_snapshot();
 	}
 	#[test]
 	fn applies_to_slots() {
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<style {StyleId::new(0)}/>
 			<MyTemplate>
 				<span/>
 			</MyTemplate>
 		})
 		.xpect()
-		.to_be_str("<style/><div/><span data-beet-style-id-0/>");
+		.to_be_snapshot();
 	}
 	#[test]
 	fn cascades() {
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<style {StyleId::new(0)}/>
 			<MyTemplate style:cascade/>
 		})
 		.xpect()
-		.to_be_str("<style/><div data-beet-style-id-0/>");
+		.to_be_snapshot();
 	}
 	#[test]
 	fn nested_template() {
@@ -191,10 +170,10 @@ mod test {
 			}
 		}
 
-		parse(rsx! {
+		HtmlDocument::parse_bundle(rsx! {
 			<StyledTemplate/>
 		})
 		.xpect()
-		.to_be_str("<style/><div data-beet-style-id-0/>");
+		.to_be_snapshot();
 	}
 }

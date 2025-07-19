@@ -1,7 +1,5 @@
 use std::path::PathBuf;
-
 use bevy::prelude::*;
-
 use crate::node::StyleId;
 
 /// Constant values used in the HTML rendering process.

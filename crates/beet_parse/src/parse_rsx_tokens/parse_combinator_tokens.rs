@@ -29,7 +29,7 @@ pub(super) fn parse_combinator_tokens(
 ) -> bevy::prelude::Result {
 	for (entity, tokens, snippet_root) in query.iter() {
 		Builder {
-			verbatim_tags: &["script", "style", "code"],
+			raw_text_elements: &LANG_NODE_TAGS,
 			file_path: &snippet_root.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
@@ -45,7 +45,7 @@ pub(super) fn parse_combinator_tokens(
 struct Builder<'w, 's, 'a> {
 	// the content of these tags will not be parsed and instead inserted
 	// as a [`TextNode`]
-	verbatim_tags: &'a [&'a str],
+	raw_text_elements: &'a [&'a str],
 	file_path: &'a WsPathBuf,
 	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,
@@ -167,7 +167,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		tag_str: &str,
 		children: RsxChildren,
 	) -> Result<Vec<Entity>> {
-		if self.verbatim_tags.contains(&tag_str) {
+		if self.raw_text_elements.contains(&tag_str) {
 			vec![
 				self.commands
 					.spawn((

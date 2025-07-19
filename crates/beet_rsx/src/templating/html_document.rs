@@ -275,10 +275,10 @@ mod test {
 	}
 	#[test]
 	fn hoist_tag() {
-		HtmlDocument::parse_bundle(rsx! {<style></style>})
+		HtmlDocument::parse_bundle(rsx! {<style>foo</style>})
 			.xpect()
 			.to_be_str(
-				"<!DOCTYPE html><html><head><style></style></head><body></body></html>",
+				"<!DOCTYPE html><html><head><style>foo</style></head><body></body></html>",
 			);
 		HtmlDocument::parse_bundle(
 			rsx! {<script></script><br/>},
@@ -293,7 +293,7 @@ mod test {
 		)
 		.xpect()
 		.to_be_str(
-			"<!DOCTYPE html><html><head><script/></head><body></body></html>",
+			"<!DOCTYPE html><html><head><script></script></head><body></body></html>",
 		);
 	}
 	#[test]
@@ -303,7 +303,7 @@ mod test {
 	)
 	.xpect()
 	.to_be_str(
-		"<!DOCTYPE html><html><head><span/></head><body><script/><br/></body></html>",
+		"<!DOCTYPE html><html><head><span/></head><body><script></script><br/></body></html>",
 	);
 	}
 	#[test]

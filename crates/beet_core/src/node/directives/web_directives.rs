@@ -14,8 +14,8 @@ pub fn extract_web_directives_plugin(app: &mut App) {
 	.add_systems(Update, extract_lang_nodes.in_set(ExtractDirectivesSet));
 }
 
-
-pub(crate) type WebDirectives = (
+/// Specify types for variadic functions like TokenizeComponent
+pub type WebDirectives = (
 	HtmlHoistDirective,
 	ClientLoadDirective,
 	ClientOnlyDirective,

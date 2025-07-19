@@ -4,7 +4,8 @@ use beet_utils::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-pub(crate) type RootComponents = (
+/// Specify types for variadic functions like TokenizeComponent
+pub type RootComponents = (
 	SnippetRoot,
 	StaticRoot,
 	InstanceRoot,

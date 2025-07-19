@@ -2,8 +2,8 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-
-pub(crate) type RsxNodes =
+/// Specify types for variadic functions like TokenizeComponent
+pub type RsxNodes =
 	(NodeTag, FragmentNode, TemplateNode, TextNode, BlockNode);
 
 /// The tag of a node, ie 'div' or 'MyTemplate'

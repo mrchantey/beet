@@ -36,7 +36,7 @@ pub struct RstmlConfig {
 impl Default for RstmlConfig {
 	fn default() -> Self {
 		Self {
-			raw_text_elements: ["script", "style"].into_iter().collect(),
+			raw_text_elements: LANG_NODE_TAGS.into_iter().collect(),
 			self_closing_elements: [
 				"area", "base", "br", "col", "embed", "hr", "img", "input",
 				"link", "meta", "param", "source", "track", "wbr",
