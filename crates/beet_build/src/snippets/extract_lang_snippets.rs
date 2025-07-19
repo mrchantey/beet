@@ -22,7 +22,7 @@ impl LangSnippetId {
 }
 
 /// Deduplicate `script` and `style` tags by replacing the
-/// [`LangContent`] directive with a [`LangSnippetPath`].
+/// [`InnerText`] directive with a [`LangSnippetPath`].
 pub(super) fn extract_lang_snippets(
 	mut commands: Commands,
 	mut id_counter: Local<LangSnippetId>,
@@ -33,20 +33,20 @@ pub(super) fn extract_lang_snippets(
 		(
 			Entity,
 			&NodeTag,
-			&LangContent,
+			&InnerText,
 			Option<&StyleScope>,
 			Option<&HtmlHoistDirective>,
 		),
-		Added<LangContent>,
+		Added<InnerText>,
 	>,
 ) -> Result {
 	let mut groups = HashMap::<u64, Vec<Entity>>::new();
 	// create a unique hash for each LangSnippet to deduplicate,
 	// including the tag, content, scope, and hoist directive.
-	for (entity, tag, lang_content, scope, hoist) in query.iter() {
+	for (entity, tag, inner_text, scope, hoist) in query.iter() {
 		let mut hasher = RapidHasher::default();
 		tag.hash(&mut hasher);
-		lang_content.hash_no_whitespace(&mut hasher);
+		inner_text.hash_no_whitespace(&mut hasher);
 		scope.map(|s| s.hash(&mut hasher));
 		hoist.map(|h| h.hash(&mut hasher));
 		let hash = hasher.finish();
@@ -61,27 +61,27 @@ pub(super) fn extract_lang_snippets(
 			.unwrap();
 
 		let snippet_source = match content {
-			LangContent::InnerText(_) => {
+			InnerText::Inline(_) => {
 				let idx = parents
 					.iter_ancestors_inclusive(rsx_entities[0])
 					.find_map(|e| idxs.get(e).ok())
 					.ok_or_else(|| {
 						bevyhow!(
-							"LangContent without parent SnippetRoot: {:?}",
+							"InnerText without parent SnippetRoot: {:?}",
 							rsx_entities[0]
 						)
 					})?;
 				&idx.file
 			}
-			LangContent::File(path) => path,
+			InnerText::File(path) => path,
 		};
 		let index = id_counter.next();
 		let snippet_path =
 			LangSnippetPath(config.lang_snippet_path(snippet_source, index));
 
 		let content = match content {
-			LangContent::InnerText(text) => text.to_string(),
-			LangContent::File(path) => {
+			InnerText::Inline(text) => text.to_string(),
+			InnerText::File(path) => {
 				let file = ReadFile::to_string(path.into_abs())?;
 				file.to_string()
 			}
@@ -118,7 +118,7 @@ pub(super) fn extract_lang_snippets(
 			// these entities are now just pointers to the shared content
 			let mut entity = commands.entity(*rsx_entity);
 			entity
-				.remove::<LangContent>()
+				.remove::<InnerText>()
 				.remove::<NodeTag>()
 				.remove::<ElementNode>()
 				.remove::<Children>()
@@ -208,7 +208,7 @@ mod test {
 			.spawn((
 				NodeTag(String::from("style")),
 				ElementNode { self_closing: true },
-				LangContent::File(WsPathBuf::new(
+				InnerText::File(WsPathBuf::new(
 					"crates/beet_router/src/test_site/components/style.css",
 				)),
 			))

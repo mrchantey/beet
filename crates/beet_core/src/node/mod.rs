@@ -68,7 +68,7 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			// directives - script/style
 			.register_type::<LangSnippet>()
 			.register_type::<LangSnippetPath>()
-			.register_type::<LangContent>()
+			.register_type::<InnerText>()
 			.register_type::<StyleId>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()

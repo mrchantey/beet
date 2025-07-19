@@ -844,6 +844,7 @@ dependencies = [
  "tower-http 0.6.6",
  "tower-livereload",
  "url",
+ "variadics_please",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -12,11 +13,7 @@ pub fn tokenize_bundle(
 	entity: Entity,
 ) -> Result<TokenStream> {
 	let mut items = Vec::new();
-	tokenize_roots(world, &mut items, entity)?;
-	tokenize_rsx_nodes(world,&mut items, entity)?;
-	tokenize_rsx_directives(world,&mut items, entity)?;
-	tokenize_web_nodes(world,&mut items, entity)?;
-	tokenize_web_directives(world,&mut items, entity)?;
+	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	tokenize_element_attributes(world,&mut items, entity)?;
 	tokenize_template(world,&mut items, entity)?;
 	tokenize_node_exprs(world,&mut items, entity)?;
@@ -104,7 +101,7 @@ mod test {
 			.to_be_snapshot();
 	}
 	#[test]
-	fn lang_content_empty() {
+	fn inner_text_empty() {
 		quote! {<style></style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
@@ -112,7 +109,7 @@ mod test {
 			.to_be_snapshot();
 	}
 	#[test]
-	fn lang_content() {
+	fn inner_text() {
 		quote! {<style>foo</style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()

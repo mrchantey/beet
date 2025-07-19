@@ -13,11 +13,7 @@ pub fn tokenize_bundle_tokens(
 	entity: Entity,
 ) -> Result<TokenStream> {
 	let mut items = Vec::new();
-	tokenize_roots(world, &mut items, entity)?;
-	tokenize_rsx_nodes(world, &mut items, entity)?;
-	tokenize_rsx_directives(world, &mut items, entity)?;
-	tokenize_web_nodes(world, &mut items, entity)?;
-	tokenize_web_directives(world, &mut items, entity)?;
+	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	tokenize_node_exprs_tokens(world, &mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;

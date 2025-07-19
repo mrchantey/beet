@@ -6,7 +6,7 @@ use std::hash::Hasher;
 use std::path::PathBuf;
 
 
-/// The fs loaded and deduplicated [`LangContent`], existing seperately from the
+/// The fs loaded and deduplicated [`InnerText`], existing seperately from the
 /// originating tree(s).
 /// Created alongside a [`NodeTag`], [`LangSnippetPath`] and optionally a [`StyleId`]
 #[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
@@ -20,7 +20,7 @@ impl LangSnippet {
 	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
 }
 
-/// The replacement for [`LangContent`] after the lang snippet has been
+/// The replacement for [`InnerText`] after the lang snippet has been
 /// extracted, referencing the path to the snippet scene file.
 #[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -29,22 +29,59 @@ impl LangSnippet {
 pub struct LangSnippetPath(pub WsPathBuf);
 
 
+#[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
+#[reflect(Component)]
+#[require(InnerText)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct ScriptElement {
+	/// The 'type' attribute of the `<script>` element, e.g. `type="module"`,
+	r#type: String,
+}
 
-/// The content of a script or style template, either as inner text or a file path.
-/// Attributes and children are removed.
-/// File paths are resolved lazily in beet_build.
+
+#[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
+#[reflect(Component)]
+#[require(InnerText)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct StyleElement;
+
+#[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
+#[reflect(Component)]
+#[require(InnerText)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct CodeElement {
+	/// the 'lang' attribute of the `<code>` element, e.g. `lang="rust"`,
+	/// defaults to "plaintext"
+	language: String,
+}
+
+
+/// Elements like `script`,`style` or `code` may contain either a single child
+/// text node or a src attribute pointing to a file.
+/// This directive contains the content of that element and is added *alongside*
+/// the element.
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum LangContent {
+pub enum InnerText {
 	/// The content is the inner text of a `<style>` or `<script>` tag.
-	InnerText(String),
+	Inline(String),
 	/// The content is a file path to a `<style src="...">` or `<script src="...">`.
 	File(WsPathBuf),
 }
-impl LangContent {
+impl Default for InnerText {
+	fn default() -> Self { InnerText::Inline(String::new()) }
+}
+
+impl InnerText {
 	pub fn file(src: &str, span: &FileSpan) -> Self {
 		let path = span
 			.file()
@@ -54,10 +91,10 @@ impl LangContent {
 		Self::File(WsPathBuf::new(path))
 	}
 
-	/// create a hash ignoring whitespace in the case of [`Self::InnerText`]
+	/// create a hash ignoring whitespace in the case of [`Self::Inline`]
 	pub fn hash_no_whitespace(&self, hasher: &mut impl Hasher) {
 		match self {
-			Self::InnerText(text) => {
+			Self::Inline(text) => {
 				let text = text.replace(char::is_whitespace, "");
 				text.hash(hasher);
 			}
@@ -68,7 +105,7 @@ impl LangContent {
 	}
 }
 
-/// For script and style tags, replace the [`ElementNode`] with a [`LangContent`]
+/// For script and style tags, replace the [`ElementNode`] with a [`InnerText`]
 pub(crate) fn extract_lang_content(
 	mut commands: Commands,
 	text_nodes: Query<&TextNode>,
@@ -108,7 +145,7 @@ pub(crate) fn extract_lang_content(
 					commands.entity(attr_entity).despawn();
 					commands
 						.entity(entity)
-						.insert(LangContent::file(value, span));
+						.insert(InnerText::file(value, span));
 					continue 'iter_elements;
 				}
 				_ => {}
@@ -117,9 +154,9 @@ pub(crate) fn extract_lang_content(
 		// 2. Check for inner text
 		for child in children.iter().flat_map(|c| c.iter()) {
 			if let Ok(text_node) = text_nodes.get(child) {
-				commands.entity(entity).insert(LangContent::InnerText(
-					text_node.text().to_string(),
-				));
+				commands
+					.entity(entity)
+					.insert(InnerText::Inline(text_node.text().to_string()));
 				commands.entity(child).despawn();
 				continue 'iter_elements;
 			}
@@ -152,10 +189,10 @@ mod test {
 		world.run_system_once(super::extract_lang_content).unwrap();
 		let entity = world.entity(entity);
 		entity
-			.get::<LangContent>()
+			.get::<InnerText>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangContent::InnerText("div { color: red; }".to_string()));
+			.to_be(&InnerText::Inline("div { color: red; }".to_string()));
 		entity.contains::<Children>().xpect().to_be(false);
 	}
 	#[test]
@@ -180,12 +217,10 @@ mod test {
 		world.run_system_once(super::extract_lang_content).unwrap();
 		let entity = world.entity(entity);
 		entity
-			.get::<LangContent>()
+			.get::<InnerText>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangContent::File(
-				WsPathBuf::new(dir!()).join("style.css"),
-			));
+			.to_be(&InnerText::File(WsPathBuf::new(dir!()).join("style.css")));
 		entity.contains::<Attributes>().xpect().to_be(false);
 	}
 }

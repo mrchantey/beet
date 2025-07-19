@@ -495,8 +495,8 @@ mod test {
 			}
 			</style>
 		});
-		expect(app.query_once::<&LangContent>()[0]).to_be(
-			&LangContent::InnerText("body { font-size : 1 em ; }".to_string()),
-		);
+		expect(app.query_once::<&InnerText>()[0]).to_be(&InnerText::Inline(
+			"body { font-size : 1 em ; }".to_string(),
+		));
 	}
 }

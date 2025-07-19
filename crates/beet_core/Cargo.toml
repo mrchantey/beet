@@ -76,6 +76,7 @@ beet_utils.workspace = true
 beet_core_macros = { workspace = true, optional = true }
 rapidhash.workspace = true
 send_wrapper.workspace = true
+variadics_please.workspace = true
 
 # bevy dependencies (optional)
 bevy = { workspace = true, optional = true }
