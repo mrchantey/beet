@@ -5,6 +5,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 
+pub const LANG_NODE_TAGS: [&str; 3] = ["script", "style", "code"];
+
 /// The fs loaded and deduplicated [`InnerText`], existing seperately from the
 /// originating tree(s).
 /// Created alongside a [`NodeTag`], [`LangSnippetPath`] and optionally a [`StyleId`]
@@ -30,19 +32,13 @@ pub struct LangSnippetPath(pub WsPathBuf);
 
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
-#[require(InnerText)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct ScriptElement {
-	/// The 'type' attribute of the `<script>` element, e.g. `type="module"`,
-	/// defaults to "text/javascript"
-	pub script_type: String,
-}
+pub struct ScriptElement;
 
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
-#[require(InnerText)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
@@ -50,15 +46,10 @@ pub struct StyleElement;
 
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
-#[require(InnerText)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct CodeElement {
-	/// the 'lang' attribute of the `<code>` element, e.g. `lang="rust"`,
-	/// defaults to "plaintext"
-pub	lang: String,
-}
+pub struct CodeElement;
 
 
 /// Elements like `script`,`style` or `code` may contain either a single child
@@ -77,8 +68,7 @@ pub struct InnerText(pub String);
 /// Upon tokenization this is replaced with an include_str,
 /// ie [`InnerText(include_str!("style.css"))`],
 /// feature gated behind a  [`not(feature="client")`] to avoid excessivly large
-/// client bundles, otherwise inserting a placeholder comment,
-/// ie `<!-- FileInnerText(style.css) -->`.
+/// client bundles, otherwise inserting a unit type
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]
@@ -92,16 +82,16 @@ pub struct FileInnerText(
 impl TokenizeSelf for FileInnerText {
 	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		let path = &self.0;
-		tokens.extend(quote::quote! {
+		tokens.extend(quote::quote! {{
 			#[cfg(not(feature = "client"))]
 			{
 				InnerText::new(include_str!(#path))
 			}
 			#[cfg(feature = "client")]
 			{
-				InnerText::new(format!("<!-- FileInnerText({}) -->", #path))
+				()
 			}
-		});
+		}});
 	}
 }
 
@@ -147,39 +137,26 @@ pub(crate) fn extract_lang_nodes(
 		// 1. Convert from 'ElementNode' to 'LangNode'
 		match tag.as_str() {
 			"script" => {
-				let script_type = find_attr(&attributes, "type")
-					.and_then(|(_, value)| value)
-					.map_or_else(
-						|| "text/javascript".to_string(),
-						|lit| lit.to_string(),
-					);
-
 				commands
 					.entity(entity)
-					.insert(ScriptElement { script_type });
+					.insert(ScriptElement);
 			}
 			"style" => {
 				commands.entity(entity).insert(StyleElement);
 			}
 			"code" => {
-				let lang = find_attr(&attributes, "lang")
-					.and_then(|(_, value)| value)
-					.map_or_else(
-						|| "plaintext".to_string(),
-						|lit| lit.to_string(),
-					);
-				commands.entity(entity).insert(CodeElement { lang });
+				commands.entity(entity).insert(CodeElement);
 			}
 			_ => {
 				// skip non-lang nodes
 				continue 'iter_elements;
 			}
 		}
-		commands
-			.entity(entity)
-			.remove::<ElementNode>()
-			.remove::<NodeTag>()
-			.despawn_related::<Children>();
+		// commands
+		// 	.entity(entity)
+		// 	// .remove::<ElementNode>()
+		// 	// .remove::<NodeTag>()
+		// 	.despawn_related::<Children>();
 
 		// 1. Collect InnerText
 		for child in children.iter().flat_map(|c| c.iter()) {
@@ -199,9 +176,9 @@ pub(crate) fn extract_lang_nodes(
 			commands.entity(attr_entity).despawn();
 			continue 'iter_elements;
 		}
-		// 3. If no text or src, insert an empty InnerText
-		commands.entity(entity).insert(InnerText::default());
-	}
+
+		// ignore empty nodes
+		}
 }
 
 

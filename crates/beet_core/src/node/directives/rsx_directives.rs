@@ -9,7 +9,8 @@ pub fn extract_rsx_directives_plugin(app: &mut App) {
 		);
 }
 
-pub(crate) type RsxDirectives = (SlotChild, SlotTarget);
+/// Specify types for variadic functions like TokenizeComponent
+pub type RsxDirectives = (SlotChild, SlotTarget);
 
 /// Directive indicating a node should be moved to the slot with the given name.
 /// All nodes without this directive are moved to the default slot.

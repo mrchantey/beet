@@ -6,6 +6,7 @@
     InstanceRoot,
     FragmentNode,
     related! {
-        Children[(StyleElement, InnerText(String::from("")))]
+        Children[(NodeTag(String::from("style")), ElementNode { self_closing : false
+        }, StyleElement)]
     },
 )
