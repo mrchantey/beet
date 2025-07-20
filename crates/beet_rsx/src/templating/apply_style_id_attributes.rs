@@ -28,16 +28,16 @@ pub(super) fn apply_style_id_attributes(
 	// visit all docment roots and templates that aren't yet children
 	roots: Populated<Entity, Or<(Added<HtmlDocument>, Added<TemplateOf>)>>,
 	children: Query<&Children>,
-	style_ids: Query<&StyleId>,
+	style_ids: Query<&LangSnippetHash, With<StyleElement>>,
 	mut builder: ApplyAttributes,
 ) {
-	for entity in roots.iter() {
-		let mut visited = HashSet::<(Entity, StyleId)>::default();
+	for root in roots.iter() {
+		let mut visited = HashSet::<(Entity, LangSnippetHash)>::default();
 		for styleid in children
-			.iter_descendants(entity)
+			.iter_descendants(root)
 			.filter_map(|en| style_ids.get(en).ok())
 		{
-			builder.apply_recursive(&mut visited, entity, *styleid);
+			builder.apply_recursive(&mut visited, root, *styleid);
 		}
 	}
 }
@@ -54,22 +54,21 @@ pub(super) struct ApplyAttributes<'w, 's> {
 impl ApplyAttributes<'_, '_> {
 	fn apply_recursive(
 		&mut self,
-		visited: &mut HashSet<(Entity, StyleId)>,
+		visited: &mut HashSet<(Entity, LangSnippetHash)>,
 		entity: Entity,
-		styleid: StyleId,
+		styleid: LangSnippetHash,
 	) {
 		if visited.contains(&(entity, styleid)) {
 			return;
 		}
 		visited.insert((entity, styleid));
 		if let Ok(tag) = self.elements.get(entity)
-			&& !self.html_constants.hoist_to_head_tags.contains(&tag.0)
+			&& !self.html_constants.ignore_style_id_tags.contains(&tag.0)
 		{
 			self.commands.spawn((
 				AttributeOf::new(entity),
-				AttributeKey::new(
-					self.html_constants.style_id_attribute(styleid),
-				),
+				// hash will be converted to attribute key in compress_style_ids.rs
+				styleid.clone(),
 			));
 		}
 		for template in self
@@ -105,16 +104,18 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		HtmlDocument::parse_bundle(rsx! {<style {StyleId::new(0)}/><span/>})
-			.xpect()
-			.to_be_snapshot();
+		HtmlDocument::parse_bundle(
+			rsx! {<style {LangSnippetHash::new(0)}/><span/>},
+		)
+		.xpect()
+		.to_be_snapshot();
 	}
 	#[test]
 	fn deduplicates() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {StyleId::new(0)}/>
-			<style {StyleId::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
 			</div>
 		})
 		.xpect()
@@ -124,7 +125,7 @@ mod test {
 	fn assigns_id_to_all() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {StyleId::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
 			<span/>
 			</div>
 		})
@@ -134,7 +135,7 @@ mod test {
 	#[test]
 	fn ignores_templates() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {StyleId::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
 			<MyTemplate/>
 		})
 		.xpect()
@@ -143,7 +144,7 @@ mod test {
 	#[test]
 	fn applies_to_slots() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {StyleId::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
 			<MyTemplate>
 				<span/>
 			</MyTemplate>
@@ -154,7 +155,7 @@ mod test {
 	#[test]
 	fn cascades() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {StyleId::new(0)}/>
+			<style {LangSnippetHash::new(0)}/>
 			<MyTemplate style:cascade/>
 		})
 		.xpect()
@@ -165,7 +166,7 @@ mod test {
 		#[template]
 		fn StyledTemplate() -> impl Bundle {
 			rsx! {
-				<style {StyleId::new(0)}/>
+				<style {LangSnippetHash::new(0)}/>
 				<div>
 			}
 		}

@@ -110,7 +110,7 @@ mod test {
 	}
 	#[test]
 	fn inner_text() {
-		quote! {<style>foo</style>}
+		quote! {<style is:inline>foo{}</style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect()

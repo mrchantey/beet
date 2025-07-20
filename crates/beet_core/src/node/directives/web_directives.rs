@@ -2,30 +2,11 @@ use super::*;
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-/// plugin containing all web directive extraction
-pub fn extract_web_directives_plugin(app: &mut App) {
-	app.add_plugins((
-		extract_directive_plugin::<ClientLoadDirective>,
-		extract_directive_plugin::<ClientOnlyDirective>,
-		extract_directive_plugin::<HtmlHoistDirective>,
-		extract_directive_plugin::<StyleScope>,
-		extract_directive_plugin::<StyleCascade>,
-	))
-	.add_systems(Update, extract_lang_nodes.in_set(ExtractDirectivesSet));
-}
-
 /// Specify types for variadic functions like TokenizeComponent
 pub type WebDirectives = (
 	HtmlHoistDirective,
 	ClientLoadDirective,
 	ClientOnlyDirective,
-	StyleScope,
-	StyleCascade,
-	ScriptElement,
-	StyleElement,
-	CodeElement,
-	InnerText,
-	FileInnerText,
 );
 
 

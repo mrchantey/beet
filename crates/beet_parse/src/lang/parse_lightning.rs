@@ -1,4 +1,3 @@
-use super::error::Error;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
@@ -10,34 +9,40 @@ use rayon::iter::ParallelIterator;
 /// Parse css using lightningcss, applying styleid to selectors as required.
 pub fn parse_lightning(
 	constants: Res<HtmlConstants>,
-	mut commands: Commands,
-	query: Populated<
+	mut query: Populated<
 		(
-			Entity,
-			&LangSnippet,
-			&NodeTag,
-			Option<&StyleId>,
+			&mut InnerText,
+			Option<&LangSnippetHash>,
+			Option<&StyleScope>,
 			Option<&FileSpanOf<ElementNode>>,
 		),
-		Added<LangSnippet>,
+		Added<StyleElement>,
 	>,
 ) -> Result {
-	let output = query
-		.iter()
+	query
+		.iter_mut()
 		.collect::<Vec<_>>()
 		.into_par_iter()
-		.filter(|(_, _, tag, _, _)| tag.as_str() == "style")
-		.map(|(entity, partial, _tag, styleid, span)| {
+		.map(|(mut text, hash, scope, span)| {
 			// Parse the stylesheet
 			let mut stylesheet =
-				StyleSheet::parse(&partial, ParserOptions::default()).map_err(
-					|e| Error::LightningCss {
-						span: span.map(|s| s.value.clone()),
-						err: e.to_string(),
+				StyleSheet::parse(&text.0, ParserOptions::default()).map_err(
+					|e| {
+						bevyhow!(
+							"Failed to parse css: {}\nSpan: {:?}",
+							e.to_string(),
+							span,
+						)
 					},
 				)?;
-			if let Some(styleid) = styleid {
-				let class_name = constants.style_id_attribute(*styleid);
+
+			let scope = scope.map(|s| *s).unwrap_or(StyleScope::Local);
+
+			// apply hash as a style id for local styles
+			if scope == StyleScope::Local
+				&& let Some(hash) = hash
+			{
+				let class_name = constants.style_id_attribute(**hash);
 				stylesheet.rules.0.iter_mut().for_each(|rule| {
 					match rule {
 						// currently only style rules are supported
@@ -60,6 +65,7 @@ pub fn parse_lightning(
 
 			#[cfg(debug_assertions)]
 			let options = PrinterOptions::default();
+			// minify in release builds
 			#[cfg(not(debug_assertions))]
 			let options = PrinterOptions {
 				minify: true,
@@ -68,19 +74,21 @@ pub fn parse_lightning(
 
 			let new_css = stylesheet
 				.to_css(options)
-				.map_err(|e| Error::LightningCss {
-					span: span.map(|s| s.value.clone()),
-					err: e.to_string(),
+				.map_err(|e| {
+					bevyhow!(
+						"Failed to serialize stylesheet: {}\nSpan: {:?}",
+						e.to_string(),
+						span,
+					)
 				})?
 				.code;
-			Ok((entity, new_css))
+			drop(stylesheet);
+
+			text.0 = new_css;
+
+			Ok(())
 		})
 		.collect::<Result<Vec<_>>>()?;
-	// only local style tags
-
-	for (entity, css) in output {
-		commands.entity(entity).insert(LangSnippet::new(css));
-	}
 	Ok(())
 }
 
@@ -103,17 +111,17 @@ mod test {
 		let global = app
 			.world_mut()
 			.spawn((
-				LangSnippet("div { color: red; }".to_string()),
-				NodeTag("style".into()),
-				// no styleid indicates global
+				InnerText("div { color: red; }".to_string()),
+				StyleElement,
+				StyleScope::Global,
 			))
 			.id();
 		let local = app
 			.world_mut()
 			.spawn((
-				LangSnippet("div { color: red; }".to_string()),
-				NodeTag("style".into()),
-				StyleId::new(7),
+				InnerText("div { color: red; }".to_string()),
+				StyleElement,
+				LangSnippetHash::new(7),
 			))
 			.id();
 
@@ -121,16 +129,16 @@ mod test {
 
 		app.world()
 			.entity(global)
-			.get::<LangSnippet>()
+			.get::<InnerText>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangSnippet("div {\n  color: red;\n}\n".to_string()));
+			.to_be(&InnerText("div {\n  color: red;\n}\n".to_string()));
 		app.world()
 			.entity(local)
-			.get::<LangSnippet>()
+			.get::<InnerText>()
 			.unwrap()
 			.xpect()
-			.to_be(&LangSnippet(
+			.to_be(&InnerText(
 				"div[data-beet-style-id-7] {\n  color: red;\n}\n".to_string(),
 			));
 	}

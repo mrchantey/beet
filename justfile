@@ -98,7 +98,7 @@ run-hydration:
 	just watch just build-hydration
 
 build-hydration:
-	cargo run --example hydration
+	cargo run --example hydration --features=css
 	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
 	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
 	sweet serve target/examples/hydration
@@ -184,8 +184,8 @@ test-beet-utils *args:
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx       --lib -- --exclude=*apply_style_id_attributes* 						{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}	

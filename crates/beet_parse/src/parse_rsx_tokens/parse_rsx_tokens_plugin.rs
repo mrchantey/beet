@@ -1,4 +1,6 @@
 use super::*;
+#[allow(unused)]
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
@@ -16,30 +18,38 @@ pub struct ParseRsxTokensPlugin;
 
 impl Plugin for ParseRsxTokensPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<RstmlConfig>()
-			.configure_sets(
-				Update,
-				ExtractDirectivesSet.in_set(ParseRsxTokensSet),
+		app.init_resource::<HtmlConstants>().add_systems(
+			Update,
+			(
+				// parsing raw tokens
+				#[cfg(feature = "rsx")]
+				parse_combinator_tokens,
+				#[cfg(feature = "rsx")]
+				parse_rstml_tokens,
+				// extractors
+				// lang nodes must run first, hashes raw attributes not extracted directives
+				extract_lang_nodes,
+				extract_slot_targets,
+				try_extract_directive::<SlotChild>,
+				try_extract_directive::<ClientLoadDirective>,
+				try_extract_directive::<ClientOnlyDirective>,
+				try_extract_directive::<HtmlHoistDirective>,
+				try_extract_directive::<StyleScope>,
+				try_extract_directive::<StyleCascade>,
+				// collect combinator exprs last
+				#[cfg(feature = "rsx")]
+				collapse_combinator_exprs,
+				#[cfg(feature = "css")]
+				parse_lightning,
 			)
-			.add_systems(
-				Update,
-				(
-					(parse_combinator_tokens, parse_rstml_tokens)
-						.in_set(ParseRsxTokensSet)
-						.before(ExtractDirectivesSet),
-					collapse_combinator_exprs
-						.in_set(ParseRsxTokensSet)
-						.after(ExtractDirectivesSet),
-				),
-			)
-			.add_plugins((
-				extract_rsx_directives_plugin,
-				extract_web_directives_plugin,
-			));
+				.chain()
+				.in_set(ParseRsxTokensSet),
+		);
 
 		// cache the rstml parser to avoid recreating every frame
-		let rstml_config = app.world().resource::<RstmlConfig>();
-		app.insert_non_send_resource(rstml_config.clone().into_parser());
+		let constants = app.world().resource::<HtmlConstants>();
+		let rstml_parser = create_rstml_parser(constants);
+		app.insert_non_send_resource(rstml_parser);
 	}
 }
 

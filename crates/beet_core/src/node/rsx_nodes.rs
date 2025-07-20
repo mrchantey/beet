@@ -3,8 +3,7 @@ use crate::as_beet::*;
 use bevy::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
-pub type RsxNodes =
-	(NodeTag, FragmentNode, TemplateNode, TextNode, BlockNode);
+pub type RsxNodes = (NodeTag, FragmentNode, TemplateNode, TextNode, BlockNode);
 
 /// The tag of a node, ie 'div' or 'MyTemplate'
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, Deref, DerefMut)]
@@ -56,6 +55,7 @@ pub struct FragmentNode;
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[cfg_attr(feature = "bevy_default", require(bevy::prelude::TextSpan))]
 pub struct TextNode(pub String);
 
 impl TextNode {

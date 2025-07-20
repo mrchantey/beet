@@ -1,10 +1,8 @@
-use std::path::PathBuf;
 use bevy::prelude::*;
-use crate::node::StyleId;
+use std::path::PathBuf;
 
 /// Constant values used in the HTML rendering process.
 #[derive(Debug, Clone, PartialEq, Resource)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
 	pub dom_idx_key: String,
@@ -25,13 +23,28 @@ pub struct HtmlConstants {
 	pub wasm_dir: PathBuf,
 	/// Name of the wasm js and bin files, defaults to `main`
 	pub wasm_name: String,
+	/// Tags whose inner text content is 'escaped', ie not parsed as rsx
+	pub lang_node_tags: std::collections::HashSet<&'static str>,
+	/// Tags that should not have style ids applied to them
+	pub ignore_style_id_tags: Vec<String>,
 	/// When parsing a [`HtmlDocument`], elements with these tags will be hoisted to the head of the document.
 	/// Defauts to `["title", "meta", "link", "style", "script", "base"]`.
 	pub hoist_to_head_tags: Vec<String>,
+	/// This type is used by rstml to determine if an element should be treated as self-closing.
+	pub self_closing_elements: std::collections::HashSet<&'static str>,
 }
 
 impl Default for HtmlConstants {
 	fn default() -> Self {
+		let hoist_to_head_tags = vec![
+			"title".into(),
+			"meta".into(),
+			"link".into(),
+			"style".into(),
+			"script".into(),
+			"base".into(),
+		];
+
 		Self {
 			dom_idx_key: "data-beet-dom-idx".into(),
 			span_key: "data-beet-span".into(),
@@ -42,21 +55,26 @@ impl Default for HtmlConstants {
 			text_node_marker: "bt".into(),
 			wasm_dir: "wasm".into(),
 			wasm_name: "main".into(),
-			hoist_to_head_tags: vec![
-				"title".into(),
-				"meta".into(),
-				"link".into(),
-				"style".into(),
-				"script".into(),
-				"base".into(),
-			],
+			lang_node_tags: ["script", "style", "code"].into_iter().collect(),
+			ignore_style_id_tags: hoist_to_head_tags
+				.iter()
+				.cloned()
+				.chain(["html".into(), "head".into()])
+				.collect(),
+			hoist_to_head_tags,
+			self_closing_elements: [
+				"area", "base", "br", "col", "embed", "hr", "img", "input",
+				"link", "meta", "param", "source", "track", "wbr",
+			]
+			.into_iter()
+			.collect(),
 		}
 	}
 }
 impl HtmlConstants {
 	/// Returns the attribute key for the style id
-	pub fn style_id_attribute(&self, id: StyleId) -> String {
-		format!("{}-{}", self.style_id_key, *id)
+	pub fn style_id_attribute(&self, id: u64) -> String {
+		format!("{}-{}", self.style_id_key, id)
 	}
 
 	pub fn wasm_bin_url(&self) -> String {

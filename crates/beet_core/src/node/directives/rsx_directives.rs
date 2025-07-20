@@ -1,14 +1,6 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-pub fn extract_rsx_directives_plugin(app: &mut App) {
-	app.add_plugins(extract_directive_plugin::<SlotChild>)
-		.add_systems(
-			Update,
-			slot_target_directive.in_set(ExtractDirectivesSet),
-		);
-}
-
 /// Specify types for variadic functions like TokenizeComponent
 pub type RsxDirectives = (SlotChild, SlotTarget);
 
@@ -71,9 +63,9 @@ impl SlotTarget {
 	}
 }
 
-
-// convert all nodes with the `slot` tag into a `SlotTarget`
-fn slot_target_directive(
+/// convert all nodes with the `slot` tag into a `SlotTarget`,
+/// this does not address slot children, ie `<div slot="foo">`
+pub fn extract_slot_targets(
 	mut commands: Commands,
 	attributes: Query<&Attributes>,
 	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
@@ -123,7 +115,7 @@ mod test {
 			.spawn((ElementNode::self_closing(), NodeTag("slot".to_string())))
 			.id();
 		app.world_mut()
-			.run_system_once(slot_target_directive)
+			.run_system_once(extract_slot_targets)
 			.unwrap();
 
 		app.world_mut()
@@ -149,7 +141,7 @@ mod test {
 			))
 			.id();
 		app.world_mut()
-			.run_system_once(slot_target_directive)
+			.run_system_once(extract_slot_targets)
 			.unwrap();
 
 		app.world_mut()

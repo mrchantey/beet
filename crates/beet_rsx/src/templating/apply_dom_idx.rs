@@ -129,10 +129,7 @@ mod test {
 			}))
 			.get::<Children>()
 			.unwrap()[0];
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(apply_static_rsx).unwrap().unwrap();
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
 		world.get::<DomIdx>(div).unwrap().xpect().to_be(&DomIdx(0));

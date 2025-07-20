@@ -4,7 +4,7 @@
 //! Building is usually done by the cli but it can also be done manually:
 //! ```sh
 //! # export the html file
-//! cargo run --example hydration
+//! cargo run --example hydration --features=css
 //! # build the wasm module
 //! cargo build --example hydration --target-dir=target --target wasm32-unknown-unknown
 //! wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
@@ -28,8 +28,9 @@ fn main() {
 	let html = HtmlDocument::parse_bundle(rsx! {
 		<h1>Hello Hydration</h1>
 		<Counter client:load initial=7/>
-		<style>
+		<style scope:global>
 			body{
+				font-family: system-ui, sans-serif;
 				background: black;
 				color: white;
 			}
@@ -49,5 +50,15 @@ fn Counter(initial: u32) -> impl Bundle {
 		<button
 			onclick={move || set(get()+1)}
 		>"Increment"</button>
+		<style>
+		button{
+			background: #444;
+			color: white;
+			border: none;
+			padding: 0.5.em 1.em;
+			border-radius: 0.25.em;
+			cursor: pointer;
+		}
+		</style>
 	}
 }

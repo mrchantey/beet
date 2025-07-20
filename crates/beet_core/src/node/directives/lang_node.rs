@@ -2,29 +2,70 @@ use crate::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;
-use std::hash::Hasher;
+
+/// Specify types for variadic functions like TokenizeComponent
+pub type LangDirectives = (
+	StyleScope,
+	StyleCascade,
+	ScriptElement,
+	StyleElement,
+	CodeElement,
+	LangSnippetHash,
+	StaticLangNode,
+	InnerText,
+	FileInnerText,
+);
 
 
-pub const LANG_NODE_TAGS: [&str; 3] = ["script", "style", "code"];
 
-/// The fs loaded and deduplicated [`InnerText`], existing seperately from the
-/// originating tree(s).
-/// Created alongside a [`NodeTag`], [`LangSnippetPath`] and optionally a [`StyleId`]
-#[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// A hash of all aspects of a lang node that makes it unique,
+/// including:
+/// - [`NodeTag`]
+/// - [`InnerText`]
+/// - [`StyleScope`]
+/// - [`HtmlHoistDirective`]
+/// - [`AttributeKey`]
+/// - [`AttributeLit`]
+/// This is used for several purposes:
+/// - deduplication of lang nodes
+/// - assigning unique style ids to css content
+/// 	- in this case the hash may be compressed to a shorter alphanumeric string
+#[derive(
+	Debug, Copy, Clone, PartialEq, Eq, Hash, Deref, Component, Reflect,
+)]
 #[reflect(Component)]
-// #[component(immutable)]
-pub struct LangSnippet(pub String);
-
-impl LangSnippet {
-	/// Create a new [`LangSnippet`] from a `String`.
-	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[component(immutable)]
+pub struct LangSnippetHash(pub u64);
+impl LangSnippetHash {
+	/// Create a new [`LangSnippetHash`] from a `u64`.
+	pub fn new(hash: u64) -> Self { Self(hash) }
 }
+impl std::fmt::Display for LangSnippetHash {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+
+/// The deduplicated form of a 'lang node' is a clone of the original,
+/// this marker indicates this is the canonical deduplicated version,
+/// and should be used to filter for processing so that we arent performing
+/// duplicated work on the same node.
+#[derive(Debug, Component, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[reflect(Component)]
+#[component(immutable)]
+pub struct StaticLangNode;
+
 
 /// The replacement for [`InnerText`] after the lang snippet has been
 /// extracted, referencing the path to the snippet scene file.
 #[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
 // #[component(immutable)]
 pub struct LangSnippetPath(pub WsPathBuf);
@@ -52,13 +93,10 @@ pub struct StyleElement;
 pub struct CodeElement;
 
 
-/// Elements like `script`,`style` or `code` may contain either a single child
-/// text node or a src attribute pointing to a file.
-/// This directive contains the content of that element and is added *alongside*
-/// the element.
+/// Convenience component equivelent to `children![TextNode]`, often used by elements
+/// like `script`,`style` or `code` which require further processing.
 #[derive(Debug, Default, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
-#[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct InnerText(pub String);
@@ -78,6 +116,10 @@ pub struct FileInnerText(
 	pub String,
 );
 
+
+/// if `beet_parse` has the `css` feature FileInnerText will be loaded by the macro
+/// and replaced with an `InnerText` containing the css, so this tokenization
+/// will not occur.
 #[cfg(feature = "tokens")]
 impl TokenizeSelf for FileInnerText {
 	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
@@ -98,143 +140,4 @@ impl TokenizeSelf for FileInnerText {
 impl InnerText {
 	/// Create a new [`InnerText`] from a `String`.
 	pub fn new(text: impl Into<String>) -> Self { Self(text.into()) }
-
-	/// create a hash ignoring whitespace in the case of [`Self::Inline`]
-	pub fn hash_no_whitespace(&self, hasher: &mut impl Hasher) {
-		self.0.replace(char::is_whitespace, "").hash(hasher);
-	}
-}
-
-/// For script and style tags, replace the [`ElementNode`] with a [`InnerText`]
-pub(crate) fn extract_lang_nodes(
-	mut commands: Commands,
-	text_nodes: Query<&TextNode>,
-	attr_lits: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
-	query: Populated<
-		(Entity, &NodeTag, Option<&Attributes>, Option<&Children>),
-		Added<NodeTag>,
-	>,
-) {
-	let find_attr = |attrs: &Option<&Attributes>,
-	                 key: &str|
-	 -> Option<(Entity, Option<&AttributeLit>)> {
-		attrs.as_ref()?.iter().find_map(|entity| {
-			let (attr_entity, inner_key, value) = attr_lits.get(entity).ok()?;
-			if inner_key.as_str() == key {
-				Some((attr_entity, value))
-			} else {
-				None
-			}
-		})
-	};
-
-	'iter_elements: for (entity, tag, attributes, children) in query.iter() {
-		// entirely skip is:inline
-		if find_attr(&attributes, "is:inline").is_some() {
-			continue 'iter_elements;
-		}
-
-		// 1. Convert from 'ElementNode' to 'LangNode'
-		match tag.as_str() {
-			"script" => {
-				commands
-					.entity(entity)
-					.insert(ScriptElement);
-			}
-			"style" => {
-				commands.entity(entity).insert(StyleElement);
-			}
-			"code" => {
-				commands.entity(entity).insert(CodeElement);
-			}
-			_ => {
-				// skip non-lang nodes
-				continue 'iter_elements;
-			}
-		}
-		// commands
-		// 	.entity(entity)
-		// 	// .remove::<ElementNode>()
-		// 	// .remove::<NodeTag>()
-		// 	.despawn_related::<Children>();
-
-		// 1. Collect InnerText
-		for child in children.iter().flat_map(|c| c.iter()) {
-			if let Ok(text_node) = text_nodes.get(child) {
-				commands
-					.entity(entity)
-					.insert(InnerText(text_node.text().to_string()));
-				commands.entity(child).despawn();
-				continue 'iter_elements;
-			}
-		}
-		// 2. Collect FileInnerText
-		if let Some((attr_entity, value)) = find_attr(&attributes, "src")
-			&& let Some(AttributeLit::String(value)) = value
-		{
-			commands.entity(entity).insert(FileInnerText(value.clone()));
-			commands.entity(attr_entity).despawn();
-			continue 'iter_elements;
-		}
-
-		// ignore empty nodes
-		}
-}
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use bevy::ecs::system::RunSystemOnce;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
-
-
-	#[test]
-	fn extracts_inline() {
-		let mut world = World::new();
-		let entity = world
-			.spawn((
-				NodeTag::new("style"),
-				FileSpanOf::<ElementNode>::new(FileSpan::default()),
-				children![TextNode::new("div { color: red; }")],
-			))
-			.id();
-		world.run_system_once(super::extract_lang_nodes).unwrap();
-		let entity = world.entity(entity);
-		entity
-			.get::<InnerText>()
-			.unwrap()
-			.xpect()
-			.to_be(&InnerText::new("div { color: red; }"));
-		entity.contains::<Children>().xpect().to_be(false);
-	}
-	#[test]
-	fn extracts_src() {
-		let mut world = World::new();
-		let entity = world
-			.spawn((
-				NodeTag::new("style"),
-				FileSpanOf::<ElementNode>::new(FileSpan::new(
-					file!(),
-					default(),
-					default(),
-				)),
-				related!(
-					Attributes[(
-						AttributeKey::new("src"),
-						AttributeLit::String("./style.css".to_string())
-					)]
-				),
-			))
-			.id();
-		world.run_system_once(super::extract_lang_nodes).unwrap();
-		let entity = world.entity(entity);
-		entity
-			.get::<FileInnerText>()
-			.unwrap()
-			.xpect()
-			.to_be(&FileInnerText("./style.css".to_string()));
-		entity.contains::<Attributes>().xpect().to_be(false);
-	}
 }

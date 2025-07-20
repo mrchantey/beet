@@ -10,6 +10,7 @@ pub type RsxComponents = (
 	WebNodes,
 	RsxDirectives,
 	WebDirectives,
+	LangDirectives
 );
 
 pub trait TokenizeComponents {

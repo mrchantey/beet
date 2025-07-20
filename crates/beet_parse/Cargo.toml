@@ -14,13 +14,19 @@ keywords.workspace = true
 
 
 [features]
-default = ["html"]
-html = ["dep:beet_rsx_combinator"]
+default = ["rsx"]
+css = ["dep:lightningcss", "dep:parcel_selectors"]
+rsx = ["dep:beet_rsx_combinator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["serde", "tokens"] }
 beet_utils.workspace = true
 beet_rsx_combinator = { workspace = true, optional = true }
+
+
+#💡 style
+parcel_selectors = { version = "0.28", optional = true }
+lightningcss = { version = "1.0.0-alpha.63", optional = true }
 
 ron.workspace = true
 anyhow.workspace = true

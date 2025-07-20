@@ -19,6 +19,8 @@ default = ["nightly", "scene"]
 nightly = []
 # client to match rsx macro conventions, for testing only
 client = []
+# adds css support for non-cli usage
+css = ["beet_rsx_macros/css"]
 serde = ["dep:serde", "beet_core/bevy_scene"]
 scene = ["bevy/bevy_scene", "beet_core/bevy_scene", "beet_core/http"]
 bevy_default = ["bevy/bevy_text"]
@@ -68,3 +70,9 @@ console_error_panic_hook.workspace = true
 beet_rsx = { path = "", features = ["tokens"] }
 serde.workspace = true
 sweet.workspace = true
+
+
+[[test]]
+name = "css"
+path = "tests/css.rs"
+required-features = ["css"]

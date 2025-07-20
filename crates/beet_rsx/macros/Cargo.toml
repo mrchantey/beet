@@ -13,8 +13,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-# css = ["beet_parse/css"]
-# bevy = []
+css = ["beet_parse/css"]
 
 [lib]
 proc-macro = true

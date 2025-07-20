@@ -31,7 +31,6 @@ pub struct Attributes(Vec<Entity>);
 	Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Reflect, Component,
 )]
 #[reflect(Component)]
-#[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct AttributeKey(pub String);

@@ -82,6 +82,7 @@ pub struct HtmlBuilder<'w, 's> {
 	elements: Query<'w,'s,(
 		&'static ElementNode,
 		&'static NodeTag,
+		Option<&'static InnerText>,
 		Option<&'static Attributes>,
 		Option<&'static Children>
 	)>,
@@ -114,11 +115,13 @@ impl HtmlBuilder<'_, '_> {
 				self.parse(child, html);
 			}
 		}
-		if let Ok((element, tag, attributes, children)) =
+		if let Ok((element, tag, inner_text, attributes, children)) =
 			self.elements.get(entity)
 		{
 			if element.self_closing && (**tag == "style") {
-				panic!("self closing style tags are not allowed in HTML, and produce highly unexpected results");
+				panic!(
+					"self closing style tags are not allowed in HTML, and produce highly unexpected results"
+				);
 			}
 
 			html.push_str(&format!("<{}", tag.0));
@@ -141,9 +144,13 @@ impl HtmlBuilder<'_, '_> {
 			if element.self_closing {
 				html.push_str("/>");
 				return;
-			} else {
-				html.push('>');
 			}
+			html.push('>');
+
+			if let Some(inner_text) = inner_text {
+				html.push_str(&inner_text.0);
+			}
+
 			if let Some(children) = children {
 				for child in children.iter() {
 					self.parse(child, html);
@@ -339,5 +346,41 @@ mod test {
 		rsx! {<div>{get}</div>}
 			.xmap(HtmlDocument::parse_bundle).xpect()
 		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
+	}
+
+
+	#[test]
+	#[cfg(feature = "css")]
+	fn style_inline() {
+		HtmlFragment::parse_bundle(rsx! {<style>body { color: red; }</style>})
+			.xpect()
+			.to_be_snapshot();
+	}
+
+	#[test]
+	#[cfg(not(feature = "client"))]
+	fn style_src() {
+		HtmlFragment::parse_bundle(
+			rsx! {<style src="../../tests/test_file.css"/>},
+		)
+		.xpect()
+		.to_be_snapshot();
+	}
+
+	#[test]
+	fn script() {
+		HtmlFragment::parse_bundle(
+			rsx! {<script type="pizza">let foo = "bar"</script>},
+		)
+		.xpect()
+		.to_be_str("<script type=\"pizza\">let foo = \"bar\"</script>");
+	}
+	#[test]
+	fn code() {
+		HtmlFragment::parse_bundle(
+			rsx! {<code lang="pizza">let foo = "bar"</code>},
+		)
+		.xpect()
+		.to_be_str("<code lang=\"pizza\">let foo = \"bar\"</code>");
 	}
 }

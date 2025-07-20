@@ -273,18 +273,19 @@ mod test {
 			"<!DOCTYPE html><html><head><br/></head><body></body></html>",
 		);
 	}
+
 	#[test]
-	fn hoist_tag() {
-		HtmlDocument::parse_bundle(rsx! {<style>foo</style>})
+	#[cfg(feature = "css")]
+	fn hoist_style_tag() {
+		HtmlDocument::parse_bundle(rsx! {<style>foo{}</style>})
 			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head><style>foo</style></head><body></body></html>",
-			);
-		HtmlDocument::parse_bundle(
-			rsx! {<script></script><br/>},
-		)
-		.xpect()
-		.to_be_str("<!DOCTYPE html><html><head><script></script></head><body><br/></body></html>");
+			.to_be_snapshot();
+	}
+	#[test]
+	fn hoist_script_tag() {
+		HtmlDocument::parse_bundle(rsx! {<script></script><br/>})
+			.xpect()
+			.to_be_snapshot();
 	}
 	#[test]
 	fn hoist_top_tag() {

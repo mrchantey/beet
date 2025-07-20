@@ -28,12 +28,12 @@
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(let_chains, if_let_guard, result_flattening, exit_status_error)]
 
-mod route_codegen;
-mod snippets;
+// mod route_codegen;
+// mod snippets;
 
 pub mod prelude {
-	pub use crate::route_codegen::*;
-	pub use crate::snippets::*;
+	// pub use crate::route_codegen::*;
+	// pub use crate::snippets::*;
 }
 pub mod exports {
 	pub use proc_macro2;
@@ -47,7 +47,7 @@ pub mod as_beet {
 		pub use beet_parse as parse;
 		pub use beet_rsx as rsx;
 		pub mod prelude {
-			pub use crate::prelude::*;
+			// pub use crate::prelude::*;
 			pub use beet_core::prelude::*;
 			pub use beet_parse::prelude::*;
 			pub use beet_rsx::prelude::*;

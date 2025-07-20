@@ -1,4 +1,6 @@
+mod deduplicate_static_lang_snippets;
 mod import_rsx_snippets_md;
+pub use deduplicate_static_lang_snippets::*;
 pub use import_rsx_snippets_md::*;
 mod import_rsx_snippets_rs;
 pub use import_rsx_snippets_rs::*;
@@ -20,10 +22,4 @@ mod export_snippets;
 #[cfg(test)]
 mod test_utils;
 use export_snippets::*;
-#[cfg(feature = "css")]
-mod parse_lightning;
-#[cfg(feature = "css")]
-pub use parse_lightning::*;
-mod extract_lang_snippets;
-use extract_lang_snippets::*;
 pub mod error;

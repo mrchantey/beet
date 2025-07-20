@@ -6,7 +6,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
-use quote::quote;
 use rstml::Parser;
 use rstml::ParserConfig;
 use rstml::node::KVAttributeValue;
@@ -20,46 +19,8 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprLit;
 use syn::spanned::Spanned;
-
-// we must use `std::collections::HashSet` because thats what rstml uses
-type HashSet<T> = std::collections::HashSet<T>;
 /// definition for the rstml custom node, currently unused
 pub(super) type RstmlCustomNode = rstml::Infallible;
-
-/// Hashset of element tag names that should be self-closing.
-#[derive(Debug, Clone, Resource)]
-pub struct RstmlConfig {
-	pub raw_text_elements: HashSet<&'static str>,
-	pub self_closing_elements: HashSet<&'static str>,
-}
-
-impl Default for RstmlConfig {
-	fn default() -> Self {
-		Self {
-			raw_text_elements: LANG_NODE_TAGS.into_iter().collect(),
-			self_closing_elements: [
-				"area", "base", "br", "col", "embed", "hr", "img", "input",
-				"link", "meta", "param", "source", "track", "wbr",
-			]
-			.into_iter()
-			.collect(),
-		}
-	}
-}
-
-impl RstmlConfig {
-	pub(super) fn into_parser(self) -> Parser<RstmlCustomNode> {
-		let config = ParserConfig::new()
-			.recover_block(true)
-			.always_self_closed_elements(self.self_closing_elements)
-			.raw_text_elements(self.raw_text_elements)
-			// here we define the rsx! macro as the constant thats used
-			// to resolve raw text blocks more correctly
-			.macro_call_pattern(quote!(rsx! {%%}))
-			.custom_node::<RstmlCustomNode>();
-		Parser::new(config)
-	}
-}
 
 /// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.
 #[derive(Debug, Clone, Deref, Component)]
@@ -85,11 +46,26 @@ impl TokensDiagnostics {
 }
 
 
+pub fn create_rstml_parser(constants: &HtmlConstants) -> Parser<RstmlCustomNode> {
+	Parser::new(
+		ParserConfig::new()
+			.recover_block(true)
+			.always_self_closed_elements(
+				constants.self_closing_elements.clone(),
+			)
+			.raw_text_elements(constants.lang_node_tags.clone())
+			// here we define the rsx! macro as the constant thats used
+			// to resolve raw text blocks more correctly
+			.macro_call_pattern(quote::quote!(rsx! {%%}))
+			.custom_node::<RstmlCustomNode>(),
+	)
+}
+
 /// Replace the tokens with parsed [`RstmlNodes`], and apply a [`SnippetRoot`]
 pub(super) fn parse_rstml_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	rstml_config: Res<RstmlConfig>,
+	constants: Res<HtmlConstants>,
 	parser: NonSend<Parser<RstmlCustomNode>>,
 	query: Populated<(Entity, &SnippetRoot, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
@@ -103,8 +79,8 @@ pub(super) fn parse_rstml_tokens(
 		let mut collected_elements = CollectedElements::default();
 
 		let children = RstmlToWorld {
+			constants: &constants,
 			file_path: &snippet_root.file,
-			rstml_config: &rstml_config,
 			collected_elements: &mut collected_elements,
 			diagnostics: &mut diagnostics,
 			commands: &mut commands,
@@ -122,7 +98,7 @@ pub(super) fn parse_rstml_tokens(
 
 struct RstmlToWorld<'w, 's, 'a> {
 	file_path: &'a WsPathBuf,
-	rstml_config: &'a RstmlConfig,
+	constants: &'a HtmlConstants,
 	collected_elements: &'a mut CollectedElements,
 	diagnostics: &'a mut Vec<Diagnostic>,
 	commands: &'a mut Commands<'w, 's>,
@@ -434,7 +410,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	) {
 		if element.children.is_empty()
 			|| !self
-				.rstml_config
+				.constants
 				.self_closing_elements
 				.contains(element.open_tag.name.to_string().as_str())
 		{
@@ -489,12 +465,16 @@ mod test {
 	#[test]
 	fn style_tags() {
 		let (mut app, _) = parse(quote! {
-			<style>
+			<style scope:global>
 			body{
 				font-size: 1.em;
 			}
 			</style>
 		});
+		#[cfg(feature = "css")]
+		expect(app.query_once::<&InnerText>()[0])
+			.to_be(&InnerText("body {\n  font-size: 1 em;\n}\n".to_string()));
+		#[cfg(not(feature = "css"))]
 		expect(app.query_once::<&InnerText>()[0])
 			.to_be(&InnerText("body { font-size : 1 em ; }".to_string()));
 	}

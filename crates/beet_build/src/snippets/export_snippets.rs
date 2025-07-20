@@ -66,7 +66,7 @@ fn collect_rsx_snippets(
 /// Collect all changed [`LangSnippet`], returning the output path
 /// and all entities that are part of the snippet.
 fn collect_lang_snippets(
-	query: Query<(Entity, &LangSnippetPath), Changed<LangSnippet>>,
+	query: Query<(Entity, &LangSnippetPath), Changed<StaticLangNode>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
 	debug!("{} lang snippets changed", query.iter().count());

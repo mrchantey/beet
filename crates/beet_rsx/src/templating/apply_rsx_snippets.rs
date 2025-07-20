@@ -50,7 +50,7 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 
 /// When a [`SnippetRoot`] is added to an entity,
 /// recusively apply each [`StaticRoot`] and run [`OnSpawnTemplate`] methods
-pub fn apply_snippets_to_instances(world: &mut World) -> Result {
+pub fn apply_static_rsx(world: &mut World) -> Result {
 	let mut query = world
 		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
 	while query.iter(world).next().is_some() {
@@ -264,10 +264,7 @@ mod test {
 			.insert(SnippetRoot::default())
 			.id();
 
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(apply_static_rsx).unwrap().unwrap();
 
 		// let frag = world
 		// 	.component_names_related::<Children>(parent)
@@ -293,10 +290,7 @@ mod test {
 			.insert(SnippetRoot::default())
 			.id();
 
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(apply_static_rsx).unwrap().unwrap();
 		world.run_system_once(apply_slots).ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)
@@ -455,10 +449,7 @@ mod test {
 			.insert(idx2)
 			.id();
 
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(apply_static_rsx).unwrap().unwrap();
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()

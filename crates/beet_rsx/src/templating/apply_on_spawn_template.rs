@@ -100,10 +100,7 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).id();
 
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(apply_static_rsx).unwrap().unwrap();
 		world.run_system_once(apply_slots).ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)

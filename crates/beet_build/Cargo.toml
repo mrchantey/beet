@@ -17,7 +17,6 @@ default = ["markdown"]
 # should usually be enabled but slows down rust analyzer
 # default = ["markdown", "css"] 
 markdown = ["dep:pulldown-cmark"]
-css = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [[test]]
 name = "lang_snippets"
@@ -61,11 +60,6 @@ serde_json.workspace = true
 prettyplease.workspace = true
 cargo-manifest = "0.19"
 pulldown-cmark = { version = "0.13", optional = true }
-
-#💡 style
-parcel_selectors = { workspace = true, optional = true }
-# TODO direct dep, not workspace. this should be the only place
-lightningcss = { workspace = true, optional = true }
 
 #💡 Bevy
 bevy = { workspace = true, features = ["bevy_scene"] }

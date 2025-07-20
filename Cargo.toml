@@ -214,11 +214,6 @@ wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 web-sys = "0.3"
 
-
-#💡 style
-parcel_selectors = { version = "0.28" }
-lightningcss = { version = "1.0.0-alpha.63" }
-
 [package]
 name = "beet"
 version.workspace = true
@@ -254,8 +249,8 @@ rand = ["beet_utils/rand", "beet_core/rand"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
-css = ["beet_build?/css"]
-design = ["rsx", "css", "dep:beet_design"]
+css = ["beet_parse?/css", "beet_rsx?/css"]
+design = ["rsx", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
 # query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]

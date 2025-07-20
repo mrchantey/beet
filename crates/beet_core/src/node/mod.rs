@@ -10,6 +10,8 @@ pub use expr_idx::*;
 pub use template::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;
+mod workspace_config;
+pub use workspace_config::*;
 pub mod rsx_nodes;
 pub use rsx_nodes::*;
 mod web_nodes;
@@ -66,10 +68,10 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<ClientLoadDirective>()
 			.register_type::<ClientOnlyDirective>()
 			// directives - script/style
-			.register_type::<LangSnippet>()
+			.register_type::<StaticLangNode>()
 			.register_type::<LangSnippetPath>()
 			.register_type::<InnerText>()
-			.register_type::<StyleId>()
+			.register_type::<LangSnippetHash>()
 			.register_type::<StyleScope>()
 			.register_type::<StyleCascade>()
 			// directives - slots

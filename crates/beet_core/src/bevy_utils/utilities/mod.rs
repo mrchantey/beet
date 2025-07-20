@@ -1,11 +1,13 @@
 mod bevyhow;
 mod bundle_iter;
+mod counter;
+mod garbage_collect;
 mod on_spawn;
 mod tracing;
-mod garbage_collect;
-pub use garbage_collect::*;
 pub use bevyhow::*;
 pub use bundle_iter::*;
+pub use counter::*;
+pub use garbage_collect::*;
 pub use on_spawn::*;
 pub use tracing::*;
 mod non_send_plugin;

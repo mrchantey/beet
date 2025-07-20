@@ -28,10 +28,9 @@ impl Plugin for TemplatePlugin {
 			load_all_file_snippets
 				.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
 		);
-		if !app.is_plugin_added::<TemplateConfig>() {
-			app.add_plugins(TemplateConfig::default());
-		}
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
+			.init_resource::<HtmlConstants>()
+			.init_resource::<WorkspaceConfig>()
 			.init_resource::<ClientIslandRegistry>()
 			.init_resource::<TemplateFlags>()
 			.add_systems(
@@ -39,11 +38,10 @@ impl Plugin for TemplatePlugin {
 				// almost all of these systems must be run in this sequence,
 				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(
-					apply_snippets_to_instances,
+					apply_static_rsx,
 					apply_style_id_attributes,
 					apply_slots,
-					apply_lang_snippets,
-					apply_unparsed_lang_nodes,
+					apply_static_lang_snippets,
 					apply_requires_dom_idx,
 					#[cfg(target_arch = "wasm32")]
 					apply_client_island_dom_idx,
@@ -56,6 +54,7 @@ impl Plugin for TemplatePlugin {
 					insert_hydration_scripts,
 					hoist_document_elements,
 					insert_event_playback_attribute,
+					compress_style_ids,
 					render_html_fragments,
 				)
 					.chain()

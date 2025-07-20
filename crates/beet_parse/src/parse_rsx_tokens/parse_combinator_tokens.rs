@@ -4,6 +4,7 @@ use beet_core::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use std::collections::HashSet;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree, which can then
 /// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_bundle`]
@@ -21,6 +22,7 @@ impl CombinatorTokens {
 
 pub(super) fn parse_combinator_tokens(
 	_: TempNonSendMarker,
+	constants: Res<HtmlConstants>,
 	mut commands: Commands,
 	query: Populated<
 		(Entity, &CombinatorTokens, &SnippetRoot),
@@ -29,7 +31,7 @@ pub(super) fn parse_combinator_tokens(
 ) -> bevy::prelude::Result {
 	for (entity, tokens, snippet_root) in query.iter() {
 		Builder {
-			raw_text_elements: &LANG_NODE_TAGS,
+			raw_text_elements: &constants.lang_node_tags,
 			file_path: &snippet_root.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
@@ -45,7 +47,7 @@ pub(super) fn parse_combinator_tokens(
 struct Builder<'w, 's, 'a> {
 	// the content of these tags will not be parsed and instead inserted
 	// as a [`TextNode`]
-	raw_text_elements: &'a [&'a str],
+	raw_text_elements: &'a HashSet<&'static str>,
 	file_path: &'a WsPathBuf,
 	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,

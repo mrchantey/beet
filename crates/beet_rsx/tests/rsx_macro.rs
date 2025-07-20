@@ -19,7 +19,7 @@ fn rsx_macro() {
 		.get::<Children>()
 		.unwrap()[0];
 	app.world_mut()
-		.run_system_cached(apply_snippets_to_instances)
+		.run_system_cached(apply_static_rsx)
 		.unwrap()
 		.unwrap();
 	app.world_mut()

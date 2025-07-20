@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -8,24 +8,14 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 
-/// Ensure every [`LangSnippet`] has a unique id, even across
-/// partial changes. This is also used as the [`StyleId`]
-#[derive(Debug, Default, Clone, Resource)]
-pub(super) struct LangSnippetId(u64);
-impl LangSnippetId {
-	/// Get the next unique style id.
-	pub fn next(&mut self) -> u64 {
-		let id = self.0;
-		self.0 += 1;
-		id
-	}
-}
 
-/// Deduplicate `script` and `style` tags by replacing the
+/// Deduplicate `script` and `style` tags: by
+/// 1. clone the entity and add a [`StaticLangNode`]
+/// 2. remove the original  
 /// [`InnerText`] directive with a [`LangSnippetPath`].
-pub(super) fn extract_lang_snippets(
+pub fn deduplicate_static_lang_snippets(
 	mut commands: Commands,
-	mut id_counter: Local<LangSnippetId>,
+	mut id_counter: Local<Counter>,
 	config: Res<WorkspaceConfig>,
 	idxs: Query<&SnippetRoot>,
 	parents: Query<&ChildOf>,
@@ -44,13 +34,14 @@ pub(super) fn extract_lang_snippets(
 	// create a unique hash for each LangSnippet to deduplicate,
 	// including the tag, content, scope, and hoist directive.
 	for (entity, tag, inner_text, scope, hoist) in query.iter() {
-		let mut hasher = RapidHasher::default();
-		tag.hash(&mut hasher);
-		inner_text.hash_no_whitespace(&mut hasher);
-		scope.map(|s| s.hash(&mut hasher));
-		hoist.map(|h| h.hash(&mut hasher));
-		let hash = hasher.finish();
-		groups.entry(hash).or_default().push(entity);
+		todo!("already has a hash now");
+		// let mut hasher = RapidHasher::default();
+		// tag.hash(&mut hasher);
+		// inner_text.hash_no_whitespace(&mut hasher);
+		// scope.map(|s| s.hash(&mut hasher));
+		// hoist.map(|h| h.hash(&mut hasher));
+		// let hash = hasher.finish();
+		// groups.entry(hash).or_default().push(entity);
 	}
 	for rsx_entities in groups.into_values() {
 		// we just take the first entity as the representative,
@@ -92,7 +83,7 @@ pub(super) fn extract_lang_snippets(
 		let style_id = if tag.as_str() == "style"
 			&& scope.map_or(true, |s| s == &StyleScope::Local)
 		{
-			Some(StyleId::new(index))
+			Some(LangSnippetHash::new(index))
 		} else {
 			None
 		};
@@ -100,7 +91,7 @@ pub(super) fn extract_lang_snippets(
 		// this should be a clone instead
 		let mut lang_entity = commands.spawn((
 			tag.clone(),
-			LangSnippet(content),
+			StaticLangNode(content),
 			snippet_path.clone(),
 		));
 		style_id.map(|id| {
@@ -159,10 +150,10 @@ mod test {
 
 		app.world()
 			.entity(entity)
-			.get::<StyleId>()
+			.get::<LangSnippetHash>()
 			.unwrap()
 			.xpect()
-			.to_be(&StyleId::new(0));
+			.to_be(&LangSnippetHash::new(0));
 		app.world()
 			.entity(entity)
 			.get::<LangSnippetPath>()
@@ -173,7 +164,7 @@ mod test {
 
 		let (snippet, snippet_path) = app
 			.world_mut()
-			.query_once::<(&LangSnippet, &LangSnippetPath)>()[0];
+			.query_once::<(&StaticLangNode, &LangSnippetPath)>()[0];
 		#[cfg(feature = "css")]
 		expect(&snippet.0)
 			.to_be("div[data-beet-style-id-0] {\n  color: #00f;\n}\n");
@@ -194,7 +185,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<StyleId>()
+			.get::<LangSnippetHash>()
 			.xpect()
 			.to_be_none();
 	}
@@ -216,10 +207,10 @@ mod test {
 		app.update();
 		app.world()
 			.entity(entity)
-			.get::<StyleId>()
+			.get::<LangSnippetHash>()
 			.unwrap()
 			.xpect()
-			.to_be(&StyleId::new(0));
+			.to_be(&LangSnippetHash::new(0));
 		app.world()
 			.entity(entity)
 			.contains::<ElementNode>()

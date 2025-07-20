@@ -34,11 +34,11 @@ where
 {
 	fn into_node_bundle(self) -> impl Bundle {
 		match self {
-			Self::Const(val) => TextSpan::new(val.to_string()).any_bundle(),
+			Self::Const(val) => TextNode::new(val.to_string()).any_bundle(),
 			Self::Getter(getter) => {
 				// used by bevy_signal::receive_text_node_signals
 				(
-					TextSpan::new(getter.get().to_string()),
+					TextNode::new(getter.get().to_string()),
 					SignalReceiver::new(move || getter.get().to_string()),
 				)
 					.any_bundle()

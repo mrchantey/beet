@@ -59,13 +59,19 @@ where
 		Ok(())
 	}
 }
+pub fn inline_diff(expected: &str, received: &str) -> String {
+	let mut output = String::new();
+	write_inline_diff(&mut output, expected, received).expect("inline diff failed");
+	output
+}
+
 
 /// Format a single line to show an inline diff of the two strings given.
 ///
 /// The given strings should not have a trailing newline.
 ///
 /// The output of this function will be two lines, each with a trailing newline.
-pub(crate) fn write_inline_diff<TWrite: fmt::Write>(
+fn write_inline_diff<TWrite: fmt::Write>(
 	f: &mut TWrite,
 	left: &str,
 	right: &str,

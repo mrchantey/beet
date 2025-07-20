@@ -21,12 +21,9 @@ impl<T> Matcher<T> {
 		let result = expected == received;
 		let result = if self.negated { !result } else { result };
 		if !result {
-			let mut msg = String::new();
-			crate::utils::pretty_diff::write_inline_diff(
-				&mut msg, expected, received,
-			)
-			.unwrap();
-			self.panic_with_str(&msg);
+			self.panic_with_str(&crate::utils::pretty_diff::inline_diff(
+				expected, received,
+			));
 		}
 	}
 

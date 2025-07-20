@@ -28,17 +28,21 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 		println!("Snapshot saved: {}", desc.name);
 		Ok(None)
 	} else {
-		let expected = ReadFile::to_string(&save_path).unwrap_or_else(|_| {			
-			panic!(
-				"Received: \n\n{}\n\n				
-				Snapshot file not found: {}\n
-				please run test -- --snap to generate\n
-				Snapshots should be commited to version control\n
+		let expected = ReadFile::to_string(&save_path).map_err(|_| {
+			
+			anyhow::anyhow!(
+				"
+Snapshot file not found: {}
+please run `cargo test -- --snap` to generate, snapshots should be commited to version control
+
+Received:
+
+{}
 				",
+				&save_path,
 				received.to_string().red(),
-				&save_path
 			)
-		});
+		})?;
 		Ok(Some(expected))
 	}
 }
@@ -65,9 +69,17 @@ impl<T> Matcher<T> {
 		#[cfg(not(target_arch = "wasm32"))]
 		{
 			let received = self.value.to_comp_string();
-			if let Some(expected) = parse_snapshot(&received).unwrap() {
-				self.assert_diff(&expected, &received);
-			}
+			match parse_snapshot(&received) {
+				Ok(Some(expected)) => self.assert_diff(&expected, &received),
+				Ok(None) => {
+					// snapshot saved, no assertion made
+					return;
+				}
+				Err(e)=>{
+					self.assert(false, &e.to_string());
+
+				}
+		 }
 		}
 	}
 }

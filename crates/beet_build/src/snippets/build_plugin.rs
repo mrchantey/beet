@@ -151,7 +151,7 @@ impl Plugin for BuildPlugin {
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?
 						// we should remove it!
-						apply_snippets_to_instances,
+						apply_static_rsx,
 						parse_file_watch_events,
 						(import_rsx_snippets_rs, import_rsx_snippets_md),
 					)
@@ -162,7 +162,7 @@ impl Plugin for BuildPlugin {
 						.before(ProcessChangedSnippets),
 					// compile and export steps
 					(
-						extract_lang_snippets,
+						deduplicate_static_lang_snippets,
 						#[cfg(feature = "css")]
 						parse_lightning,
 					)
