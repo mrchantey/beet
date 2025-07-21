@@ -55,11 +55,20 @@ impl Plugin for AppRouterPlugin {
 				handler_output_plugin::<Json>,
 				handler_output_plugin::<Png>,
 			))
+			.add_systems(
+				CollectResponse,
+				(
+					bundle_layer.run_if(
+						resource_exists::<RouteHandlerOutput<BoxedBundle>>,
+					),
+					documents_to_response,
+				),
+			)
 			.set_runner(AppRunner::runner);
 	}
 }
 
-/// Converts
+/// Converts the [`RouteHandlerOutput<T>`] into a [`Response`]
 fn handler_output_plugin<T: 'static + Send + Sync + IntoResponse>(
 	app: &mut App,
 ) {
@@ -74,9 +83,6 @@ fn handler_output_plugin<T: 'static + Send + Sync + IntoResponse>(
 			output_to_response::<Result<T, AppError>>.run_if(
 				resource_exists::<RouteHandlerOutput<Result<T, AppError>>>,
 			),
-			bundle_layer
-				.run_if(resource_exists::<RouteHandlerOutput<BoxedBundle>>),
-			documents_to_response,
 		),
 	);
 }

@@ -140,6 +140,7 @@ impl AppRunner {
 
 		// write files all at once to avoid triggering file watcher multiple times
 		for (path, html) in html {
+			println!("Exporting html to {}", path);
 			FsExt::write(path, &html)?;
 		}
 		Ok(())

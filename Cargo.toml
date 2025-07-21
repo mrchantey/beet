@@ -346,17 +346,18 @@ web-sys.workspace = true
 # 💡 Examples - dom
 [[example]]
 name = "csr"
-path = "examples/dom/csr.rs"
+path = "examples/rsx/csr.rs"
 required-features = ["rsx"]
 
 [[example]]
 name = "ssr"
-path = "examples/dom/ssr.rs"
+path = "examples/rsx/ssr.rs"
 required-features = ["server"]
 
 [[example]]
 name = "hydration"
-path = "examples/dom/hydration.rs"
+path = "examples/rsx/hydration.rs"
+required-features = ["rsx"]
 
 # 💡 Examples - flow
 

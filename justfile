@@ -97,6 +97,9 @@ build-csr:
 run-hydration:
 	just watch just build-hydration
 
+run-ssr:
+	just watch cargo run --example ssr --features=server
+
 build-hydration:
 	cargo run --example hydration --features=css
 	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown

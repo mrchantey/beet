@@ -3,6 +3,8 @@ use beet_core::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
 
+/// An entirely isolated instance of a route, which may be
+/// embedded in routers like axum
 #[derive(Clone)]
 pub struct RouteInstance {
 	pub workspace_config: WorkspaceConfig,
@@ -73,13 +75,9 @@ impl RouteInstance {
 			if let Some(flags) = self.template_flags {
 				app.insert_resource(flags);
 			}
-			// usually we dont want to load snippets in tests,
-			// but this can be overridden by calling set_bevy_plugins
-			// later
 
-
-			#[cfg(all(not(test), feature = "build"))]
-			app.add_plugins(beet_build::prelude::BuildPlugin::default());
+			// #[cfg(all(not(test), feature = "build"))]
+			// app.add_plugins(beet_build::prelude::BuildPlugin::default());
 
 			for layer in self.layers {
 				layer.add_to_app(&mut app);

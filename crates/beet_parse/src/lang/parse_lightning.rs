@@ -29,9 +29,10 @@ pub fn parse_lightning(
 				StyleSheet::parse(&text.0, ParserOptions::default()).map_err(
 					|e| {
 						bevyhow!(
-							"Failed to parse css: {}\nSpan: {:?}",
+							"Failed to parse css: {}\nSpan: {:?}\nInput: \"{}\"",
 							e.to_string(),
 							span,
+							text.0,
 						)
 					},
 				)?;

@@ -13,7 +13,11 @@ pub fn bundle_layer(world: &mut World) -> Result {
 		.unwrap(/*checked*/);
 	let entity = output.0.add_to_world(world);
 	world.entity_mut(entity).insert(HtmlDocument);
+	// println!("Before");
+	// world.log_component_names(entity);
 	world.run_schedule(Update);
+	// println!("After");
+	// world.log_component_names(entity);
 	let html = world.run_system_cached_with(render_fragment, entity)?;
 
 	world.insert_resource(Html(html).into_response());

@@ -66,6 +66,7 @@ impl RouteHandler {
 		Self::new_mapped(handler, |out| out)
 	}
 
+	/// Create a new route handler from a system returning a bundle
 	pub fn new_bundle<T, Out, Marker>(handler: T) -> Self
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<(), Out, Marker>,

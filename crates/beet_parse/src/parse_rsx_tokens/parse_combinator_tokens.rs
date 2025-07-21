@@ -404,4 +404,36 @@ mod test {
 			.xmap(parse)
 			.to_be_snapshot();
 	}
+	#[cfg(feature = "css")]
+	#[test]
+	fn style() {
+		r#"
+<div> hello world </div>
+<style>
+	main{
+		padding-top: 2em;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		height: 100vh;
+	}
+	a {
+		color: #90ee90;
+	}
+	a:visited {
+		color: #3399ff;
+	}
+</style>
+<style scope:global>
+	body{
+		font-size: 1.4em;
+		font-family: system-ui, sans-serif;
+		background: black;
+		color: white;
+	}
+</style>
+"#
+			.xmap(parse)
+			.to_be_snapshot();
+	}
 }

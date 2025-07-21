@@ -89,14 +89,28 @@ pub struct Response {
 	pub body: Option<Bytes>,
 }
 
-
-
-
 pub struct Html(pub String);
 pub struct Css(pub String);
 pub struct Javascript(pub String);
 pub struct Json(pub String);
 pub struct Png(pub String);
+
+
+impl Into<Html> for String {
+	fn into(self) -> Html { Html(self) }
+}
+impl Into<Css> for String {
+	fn into(self) -> Css { Css(self) }
+}
+impl Into<Javascript> for String {
+	fn into(self) -> Javascript { Javascript(self) }
+}
+impl Into<Json> for String {
+	fn into(self) -> Json { Json(self) }
+}
+impl Into<Png> for String {
+	fn into(self) -> Png { Png(self) }
+}
 
 /// Allows for blanket implementation of `Into<Response>` for various types
 /// and their `Result` variants.
