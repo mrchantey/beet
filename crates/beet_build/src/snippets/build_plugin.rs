@@ -1,7 +1,7 @@
 use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_parse::prelude::*;
+use beet_parse::prelude::ParseRsxTokensSequence;
 use beet_rsx::as_beet::AbsPathBuf;
 use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;
@@ -16,8 +16,6 @@ use std::str::FromStr;
 /// Config file usually located at `beet.toml`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BuildConfig {
-	#[serde(flatten)]
-	pub template_config: TemplateConfig,
 	pub route_codegen: RouteCodegenConfig,
 	/// The path to the Cargo.toml file, defaults to `Cargo.toml`
 	#[serde(default = "default_manifest_path")]
@@ -27,7 +25,6 @@ pub struct BuildConfig {
 impl Default for BuildConfig {
 	fn default() -> Self {
 		Self {
-			template_config: TemplateConfig::default(),
 			route_codegen: RouteCodegenConfig::default(),
 			manifest_path: default_manifest_path(),
 		}
@@ -66,13 +63,12 @@ impl NonSendPlugin for BuildConfig {
 		let manifest = self.load_manifest().unwrap_or_exit();
 
 		app.add_non_send_plugin(self.route_codegen)
-			.add_plugins(self.template_config)
 			.insert_resource(manifest);
 	}
 }
 
 /// Main plugin for beet_build
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct BuildPlugin {
 	/// Disable loading the workspace source files, useful for
 	/// testing or manually loading files.
@@ -89,34 +85,72 @@ impl BuildPlugin {
 	}
 }
 
-
-/// Runs before rsx tokens have been resolved into entity trees,
-/// used for importing and preparing token streams.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportSnippets;
-/// Runs after rsx tokens have been resolved into entity trees,
-/// and the new [`FileExprHash`] has been calculated.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessChangedSnippets;
-/// System set for exporting codegen files, Static Trees, Lang Partials, etc.
-/// This set should be configured to run after all importing and processing.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportArtifactsSet;
-
-
-
-impl Plugin for BuildPlugin {
-	fn build(&self, app: &mut App) {
+impl WorldSequence for BuildPlugin {
+	fn run_sequence<R: WorldSequenceRunner>(
+		self,
+		runner: &mut R,
+	) -> Result<()> {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
 
+		#[cfg(not(test))]
 		if !self.skip_load_workspace {
-			#[cfg(not(test))]
-			app.add_systems(Startup, load_workspace_source_files);
+			load_workspace_source_files.run_sequence(runner)?;
 		}
-		let write_to_fs = !self.skip_write_to_fs;
+		(
+			// style roundtrip breaks without resolving templates,
+			// im not sure if this should be here, doesnt it indicate
+			// we're relying on exprs in templates?
+			// we should remove it!
+			apply_static_rsx,
+			// import step
+			parse_file_watch_events,
+			import_rsx_snippets_rs,
+			import_rsx_snippets_md,
+			// parse step
+			|world: &mut World| world.run_sequence_once(ParseRsxTokensSequence),
+			update_file_expr_hash,
+			|world: &mut World| {
+				if world.resource::<BuildFlags>().contains(BuildFlag::Snippets)
+				{
+					world.run_sequence_once(RouteCodegenPlugin)?;
+				}
+				Ok(())
+			},
+		)
+			.run_sequence(runner)?;
 
+		if self.skip_write_to_fs {
+			return Ok(());
+		}
+
+		let flags = runner.world().resource::<BuildFlags>().clone();
+		if flags.contains(BuildFlag::Snippets) {
+			export_snippets.run_sequence(runner)?;
+		}
+		if flags.contains(BuildFlag::Routes) {
+			export_route_codegen.run_sequence(runner)?;
+		}
+		if flags.contains(BuildFlag::CompileServer) {
+			compile_server.run_sequence(runner)?;
+		}
+		if flags.contains(BuildFlag::ExportSsg) {
+			export_server_ssg.run_sequence(runner)?;
+		}
+		if flags.contains(BuildFlag::CompileWasm) {
+			compile_client.run_sequence(runner)?;
+		}
+		if flags.contains(BuildFlag::RunServer) {
+			run_server.run_sequence(runner)?;
+		}
+		Ok(())
+	}
+}
+
+impl Plugin for BuildPlugin {
+	fn build(&self, app: &mut App) {
+		let this = self.clone();
 		app.add_event::<WatchEvent>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<BuildFlags>()
@@ -124,74 +158,12 @@ impl Plugin for BuildPlugin {
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
-			.add_plugins((
-				NodeTypesPlugin,
-				ParseRsxTokensPlugin::default(),
-				RouteCodegenPlugin::default(),
-				// ClientIslandCodegenPlugin::default(),
-			))
-			.configure_sets(
-				Update,
-				(
-					ImportSnippets.before(ParseRsxTokensSet),
-					ProcessChangedSnippets
-						.after(ImportSnippets)
-						.after(ParseRsxTokensSet),
-					ExportArtifactsSet
-						.after(ProcessChangedSnippets)
-						.before(TemplateSet)
-						.run_if(move || write_to_fs),
-				),
-			)
-			.add_systems(
-				Update,
-				(
-					(
-						// style roundtrip breaks without resolving templates,
-						// im not sure if this should be here, doesnt it indicate
-						// we're relying on exprs in templates?
-						// we should remove it!
-						apply_static_rsx,
-						parse_file_watch_events,
-						(import_rsx_snippets_rs, import_rsx_snippets_md),
-					)
-						.chain()
-						.before(ImportSnippets),
-					update_file_expr_hash
-						.after(ParseRsxTokensSet)
-						.before(ProcessChangedSnippets),
-					// compile and export steps
-					(
-						deduplicate_static_lang_snippets,
-						#[cfg(feature = "css")]
-						parse_lightning,
-					)
-						.chain()
-						.in_set(ProcessChangedSnippets)
-						.run_if(BuildFlags::should_run(BuildFlag::Snippets)),
-					(
-						export_snippets.run_if(BuildFlags::should_run(
-							BuildFlag::Snippets,
-						)),
-						export_route_codegen
-							.run_if(BuildFlags::should_run(BuildFlag::Routes)),
-						compile_server.run_if(BuildFlags::should_run(
-							BuildFlag::CompileServer,
-						)),
-						export_server_ssg.run_if(BuildFlags::should_run(
-							BuildFlag::ExportSsg,
-						)),
-						compile_client.run_if(BuildFlags::should_run(
-							BuildFlag::CompileWasm,
-						)),
-						run_server.run_if(BuildFlags::should_run(
-							BuildFlag::RunServer,
-						)),
-					)
-						.chain()
-						.in_set(ExportArtifactsSet),
-				),
-			);
+			.add_plugins(NodeTypesPlugin)
+			// .add_plugins(TemplatePlugin)
+			// .insert_resource(TemplateFlags::None)
+			.add_systems(Update, move |world: &mut World| {
+				world.run_sequence_once(this.clone())
+			});
 	}
 }
 

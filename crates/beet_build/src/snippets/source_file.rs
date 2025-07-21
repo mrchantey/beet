@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::When;
-use beet_rsx::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::exports::notify::EventKind;
 use beet_utils::exports::notify::event::CreateKind;
 use beet_utils::exports::notify::event::RemoveKind;

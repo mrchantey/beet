@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use beet_core::prelude::NonSendPlugin;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -9,36 +9,36 @@ use serde::Serialize;
 #[derive(Debug, Default)]
 pub struct RouteCodegenPlugin;
 
-impl Plugin for RouteCodegenPlugin {
-	fn build(&self, app: &mut App) {
-		app.init_non_send_resource::<RouteCodegenConfig>()
-			.add_systems(
-				Update,
-				// not a perfect ordering, some of these, ie action codegen, arent actually dependent on preceeding
-				// systems but legibility is more valuable than perf at this stage
-				((
-					(reset_changed_codegen, update_route_files),
-					// create the child routes
-					(parse_route_file_rs, parse_route_file_md),
-					modify_route_file_tokens,
-					(collect_combinator_route_meta, tokenize_combinator_route),
-					collect_route_files,
-					// update root codegen file
-					reexport_collections,
-					parse_route_tree,
-					// action codegen
-					(
-						add_client_codegen_to_actions_export,
-						collect_client_action_group,
-					),
-				)
-					.chain()
-					.in_set(ProcessChangedSnippets))
-				.run_if(BuildFlags::should_run(BuildFlag::Routes)),
-			);
+
+impl WorldSequence for RouteCodegenPlugin {
+	fn run_sequence<R: WorldSequenceRunner>(
+		self,
+		runner: &mut R,
+	) -> Result<()> {
+		let world = runner.world_mut();
+		world.init_non_send_resource::<RouteCodegenConfig>();
+		(
+			reset_changed_codegen,
+			update_route_files,
+			// create the child routes
+			parse_route_file_rs,
+			parse_route_file_md,
+			modify_route_file_tokens,
+			collect_combinator_route_meta,
+			tokenize_combinator_route,
+			collect_route_files,
+			// update root codegen file
+			reexport_collections,
+			parse_route_tree,
+			// action codegen
+			add_client_codegen_to_actions_export,
+			collect_client_action_group,
+		)
+			.run_sequence(runner)?;
+		// .run_if(BuildFlags::should_run(BuildFlag::Routes)),
+		Ok(())
 	}
 }
-
 
 /// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
 pub fn export_route_codegen(

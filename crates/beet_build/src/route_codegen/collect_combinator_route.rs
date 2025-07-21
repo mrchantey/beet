@@ -81,22 +81,20 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			snippets.len() == 1,
 			"Combinator Source File should have exactly one RsxSnippet"
 		);
-		let snippet_root = snippets[0];
+		let static_root = snippets[0];
 
-
-		// this is a snippet but we need an instance, the only difference being
+		// this is a static but we need an instance, the only difference being
 		// StaticRoot vs InstanceRoot
-		let instance_root = world
-			.entity_mut(snippet_root)
-			.clone_and_spawn_with(|builder| {
-				builder
-					.deny::<StaticRoot>()
-					.linked_cloning(true)
-					.add_observers(true);
-			});
-		world.entity_mut(instance_root).insert(InstanceRoot);
-		let tokens = tokenize_bundle(world, instance_root)?;
-		world.entity_mut(instance_root).despawn();
+		world
+			.entity_mut(static_root)
+			.remove::<StaticRoot>()
+			.insert(InstanceRoot);
+		let tokens = tokenize_bundle(world, static_root)?;
+		world
+			.entity_mut(static_root)
+			.remove::<InstanceRoot>()
+			.insert(StaticRoot);
+
 
 		// let foo = world
 		// 	.component_names_related::<Children>(instance_root)
@@ -171,11 +169,11 @@ mod test {
 
 				pub fn get() -> impl Bundle {
 					(
-						InstanceRoot,
 						SnippetRoot {
 							file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
 							start: LineCol { line: 1u32, col: 0u32 }
 						},
+						InstanceRoot,
 						FragmentNode,
 						related! {
 							Children [

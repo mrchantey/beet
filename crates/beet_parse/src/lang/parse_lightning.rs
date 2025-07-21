@@ -84,7 +84,6 @@ pub fn parse_lightning(
 				})?
 				.code;
 			drop(stylesheet);
-
 			text.0 = new_css;
 
 			Ok(())

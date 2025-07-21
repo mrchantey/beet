@@ -74,6 +74,7 @@ pub fn parse_route_file_md(
 			},
 		}));
 		// here the markdown will be generated in its own codegen
+		// println!("BANG: {:?}", collection_codegen.path);
 		commands.spawn((
 			ChildOf(route_file_entity),
 			CombinatorRouteCodegen::new(meta),

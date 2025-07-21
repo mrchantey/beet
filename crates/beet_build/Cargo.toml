@@ -13,7 +13,11 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["markdown"]
+default = ["markdown", "css"]
+css = [
+	# "beet_rsx/css", do we want this?
+	"beet_parse/css",
+]
 # should usually be enabled but slows down rust analyzer
 # default = ["markdown", "css"] 
 markdown = ["dep:pulldown-cmark"]

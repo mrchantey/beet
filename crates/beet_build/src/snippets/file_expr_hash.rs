@@ -131,6 +131,7 @@ pub fn update_file_expr_hash(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
+	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;

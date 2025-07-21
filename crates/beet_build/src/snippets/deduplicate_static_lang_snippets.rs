@@ -1,220 +1,216 @@
-use crate::prelude::*;
-use beet_core::prelude::*;
-use beet_utils::prelude::*;
-use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
-use rapidhash::RapidHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
+// use beet_core::prelude::*;
+// use beet_utils::prelude::*;
+// use bevy::platform::collections::HashMap;
+// use bevy::prelude::*;
 
 
 
-/// Deduplicate `script` and `style` tags: by
-/// 1. clone the entity and add a [`StaticLangNode`]
-/// 2. remove the original  
-/// [`InnerText`] directive with a [`LangSnippetPath`].
-pub fn deduplicate_static_lang_snippets(
-	mut commands: Commands,
-	mut id_counter: Local<Counter>,
-	config: Res<WorkspaceConfig>,
-	idxs: Query<&SnippetRoot>,
-	parents: Query<&ChildOf>,
-	query: Populated<
-		(
-			Entity,
-			&NodeTag,
-			&InnerText,
-			Option<&StyleScope>,
-			Option<&HtmlHoistDirective>,
-		),
-		Added<InnerText>,
-	>,
-) -> Result {
-	let mut groups = HashMap::<u64, Vec<Entity>>::new();
-	// create a unique hash for each LangSnippet to deduplicate,
-	// including the tag, content, scope, and hoist directive.
-	for (entity, tag, inner_text, scope, hoist) in query.iter() {
-		todo!("already has a hash now");
-		// let mut hasher = RapidHasher::default();
-		// tag.hash(&mut hasher);
-		// inner_text.hash_no_whitespace(&mut hasher);
-		// scope.map(|s| s.hash(&mut hasher));
-		// hoist.map(|h| h.hash(&mut hasher));
-		// let hash = hasher.finish();
-		// groups.entry(hash).or_default().push(entity);
-	}
-	for rsx_entities in groups.into_values() {
-		// we just take the first entity as the representative,
-		// they are identical
-		let (_, tag, content, scope, hoist) = query
-			.get(rsx_entities[0])
-			// must exist
-			.unwrap();
+// /// Deduplicate `script` and `style` tags: by
+// /// 1. clone the entity and add a [`StaticLangNode`]
+// /// 2. remove the original  
+// /// [`InnerText`] directive with a [`LangSnippetPath`].
+// pub fn deduplicate_static_lang_snippets(
+// 	mut commands: Commands,
+// 	mut id_counter: Local<Counter>,
+// 	config: Res<WorkspaceConfig>,
+// 	idxs: Query<&SnippetRoot>,
+// 	parents: Query<&ChildOf>,
+// 	query: Populated<
+// 		(
+// 			Entity,
+// 			&NodeTag,
+// 			&InnerText,
+// 			Option<&StyleScope>,
+// 			Option<&HtmlHoistDirective>,
+// 		),
+// 		Added<InnerText>,
+// 	>,
+// ) -> Result {
+// 	let mut groups = HashMap::<u64, Vec<Entity>>::new();
+// 	// create a unique hash for each LangSnippet to deduplicate,
+// 	// including the tag, content, scope, and hoist directive.
+// 	for (entity, tag, inner_text, scope, hoist) in query.iter() {
+// 		todo!("already has a hash now");
+// 		// let mut hasher = RapidHasher::default();
+// 		// tag.hash(&mut hasher);
+// 		// inner_text.hash_no_whitespace(&mut hasher);
+// 		// scope.map(|s| s.hash(&mut hasher));
+// 		// hoist.map(|h| h.hash(&mut hasher));
+// 		// let hash = hasher.finish();
+// 		// groups.entry(hash).or_default().push(entity);
+// 	}
+// 	for rsx_entities in groups.into_values() {
+// 		// we just take the first entity as the representative,
+// 		// they are identical
+// 		let (_, tag, content, scope, hoist) = query
+// 			.get(rsx_entities[0])
+// 			// must exist
+// 			.unwrap();
 
-		let snippet_source = match content {
-			InnerText::Inline(_) => {
-				let idx = parents
-					.iter_ancestors_inclusive(rsx_entities[0])
-					.find_map(|e| idxs.get(e).ok())
-					.ok_or_else(|| {
-						bevyhow!(
-							"InnerText without parent SnippetRoot: {:?}",
-							rsx_entities[0]
-						)
-					})?;
-				&idx.file
-			}
-			InnerText::File(path) => path,
-		};
-		let index = id_counter.next();
-		let snippet_path =
-			LangSnippetPath(config.lang_snippet_path(snippet_source, index));
+// 		let snippet_source = match content {
+// 			InnerText::Inline(_) => {
+// 				let idx = parents
+// 					.iter_ancestors_inclusive(rsx_entities[0])
+// 					.find_map(|e| idxs.get(e).ok())
+// 					.ok_or_else(|| {
+// 						bevyhow!(
+// 							"InnerText without parent SnippetRoot: {:?}",
+// 							rsx_entities[0]
+// 						)
+// 					})?;
+// 				&idx.file
+// 			}
+// 			InnerText::File(path) => path,
+// 		};
+// 		let index = id_counter.next();
+// 		let snippet_path =
+// 			LangSnippetPath(config.lang_snippet_path(snippet_source, index));
 
-		let content = match content {
-			InnerText::Inline(text) => text.to_string(),
-			InnerText::File(path) => {
-				let file = ReadFile::to_string(path.into_abs())?;
-				file.to_string()
-			}
-		};
-
-
-		// only local style tags
-		let style_id = if tag.as_str() == "style"
-			&& scope.map_or(true, |s| s == &StyleScope::Local)
-		{
-			Some(LangSnippetHash::new(index))
-		} else {
-			None
-		};
-
-		// this should be a clone instead
-		let mut lang_entity = commands.spawn((
-			tag.clone(),
-			StaticLangNode(content),
-			snippet_path.clone(),
-		));
-		style_id.map(|id| {
-			lang_entity.insert(id);
-		});
-		scope.map(|scope| {
-			lang_entity.insert(scope.clone());
-		});
-		hoist.map(|hoist| {
-			lang_entity.insert(hoist.clone());
-		});
-		let lang_entity = lang_entity.id();
-
-		for rsx_entity in rsx_entities.iter() {
-			// these entities are now just pointers to the shared content
-			let mut entity = commands.entity(*rsx_entity);
-			entity
-				.remove::<InnerText>()
-				.remove::<NodeTag>()
-				.remove::<ElementNode>()
-				.remove::<Children>()
-				.remove::<Attributes>()
-				.insert(snippet_path.clone())
-				// despawning the last of these entities will
-				// remove the lang entity
-				.with_child(GarbageCollectRef(lang_entity));
-			style_id.map(|id| {
-				entity.insert(id);
-			});
-		}
-	}
-	Ok(())
-}
-
-#[cfg(test)]
-mod test {
-	use crate::as_beet::*;
-	use beet_core::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
-
-	#[test]
-	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
-
-		let path = WorkspaceConfig::default()
-			.lang_snippet_path(&WsPathBuf::new(file!()), 0);
-
-		let entity = app
-			.world_mut()
-			.spawn(rsx! {<style>div{color:blue;}</style>})
-			.get::<Children>()
-			.unwrap()[0];
-		app.update();
-
-		app.world()
-			.entity(entity)
-			.get::<LangSnippetHash>()
-			.unwrap()
-			.xpect()
-			.to_be(&LangSnippetHash::new(0));
-		app.world()
-			.entity(entity)
-			.get::<LangSnippetPath>()
-			.unwrap()
-			.xpect()
-			.to_be(&LangSnippetPath(path.clone()));
+// 		let content = match content {
+// 			InnerText::Inline(text) => text.to_string(),
+// 			InnerText::File(path) => {
+// 				let file = ReadFile::to_string(path.into_abs())?;
+// 				file.to_string()
+// 			}
+// 		};
 
 
-		let (snippet, snippet_path) = app
-			.world_mut()
-			.query_once::<(&StaticLangNode, &LangSnippetPath)>()[0];
-		#[cfg(feature = "css")]
-		expect(&snippet.0)
-			.to_be("div[data-beet-style-id-0] {\n  color: #00f;\n}\n");
-		#[cfg(not(feature = "css"))]
-		expect(&snippet.0).to_be("div{color:blue;}");
-		expect(&snippet_path.0).to_be(&path);
-	}
-	#[test]
-	fn global_no_styleid() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+// 		// only local style tags
+// 		let style_id = if tag.as_str() == "style"
+// 			&& scope.map_or(true, |s| s == &StyleScope::Local)
+// 		{
+// 			Some(LangSnippetHash::new(index))
+// 		} else {
+// 			None
+// 		};
 
-		let entity = app
-			.world_mut()
-			.spawn(rsx! {<style scope:global>div{color:blue;}</style>})
-			.get::<Children>()
-			.unwrap()[0];
-		app.update();
-		app.world()
-			.entity(entity)
-			.get::<LangSnippetHash>()
-			.xpect()
-			.to_be_none();
-	}
-	#[test]
-	fn file_src() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+// 		// this should be a clone instead
+// 		let mut lang_entity = commands.spawn((
+// 			tag.clone(),
+// 			StaticLangNode(content),
+// 			snippet_path.clone(),
+// 		));
+// 		style_id.map(|id| {
+// 			lang_entity.insert(id);
+// 		});
+// 		scope.map(|scope| {
+// 			lang_entity.insert(scope.clone());
+// 		});
+// 		hoist.map(|hoist| {
+// 			lang_entity.insert(hoist.clone());
+// 		});
+// 		let lang_entity = lang_entity.id();
 
-		let entity = app
-			.world_mut()
-			.spawn((
-				NodeTag(String::from("style")),
-				ElementNode { self_closing: true },
-				InnerText::File(WsPathBuf::new(
-					"crates/beet_router/src/test_site/components/style.css",
-				)),
-			))
-			.id();
-		app.update();
-		app.world()
-			.entity(entity)
-			.get::<LangSnippetHash>()
-			.unwrap()
-			.xpect()
-			.to_be(&LangSnippetHash::new(0));
-		app.world()
-			.entity(entity)
-			.contains::<ElementNode>()
-			.xpect()
-			.to_be_false();
-	}
-}
+// 		for rsx_entity in rsx_entities.iter() {
+// 			// these entities are now just pointers to the shared content
+// 			let mut entity = commands.entity(*rsx_entity);
+// 			entity
+// 				.remove::<InnerText>()
+// 				.remove::<NodeTag>()
+// 				.remove::<ElementNode>()
+// 				.remove::<Children>()
+// 				.remove::<Attributes>()
+// 				.insert(snippet_path.clone())
+// 				// despawning the last of these entities will
+// 				// remove the lang entity
+// 				.with_child(GarbageCollectRef(lang_entity));
+// 			style_id.map(|id| {
+// 				entity.insert(id);
+// 			});
+// 		}
+// 	}
+// 	Ok(())
+// }
+
+// #[cfg(test)]
+// mod test {
+// 	use crate::as_beet::*;
+// 	use beet_core::prelude::*;
+// 	use bevy::prelude::*;
+// 	use sweet::prelude::*;
+
+// 	#[test]
+// 	fn works() {
+// 		let mut app = App::new();
+// 		app.add_plugins(BuildPlugin::without_fs());
+
+// 		let path = WorkspaceConfig::default()
+// 			.lang_snippet_path(&WsPathBuf::new(file!()), 0);
+
+// 		let entity = app
+// 			.world_mut()
+// 			.spawn(rsx! {<style>div{color:blue;}</style>})
+// 			.get::<Children>()
+// 			.unwrap()[0];
+// 		app.update();
+
+// 		app.world()
+// 			.entity(entity)
+// 			.get::<LangSnippetHash>()
+// 			.unwrap()
+// 			.xpect()
+// 			.to_be(&LangSnippetHash::new(0));
+// 		app.world()
+// 			.entity(entity)
+// 			.get::<LangSnippetPath>()
+// 			.unwrap()
+// 			.xpect()
+// 			.to_be(&LangSnippetPath(path.clone()));
+
+
+// 		let (snippet, snippet_path) = app
+// 			.world_mut()
+// 			.query_once::<(&StaticLangNode, &LangSnippetPath)>()[0];
+// 		#[cfg(feature = "css")]
+// 		expect(&snippet.0)
+// 			.to_be("div[data-beet-style-id-0] {\n  color: #00f;\n}\n");
+// 		#[cfg(not(feature = "css"))]
+// 		expect(&snippet.0).to_be("div{color:blue;}");
+// 		expect(&snippet_path.0).to_be(&path);
+// 	}
+// 	#[test]
+// 	fn global_no_styleid() {
+// 		let mut app = App::new();
+// 		app.add_plugins(BuildPlugin::without_fs());
+
+// 		let entity = app
+// 			.world_mut()
+// 			.spawn(rsx! {<style scope:global>div{color:blue;}</style>})
+// 			.get::<Children>()
+// 			.unwrap()[0];
+// 		app.update();
+// 		app.world()
+// 			.entity(entity)
+// 			.get::<LangSnippetHash>()
+// 			.xpect()
+// 			.to_be_none();
+// 	}
+// 	#[test]
+// 	fn file_src() {
+// 		let mut app = App::new();
+// 		app.add_plugins(BuildPlugin::without_fs());
+
+// 		let entity = app
+// 			.world_mut()
+// 			.spawn((
+// 				NodeTag(String::from("style")),
+// 				ElementNode { self_closing: true },
+// 				InnerText::File(WsPathBuf::new(
+// 					"crates/beet_router/src/test_site/components/style.css",
+// 				)),
+// 			))
+// 			.id();
+// 		app.update();
+// 		app.world()
+// 			.entity(entity)
+// 			.get::<LangSnippetHash>()
+// 			.unwrap()
+// 			.xpect()
+// 			.to_be(&LangSnippetHash::new(0));
+// 		app.world()
+// 			.entity(entity)
+// 			.contains::<ElementNode>()
+// 			.xpect()
+// 			.to_be_false();
+// 	}
+// }
