@@ -348,7 +348,6 @@ mod test {
 		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
 	}
 
-
 	#[test]
 	#[cfg(feature = "css")]
 	fn style_inline() {
@@ -366,6 +365,8 @@ mod test {
 		.xpect()
 		.to_be_snapshot();
 	}
+
+
 
 	#[test]
 	fn script() {

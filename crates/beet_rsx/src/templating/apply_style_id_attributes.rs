@@ -177,4 +177,24 @@ mod test {
 		.xpect()
 		.to_be_snapshot();
 	}
+
+	#[test]
+	#[cfg(feature = "css")]
+	fn style_template() {
+		use crate::as_beet::*;
+
+		#[template]
+		fn Style() -> impl Bundle {
+			rsx_combinator! {r"
+<div>pow</div>
+<style>
+	body { color: red; }
+</style>
+			"}
+		}
+
+		HtmlDocument::parse_bundle(rsx! {<Style/>})
+			.xpect()
+			.to_be_snapshot();
+	}
 }

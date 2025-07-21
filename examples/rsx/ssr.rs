@@ -37,45 +37,7 @@ fn setup(mut commands: Commands) {
 		(
 			StaticRoute,
 			RouteInfo::get("/"),
-			RouteHandler::new_bundle(|| {
-				let mut state = AppState::get();
-				let uptime = state.started.elapsed();
-				let uptime = format!("{:.2}", uptime.as_secs_f32());
-				let num_requests = state.num_requests;
-
-				state.num_requests += 1;
-				AppState::set(state);
-
-				let style = rsx_combinator! {r#"
-<style>
-	main {
-		padding-top: 2em;
-	}
-</style>
-			"#};
-
-				rsx! {
-					{style}
-					<Style/>
-					<main>
-					<Foo/>
-					<div>hello world!</div>
-					<div>uptime: {uptime} seconds</div>
-					<div>request count: {num_requests}</div>
-					<a href="/hello-layer">visit jimmy</a>
-					{
-						match num_requests % 7 {
-							0 => rsx! {
-								<div>
-								Congratulations you are visitor number {num_requests}!
-								</div>
-							}.any_bundle(),
-							_ => ().any_bundle(),
-						}
-					}
-					</main>
-				}
-			})
+			RouteHandler::new_bundle(|| rsx! {<Home/>})
 		),
 		(
 			StaticRoute,
@@ -97,6 +59,42 @@ fn setup(mut commands: Commands) {
 	],));
 }
 
+
+
+
+#[template]
+fn Home() -> impl Bundle {
+	let mut state = AppState::get();
+	let uptime = state.started.elapsed();
+	let uptime = format!("{:.2}", uptime.as_secs_f32());
+	let num_requests = state.num_requests;
+
+	state.num_requests += 1;
+	AppState::set(state);
+
+	rsx! {
+		<Style/>
+		<main>
+		<Foo/>
+		<div>hello world!</div>
+		<div>uptime: {uptime} seconds</div>
+		<div>request count: {num_requests}</div>
+		<a href="/hello-layer">visit jimmy</a>
+		{
+			match num_requests % 7 {
+				0 => rsx! {
+					<div>
+					Congratulations you are visitor number {num_requests}!
+					</div>
+				}.any_bundle(),
+				_ => ().any_bundle(),
+			}
+		}
+		</main>
+	}
+}
+
+
 #[template]
 fn Foo() -> impl Bundle {
 	rsx_combinator! {r#"
@@ -108,7 +106,7 @@ fn Foo() -> impl Bundle {
 fn Style() -> impl Bundle {
 	// css is much easier to write with the rsx_combinator!,
 	// as many css tokens are not valid rust tokens, ie 1em, a:visited, etc.
-	rsx_combinator! {r#"
+	rsx_combinator! {r"
 <style scope:global>
 	main{
 		padding-top: 2em;
@@ -131,6 +129,5 @@ fn Style() -> impl Bundle {
 		background: black;
 		color: white;
 	}
-</style>
-	"#};
+</style>"}
 }
