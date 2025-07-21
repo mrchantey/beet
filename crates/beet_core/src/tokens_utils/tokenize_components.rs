@@ -10,7 +10,7 @@ pub type RsxComponents = (
 	WebNodes,
 	RsxDirectives,
 	WebDirectives,
-	LangDirectives
+	LangDirectives,
 );
 
 pub trait TokenizeComponents {
@@ -20,28 +20,6 @@ pub trait TokenizeComponents {
 		entity: Entity,
 	);
 }
-
-
-macro_rules! impl_tokenize_components_tuple {
-	($(($T:ident, $t:ident)),*) => {
-		impl<$($T),*> TokenizeComponents for ($($T,)*)
-		where
-			$($T: TokenizeComponents,)*
-		{
-			fn tokenize_if_present(
-				world: &World,
-				items: &mut Vec<TokenStream>,
-				entity: Entity,
-			) {
-				$(
-					<$T as TokenizeComponents>::tokenize_if_present(world, items, entity);
-				)*
-			}
-		}
-	}
-}
-
-all_tuples!(impl_tokenize_components_tuple, 1, 15, T, t);
 
 impl<T> TokenizeComponents for T
 where
@@ -65,6 +43,28 @@ where
 		};
 	}
 }
+
+
+macro_rules! impl_tokenize_components_tuple {
+	($(($T:ident, $t:ident)),*) => {
+		impl<$($T),*> TokenizeComponents for ($($T,)*)
+		where
+			$($T: TokenizeComponents,)*
+		{
+			fn tokenize_if_present(
+				world: &World,
+				items: &mut Vec<TokenStream>,
+				entity: Entity,
+			) {
+				$(
+					<$T as TokenizeComponents>::tokenize_if_present(world, items, entity);
+				)*
+			}
+		}
+	}
+}
+
+all_tuples!(impl_tokenize_components_tuple, 1, 15, T, t);
 
 #[cfg(test)]
 mod test {

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_utils::utils::Tree;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::query::QueryData;
@@ -5,6 +6,8 @@ use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use extend::ext;
 
+
+/// common trait for 'App' and 'World'
 trait IntoWorld {
 	#[allow(unused)]
 	fn into_world(&self) -> &World;
@@ -22,6 +25,22 @@ impl IntoWorld for App {
 #[ext(name=WorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
+	/// Run the provided tuple of systems in a dfs sequence.
+	fn run_sequence_once<M>(
+		&mut self,
+		systems: impl WorldSequence<M>,
+	) -> Result<()> {
+		systems.run_sequence(&mut RunOnce(self.into_world_mut()))
+	}
+
+	/// Run the provided tuple of systems in a dfs sequence, caching them.
+	fn run_sequence_cached<M>(
+		&mut self,
+		systems: impl WorldSequence<M>,
+	) -> Result<()> {
+		systems.run_sequence(&mut RunCached(self.into_world_mut()))
+	}
+
 	fn component_names(&self, entity: Entity) -> Vec<String> {
 		let world = self.into_world();
 		world

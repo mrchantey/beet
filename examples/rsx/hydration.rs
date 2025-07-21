@@ -11,6 +11,9 @@
 //! # serve with your favorite web server
 //! sweet serve target/examples/hydration
 //! ```
+//! For a sense of how hydration can make updates to static parts of the page,
+//! try changing some of the text like "Count" then running `cargo run --example hydration --features=css` again
+//! Note how the wasm module still updates the correct locations in the page, even without recompiling wasm.
 use beet::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
@@ -46,7 +49,7 @@ fn main() {
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	rsx! {
-		<p>"Count awesome: "{get}</p>
+		<p>"Count: "{get}</p>
 		<button
 			onclick={move || set(get()+1)}
 		>"Increment"</button>

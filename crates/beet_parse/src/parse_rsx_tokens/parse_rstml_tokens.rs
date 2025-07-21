@@ -46,7 +46,9 @@ impl TokensDiagnostics {
 }
 
 
-pub fn create_rstml_parser(constants: &HtmlConstants) -> Parser<RstmlCustomNode> {
+pub fn create_rstml_parser(
+	constants: &HtmlConstants,
+) -> Parser<RstmlCustomNode> {
 	Parser::new(
 		ParserConfig::new()
 			.recover_block(true)
@@ -434,12 +436,11 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> (App, Entity) {
-		let mut app = App::new();
-		app.add_plugins(ParseRsxTokensPlugin);
-		let entity = app.world_mut().spawn(RstmlTokens::new(tokens)).id();
-		app.update();
-		(app, entity)
+	fn parse(tokens: TokenStream) -> (World, Entity) {
+		let mut world = World::new();
+		let entity = world.spawn(RstmlTokens::new(tokens)).id();
+		world.run_sequence_once(ParseRsxTokensSequence).unwrap();
+		(world, entity)
 	}
 
 
