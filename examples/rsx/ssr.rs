@@ -42,6 +42,7 @@ fn setup(mut commands: Commands) {
 		(
 			StaticRoute,
 			RouteInfo::get("/hello-layer"),
+			// layers are regular systems that run before or after the route handler
 			RouteLayer::before_route(|mut req: ResMut<Request>| {
 				req.set_body("jimmy");
 			}),
@@ -75,32 +76,24 @@ fn Home() -> impl Bundle {
 	rsx! {
 		<Style/>
 		<main>
-		<Foo/>
-		<div>hello world!</div>
-		<div>uptime: {uptime} seconds</div>
-		<div>request count: {num_requests}</div>
-		<a href="/hello-layer">visit jimmy</a>
-		{
-			match num_requests % 7 {
-				0 => rsx! {
-					<div>
-					Congratulations you are visitor number {num_requests}!
-					</div>
-				}.any_bundle(),
-				_ => ().any_bundle(),
+			<div>hello world!</div>
+			<div>uptime: {uptime} seconds</div>
+			<div>request count: {num_requests}</div>
+			<a href="/hello-layer">visit jimmy</a>
+			{
+				match num_requests % 7 {
+					0 => rsx! {
+						<div>
+						Congratulations you are visitor number {num_requests}!
+						</div>
+					}.any_bundle(),
+					_ => ().any_bundle(),
+				}
 			}
-		}
 		</main>
 	}
 }
 
-
-#[template]
-fn Foo() -> impl Bundle {
-	rsx_combinator! {r#"
-		<div>Foo</div>
-	"#}
-}
 
 #[template]
 fn Style() -> impl Bundle {

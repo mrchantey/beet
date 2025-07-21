@@ -65,7 +65,7 @@ impl RouteInstance {
 	}
 
 	pub async fn call(self, request: Request) -> AppResult<Response> {
-		let start_time = std::time::Instant::now();
+		let start_time = CrossInstant::now();
 
 		let mut world = {
 			let mut app = App::new();
@@ -106,7 +106,6 @@ impl RouteInstance {
 		}
 
 		let response = world.remove_resource::<Response>().unwrap_or_default();
-
 		debug!("Route handler completed in: {:.2?}", start_time.elapsed());
 
 		Ok(response)

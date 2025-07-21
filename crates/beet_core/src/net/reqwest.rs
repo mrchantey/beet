@@ -1,5 +1,5 @@
-use std::sync::LazyLock;
 use reqwest::Client;
+use std::sync::LazyLock;
 
 
 static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(|| Client::new());
@@ -24,6 +24,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[sweet::test]
+	#[ignore = "flaky example.com"]
 	async fn works() {
 		ReqwestClient::client()
 			.get("https://example.com")

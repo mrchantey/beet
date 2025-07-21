@@ -157,6 +157,7 @@ mod test {
 	const HTTPBIN: &str = "https://httpbin.org";
 
 	#[sweet::test]
+	#[ignore = "flaky example.com"]
 	async fn works() {
 		Request::new("https://example.com")
 			.send()
