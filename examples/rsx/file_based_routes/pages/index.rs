@@ -5,7 +5,7 @@ use beet::prelude::*;
 
 
 
-fn get()->impl Bundle{
+pub fn get()->impl Bundle{
 
 	rsx!{
 		<div>

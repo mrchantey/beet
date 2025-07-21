@@ -1,5 +1,4 @@
 use beet::prelude::*;
-
 fn main() -> Result {
 	let mut app = App::new();
 	app.insert_resource(CargoManifest::load()?);
@@ -16,6 +15,13 @@ fn main() -> Result {
 		children![pages(), actions()],
 	));
 
+	app.world_mut()
+		.run_sequence_once(import_route_file_collection)?
+		.run_sequence_once(RouteCodegenPlugin)?
+		.run_sequence_once(export_route_codegen)?;
+
+
+	todo!("update codegen (its simpler)");
 
 	Ok(())
 }

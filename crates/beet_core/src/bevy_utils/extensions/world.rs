@@ -29,16 +29,18 @@ pub impl<W: IntoWorld> W {
 	fn run_sequence_once<M>(
 		&mut self,
 		systems: impl WorldSequence<M>,
-	) -> Result<()> {
-		systems.run_sequence(&mut RunOnce(self.into_world_mut()))
+	) -> Result<&mut Self> {
+		systems.run_sequence(&mut RunOnce(self.into_world_mut()))?;
+		Ok(self)
 	}
 
 	/// Run the provided tuple of systems in a dfs sequence, caching them.
 	fn run_sequence_cached<M>(
 		&mut self,
 		systems: impl WorldSequence<M>,
-	) -> Result<()> {
-		systems.run_sequence(&mut RunCached(self.into_world_mut()))
+	) -> Result<&mut Self> {
+		systems.run_sequence(&mut RunCached(self.into_world_mut()))?;
+		Ok(self)
 	}
 
 	fn component_names(&self, entity: Entity) -> Vec<String> {

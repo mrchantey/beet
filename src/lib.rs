@@ -52,16 +52,18 @@ pub mod prelude {
 	// pub use crate::query::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use crate::server::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	pub use crate::server::prelude::*;
 	#[cfg(feature = "sim")]
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 	pub use crate::utils::prelude::*;
 	pub use bevy::prelude::*;
+	// beet workflows make heavy use of `RunSystemOnce` to run systems
+	pub use bevy::ecs::system::RunSystemOnce;
 }
 pub mod exports {
 	#[cfg(feature = "build")]

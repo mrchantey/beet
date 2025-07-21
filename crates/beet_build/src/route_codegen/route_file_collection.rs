@@ -22,6 +22,19 @@ pub struct RouteFileCollection {
 	pub category: RouteCollectionCategory,
 }
 
+pub fn import_route_file_collection(
+	mut commands: Commands,
+	collections: Query<&RouteFileCollection, Changed<RouteFileCollection>>,
+) -> Result {
+	for collection in collections.iter() {
+		for file in ReadDir::files_recursive(&collection.src)? {
+			let file = AbsPathBuf::new(file)?;
+			commands.spawn(SourceFile::new(file));
+		}
+	}
+	Ok(())
+}
+
 impl Default for RouteFileCollection {
 	fn default() -> Self {
 		Self {

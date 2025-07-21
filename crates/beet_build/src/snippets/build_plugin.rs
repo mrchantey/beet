@@ -76,10 +76,13 @@ impl WorldSequence for BuildPlugin {
 			import_rsx_snippets_rs,
 			import_rsx_snippets_md,
 			// parse step
-			|world: &mut World| world.run_sequence_once(ParseRsxTokensSequence),
+			|world: &mut World| {
+				world.run_sequence_once(ParseRsxTokensSequence)?;
+				Ok(())
+			},
 			update_file_expr_hash,
 			|world: &mut World| {
-				if world.resource::<BuildFlags>().contains(BuildFlag::Snippets)
+				if world.resource::<BuildFlags>().contains(BuildFlag::Routes)
 				{
 					world.run_sequence_once(RouteCodegenPlugin)?;
 				}
@@ -129,7 +132,8 @@ impl Plugin for BuildPlugin {
 			// .add_plugins(TemplatePlugin)
 			// .insert_resource(TemplateFlags::None)
 			.add_systems(Update, move |world: &mut World| {
-				world.run_sequence_once(this.clone())
+				world.run_sequence_once(this.clone())?;
+				Ok(())
 			});
 	}
 }

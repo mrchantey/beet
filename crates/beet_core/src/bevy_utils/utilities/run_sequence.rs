@@ -58,6 +58,12 @@ impl WorldSequenceRunner for RunCached<'_> {
 
 
 pub trait WorldSequence<M = Self>: Sized {
+	// fn sequence_once(self, world: &mut World) -> Result<&mut World> {
+	// 	world.run_sequence_once(self)
+	// }
+	// fn sequence_cached(self, world: &mut World) -> Result<&mut World> {
+	// 	world.run_sequence_cached(self)
+	// }
 	fn run_sequence<R: WorldSequenceRunner>(self, runner: &mut R)
 	-> Result<()>;
 }

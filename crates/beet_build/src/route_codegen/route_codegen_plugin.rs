@@ -36,6 +36,8 @@ impl WorldSequence for RouteCodegenPlugin {
 	}
 }
 
+
+
 /// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
 pub fn export_route_codegen(
 	query: Populated<&CodegenFile, Changed<CodegenFile>>,

@@ -19,6 +19,7 @@ pub fn parse_route_file_rs(
 				.extension()
 				.map_or(false, |ext| ext == "rs")
 		}) {
+
 		let source_file = source_files.get(**source_file_ref)?;
 		// discard any existing children, we could
 		// possibly do a diff but these changes already result in recompile
