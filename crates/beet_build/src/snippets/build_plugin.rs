@@ -3,37 +3,22 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::ParseRsxTokensSequence;
 use beet_rsx::as_beet::AbsPathBuf;
-use beet_rsx::as_beet::ResultExtDisplay;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::WatchEvent;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
-use serde::Deserialize;
-use serde::Serialize;
-use std::path::PathBuf;
 use std::str::FromStr;
 
-/// Config file usually located at `beet.toml`
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BuildConfig {
-	pub route_codegen: RouteCodegenConfig,
-	/// The path to the Cargo.toml file, defaults to `Cargo.toml`
-	#[serde(default = "default_manifest_path")]
-	manifest_path: PathBuf,
-}
 
-impl Default for BuildConfig {
-	fn default() -> Self {
-		Self {
-			route_codegen: RouteCodegenConfig::default(),
-			manifest_path: default_manifest_path(),
-		}
+#[derive(Resource, Deref)]
+pub struct CargoManifest(Manifest);
+
+impl CargoManifest {
+	pub fn load() -> Result<CargoManifest> {
+		Self::load_from_path(&AbsPathBuf::new_workspace_rel("Cargo.toml")?)
 	}
-}
 
-impl BuildConfig {
-	pub fn load_manifest(&self) -> Result<CargoManifest> {
-		let path = AbsPathBuf::new(&self.manifest_path)?;
+	pub fn load_from_path(path: &AbsPathBuf) -> Result<CargoManifest> {
 		Manifest::from_path(&path)
 			.map_err(|e| {
 				bevyhow!(
@@ -44,26 +29,8 @@ impl BuildConfig {
 			})
 			.map(|manifest| CargoManifest(manifest))
 	}
-}
-
-
-#[derive(Resource, Deref)]
-pub struct CargoManifest(Manifest);
-
-impl CargoManifest {
 	pub fn package_name(&self) -> Option<&str> {
 		self.0.package.as_ref().map(|p| p.name.as_str())
-	}
-}
-
-fn default_manifest_path() -> PathBuf { PathBuf::from("Cargo.toml") }
-
-impl NonSendPlugin for BuildConfig {
-	fn build(self, app: &mut App) {
-		let manifest = self.load_manifest().unwrap_or_exit();
-
-		app.add_non_send_plugin(self.route_codegen)
-			.insert_resource(manifest);
 	}
 }
 

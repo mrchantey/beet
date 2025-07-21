@@ -3,8 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 #[derive(Debug, Default)]
 pub struct RouteCodegenPlugin;
@@ -15,8 +13,6 @@ impl WorldSequence for RouteCodegenPlugin {
 		self,
 		runner: &mut R,
 	) -> Result<()> {
-		let world = runner.world_mut();
-		world.init_non_send_resource::<RouteCodegenConfig>();
 		(
 			reset_changed_codegen,
 			update_route_files,
@@ -53,16 +49,13 @@ pub fn export_route_codegen(
 }
 
 
-/// The codegen builder for routes in a beet site.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RouteCodegenConfig {
-	/// The root codegen, containing the route mod tree and other utilities.
-	#[serde(flatten)]
-	pub codegen_file: CodegenFile,
-	/// Collections to be included in the codegen.
-	#[serde(default, rename = "collection")]
-	pub collections: Vec<RouteFileConfig>,
-}
+/// Marker type indicating the (usually `mod.rs`) file
+/// containing reexports and static route trees.
+/// This component is marked [`Changed`] when recompilation
+/// is required.
+#[derive(Debug, Clone, Default, Component)]
+#[require(CodegenFile=default_codegen_file())]
+pub struct RouteCodegenRoot;
 
 
 fn default_codegen_file() -> CodegenFile {
@@ -70,32 +63,3 @@ fn default_codegen_file() -> CodegenFile {
 		AbsPathBuf::new_workspace_rel("src/codegen/mod.rs").unwrap(),
 	)
 }
-
-impl Default for RouteCodegenConfig {
-	fn default() -> Self {
-		Self {
-			codegen_file: default_codegen_file(),
-			collections: Vec::new(),
-		}
-	}
-}
-
-impl NonSendPlugin for RouteCodegenConfig {
-	fn build(self, app: &mut App) {
-		let mut root = app
-			.world_mut()
-			.spawn((RouteCodegenRoot::default(), self.codegen_file.clone()));
-		root.with_children(|mut parent| {
-			for collection in self.collections {
-				collection.spawn(&mut parent);
-			}
-		});
-	}
-}
-/// Marker type indicating the (usually `mod.rs`) file
-/// containing reexports and static route trees.
-/// This component is marked [`Changed`] when recompilation
-/// is required.
-#[derive(Debug, Clone, Default, Component)]
-#[require(CodegenFile)]
-pub struct RouteCodegenRoot;

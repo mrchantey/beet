@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::bevyhow;
 use beet_core::prelude::TokenizeSelf;
+use beet_core::prelude::bevyhow;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
@@ -73,15 +73,12 @@ pub fn collect_route_files(
 		}
 
 
-		let collection_name = if let Some(name) = &collection.name {
-			name.clone()
-		} else {
-			codegen_file
-				.output
-				.file_stem()
-				.map(|name| name.to_string_lossy().to_string())
-				.ok_or_else(|| bevyhow!("failed"))?
-		};
+		let collection_name = codegen_file
+			.output
+			.file_stem()
+			.map(|name| name.to_string_lossy().to_string())
+			.ok_or_else(|| bevyhow!("failed"))?;
+
 
 		let router_plugin_ident = quote::format_ident!(
 			"{}Plugin",
@@ -192,7 +189,7 @@ mod test {
 				impl TestDocsPlugin {}
 				#[cfg(not(feature = "client"))]
 				impl RouterPlugin for TestDocsPlugin {
-					type State = AppRouterState;
+					type State = ();
 					type Meta = ();
 					fn is_static(&self) -> bool {
 						true

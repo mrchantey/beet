@@ -14,16 +14,15 @@ pub fn reexport_collections(
 			Without<RouteFileCollection>,
 		),
 	>,
-	collections: Query<(&CodegenFile, &RouteFileCollection)>,
+	collections: Query<&CodegenFile, With<RouteFileCollection>>,
 ) -> Result {
 	for (mut codegen, children) in roots.iter_mut() {
 		let codegen_name = codegen.pkg_name.clone();
-		for (child_codegen, child_collection) in children
+		for child_codegen in children
 			.iter()
 			.filter_map(|id| collections.get(id).ok())
-			.filter(|(child_codegen, _)| {
-				&child_codegen.pkg_name == &codegen_name
-			}) {
+			.filter(|child_codegen| &child_codegen.pkg_name == &codegen_name)
+		{
 			let relative_path = PathExt::create_relative(
 				codegen.output_dir()?,
 				&child_codegen.output,
@@ -31,17 +30,11 @@ pub fn reexport_collections(
 			let relative_path = relative_path.to_string_lossy();
 			let name = quote::format_ident!(
 				"{}",
-				child_collection
-					.name
-					.as_ref()
-					.map(|name| name.as_str())
-					.unwrap_or_else(|| {
-						child_codegen
-							.output
-							.file_stem()
-							.and_then(|s| s.to_str())
-							.unwrap_or("collection")
-					})
+				child_codegen
+					.output
+					.file_stem()
+					.and_then(|s| s.to_str())
+					.unwrap_or("collection")
 			);
 			codegen.add_item::<ItemMod>(syn::parse_quote! {
 				#[path = #relative_path]

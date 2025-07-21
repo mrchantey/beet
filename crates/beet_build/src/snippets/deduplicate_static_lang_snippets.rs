@@ -4,7 +4,6 @@
 // use bevy::prelude::*;
 
 
-
 // /// Deduplicate `script` and `style` tags: by
 // /// 1. clone the entity and add a [`StaticLangNode`]
 // /// 2. remove the original  

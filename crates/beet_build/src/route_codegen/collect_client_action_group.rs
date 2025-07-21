@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_utils::prelude::AbsPathBuf;
 use bevy::prelude::*;
 use syn::Item;
 use syn::ItemMod;
@@ -12,27 +11,6 @@ use syn::ItemUse;
 pub struct CollectClientActions {
 	/// Collapse single child functions into their parent mod
 	pub collapse_nodes: bool,
-}
-
-impl CollectClientActions {
-	pub fn path(actions_codegen: &AbsPathBuf) -> AbsPathBuf {
-		let mut path = actions_codegen.clone();
-		let stem = path
-			.file_stem()
-			.expect("Actions codegen path must have a file stem");
-		{
-			let stem = format!("client_{}.rs", stem.to_string_lossy());
-			path.set_file_name(stem);
-		}
-		path
-	}
-
-	pub fn ident(actions_codegen: &AbsPathBuf) -> syn::Ident {
-		let stem = actions_codegen
-			.file_stem()
-			.expect("Actions codegen path must have a file stem");
-		quote::format_ident!("client_{}", stem.to_string_lossy())
-	}
 }
 
 impl Default for CollectClientActions {
@@ -51,8 +29,14 @@ pub fn add_client_codegen_to_actions_export(
 	for child in query.iter() {
 		let mut codegen = collection_codegen.get_mut(child.parent())?;
 
-		let ident = CollectClientActions::ident(&codegen.output);
+		let path = codegen.output.clone();
+		let ident = syn::Ident::new(
+			path.file_stem().unwrap().to_string_lossy().as_ref(),
+			proc_macro2::Span::call_site(),
+		);
+		let path = path.to_string_lossy();
 		codegen.add_item::<ItemMod>(syn::parse_quote! {
+			#[path = #path]
 			pub mod #ident;
 		});
 		codegen.add_item::<ItemUse>(syn::parse_quote! {

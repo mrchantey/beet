@@ -360,7 +360,7 @@ path = "examples/rsx/hydration.rs"
 required-features = ["rsx"]
 [[example]]
 name = "file_based_routes"
-path = "examples/rsx/file_based_routes.rs"
+path = "examples/rsx/file_based_routes/main.rs"
 required-features = ["rsx"]
 
 # 💡 Examples - flow
