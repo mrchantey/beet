@@ -3679,6 +3679,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "file_based_routes"
+version = "0.0.6-dev.7"
+dependencies = [
+ "beet",
+ "serde",
+]
+
+[[package]]
 name = "fixedbitset"
 version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

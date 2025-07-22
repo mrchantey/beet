@@ -67,7 +67,7 @@ fn docs() -> impl Bundle {
 			base_route: Some(RoutePath::new("/docs")),
 			..default()
 		},
-		MetaType::new(syn::parse_quote!(crate::Article)),
+		MetaType::new(syn::parse_quote!(crate::prelude::Article)),
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
 				"examples/rsx/file_based_routes/src/codegen/docs/mod.rs",

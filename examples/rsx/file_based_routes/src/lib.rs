@@ -3,14 +3,13 @@
 mod client_actions;
 #[cfg(feature = "server")]
 mod codegen;
-mod config_plugin;
 mod types;
 
 #[cfg(feature = "config")]
 mod config_plugin;
 pub mod prelude {
 	#[cfg(feature = "client")]
-	pub use crate::client_actions::client_actions_routes;
+	pub use crate::client_actions::routes as actions;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::actions::actions_routes;
 	#[cfg(feature = "server")]
