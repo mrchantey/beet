@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::TokenizeSelf;
-use beet_core::prelude::bevyhow;
 use bevy::prelude::*;
-use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse_quote;
@@ -29,30 +27,38 @@ pub fn collect_route_files(
 			codegen_file.add_item(route_file.item_mod(collection.category));
 			let mod_ident = route_file.mod_ident();
 
-			for method in route_file_children
+			for route_file_method in route_file_children
 				.iter()
 				.filter_map(|child| methods.get(child).ok())
 			{
-				let method_name =
-					method.route_info.method.to_string_lowercase();
+				let func_ident = &route_file_method.item.sig.ident;
 
-				let http_method = quote::format_ident!("{method_name}");
-				let route_info = method.route_info.self_token_stream();
-
+				let is_async = route_file_method.item.sig.asyncness.is_some();
 				let handler = match collection.category {
 					RouteCollectionCategory::Pages => {
 						// page routes are presumed to be bundles
-						quote! {
-								RouteHandler::new_bundle(#mod_ident::#http_method)
+						match is_async {
+							true => quote! {
+								RouteHandler::new_async_bundle(#mod_ident::#func_ident)
+							},
+							false => quote! {
+								RouteHandler::new_bundle(#mod_ident::#func_ident)
+							},
 						}
 					}
 					RouteCollectionCategory::Actions => {
+						let method = route_file_method
+							.route_info
+							.method
+							.self_token_stream();
 						// Action routes may be any kind of route
 						quote! {
-								RouteHandler::new(#mod_ident::#http_method)
+							RouteHandler::new_action(#method, #mod_ident::#func_ident)
 						}
 					}
 				};
+				let route_info =
+					route_file_method.route_info.self_token_stream();
 				let static_route =
 					if collection.category.include_in_route_tree() {
 						Some(quote! { StaticRoute, })
@@ -68,22 +74,12 @@ pub fn collect_route_files(
 		}
 
 
-		let collection_name = codegen_file
-			.output
-			.file_stem()
-			.map(|name| name.to_string_lossy().to_string())
-			.ok_or_else(|| bevyhow!("failed"))?;
-
-
-		let router_plugin_ident = quote::format_ident!(
-			"{}Plugin",
-			collection_name.to_upper_camel_case()
-		);
+		let collection_name = codegen_file.name();
+		let collection_ident = quote::format_ident!("{collection_name}_routes");
 
 		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
 			#[cfg(feature = "server")]
-			#[allow(non_snake_case)]
-			pub fn #router_plugin_ident() -> impl Bundle {
+			pub fn #collection_ident() -> impl Bundle {
 				children![#(#children),*]
 			}
 		});

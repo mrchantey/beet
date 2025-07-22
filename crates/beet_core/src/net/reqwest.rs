@@ -20,7 +20,6 @@ impl ReqwestClient {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]
@@ -30,7 +29,7 @@ mod test {
 			.get("https://example.com")
 			.send()
 			.await
-			.xmap(expect)
+			.xpect()
 			.to_be_ok();
 	}
 }

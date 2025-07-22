@@ -84,6 +84,7 @@ pub mod exports {
 	pub use beet_sim::exports::*;
 	#[cfg(feature = "spatial")]
 	pub use beet_spatial::exports::*;
+	pub use bevy;
 }
 #[cfg(test)]
 mod test {

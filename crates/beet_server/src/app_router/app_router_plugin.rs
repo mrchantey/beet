@@ -52,7 +52,7 @@ impl Plugin for AppRouterPlugin {
 				handler_output_plugin::<Html>,
 				handler_output_plugin::<Css>,
 				handler_output_plugin::<Javascript>,
-				handler_output_plugin::<Json>,
+				// handler_output_plugin::<Json>,
 				handler_output_plugin::<Png>,
 			))
 			.add_systems(

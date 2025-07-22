@@ -3,6 +3,7 @@ use anyhow::Result;
 use beet_core::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use heck::ToSnakeCase;
 use serde::Deserialize;
 use serde::Serialize;
 use syn::Expr;
@@ -60,6 +61,28 @@ impl CodegenFile {
 			output,
 			..Default::default()
 		}
+	}
+
+	pub fn name(&self) -> String {
+		match self
+			.output
+			.file_stem()
+			.expect("codegen output must have a file stem")
+			.to_str()
+			.expect("file stem must be valid UTF-8")
+		{
+			"mod" => self
+				.output
+				.parent()
+				.expect("mod files must have a parent")
+				.file_name()
+				.expect("parent must have a file name")
+				.to_str()
+				.expect("file name must be valid UTF-8")
+				.to_owned(),
+			other => other.to_owned(),
+		}
+		.to_snake_case()
 	}
 
 	/// Clone the metadata of this codegen file, but change the output path

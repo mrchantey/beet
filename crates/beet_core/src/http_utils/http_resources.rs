@@ -4,7 +4,10 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::request;
 use http::response;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
+use crate::bevyhow;
 use crate::prelude::RouteInfo;
 
 /// A generalized request [`Resource`] added to every route app before the
@@ -92,7 +95,8 @@ pub struct Response {
 pub struct Html(pub String);
 pub struct Css(pub String);
 pub struct Javascript(pub String);
-pub struct Json(pub String);
+pub struct Json<T>(pub T);
+pub struct QueryParams<T>(pub T);
 pub struct Png(pub String);
 
 
@@ -105,12 +109,46 @@ impl Into<Css> for String {
 impl Into<Javascript> for String {
 	fn into(self) -> Javascript { Javascript(self) }
 }
-impl Into<Json> for String {
-	fn into(self) -> Json { Json(self) }
-}
 impl Into<Png> for String {
 	fn into(self) -> Png { Png(self) }
 }
+
+impl<T: DeserializeOwned> TryInto<Json<T>> for Request {
+	type Error = BevyError;
+
+	fn try_into(self) -> std::result::Result<Json<T>, Self::Error> {
+		let body = self.body.ok_or_else(|| bevyhow!("no body in request"))?;
+		let json: T = serde_json::from_slice(&body)?;
+		Ok(Json(json))
+	}
+}
+impl<T: DeserializeOwned> TryInto<QueryParams<T>> for Request {
+	type Error = BevyError;
+	fn try_into(self) -> std::result::Result<QueryParams<T>, Self::Error> {
+		let query = self
+			.parts
+			.uri
+			.query()
+			.ok_or_else(|| bevyhow!("no query params in request"))?;
+		let params: T = serde_urlencoded::from_str(query)?;
+		Ok(QueryParams(params))
+	}
+}
+
+
+impl<T: Serialize> TryInto<Response> for Json<T> {
+	type Error = BevyError;
+
+	fn try_into(self) -> Result<Response, Self::Error> {
+		let json_str = serde_json::to_string(&self.0)?;
+		Ok(Response::ok_str(
+			&json_str,
+			"application/json; charset=utf-8",
+		))
+	}
+}
+
+
 
 /// Allows for blanket implementation of `Into<Response>` for various types
 /// and their `Result` variants.
@@ -164,12 +202,6 @@ impl IntoResponse for Css {
 impl IntoResponse for Javascript {
 	fn into_response(self) -> Response {
 		Response::ok_str(&self.0, "application/javascript; charset=utf-8")
-	}
-}
-
-impl IntoResponse for Json {
-	fn into_response(self) -> Response {
-		Response::ok_str(&self.0, "application/json; charset=utf-8")
 	}
 }
 

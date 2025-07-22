@@ -1,5 +1,7 @@
+use beet_core::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
+use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -142,10 +144,54 @@ impl RouteHandler {
 	}
 
 
+	/// Create a new route handler from a system returning a bundle
+	pub fn new_action<T, In, Out, Marker>(
+		method: HttpMethod,
+		handler: T,
+	) -> Self
+	where
+		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
+		In: 'static + SystemInput,
+		for<'a> In::Inner<'a>: DeserializeOwned,
+		Out: 'static + Send + Sync,
+	{
+		Self::new_mapped(
+			move |world: &mut World| -> Result {
+				let input = action_input::<In::Inner<'_>>(world, method)?;
+				let _out =
+					world.run_system_cached_with(handler.clone(), input)?;
+				todo!("handle output");
+				// Ok(())
+			},
+			|out| out,
+		)
+	}
+
 	/// handlers are infallible, any error is inserted into [`RouteHandlerOutput`]
 	pub async fn run(&self, world: World) -> World { (self.0)(world).await }
 }
 
+
+fn action_input<T: DeserializeOwned>(
+	world: &mut World,
+	method: HttpMethod,
+) -> Result<T> {
+	let request = world
+		.remove_resource::<Request>()
+		.ok_or_else(|| bevyhow!("no request found in world"))?;
+
+	let input = match method.has_body() {
+		true => {
+			let json: Json<T> = request.try_into()?;
+			json.0
+		}
+		false => {
+			let query: QueryParams<T> = request.try_into()?;
+			query.0
+		}
+	};
+	Ok(input)
+}
 
 
 #[cfg(test)]
