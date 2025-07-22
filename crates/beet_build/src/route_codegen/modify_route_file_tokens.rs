@@ -2,21 +2,18 @@ use crate::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
 use bevy::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 use std::path::PathBuf;
 
 /// Helper for common route mapping
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, PartialEq, Component)]
 pub struct ModifyRoutePath {
 	/// A base path to prepend to the route path
 	pub base_route: Option<RoutePath>,
 	/// List of strings to replace in the route path
-	#[serde(default)]
 	pub replace_route: Vec<ReplaceRoute>,
 }
 /// Replace some part of the route path with another string
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReplaceRoute {
 	/// The string to replace
 	from: String,

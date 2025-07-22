@@ -82,9 +82,8 @@ impl WorldSequence for BuildPlugin {
 			},
 			update_file_expr_hash,
 			|world: &mut World| {
-				if world.resource::<BuildFlags>().contains(BuildFlag::Routes)
-				{
-					world.run_sequence_once(RouteCodegenPlugin)?;
+				if world.resource::<BuildFlags>().contains(BuildFlag::Routes) {
+					world.run_sequence_once(RouteCodegenSequence)?;
 				}
 				Ok(())
 			},

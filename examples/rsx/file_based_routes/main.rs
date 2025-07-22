@@ -1,4 +1,7 @@
 use beet::prelude::*;
+
+// mod codegen;
+
 fn main() -> Result {
 	let mut app = App::new();
 	app.insert_resource(CargoManifest::load()?);
@@ -12,16 +15,13 @@ fn main() -> Result {
 			)
 			.unwrap(),
 		),
-		children![pages(), actions()],
+		children![pages(), docs(), actions()],
 	));
 
 	app.world_mut()
 		.run_sequence_once(import_route_file_collection)?
-		.run_sequence_once(RouteCodegenPlugin)?
+		.run_sequence_once(RouteCodegenSequence)?
 		.run_sequence_once(export_route_codegen)?;
-
-
-	todo!("update codegen (its simpler)");
 
 	Ok(())
 }
@@ -42,9 +42,29 @@ fn pages() -> impl Bundle {
 				"examples/rsx/file_based_routes/codegen/pages.rs",
 			)
 			.unwrap(),
-		)
-		.with_pkg_name("file_based_routes"),
-		// ModifyRoutePath::default()
+		), // .with_pkg_name("file_based_routes"),
+		   // ModifyRoutePath::default()
+	)
+}
+fn docs() -> impl Bundle {
+	(
+		RouteFileCollection {
+			src: AbsPathBuf::new_workspace_rel(
+				"examples/rsx/file_based_routes/docs",
+			)
+			.unwrap(),
+			..default()
+		},
+		ModifyRoutePath {
+			base_route: Some(RoutePath::new("/docs")),
+			..default()
+		},
+		CodegenFile::new(
+			AbsPathBuf::new_workspace_rel(
+				"examples/rsx/file_based_routes/codegen/docs.rs",
+			)
+			.unwrap(),
+		),
 	)
 }
 fn actions() -> impl Bundle {

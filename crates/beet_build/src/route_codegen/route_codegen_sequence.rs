@@ -5,10 +5,10 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Debug, Default)]
-pub struct RouteCodegenPlugin;
+pub struct RouteCodegenSequence;
 
 
-impl WorldSequence for RouteCodegenPlugin {
+impl WorldSequence for RouteCodegenSequence {
 	fn run_sequence<R: WorldSequenceRunner>(
 		self,
 		runner: &mut R,

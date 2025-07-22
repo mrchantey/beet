@@ -42,5 +42,5 @@ mod modify_route_file_tokens;
 pub use modify_route_file_tokens::*;
 mod route_file_collection;
 pub use route_file_collection::*;
-mod route_codegen_plugin;
-pub use route_codegen_plugin::*;
+mod route_codegen_sequence;
+pub use route_codegen_sequence::*;
