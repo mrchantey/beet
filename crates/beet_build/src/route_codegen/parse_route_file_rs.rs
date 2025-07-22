@@ -19,7 +19,6 @@ pub fn parse_route_file_rs(
 				.extension()
 				.map_or(false, |ext| ext == "rs")
 		}) {
-
 		let source_file = source_files.get(**source_file_ref)?;
 		// discard any existing children, we could
 		// possibly do a diff but these changes already result in recompile
@@ -48,23 +47,9 @@ pub fn parse_route_file_rs(
 			})
 			.collect::<Vec<_>>();
 
-		for (ident, method, func) in funcs.iter().filter_map(|(ident, sig)| {
-			HttpMethod::from_str(ident)
-				.ok()
-				.map(|method| (ident, method, sig))
+		for (method, func) in funcs.iter().filter_map(|(ident, sig)| {
+			HttpMethod::from_str(ident).ok().map(|method| (method, sig))
 		}) {
-			let meta_ident = format!("meta_{}", ident);
-			let meta = funcs
-				.iter()
-				.find_map(|(ident, _)| match ident.as_str() {
-					"meta" => Some(RouteFileMethodMeta::File),
-					ident if ident == &meta_ident => {
-						Some(RouteFileMethodMeta::Method)
-					}
-					_ => None,
-				})
-				.unwrap_or_default();
-
 			commands.spawn((
 				ChildOf(route_file_entity),
 				RouteFileMethodSyn::new(func.clone()),
@@ -73,7 +58,6 @@ pub fn parse_route_file_rs(
 						route_file.route_path.clone(),
 						method,
 					),
-					meta,
 				},
 			));
 		}
@@ -121,10 +105,6 @@ mod test {
 			.unwrap()
 			.clone();
 		// send_wrapper::SendWrapper::assert_send(&tokens);
-		route_method
-			.meta
-			.xpect()
-			.to_be(RouteFileMethodMeta::Collection);
 		route_method
 			.route_info
 			.method

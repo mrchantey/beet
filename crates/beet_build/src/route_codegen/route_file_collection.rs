@@ -6,6 +6,14 @@ use serde::Deserialize;
 use serde::Serialize;
 
 
+/// Added alongside a [`SourceFile`] for easy cohersion of route meta
+#[derive(Debug, PartialEq, Clone, Component)]
+pub struct MetaType(pub Unspan<syn::Type>);
+
+impl MetaType {
+	pub fn new(ty: syn::Type) -> Self { Self(Unspan::new(&ty)) }
+}
+
 /// Definition for a group of route files that should be collected together,
 /// including pages and actions.
 #[derive(Debug, PartialEq, Clone, Component)]
@@ -18,18 +26,26 @@ pub struct RouteFileCollection {
 	/// Specify the meta type, used for the file group codegen and individual
 	/// route codegen like `.md` and `.rsx` files.
 	pub meta_type: Unspan<syn::Type>,
+	// deprecate this
 	pub router_state_type: Unspan<syn::Type>,
 	pub category: RouteCollectionCategory,
 }
 
 pub fn import_route_file_collection(
 	mut commands: Commands,
-	collections: Query<&RouteFileCollection, Changed<RouteFileCollection>>,
+	collections: Query<
+		(Entity, &RouteFileCollection, Option<&MetaType>),
+		Changed<RouteFileCollection>,
+	>,
 ) -> Result {
-	for collection in collections.iter() {
+	for (entity, collection, meta_type) in collections.iter() {
 		for file in ReadDir::files_recursive(&collection.src)? {
 			let file = AbsPathBuf::new(file)?;
-			commands.spawn(SourceFile::new(file));
+			let mut child =
+				commands.spawn((ChildOf(entity), SourceFile::new(file)));
+			if let Some(meta_type) = meta_type {
+				child.insert(meta_type.clone());
+			}
 		}
 	}
 	Ok(())

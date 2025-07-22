@@ -20,7 +20,6 @@ impl WorldSequence for RouteCodegenSequence {
 			parse_route_file_rs,
 			parse_route_file_md,
 			modify_route_file_tokens,
-			collect_combinator_route_meta,
 			tokenize_combinator_route,
 			collect_route_files,
 			// update root codegen file

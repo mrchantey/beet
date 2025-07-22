@@ -3,14 +3,18 @@ use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use quote::ToTokens;
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert
 /// as [`CombinatorToNodeTokens`].
 pub fn import_rsx_snippets_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	query: Populated<
+		(Entity, &SourceFile, Option<&MetaType>),
+		Changed<SourceFile>,
+	>,
 ) -> Result {
-	for (source_file_entity, path) in query.iter() {
+	for (source_file_entity, path, meta_type) in query.iter() {
 		if let Some(ex) = path.extension()
 		// TODO md should not 
 			&& (ex == "md" || ex == "mdx")
@@ -23,12 +27,28 @@ pub fn import_rsx_snippets_md(
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
-			commands.spawn((
+
+			let mut snippet = commands.spawn((
 				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
 				StaticRoot,
 				RsxSnippetOf(source_file_entity),
 				CombinatorTokens::new(rsx_str),
 			));
+			if let Some(meta_type) = meta_type
+				&& let Some(meta_block) =
+					ParseMarkdown::markdown_to_frontmatter_tokens(&file)?
+			{
+				let meta_type = &meta_type.0;
+				let err_msg = format!(
+					"Failed to parse frontmatter into {}",
+					meta_type.to_token_stream().to_string(),
+				);
+				// snippet roots are always fragments
+				snippet.with_child(NodeExpr::new(syn::parse_quote! {{
+					let meta: #meta_type = #meta_block.expect(#err_msg);
+					meta
+				}}));
+			}
 		}
 	}
 	Ok(())

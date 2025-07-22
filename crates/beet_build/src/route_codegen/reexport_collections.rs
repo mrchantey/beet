@@ -33,7 +33,12 @@ pub fn reexport_collections(
 				child_codegen
 					.output
 					.file_stem()
-					.and_then(|s| s.to_str())
+					.and_then(|s| {
+						match s.to_str() {
+							Some("mod") => None,
+							other => other,
+						}
+					})
 					.unwrap_or("collection")
 			);
 			codegen.add_item::<ItemMod>(syn::parse_quote! {

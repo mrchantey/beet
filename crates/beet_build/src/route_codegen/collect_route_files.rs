@@ -22,8 +22,6 @@ pub fn collect_route_files(
 	{
 		let mut route_infos = Vec::<TokenStream>::new();
 		let mut route_handlers = Vec::<TokenStream>::new();
-		let mut route_metas = Vec::<syn::Path>::new();
-		let mut contains_file_meta = false;
 
 		for (route_file, route_file_children) in collection_children
 			.iter()
@@ -39,13 +37,8 @@ pub fn collect_route_files(
 				let method_name =
 					method.route_info.method.to_string_lowercase();
 
-				if method.meta == RouteFileMethodMeta::Collection {
-					contains_file_meta = true;
-				}
-
 				let http_method = quote::format_ident!("{method_name}",);
 				let route_info = method.route_info.self_token_stream();
-				let meta_ident = method.meta.ident(&mod_ident, &method_name);
 
 				match collection.category {
 					RouteCollectionCategory::Pages => {
@@ -56,7 +49,6 @@ pub fn collect_route_files(
 									router,
 									#route_info,
 									#mod_ident::#http_method,
-									#meta_ident()
 								);
 						});
 					}
@@ -67,7 +59,6 @@ pub fn collect_route_files(
 						});
 					}
 				}
-				route_metas.push(meta_ident);
 				route_infos.push(route_info);
 			}
 		}
@@ -90,24 +81,6 @@ pub fn collect_route_files(
 			pub struct #router_plugin_ident;
 		});
 
-		let default_meta: Option<syn::ItemFn> = if contains_file_meta {
-			Some(parse_quote! {
-				/// The default meta for routes that do not have a specific
-				/// meta defined.
-				fn meta() -> <Self as RouterPlugin>::Meta {
-					Default::default()
-				}
-			})
-		} else {
-			None
-		};
-
-		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
-			#[cfg(not(feature = "client"))]
-			impl #router_plugin_ident {
-				#default_meta
-			}
-		});
 		let meta_ty = &collection.meta_type;
 		let router_state_type = &collection.router_state_type;
 		let is_static = collection.category.include_in_route_tree();
@@ -124,10 +97,6 @@ pub fn collect_route_files(
 
 				fn routes(&self)-> Vec<RouteInfo> {
 					vec![#(#route_infos),*]
-				}
-
-				fn meta(&self) -> Vec<Self::Meta> {
-					vec![#(#route_metas()),*]
 				}
 
 				fn add_routes_with(&self,

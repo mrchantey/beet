@@ -32,8 +32,6 @@ pub fn parse_route_file_md(
 
 		// loading the file a second time is not ideal, we should probably
 		// cache the meta from the first parse
-		let file_str = ReadFile::to_string(&source_file)?;
-		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 
 		let Some(collection_codegen) = parents
 			.iter_ancestors(route_file_entity)
@@ -63,11 +61,6 @@ pub fn parse_route_file_md(
 		route_file.bypass_change_detection().mod_path = route_codegen_path;
 
 		commands.spawn((ChildOf(route_file_entity), RouteFileMethod {
-			meta: if meta.is_some() {
-				RouteFileMethodMeta::File
-			} else {
-				RouteFileMethodMeta::Collection
-			},
 			route_info: RouteInfo {
 				path: route_file.route_path.clone(),
 				method: HttpMethod::Get,
@@ -77,7 +70,7 @@ pub fn parse_route_file_md(
 		// println!("BANG: {:?}", collection_codegen.path);
 		commands.spawn((
 			ChildOf(route_file_entity),
-			CombinatorRouteCodegen::new(meta),
+			CombinatorRouteCodegen,
 			SourceFileRef(**source_file_ref),
 			collection_codegen.clone_info(route_codegen_path_abs),
 		));

@@ -1,6 +1,9 @@
+use beet::exports::syn;
 use beet::prelude::*;
+use serde::Deserialize;
 
-// mod codegen;
+#[cfg(feature = "server")]
+mod codegen;
 
 fn main() -> Result {
 	let mut app = App::new();
@@ -20,12 +23,19 @@ fn main() -> Result {
 
 	app.world_mut()
 		.run_sequence_once(import_route_file_collection)?
+		.run_sequence_once(ParseFileSnippets)?
 		.run_sequence_once(RouteCodegenSequence)?
 		.run_sequence_once(export_route_codegen)?;
 
 	Ok(())
 }
 
+/// The metadata at the top of a markdown article,
+#[derive(Debug, Default, Clone, Component, Deserialize)]
+pub struct Article {
+	pub title: String,
+	pub created: Option<String>,
+}
 
 
 fn pages() -> impl Bundle {
@@ -59,9 +69,10 @@ fn docs() -> impl Bundle {
 			base_route: Some(RoutePath::new("/docs")),
 			..default()
 		},
+		MetaType::new(syn::parse_quote!(crate::Article)),
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
-				"examples/rsx/file_based_routes/codegen/docs.rs",
+				"examples/rsx/file_based_routes/codegen/docs/mod.rs",
 			)
 			.unwrap(),
 		),

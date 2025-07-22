@@ -1,10 +1,7 @@
 use crate::prelude::*;
 use beet_core::as_beet::*;
-use beet_core::prelude::bevyhow;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
-use quote::quote;
-use syn::Block;
 use syn::ItemFn;
 
 
@@ -12,54 +9,7 @@ use syn::ItemFn;
 /// Added to the root of route files that have been parsed into a tree via
 /// [`CombinatorTokens`], ie `.md` and `.rsx` files.
 #[derive(Debug, Clone, Component)]
-pub struct CombinatorRouteCodegen {
-	/// Optional metadata, this is the frontmatter of markdown files
-	pub meta: Option<Unspan<Block>>,
-}
-
-impl CombinatorRouteCodegen {
-	/// Create a new [`CombinatorRouteCodegen`] with the given metadata
-	pub fn new(meta: Option<Block>) -> Self {
-		Self {
-			meta: meta.map(|val| Unspan::new(&val)),
-		}
-	}
-}
-
-/// insert the config function into the codegen file if it exists
-pub fn collect_combinator_route_meta(
-	mut query: Populated<
-		(Entity, &mut CodegenFile, &CombinatorRouteCodegen),
-		Changed<CombinatorRouteCodegen>,
-	>,
-	parents: Query<&ChildOf>,
-	collections: Query<&RouteFileCollection>,
-) -> Result {
-	for (entity, mut codegen_file, combinator_codegen) in query.iter_mut() {
-		let collection = parents
-			.iter_ancestors(entity)
-			.find_map(|e| collections.get(e).ok())
-			.ok_or_else(|| {
-				bevyhow!("failed to find parent RouteFileCollection")
-			})?;
-		let meta_block = match &combinator_codegen.meta {
-			Some(meta) => quote! {
-				#meta.map_err(|err|{
-					format!("Failed to parse meta: {}", err)
-				}).unwrap()
-			},
-			None => quote!(Default::default()),
-		};
-		let meta_type = &collection.meta_type;
-		codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-			#[allow(unused)]
-			pub fn meta()-> #meta_type{
-				#meta_block
-			}
-		));
-	}
-	Ok(())
-}
+pub struct CombinatorRouteCodegen;
 
 /// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
 /// tokenize it and append to the [`CodegenFile`].

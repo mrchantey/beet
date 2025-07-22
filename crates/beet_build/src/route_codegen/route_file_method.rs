@@ -14,9 +14,6 @@ impl RouteFileMethodSyn {
 /// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
-	/// Whether this handler has an associated `meta_` method,
-	/// ie for `my_route::post()` this would be `my_route::meta_post()`.
-	pub meta: RouteFileMethodMeta,
 	/// A reasonable route path generated from this file's local path,
 	/// and a method matching either the functions signature, or
 	/// `get` in the case of single file routes like markdown.
@@ -31,16 +28,6 @@ impl RouteFileMethod {
 	pub fn new(route_info: impl Into<RouteInfo>) -> Self {
 		Self {
 			route_info: route_info.into(),
-			meta: Default::default(),
-		}
-	}
-	pub fn new_with_config(
-		route_info: impl Into<RouteInfo>,
-		meta: RouteFileMethodMeta,
-	) -> Self {
-		Self {
-			route_info: route_info.into(),
-			meta,
 		}
 	}
 	pub fn from_path(

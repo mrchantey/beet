@@ -52,6 +52,33 @@ impl BuildPlugin {
 	}
 }
 
+/// for any [`Changed<SourceFile>`], import its rsx snippets as children,
+/// then parse using [`ParseRsxTokensSequence`].
+pub struct ParseFileSnippets;
+
+impl WorldSequence for ParseFileSnippets {
+	fn run_sequence<R: WorldSequenceRunner>(
+		self,
+		runner: &mut R,
+	) -> Result<()> {
+		(
+			import_rsx_snippets_rs,
+			import_rsx_snippets_md,
+			// parse step
+			|world: &mut World| {
+				world.run_sequence_once(ParseRsxTokensSequence)?;
+				Ok(())
+			},
+			update_file_expr_hash,
+		)
+			.run_sequence(runner)?;
+
+
+		Ok(())
+	}
+}
+
+
 impl WorldSequence for BuildPlugin {
 	fn run_sequence<R: WorldSequenceRunner>(
 		self,
@@ -71,16 +98,12 @@ impl WorldSequence for BuildPlugin {
 			// we're relying on exprs in templates?
 			// we should remove it!
 			apply_static_rsx,
-			// import step
-			parse_file_watch_events,
-			import_rsx_snippets_rs,
-			import_rsx_snippets_md,
-			// parse step
 			|world: &mut World| {
-				world.run_sequence_once(ParseRsxTokensSequence)?;
+				world.run_sequence_once(ParseFileSnippets)?;
 				Ok(())
 			},
-			update_file_expr_hash,
+			// import step
+			parse_file_watch_events,
 			|world: &mut World| {
 				if world.resource::<BuildFlags>().contains(BuildFlag::Routes) {
 					world.run_sequence_once(RouteCodegenSequence)?;
