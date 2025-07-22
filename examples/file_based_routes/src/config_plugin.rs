@@ -1,7 +1,7 @@
 use beet::exports::syn;
 use beet::prelude::*;
 
-
+/// Config for the file based routes codegen output
 pub fn config_plugin(app: &mut App) {
 	app.insert_resource(CargoManifest::load().unwrap());
 

@@ -7,8 +7,7 @@ use crate as test_site;
 #[path = "hello.rs"]
 pub mod route0;
 #[cfg(feature = "server")]
-#[allow(non_snake_case)]
-pub fn TestDocsPlugin() -> impl Bundle {
+pub fn test_docs_routes() -> impl Bundle {
     children![
         (RouteInfo { path : RoutePath(std::path::PathBuf::from("/hello")), method :
         HttpMethod::Get }, StaticRoute, RouteHandler::new_bundle(route0::get))

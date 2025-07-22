@@ -1,4 +1,4 @@
-#[cfg(feature = "client")]
+#[cfg(any(feature = "server", feature = "client"))]
 #[path = "codegen/client_actions.rs"]
 mod client_actions;
 #[cfg(feature = "server")]

@@ -27,13 +27,18 @@ fn main() -> Result {
 
 
 #[cfg(feature = "server")]
+#[rustfmt::skip]
 fn server_plugin(app: &mut App) {
-	app.world_mut()
-		.spawn((Name::new("File Based Routes"), children![
-			pages_routes(),
-			docs_routes(),
-			actions_routes()
-		]));
+	app
+		.add_plugins(AppRouterPlugin)
+		.world_mut().spawn((
+			Name::new("File Based Routes"),
+			children![
+				pages_routes(), 
+				docs_routes(), 
+				actions_routes()
+			],
+	));
 }
 
 
@@ -41,7 +46,6 @@ fn server_plugin(app: &mut App) {
 fn client_plugin(app: &mut App) {
 	app.add_plugins(TemplatePlugin)
 		.insert_resource(TemplateFlags::None)
-		// register the component in the scene to be loaded
 		.register_type::<ClientIslandRoot<ClientCounter>>()
 		.set_runner(ReactiveApp::runner);
 }

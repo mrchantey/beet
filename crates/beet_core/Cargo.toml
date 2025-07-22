@@ -28,7 +28,13 @@ bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
-http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
+http = [
+	"dep:http",
+	"dep:http-body-util",
+	"dep:url",
+	"dep:bytes",
+	"dep:serde_urlencoded",
+]
 web = [
 	"http",
 	"dep:wasm-bindgen",
@@ -52,13 +58,7 @@ server = [
 	"dep:tokio",
 	"beet_utils/fs",
 ]
-net = [
-	"http",
-	"dep:reqwest",
-	"dep:serde",
-	"dep:serde_json",
-	"dep:serde_urlencoded",
-]
+net = ["http", "dep:reqwest", "dep:serde", "dep:serde_json"]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]
 tokens = [
