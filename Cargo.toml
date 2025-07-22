@@ -77,7 +77,7 @@ members = [
 	"crates/beet_utils",
 	"crates/sweet/cli",
 
-	"examples/rsx/file_based_routes",
+	"examples/file_based_routes",
 ]
 
 [workspace.dependencies]

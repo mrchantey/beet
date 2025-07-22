@@ -7,7 +7,7 @@ pub fn Code(
 	#[field(flatten)] attrs: BaseHtmlAttributes,
 	content: String,
 ) -> impl Bundle {
-	let content = html_escape::encode_text(&content).to_string();
+	let _content = html_escape::encode_text(&content).to_string();
 
 	rsx! {
 		<pre {attrs}>

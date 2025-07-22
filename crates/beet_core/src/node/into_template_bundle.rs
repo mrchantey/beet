@@ -33,6 +33,7 @@ pub trait IntoTemplateBundle<M> {
 		self.into_node_bundle()
 	}
 }
+#[derive(Reflect)]
 pub struct BundleMarker;
 
 impl<T: Bundle> IntoTemplateBundle<(T, BundleMarker)> for T {

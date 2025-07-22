@@ -19,8 +19,8 @@ use bevy::prelude::*;
 /// ```
 ///
 #[derive(Debug, Default, Clone, Resource)]
-pub struct Counter(u64);
-impl Counter {
+pub struct IdCounter(u64);
+impl IdCounter {
 	/// Get the next unique style id.
 	pub fn next(&mut self) -> u64 {
 		let id = self.0;
