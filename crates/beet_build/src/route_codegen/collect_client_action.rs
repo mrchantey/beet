@@ -11,6 +11,7 @@ use syn::Type;
 use syn::TypePath;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
+use crate::prelude::*;
 
 /// For a given [`RouteFileMethod::item_fn`] which is a valid [`axum::handler::Handler`],
 /// create an equivelent client side function to call it.
@@ -20,14 +21,14 @@ use syn::punctuated::Punctuated;
 pub struct ParseClientAction;
 
 impl ParseClientAction {
-	pub fn client_func(&self, route_info: &RouteInfo, func: &ItemFn) -> ItemFn {
-		let parsed_inputs = Self::parse_inputs(route_info, func);
-		let (return_type, error_type) = Self::parse_output(func);
+	pub fn client_func(&self, RouteFileMethod{route_info,item}: &RouteFileMethod) -> ItemFn {
+		let parsed_inputs = Self::parse_inputs(route_info, item);
+		let (return_type, error_type) = Self::parse_output(item);
 
-		let fn_ident = &func.sig.ident;
+		let fn_ident = &item.sig.ident;
 		let route_info = route_info.self_token_stream();
 
-		let docs = func.attrs.iter().filter_map(|attr| {
+		let docs = item.attrs.iter().filter_map(|attr| {
 			if attr.path().is_ident("doc") {
 				Some(attr.clone())
 			} else {
@@ -407,7 +408,7 @@ assert("ActionError<Json<Bar>>", ("()", "Bar"));
 			expected: syn::ItemFn,
 		) -> (String, String) {
 			let received = ParseClientAction
-				.client_func(&"/add".into(), &func)
+				.client_func(&RouteFileMethod::new_with("/add",&func))
 				.to_token_stream()
 				.to_string();
 			(received, expected.to_token_stream().to_string())

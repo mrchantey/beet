@@ -5,12 +5,6 @@ use bevy::prelude::*;
 use syn::Ident;
 use syn::ItemFn;
 
-/// The signature of a route file method
-#[derive(Debug, Clone, Deref, Component)]
-pub struct RouteFileMethodSyn(Unspan<ItemFn>);
-impl RouteFileMethodSyn {
-	pub fn new(func: ItemFn) -> Self { Self(func.into()) }
-}
 /// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
@@ -18,6 +12,8 @@ pub struct RouteFileMethod {
 	/// and a method matching either the functions signature, or
 	/// `get` in the case of single file routes like markdown.
 	pub route_info: RouteInfo,
+	/// The signature of a route file method
+	pub item: Unspan<ItemFn>,
 }
 impl AsRef<RouteFileMethod> for RouteFileMethod {
 	fn as_ref(&self) -> &RouteFileMethod { self }
@@ -25,11 +21,27 @@ impl AsRef<RouteFileMethod> for RouteFileMethod {
 
 
 impl RouteFileMethod {
+	/// create a new route file method with the given route info
+	/// and a default function signature matching the method name.
 	pub fn new(route_info: impl Into<RouteInfo>) -> Self {
+		let route_info = route_info.into();
+		let method = route_info.method.to_string_lowercase();
+		let method_ident = quote::format_ident!("{method}");
 		Self {
-			route_info: route_info.into(),
+			route_info,
+			item: Unspan::new(&syn::parse_quote!(
+				fn #method_ident() {}
+			)),
 		}
 	}
+	pub fn new_with(route_info: impl Into<RouteInfo>, item: &ItemFn) -> Self {
+		let route_info = route_info.into();
+		Self {
+			route_info,
+			item: Unspan::new(item),
+		}
+	}
+
 	pub fn from_path(
 		local_path: impl AsRef<std::path::Path>,
 		method: HttpMethod,

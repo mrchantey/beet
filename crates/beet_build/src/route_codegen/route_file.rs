@@ -52,7 +52,7 @@ impl RouteFile {
 		let cfg: Option<Attribute> = match category {
 			RouteCollectionCategory::Pages => None,
 			RouteCollectionCategory::Actions => Some(parse_quote! {
-				#[cfg(not(feature = "client"))]
+				#[cfg(feature = "server")]
 			}),
 		};
 

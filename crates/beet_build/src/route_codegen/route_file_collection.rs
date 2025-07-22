@@ -23,11 +23,6 @@ pub struct RouteFileCollection {
 	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
 	pub filter: GlobFilter,
-	/// Specify the meta type, used for the file group codegen and individual
-	/// route codegen like `.md` and `.rsx` files.
-	pub meta_type: Unspan<syn::Type>,
-	// deprecate this
-	pub router_state_type: Unspan<syn::Type>,
 	pub category: RouteCollectionCategory,
 }
 
@@ -56,8 +51,6 @@ impl Default for RouteFileCollection {
 		Self {
 			src: Default::default(),
 			filter: Default::default(),
-			meta_type: Unspan::parse_str("()").unwrap(),
-			router_state_type: Unspan::parse_str("()").unwrap(),
 			category: Default::default(),
 		}
 	}

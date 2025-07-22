@@ -22,11 +22,10 @@ impl WorldSequence for RouteCodegenSequence {
 			modify_route_file_tokens,
 			tokenize_combinator_route,
 			collect_route_files,
-			// update root codegen file
-			reexport_collections,
+			// update codegen files
+			reexport_child_codegen,
 			parse_route_tree,
 			// action codegen
-			add_client_codegen_to_actions_export,
 			collect_client_action_group,
 		)
 			.run_sequence(runner)?;

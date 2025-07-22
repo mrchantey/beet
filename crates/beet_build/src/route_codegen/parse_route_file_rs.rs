@@ -52,13 +52,10 @@ pub fn parse_route_file_rs(
 		}) {
 			commands.spawn((
 				ChildOf(route_file_entity),
-				RouteFileMethodSyn::new(func.clone()),
-				RouteFileMethod {
-					route_info: RouteInfo::new(
-						route_file.route_path.clone(),
-						method,
-					),
-				},
+				RouteFileMethod::new_with(
+					RouteInfo::new(route_file.route_path.clone(), method),
+					func,
+				),
 			));
 		}
 	}

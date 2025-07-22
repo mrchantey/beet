@@ -5,6 +5,11 @@ use serde::Deserialize;
 #[cfg(feature = "server")]
 mod codegen;
 
+
+// #[cfg(feature = "client")]
+#[path = "codegen/client_actions.rs"]
+mod client_actions;
+
 fn main() -> Result {
 	let mut app = App::new();
 	app.insert_resource(CargoManifest::load()?);
@@ -52,8 +57,7 @@ fn pages() -> impl Bundle {
 				"examples/rsx/file_based_routes/codegen/pages.rs",
 			)
 			.unwrap(),
-		), // .with_pkg_name("file_based_routes"),
-		   // ModifyRoutePath::default()
+		),
 	)
 }
 fn docs() -> impl Bundle {
@@ -93,9 +97,7 @@ fn actions() -> impl Bundle {
 			category: RouteCollectionCategory::Actions,
 			..default()
 		},
-		CodegenFile::new(actions_path.clone())
-			.with_pkg_name("file_based_routes"),
-		// ModifyRoutePath::default()
+		CodegenFile::new(actions_path.clone()),
 		children![(
 			CollectClientActions::default(),
 			CodegenFile::new(

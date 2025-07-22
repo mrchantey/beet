@@ -60,12 +60,13 @@ pub fn parse_route_file_md(
 		trace!("Parsed route file: {}", source_file.display());
 		route_file.bypass_change_detection().mod_path = route_codegen_path;
 
-		commands.spawn((ChildOf(route_file_entity), RouteFileMethod {
-			route_info: RouteInfo {
+		commands.spawn((
+			ChildOf(route_file_entity),
+			RouteFileMethod::new(RouteInfo {
 				path: route_file.route_path.clone(),
 				method: HttpMethod::Get,
-			},
-		}));
+			}),
+		));
 		// here the markdown will be generated in its own codegen
 		// println!("BANG: {:?}", collection_codegen.path);
 		commands.spawn((

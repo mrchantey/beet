@@ -1,3 +1,4 @@
+use bevy::prelude::*;
 /// An extractor that extracts JSON data from the `data` query parameter.
 ///
 /// Similar to `axum::extract::Json`, but works on bodyless requests like GET by pulling
@@ -8,6 +9,7 @@
 /// curl -X GET "http://localhost:3000/?data={\"key\":\"value\"}"
 ///
 /// ```
+#[derive(Resource)]
 pub struct JsonQuery<T>(pub T);
 
 impl<T> JsonQuery<T> {
