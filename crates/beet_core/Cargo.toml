@@ -26,15 +26,15 @@ default = ["bevy"]
 bevy = ["dep:bevy", "beet_core_macros"]
 bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
-serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
-rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
-http = [
-	"dep:http",
-	"dep:http-body-util",
-	"dep:url",
-	"dep:bytes",
+serde = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ron",
+	"dep:toml",
 	"dep:serde_urlencoded",
 ]
+rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
 web = [
 	"http",
 	"dep:wasm-bindgen",
@@ -72,6 +72,7 @@ tokens = [
 
 
 [dependencies]
+tracing.workspace = true
 beet_utils.workspace = true
 beet_core_macros = { workspace = true, optional = true }
 rapidhash.workspace = true

@@ -17,7 +17,33 @@ pub struct RouteInstance {
 }
 
 
+/// Return the entity with matching [`RouteInfo`]
+fn find_route(
+	info: In<impl Into<RouteInfo>>,
+	query: Query<(Entity, &RouteInfo)>,
+) -> HttpResult<Entity> {
+	let route_info = info.0.into();
+	query
+		.iter()
+		.find(|(_, r)| r == &&route_info)
+		.map(|(entity, _)| entity)
+		.ok_or_else(|| {
+			HttpError::not_found(format!("Route not found: {}", route_info))
+		})
+}
+
 impl RouteInstance {
+	pub fn from_info(
+		info: In<impl Into<RouteInfo>>,
+		world: &mut World,
+	) -> Result<RouteInstance> {
+		let info = info.0.into();
+		let route =
+			world.run_system_cached_with(find_route, info.clone())??;
+		world
+			.run_system_cached_with(RouteInstance::from_entity, route)?
+			.xok()
+	}
 	pub fn from_entity(
 		entity: In<Entity>,
 		workspace_config: Option<Res<WorkspaceConfig>>,
@@ -64,7 +90,7 @@ impl RouteInstance {
 		}
 	}
 
-	pub async fn call(self, request: Request) -> AppResult<Response> {
+	pub async fn call(self, request: Request) -> HttpResult<Response> {
 		let start_time = CrossInstant::now();
 
 		let mut world = {
@@ -89,7 +115,7 @@ impl RouteInstance {
 
 		if let Some(route_scene) = self.route_scene {
 			world.load_scene(route_scene.ron).map_err(|err| {
-				AppError::bad_request(format!("Failed to load scene: {err}"))
+				HttpError::bad_request(format!("Failed to load scene: {err}"))
 			})?;
 		}
 

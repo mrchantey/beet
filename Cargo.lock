@@ -841,6 +841,7 @@ dependencies = [
  "tower 0.5.2",
  "tower-http 0.6.6",
  "tower-livereload",
+ "tracing",
  "url",
  "variadics_please",
  "wasm-bindgen",

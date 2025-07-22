@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 ///
-/// fn my_system(mut counter: Local<Counter>) {
+/// fn my_system(mut counter: Local<IdCounter>) {
 /// // incremented each time the system runs
 /// let val = counter.next();
 /// assert!(val >= 0);

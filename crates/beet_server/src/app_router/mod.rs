@@ -14,8 +14,6 @@ pub use route_instance::*;
 pub use route_layer::*;
 mod route_handler;
 pub use route_handler::*;
-mod app_error;
-pub use app_error::*;
 mod clone_plugin;
 pub use clone_plugin::*;
 mod router;

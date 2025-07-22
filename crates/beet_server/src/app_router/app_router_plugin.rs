@@ -2,7 +2,7 @@
 //!
 //!
 //!
-use crate::prelude::AppError;
+use crate::prelude::HttpError;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
@@ -80,8 +80,8 @@ fn handler_output_plugin<T: 'static + Send + Sync + IntoResponse>(
 			output_to_response::<Result<T, BevyError>>.run_if(
 				resource_exists::<RouteHandlerOutput<Result<T, BevyError>>>,
 			),
-			output_to_response::<Result<T, AppError>>.run_if(
-				resource_exists::<RouteHandlerOutput<Result<T, AppError>>>,
+			output_to_response::<Result<T, HttpError>>.run_if(
+				resource_exists::<RouteHandlerOutput<Result<T, HttpError>>>,
 			),
 		),
 	);

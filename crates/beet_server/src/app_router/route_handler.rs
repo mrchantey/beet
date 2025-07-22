@@ -6,7 +6,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::prelude::AppResult;
+use crate::prelude::HttpResult;
 
 
 type RouteHandlerFunc = dyn 'static
@@ -96,7 +96,7 @@ impl RouteHandler {
 				}
 				Err(run_system_err) => {
 					// resemble the expected output as close as possible
-					let result: AppResult<Out2> = Err(run_system_err.into());
+					let result: HttpResult<Out2> = Err(run_system_err.into());
 					world.insert_resource(RouteHandlerOutput(result));
 				}
 			}

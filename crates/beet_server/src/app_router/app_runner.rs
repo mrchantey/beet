@@ -127,7 +127,7 @@ impl AppRunner {
 					html_dir.join(&info.path.as_relative()).join("index.html");
 				let response = instance.call(info.clone().into()).await?;
 				let html = response.body_str().ok_or_else(|| {
-					AppError::internal_error(format!(
+					HttpError::internal_error(format!(
 						"Failed to get body from response for route {}",
 						info.path
 					))

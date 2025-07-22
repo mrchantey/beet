@@ -144,11 +144,11 @@ fn instance_to_axum(router: Router, instance: RouteInstance) -> Router {
 	router.route(
 			&instance.route_info.path.to_string_lossy().to_string(),
 			routing::on(method_to_axum(instance.route_info.method),
-				async move |request: axum::extract::Request| -> AppResult<axum::response::Response> {
+				async move |request: axum::extract::Request| -> HttpResult<axum::response::Response> {
 					let beet_request = Request::from_axum(request, &())
 						.await
 						.map_err(|err| {
-							AppError::bad_request(format!(
+							HttpError::bad_request(format!(
 								"Failed to extract request: {}",
 								err
 							))
@@ -162,11 +162,6 @@ fn instance_to_axum(router: Router, instance: RouteInstance) -> Router {
 
 
 
-impl axum::response::IntoResponse for AppError {
-	fn into_response(self) -> axum::response::Response {
-		(self.status_code, self.message).into_response()
-	}
-}
 
 
 

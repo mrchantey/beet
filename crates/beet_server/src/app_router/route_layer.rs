@@ -67,7 +67,7 @@ mod test {
 			),],
 		));
 
-		BeetRouter::route_str(&mut world, "/")
+		BeetRouter::oneshot_str(&mut world, "/")
 			.await
 			.unwrap()
 			.xpect()
