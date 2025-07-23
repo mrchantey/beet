@@ -49,6 +49,20 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
+	#[sweet::test]
+	async fn creates_resource() {
+		let mut world = World::new();
+		world = RouteHandler::new_bundle(|| ()).run(world).await;
+		world.resource::<RouteHandlerOutput<BoxedBundle>>();
+
+		async fn foo(world: World) -> (World, ()) { (world, ()) }
+
+		let mut world = World::new();
+		world = RouteHandler::new_async_bundle(foo).run(world).await;
+		world.resource::<RouteHandlerOutput<BoxedBundle>>();
+	}
+
+
 	#[template]
 	pub fn MyTemplate(foo: u32) -> impl Bundle {
 		rsx! {

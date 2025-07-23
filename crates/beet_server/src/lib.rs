@@ -8,8 +8,10 @@ mod axum_utils;
 mod lambda_utils;
 
 pub mod prelude {
+	pub use http::StatusCode;
+
 	pub use crate::app_router::*;
-#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
@@ -26,6 +28,6 @@ pub mod prelude {
 
 
 pub mod exports {
-#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use axum;
 }

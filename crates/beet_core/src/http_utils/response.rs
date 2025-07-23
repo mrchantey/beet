@@ -1,9 +1,9 @@
-use std::convert::Infallible;
 use crate::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
 use http::response;
+use std::convert::Infallible;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
 /// will be returned.
@@ -11,6 +11,10 @@ use http::response;
 pub struct Response {
 	pub parts: response::Parts,
 	pub body: Option<Bytes>,
+}
+
+impl Response {
+	pub fn status(&self) -> StatusCode { self.parts.status }
 }
 
 /// Allows for blanket implementation of `Into<Response>`,
@@ -112,9 +116,10 @@ impl Response {
 		}
 	}
 
-	pub fn body_str(self) -> Option<String> {
+	pub fn body_str(self) -> Result<String> {
 		self.body
 			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
+			.ok_or_else(|| bevyhow!("Response body is empty"))
 	}
 
 	pub fn into_http(self) -> http::Response<Bytes> {
@@ -136,7 +141,7 @@ impl Response {
 	}
 }
 
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 impl axum::response::IntoResponse for HttpError {
 	fn into_response(self) -> axum::response::Response {
 		(self.status_code, self.message).into_response()

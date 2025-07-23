@@ -92,6 +92,9 @@ impl RouteHandler {
 		RouteHandler(Arc::new(move |mut world: World| {
 			match world.run_system_once(handler.clone()) {
 				Ok(out) => {
+					todo!(
+						"impl IntoResponse instead, bundles are a special case"
+					);
 					world.insert_resource(RouteHandlerOutput(map(out)));
 				}
 				Err(run_system_err) => {
@@ -197,17 +200,36 @@ fn action_input<T: DeserializeOwned>(
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::prelude::*;
+	use sweet::prelude::*;
 
+	#[sweet::test]
+	async fn not_found() {
+		let mut world = World::new();
+		BeetRouter::oneshot(&mut world, "/")
+			.await
+			.xpect()
+			.to_be_err();
+	}
 	#[sweet::test]
 	async fn works() {
 		let mut world = World::new();
-		world = RouteHandler::new_bundle(|| ()).run(world).await;
-		world.resource::<RouteHandlerOutput<BoxedBundle>>();
-
-		async fn foo(world: World) -> (World, ()) { (world, ()) }
-
+		world.spawn((RouteInfo::get("/"), RouteHandler::new(|| {})));
+		BeetRouter::oneshot(&mut world, "/")
+			.await
+			.unwrap()
+			.status()
+			.xpect()
+			.to_be(StatusCode::OK);
+	}
+	#[sweet::test]
+	async fn body() {
 		let mut world = World::new();
-		world = RouteHandler::new_async_bundle(foo).run(world).await;
-		world.resource::<RouteHandlerOutput<BoxedBundle>>();
+		world.spawn((RouteInfo::get("/"), RouteHandler::new(|| "hello")));
+		BeetRouter::oneshot_str(&mut world, "/")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be("hello");
 	}
 }

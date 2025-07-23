@@ -23,6 +23,18 @@ impl BeetRouter {
 			})
 			.collect()
 	}
+	#[cfg(test)]
+	pub async fn oneshot(
+		world: &mut World,
+		route: impl Into<RouteInfo>,
+	) -> Result<Response> {
+		let route = route.into();
+		world
+			.run_system_cached_with(RouteInstance::from_info, route.clone())??
+			.call(route.into())
+			.await?
+			.xok()
+	}
 
 	/// For testing, collect all routes and return the base route as a string
 	#[cfg(test)]
@@ -30,13 +42,9 @@ impl BeetRouter {
 		world: &mut World,
 		route: impl Into<RouteInfo>,
 	) -> Result<String> {
-		let route = route.into();
-		world
-			.run_system_cached_with(RouteInstance::from_info, route.clone())??
-			.call(route.into())
+		Self::oneshot(world, route)
 			.await?
-			.xmap(|res| res.body_str().unwrap())
-			.xok()
+			.xmap(|res| res.body_str())
 	}
 }
 
