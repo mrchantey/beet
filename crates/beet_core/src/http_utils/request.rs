@@ -96,10 +96,13 @@ impl From<RouteInfo> for Request {
 	}
 }
 
+impl Into<()> for Request {
+	fn into(self) -> () {}
+}
+
+
 impl From<&str> for Request {
-	fn from(path: &str) -> Self {
-		Request::get(path)
-	}
+	fn from(path: &str) -> Self { Request::get(path) }
 }
 
 /// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.

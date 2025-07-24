@@ -96,13 +96,9 @@ mod test {
 		world1.spawn((Foo(7), RouteHandler::new(|| "hello world!")));
 		let mut world2 = CloneWorld::new(&mut world1).clone_world().unwrap();
 
-		let (foo2, handler2) = world2.query_once::<(&Foo, &RouteHandler)>()[0];
-		foo2.0.xpect().to_be(7);
-		let world2 = handler2.clone().run(world2).await;
-		world2
-			.resource::<Response>()
-			.clone()
-			.body_str()
+		world2.query_once::<&Foo>()[0].0.xpect().to_be(7);
+		Router::oneshot_str(&mut world2, "/")
+			.await
 			.unwrap()
 			.xpect()
 			.to_be("hello world!");

@@ -20,19 +20,6 @@ pub struct HandlerBundle;
 #[reflect(Default, Component)]
 pub struct StaticRoute;
 
-/// A boxed bundle, used to store a bundle in a [`RouteHandlerOutput`]
-/// for later processing by layers.
-pub struct BoxedBundle(
-	pub Box<dyn 'static + Send + Sync + FnOnce(&mut World) -> Entity>,
-);
-
-
-impl BoxedBundle {
-	pub fn new(bundle: impl Bundle) -> Self {
-		Self(Box::new(move |world| world.spawn(bundle).id()))
-	}
-	pub fn add_to_world(self, world: &mut World) -> Entity { (self.0)(world) }
-}
 /// An asynchronous route handler, accepting and returning a [`World`].
 #[derive(Clone, Component)]
 pub struct RouteHandler(Arc<RouteHandlerFunc>);
@@ -45,14 +32,32 @@ type RouteHandlerFunc = dyn 'static
 
 impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`]
-	pub fn new<T, Out, Marker>(handler: T) -> Self
+	pub fn new<T, In, InErr, Out, Marker>(handler: T) -> Self
 	where
-		T: 'static + Send + Sync + Clone + IntoSystem<(), Out, Marker>,
+		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		Out: 'static + Send + Sync + IntoResponse,
+		In: 'static + SystemInput,
+		for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
+		InErr: IntoResponse,
 	{
+		let handler = move |world: &mut World| -> Result<Out, Response> {
+			let request =
+				world.remove_resource::<Request>().ok_or_else(|| {
+					bevyhow!("no request found in world").into_response()
+				})?;
+
+			let input = request
+				.try_into()
+				.map_err(|err: InErr| err.into_response())?;
+			let out = world
+				.run_system_cached_with(handler.clone(), input)
+				.map_err(|err| HttpError::from(err).into_response())?;
+			Ok(out)
+		};
+
 		Self::new_layer(move |world: &mut World| {
-			let result = world.run_system_once(handler.clone());
-			world.insert_resource(result.into_response());
+			let res = handler(world).into_response();
+			world.insert_resource(res);
 		})
 	}
 
@@ -78,21 +83,38 @@ impl RouteHandler {
 	/// A route handler accepting an input type to be extracted from the request.
 	/// - For requests with no body, ie `GET`, the input is deserialized from the query parameters.
 	/// - For requests with a body, ie `POST`, `PUT`, etc, the input is deserialized from the body.
-	pub fn new_action<T, In, Out, Marker>(
+	pub fn new_action<T, Input, Out, Marker>(
 		method: HttpMethod,
 		handler: T,
 	) -> Self
 	where
-		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
-		In: 'static + SystemInput,
-		for<'a> In::Inner<'a>: DeserializeOwned,
+		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
+		Input: 'static + SystemInput,
+		for<'a> Input::Inner<'a>: DeserializeOwned,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::new(move |world: &mut World| -> Result<Out> {
-			let input = action_input::<In::Inner<'_>>(world, method)?;
-			let out = world.run_system_cached_with(handler.clone(), input)?;
-			Ok(out)
-		})
+		match method.has_body() {
+			// ie `POST`, `PUT`, etc
+			true => Self::new(
+				move |val: In<Json<Input::Inner<'_>>>,
+				      world: &mut World|
+				      -> Result<Out> {
+					let out = world
+						.run_system_cached_with(handler.clone(), val.0.0)?;
+					Ok(out)
+				},
+			),
+			// ie `GET`, `DELETE`, etc
+			false => Self::new(
+				move |val: In<QueryParams<Input::Inner<'_>>>,
+				      world: &mut World|
+				      -> Result<Out> {
+					let out = world
+						.run_system_cached_with(handler.clone(), val.0.0)?;
+					Ok(out)
+				},
+			),
+		}
 	}
 
 	/// A route handler that passively runs a system, without expecting any output.
@@ -178,29 +200,6 @@ impl RouteHandler {
 	pub async fn run(&self, world: World) -> World { (self.0)(world).await }
 }
 
-
-fn action_input<T: DeserializeOwned>(
-	world: &mut World,
-	method: HttpMethod,
-) -> Result<T> {
-	let request = world
-		.remove_resource::<Request>()
-		.ok_or_else(|| bevyhow!("no request found in world"))?;
-
-	let input = match method.has_body() {
-		true => {
-			let json: Json<T> = request.try_into()?;
-			json.0
-		}
-		false => {
-			let query: QueryParams<T> = request.try_into()?;
-			query.0
-		}
-	};
-	Ok(input)
-}
-
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -243,7 +242,7 @@ mod test {
 			RouteHandler::new_layer(|mut req: ResMut<Request>| {
 				req.set_body("jimmy");
 			}),
-			RouteHandler::new(|req: Res<Request>| {
+			RouteHandler::new(|req: In<Request>| {
 				let body = req.body_str().unwrap_or_default();
 				format!("hello {}", body)
 			})

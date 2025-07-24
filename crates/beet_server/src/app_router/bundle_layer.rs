@@ -6,11 +6,6 @@ use bevy::prelude::*;
 /// A [`RouteHandler`] layer for converting bundles into HTML responses.
 /// - First checks for a [`HtmlDocument`] and renders that one,
 /// - otherwise searches for a [`HandlerBundle`].
-///
-/// this layer will convert any entity with a [`HandlerBundle`]
-/// into a [`HtmlDocument`] and return as [`Html`] response.
-/// This excludes any [`BoxedBundle`] consumed in the [`AfterRoute`] step,
-/// for example by the [`ClientIslandLayer`].
 pub fn bundle_layer() -> RouteHandler {
 	RouteHandler::new(|world: &mut World| -> HttpResult<Response> {
 		let entity = if let Some(&entity) = world

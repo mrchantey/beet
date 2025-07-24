@@ -24,12 +24,14 @@ impl Into<Png> for String {
 	fn into(self) -> Png { Png(self) }
 }
 
+
+
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> TryInto<Json<T>> for Request {
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request> for Json<T> {
 	type Error = HttpError;
 
-	fn try_into(self) -> std::result::Result<Json<T>, Self::Error> {
-		let body = self
+	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
+		let body = req
 			.body
 			.ok_or_else(|| HttpError::bad_request("no body in request"))?;
 		let json: T = serde_json::from_slice(&body).map_err(|err| {
@@ -39,12 +41,12 @@ impl<T: serde::de::DeserializeOwned> TryInto<Json<T>> for Request {
 	}
 }
 
-
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> TryInto<QueryParams<T>> for Request {
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request> for QueryParams<T> {
 	type Error = HttpError;
-	fn try_into(self) -> std::result::Result<QueryParams<T>, Self::Error> {
-		let query = self.parts.uri.query().ok_or_else(|| {
+
+	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
+		let query = req.parts.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
 		let params: T = serde_urlencoded::from_str(query).map_err(|err| {
