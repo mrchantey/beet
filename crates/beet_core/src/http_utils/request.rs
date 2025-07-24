@@ -11,22 +11,6 @@ pub struct Request {
 	pub body: Option<Bytes>,
 }
 
-/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
-pub trait FromRequest<M>: Sized {
-	fn from_request(request: Request) -> Result<Self, Response>;
-}
-
-
-impl<T, E> FromRequest<E> for T
-where
-	T: TryFrom<Request, Error = E>,
-	E: IntoResponse,
-{
-	fn from_request(request: Request) -> Result<Self, Response> {
-		request.try_into().map_err(|e: E| e.into_response())
-	}
-}
-
 impl Request {
 	pub fn new(parts: request::Parts, body: Option<Bytes>) -> Self {
 		Self { parts, body }
@@ -50,6 +34,10 @@ impl Request {
 		self
 	}
 
+	pub fn method(&self) -> HttpMethod {
+		HttpMethod::from(self.parts.method.clone())
+	}
+
 	pub fn body_str(&self) -> Option<String> {
 		self.body
 			.as_ref()
@@ -70,13 +58,19 @@ impl Request {
 	pub async fn from_axum<S: 'static + Send + Sync>(
 		request: axum::extract::Request,
 		state: &S,
-	) -> Result<Self, axum::extract::rejection::BytesRejection> {
+	) -> HttpResult<Self> {
 		use axum::extract::FromRequest;
 		let (parts, body) = request.into_parts();
 		let bytes = if HttpExt::has_body(&parts) {
 			let request =
 				axum::extract::Request::from_parts(parts.clone(), body);
-			let bytes = Bytes::from_request(request, state).await?;
+			let bytes =
+				Bytes::from_request(request, state).await.map_err(|err| {
+					HttpError::bad_request(format!(
+						"Failed to extract request: {}",
+						err
+					))
+				})?;
 			Some(bytes)
 		} else {
 			None
@@ -101,6 +95,28 @@ impl From<RouteInfo> for Request {
 		}
 	}
 }
+
+impl From<&str> for Request {
+	fn from(path: &str) -> Self {
+		Request::get(path)
+	}
+}
+
+/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
+pub trait FromRequest<M>: Sized {
+	fn from_request(request: Request) -> Result<Self, Response>;
+}
+
+impl<T, E> FromRequest<E> for T
+where
+	T: TryFrom<Request, Error = E>,
+	E: IntoResponse,
+{
+	fn from_request(request: Request) -> Result<Self, Response> {
+		request.try_into().map_err(|e: E| e.into_response())
+	}
+}
+
 
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }

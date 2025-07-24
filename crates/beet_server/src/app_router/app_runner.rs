@@ -105,29 +105,16 @@ impl AppRunner {
 	async fn export_html(self, mut app: App) -> Result {
 		let workspace_config = app.world().resource::<WorkspaceConfig>();
 		let html_dir = workspace_config.html_dir.into_abs();
-		let html = app
-			.world_mut()
-			.query_filtered_once::<(Entity, &RouteInfo), With<StaticRoute>>()
+
+		let clone_world = CloneWorld::new(app.world_mut());
+		let html = Router::endpoints(app.world_mut())
 			.into_iter()
-			.map(|(entity, info)| (entity, info.clone()))
-			.collect::<Vec<_>>()
-			.into_iter()
-			.map(|(entity, _)| {
-				let instance = app.world_mut().run_system_cached_with(
-					RouteInstance::from_entity,
-					entity,
-				)?;
-				Ok(instance)
-			})
-			.collect::<Result<Vec<_>>>()?
-			.into_iter()
-			.map(async |instance| -> Result<(AbsPathBuf, String)> {
-				let info = instance.route_info.clone();
+			// TODO parallel
+			.map(async |info| -> Result<(AbsPathBuf, String)> {
+				let mut world = clone_world.clone().clone_world()?;
 				let route_path =
 					html_dir.join(&info.path.as_relative()).join("index.html");
-				let response = instance.call(info.clone().into()).await?;
-				let html = response.body_str()?;
-
+				let html = Router::oneshot_str(&mut world, info).await?;
 				Ok((route_path, html))
 			})
 			.xmap(futures::future::try_join_all)

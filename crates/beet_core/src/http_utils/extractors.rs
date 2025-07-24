@@ -156,7 +156,7 @@ mod test {
 			.into();
 		app.insert_resource(req);
 		app.add_systems(Update, |mut commands: Commands, req: Res<Request>| {
-			let mut res = Response::default();
+			let mut res = Response::ok();
 			res.parts.headers = req.parts.headers.clone();
 			commands.insert_resource(res);
 		});

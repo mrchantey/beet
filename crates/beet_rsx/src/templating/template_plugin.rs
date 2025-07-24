@@ -65,7 +65,8 @@ impl Plugin for TemplatePlugin {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Resource, Reflect)]
+#[reflect(Resource)]
 pub enum TemplateFlags {
 	/// Run with all flags enabled.
 	#[default]
@@ -92,7 +93,7 @@ impl TemplateFlags {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum TemplateFlag {
 	/// Load snippets from the file system.
 	LoadSnippets,

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::ecs::system::RunSystemError;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
@@ -13,66 +14,22 @@ pub struct Response {
 	pub body: Option<Bytes>,
 }
 
+impl PartialEq for Response {
+	fn eq(&self, other: &Self) -> bool {
+		self.body == other.body
+			&& self.parts.status == other.parts.status
+			&& self.parts.headers == other.parts.headers
+			&& self.parts.version == other.parts.version
+		// && self.parts.extensions == other.parts.extensions
+	}
+}
+
 impl Response {
+	pub fn ok() -> Self { Self::from_status(StatusCode::OK) }
+	pub fn not_found() -> Self {
+		Self::from_status_body(StatusCode::NOT_FOUND, "Not Found")
+	}
 	pub fn status(&self) -> StatusCode { self.parts.status }
-}
-
-/// Allows for blanket implementation of `Into<Response>`,
-/// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
-/// and  Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
-pub trait IntoResponse {
-	fn into_response(self) -> Response;
-}
-
-impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
-	fn into_response(self) -> Response {
-		match self {
-			Ok(t) => t.into_response(),
-			Err(e) => e.into_response(),
-		}
-	}
-}
-
-impl IntoResponse for Infallible {
-	fn into_response(self) -> Response {
-		unreachable!("Infallible cannot be converted to a response");
-	}
-}
-
-impl<T: TryInto<Response>> IntoResponse for T
-where
-	T::Error: IntoResponse,
-{
-	fn into_response(self) -> Response {
-		match self.try_into() {
-			Ok(response) => response,
-			Err(err) => err.into_response(),
-		}
-	}
-}
-
-impl IntoResponse for () {
-	fn into_response(self) -> Response { Response::from_status(StatusCode::OK) }
-}
-
-/// None = not found, matching http principles ie crud operations
-impl<T: IntoResponse> IntoResponse for Option<T> {
-	fn into_response(self) -> Response {
-		match self {
-			Some(t) => t.into_response(),
-			None => {
-				Response::from_status_body(StatusCode::NOT_FOUND, b"Not Found")
-			}
-		}
-	}
-}
-
-impl Into<Response> for BevyError {
-	fn into(self) -> Response { HttpError::from_opaque(self).into() }
-}
-
-
-impl Response {
 	pub fn from_status(status: StatusCode) -> Self {
 		Self::from_parts(
 			http::response::Builder::new()
@@ -85,7 +42,10 @@ impl Response {
 		)
 	}
 
-	pub fn from_status_body(status: StatusCode, body: &[u8]) -> Self {
+	pub fn from_status_body(
+		status: StatusCode,
+		body: impl AsRef<[u8]>,
+	) -> Self {
 		Self::from_parts(
 			http::response::Builder::new()
 				.status(status)
@@ -93,7 +53,7 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			Some(Bytes::copy_from_slice(body)),
+			Some(Bytes::copy_from_slice(body.as_ref())),
 		)
 	}
 
@@ -139,13 +99,28 @@ impl Response {
 			),
 		)
 	}
+
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	pub async fn from_axum(resp: axum::response::Response) -> Self {
+		let (parts, body) = resp.into_parts();
+		let bytes = axum::body::to_bytes(body, usize::MAX).await.ok();
+		Self { parts, body: bytes }
+	}
 }
 
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-impl axum::response::IntoResponse for HttpError {
-	fn into_response(self) -> axum::response::Response {
-		(self.status_code, self.message).into_response()
-	}
+
+// not specific enough
+// impl Into<Response> for () {
+// 	fn into(self) -> Response { Response::ok() }
+// }
+
+
+impl Into<Response> for BevyError {
+	fn into(self) -> Response { HttpError::from_opaque(self).into() }
+}
+
+impl Into<Response> for RunSystemError {
+	fn into(self) -> Response { HttpError::from_opaque(self).into() }
 }
 
 
@@ -158,16 +133,63 @@ impl Into<axum::response::Response> for Response {
 	fn into(self) -> axum::response::Response { self.into_axum() }
 }
 
-impl Default for Response {
-	fn default() -> Self {
-		Self {
-			// one does not simply Parts::default()
-			parts: http::response::Builder::new()
-				.body(())
-				.unwrap()
-				.into_parts()
-				.0,
-			body: None,
+
+/// Allows for blanket implementation of `Into<Response>`,
+/// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
+/// and  Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
+pub trait IntoResponse {
+	fn into_response(self) -> Response;
+}
+
+impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
+	fn into_response(self) -> Response {
+		match self {
+			Ok(t) => t.into_response(),
+			Err(e) => e.into_response(),
 		}
 	}
 }
+
+impl IntoResponse for Infallible {
+	fn into_response(self) -> Response {
+		unreachable!("Infallible cannot be converted to a response");
+	}
+}
+
+impl<T: TryInto<Response>> IntoResponse for T
+where
+	T::Error: IntoResponse,
+{
+	fn into_response(self) -> Response {
+		match self.try_into() {
+			Ok(response) => response,
+			Err(err) => err.into_response(),
+		}
+	}
+}
+
+/// None = not found, matching http principles ie crud operations
+impl<T: IntoResponse> IntoResponse for Option<T> {
+	fn into_response(self) -> Response {
+		match self {
+			Some(t) => t.into_response(),
+			None => {
+				Response::from_status_body(StatusCode::NOT_FOUND, b"Not Found")
+			}
+		}
+	}
+}
+
+// impl Default for Response {
+// 	fn default() -> Self {
+// 		Self {
+// 			// one does not simply Parts::default()
+// 			parts: http::response::Builder::new()
+// 				.body(())
+// 				.unwrap()
+// 				.into_parts()
+// 				.0,
+// 			body: None,
+// 		}
+// 	}
+// }

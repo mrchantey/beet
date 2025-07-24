@@ -24,9 +24,18 @@ impl AxumExt {
 }
 
 
-#[extend::ext(name=BeetRouterExt)]
+#[extend::ext(name=AxumRouterExt)]
 #[allow(async_fn_in_trait)]
 pub impl Router {
+	async fn oneshot_res(
+		&mut self,
+		req: impl Into<RouteInfo>,
+	) -> anyhow::Result<Response> {
+		let req = req.into().into_request(String::new())?;
+		let res = self.oneshot(req).await?;
+		let res = Response::from_axum(res).await;
+		Ok(res)
+	}
 	async fn oneshot_str(
 		&mut self,
 		req: impl Into<RouteInfo>,

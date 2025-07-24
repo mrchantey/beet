@@ -5,10 +5,12 @@ use std::path::Path;
 
 /// Config for the scene containing all information that can be statically extracted
 /// from files, including html, parsed styles etc.
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone, Resource, Reflect)]
+#[reflect(Resource)]
 pub struct WorkspaceConfig {
 	/// Filter for extracting snippets,
 	/// excludes 'target' and 'node_modules' directories by default
+	#[reflect(ignore)] // TODO reflect GlobFilter
 	pub filter: GlobFilter,
 	/// The root directory for extracting snippets
 	pub root_dir: WsPathBuf,

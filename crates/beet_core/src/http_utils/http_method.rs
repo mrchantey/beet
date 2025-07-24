@@ -1,5 +1,6 @@
 #[cfg(feature = "tokens")]
 use crate::as_beet::*;
+use bevy::prelude::*;
 use std::fmt;
 
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
@@ -10,7 +11,7 @@ use std::fmt;
 ///
 /// Additionally the naming convention follows Rusty conventions rather
 /// than HTTP conventions, ie `Get` instead of `GET`.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {

@@ -3,44 +3,35 @@ use beet_core::prelude::*;
 use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 
-/// Added by the [`AppRouterPlugin`], this layer will convert any
-/// [`RouteHandlerOutput<BoxedBundle>`] into a [`HtmlDocument`] and return
-/// as [`Html`] response.
+/// A [`RouteHandler`] layer for converting bundles into HTML responses.
+/// - First checks for a [`HtmlDocument`] and renders that one,
+/// - otherwise searches for a [`HandlerBundle`].
+///
+/// this layer will convert any entity with a [`HandlerBundle`]
+/// into a [`HtmlDocument`] and return as [`Html`] response.
 /// This excludes any [`BoxedBundle`] consumed in the [`AfterRoute`] step,
 /// for example by the [`ClientIslandLayer`].
-pub fn bundle_layer(world: &mut World) -> Result {
-	let output = world.remove_resource::<RouteHandlerOutput<BoxedBundle>>()
-		.unwrap(/*checked*/);
-	let entity = output.0.add_to_world(world);
-	world.entity_mut(entity).insert(HtmlDocument);
-	// println!("Before");
-	// world.log_component_names(entity);
-	world.run_schedule(Update);
-	// println!("After");
-	// world.log_component_names(entity);
-	let html = world.run_system_cached_with(render_fragment, entity)?;
-
-	world.insert_resource(Html(html).into_response());
-	Ok(())
-}
-
-/// If the world contains a [`HtmlDocument`] and there is no current [`Response`],
-/// convert the document to a response.
-pub fn documents_to_response(world: &mut World) -> Result {
-	if let Some(&entity) = world
-		.query_filtered_once::<Entity, With<HtmlDocument>>()
-		.iter()
-		.next()
-	{
+pub fn bundle_layer() -> RouteHandler {
+	RouteHandler::new(|world: &mut World| -> HttpResult<Response> {
+		let entity = if let Some(&entity) = world
+			.query_filtered_once::<Entity, With<HtmlDocument>>()
+			.iter()
+			.next()
+		{
+			entity
+		} else {
+			*world
+				.query_filtered_once::<Entity, With<HandlerBundle>>()
+				.iter()
+				.next()
+				.ok_or_else(|| HttpError::not_found())?
+		};
+		world.entity_mut(entity).insert(HtmlDocument);
 		world.run_schedule(Update);
 		let html = world.run_system_cached_with(render_fragment, entity)?;
-
-		world.insert_resource(Html(html).into_response());
-	}
-	Ok(())
+		Ok(Html(html).into_response())
+	})
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -48,20 +39,6 @@ mod test {
 	use beet_rsx::as_beet::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
-
-	#[sweet::test]
-	async fn creates_resource() {
-		let mut world = World::new();
-		world = RouteHandler::new_bundle(|| ()).run(world).await;
-		world.resource::<RouteHandlerOutput<BoxedBundle>>();
-
-		async fn foo(world: World) -> (World, ()) { (world, ()) }
-
-		let mut world = World::new();
-		world = RouteHandler::new_async_bundle(foo).run(world).await;
-		world.resource::<RouteHandlerOutput<BoxedBundle>>();
-	}
-
 
 	#[template]
 	pub fn MyTemplate(foo: u32) -> impl Bundle {
@@ -72,17 +49,19 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world = World::new();
-		world.spawn((
-			RouteInfo::get("/"),
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		let world = app.world_mut();
+		world.spawn(children![
 			RouteHandler::new_bundle(|| {
 				rsx! {
 					<MyTemplate foo=42/>
 				}
 			}),
-		));
+			bundle_layer(),
+		]);
 
-		BeetRouter::oneshot_str(&mut world, "/")
+		Router::oneshot_str(world, "/")
 			.await
 			.unwrap()
 			.xpect()
@@ -92,26 +71,26 @@ mod test {
 	}
 	#[sweet::test]
 	async fn middleware() {
-		let mut world = World::new();
-		world.spawn((
-			RouteInfo::get("/"),
-			RouteLayer::after_route(|world: &mut World| {
-				let output = world
-					.remove_resource::<RouteHandlerOutput<BoxedBundle>>()
-					.unwrap();
-				let entity = output.0.add_to_world(world);
-				world.spawn((HtmlDocument, rsx! {
-					middleware! {entity}
-				}));
-			}),
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		let world = app.world_mut();
+		world.spawn(children![
 			RouteHandler::new_bundle(|| {
 				rsx! {
 					<MyTemplate foo=42/>
 				}
 			}),
-		));
+			RouteHandler::new_layer(|world: &mut World| {
+				let entity = world
+					.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+				world.spawn((HtmlDocument, rsx! {
+					"middleware!" {entity}
+				}));
+			}),
+			bundle_layer(),
+		]);
 
-		BeetRouter::oneshot_str(&mut world, "/")
+		Router::oneshot_str(world, "/")
 			.await
 			.unwrap()
 			.xpect()

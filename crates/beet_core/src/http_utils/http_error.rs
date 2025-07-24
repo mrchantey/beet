@@ -22,6 +22,32 @@ pub struct HttpError {
 
 
 impl HttpError {
+	pub fn from_status(status_code: StatusCode) -> Self {
+		Self {
+			status_code,
+			message: status_code
+				.canonical_reason()
+				.unwrap_or("Unknown error")
+				.to_string(),
+		}
+	}
+
+	/// Creates a new [`AppError`] with the given status code and message.
+	pub fn new(status_code: StatusCode, message: impl Into<String>) -> Self {
+		Self {
+			message: message.into(),
+			status_code,
+		}
+	}
+	pub fn not_found() -> Self { Self::from_status(StatusCode::NOT_FOUND) }
+
+	pub fn bad_request(message: impl Into<String>) -> Self {
+		Self::new(StatusCode::BAD_REQUEST, message)
+	}
+	pub fn internal_error(message: impl Into<String>) -> Self {
+		Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
+	}
+
 	/// Unwraps the `BevyError` into a `HttpError` if thats what it is,
 	/// otherwise logs the error and returns an opaque internal server error
 	/// in release builds.
@@ -61,7 +87,15 @@ impl From<BevyError> for HttpError {
 impl From<RunSystemError> for HttpError {
 	fn from(err: RunSystemError) -> HttpError { Self::from_opaque(err) }
 }
-
+impl<In, Out> From<RegisteredSystemError<In, Out>> for HttpError
+where
+	In: 'static + SystemInput,
+	Out: 'static,
+{
+	fn from(err: RegisteredSystemError<In, Out>) -> HttpError {
+		Self::from_opaque(err)
+	}
+}
 
 #[cfg(feature = "serde")]
 impl From<serde_json::Error> for HttpError {
@@ -75,35 +109,15 @@ impl From<serde_urlencoded::de::Error> for HttpError {
 	}
 }
 
-impl<T: 'static + SystemInput> From<RegisteredSystemError<T>> for HttpError {
-	fn from(err: RegisteredSystemError<T>) -> HttpError {
-		Self::from_opaque(err)
-	}
-}
 impl Into<Response> for HttpError {
 	fn into(self) -> Response {
 		Response::from_status_body(self.status_code, self.message.as_bytes())
 	}
 }
 
-
-
-impl HttpError {
-	/// Creates a new [`AppError`] with the given status code and message.
-	pub fn new(status_code: StatusCode, message: impl Into<String>) -> Self {
-		Self {
-			message: message.into(),
-			status_code,
-		}
-	}
-	pub fn not_found(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::NOT_FOUND, message)
-	}
-
-	pub fn bad_request(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::BAD_REQUEST, message)
-	}
-	pub fn internal_error(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+impl axum::response::IntoResponse for HttpError {
+	fn into_response(self) -> axum::response::Response {
+		(self.status_code, self.message).into_response()
 	}
 }

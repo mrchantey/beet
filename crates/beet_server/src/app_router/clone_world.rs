@@ -1,4 +1,4 @@
-use crate::prelude::RouteHandler;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_rsx::as_beet::WorldMutExt;
 use bevy::prelude::*;
@@ -13,6 +13,16 @@ pub struct CloneWorld {
 	registry: TypeRegistry,
 	// route handlers cannot be serialized so we clone them separately
 	handlers: Vec<(Entity, RouteHandler)>,
+}
+
+impl Clone for CloneWorld {
+	fn clone(&self) -> Self {
+		Self {
+			scene: self.scene.clone(),
+			registry: clone_registry(&self.registry),
+			handlers: self.handlers.clone(),
+		}
+	}
 }
 
 impl CloneWorld {
@@ -34,20 +44,23 @@ impl CloneWorld {
 		}
 	}
 
-	pub fn clone(&self) -> Result<World> {
-		let mut world = World::new();
-		let registry = clone_registry(&self.registry);
+	pub fn clone_world(self) -> Result<World> {
+		let mut app = App::new();
+		app.add_plugins(AppRouterPlugin);
+		let mut world = std::mem::take(app.world_mut());
+
+		// let mut world = World::new();
 		world.insert_resource(AppTypeRegistry(TypeRegistryArc {
-			internal: Arc::new(RwLock::new(registry)),
+			internal: Arc::new(RwLock::new(self.registry)),
 		}));
 		let mut entity_map = Default::default();
 		world.load_scene_with(&self.scene, &mut entity_map)?;
 
-		for (entity, handler) in &self.handlers {
-			let target_entity = entity_map.get(entity).ok_or_else(|| {
+		for (entity, handler) in self.handlers {
+			let target_entity = entity_map.get(&entity).ok_or_else(|| {
 				bevyhow!("Entity {} not found in cloned world", entity)
 			})?;
-			world.entity_mut(*target_entity).insert(handler.clone());
+			world.entity_mut(*target_entity).insert(handler);
 		}
 		Ok(world)
 	}
@@ -80,13 +93,8 @@ mod test {
 		let registry = world1.resource_mut::<AppTypeRegistry>();
 		registry.write().register::<Foo>();
 
-		world1.spawn((
-			Foo(7),
-			RouteHandler::new(|mut commands: Commands| {
-				commands.insert_resource("hello world!".into_response());
-			}),
-		));
-		let mut world2 = CloneWorld::new(&mut world1).clone().unwrap();
+		world1.spawn((Foo(7), RouteHandler::new(|| "hello world!")));
+		let mut world2 = CloneWorld::new(&mut world1).clone_world().unwrap();
 
 		let (foo2, handler2) = world2.query_once::<(&Foo, &RouteHandler)>()[0];
 		foo2.0.xpect().to_be(7);

@@ -8,6 +8,7 @@ use glob::PatternError;
 /// glob for watch patterns
 #[derive(Default, Clone, PartialEq, Parser)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all
 	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]

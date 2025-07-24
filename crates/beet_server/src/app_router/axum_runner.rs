@@ -1,6 +1,5 @@
 use crate::app_router::app_runner::AppRunner;
 use crate::prelude::*;
-use axum::Router;
 use axum::routing;
 use axum::routing::MethodFilter;
 use beet_core::prelude::*;
@@ -15,20 +14,45 @@ pub struct AxumRunner {
 impl AxumRunner {
 	pub fn new(runner: AppRunner) -> Self { Self { runner } }
 
+
+	pub fn from_world(world: &mut World) -> axum::Router {
+		let clone_world = CloneWorld::new(world);
+		axum::Router::new().fallback(routing::any(
+			move |request: axum::extract::Request| {
+				let world = clone_world.clone();
+				async move {
+					handle_axum_request(world, request)
+						.await
+						.into_response()
+						.into_axum()
+				}
+			},
+		))
+	}
+
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
 		// take the non-send router to support custom axum routes & layers
 		let mut router = app
 			.world_mut()
-			.remove_non_send_resource::<Router>()
+			.remove_non_send_resource::<axum::Router>()
 			.unwrap_or_default();
 
-		for route in app
-			.world_mut()
-			.run_system_cached(BeetRouter::collect_routes)??
-		{
-			router = instance_to_axum(router, route);
-		}
+
+		let clone_world = CloneWorld::new(app.world_mut());
+
+		// Add a catch-all fallback handler for unmatched routes
+		router = router.fallback(routing::any(
+			move |request: axum::extract::Request| {
+				let world = clone_world.clone();
+				async move {
+					handle_axum_request(world, request)
+						.await
+						.into_response()
+						.into_axum()
+				}
+			},
+		));
 
 		let html_dir = app
 			.world()
@@ -121,10 +145,7 @@ fn get_reload(
 	(livereload, reload_handle)
 }
 
-
-
-
-
+#[allow(unused)]
 fn method_to_axum(method: HttpMethod) -> MethodFilter {
 	match method {
 		HttpMethod::Get => MethodFilter::GET,
@@ -140,24 +161,17 @@ fn method_to_axum(method: HttpMethod) -> MethodFilter {
 }
 
 
-fn instance_to_axum(router: Router, instance: RouteInstance) -> Router {
-	router.route(
-			&instance.route_info.path.to_string_lossy().to_string(),
-			routing::on(method_to_axum(instance.route_info.method),
-				async move |request: axum::extract::Request| -> HttpResult<axum::response::Response> {
-					let beet_request = Request::from_axum(request, &())
-						.await
-						.map_err(|err| {
-							HttpError::bad_request(format!(
-								"Failed to extract request: {}",
-								err
-							))
-						})?;
+async fn handle_axum_request(
+	clone_world: CloneWorld,
+	request: axum::extract::Request,
+) -> Result<Response> {
+	let world = clone_world.clone_world()?;
 
-					instance.call(beet_request).await?.into_axum().xok()
-				},
-			),
-		)
+	let request = Request::from_axum(request, &()).await?;
+
+	let (_world, response) = Router::handle_request(world, request).await;
+
+	Ok(response)
 }
 
 
@@ -172,26 +186,22 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world = World::new();
-		world.spawn(children![(
-			RouteInfo::get("/"),
-			RouteHandler::new(|mut commands: Commands| {
-				commands.insert_resource("hello world!".into_response());
-			})
-		),]);
+		let mut app = App::new();
+		app.add_plugins(AppRouterPlugin);
+		app.world_mut().spawn((
+			RouteSegment::new("pizza"),
+			RouteHandler::new(|| "hello world!"),
+		));
 
-		let mut router = Router::new();
-		for route in world
-			.run_system_cached(BeetRouter::collect_routes)
+		AxumRunner::from_world(app.world_mut())
+			.oneshot_res("/dsfkdsl")
+			.await
 			.unwrap()
-			.unwrap()
-		{
-			router = instance_to_axum(router, route);
-		}
-
-
-		router
-			.oneshot_str("/")
+			.status()
+			.xpect()
+			.to_be(StatusCode::NOT_FOUND);
+		AxumRunner::from_world(app.world_mut())
+			.oneshot_str("/pizza")
 			.await
 			.unwrap()
 			.xpect()

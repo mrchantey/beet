@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use std::path::PathBuf;
 
 /// Constant values used in the HTML rendering process.
-#[derive(Debug, Clone, PartialEq, Resource)]
+#[derive(Debug, Clone, PartialEq, Resource, Reflect)]
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
 	pub dom_idx_key: String,

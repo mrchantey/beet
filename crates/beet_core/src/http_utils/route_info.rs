@@ -1,9 +1,8 @@
 use crate::as_beet::*;
-use bevy::ecs::component::Component;
 use http::request::Parts;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RouteInfo {

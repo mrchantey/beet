@@ -12,9 +12,12 @@ use std::path::PathBuf;
 /// - leading & trailing slashes `/`
 /// - dynamic prefixes `:`
 /// - wildcard prefixes `*`
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Component)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Component, Reflect,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[reflect(Component)]
 pub enum RouteSegment {
 	/// A static segment, the `foo` in `/foo`
 	Static(String),
@@ -48,6 +51,7 @@ impl RouteSegment {
 			Self::Static(trimmed.to_string())
 		}
 	}
+
 	pub fn matches(&self, segment: &str) -> bool {
 		match self {
 			Self::Static(s) => s == segment,
