@@ -1,0 +1,102 @@
+use crate::prelude::RouteHandler;
+use beet_core::prelude::*;
+use beet_rsx::as_beet::WorldMutExt;
+use bevy::prelude::*;
+use bevy::reflect::TypeRegistry;
+use bevy::reflect::TypeRegistryArc;
+use std::sync::Arc;
+use std::sync::RwLock;
+
+/// Clones a world by serializing the scene and cloning the route handlers.
+pub struct CloneWorld {
+	scene: String,
+	registry: TypeRegistry,
+	// route handlers cannot be serialized so we clone them separately
+	handlers: Vec<(Entity, RouteHandler)>,
+}
+
+impl CloneWorld {
+	pub fn new(world: &mut World) -> Self {
+		let scene = world.build_scene();
+
+		let handlers = world
+			.query::<(Entity, &RouteHandler)>()
+			.iter(world)
+			.map(|(entity, handler)| (entity, handler.clone()))
+			.collect();
+
+		let registry =
+			clone_registry(&world.resource::<AppTypeRegistry>().0.read());
+		Self {
+			scene,
+			handlers,
+			registry,
+		}
+	}
+
+	pub fn clone(&self) -> Result<World> {
+		let mut world = World::new();
+		let registry = clone_registry(&self.registry);
+		world.insert_resource(AppTypeRegistry(TypeRegistryArc {
+			internal: Arc::new(RwLock::new(registry)),
+		}));
+		let mut entity_map = Default::default();
+		world.load_scene_with(&self.scene, &mut entity_map)?;
+
+		for (entity, handler) in &self.handlers {
+			let target_entity = entity_map.get(entity).ok_or_else(|| {
+				bevyhow!("Entity {} not found in cloned world", entity)
+			})?;
+			world.entity_mut(*target_entity).insert(handler.clone());
+		}
+		Ok(world)
+	}
+}
+
+
+fn clone_registry(registry: &TypeRegistry) -> TypeRegistry {
+	let mut new_registry = TypeRegistry::default();
+	for item in registry.iter() {
+		new_registry.add_registration(item.clone());
+	}
+	new_registry
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn works() {
+		#[derive(Component, Reflect)]
+		#[reflect(Component)]
+		struct Foo(u32);
+
+		let mut world1 = World::new();
+		world1.init_resource::<AppTypeRegistry>();
+		let registry = world1.resource_mut::<AppTypeRegistry>();
+		registry.write().register::<Foo>();
+
+		world1.spawn((
+			Foo(7),
+			RouteHandler::new(|mut commands: Commands| {
+				commands.insert_resource("hello world!".into_response());
+			}),
+		));
+		let mut world2 = CloneWorld::new(&mut world1).clone().unwrap();
+
+		let (foo2, handler2) = world2.query_once::<(&Foo, &RouteHandler)>()[0];
+		foo2.0.xpect().to_be(7);
+		let world2 = handler2.clone().run(world2).await;
+		world2
+			.resource::<Response>()
+			.clone()
+			.body_str()
+			.unwrap()
+			.xpect()
+			.to_be("hello world!");
+	}
+}

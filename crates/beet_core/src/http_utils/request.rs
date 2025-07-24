@@ -32,6 +32,19 @@ impl Request {
 		Self { parts, body }
 	}
 
+	pub fn get(path: &str) -> Self {
+		Self {
+			parts: request::Builder::new()
+				.method(http::Method::GET)
+				.uri(path)
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			body: None,
+		}
+	}
+
 	pub fn set_body<T: Into<Bytes>>(&mut self, body: T) -> &mut Self {
 		self.body = Some(body.into());
 		self

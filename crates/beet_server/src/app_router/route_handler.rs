@@ -1,5 +1,7 @@
 use beet_core::prelude::*;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::RunSystemOnce;
+use bevy::ecs::system::ScheduleSystem;
 use bevy::prelude::*;
 use serde::de::DeserializeOwned;
 use std::future::Future;
@@ -8,11 +10,6 @@ use std::sync::Arc;
 
 use crate::prelude::HttpResult;
 
-
-type RouteHandlerFunc = dyn 'static
-	+ Send
-	+ Sync
-	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 /// The returned value from a [`RouteHandler`] will be placed in this resource,
 /// including [`Result`] and [`()`] types.
@@ -53,9 +50,14 @@ impl BoxedBundle {
 	}
 	pub fn add_to_world(self, world: &mut World) -> Entity { (self.0)(world) }
 }
-/// An asynchronous route handler
+/// An asynchronous route handler, accepting and returning a [`World`].
 #[derive(Clone, Component)]
 pub struct RouteHandler(Arc<RouteHandlerFunc>);
+
+type RouteHandlerFunc = dyn 'static
+	+ Send
+	+ Sync
+	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 
 impl RouteHandler {
@@ -66,6 +68,14 @@ impl RouteHandler {
 		Out: 'static + Send + Sync,
 	{
 		Self::new_mapped(handler, |out| out)
+	}
+
+	pub fn new_system<M>(
+		_schedule: impl ScheduleLabel,
+		_systems: impl IntoScheduleConfigs<ScheduleSystem, M>,
+	) {
+		// let mut schedules = self.world.resource_mut::<Schedules>();
+		// schedules.add_systems(schedule, systems);
 	}
 
 	/// Create a new route handler from a system returning a bundle
@@ -92,9 +102,6 @@ impl RouteHandler {
 		RouteHandler(Arc::new(move |mut world: World| {
 			match world.run_system_once(handler.clone()) {
 				Ok(out) => {
-					todo!(
-						"impl IntoResponse instead, bundles are a special case"
-					);
 					world.insert_resource(RouteHandlerOutput(map(out)));
 				}
 				Err(run_system_err) => {

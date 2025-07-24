@@ -1,5 +1,6 @@
 mod app_router_plugin;
 mod app_runner;
+mod clone_world;
 mod route_instance;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub use axum_runner::*;
@@ -10,6 +11,7 @@ mod route_layer;
 pub use app_router_plugin::*;
 pub use app_runner::*;
 pub use bundle_layer::*;
+pub use clone_world::*;
 pub use route_instance::*;
 pub use route_layer::*;
 mod route_handler;

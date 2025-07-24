@@ -14,6 +14,48 @@ fn main() {
 		.run();
 }
 
+#[rustfmt::skip]
+fn setup(mut commands: Commands) {
+
+	commands.spawn((children![
+		(
+			StaticRoute,
+			RouteInfo::get("/"),
+			RouteHandler::new_bundle(|| rsx! {<Home/>})
+		),
+		(
+			StaticRoute,
+			RouteInfo::get("/foo"),
+			RouteHandler::new(|| 7)
+		),
+		(
+			StaticRoute,
+			RouteInfo::get("/hello-layer"),
+			RouteLayer::before_route(modify_request_layer),
+			RouteHandler::new_bundle(|req:Res<Request>|{
+	let body = req.body_str().unwrap_or_default();
+	rsx! {
+		<Style/>
+		<main>
+			<div> hello {body}</div>
+			<a href="/">go home</a>
+		</main>
+	}			
+})
+		),
+	],));
+}
+
+// modifies the request body to "jimmy"
+fn modify_request_layer(mut req: ResMut<Request>) { req.set_body("jimmy"); }
+
+// accepts a request body and inserts it into a html template with a
+// warm greeting
+// fn greet_user(req: Res<Request>) -> impl Clone {
+// 	// 2
+// }
+
+
 #[derive(Clone)]
 struct AppState {
 	started: std::time::Instant,
@@ -29,36 +71,6 @@ static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
 		num_requests: 0,
 	})
 });
-
-
-
-fn setup(mut commands: Commands) {
-	commands.spawn((children![
-		(
-			StaticRoute,
-			RouteInfo::get("/"),
-			RouteHandler::new_bundle(|| rsx! {<Home/>})
-		),
-		(
-			StaticRoute,
-			RouteInfo::get("/hello-layer"),
-			// layers are regular systems that run before or after the route handler
-			RouteLayer::before_route(|mut req: ResMut<Request>| {
-				req.set_body("jimmy");
-			}),
-			RouteHandler::new_bundle(|req: Res<Request>| {
-				let body = req.body_str().unwrap_or_default();
-				rsx! {
-					<Style/>
-					<main>
-						<div> hello {body}</div>
-						<a href="/">go home</a>
-					</main>
-				}
-			})
-		),
-	],));
-}
 
 
 

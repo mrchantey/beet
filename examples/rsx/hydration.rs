@@ -12,20 +12,16 @@
 //! sweet serve target/examples/hydration
 //! ```
 //! For a sense of how hydration can make updates to static parts of the page,
-//! try changing some of the text like "Count" then running `cargo run --example hydration --features=css` again
-//! Note how the wasm module still updates the correct locations in the page, even without recompiling wasm.
+//! try changing some of the text like "Count: " to "Num <b>Bananas</b>: "
+//! then rebuild the html file `cargo run --example hydration --features=css`
+//! Note how the wasm module still updates the correct locations in the page.
+//! This works even without recompiling wasm, so long as the 'rusty parts' of the page
+//! are still the same.
 use beet::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
-fn main() {
-	App::new()
-		.add_plugins(TemplatePlugin)
-		// register the component in the scene to be loaded
-		.register_type::<ClientIslandRoot<Counter>>()
-		.set_runner(ReactiveApp::runner)
-		.run();
-}
 
+// first run to generate the html file, which contains
+// a serialized form of Counter used for hydration on the client.
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
 	let html = HtmlDocument::parse_bundle(rsx! {
@@ -42,8 +38,22 @@ fn main() {
 	FsExt::write("target/examples/hydration/index.html", html).unwrap();
 }
 
+// then build the wasm module, this app must register the `ClientIslandRoot<Counter>`
+// component so it can deserialize Counter.
+#[cfg(target_arch = "wasm32")]
+fn main() {
+	App::new()
+		.add_plugins(TemplatePlugin)
+		// register the component in the scene to be loaded
+		.register_type::<ClientIslandRoot<Counter>>()
+		.set_runner(ReactiveApp::runner)
+		.run();
+}
 
 
+
+// a simple counter,
+// client islands must derive Reflect
 #[template]
 #[derive(Reflect)]
 fn Counter(initial: u32) -> impl Bundle {
