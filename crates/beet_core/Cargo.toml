@@ -34,7 +34,9 @@ serde = [
 	"dep:serde_urlencoded",
 ]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+# TODO merge with net feature
 http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
+# is this nessecary?
 web = [
 	"http",
 	"dep:wasm-bindgen",
@@ -58,7 +60,7 @@ server = [
 	"dep:tokio",
 	"beet_utils/fs",
 ]
-net = ["http", "serde", "dep:reqwest"]
+net = ["http", "serde", "dep:reqwest", "web"]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]
 tokens = [

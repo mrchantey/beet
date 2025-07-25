@@ -1,5 +1,24 @@
+use crate::prelude::*;
+use bevy::prelude::*;
+
+impl Request {
+	pub async fn send(self) -> Result<Response> {
+		#[cfg(target_arch = "wasm32")]
+		{
+			super::impl_web_sys::send_wasm(self).await
+		}
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			super::impl_reqwest::send_reqwest(self).await
+		}
+	}
+}
+
+
+
+
 #[cfg(test)]
-mod test {
+mod test_request {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
 	use sweet::prelude::*;
@@ -129,7 +148,41 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn invalid_header_fails() {
-		Request::get("http://localhost")
-			.with_header("bad\nheader", "val");
+		Request::get("http://localhost").with_header("bad\nheader", "val");
+	}
+}
+
+
+#[cfg(test)]
+mod test_response {
+	use crate::prelude::*;
+	use beet_utils::utils::PipelineTarget;
+	use sweet::prelude::*;
+
+
+	const HTTPBIN: &str = "https://httpbin.org";
+
+	#[derive(Debug, PartialEq, serde::Deserialize)]
+	struct Res {
+		data: Body,
+	}
+	#[derive(Debug, PartialEq, serde::Deserialize)]
+	struct Body {
+		foo: String,
+	}
+
+	#[sweet::test]
+	#[ignore = "flaky httpbin"]
+	async fn works() {
+		Request::post(format!("{HTTPBIN}/post"))
+			.with_body(&serde_json::json!({"foo": "bar"}).to_string())
+			.send()
+			.await
+			.unwrap()
+			.json::<serde_json::Value>()
+			.unwrap()
+			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
+			.xpect()
+			.to_be("bar");
 	}
 }

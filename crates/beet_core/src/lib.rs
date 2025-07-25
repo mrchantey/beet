@@ -15,8 +15,6 @@ pub use beet_core_macros::*;
 mod bevy_utils;
 #[cfg(feature = "net")]
 pub mod net;
-#[cfg(feature = "net")]
-pub use net::cross_fetch;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub mod server;
 #[cfg(feature = "web")]

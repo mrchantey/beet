@@ -1,7 +1,5 @@
 use http::StatusCode;
 use std::fmt::Debug;
-pub type Result<T> = std::result::Result<T, Error>;
-
 
 /// Errors returned from a [`Request::fetch`]
 #[derive(Debug, thiserror::Error)]
