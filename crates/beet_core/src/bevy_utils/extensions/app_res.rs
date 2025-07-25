@@ -26,22 +26,22 @@ impl AppRes {
 
 #[ext]
 pub impl Rc<RefCell<App>> {
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_on_animation_frame(self) -> crate::web::AnimationFrame {
 		crate::web::AnimationFrame::new(move || {
 			self.borrow_mut().update();
 		})
 	}
-
-	#[cfg(target_arch = "wasm32")]
+	
+	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_forever(self) -> impl std::future::Future<Output = ()> {
 		async {
 			let _frame = self.run_on_animation_frame();
 			crate::web::loop_forever().await;
 		}
 	}
-
-	#[cfg(target_arch = "wasm32")]
+	
+	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_while_mounted(self) {
 		todo!("broken in 12.1?");
 		// let mut app = self.borrow_mut();
