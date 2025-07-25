@@ -58,7 +58,7 @@ server = [
 	"dep:tokio",
 	"beet_utils/fs",
 ]
-net = ["http", "dep:reqwest", "dep:serde", "dep:serde_json"]
+net = ["http", "serde", "dep:reqwest"]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]
 tokens = [
@@ -217,3 +217,7 @@ features = [
 
 [dev-dependencies]
 sweet.workspace = true
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

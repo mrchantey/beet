@@ -62,8 +62,8 @@ impl Response {
 		Self { parts, body }
 	}
 
-	/// Create a response returning a string body with a 200 OK status.
-	pub fn ok_str(body: &str, content_type: &str) -> Self {
+	/// Create a response with the given body and content type.
+	pub fn ok_body(body: impl AsRef<[u8]>, content_type: &str) -> Self {
 		Self {
 			parts: http::response::Builder::new()
 				.status(StatusCode::OK)
@@ -72,7 +72,7 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: Some(Bytes::copy_from_slice(body.as_bytes())),
+			body: Some(Bytes::copy_from_slice(body.as_ref())),
 		}
 	}
 
@@ -123,6 +123,16 @@ impl Into<Response> for RunSystemError {
 	fn into(self) -> Response { HttpError::from_opaque(self).into() }
 }
 
+impl IntoResponse for Bytes {
+	fn into_response(self) -> Response {
+		Response::ok_body(&self, "application/octet-stream")
+	}
+}
+impl IntoResponse for &[u8] {
+	fn into_response(self) -> Response {
+		Response::ok_body("dsds", "application/octet-stream")
+	}
+}
 
 impl Into<http::Response<Bytes>> for Response {
 	fn into(self) -> http::Response<Bytes> { self.into_http() }

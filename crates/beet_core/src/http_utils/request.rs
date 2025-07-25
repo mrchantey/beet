@@ -1,6 +1,9 @@
+use std::str::FromStr;
+
 use crate::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
+use http::Uri;
 use http::request;
 
 /// A generalized request [`Resource`] added to every route app before the
@@ -34,6 +37,46 @@ impl Request {
 		self.body = Some(body.into());
 		self
 	}
+
+	/// Shorthand for an `Authorization: Bearer <token>` header.
+	pub fn with_auth_bearer(mut self, token: &str) -> Self {
+		self.parts.headers.insert(
+			http::header::AUTHORIZATION,
+			http::header::HeaderValue::from_str(&format!("Bearer {}", token))
+				.unwrap(),
+		);
+		self
+	}
+
+	/// Parse both the key and value as valid URL query parameters.
+	#[cfg(feature = "serde")]
+	pub fn parse_query_param<T1: serde::Serialize, T2: serde::Serialize>(
+		self,
+		key: &T1,
+		value: &T2,
+	) -> Result<Self> {
+		let key = serde_urlencoded::to_string(key)?;
+		let value = serde_urlencoded::to_string(value)?;
+		self.with_query_param(&key, &value)
+	}
+
+	/// Insert a query parameter into the request URI without checking it is
+	/// a valid URL, for the checked version use [`Self::parse_query_param`].
+	pub fn with_query_param(mut self, key: &str, value: &str) -> Result<Self> {
+		let path = self.parts.uri.path();
+		let query = self.parts.uri.query();
+		let path_and_query = if let Some(query) = query {
+			format!("{}?{}&{}={}", path, query, key, value)
+		} else {
+			format!("{}?{}={}", path, key, value)
+		};
+		let mut uri_parts = self.parts.uri.clone().into_parts();
+		uri_parts.path_and_query =
+			Some(http::uri::PathAndQuery::from_str(&path_and_query)?);
+		self.parts.uri = Uri::from_parts(uri_parts)?;
+		Ok(self)
+	}
+
 
 	pub fn method(&self) -> HttpMethod {
 		HttpMethod::from(self.parts.method.clone())

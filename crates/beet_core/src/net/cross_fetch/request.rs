@@ -55,15 +55,7 @@ impl Request {
 		Ok(self)
 	}
 
-	/// Shorthand for an `Authorization: Bearer <token>` header.
-	pub fn auth_bearer(mut self, token: &str) -> Self {
-		self.headers.insert(
-			http::header::AUTHORIZATION,
-			http::header::HeaderValue::from_str(&format!("Bearer {}", token))
-				.unwrap(),
-		);
-		self
-	}
+
 
 	/// Serailizes the body to JSON and sets the `Content-Type` header to `application/json`.
 	pub fn body<T: Serialize>(mut self, body: T) -> Result<Self> {
