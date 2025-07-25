@@ -15,19 +15,22 @@ impl AxumRunner {
 	pub fn new(runner: AppRunner) -> Self { Self { runner } }
 
 
-	pub fn from_world(world: &mut World) -> axum::Router {
+	pub fn from_world(world: &mut World, router: axum::Router) -> axum::Router {
 		let clone_world = CloneWorld::new(world);
-		axum::Router::new().fallback(routing::any(
-			move |request: axum::extract::Request| {
-				let world = clone_world.clone();
-				async move {
-					handle_axum_request(world, request)
-						.await
-						.into_response()
-						.into_axum()
-				}
-			},
-		))
+		// Add a catch-all fallback handler for unmatched routes
+		let route = routing::any(move |request: axum::extract::Request| {
+			let world = clone_world.clone();
+			async move {
+				handle_axum_request(world, request)
+					.await
+					.into_response()
+					.into_axum()
+			}
+		});
+
+		router
+			.route("/", route.clone())
+			.route("/{*wildcard}", route)
 	}
 
 	#[tokio::main]
@@ -38,21 +41,7 @@ impl AxumRunner {
 			.remove_non_send_resource::<axum::Router>()
 			.unwrap_or_default();
 
-
-		let clone_world = CloneWorld::new(app.world_mut());
-
-		// Add a catch-all fallback handler for unmatched routes
-		router = router.fallback(routing::any(
-			move |request: axum::extract::Request| {
-				let world = clone_world.clone();
-				async move {
-					handle_axum_request(world, request)
-						.await
-						.into_response()
-						.into_axum()
-				}
-			},
-		));
+		router = Self::from_world(app.world_mut(), router);
 
 		let html_dir = app
 			.world()
@@ -195,14 +184,14 @@ mod test {
 
 		// these tests also test the roundtrip CloneWorld mechanism
 		// catching errors like missing app.register_type::<T>()
-		AxumRunner::from_world(app.world_mut())
+		AxumRunner::from_world(app.world_mut(), axum::Router::new())
 			.oneshot_res("/dsfkdsl")
 			.await
 			.unwrap()
 			.status()
 			.xpect()
 			.to_be(StatusCode::NOT_FOUND);
-		AxumRunner::from_world(app.world_mut())
+		AxumRunner::from_world(app.world_mut(), axum::Router::new())
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()

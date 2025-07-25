@@ -84,10 +84,17 @@ impl Router {
 		mut world: World,
 		request: Request,
 	) -> (World, Response) {
+		if request.parts.uri.path().starts_with("/.well-known/") {
+			// skip well-known requests
+			return (world, Response::not_found());
+		}
+
+
 		let start_time = CrossInstant::now();
 
 		let route_parts = RouteParts::from_parts(&request.parts);
 
+		debug!("Handling request: {:#?}", request);
 		world.insert_resource(request);
 
 		for entity in world.query_filtered_once::<Entity, Without<ChildOf>>() {
@@ -95,27 +102,26 @@ impl Router {
 				handle_request_recursive(world, route_parts.clone(), entity)
 					.await;
 		}
+
+		let response =
+			if let Some(response) = world.remove_resource::<Response>() {
+				response
+			} else {
+				// if no response try building one from a bundle
+				bundle_to_html(&mut world).into_response()
+			};
+
+		debug!("Returning Response: {:#?}", response);
 		debug!("Route handler completed in: {:.2?}", start_time.elapsed());
-
-		// if let Some(response) = world.remove_resource::<Response>() {
-		// 	return (world, response);
-		// }
-
-		let response = world
-			.remove_resource::<Response>()
-			.unwrap_or_else(|| Response::not_found());
-
-
 		(world, response)
 	}
 }
 
 
 
-/// Pre-order dfs, accepting *reversed* path segments.
+/// Pre-order depth fist traversal. parent first, then children.
 async fn handle_request_recursive(
 	mut world: World,
-	// reversed path segments for pop()
 	parts: RouteParts,
 	root_entity: Entity,
 ) -> World {
@@ -189,33 +195,33 @@ mod test {
 
 		world.spawn((
 			// RouteFilter::new("/"),
-			RouteHandler::new_layer(|mut res: ResMut<Foo>| {
+			RouteHandler::layer(|mut res: ResMut<Foo>| {
 				res.push(0);
 			}),
 		));
 
 		world.spawn((
 			RouteFilter::new("foo"),
-			RouteHandler::new_layer(|mut res: ResMut<Foo>| {
+			RouteHandler::layer(|mut res: ResMut<Foo>| {
 				res.push(1);
 			}),
 			children![
 				(
 					RouteFilter::new("bar"),
-					RouteHandler::new_layer(|mut res: ResMut<Foo>| {
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(2);
 					}),
 				),
 				(
 					StaticRoute,
 					RouteFilter::new("bazz").with_method(HttpMethod::Delete),
-					RouteHandler::new_layer(|mut res: ResMut<Foo>| {
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(3);
 					}),
 				),
 				(
 					// no segment, always runs if parent matches
-					RouteHandler::new_layer(|mut res: ResMut<Foo>| {
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(4);
 					}),
 				),

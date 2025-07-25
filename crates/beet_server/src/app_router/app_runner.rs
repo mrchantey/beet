@@ -94,7 +94,7 @@ impl AppRunner {
 					AxumRunner::new(self).run(app)
 				}
 				#[cfg(not(feature = "axum"))]
-				todo!("a simple beet router");
+				todo!("hyper router");
 			}
 		}
 	}

@@ -30,6 +30,10 @@ type RouteHandlerFunc = dyn 'static
 	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 
+
+
+	
+
 impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`]
 	pub fn new<T, In, InErr, Out, Marker>(handler: T) -> Self
@@ -55,7 +59,7 @@ impl RouteHandler {
 			Ok(out)
 		};
 
-		Self::new_layer(move |world: &mut World| {
+		Self::layer(move |world: &mut World| {
 			let res = handler(world).into_response();
 			world.insert_resource(res);
 		})
@@ -63,12 +67,12 @@ impl RouteHandler {
 
 	/// A route handler returning a bundle, which is inserted into the world
 	/// with a [`HandlerBundle`] component.
-	pub fn new_bundle<T, Out, Marker>(handler: T) -> Self
+	pub fn bundle<T, Out, Marker>(handler: T) -> Self
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<(), Out, Marker>,
 		Out: 'static + Send + Sync + Bundle,
 	{
-		Self::new_layer(move |world: &mut World| {
+		Self::layer(move |world: &mut World| {
 			match world.run_system_once(handler.clone()) {
 				Ok(out) => {
 					world.spawn((HandlerBundle, out));
@@ -118,7 +122,7 @@ impl RouteHandler {
 	}
 
 	/// A route handler that passively runs a system, without expecting any output.
-	pub fn new_layer<T, Marker>(handler: T) -> Self
+	pub fn layer<T, Marker>(handler: T) -> Self
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<(), (), Marker>,
 	{
@@ -239,7 +243,7 @@ mod test {
 	async fn layers() {
 		let mut world = World::new();
 		world.spawn(children![
-			RouteHandler::new_layer(|mut req: ResMut<Request>| {
+			RouteHandler::layer(|mut req: ResMut<Request>| {
 				req.set_body("jimmy");
 			}),
 			RouteHandler::new(|req: In<Request>| {

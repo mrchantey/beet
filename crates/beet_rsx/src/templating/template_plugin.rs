@@ -22,12 +22,12 @@ impl Plugin for TemplatePlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
-		app.add_systems(
-			Startup,
-			load_all_file_snippets
-				.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
-		);
+		// #[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
+		// app.add_systems(
+		// 	Startup,
+		// 	load_all_file_snippets
+		// 		.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
+		// );
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()

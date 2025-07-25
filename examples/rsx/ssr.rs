@@ -14,66 +14,42 @@ fn main() {
 		.run();
 }
 
-#[rustfmt::skip]
+// #[rustfmt::skip]
 fn setup(mut commands: Commands) {
-
-	commands.spawn((children![
+	commands.spawn(children![
 		(
 			StaticRoute,
-			RouteInfo::get("/"),
-			RouteHandler::new_bundle(|| rsx! {<Home/>})
+			RouteFilter::new("/"),
+			RouteHandler::bundle(|| rsx! {<Home/>})
 		),
 		(
 			StaticRoute,
-			RouteInfo::get("/foo"),
-			RouteHandler::new(|| 7)
+			RouteFilter::new("/foo"),
+			RouteHandler::new(|| "bar")
 		),
 		(
 			StaticRoute,
-			RouteInfo::get("/hello-layer"),
-			RouteLayer::before_route(modify_request_layer),
-			RouteHandler::new_bundle(|req:Res<Request>|{
-	let body = req.body_str().unwrap_or_default();
-	rsx! {
-		<Style/>
-		<main>
-			<div> hello {body}</div>
-			<a href="/">go home</a>
-		</main>
-	}			
-})
-		),
-	],));
+			RouteFilter::new("/hello-layer"),
+			// children are run in sequence
+			children![
+				RouteHandler::layer(modify_request_layer),
+				RouteHandler::bundle(|req: Res<Request>| {
+					let body = req.body_str().unwrap_or_default();
+					rsx! {
+						<Style/>
+						<main>
+							<div> hello {body}</div>
+							<a href="/">go home</a>
+						</main>
+					}
+				})
+			]
+		)
+	]);
 }
 
 // modifies the request body to "jimmy"
 fn modify_request_layer(mut req: ResMut<Request>) { req.set_body("jimmy"); }
-
-// accepts a request body and inserts it into a html template with a
-// warm greeting
-// fn greet_user(req: Res<Request>) -> impl Clone {
-// 	// 2
-// }
-
-
-#[derive(Clone)]
-struct AppState {
-	started: std::time::Instant,
-	num_requests: u32,
-}
-impl AppState {
-	pub fn get() -> AppState { APP_STATE.lock().unwrap().clone() }
-	pub fn set(state: AppState) { *APP_STATE.lock().unwrap() = state; }
-}
-static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
-	Mutex::new(AppState {
-		started: std::time::Instant::now(),
-		num_requests: 0,
-	})
-});
-
-
-
 
 #[template]
 fn Home() -> impl Bundle {
@@ -84,7 +60,6 @@ fn Home() -> impl Bundle {
 
 	state.num_requests += 1;
 	AppState::set(state);
-
 	rsx! {
 		<Style/>
 		<main>
@@ -105,6 +80,24 @@ fn Home() -> impl Bundle {
 		</main>
 	}
 }
+
+#[derive(Clone)]
+struct AppState {
+	started: std::time::Instant,
+	num_requests: u32,
+}
+impl AppState {
+	pub fn get() -> AppState { APP_STATE.lock().unwrap().clone() }
+	pub fn set(state: AppState) { *APP_STATE.lock().unwrap() = state; }
+}
+static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
+	Mutex::new(AppState {
+		started: std::time::Instant::now(),
+		num_requests: 0,
+	})
+});
+
+
 
 
 #[template]
