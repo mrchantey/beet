@@ -85,7 +85,6 @@ fn collect_lang_snippets(
 mod test {
 	use crate::prelude::*;
 	use beet_core::node::SnippetRoot;
-	use beet_router::as_beet::WorkspaceConfig;
 	use beet_rsx::as_beet::*;
 	// use beet_utils::prelude::*;
 	use bevy::prelude::*;

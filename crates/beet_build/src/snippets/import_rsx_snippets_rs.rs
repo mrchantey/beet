@@ -73,7 +73,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::as_beet::render_fragment;
+	use beet_rsx::prelude::*;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

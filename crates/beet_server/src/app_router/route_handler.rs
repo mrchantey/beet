@@ -243,6 +243,24 @@ mod test {
 			.to_be(StatusCode::OK);
 	}
 	#[sweet::test]
+	async fn bundle() {
+		let mut app = App::new();
+		app.add_plugins(RouterPlugin);
+		let mut world = app.world_mut();
+		fn foo(_bar: Query<Entity>) -> impl Bundle + use<> {
+			rsx! {<div>hello</div>}
+		}
+
+		world.spawn(RouteHandler::bundle(foo));
+		Router::oneshot_str(&mut world, "/")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be(
+				"<!DOCTYPE html><html><head></head><body><div>hello</div></body></html>",
+			);
+	}
+	#[sweet::test]
 	async fn body() {
 		let mut world = World::new();
 		world.spawn(RouteHandler::new(|| "hello"));
