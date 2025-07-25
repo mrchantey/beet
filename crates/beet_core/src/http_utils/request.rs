@@ -4,6 +4,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::Uri;
+use http::header::IntoHeaderName;
 use http::request;
 
 /// A generalized request [`Resource`] added to every route app before the
@@ -20,11 +21,11 @@ impl Request {
 		Self { parts, body }
 	}
 
-	pub fn get(path: &str) -> Self {
+	pub fn get(path: impl AsRef<str>) -> Self {
 		Self {
 			parts: request::Builder::new()
 				.method(http::Method::GET)
-				.uri(path)
+				.uri(path.as_ref())
 				.body(())
 				.unwrap()
 				.into_parts()
@@ -32,9 +33,40 @@ impl Request {
 			body: None,
 		}
 	}
+	pub fn post(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Post)
+	}
 
-	pub fn set_body<T: Into<Bytes>>(&mut self, body: T) -> &mut Self {
-		self.body = Some(body.into());
+	pub fn with_method(mut self, method: HttpMethod) -> Self {
+		self.parts.method = method.into();
+		self
+	}
+
+	pub fn with_body(mut self, body: impl AsRef<[u8]>) -> Self {
+		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self
+	}
+
+	pub fn with_json_body<T: serde::Serialize>(
+		self,
+		body: &T,
+	) -> Result<Self, serde_json::Error> {
+		let body = serde_json::to_string(body)?;
+		Ok(self.with_body(body))
+	}
+
+	pub fn set_body(&mut self, body: impl AsRef<[u8]>) -> &mut Self {
+		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self
+	}
+	pub fn with_header<K: IntoHeaderName>(
+		mut self,
+		key: K,
+		value: &str,
+	) -> Self {
+		self.parts
+			.headers
+			.insert(key, http::header::HeaderValue::from_str(value).unwrap());
 		self
 	}
 
@@ -50,7 +82,10 @@ impl Request {
 
 	/// Parse both the key and value as valid URL query parameters.
 	#[cfg(feature = "serde")]
-	pub fn parse_query_param<T1: serde::Serialize, T2: serde::Serialize>(
+	pub fn parse_query_param<
+		T1: serde::Serialize + ?Sized,
+		T2: serde::Serialize,
+	>(
 		self,
 		key: &T1,
 		value: &T2,
@@ -121,6 +156,7 @@ impl Request {
 		};
 		Ok(Self { parts, body: bytes })
 	}
+	pub fn into_http_request(self) -> http::Request<Bytes> { self.into() }
 }
 
 
@@ -142,6 +178,15 @@ impl From<RouteInfo> for Request {
 
 impl Into<()> for Request {
 	fn into(self) -> () {}
+}
+
+impl Into<http::Request<Bytes>> for Request {
+	fn into(self) -> http::Request<Bytes> {
+		http::Request::from_parts(
+			self.parts,
+			self.body.unwrap_or_else(Bytes::new),
+		)
+	}
 }
 
 

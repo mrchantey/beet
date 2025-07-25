@@ -15,9 +15,9 @@ impl RealtimeApi {
 		req: RealtimeSessionCreateRequest,
 	) -> OpenAiResult<RealtimeSessionCreateResponse> {
 		Request::new("https://api.openai.com/v1/realtime/sessions")
-			.method(HttpMethod::Post)
-			.auth_bearer(&OpenAiKey::get()?)
-			.body(req)?
+			.with_method(HttpMethod::Post)
+			.with_auth_bearer(&OpenAiKey::get()?)
+			.with_body(req)?
 			.send()
 			.await?
 			.into_result()?

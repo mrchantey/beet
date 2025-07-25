@@ -75,7 +75,7 @@ impl Router {
 		world: &mut World,
 		req: impl Into<Request>,
 	) -> Result<String> {
-		Self::oneshot(world, req).await.xmap(|res| res.body_str())
+		Self::oneshot(world, req).await.xmap(|res| res.text())
 	}
 
 

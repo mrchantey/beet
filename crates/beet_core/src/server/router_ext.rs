@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use axum::Router;
+use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-
 
 pub struct AxumExt;
 
@@ -30,20 +30,20 @@ pub impl Router {
 	async fn oneshot_res(
 		&mut self,
 		req: impl Into<RouteInfo>,
-	) -> anyhow::Result<Response> {
+	) -> Result<Response> {
 		let req = req.into().into_request(String::new())?;
 		let res = self.oneshot(req).await?;
-		let res = Response::from_axum(res).await;
+		let res = Response::from_axum(res).await?;
 		Ok(res)
 	}
 	async fn oneshot_str(
 		&mut self,
 		req: impl Into<RouteInfo>,
-	) -> anyhow::Result<String> {
+	) -> Result<String> {
 		let req = req.into().into_request(String::new())?;
 		let res = self.oneshot(req).await?;
 		if res.status() != StatusCode::OK {
-			anyhow::bail!("Expected status code 200 OK, got {}", res.status());
+			bevybail!("Expected status code 200 OK, got {}", res.status());
 		}
 		let body = res.into_body().collect().await?.to_bytes();
 		let res = String::from_utf8(body.to_vec())?;
@@ -53,11 +53,11 @@ pub impl Router {
 	async fn oneshot_json<T: serde::de::DeserializeOwned>(
 		&mut self,
 		req: impl Into<RouteInfo>,
-	) -> anyhow::Result<T> {
+	) -> Result<T> {
 		let req = req.into().into_request(String::new())?;
 		let res = self.oneshot(req).await?;
 		if res.status() != StatusCode::OK {
-			anyhow::bail!("Expected status code 200 OK, got {}", res.status());
+			bevybail!("Expected status code 200 OK, got {}", res.status());
 		}
 		let body = res.into_body().collect().await?.to_bytes();
 		let res: T = serde_json::from_slice(&body)?;

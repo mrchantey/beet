@@ -57,7 +57,7 @@ impl CallServerAction {
 		route_info: RouteInfo,
 	) -> ServerActionResult<O, E> {
 		let req = Request::new(Self::create_url(&route_info))
-			.method(route_info.method);
+			.with_method(route_info.method);
 		Self::send(route_info, req).await
 	}
 
@@ -77,7 +77,7 @@ impl CallServerAction {
 			.map_err(|err| cross_fetch::Error::serialization(err))?;
 
 		let req = Request::new(Self::create_url(&route_info))
-			.method(route_info.method)
+			.with_method(route_info.method)
 			.query(&[("data", payload)])?;
 		Self::send(route_info, req).await
 	}
@@ -93,8 +93,8 @@ impl CallServerAction {
 		value: T,
 	) -> ServerActionResult<O, E> {
 		let req = Request::new(Self::create_url(&route_info))
-			.method(route_info.method)
-			.body(value)?;
+			.with_method(route_info.method)
+			.with_body(value)?;
 		Self::send(route_info, req).await
 	}
 

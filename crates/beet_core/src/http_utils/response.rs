@@ -1,9 +1,11 @@
 use crate::prelude::*;
+use beet_utils::utils::PipelineTarget;
 use bevy::ecs::system::RunSystemError;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
 use http::response;
+use serde::de::DeserializeOwned;
 use std::convert::Infallible;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
@@ -11,7 +13,7 @@ use std::convert::Infallible;
 #[derive(Debug, Clone, Resource)]
 pub struct Response {
 	pub parts: response::Parts,
-	pub body: Option<Bytes>,
+	pub body: Bytes,
 }
 
 impl PartialEq for Response {
@@ -38,7 +40,7 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			None,
+			Default::default(),
 		)
 	}
 
@@ -53,12 +55,12 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			Some(Bytes::copy_from_slice(body.as_ref())),
+			Bytes::copy_from_slice(body.as_ref()),
 		)
 	}
 
 
-	pub fn from_parts(parts: response::Parts, body: Option<Bytes>) -> Self {
+	pub fn from_parts(parts: response::Parts, body: Bytes) -> Self {
 		Self { parts, body }
 	}
 
@@ -72,39 +74,35 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: Some(Bytes::copy_from_slice(body.as_ref())),
+			body: Bytes::copy_from_slice(body.as_ref()),
 		}
 	}
 
-	pub fn body_str(self) -> Result<String> {
-		self.body
-			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
-			.ok_or_else(|| bevyhow!("Response body is empty"))
+	pub fn text(self) -> Result<String> {
+		String::from_utf8(self.body.to_vec())?.xok()
+	}
+
+	pub fn json<T: DeserializeOwned>(self) -> Result<T> {
+		serde_json::from_slice::<T>(&self.body)?.xok()
 	}
 
 	pub fn into_http(self) -> http::Response<Bytes> {
-		http::Response::from_parts(
-			self.parts,
-			self.body.unwrap_or_else(|| Bytes::new()),
-		)
+		http::Response::from_parts(self.parts, self.body)
 	}
 
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub fn into_axum(self) -> axum::response::Response {
 		axum::response::Response::from_parts(
 			self.parts,
-			self.body.map_or_else(
-				|| axum::body::Body::empty(),
-				|bytes| axum::body::Body::from(bytes),
-			),
+			axum::body::Body::from(self.body),
 		)
 	}
 
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub async fn from_axum(resp: axum::response::Response) -> Self {
+	pub async fn from_axum(resp: axum::response::Response) -> Result<Self> {
 		let (parts, body) = resp.into_parts();
-		let bytes = axum::body::to_bytes(body, usize::MAX).await.ok();
-		Self { parts, body: bytes }
+		let body = axum::body::to_bytes(body, usize::MAX).await?;
+		Self { parts, body }.xok()
 	}
 }
 
@@ -136,6 +134,13 @@ impl IntoResponse for &[u8] {
 
 impl Into<http::Response<Bytes>> for Response {
 	fn into(self) -> http::Response<Bytes> { self.into_http() }
+}
+
+impl From<http::Response<Bytes>> for Response {
+	fn from(res: http::Response<Bytes>) -> Self {
+		let (parts, body) = res.into_parts();
+		Response { parts, body }
+	}
 }
 
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
