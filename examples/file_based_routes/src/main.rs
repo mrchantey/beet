@@ -30,7 +30,7 @@ fn main() -> Result {
 #[rustfmt::skip]
 fn server_plugin(app: &mut App) {
 	app
-		.add_plugins(AppRouterPlugin)
+		.add_plugins(RouterPlugin)
 		.world_mut().spawn((
 			Name::new("File Based Routes"),
 			children![

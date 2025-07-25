@@ -3,12 +3,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
-pub struct AppRouterPlugin;
+pub struct RouterPlugin;
 
-impl Plugin for AppRouterPlugin {
+impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(TemplatePlugin)
-			.register_type::<RouteSegment>()
+			.register_type::<RouteFilter>()
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()
 			.register_type::<TemplateFlags>()

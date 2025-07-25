@@ -1,7 +1,9 @@
 #[cfg(feature = "bevy")]
 mod extractors;
 mod response;
+mod route_filter;
 pub use response::*;
+pub use route_filter::*;
 mod request;
 pub use request::*;
 mod http_error;

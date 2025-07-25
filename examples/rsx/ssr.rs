@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 fn main() {
 	App::new()
-		.add_plugins(AppRouterPlugin)
+		.add_plugins(RouterPlugin)
 		.add_systems(Startup, setup)
 		.run();
 }

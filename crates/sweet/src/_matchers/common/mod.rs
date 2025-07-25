@@ -1,4 +1,5 @@
 mod close_to;
+mod matcher_control_flow;
 #[allow(unused_imports)]
 pub use self::close_to::*;
 mod expect;

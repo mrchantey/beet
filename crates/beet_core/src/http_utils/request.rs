@@ -8,6 +8,7 @@ use http::request;
 #[derive(Debug, Clone, Resource)]
 pub struct Request {
 	pub parts: request::Parts,
+
 	pub body: Option<Bytes>,
 }
 

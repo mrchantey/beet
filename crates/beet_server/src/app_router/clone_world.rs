@@ -46,7 +46,7 @@ impl CloneWorld {
 
 	pub fn clone_world(self) -> Result<World> {
 		let mut app = App::new();
-		app.add_plugins(AppRouterPlugin);
+		app.add_plugins(RouterPlugin);
 		let mut world = std::mem::take(app.world_mut());
 
 		// let mut world = World::new();

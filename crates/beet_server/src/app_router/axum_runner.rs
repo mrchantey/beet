@@ -187,12 +187,14 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins(AppRouterPlugin);
+		app.add_plugins(RouterPlugin);
 		app.world_mut().spawn((
-			RouteSegment::new("pizza"),
+			RouteFilter::new("pizza"),
 			RouteHandler::new(|| "hello world!"),
 		));
 
+		// these tests also test the roundtrip CloneWorld mechanism
+		// catching errors like missing app.register_type::<T>()
 		AxumRunner::from_world(app.world_mut())
 			.oneshot_res("/dsfkdsl")
 			.await

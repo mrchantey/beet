@@ -8,59 +8,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 
-/// A segment of a route path, stripped of:
-/// - leading & trailing slashes `/`
-/// - dynamic prefixes `:`
-/// - wildcard prefixes `*`
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Component, Reflect,
-)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[reflect(Component)]
-pub enum RouteSegment {
-	/// A static segment, the `foo` in `/foo`
-	Static(String),
-	/// A dynamic segment, the `foo` in `/:foo`
-	Dynamic(String),
-	/// A wildcard segment, the `foo` in `/*foo`
-	Wildcard(String),
-}
-
-impl RouteSegment {
-	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
-	///
-	/// ## Panics
-	///
-	/// - Panics if the segment is empty after trimming
-	/// - Panics if the segment contains internal slashes '/'
-	pub fn new(segment: &str) -> Self {
-		// trim leading and trailing slashes
-		let trimmed = segment.trim_matches('/');
-		if trimmed.is_empty() {
-			panic!("RouteSegment cannot be empty");
-		}
-		if trimmed.contains('/') {
-			panic!("RouteSegment cannot contain internal slashes: {}", segment);
-		}
-		if trimmed.starts_with(':') {
-			Self::Dynamic(trimmed[1..].to_string())
-		} else if trimmed.starts_with('*') {
-			Self::Wildcard(trimmed[1..].to_string())
-		} else {
-			Self::Static(trimmed.to_string())
-		}
-	}
-
-	pub fn matches(&self, segment: &str) -> bool {
-		match self {
-			Self::Static(s) => s == segment,
-			Self::Dynamic(_) => true, // dynamic segments match anything
-			Self::Wildcard(_) => true, // wildcard segments match anything
-		}
-	}
-}
-
 
 /// Describes an absolute path to a route, beginning with `/`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -11,7 +11,7 @@ use std::fmt;
 ///
 /// Additionally the naming convention follows Rusty conventions rather
 /// than HTTP conventions, ie `Get` instead of `GET`.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy, Component)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {
