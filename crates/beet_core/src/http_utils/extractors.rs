@@ -42,6 +42,25 @@ impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
 		Ok(Json(json))
 	}
 }
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EncodedQueryParams {
+	/// A serde_json representation of the QueryParams.
+	pub data: String,
+}
+impl EncodedQueryParams {
+	pub fn from_value<T: serde::Serialize + ?Sized>(
+		params: &T,
+	) -> Result<Self, serde_json::Error> {
+		let data = serde_json::to_string(params)?;
+		Ok(Self { data })
+	}
+	pub fn into_value<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T, serde_json::Error> {
+		serde_json::from_str(&self.data)
+	}
+}
+
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
@@ -179,14 +198,22 @@ mod test {
 
 	#[test]
 	fn urlencoded() {
-		// expect(true).to_be_false();
+		let dirty_string = "foo$\" \" &dsds?sd#@$)#@$*()";
 
-		#[derive(serde::Serialize, serde::Deserialize, Debug)]
-		struct Data<T> {
-			value: T,
+		let a = serde_urlencoded::to_string(
+			EncodedQueryParams::from_value(dirty_string).unwrap(),
+		)
+		.unwrap();
+
+		for str in &[" ", "$", "\"", "&", "?", "#", "@", "(", ")"] {
+			expect(&a).not().to_contain(str);
 		}
 
-		let a = serde_urlencoded::to_string(33).unwrap();
-		println!("a: {a}");
+		serde_urlencoded::from_str::<EncodedQueryParams>(&a)
+			.unwrap()
+			.into_value::<String>()
+			.unwrap()
+			.xpect()
+			.to_be(dirty_string);
 	}
 }
