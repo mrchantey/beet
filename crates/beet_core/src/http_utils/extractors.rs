@@ -27,7 +27,9 @@ impl Into<Png> for String {
 
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request> for Json<T> {
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+	for Json<T>
+{
 	type Error = HttpError;
 
 	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
@@ -42,7 +44,9 @@ impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request> for Json<T> 
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request> for QueryParams<T> {
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+	for QueryParams<T>
+{
 	type Error = HttpError;
 
 	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
@@ -171,5 +175,18 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be("5");
+	}
+
+	#[test]
+	fn urlencoded() {
+		// expect(true).to_be_false();
+
+		#[derive(serde::Serialize, serde::Deserialize, Debug)]
+		struct Data<T> {
+			value: T,
+		}
+
+		let a = serde_urlencoded::to_string(33).unwrap();
+		println!("a: {a}");
 	}
 }

@@ -1,7 +1,7 @@
 #[cfg(any(feature = "server", feature = "client"))]
 #[path = "codegen/client_actions.rs"]
 mod client_actions;
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", feature = "client"))]
 mod codegen;
 #[cfg(any(feature = "server", feature = "client"))]
 pub mod types;

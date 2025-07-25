@@ -5,7 +5,17 @@ use bevy::prelude::*;
 use syn::Ident;
 use syn::ItemFn;
 
-/// Tokens for a function that may be used as a route.
+/// Tokens for a function that may be used as a route:
+///
+/// ```ignore
+/// pub fn get()->impl Bundle{
+/// ..
+/// }
+///
+/// pub fn post()->impl IntoResponse{
+/// ..
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
 	/// A reasonable route path generated from this file's local path,

@@ -1,6 +1,7 @@
 use beet_core::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::pin::Pin;
@@ -32,7 +33,7 @@ type RouteHandlerFunc = dyn 'static
 
 
 
-	
+
 
 impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`]
@@ -45,12 +46,11 @@ impl RouteHandler {
 		InErr: IntoResponse,
 	{
 		let handler = move |world: &mut World| -> Result<Out, Response> {
-			let request =
-				world.remove_resource::<Request>().ok_or_else(|| {
+			let input = world
+				.remove_resource::<Request>()
+				.ok_or_else(|| {
 					bevyhow!("no request found in world").into_response()
-				})?;
-
-			let input = request
+				})?
 				.try_into()
 				.map_err(|err: InErr| err.into_response())?;
 			let out = world
@@ -67,13 +67,23 @@ impl RouteHandler {
 
 	/// A route handler returning a bundle, which is inserted into the world
 	/// with a [`HandlerBundle`] component.
-	pub fn bundle<T, Out, Marker>(handler: T) -> Self
+	pub fn bundle<T, In, InErr, Out, Marker>(handler: T) -> Self
 	where
-		T: 'static + Send + Sync + Clone + IntoSystem<(), Out, Marker>,
+		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
+		In: 'static + SystemInput,
+		for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
+		InErr: IntoResponse,
 		Out: 'static + Send + Sync + Bundle,
 	{
-		Self::layer(move |world: &mut World| {
-			match world.run_system_once(handler.clone()) {
+		let handler = move |world: &mut World| -> Result<(), Response> {
+			let input = world
+				.remove_resource::<Request>()
+				.ok_or_else(|| {
+					bevyhow!("no request found in world").into_response()
+				})?
+				.try_into()
+				.map_err(|err: InErr| err.into_response())?;
+			match world.run_system_once_with(handler.clone(), input) {
 				Ok(out) => {
 					world.spawn((HandlerBundle, out));
 				}
@@ -81,41 +91,45 @@ impl RouteHandler {
 					world.insert_resource(err.into_response());
 				}
 			}
+			Ok(())
+		};
+
+		Self::layer(move |world: &mut World| {
+			if let Err(err) = handler(world) {
+				world.insert_resource(err);
+			}
 		})
 	}
 
 	/// A route handler accepting an input type to be extracted from the request.
 	/// - For requests with no body, ie `GET`, the input is deserialized from the query parameters.
 	/// - For requests with a body, ie `POST`, `PUT`, etc, the input is deserialized from the body.
-	pub fn new_action<T, Input, Out, Marker>(
-		method: HttpMethod,
-		handler: T,
-	) -> Self
+	pub fn action<T, Input, Out, Marker>(method: HttpMethod, handler: T) -> Self
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
 		Input: 'static + SystemInput,
 		for<'a> Input::Inner<'a>: DeserializeOwned,
-		Out: 'static + Send + Sync + IntoResponse,
+		Out: 'static + Send + Sync + Serialize,
 	{
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => Self::new(
 				move |val: In<Json<Input::Inner<'_>>>,
 				      world: &mut World|
-				      -> Result<Out> {
+				      -> Result<Json<Out>> {
 					let out = world
 						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(out)
+					Ok(Json(out))
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => Self::new(
 				move |val: In<QueryParams<Input::Inner<'_>>>,
 				      world: &mut World|
-				      -> Result<Out> {
+				      -> Result<Json<Out>> {
 					let out = world
 						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(out)
+					Ok(Json(out))
 				},
 			),
 		}
@@ -138,13 +152,13 @@ impl RouteHandler {
 	}
 
 	/// An async route handler with output inserted as a [`Response`]
-	pub fn new_async_system<Handler, Fut, Out>(handler: Handler) -> Self
+	pub fn async_system<Handler, Fut, Out>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + Fn(&mut World) -> Fut,
 		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::new_async_layer(move |mut world: World| {
+		Self::async_layer(move |mut world: World| {
 			let func = handler.clone();
 			async move {
 				let out = func(&mut world).await;
@@ -160,7 +174,7 @@ impl RouteHandler {
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::new_async_layer(move |world: World| {
+		Self::async_layer(move |world: World| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -172,13 +186,13 @@ impl RouteHandler {
 
 	/// An async route handler returning a bundle, which is inserted into the world
 	/// with a [`HandlerBundle`] component.
-	pub fn new_async_bundle<Handler, Fut, Out>(handler: Handler) -> Self
+	pub fn async_bundle<Handler, Fut, Out>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + Fn(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + Bundle,
 	{
-		Self::new_async_layer(move |world: World| {
+		Self::async_layer(move |world: World| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -189,7 +203,7 @@ impl RouteHandler {
 	}
 
 	/// An async route handler with output inserted as a [`Response`]
-	pub fn new_async_layer<Handler, Fut>(handler: Handler) -> Self
+	pub fn async_layer<Handler, Fut>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + Fn(World) -> Fut,
 		Fut: 'static + Send + Future<Output = World>,

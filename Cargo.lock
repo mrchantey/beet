@@ -3230,6 +3230,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "demo_site"
+version = "0.0.6-dev.7"
+dependencies = [
+ "beet",
+ "serde",
+]
+
+[[package]]
 name = "deranged"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3677,14 +3685,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bc904b9bbefcadbd8e3a9fb0d464a9b979de6324c03b3c663e8994f46a5be36"
 dependencies = [
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "file_based_routes"
-version = "0.0.6-dev.7"
-dependencies = [
- "beet",
- "serde",
 ]
 
 [[package]]

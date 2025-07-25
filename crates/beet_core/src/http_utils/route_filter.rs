@@ -38,6 +38,12 @@ impl RouteFilter {
 			methods: Vec::new(),
 		}
 	}
+
+	pub fn from_info(route_info: &RouteInfo) -> Self {
+		Self::new(&route_info.path.to_string_lossy())
+			.with_method(route_info.method)
+	}
+
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
 		self.methods.push(method);
 		self

@@ -10,7 +10,7 @@ pub fn config_plugin(app: &mut App) {
 		// override default location
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/codegen/mod.rs",
+				"examples/demo_site/src/codegen/mod.rs",
 			)
 			.unwrap(),
 		),
@@ -38,14 +38,14 @@ fn pages() -> impl Bundle {
 	(
 		RouteFileCollection {
 			src: AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/pages",
+				"examples/demo_site/src/pages",
 			)
 			.unwrap(),
 			..default()
 		},
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/codegen/pages.rs",
+				"examples/demo_site/src/codegen/pages.rs",
 			)
 			.unwrap(),
 		),
@@ -55,7 +55,7 @@ fn docs() -> impl Bundle {
 	(
 		RouteFileCollection {
 			src: AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/docs",
+				"examples/demo_site/src/docs",
 			)
 			.unwrap(),
 			..default()
@@ -67,7 +67,7 @@ fn docs() -> impl Bundle {
 		MetaType::new(syn::parse_quote!(crate::prelude::Article)),
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/codegen/docs/mod.rs",
+				"examples/demo_site/src/codegen/docs/mod.rs",
 			)
 			.unwrap(),
 		),
@@ -75,14 +75,14 @@ fn docs() -> impl Bundle {
 }
 fn actions() -> impl Bundle {
 	let actions_path = AbsPathBuf::new_workspace_rel(
-		"examples/file_based_routes/src/codegen/actions.rs",
+		"examples/demo_site/src/codegen/actions.rs",
 	)
 	.unwrap();
 
 	(
 		RouteFileCollection {
 			src: AbsPathBuf::new_workspace_rel(
-				"examples/file_based_routes/src/actions",
+				"examples/demo_site/src/actions",
 			)
 			.unwrap(),
 			category: RouteCollectionCategory::Actions,
@@ -93,7 +93,7 @@ fn actions() -> impl Bundle {
 			CollectClientActions::default(),
 			CodegenFile::new(
 				AbsPathBuf::new_workspace_rel(
-					"examples/file_based_routes/src/codegen/client_actions.rs",
+					"examples/demo_site/src/codegen/client_actions.rs",
 				)
 				.unwrap(),
 			)

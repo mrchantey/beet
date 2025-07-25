@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::TokenizeSelf;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -39,10 +39,10 @@ pub fn collect_route_files(
 						// page routes are presumed to be bundles
 						match is_async {
 							true => quote! {
-								RouteHandler::new_async_bundle(#mod_ident::#func_ident)
+								RouteHandler::async_bundle(#mod_ident::#func_ident)
 							},
 							false => quote! {
-								RouteHandler::new_bundle(#mod_ident::#func_ident)
+								RouteHandler::bundle(#mod_ident::#func_ident)
 							},
 						}
 					}
@@ -53,12 +53,14 @@ pub fn collect_route_files(
 							.self_token_stream();
 						// Action routes may be any kind of route
 						quote! {
-							RouteHandler::new_action(#method, #mod_ident::#func_ident)
+							RouteHandler::action(#method, #mod_ident::#func_ident)
 						}
 					}
 				};
-				let route_info =
-					route_file_method.route_info.self_token_stream();
+				let filter =
+					RouteFilter::from_info(&route_file_method.route_info)
+						.self_token_stream();
+
 				let static_route =
 					if collection.category.include_in_route_tree() {
 						Some(quote! { StaticRoute, })
@@ -66,8 +68,8 @@ pub fn collect_route_files(
 						None
 					};
 				children.push(quote! {(
-					#route_info,
 					#static_route
+					#filter,
 					#handler
 				)});
 			}

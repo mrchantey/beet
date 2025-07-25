@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use file_based_routes::prelude::*;
+use demo_site::prelude::*;
 
 
 
