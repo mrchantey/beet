@@ -1,8 +1,6 @@
 use super::types::*;
 use crate::openai::*;
-use beet_core::cross_fetch::Request;
-use beet_core::cross_fetch::ResponseInner;
-use beet_core::prelude::*;
+// use bevy::prelude::*;
 
 /// REST API endpoint to generate ephemeral session tokens for use in client-side applications.
 pub struct RealtimeApi;
@@ -13,17 +11,19 @@ impl RealtimeApi {
 	/// https://platform.openai.com/docs/api-reference/realtime-sessions
 	pub async fn create(
 		req: RealtimeSessionCreateRequest,
-	) -> OpenAiResult<RealtimeSessionCreateResponse> {
-		Request::new("https://api.openai.com/v1/realtime/sessions")
-			.with_method(HttpMethod::Post)
-			.with_auth_bearer(&OpenAiKey::get()?)
-			.with_body(req)?
-			.send()
-			.await?
-			.into_result()?
-			.body::<RealtimeSessionCreateResponse>()
-			.await?
-			.xok()
+	) -> Result<RealtimeSessionCreateResponse> {
+		Request::new(
+			HttpMethod::Post,
+			"https://api.openai.com/v1/realtime/sessions",
+		)
+		.with_auth_bearer(&OpenAiKey::get()?)
+		.with_json_body(&req)
+		.unwrap()
+		.send()
+		.await?
+		.into_result()?
+		.json::<RealtimeSessionCreateResponse>()?
+		.xok()
 	}
 }
 

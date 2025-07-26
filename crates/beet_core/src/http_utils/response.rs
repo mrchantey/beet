@@ -5,7 +5,6 @@ use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
 use http::response;
-use serde::de::DeserializeOwned;
 use std::convert::Infallible;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
@@ -29,7 +28,7 @@ impl PartialEq for Response {
 impl Response {
 	pub fn ok() -> Self { Self::from_status(StatusCode::OK) }
 	pub fn not_found() -> Self {
-		Self::from_status_body(StatusCode::NOT_FOUND, "Not Found")
+		Self::from_status_body(StatusCode::NOT_FOUND, "Not Found", "text/plain")
 	}
 	pub fn status(&self) -> StatusCode { self.parts.status }
 	pub fn from_status(status: StatusCode) -> Self {
@@ -47,10 +46,12 @@ impl Response {
 	pub fn from_status_body(
 		status: StatusCode,
 		body: impl AsRef<[u8]>,
+		content_type: &str,
 	) -> Self {
 		Self::from_parts(
 			http::response::Builder::new()
 				.status(status)
+				.header(http::header::CONTENT_TYPE, content_type)
 				.body(())
 				.unwrap()
 				.into_parts()
@@ -82,12 +83,25 @@ impl Response {
 		String::from_utf8(self.body.to_vec())?.xok()
 	}
 
-	pub fn json<T: DeserializeOwned>(self) -> Result<T> {
-		serde_json::from_slice::<T>(&self.body)?.xok()
+	#[cfg(feature = "serde")]
+	pub fn json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
+		serde_json::from_slice::<T>(&self.body).map_err(|e| {
+			bevyhow!("Failed to deserialize response body\n {}", e)
+		})
 	}
 
 	pub fn into_http(self) -> http::Response<Bytes> {
 		http::Response::from_parts(self.parts, self.body)
+	}
+
+	/// Convert the response into a result,
+	/// returning an error if the status code is not successful 2xx.
+	pub fn into_result(self) -> Result<Self, HttpError> {
+		if self.parts.status.is_success() {
+			Ok(self)
+		} else {
+			Err(self.into())
+		}
 	}
 
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
@@ -188,9 +202,11 @@ impl<T: IntoResponse> IntoResponse for Option<T> {
 	fn into_response(self) -> Response {
 		match self {
 			Some(t) => t.into_response(),
-			None => {
-				Response::from_status_body(StatusCode::NOT_FOUND, b"Not Found")
-			}
+			None => Response::from_status_body(
+				StatusCode::NOT_FOUND,
+				b"Not Found",
+				"text/plain",
+			),
 		}
 	}
 }

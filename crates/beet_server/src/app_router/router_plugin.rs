@@ -3,6 +3,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
+
+#[derive(Default)]
 pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {

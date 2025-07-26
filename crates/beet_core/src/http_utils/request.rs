@@ -17,7 +17,19 @@ pub struct Request {
 }
 
 impl Request {
-	pub fn new(parts: request::Parts, body: Option<Bytes>) -> Self {
+	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
+		let parts = request::Builder::new()
+			.method(method)
+			.uri(path.as_ref())
+			.body(())
+			.expect("Failed to create request parts")
+			.into_parts()
+			.0;
+		Self { parts, body: None }
+	}
+
+
+	pub fn from_parts(parts: request::Parts, body: Option<Bytes>) -> Self {
 		Self { parts, body }
 	}
 
@@ -47,6 +59,7 @@ impl Request {
 		self
 	}
 
+	#[cfg(feature = "serde")]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,
@@ -97,21 +110,23 @@ impl Request {
 
 	/// Insert a query parameter into the request URI without checking it is
 	/// a valid URL, for the checked version use [`Self::parse_query_param`].
-	pub fn with_query_param(mut self, key: &str, value: &str) -> Result<Self> {
-		let path = self.parts.uri.path();
-		let query = self.parts.uri.query();
-		let path_and_query = if let Some(query) = query {
-			format!("{}?{}&{}={}", path, query, key, value)
+	pub fn with_query_param(self, key: &str, value: &str) -> Result<Self> {
+		let updated_query = if let Some(query) = self.parts.uri.query() {
+			format!("{}&{}={}", query, key, value)
 		} else {
-			format!("{}?{}={}", path, key, value)
+			format!("{}={}", key, value)
 		};
+		self.with_query_string(&updated_query)
+	}
+	pub fn with_query_string(mut self, query: &str) -> Result<Self> {
+		let path = self.parts.uri.path();
+		let path_and_query = format!("{}?{}", path, query);
 		let mut uri_parts = self.parts.uri.clone().into_parts();
 		uri_parts.path_and_query =
 			Some(http::uri::PathAndQuery::from_str(&path_and_query)?);
 		self.parts.uri = Uri::from_parts(uri_parts)?;
 		Ok(self)
 	}
-
 
 	pub fn method(&self) -> HttpMethod {
 		HttpMethod::from(self.parts.method.clone())

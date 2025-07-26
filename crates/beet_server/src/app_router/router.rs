@@ -85,10 +85,9 @@ impl Router {
 		request: Request,
 	) -> (World, Response) {
 		if request.parts.uri.path().starts_with("/.well-known/") {
-			// skip well-known requests
+			// skip 'well-known' requests
 			return (world, Response::not_found());
 		}
-
 
 		let start_time = CrossInstant::now();
 
@@ -136,6 +135,7 @@ async fn handle_request_recursive(
 	}];
 
 	while let Some(StackFrame { entity, mut parts }) = stack.pop() {
+
 		if let Some(filter) = world.entity(entity).get::<RouteFilter>() {
 			match filter.matches(parts.clone()) {
 				ControlFlow::Break(_) => {

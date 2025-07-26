@@ -18,8 +18,8 @@ keywords.workspace = true
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
-
-beet_core = { workspace = true, features = ["net"] }
+bevy.workspace = true
+beet_core = { workspace = true, features = ["bevy", "net"] }
 beet_utils.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -1,14 +1,10 @@
 use crate::prelude::*;
-use beet_core::net::cross_fetch;
-use beet_core::net::cross_fetch::Request;
-use beet_core::net::cross_fetch::ResponseInner;
 use beet_core::prelude::*;
-use beet_utils::prelude::*;
+use bevy::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 use std::sync::Mutex;
-
 
 /// the url for the server.
 /// On native builds this defaults to `http://127.0.0.1:3000`.
@@ -30,93 +26,77 @@ impl CallServerAction {
 	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
 	/// on wasm we assume the same domain and dont prefix SERVER_URL.
 	fn create_url(route_info: &RouteInfo) -> String {
-		format!("{}{}", Self::get_server_url(), route_info.path)
+		format!("{}{}", CallServerAction::get_server_url(), route_info.path)
 	}
-
-
 	/// Makes a HTTP request to a server action.
 	/// Automatically uses the correct request style based on the HTTP method:
 	/// - Bodyless methods (GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE) send data as query parameters
 	/// - Methods with body (POST, PUT, PATCH) send data in the request body
-	pub async fn request<
-		T: Serialize,
-		O: DeserializeOwned,
-		E: DeserializeOwned,
-	>(
+	pub async fn request<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
-		value: T,
+		value: impl Serialize,
 	) -> ServerActionResult<O, E> {
 		if route_info.method.has_body() {
 			Self::request_with_body(route_info, value).await
 		} else {
 			Self::request_with_query(route_info, value).await
 		}
+		.map_err(ServerActionError::from)
 	}
 	//// Makes a HTTP request to a server action without any data.
 	pub async fn request_no_data<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
 	) -> ServerActionResult<O, E> {
-		let req = Request::new(Self::create_url(&route_info))
-			.with_method(route_info.method);
-		Self::send(route_info, req).await
+		let req =
+			Request::new(route_info.method, Self::create_url(&route_info));
+		Self::send(req).await.map_err(ServerActionError::from)
 	}
 
 	/// Internal function to make a request with data in the query parameters.
 	/// This will be first serialized as json and then encoded as a query parameter
 	/// for deserilaization by [`JsonQuery`].
 	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
-	async fn request_with_query<
-		T: Serialize,
-		O: DeserializeOwned,
-		E: DeserializeOwned,
-	>(
+	async fn request_with_query<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
-		value: T,
+		value: impl Serialize,
 	) -> ServerActionResult<O, E> {
-		let payload = serde_json::to_string(&value)
-			.map_err(|err| cross_fetch::Error::serialization(err))?;
-
-		let req = Request::new(Self::create_url(&route_info))
-			.with_method(route_info.method)
-			.query(&[("data", payload)])?;
-		Self::send(route_info, req).await
+		let payload = JsonQueryParams::to_query_string(&value)
+			.map_err(ServerActionError::from_opaque)?;
+		let req =
+			Request::new(route_info.method, Self::create_url(&route_info))
+				.with_query_string(&payload)
+				.map_err(ServerActionError::from_opaque)?;
+		Self::send(req).await
 	}
 
 	/// Internal function to make a request with data in the request body.
 	/// Used by POST, PUT, PATCH methods.
-	async fn request_with_body<
-		T: Serialize,
-		O: DeserializeOwned,
-		E: DeserializeOwned,
-	>(
+	async fn request_with_body<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
-		value: T,
+		value: impl Serialize,
 	) -> ServerActionResult<O, E> {
-		let req = Request::new(Self::create_url(&route_info))
-			.with_method(route_info.method)
-			.with_body(value)?;
-		Self::send(route_info, req).await
+		let req =
+			Request::new(route_info.method, Self::create_url(&route_info))
+				.with_json_body(&value)
+				.map_err(ServerActionError::from_opaque)?;
+		Self::send(req).await
 	}
 
 
 	async fn send<O: DeserializeOwned, E: DeserializeOwned>(
-		_route_info: RouteInfo,
 		req: Request,
 	) -> ServerActionResult<O, E> {
-		let res = req.send().await?;
-		let status = res.status_code();
-
-		let body_bytes = res.bytes().await?;
+		let res = req.send().await.map_err(ServerActionError::from_opaque)?;
+		let status = res.status();
 
 		if status.is_success() {
-			serde_json::from_slice::<O>(&body_bytes)
-				.map_err(|err| cross_fetch::Error::serialization(err))?
-				.xok()
-		} else if let Ok(err) = serde_json::from_slice(&body_bytes) {
+			res.json().map_err(ServerActionError::from_opaque)
+			// if not success, try to deserialize the error
+			// using the actions Error type
+		} else if let Ok(err) = serde_json::from_slice::<E>(&res.body) {
 			Err(ServerActionError::ActionError(err))
 		} else {
-			let str = String::from_utf8_lossy(&body_bytes).to_string();
-			Err(ServerActionError::UnparsedError(status, str))
+			Err(ServerActionError::HttpError::<E>(res.into()))
 		}
 	}
 }
@@ -126,40 +106,26 @@ impl CallServerAction {
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
-	use axum::Json;
-	use axum::Router;
-	use axum::routing::get;
-	use axum::routing::post;
 	use beet_core::prelude::*;
+	use bevy::prelude::*;
 	use sweet::prelude::*;
 	use tokio::net::TcpListener;
-	use tokio::spawn;
 	use tokio::task::JoinHandle;
 
-	async fn add_via_get(
-		JsonQuery(params): JsonQuery<(i32, i32)>,
-	) -> Json<i32> {
-		Json(params.0 + params.1)
-	}
-
-	async fn add_via_post(Json(params): Json<(i32, i32)>) -> Json<i32> {
-		Json(params.0 + params.1)
-	}
-
-	fn check(val: i32) -> anyhow::Result<()> {
-		if val > 0 {
-			Ok(())
+	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
+	fn add_via_post(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
+	fn increment_if_positive(In(params): In<i32>) -> Result<i32, String> {
+		if params > 0 {
+			Ok(params + 1)
 		} else {
-			anyhow::bail!("expected positive number, received {val}")
+			Err(format!("expected positive number, received {params}"))
 		}
 	}
 
-	async fn reject_neg(Json(params): Json<i32>) -> Result<(), ActionError> {
-		check(params).into_action_result()
-	}
+	// fn parse_err
 
 	#[must_use]
-	async fn serve(router: Router) -> JoinHandle<()> {
+	async fn serve(router: axum::Router) -> JoinHandle<()> {
 		// random port assigned
 		let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 		let addr = listener.local_addr().unwrap();
@@ -169,28 +135,50 @@ mod test {
 		)));
 
 		// Start the server in a separate task, dropped on exit
-		spawn(async move {
+		tokio::spawn(async move {
 			axum::serve(listener, router).await.unwrap();
 		})
 	}
-
 	// only a single entry because set_server_url is static
 	#[sweet::test]
 	async fn works() {
-		let _server = serve(
-			Router::new()
-				.route("/add", get(add_via_get))
-				.route("/add", post(add_via_post))
-				.route("/reject_neg", post(reject_neg)),
-		)
-		.await;
+		let mut app = App::new();
+		app.add_plugins(RouterPlugin::default());
+		app.world_mut().spawn(children![
+			(
+				RouteFilter::new("/add").with_method(HttpMethod::Get),
+				RouteHandler::action(
+					HttpMethod::Get,
+					add_via_get.pipe(Json::pipe)
+				)
+			),
+			(
+				RouteFilter::new("/add").with_method(HttpMethod::Post),
+				RouteHandler::action(
+					HttpMethod::Post,
+					add_via_post.pipe(Json::pipe)
+				)
+			),
+			(
+				RouteFilter::new("/increment_if_positive")
+					.with_method(HttpMethod::Get),
+				RouteHandler::action(
+					HttpMethod::Get,
+					increment_if_positive.pipe(JsonResult::pipe)
+				)
+			),
+		]);
+
+		let router =
+			AxumRunner::from_world(app.world_mut(), Default::default());
+		let _handle = serve(router).await;
 		test_get().await;
 		test_post().await;
-		rejects().await;
+		test_result().await;
 	}
 	async fn test_get() {
 		expect(
-			CallServerAction::request::<_, i32, ()>(
+			CallServerAction::request::<i32, ()>(
 				RouteInfo::new("/add", HttpMethod::Get),
 				(5, 3),
 			)
@@ -201,7 +189,7 @@ mod test {
 	}
 	async fn test_post() {
 		expect(
-			CallServerAction::request::<_, i32, ()>(
+			CallServerAction::request::<i32, ()>(
 				RouteInfo::new("/add", HttpMethod::Post),
 				(10, 7),
 			)
@@ -210,16 +198,25 @@ mod test {
 		)
 		.to_be(17);
 	}
-	async fn rejects() {
+	async fn test_result() {
 		expect(
-			CallServerAction::request::<_, i32, String>(
-				RouteInfo::new("/reject_neg", HttpMethod::Post),
+			CallServerAction::request::<i32, String>(
+				RouteInfo::new("/increment_if_positive", HttpMethod::Get),
+				7,
+			)
+			.await
+			.unwrap(),
+		)
+		.to_be(8);
+		expect(
+			CallServerAction::request::<i32, String>(
+				RouteInfo::new("/increment_if_positive", HttpMethod::Get),
 				-7,
 			)
 			.await
 			.unwrap_err()
 			.to_string(),
 		)
-		.to_contain("expected positive number, received -7");
+		.to_be("expected positive number, received -7");
 	}
 }

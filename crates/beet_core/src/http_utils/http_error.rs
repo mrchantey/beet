@@ -111,7 +111,29 @@ impl From<serde_urlencoded::de::Error> for HttpError {
 
 impl Into<Response> for HttpError {
 	fn into(self) -> Response {
-		Response::from_status_body(self.status_code, self.message.as_bytes())
+		Response::from_status_body(
+			self.status_code,
+			self.message.as_bytes(),
+			"text/plain",
+		)
+	}
+}
+
+impl From<Response> for HttpError {
+	fn from(resp: Response) -> Self {
+		let message = if resp.body.is_empty() {
+			resp.status()
+				.canonical_reason()
+				.unwrap_or("Unknown error")
+				.to_string()
+		} else {
+			String::from_utf8_lossy(&resp.body).to_string()
+		};
+
+		Self {
+			status_code: resp.status(),
+			message,
+		}
 	}
 }
 

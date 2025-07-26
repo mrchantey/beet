@@ -41,6 +41,7 @@ impl HttpMethod {
 	pub fn to_string_lowercase(&self) -> String {
 		self.to_string().to_ascii_lowercase()
 	}
+	pub fn into_http(self) -> http::Method { self.into() }
 }
 impl From<http::Method> for HttpMethod {
 	fn from(value: http::Method) -> Self { Self::from(&value) }

@@ -19,6 +19,7 @@ impl AxumRunner {
 		let clone_world = CloneWorld::new(world);
 		// Add a catch-all fallback handler for unmatched routes
 		let route = routing::any(move |request: axum::extract::Request| {
+
 			let world = clone_world.clone();
 			async move {
 				handle_axum_request(world, request)
@@ -43,14 +44,13 @@ impl AxumRunner {
 
 		router = Self::from_world(app.world_mut(), router);
 
+		router = router.merge(state_utils_routes());
+		// .layer(NormalizePathLayer::trim_trailing_slash());
 		let html_dir = app
 			.world()
 			.resource::<WorkspaceConfig>()
 			.html_dir
 			.into_abs();
-
-		router = router.merge(state_utils_routes());
-		// .layer(NormalizePathLayer::trim_trailing_slash());
 
 		match self.runner.mode.unwrap_or_default() {
 			RouterMode::Ssg => {

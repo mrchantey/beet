@@ -1,13 +1,13 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use http::HeaderMap;
+use http::StatusCode;
 use http::request;
 
 pub struct Html(pub String);
 pub struct Css(pub String);
 pub struct Javascript(pub String);
-pub struct Json<T>(pub T);
-pub struct QueryParams<T>(pub T);
 pub struct Png(pub String);
 
 
@@ -25,6 +25,65 @@ impl Into<Png> for String {
 }
 
 
+pub struct JsonResult<T, E> {
+	pub result: Result<T, E>,
+	/// The status code to return in case of an error,
+	/// defaults to 418 (I'm a teapot).
+	pub err_status: StatusCode,
+}
+
+impl<T, E> From<Result<T, E>> for JsonResult<T, E> {
+	fn from(result: Result<T, E>) -> Self {
+		Self {
+			result,
+			err_status: StatusCode::IM_A_TEAPOT,
+		}
+	}
+}
+
+impl<T, E> JsonResult<T, E> {
+	/// Convenience function for system piping
+	pub fn pipe(val: In<Result<T, E>>) -> Self { Self::from(val.0) }
+	pub fn pipe_with_status(
+		status: StatusCode,
+	) -> impl Fn(In<Result<T, E>>) -> Self {
+		move |val: In<Result<T, E>>| Self {
+			result: val.0,
+			err_status: status,
+		}
+	}
+}
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
+	for JsonResult<T, E>
+{
+	type Error = HttpError;
+
+	fn try_into(self) -> Result<Response, Self::Error> {
+		match self.result {
+			Ok(val) => {
+				let ok_body = serde_json::to_string(&val)?;
+				Response::ok_body(&ok_body, "application/json")
+			}
+			Err(err) => {
+				let err_body = serde_json::to_string(&err)?;
+				Response::from_status_body(
+					self.err_status,
+					&err_body,
+					"application/json",
+				)
+			}
+		}
+		.xok()
+	}
+}
+
+pub struct Json<T>(pub T);
+
+impl<T> Json<T> {
+	/// Convenience function for system piping
+	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
+}
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
@@ -42,25 +101,80 @@ impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
 		Ok(Json(json))
 	}
 }
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EncodedQueryParams {
-	/// A serde_json representation of the QueryParams.
-	pub data: String,
-}
-impl EncodedQueryParams {
-	pub fn from_value<T: serde::Serialize + ?Sized>(
-		params: &T,
-	) -> Result<Self, serde_json::Error> {
-		let data = serde_json::to_string(params)?;
-		Ok(Self { data })
-	}
-	pub fn into_value<T: serde::de::DeserializeOwned>(
-		self,
-	) -> Result<T, serde_json::Error> {
-		serde_json::from_str(&self.data)
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize> TryInto<Response> for Json<T> {
+	type Error = HttpError;
+
+	fn try_into(self) -> Result<Response, Self::Error> {
+		let json_str = serde_json::to_string(&self.0)?;
+		Ok(Response::ok_body(
+			&json_str,
+			"application/json; charset=utf-8",
+		))
 	}
 }
 
+
+/// [`QueryParams`] is a limited format, for example enums and tuples are not allowed,
+/// this struct accepts any value by first serializing it as JSON,
+/// then encode it as a URL-encoded string, for use as a query param value.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct JsonQueryParams<T>(pub T);
+
+/// The query params representation of the [`JsonQueryParams`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+struct JsonQueryParamsInner {
+	data: String,
+}
+
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize> JsonQueryParams<T> {
+	pub fn to_query_string(value: &T) -> Result<String> {
+		let data = serde_json::to_string(value)?;
+		serde_urlencoded::to_string(&JsonQueryParamsInner { data })?.xok()
+	}
+}
+
+#[cfg(feature = "serde")]
+impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
+	pub fn from_query_string(query: &str) -> Result<T> {
+		let inner = serde_urlencoded::from_str::<JsonQueryParamsInner>(query)?;
+		serde_json::from_str::<T>(&inner.data)?.xok()
+	}
+}
+#[cfg(feature = "serde")]
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+	for JsonQueryParams<T>
+{
+	type Error = HttpError;
+
+	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
+		let query = req.parts.uri.query().ok_or_else(|| {
+			HttpError::bad_request("no query params in request")
+		})?;
+		let value = Self::from_query_string(query)?;
+		Ok(Self(value))
+	}
+}
+
+pub struct QueryParams<T>(pub T);
+
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize> QueryParams<T> {
+	/// Parses as serde_json and encodes the data as a URL-encoded string,
+	/// for use as a query param value.
+	pub fn encode(&self) -> Result<String> {
+		serde_urlencoded::to_string(&self.0)?.xok()
+	}
+}
+#[cfg(feature = "serde")]
+impl<T: serde::de::DeserializeOwned> QueryParams<T> {
+	/// Decodes a URL-encoded string into a serde_json value,
+	/// then deserializes it into the specified type.
+	pub fn decode(value: &str) -> Result<T> {
+		serde_urlencoded::from_str::<T>(value)?.xok()
+	}
+}
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
@@ -78,23 +192,10 @@ impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
 				err
 			))
 		})?;
-		Ok(QueryParams(params))
+		Ok(Self(params))
 	}
 }
 
-
-#[cfg(feature = "serde")]
-impl<T: serde::Serialize> TryInto<Response> for Json<T> {
-	type Error = HttpError;
-
-	fn try_into(self) -> Result<Response, Self::Error> {
-		let json_str = serde_json::to_string(&self.0)?;
-		Ok(Response::ok_body(
-			&json_str,
-			"application/json; charset=utf-8",
-		))
-	}
-}
 
 impl<'a> Into<Response> for &'a str {
 	fn into(self) -> Response {
@@ -197,23 +298,20 @@ mod test {
 	}
 
 	#[test]
-	fn urlencoded() {
-		let dirty_string = "foo$\" \" &dsds?sd#@$)#@$*()";
+	#[cfg(feature = "serde")]
+	fn json_query_params() {
+		#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
+		struct Foo(u32, String);
+		let val = Foo(42, "foo$\" \" &dsds?sd#@$)#@$*()".to_owned());
 
-		let a = serde_urlencoded::to_string(
-			EncodedQueryParams::from_value(dirty_string).unwrap(),
-		)
-		.unwrap();
-
+		let query_str = JsonQueryParams::to_query_string(&val).unwrap();
+		expect(&query_str).to_start_with("data=%5B42%2C%22foo");
 		for str in &[" ", "$", "\"", "&", "?", "#", "@", "(", ")"] {
-			expect(&a).not().to_contain(str);
+			expect(&query_str).not().to_contain(str);
 		}
 
-		serde_urlencoded::from_str::<EncodedQueryParams>(&a)
-			.unwrap()
-			.into_value::<String>()
-			.unwrap()
-			.xpect()
-			.to_be(dirty_string);
+		let val2 =
+			JsonQueryParams::<Foo>::from_query_string(&query_str).unwrap();
+		expect(val).to_be(val2);
 	}
 }

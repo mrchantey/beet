@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::pin::Pin;
@@ -109,31 +108,32 @@ impl RouteHandler {
 		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
 		Input: 'static + SystemInput,
 		for<'a> Input::Inner<'a>: DeserializeOwned,
-		Out: 'static + Send + Sync + Serialize,
+		Out: 'static + Send + Sync + IntoResponse,
 	{
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => Self::new(
 				move |val: In<Json<Input::Inner<'_>>>,
 				      world: &mut World|
-				      -> Result<Json<Out>> {
+				      -> Result<Out> {
 					let out = world
 						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(Json(out))
+					Ok(out)
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => Self::new(
-				move |val: In<QueryParams<Input::Inner<'_>>>,
+				move |val: In<JsonQueryParams<Input::Inner<'_>>>,
 				      world: &mut World|
-				      -> Result<Json<Out>> {
+				      -> Result<Out> {
 					let out = world
 						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(Json(out))
+					Ok(out)
 				},
 			),
 		}
 	}
+
 
 	/// A route handler that passively runs a system, without expecting any output.
 	pub fn layer<T, Marker>(handler: T) -> Self

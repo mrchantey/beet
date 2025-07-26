@@ -28,8 +28,6 @@ pub mod prelude {
 	pub use crate::bevyhow;
 	#[cfg(feature = "http")]
 	pub use crate::http_utils::*;
-	#[cfg(feature = "net")]
-	pub use crate::net::*;
 	pub use crate::node::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
