@@ -139,11 +139,11 @@ mod test {
 	use beet_rsx::as_beet::RouteInfo;
 	use beet_utils::utils::PipelineTarget;
 	use bevy::prelude::*;
+	use proc_macro2::TokenStream;
 	use quote::ToTokens;
-	use quote::quote;
 	use sweet::prelude::*;
 
-	fn mod_tree(methods: Vec<RouteFileMethod>) -> String {
+	fn mod_tree(methods: Vec<RouteFileMethod>) -> TokenStream {
 		let mut world = World::new();
 		world.spawn_batch(methods);
 
@@ -160,31 +160,14 @@ mod test {
 			collect: &CollectClientActions::default(),
 			query,
 		};
-		builder
-			.mod_tree(&tree)
-			.xmap(|item| item.to_token_stream().to_string())
+		builder.mod_tree(&tree).xmap(|item| item.to_token_stream())
 	}
 
 	#[test]
 	fn simple() {
 		mod_tree(vec![RouteFileMethod::new("/bazz")])
 			.xpect()
-			.to_be_str(
-				quote! {
-					#[allow(missing_docs)]
-					pub mod routes {
-						#[allow(unused_imports)]
-						use super::*;
-						pub async fn bazz() -> ServerActionResult<(), ()> {
-							CallServerAction::request_no_data(RouteInfo {
-								path: RoutePath(std::path::PathBuf::from("/bazz")),
-								method: HttpMethod::Get
-							}).await
-						}
-					}
-				}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 
 

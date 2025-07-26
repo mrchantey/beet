@@ -32,11 +32,15 @@ pub struct JsonResult<T, E> {
 	pub err_status: StatusCode,
 }
 
+impl JsonResult<(), ()> {
+	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::IM_A_TEAPOT;
+}
+
 impl<T, E> From<Result<T, E>> for JsonResult<T, E> {
 	fn from(result: Result<T, E>) -> Self {
 		Self {
 			result,
-			err_status: StatusCode::IM_A_TEAPOT,
+			err_status: JsonResult::DEFAULT_ERR_STATUS,
 		}
 	}
 }

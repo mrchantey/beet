@@ -51,9 +51,16 @@ pub fn collect_route_files(
 							.route_info
 							.method
 							.self_token_stream();
+
+						let pipe = match route_file_method.returns_result() {
+							true => quote! { .pipe(JsonResult::pipe) },
+							false => quote! {.pipe(Json::pipe) },
+						};
+
+
 						// Action routes may be any kind of route
 						quote! {
-							RouteHandler::action(#method, #mod_ident::#func_ident)
+							RouteHandler::action(#method, #mod_ident::#func_ident #pipe)
 						}
 					}
 				};

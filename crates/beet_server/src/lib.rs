@@ -6,7 +6,6 @@ mod app_router;
 mod axum_utils;
 #[cfg(feature = "lambda")]
 mod lambda_utils;
-mod server_actions;
 
 pub mod prelude {
 	pub use http::StatusCode;
@@ -16,7 +15,6 @@ pub mod prelude {
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
-	pub use crate::server_actions::*;
 
 	pub(crate) use internal::*;
 	#[allow(unused_imports)]

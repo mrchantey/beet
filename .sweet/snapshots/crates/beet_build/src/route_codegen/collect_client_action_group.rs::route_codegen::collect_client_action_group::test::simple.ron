@@ -1,0 +1,8 @@
+#[allow(missing_docs)]
+pub mod routes {
+    #[allow(unused_imports)]
+    use super::*;
+    pub async fn bazz() -> Result<()> {
+        ServerActionRequest::new(HttpMethod::Get, "/bazz").send().await
+    }
+}

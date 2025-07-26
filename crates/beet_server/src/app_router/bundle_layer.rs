@@ -8,18 +8,6 @@ use bevy::prelude::*;
 /// run by the router if no [`Response`] is set.
 /// - First checks for a [`HtmlDocument`] and renders that one,
 /// - otherwise searches for a [`HandlerBundle`].
-///
-/// This can also be used as a [`RouteHandler`]:
-///
-/// ```rust
-/// # use beet_rsx::as_beet::*;
-/// # use beet_server::prelude::*;
-///
-/// World::new().spawn(children![
-/// 	RouteHandler::bundle(||rsx!{<div>hello world</div>}),
-/// 	RouteHandler::new(bundle_to_html),
-/// ])
-/// ```
 pub fn bundle_to_html(world: &mut World) -> HttpResult<Html> {
 	let entity = if let Some(&entity) = world
 		.query_filtered_once::<Entity, With<HtmlDocument>>()

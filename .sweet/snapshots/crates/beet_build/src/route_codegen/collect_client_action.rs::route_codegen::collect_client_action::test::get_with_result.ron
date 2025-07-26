@@ -1,0 +1,6 @@
+pub async fn get(a: i32, b: i64) -> Result<Result<u32, String>> {
+    ServerActionRequest::new(HttpMethod::Get, "/add")
+        .with_body((a, b))
+        .send_fallible()
+        .await
+}

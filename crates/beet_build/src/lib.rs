@@ -1,6 +1,6 @@
 //! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
 //!
-//! ```
+//! ```ignore
 //! //
 //! SourceFileRoot
 //! ├── (SourceFile(foo.rs), FileExprHash)

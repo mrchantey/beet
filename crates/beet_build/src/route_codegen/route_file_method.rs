@@ -59,6 +59,18 @@ impl RouteFileMethod {
 		let route = RoutePath::from_file_path(local_path).unwrap();
 		Self::new(RouteInfo::new(route, method))
 	}
+
+	/// Whether the return type of this method is a `Result`.
+	pub fn returns_result(&self) -> bool {
+		if let syn::ReturnType::Type(_, ty) = &self.item.sig.output {
+			if let syn::Type::Path(syn::TypePath { path, .. }) = &**ty {
+				if let Some(seg) = path.segments.last() {
+					return seg.ident == "Result";
+				}
+			}
+		}
+		false
+	}
 }
 
 /// Specify the location of the meta for this route file method.
@@ -87,5 +99,34 @@ impl RouteFileMethodMeta {
 			RouteFileMethodMeta::File => syn::parse_quote!(#mod_ident::meta),
 			RouteFileMethodMeta::Collection => syn::parse_quote!(Self::meta),
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn returns_result() {
+		RouteFileMethod::new_with(
+			"",
+			&syn::parse_quote!(
+				fn get() {}
+			),
+		)
+		.returns_result()
+		.xpect()
+		.to_be_false();
+		RouteFileMethod::new_with(
+			"",
+			&syn::parse_quote!(
+				fn get() -> Result<(), ()> {}
+			),
+		)
+		.returns_result()
+		.xpect()
+		.to_be_true();
 	}
 }

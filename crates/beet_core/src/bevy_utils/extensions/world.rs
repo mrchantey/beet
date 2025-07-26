@@ -78,10 +78,12 @@ pub impl<W: IntoWorld> W {
 	fn pretty_name(&self, component: &ComponentInfo) -> String {
 		let id = component.type_id();
 		if let Some(id) = id {
-			let type_registry =
-				self.into_world().resource::<AppTypeRegistry>().read();
-			if let Some(info) = type_registry.get_type_info(id) {
-				return info.ty().short_path().to_string();
+			if let Some(type_registry) =
+				self.into_world().get_resource::<AppTypeRegistry>()
+			{
+				if let Some(info) = type_registry.read().get_type_info(id) {
+					return info.ty().short_path().to_string();
+				}
 			}
 		}
 		component.name().to_string()

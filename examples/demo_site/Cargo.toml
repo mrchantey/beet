@@ -5,7 +5,7 @@ edition.workspace = true
 
 
 [features]
-# default = ["server"]
+default = ["server"]
 config = ["beet/web-config"]
 server = ["beet/web-server"]
 client = ["beet/web-client"]

@@ -1,4 +1,3 @@
-use super::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
@@ -6,19 +5,19 @@ use http::HeaderValue;
 use http::StatusCode;
 use http::header::HeaderName;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 
+
+fn js_err(err: JsValue) -> BevyError { bevyhow!("{err:?}") }
 
 pub(crate) async fn send_wasm(request: Request) -> Result<Response> {
 	let request: web_sys::Request = request.try_into()?;
-	let window = web_sys::window()
-		.ok_or_else(|| Error::NetworkError("No window".to_string()))?;
+	let window = web_sys::window().ok_or_else(|| bevyhow!("No window"))?;
 	let promise = window.fetch_with_request(&request);
 	let resp_js = wasm_bindgen_futures::JsFuture::from(promise)
 		.await
-		.map_err(Error::network)?;
-	let resp = resp_js
-		.dyn_into::<web_sys::Response>()
-		.map_err(Error::network)?;
+		.map_err(js_err)?;
+	let resp = resp_js.dyn_into::<web_sys::Response>().map_err(js_err)?;
 
 	Response::from_web_sys(resp).await
 }
@@ -34,20 +33,14 @@ impl TryInto<web_sys::Request> for Request {
 		}
 		let url = self.parts.uri.to_string();
 		let request = web_sys::Request::new_with_str_and_init(&url, &init)
-			.map_err(Error::network)?;
+			.map_err(js_err)?;
 
 		for (name, value) in self.parts.headers.iter() {
 			let name_str = name.as_str();
 			let value_str = value.to_str().map_err(|e| {
-				Error::Serialization(format!(
-					"Failed to set header {}: {}",
-					name_str, e
-				))
+				bevyhow!("Failed to set header {}: {}", name_str, e)
 			})?;
-			request
-				.headers()
-				.set(name_str, value_str)
-				.map_err(Error::network)?;
+			request.headers().set(name_str, value_str).map_err(js_err)?;
 		}
 		Ok(request)
 	}
@@ -66,16 +59,10 @@ impl Response {
 		let mut headers = http::HeaderMap::new();
 		let headers_iter = resp.headers();
 		let js_iter = js_sys::try_iter(&headers_iter)
-			.map_err(|_| {
-				Error::NetworkError("Failed to iterate headers".to_string())
-			})?
-			.ok_or_else(|| {
-				Error::NetworkError("No headers iterator".to_string())
-			})?;
+			.map_err(js_err)?
+			.ok_or_else(|| bevyhow!("no iterator"))?;
 		for entry in js_iter {
-			let entry = entry.map_err(|_| {
-				Error::NetworkError("Header entry error".to_string())
-			})?;
+			let entry = entry.map_err(js_err)?;
 			let arr = js_sys::Array::from(&entry);
 			if arr.length() == 2 {
 				let key = arr.get(0).as_string().unwrap_or_default();
@@ -90,10 +77,10 @@ impl Response {
 		}
 
 		let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
-			resp.array_buffer().map_err(Error::network)?,
+			resp.array_buffer().map_err(js_err)?,
 		)
 		.await
-		.map_err(Error::network)?;
+		.map_err(js_err)?;
 		let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
 		let mut body = vec![0; array_buffer.length() as usize];
 		array_buffer.copy_to(&mut body);
@@ -104,9 +91,7 @@ impl Response {
 		for (key, value) in headers.iter() {
 			builder = builder.header(key, value);
 		}
-		let http_response = builder.body(bytes.clone()).map_err(|e| {
-			Error::NetworkError(format!("Failed to build response: {e}"))
-		})?;
+		let http_response = builder.body(bytes.clone())?;
 		let (parts, body) = http_response.into_parts();
 		Ok(Response { parts, body })
 	}

@@ -1,3 +1,4 @@
+#![allow(unused)]
 use beet::prelude::*;
 use demo_site::prelude::*;
 
