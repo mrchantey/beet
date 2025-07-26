@@ -102,11 +102,11 @@ static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
 
 #[template]
 fn Style() -> impl Bundle {
-	// css is much easier to write with the rsx_combinator!,
-	// as many css tokens are not valid rust tokens, ie 1em, a:visited, etc.
+	// css is much easier to write with the rsx_combinator macro
+	// as many common css tokens like `1em` or `a:visited` are not valid rust tokens
 	rsx_combinator! {r"
 <style scope:global>
-	main{
+	main {
 		padding-top: 2em;
 		display: flex;
 		flex-direction: column;
@@ -119,9 +119,7 @@ fn Style() -> impl Bundle {
 	a:visited {
 		color: #3399ff;
 	}
-</style>
-<style scope:global>
-	body{
+	body {
 		font-size: 1.4em;
 		font-family: system-ui, sans-serif;
 		background: black;

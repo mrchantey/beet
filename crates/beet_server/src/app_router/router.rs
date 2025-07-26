@@ -93,7 +93,7 @@ impl Router {
 
 		let route_parts = RouteParts::from_parts(&request.parts);
 
-		debug!("Handling request: {:#?}", request);
+		trace!("Handling request: {:#?}", request);
 		world.insert_resource(request);
 
 		for entity in world.query_filtered_once::<Entity, Without<ChildOf>>() {
@@ -110,8 +110,8 @@ impl Router {
 				bundle_to_html(&mut world).into_response()
 			};
 
-		debug!("Returning Response: {:#?}", response);
-		debug!("Route handler completed in: {:.2?}", start_time.elapsed());
+		trace!("Returning Response: {:#?}", response);
+		trace!("Route handler completed in: {:.2?}", start_time.elapsed());
 		(world, response)
 	}
 }

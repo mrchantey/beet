@@ -18,11 +18,9 @@ pub use beet_ml as ml;
 pub use beet_parse as parse;
 // #[cfg(feature = "query")]
 // pub use beet_query as query;
-#[cfg(feature = "router")]
-pub use beet_router as router;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(feature = "beet_server")]
 pub use beet_server as server;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
@@ -50,11 +48,9 @@ pub mod prelude {
 	pub use crate::parse::prelude::*;
 	// #[cfg(feature = "query")]
 	// pub use crate::query::prelude::*;
-	#[cfg(feature = "router")]
-	pub use crate::router::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(feature = "beet_server")]
 	pub use crate::server::prelude::*;
 	#[cfg(feature = "sim")]
 	pub use crate::sim::prelude::*;
@@ -73,7 +69,7 @@ pub mod exports {
 	pub use crate::design::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::exports::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(feature = "beet_server")]
 	pub use crate::server::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]

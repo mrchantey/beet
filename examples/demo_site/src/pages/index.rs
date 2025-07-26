@@ -1,15 +1,21 @@
+use crate::prelude::*;
 use beet::prelude::*;
 
 
 
 
 
+pub fn get() -> impl Bundle {
+	let num_requests = AppState::get().num_requests;
 
-pub fn get()->impl Bundle{
-
-	rsx!{
+	rsx! {
+		<Layout>
+		<h1>Beet Demo Site</h1>
 		<div>
-		"howdy"
+			"Greetings visitor " {num_requests}
 		</div>
+		<ClientCounter client:load/>
+		<ServerCounter client:load/>
+		</Layout>
 	}
 }

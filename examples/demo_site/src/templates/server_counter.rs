@@ -1,11 +1,11 @@
+#![allow(unused)]
+use crate::prelude::*;
+use beet::exports::bevy::reflect as bevy_reflect;
 use beet::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 #[template]
-#[derive(Serialize, Deserialize)]
+#[derive(Reflect)]
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
-	#[allow(unused)]
 	let (get, set) = signal(initial);
 
 	let onclick = move |_: Trigger<OnClick>| {
@@ -13,8 +13,7 @@ pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 		{
 			let val = get();
 			beet::exports::wasm_bindgen_futures::spawn_local(async move {
-				let result =
-					crate::prelude::actions::add(val, 1).await.unwrap();
+				let result = actions::add(val, 1).await.unwrap();
 				set(result);
 			});
 		}

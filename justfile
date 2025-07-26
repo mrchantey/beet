@@ -94,8 +94,13 @@ build-csr:
 	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
 	sweet serve target/examples/csr
 	
+build-demo-site *args:
+	cd examples/demo_site && cargo run 		--no-default-features --features=config
+	cd examples/demo_site && cargo build 	--no-default-features --features=client --target-dir=target --target wasm32-unknown-unknown
+	cd examples/demo_site && wasm-bindgen --out-dir target/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/demo_site.wasm
+
 run-demo-site *args:
-	cd examples/demo_site && cargo run --no-default-features {{args}}
+	cd examples/demo_site && cargo run --no-default-features --features=server {{args}}
 
 run-hydration:
 	just watch just build-hydration

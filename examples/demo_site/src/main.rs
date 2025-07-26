@@ -39,6 +39,13 @@ fn server_plugin(app: &mut App) {
 				docs_routes(), 
 				actions_routes()
 			],
+			// this is placed last to ensure it runs after the routes
+			RouteHandler::layer(||{
+				let mut state = AppState::get();
+				state.num_requests += 1;
+				AppState::set(state);
+			
+			})
 	));
 }
 

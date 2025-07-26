@@ -64,7 +64,6 @@ members = [
 	"crates/beet_design",
 	"crates/beet_query",
 	"crates/beet_query/macros",
-	"crates/beet_router",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
 	"crates/beet_server",
@@ -91,7 +90,6 @@ beet_core = { path = "crates/beet_core", version = "0.0.6-dev.7" }
 
 beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.6-dev.7" }
 beet_parse = { path = "crates/beet_parse", version = "0.0.6-dev.7" }
-beet_router = { path = "crates/beet_router", version = "0.0.6-dev.7" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.7" }
 beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.7" }
 beet_build = { path = "crates/beet_build", version = "0.0.6-dev.7" }
@@ -233,16 +231,19 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow"]
 #💡 helper features
 web-config = ["build"]
-web-server = ["server", "router", "design", "net", "serde"]
+web-server = ["server", "design", "net", "serde"]
 web-client = [
 	"rsx",
-	"router",
 	"design",
 	"web",
 	"net",
 	"serde",
+	"beet_server",
 	"beet_design/client",
 ]
+
+beet_server = ["dep:beet_server"]
+
 #💡 fine-grained
 native-tls = ["beet_core/native-tls"]
 serde = ["beet_utils/serde"]
@@ -252,13 +253,12 @@ examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
 design = ["rsx", "dep:beet_design"]
-router = ["rsx", "dep:beet_router"]
 # query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["router", "beet_router/axum", "dep:beet_server", "beet_core/server"]
+server = ["beet_server", "beet_core/server"]
 lambda = ["server", "beet_server/lambda", "beet_core/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
@@ -296,7 +296,7 @@ beet_core.workspace = true
 #💡 rsx
 beet_rsx = { workspace = true, optional = true }
 beet_parse = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
+beet_server = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
@@ -312,7 +312,6 @@ beet_examples = { workspace = true, optional = true }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_server = { workspace = true, optional = true }
 tokio.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -322,7 +321,12 @@ uuid = { version = "1", features = ["rng-getrandom"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = "", features = ["router", "rand"] }
+beet = { path = "", features = [
+	"web-config",
+	"web-server",
+	"web-client",
+	"rand",
+] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 sweet.workspace = true
