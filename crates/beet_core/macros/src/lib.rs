@@ -7,15 +7,27 @@ mod to_tokens;
 mod utils;
 
 /// Implements `TokenizeSelf` for a struct or enum.
-/// All fields must also implement `TokenizeSelf`, please open
-/// a pr if you want to add support for a type.
-///
+/// All fields must also implement `TokenizeSelf`.
+/// 
+/// If the type is a struct with private fields, please use the `to_tokens` attribute to specify
+/// a constructor accepting all fields in the order they are defined.
+/// 
+/// `TokenizeSelf` is implemented for primitives and some other common types, 
+/// please open a pr if you want to add support for a type in an external crate.
+/// 
 /// ## Example
 ///
 /// ```rust ignore
 /// #[derive(ToTokens)]
+/// #[to_tokens(Foo::new)]
 /// struct Foo{
 ///   bar: String,
+/// }
+/// 
+/// impl Foo{
+///   pub fn new(bar: String) -> Self {
+///     Self { bar }
+///   }
 /// }
 /// ```
 #[proc_macro_derive(ToTokens, attributes(to_tokens, field))]

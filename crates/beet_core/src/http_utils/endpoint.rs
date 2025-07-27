@@ -1,10 +1,11 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[cfg_attr(feature = "tokens", to_tokens(Self::new_with))]
+#[cfg_attr(feature = "tokens", to_tokens(Endpoint::new_with))]
 pub struct Endpoint {
 	method: HttpMethod,
 	cache_strategy: CacheStrategy,
@@ -32,7 +33,8 @@ impl Into<Endpoint> for HttpMethod {
 }
 
 
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ResolvedEndpoint {
@@ -42,7 +44,10 @@ pub struct ResolvedEndpoint {
 }
 
 impl ResolvedEndpoint {
-	pub fn new(endpoint: Endpoint, segments: Vec<RouteSegment>) -> Self {
+	pub fn new(
+		endpoint: impl Into<Endpoint>,
+		segments: Vec<RouteSegment>,
+	) -> Self {
 		let path = RoutePath::from(
 			segments
 				.iter()
@@ -51,7 +56,7 @@ impl ResolvedEndpoint {
 				.join("/"),
 		);
 		Self {
-			endpoint,
+			endpoint: endpoint.into(),
 			path,
 			segments,
 		}
@@ -94,6 +99,7 @@ impl ResolvedEndpoint {
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum CacheStrategy {
 	/// An endpoint that may produce different responses for the same path and method,
@@ -103,4 +109,64 @@ pub enum CacheStrategy {
 	/// An endpoint that always returns the same response for a given
 	/// path and method, making it suitable for ssg and caching.
 	Static,
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+
+
+	#[test]
+	#[rustfmt::skip]
+	fn collect() {
+		let mut world = World::new();
+		world.spawn((
+			RouteFilter::new("foo"),
+			Endpoint::new(HttpMethod::Get),
+			children![
+				children![
+					(
+						RouteFilter::new("*bar"), 
+						Endpoint::new(HttpMethod::Post)
+					),
+					RouteFilter::new("bazz")
+				],
+				(
+					RouteFilter::new("qux"),
+				),
+				(
+					RouteFilter::new(":quax"), 
+					Endpoint::new(HttpMethod::Post)
+				),
+			],
+		));
+		world.run_system_cached(ResolvedEndpoint::collect).unwrap()
+		.xpect().to_be(vec![
+			ResolvedEndpoint::new(
+				HttpMethod::Get,
+				vec![
+					RouteSegment::Static("foo".into()),
+				],
+			),
+			ResolvedEndpoint::new(
+				HttpMethod::Post,
+				vec![
+					RouteSegment::Static("foo".into()),
+					RouteSegment::Wildcard("bar".into()),
+				],
+			),
+			ResolvedEndpoint::new(
+				HttpMethod::Post,
+				vec![
+					RouteSegment::Static("foo".into()),
+					RouteSegment::Dynamic("quax".into()),
+				],
+			),
+		]);
+	}
 }
