@@ -21,13 +21,19 @@ fn setup(mut commands: Commands) {
 			RouteFilter::new("/"),
 			RouteHandler::bundle(HttpMethod::Get, || rsx! {<Home/>})
 		),
-		(RouteFilter::new("/foo"), RouteHandler::new(|| "bar")),
 		(
+			RouteFilter::new("/foo"),
+			RouteHandler::new(HttpMethod::Get, || "bar")
+		),
+		(
+			// this entity has no endpoint so will be called for every request
+			// that matches the filter
 			RouteFilter::new("/hello-layer"),
+			RouteHandler::layer(modify_request_layer),
 			// children are run in sequence
-			children![
-				RouteHandler::layer(modify_request_layer),
-				RouteHandler::bundle(HttpMethod::Get, |req: Res<Request>| {
+			children![RouteHandler::bundle(
+				HttpMethod::Get,
+				|req: Res<Request>| {
 					let body = req.body_str().unwrap_or_default();
 					rsx! {
 						<Style/>
@@ -36,8 +42,8 @@ fn setup(mut commands: Commands) {
 							<a href="/">go home</a>
 						</main>
 					}
-				})
-			]
+				}
+			)]
 		)
 	]);
 }

@@ -9,10 +9,7 @@ pub fn config_plugin(app: &mut App) {
 		RouteCodegenRoot::default(),
 		// override default location
 		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/codegen/mod.rs",
-			)
-			.unwrap(),
+			AbsPathBuf::new_workspace_rel("src/codegen/mod.rs").unwrap(),
 		),
 		children![pages(), docs(), actions()],
 	));
@@ -37,27 +34,18 @@ pub fn config_plugin(app: &mut App) {
 fn pages() -> impl Bundle {
 	(
 		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/pages",
-			)
-			.unwrap(),
+			src: AbsPathBuf::new_workspace_rel("src/pages").unwrap(),
 			..default()
 		},
 		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/codegen/pages.rs",
-			)
-			.unwrap(),
+			AbsPathBuf::new_workspace_rel("src/codegen/pages.rs").unwrap(),
 		),
 	)
 }
 fn docs() -> impl Bundle {
 	(
 		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/docs",
-			)
-			.unwrap(),
+			src: AbsPathBuf::new_workspace_rel("src/docs").unwrap(),
 			..default()
 		},
 		ModifyRoutePath {
@@ -66,25 +54,17 @@ fn docs() -> impl Bundle {
 		},
 		MetaType::new(syn::parse_quote!(crate::prelude::Article)),
 		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/codegen/docs/mod.rs",
-			)
-			.unwrap(),
+			AbsPathBuf::new_workspace_rel("src/codegen/docs/mod.rs").unwrap(),
 		),
 	)
 }
 fn actions() -> impl Bundle {
-	let actions_path = AbsPathBuf::new_workspace_rel(
-		"examples/demo_site/src/codegen/actions.rs",
-	)
-	.unwrap();
+	let actions_path =
+		AbsPathBuf::new_workspace_rel("src/codegen/actions.rs").unwrap();
 
 	(
 		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel(
-				"examples/demo_site/src/actions",
-			)
-			.unwrap(),
+			src: AbsPathBuf::new_workspace_rel("src/actions").unwrap(),
 			category: RouteCollectionCategory::Actions,
 			..default()
 		},
@@ -92,10 +72,8 @@ fn actions() -> impl Bundle {
 		children![(
 			CollectClientActions::default(),
 			CodegenFile::new(
-				AbsPathBuf::new_workspace_rel(
-					"examples/demo_site/src/codegen/client_actions.rs",
-				)
-				.unwrap(),
+				AbsPathBuf::new_workspace_rel("src/codegen/client_actions.rs",)
+					.unwrap(),
 			)
 		)],
 	)

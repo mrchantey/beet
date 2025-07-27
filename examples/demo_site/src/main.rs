@@ -55,5 +55,6 @@ fn client_plugin(app: &mut App) {
 	app.add_plugins(TemplatePlugin)
 		.insert_resource(TemplateFlags::None)
 		.register_type::<ClientIslandRoot<ClientCounter>>()
+		.register_type::<ClientIslandRoot<ServerCounter>>()
 		.set_runner(ReactiveApp::runner);
 }

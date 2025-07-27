@@ -1,3 +1,4 @@
+#[allow(unused)]
 pub async fn get() -> Result<()> {
     ServerActionRequest::new(HttpMethod::Get, "/add").send().await
 }

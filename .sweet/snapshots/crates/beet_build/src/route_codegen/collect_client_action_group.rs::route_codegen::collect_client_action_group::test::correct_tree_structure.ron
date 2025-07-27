@@ -2,6 +2,7 @@
 pub mod routes {
     #[allow(unused_imports)]
     use super::*;
+    #[allow(unused)]
     pub async fn bazz() -> Result<()> {
         ServerActionRequest::new(HttpMethod::Get, "/bazz").send().await
     }
@@ -9,6 +10,7 @@ pub mod routes {
     pub mod foo {
         #[allow(unused_imports)]
         use super::*;
+        #[allow(unused)]
         pub async fn bar() -> Result<()> {
             ServerActionRequest::new(HttpMethod::Get, "/foo/bar").send().await
         }
@@ -16,9 +18,11 @@ pub mod routes {
         pub mod boo {
             #[allow(unused_imports)]
             use super::*;
+            #[allow(unused)]
             pub async fn get() -> Result<()> {
                 ServerActionRequest::new(HttpMethod::Get, "/foo/boo").send().await
             }
+            #[allow(unused)]
             pub async fn post() -> Result<()> {
                 ServerActionRequest::new(HttpMethod::Post, "/foo/boo").send().await
             }
@@ -27,6 +31,7 @@ pub mod routes {
         pub mod bing {
             #[allow(unused_imports)]
             use super::*;
+            #[allow(unused)]
             pub async fn bong() -> Result<()> {
                 ServerActionRequest::new(HttpMethod::Post, "/foo/bing/bong").send().await
             }

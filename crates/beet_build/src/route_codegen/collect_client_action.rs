@@ -51,24 +51,22 @@ impl ParseClientAction {
 			false => quote! { .send() },
 		};
 
-		match parsed_inputs {
-			Some((fn_args, param_names)) => parse_quote! {
-				#(#docs)*
-				pub async fn #fn_ident(#fn_args) -> Result<#fn_return_type> {
-					ServerActionRequest::new(#method,#path)
-						.with_body(#param_names)
-						#dot_send
-						.await
-				}
-			},
-			None => parse_quote! {
-				#(#docs)*
-				pub async fn #fn_ident() -> Result<#fn_return_type> {
-					ServerActionRequest::new(#method,#path)
-						#dot_send
-						.await
-				}
-			},
+		let (fn_args, body) = match parsed_inputs {
+			Some((fn_args, param_names)) => {
+				(fn_args, quote! { .with_body(#param_names) })
+			}
+			None => (Punctuated::new(), Default::default()),
+		};
+
+		parse_quote! {
+			#(#docs)*
+			#[allow(unused)]
+			pub async fn #fn_ident(#fn_args) -> Result<#fn_return_type> {
+				ServerActionRequest::new(#method, #path)
+					#body
+					#dot_send
+					.await
+			}
 		}
 	}
 	/// For given function inputs, return the inputs for the client function
