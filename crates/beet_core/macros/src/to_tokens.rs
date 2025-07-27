@@ -1,11 +1,11 @@
+use crate::utils::pound_token;
+use beet_utils::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use beet_utils::prelude::*;
-use crate::utils::pound_token;
 use syn;
 use syn::DeriveInput;
-use syn::parse_macro_input;
 use syn::WherePredicate;
+use syn::parse_macro_input;
 
 pub fn impl_derive_to_tokens(
 	input: proc_macro::TokenStream,
@@ -21,6 +21,14 @@ pub fn impl_derive_to_tokens(
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let ident = &input.ident;
 	let pound_token = pound_token();
+
+	// extract the to_tokens attribute if it exists
+	let constructor = input
+		.attrs
+		.iter()
+		.find(|attr| attr.path().is_ident("to_tokens"))
+		.map(|attr| attr.parse_args::<syn::Expr>().ok())
+		.flatten();
 
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
@@ -52,70 +60,77 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	};
 
 	let content = match &input.data {
-		syn::Data::Struct(data_struct) => {
-			let fields = &data_struct.fields;
+		syn::Data::Struct(data_struct) => match &data_struct.fields {
+			syn::Fields::Named(fields_named) => {
+				let field_names = fields_named
+					.named
+					.iter()
+					.map(|field| &field.ident)
+					.collect::<Vec<_>>();
 
-			match fields {
-				syn::Fields::Named(fields_named) => {
-					let field_defs = fields_named.named.iter().map(|field| {
-						let field_name = &field.ident;
-						quote! {
-							let #field_name = self.#field_name.self_token_stream();
-						}
-					});
+				let field_defs = quote!(#(let #field_names = self.#field_names.self_token_stream();)*);
 
+				if let Some(constructor) = &constructor {
+					quote! {
+						#field_defs
+						tokens.extend(quote::quote! {
+							#constructor( #(#pound_token #field_names),* )
+						});
+					}
+				} else {
 					let field_tokens = fields_named.named.iter().map(|field| {
 						let field_name = &field.ident;
 						quote! {
 							#field_name: #pound_token #field_name
 						}
 					});
-
 					quote! {
-						#(#field_defs)*
-						tokens.extend(quote::quote! { #qualified_name {
-							#(#field_tokens),*
-						} });
-					}
-				}
-				syn::Fields::Unnamed(fields_unnamed) => {
-					let field_defs =
-						fields_unnamed.unnamed.iter().enumerate().map(
-							|(i, _)| {
-								let index = syn::Index::from(i);
-								let field_var = syn::Ident::new(
-									&format!("field{}", i),
-									proc_macro2::Span::call_site(),
-								);
-								quote! {
-									let #field_var = self.#index.self_token_stream();
-								}
-							},
-						);
-
-					let field_vars = (0..fields_unnamed.unnamed.len())
-						.map(|i| {
-							syn::Ident::new(
-								&format!("field{}", i),
-								proc_macro2::Span::call_site(),
-							)
-						})
-						.collect::<Vec<_>>();
-
-					quote! {
-						#(#field_defs)*
-						tokens.extend(quote::quote! { #qualified_name(
-							#(#pound_token #field_vars),*
-						) });
-					}
-				}
-				syn::Fields::Unit => {
-					quote! {
-						tokens.extend(quote::quote! { #qualified_name });
+						#field_defs
+						tokens.extend(quote::quote! {
+							#qualified_name{ #(#field_tokens),* }
+						});
 					}
 				}
 			}
-		}
+			syn::Fields::Unnamed(fields_unnamed) => {
+				let field_names = (0..fields_unnamed.unnamed.len())
+					.map(|i| {
+						syn::Ident::new(
+							&format!("field{}", i),
+							proc_macro2::Span::call_site(),
+						)
+					})
+					.collect::<Vec<_>>();
+				let field_defs =
+					field_names.iter().enumerate().map(|(i, name)| {
+						let index = syn::Index::from(i);
+						quote! {
+							let #name = self.#index.self_token_stream();
+						}
+					});
+
+				if let Some(constructor) = &constructor {
+					quote! {
+						#(#field_defs)*
+						tokens.extend(quote::quote! {
+							#constructor(#(#pound_token #field_names),*)
+						});
+					}
+				} else {
+					quote! {
+						#(#field_defs)*
+						tokens.extend(quote::quote! {
+							#qualified_name( #(#pound_token #field_names),*)
+						});
+					}
+				}
+			}
+			syn::Fields::Unit => {
+				quote! {
+					tokens.extend(quote::quote! { #qualified_name });
+				}
+			}
+		},
 		syn::Data::Enum(data_enum) => {
 			let match_arms = data_enum.variants.iter().map(|variant| {
 				let variant_name = &variant.ident;
@@ -188,12 +203,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let mut where_clause = where_clause
 		.cloned()
 		.unwrap_or_else(|| syn::parse_quote!(where));
-	where_clause.predicates.extend(generic_idents.map(|(ident, _)| {
-		let predicate: WherePredicate = syn::parse_quote! {
-			#ident: beet::prelude::TokenizeSelf
-		};
-		predicate
-	}));
+	where_clause
+		.predicates
+		.extend(generic_idents.map(|(ident, _)| {
+			let predicate: WherePredicate = syn::parse_quote! {
+				#ident: beet::prelude::TokenizeSelf
+			};
+			predicate
+		}));
 
 
 	quote! {
@@ -212,133 +229,69 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 #[cfg(test)]
 mod test {
-	use beet_utils::prelude::*;
 	use super::parse;
-	use super::pound_token;
-	use quote::quote;
+	use beet_utils::prelude::*;
 	use sweet::prelude::*;
 	use syn::DeriveInput;
 
 	#[test]
-	fn test_struct_named_fields() {
+	fn named_struct() {
 		let input: DeriveInput = syn::parse_quote! {
-			struct Test {
-				inner: u32,
-				value: String,
+			struct MyNamedStruct {
+				field1: u32,
+				field2: String,
 			}
 		};
-		let pound_token = pound_token();
-
-
-		input.xmap(parse).unwrap().to_string().xpect().to_be(
-			quote! {
-					impl beet::prelude::TokenizeSelf for Test {
-						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use beet::exports::quote;
-							use beet::exports::proc_macro2;
-							let inner = self.inner.self_token_stream();
-							let value = self.value.self_token_stream();
-							tokens.extend(quote::quote! { Test {
-								inner: #pound_token inner,
-								value: #pound_token value
-							} });
-						}
-					}
-				}
-			.to_string(),
-		);
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
 	}
-
 	#[test]
-	fn test_struct_tuple() {
+	fn named_struct_constructor() {
 		let input: DeriveInput = syn::parse_quote! {
-			struct TupleTest(u32, String);
+			#[to_tokens(Self::new)]
+			struct MyNamedStruct {
+				field1: u32,
+				field2: String,
+			}
 		};
-		let pound_token = pound_token();
-
-		input.xmap(parse).unwrap().to_string().xpect().to_be(
-			quote! {
-					impl beet::prelude::TokenizeSelf for TupleTest {
-						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use beet::exports::quote;
-							use beet::exports::proc_macro2;
-							let field0 = self.0.self_token_stream();
-							let field1 = self.1.self_token_stream();
-							tokens.extend(quote::quote! { TupleTest(
-								#pound_token field0,
-								#pound_token field1
-							) });
-						}
-					}
-				}
-			.to_string(),
-		);
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
 	}
 
 	#[test]
-	fn test_enum() {
+	fn tuple_struct() {
 		let input: DeriveInput = syn::parse_quote! {
-			enum TestEnum {
+			struct MyTupleStruct(u32, String);
+		};
+
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+	}
+	#[test]
+	fn tuple_struct_constructor() {
+		let input: DeriveInput = syn::parse_quote! {
+			#[to_tokens(Self::new)]
+			struct MyTupleStruct(u32, String);
+		};
+
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+	}
+
+	#[test]
+	fn r#enum() {
+		let input: DeriveInput = syn::parse_quote! {
+			enum MyEnum {
 				A,
 				B(u32),
 				C { value: String },
 			}
 		};
-		let pound_token = pound_token();
 
-		input.xmap(parse).unwrap().to_string().xpect().to_be(
-			quote! {
-					impl beet::prelude::TokenizeSelf for TestEnum {
-						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use beet::exports::quote;
-							use beet::exports::proc_macro2;
-							match self {
-								Self::A => {
-									tokens.extend(quote::quote! { TestEnum::A });
-								},
-								Self::B(field0) => {
-									let field0 = field0.self_token_stream();
-									tokens.extend(quote::quote! { TestEnum::B(
-										#pound_token field0
-									) });
-								},
-								Self::C { value } => {
-									let value = value.self_token_stream();
-									tokens.extend(quote::quote! { TestEnum::C {
-										value: #pound_token value
-									} });
-								}
-							}
-						}
-					}
-				}
-			.to_string(),
-		);
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
 	}
 	#[test]
-	fn test_generics() {
+	fn generics() {
 		let input: DeriveInput = syn::parse_quote! {
-			struct Foo<U:Clone>{}
+			struct MyGenericStruct<U:Clone>{}
 		};
-		let pound_token = pound_token();
 
-
-		input.xmap(parse).unwrap().to_string().xpect().to_be(
-			quote! {
-				impl<U: Clone> beet::prelude::TokenizeSelf for Foo<U> 
-				where 
-					U: beet::prelude::TokenizeSelf
-				{
-					fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-						use beet::exports::quote;
-						use beet::exports::proc_macro2;
-						
-						let generic0 = short_type_path::<U>();
-						tokens.extend(quote::quote! { Foo::<#pound_token generic0>{ } });
-					}
-				}
-			}
-			.to_string(),
-		);
+		input.xmap(parse).unwrap().xpect().to_be_snapshot();
 	}
 }

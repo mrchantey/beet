@@ -4,6 +4,7 @@ use bevy::prelude::*;
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[cfg_attr(feature = "tokens", to_tokens(Self::new_with))]
 pub struct Endpoint {
 	method: HttpMethod,
 	cache_strategy: CacheStrategy,

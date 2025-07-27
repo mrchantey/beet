@@ -1,0 +1,14 @@
+impl beet::prelude::TokenizeSelf for MyNamedStruct {
+    fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+        use beet::exports::quote;
+        use beet::exports::proc_macro2;
+        let field1 = self.field1.self_token_stream();
+        let field2 = self.field2.self_token_stream();
+        tokens
+            .extend(
+                quote::quote! {
+                    MyNamedStruct { field1 : # field1, field2 : # field2 }
+                },
+            );
+    }
+}

@@ -18,7 +18,7 @@ mod utils;
 ///   bar: String,
 /// }
 /// ```
-#[proc_macro_derive(ToTokens, attributes(field))]
+#[proc_macro_derive(ToTokens, attributes(to_tokens, field))]
 pub fn derive_to_tokens(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

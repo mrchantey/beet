@@ -10,7 +10,7 @@ pub mod route0;
 pub fn test_docs_routes() -> impl Bundle {
     children![
         (RouteFilter { segments : vec![RouteSegment::Static(String::from("hello"))] },
-        RouteHandler::bundle(Endpoint { method : HttpMethod::Get, cache_strategy :
-        CacheStrategy::Dynamic }, route0::get))
+        RouteHandler::bundle(Self::new_with(HttpMethod::Get, CacheStrategy::Dynamic),
+        route0::get))
     ]
 }
