@@ -25,10 +25,7 @@ impl HttpError {
 	pub fn from_status(status_code: StatusCode) -> Self {
 		Self {
 			status_code,
-			message: status_code
-				.canonical_reason()
-				.unwrap_or("Unknown error")
-				.to_string(),
+			message: Default::default(),
 		}
 	}
 
@@ -78,7 +75,11 @@ impl std::error::Error for HttpError {}
 
 impl std::fmt::Display for HttpError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}: {}", self.status_code, self.message)
+		if self.message.is_empty() {
+			write!(f, "{}", self.status_code)
+		} else {
+			write!(f, "{}: {}", self.status_code, self.message)
+		}
 	}
 }
 impl From<BevyError> for HttpError {
@@ -109,30 +110,16 @@ impl From<serde_urlencoded::de::Error> for HttpError {
 	}
 }
 
-impl Into<Response> for HttpError {
-	fn into(self) -> Response {
-		Response::from_status_body(
-			self.status_code,
-			self.message.as_bytes(),
-			"text/plain",
-		)
-	}
-}
-
-impl From<Response> for HttpError {
-	fn from(resp: Response) -> Self {
-		let message = if resp.body.is_empty() {
-			resp.status()
-				.canonical_reason()
-				.unwrap_or("Unknown error")
-				.to_string()
+impl From<HttpError> for Response {
+	fn from(error: HttpError) -> Response {
+		if error.message.is_empty() {
+			Response::from_status(error.status_code)
 		} else {
-			String::from_utf8_lossy(&resp.body).to_string()
-		};
-
-		Self {
-			status_code: resp.status(),
-			message,
+			Response::from_status_body(
+				error.status_code,
+				error.message.as_bytes(),
+				"text/plain",
+			)
 		}
 	}
 }

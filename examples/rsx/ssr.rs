@@ -18,22 +18,16 @@ fn main() {
 fn setup(mut commands: Commands) {
 	commands.spawn(children![
 		(
-			StaticRoute,
 			RouteFilter::new("/"),
-			RouteHandler::bundle(|| rsx! {<Home/>})
+			RouteHandler::bundle(HttpMethod::Get, || rsx! {<Home/>})
 		),
+		(RouteFilter::new("/foo"), RouteHandler::new(|| "bar")),
 		(
-			StaticRoute,
-			RouteFilter::new("/foo"),
-			RouteHandler::new(|| "bar")
-		),
-		(
-			StaticRoute,
 			RouteFilter::new("/hello-layer"),
 			// children are run in sequence
 			children![
 				RouteHandler::layer(modify_request_layer),
-				RouteHandler::bundle(|req: Res<Request>| {
+				RouteHandler::bundle(HttpMethod::Get, |req: Res<Request>| {
 					let body = req.body_str().unwrap_or_default();
 					rsx! {
 						<Style/>

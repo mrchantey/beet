@@ -1,4 +1,5 @@
 use crate::prelude::*;
+#[allow(unused)]
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use http::HeaderMap;
@@ -126,7 +127,8 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 pub struct JsonQueryParams<T>(pub T);
 
 /// The query params representation of the [`JsonQueryParams`].
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg(feature = "serde")]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct JsonQueryParamsInner {
 	data: String,
 }

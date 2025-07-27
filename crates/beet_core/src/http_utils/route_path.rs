@@ -7,10 +7,8 @@ use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
-
-
 /// Describes an absolute path to a route, beginning with `/`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RoutePath(pub PathBuf);

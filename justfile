@@ -97,7 +97,7 @@ build-csr:
 build-demo-site *args:
 	cd examples/demo_site && cargo run 		--no-default-features --features=config
 	cd examples/demo_site && cargo build 	--no-default-features --features=client --target-dir=target --target wasm32-unknown-unknown
-	cd examples/demo_site && wasm-bindgen --out-dir target/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/demo_site.wasm
+	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/demo_site.wasm
 
 run-demo-site *args:
 	cd examples/demo_site && cargo run --no-default-features --features=server {{args}}
@@ -129,9 +129,6 @@ leptosfmt *args:
 	crates/beet_design/**/*.rs 				\
 	crates/beet_design/**/**/*.rs 		\
 	crates/beet_design/**/**/**/*.rs 	\
-	crates/beet_router/**/*.rs 				\
-	crates/beet_router/**/**/*.rs 		\
-	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -145,13 +142,6 @@ run-bevy-rsx:
 # run-bevy-rsx but stop if there's an error
 run-bevy-rsx-if-ok:
 	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
-
-run-test-site:
-	cargo run -p beet_router --example collect_routes
-	cargo run -p beet_router --example templates
-	cargo run -p beet_router --example html
-	sweet serve target/test_site
-# --templates-root-dir crates \
 
 #just cli watch -p beet_site {{args}}
 build-site *args:
@@ -197,7 +187,6 @@ test-rsx *args:
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}	
 	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
@@ -316,7 +305,6 @@ publish-all *args:
 	just publish beet_parse      			{{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx        			{{args}} || true
-	just publish beet_router          {{args}} || true
 	just publish beet_build      			{{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_design 					{{args}} || true

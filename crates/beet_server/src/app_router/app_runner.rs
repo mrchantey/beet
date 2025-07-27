@@ -107,21 +107,47 @@ impl AppRunner {
 		let html_dir = workspace_config.html_dir.into_abs();
 
 		let clone_world = CloneWorld::new(app.world_mut());
-		let html = Router::endpoints(app.world_mut())
+		let html = app
+			.world_mut()
+			.run_system_cached(ResolvedEndpoint::collect)?
 			.into_iter()
+			.filter(|info| {
+				// only export static get requests
+				info.method() == HttpMethod::Get
+					&& info.cache_strategy() == CacheStrategy::Static
+			})
 			// TODO parallel
-			.map(async |info| -> Result<(AbsPathBuf, String)> {
+			.map(async |info| -> Result<Option<(AbsPathBuf, String)>> {
+				use http::header::CONTENT_TYPE;
+
 				let mut world = clone_world.clone().clone_world()?;
-				let route_path =
-					html_dir.join(&info.path.as_relative()).join("index.html");
-				let html = Router::oneshot_str(&mut world, info).await?;
-				Ok((route_path, html))
+				let route_path = html_dir
+					.join(&info.path().as_relative())
+					.join("index.html");
+
+				let route_info =
+					RouteInfo::new(info.path().clone(), info.method());
+
+				let res = Router::oneshot(&mut world, route_info)
+					.await
+					.into_result()
+					.await?;
+
+				// we are only collecting html responses, other static endpoints
+				// are not exported
+				if res.header_matches(CONTENT_TYPE, "text/html") {
+					let html = res.text().await?;
+					Some((route_path, html))
+				} else {
+					None
+				}
+				.xok()
 			})
 			.xmap(futures::future::try_join_all)
 			.await?;
 
 		// write files all at once to avoid triggering file watcher multiple times
-		for (path, html) in html {
+		for (path, html) in html.into_iter().filter_map(|x| x) {
 			println!("Exporting html to {}", path);
 			FsExt::write(path, &html)?;
 		}

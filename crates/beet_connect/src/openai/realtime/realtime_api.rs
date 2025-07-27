@@ -21,8 +21,10 @@ impl RealtimeApi {
 		.unwrap()
 		.send()
 		.await?
-		.into_result()?
-		.json::<RealtimeSessionCreateResponse>()?
+		.into_result()
+		.await?
+		.json::<RealtimeSessionCreateResponse>()
+		.await?
 		.xok()
 	}
 }

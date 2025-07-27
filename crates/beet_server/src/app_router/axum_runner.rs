@@ -19,13 +19,12 @@ impl AxumRunner {
 		let clone_world = CloneWorld::new(world);
 		// Add a catch-all fallback handler for unmatched routes
 		let route = routing::any(move |request: axum::extract::Request| {
-
 			let world = clone_world.clone();
 			async move {
 				handle_axum_request(world, request)
 					.await
 					.into_response()
-					.into_axum()
+					.into_axum().await
 			}
 		});
 
@@ -54,6 +53,10 @@ impl AxumRunner {
 
 		match self.runner.mode.unwrap_or_default() {
 			RouterMode::Ssg => {
+				debug!(
+					"Serving static files from:\n{}",
+					&html_dir
+				);
 				router =
 					router.fallback_service(file_and_error_handler(&html_dir));
 			}

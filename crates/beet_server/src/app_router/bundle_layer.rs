@@ -49,7 +49,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(TemplatePlugin);
 		let world = app.world_mut();
-		world.spawn(children![RouteHandler::bundle(|| {
+		world.spawn(children![RouteHandler::bundle(HttpMethod::Get, || {
 			rsx! {
 				<MyTemplate foo=42/>
 			}
@@ -69,7 +69,7 @@ mod test {
 		app.add_plugins(TemplatePlugin);
 		let world = app.world_mut();
 		world.spawn(children![
-			RouteHandler::bundle(|| {
+			RouteHandler::bundle(HttpMethod::Get, || {
 				rsx! {
 					<MyTemplate foo=42/>
 				}

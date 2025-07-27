@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_utils::utils::PipelineTarget;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use serde::de::DeserializeOwned;
@@ -12,13 +13,6 @@ use std::sync::Arc;
 pub struct HandlerBundle;
 
 
-/// A route layer that will always return the same html file for a given path,
-/// making it suitable for ssg. Static routes can still have
-/// client and server islands, but these are loaded from the html file
-/// instead of being rendered on each request.
-#[derive(Default, Component, Reflect)]
-#[reflect(Default, Component)]
-pub struct StaticRoute;
 
 /// An asynchronous route handler, accepting and returning a [`World`].
 #[derive(Clone, Component)]
@@ -30,9 +24,17 @@ type RouteHandlerFunc = dyn 'static
 	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 
-
-
-
+fn no_request_err<T>() -> HttpError {
+	HttpError::internal_error(format!(
+		"
+Handler Error: {}\n\n
+No request found in world. This can occur when two handlers compete
+to remove the request resource, try explicitly adding an Endpoint to each
+	
+	",
+		std::any::type_name::<T>()
+	))
+}
 
 impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`]
@@ -47,9 +49,7 @@ impl RouteHandler {
 		let handler = move |world: &mut World| -> Result<Out, Response> {
 			let input = world
 				.remove_resource::<Request>()
-				.ok_or_else(|| {
-					bevyhow!("no request found in world").into_response()
-				})?
+				.ok_or_else(|| no_request_err::<T>())?
 				.try_into()
 				.map_err(|err: InErr| err.into_response())?;
 			let out = world
@@ -66,7 +66,10 @@ impl RouteHandler {
 
 	/// A route handler returning a bundle, which is inserted into the world
 	/// with a [`HandlerBundle`] component.
-	pub fn bundle<T, In, InErr, Out, Marker>(handler: T) -> Self
+	pub fn bundle<T, In, InErr, Out, Marker>(
+		endpoint: impl Into<Endpoint>,
+		handler: T,
+	) -> (Endpoint, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		In: 'static + SystemInput,
@@ -77,9 +80,7 @@ impl RouteHandler {
 		let handler = move |world: &mut World| -> Result<(), Response> {
 			let input = world
 				.remove_resource::<Request>()
-				.ok_or_else(|| {
-					bevyhow!("no request found in world").into_response()
-				})?
+				.ok_or_else(|| no_request_err::<T>())?
 				.try_into()
 				.map_err(|err: InErr| err.into_response())?;
 			match world.run_system_once_with(handler.clone(), input) {
@@ -98,19 +99,24 @@ impl RouteHandler {
 				world.insert_resource(err);
 			}
 		})
+		.xmap(move |handler| (endpoint.into(), handler))
 	}
 
 	/// A route handler accepting an input type to be extracted from the request.
 	/// - For requests with no body, ie `GET`, the input is deserialized from the query parameters.
 	/// - For requests with a body, ie `POST`, `PUT`, etc, the input is deserialized from the body.
-	pub fn action<T, Input, Out, Marker>(method: HttpMethod, handler: T) -> Self
+	pub fn action<T, Input, Out, Marker>(
+		endpoint: impl Into<Endpoint>,
+		handler: T,
+	) -> (Endpoint, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
 		Input: 'static + SystemInput,
 		for<'a> Input::Inner<'a>: DeserializeOwned,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		match method.has_body() {
+		let endpoint = endpoint.into();
+		match endpoint.method().has_body() {
 			// ie `POST`, `PUT`, etc
 			true => Self::new(
 				move |val: In<Json<Input::Inner<'_>>>,
@@ -132,6 +138,7 @@ impl RouteHandler {
 				},
 			),
 		}
+		.xmap(|handler| (endpoint, handler))
 	}
 
 
@@ -226,8 +233,7 @@ mod test {
 
 	#[sweet::test]
 	async fn not_found() {
-		let mut world = World::new();
-		Router::oneshot(&mut world, "/")
+		Router::oneshot(&mut World::new(), "/")
 			.await
 			.xpect()
 			.to_be(Response::not_found());
@@ -251,7 +257,7 @@ mod test {
 			rsx! {<div>hello</div>}
 		}
 
-		world.spawn(RouteHandler::bundle(foo));
+		world.spawn(RouteHandler::bundle(HttpMethod::Get, foo));
 		Router::oneshot_str(&mut world, "/")
 			.await
 			.unwrap()

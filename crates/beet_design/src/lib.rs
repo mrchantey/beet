@@ -43,7 +43,6 @@ pub mod prelude {
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_core::prelude::*;
-			pub use beet_router::prelude::*;
 			pub use beet_rsx::prelude::*;
 			#[cfg(not(target_arch = "wasm32"))]
 			pub use beet_server::prelude::*;

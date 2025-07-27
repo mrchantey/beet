@@ -9,8 +9,8 @@ pub mod route0;
 #[cfg(feature = "server")]
 pub fn test_docs_routes() -> impl Bundle {
     children![
-        (StaticRoute, RouteFilter { segments :
-        vec![RouteSegment::Static(String::from("hello"))], methods :
-        vec![HttpMethod::Get] }, RouteHandler::bundle(route0::get))
+        (RouteFilter { segments : vec![RouteSegment::Static(String::from("hello"))] },
+        RouteHandler::bundle(Endpoint { method : HttpMethod::Get, cache_strategy :
+        CacheStrategy::Dynamic }, route0::get))
     ]
 }

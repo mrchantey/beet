@@ -26,7 +26,7 @@ mod test_request {
 	const HTTPBIN: &str = "https://httpbin.org";
 
 	#[sweet::test]
-	// #[ignore = "flaky example.com"]
+	#[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
 			.send()
@@ -108,6 +108,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.text()
+			.await
 			.unwrap()
 			.xpect()
 			.to_contain("rawbytes");
@@ -138,6 +139,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.text()
+			.await
 			.unwrap()
 			.xpect()
 			.to_contain("baz");
@@ -180,6 +182,7 @@ mod test_response {
 			.await
 			.unwrap()
 			.json::<serde_json::Value>()
+			.await
 			.unwrap()
 			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
 			.xpect()

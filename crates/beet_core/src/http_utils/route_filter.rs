@@ -5,6 +5,10 @@ use bevy::prelude::*;
 use http::request::Parts;
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
+use std::path::Path;
+
+
+
 
 
 /// A filter for matching routes based on path segments and HTTP methods.
@@ -18,39 +22,20 @@ pub struct RouteFilter {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
 	pub segments: Vec<RouteSegment>,
-	/// Methods that this route filter applies to,
-	/// an empty vector means all methods.
-	/// The first method in the vector is considered the canonical method
-	/// for this route, and will be used when generating route info.
-	pub methods: Vec<HttpMethod>,
 }
 
 
 impl RouteFilter {
-	pub fn new(path: &str) -> Self {
+	/// Create a new `RouteFilter` with the given path which is split into segments.
+	pub fn new(path: impl AsRef<Path>) -> Self {
 		let segments = path
+			.as_ref()
+			.to_string_lossy()
 			.split('/')
 			.filter(|s| !s.is_empty())
 			.map(RouteSegment::new)
 			.collect::<Vec<_>>();
-		Self {
-			segments,
-			methods: Vec::new(),
-		}
-	}
-
-	pub fn from_info(route_info: &RouteInfo) -> Self {
-		Self::new(&route_info.path.to_string_lossy())
-			.with_method(route_info.method)
-	}
-
-	pub fn with_method(mut self, method: HttpMethod) -> Self {
-		self.methods.push(method);
-		self
-	}
-	pub fn set_methods(mut self, methods: Vec<HttpMethod>) -> Self {
-		self.methods = methods;
-		self
+		Self { segments }
 	}
 
 	/// Consume a segment of the path for each segment in the filter,
@@ -59,10 +44,6 @@ impl RouteFilter {
 		&self,
 		mut parts: RouteParts,
 	) -> ControlFlow<(), RouteParts> {
-		// if methods are specified, check if the method matches
-		if !self.methods.is_empty() && !self.methods.contains(&parts.method) {
-			return ControlFlow::Break(());
-		}
 		// if segments is empty, only the root path is valid
 		if self.segments.is_empty() && !parts.path.is_empty() {
 			return ControlFlow::Break(());
@@ -120,6 +101,14 @@ impl RouteSegment {
 			Self::Static(trimmed.to_string())
 		}
 	}
+	/// Uses conventions of `:` and `*` to annotate non static segments
+	pub fn to_string_annotated(&self) -> String {
+		match self {
+			Self::Static(val) => val.clone(),
+			Self::Dynamic(val) => format!(":{}", val),
+			Self::Wildcard(val) => format!("*{}", val),
+		}
+	}
 
 	/// Attempts to match the segment against a path,
 	/// returning the remaining path if it matches.
@@ -154,7 +143,7 @@ impl RouteSegment {
 /// - not contain internal slashes `/`
 #[derive(Debug, Default, Clone)]
 pub struct RouteParts {
-	method: HttpMethod,
+	pub(super) method: HttpMethod,
 	/// Non-empty segments of the path,
 	path: VecDeque<String>,
 }
@@ -175,6 +164,8 @@ impl RouteParts {
 	pub fn from_parts(parts: &Parts) -> Self {
 		Self::new(parts.uri.path(), parts.method.clone().into())
 	}
+	pub fn method(&self) -> HttpMethod { self.method }
+	pub fn path(&self) -> &VecDeque<String> { &self.path }
 }
 
 
@@ -229,32 +220,5 @@ mod test {
 		expect_segment("foo/*bar", "foo").to_continue();
 		expect_segment("foo/*bar", "bar").to_break();
 		expect_segment("/*foo", "").to_continue();
-	}
-
-	#[test]
-	#[rustfmt::skip]
-	fn method_filter() {
-		fn expect_method(
-			filter: Vec<HttpMethod>,
-			request: HttpMethod,
-		) -> Matcher<ControlFlow<(), RouteParts>> {
-			RouteFilter::new("*")
-				.set_methods(filter)
-				.matches(RouteParts::new("", request))
-				.xpect()
-		}
-		
-		expect_method(vec![], HttpMethod::Get)
-			.to_continue();
-		expect_method(vec![], HttpMethod::Post)
-			.to_continue();
-		expect_method(vec![HttpMethod::Get], HttpMethod::Get)
-			.to_continue();
-		expect_method(vec![HttpMethod::Get, HttpMethod::Post], HttpMethod::Get)
-			.to_continue();
-		expect_method(vec![HttpMethod::Get, HttpMethod::Post], HttpMethod::Post)
-			.to_continue();
-		expect_method(vec![HttpMethod::Post], HttpMethod::Get)
-			.to_break();
 	}
 }

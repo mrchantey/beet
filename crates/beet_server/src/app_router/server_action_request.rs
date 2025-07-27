@@ -97,11 +97,13 @@ where
 	where
 		Res: DeserializeOwned,
 	{
-		let res = self.into_request()?.send().await?;
-		match res.status().is_success() {
-			true => res.json(),
-			false => Err(HttpError::from(res).into()),
-		}
+		self.into_request()?
+			.send()
+			.await?
+			.into_result()
+			.await?
+			.json()
+			.await
 	}
 	pub async fn send_fallible<Res, Err>(self) -> Result<Result<Res, Err>>
 	where
@@ -113,16 +115,16 @@ where
 		match res.status() {
 			// succesfull request, handler failed
 			status if status == error_status => {
-				let err = res.json()?;
+				let err = res.json().await?;
 				Ok(Err(err))
 			}
 			// successful request, handler succeeded
 			status if status.is_success() => {
-				let ok = res.json()?;
+				let ok = res.json().await?;
 				Ok(Ok(ok))
 			}
 			// failed request
-			_ => Err(HttpError::from(res).into()),
+			_ => Err(res.into_error().await.into()),
 		}
 	}
 }
@@ -137,8 +139,13 @@ mod test {
 	use tokio::net::TcpListener;
 	use tokio::task::JoinHandle;
 
-	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
-	fn add_via_post(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
+	fn add_via_get(In(params): In<(i32, i32)>) -> i32 {
+		params.0 + params.1
+	}
+	fn add_via_post(In(params): In<(i32, i32)>) -> i32 {
+
+		params.0 + params.1
+	}
 	fn increment_if_positive(In(params): In<i32>) -> Result<i32, String> {
 		if params > 0 {
 			Ok(params + 1)
@@ -171,22 +178,21 @@ mod test {
 		app.add_plugins(RouterPlugin::default());
 		app.world_mut().spawn(children![
 			(
-				RouteFilter::new("/add").with_method(HttpMethod::Get),
+				RouteFilter::new("/add"),
 				RouteHandler::action(
 					HttpMethod::Get,
 					add_via_get.pipe(Json::pipe)
 				)
 			),
 			(
-				RouteFilter::new("/add").with_method(HttpMethod::Post),
+				RouteFilter::new("/add"),
 				RouteHandler::action(
 					HttpMethod::Post,
 					add_via_post.pipe(Json::pipe)
 				)
 			),
 			(
-				RouteFilter::new("/increment_if_positive")
-					.with_method(HttpMethod::Get),
+				RouteFilter::new("/increment_if_positive"),
 				RouteHandler::action(
 					HttpMethod::Get,
 					increment_if_positive.pipe(JsonResult::pipe)

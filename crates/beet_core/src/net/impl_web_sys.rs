@@ -93,6 +93,9 @@ impl Response {
 		}
 		let http_response = builder.body(bytes.clone())?;
 		let (parts, body) = http_response.into_parts();
-		Ok(Response { parts, body })
+		Ok(Response {
+			parts,
+			body: body.into(),
+		})
 	}
 }

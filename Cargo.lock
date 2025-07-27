@@ -713,7 +713,6 @@ dependencies = [
  "beet_flow",
  "beet_ml",
  "beet_parse",
- "beet_router",
  "beet_rsx",
  "beet_server",
  "beet_sim",
@@ -730,32 +729,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet-cli"
-version = "0.0.6-dev.7"
-dependencies = [
- "anyhow",
- "beet",
- "bevy",
- "clap",
- "heck 0.4.1",
- "prettyplease",
- "proc-macro2",
- "quote",
- "rapidhash",
- "ron",
- "sweet",
- "syn 2.0.104",
- "tokio",
-]
-
-[[package]]
 name = "beet_build"
 version = "0.0.6-dev.7"
 dependencies = [
  "anyhow",
  "beet_core",
  "beet_parse",
- "beet_router",
  "beet_rsx",
  "beet_utils",
  "bevy",
@@ -870,7 +849,6 @@ dependencies = [
  "anyhow",
  "beet_core",
  "beet_parse",
- "beet_router",
  "beet_rsx",
  "beet_server",
  "beet_utils",
@@ -1027,36 +1005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_router"
-version = "0.0.6-dev.7"
-dependencies = [
- "anyhow",
- "axum 0.8.4",
- "beet_core",
- "beet_router",
- "beet_rsx",
- "beet_utils",
- "bevy",
- "clap",
- "console_error_panic_hook",
- "extend",
- "futures",
- "heck 0.4.1",
- "http 1.3.1",
- "http-body-util",
- "rapidhash",
- "ron",
- "serde",
- "serde_json",
- "sweet",
- "thiserror 1.0.69",
- "tokio",
- "toml",
- "tower 0.5.2",
- "web-sys",
-]
-
-[[package]]
 name = "beet_rsx"
 version = "0.0.6-dev.7"
 dependencies = [
@@ -1120,7 +1068,6 @@ dependencies = [
  "axum 0.8.4",
  "beet_build",
  "beet_core",
- "beet_router",
  "beet_rsx",
  "beet_utils",
  "bevy",
@@ -1152,19 +1099,6 @@ dependencies = [
  "beet_spatial",
  "bevy",
  "sweet",
-]
-
-[[package]]
-name = "beet_site"
-version = "0.0.6-dev.7"
-dependencies = [
- "anyhow",
- "beet",
- "beet_design",
- "getrandom 0.3.3",
- "serde",
- "sweet",
- "tokio",
 ]
 
 [[package]]

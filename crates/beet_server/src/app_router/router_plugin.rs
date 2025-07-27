@@ -10,6 +10,8 @@ pub struct RouterPlugin;
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(TemplatePlugin)
+			.register_type::<MethodFilter>()
+			.register_type::<Endpoint>()
 			.register_type::<RouteFilter>()
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()

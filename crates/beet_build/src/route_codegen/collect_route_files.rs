@@ -33,49 +33,45 @@ pub fn collect_route_files(
 			{
 				let func_ident = &route_file_method.item.sig.ident;
 
+				let endpoint = Endpoint::new_with(
+					route_file_method.route_info.method,
+					collection.category.cache_strategy(),
+				)
+				.self_token_stream();
+
 				let is_async = route_file_method.item.sig.asyncness.is_some();
 				let handler = match collection.category {
 					RouteCollectionCategory::Pages => {
 						// page routes are presumed to be bundles
 						match is_async {
 							true => quote! {
-								RouteHandler::async_bundle(#mod_ident::#func_ident)
+								RouteHandler::async_bundle(#endpoint, #mod_ident::#func_ident)
 							},
 							false => quote! {
-								RouteHandler::bundle(#mod_ident::#func_ident)
+								RouteHandler::bundle(#endpoint, #mod_ident::#func_ident)
 							},
 						}
 					}
 					RouteCollectionCategory::Actions => {
-						let method = route_file_method
-							.route_info
-							.method
-							.self_token_stream();
-
-						let pipe = match route_file_method.returns_result() {
-							true => quote! { .pipe(JsonResult::pipe) },
-							false => quote! {.pipe(Json::pipe) },
+						let out_ty = match route_file_method.returns_result() {
+							true => quote! { JsonResult },
+							false => quote! { Json },
 						};
-
-
 						// Action routes may be any kind of route
 						quote! {
-							RouteHandler::action(#method, #mod_ident::#func_ident #pipe)
+							RouteHandler::action(
+								#endpoint,
+								#mod_ident::#func_ident.pipe(#out_ty::pipe)
+							)
 						}
 					}
 				};
 				let filter =
-					RouteFilter::from_info(&route_file_method.route_info)
+					RouteFilter::new(&route_file_method.route_info.path)
 						.self_token_stream();
 
-				let static_route =
-					if collection.category.include_in_route_tree() {
-						Some(quote! { StaticRoute, })
-					} else {
-						None
-					};
+
 				children.push(quote! {(
-					#static_route
 					#filter,
 					#handler
 				)});

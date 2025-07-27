@@ -1,4 +1,3 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 use std::fmt;
@@ -11,7 +10,9 @@ use std::fmt;
 ///
 /// Additionally the naming convention follows Rusty conventions rather
 /// than HTTP conventions, ie `Get` instead of `GET`.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Reflect,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {
@@ -28,9 +29,21 @@ pub enum HttpMethod {
 }
 
 impl HttpMethod {
-	pub const METHODS: [&str; 9] = [
+	#[allow(unused)]
+	const METHODS: [&str; 9] = [
 		"get", "post", "put", "delete", "head", "options", "connect", "trace",
 		"patch",
+	];
+	pub const ALL: [HttpMethod; 9] = [
+		HttpMethod::Get,
+		HttpMethod::Post,
+		HttpMethod::Put,
+		HttpMethod::Delete,
+		HttpMethod::Head,
+		HttpMethod::Options,
+		HttpMethod::Connect,
+		HttpMethod::Trace,
+		HttpMethod::Patch,
 	];
 
 	/// Whether this method is one of the HTTP methods that typically
@@ -113,5 +126,43 @@ impl std::str::FromStr for HttpMethod {
 			"CONNECT" => HttpMethod::Connect,
 			_ => anyhow::bail!("Unknown HTTP method: {}", s),
 		})
+	}
+}
+
+
+/// Specify which HTTP methods a route should respond to
+#[derive(
+	Debug, Clone, PartialEq, Eq, Hash, Component, Reflect, Deref, DerefMut,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct MethodFilter {
+	methods: Vec<HttpMethod>,
+}
+
+impl Default for MethodFilter {
+	fn default() -> Self { HttpMethod::Get.into() }
+}
+
+impl Into<MethodFilter> for HttpMethod {
+	fn into(self) -> MethodFilter { MethodFilter::new(vec![self]) }
+}
+
+impl Into<MethodFilter> for Vec<HttpMethod> {
+	fn into(self) -> MethodFilter { MethodFilter::new(self) }
+}
+
+impl MethodFilter {
+	pub fn new(methods: Vec<HttpMethod>) -> Self { methods.into() }
+
+	pub fn matches(&self, parts: &RouteParts) -> bool {
+		self.methods.contains(&parts.method)
+	}
+
+	pub fn merge(mut self, other: MethodFilter) -> MethodFilter {
+		self.extend(other.methods);
+		self.sort();
+		self.dedup();
+		self
 	}
 }

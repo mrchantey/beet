@@ -6,58 +6,14 @@ use std::ops::ControlFlow;
 pub struct Router;
 
 
-fn static_routes(
-	methods: Query<Entity, With<StaticRoute>>,
-	parents: Query<&ChildOf>,
-	filters: Query<&RouteFilter>,
-) -> Vec<RouteInfo> {
-	let mut paths = Vec::new();
-	for entity in methods.iter() {
-		let mut path = Vec::new();
-		let mut method = HttpMethod::Get;
-		// iterate over ancestors starting from the root
-		for parent in parents
-			.iter_ancestors_inclusive(entity)
-			.collect::<Vec<_>>()
-			.into_iter()
-			.rev()
-		{
-			match filters.get(parent) {
-				Ok(filter) => {
-					for segment in filter.segments.iter() {
-						match segment {
-							RouteSegment::Static(s) => {
-								path.push(s.to_string());
-							}
-							RouteSegment::Dynamic(str) => {
-								path.push(format!("<dynamic-{}>", str));
-							}
-							RouteSegment::Wildcard(str) => {
-								path.push(format!("<wildcard-{}>", str));
-							}
-						}
-						if !filter.methods.is_empty() {
-							method = filter.methods[0].clone();
-						}
-					}
-				}
-				Err(_) => {
-					// no segment, skip
-				}
-			}
-		}
-		paths.push(RouteInfo {
-			method: method.clone(),
-			path: RoutePath::new(path.join("/")),
-		});
-	}
-	paths
-}
-
 
 impl Router {
-	pub fn endpoints(world: &mut World) -> Vec<RouteInfo> {
-		world.run_system_cached(static_routes).unwrap_or_default()
+	pub async fn oneshot_str(
+		world: &mut World,
+		req: impl Into<Request>,
+	) -> Result<String> {
+		let res = Self::oneshot(world, req).await.into_result().await?;
+		res.text().await
 	}
 
 	pub async fn oneshot(
@@ -69,15 +25,6 @@ impl Router {
 		*world = world2;
 		out
 	}
-
-	/// For testing, collect all routes and return the base route as a string
-	pub async fn oneshot_str(
-		world: &mut World,
-		req: impl Into<Request>,
-	) -> Result<String> {
-		Self::oneshot(world, req).await.xmap(|res| res.text())
-	}
-
 
 	/// Handle a request in the world, returning the response
 	pub async fn handle_request(
@@ -135,16 +82,31 @@ async fn handle_request_recursive(
 	}];
 
 	while let Some(StackFrame { entity, mut parts }) = stack.pop() {
-
+		// Check 1: MethodFilter
+		if let Some(method_filter) = world.entity(entity).get::<MethodFilter>()
+		{
+			if !method_filter.matches(&parts) {
+				// method does not match, skip this entity
+				continue;
+			}
+		}
+		// Check 2: RouteFilter
 		if let Some(filter) = world.entity(entity).get::<RouteFilter>() {
 			match filter.matches(parts.clone()) {
 				ControlFlow::Break(_) => {
-					// filter does not match, skip this entity
+					// path does not match, skip this entity
 					continue;
 				}
 				ControlFlow::Continue(new_parts) => {
 					parts = new_parts;
 				}
+			}
+		}
+		// Check 3: Endpoint
+		if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
+			if endpoint.method() != parts.method() {
+				// method does not match, skip this entity
+				continue;
 			}
 		}
 
@@ -208,18 +170,20 @@ mod test {
 			children![
 				(
 					RouteFilter::new("bar"),
+					Endpoint::new(HttpMethod::Get),
 					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(2);
 					}),
 				),
 				(
-					StaticRoute,
-					RouteFilter::new("bazz").with_method(HttpMethod::Delete),
+					RouteFilter::new("bazz"),
+					Endpoint::new(HttpMethod::Delete),
 					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(3);
 					}),
 				),
 				(
+					Endpoint::new(HttpMethod::Get),
 					// no segment, always runs if parent matches
 					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(4);
@@ -253,40 +217,14 @@ mod test {
 		));
 		Router::oneshot_str(&mut world, "sdjhkfds")
 			.await
-			.unwrap()
+			.unwrap_err()
+			.to_string()
 			.xpect()
-			.to_be_str("Not Found");
+			.to_be("404 Not Found\n");
 		Router::oneshot_str(&mut world, "/pizza")
 			.await
 			.unwrap()
 			.xpect()
 			.to_be_str("hawaiian");
-	}
-
-
-
-
-	#[test]
-	fn static_routes() {
-		let mut world = World::new();
-		world.spawn((
-			StaticRoute,
-			RouteFilter::new("foo").with_method(HttpMethod::Get),
-			children![
-				children![(
-					StaticRoute,
-					RouteFilter::new("bar").with_method(HttpMethod::Post),
-				),],
-				(
-					StaticRoute,
-					RouteFilter::new("bazz").with_method(HttpMethod::Post),
-				)
-			],
-		));
-		Router::endpoints(&mut world).xpect().to_be(vec![
-			RouteInfo::get("/foo"),
-			RouteInfo::post("/foo/bar"),
-			RouteInfo::post("/foo/bazz"),
-		]);
 	}
 }
