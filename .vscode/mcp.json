@@ -1,0 +1,9 @@
+{  "servers": {
+    "Beet Spec": {
+      "type": "stdio",
+			"cwd": "${workspaceFolder}/crates/beet_spec",
+      "command": "cargo",
+      "args": ["run", "--example","mcp-hello-world"],
+    }
+  }
+}

@@ -1185,6 +1185,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_spec"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "beet_utils"
 version = "0.0.6-rc.3"
 dependencies = [

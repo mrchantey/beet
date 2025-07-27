@@ -50,6 +50,7 @@ members = [
 	"crates/beet_build",
 	"crates/beet_rsx_combinator",
 	"crates/beet_parse",
+	"crates/beet_spec",
 
 	## 💡 Flow
 	"crates/beet_examples",

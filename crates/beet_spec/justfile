@@ -1,0 +1,5 @@
+# MCP hello world test
+
+test:
+    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test-client","version":"0.1.0"},"protocolVersion":"2025-06-18"}}' | cargo run --example mcp-hello-world
+    echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"toolName":"hello","arguments":{"name":"pizza"}}}' | cargo run --example mcp-hello-world
