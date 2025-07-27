@@ -38,7 +38,10 @@ to remove the request resource, try explicitly adding an Endpoint to each
 
 impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`]
-	pub fn new<T, In, InErr, Out, Marker>(handler: T) -> Self
+	pub fn new<T, In, InErr, Out, Marker>(
+		endpoint: impl Into<Endpoint>,
+		handler: T,
+	) -> (Endpoint, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		Out: 'static + Send + Sync + IntoResponse,
@@ -62,6 +65,7 @@ impl RouteHandler {
 			let res = handler(world).into_response();
 			world.insert_resource(res);
 		})
+		.xmap(move |handler| (endpoint.into(), handler))
 	}
 
 	/// A route handler returning a bundle, which is inserted into the world
@@ -119,6 +123,7 @@ impl RouteHandler {
 		match endpoint.method().has_body() {
 			// ie `POST`, `PUT`, etc
 			true => Self::new(
+				endpoint,
 				move |val: In<Json<Input::Inner<'_>>>,
 				      world: &mut World|
 				      -> Result<Out> {
@@ -129,6 +134,7 @@ impl RouteHandler {
 			),
 			// ie `GET`, `DELETE`, etc
 			false => Self::new(
+				endpoint,
 				move |val: In<JsonQueryParams<Input::Inner<'_>>>,
 				      world: &mut World|
 				      -> Result<Out> {
@@ -138,7 +144,6 @@ impl RouteHandler {
 				},
 			),
 		}
-		.xmap(|handler| (endpoint, handler))
 	}
 
 
@@ -241,7 +246,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = World::new();
-		world.spawn(RouteHandler::new(|| "howdy"));
+		world.spawn(RouteHandler::new(HttpMethod::Get, || "howdy"));
 		Router::oneshot(&mut world, "/")
 			.await
 			.status()
@@ -269,7 +274,7 @@ mod test {
 	#[sweet::test]
 	async fn body() {
 		let mut world = World::new();
-		world.spawn(RouteHandler::new(|| "hello"));
+		world.spawn(RouteHandler::new(HttpMethod::Get, || "hello"));
 		Router::oneshot_str(&mut world, "/")
 			.await
 			.unwrap()
@@ -284,7 +289,7 @@ mod test {
 			RouteHandler::layer(|mut req: ResMut<Request>| {
 				req.set_body("jimmy");
 			}),
-			RouteHandler::new(|req: In<Request>| {
+			RouteHandler::new(HttpMethod::Get, |req: In<Request>| {
 				let body = req.body_str().unwrap_or_default();
 				format!("hello {}", body)
 			})

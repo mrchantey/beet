@@ -81,7 +81,6 @@ mod test {
 					"middleware!" {entity}
 				}));
 			}),
-			// RouteHandler::new(bundle_to_html),
 		]);
 
 		Router::oneshot_str(world, "/")

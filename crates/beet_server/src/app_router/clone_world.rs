@@ -93,7 +93,10 @@ mod test {
 		let registry = world1.resource_mut::<AppTypeRegistry>();
 		registry.write().register::<Foo>();
 
-		world1.spawn((Foo(7), RouteHandler::new(|| "hello world!")));
+		world1.spawn((
+			Foo(7),
+			RouteHandler::new(HttpMethod::Get, || "hello world!"),
+		));
 		let mut world2 = CloneWorld::new(&mut world1).clone_world().unwrap();
 
 		world2.query_once::<&Foo>()[0].0.xpect().to_be(7);

@@ -31,11 +31,6 @@ impl Router {
 		mut world: World,
 		request: Request,
 	) -> (World, Response) {
-		if request.parts.uri.path().starts_with("/.well-known/") {
-			// skip 'well-known' requests
-			return (world, Response::not_found());
-		}
-
 		let start_time = CrossInstant::now();
 
 		let route_parts = RouteParts::from_parts(&request.parts);
@@ -141,7 +136,7 @@ mod test {
 	#[sweet::test]
 	async fn beet_route_works() {
 		let mut world = World::new();
-		world.spawn(RouteHandler::new(|| "hello world!"));
+		world.spawn(RouteHandler::new(HttpMethod::Get, || "hello world!"));
 
 		Router::oneshot_str(&mut world, "/")
 			.await
@@ -213,7 +208,7 @@ mod test {
 		let mut world = World::new();
 		world.spawn((
 			RouteFilter::new("pizza"),
-			RouteHandler::new(|| "hawaiian"),
+			RouteHandler::new(HttpMethod::Get, || "hawaiian"),
 		));
 		Router::oneshot_str(&mut world, "sdjhkfds")
 			.await

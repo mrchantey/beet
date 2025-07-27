@@ -3,6 +3,7 @@ use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
 use beet_core::prelude::*;
+use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
@@ -15,22 +16,33 @@ impl AxumRunner {
 	pub fn new(runner: AppRunner) -> Self { Self { runner } }
 
 
-	pub fn from_world(world: &mut World, router: axum::Router) -> axum::Router {
+	pub fn from_world(
+		world: &mut World,
+		mut router: axum::Router,
+	) -> axum::Router {
 		let clone_world = CloneWorld::new(world);
-		// Add a catch-all fallback handler for unmatched routes
-		let route = routing::any(move |request: axum::extract::Request| {
+
+		let handler = move |request: axum::extract::Request| {
 			let world = clone_world.clone();
 			async move {
 				handle_axum_request(world, request)
 					.await
 					.into_response()
-					.into_axum().await
+					.into_axum()
+					.await
 			}
-		});
+		};
 
+		for endpoint in
+			world.run_system_once(ResolvedEndpoint::collect).unwrap()
+		{
+			let segments = segments_to_axum(endpoint.segments().clone());
+			let method = method_to_axum(endpoint.method());
+			trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
+			router =
+				router.route(&segments, routing::on(method, handler.clone()));
+		}
 		router
-			.route("/", route.clone())
-			.route("/{*wildcard}", route)
 	}
 
 	#[tokio::main]
@@ -53,10 +65,7 @@ impl AxumRunner {
 
 		match self.runner.mode.unwrap_or_default() {
 			RouterMode::Ssg => {
-				debug!(
-					"Serving static files from:\n{}",
-					&html_dir
-				);
+				debug!("Serving static files from:\n{}", &html_dir);
 				router =
 					router.fallback_service(file_and_error_handler(&html_dir));
 			}
@@ -137,7 +146,6 @@ fn get_reload(
 	(livereload, reload_handle)
 }
 
-#[allow(unused)]
 fn method_to_axum(method: HttpMethod) -> MethodFilter {
 	match method {
 		HttpMethod::Get => MethodFilter::GET,
@@ -150,6 +158,20 @@ fn method_to_axum(method: HttpMethod) -> MethodFilter {
 		HttpMethod::Trace => MethodFilter::TRACE,
 		HttpMethod::Connect => MethodFilter::CONNECT,
 	}
+}
+
+/// Convert a vector of RouteSegment to a string representation for axum routing
+fn segments_to_axum(segments: Vec<RouteSegment>) -> String {
+	let path = segments
+		.into_iter()
+		.map(|segment| match segment {
+			RouteSegment::Static(seg) => seg,
+			RouteSegment::Dynamic(seg) => format!("{{{seg}}}"),
+			RouteSegment::Wildcard(seg) => format!("{{*{seg}}}"),
+		})
+		.collect::<Vec<_>>()
+		.join("/");
+	format!("/{}", path)
 }
 
 
@@ -182,7 +204,7 @@ mod test {
 		app.add_plugins(RouterPlugin);
 		app.world_mut().spawn((
 			RouteFilter::new("pizza"),
-			RouteHandler::new(|| "hello world!"),
+			RouteHandler::new(HttpMethod::Get, || "hello world!"),
 		));
 
 		// these tests also test the roundtrip CloneWorld mechanism

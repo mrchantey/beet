@@ -66,7 +66,7 @@ impl ResolvedEndpoint {
 		self.endpoint.cache_strategy
 	}
 	pub fn endpoint(&self) -> &Endpoint { &self.endpoint }
-
+	pub fn segments(&self) -> &Vec<RouteSegment> { &self.segments }
 	pub fn path(&self) -> &RoutePath { &self.path }
 
 	pub fn collect(
