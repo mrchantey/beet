@@ -25,9 +25,3 @@ pub mod prelude {
 		pub use beet_utils::prelude::*;
 	}
 }
-
-
-pub mod exports {
-	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-	pub use axum;
-}

@@ -50,10 +50,6 @@ pub mod prelude {
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;
 		}
-		pub mod exports {
-			#[cfg(not(target_arch = "wasm32"))]
-			pub use beet_server::exports::*;
-		}
 	}
 }
 

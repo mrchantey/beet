@@ -69,8 +69,6 @@ pub mod exports {
 	pub use crate::design::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::exports::*;
-	#[cfg(feature = "beet_server")]
-	pub use crate::server::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;

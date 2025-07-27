@@ -6,16 +6,16 @@ use demo_site::prelude::*;
 
 fn main() -> Result {
 	#[cfg(not(any(
-		feature = "config",
+		feature = "launch",
 		feature = "server",
 		feature = "client"
 	)))]
-	panic!("one of 'config', 'server', or 'client' features must be enabled");
+	panic!("one of 'launch', 'server', or 'client' features must be enabled");
 
 	let mut app = App::new();
 
-	#[cfg(feature = "config")]
-	app.add_plugins(config_plugin);
+	#[cfg(feature = "launch")]
+	app.add_plugins(launch_plugin);
 	#[cfg(feature = "server")]
 	app.add_plugins(server_plugin);
 	#[cfg(feature = "client")]

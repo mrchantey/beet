@@ -230,9 +230,9 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 [features]
 default = ["flow"]
 #💡 helper features
-web-config = ["build"]
-web-server = ["server", "design", "net", "serde"]
-web-client = [
+launch = ["build"]
+server = ["beet_server", "design", "net", "serde"]
+client = [
 	"rsx",
 	"design",
 	"web",
@@ -258,7 +258,7 @@ parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["beet_server", "beet_core/server"]
+axum = ["beet_core/axum"]
 lambda = ["server", "beet_server/lambda", "beet_core/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
@@ -321,12 +321,7 @@ uuid = { version = "1", features = ["rng-getrandom"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = "", features = [
-	"web-config",
-	"web-server",
-	"web-client",
-	"rand",
-] }
+beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 sweet.workspace = true

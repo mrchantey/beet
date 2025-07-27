@@ -46,7 +46,7 @@ web = [
 	"dep:js-sys",
 ]
 
-server = [
+axum = [
 	"http",
 	"dep:axum",
 	"dep:axum-extra",

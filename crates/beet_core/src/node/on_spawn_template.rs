@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+
+
 /// A component containing a method that will run after spawn, giving rsx snippets
 /// a chance to be applied. This is basically only added for NodeExprs,
 /// ie `<div foo={bar}/>` or `<div>{bar}</div>`.

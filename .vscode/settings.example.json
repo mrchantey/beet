@@ -1,27 +1,28 @@
 {
-	//💡💡💡 EXAMPLE SETTINGS 💡💡💡
-	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	// 💡💡💡 Example Settings 💡💡💡
+	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"rust-analyzer.cargo.features": [
-		"sweet/e2e",
-		"sweet/nightly", 
-		"sweet/bevy",
-		"beet/bevy_default",
-		"beet/examples",
-		"beet/css",
-		"beet/ml"
+		"beet/server",
+		"beet/client",
+		"beet/launch"
+		// "file_based_routes/config",
+		// "file_based_routes/server",
+		// "file_based_routes/client",
+		// "beet/server",
 	],
 	"deno.enable": true,
 	"files.exclude": {
-		".sweet": true,
+		"infra/.sst": true,
 		"**/.git": true,
 		".gitattributes": true,
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true
 	},
 	"search.exclude": {
-		".sweet": true,
+		"**/target": true,
 		"**/assets/": true,
 		"**.svg": true,
+		".sweet": true,
 		"Cargo.lock": true
 	}
 }

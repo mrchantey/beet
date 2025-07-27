@@ -148,7 +148,7 @@ impl Request {
 		Self { parts, body: bytes }
 	}
 
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub async fn from_axum<S: 'static + Send + Sync>(
 		request: axum::extract::Request,
 		state: &S,

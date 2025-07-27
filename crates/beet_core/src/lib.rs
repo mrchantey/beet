@@ -15,7 +15,7 @@ pub use beet_core_macros::*;
 mod bevy_utils;
 #[cfg(feature = "net")]
 pub mod net;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub mod server;
 #[cfg(feature = "web")]
 pub mod web;
@@ -29,7 +29,7 @@ pub mod prelude {
 	#[cfg(feature = "http")]
 	pub use crate::http_utils::*;
 	pub use crate::node::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;

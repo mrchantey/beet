@@ -95,7 +95,7 @@ build-csr:
 	sweet serve target/examples/csr
 	
 build-demo-site *args:
-	cd examples/demo_site && cargo run 		--no-default-features --features=config
+	cd examples/demo_site && cargo run 		--no-default-features --features=launch
 	cd examples/demo_site && cargo build 	--no-default-features --features=client --target-dir=target --target wasm32-unknown-unknown
 	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/demo_site.wasm
 

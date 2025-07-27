@@ -155,7 +155,7 @@ impl Response {
 		}
 	}
 
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub async fn into_axum(self) -> axum::response::Response {
 		use axum::response::IntoResponse;
 
@@ -171,7 +171,7 @@ impl Response {
 		}
 	}
 
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub async fn from_axum(resp: axum::response::Response) -> Result<Self> {
 		let (parts, body) = resp.into_parts();
 		let body = axum::body::to_bytes(body, usize::MAX).await?;
