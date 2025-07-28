@@ -9,7 +9,7 @@
     FragmentNode,
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("br")), ElementNode {
-        self_closing : true }, OnSpawnTemplate::new_insert(#[allow(unused_braces)] {
-        bar } .into_node_bundle()))]
+        self_closing : true }, OnSpawnDeferred::insert(#[allow(unused_braces)] { bar
+        } .into_template_bundle()))]
     },
 )

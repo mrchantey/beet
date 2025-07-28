@@ -25,16 +25,17 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			let ident = &field.ident;
 			let name_str = ident.to_string().replace('#', "");
 			// attribute values added to child entity,
-			// event handlers added to parent entity
+			// event handlers added to parent entity.
+			// this technique is also used in `tokenize_element_attributes.rs`
 			let (attr_bundle, event_bundle) = match name_str.starts_with("on") {
 				true => (
 					None,
 					Some(quote! {
 						world.entity_mut(parent_entity)
-							.insert(#ident.into_node_bundle());
+							.insert(#ident.into_template_bundle());
 					}),
 				),
-				false => (Some(quote! {#ident.into_attribute_bundle(),}), None),
+				false => (Some(quote! {#ident.into_template_bundle(),}), None),
 			};
 
 			let inner = quote! {(
@@ -77,14 +78,14 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		use beet::prelude::*;
 
 		impl #impl_generics IntoTemplateBundle<Self> for #target_name #type_generics #where_clause {
-		fn into_node_bundle(self) -> impl Bundle{
+		fn into_template_bundle(self) -> impl Bundle{
 			let Self {
 				#(#idents),*
 			} = self;
 			#[allow(unused_braces)]
 			(
 				#attrs,
-				#(#flattened.into_node_bundle()),*
+				#(#flattened.into_template_bundle()),*
 			)
 			}
 		}

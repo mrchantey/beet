@@ -28,6 +28,7 @@ impl Plugin for TemplatePlugin {
 		// 	load_all_file_snippets
 		// 		.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
 		// );
+
 		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
@@ -38,7 +39,7 @@ impl Plugin for TemplatePlugin {
 				// almost all of these systems must be run in this sequence,
 				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(
-					apply_static_rsx,
+					apply_rsx_snippets,
 					apply_style_id_attributes,
 					apply_slots,
 					apply_static_lang_snippets,

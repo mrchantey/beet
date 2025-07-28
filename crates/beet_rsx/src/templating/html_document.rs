@@ -211,10 +211,9 @@ fn script(content: impl Into<String>) -> impl Bundle {
 		ElementNode::open(),
 		NodeTag::new("script"),
 		related!(
-			Attributes
-				[(AttributeKey::new("type"), AttributeLit::new("module"),)]
+			Attributes[(AttributeKey::new("type"), TextNode::new("module"),)]
 		),
-		children![TextNode::new(content)],
+		children![TextNode::new(content.into())],
 	)
 }
 

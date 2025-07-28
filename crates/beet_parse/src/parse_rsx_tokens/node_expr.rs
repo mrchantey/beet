@@ -2,7 +2,7 @@
 //! All of these types contain the completely unparsed version of
 //! their expression, to be be modified in the tokenization stage,
 //! for example adding #[allow(unused_braces)] to block nodes
-//! and appending `.into_node_bundle()`
+//! and appending `.into_template_bundle()`
 use beet_core::as_beet::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -18,7 +18,7 @@ use syn::Expr;
 /// - template spawn funcs: `<MyTemplate/>`
 ///
 /// Cases where this is not used:
-/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_node_bundle` and `.into_attribute_bundle`
+/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_template_bundle`
 ///
 /// The parsed output depends on the context in which this expression is used:
 ///
@@ -46,7 +46,7 @@ use syn::Expr;
 /// An expression that is used as the value of an attribute.
 /// any [`NodeExpr`] with an [`AttributeOf`] *and* an [`AttributeKey`]
 /// is an attribute value.
-/// If the entity also has an [`AttributeLit`] this will be an [`Expr::Lit`].
+/// If the entity also has an [`TextNode`] this will be an [`Expr::Lit`].
 /// ```ignore
 /// rsx!{<span key={value} />};
 /// ```
@@ -86,16 +86,10 @@ impl NodeExpr {
 		}
 	}
 
-	/// Called when this expression is in the position of a block attribute,
+	/// Called when this expression is in the position of a node or block attribute,
 	/// ie `<div {my_expr} />`.
-	pub fn node_bundle_tokens(&self) -> TokenStream {
+	pub fn insert_deferred(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
-		quote! { OnSpawnTemplate::new_insert(#parsed.into_node_bundle()) }
-	}
-	/// Called when this expression is in the position of a block attribute,
-	/// ie `<div key={my_expr} />`.
-	pub fn attribute_bundle_tokens(&self) -> TokenStream {
-		let parsed = self.inner_parsed();
-		quote! { OnSpawnTemplate::new_insert(#parsed.into_attribute_bundle()) }
+		quote! { OnSpawnDeferred::insert(#parsed.into_template_bundle()) }
 	}
 }

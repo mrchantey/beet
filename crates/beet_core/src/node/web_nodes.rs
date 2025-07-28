@@ -1,9 +1,8 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
-pub type WebNodes = (DoctypeNode, CommentNode, ElementNode);
+pub type WebNodes = (DoctypeNode, CommentNode, ElementNode, AttributeKey);
 
 
 /// Indicates a Html Doctype Node, [W3 Docs](https://www.w3schools.com/tags/tag_doctype.ASP)

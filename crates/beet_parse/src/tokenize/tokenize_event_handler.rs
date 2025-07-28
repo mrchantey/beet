@@ -30,7 +30,7 @@ pub fn tokenize_event_handler(
 	match expr {
 		Expr::Closure(closure) => {
 			process_closure(closure, &ident);
-			// wrap closures in a block so we can safely call .into_node_bundle()
+			// wrap closures in a block so we can safely call .into_template_bundle()
 			// on the closure itsself
 			*expr = syn::parse_quote! {{#closure}}
 		}

@@ -118,7 +118,7 @@ mod test {
 			.spawn(rsx! {<button onclick=move|ev|set(ev.value())/>})
 			.get::<Children>()
 			.unwrap()[0];
-		world.run_system_once(apply_static_rsx).unwrap().unwrap();
+		world.run_system_once(apply_rsx_snippets).unwrap().unwrap();
 		world
 			.entity_mut(entity)
 			.trigger(OnClick::new(MockEvent::new("bar")));

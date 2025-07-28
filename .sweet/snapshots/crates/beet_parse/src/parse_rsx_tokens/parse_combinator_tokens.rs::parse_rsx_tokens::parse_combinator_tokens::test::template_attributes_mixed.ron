@@ -9,9 +9,9 @@
     FragmentNode,
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("MyTemplate")), FragmentNode,
-        TemplateNode, OnSpawnTemplate::new_insert(TemplateRoot::spawn(Spawn(<
-        MyTemplate as Props > ::Builder::default().foo(#[allow(unused_braces)] { let
-        bar = (NodeTag(String::from("br")), ElementNode { self_closing : true }); bar
-        }).build().into_node_bundle())).into_node_bundle()))]
+        TemplateNode, OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< MyTemplate
+        as Props > ::Builder::default().foo(#[allow(unused_braces)] { let bar =
+        (NodeTag(String::from("br")), ElementNode { self_closing : true }); bar })
+        .build().into_template_bundle())).into_template_bundle()))]
     },
 )

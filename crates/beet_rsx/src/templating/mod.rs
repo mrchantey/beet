@@ -1,6 +1,5 @@
 #[cfg(feature = "scene")]
 mod apply_client_islands;
-mod apply_on_spawn_template;
 mod apply_reactive_text_nodes;
 mod apply_rsx_snippets;
 mod apply_static_lang_snippets;
@@ -10,7 +9,6 @@ mod html_fragment;
 mod template_plugin;
 #[cfg(feature = "scene")]
 pub use apply_client_islands::*;
-pub use apply_on_spawn_template::*;
 pub use apply_reactive_text_nodes::*;
 pub use apply_rsx_snippets::*;
 use apply_style_id_attributes::*;

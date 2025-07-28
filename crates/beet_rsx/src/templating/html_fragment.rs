@@ -55,7 +55,7 @@ pub(super) fn insert_event_playback_attribute(
 		(With<EventTarget>, Added<DomIdx>),
 	>,
 	// potential event attributes
-	attributes: Query<(Entity, &AttributeKey), Without<AttributeLit>>,
+	attributes: Query<(Entity, &AttributeKey), Without<TextNode>>,
 ) {
 	for (idx, attrs) in query.iter() {
 		for (attr_entity, _) in attrs
@@ -63,13 +63,11 @@ pub(super) fn insert_event_playback_attribute(
 			.filter_map(|attr| attributes.get(attr).ok())
 			.filter(|(_, key)| key.starts_with("on"))
 		{
-			commands
-				.entity(attr_entity)
-				.insert(AttributeLit::new(format!(
-					"{}({}, event)",
-					html_constants.event_handler,
-					idx.inner()
-				)));
+			commands.entity(attr_entity).insert(TextNode::new(format!(
+				"{}({}, event)",
+				html_constants.event_handler,
+				idx.inner()
+			)));
 		}
 	}
 }
@@ -79,44 +77,44 @@ pub(super) fn insert_event_playback_attribute(
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct HtmlBuilder<'w, 's> {
-	elements: Query<'w,'s,(
+	fragment_nodes: Query<'w, 's,(
+		&'static FragmentNode,
+		&'static Children
+	)>,
+	doctype_nodes: Query<'w, 's, &'static DoctypeNode>,
+	comment_nodes: Query<'w, 's, &'static CommentNode>,
+	text_nodes: Query<'w, 's, &'static TextNode, Without<AttributeOf>>,
+	element_nodes: Query<'w,'s,(
 		&'static ElementNode,
 		&'static NodeTag,
 		Option<&'static InnerText>,
 		Option<&'static Attributes>,
 		Option<&'static Children>
 	)>,
-	fragments: Query<'w, 's,(
-		&'static FragmentNode,
-		&'static Children
-	)>,
-	attributes: Query<'w,'s,(
+	attribute_nodes: Query<'w,'s,(
 		&'static AttributeKey,
-		Option<&'static AttributeLit>
+		Option<&'static TextNode>
 	)>,
-	doctypes: Query<'w, 's, &'static DoctypeNode>,
-	comments: Query<'w, 's, &'static CommentNode>,
-	texts: Query<'w, 's, &'static TextNode>,
 }
 
 impl HtmlBuilder<'_, '_> {
 	fn parse(&self, entity: Entity, html: &mut String) {
-		if let Ok(_) = self.doctypes.get(entity) {
+		if let Ok(_) = self.doctype_nodes.get(entity) {
 			html.push_str("<!DOCTYPE html>");
 		}
-		if let Ok(comment) = self.comments.get(entity) {
+		if let Ok(comment) = self.comment_nodes.get(entity) {
 			html.push_str(&format!("<!--{}-->", comment.0));
 		}
-		if let Ok(text) = self.texts.get(entity) {
-			html.push_str(&text.0);
+		if let Ok(text) = self.text_nodes.get(entity) {
+			html.push_str(&text);
 		}
-		if let Ok((_, children)) = self.fragments.get(entity) {
+		if let Ok((_, children)) = self.fragment_nodes.get(entity) {
 			for child in children.iter() {
 				self.parse(child, html);
 			}
 		}
 		if let Ok((element, tag, inner_text, attributes, children)) =
-			self.elements.get(entity)
+			self.element_nodes.get(entity)
 		{
 			if element.self_closing && (**tag == "style") {
 				panic!(
@@ -129,7 +127,7 @@ impl HtmlBuilder<'_, '_> {
 			if let Some(attrs) = attributes {
 				for (key, value) in attrs
 					.iter()
-					.filter_map(|attr| self.attributes.get(attr).ok())
+					.filter_map(|attr| self.attribute_nodes.get(attr).ok())
 				{
 					html.push(' ');
 					html.push_str(&key);

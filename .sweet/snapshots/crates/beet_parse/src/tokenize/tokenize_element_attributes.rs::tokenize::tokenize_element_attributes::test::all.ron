@@ -9,13 +9,13 @@
     FragmentNode,
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("span")), ElementNode {
-        self_closing : true }, OnSpawnTemplate::new_insert(#[allow(unused_braces)] {
-        foo } .into_node_bundle()), related!(Attributes[AttributeKey::new("hidden"),
-        (AttributeKey::new("class"), OnSpawnTemplate::new_insert("foo"
-        .into_attribute_bundle())), (AttributeKey::new("onmousemove"),
-        OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())),
-        (AttributeKey::new("onclick"),
-        OnSpawnTemplate::new_insert(#[allow(unused_braces)] { | _ : Trigger < OnClick
-        > | { println!("clicked"); } } .into_attribute_bundle()), ExprIdx(1u32))]))]
+        self_closing : true }, OnSpawnDeferred::insert(#[allow(unused_braces)] { foo
+        } .into_template_bundle()), related!(Attributes[AttributeKey::new("hidden"),
+        (AttributeKey::new("class"), OnSpawnDeferred::insert("foo"
+        .into_template_bundle())), (AttributeKey::new("onmousemove"),
+        OnSpawnDeferred::insert("some_js_func".into_template_bundle())),
+        (AttributeKey::new("onclick"), OnSpawnDeferred::insert_parent:: < AttributeOf
+        > (#[allow(unused_braces)] { | _ : Trigger < OnClick > | {
+        println!("clicked"); } } .into_template_bundle()), ExprIdx(1u32))]))]
     },
 )

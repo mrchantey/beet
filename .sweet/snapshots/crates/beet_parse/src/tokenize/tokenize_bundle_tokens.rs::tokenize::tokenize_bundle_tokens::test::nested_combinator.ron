@@ -13,7 +13,7 @@
         NodeExpr(SendWrapper::new(syn::parse_quote!({ let class = "bar";
         (NodeTag(String::from("div")), ElementNode { self_closing : true },
         related!(Attributes[(AttributeKey::new("class"),
-        OnSpawnTemplate::new_insert(#[allow(unused_braces)] { class }
-        .into_attribute_bundle()), ExprIdx(1u32))])) }))))] })]
+        OnSpawnDeferred::insert(#[allow(unused_braces)] { class }
+        .into_template_bundle()), ExprIdx(1u32))])) }))))] })]
     },
 )

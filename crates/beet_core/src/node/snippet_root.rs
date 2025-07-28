@@ -9,8 +9,8 @@ pub type RootComponents = (
 	SnippetRoot,
 	StaticRoot,
 	InstanceRoot,
-	ResolvedRoot,
 	ExprIdx,
+	DomIdx,
 	RequiresDomIdx,
 );
 
@@ -104,8 +104,6 @@ impl SnippetRoot {
 pub struct StaticRoot;
 
 /// An instantiated node tree, ie the output of an `rsx!` macro.
-/// The [`OnSpawnTemplate`] systems may or may not have been evaluated yet,
-/// which can be determined by the presence of a [`ResolvedRoot`].
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
 )]
@@ -114,19 +112,6 @@ pub struct StaticRoot;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct InstanceRoot;
-
-/// Added to non-static entities with a [`SnippetRoot`], indicating they have
-/// had the [`StaticRoot`] applied.
-/// The [`OnSpawnTemplate`] systems have been evaluated, ie this node will not
-/// have any, and instead contain the resolved children and templates.
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
-)]
-#[reflect(Default, Component)]
-#[require(InstanceRoot)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct ResolvedRoot;
 
 /// Utility for getting the closest [`SnippetRoot`] ancestor of the entity,
 ///
@@ -149,3 +134,5 @@ impl NodeLocation<'_, '_> {
 			.unwrap_or_else(|| format!("Entity without location: {entity:?}"))
 	}
 }
+
+

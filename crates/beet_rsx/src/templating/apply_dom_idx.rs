@@ -8,10 +8,14 @@ use bevy::prelude::*;
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
 	attributes: Query<(Entity, &Attributes)>,
-	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<ReceivesSignals>)>,
 	dyn_text_nodes: Query<
 		Entity,
-		(With<TextNode>, With<SignalReceiver<String>>),
+		(
+			With<TextNode>,
+			With<ReceivesSignals>,
+			Without<AttributeOf>,
+		),
 	>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,
@@ -29,7 +33,7 @@ pub fn apply_requires_dom_idx(
 			.find(|e| elements.contains(*e))
 			.ok_or_else(|| {
 				bevyhow!(
-					"TextNode with SignalReceiver<String> must have an ElementNode parent"
+					"TextNode with ReceivesSignals must have an ElementNode parent"
 				)
 			})?;
 		commands.entity(entity).insert(RequiresDomIdx);
@@ -66,7 +70,7 @@ pub(super) fn apply_root_dom_idx(
 			commands.spawn((
 				AttributeOf::new(entity),
 				AttributeKey::new(html_constants.dom_idx_key.clone()),
-				AttributeLit::new(id.to_string()),
+				TextNode::new(id.to_string()),
 			));
 			id += 1;
 		}
@@ -98,7 +102,7 @@ pub(super) fn apply_client_island_dom_idx(
 			commands.spawn((
 				AttributeOf::new(entity),
 				AttributeKey::new(html_constants.dom_idx_key.clone()),
-				AttributeLit::new(id.to_string()),
+				TextNode::new(id.to_string()),
 			));
 			id += 1;
 		}
@@ -129,7 +133,7 @@ mod test {
 			}))
 			.get::<Children>()
 			.unwrap()[0];
-		world.run_system_once(apply_static_rsx).unwrap().unwrap();
+		world.run_system_once(apply_rsx_snippets).unwrap().unwrap();
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
 		world.get::<DomIdx>(div).unwrap().xpect().to_be(&DomIdx(0));

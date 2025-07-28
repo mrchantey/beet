@@ -173,7 +173,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			vec![
 				self.commands
 					.spawn((
-						TextNode(children.to_html()),
+						TextNode::new(children.to_html()),
 						FileSpanOf::<TextNode>::new(self.default_file_span()),
 					))
 					.id(),
@@ -205,7 +205,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn rsx_text(&mut self, text: RsxText) -> Result<Entity> {
 		self.commands
 			.spawn((
-				TextNode(text.0.to_string()),
+				TextNode::new(text.0.to_string()),
 				FileSpanOf::<TextNode>::new(self.default_file_span()),
 			))
 			.id()
@@ -243,21 +243,21 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							val.into_template_bundle(),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							val.into_template_bundle(),
 						));
 					}
 					RsxAttributeValue::Str(val) => {
 						let val = val.to_string_unquoted();
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							TextNode::new(val),
 						));
 					}
 					RsxAttributeValue::Element(value) => {
@@ -433,7 +433,7 @@ mod test {
 	}
 </style>
 "#
-			.xmap(parse)
-			.to_be_snapshot();
+		.xmap(parse)
+		.to_be_snapshot();
 	}
 }

@@ -10,8 +10,8 @@
     related! {
         Children[(NodeTag(String::from("br")), ElementNode { self_closing : true },
         related!(Attributes[(AttributeKey::new("foo"),
-        OnSpawnTemplate::new_insert(#[allow(unused_braces)] { let bar =
+        OnSpawnDeferred::insert(#[allow(unused_braces)] { let bar =
         (NodeTag(String::from("br")), ElementNode { self_closing : true }); bar }
-        .into_attribute_bundle()), ExprIdx(0u32))]))]
+        .into_template_bundle()), ExprIdx(0u32))]))]
     },
 )

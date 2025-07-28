@@ -172,13 +172,6 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 		// 	parent.spawn(bundle).insert(common_idx());
 		// })
 		.id();
-
-	// app.world_mut().spawn((
-	// 	OnSpawnTemplate::new(|_| {
-	// 		panic!("dsds");
-	// 	}),
-	// 	SnippetRoot::new_file_line_col(file!(), line!(), column!()),
-	// ));
 	app.update();
 
 	app.world_mut()

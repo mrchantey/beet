@@ -112,7 +112,7 @@ where
 				let value =
 					<T as FromReflect>::from_reflect(&*dynamic).unwrap();
 				world.entity_mut(entity).insert(TemplateRoot::spawn(Spawn(
-					value.into_node_bundle(),
+					value.into_template_bundle(),
 				)));
 			});
 		})

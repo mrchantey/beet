@@ -19,7 +19,7 @@ fn rsx_combinator() {
 		.get::<Children>()
 		.unwrap()[0];
 	app.world_mut()
-		.run_system_cached(apply_static_rsx)
+		.run_system_cached(apply_rsx_snippets)
 		.unwrap()
 		.unwrap();
 	app.world_mut()

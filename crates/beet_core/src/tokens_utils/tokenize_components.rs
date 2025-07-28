@@ -3,15 +3,6 @@ use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use variadics_please::all_tuples;
 
-// a group of all groups of components
-pub type RsxComponents = (
-	RootComponents,
-	RsxNodes,
-	WebNodes,
-	RsxDirectives,
-	WebDirectives,
-	LangDirectives,
-);
 
 pub trait TokenizeComponents {
 	fn tokenize_if_present(

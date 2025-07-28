@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
@@ -14,21 +16,35 @@ impl Plugin for SignalsPlugin {
 			.add_systems(
 				Update,
 				(
-					#[cfg(not(feature = "bevy_default"))]
-					receive_text_node_signals,
+					receive_string_signals::<String>,
+					receive_string_signals::<&'static str>,
+					receive_string_signals::<Cow<'static, str>>,
+					receive_bool_signals::<bool>,
+					receive_num_signals::<f32>,
+					receive_num_signals::<f64>,
+					receive_num_signals::<u8>,
+					receive_num_signals::<u16>,
+					receive_num_signals::<u32>,
+					// receive_num_signals::<u64>,
+					receive_num_signals::<i8>,
+					receive_num_signals::<i16>,
+					receive_num_signals::<i32>,
+					// receive_num_signals::<i64>,
 					#[cfg(feature = "bevy_default")]
-					(receive_text_node_signals, propagate_text_signals).chain(),
-					receive_attribute_value_signals,
+					propagate_text_signals,
 				)
+					.chain()
 					.in_set(SignalsSet),
 			);
 	}
 }
-
-
+/// Non generic marker to indicate this entity receives signals.
+#[derive(Default, Component)]
+pub struct ReceivesSignals;
 /// A component with a [`flume::Receiver`] that can be used to propagate changes
 /// throughout the app, for instance in [`receive_text_signals`].
 #[derive(Component)]
+#[require(ReceivesSignals)]
 pub struct SignalReceiver<T>(Receiver<T>);
 
 impl<T: 'static + Send + Sync> SignalReceiver<T> {
@@ -44,12 +60,38 @@ impl<T: 'static + Send + Sync> SignalReceiver<T> {
 	}
 }
 
-pub(crate) fn receive_text_node_signals(
-	mut query: Populated<(&mut TextNode, &SignalReceiver<String>)>,
+pub(crate) fn receive_string_signals<
+	T: 'static + Send + Sync + Into<String>,
+>(
+	mut query: Populated<(&mut TextNode, &SignalReceiver<T>)>,
 ) {
-	for (mut text, update) in query.iter_mut() {
-		while let Ok(new_text) = update.0.try_recv() {
-			text.0 = new_text;
+	for (mut lit, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val);
+		}
+	}
+}
+pub(crate) fn receive_bool_signals<
+	T: 'static + Send + Sync + Clone + Into<bool>,
+>(
+	mut query: Populated<(&mut TextNode, &mut BoolNode, &SignalReceiver<T>)>,
+) {
+	for (mut lit, mut num, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val.clone().into().to_string());
+			*num = BoolNode::new(val);
+		}
+	}
+}
+pub(crate) fn receive_num_signals<
+	T: 'static + Send + Sync + Clone + Into<f64>,
+>(
+	mut query: Populated<(&mut TextNode, &mut NumberNode, &SignalReceiver<T>)>,
+) {
+	for (mut lit, mut num, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val.clone().into().to_string());
+			*num = NumberNode::new(val);
 		}
 	}
 }
@@ -57,37 +99,24 @@ pub(crate) fn receive_text_node_signals(
 /// In bevy_default pass changed TextNode values to TextSpan
 #[cfg(feature = "bevy_default")]
 fn propagate_text_signals(
-	mut query: Populated<(&TextNode, &mut TextSpan), Changed<TextNode>>,
+	mut query: Populated<(&mut TextSpan, &TextNode), Changed<TextNode>>,
 ) {
-	for (text, mut span) in query.iter_mut() {
+	for (mut span, text) in query.iter_mut() {
 		**span = text.0.clone();
 	}
 }
-
-pub(crate) fn receive_attribute_value_signals(
-	mut query: Populated<(&mut AttributeLit, &SignalReceiver<String>)>,
-) {
-	for (mut lit, update) in query.iter_mut() {
-		while let Ok(new_text) = update.0.try_recv() {
-			*lit = AttributeLit::new(new_text);
-		}
-	}
-}
-
-impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
-	for Getter<T>
+// TODO we might want to handle Number and Bool types seperately, instead of this
+// blanket implementation
+impl<T, M> IntoTemplateBundle<(Self, M)> for Getter<T>
+where
+	T: 'static + Send + Sync + Clone + IntoTemplateBundle<M>,
 {
-	fn into_node_bundle(self) -> impl Bundle {
-		// changes here should be reflected in maybe_signal.rs
-		let get_str = move || self.get().to_string();
-		(TextNode::new(get_str()), SignalReceiver::new(get_str))
-	}
-	fn into_attribute_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		let get_str = move || self.get().to_string();
-		(AttributeLit::new(get_str()), SignalReceiver::new(get_str))
+	fn into_template_bundle(self) -> impl Bundle {
+		// let get_str = move || self.get().to_string();
+		(
+			self.get().into_template_bundle(),
+			SignalReceiver::new(move || self.get()),
+		)
 	}
 }
 
@@ -138,17 +167,17 @@ mod test {
 	fn nodes() {
 		let mut app = App::new();
 		app.add_plugins(SignalsPlugin);
-		let (get, set) = signal(5);
+		let (get, set) = signal(5u32);
 		let div = app
 			.world_mut()
 			.spawn(rsx! {<div>{get}</div>})
 			.get::<Children>()
 			.unwrap()[0];
+		let text = app.world().entity(div).get::<Children>().unwrap()[0];
 		app.world_mut()
-			.run_system_once(apply_static_rsx)
+			.run_system_once(apply_rsx_snippets)
 			.unwrap()
 			.unwrap();
-		let text = app.world().entity(div).get::<Children>().unwrap()[0];
 
 		app.world()
 			.entity(text)
@@ -181,15 +210,15 @@ mod test {
 			.spawn(rsx! {<div class={get}/>})
 			.get::<Children>()
 			.unwrap()[0];
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
 		app.world_mut()
-			.run_system_once(apply_static_rsx)
+			.run_system_once(apply_rsx_snippets)
 			.unwrap()
 			.unwrap();
-		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
 
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -201,7 +230,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -241,7 +270,7 @@ mod test {
 
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -253,7 +282,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()

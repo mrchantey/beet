@@ -54,7 +54,7 @@ pub fn tokenize_template(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(value.node_bundle_tokens());
+					entity_components.push(value.insert_deferred());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}
@@ -67,9 +67,6 @@ pub fn tokenize_template(
 		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 
-	// temp: we reuse the builder twice, once for the instance and onother used
-	// for the client island definition, eventually OnSpawnTemplate should
-	// be in a scene and we wont need this.
 	let template_def = quote! {
 			<#template_ident as Props>::Builder::default()
 			#(#prop_assignments)*
@@ -87,11 +84,11 @@ pub fn tokenize_template(
 		}
 	} else {
 		syn::parse_quote! {
-			TemplateRoot::spawn(Spawn(#template_def.into_node_bundle()))
+			TemplateRoot::spawn(Spawn(#template_def.into_template_bundle()))
 		}
 	};
-
-	entity_components.push(NodeExpr::new(inner).node_bundle_tokens());
+	// dont wrap in nodeexpr thats not nessecary
+	entity_components.push(NodeExpr::new(inner).insert_deferred());
 
 	Ok(())
 }

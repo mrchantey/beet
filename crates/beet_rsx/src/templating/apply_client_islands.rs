@@ -48,7 +48,7 @@ pub fn apply_client_islands(world: &mut World) -> Result {
 			related!(
 				Attributes[(
 					AttributeKey::new("type"),
-					AttributeLit::new(script_type.clone()),
+					TextNode::new(script_type.clone()),
 				),]
 			),
 			children![TextNode::new(scene)],
@@ -106,7 +106,7 @@ mod test {
 				std::any::TypeId::of::<ClientIslandRoot<MyTemplate>>(),
 			)
 			.xpect()
-			// OnSpawnTemplate not triggered yet
+			// OnSpawnDeferred not triggered yet
 			.to_be_none();
 
 		app.update();

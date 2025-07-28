@@ -10,15 +10,14 @@
     related! {
         Children[(NodeTag(String::from("br")), ElementNode { self_closing : true },
         related! { Attributes[AttributeKey(String::from("hidden")),
-        (AttributeKey(String::from("class")),
-        AttributeLit::String(String::from("foo")),
+        (AttributeKey(String::from("class")), TextNode(String::from("foo")),
         NodeExpr(SendWrapper::new(syn::parse_quote!("foo")))),
-        (AttributeKey(String::from("party_time")), AttributeLit::Boolean(true),
+        (AttributeKey(String::from("party_time")), TextNode(String::from("true")),
         NodeExpr(SendWrapper::new(syn::parse_quote!(true)))),
         (AttributeKey(String::from("some_key")),
         NodeExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
         (AttributeKey(String::from("onmousemove")),
-        AttributeLit::String(String::from("some_js_func")),
+        TextNode(String::from("some_js_func")),
         NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
         (AttributeKey(String::from("onclick")),
         NodeExpr(SendWrapper::new(syn::parse_quote!({ | _ : Trigger < OnClick > | {}

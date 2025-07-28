@@ -4,40 +4,26 @@ use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
-/// Very inclusive version of [`Bundle`], accounting for the location
-/// of the bundle in a tree, and allowing primitives to be wrapped
-/// in a [`TextNode`].
-/// for example, [`String`] into [`TextNode`].
+/// Very inclusive version of [`Bundle`], allowing primitives to be wrapped
+/// in a [`TextNode`] and entities to be reparented.
 ///
 /// ```rust ignore
 /// // the following
 /// rsx!{{"howdy"}}
 /// // becomes
-/// "howdy".into_node_bundle()
+/// "howdy".into_template_bundle()
 /// ```
 pub trait IntoTemplateBundle<M> {
 	/// Called for nodes and attributes expressions:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
-	/// This is also called by default in [`Self::into_attribute_bundle`],
-	/// wrapping them in [`AttributeKey`] and [`AttributeValue`].
-	fn into_node_bundle(self) -> impl Bundle;
-	/// By default calls [`Self::into_node_bundle`], but can be overridden,
-	/// for instance literals like `String` or `bool` will insert
-	/// an [`AttributeLit`] instead, and signals will update the [`AttributeLit`]
-	/// instead of the [`TextNode`].
-	fn into_attribute_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		self.into_node_bundle()
-	}
+	fn into_template_bundle(self) -> impl Bundle;
 }
 #[derive(Reflect)]
 pub struct BundleMarker;
 
 impl<T: Bundle> IntoTemplateBundle<(T, BundleMarker)> for T {
-	fn into_node_bundle(self) -> impl Bundle { self }
+	fn into_template_bundle(self) -> impl Bundle { self }
 }
 
 /// Observers
@@ -49,7 +35,7 @@ where
 	B: Bundle,
 	T: IntoObserverSystem<E, B, M>,
 {
-	fn into_node_bundle(self) -> impl Bundle {
+	fn into_template_bundle(self) -> impl Bundle {
 		(EventTarget, EntityObserver::new(self))
 	}
 }
@@ -64,28 +50,13 @@ where
 	BundleType: IntoTemplateBundle<MarkerType>,
 	I::IntoIter: 'static + Send + Sync + Iterator<Item = BundleType>,
 {
-	fn into_node_bundle(self) -> impl Bundle {
+	fn into_template_bundle(self) -> impl Bundle {
 		(
 			FragmentNode,
 			Children::spawn(SpawnIter(
-				self.into_iter().map(|item| item.into_node_bundle()),
+				self.into_iter().map(|item| item.into_template_bundle()),
 			)),
 		)
-	}
-}
-
-pub struct IntoTextNodeBundleMarker;
-
-macro_rules! primitives_into_bundle {
-	($($t:ty),*) => {
-		$(
-			impl IntoTemplateBundle<IntoTextNodeBundleMarker> for $t {
-				fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
-				fn into_attribute_bundle(self) -> impl Bundle {
-					AttributeLit::new(self)
-				}
-			}
-		)*
 	}
 }
 
@@ -94,7 +65,7 @@ macro_rules! primitives_into_bundle {
 /// `rsx!{<div>{entity}</div>}` spawns an entity with this OnSpawn effect,
 /// which becomes the parent of the entity passed in.
 impl IntoTemplateBundle<Self> for Entity {
-	fn into_node_bundle(self) -> impl Bundle {
+	fn into_template_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |spawned_entity| {
 			spawned_entity.insert(FragmentNode);
 			let id = spawned_entity.id();
@@ -105,15 +76,120 @@ impl IntoTemplateBundle<Self> for Entity {
 	}
 }
 
-// Implement for primitives
-#[rustfmt::skip]
-primitives_into_bundle!(
-	&str,String, bool, 
-	f32, f64,
-	u8, u16, u32, u64, u128, usize, 
-	i8, i16, i32, i64, i128, isize
-);
+impl IntoTemplateBundle<Self> for String {
+	fn into_template_bundle(self) -> impl Bundle { TextNode::new(self) }
+}
+impl IntoTemplateBundle<Self> for &String {
+	fn into_template_bundle(self) -> impl Bundle { TextNode::new(self.clone()) }
+}
+impl IntoTemplateBundle<Self> for &str {
+	fn into_template_bundle(self) -> impl Bundle {
+		TextNode::new(self.to_string())
+	}
+}
 
+impl IntoTemplateBundle<Self> for bool {
+	fn into_template_bundle(self) -> impl Bundle {
+		(TextNode::new(self.to_string()), BoolNode::new(self))
+	}
+}
+
+impl IntoTemplateBundle<Self> for f32 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+impl IntoTemplateBundle<Self> for f64 {
+	fn into_template_bundle(self) -> impl Bundle {
+		(TextNode::new(self.to_string()), NumberNode::new(self))
+	}
+}
+
+impl IntoTemplateBundle<Self> for u8 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+impl IntoTemplateBundle<Self> for u16 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+impl IntoTemplateBundle<Self> for u32 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+// impl IntoTemplateBundle<Self> for u64 {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
+
+// impl IntoTemplateBundle<Self> for u128 {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
+
+// impl IntoTemplateBundle<Self> for usize {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
+
+impl IntoTemplateBundle<Self> for i8 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+impl IntoTemplateBundle<Self> for i16 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+impl IntoTemplateBundle<Self> for i32 {
+	fn into_template_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
+
+// impl IntoTemplateBundle<Self> for i64 {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
+
+// impl IntoTemplateBundle<Self> for i128 {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
+
+// impl IntoTemplateBundle<Self> for isize {
+// 	fn into_template_bundle(self) -> impl Bundle {
+// 		let value = self as f64;
+// 		(TextNode::new(value.to_string()), NumberNode::new(value))
+// 	}
+// }
 
 
 #[cfg(test)]

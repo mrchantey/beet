@@ -41,7 +41,7 @@ fn tokenize_attribute_tokens(
 	if let Some(attr_key) = entity.get::<AttributeKey>() {
 		items.push(attr_key.self_token_stream());
 	}
-	if let Some(attr_val) = entity.get::<AttributeLit>() {
+	if let Some(attr_val) = entity.get::<TextNode>() {
 		items.push(attr_val.self_token_stream());
 	}
 	if let Some(attr_expr) = entity.get::<NodeExpr>() {

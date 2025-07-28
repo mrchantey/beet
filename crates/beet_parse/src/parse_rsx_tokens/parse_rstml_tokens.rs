@@ -160,7 +160,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Text(node) => {
 				self.commands.entity(entity).insert((
-					TextNode(node.value.value()),
+					TextNode::new(node.value.value()),
 					FileSpanOf::<TextNode>::new(file_span),
 					SpanOf::<TextNode>::new(node_span),
 				));
@@ -171,7 +171,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					text = self.mend_style_raw_text(&text);
 				}
 				self.commands.entity(entity).insert((
-					TextNode(text),
+					TextNode::new(text),
 					FileSpanOf::<TextNode>::new(file_span),
 					SpanOf::<TextNode>::new(node_span),
 				));
@@ -339,7 +339,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
-								entity.insert(lit_to_attr(lit));
+								insert_lit(&mut entity, lit);
 							} else {
 								// non-literal expression, needs an ExprIdx
 								entity.insert(self.expr_idx.next());

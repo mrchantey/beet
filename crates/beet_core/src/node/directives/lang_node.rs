@@ -11,6 +11,7 @@ pub type LangDirectives = (
 	StyleElement,
 	CodeElement,
 	LangSnippetHash,
+	LangSnippetPath,
 	StaticLangNode,
 	InnerText,
 	FileInnerText,
@@ -25,7 +26,6 @@ pub type LangDirectives = (
 /// - [`StyleScope`]
 /// - [`HtmlHoistDirective`]
 /// - [`AttributeKey`]
-/// - [`AttributeLit`]
 /// This is used for several purposes:
 /// - deduplication of lang nodes
 /// - assigning unique style ids to css content

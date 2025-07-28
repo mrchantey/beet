@@ -31,6 +31,11 @@ pub fn tokenize_element_attributes(
 			match (key, value) {
 				// 1. Key with value
 				(Some((key_str, key)), Some(mut value)) => {
+					attr_components.push(quote! {AttributeKey::new(#key)});
+					// both events and attributes get a key
+					// attribute values added to child entity,
+					// event handlers added to parent entity.
+					// this technique is also used in `derive_attribute_block.rs`
 					if is_event(&key_str, &value) {
 						// event syntax sugar (inferred trigger types)
 						tokenize_event_handler(
@@ -38,9 +43,13 @@ pub fn tokenize_element_attributes(
 							key.span(),
 							&mut value,
 						)?;
+						let parsed = value.inner_parsed();
+						attr_components.push(quote!{
+							OnSpawnDeferred::insert_parent::<AttributeOf>(#parsed.into_template_bundle())		
+					});
+					} else {
+						attr_components.push(value.insert_deferred());
 					}
-					attr_components.push(quote! {AttributeKey::new(#key)});
-					attr_components.push(value.attribute_bundle_tokens());
 				}
 				// 3. Key without value
 				(Some((_, key)), None) => {
@@ -48,7 +57,7 @@ pub fn tokenize_element_attributes(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(value.node_bundle_tokens());
+					entity_components.push(value.insert_deferred());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}

@@ -97,7 +97,7 @@ fn tokenize_combinator_exprs(
 	if let Some(expr) =
 		tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle)?
 	{
-		items.push(expr.node_bundle_tokens());
+		items.push(expr.insert_deferred());
 	}
 	Ok(())
 }

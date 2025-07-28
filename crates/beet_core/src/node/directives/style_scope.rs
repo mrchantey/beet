@@ -22,10 +22,7 @@ pub struct StyleCascade;
 
 
 impl TemplateDirective for StyleCascade {
-	fn try_from_attribute(
-		key: &str,
-		value: Option<&AttributeLit>,
-	) -> Option<Self> {
+	fn try_from_attribute(key: &str, value: Option<&TextNode>) -> Option<Self> {
 		match (key, value) {
 			("style:cascade", _) => Some(Self),
 			_ => None,
@@ -71,10 +68,7 @@ pub enum StyleScope {
 
 
 impl TemplateDirective for StyleScope {
-	fn try_from_attribute(
-		key: &str,
-		value: Option<&AttributeLit>,
-	) -> Option<Self> {
+	fn try_from_attribute(key: &str, value: Option<&TextNode>) -> Option<Self> {
 		match (key, value) {
 			("scope:local", _) => Some(Self::Local),
 			("scope:global", _) => Some(Self::Global),

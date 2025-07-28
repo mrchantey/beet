@@ -29,7 +29,7 @@ fn tokenize_node_exprs(
 	entity: Entity,
 ) -> Result<()> {
 	if let Some(block) = world.entity(entity).get::<NodeExpr>() {
-		items.push(block.node_bundle_tokens());
+		items.push(block.insert_deferred());
 	}
 	Ok(())
 }

@@ -10,8 +10,8 @@ use std::hash::Hasher;
 /// - insert a [`LangSnippetHash`]
 pub fn extract_lang_nodes(
 	mut commands: Commands,
-	text_nodes: Query<&TextNode>,
-	attributes: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
+	lit_nodes: Query<&TextNode>,
+	attributes: Query<(Entity, &AttributeKey, Option<&TextNode>)>,
 	query: Populated<
 		(Entity, &NodeTag, Option<&Attributes>, Option<&Children>),
 		Added<NodeTag>,
@@ -19,7 +19,7 @@ pub fn extract_lang_nodes(
 ) {
 	let find_attr = |attrs: &Option<&Attributes>,
 	                 key: &str|
-	 -> Option<(Entity, Option<&AttributeLit>)> {
+	 -> Option<(Entity, Option<&TextNode>)> {
 		attrs.as_ref()?.iter().find_map(|entity| {
 			let (attr_entity, inner_key, value) =
 				attributes.get(entity).ok()?;
@@ -59,7 +59,7 @@ pub fn extract_lang_nodes(
 		// Collect child TextNode
 		let text_child =
 			children.iter().flat_map(|c| c.iter()).find_map(|child| {
-				match text_nodes.get(child) {
+				match lit_nodes.get(child) {
 					Ok(text) => Some((child, text)),
 					Err(_) => None,
 				}
@@ -99,9 +99,11 @@ pub fn extract_lang_nodes(
 		}
 		// Collect FileInnerText
 		else if let Some((attr_entity, value)) = find_attr(&attrs, "src")
-			&& let Some(AttributeLit::String(value)) = value
+			&& let Some(value) = value
 		{
-			commands.entity(entity).insert(FileInnerText(value.clone()));
+			commands
+				.entity(entity)
+				.insert(FileInnerText(value.0.clone()));
 			commands.entity(attr_entity).despawn();
 		}
 
@@ -182,7 +184,7 @@ mod test {
 				related!(
 					Attributes[(
 						AttributeKey::new("src"),
-						AttributeLit::String("./style.css".to_string())
+						TextNode::new("./style.css".to_string())
 					)]
 				),
 			))

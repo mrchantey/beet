@@ -55,12 +55,12 @@ pub fn update_file_expr_hash(
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	attributes: Query<&Attributes>,
 	// dont hash literal attribute values, they can be updated via snippets
-	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<AttributeLit>)>,
+	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<TextNode>)>,
 	// hash all template attributes, they are currently used to build functions
 	// should change when bevy has native templates
 	template_attrs: Query<(
 		Option<&AttributeKey>,
-		Option<&AttributeLit>,
+		Option<&TextNode>,
 		Option<&NodeExpr>,
 	)>,
 ) -> Result {

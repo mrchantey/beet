@@ -10,6 +10,6 @@
     related! {
         Children[(NodeTag(String::from("span")), ElementNode { self_closing : true },
         related!(Attributes[(AttributeKey::new("onclick"),
-        OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle()))]))]
+        OnSpawnDeferred::insert("some_js_func".into_template_bundle()))]))]
     },
 )

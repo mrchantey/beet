@@ -102,10 +102,16 @@ mod test {
 		rsx! {<div/><slot/>}
 	}
 
+	fn replace_hash() -> impl Bundle {
+		OnSpawn::new(move |entity| {
+			entity.insert(LangSnippetHash::new(0));
+		})
+	}
+
 	#[test]
 	fn assigns_id_attr() {
 		HtmlDocument::parse_bundle(
-			rsx! {<style {LangSnippetHash::new(0)}/><span/>},
+			rsx! {<style {replace_hash()}/><span/>},
 		)
 		.xpect()
 		.to_be_snapshot();
@@ -114,8 +120,8 @@ mod test {
 	fn deduplicates() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {LangSnippetHash::new(0)}/>
-			<style {LangSnippetHash::new(0)}/>
+			<style {replace_hash()}/>
+			<style {replace_hash()}/>
 			</div>
 		})
 		.xpect()
@@ -125,7 +131,7 @@ mod test {
 	fn assigns_id_to_all() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {LangSnippetHash::new(0)}/>
+			<style {replace_hash()}/>
 			<span/>
 			</div>
 		})
@@ -135,7 +141,7 @@ mod test {
 	#[test]
 	fn ignores_templates() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {LangSnippetHash::new(0)}/>
+			<style {replace_hash()}/>
 			<MyTemplate/>
 		})
 		.xpect()
@@ -144,7 +150,7 @@ mod test {
 	#[test]
 	fn applies_to_slots() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {LangSnippetHash::new(0)}/>
+			<style {replace_hash()}/>
 			<MyTemplate>
 				<span/>
 			</MyTemplate>
@@ -155,7 +161,7 @@ mod test {
 	#[test]
 	fn cascades() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {LangSnippetHash::new(0)}/>
+			<style {replace_hash()}/>
 			<MyTemplate style:cascade/>
 		})
 		.xpect()
@@ -166,7 +172,7 @@ mod test {
 		#[template]
 		fn StyledTemplate() -> impl Bundle {
 			rsx! {
-				<style {LangSnippetHash::new(0)}/>
+				<style {replace_hash()}/>
 				<div>
 			}
 		}

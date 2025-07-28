@@ -5,6 +5,10 @@ use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use extend::ext;
+/// system version
+pub fn log_component_names(entity: In<Entity>, world: &mut World) {
+	world.log_component_names(*entity);
+}
 
 
 /// common trait for 'App' and 'World'

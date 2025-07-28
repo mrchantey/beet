@@ -108,7 +108,7 @@ pub fn derive_buildable(
 /// Types that can be used as an attribute block, where each field
 /// is applied as [`Attributes`](beet_core::prelude::Attributes) of the entity.
 /// Use [`#[field(flatten)]`] for the key to be discarded, and the value to be
-/// applied by calling `into_node_bundle`. This allows for a nested [`AttributeBlock`].
+/// applied by calling `into_template_bundle`. This allows for a nested [`AttributeBlock`].
 ///
 ///
 ///
@@ -133,7 +133,6 @@ fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {
 /// we'll get this from proc_macro2::Span::source_file, when this issue resolves:
 /// https://github.com/dtolnay/proc-macro2/issues/499
 fn source_file(tokens: &proc_macro::TokenStream) -> WsPathBuf {
-
 	// cloning is cheap, its an immutable arc
 	tokens
 		.clone()

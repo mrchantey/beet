@@ -1,6 +1,8 @@
+use crate::bevybail;
 use beet_core_macros::ImplBundle;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::relationship::RelatedSpawner;
+use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
 use bevy::prelude::*;
@@ -57,6 +59,88 @@ impl BundleEffect for OnSpawnBoxed {
 }
 
 
+#[derive(Component)]
+pub struct OnSpawnDeferred(
+	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result>,
+);
+
+impl OnSpawnDeferred {
+	/// Create a new [`OnSpawnDeferred`] effect.
+	pub fn new(
+		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
+	) -> Self {
+		Self(Box::new(func))
+	}
+
+	/// Insert this bundle into the entity on spawn.
+	pub fn insert(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			entity.insert(bundle);
+			Ok(())
+		})
+	}
+
+	/// When flushed, insert this bundle into the parent of the entity.
+	pub fn insert_parent<R: Relationship>(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			let Some(parent) = entity.get::<R>() else {
+				bevybail!(
+					"OnSpawnDeferred::new_insert_parent: Entity does not have a parent"
+				);
+			};
+			let parent = parent.get();
+			entity.world_scope(move |world| {
+				world.entity_mut(parent).insert(bundle);
+			});
+			Ok(())
+		})
+	}
+
+	/// Run all [`OnSpawnDeferred`]
+	pub fn flush(
+		mut commands: Commands,
+		mut query: Query<(Entity, &mut Self)>,
+	) {
+		for (entity, mut on_spawn) in query.iter_mut() {
+			commands.entity(entity).remove::<Self>();
+			let func = on_spawn.take();
+			commands.queue(move |world: &mut World| {
+				let mut entity = world.entity_mut(entity);
+				func.call(&mut entity)
+			});
+		}
+	}
+
+	pub fn into_command(
+		self,
+		entity: Entity,
+	) -> impl FnOnce(&mut World) -> Result {
+		move |world: &mut World| {
+			let mut entity = world.entity_mut(entity);
+			self.call(&mut entity)
+		}
+	}
+
+
+	/// Call the deferred function.
+	pub fn call(self, entity: &mut EntityWorldMut) -> Result {
+		(self.0)(entity)
+	}
+	/// Convenience for getting the method from inside a system,
+	/// this component should be removed when this is called
+	///
+	/// # Panics
+	/// If the method has already been taken
+	pub fn take(&mut self) -> Self {
+		Self::new(std::mem::replace(
+			&mut self.0,
+			Box::new(|_| {
+				panic!("OnSpawwnDeferred: This method has already been taken")
+			}),
+		))
+	}
+}
+
 
 #[cfg(test)]
 mod test {
@@ -90,5 +174,34 @@ mod test {
 		));
 
 		expect(numbers.lock().unwrap().as_slice()).to_be([1, 2, 3].as_slice());
+	}
+	#[test]
+	fn on_spawn_deferred() {
+		let mut world = World::new();
+
+		let numbers: Arc<Mutex<Vec<u32>>> = Arc::new(Mutex::new(Vec::new()));
+
+		let numbers1 = numbers.clone();
+		let numbers2 = numbers.clone();
+		let numbers3 = numbers.clone();
+
+		world.spawn((
+			OnSpawnDeferred::new(move |entity_world_mut| {
+				numbers1.lock().unwrap().push(1);
+				entity_world_mut.insert(OnSpawn::new(move |_| {
+					numbers2.lock().unwrap().push(2);
+				}));
+				Ok(())
+			}),
+			children![OnSpawnDeferred::new(move |_| {
+				numbers3.lock().unwrap().push(3);
+				Ok(())
+			}),],
+		));
+
+		expect(&*numbers.lock().unwrap()).to_be(&[] as &[u32]);
+		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
+
+		expect(&*numbers.lock().unwrap()).to_be(&[1, 2, 3]);
 	}
 }

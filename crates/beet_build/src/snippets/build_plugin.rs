@@ -97,7 +97,7 @@ impl WorldSequence for BuildPlugin {
 			// im not sure if this should be here, doesnt it indicate
 			// we're relying on exprs in templates?
 			// we should remove it!
-			apply_static_rsx,
+			apply_rsx_snippets,
 			|world: &mut World| {
 				world.run_sequence_once(ParseFileSnippets)?;
 				Ok(())

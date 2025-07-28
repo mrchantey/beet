@@ -9,15 +9,6 @@ pub enum MaybeSignal<T: 'static> {
 	Getter(Getter<T>),
 }
 
-// impl<T: 'static + Clone> Clone for MaybeSignal<T> {
-// 	fn clone(&self) -> Self {
-// 		match self {
-// 			MaybeSignal::Const(v) => MaybeSignal::Const(v.clone()),
-// 			MaybeSignal::Func(f) => MaybeSignal::Func(f.clone()),
-// 		}
-// 	}
-// }
-
 impl<T: 'static + Send + Clone> MaybeSignal<T> {
 	pub fn value(&self) -> T {
 		match self {
@@ -27,37 +18,17 @@ impl<T: 'static + Send + Clone> MaybeSignal<T> {
 	}
 }
 
-impl<T: IntoTemplateBundle<M>, M> IntoTemplateBundle<(Self, M)>
-	for MaybeSignal<T>
+
+impl<T, M1, M2> IntoTemplateBundle<(Self, M1, M2)> for MaybeSignal<T>
 where
-	T: 'static + Send + Sync + Clone + ToString,
+	T: IntoTemplateBundle<M1>,
+	Getter<T>: IntoTemplateBundle<M2>,
 {
-	fn into_node_bundle(self) -> impl Bundle {
+	fn into_template_bundle(self) -> impl Bundle {
 		match self {
-			Self::Const(val) => TextNode::new(val.to_string()).any_bundle(),
+			Self::Const(val) => val.into_template_bundle().any_bundle(),
 			Self::Getter(getter) => {
-				// used by bevy_signal::receive_text_node_signals
-				(
-					TextNode::new(getter.get().to_string()),
-					SignalReceiver::new(move || getter.get().to_string()),
-				)
-					.any_bundle()
-			}
-		}
-	}
-	fn into_attribute_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		match self {
-			Self::Const(val) => AttributeLit::new(val.to_string()).any_bundle(),
-			Self::Getter(getter) => {
-				// used by bevy_signal::receive_attribute_value_signals
-				(
-					AttributeLit::new(getter.get().to_string()),
-					SignalReceiver::new(move || getter.get().to_string()),
-				)
-					.any_bundle()
+				getter.into_template_bundle().any_bundle()
 			}
 		}
 	}

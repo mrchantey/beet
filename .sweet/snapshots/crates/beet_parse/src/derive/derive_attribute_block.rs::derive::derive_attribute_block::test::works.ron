@@ -1,6 +1,6 @@
 use beet::prelude::*;
 impl IntoTemplateBundle<Self> for MyNode {
-    fn into_node_bundle(self) -> impl Bundle {
+    fn into_template_bundle(self) -> impl Bundle {
         let Self { present, optional, onclick, nested } = self;
         #[allow(unused_braces)]
         (
@@ -11,20 +11,20 @@ impl IntoTemplateBundle<Self> for MyNode {
                         world
                             .spawn((
                                 AttributeOf::new(parent_entity),
-                                present.into_attribute_bundle(),
+                                present.into_template_bundle(),
                                 AttributeKey::new("present"),
                             ));
                         if let Some(optional) = optional {
                             world
                                 .spawn((
                                     AttributeOf::new(parent_entity),
-                                    optional.into_attribute_bundle(),
+                                    optional.into_template_bundle(),
                                     AttributeKey::new("optional"),
                                 ));
                         }
                         world
                             .entity_mut(parent_entity)
-                            .insert(onclick.into_node_bundle());
+                            .insert(onclick.into_template_bundle());
                         world
                             .spawn((
                                 AttributeOf::new(parent_entity),
@@ -32,7 +32,7 @@ impl IntoTemplateBundle<Self> for MyNode {
                             ));
                     });
             }),
-            nested.into_node_bundle(),
+            nested.into_template_bundle(),
         )
     }
 }

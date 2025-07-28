@@ -1,7 +1,5 @@
 mod event_observer;
-mod on_spawn_template;
 pub use event_observer::*;
-pub use on_spawn_template::*;
 pub mod snippet_root;
 pub use snippet_root::*;
 pub mod expr_idx;
@@ -34,57 +32,23 @@ pub use html_constants::*;
 /// This plugin is not unique, so can be added in multiple places.
 pub struct NodeTypesPlugin;
 
+// a group of all groups of components
+pub type RsxComponents = (
+	RootComponents,
+	RsxNodes,
+	WebNodes,
+	RsxDirectives,
+	WebDirectives,
+	LangDirectives,
+);
+
 impl bevy::app::Plugin for NodeTypesPlugin {
 	fn is_unique(&self) -> bool { false }
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
-			// idxs & roots
-			.register_type::<SnippetRoot>()
-			.register_type::<StaticRoot>()
-			.register_type::<InstanceRoot>()
-			.register_type::<ResolvedRoot>()
-			.register_type::<ExprIdx>()
-			.register_type::<DomIdx>()
-			.register_type::<RequiresDomIdx>()
-			// rsx nodes
-			.register_type::<NodeTag>()
-			.register_type::<TemplateNode>()
-			.register_type::<FragmentNode>()
-			.register_type::<TextNode>()
-			.register_type::<BlockNode>()
-			.register_type::<FileSpanOf<NodeTag>>()
-			.register_type::<FileSpanOf<TemplateNode>>()
-			.register_type::<FileSpanOf<FragmentNode>>()
-			.register_type::<FileSpanOf<TextNode>>()
-			.register_type::<FileSpanOf<BlockNode>>()
-			// web nodes
-			.register_type::<DoctypeNode>()
-			.register_type::<CommentNode>()
-			.register_type::<ElementNode>()
-			.register_type::<FileSpanOf<DoctypeNode>>()
-			.register_type::<FileSpanOf<CommentNode>>()
-			.register_type::<FileSpanOf<ElementNode>>()
-			// directives - client island
-			.register_type::<ClientLoadDirective>()
-			.register_type::<ClientOnlyDirective>()
-			// directives - script/style
-			.register_type::<StaticLangNode>()
-			.register_type::<LangSnippetPath>()
-			.register_type::<InnerText>()
-			.register_type::<LangSnippetHash>()
-			.register_type::<StyleScope>()
-			.register_type::<StyleCascade>()
-			// directives - slots
-    	.register_type::<SlotChild>()
-			.register_type::<SlotTarget>()
-			// directives - other
-			.register_type::<HtmlHoistDirective>()
-			// attributes
+			// a blanket tuple, recursively registers all
+			.register_type::<RsxComponents>()
 			.register_type::<AttributeOf>()
-			.register_type::<Attributes>()
-			.register_type::<AttributeKey>()
-			.register_type::<AttributeLit>()
-			//_
-			;
+			.register_type::<Attributes>();
 	}
 }

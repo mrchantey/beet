@@ -19,19 +19,12 @@ pub enum SlotChild {
 }
 
 impl TemplateDirective for SlotChild {
-	fn try_from_attribute(
-		key: &str,
-		value: Option<&AttributeLit>,
-	) -> Option<Self> {
+	fn try_from_attribute(key: &str, value: Option<&TextNode>) -> Option<Self> {
 		match (key, value) {
-			("slot", Some(AttributeLit::String(value)))
-				if value.as_str() == "default" =>
-			{
+			("slot", Some(value)) if value.as_str() == "default" => {
 				Some(Self::Default)
 			}
-			("slot", Some(AttributeLit::String(value))) => {
-				Some(Self::Named(value.to_string()))
-			}
+			("slot", Some(value)) => Some(Self::Named(value.to_string())),
 			("slot", None) => Some(Self::Default),
 			_ => None,
 		}
@@ -69,7 +62,7 @@ pub fn extract_slot_targets(
 	mut commands: Commands,
 	attributes: Query<&Attributes>,
 	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
-	attributes_query: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
+	attributes_query: Query<(Entity, &AttributeKey, Option<&TextNode>)>,
 ) {
 	for (node_ent, node_tag) in query.iter() {
 		if **node_tag != "slot" {
@@ -81,8 +74,8 @@ pub fn extract_slot_targets(
 			.find(|(_, key, _)| ***key == "name")
 			.map(|(entity, _, value)| {
 				commands.entity(entity).despawn();
-				if let Some(AttributeLit::String(value)) = value.as_ref() {
-					SlotTarget::Named(value.clone())
+				if let Some(value) = value.as_ref() {
+					SlotTarget::Named(value.0.clone())
 				} else {
 					SlotTarget::Default
 				}
@@ -135,7 +128,7 @@ mod test {
 				related!(
 					Attributes[(
 						AttributeKey::new("name"),
-						"foo".into_attribute_bundle()
+						"foo".into_template_bundle()
 					)]
 				),
 			))

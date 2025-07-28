@@ -43,32 +43,36 @@ pub(super) fn update_text_nodes(
 pub(super) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
-		(&AttributeKey, &AttributeLit, &DomElementBinding),
-		Changed<AttributeLit>,
+		(
+			&AttributeKey,
+			&DomElementBinding,
+			&TextNode,
+			Option<&NumberNode>,
+			Option<&BoolNode>,
+		),
+		Changed<TextNode>,
 	>,
 ) -> Result<()> {
-	for (key, value, el) in query.iter() {
+	for (key, el, text, num, bool) in query.iter() {
+		let value = if let Some(num) = num {
+			wasm_bindgen::JsValue::from_f64(**num)
+		} else if let Some(bool) = bool {
+			wasm_bindgen::JsValue::from_bool(**bool)
+		} else {
+			wasm_bindgen::JsValue::from_str(&**text)
+		};
+
 		// el.set_attribute(&key.0, &value.to_string())
 		// 	.map_err(|err| format!("{err:?}"))?;
 		// TODO use heck for camelCase conversion
 		js_sys::Reflect::set(
 			el.inner().as_ref(),
 			&wasm_bindgen::JsValue::from_str(&key.0),
-			&attribute_lit_to_js_value(value)?,
+			&value,
 		)
 		.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
-}
-
-fn attribute_lit_to_js_value(
-	value: &AttributeLit,
-) -> Result<wasm_bindgen::JsValue> {
-	match value {
-		AttributeLit::String(s) => Ok(wasm_bindgen::JsValue::from_str(s)),
-		AttributeLit::Number(n) => Ok(wasm_bindgen::JsValue::from_f64(*n)),
-		AttributeLit::Boolean(b) => Ok(wasm_bindgen::JsValue::from_bool(*b)),
-	}
 }
 
 /// lazily attach the text nodes to the DOM with the following steps:
@@ -86,7 +90,7 @@ pub(super) fn bind_text_nodes(
 		(Entity, &DomIdx),
 		(
 			Changed<TextNode>,
-			With<SignalReceiver<String>>,
+			With<ReceivesSignals>,
 			Without<DomTextBinding>,
 			Without<AttributeOf>,
 		),
@@ -164,8 +168,8 @@ pub(super) fn bind_attribute_values(
 	query: Populated<
 		(Entity, &AttributeOf),
 		(
-			Changed<AttributeLit>,
-			(With<SignalReceiver<String>>, Without<DomElementBinding>),
+			Changed<TextNode>,
+			(With<ReceivesSignals>, Without<DomElementBinding>),
 		),
 	>,
 ) -> Result<()> {
