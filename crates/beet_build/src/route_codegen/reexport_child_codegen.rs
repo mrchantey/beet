@@ -5,23 +5,37 @@ use syn::ItemMod;
 
 /// Add a `pub mod #name;` for any child [`CodegenFile`] of a [`CodegenFile`]
 pub fn reexport_child_codegen(
-	mut roots: Populated<(Entity, &Children), With<CodegenFile>>,
-	mut codegens: Query<&mut CodegenFile>,
+	mut query: ParamSet<(
+		Populated<(Entity, &Children), Changed<CodegenFile>>,
+		Query<&mut CodegenFile>,
+	)>,
 ) -> Result {
-	for (entity, children) in roots.iter_mut() {
-		let child_paths = children
-			.iter()
-			.filter_map(|id| {
-				codegens.get(id).map(|c| (c.name(), c.output.clone())).ok()
-			})
-			.collect::<Vec<_>>();
-
-		let mut codegen = codegens.get_mut(entity)?;
-		if !codegen.is_changed() {
-			// we cant use Changed<CodegenFile> due to disjoint queries so perform
-			// a manual check
-			continue;
-		}
+	let items = query
+		.p0()
+		.iter()
+		.map(|(entity, children)| (entity, children.iter().collect::<Vec<_>>()))
+		.collect::<Vec<_>>();
+	let items = items
+		.into_iter()
+		.map(|(entity, children)| {
+			(
+				entity,
+				children
+					.into_iter()
+					.filter_map(|id| {
+						query
+							.p1()
+							.get(id)
+							.map(|c| (c.name(), c.output.clone()))
+							.ok()
+					})
+					.collect::<Vec<_>>(),
+			)
+		})
+		.collect::<Vec<_>>();
+	for (entity, child_paths) in items {
+		let mut p1 = query.p1();
+		let mut codegen = p1.get_mut(entity)?;
 
 		for (child_name, child_path) in child_paths {
 			let relative_path =
@@ -33,7 +47,7 @@ pub fn reexport_child_codegen(
 				pub mod #name;
 			});
 			// codegen.add_item::<ItemUse>(syn::parse_quote! {
-			// 	pub use #name;
+			// 	pub use self::#name::*;
 			// });
 		}
 	}

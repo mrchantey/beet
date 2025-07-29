@@ -78,8 +78,8 @@ impl RouteCollectionCategory {
 	}
 	pub fn cache_strategy(&self) -> CacheStrategy {
 		match self {
-			Self::Pages => CacheStrategy::Dynamic,
-			Self::Actions => CacheStrategy::Static,
+			Self::Pages => CacheStrategy::Static,
+			Self::Actions => CacheStrategy::Dynamic,
 		}
 	}
 }

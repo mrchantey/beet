@@ -19,6 +19,7 @@ pub struct LaunchRunner {
 impl LaunchRunner {
 	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
+		init_pretty_tracing(bevy::log::Level::DEBUG);
 		let result = match self.watch {
 			true => self.watch(app),
 			false => app.run_once(),

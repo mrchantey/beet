@@ -5,6 +5,7 @@ use beet::prelude::*;
 
 
 
+
 pub fn get() -> impl Bundle {
 	let num_requests = AppState::get().num_requests;
 

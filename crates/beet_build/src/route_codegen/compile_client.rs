@@ -12,14 +12,15 @@ pub fn compile_client(
 	manifest: When<Res<CargoManifest>>,
 	config: When<Res<WorkspaceConfig>>,
 ) -> Result {
-	let mut cmd = cmd.clone();
-	cmd.target = Some("wasm32-unknown-unknown".to_string());
-	let exe_path = cmd.exe_path(manifest.package_name());
-	cmd.no_default_features = true;
-	cmd.push_feature("client");
+	let exe_path = cmd
+		.clone()
+		.target("wasm32-unknown-unknown")
+		.no_default_features()
+		.push_feature("client")
+		.spawn()?
+		.exe_path(manifest.package_name());
 
 	debug!("Building client binary");
-	cmd.spawn()?;
 	wasm_bindgen(&html_constants, &config.html_dir, &exe_path)?;
 	if cmd.release {
 		wasm_opt(&html_constants, &config.html_dir)?;

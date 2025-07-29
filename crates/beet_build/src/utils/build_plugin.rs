@@ -47,7 +47,11 @@ impl Plugin for BuildPlugin {
 			.ok();
 
 		#[cfg(not(test))]
-		app.insert_resource(CargoBuildCmd::parse())
+		app.insert_resource(
+			
+			//todo parse the package name etc, this is used for compiling server and client
+			// but a verbatim parse() confuses the cli 
+			CargoBuildCmd::default())
 			.insert_resource(CargoManifest::load().unwrap())
 			.add_systems(
 				Startup,
