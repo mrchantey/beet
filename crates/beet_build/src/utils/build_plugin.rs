@@ -35,22 +35,8 @@ impl CargoManifest {
 }
 
 /// Main plugin for beet_build
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct BuildPlugin {
-	/// Disable loading the workspace source files, useful for
-	/// testing or manually loading files.
-	pub skip_load_workspace: bool,
-	pub skip_write_to_fs: bool,
-}
-impl BuildPlugin {
-	/// Do not read workspace files, and do not write any files to the filesystem.
-	pub fn without_fs() -> Self {
-		Self {
-			skip_load_workspace: true,
-			skip_write_to_fs: true,
-		}
-	}
-}
+#[derive(Debug, Default, Clone)]
+pub struct BuildPlugin;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct BuildSequence;
@@ -81,19 +67,14 @@ impl Plugin for BuildPlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		#[allow(unused)]
-		let Self {
-			skip_load_workspace,
-			skip_write_to_fs,
-		} = self.clone();
 
 		#[cfg(not(test))]
-		if !skip_load_workspace {
-			app.add_systems(Startup, load_workspace_source_files);
-			// alternatively use import_route_file_collection
-			// to only load route files
-			// import_route_file_collection
-		}
+		app.add_systems(
+			Startup,
+			// alternatively use import_route_file_collection to only load route files
+			load_workspace_source_files
+				.run_if(BuildFlag::ImportSnippets.should_run()),
+		);
 
 		app.add_event::<WatchEvent>()
 			.init_plugin(ParseRsxTokensSequence)
@@ -103,8 +84,8 @@ impl Plugin for BuildPlugin {
 				NodeTypesPlugin,
 			))
 			.insert_schedule_before(Update, BuildSequence)
-			.init_resource::<WorkspaceConfig>()
 			.init_resource::<BuildFlags>()
+			.init_resource::<WorkspaceConfig>()
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
@@ -121,30 +102,21 @@ impl Plugin for BuildPlugin {
 					ParseFileSnippetsSequence.run(),
 					// import step
 					parse_file_watch_events,
-					RouteCodegenSequence
-						.run()
-						.run_if(BuildFlags::should_run(BuildFlag::Routes)),
+					RouteCodegenSequence.run(),
 					(
-						export_snippets.run_if(BuildFlags::should_run(
-							BuildFlag::Snippets,
-						)),
+						export_snippets
+							.run_if(BuildFlag::ExportSnippets.should_run()),
 						export_route_codegen
-							.run_if(BuildFlags::should_run(BuildFlag::Routes)),
-						compile_server.run_if(BuildFlags::should_run(
-							BuildFlag::CompileServer,
-						)),
-						export_server_ssg.run_if(BuildFlags::should_run(
-							BuildFlag::ExportSsg,
-						)),
-						compile_client.run_if(BuildFlags::should_run(
-							BuildFlag::CompileWasm,
-						)),
-						run_server.run_if(BuildFlags::should_run(
-							BuildFlag::RunServer,
-						)),
+							.run_if(BuildFlag::Routes.should_run()),
+						compile_server
+							.run_if(BuildFlag::CompileServer.should_run()),
+						export_server_ssg
+							.run_if(BuildFlag::ExportSsg.should_run()),
+						compile_client
+							.run_if(BuildFlag::CompileWasm.should_run()),
+						run_server.run_if(BuildFlag::RunServer.should_run()),
 					)
-						.chain()
-						.run_if(move || !skip_write_to_fs),
+						.chain(),
 				)
 					.chain(),
 			);
@@ -157,8 +129,9 @@ impl Plugin for BuildPlugin {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
 pub enum BuildFlags {
 	/// Run with all flags enabled.
-	#[default]
+	#[cfg_attr(not(test), default)]
 	All,
+	#[cfg_attr(test, default)]
 	/// Run with no flags enabled.
 	None,
 	/// Only run with the specified flags.
@@ -174,31 +147,34 @@ impl BuildFlags {
 			Self::Only(flags) => flags.contains(&flag),
 		}
 	}
-
-	/// A predicate system for run_if conditions
-	pub fn should_run(flag: BuildFlag) -> impl Fn(Res<Self>) -> bool {
-		move |flags| flags.contains(flag)
-	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildFlag {
+	ImportSnippets,
+	/// Generate File Snippet Scenes
+	ExportSnippets,
 	/// Generate Router Codegen
 	Routes,
-	/// Generate File Snippet Scenes
-	Snippets,
 	CompileServer,
 	ExportSsg,
 	CompileWasm,
 	RunServer,
 }
 
+impl BuildFlag {
+	/// A predicate system for run_if conditions
+	fn should_run(self) -> impl Fn(Res<BuildFlags>) -> bool {
+		move |flags| flags.contains(self)
+	}
+}
 
 impl std::fmt::Display for BuildFlag {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			BuildFlag::ImportSnippets => write!(f, "import-snippets"),
+			BuildFlag::ExportSnippets => write!(f, "export-snippets"),
 			BuildFlag::Routes => write!(f, "routes"),
-			BuildFlag::Snippets => write!(f, "snippets"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
 			BuildFlag::ExportSsg => write!(f, "export-ssg"),
 			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
@@ -212,8 +188,9 @@ impl FromStr for BuildFlag {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s.to_lowercase().as_str() {
+			"import-snippets" => Ok(BuildFlag::ImportSnippets),
+			"export-snippets" => Ok(BuildFlag::ExportSnippets),
 			"routes" => Ok(BuildFlag::Routes),
-			"snippets" => Ok(BuildFlag::Snippets),
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"export-ssg" => Ok(BuildFlag::ExportSsg),
 			"compile-wasm" => Ok(BuildFlag::CompileWasm),

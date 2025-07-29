@@ -6,7 +6,7 @@
 
 // /// Deduplicate `script` and `style` tags: by
 // /// 1. clone the entity and add a [`StaticLangNode`]
-// /// 2. remove the original  
+// /// 2. remove the original
 // /// [`InnerText`] directive with a [`LangSnippetPath`].
 // pub fn deduplicate_static_lang_snippets(
 // 	mut commands: Commands,
@@ -131,7 +131,7 @@
 // 	#[test]
 // 	fn works() {
 // 		let mut app = App::new();
-// 		app.add_plugins(BuildPlugin::without_fs());
+// 		app.add_plugins(BuildPlugin::default());
 
 // 		let path = WorkspaceConfig::default()
 // 			.lang_snippet_path(&WsPathBuf::new(file!()), 0);
@@ -170,7 +170,7 @@
 // 	#[test]
 // 	fn global_no_styleid() {
 // 		let mut app = App::new();
-// 		app.add_plugins(BuildPlugin::without_fs());
+// 		app.add_plugins(BuildPlugin::default());
 
 // 		let entity = app
 // 			.world_mut()
@@ -187,7 +187,7 @@
 // 	#[test]
 // 	fn file_src() {
 // 		let mut app = App::new();
-// 		app.add_plugins(BuildPlugin::without_fs());
+// 		app.add_plugins(BuildPlugin::default());
 
 // 		let entity = app
 // 			.world_mut()

@@ -196,7 +196,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 
 		let group = app
 			.world_mut()

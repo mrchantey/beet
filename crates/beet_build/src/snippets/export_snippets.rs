@@ -93,11 +93,9 @@ mod test {
 	#[test]
 	fn rsx_snippets() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin {
-			skip_load_workspace: true,
-			skip_write_to_fs: false,
-			..default()
-		});
+		app.add_plugins(BuildPlugin::default())
+			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
+
 
 		let test_site_index =
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
@@ -127,11 +125,8 @@ mod test {
 	#[ignore = "lang snippet exports is a wip"]
 	fn lang_snippets() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin {
-			skip_load_workspace: true,
-			skip_write_to_fs: false,
-			..default()
-		});
+		app.add_plugins(BuildPlugin::default())
+			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 		let path = WorkspaceConfig::default()
 			.lang_snippet_path(&WsPathBuf::new(file!()), 0)

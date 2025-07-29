@@ -105,7 +105,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 		app.world_mut().spawn(SourceFile::new(
 			WsPathBuf::new(
 				"crates/beet_router/src/test_site/test_docs/hello.md",

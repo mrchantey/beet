@@ -23,7 +23,6 @@ impl LaunchRunner {
 			true => self.watch(app),
 			false => app.run_once(),
 		};
-		println!("done");
 		result
 	}
 	#[tokio::main]

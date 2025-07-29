@@ -11,8 +11,8 @@ use sweet::prelude::*;
 fn works() {
 	let mut app = App::new();
 
-	app.add_plugins((BuildPlugin::without_fs(), TemplatePlugin::default()))
-		.insert_resource(BuildFlags::only(BuildFlag::Snippets))
+	app.add_plugins((BuildPlugin::default(), TemplatePlugin::default()))
+		.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets))
 		.insert_resource(TemplateFlags::None);
 
 	let entity = app

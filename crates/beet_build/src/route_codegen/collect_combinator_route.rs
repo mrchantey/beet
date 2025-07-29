@@ -78,7 +78,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs())
+		app.add_plugins(BuildPlugin::default())
 			.world_mut()
 			.spawn(RouteFileCollection::test_site_docs());
 		app.world_mut().spawn(SourceFile::new(

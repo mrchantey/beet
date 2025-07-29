@@ -40,7 +40,7 @@ impl RunBuild {
 	}
 
 	pub fn workspace_config(&self) -> Result<WorkspaceConfig> {
-		todo!("from a toml file or cli args?");
+		todo!("load from toml, bsn or cli args");
 		// Ok(WorkspaceConfig::default())
 	}
 

@@ -243,7 +243,7 @@ mod test {
 	#[test]
 	fn doesnt_change() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 
 		let index_path = WsPathBuf::new(
 			"crates/beet_router/src/test_site/pages/docs/index.rs",
