@@ -1,15 +1,19 @@
 mod bevyhow;
 mod bundle_iter;
 mod common_systems;
-mod id_counter;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+mod fs_app;
 mod garbage_collect;
+mod id_counter;
 mod on_spawn;
 mod tracing;
 pub use bevyhow::*;
 pub use bundle_iter::*;
 pub use common_systems::*;
-pub use id_counter::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub use fs_app::*;
 pub use garbage_collect::*;
+pub use id_counter::*;
 pub use on_spawn::*;
 pub use tracing::*;
 mod non_send_plugin;

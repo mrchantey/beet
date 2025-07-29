@@ -729,6 +729,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet-cli"
+version = "0.0.6-dev.7"
+dependencies = [
+ "anyhow",
+ "beet",
+ "bevy",
+ "clap",
+ "heck 0.4.1",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "rapidhash",
+ "ron",
+ "sweet",
+ "syn 2.0.104",
+ "tokio",
+]
+
+[[package]]
 name = "beet_build"
 version = "0.0.6-dev.7"
 dependencies = [

@@ -45,7 +45,7 @@ exclude = [
 
 members = [
 	# "crates/beet_site",
-	# "crates/beet-cli",
+	"crates/beet-cli",
 
 	"crates/beet_build",
 	"crates/beet_rsx_combinator",

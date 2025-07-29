@@ -36,12 +36,8 @@ impl RunDeploy {
 		// and export the html
 		let mut build = self.build.clone();
 		build.build_cmd.release = true; // force release build
+		let config = build.workspace_config()?;
 		build.run(RunMode::Once).await?;
-
-		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
-			self.build.beet_config.as_deref(),
-		)
-		.unwrap_or_exit();
 
 		self.lambda_build().await?;
 		if !self.dry_run {
@@ -96,20 +92,16 @@ impl RunDeploy {
 
 	/// Deploy to lambda, using best effort to determine the binary name
 	#[allow(unused)]
-	async fn lambda_deploy(&self, config: &BuildConfig) -> Result {
+	async fn lambda_deploy(&self, config: &WorkspaceConfig) -> Result {
 		let mut cmd = Command::new("cargo");
 
 		let binary_name = self.build.load_binary_name()?;
 
 		let html_dir = config
-			.template_config
-			.workspace
 			.html_dir
 			// .into_abs()
 			.to_string();
 		let snippets_dir = config
-			.template_config
-			.workspace
 			.snippets_dir()
 			// .into_abs()
 			.to_string();

@@ -3,7 +3,7 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
-pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
+pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	let rsx_snippets = world.run_system_cached(collect_rsx_snippets)?;
 	let lang_snippets = world.run_system_cached(collect_lang_snippets)?;
 	let snippets = lang_snippets

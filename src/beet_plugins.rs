@@ -23,7 +23,7 @@ impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
 		#[cfg(feature = "launch")]
 		app.insert_resource(CargoManifest::load().unwrap())
-			.set_runner(|mut app| app.run_once());
+			.set_runner(LaunchRunner::runner);
 
 		#[cfg(feature = "server")]
 		app.set_runner(AppRunner::runner);

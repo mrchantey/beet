@@ -65,7 +65,7 @@ pub struct SourceFileRoot;
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
 /// will incrementally load changed files.
 #[cfg_attr(test, allow(dead_code))]
-pub(super) fn load_workspace_source_files(
+pub fn load_workspace_source_files(
 	mut commands: Commands,
 	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
@@ -85,7 +85,7 @@ pub(super) fn load_workspace_source_files(
 
 /// Update [`SourceFile`] entities based on file watch events,
 /// including marking as [`Changed`] on modification.
-pub(super) fn parse_file_watch_events(
+pub fn parse_file_watch_events(
 	mut commands: Commands,
 	mut events: EventReader<WatchEvent>,
 	config: When<Res<WorkspaceConfig>>,

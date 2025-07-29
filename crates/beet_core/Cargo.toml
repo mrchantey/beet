@@ -48,6 +48,7 @@ web = [
 
 axum = [
 	"http",
+	"fs",
 	"dep:axum",
 	"dep:axum-extra",
 	"dep:axum-server",
@@ -58,8 +59,8 @@ axum = [
 	"dep:glob",
 	"dep:futures",
 	"dep:tokio",
-	"beet_utils/fs",
 ]
+fs = ["beet_utils/fs"]
 net = ["http", "serde", "dep:reqwest", "web"]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]

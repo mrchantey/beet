@@ -1,10 +1,7 @@
-use crate::prelude::*;
 use beet::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::time::Duration;
-
 
 /// Build the project
 #[derive(Debug, Clone, Parser)]
@@ -27,37 +24,29 @@ pub struct RunBuild {
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 
-
-
-
+#[derive(PartialEq)]
 pub enum RunMode {
 	Once,
 	Watch,
 }
 
 
+
 impl RunBuild {
-	pub fn load_config(&self) -> Result<BuildConfig> {
-		BeetConfigFile::try_load_or_default::<BuildConfig>(
-			self.beet_config.as_deref(),
-		)
-		.map_err(|e| bevyhow!("Failed to load beet config: {}", e))
-		.map(|config| config)
-	}
-
-
 	pub fn load_binary_name(&self) -> Result<String> {
-		let config = self.load_config()?;
-		let manifest = config.load_manifest()?;
+		let manifest = CargoManifest::load()?;
 		let package_name = manifest.package_name();
 		Ok(self.build_cmd.binary_name(package_name))
 	}
 
+	pub fn workspace_config(&self) -> Result<WorkspaceConfig> {
+		todo!("from a toml file or cli args?");
+		// Ok(WorkspaceConfig::default())
+	}
+
 	pub async fn run(self, run_mode: RunMode) -> Result {
 		let mut app = App::new();
-		let config = self.load_config().unwrap_or_exit();
-		let cwd = config.template_config.workspace.root_dir.into_abs();
-		let filter = config.template_config.workspace.filter.clone();
+		let config = self.workspace_config()?;
 
 		let build_flags = if self.only.is_empty() {
 			BuildFlags::All
@@ -65,27 +54,18 @@ impl RunBuild {
 			BuildFlags::Only(self.only)
 		};
 
+
+
 		app.insert_resource(build_flags)
 			.insert_resource(self.build_cmd)
-			.add_non_send_plugin(config)
+			.insert_resource(config)
 			.add_plugins(BuildPlugin::default());
 
-		match run_mode {
-			RunMode::Once => app.run_once(),
-			RunMode::Watch => {
-				app.run_async(
-					FsApp {
-						watcher: FsWatcher {
-							cwd: cwd.0,
-							filter,
-							debounce: Duration::from_millis(100),
-						},
-					}
-					.runner(),
-				)
-				.await
-			}
+
+		LaunchRunner {
+			watch: run_mode == RunMode::Watch,
 		}
+		.run(app)
 		.into_result()
 	}
 }

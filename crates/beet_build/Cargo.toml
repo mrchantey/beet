@@ -34,7 +34,7 @@ required-features = ["css"]
 [dependencies]
 #💡 Internal
 beet_rsx = { workspace = true, features = ["tokens"] }
-beet_core = { workspace = true, features = ["bevy_scene", "tokens"] }
+beet_core = { workspace = true, features = ["fs", "bevy_scene", "tokens"] }
 beet_parse.workspace = true
 beet_utils = { workspace = true, features = ["fs"] }
 
@@ -63,6 +63,7 @@ serde_json.workspace = true
 prettyplease.workspace = true
 cargo-manifest = "0.19"
 pulldown-cmark = { version = "0.13", optional = true }
+clap.workspace = true
 
 #💡 Bevy
 bevy = { workspace = true, features = ["bevy_scene"] }

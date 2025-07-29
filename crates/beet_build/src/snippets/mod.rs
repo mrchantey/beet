@@ -10,16 +10,10 @@ mod hash_non_snippet_rust;
 use hash_non_snippet_rust::*;
 mod file_expr_hash;
 pub use file_expr_hash::*;
-mod build_plugin;
 mod parse_markdown;
-pub use build_plugin::*;
-mod codegen_file;
-pub use codegen_file::*;
 mod syn_serde;
 pub use parse_markdown::*;
 pub use syn_serde::*;
-mod export_snippets;
-#[cfg(test)]
-mod test_utils;
-use export_snippets::*;
 pub mod error;
+mod export_snippets;
+pub use export_snippets::*;
