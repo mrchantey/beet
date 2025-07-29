@@ -73,7 +73,7 @@ impl ResolvedEndpoint {
 		query: Query<(Entity, &Endpoint)>,
 		parents: Query<&ChildOf>,
 		path_filters: Query<&RouteFilter>,
-	) -> Vec<Self> {
+	) -> Vec<(Entity, Self)> {
 		query
 			.iter()
 			.map(|(entity, endpoint)| {
@@ -91,7 +91,21 @@ impl ResolvedEndpoint {
 						}
 					}
 				}
-				Self::new(endpoint.clone(), segments)
+				(entity, Self::new(endpoint.clone(), segments))
+			})
+			.collect()
+	}
+
+	/// Collect all static GET endpoints from the world,
+	/// used for differentiating ssg paths
+	pub fn collect_static_get(world: &mut World) -> Vec<(Entity, Self)> {
+		world
+			.run_system_cached(Self::collect)
+			.unwrap()
+			.into_iter()
+			.filter(|(_, info)| {
+				info.method() == HttpMethod::Get
+					&& info.cache_strategy() == CacheStrategy::Static
 			})
 			.collect()
 	}
@@ -146,6 +160,9 @@ mod test {
 			],
 		));
 		world.run_system_cached(ResolvedEndpoint::collect).unwrap()
+    .into_iter()
+    .map(|(_, info)| info)
+    .collect::<Vec<_>>()
 		.xpect().to_be(vec![
 			ResolvedEndpoint::new(
 				HttpMethod::Get,

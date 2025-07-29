@@ -13,7 +13,7 @@ pub fn get() -> impl Bundle {
 		<Layout>
 		<h1>Beet Demo Site</h1>
 		<div>
-			"Greetings visitor " {num_requests}
+			"Greetings champ " {num_requests}
 		</div>
 		<ClientCounter client:load/>
 		<ServerCounter client:load/>

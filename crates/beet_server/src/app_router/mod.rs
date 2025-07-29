@@ -1,4 +1,4 @@
-mod app_runner;
+mod server_runner;
 mod clone_world;
 mod router_plugin;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
@@ -6,7 +6,7 @@ pub use axum_runner::*;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_runner;
 mod bundle_layer;
-pub use app_runner::*;
+pub use server_runner::*;
 pub use bundle_layer::*;
 pub use clone_world::*;
 pub use router_plugin::*;

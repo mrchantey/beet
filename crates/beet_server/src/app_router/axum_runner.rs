@@ -1,4 +1,4 @@
-use crate::app_router::app_runner::AppRunner;
+use crate::app_router::server_runner::ServerRunner;
 use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
@@ -8,12 +8,16 @@ use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
 
+// use tower::Layer;
+// use tower_http::normalize_path::NormalizePath;
+// use tower_http::normalize_path::NormalizePathLayer;
+
 pub struct AxumRunner {
-	pub runner: AppRunner,
+	pub runner: ServerRunner,
 }
 
 impl AxumRunner {
-	pub fn new(runner: AppRunner) -> Self { Self { runner } }
+	pub fn new(runner: ServerRunner) -> Self { Self { runner } }
 
 
 	pub fn from_world(
@@ -33,7 +37,7 @@ impl AxumRunner {
 			}
 		};
 
-		for endpoint in
+		for (_, endpoint) in
 			world.run_system_once(ResolvedEndpoint::collect).unwrap()
 		{
 			let segments = segments_to_axum(endpoint.segments().clone());

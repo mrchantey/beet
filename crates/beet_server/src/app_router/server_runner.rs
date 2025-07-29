@@ -12,14 +12,10 @@ use clap::Parser;
 use clap::Subcommand;
 
 
-// use tower::Layer;
-// use tower_http::normalize_path::NormalizePath;
-// use tower_http::normalize_path::NormalizePathLayer;
-
-/// Cli args parser when running an [`AppRouter`].
+/// Cli args for running a beet server.
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-pub struct AppRunner {
+pub struct ServerRunner {
 	/// Specify the router mode
 	#[command(subcommand)]
 	pub mode: Option<RouterMode>,
@@ -28,7 +24,7 @@ pub struct AppRunner {
 	// tracing: Level::WARN,
 	pub tracing: Level,
 }
-impl Default for AppRunner {
+impl Default for ServerRunner {
 	fn default() -> Self {
 		Self {
 			mode: None,
@@ -53,7 +49,7 @@ pub enum RouterMode {
 	ExportHtml,
 }
 
-impl AppRunner {
+impl ServerRunner {
 	// #[cfg(target_arch = "wasm32")]
 	// pub fn from_url_params() -> anyhow::Result<Self> {
 	// 	// TODO actually parse from search params
@@ -75,49 +71,58 @@ impl AppRunner {
 			}
 		}
 	}
-
-	#[allow(unused)]
-	fn run(self, app: App) -> Result {
+	#[cfg(target_arch = "wasm32")]
+	fn run(self, _: App) -> Result {
+		todo!("wasm runner");
+	}
+	#[cfg(not(target_arch = "wasm32"))]
+	fn run(self, mut app: App) -> Result {
 		#[cfg(not(feature = "lambda"))]
 		init_pretty_tracing(bevy::log::Level::DEBUG);
 
-		#[cfg(target_arch = "wasm32")]
-		{
-			todo!("wasm runner");
-		}
-		#[cfg(not(target_arch = "wasm32"))]
-		match self.mode.clone().unwrap_or_default() {
-			RouterMode::ExportHtml => self.export_html(app),
-			_ => {
-				#[cfg(feature = "axum")]
-				{
-					AxumRunner::new(self).run(app)
-				}
-				#[cfg(not(feature = "axum"))]
-				todo!("hyper router");
+		let mode = self.mode.unwrap_or_default();
+		if let RouterMode::Ssg = mode {}
+
+		match mode {
+			RouterMode::ExportHtml => {
+				return self.export_html(&mut app);
 			}
+			RouterMode::Ssg => {
+				// despawn all static endpoints, they will be loaded from the html dir
+				self.export_html(&mut app)?;
+				for (entity, _) in app
+					.world_mut()
+					.run_system_cached(ResolvedEndpoint::collect_static_get)?
+					.into_iter()
+				{
+					app.world_mut().entity_mut(entity).despawn();
+				}
+			}
+			RouterMode::Ssr => {}
 		}
+		#[cfg(feature = "axum")]
+		{
+			AxumRunner::new(self).run(app)
+		}
+		#[cfg(not(feature = "axum"))]
+		todo!("hyper router");
 	}
 
 	/// Export static html files and client islands.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[tokio::main]
-	async fn export_html(self, mut app: App) -> Result {
+	async fn export_html(&self, app: &mut App) -> Result {
 		let workspace_config = app.world().resource::<WorkspaceConfig>();
 		let html_dir = workspace_config.html_dir.into_abs();
 
 		let clone_world = CloneWorld::new(app.world_mut());
 		let html = app
 			.world_mut()
-			.run_system_cached(ResolvedEndpoint::collect)?
+			.run_system_cached(ResolvedEndpoint::collect_static_get)?
 			.into_iter()
-			.filter(|info| {
-				// only export static get requests
-				info.method() == HttpMethod::Get
-					&& info.cache_strategy() == CacheStrategy::Static
-			})
 			// TODO parallel
-			.map(async |info| -> Result<Option<(AbsPathBuf, String)>> {
+			.map(async |(_, info)| -> Result<Option<(AbsPathBuf, String)>> {
+				debug!("building html for {}", info.path());
 				use http::header::CONTENT_TYPE;
 
 				let mut world = clone_world.clone().clone_world()?;
@@ -132,10 +137,11 @@ impl AppRunner {
 					.await
 					.into_result()
 					.await?;
+				// debug!("building html for {}", info.path());
 
 				// we are only collecting html responses, other static endpoints
 				// are not exported
-				if res.header_matches(CONTENT_TYPE, "text/html") {
+				if res.header_contains(CONTENT_TYPE, "text/html") {
 					let html = res.text().await?;
 					Some((route_path, html))
 				} else {
@@ -148,7 +154,7 @@ impl AppRunner {
 
 		// write files all at once to avoid triggering file watcher multiple times
 		for (path, html) in html.into_iter().filter_map(|x| x) {
-			println!("Exporting html to {}", path);
+			debug!("Exporting html to {}", path);
 			FsExt::write(path, &html)?;
 		}
 		Ok(())

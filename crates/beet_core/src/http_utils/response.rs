@@ -95,6 +95,9 @@ impl Response {
 		)
 	}
 
+	/// Check whether a header exactly matches the given value,
+	/// do not use this for checks like `ConteTnt-Type` as they may
+	/// have additional parameters like `charset=utf-8`.
 	pub fn header_matches(
 		&self,
 		header: http::header::HeaderName,
@@ -104,6 +107,18 @@ impl Response {
 			.headers
 			.get(&header)
 			.map_or(false, |v| v == value)
+	}
+	/// Check whether a header contains the given value, use this for
+	/// checks like `Content-Type`.
+	pub fn header_contains(
+		&self,
+		header: http::header::HeaderName,
+		value: &str,
+	) -> bool {
+		self.parts
+			.headers
+			.get(&header)
+			.map_or(false, |v| v.to_str().map_or(false, |s| s.contains(value)))
 	}
 
 	pub fn from_parts(parts: response::Parts, body: Bytes) -> Self {
@@ -185,7 +200,7 @@ impl Response {
 	/// extracting the status code and message from the body.
 	/// For a method that checks the status code see [`Response::into_result`].
 	pub async fn into_error(self) -> HttpError {
-		let is_text = self.header_matches(CONTENT_TYPE, "text/plain");
+		let is_text = self.header_contains(CONTENT_TYPE, "text/plain");
 		let status = self.status();
 		let Ok(bytes) = self.body.into_bytes().await else {
 			return HttpError::internal_error("Failed to read response body");
