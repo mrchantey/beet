@@ -758,6 +758,7 @@ dependencies = [
  "beet_utils",
  "bevy",
  "cargo-manifest",
+ "clap",
  "flume",
  "futures",
  "heck 0.4.1",
