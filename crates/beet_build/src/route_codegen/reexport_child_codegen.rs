@@ -6,7 +6,7 @@ use syn::ItemMod;
 /// Add a `pub mod #name;` for any child [`CodegenFile`] of a [`CodegenFile`]
 pub fn reexport_child_codegen(
 	mut query: ParamSet<(
-		Populated<(Entity, &Children), Changed<CodegenFile>>,
+		Populated<(Entity, &Children), Added<CodegenFile>>,
 		Query<&mut CodegenFile>,
 	)>,
 ) -> Result {
@@ -36,6 +36,7 @@ pub fn reexport_child_codegen(
 	for (entity, child_paths) in items {
 		let mut p1 = query.p1();
 		let mut codegen = p1.get_mut(entity)?;
+		trace!("reexporting child codegen: {}", codegen.output);
 
 		for (child_name, child_path) in child_paths {
 			let relative_path =

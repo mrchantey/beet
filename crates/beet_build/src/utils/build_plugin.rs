@@ -80,12 +80,11 @@ impl Plugin for BuildPlugin {
 					// we're relying on exprs in templates?
 					// we should remove it!
 					apply_rsx_snippets,
+					parse_file_watch_events,
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
 					ParseRsxTokensSequence.run(),
 					update_file_expr_hash,
-					// todo i think this should be a higher step, it may load files
-					parse_file_watch_events,
 					RouteCodegenSequence.run(),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),

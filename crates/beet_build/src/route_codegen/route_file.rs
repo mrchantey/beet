@@ -109,10 +109,17 @@ pub fn reset_changed_codegen(
 				.map(|parent| roots.get_mut(parent.parent()).ok())
 				.flatten()
 				.map(|(mut root, mut root_codegen)| {
-					root.set_changed();
+					trace!(
+						"Resetting changed codegen for root: {}",
+						root_codegen.output
+					);
+					root.set_added();
+					root_codegen.set_added();
 					root_codegen.clear_items();
 				});
-			collection.set_changed();
+
+			collection.set_added();
+			collection_codegen.set_added();
 			collection_codegen.clear_items();
 		}
 	}
