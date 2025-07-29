@@ -17,7 +17,6 @@ impl Plugin for RouterPlugin {
 			.register_type::<HtmlConstants>()
 			.register_type::<TemplateFlags>()
 			.init_resource::<WorkspaceConfig>()
-			.init_resource::<HtmlConstants>()
-			.set_runner(AppRunner::runner);
+			.init_resource::<HtmlConstants>();
 	}
 }

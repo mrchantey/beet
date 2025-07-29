@@ -91,6 +91,9 @@ impl Plugin for BuildPlugin {
 		#[cfg(not(test))]
 		if !skip_load_workspace {
 			app.add_systems(Startup, load_workspace_source_files);
+			// alternatively use import_route_file_collection
+			// to only load route files
+			// import_route_file_collection
 		}
 
 		app.add_event::<WatchEvent>()

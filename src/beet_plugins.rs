@@ -10,42 +10,25 @@ pub struct BeetPlugins {
 	:BuildPlugin,
 	#[cfg(feature = "server")]
 	:RouterPlugin,
-	#[cfg(feature = "client")]
-	:ClientPlugin,
-	#[cfg(feature = "launch")]
-	:LaunchPlugin,
+	:BeetRunner,
 }
 }
-#[allow(unused)]
-#[cfg(feature = "client")]
-#[derive(Default)]
-struct ClientPlugin;
 
-#[cfg(feature = "client")]
-impl Plugin for ClientPlugin {
-	fn build(&self, app: &mut App) { app.set_runner(ReactiveApp::runner); }
-}
-#[cfg(feature = "launch")]
-#[derive(Default)]
-struct LaunchPlugin;
 
-#[cfg(feature = "launch")]
-impl Plugin for LaunchPlugin {
+/// Will set the [`App::runner`] based on the features enabled.
+#[derive(Default)]
+pub struct BeetRunner;
+
+impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
+		#[cfg(feature = "launch")]
 		app.insert_resource(CargoManifest::load().unwrap())
-			.set_runner(|mut app| {
-				let world = app.world_mut();
-				world
-					.run_system_cached(import_route_file_collection)
-					.unwrap()
-					.unwrap();
-				world.run_schedule(ParseFileSnippetsSequence);
-				world.run_schedule(RouteCodegenSequence);
-				world
-					.run_system_cached(export_route_codegen)
-					.unwrap()
-					.unwrap();
-				AppExit::Success
-			});
+			.set_runner(|mut app| app.run_once());
+
+		#[cfg(feature = "server")]
+		app.set_runner(AppRunner::runner);
+
+		#[cfg(feature = "client")]
+		app.set_runner(ReactiveApp::runner);
 	}
 }
