@@ -1,9 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::ParseRsxTokensSequence;
-use beet_rsx::as_beet::AbsPathBuf;
 use beet_rsx::prelude::*;
-use beet_utils::prelude::WatchEvent;
+use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
@@ -41,27 +40,6 @@ pub struct BuildPlugin;
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct BuildSequence;
 
-/// for any [`Changed<SourceFile>`], import its rsx snippets as children,
-/// then parse using [`ParseRsxTokens`].
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct ParseFileSnippetsSequence;
-
-impl Plugin for ParseFileSnippetsSequence {
-	fn build(&self, app: &mut App) {
-		app.init_schedule(Self).add_systems(
-			Self,
-			(
-				import_rsx_snippets_rs,
-				import_rsx_snippets_md,
-				// parse step
-				ParseRsxTokensSequence.run(),
-				update_file_expr_hash,
-			)
-				.chain(),
-		);
-	}
-}
-
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
@@ -69,20 +47,19 @@ impl Plugin for BuildPlugin {
 			.ok();
 
 		#[cfg(not(test))]
-		app.add_systems(
-			Startup,
-			// alternatively use import_route_file_collection to only load route files
-			load_workspace_source_files
-				.run_if(BuildFlag::ImportSnippets.should_run()),
-		);
+		app.insert_resource(CargoBuildCmd::parse())
+			.insert_resource(CargoManifest::load().unwrap())
+			.add_systems(
+				Startup,
+				// alternatively use import_route_file_collection to only load
+				// source files used by file based routes
+				load_workspace_source_files
+					.run_if(BuildFlag::ImportSnippets.should_run()),
+			);
 
 		app.add_event::<WatchEvent>()
 			.init_plugin(ParseRsxTokensSequence)
-			.add_plugins((
-				RouteCodegenSequence,
-				ParseFileSnippetsSequence,
-				NodeTypesPlugin,
-			))
+			.add_plugins((RouteCodegenSequence, NodeTypesPlugin))
 			.insert_schedule_before(Update, BuildSequence)
 			.init_resource::<BuildFlags>()
 			.init_resource::<WorkspaceConfig>()
@@ -99,24 +76,21 @@ impl Plugin for BuildPlugin {
 					// we're relying on exprs in templates?
 					// we should remove it!
 					apply_rsx_snippets,
-					ParseFileSnippetsSequence.run(),
-					// import step
+					import_rsx_snippets_rs,
+					import_rsx_snippets_md,
+					ParseRsxTokensSequence.run(),
+					update_file_expr_hash,
+					// todo i think this should be a higher step, it may load files
 					parse_file_watch_events,
 					RouteCodegenSequence.run(),
-					(
-						export_snippets
-							.run_if(BuildFlag::ExportSnippets.should_run()),
-						export_route_codegen
-							.run_if(BuildFlag::Routes.should_run()),
-						compile_server
-							.run_if(BuildFlag::CompileServer.should_run()),
-						export_server_ssg
-							.run_if(BuildFlag::ExportSsg.should_run()),
-						compile_client
-							.run_if(BuildFlag::CompileWasm.should_run()),
-						run_server.run_if(BuildFlag::RunServer.should_run()),
-					)
-						.chain(),
+					export_snippets
+						.run_if(BuildFlag::ExportSnippets.should_run()),
+					export_route_codegen.run_if(BuildFlag::Routes.should_run()),
+					compile_server
+						.run_if(BuildFlag::CompileServer.should_run()),
+					export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),
+					compile_client.run_if(BuildFlag::CompileWasm.should_run()),
+					run_server.run_if(BuildFlag::RunServer.should_run()),
 				)
 					.chain(),
 			);
@@ -164,7 +138,7 @@ pub enum BuildFlag {
 
 impl BuildFlag {
 	/// A predicate system for run_if conditions
-	fn should_run(self) -> impl Fn(Res<BuildFlags>) -> bool {
+	pub fn should_run(self) -> impl Fn(Res<BuildFlags>) -> bool {
 		move |flags| flags.contains(self)
 	}
 }

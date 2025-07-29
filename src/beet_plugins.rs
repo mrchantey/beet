@@ -22,8 +22,7 @@ pub struct BeetRunner;
 impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
 		#[cfg(feature = "launch")]
-		app.insert_resource(CargoManifest::load().unwrap())
-			.set_runner(LaunchRunner::runner);
+		app.set_runner(LaunchRunner::runner);
 
 		#[cfg(feature = "server")]
 		app.set_runner(AppRunner::runner);

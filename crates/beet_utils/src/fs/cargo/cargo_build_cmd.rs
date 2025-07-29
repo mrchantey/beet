@@ -107,13 +107,19 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
-	pub fn push_feature(&mut self, feature: impl Into<String>) {
+	pub fn parse() -> Self { Parser::parse() }
+	pub fn no_default_features(mut self) -> Self {
+		self.no_default_features = true;
+		self
+	}
+	pub fn push_feature(&mut self, feature: impl Into<String>) -> &mut Self {
 		let feature = feature.into();
 		if let Some(features) = &mut self.features {
 			features.push_str(&format!(",{}", feature));
 		} else {
 			self.features = Some(feature);
 		}
+		self
 	}
 	/// ## Panics
 	///

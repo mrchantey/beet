@@ -86,8 +86,8 @@ fn simple_template() {
 #[test]
 fn nested_template() {
 	let mut app = App::new();
-	app.add_plugins(BuildPlugin::default());
-
+	app.add_plugins(BuildPlugin::default())
+		.insert_resource(BuildFlags::None);
 
 	// create root static node
 	app.world_mut().spawn((
@@ -147,7 +147,8 @@ fn common_idx_nested() -> SnippetRoot {
 
 fn build_scene(tokens: TokenStream) -> String {
 	let mut app = App::new();
-	app.add_plugins(BuildPlugin::default());
+	app.add_plugins(BuildPlugin::default())
+		.insert_resource(BuildFlags::None);
 	let _entity = app
 		.world_mut()
 		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))

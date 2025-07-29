@@ -20,7 +20,10 @@ pub(crate) fn compile_server(
 	}
 
 	debug!("Building server binary");
-	cmd.spawn()?;
+	cmd.clone()
+		.no_default_features()
+		.push_feature("server")
+		.spawn()?;
 	Ok(())
 }
 
@@ -39,7 +42,7 @@ pub fn export_server_ssg(
 	);
 	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
-		.arg("export-static")
+		.arg("export-html")
 		.status()?
 		.exit_ok()?;
 	Ok(())
