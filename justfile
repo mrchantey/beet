@@ -96,8 +96,10 @@ build-csr:
 	
 build-demo-site *args:
 	cd examples/demo_site && cargo run 		--no-default-features --features=launch
-	cd examples/demo_site && cargo build 	--no-default-features --features=client --target-dir=target --target wasm32-unknown-unknown
-	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/demo_site.wasm
+	just build-demo-site-wasm {{args}}
+build-demo-site-wasm *args:
+	cd examples/demo_site && cargo build 	--no-default-features --features=client --target wasm32-unknown-unknown
+	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/demo_site.wasm
 
 run-demo-site *args:
 	cd examples/demo_site && cargo run --no-default-features --features=server {{args}}

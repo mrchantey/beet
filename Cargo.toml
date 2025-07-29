@@ -262,7 +262,7 @@ axum = ["beet_core/axum"]
 lambda = ["server", "beet_server/lambda", "beet_core/rustls"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = ["parse", "dep:beet_build", "beet_server?/build"]
+build = ["parse", "dep:beet_build"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",

@@ -9,7 +9,7 @@ use web_sys::Event;
 
 /// A system that runs once after hydration to playback any events
 /// that occured while the wasm was loading.
-pub(super) fn event_playback(
+pub(crate) fn event_playback(
 	constants: Res<HtmlConstants>,
 	mut commands: Commands,
 	query: Populated<

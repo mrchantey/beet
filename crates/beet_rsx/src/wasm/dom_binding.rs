@@ -27,7 +27,7 @@ impl DomTextBinding {
 pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
-pub(super) fn update_text_nodes(
+pub(crate) fn update_text_nodes(
 	_: TempNonSendMarker,
 	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
 ) -> Result<()> {
@@ -40,7 +40,7 @@ pub(super) fn update_text_nodes(
 
 /// The attributes of elements are applied in the render html step,
 /// updating is applied to the DOM *properties* of the element
-pub(super) fn update_attribute_values(
+pub(crate) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
 		(
@@ -80,7 +80,7 @@ pub(super) fn update_attribute_values(
 /// 2. find the marker comment node
 /// 3. assign the text node to the next sibling of the marker comment
 /// 4. remove the marker comments
-pub(super) fn bind_text_nodes(
+pub(crate) fn bind_text_nodes(
 	mut commands: Commands,
 	constants: Res<HtmlConstants>,
 	mut get_binding: GetDomBinding,
@@ -161,7 +161,7 @@ pub(super) fn bind_text_nodes(
 	Ok(())
 }
 
-pub(super) fn bind_attribute_values(
+pub(crate) fn bind_attribute_values(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	elements: Query<(Entity, &DomIdx)>,
@@ -190,7 +190,7 @@ pub(super) fn bind_attribute_values(
 	Ok(())
 }
 
-pub(super) fn bind_events(
+pub(crate) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	query: Populated<
@@ -242,7 +242,7 @@ pub(super) fn bind_events(
 
 
 #[derive(SystemParam)]
-pub(super) struct GetDomBinding<'w, 's> {
+pub(crate) struct GetDomBinding<'w, 's> {
 	commands: Commands<'w, 's>,
 	elements: Query<'w, 's, &'static DomElementBinding>,
 	constants: Res<'w, HtmlConstants>,

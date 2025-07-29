@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+mod beet_plugins;
+
 #[cfg(feature = "build")]
 pub use beet_build as build;
 #[cfg(feature = "connect")]
@@ -31,6 +33,7 @@ pub use beet_utils::elog;
 pub use beet_utils::log;
 pub use beet_utils::noop;
 pub mod prelude {
+	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
 	#[cfg(feature = "connect")]

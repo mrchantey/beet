@@ -2,40 +2,58 @@ use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 use std::str::FromStr;
-
-/// System set for the [`TemplatePlugin`] to spawn templates.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct TemplateSet;
 
 #[derive(Default)]
 pub struct TemplatePlugin;
 
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct BuildTemplate;
 
+/// A schedule for completely building templates,
+/// this will run before each [`Update`] schedule and can be
+/// executed manually after adding unresolved templates to the world.
+/// (see beet_server bundle_layer.rs for an example)
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct BuildTemplates;
+
+
+pub(crate) fn schedule_order_plugin(app: &mut App) {
+	BuildTemplates.register_before(app, Update);
+	PropagateSignals.register_after(app, BuildTemplates);
+}
 
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		// #[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
-		// app.add_systems(
-		// 	Startup,
-		// 	load_all_file_snippets
-		// 		.run_if(TemplateFlags::should_run(TemplateFlag::LoadSnippets)),
-		// );
+		#[cfg(all(target_arch = "wasm32", not(test)))]
+		console_error_panic_hook::set_once();
 
-		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
+
+		app.init_plugin(schedule_order_plugin)
+			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<ClientIslandRegistry>()
 			.init_resource::<TemplateFlags>()
 			.add_systems(
-				Update,
+				Startup,
+				(
+					|| {},
+					// #[cfg(all(
+					// 	feature = "serde",
+					// 	not(target_arch = "wasm32")
+					// ))]
+					// load_all_file_snippets.run_if(TemplateFlags::should_run(
+					// 	TemplateFlag::LoadSnippets,
+					// )),
+					#[cfg(target_arch = "wasm32")]
+					load_client_islands.run_if(document_exists),
+				),
+			)
+			.add_systems(
+				BuildTemplates,
 				// almost all of these systems must be run in this sequence,
 				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(
@@ -44,9 +62,10 @@ impl Plugin for TemplatePlugin {
 					apply_slots,
 					apply_static_lang_snippets,
 					apply_requires_dom_idx,
-					#[cfg(target_arch = "wasm32")]
+					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,
-					#[cfg(not(target_arch = "wasm32"))]
+					// in cl
+					#[cfg(any(not(target_arch = "wasm32"), test))]
 					apply_root_dom_idx,
 					rearrange_html_document,
 					apply_reactive_text_nodes,
@@ -57,12 +76,19 @@ impl Plugin for TemplatePlugin {
 					insert_event_playback_attribute,
 					compress_style_ids,
 					render_html_fragments,
+					#[cfg(target_arch = "wasm32")]
+					(
+						mount_client_only,
+						event_playback.run_if(run_once),
+						bind_events,
+						bind_text_nodes,
+						bind_attribute_values,
+					)
+						.chain()
+						.run_if(document_exists),
 				)
-					.chain()
-					.in_set(TemplateSet),
+					.chain(),
 			);
-		#[cfg(target_arch = "wasm32")]
-		app.add_plugins(wasm_template_plugin);
 	}
 }
 

@@ -1066,7 +1066,6 @@ version = "0.0.6-dev.7"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
- "beet_build",
  "beet_core",
  "beet_rsx",
  "beet_utils",

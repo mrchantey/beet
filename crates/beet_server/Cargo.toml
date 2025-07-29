@@ -18,13 +18,11 @@ default = ["axum", "reload"]
 axum = ["dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
-build = ["dep:beet_build"]
 
 [dependencies]
 beet_utils = { workspace = true }
 beet_core = { workspace = true, features = ["bevy", "net", "serde"] }
 beet_rsx.workspace = true
-beet_build = { workspace = true, optional = true }
 
 bevy.workspace = true
 

@@ -6,6 +6,16 @@ use extend::ext;
 #[ext]
 #[allow(async_fn_in_trait)]
 pub impl App {
+	/// Add a plugin to the app, if it hasn't been added yet.
+	fn init_plugin<T: Plugin>(&mut self, plugin: T) -> &mut Self {
+		if self.get_added_plugins::<T>().is_empty() {
+			self.add_plugins(plugin);
+		}
+		self
+	}
+
+
+
 	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_on_animation_frame(mut self) -> crate::web::AnimationFrame {
 		crate::web::AnimationFrame::new(move || {

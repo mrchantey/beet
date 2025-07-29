@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::node::ClientOnlyDirective;
 use bevy::prelude::*;
 
-pub(super) fn mount_client_only(
+pub(crate) fn mount_client_only(
 	mut commands: Commands,
 	query: Populated<Entity, Added<ClientOnlyDirective>>,
 ) {
