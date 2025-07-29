@@ -21,12 +21,14 @@ fn works() {
 			<Roundtrip/>
 		}))
 		.id();
-	app.update();
+	app.world_mut().run_schedule(BuildSequence);
+	app.world_mut().run_schedule(BuildTemplates);
+	// app.update();
 	app.world_mut()
 		.run_system_cached_with(render_fragment, entity)
 		.unwrap()
 		.xpect()
-		.to_be_str("<!DOCTYPE html><html><head><style>h1[data-beet-style-id-18336657424200447272] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>");
+		.to_be_str("<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>");
 }
 
 

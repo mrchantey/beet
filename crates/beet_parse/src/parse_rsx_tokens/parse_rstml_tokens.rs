@@ -437,9 +437,11 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> (World, Entity) {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(ParseRsxTokensSequence);
+		let mut world = std::mem::take(app.world_mut());
 		let entity = world.spawn(RstmlTokens::new(tokens)).id();
-		world.run_sequence_once(ParseRsxTokensSequence).unwrap();
+		world.run_schedule(ParseRsxTokensSequence);
 		(world, entity)
 	}
 

@@ -1,8 +1,5 @@
-use bevy::app::MainScheduleOrder;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-
-
 
 
 
@@ -15,29 +12,4 @@ pub impl<T: Clone + ScheduleLabel> T {
 		}
 	}
 
-
-	/// Register this schedule in the main schedule order after the specified schedule
-	/// # Panics
-	/// Panics if the other schedule has not been registered yet.
-	fn register_before(
-		self,
-		app: &mut App,
-		before: impl Clone + ScheduleLabel,
-	) {
-		app.init_schedule(self.clone());
-		app.init_schedule(before.clone());
-		let mut main_schedule_order =
-			app.world_mut().resource_mut::<MainScheduleOrder>();
-		main_schedule_order.insert_before(before, self);
-	}
-	/// Register this schedule in the main schedule order after the specified schedule
-	/// # Panics
-	/// Panics if the other schedule has not been registered yet.
-	fn register_after(self, app: &mut App, after: impl Clone + ScheduleLabel) {
-		app.init_schedule(self.clone());
-		app.init_schedule(after.clone());
-		let mut main_schedule_order =
-			app.world_mut().resource_mut::<MainScheduleOrder>();
-		main_schedule_order.insert_after(after, self);
-	}
 }

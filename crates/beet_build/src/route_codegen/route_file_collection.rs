@@ -26,6 +26,8 @@ pub struct RouteFileCollection {
 	pub category: RouteCollectionCategory,
 }
 
+
+/// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
 pub fn import_route_file_collection(
 	mut commands: Commands,
 	collections: Query<

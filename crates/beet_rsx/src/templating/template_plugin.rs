@@ -18,8 +18,8 @@ pub struct BuildTemplates;
 
 
 pub(crate) fn schedule_order_plugin(app: &mut App) {
-	BuildTemplates.register_before(app, Update);
-	PropagateSignals.register_after(app, BuildTemplates);
+	app.insert_schedule_before(Update, BuildTemplates)
+		.insert_schedule_after(BuildTemplates, PropagateSignals);
 }
 
 impl Plugin for TemplatePlugin {

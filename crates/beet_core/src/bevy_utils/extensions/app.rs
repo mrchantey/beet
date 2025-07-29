@@ -1,5 +1,7 @@
 use crate::prelude::NonSendPlugin;
+use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use extend::ext;
 
@@ -15,6 +17,35 @@ pub impl App {
 	}
 
 
+
+	/// Register this schedule in the main schedule order after the specified schedule
+	/// # Panics
+	/// Panics if the other schedule has not been registered yet.
+	fn insert_schedule_before(
+		&mut self,
+		before: impl ScheduleLabel,
+		schedule: impl Clone + ScheduleLabel,
+	) -> &mut Self {
+		self.init_schedule(schedule.clone());
+		let mut main_schedule_order =
+			self.world_mut().resource_mut::<MainScheduleOrder>();
+		main_schedule_order.insert_before(before, schedule);
+		self
+	}
+	/// Register this schedule in the main schedule order after the specified schedule
+	/// # Panics
+	/// Panics if the other schedule has not been registered yet.
+	fn insert_schedule_after(
+		&mut self,
+		after: impl ScheduleLabel,
+		schedule: impl Clone + ScheduleLabel,
+	) -> &mut Self {
+		self.init_schedule(schedule.clone());
+		let mut main_schedule_order =
+			self.world_mut().resource_mut::<MainScheduleOrder>();
+		main_schedule_order.insert_after(after, schedule);
+		self
+	}
 
 	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_on_animation_frame(mut self) -> crate::web::AnimationFrame {

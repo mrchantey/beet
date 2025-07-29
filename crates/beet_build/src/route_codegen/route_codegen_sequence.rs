@@ -1,40 +1,37 @@
 use super::*;
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_utils::prelude::*;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 
-#[derive(Debug, Default)]
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct RouteCodegenSequence;
 
-
-impl WorldSequence for RouteCodegenSequence {
-	fn run_sequence<R: WorldSequenceRunner>(
-		self,
-		runner: &mut R,
-	) -> Result<()> {
-		(
-			reset_changed_codegen,
-			update_route_files,
-			// create the child routes
-			parse_route_file_rs,
-			parse_route_file_md,
-			modify_route_file_tokens,
-			tokenize_combinator_route,
-			collect_route_files,
-			// update codegen files
-			reexport_child_codegen,
-			parse_route_tree,
-			// action codegen
-			collect_client_action_group,
-		)
-			.run_sequence(runner)?;
-		// .run_if(BuildFlags::should_run(BuildFlag::Routes)),
-		Ok(())
+impl Plugin for RouteCodegenSequence {
+	fn build(&self, app: &mut App) {
+		app
+		.init_schedule(Self)
+		.add_systems(
+			Self,
+			(
+				reset_changed_codegen,
+				update_route_files,
+				// create the child routes
+				parse_route_file_rs,
+				parse_route_file_md,
+				modify_route_file_tokens,
+				tokenize_combinator_route,
+				collect_route_files,
+				// update codegen files
+				reexport_child_codegen,
+				parse_route_tree,
+				// action codegen
+				collect_client_action_group,
+			)
+				.chain(),
+		);
 	}
 }
-
-
 
 /// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
 pub fn export_route_codegen(

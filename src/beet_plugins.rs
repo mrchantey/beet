@@ -6,6 +6,8 @@ plugin_group! {
 pub struct BeetPlugins {
 	#[cfg(feature = "rsx")]
 	:TemplatePlugin,
+	#[cfg(feature = "build")]
+	:BuildPlugin,
 	#[cfg(feature = "server")]
 	:RouterPlugin,
 	#[cfg(feature = "client")]
@@ -32,14 +34,16 @@ impl Plugin for LaunchPlugin {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(CargoManifest::load().unwrap())
 			.set_runner(|mut app| {
-				app.world_mut()
-					.run_sequence_once(import_route_file_collection)
+				let world = app.world_mut();
+				world
+					.run_system_cached(import_route_file_collection)
 					.unwrap()
-					.run_sequence_once(ParseFileSnippets)
+					.unwrap();
+				world.run_schedule(ParseFileSnippetsSequence);
+				world.run_schedule(RouteCodegenSequence);
+				world
+					.run_system_cached(export_route_codegen)
 					.unwrap()
-					.run_sequence_once(RouteCodegenSequence)
-					.unwrap()
-					.run_sequence_once(export_route_codegen)
 					.unwrap();
 				AppExit::Success
 			});

@@ -1,44 +1,45 @@
-use std::borrow::Cow;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use flume::Receiver;
+use std::borrow::Cow;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct PropagateSignals;
 
 pub struct SignalsPlugin;
 impl Plugin for SignalsPlugin {
+	#[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		// BuildTemplates.register_before(app, Update);
-		app.init_plugin(schedule_order_plugin).add_systems(
-			PropagateSignals,
-			(
-				receive_string_signals::<String>,
-				receive_string_signals::<&'static str>,
-				receive_string_signals::<Cow<'static, str>>,
-				receive_bool_signals::<bool>,
-				receive_num_signals::<f32>,
-				receive_num_signals::<f64>,
-				receive_num_signals::<u8>,
-				receive_num_signals::<u16>,
-				receive_num_signals::<u32>,
-				// receive_num_signals::<u64>,
-				receive_num_signals::<i8>,
-				receive_num_signals::<i16>,
-				receive_num_signals::<i32>,
-				// receive_num_signals::<i64>,
-				#[cfg(feature = "bevy_default")]
-				propagate_text_signals,
-				#[cfg(target_arch = "wasm32")]
-				(update_text_nodes, update_attribute_values)
-					.chain()
-					.run_if(document_exists),
-			)
-				.chain(),
-		);
+		app
+			.init_plugin(schedule_order_plugin)
+			.add_systems(
+				PropagateSignals,
+				(
+					receive_string_signals::<String>,
+					receive_string_signals::<&'static str>,
+					receive_string_signals::<Cow<'static, str>>,
+					receive_bool_signals::<bool>,
+					receive_num_signals::<f32>,
+					receive_num_signals::<f64>,
+					receive_num_signals::<u8>,
+					receive_num_signals::<u16>,
+					receive_num_signals::<u32>,
+					// receive_num_signals::<u64>,
+					receive_num_signals::<i8>,
+					receive_num_signals::<i16>,
+					receive_num_signals::<i32>,
+					// receive_num_signals::<i64>,
+					#[cfg(feature = "bevy_default")]
+					propagate_text_signals,
+					#[cfg(target_arch = "wasm32")]
+					(update_text_nodes, update_attribute_values)
+						.chain()
+						.run_if(document_exists),
+				)
+					.chain(),
+			);
 	}
 }
 /// Non generic marker to indicate this entity receives signals.

@@ -5,6 +5,7 @@ use beet_parse::prelude::ParseRsxTokensSequence;
 use beet_rsx::as_beet::AbsPathBuf;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::WatchEvent;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
 use std::str::FromStr;
@@ -35,7 +36,7 @@ impl CargoManifest {
 }
 
 /// Main plugin for beet_build
-#[derive(Debug, Clone, Default)]
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct BuildPlugin {
 	/// Disable loading the workspace source files, useful for
 	/// testing or manually loading files.
@@ -52,111 +53,99 @@ impl BuildPlugin {
 	}
 }
 
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct BuildSequence;
+
 /// for any [`Changed<SourceFile>`], import its rsx snippets as children,
-/// then parse using [`ParseRsxTokensSequence`].
-pub struct ParseFileSnippets;
+/// then parse using [`ParseRsxTokens`].
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct ParseFileSnippetsSequence;
 
-impl WorldSequence for ParseFileSnippets {
-	fn run_sequence<R: WorldSequenceRunner>(
-		self,
-		runner: &mut R,
-	) -> Result<()> {
-		(
-			import_rsx_snippets_rs,
-			import_rsx_snippets_md,
-			// parse step
-			|world: &mut World| {
-				world.run_sequence_once(ParseRsxTokensSequence)?;
-				Ok(())
-			},
-			update_file_expr_hash,
-		)
-			.run_sequence(runner)?;
-
-
-		Ok(())
-	}
-}
-
-
-impl WorldSequence for BuildPlugin {
-	fn run_sequence<R: WorldSequenceRunner>(
-		self,
-		runner: &mut R,
-	) -> Result<()> {
-		bevy::ecs::error::GLOBAL_ERROR_HANDLER
-			.set(bevy::ecs::error::panic)
-			.ok();
-
-		#[cfg(not(test))]
-		if !self.skip_load_workspace {
-			load_workspace_source_files.run_sequence(runner)?;
-		}
-		(
-			// style roundtrip breaks without resolving templates,
-			// im not sure if this should be here, doesnt it indicate
-			// we're relying on exprs in templates?
-			// we should remove it!
-			apply_rsx_snippets,
-			|world: &mut World| {
-				world.run_sequence_once(ParseFileSnippets)?;
-				Ok(())
-			},
-			// import step
-			parse_file_watch_events,
-			|world: &mut World| {
-				if world.resource::<BuildFlags>().contains(BuildFlag::Routes) {
-					world.run_sequence_once(RouteCodegenSequence)?;
-				}
-				Ok(())
-			},
-		)
-			.run_sequence(runner)?;
-
-		if self.skip_write_to_fs {
-			return Ok(());
-		}
-
-		let flags = runner.world().resource::<BuildFlags>().clone();
-		if flags.contains(BuildFlag::Snippets) {
-			export_snippets.run_sequence(runner)?;
-		}
-		if flags.contains(BuildFlag::Routes) {
-			export_route_codegen.run_sequence(runner)?;
-		}
-		if flags.contains(BuildFlag::CompileServer) {
-			compile_server.run_sequence(runner)?;
-		}
-		if flags.contains(BuildFlag::ExportSsg) {
-			export_server_ssg.run_sequence(runner)?;
-		}
-		if flags.contains(BuildFlag::CompileWasm) {
-			compile_client.run_sequence(runner)?;
-		}
-		if flags.contains(BuildFlag::RunServer) {
-			run_server.run_sequence(runner)?;
-		}
-		Ok(())
+impl Plugin for ParseFileSnippetsSequence {
+	fn build(&self, app: &mut App) {
+		app.init_schedule(Self).add_systems(
+			Self,
+			(
+				import_rsx_snippets_rs,
+				import_rsx_snippets_md,
+				// parse step
+				ParseRsxTokensSequence.run(),
+				update_file_expr_hash,
+			)
+				.chain(),
+		);
 	}
 }
 
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
-		let this = self.clone();
+		bevy::ecs::error::GLOBAL_ERROR_HANDLER
+			.set(bevy::ecs::error::panic)
+			.ok();
+		#[allow(unused)]
+		let Self {
+			skip_load_workspace,
+			skip_write_to_fs,
+		} = self.clone();
+
+		#[cfg(not(test))]
+		if !skip_load_workspace {
+			app.add_systems(Startup, load_workspace_source_files);
+		}
+
 		app.add_event::<WatchEvent>()
+			.init_plugin(ParseRsxTokensSequence)
+			.add_plugins((
+				RouteCodegenSequence,
+				ParseFileSnippetsSequence,
+				NodeTypesPlugin,
+			))
+			.insert_schedule_before(Update, BuildSequence)
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<BuildFlags>()
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
-			// types
-			.add_plugins(NodeTypesPlugin)
 			// .add_plugins(TemplatePlugin)
 			// .insert_resource(TemplateFlags::None)
-			.add_systems(Update, move |world: &mut World| {
-				world.run_sequence_once(this.clone())?;
-				Ok(())
-			});
+			.add_systems(
+				BuildSequence,
+				(
+					// style roundtrip breaks without resolving templates,
+					// im not sure if this should be here, doesnt it indicate
+					// we're relying on exprs in templates?
+					// we should remove it!
+					apply_rsx_snippets,
+					ParseFileSnippetsSequence.run(),
+					// import step
+					parse_file_watch_events,
+					RouteCodegenSequence
+						.run()
+						.run_if(BuildFlags::should_run(BuildFlag::Routes)),
+					(
+						export_snippets.run_if(BuildFlags::should_run(
+							BuildFlag::Snippets,
+						)),
+						export_route_codegen
+							.run_if(BuildFlags::should_run(BuildFlag::Routes)),
+						compile_server.run_if(BuildFlags::should_run(
+							BuildFlag::CompileServer,
+						)),
+						export_server_ssg.run_if(BuildFlags::should_run(
+							BuildFlag::ExportSsg,
+						)),
+						compile_client.run_if(BuildFlags::should_run(
+							BuildFlag::CompileWasm,
+						)),
+						run_server.run_if(BuildFlags::should_run(
+							BuildFlag::RunServer,
+						)),
+					)
+						.chain()
+						.run_if(move || !skip_write_to_fs),
+				)
+					.chain(),
+			);
 	}
 }
 
