@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::WorldMutExt;
 use beet_core::prelude::*;
+use beet_utils::prelude::ReadDir;
+use beet_utils::prelude::ReadFile;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
@@ -8,24 +11,15 @@ use bevy::prelude::*;
 
 /// Load snippet scene if it exists.
 // temp whole file until fine-grained loading is implemented
-#[cfg(feature = "serde")]
 pub fn load_all_file_snippets(world: &mut World) -> Result {
-	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::ReadFile;
 	let config = world.resource::<WorkspaceConfig>();
-
 	let file = config.snippets_dir().into_abs().join("snippets.ron");
 	let file = ReadFile::to_string(file)?;
 	world.load_scene(file)?;
-
 	Ok(())
 }
-#[cfg(feature = "serde")]
 pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
-	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::ReadFile;
 	let config = world.resource::<WorkspaceConfig>();
-	use beet_utils::prelude::ReadDir;
 
 	let files = ReadDir::files_recursive(config.snippets_dir().into_abs())?;
 	let num_files = files.len();
@@ -101,7 +95,9 @@ fn apply_static_rsx(
 	};
 	let Some((static_root, snippet_root)) = rsx_snippets
 		.iter()
-		.find(|(_, static_loc)| *static_loc == instance_loc)
+		.find(|(_, static_loc)| {
+			// println!("compare:\n{}\n{}", static_loc, instance_loc);
+			*static_loc == instance_loc})
 	else {
 		return Ok(());
 	};

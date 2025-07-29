@@ -1,8 +1,6 @@
 [package]
 name = "demo_site"
-version.workspace = true
-edition.workspace = true
-
+edition = "2024"
 
 [features]
 default = ["server"]
@@ -12,6 +10,5 @@ client = ["beet/client"]
 
 
 [dependencies]
-serde.workspace = true
-beet = { workspace = true }
-
+serde = "1"
+beet = { path = "../../" }

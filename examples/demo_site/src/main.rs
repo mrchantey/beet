@@ -4,6 +4,8 @@ use beet::prelude::*;
 use demo_site::prelude::*;
 
 fn main() {
+	println!("file: {} ",file!());
+
 	App::new()
 		.add_plugins((
 			BeetPlugins,

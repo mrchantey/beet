@@ -41,13 +41,10 @@ impl Plugin for TemplatePlugin {
 				Startup,
 				(
 					|| {},
-					// #[cfg(all(
-					// 	feature = "serde",
-					// 	not(target_arch = "wasm32")
-					// ))]
-					// load_all_file_snippets.run_if(TemplateFlags::should_run(
-					// 	TemplateFlag::LoadSnippets,
-					// )),
+					#[cfg(not(target_arch = "wasm32"))]
+					load_all_file_snippets.run_if(TemplateFlags::should_run(
+						TemplateFlag::LoadSnippets,
+					)),
 					#[cfg(target_arch = "wasm32")]
 					load_client_islands.run_if(document_exists),
 				),
