@@ -9,7 +9,7 @@ mod templates;
 
 
 #[cfg(feature = "launch")]
-mod launch;
+mod collections;
 pub mod prelude {
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use templates::*;
@@ -26,7 +26,7 @@ pub mod prelude {
 	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(feature = "launch")]
-	pub use crate::launch::*;
+	pub use crate::collections::*;
 	pub use crate::*;
 }
 

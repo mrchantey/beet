@@ -9,7 +9,7 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(TemplatePlugin)
+		app.init_plugin(TemplatePlugin)
 			.register_type::<MethodFilter>()
 			.register_type::<Endpoint>()
 			.register_type::<RouteFilter>()
