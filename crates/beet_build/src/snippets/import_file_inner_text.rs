@@ -75,15 +75,20 @@ mod test {
 			.id();
 		app.update();
 
+		#[cfg(feature = "css")]
+		let expected = "body[data-beet-style-id-15207297232399335040] {\n  color: #00f;\n}\n";
+		#[cfg(not(feature = "css"))]
+		let expected = include_str!("../../tests/test_file.css");
+
 		app.world_mut().query_once::<&InnerText>()[0]
 			.xpect()
-			.to_be(&InnerText::new(include_str!("../../tests/test_file.css")));
+			.to_be(&InnerText::new(expected));
+		
 		// links source files
 		app.world_mut().query_once::<&SourceFileRef>()[0]
 			.0
 			.xpect()
 			.to_be(file);
-
 
 		app.world_mut()
 			.query_once::<&SourceFileRef>()

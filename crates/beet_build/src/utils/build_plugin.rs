@@ -62,8 +62,8 @@ impl Plugin for BuildPlugin {
 		);
 
 		app.add_event::<WatchEvent>()
-		.init_plugin(ParseRsxTokensPlugin)
-		// .init_plugin(ApplyDirectivesPlugin)
+			.init_plugin(ParseRsxTokensPlugin)
+			// .init_plugin(ApplyDirectivesPlugin)
 			.init_plugin(RouteCodegenPlugin)
 			.init_plugin(NodeTypesPlugin)
 			.insert_schedule_before(Update, BuildSequence)
@@ -72,6 +72,10 @@ impl Plugin for BuildPlugin {
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
+			.add_systems(
+				ParseRsxTokens,
+				import_file_inner_text.in_set(ModifyRsxTree),
+			)
 			.add_systems(
 				BuildSequence,
 				(
@@ -84,7 +88,6 @@ impl Plugin for BuildPlugin {
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
 					ParseRsxTokens.run(),
-					import_file_inner_text,
 					update_file_expr_hash,
 					RouteCodegen.run(),
 					export_snippets
