@@ -60,7 +60,11 @@ pub mod prelude {
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 	pub use crate::utils::prelude::*;
+	/// hack to fix bevy macros
+	pub use bevy::ecs as bevy_ecs;
 	pub use bevy::prelude::*;
+	/// hack to fix bevy macros
+	pub use bevy::reflect as bevy_reflect;
 	// beet workflows make heavy use of `RunSystemOnce` to run systems
 	pub use bevy::ecs::system::RunSystemOnce;
 }

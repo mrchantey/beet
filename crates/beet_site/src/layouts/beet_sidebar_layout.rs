@@ -1,11 +1,11 @@
+#![allow(unused)]
 use crate::prelude::*;
 use beet::prelude::*;
 
 
 #[template]
 pub fn BeetSidebarLayout() -> impl Bundle {
-	let sidebar_nodes =
-		route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
+	let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>
 		<PageLayout>

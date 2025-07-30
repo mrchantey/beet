@@ -1,6 +1,3 @@
-use beet::exports::axum::Json;
 use beet::prelude::*;
 
-pub async fn get(JsonQuery((a, b)): JsonQuery<(i32, i32)>) -> Json<i32> {
-	Json(a + b)
-}
+pub fn get(In((a, b)): In<(i32, i32)>) -> i32 { a + b }

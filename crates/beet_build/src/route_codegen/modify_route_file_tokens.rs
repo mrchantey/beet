@@ -36,17 +36,15 @@ impl ModifyRoutePath {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
 	}
-	pub fn replace_route<S1: ToString, S2: ToString>(
+	pub fn replace_route(
 		mut self,
-		replace: impl IntoIterator<Item = (S1, S2)>,
+		from: impl ToString,
+		to: impl ToString,
 	) -> Self {
-		self.replace_route = replace
-			.into_iter()
-			.map(|(a, b)| ReplaceRoute {
-				from: a.to_string(),
-				to: b.to_string(),
-			})
-			.collect();
+		self.replace_route.push(ReplaceRoute {
+			from: from.to_string(),
+			to: to.to_string(),
+		});
 		self
 	}
 }
@@ -98,11 +96,11 @@ mod test {
 				RouteFileMethod::new(&*file!().replace(".rs", "")),
 				ModifyRoutePath::default()
 					.base_route("/design")
-					.replace_route([(
-						&format!("/{}", dir!().display()),
+					.replace_route(
+						format!("/{}", dir!().display()),
 						// "crates/beet_build/src/codegen_native/",
 						"",
-					)]),
+					),
 			))
 			.id();
 		world.run_system_cached(modify_route_file_tokens).unwrap();

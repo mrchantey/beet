@@ -19,6 +19,7 @@ pub struct CodegenFile {
 	pub output: AbsPathBuf,
 	/// All of the imports that must be included both globally and inside each
 	/// inline module.
+	/// These will not be erased when the file is regenerated.
 	#[serde(
 		default = "default_imports",
 		rename = "import_tokens",

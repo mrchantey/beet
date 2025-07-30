@@ -1,11 +1,9 @@
 #[allow(unused)]
 use crate::prelude::*;
 use beet::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 #[template]
-#[derive(Serialize, Deserialize)]
+#[derive(Reflect)]
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	#[allow(unused)]
 	let (get, set) = signal(initial);

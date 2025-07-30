@@ -21,6 +21,8 @@ pub mod prelude {
 	#[cfg(feature = "server")]
 	pub use crate::codegen::docs::docs_routes;
 	#[cfg(feature = "server")]
+	pub use crate::codegen::blog::blog_routes;
+	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::codegen::routes;

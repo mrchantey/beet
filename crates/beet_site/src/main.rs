@@ -19,18 +19,15 @@ fn main() {
 
 #[cfg(feature = "launch")]
 fn launch_plugin(app: &mut App) {
-	app.world_mut().spawn((
-		RouteCodegenRoot::default(),
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel("crates/beet_site/src/codegen/mod.rs")
-				.unwrap(),
-		),
-		children![
-			pages_collection(), 
-			docs_collection(), 
-			actions_collection()
-		],
-	));
+
+	let mut config = WorkspaceConfig::default();
+	config.filter
+		.include("*/crates/beet_design/src/**/*")
+		.include("*/crates/beet_site/src/**/*");
+
+	app.insert_resource(config);
+
+	app.world_mut().spawn(collections());
 }
 
 #[cfg(feature = "server")]
@@ -39,14 +36,17 @@ fn server_plugin(app: &mut App) {
 		children![
 			pages_routes(), 
 			docs_routes(), 
-			actions_routes()
+			blog_routes(), 
+			actions_routes(),
+			(
+				RouteFilter::new("docs"),
+				article_layout_middleware()
+			),
+			(
+				RouteFilter::new("blog"),
+				article_layout_middleware()
+			),
 		],
-		// this is placed last to ensure it runs after all handlers
-		RouteHandler::layer(|| {
-			let mut state = AppState::get();
-			state.num_requests += 1;
-			AppState::set(state);
-		}),
 	));
 }
 

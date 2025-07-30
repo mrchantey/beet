@@ -1,6 +1,5 @@
 #![allow(unused)]
 use crate::prelude::*;
-use beet::exports::bevy::reflect as bevy_reflect;
 use beet::prelude::*;
 
 #[template]

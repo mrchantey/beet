@@ -31,8 +31,6 @@ pub mod prelude {
 }
 
 
-
-use beet::exports::bevy::ecs as bevy_ecs;
 use beet::prelude::*;
 use serde::Deserialize;
 use std::sync::LazyLock;

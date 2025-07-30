@@ -14,7 +14,7 @@ keywords.workspace = true
 
 
 [features]
-default = ["server"]
+default = ["launch", "server", "client"]
 # default = ["beet/web-server", "beet/native-tls"]
 # used by beet cli for building prod server
 launch = ["beet/launch"]
