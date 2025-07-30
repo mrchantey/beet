@@ -9,7 +9,7 @@ pub fn tokenize_rstml(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokensSequence::parse_and_run(
+	let tokens = ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new_from_tokens(source_file, &tokens),
 			InstanceRoot,
@@ -26,7 +26,7 @@ pub fn tokenize_rstml_tokens(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokensSequence::parse_and_run(
+	let tokens = ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new_from_tokens(source_file, &tokens),
 			InstanceRoot,

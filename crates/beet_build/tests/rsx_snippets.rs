@@ -160,7 +160,7 @@ fn build_scene(tokens: TokenStream) -> String {
 
 fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	let mut app = App::new();
-	app.add_plugins(TemplatePlugin)
+	app.add_plugins(ApplyDirectivesPlugin)
 		.insert_resource(TemplateFlags::None);
 	app.load_scene(scene).unwrap();
 

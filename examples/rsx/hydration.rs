@@ -43,7 +43,7 @@ fn main() {
 #[cfg(target_arch = "wasm32")]
 fn main() {
 	App::new()
-		.add_plugins(TemplatePlugin)
+		.add_plugins(ApplyDirectivesPlugin)
 		// register the component in the scene to be loaded
 		.register_type::<ClientIslandRoot<Counter>>()
 		.set_runner(ReactiveApp::runner)

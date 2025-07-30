@@ -23,7 +23,7 @@ pub fn bundle_to_html(world: &mut World) -> HttpResult<Html> {
 			.ok_or_else(|| HttpError::not_found())?
 	};
 	world.entity_mut(entity).insert(HtmlDocument);
-	world.run_schedule(BuildTemplates);
+	world.run_schedule(ApplyDirectives);
 	let html = world.run_system_cached_with(render_fragment, entity)?;
 	Ok(Html(html))
 }
@@ -47,7 +47,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let world = app.world_mut();
 		world.spawn(children![RouteHandler::bundle(HttpMethod::Get, || {
 			rsx! {
@@ -66,7 +66,7 @@ mod test {
 	#[sweet::test]
 	async fn middleware() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let world = app.world_mut();
 		world.spawn(children![
 			RouteHandler::bundle(HttpMethod::Get, || {

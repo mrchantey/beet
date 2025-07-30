@@ -7,10 +7,10 @@ use bevy::prelude::*;
 
 /// A sequence for parsing raw rstml token streams and combinator strings into
 /// rsx trees, then extracting directives.
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct ParseRsxTokensSequence;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ParseRsxTokens;
 
-impl ParseRsxTokensSequence {
+impl ParseRsxTokens {
 	/// Spawn the bundle, run the function with it, then return the result.
 	pub fn parse_and_run<O>(
 		bundle: impl Bundle,
@@ -19,17 +19,19 @@ impl ParseRsxTokensSequence {
 		// TODO cost 100us creating an app per macro, we should cache thread
 		// local app, wait for BeetMain pattern
 		let mut app = App::new();
-		app.add_plugins(ParseRsxTokensSequence);
+		app.add_plugins(ParseRsxTokensPlugin);
 		let world = app.world_mut();
 		let entity = world.spawn(bundle).id();
-		world.run_schedule(ParseRsxTokensSequence);
+		world.run_schedule(ParseRsxTokens);
 		let out = func(world, entity);
 		Ok(out)
 	}
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct ParseRsxTokensPlugin;
 
-impl Plugin for ParseRsxTokensSequence {
+impl Plugin for ParseRsxTokensPlugin {
 	fn build(&self, app: &mut App) {
 		let constants = app
 			.init_resource::<HtmlConstants>()
@@ -37,9 +39,9 @@ impl Plugin for ParseRsxTokensSequence {
 			.resource::<HtmlConstants>();
 		let rstml_parser = create_rstml_parser(constants);
 		app.insert_non_send_resource(rstml_parser)
-			.insert_schedule_before(Update, Self)
+			.insert_schedule_before(Update, ParseRsxTokens)
 			.add_systems(
-				Self,
+				ParseRsxTokens,
 				(
 					// parsing raw tokens
 					#[cfg(feature = "rsx")]

@@ -8,7 +8,7 @@ use sweet::prelude::*;
 #[test]
 fn works() {
 	let mut app = App::new();
-	app.add_plugins(TemplatePlugin)
+	app.add_plugins(ApplyDirectivesPlugin)
 		.register_type::<ClientIslandRoot<Counter>>();
 
 	app.load_scene(SCENE).unwrap();

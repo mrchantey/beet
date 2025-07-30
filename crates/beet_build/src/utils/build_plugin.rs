@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_parse::prelude::ParseRsxTokensSequence;
+use beet_parse::prelude::*;
 use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
@@ -37,7 +37,7 @@ impl CargoManifest {
 #[derive(Debug, Default, Clone)]
 pub struct BuildPlugin;
 
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct BuildSequence;
 
 impl Plugin for BuildPlugin {
@@ -48,30 +48,30 @@ impl Plugin for BuildPlugin {
 
 		#[cfg(not(test))]
 		app.insert_resource(
-			
 			//todo parse the package name etc, this is used for compiling server and client
-			// but a verbatim parse() confuses the cli 
-			CargoBuildCmd::default())
-			.insert_resource(CargoManifest::load().unwrap())
-			.add_systems(
-				Startup,
-				// alternatively use import_route_file_collection to only load
-				// source files used by file based routes
-				load_workspace_source_files
-					.run_if(BuildFlag::ImportSnippets.should_run()),
-			);
+			// but a verbatim parse() confuses the cli
+			CargoBuildCmd::default(),
+		)
+		.insert_resource(CargoManifest::load().unwrap())
+		.add_systems(
+			Startup,
+			// alternatively use import_route_file_collection to only load
+			// source files used by file based routes
+			load_workspace_source_files
+				.run_if(BuildFlag::ImportSnippets.should_run()),
+		);
 
 		app.add_event::<WatchEvent>()
-			.init_plugin(ParseRsxTokensSequence)
-			.add_plugins((RouteCodegenSequence, NodeTypesPlugin))
+		.init_plugin(ParseRsxTokensPlugin)
+		// .init_plugin(ApplyDirectivesPlugin)
+			.init_plugin(RouteCodegenPlugin)
+			.init_plugin(NodeTypesPlugin)
 			.insert_schedule_before(Update, BuildSequence)
 			.init_resource::<BuildFlags>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
-			// .add_plugins(TemplatePlugin)
-			// .insert_resource(TemplateFlags::None)
 			.add_systems(
 				BuildSequence,
 				(
@@ -83,9 +83,9 @@ impl Plugin for BuildPlugin {
 					parse_file_watch_events,
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
-					ParseRsxTokensSequence.run(),
+					ParseRsxTokens.run(),
 					update_file_expr_hash,
-					RouteCodegenSequence.run(),
+					RouteCodegen.run(),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
 					export_route_codegen.run_if(BuildFlag::Routes.should_run()),

@@ -12,7 +12,7 @@ pub fn tokenize_combinator(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokensSequence::parse_and_run(
+	let tokens = ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new(source_file, LineCol::default()),
 			InstanceRoot,
@@ -28,7 +28,7 @@ pub fn tokenize_combinator_tokens(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokensSequence::parse_and_run(
+	let tokens = ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new(source_file, LineCol::default()),
 			InstanceRoot,

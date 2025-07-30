@@ -126,7 +126,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin::default());
+		app.add_plugins(ApplyDirectivesPlugin::default());
 		app.insert_resource(TemplateFlags::None);
 
 		parse(&mut app, rsx! {

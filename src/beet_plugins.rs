@@ -5,7 +5,7 @@ plugin_group! {
 /// This plugin group will add all the default plugins for a *Beet* application:
 pub struct BeetPlugins {
 	#[cfg(feature = "rsx")]
-	:TemplatePlugin,
+	:ApplyDirectivesPlugin,
 	#[cfg(feature = "build")]
 	:BuildPlugin,
 	#[cfg(feature = "server")]

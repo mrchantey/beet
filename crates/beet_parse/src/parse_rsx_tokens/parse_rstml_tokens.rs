@@ -438,10 +438,10 @@ mod test {
 
 	fn parse(tokens: TokenStream) -> (World, Entity) {
 		let mut app = App::new();
-		app.add_plugins(ParseRsxTokensSequence);
+		app.add_plugins(ParseRsxTokensPlugin);
 		let mut world = std::mem::take(app.world_mut());
 		let entity = world.spawn(RstmlTokens::new(tokens)).id();
-		world.run_schedule(ParseRsxTokensSequence);
+		world.run_schedule(ParseRsxTokens);
 		(world, entity)
 	}
 

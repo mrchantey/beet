@@ -18,7 +18,7 @@ use beet::prelude::*;
 #[cfg(target_arch = "wasm32")]
 fn main() {
 	App::new()
-		.add_plugins(TemplatePlugin)
+		.add_plugins(ApplyDirectivesPlugin)
     .add_systems(Startup, |mut commands: Commands| {	
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
 			commands.spawn(rsx! {<Counter client:only initial=7/>});

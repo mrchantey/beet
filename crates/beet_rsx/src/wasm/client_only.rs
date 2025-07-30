@@ -45,7 +45,7 @@ mod test {
 	// deno no document, eventually we should mock the dom
 	fn works() {
 		App::new()
-			.add_plugins(TemplatePlugin)
+			.add_plugins(ApplyDirectivesPlugin)
 			.add_systems(Startup, setup)
 			.set_runner(ReactiveApp::runner)
 			.run();

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use flume::Receiver;
 use std::borrow::Cow;
 
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct PropagateSignals;
 
 pub struct SignalsPlugin;
@@ -254,7 +254,7 @@ mod test {
 		}
 
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin)
+		app.add_plugins(ApplyDirectivesPlugin)
 			.insert_resource(TemplateFlags::None);
 		let (get, set) = signal("foo".to_string());
 		let template = app

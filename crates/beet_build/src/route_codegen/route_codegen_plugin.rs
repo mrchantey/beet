@@ -4,15 +4,17 @@ use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct RouteCodegenSequence;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct RouteCodegen;
 
-impl Plugin for RouteCodegenSequence {
+#[derive(Debug, Default, Clone)]
+pub struct RouteCodegenPlugin;
+
+
+impl Plugin for RouteCodegenPlugin {
 	fn build(&self, app: &mut App) {
-		app
-		.init_schedule(Self)
-		.add_systems(
-			Self,
+		app.init_schedule(RouteCodegen).add_systems(
+			RouteCodegen,
 			(
 				reset_changed_codegen,
 				update_route_files,

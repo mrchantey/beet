@@ -17,7 +17,7 @@ fn main() -> Result {
 #[cfg(feature = "client")]
 fn main() {
 	App::new()
-		.add_plugins((TemplatePlugin, ClientIslandPlugin))
+		.add_plugins((ApplyDirectivesPlugin, ClientIslandPlugin))
 		.set_runner(ReactiveApp::runner)
 		.run();
 }

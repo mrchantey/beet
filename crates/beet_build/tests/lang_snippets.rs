@@ -1,5 +1,5 @@
 //! An integration test for lang snippets roudtrip,
-//! and also a demostration of using BuildPlugin and TemplatePlugin together
+//! and also a demostration of using BuildPlugin and ApplyDirectives together
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
@@ -11,7 +11,7 @@ use sweet::prelude::*;
 fn works() {
 	let mut app = App::new();
 
-	app.add_plugins((BuildPlugin::default(), TemplatePlugin::default()))
+	app.add_plugins((BuildPlugin::default(), ApplyDirectivesPlugin::default()))
 		.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets))
 		.insert_resource(TemplateFlags::None);
 
@@ -22,7 +22,7 @@ fn works() {
 		}))
 		.id();
 	app.world_mut().run_schedule(BuildSequence);
-	app.world_mut().run_schedule(BuildTemplates);
+	app.world_mut().run_schedule(ApplyDirectives);
 	// app.update();
 	app.world_mut()
 		.run_system_cached_with(render_fragment, entity)

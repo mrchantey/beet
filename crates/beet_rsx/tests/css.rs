@@ -17,3 +17,9 @@ fn css() {
 	.xpect()
 	.to_be_snapshot();
 }
+#[test]
+fn fs_src() {
+	HtmlDocument::parse_bundle(rsx! {<style src="./layout.css"/>})
+		.xpect()
+		.to_be_snapshot();
+}

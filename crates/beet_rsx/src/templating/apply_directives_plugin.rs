@@ -6,23 +6,23 @@ use bevy::prelude::*;
 use std::str::FromStr;
 
 #[derive(Default)]
-pub struct TemplatePlugin;
+pub struct ApplyDirectivesPlugin;
 
 
 /// A schedule for completely building templates,
 /// this will run before each [`Update`] schedule and can be
 /// executed manually after adding unresolved templates to the world.
 /// (see beet_server bundle_layer.rs for an example)
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct BuildTemplates;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ApplyDirectives;
 
 
 pub(crate) fn schedule_order_plugin(app: &mut App) {
-	app.insert_schedule_before(Update, BuildTemplates)
-		.insert_schedule_after(BuildTemplates, PropagateSignals);
+	app.insert_schedule_before(Update, ApplyDirectives)
+		.insert_schedule_after(ApplyDirectives, PropagateSignals);
 }
 
-impl Plugin for TemplatePlugin {
+impl Plugin for ApplyDirectivesPlugin {
 	fn build(&self, app: &mut App) {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
@@ -50,7 +50,7 @@ impl Plugin for TemplatePlugin {
 				),
 			)
 			.add_systems(
-				BuildTemplates,
+				ApplyDirectives,
 				// almost all of these systems must be run in this sequence,
 				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(

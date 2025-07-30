@@ -1,0 +1,27 @@
+.layout {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+main {
+	padding: 1em;
+	display: flex;
+	flex-direction: column;
+	max-width: 800px;
+	min-height: 100vh;
+	background: #222;
+}
+a {
+	color: #90ee90;
+}
+a:visited {
+	color: #3399ff;
+}
+body{
+	margin: 0;
+	font-size: 1.4em;
+	font-family: system-ui, sans-serif;
+	background: black;
+	color: white;
+	height: 100vh;
+}
