@@ -1121,6 +1121,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_site"
+version = "0.0.6-dev.7"
+dependencies = [
+ "anyhow",
+ "beet",
+ "beet_design",
+ "getrandom 0.3.3",
+ "serde",
+ "sweet",
+ "tokio",
+]
+
+[[package]]
 name = "beet_spatial"
 version = "0.0.6-dev.7"
 dependencies = [

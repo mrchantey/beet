@@ -15,3 +15,8 @@ rustflags = [
 
 [env]
 SWEET_ROOT = { value = "", relative = true }
+
+
+[alias]
+launch = "run -p beet_site --no-default-features --features launch -- --package beet_site"
+serve = "run -p beet_site --no-default-features --features server"
