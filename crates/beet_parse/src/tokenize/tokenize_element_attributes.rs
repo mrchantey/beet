@@ -144,6 +144,14 @@ mod test {
 		.to_be_snapshot();
 	}
 	#[test]
+	fn lang_src() {
+		quote! {
+			<style src="./foobar"/>
+		}
+		.xmap(parse)
+		.to_be_snapshot();
+	}
+	#[test]
 	fn all() {
 		quote! {
 			<span

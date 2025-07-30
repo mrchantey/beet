@@ -106,7 +106,10 @@ pub struct InnerText(pub String);
 /// Upon tokenization this is replaced with an include_str,
 /// ie [`InnerText(include_str!("style.css"))`],
 /// feature gated behind a  [`not(feature="client")`] to avoid excessivly large
-/// client bundles, otherwise inserting a unit type
+/// client bundles.
+///
+/// This type is also collected in beet_build and manually loaded, so we can
+/// live reload the contents of an `include_str!`.
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]

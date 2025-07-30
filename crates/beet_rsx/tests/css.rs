@@ -19,7 +19,7 @@ fn css() {
 }
 #[test]
 fn fs_src() {
-	HtmlDocument::parse_bundle(rsx! {<style src="./layout.css"/>})
+	HtmlDocument::parse_bundle(rsx! {<style src="./test_file.css"/>})
 		.xpect()
 		.to_be_snapshot();
 }
