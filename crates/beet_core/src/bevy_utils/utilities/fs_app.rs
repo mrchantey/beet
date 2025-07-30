@@ -93,7 +93,7 @@ impl FsApp {
 		app.update();
 		let elapsed = start.elapsed();
 		// TODO per-system profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
-		debug!("App updated in {:?}", elapsed);
+		debug!("App updated in {:.2?}", elapsed);
 		match app.should_exit() {
 			Some(exit) => Ok(ControlFlow::Break(exit)),
 			None => Ok(ControlFlow::Continue(())),

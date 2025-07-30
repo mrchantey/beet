@@ -27,7 +27,8 @@ impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
-/// Types like [`RouteFile`] exist outside of the [`SourceFile`] tree,
+/// Types like [`RouteFile`] and files added via include_str!
+/// exist outside of the [`SourceFile`] tree,
 /// but need to reference it to get its rsx children.
 /// This entity will be despawned when the [`SourceFile`] is despawned.
 #[derive(Deref, Reflect, Component)]
@@ -121,8 +122,12 @@ pub fn parse_file_watch_events(
 				}
 			}
 			EventKind::Modify(_) => {
-				for (_, mut file) in matches {
+				for (entity, mut file) in matches {
 					file.set_changed();
+					commands.run_system_cached_with(
+						propagate_source_file_changes,
+						entity,
+					);
 				}
 			}
 			other => {
@@ -131,4 +136,19 @@ pub fn parse_file_watch_events(
 		}
 	}
 	Ok(())
+}
+
+
+// if a [`SourceFile`] is changed, notify source files that depend
+// on it.
+fn propagate_source_file_changes(
+	In(entity): In<Entity>,
+	query: Query<&SourceFileRef>,
+	mut files: Query<&mut SourceFile>,
+) {
+	if let Ok(ref_target) = query.get(entity)
+		&& let Ok(mut file) = files.get_mut(ref_target.0)
+	{
+		file.set_changed();
+	}
 }

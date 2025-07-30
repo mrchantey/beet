@@ -84,6 +84,7 @@ impl Plugin for BuildPlugin {
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
 					ParseRsxTokens.run(),
+					import_file_inner_text,
 					update_file_expr_hash,
 					RouteCodegen.run(),
 					export_snippets
