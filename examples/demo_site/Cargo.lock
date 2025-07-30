@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "beet_build",
  "beet_core",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -594,7 +594,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "extend",
@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.6-dev.7"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "bevy",

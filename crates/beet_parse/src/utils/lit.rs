@@ -1,6 +1,6 @@
 //
 
-use beet_core::node::IntoTemplateBundle;
+use beet_core::node::IntoBundle;
 use bevy::ecs::system::EntityCommands;
 use quote::ToTokens;
 
@@ -13,7 +13,7 @@ pub fn insert_lit(entity: &mut EntityCommands, lit: &syn::Lit) {
 					.base10_digits()
 					.parse::<f64>()
 					.unwrap()
-					.into_template_bundle(),
+					.into_bundle(),
 			);
 		}
 		syn::Lit::Float(lit_float) => {
@@ -22,37 +22,37 @@ pub fn insert_lit(entity: &mut EntityCommands, lit: &syn::Lit) {
 					.base10_digits()
 					.parse::<f64>()
 					.unwrap()
-					.into_template_bundle(),
+					.into_bundle(),
 			);
 		}
 		syn::Lit::Bool(lit_bool) => {
-			entity.insert(lit_bool.value().into_template_bundle());
+			entity.insert(lit_bool.value().into_bundle());
 		}
 		syn::Lit::Str(lit_str) => {
-			entity.insert(lit_str.value().into_template_bundle());
+			entity.insert(lit_str.value().into_bundle());
 		}
 		syn::Lit::ByteStr(lit_byte_str) => {
 			entity.insert(
 				String::from_utf8_lossy(&lit_byte_str.value())
 					.into_owned()
-					.into_template_bundle(),
+					.into_bundle(),
 			);
 		}
 		syn::Lit::Byte(lit_byte) => {
-			entity.insert(lit_byte.value().to_string().into_template_bundle());
+			entity.insert(lit_byte.value().to_string().into_bundle());
 		}
 		syn::Lit::Char(lit_char) => {
-			entity.insert(lit_char.value().to_string().into_template_bundle());
+			entity.insert(lit_char.value().to_string().into_bundle());
 		}
 		syn::Lit::Verbatim(lit_verbatim) => {
-			entity.insert(lit_verbatim.to_string().into_template_bundle());
+			entity.insert(lit_verbatim.to_string().into_bundle());
 		}
 		syn::Lit::CStr(lit_cstr) => {
 			entity.insert(
 				lit_cstr
 					.to_token_stream()
 					.to_string()
-					.into_template_bundle(),
+					.into_bundle(),
 			);
 		}
 		_ => unimplemented!(),

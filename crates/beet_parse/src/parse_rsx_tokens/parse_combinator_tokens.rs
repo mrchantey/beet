@@ -243,14 +243,14 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							val.into_template_bundle(),
+							val.into_bundle(),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							val.into_template_bundle(),
+							val.into_bundle(),
 						));
 					}
 					RsxAttributeValue::Str(val) => {

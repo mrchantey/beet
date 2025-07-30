@@ -8,6 +8,6 @@
     related! {
         Children[(NodeTag(String::from("input")), ElementNode { self_closing : true
         }, related!(Attributes[(AttributeKey::new("hidden"),
-        OnSpawnDeferred::insert(val.into_template_bundle()), ExprIdx(0u32))]))]
+        OnSpawnDeferred::insert(val.into_bundle()), ExprIdx(0u32))]))]
     },
 )

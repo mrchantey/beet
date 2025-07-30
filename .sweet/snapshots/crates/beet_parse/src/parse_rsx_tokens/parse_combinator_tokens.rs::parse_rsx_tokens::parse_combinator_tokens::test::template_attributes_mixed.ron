@@ -12,6 +12,6 @@
         TemplateNode, OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< MyTemplate
         as Props > ::Builder::default().foo(#[allow(unused_braces)] { let bar =
         (NodeTag(String::from("br")), ElementNode { self_closing : true }); bar })
-        .build().into_template_bundle())).into_template_bundle()))]
+        .build().into_bundle())).into_bundle()))]
     },
 )

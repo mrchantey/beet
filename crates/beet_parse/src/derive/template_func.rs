@@ -73,8 +73,8 @@ fn impl_template_bundle(
 	let return_type = &func.sig.output;
 
 	Ok(quote! {
-	impl #impl_generics IntoTemplateBundle<Self> for #ident #type_generics #where_clause {
-		fn into_template_bundle(self) #return_type {
+	impl #impl_generics IntoBundle<Self> for #ident #type_generics #where_clause {
+		fn into_bundle(self) #return_type {
 			let Self{#(#destructure),*} = self;
 			#(#body)*
 		}
@@ -112,8 +112,8 @@ mod test {
 				pub foo: u32,
 				pub bar: u32
 			}
-			impl IntoTemplateBundle<Self> for MyNode {
-				fn into_template_bundle(self) -> impl Bundle {
+			impl IntoBundle<Self> for MyNode {
+				fn into_bundle(self) -> impl Bundle {
 					let Self { foo, mut bar } = self;
 					()
 				}

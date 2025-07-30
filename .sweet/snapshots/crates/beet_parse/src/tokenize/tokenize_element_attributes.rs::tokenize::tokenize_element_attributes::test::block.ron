@@ -10,6 +10,6 @@
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("span")), ElementNode {
         self_closing : true }, OnSpawnDeferred::insert(#[allow(unused_braces)] { foo
-        } .into_template_bundle()))]
+        } .into_bundle()))]
     },
 )

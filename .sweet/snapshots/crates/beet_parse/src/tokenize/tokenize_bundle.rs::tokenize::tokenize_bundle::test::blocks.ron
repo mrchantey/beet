@@ -7,7 +7,6 @@
     FragmentNode,
     related! {
         Children[(ExprIdx(0u32), BlockNode,
-        OnSpawnDeferred::insert(#[allow(unused_braces)] { foo }
-        .into_template_bundle()))]
+        OnSpawnDeferred::insert(#[allow(unused_braces)] { foo } .into_bundle()))]
     },
 )

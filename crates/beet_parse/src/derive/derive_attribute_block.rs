@@ -5,7 +5,7 @@ use syn::DeriveInput;
 use syn::Result;
 
 
-/// For a struct where each field implements `IntoTemplateBundle`
+/// For a struct where each field implements `IntoBundle`
 pub fn parse_derive_attribute_block(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
@@ -32,10 +32,10 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 					None,
 					Some(quote! {
 						world.entity_mut(parent_entity)
-							.insert(#ident.into_template_bundle());
+							.insert(#ident.into_bundle());
 					}),
 				),
-				false => (Some(quote! {#ident.into_template_bundle(),}), None),
+				false => (Some(quote! {#ident.into_bundle(),}), None),
 			};
 
 			let inner = quote! {(
@@ -77,15 +77,15 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	Ok(quote! {
 		use beet::prelude::*;
 
-		impl #impl_generics IntoTemplateBundle<Self> for #target_name #type_generics #where_clause {
-		fn into_template_bundle(self) -> impl Bundle{
+		impl #impl_generics IntoBundle<Self> for #target_name #type_generics #where_clause {
+		fn into_bundle(self) -> impl Bundle{
 			let Self {
 				#(#idents),*
 			} = self;
 			#[allow(unused_braces)]
 			(
 				#attrs,
-				#(#flattened.into_template_bundle()),*
+				#(#flattened.into_bundle()),*
 			)
 			}
 		}

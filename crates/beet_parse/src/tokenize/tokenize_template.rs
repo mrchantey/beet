@@ -84,7 +84,7 @@ pub fn tokenize_template(
 		}
 	} else {
 		syn::parse_quote! {
-			TemplateRoot::spawn(Spawn(#template_def.into_template_bundle()))
+			TemplateRoot::spawn(Spawn(#template_def.into_bundle()))
 		}
 	};
 	// dont wrap in nodeexpr thats not nessecary

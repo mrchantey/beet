@@ -9,6 +9,6 @@
         Children[(ExprIdx(0u32), RequiresDomIdx, NodeTag(String::from("Foo")),
         FragmentNode, TemplateNode, ClientLoadDirective,
         OnSpawnDeferred::insert(ClientIslandRoot::new(< Foo as Props >
-        ::Builder::default().bar(true).build()).into_template_bundle()))]
+        ::Builder::default().bar(true).build()).into_bundle()))]
     },
 )

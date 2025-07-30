@@ -10,7 +10,7 @@
     related! {
         Children[(NodeTag(String::from("br")), ElementNode { self_closing : true },
         related!(Attributes[(AttributeKey::new("foo"),
-        OnSpawnDeferred::insert(#[allow(unused_braces)] { bar }
-        .into_template_bundle()), ExprIdx(0u32))]))]
+        OnSpawnDeferred::insert(#[allow(unused_braces)] { bar } .into_bundle()),
+        ExprIdx(0u32))]))]
     },
 )

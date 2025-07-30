@@ -109,16 +109,15 @@ fn propagate_text_signals(
 		**span = text.0.clone();
 	}
 }
-// TODO we might want to handle Number and Bool types seperately, instead of this
-// blanket implementation
-impl<T, M> IntoTemplateBundle<(Self, M)> for Getter<T>
+
+/// Adds both the received valus and a SignalReceiver to the entity
+impl<T, M> IntoBundle<(Self, M)> for Getter<T>
 where
-	T: 'static + Send + Sync + Clone + IntoTemplateBundle<M>,
+	T: 'static + Send + Sync + Clone + IntoBundle<M>,
 {
-	fn into_template_bundle(self) -> impl Bundle {
-		// let get_str = move || self.get().to_string();
+	fn into_bundle(self) -> impl Bundle {
 		(
-			self.get().into_template_bundle(),
+			self.get().into_bundle(),
 			SignalReceiver::new(move || self.get()),
 		)
 	}

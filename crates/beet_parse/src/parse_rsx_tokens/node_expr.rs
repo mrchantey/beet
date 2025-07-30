@@ -2,7 +2,7 @@
 //! All of these types contain the completely unparsed version of
 //! their expression, to be be modified in the tokenization stage,
 //! for example adding #[allow(unused_braces)] to block nodes
-//! and appending `.into_template_bundle()`
+//! and appending `.into_bundle()`
 use beet_core::as_beet::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -18,7 +18,7 @@ use syn::Expr;
 /// - template spawn funcs: `<MyTemplate/>`
 ///
 /// Cases where this is not used:
-/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_template_bundle`
+/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_bundle`
 ///
 /// The parsed output depends on the context in which this expression is used:
 ///
@@ -90,6 +90,6 @@ impl NodeExpr {
 	/// ie `<div {my_expr} />`.
 	pub fn insert_deferred(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
-		quote! { OnSpawnDeferred::insert(#parsed.into_template_bundle()) }
+		quote! { OnSpawnDeferred::insert(#parsed.into_bundle()) }
 	}
 }

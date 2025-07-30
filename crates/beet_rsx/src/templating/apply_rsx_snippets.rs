@@ -93,11 +93,11 @@ fn apply_static_rsx(
 	let Ok(instance_loc) = instances.get(instance_root) else {
 		return Ok(());
 	};
-	let Some((static_root, snippet_root)) = rsx_snippets
-		.iter()
-		.find(|(_, static_loc)| {
+	let Some((static_root, snippet_root)) =
+		rsx_snippets.iter().find(|(_, static_loc)| {
 			// println!("compare:\n{}\n{}", static_loc, instance_loc);
-			*static_loc == instance_loc})
+			*static_loc == instance_loc
+		})
 	else {
 		return Ok(());
 	};
@@ -462,10 +462,7 @@ mod test {
 		let idx2 = SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
 		let mut world = world();
-		let child = world
-			.spawn(bundle.into_template_bundle())
-			.insert(idx2.clone())
-			.id();
+		let child = world.spawn(bundle.into_bundle()).insert(idx2.clone()).id();
 		let instance = world
 			.spawn((
 				InstanceRoot,

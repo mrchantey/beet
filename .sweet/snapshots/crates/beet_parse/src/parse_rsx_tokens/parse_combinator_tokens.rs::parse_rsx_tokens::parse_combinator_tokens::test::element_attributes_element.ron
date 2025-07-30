@@ -12,6 +12,6 @@
         related!(Attributes[(AttributeKey::new("foo"),
         OnSpawnDeferred::insert(#[allow(unused_braces)] {
         (NodeTag(String::from("br")), ElementNode { self_closing : true }) }
-        .into_template_bundle()), ExprIdx(0u32))]))]
+        .into_bundle()), ExprIdx(0u32))]))]
     },
 )

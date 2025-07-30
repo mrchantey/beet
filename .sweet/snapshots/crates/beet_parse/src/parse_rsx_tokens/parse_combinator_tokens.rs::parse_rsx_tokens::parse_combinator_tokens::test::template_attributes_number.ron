@@ -10,7 +10,7 @@
     related! {
         Children[(ExprIdx(0u32), NodeTag(String::from("MyTemplate")), FragmentNode,
         TemplateNode, OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< MyTemplate
-        as Props > ::Builder::default().foo(20f64).build().into_template_bundle()))
-        .into_template_bundle()))]
+        as Props > ::Builder::default().foo(20f64).build().into_bundle()))
+        .into_bundle()))]
     },
 )

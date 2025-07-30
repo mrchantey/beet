@@ -128,7 +128,7 @@ mod test {
 				related!(
 					Attributes[(
 						AttributeKey::new("name"),
-						"foo".into_template_bundle()
+						"foo".into_bundle()
 					)]
 				),
 			))

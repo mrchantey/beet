@@ -7,7 +7,7 @@ use bevy::prelude::*;
 fn main() {
 	App::new()
 		.world_mut()
-		.spawn(MyBundle::default().into_template_bundle());
+		.spawn(MyBundle::default().into_bundle());
 }
 
 #[derive(Default, Buildable, AttributeBlock)]

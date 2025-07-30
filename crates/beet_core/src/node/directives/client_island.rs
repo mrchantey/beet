@@ -43,12 +43,7 @@ impl ClientIslandRegistry {
 #[reflect(Component)]
 pub struct ClientIslandRoot<T, U = T>
 where
-	T: 'static
-		+ Send
-		+ Sync
-		+ FromReflect
-		+ Reflectable
-		+ IntoTemplateBundle<U>,
+	T: 'static + Send + Sync + FromReflect + Reflectable + IntoBundle<U>,
 	U: 'static + Send + Sync + TypePath,
 {
 	value: T,
@@ -58,12 +53,7 @@ where
 
 impl<T, U> ClientIslandRoot<T, U>
 where
-	T: 'static
-		+ Send
-		+ Sync
-		+ FromReflect
-		+ Reflectable
-		+ IntoTemplateBundle<U>,
+	T: 'static + Send + Sync + FromReflect + Reflectable + IntoBundle<U>,
 	U: 'static + Send + Sync + TypePath,
 {
 	/// Create a new [`ClientIslandRoot<T>`] with the given value,
@@ -79,12 +69,7 @@ where
 
 impl<T, U> Component for ClientIslandRoot<T, U>
 where
-	T: 'static
-		+ Send
-		+ Sync
-		+ FromReflect
-		+ Reflectable
-		+ IntoTemplateBundle<U>,
+	T: 'static + Send + Sync + FromReflect + Reflectable + IntoBundle<U>,
 	U: 'static + Send + Sync + TypePath,
 {
 	const STORAGE_TYPE: StorageType = StorageType::Table;
@@ -111,9 +96,9 @@ where
 				let dynamic: Box<dyn PartialReflect> = this.value.to_dynamic();
 				let value =
 					<T as FromReflect>::from_reflect(&*dynamic).unwrap();
-				world.entity_mut(entity).insert(TemplateRoot::spawn(Spawn(
-					value.into_template_bundle(),
-				)));
+				world
+					.entity_mut(entity)
+					.insert(TemplateRoot::spawn(Spawn(value.into_bundle())));
 			});
 		})
 	}

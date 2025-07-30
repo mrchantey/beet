@@ -108,7 +108,7 @@ pub fn derive_buildable(
 /// Types that can be used as an attribute block, where each field
 /// is applied as [`Attributes`](beet_core::prelude::Attributes) of the entity.
 /// Use [`#[field(flatten)]`] for the key to be discarded, and the value to be
-/// applied by calling `into_template_bundle`. This allows for a nested [`AttributeBlock`].
+/// applied by calling `into_bundle`. This allows for a nested [`AttributeBlock`].
 ///
 ///
 ///

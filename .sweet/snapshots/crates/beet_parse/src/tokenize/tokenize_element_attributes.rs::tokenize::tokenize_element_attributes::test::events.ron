@@ -11,6 +11,6 @@
         Children[(NodeTag(String::from("span")), ElementNode { self_closing : true },
         related!(Attributes[(AttributeKey::new("onclick"),
         OnSpawnDeferred::insert_parent:: < AttributeOf > (#[allow(unused_braces)] {
-        foo } .into_template_bundle()), ExprIdx(0u32))]))]
+        foo } .into_bundle()), ExprIdx(0u32))]))]
     },
 )

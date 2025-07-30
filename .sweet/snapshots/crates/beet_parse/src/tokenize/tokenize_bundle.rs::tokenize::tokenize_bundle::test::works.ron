@@ -8,12 +8,12 @@
     related! {
         Children[(NodeTag(String::from("span")), ElementNode { self_closing : false
         }, related!(Attributes[(AttributeKey::new("hidden"),
-        OnSpawnDeferred::insert(true.into_template_bundle()))]), related! {
+        OnSpawnDeferred::insert(true.into_bundle()))]), related! {
         Children[(ExprIdx(0u32), RequiresDomIdx,
         NodeTag(String::from("MyComponent")), FragmentNode, TemplateNode,
         ClientLoadDirective, OnSpawnDeferred::insert(ClientIslandRoot::new(<
         MyComponent as Props > ::Builder::default().foo("bar").build())
-        .into_template_bundle())), (NodeTag(String::from("div")), ElementNode {
-        self_closing : true })] })]
+        .into_bundle())), (NodeTag(String::from("div")), ElementNode { self_closing :
+        true })] })]
     },
 )

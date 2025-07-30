@@ -18,8 +18,8 @@ pub fn get() -> impl Bundle {
             (NodeTag(String::from("p")), ElementNode { self_closing : false }, related! {
             Children[TextNode(String::from("This page is all about saying")),
             (ExprIdx(0u32), BlockNode, OnSpawnDeferred::insert(#[allow(unused_braces)] {
-            "hello" } .into_template_bundle()))] }), (NodeTag(String::from("main")),
-            ElementNode { self_closing : false }, related! {
+            "hello" } .into_bundle()))] }), (NodeTag(String::from("main")), ElementNode {
+            self_closing : false }, related! {
             Children[TextNode(String::from("## Nested Heading\n\tnested markdown doesnt work yet"))]
             })]
         },
