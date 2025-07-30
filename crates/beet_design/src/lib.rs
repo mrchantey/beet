@@ -17,9 +17,9 @@ pub mod macros;
 pub mod types;
 // /// Collection of mockups for all components
 // // #[cfg(not(target_arch = "wasm32"))]
-// #[cfg(feature = "mockups")]
-// #[path = "codegen/mockups.rs"]
-// pub mod mockups;
+#[cfg(feature = "mockups")]
+#[path = "codegen/mockups.rs"]
+pub mod mockups;
 
 
 /// Commonly used components for beet_design
@@ -32,8 +32,8 @@ pub mod prelude {
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	pub use crate::macros::*;
-	// #[cfg(feature = "mockups")]
-	// pub use crate::mockups::*;
+	#[cfg(feature = "mockups")]
+	pub use crate::mockups::*;
 	pub use crate::types::*;
 	// pub(crate) use beet_rsx::as_beet::*;
 	#[allow(unused)]

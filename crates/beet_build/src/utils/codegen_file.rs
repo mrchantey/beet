@@ -106,6 +106,12 @@ impl CodegenFile {
 		self.imports.push(Unspan::new(&item));
 		self
 	}
+	/// Set the imports for this codegen file, replacing the default and a
+	/// previously set imports.
+	pub fn set_imports(mut self, items: Vec<Item>) -> Self {
+		self.imports = items.iter().map(Unspan::new).collect();
+		self
+	}
 
 
 	pub fn output_dir(&self) -> Result<AbsPathBuf> {

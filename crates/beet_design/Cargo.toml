@@ -18,7 +18,9 @@ publish = true
 # required-features = ["build"]
 
 [features]
+# default = ["mockups"]
 client = []
+server = []
 mockups = []
 _test_lightningcss = ["dep:beet_parse", "beet_parse/css"]
 

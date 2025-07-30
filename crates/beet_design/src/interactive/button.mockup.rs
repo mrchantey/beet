@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 
 pub fn get() -> impl Bundle {
 	rsx! { <Inner client:load /> }
@@ -6,7 +7,7 @@ pub fn get() -> impl Bundle {
 
 // temp until global client:load
 #[template]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
 	let (value, set_value) = signal(0);
 	let val2 = value.clone();

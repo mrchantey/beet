@@ -18,7 +18,7 @@ default = ["launch", "server", "client"]
 # default = ["beet/web-server", "beet/native-tls"]
 # used by beet cli for building prod server
 launch = ["beet/launch"]
-server = ["beet/server"]
+server = ["beet/server", "beet_design/mockups"]
 deploy = ["server", "beet/lambda"]
 # used by beet cli for building client
 client = ["beet/client"]
@@ -27,7 +27,7 @@ client = ["beet/client"]
 anyhow.workspace = true
 serde.workspace = true
 beet.workspace = true
-beet_design = { workspace = true, features = ["mockups"] }
+beet_design.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }

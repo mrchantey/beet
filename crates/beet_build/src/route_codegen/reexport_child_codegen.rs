@@ -26,7 +26,9 @@ pub fn reexport_child_codegen(
 						query
 							.p1()
 							.get(id)
-							.map(|c| (c.name(), c.output.clone()))
+							.map(|c| {
+								(c.name(), c.pkg_name.clone(), c.output.clone())
+							})
 							.ok()
 					})
 					.collect::<Vec<_>>(),
@@ -38,7 +40,12 @@ pub fn reexport_child_codegen(
 		let mut codegen = p1.get_mut(entity)?;
 		trace!("reexporting child codegen: {}", codegen.output);
 
-		for (child_name, child_path) in child_paths {
+		for (child_name, child_pkg_name, child_path) in child_paths {
+			if child_pkg_name != codegen.pkg_name {
+				// this is imported from another package dont reexport
+				continue;
+			}
+
 			let relative_path =
 				PathExt::create_relative(codegen.output_dir()?, &child_path)?;
 			let relative_path = relative_path.to_string_lossy();
