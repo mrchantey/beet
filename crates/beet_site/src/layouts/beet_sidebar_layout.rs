@@ -5,7 +5,8 @@ use beet::prelude::*;
 
 #[template]
 pub fn BeetSidebarLayout() -> impl Bundle {
-	let sidebar_nodes = todo!("get route tree");
+	let sidebar_nodes = vec![];
+	// let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>
 		<PageLayout>

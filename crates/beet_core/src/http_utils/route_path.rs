@@ -120,21 +120,82 @@ impl RoutePath {
 
 #[derive(Debug, Clone)]
 pub struct RoutePathTree {
-	/// the name of this level of the tree, ie the directory.
-	/// for the root this is called 'root'
-	pub name: String,
-	/// all paths available at this level of the tree
-	pub path: Option<RoutePath>,
+	/// The route path for this node (for root, this is `/`)
+	pub route: RoutePath,
+	/// Whether this path exists as an endpoint
+	pub exists: bool,
 	/// All child directories
 	pub children: Vec<RoutePathTree>,
 }
 
 impl RoutePathTree {
+	pub fn name(&self) -> &str {
+		self.route
+			.0
+			.file_name()
+			.and_then(|name| name.to_str())
+			.unwrap_or("")
+	}
+
+	/// Builds a RoutePathTree from a list of RoutePath
+	pub fn from_paths(paths: Vec<RoutePath>) -> Self {
+		use std::collections::HashMap;
+		// Helper to split a RoutePath into segments
+		fn split_segments(path: &RoutePath) -> Vec<String> {
+			let s = path.0.to_string_lossy();
+			s.split('/')
+				.filter(|seg| !seg.is_empty())
+				.map(|seg| seg.to_string())
+				.collect()
+		}
+
+		// Build a trie-like structure
+		#[derive(Default)]
+		struct Node {
+			children: HashMap<String, Node>,
+			exists: bool,
+		}
+
+		let mut root = Node::default();
+		for route_path in &paths {
+			let segments = split_segments(route_path);
+			let mut node = &mut root;
+			for (i, seg) in segments.iter().enumerate() {
+				node = node.children.entry(seg.clone()).or_default();
+				if i == segments.len() - 1 {
+					node.exists = true;
+				}
+			}
+			// Handle root path
+			if segments.is_empty() {
+				node.exists = true;
+			}
+		}
+
+		// Recursively build RoutePathTree from Node
+		fn build_tree(route: RoutePath, node: &Node) -> RoutePathTree {
+			let children = node
+				.children
+				.iter()
+				.map(|(child_name, child_node)| {
+					let child_route = route.join(&RoutePath::new(child_name));
+					build_tree(child_route, child_node)
+				})
+				.collect();
+			RoutePathTree {
+				route,
+				exists: node.exists,
+				children,
+			}
+		}
+
+		build_tree(RoutePath::new("/"), &root)
+	}
 	pub fn flatten(&self) -> Vec<RoutePath> {
 		let mut paths = Vec::new();
 		fn inner(paths: &mut Vec<RoutePath>, node: &RoutePathTree) {
-			if let Some(path) = &node.path {
-				paths.push(path.clone());
+			if node.exists {
+				paths.push(node.route.clone());
 			}
 			for child in node.children.iter() {
 				inner(paths, child);
@@ -179,5 +240,64 @@ mod test {
 				.to_string(),
 		)
 		.to_be("/foo");
+	}
+
+	#[test]
+	fn route_path_tree_from_paths() {
+		let paths = vec![
+			RoutePath::new("/foo/bar"),
+			RoutePath::new("/foo/baz"),
+			RoutePath::new("/foo/qux/quux"),
+			RoutePath::new("/root"),
+		];
+		let tree = RoutePathTree::from_paths(paths.clone());
+
+		// Root node
+		expect(tree.route.to_string()).to_be("/");
+		expect(tree.exists).to_be_false();
+
+		// Find child '/foo'
+		let foo = tree
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/foo")
+			.unwrap();
+		expect(foo.exists).to_be_false();
+
+		// 'bar' and 'baz' are endpoints under 'foo'
+		let bar = foo
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/foo/bar")
+			.unwrap();
+		expect(bar.exists).to_be_true();
+		let baz = foo
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/foo/baz")
+			.unwrap();
+		expect(baz.exists).to_be_true();
+
+		// 'qux' is a directory, 'quux' is endpoint
+		let qux = foo
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/foo/qux")
+			.unwrap();
+		expect(qux.exists).to_be_false();
+		let quux = qux
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/foo/qux/quux")
+			.unwrap();
+		expect(quux.exists).to_be_true();
+
+		// 'root' endpoint
+		let root = tree
+			.children
+			.iter()
+			.find(|c| c.route.to_string() == "/root")
+			.unwrap();
+		expect(root.exists).to_be_true();
 	}
 }

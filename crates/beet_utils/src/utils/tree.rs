@@ -10,6 +10,35 @@ pub struct Tree<T> {
 	pub children: Vec<Tree<T>>,
 }
 
+impl<T> IntoIterator for Tree<T> {
+	type Item = T;
+	type IntoIter = TreeIterDfs<T>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		TreeIterDfs { stack: vec![self] }
+	}
+}
+
+pub struct TreeIterDfs<T> {
+	stack: Vec<Tree<T>>,
+}
+
+impl<T> Iterator for TreeIterDfs<T> {
+	type Item = T;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if let Some(node) = self.stack.pop() {
+			// Push children in reverse so leftmost is popped first
+			for child in node.children.into_iter().rev() {
+				self.stack.push(child);
+			}
+			Some(node.value)
+		} else {
+			None
+		}
+	}
+}
+
 impl<T> Tree<Vec<T>> {
 	pub fn iter_to_string_indented(&self) -> String
 	where

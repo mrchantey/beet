@@ -1,49 +1,13 @@
 mod sidebar;
 mod sidebar_item;
-use beet_core::prelude::RoutePath;
-use beet_core::prelude::RoutePathTree;
-use beet_utils::prelude::GlobFilter;
-use beet_utils::utils::Pipeline;
+use crate::types::ArticleMeta;
+use beet_core::prelude::*;
+use beet_rsx::as_beet::GlobFilter;
+use bevy::platform::collections::HashMap;
+use bevy::prelude::*;
 use heck::ToTitleCase;
 pub use sidebar::*;
 pub use sidebar_item::*;
-
-#[derive(Debug, Default, Clone)]
-pub struct RoutePathTreeToSidebarTree {
-	/// All groups that match this filter will be expanded
-	pub expanded_filter: GlobFilter,
-	/// By default the root is unwrapped, enable this to return the root node
-	pub keep_root: bool,
-}
-
-impl RoutePathTreeToSidebarTree {
-	fn map_node(&self, tree: RoutePathTree) -> SidebarNode {
-		SidebarNode {
-			display_name: tree.name.as_str().to_title_case(),
-			expanded: tree
-				.path
-				.as_ref()
-				.map_or(false, |path| self.expanded_filter.passes(&path)),
-			path: tree.path,
-			children: tree
-				.children
-				.into_iter()
-				.map(|child| self.map_node(child))
-				.collect::<Vec<_>>(),
-		}
-	}
-}
-
-impl Pipeline<RoutePathTree, Vec<SidebarNode>> for RoutePathTreeToSidebarTree {
-	fn apply(self, value: RoutePathTree) -> Vec<SidebarNode> {
-		let root_node = self.map_node(value);
-		if self.keep_root {
-			vec![root_node]
-		} else {
-			root_node.children
-		}
-	}
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarNode {
@@ -55,4 +19,66 @@ pub struct SidebarNode {
 	pub children: Vec<SidebarNode>,
 	/// expanded portions of the tree
 	pub expanded: bool,
+}
+
+
+impl SidebarNode {
+	pub fn collect(world: &mut World, expanded_filter: &GlobFilter) -> Self {
+		let nodes = ResolvedEndpoint::collect_static_get(world);
+		let info_map = nodes
+			.iter()
+			.map(|(entity, endpoint)| {
+				(endpoint.path(), world.entity(*entity).get::<ArticleMeta>())
+			})
+			.collect::<HashMap<_, _>>();
+
+		let path_tree = RoutePathTree::from_paths(
+			nodes
+				.iter()
+				.map(|(_, endpoint)| endpoint.path())
+				.cloned()
+				.collect(),
+		);
+		Self::map_node(&expanded_filter, &info_map, path_tree)
+	}
+
+	fn map_node(
+		expanded_filter: &GlobFilter,
+		info_map: &HashMap<&RoutePath, Option<&ArticleMeta>>,
+		node: RoutePathTree,
+	) -> Self {
+		let meta = info_map.get(&node.route).and_then(|meta| *meta);
+
+		let children = node
+			.children
+			.iter()
+			.map(|child| {
+				Self::map_node(expanded_filter, info_map, child.clone())
+			})
+			.collect();
+
+		// Helper to get a display name from a RoutePath
+		fn route_name(route: &RoutePath) -> String {
+			let s = route.to_string();
+			if s == "/" {
+				"Root".to_string()
+			} else {
+				s.trim_start_matches('/').to_string()
+			}
+		}
+
+		Self {
+			display_name: meta
+				.map(|m| m.sidebar.label.clone())
+				.flatten()
+				.unwrap_or_else(|| route_name(&node.route).to_title_case()),
+			path: if node.exists {
+				Some(node.route.clone())
+			} else {
+				None
+			},
+			children,
+			expanded: expanded_filter.passes(&node.route.0),
+		}
+	}
 }

@@ -1,11 +1,20 @@
+use crate::prelude::SidebarInfo;
+use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::prelude::SidebarInfo;
-
 
 
 /// General metadata common for blog posts, docs, etc.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	Serialize,
+	Deserialize,
+	Component,
+)]
 pub struct ArticleMeta {
 	#[serde(default)]
 	pub title: Option<String>,
