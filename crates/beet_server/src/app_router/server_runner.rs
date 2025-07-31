@@ -111,6 +111,7 @@ impl ServerRunner {
 	/// Export static html files and client islands.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[tokio::main]
+	// TODO this should be a system
 	async fn export_html(&self, app: &mut App) -> Result {
 		let workspace_config = app.world().resource::<WorkspaceConfig>();
 		let html_dir = workspace_config.html_dir.into_abs();

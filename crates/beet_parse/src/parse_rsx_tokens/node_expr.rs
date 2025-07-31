@@ -86,7 +86,7 @@ impl NodeExpr {
 		}
 	}
 
-	pub fn as_bundle(&self) -> TokenStream {
+	pub fn bundle_tokens(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
 		quote! {#parsed.into_bundle()}
 	}

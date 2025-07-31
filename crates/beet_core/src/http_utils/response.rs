@@ -276,6 +276,14 @@ impl IntoResponse for Infallible {
 	}
 }
 
+impl IntoResponse for () {
+	fn into_response(self) -> Response { Response::ok() }
+}
+
+impl IntoResponse for StatusCode {
+	fn into_response(self) -> Response { Response::from_status(self) }
+}
+
 impl<T: TryInto<Response>> IntoResponse for T
 where
 	T::Error: IntoResponse,

@@ -7,6 +7,7 @@ use bevy::prelude::*;
 #[derive(Default)]
 pub struct RouterPlugin;
 
+
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin(ApplyDirectivesPlugin)
@@ -17,6 +18,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<HtmlConstants>()
 			.register_type::<TemplateFlags>()
 			.init_resource::<WorkspaceConfig>()
-			.init_resource::<HtmlConstants>();
+			.init_resource::<HtmlConstants>()
+			.add_systems(Startup, insert_route_tree);
 	}
 }

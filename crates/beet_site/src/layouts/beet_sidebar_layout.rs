@@ -4,7 +4,11 @@ use beet::prelude::*;
 
 
 #[template]
-pub fn BeetSidebarLayout() -> impl Bundle {
+pub fn BeetSidebarLayout(world:&mut World) -> impl Bundle {
+	let filter = GlobFilter::default()
+		.with_include("docs/*")
+		.with_include("blog/*");
+
 	let sidebar_nodes = vec![];
 	// let sidebar_nodes = todo!("get route tree");
 	rsx! {

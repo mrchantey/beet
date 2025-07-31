@@ -129,6 +129,13 @@ async fn handle_request_recursive(
 	world
 }
 
+/// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
+pub fn insert_route_tree(world: &mut World) {
+	let endpoints = world.run_system_cached(ResolvedEndpoint::collect).unwrap();
+	let paths = endpoints.iter().map(|(_, e)| e.path()).cloned().collect();
+
+	world.insert_resource(RoutePathTree::from_paths(paths));
+}
 
 #[cfg(test)]
 mod test {
@@ -249,5 +256,40 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be_str("bar");
+	}
+	#[sweet::test]
+	async fn route_tree() {
+		let mut world = World::new();
+		world.spawn(
+		(
+			RouteHandler::new(HttpMethod::Get, |tree: Res<RoutePathTree>| {
+				tree.to_string()
+			}),
+			children![
+				(
+					RouteFilter::new("foo"),
+					RouteHandler::new(HttpMethod::Get, || "foo")
+				),
+				(
+					RouteFilter::new("bar"),
+					children![
+						(
+							RouteFilter::new("baz"),
+							RouteHandler::new(HttpMethod::Get, || "baz")
+						)]
+				),
+				(
+					RouteFilter::new("foo"),
+				),
+			]
+		)
+		);
+		world.run_system_cached(insert_route_tree).unwrap();
+		Router::oneshot_str(&mut world, "/")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be_snapshot();
+
 	}
 }

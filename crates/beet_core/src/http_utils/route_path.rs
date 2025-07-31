@@ -118,9 +118,11 @@ impl RoutePath {
 	}
 }
 
-#[derive(Debug, Clone)]
+
+/// Represents all route paths in an application, structured as a tree.
+#[derive(Debug, Clone, Resource)]
 pub struct RoutePathTree {
-	/// The route path for this node (for root, this is `/`)
+	/// The full route path for this node
 	pub route: RoutePath,
 	/// Whether this path exists as an endpoint
 	pub exists: bool,
@@ -203,6 +205,23 @@ impl RoutePathTree {
 		}
 		inner(&mut paths, &self);
 		paths
+	}
+}
+
+impl std::fmt::Display for RoutePathTree {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		fn inner(
+			node: &RoutePathTree,
+			f: &mut std::fmt::Formatter<'_>,
+		) -> std::fmt::Result {
+			let suffix = if node.exists { "" } else { "*" };
+			writeln!(f, "{}{suffix}", node.route)?;
+			for child in &node.children {
+				inner(child, f)?;
+			}
+			Ok(())
+		}
+		inner(self, f)
 	}
 }
 

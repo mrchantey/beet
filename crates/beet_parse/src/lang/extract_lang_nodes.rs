@@ -19,7 +19,7 @@ pub fn extract_inner_text(
 		{
 			if key.as_str() == "inner:text" {
 				commands.entity(attr_entity).despawn();
-				let value = value.self_token_stream();
+				let value = value.inner_parsed();
 				commands.entity(entity).insert(NodeExpr::new_block(
 					syn::parse_quote!({
 						InnerText::new(#value)
