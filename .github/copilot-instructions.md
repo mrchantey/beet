@@ -11,7 +11,7 @@ Always greet the user by saying something foolish, here are some examples but yo
 
 ## Requirements
 
-
+- Never use `cargo clippy`
 - Do not create examples without being explictly asked to do so.
 - Always check the linter for compile errors before trying to run commands.
 - Implement trait bounds in the order from lowest to highest level, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Component + Reflect..`

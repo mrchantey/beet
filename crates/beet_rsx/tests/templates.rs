@@ -14,6 +14,6 @@ fn works() {
 }
 
 #[template]
-fn HelloWorld() -> impl Bundle {
+fn HelloWorld(a:u32) -> impl Bundle {
 	rsx! {<div>hello</div>}
 }

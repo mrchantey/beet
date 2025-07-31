@@ -93,33 +93,14 @@ mod test {
 	#[test]
 	fn simple() {
 		template_func(syn::parse_quote! {
-			/// probably the best templating layout
+			/// probably the best templating layout ever
 			pub(crate) fn MyNode(
 				/// some comment
 				foo:u32,
 				mut bar:u32
 			) -> impl Bundle{()}
 		})
-		.to_string()
 		.xpect()
-		.to_be(
-			quote! {
-			use beet::prelude::*;
-			#[doc = r" probably the best templating layout"]
-			#[derive(Props)]
-			pub(crate) struct MyNode {
-				#[doc = r" some comment"]
-				pub foo: u32,
-				pub bar: u32
-			}
-			impl IntoBundle<Self> for MyNode {
-				fn into_bundle(self) -> impl Bundle {
-					let Self { foo, mut bar } = self;
-					()
-				}
-			}
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 }

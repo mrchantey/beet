@@ -1,0 +1,14 @@
+use beet::prelude::*;
+/// probably the best templating layout ever
+#[derive(Props)]
+pub(crate) struct MyNode {
+    /// some comment
+    pub foo: u32,
+    pub bar: u32,
+}
+impl IntoBundle<Self> for MyNode {
+    fn into_bundle(self) -> impl Bundle {
+        let Self { foo, mut bar } = self;
+        ()
+    }
+}
