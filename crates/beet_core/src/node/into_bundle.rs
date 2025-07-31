@@ -40,7 +40,6 @@ where
 	}
 }
 
-
 /// includes Option, all iterators are spawned as children
 pub struct IterMarker;
 

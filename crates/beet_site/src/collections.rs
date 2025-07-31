@@ -98,7 +98,10 @@ fn design_mockups_collection() -> impl Bundle {
 				use bevy::prelude::*;},
 			syn::parse_quote!{
 				#[allow(unused_imports)]
-				use beet_rsx::as_beet::*;}
+				use beet_rsx::as_beet::*;},
+			syn::parse_quote!{
+				#[allow(unused_imports)]
+				use crate::prelude::*;},
 		]),
 	)
 }

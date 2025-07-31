@@ -9,11 +9,17 @@ pub(crate) struct MyNode {
 impl IntoBundle<Self> for MyNode {
     fn into_bundle(self) -> impl Bundle {
         OnSpawn::new(move |entity_world_mut: &mut EntityWorldMut| {
+            let my_entity = entity_world_mut.id();
             let bundle = entity_world_mut
                 .world_scope(|world| {
                     world
                         .run_system_cached_with(
-                            move |In(input): In<Self>| {
+                            move |
+                                In(input): In<Self>,
+                                world: &mut World,
+                                res: Res<Time>,
+                                mut query: Query<&mut Transform>|
+                            {
                                 let Self { foo, mut bar } = input;
                                 ()
                             },

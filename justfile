@@ -15,8 +15,9 @@ set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
 
-# it keeps asking for bigger stacks..
-export RUST_MIN_STACK := '268435456'
+# it keeps asking for bigger stacks.. this is 1GB :(
+export RUST_MIN_STACK := '1073741824'
+# export RUST_MIN_STACK := '268435456'
 # min-stack := 'RUST_MIN_STACK=134217728'
 # min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'
