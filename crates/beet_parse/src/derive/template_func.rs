@@ -100,7 +100,7 @@ fn impl_template_bundle(
 
 					).unwrap_or_exit()
 				});
-				entity_world_mut.insert(bundle);
+				entity_world_mut.insert(bundle.into_bundle());
 			})
 		}
 	}

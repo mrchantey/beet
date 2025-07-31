@@ -2,7 +2,6 @@ use crate::prelude::*;
 use crate::types::ArticleMeta;
 use beet_core::prelude::*;
 use beet_rsx::as_beet::GlobFilter;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use heck::ToTitleCase;
 use serde::Deserialize;
@@ -56,52 +55,48 @@ pub struct SidebarNode {
 }
 
 
-pub struct CollectSidebarNode{
+pub struct CollectSidebarNode {
+	/// Which routes to include, root is always included.
 	pub include_filter: GlobFilter,
 	/// Set some paths to expanded by default,
 	/// useful for directories without an index that dont
 	/// have an `[ArticleMeta]`.
 	pub expanded_filter: GlobFilter,
-
 }
 
-impl SidebarNode {
-	pub fn collect(
-		filter: In<GlobFilter>,
-		world: &mut World,
-		path_tree: Res<RoutePathTree>,
+impl CollectSidebarNode {
+	pub fn new(
+		include_filter: GlobFilter,
+		expanded_filter: GlobFilter,
 	) -> Self {
-		let nodes = ResolvedEndpoint::collect_static_get(world);
-		let info_map = nodes
-			.iter()
-			.map(|(entity, endpoint)| {
-				(endpoint.path(), world.entity(*entity).get::<ArticleMeta>())
-			})
-			.collect::<HashMap<_, _>>();
+		Self {
+			include_filter,
+			expanded_filter,
+		}
+	}
 
-		let path_tree = RoutePathTree::from_paths(
-			nodes
-				.iter()
-				.map(|(_, endpoint)| endpoint.path())
-				.cloned()
-				.collect(),
-		);
-		Self::map_node(&filter, &info_map, path_tree)
+
+	pub fn collect(
+		this: In<Self>,
+		path_tree: Res<RoutePathTree>,
+		articles: Query<&ArticleMeta>,
+	) -> SidebarNode {
+		this.map_node(&path_tree, &articles)
 	}
 
 	fn map_node(
-		expanded_filter: &GlobFilter,
-		info_map: &HashMap<&RoutePath, Option<&ArticleMeta>>,
-		node: RoutePathTree,
-	) -> Self {
-		let meta = info_map.get(&node.route).and_then(|meta| *meta);
-
+		&self,
+		node: &RoutePathTree,
+		articles: &Query<&ArticleMeta>,
+	) -> SidebarNode {
+		// get the first article meta for these endpoints
+		let meta = node.endpoints.iter().find_map(|e| articles.get(*e).ok());
+		let contains_endpoints = node.contains_endpoints();
 		let children = node
 			.children
 			.iter()
-			.map(|child| {
-				Self::map_node(expanded_filter, info_map, child.clone())
-			})
+			.filter(|child| self.include_filter.passes(&child.route.0))
+			.map(|child| self.map_node(child, articles))
 			.collect();
 
 		// Helper to get a display name from a RoutePath
@@ -114,27 +109,94 @@ impl SidebarNode {
 			}
 		}
 
-		Self {
+		SidebarNode {
 			display_name: meta
 				.map(|m| m.sidebar.label.clone())
 				.flatten()
 				.unwrap_or_else(|| route_name(&node.route).to_title_case()),
-			path: if node.exists {
+			path: if contains_endpoints {
 				Some(node.route.clone())
 			} else {
 				None
 			},
 			children,
-			expanded: expanded_filter.passes(&node.route.0),
+			expanded: self.expanded_filter.passes(&node.route.0),
 		}
 	}
 }
+
+
+impl SidebarNode {}
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
+
+
+	#[test]
+	fn collect_sidebar_node() {
+		let mut world = World::new();
+
+		world.spawn((Endpoint::new(HttpMethod::Get), children![(
+			RouteFilter::new("docs"),
+			Endpoint::new(HttpMethod::Get),
+			ArticleMeta {
+				title: Some("Docs".to_string()),
+				sidebar: SidebarInfo {
+					label: Some("Testing".to_string()),
+					order: Some(1),
+				},
+				..Default::default()
+			},
+			children![(
+				RouteFilter::new("testing"),
+				Endpoint::new(HttpMethod::Get),
+				ArticleMeta {
+					title: Some("Partying".to_string()),
+					sidebar: SidebarInfo {
+						label: Some("Partying".to_string()),
+						order: Some(2),
+					},
+					..Default::default()
+				},
+			)]
+		),]));
+		world.run_system_cached(insert_route_tree).unwrap();
+		world
+			.run_system_cached_with(
+				CollectSidebarNode::collect,
+				CollectSidebarNode {
+					include_filter: GlobFilter::default(), // .with_include("/docs/*")
+					// .with_include("/blog/*")
+					expanded_filter: GlobFilter::default()
+						.with_include("/docs/"),
+				},
+			)
+			.unwrap()
+			.xpect()
+			.to_be(SidebarNode {
+				display_name: "Root".to_string(),
+				path: Some(RoutePath::new("/")),
+				children: vec![
+					SidebarNode {
+						display_name: "Testing".to_string(),
+						path: Some(RoutePath::new("/docs")),
+						children: vec![
+							SidebarNode {
+								display_name: "Partying".to_string(),
+								path: Some(RoutePath::new("/docs/testing")),
+								children: vec![],
+								expanded: false,
+							},
+						],
+						expanded: false,
+					},
+				],
+				expanded: false,
+			});
+	}
 
 	#[test]
 	fn works() {

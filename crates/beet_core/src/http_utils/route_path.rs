@@ -124,8 +124,8 @@ impl RoutePath {
 pub struct RoutePathTree {
 	/// The full route path for this node
 	pub route: RoutePath,
-	/// Whether this path exists as an endpoint
-	pub exists: bool,
+	/// All endpoints with this path
+	pub endpoints: Vec<Entity>,
 	/// All child directories
 	pub children: Vec<RoutePathTree>,
 }
@@ -139,8 +139,11 @@ impl RoutePathTree {
 			.unwrap_or("")
 	}
 
-	/// Builds a RoutePathTree from a list of RoutePath
-	pub fn from_paths(paths: Vec<RoutePath>) -> Self {
+	/// Returns true if this node has no entities (not an endpoint)
+	pub fn contains_endpoints(&self) -> bool { !self.endpoints.is_empty() }
+
+	/// Builds a RoutePathTree from a list of (Entity, RoutePath)
+	pub fn from_paths(paths: Vec<(Entity, RoutePath)>) -> Self {
 		use std::collections::HashMap;
 		// Helper to split a RoutePath into segments
 		fn split_segments(path: &RoutePath) -> Vec<String> {
@@ -155,28 +158,28 @@ impl RoutePathTree {
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,
-			exists: bool,
+			entities: Vec<Entity>,
 		}
 
 		let mut root = Node::default();
-		for route_path in &paths {
+		for (ent, route_path) in &paths {
 			let segments = split_segments(route_path);
 			let mut node = &mut root;
 			for (i, seg) in segments.iter().enumerate() {
 				node = node.children.entry(seg.clone()).or_default();
 				if i == segments.len() - 1 {
-					node.exists = true;
+					node.entities.push(*ent);
 				}
 			}
 			// Handle root path
 			if segments.is_empty() {
-				node.exists = true;
+				node.entities.push(*ent);
 			}
 		}
 
 		// Recursively build RoutePathTree from Node
 		fn build_tree(route: RoutePath, node: &Node) -> RoutePathTree {
-			let children = node
+			let mut children: Vec<RoutePathTree> = node
 				.children
 				.iter()
 				.map(|(child_name, child_node)| {
@@ -184,19 +187,22 @@ impl RoutePathTree {
 					build_tree(child_route, child_node)
 				})
 				.collect();
+			children
+				.sort_by(|a, b| a.route.to_string().cmp(&b.route.to_string()));
 			RoutePathTree {
 				route,
-				exists: node.exists,
+				endpoints: node.entities.clone(),
 				children,
 			}
 		}
 
 		build_tree(RoutePath::new("/"), &root)
 	}
+
 	pub fn flatten(&self) -> Vec<RoutePath> {
 		let mut paths = Vec::new();
 		fn inner(paths: &mut Vec<RoutePath>, node: &RoutePathTree) {
-			if node.exists {
+			if node.contains_endpoints() {
 				paths.push(node.route.clone());
 			}
 			for child in node.children.iter() {
@@ -214,7 +220,7 @@ impl std::fmt::Display for RoutePathTree {
 			node: &RoutePathTree,
 			f: &mut std::fmt::Formatter<'_>,
 		) -> std::fmt::Result {
-			let suffix = if node.exists { "" } else { "*" };
+			let suffix = if node.contains_endpoints() { "" } else { "*" };
 			writeln!(f, "{}{suffix}", node.route)?;
 			for child in &node.children {
 				inner(child, f)?;
@@ -227,7 +233,23 @@ impl std::fmt::Display for RoutePathTree {
 
 #[cfg(test)]
 mod test {
+	#[test]
+	fn children_are_sorted() {
+		let ent1 = Entity::from_raw(1);
+		let ent2 = Entity::from_raw(2);
+		let ent3 = Entity::from_raw(3);
+		let paths = vec![
+			(ent1, RoutePath::new("/zeta")),
+			(ent2, RoutePath::new("/alpha")),
+			(ent3, RoutePath::new("/beta")),
+		];
+		let tree = RoutePathTree::from_paths(paths);
+		let child_names: Vec<_> =
+			tree.children.iter().map(|c| c.route.to_string()).collect();
+		expect(child_names).to_be(vec!["/alpha", "/beta", "/zeta"]);
+	}
 	use crate::prelude::*;
+	use bevy::prelude::Entity;
 	use sweet::prelude::*;
 
 	#[test]
@@ -263,17 +285,22 @@ mod test {
 
 	#[test]
 	fn route_path_tree_from_paths() {
+		// Dummy entity values for testing
+		let ent1 = Entity::from_raw(1);
+		let ent2 = Entity::from_raw(2);
+		let ent3 = Entity::from_raw(3);
+		let ent4 = Entity::from_raw(4);
 		let paths = vec![
-			RoutePath::new("/foo/bar"),
-			RoutePath::new("/foo/baz"),
-			RoutePath::new("/foo/qux/quux"),
-			RoutePath::new("/root"),
+			(ent1, RoutePath::new("/foo/bar")),
+			(ent2, RoutePath::new("/foo/baz")),
+			(ent3, RoutePath::new("/foo/qux/quux")),
+			(ent4, RoutePath::new("/root")),
 		];
 		let tree = RoutePathTree::from_paths(paths.clone());
 
 		// Root node
 		expect(tree.route.to_string()).to_be("/");
-		expect(tree.exists).to_be_false();
+		expect(tree.contains_endpoints()).to_be_false();
 
 		// Find child '/foo'
 		let foo = tree
@@ -281,7 +308,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo")
 			.unwrap();
-		expect(foo.exists).to_be_false();
+		expect(foo.contains_endpoints()).to_be_false();
 
 		// 'bar' and 'baz' are endpoints under 'foo'
 		let bar = foo
@@ -289,13 +316,15 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/bar")
 			.unwrap();
-		expect(bar.exists).to_be_true();
+		expect(bar.contains_endpoints()).to_be_true();
+		expect(&bar.endpoints).to_be(&vec![ent1]);
 		let baz = foo
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/baz")
 			.unwrap();
-		expect(baz.exists).to_be_true();
+		expect(baz.contains_endpoints()).to_be_true();
+		expect(&baz.endpoints).to_be(&vec![ent2]);
 
 		// 'qux' is a directory, 'quux' is endpoint
 		let qux = foo
@@ -303,13 +332,14 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux")
 			.unwrap();
-		expect(qux.exists).to_be_false();
+		expect(qux.contains_endpoints()).to_be_false();
 		let quux = qux
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux/quux")
 			.unwrap();
-		expect(quux.exists).to_be_true();
+		expect(quux.contains_endpoints()).to_be_true();
+		expect(&quux.endpoints).to_be(&vec![ent3]);
 
 		// 'root' endpoint
 		let root = tree
@@ -317,6 +347,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/root")
 			.unwrap();
-		expect(root.exists).to_be_true();
+		expect(root.contains_endpoints()).to_be_true();
+		expect(&root.endpoints).to_be(&vec![ent4]);
 	}
 }

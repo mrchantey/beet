@@ -4,12 +4,18 @@ use beet::prelude::*;
 
 
 #[template]
-pub fn BeetSidebarLayout(world:&mut World) -> impl Bundle {
-	let filter = GlobFilter::default()
-		.with_include("docs/*")
-		.with_include("blog/*");
-
-	let sidebar_nodes = vec![];
+pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
+	let sidebar_nodes = world
+		.run_system_cached_with(
+			CollectSidebarNode::collect,
+			CollectSidebarNode {
+				include_filter: GlobFilter::default()
+					.with_include("/docs/*")
+					.with_include("/blog/*"),
+				expanded_filter: GlobFilter::default().with_include("/docs/"),
+			},
+		)?
+		.children;
 	// let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>
@@ -41,5 +47,5 @@ pub fn BeetSidebarLayout(world:&mut World) -> impl Bundle {
 			/* padding: 0 calc(var(--content-padding-width) - var(--sidebar-width)) 0 0; */
 		}
 		</style>
-	}
+	}.xok::<BevyError>()
 }

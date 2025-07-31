@@ -132,8 +132,7 @@ async fn handle_request_recursive(
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
 pub fn insert_route_tree(world: &mut World) {
 	let endpoints = world.run_system_cached(ResolvedEndpoint::collect).unwrap();
-	let paths = endpoints.iter().map(|(_, e)| e.path()).cloned().collect();
-
+	let paths = endpoints.into_iter().map(|(entity, endpoint)| (entity, endpoint.path().clone())).collect();
 	world.insert_resource(RoutePathTree::from_paths(paths));
 }
 
@@ -279,7 +278,7 @@ mod test {
 						)]
 				),
 				(
-					RouteFilter::new("foo"),
+					RouteFilter::new("boo"),
 				),
 			]
 		)
