@@ -377,9 +377,9 @@ mod test {
 	#[test]
 	fn code() {
 		HtmlFragment::parse_bundle(
-			rsx! {<code lang="pizza">let foo = "bar"</code>},
+			rsx! {<code lang="js">let foo = "bar"</code>},
 		)
 		.xpect()
-		.to_be_str("<code lang=\"pizza\">let foo = \"bar\"</code>");
+		.to_be_snapshot();
 	}
 }

@@ -7,8 +7,9 @@
     FragmentNode,
     related! {
         Children[(NodeTag(String::from("code")), ElementNode { self_closing : false
-        }, CodeElement, LangSnippetHash(13569294293848105359u64), { #[cfg(not(feature
-        = "client"))] { InnerText::new(include_str!("foo.rs")) } #[cfg(feature =
-        "client")] { () } })]
+        }, CodeElement { lang : String::from("rust") },
+        LangSnippetHash(13569294293848105359u64), { #[cfg(not(feature = "client"))] {
+        InnerText::new(include_str!("foo.rs")) } #[cfg(feature = "client")] { () }
+        })]
     },
 )

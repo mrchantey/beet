@@ -90,8 +90,20 @@ pub struct StyleElement;
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct CodeElement;
-
+pub struct CodeElement {
+	pub lang: String,
+}
+impl CodeElement {
+	/// Create a new [`CodeElement`] with the given language.
+	pub fn new(lang: impl Into<String>) -> Self { Self { lang: lang.into() } }
+}
+impl Default for CodeElement {
+	fn default() -> Self {
+		Self {
+			lang: "rust".to_string(),
+		}
+	}
+}
 
 /// Convenience component equivelent to `children![TextNode]`, often used by elements
 /// like `script`,`style` or `code` which require further processing.

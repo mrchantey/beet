@@ -109,7 +109,7 @@ build-demo-site *args:
 	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/demo_site.wasm
 
 launch *args:
-	cargo launch {{args}}
+	cargo launch -w {{args}}
 
 demo-site *args:
 	cd examples/demo_site && cargo launch -- --watch {{args}}

@@ -25,7 +25,6 @@ pub mod prelude {
 	pub use super::extensions::*;
 	#[cfg(target_arch = "wasm32")]
 	pub use super::logging::*;
-	pub use html_escape;
 	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures::spawn_local;
 	

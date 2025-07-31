@@ -13,15 +13,18 @@ pub mod layouts;
 #[cfg(feature = "launch")]
 mod collections;
 
+#[cfg(any(feature = "server", feature = "client"))]
+pub use crate::client_actions::routes as actions;
+
 pub mod prelude {
 	#[cfg(any(feature = "server", feature = "client"))]
-	pub use crate::client_actions::routes as actions;
+	pub use super::actions;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::actions::actions_routes;
 	#[cfg(feature = "server")]
-	pub use crate::codegen::docs::docs_routes;
-	#[cfg(feature = "server")]
 	pub use crate::codegen::blog::blog_routes;
+	#[cfg(feature = "server")]
+	pub use crate::codegen::docs::docs_routes;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(any(feature = "server", feature = "client"))]

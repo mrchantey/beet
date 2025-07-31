@@ -27,3 +27,13 @@ fn rsx_macro() {
 		.trigger(OnClick::new(MockEvent::new("foo")));
 	get().xpect().to_be("foo");
 }
+
+
+#[test]
+fn inner_text(){
+	let code = "let foo = {bar};";
+		rsx! {<code inner:text=code />}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect()
+		.to_be("<code>let foo = {bar};</code>");
+}

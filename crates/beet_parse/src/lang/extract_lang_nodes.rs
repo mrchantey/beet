@@ -1,7 +1,36 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;
 use std::hash::Hasher;
+
+
+/// For elements with an `innerText` directive, extract the inner text
+/// and insert it as an [`InnerText`] component.
+/// This is used for elements like `<code inner:text="..."/>`
+pub fn extract_inner_text(
+	mut commands: Commands,
+	attributes: Query<(Entity, &AttributeKey, &NodeExpr)>,
+	query: Populated<(Entity, &Attributes), Added<NodeTag>>,
+) {
+	for (entity, attrs) in query.iter() {
+		for (attr_entity, key, value) in
+			attrs.iter().filter_map(|attr| attributes.get(attr).ok())
+		{
+			if key.as_str() == "inner:text" {
+				commands.entity(attr_entity).despawn();
+				let value = value.self_token_stream();
+				commands.entity(entity).insert(NodeExpr::new_block(
+					syn::parse_quote!({
+						InnerText::new(#value)
+					}),
+				));
+			}
+		}
+	}
+}
+// for (entity
+
 
 /// For elements with a `script`, `style` or `code` tag, and without an
 /// `is:inline` attribute, parse as a lang node:
@@ -17,6 +46,7 @@ pub fn extract_lang_nodes(
 		Added<NodeTag>,
 	>,
 ) {
+	// returns the entity and value of the first attribute with the given key
 	let find_attr = |attrs: &Option<&Attributes>,
 	                 key: &str|
 	 -> Option<(Entity, Option<&TextNode>)> {
@@ -48,7 +78,15 @@ pub fn extract_lang_nodes(
 				commands.entity(entity).insert(StyleElement);
 			}
 			"code" => {
-				commands.entity(entity).insert(CodeElement);
+				let code_el = if let Some((attr_ent, Some(text))) =
+					find_attr(&attrs, "lang")
+				{
+					commands.entity(attr_ent).despawn();
+					CodeElement::new(&text.0)
+				} else {
+					CodeElement::default()
+				};
+				commands.entity(entity).insert(code_el);
 			}
 			_ => {
 				// skip non-lang nodes
@@ -107,7 +145,7 @@ pub fn extract_lang_nodes(
 			commands.entity(attr_entity).despawn();
 		}
 
-		// ignore empty nodes
+		// ignore nodes without inner text or src, they may have an inner:text
 	}
 }
 
@@ -118,6 +156,8 @@ mod test {
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
+
+	use crate::prelude::NodeExpr;
 
 
 	#[test]
@@ -151,6 +191,33 @@ mod test {
 		expect(hash1).not().to_be(hash2);
 		expect(hash2).to_be(hash3);
 	}
+	#[test]
+	fn extracts_inner_text() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((
+				NodeTag::new("code"),
+				related!(
+					Attributes[(
+						AttributeKey::new("inner:text"),
+						NodeExpr::new_block(syn::parse_quote! {{some_val}})
+					)]
+				),
+			))
+			.id();
+		world.run_system_once(super::extract_inner_text).unwrap();
+		let entity = world.entity(entity);
+		entity.contains::<Attributes>().xpect().to_be(false);
+		entity
+			.get::<NodeExpr>()
+			.unwrap()
+			.self_token_stream()
+			.xpect()
+			.to_be_snapshot();
+	}
+
+
+
 	#[test]
 	fn extracts_inline() {
 		let mut world = World::new();

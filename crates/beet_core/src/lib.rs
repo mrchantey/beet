@@ -33,6 +33,7 @@ pub mod prelude {
 	pub use crate::server::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	#[allow(unused)]
 	#[cfg(feature = "web")]
 	pub use crate::web::prelude::*;
 	pub use beet_core_macros::*;
@@ -52,6 +53,7 @@ pub mod as_beet {
 
 
 pub mod exports {
+	pub use html_escape;
 	#[cfg(feature = "http")]
 	pub use http;
 	#[cfg(feature = "http")]

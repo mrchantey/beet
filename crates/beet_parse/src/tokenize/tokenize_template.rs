@@ -78,7 +78,7 @@ pub fn tokenize_template(
 	let inner = if entity.contains::<ClientLoadDirective>()
 		|| entity.contains::<ClientOnlyDirective>()
 	{
-		// this also adds a TemplateRoot::spawn() call, using a reflect clone
+		// this also adds a TemplateRoot::spawn() via component hook using a reflect clone
 		syn::parse_quote! {
 			ClientIslandRoot::new(#template_def)
 		}
@@ -87,7 +87,6 @@ pub fn tokenize_template(
 			TemplateRoot::spawn(Spawn(#template_def.into_bundle()))
 		}
 	};
-	// dont wrap in nodeexpr thats not nessecary
 	entity_components.push(NodeExpr::new(inner).insert_deferred());
 
 	Ok(())

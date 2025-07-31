@@ -1,20 +1,14 @@
-use beet_core::web::prelude::html_escape;
-
 use crate::prelude::*;
 
 #[template]
 pub fn Code(
 	#[field(flatten)] attrs: BaseHtmlAttributes,
-	content: String,
+	// content: String,
 ) -> impl Bundle {
-	let _content = html_escape::encode_text(&content).to_string();
 
 	rsx! {
 		<pre {attrs}>
-		<code>
-			{content}
-			<slot/>
-		</code>
+		<slot/>
 		</pre>
 		<style>
 			pre{

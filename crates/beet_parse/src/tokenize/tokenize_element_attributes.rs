@@ -43,9 +43,9 @@ pub fn tokenize_element_attributes(
 							key.span(),
 							&mut value,
 						)?;
-						let parsed = value.inner_parsed();
+						let parsed = value.as_bundle();
 						attr_components.push(quote! {
-								OnSpawnDeferred::insert_parent::<AttributeOf>(#parsed.into_bundle())
+								OnSpawnDeferred::insert_parent::<AttributeOf>(#parsed)
 						});
 					} else {
 						attr_components.push(value.insert_deferred());

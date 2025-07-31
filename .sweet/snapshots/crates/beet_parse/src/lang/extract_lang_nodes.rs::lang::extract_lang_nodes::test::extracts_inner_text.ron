@@ -1,0 +1,8 @@
+NodeExpr(
+    SendWrapper::new(
+        syn::parse_quote!(
+            { InnerText::new(NodeExpr(SendWrapper::new(syn::parse_quote!({ some_val
+            })))) }
+        ),
+    ),
+)

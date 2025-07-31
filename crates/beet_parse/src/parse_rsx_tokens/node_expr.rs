@@ -86,6 +86,11 @@ impl NodeExpr {
 		}
 	}
 
+	pub fn as_bundle(&self) -> TokenStream {
+		let parsed = self.inner_parsed();
+		quote! {#parsed.into_bundle()}
+	}
+
 	/// Called when this expression is in the position of a node or block attribute,
 	/// ie `<div {my_expr} />`.
 	pub fn insert_deferred(&self) -> TokenStream {

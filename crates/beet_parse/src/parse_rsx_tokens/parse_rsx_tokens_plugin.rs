@@ -56,6 +56,7 @@ impl Plugin for ParseRsxTokensPlugin {
 						parse_combinator_tokens,
 						#[cfg(feature = "rsx")]
 						parse_rstml_tokens,
+						extract_inner_text,
 						// extractors
 						// lang nodes must run first, hashes raw attributes not extracted directives
 						extract_lang_nodes,
@@ -74,6 +75,8 @@ impl Plugin for ParseRsxTokensPlugin {
 						.before(ModifyRsxTree),
 					(
 						|| {},
+						#[cfg(feature = "syntect")]
+						parse_syntect,
 						#[cfg(feature = "css")]
 						parse_lightning,
 					)
