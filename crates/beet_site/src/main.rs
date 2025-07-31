@@ -35,7 +35,7 @@ fn server_plugin(app: &mut App) {
 	app.world_mut().spawn((
 		children![
 			pages_routes(), 
-			// docs_routes(), 
+			docs_routes(), 
 			// blog_routes(), 
 			// actions_routes(),
 			// (

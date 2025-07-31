@@ -92,22 +92,14 @@ async fn handle_request_recursive(
 					// path does not match, skip this entity
 					continue;
 				}
-				ControlFlow::Continue(new_parts) => {
-					parts = new_parts;
+				ControlFlow::Continue(remaining_parts) => {
+					parts = remaining_parts;
 				}
 			}
 		}
-		// Check 3: Endpoint
-		if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
-			if endpoint.method() != parts.method() {
-				// method does not match, skip this entity
-				continue;
-			}
-		}
 
-		if let Some(handler) = world.entity(entity).get::<RouteHandler>() {
-			world = handler.clone().run(world).await;
-		}
+		// at this point add children, even if the endpoint doesnt match
+		// a child might
 		if let Some(children) = world.entity(entity).get::<Children>() {
 			// reverse children to maintain order with stack.pop()
 			for child in children.iter().rev() {
@@ -116,6 +108,21 @@ async fn handle_request_recursive(
 					parts: parts.clone(),
 				});
 			}
+		}
+
+		// Check 3: Endpoint
+		if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
+			if
+			// endpoints may only run if exact match
+			!parts.path().is_empty() || 
+			// method must match
+			endpoint.method() != parts.method() {
+				continue;
+			}
+		}
+
+		if let Some(handler) = world.entity(entity).get::<RouteHandler>() {
+			world = handler.clone().run(world).await;
 		}
 	}
 
@@ -178,8 +185,7 @@ mod test {
 					}),
 				),
 				(
-					Endpoint::new(HttpMethod::Get),
-					// no segment, always runs if parent matches
+					// no endpoint, always runs if parent matches
 					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(4);
 					}),
@@ -221,5 +227,27 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be_str("hawaiian");
+	}
+	#[sweet::test]
+	async fn endpoint_with_children() {
+		let mut world = World::new();
+		world.spawn((
+			RouteFilter::new("foo"),
+			RouteHandler::new(HttpMethod::Get, || "foo"),
+			children![(
+				RouteFilter::new("bar"),
+				RouteHandler::new(HttpMethod::Get, || "bar")
+			),],
+		));
+		Router::oneshot_str(&mut world, "/foo")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be_str("foo");
+		Router::oneshot_str(&mut world, "/foo/bar")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be_str("bar");
 	}
 }
