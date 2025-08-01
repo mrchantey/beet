@@ -8,13 +8,13 @@ mod utils;
 
 /// Implements `TokenizeSelf` for a struct or enum.
 /// All fields must also implement `TokenizeSelf`.
-/// 
+///
 /// If the type is a struct with private fields, please use the `to_tokens` attribute to specify
 /// a constructor accepting all fields in the order they are defined.
-/// 
-/// `TokenizeSelf` is implemented for primitives and some other common types, 
+///
+/// `TokenizeSelf` is implemented for primitives and some other common types,
 /// please open a pr if you want to add support for a type in an external crate.
-/// 
+///
 /// ## Example
 ///
 /// ```rust ignore
@@ -23,7 +23,7 @@ mod utils;
 /// struct Foo{
 ///   bar: String,
 /// }
-/// 
+///
 /// impl Foo{
 ///   pub fn new(bar: String) -> Self {
 ///     Self { bar }

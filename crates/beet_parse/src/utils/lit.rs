@@ -48,12 +48,7 @@ pub fn insert_lit(entity: &mut EntityCommands, lit: &syn::Lit) {
 			entity.insert(lit_verbatim.to_string().into_bundle());
 		}
 		syn::Lit::CStr(lit_cstr) => {
-			entity.insert(
-				lit_cstr
-					.to_token_stream()
-					.to_string()
-					.into_bundle(),
-			);
+			entity.insert(lit_cstr.to_token_stream().to_string().into_bundle());
 		}
 		_ => unimplemented!(),
 	}

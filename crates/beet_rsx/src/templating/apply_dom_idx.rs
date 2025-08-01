@@ -11,11 +11,7 @@ pub fn apply_requires_dom_idx(
 	dyn_attrs: Query<(), (With<AttributeOf>, Added<ReceivesSignals>)>,
 	dyn_text_nodes: Query<
 		Entity,
-		(
-			With<TextNode>,
-			With<ReceivesSignals>,
-			Without<AttributeOf>,
-		),
+		(With<TextNode>, With<ReceivesSignals>, Without<AttributeOf>),
 	>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,

@@ -8,7 +8,5 @@ pub struct OpenAiKey;
 
 impl OpenAiKey {
 	/// Load the `OPENAI_API_KEY` from the environment variables.
-	pub fn get() -> Result<String> {
-		std::env::var("OPENAI_API_KEY")?.xok()
-	}
+	pub fn get() -> Result<String> { std::env::var("OPENAI_API_KEY")?.xok() }
 }

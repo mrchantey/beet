@@ -171,32 +171,32 @@ mod test {
 	async fn works() {
 		let mut world = World::new();
 		world.insert_resource(Router::new(|app: &mut App| {
-		app.world_mut().spawn(children![
-			(
-				RouteFilter::new("/add"),
-				RouteHandler::action(
-					HttpMethod::Get,
-					add_via_get.pipe(Json::pipe)
-				)
-			),
-			(
-				RouteFilter::new("/add"),
-				RouteHandler::action(
-					HttpMethod::Post,
-					add_via_post.pipe(Json::pipe)
-				)
-			),
-			(
-				RouteFilter::new("/increment_if_positive"),
-				RouteHandler::action(
-					HttpMethod::Get,
-					increment_if_positive.pipe(JsonResult::pipe)
-				)
-			),
-		]);}));
+			app.world_mut().spawn(children![
+				(
+					RouteFilter::new("/add"),
+					RouteHandler::action(
+						HttpMethod::Get,
+						add_via_get.pipe(Json::pipe)
+					)
+				),
+				(
+					RouteFilter::new("/add"),
+					RouteHandler::action(
+						HttpMethod::Post,
+						add_via_post.pipe(Json::pipe)
+					)
+				),
+				(
+					RouteFilter::new("/increment_if_positive"),
+					RouteHandler::action(
+						HttpMethod::Get,
+						increment_if_positive.pipe(JsonResult::pipe)
+					)
+				),
+			]);
+		}));
 
-		let router = AxumRunner::router(&mut world);
-		let _handle = serve(router).await;
+		let _handle = serve(AxumRunner::router(&mut world)).await;
 		test_get().await;
 		test_post().await;
 		test_result().await;

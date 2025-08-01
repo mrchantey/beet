@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_utils::prelude::*;
+use beet_utils::utils::AsyncUtils;
 use fantoccini::Client;
 use fantoccini::ClientBuilder;
 use std::time::Duration;
-use beet_utils::prelude::*;
-use beet_utils::utils::AsyncUtils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunTestsMode {

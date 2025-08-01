@@ -29,8 +29,9 @@ impl CombinatorParser {
 		if tokens.is_empty() {
 			return Ok(RsxChildren::default());
 		}
-		let (children, remaining) =
-			parser(rsx_children).skip(parser(js_whitespace)).parse(tokens)?;
+		let (children, remaining) = parser(rsx_children)
+			.skip(parser(js_whitespace))
+			.parse(tokens)?;
 		if !remaining.trim().is_empty() {
 			return Err(CombinatorParserError::RemainingText(remaining));
 		}

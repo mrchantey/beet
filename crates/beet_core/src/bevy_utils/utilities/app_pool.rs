@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use std::cell::OnceCell;
+use std::cell::RefCell;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 
 /// In some cases like router it is prefereable to have a single app instance
@@ -37,7 +38,16 @@ pub struct AppPool {
 	/// The constructor to create a new app instance, if the instance is
 	/// already set this will never be called.
 	constructor: Arc<dyn 'static + Send + Sync + Fn() -> App>,
+	/// Incremented each time an app is constructed
+	num_constructed: Arc<RwLock<usize>>,
+	/// Incremented each time an app is returned to the pool
+	num_returned: Arc<RwLock<usize>>,
 }
+
+thread_local! {
+		static POOL: RefCell<Vec<World>> = RefCell::new(Vec::new());
+}
+
 
 impl AppPool {
 	pub fn new<F>(constructor: F) -> Self
@@ -46,64 +56,77 @@ impl AppPool {
 	{
 		Self {
 			constructor: Arc::new(constructor),
+			num_constructed: Arc::new(RwLock::new(0)),
+			num_returned: Arc::new(RwLock::new(0)),
 		}
 	}
 
-	pub fn get(&self) -> ThreadLocalApp {
-		let constructor = self.constructor.clone();
-		ThreadLocalApp::get_or_init_with(move || (constructor)())
+	pub fn num_constructed(&self) -> usize {
+		*self.num_constructed.read().unwrap()
 	}
-}
 
+	
+	pub fn num_returned(&self) -> usize { *self.num_returned.read().unwrap() }
 
-/// A system for setting an app constructor, and then subsequent calls
-/// to [`Self::get`] will either return the stored copy of the app
-/// or create a new one using the constructor.
-/// This is useful for situations  like routers where the cost of creating
-/// an new app for each request is high and the
-pub struct ThreadLocalApp {
-	app: *mut App,
-}
-
-thread_local! {
-		static APP: OnceCell<App> = OnceCell::new();
-}
-
-impl ThreadLocalApp {
-	fn new(app: &App) -> Self {
-		Self {
-			app: app as *const App as *mut App,
+	/// just run the constructor
+	pub fn pop(&self) -> PooledWorld {
+		PooledWorld {
+			inner: std::mem::take((self.constructor)().world_mut()),
+			num_returned: self.num_returned.clone(),
 		}
 	}
+	
+	// /// Take an app from the pool, or create a new one using the constructor.
+	// /// This should be returned to the pool using [`Self::push`] when done.
+	// pub fn pop(&self) -> PooledWorld {
+	// 	let Self {
+	// 		num_constructed,
+	// 		constructor,
+	// 		num_returned,
+	// 	} = self.clone();
+	// 	let inner = POOL.with(move |pool| {
+	// 		pool.borrow_mut().pop().unwrap_or_else(move || {
+	// 			*num_constructed.write().unwrap() += 1;
+	// 			std::mem::take(constructor().world_mut())
+	// 		})
+	// 	});
+	// 	PooledWorld {
+	// 		inner,
+	// 		num_returned,
+	// 	}
+	// }
+}
 
-	/// Sets the constructor for the app.
-	/// This should be called once before any calls to [`Self::get`].
-	pub fn get_or_init_with<F>(constructor: F) -> Self
-	where
-		F: 'static + Send + Sync + Fn() -> App,
-	{
-		APP.with(|cell| {
-			let app_ref = cell.get_or_init(|| constructor());
-			ThreadLocalApp::new(app_ref)
-		})
+/// An [`App`] that is automatically returned to the [`AppPool`] when dropped.
+#[derive(Default)]
+pub struct PooledWorld {
+	inner: World,
+	num_returned: Arc<RwLock<usize>>,
+}
+impl PooledWorld {
+	pub fn inner_mut(&mut self) -> &mut World { &mut self.inner }
+}
+
+impl std::ops::Deref for PooledWorld {
+	type Target = World;
+
+	fn deref(&self) -> &Self::Target { &self.inner }
+}
+impl std::ops::DerefMut for PooledWorld {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
+}
+
+impl Drop for PooledWorld {
+	fn drop(&mut self) {
+		*self.num_returned.write().unwrap() += 1;
+		let app = std::mem::take(&mut self.inner);
+		POOL.with(move |pool| {
+			pool.borrow_mut().push(app);
+		});
 	}
-	/// Gets a thread-local instance of the app
-	///
-	/// # Panics
-	/// If the constructor has not been set before calling this method.
-	pub fn get() -> Option<Self> {
-		APP.with(|cell| cell.get().map(|app| ThreadLocalApp::new(app)))
-	}
 }
 
-impl std::ops::Deref for ThreadLocalApp {
-	type Target = App;
-	fn deref(&self) -> &Self::Target { unsafe { &*self.app } }
-}
 
-impl std::ops::DerefMut for ThreadLocalApp {
-	fn deref_mut(&mut self) -> &mut Self::Target { unsafe { &mut *self.app } }
-}
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -123,27 +146,36 @@ mod tests {
 
 
 		// Main thread
-		let mut main_app = pool.get();
-		main_app.world().resource::<Foo>().0.xpect().to_be(1);
+		let mut main_app = pool.pop();
+		main_app.resource::<Foo>().0.xpect().to_be(1);
 
 		// Change value in main thread
-		main_app.world_mut().insert_resource(Foo(2));
-		main_app.world().resource::<Foo>().0.xpect().to_be(2);
+		main_app.insert_resource(Foo(2));
+		main_app.resource::<Foo>().0.xpect().to_be(2);
 
 		// Spawn a thread and check isolation
 		let pool2 = pool.clone();
 		#[cfg(not(target_arch = "wasm32"))]
 		std::thread::spawn(move || {
-			let mut thread_app = pool2.get();
+			let mut thread_app = pool2.pop();
 			// Should be the original value, not affected by main thread
-			thread_app.world().resource::<Foo>().0.xpect().to_be(1);
-			thread_app.world_mut().insert_resource(Foo(3));
-			thread_app.world().resource::<Foo>().0.xpect().to_be(3);
+			thread_app.resource::<Foo>().0.xpect().to_be(1);
+			thread_app.insert_resource(Foo(3));
+			thread_app.resource::<Foo>().0.xpect().to_be(3);
 		})
 		.join()
 		.unwrap();
 
 		// Main thread value should remain unchanged
-		main_app.world().resource::<Foo>().0.xpect().to_be(2);
+		main_app.resource::<Foo>().0.xpect().to_be(2);
+
+		// One for main thread, one for the spawned thread
+		pool.num_constructed().xpect().to_be(2);
+		pool.pop();
+		pool.num_constructed().xpect().to_be(3);
+
+		pool.num_returned().xpect().to_be(2);
+		drop(main_app);
+		pool.num_returned().xpect().to_be(3);
 	}
 }

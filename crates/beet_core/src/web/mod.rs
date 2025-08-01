@@ -27,5 +27,4 @@ pub mod prelude {
 	pub use super::logging::*;
 	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures::spawn_local;
-	
 }

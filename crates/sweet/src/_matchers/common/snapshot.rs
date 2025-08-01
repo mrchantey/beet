@@ -75,11 +75,10 @@ impl<T> Matcher<T> {
 					// snapshot saved, no assertion made
 					return;
 				}
-				Err(e)=>{
+				Err(e) => {
 					self.assert(false, &e.to_string());
-
 				}
-		 }
+			}
 		}
 	}
 }

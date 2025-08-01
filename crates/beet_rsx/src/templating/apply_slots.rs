@@ -309,5 +309,4 @@ mod test {
 		.xpect()
 		.to_be("<body><header><h1>Title</h1></header><main><div>Content</div></main></body>");
 	}
-
 }

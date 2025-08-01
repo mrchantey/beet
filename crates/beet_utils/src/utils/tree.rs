@@ -14,9 +14,7 @@ impl<T> IntoIterator for Tree<T> {
 	type Item = T;
 	type IntoIter = TreeIterDfs<T>;
 
-	fn into_iter(self) -> Self::IntoIter {
-		TreeIterDfs { stack: vec![self] }
-	}
+	fn into_iter(self) -> Self::IntoIter { TreeIterDfs { stack: vec![self] } }
 }
 
 pub struct TreeIterDfs<T> {

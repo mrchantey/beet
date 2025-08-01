@@ -11,5 +11,4 @@ pub impl<T: Clone + ScheduleLabel> T {
 			world.run_schedule(self.clone());
 		}
 	}
-
 }

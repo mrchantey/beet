@@ -1,11 +1,11 @@
+mod endpoint;
 #[cfg(feature = "bevy")]
 mod extractors;
 mod response;
 mod route_filter;
-mod endpoint;
+pub use endpoint::*;
 pub use response::*;
 pub use route_filter::*;
-pub use endpoint::*;
 mod request;
 pub use request::*;
 mod http_error;

@@ -5,11 +5,12 @@ use beet_site::prelude::*;
 
 #[sweet::test]
 async fn docs() {
-	let mut app = App::new();
-
-	app.add_plugins(RouterPlugin);
-	app.world_mut().spawn(routes());
-	app.insert_resource(TemplateFlags::None).init().update();
-	let _res = Router::oneshot(app.world_mut(), "/docs").await;
-	// println!("{:?}", res);
+	let res = Router::new(|app: &mut App| {
+		app.insert_resource(TemplateFlags::None)
+			.world_mut()
+			.spawn(routes());
+	})
+	.oneshot("/docs")
+	.await;
+	println!("{:?}", res);
 }

@@ -110,11 +110,9 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		HtmlDocument::parse_bundle(
-			rsx! {<style {replace_hash()}/><span/>},
-		)
-		.xpect()
-		.to_be_snapshot();
+		HtmlDocument::parse_bundle(rsx! {<style {replace_hash()}/><span/>})
+			.xpect()
+			.to_be_snapshot();
 	}
 	#[test]
 	fn deduplicates() {

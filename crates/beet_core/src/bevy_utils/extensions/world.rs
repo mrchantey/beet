@@ -28,7 +28,6 @@ impl IntoWorld for App {
 #[ext(name=WorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
-
 	fn component_names(&self, entity: Entity) -> Vec<String> {
 		let world = self.into_world();
 		world

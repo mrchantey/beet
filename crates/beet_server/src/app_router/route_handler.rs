@@ -242,7 +242,7 @@ mod test {
 			app.world_mut()
 				.spawn(RouteHandler::new(HttpMethod::Get, || "howdy"));
 		})
-		.oneshot("/")
+		.oneshot("/foobar")
 		.await
 		.xpect()
 		.to_be(Response::not_found());

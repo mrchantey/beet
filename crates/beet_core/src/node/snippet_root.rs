@@ -134,5 +134,3 @@ impl NodeLocation<'_, '_> {
 			.unwrap_or_else(|| format!("Entity without location: {entity:?}"))
 	}
 }
-
-

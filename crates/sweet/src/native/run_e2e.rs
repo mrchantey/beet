@@ -1,10 +1,10 @@
 use crate::prelude::TestRunnerConfig;
 use anyhow::Result;
+use beet_utils::utils::PipelineTarget;
 use std::env;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
-use beet_utils::utils::PipelineTarget;
 
 
 /// if the e2e flag is set, start the chromedriver

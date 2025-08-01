@@ -5,7 +5,6 @@ pub fn Code(
 	#[field(flatten)] attrs: BaseHtmlAttributes,
 	// content: String,
 ) -> impl Bundle {
-
 	rsx! {
 		<pre {attrs}>
 		<slot/>

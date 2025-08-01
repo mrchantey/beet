@@ -46,8 +46,7 @@ impl AxumRunner {
 		};
 
 		let app_pool_endpoints = beet_router
-			.get()
-			.world_mut()
+			.pop()
 			.run_system_once(ResolvedEndpoint::collect)
 			.unwrap();
 

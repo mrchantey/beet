@@ -110,7 +110,6 @@ impl<'a> Parser<'_, '_, 'a> {
 			}
 		))
 	}
-
 }
 
 #[cfg(test)]

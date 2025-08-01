@@ -56,7 +56,7 @@ mod test {
 	use quote::ToTokens;
 	use sweet::prelude::*;
 	use syn::Ident;
-	
+
 	#[test]
 	fn works() {
 		let foo: Ident = syn::parse_quote!(foo);

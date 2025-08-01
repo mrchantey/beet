@@ -71,7 +71,7 @@ impl OnSpawnDeferred {
 	) -> Self {
 		Self(Box::new(func))
 	}
-	
+
 
 	/// Insert this bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {

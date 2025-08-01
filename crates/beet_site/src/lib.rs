@@ -29,8 +29,6 @@ pub mod prelude {
 	#[cfg(feature = "server")]
 	pub use crate::codegen::docs::docs_routes;
 	#[cfg(feature = "server")]
-	pub use crate::routes::*;
-	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::codegen::routes;
@@ -40,4 +38,6 @@ pub mod prelude {
 	pub use crate::components::*;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::layouts::*;
+	#[cfg(feature = "server")]
+	pub use crate::routes::*;
 }

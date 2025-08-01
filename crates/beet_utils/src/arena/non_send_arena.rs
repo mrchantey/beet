@@ -94,7 +94,10 @@ impl NonSendArenaMap {
 	}
 
 	/// Get a reference to an object by its handle
-	pub fn get<H: NonSendHandle>(&self, handle: &H) -> Option<Ref<H::ObjectType>> {
+	pub fn get<H: NonSendHandle>(
+		&self,
+		handle: &H,
+	) -> Option<Ref<H::ObjectType>> {
 		let objects = self.objects.borrow();
 
 		// Check if the object exists and can be downcast to the correct type
@@ -125,7 +128,10 @@ impl NonSendArenaMap {
 	}
 
 	/// Manually remove an object from the arena (consumes all handles)
-	pub fn remove<H: NonSendHandle>(&self, handle: &H) -> Option<H::ObjectType> {
+	pub fn remove<H: NonSendHandle>(
+		&self,
+		handle: &H,
+	) -> Option<H::ObjectType> {
 		let mut objects = self.objects.borrow_mut();
 		// Don't call drop on the handle since we're consuming it
 		// std::mem::forget(handle);

@@ -7,11 +7,7 @@ pub fn apply_reactive_text_nodes(
 	constants: Res<HtmlConstants>,
 	query: Populated<
 		(Entity, &ChildOf, &DomIdx),
-		(
-			With<TextNode>,
-			With<ReceivesSignals>,
-			Without<AttributeOf>,
-		),
+		(With<TextNode>, With<ReceivesSignals>, Without<AttributeOf>),
 	>,
 	children: Query<&Children>,
 ) -> Result {

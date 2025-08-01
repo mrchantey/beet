@@ -6,14 +6,7 @@ use serde::Serialize;
 
 /// General metadata common for blog posts, docs, etc.
 #[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	Serialize,
-	Deserialize,
-	Component,
+	Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Component,
 )]
 pub struct ArticleMeta {
 	#[serde(default)]

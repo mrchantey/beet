@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use fantoccini::Locator;
 use fantoccini::error;
-use beet_utils::prelude::*;
 
 
 #[allow(async_fn_in_trait)]

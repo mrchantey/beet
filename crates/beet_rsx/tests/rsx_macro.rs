@@ -30,9 +30,9 @@ fn rsx_macro() {
 
 
 #[test]
-fn inner_text(){
+fn inner_text() {
 	let code = "let foo = {bar};";
-		rsx! {<code inner:text=code />}
+	rsx! {<code inner:text=code />}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<code>let foo = {bar};</code>");

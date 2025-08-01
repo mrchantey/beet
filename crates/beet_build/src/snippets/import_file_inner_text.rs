@@ -83,7 +83,7 @@ mod test {
 		app.world_mut().query_once::<&InnerText>()[0]
 			.xpect()
 			.to_be(&InnerText::new(expected));
-		
+
 		// links source files
 		app.world_mut().query_once::<&SourceFileRef>()[0]
 			.0

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -7,7 +8,6 @@ use quote::quote_spanned;
 use rapidhash::RapidHashSet;
 use send_wrapper::SendWrapper;
 use std::sync::LazyLock;
-use beet_utils::prelude::*;
 
 // Collect elements to provide semantic highlight based on element tag.
 // No differences between open tag and closed tag.

@@ -93,15 +93,15 @@ fn design_mockups_collection() -> impl Bundle {
 		)
 		.with_pkg_name("beet_design")
 		.set_imports(vec![
-			syn::parse_quote!{
-				#[allow(unused_imports)]
-				use bevy::prelude::*;},
-			syn::parse_quote!{
-				#[allow(unused_imports)]
-				use beet_rsx::as_beet::*;},
-			syn::parse_quote!{
-				#[allow(unused_imports)]
-				use crate::prelude::*;},
+			syn::parse_quote! {
+			#[allow(unused_imports)]
+			use bevy::prelude::*;},
+			syn::parse_quote! {
+			#[allow(unused_imports)]
+			use beet_rsx::as_beet::*;},
+			syn::parse_quote! {
+			#[allow(unused_imports)]
+			use crate::prelude::*;},
 		]),
 	)
 }

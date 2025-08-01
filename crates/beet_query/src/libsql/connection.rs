@@ -1,8 +1,8 @@
 use crate::libsql::cached_statement::LibsqlStatementWrapper;
 use crate::prelude::*;
 use anyhow::Result;
-use sea_query::SqliteQueryBuilder;
 use beet_utils::prelude::*;
+use sea_query::SqliteQueryBuilder;
 
 #[cfg(feature = "libsql")]
 impl ConnectionInner for libsql::Connection {

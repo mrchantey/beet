@@ -126,10 +126,8 @@ mod test {
 				ElementNode::self_closing(),
 				NodeTag("slot".to_string()),
 				related!(
-					Attributes[(
-						AttributeKey::new("name"),
-						"foo".into_bundle()
-					)]
+					Attributes
+						[(AttributeKey::new("name"), "foo".into_bundle())]
 				),
 			))
 			.id();
