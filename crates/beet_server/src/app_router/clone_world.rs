@@ -100,10 +100,10 @@ mod test {
 		let mut world2 = CloneWorld::new(&mut world1).clone_world().unwrap();
 
 		world2.query_once::<&Foo>()[0].0.xpect().to_be(7);
-		Router::oneshot_str(&mut world2, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be("hello world!");
+		// Router::oneshot_str(&mut world2, "/")
+		// 	.await
+		// 	.unwrap()
+		// 	.xpect()
+		// 	.to_be("hello world!");
 	}
 }

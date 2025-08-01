@@ -23,33 +23,29 @@ impl AxumRunner {
 	/// Create a new [`axum::Router`] using the current app's world.
 	/// All handlers will get the world from the [`AppPool`]
 	pub fn router(world: &mut World) -> axum::Router {
-		let mut router = world
+		let mut axum_router = world
 			.get_non_send_resource::<axum::Router>()
 			.cloned()
 			.unwrap_or_default();
-		let pool = world.resource::<Router>().clone();
+		let beet_router = world.resource::<Router>().clone();
 
-		let handler_pool = pool.clone();
-		let handler = move |request: axum::extract::Request| {
-			// let pool = pool.clone();
-			async move {
-				// let pool = pool.clone();
-				match async move {
-					// let world = world.clone_world()?;
-					let req = Request::from_axum(request, &()).await?;
-					let mut app = handler_pool.get();
-					let world = app.world_mut();
-					Router::handle_request(world, req).await.xok::<BevyError>()
-				}
-				.await
-				{
-					Ok(res) => res.into_axum().await,
-					Err(err) => err.into_response().into_axum().await,
-				}
+		let beet_router2 = beet_router.clone();
+		let handler = move |axum_req: axum::extract::Request| async move {
+			match async move {
+				let beet_req = Request::from_axum(axum_req, &()).await?;
+				beet_router2
+					.handle_request(beet_req)
+					.await
+					.xok::<BevyError>()
+			}
+			.await
+			{
+				Ok(beet_res) => beet_res.into_axum().await,
+				Err(bevy_err) => bevy_err.into_response().into_axum().await,
 			}
 		};
 
-		let app_pool_endpoints = pool
+		let app_pool_endpoints = beet_router
 			.get()
 			.world_mut()
 			.run_system_once(ResolvedEndpoint::collect)
@@ -59,10 +55,10 @@ impl AxumRunner {
 			let segments = segments_to_axum(endpoint.segments().clone());
 			let method = method_to_axum(endpoint.method());
 			trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
-			router =
-				router.route(&segments, routing::on(method, handler.clone()));
+			axum_router = axum_router
+				.route(&segments, routing::on(method, handler.clone()));
 		}
-		router
+		axum_router
 	}
 
 	#[tokio::main]

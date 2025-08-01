@@ -1,7 +1,9 @@
 mod server_runner;
 mod clone_world;
 mod router_plugin;
+mod collect_html;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
+pub use collect_html::*;
 pub use axum_runner::*;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_runner;

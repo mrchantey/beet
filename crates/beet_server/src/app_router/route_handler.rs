@@ -227,10 +227,7 @@ impl RouteHandler {
 	}
 
 	/// handlers are infallible, any error is inserted into [`RouteHandlerOutput`]
-	pub async fn run(&self, world: &mut World) {
-		let world_owned = std::mem::take(world);
-		*world = (self.0)(world_owned).await;
-	}
+	pub async fn run(&self, world: World) -> World { (self.0)(world).await }
 }
 
 #[cfg(test)]
@@ -241,67 +238,75 @@ mod test {
 
 	#[sweet::test]
 	async fn not_found() {
-		Router::oneshot(&mut World::new(), "/")
-			.await
-			.xpect()
-			.to_be(Response::not_found());
+		Router::new(|app: &mut App| {
+			app.world_mut()
+				.spawn(RouteHandler::new(HttpMethod::Get, || "howdy"));
+		})
+		.oneshot("/")
+		.await
+		.xpect()
+		.to_be(Response::not_found());
 	}
 	#[sweet::test]
 	async fn works() {
-		let mut world = World::new();
-		world.spawn(RouteHandler::new(HttpMethod::Get, || "howdy"));
-		Router::oneshot(&mut world, "/")
-			.await
-			.status()
-			.xpect()
-			.to_be(StatusCode::OK);
+		Router::new(|app: &mut App| {
+			app.world_mut()
+				.spawn(RouteHandler::new(HttpMethod::Get, || "howdy"));
+		})
+		.oneshot("/")
+		.await
+		.status()
+		.xpect()
+		.to_be(StatusCode::OK);
 	}
 	#[sweet::test]
 	async fn bundle() {
-		let mut app = App::new();
-		app.add_plugins(RouterPlugin);
-		let mut world = app.world_mut();
 		fn foo(_bar: Query<Entity>) -> impl Bundle + use<> {
 			rsx! {<div>hello</div>}
 		}
 
-		world.spawn(RouteHandler::bundle(HttpMethod::Get, foo));
-		Router::oneshot_str(&mut world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be(
-				"<!DOCTYPE html><html><head></head><body><div>hello</div></body></html>",
-			);
+		Router::new(|app: &mut App| {
+			app.world_mut()
+				.spawn(RouteHandler::bundle(HttpMethod::Get, foo));
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be(
+			"<!DOCTYPE html><html><head></head><body><div>hello</div></body></html>",
+		);
 	}
 	#[sweet::test]
 	async fn body() {
-		let mut world = World::new();
-		world.spawn(RouteHandler::new(HttpMethod::Get, || "hello"));
-		Router::oneshot_str(&mut world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be("hello");
+		Router::new(|app: &mut App| {
+			app.world_mut()
+				.spawn(RouteHandler::new(HttpMethod::Get, || "hello"));
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be("hello");
 	}
 
 	#[sweet::test]
 	async fn layers() {
-		let mut world = World::new();
-		world.spawn(children![
-			RouteHandler::layer(|mut req: ResMut<Request>| {
-				req.set_body("jimmy");
-			}),
-			RouteHandler::new(HttpMethod::Get, |req: In<Request>| {
-				let body = req.body_str().unwrap_or_default();
-				format!("hello {}", body)
-			})
-		]);
-
-		Router::oneshot_str(&mut world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_str("hello jimmy");
+		Router::new(|app: &mut App| {
+			app.world_mut().spawn(children![
+				RouteHandler::layer(|mut req: ResMut<Request>| {
+					req.set_body("jimmy");
+				}),
+				RouteHandler::new(HttpMethod::Get, |req: In<Request>| {
+					let body = req.body_str().unwrap_or_default();
+					format!("hello {}", body)
+				})
+			]);
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("hello jimmy");
 	}
 }

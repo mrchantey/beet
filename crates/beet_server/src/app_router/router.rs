@@ -26,25 +26,29 @@ impl Router {
 
 	/// Handle a single request, returning the response or a 404 if not found.
 	pub async fn oneshot(
-		world: &mut World,
+		&self,
 		req: impl Into<Request>,
 	) -> Response {
-		Self::handle_request(world, req.into()).await
+		self.handle_request(req.into()).await
 	}
 		pub async fn oneshot_str(
-		world: &mut World,
+			&self,
 		req: impl Into<Request>,
 	) -> Result<String> {
-		let res = Self::oneshot(world, req).await.into_result().await?;
+		let res = self.oneshot(req).await.into_result().await?;
 		res.text().await
 	}
 
 
 	/// Handle a request in the world, returning the response
 	pub async fn handle_request(
-		world: &mut World,
+		&self,
 		request: Request,
 	) -> Response {
+
+		let mut app = self.app_pool.get();
+		let world = app.world_mut();
+
 		let start_time = CrossInstant::now();
 
 		let route_parts = RouteParts::from_parts(&request.parts);
@@ -53,7 +57,7 @@ impl Router {
 		world.insert_resource(request);
 
 		for entity in world.query_filtered_once::<Entity, Without<ChildOf>>() {
-				handle_request_recursive(world, route_parts.clone(), entity)
+				self.handle_request_recursive(route_parts.clone(), entity)
 					.await;
 		}
 
@@ -69,77 +73,81 @@ impl Router {
 		trace!("Route handler completed in: {:.2?}", start_time.elapsed());
 		response
 	}
-}
-
-
-
-/// Pre-order depth fist traversal. parent first, then children.
-async fn handle_request_recursive(
-	world: &mut World,
-	parts: RouteParts,
-	root_entity: Entity,
-) {
-	struct StackFrame {
-		entity: Entity,
+	/// Pre-order depth fist traversal. parent first, then children.
+	async fn handle_request_recursive(
+		&self,
 		parts: RouteParts,
-	}
-
-	let mut stack = vec![StackFrame {
-		entity: root_entity,
-		parts,
-	}];
-
-	while let Some(StackFrame { entity, mut parts }) = stack.pop() {
-		// Check 1: MethodFilter
-		if let Some(method_filter) = world.entity(entity).get::<MethodFilter>()
-		{
-			if !method_filter.matches(&parts) {
-				// method does not match, skip this entity
-				continue;
-			}
+		root_entity: Entity,
+	) {
+	let mut app = self.app_pool.get();
+		let world = app.world_mut();
+	
+		struct StackFrame {
+			entity: Entity,
+			parts: RouteParts,
 		}
-		// Check 2: RouteFilter
-		if let Some(filter) = world.entity(entity).get::<RouteFilter>() {
-			match filter.matches(parts.clone()) {
-				ControlFlow::Break(_) => {
-					// path does not match, skip this entity
+	
+		let mut stack = vec![StackFrame {
+			entity: root_entity,
+			parts,
+		}];
+	
+		while let Some(StackFrame { entity, mut parts }) = stack.pop() {
+			// Check 1: MethodFilter
+			if let Some(method_filter) = world.entity(entity).get::<MethodFilter>()
+			{
+				if !method_filter.matches(&parts) {
+					// method does not match, skip this entity
 					continue;
 				}
-				ControlFlow::Continue(remaining_parts) => {
-					parts = remaining_parts;
+			}
+			// Check 2: RouteFilter
+			if let Some(filter) = world.entity(entity).get::<RouteFilter>() {
+				match filter.matches(parts.clone()) {
+					ControlFlow::Break(_) => {
+						// path does not match, skip this entity
+						continue;
+					}
+					ControlFlow::Continue(remaining_parts) => {
+						parts = remaining_parts;
+					}
 				}
 			}
-		}
-
-		// at this point add children, even if the endpoint doesnt match
-		// a child might
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			// reverse children to maintain order with stack.pop()
-			for child in children.iter().rev() {
-				stack.push(StackFrame {
-					entity: child,
-					parts: parts.clone(),
-				});
+	
+			// at this point add children, even if the endpoint doesnt match
+			// a child might
+			if let Some(children) = world.entity(entity).get::<Children>() {
+				// reverse children to maintain order with stack.pop()
+				for child in children.iter().rev() {
+					stack.push(StackFrame {
+						entity: child,
+						parts: parts.clone(),
+					});
+				}
 			}
-		}
-
-		// Check 3: Endpoint
-		if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
-			if
-			// endpoints may only run if exact match
-			!parts.path().is_empty() || 
-			// method must match
-			endpoint.method() != parts.method() {
-				continue;
+	
+			// Check 3: Endpoint
+			if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
+				if
+				// endpoints may only run if exact match
+				!parts.path().is_empty() || 
+				// method must match
+				endpoint.method() != parts.method() {
+					continue;
+				}
 			}
-		}
-
-		// Party time: actually run the handler
-		if let Some(handler) = world.entity(entity).get::<RouteHandler>() {
-			handler.clone().run(world).await;
+	
+			// Party time: actually run the handler
+			if let Some(handler) = world.entity(entity).get::<RouteHandler>().cloned() {
+						let world_owned = std::mem::take(world);
+						let returned_world = handler.run(world_owned).await;
+			}
 		}
 	}
 }
+
+
+
 
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
 pub fn insert_route_tree(world: &mut World) {
@@ -160,14 +168,14 @@ mod test {
 
 	#[sweet::test]
 	async fn beet_route_works() {
-		let mut world = World::new();
-		world.spawn(RouteHandler::new(HttpMethod::Get, || "hello world!"));
-
-		Router::oneshot_str(&mut world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_str("hello world!");
+	let router = Router::new(|app: &mut App| {
+		app.world_mut().spawn(RouteHandler::new(HttpMethod::Get, || "hello world!"));
+	});
+	router.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("hello world!");
 	}
 
 
@@ -212,9 +220,48 @@ mod test {
 		));
 
 
-		world.init_resource::<Foo>();
-		Router::handle_request(&mut world, Request::get(route)).await;
-		world.remove_resource::<Foo>().unwrap().0
+	let router = Router::new(|app: &mut App| {
+		app.world_mut().spawn((
+			// RouteFilter::new("/"),
+			RouteHandler::layer(|mut res: ResMut<Foo>| {
+				res.push(0);
+			}),
+		));
+		app.world_mut().spawn((
+			RouteFilter::new("foo"),
+			RouteHandler::layer(|mut res: ResMut<Foo>| {
+				res.push(1);
+			}),
+			children![
+				(
+					RouteFilter::new("bar"),
+					Endpoint::new(HttpMethod::Get),
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
+						res.push(2);
+					}),
+				),
+				(
+					RouteFilter::new("bazz"),
+					Endpoint::new(HttpMethod::Delete),
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
+						res.push(3);
+					}),
+				),
+				(
+					// no endpoint, always runs if parent matches
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
+						res.push(4);
+					}),
+				),
+			],
+		));
+		app.world_mut().init_resource::<Foo>();
+	});
+	router.handle_request(Request::get(route)).await;
+	// Remove Foo resource from the world inside the router's app_pool
+	let mut app = router.app_pool.get();
+	app.world_mut().remove_resource::<Foo>().unwrap().0;
+	todo!("pretty sure this wont work");
 	}
 
 	#[sweet::test]
@@ -228,18 +275,19 @@ mod test {
 	}
 	#[sweet::test]
 	async fn simple() {
-		let mut world = World::new();
-		world.spawn((
-			RouteFilter::new("pizza"),
-			RouteHandler::new(HttpMethod::Get, || "hawaiian"),
-		));
-		Router::oneshot_str(&mut world, "sdjhkfds")
+		let router = Router::new(|app: &mut App| {
+			app.world_mut().spawn((
+				RouteFilter::new("pizza"),
+				RouteHandler::new(HttpMethod::Get, || "hawaiian"),
+			));
+		});
+		router.oneshot_str("sdjhkfds")
 			.await
 			.unwrap_err()
 			.to_string()
 			.xpect()
 			.to_be("404 Not Found\n");
-		Router::oneshot_str(&mut world, "/pizza")
+		router.oneshot_str("/pizza")
 			.await
 			.unwrap()
 			.xpect()
@@ -247,21 +295,22 @@ mod test {
 	}
 	#[sweet::test]
 	async fn endpoint_with_children() {
-		let mut world = World::new();
-		world.spawn((
-			RouteFilter::new("foo"),
-			RouteHandler::new(HttpMethod::Get, || "foo"),
-			children![(
-				RouteFilter::new("bar"),
-				RouteHandler::new(HttpMethod::Get, || "bar")
-			),],
-		));
-		Router::oneshot_str(&mut world, "/foo")
+		let router = Router::new(|app: &mut App| {
+			app.world_mut().spawn((
+				RouteFilter::new("foo"),
+				RouteHandler::new(HttpMethod::Get, || "foo"),
+				children![(
+					RouteFilter::new("bar"),
+					RouteHandler::new(HttpMethod::Get, || "bar")
+				),],
+			));
+		});
+		router.oneshot_str("/foo")
 			.await
 			.unwrap()
 			.xpect()
 			.to_be_str("foo");
-		Router::oneshot_str(&mut world, "/foo/bar")
+		router.oneshot_str("/foo/bar")
 			.await
 			.unwrap()
 			.xpect()
@@ -269,33 +318,32 @@ mod test {
 	}
 	#[sweet::test]
 	async fn route_tree() {
-		let mut world = World::new();
-		world.spawn(
-		(
-			RouteHandler::new(HttpMethod::Get, |tree: Res<RoutePathTree>| {
-				tree.to_string()
-			}),
-			children![
-				(
-					RouteFilter::new("foo"),
-					RouteHandler::new(HttpMethod::Get, || "foo")
-				),
-				(
-					RouteFilter::new("bar"),
-					children![
-						(
-							RouteFilter::new("baz"),
-							RouteHandler::new(HttpMethod::Get, || "baz")
-						)]
-				),
-				(
-					RouteFilter::new("boo"),
-				),
-			]
-		)
-		);
-		world.run_system_cached(insert_route_tree).unwrap();
-		Router::oneshot_str(&mut world, "/")
+		let router = Router::new(|app: &mut App| {
+			app.world_mut().spawn((
+				RouteHandler::new(HttpMethod::Get, |tree: Res<RoutePathTree>| {
+					tree.to_string()
+				}),
+				children![
+					(
+						RouteFilter::new("foo"),
+						RouteHandler::new(HttpMethod::Get, || "foo")
+					),
+					(
+						RouteFilter::new("bar"),
+						children![
+							(
+								RouteFilter::new("baz"),
+								RouteHandler::new(HttpMethod::Get, || "baz")
+							)]
+					),
+					(
+						RouteFilter::new("boo"),
+					),
+				]
+			));
+			app.world_mut().run_system_cached(insert_route_tree).unwrap();
+		});
+		router.oneshot_str("/")
 			.await
 			.unwrap()
 			.xpect()

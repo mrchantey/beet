@@ -46,48 +46,46 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin);
-		let world = app.world_mut();
-		world.spawn(children![RouteHandler::bundle(HttpMethod::Get, || {
-			rsx! {
-				<MyTemplate foo=42/>
-			}
-		}),]);
-
-		Router::oneshot_str(world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
-			);
+		Router::new(|app: &mut App| {
+			app.world_mut().spawn(children![RouteHandler::bundle(
+				HttpMethod::Get,
+				|| {
+					rsx! {
+						<MyTemplate foo=42/>
+					}
+				}
+			),]);
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str(
+			"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
+		);
 	}
 	#[sweet::test]
 	async fn middleware() {
-		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin);
-		let world = app.world_mut();
-		world.spawn(children![
-			RouteHandler::bundle(HttpMethod::Get, || {
-				rsx! {
-					<MyTemplate foo=42/>
-				}
-			}),
-			RouteHandler::layer(|world: &mut World| {
-				let entity = world
-					.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
-				world.spawn((HtmlDocument, rsx! {
-					"middleware!" {entity}
-				}));
-			}),
-		]);
-
-		Router::oneshot_str(world, "/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_str(
+		Router::new(|app: &mut App| {
+			app.world_mut().spawn(children![
+				RouteHandler::bundle(HttpMethod::Get, || {
+					rsx! {
+						<MyTemplate foo=42/>
+					}
+				}),
+				RouteHandler::layer(|world: &mut World| {
+					let entity = world
+						.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+					world.spawn((HtmlDocument, rsx! {
+						"middleware!" {entity}
+					}));
+				}),
+			]);
+		}).oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str(
 				"<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>",
 			);
 	}

@@ -65,10 +65,6 @@ pub struct ThreadLocalApp {
 	app: *mut App,
 }
 
-// TODO get peer review on this
-// SAFE?: ThreadLocalApp is only ever used in a thread-local context, so this is sound.
-unsafe impl Send for ThreadLocalApp {}
-
 thread_local! {
 		static APP: OnceCell<App> = OnceCell::new();
 }

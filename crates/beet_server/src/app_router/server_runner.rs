@@ -108,53 +108,13 @@ impl ServerRunner {
 		todo!("hyper router");
 	}
 
-	/// Export static html files and client islands.
+	/// Export static html files
 	#[cfg(not(target_arch = "wasm32"))]
 	#[tokio::main]
-	// TODO this should be a system
 	async fn export_html(&self, app: &mut App) -> Result {
-		let workspace_config = app.world().resource::<WorkspaceConfig>();
-		let html_dir = workspace_config.html_dir.into_abs();
+		let html = collect_html(app.world_mut()).await?;
 
-		let clone_world = CloneWorld::new(app.world_mut());
-		let html = app
-			.world_mut()
-			.run_system_cached(ResolvedEndpoint::collect_static_get)?
-			.into_iter()
-			// TODO parallel
-			.map(async |(_, info)| -> Result<Option<(AbsPathBuf, String)>> {
-				debug!("building html for {}", info.path());
-				use http::header::CONTENT_TYPE;
-
-				let mut world = clone_world.clone().clone_world()?;
-				let route_path = html_dir
-					.join(&info.path().as_relative())
-					.join("index.html");
-
-				let route_info =
-					RouteInfo::new(info.path().clone(), info.method());
-
-				let res = Router::oneshot(&mut world, route_info)
-					.await
-					.into_result()
-					.await?;
-				// debug!("building html for {}", info.path());
-
-				// we are only collecting html responses, other static endpoints
-				// are not exported
-				if res.header_contains(CONTENT_TYPE, "text/html") {
-					let html = res.text().await?;
-					Some((route_path, html))
-				} else {
-					None
-				}
-				.xok()
-			})
-			.xmap(futures::future::try_join_all)
-			.await?;
-
-		// write files all at once to avoid triggering file watcher multiple times
-		for (path, html) in html.into_iter().filter_map(|x| x) {
+		for (path, html) in html {
 			debug!("Exporting html to {}", path);
 			FsExt::write(path, &html)?;
 		}
