@@ -39,7 +39,11 @@ pub fn parse_syntect(
 		// hack until template parsing, entity is now a div
 		// before: <code lang="rust">RAW CODE</code>
 		// after: <div><pre><code>SYNTECT CODE</code></pre></div>
-		commands.entity(entity).insert(NodeTag::new("div"));
+		// commands.entity(entity).insert(NodeTag::new("div"));
+		commands.entity(entity).with_related::<AttributeOf>((
+			AttributeKey::new("class"),
+			TextNode::new("syntect-code"),
+		));
 		// .remove::<NodeTag>()
 		// .remove::<ElementNode>()
 		// .insert(FragmentNode);
