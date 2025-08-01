@@ -8,14 +8,7 @@ pub struct Router;
 
 
 impl Router {
-	pub async fn oneshot_str(
-		world: &mut World,
-		req: impl Into<Request>,
-	) -> Result<String> {
-		let res = Self::oneshot(world, req).await.into_result().await?;
-		res.text().await
-	}
-
+	/// Handle a single request, returning the response or a 404 if not found.
 	pub async fn oneshot(
 		world: &mut World,
 		req: impl Into<Request>,
@@ -25,6 +18,14 @@ impl Router {
 		*world = world2;
 		out
 	}
+		pub async fn oneshot_str(
+		world: &mut World,
+		req: impl Into<Request>,
+	) -> Result<String> {
+		let res = Self::oneshot(world, req).await.into_result().await?;
+		res.text().await
+	}
+
 
 	/// Handle a request in the world, returning the response
 	pub async fn handle_request(

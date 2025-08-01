@@ -32,22 +32,7 @@ fn launch_plugin(app: &mut App) {
 
 #[cfg(feature = "server")]
 fn server_plugin(app: &mut App) {
-	app.world_mut().spawn((
-		children![
-			pages_routes(), 
-			docs_routes(), 
-			blog_routes(), 
-			actions_routes(),
-			(
-				RouteFilter::new("docs"),
-				article_layout_middleware()
-			),
-			(
-				RouteFilter::new("blog"),
-				article_layout_middleware()
-			),
-		],
-	));
+	app.world_mut().spawn(routes());
 }
 
 #[cfg(feature = "client")]
@@ -56,24 +41,3 @@ fn client_plugin(app: &mut App) {
 		.register_type::<ClientIslandRoot<ClientCounter>>()
 		.register_type::<ClientIslandRoot<ServerCounter>>();
 }
-
-// #[cfg(not(feature = "client"))]
-// fn main() -> Result {
-// 	AppRouter::default()
-// 		.add_plugins((
-// 			PagesPlugin,
-// 			ActionsPlugin,
-// 			DocsPlugin.layer(ArticleLayout),
-// 			BlogPlugin.layer(ArticleLayout),
-// 			BeetDesignMockupsPlugin.layer(ArticleLayout),
-// 		))
-// 		.run()
-// }
-
-// #[cfg(feature = "client")]
-// fn main() {
-// 	App::new()
-// 		.add_plugins((ApplyDirectivesPlugin, ClientIslandPlugin))
-// 		.set_runner(ReactiveApp::runner)
-// 		.run();
-// }

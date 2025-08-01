@@ -10,6 +10,9 @@ pub mod components;
 #[cfg(any(feature = "server", feature = "client"))]
 pub mod layouts;
 
+#[cfg(feature = "server")]
+mod routes;
+
 #[cfg(feature = "launch")]
 mod collections;
 
@@ -25,6 +28,8 @@ pub mod prelude {
 	pub use crate::codegen::blog::blog_routes;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::docs::docs_routes;
+	#[cfg(feature = "server")]
+	pub use crate::routes::*;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(any(feature = "server", feature = "client"))]
