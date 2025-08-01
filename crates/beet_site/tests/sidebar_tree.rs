@@ -6,14 +6,25 @@ use sweet::prelude::*;
 
 #[sweet::test]
 async fn works() {
-	// let sidebar_tree =
-	// 	route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
-	// sidebar_tree[3].display_name.xref().xpect().to_be("Docs");
-	// sidebar_tree[3].children[0]
-	// 	.display_name
-	// 	.xref()
-	// 	.xpect()
-	// 	.to_be("Testing");
+	let mut app = App::new();
+	app.add_plugins(RouterPlugin);
+	app.world_mut().spawn(routes());
+	app.init().update();
+	app.world_mut()
+		.run_system_cached_with(
+			CollectSidebarNode::collect,
+			CollectSidebarNode {
+				include_filter: GlobFilter::default()
+					.with_include("/")
+					.with_include("/docs*")
+					.with_include("/blog*")
+					.with_include("/design*"),
+				expanded_filter: GlobFilter::default().with_include("/docs"),
+			},
+		)
+		.unwrap()
+		.to_string()
+		.xpect()
+		.to_be_snapshot();
 
-	// println!("{:#?}", sidebar_tree);
 }

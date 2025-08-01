@@ -40,7 +40,7 @@ pub fn get() -> impl Bundle {
 				<p>"Pop open the dev tools to see your requests in flight!"</p>
 				<ServerCounter client:load initial=1 />
 					<code src="../content/server-actions.rs"/>
-				<h2>"Very Bevy Realtime Agents"</h2>
+				<h2>"Very Bevy Agents"</h2>
 					<code src="../content/realtime-agents.rs"/>
 				</div>
 			</ContentLayout>

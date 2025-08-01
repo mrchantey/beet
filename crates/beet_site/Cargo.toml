@@ -18,10 +18,10 @@ default = ["launch", "server", "client"]
 # default = ["beet/web-server", "beet/native-tls"]
 # used by beet cli for building prod server
 launch = ["beet/launch"]
-server = ["beet/server", "beet_design/mockups"]
+server = ["beet/server", "beet_design/mockups", "beet_design/server"]
 deploy = ["server", "beet/lambda"]
 # used by beet cli for building client
-client = ["beet/client"]
+client = ["beet/client", "beet_design/mockups", "beet_design/client"]
 
 [dependencies]
 anyhow.workspace = true

@@ -54,6 +54,30 @@ pub struct SidebarNode {
 	pub expanded: bool,
 }
 
+impl std::fmt::Display for SidebarNode {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let path_str = match &self.path {
+			Some(p) => p.to_string(),
+			None => "None".to_string(),
+		};
+		writeln!(
+			f,
+			"SidebarNode: {} ({}){}",
+			self.display_name,
+			path_str,
+			if self.expanded { " [expanded]" } else { "" }
+		)?;
+		for child in &self.children {
+			let child_str = format!("{}", child)
+				.lines()
+				.map(|line| format!("    {}", line))
+				.collect::<Vec<_>>()
+				.join("\n");
+			writeln!(f, "{}", child_str)?;
+		}
+		Ok(())
+	}
+}
 
 pub struct CollectSidebarNode {
 	/// Which routes to include, root is always included.
@@ -100,12 +124,16 @@ impl CollectSidebarNode {
 			.collect();
 
 		// Helper to get a display name from a RoutePath
-		fn route_name(route: &RoutePath) -> String {
-			let s = route.to_string();
-			if s == "/" {
+		fn pretty_route_name(route: &RoutePath) -> String {
+			let str = route
+				.file_name()
+				.map(|name| name.to_str())
+				.flatten()
+				.unwrap_or("");
+			if str.is_empty() {
 				"Root".to_string()
 			} else {
-				s.trim_start_matches('/').to_string()
+				str.to_title_case()
 			}
 		}
 
@@ -113,7 +141,7 @@ impl CollectSidebarNode {
 			display_name: meta
 				.map(|m| m.sidebar.label.clone())
 				.flatten()
-				.unwrap_or_else(|| route_name(&node.route).to_title_case()),
+				.unwrap_or_else(|| pretty_route_name(&node.route)),
 			path: if contains_endpoints {
 				Some(node.route.clone())
 			} else {
