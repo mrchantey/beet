@@ -6,25 +6,26 @@ pub(crate) struct MyNode {
     pub foo: u32,
     pub bar: u32,
 }
+impl MyNode {
+    pub fn system(
+        #[allow(unused_variables)]
+        In((my_entity, input)): In<(Entity, Self)>,
+        world: &mut World,
+        res: Res<Time>,
+        mut query: Query<&mut Transform>,
+    ) -> impl Bundle + use<> {
+        let Self { foo, mut bar } = input;
+        ()
+    }
+}
 impl IntoBundle<Self> for MyNode {
     fn into_bundle(self) -> impl Bundle {
         OnSpawn::new(move |entity_world_mut: &mut EntityWorldMut| {
-            let my_entity = entity_world_mut.id();
+            let id = entity_world_mut.id();
             let bundle = entity_world_mut
                 .world_scope(|world| {
                     world
-                        .run_system_cached_with(
-                            move |
-                                In(input): In<Self>,
-                                world: &mut World,
-                                res: Res<Time>,
-                                mut query: Query<&mut Transform>|
-                            {
-                                let Self { foo, mut bar } = input;
-                                ()
-                            },
-                            self,
-                        )
+                        .run_system_cached_with(Self::system, (id, self))
                         .map_err(|err| {
                             bevyhow!(
                                 "Error running template system for `MyNode`: {}", err

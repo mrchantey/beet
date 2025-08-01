@@ -21,7 +21,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	rsx! {
 		<nav id="sidebar" aria-hidden="false">
 		{nodes.into_iter().map(|node|
-			rsx!{<SidebarItem root node=node/>})
+			rsx!{<SidebarItem root node=node/>}).collect::<Vec<_>>()
 		}
 		</nav>
 		<script hoist:body src="./sidebar.js"/>
@@ -179,21 +179,17 @@ mod test {
 			.to_be(SidebarNode {
 				display_name: "Root".to_string(),
 				path: Some(RoutePath::new("/")),
-				children: vec![
-					SidebarNode {
-						display_name: "Testing".to_string(),
-						path: Some(RoutePath::new("/docs")),
-						children: vec![
-							SidebarNode {
-								display_name: "Partying".to_string(),
-								path: Some(RoutePath::new("/docs/testing")),
-								children: vec![],
-								expanded: false,
-							},
-						],
+				children: vec![SidebarNode {
+					display_name: "Testing".to_string(),
+					path: Some(RoutePath::new("/docs")),
+					children: vec![SidebarNode {
+						display_name: "Partying".to_string(),
+						path: Some(RoutePath::new("/docs/testing")),
+						children: vec![],
 						expanded: false,
-					},
-				],
+					}],
+					expanded: false,
+				}],
 				expanded: false,
 			});
 	}

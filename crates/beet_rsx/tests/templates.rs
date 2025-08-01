@@ -25,5 +25,18 @@ fn entity_id() {
 	rsx! {<EntityId />}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
-		.to_be("<div>hello bill</div>");
+		.to_be("<div>hello 4v1</div>");
+}
+
+
+#[test]
+fn result() {
+	#[template]
+	fn ReturnsResult() -> Result<impl Bundle> {
+		rsx! {<div><slot/></div>}.xok()
+	}
+	rsx! {<ReturnsResult>howdy</ReturnsResult>}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect()
+		.to_be("<div>howdy</div>");
 }

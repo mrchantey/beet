@@ -7,9 +7,9 @@ use beet_site::prelude::*;
 async fn docs() {
 	let mut app = App::new();
 
-	app.add_plugins(BeetPlugins);
+	app.add_plugins(RouterPlugin);
 	app.world_mut().spawn(routes());
-
-	let res = Router::oneshot(app.world_mut(), "/docs").await;
-	println!("{:?}", res);
+	app.insert_resource(TemplateFlags::None).init().update();
+	let _res = Router::oneshot(app.world_mut(), "/docs").await;
+	// println!("{:?}", res);
 }

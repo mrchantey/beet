@@ -369,7 +369,7 @@ mod test {
 	#[test]
 	fn iterators() {
 		parse(
-			rsx! {<main>{["a","b","c"]}</main>},
+			rsx! {<main>{vec!["a","b","c"]}</main>},
 			// because ExprIdx matches, this should be replace with 7
 			rsx! {<div><span>{()}</span><br/></div>},
 		)

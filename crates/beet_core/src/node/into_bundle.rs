@@ -40,14 +40,22 @@ where
 	}
 }
 
-/// includes Option, all iterators are spawned as children
-pub struct IterMarker;
-
-impl<I: IntoIterator<Item = BundleType>, BundleType, MarkerType>
-	IntoBundle<(IterMarker, MarkerType)> for I
+impl<T> IntoBundle<Self> for Option<T>
 where
-	BundleType: IntoBundle<MarkerType>,
-	I::IntoIter: 'static + Send + Sync + Iterator<Item = BundleType>,
+	T: 'static + Send + Sync + IntoBundle<Self>,
+{
+	fn into_bundle(self) -> impl Bundle {
+		match self {
+			Some(item) => item.into_bundle().any_bundle(),
+			None => OnSpawnBoxed::new(|_| {}),
+		}
+	}
+}
+
+
+impl<T, M> IntoBundle<(Self, M)> for Vec<T>
+where
+	T: 'static + Send + Sync + IntoBundle<M>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		(
