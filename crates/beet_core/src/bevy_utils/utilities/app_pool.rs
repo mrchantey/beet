@@ -65,7 +65,7 @@ impl AppPool {
 		*self.num_constructed.read().unwrap()
 	}
 
-	
+
 	pub fn num_returned(&self) -> usize { *self.num_returned.read().unwrap() }
 
 	/// just run the constructor
@@ -75,7 +75,7 @@ impl AppPool {
 			num_returned: self.num_returned.clone(),
 		}
 	}
-	
+
 	// /// Take an app from the pool, or create a new one using the constructor.
 	// /// This should be returned to the pool using [`Self::push`] when done.
 	// pub fn pop(&self) -> PooledWorld {

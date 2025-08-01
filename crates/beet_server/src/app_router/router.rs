@@ -185,7 +185,6 @@ mod test {
 
 
 	async fn parse(route: &str) -> Vec<u32> {
-
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
 				// RouteFilter::new("/"),
@@ -193,44 +192,52 @@ mod test {
 					res.push(0);
 				}),
 			));
-			app.world_mut().spawn(children![(
-				RouteFilter::new("foo"),
-				RouteHandler::layer(|mut res: ResMut<Foo>| {
-					res.push(1);
-				}),
-				children![
-					(
-						RouteFilter::new("bar"),
-						Endpoint::new(HttpMethod::Get),
-						RouteHandler::layer(|mut res: ResMut<Foo>| {
-							res.push(2);
-						}),
-					),
-					(
-						RouteFilter::new("bazz"),
-						Endpoint::new(HttpMethod::Delete),
-						RouteHandler::layer(|mut res: ResMut<Foo>| {
-							res.push(3);
-						}),
-					),
-					(
-						// no endpoint, always runs if parent matches
-						RouteHandler::layer(|mut res: ResMut<Foo>| {
-							res.push(4);
-						}),
-					),
-				],
-			),
-		(
-				RouteHandler::layer(|mut commands:Commands,res: ResMut<Foo>| {
-					commands.insert_resource(Json(res.0.clone()).into_response());
-				}),
-			)				
+			app.world_mut().spawn(children![
+				(
+					RouteFilter::new("foo"),
+					RouteHandler::layer(|mut res: ResMut<Foo>| {
+						res.push(1);
+					}),
+					children![
+						(
+							RouteFilter::new("bar"),
+							Endpoint::new(HttpMethod::Get),
+							RouteHandler::layer(|mut res: ResMut<Foo>| {
+								res.push(2);
+							}),
+						),
+						(
+							RouteFilter::new("bazz"),
+							Endpoint::new(HttpMethod::Delete),
+							RouteHandler::layer(|mut res: ResMut<Foo>| {
+								res.push(3);
+							}),
+						),
+						(
+							// no endpoint, always runs if parent matches
+							RouteHandler::layer(|mut res: ResMut<Foo>| {
+								res.push(4);
+							}),
+						),
+					],
+				),
+				(RouteHandler::layer(
+					|mut commands: Commands, res: ResMut<Foo>| {
+						commands.insert_resource(
+							Json(res.0.clone()).into_response(),
+						);
+					}
+				),)
 			]);
 
 			app.world_mut().init_resource::<Foo>();
 		});
-		router.handle_request(Request::get(route)).await.json().await.unwrap()
+		router
+			.handle_request(Request::get(route))
+			.await
+			.json()
+			.await
+			.unwrap()
 	}
 
 	#[sweet::test]

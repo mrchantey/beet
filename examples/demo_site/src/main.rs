@@ -31,7 +31,7 @@ fn launch_plugin(app: &mut App) {
 
 #[cfg(feature = "server")]
 fn server_plugin(app: &mut App) {
-	app.world_mut().spawn(Router::new(|app:&mut App|{app.world_mut().spawn((
+	app.insert_resource(Router::new(|app:&mut App|{app.world_mut().spawn((
 		children![
 			pages_routes(), 
 			docs_routes(), 
@@ -43,7 +43,7 @@ fn server_plugin(app: &mut App) {
 			state.num_requests += 1;
 			AppState::set(state);
 		}),
-	))}));
+	));}));
 }
 
 #[cfg(feature = "client")]
