@@ -227,7 +227,10 @@ impl RouteHandler {
 	}
 
 	/// handlers are infallible, any error is inserted into [`RouteHandlerOutput`]
-	pub async fn run(&self, world: World) -> World { (self.0)(world).await }
+	pub async fn run(&self, world: &mut World) {
+		let world_owned = std::mem::take(world);
+		*world = (self.0)(world_owned).await;
+	}
 }
 
 #[cfg(test)]

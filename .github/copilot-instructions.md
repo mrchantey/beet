@@ -11,6 +11,7 @@ Always greet the user by saying something foolish, here are some examples but yo
 
 ## Requirements
 
+- Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
 - NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Do not create examples without being explictly asked to do so.
 - Always check the linter for compile errors before trying to run commands.

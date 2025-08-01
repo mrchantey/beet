@@ -139,13 +139,8 @@ mod test {
 	use tokio::net::TcpListener;
 	use tokio::task::JoinHandle;
 
-	fn add_via_get(In(params): In<(i32, i32)>) -> i32 {
-		params.0 + params.1
-	}
-	fn add_via_post(In(params): In<(i32, i32)>) -> i32 {
-
-		params.0 + params.1
-	}
+	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
+	fn add_via_post(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
 	fn increment_if_positive(In(params): In<i32>) -> Result<i32, String> {
 		if params > 0 {
 			Ok(params + 1)
@@ -174,8 +169,8 @@ mod test {
 	// only a single entry because set_server_url is static
 	#[sweet::test]
 	async fn works() {
-		let mut app = App::new();
-		app.add_plugins(RouterPlugin::default());
+		let mut world = World::new();
+		world.insert_resource(Router::new(|app: &mut App| {
 		app.world_mut().spawn(children![
 			(
 				RouteFilter::new("/add"),
@@ -198,10 +193,9 @@ mod test {
 					increment_if_positive.pipe(JsonResult::pipe)
 				)
 			),
-		]);
+		]);}));
 
-		let router =
-			AxumRunner::from_world(app.world_mut(), Default::default());
+		let router = AxumRunner::router(&mut world);
 		let _handle = serve(router).await;
 		test_get().await;
 		test_post().await;

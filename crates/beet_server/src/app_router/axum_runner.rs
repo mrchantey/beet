@@ -20,26 +20,42 @@ impl AxumRunner {
 	pub fn new(runner: ServerRunner) -> Self { Self { runner } }
 
 
-	pub fn from_world(
-		world: &mut World,
-		mut router: axum::Router,
-	) -> axum::Router {
-		let clone_world = CloneWorld::new(world);
+	/// Create a new [`axum::Router`] using the current app's world.
+	/// All handlers will get the world from the [`AppPool`]
+	pub fn router(world: &mut World) -> axum::Router {
+		let mut router = world
+			.get_non_send_resource::<axum::Router>()
+			.cloned()
+			.unwrap_or_default();
+		let pool = world.resource::<Router>().clone();
 
+		let handler_pool = pool.clone();
 		let handler = move |request: axum::extract::Request| {
-			let world = clone_world.clone();
+			// let pool = pool.clone();
 			async move {
-				handle_axum_request(world, request)
-					.await
-					.into_response()
-					.into_axum()
-					.await
+				// let pool = pool.clone();
+				match async move {
+					// let world = world.clone_world()?;
+					let req = Request::from_axum(request, &()).await?;
+					let mut app = handler_pool.get();
+					let world = app.world_mut();
+					Router::handle_request(world, req).await.xok::<BevyError>()
+				}
+				.await
+				{
+					Ok(res) => res.into_axum().await,
+					Err(err) => err.into_response().into_axum().await,
+				}
 			}
 		};
 
-		for (_, endpoint) in
-			world.run_system_once(ResolvedEndpoint::collect).unwrap()
-		{
+		let app_pool_endpoints = pool
+			.get()
+			.world_mut()
+			.run_system_once(ResolvedEndpoint::collect)
+			.unwrap();
+
+		for (_, endpoint) in app_pool_endpoints {
 			let segments = segments_to_axum(endpoint.segments().clone());
 			let method = method_to_axum(endpoint.method());
 			trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
@@ -51,13 +67,7 @@ impl AxumRunner {
 
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
-		// take the non-send router to support custom axum routes & layers
-		let mut router = app
-			.world_mut()
-			.remove_non_send_resource::<axum::Router>()
-			.unwrap_or_default();
-
-		router = Self::from_world(app.world_mut(), router);
+		let mut router = Self::router(app.world_mut());
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
@@ -179,19 +189,6 @@ fn segments_to_axum(segments: Vec<RouteSegment>) -> String {
 }
 
 
-async fn handle_axum_request(
-	clone_world: CloneWorld,
-	request: axum::extract::Request,
-) -> Result<Response> {
-	let world = clone_world.clone_world()?;
-
-	let request = Request::from_axum(request, &()).await?;
-
-	let (_world, response) = Router::handle_request(world, request).await;
-
-	Ok(response)
-}
-
 
 #[cfg(test)]
 mod test {
@@ -201,22 +198,25 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins(RouterPlugin);
-		app.world_mut().spawn((
-			RouteFilter::new("pizza"),
-			RouteHandler::new(HttpMethod::Get, || "hello world!"),
+		app.add_plugins(RouterPlugin).insert_resource(Router::new(
+			|app: &mut App| {
+				app.world_mut().spawn((
+					RouteFilter::new("pizza"),
+					RouteHandler::new(HttpMethod::Get, || "hello world!"),
+				));
+			},
 		));
 
 		// these tests also test the roundtrip CloneWorld mechanism
 		// catching errors like missing app.register_type::<T>()
-		AxumRunner::from_world(app.world_mut(), axum::Router::new())
+		AxumRunner::router(app.world_mut())
 			.oneshot_res("/dsfkdsl")
 			.await
 			.unwrap()
 			.status()
 			.xpect()
 			.to_be(StatusCode::NOT_FOUND);
-		AxumRunner::from_world(app.world_mut(), axum::Router::new())
+		AxumRunner::router(app.world_mut())
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()

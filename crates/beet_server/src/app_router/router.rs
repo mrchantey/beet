@@ -3,20 +3,33 @@ use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::ops::ControlFlow;
 /// Collection of systems for collecting and running and route handlers
-pub struct Router;
-
-
+/// This type serves as the intermediarybetween the main app and the route handlers.
+#[derive(Clone, Deref, DerefMut,Resource)]
+pub struct Router{
+	app_pool:AppPool
+}
 
 impl Router {
+/// Create a new [`Router`] with the given plugin, which should add
+/// routes to the app either directly or in a [`Startup`] system.
+	pub fn new(plugin:impl 'static + Send + Sync + Clone + Plugin)->Self{
+		Self{
+			app_pool:AppPool::new(move || {
+				let mut app = App::new();
+				app.add_plugins((RouterPlugin,plugin.clone()));
+				app.init();
+				app.update();
+				app
+			}) 
+	}
+}
+
 	/// Handle a single request, returning the response or a 404 if not found.
 	pub async fn oneshot(
 		world: &mut World,
 		req: impl Into<Request>,
 	) -> Response {
-		let world_owned = std::mem::take(world);
-		let (world2, out) = Self::handle_request(world_owned, req.into()).await;
-		*world = world2;
-		out
+		Self::handle_request(world, req.into()).await
 	}
 		pub async fn oneshot_str(
 		world: &mut World,
@@ -29,9 +42,9 @@ impl Router {
 
 	/// Handle a request in the world, returning the response
 	pub async fn handle_request(
-		mut world: World,
+		world: &mut World,
 		request: Request,
-	) -> (World, Response) {
+	) -> Response {
 		let start_time = CrossInstant::now();
 
 		let route_parts = RouteParts::from_parts(&request.parts);
@@ -40,7 +53,6 @@ impl Router {
 		world.insert_resource(request);
 
 		for entity in world.query_filtered_once::<Entity, Without<ChildOf>>() {
-			world =
 				handle_request_recursive(world, route_parts.clone(), entity)
 					.await;
 		}
@@ -50,12 +62,12 @@ impl Router {
 				response
 			} else {
 				// if no response try building one from a bundle
-				bundle_to_html(&mut world).into_response()
+				bundle_to_html(world).into_response()
 			};
 
 		trace!("Returning Response: {:#?}", response);
 		trace!("Route handler completed in: {:.2?}", start_time.elapsed());
-		(world, response)
+		response
 	}
 }
 
@@ -63,10 +75,10 @@ impl Router {
 
 /// Pre-order depth fist traversal. parent first, then children.
 async fn handle_request_recursive(
-	mut world: World,
+	world: &mut World,
 	parts: RouteParts,
 	root_entity: Entity,
-) -> World {
+) {
 	struct StackFrame {
 		entity: Entity,
 		parts: RouteParts,
@@ -122,12 +134,11 @@ async fn handle_request_recursive(
 			}
 		}
 
+		// Party time: actually run the handler
 		if let Some(handler) = world.entity(entity).get::<RouteHandler>() {
-			world = handler.clone().run(world).await;
+			handler.clone().run(world).await;
 		}
 	}
-
-	world
 }
 
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
@@ -202,8 +213,7 @@ mod test {
 
 
 		world.init_resource::<Foo>();
-		let (mut world, _response) =
-			Router::handle_request(world, Request::get(route)).await;
+		Router::handle_request(&mut world, Request::get(route)).await;
 		world.remove_resource::<Foo>().unwrap().0
 	}
 
