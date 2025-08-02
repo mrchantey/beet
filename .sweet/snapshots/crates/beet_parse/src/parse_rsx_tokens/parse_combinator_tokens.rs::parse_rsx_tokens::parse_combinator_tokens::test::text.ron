@@ -9,6 +9,6 @@
     FragmentNode,
     related! {
         Children[(NodeTag(String::from("div")), ElementNode { self_closing : false },
-        related! { Children[TextNode(String::from("hello"))] })]
+        InnerText(String::from("hello")))]
     },
 )

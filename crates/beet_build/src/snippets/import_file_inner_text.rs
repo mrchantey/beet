@@ -76,7 +76,7 @@ mod test {
 		app.update();
 
 		#[cfg(feature = "css")]
-		let expected = "body[data-beet-style-id-15207297232399335040] {\n  color: #00f;\n}\n";
+		let expected = "body[data-beet-style-id-6353593457304550519] {\n  color: #00f;\n}\n";
 		#[cfg(not(feature = "css"))]
 		let expected = include_str!("../../tests/test_file.css");
 

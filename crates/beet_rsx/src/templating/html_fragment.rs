@@ -115,11 +115,8 @@ impl HtmlBuilder<'_, '_> {
 		if let Ok((element, tag, inner_text, attributes, children)) =
 			self.element_nodes.get(entity)
 		{
-			if element.self_closing && (**tag == "style") {
-				panic!(
-					"self closing style tags are not allowed in HTML, and produce highly unexpected results"
-				);
-			}
+			let is_self_closing =
+				element.self_closing && **tag != "style" && **tag != "script";
 
 			html.push_str(&format!("<{}", tag.0));
 			// add attributes
@@ -138,7 +135,7 @@ impl HtmlBuilder<'_, '_> {
 				}
 			}
 
-			if element.self_closing {
+			if is_self_closing {
 				html.push_str("/>");
 				return;
 			}
@@ -264,10 +261,10 @@ mod test {
 
 	#[test]
 	fn attribute_in_self_closing_tag() {
-		rsx! {<img src="image.jpg"/>}
+		rsx! {<img src="/image.jpg"/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<img src=\"image.jpg\"/>");
+			.to_be("<img src=\"/image.jpg\"/>");
 	}
 
 	#[test]

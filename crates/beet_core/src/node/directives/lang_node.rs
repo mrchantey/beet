@@ -1,5 +1,7 @@
 use crate::as_beet::*;
 use beet_utils::prelude::*;
+use bevy::ecs::component::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use std::hash::Hash;
 
@@ -87,11 +89,23 @@ pub struct StyleElement;
 
 /// Convenience component equivelent to `children![TextNode]`, often used by elements
 /// like `script`,`style` or `code` which require further processing.
+///
+/// Elements with an [`InnerText`] will always be rendered as
+/// open even if they are [`ElementNode::closed`],
 #[derive(Debug, Default, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[component(on_add= on_add)]
 pub struct InnerText(pub String);
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(ElementNode::open());
+}
+
 
 /// An intermediate representation of an [`InnerText`] defined by a `src` attribute,
 /// ie `<style src="style.css">`.

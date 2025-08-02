@@ -26,23 +26,3 @@ impl CodeNode {
 impl Default for CodeNode {
 	fn default() -> Self { Self::new("plaintext") }
 }
-
-
-
-
-/// Add a <CodeNode> to all `<code>` nodes inside a `<pre>`.
-/// Find all `<pre><code lang="...">` elemetnts and replace them with a [`CodeNode`].
-pub fn pre_code_to_code_node() {
-
-	// "code" => {
-	// 	let code_el = if let Some((attr_ent, Some(text))) =
-	// 		attributes.find(entity, "lang")
-	// 	{
-	// 		commands.entity(attr_ent).despawn();
-	// 		CodeNode::new(&text.0)
-	// 	} else {
-	// 		CodeNode::default()
-	// 	};
-	// 	commands.entity(entity).insert(code_el);
-	// }
-}

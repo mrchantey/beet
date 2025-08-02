@@ -7,6 +7,6 @@
     FragmentNode,
     related! {
         Children[(NodeTag(String::from("style")), ElementNode { self_closing : false
-        }, StyleElement, LangSnippetHash(18336657424200447272u64))]
+        }, StyleElement, LangSnippetHash(6353593457304550519u64))]
     },
 )
