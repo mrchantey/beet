@@ -55,7 +55,7 @@ pub fn create_rstml_parser(
 			.always_self_closed_elements(
 				constants.self_closing_elements.clone(),
 			)
-			.raw_text_elements(constants.lang_node_tags.clone())
+			.raw_text_elements(constants.raw_text_elements.clone())
 			// here we define the rsx! macro as the constant thats used
 			// to resolve raw text blocks more correctly
 			.macro_call_pattern(quote::quote!(rsx! {%%}))

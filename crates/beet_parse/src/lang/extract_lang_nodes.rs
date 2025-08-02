@@ -40,30 +40,12 @@ pub fn extract_inner_text(
 pub fn extract_lang_nodes(
 	mut commands: Commands,
 	lit_nodes: Query<&TextNode>,
-	attributes: Query<(Entity, &AttributeKey, Option<&TextNode>)>,
-	query: Populated<
-		(Entity, &NodeTag, Option<&Attributes>, Option<&Children>),
-		Added<NodeTag>,
-	>,
+	query: Populated<(Entity, &NodeTag, Option<&Children>), Added<NodeTag>>,
+	attributes: FindAttribute,
 ) {
-	// returns the entity and value of the first attribute with the given key
-	let find_attr = |attrs: &Option<&Attributes>,
-	                 key: &str|
-	 -> Option<(Entity, Option<&TextNode>)> {
-		attrs.as_ref()?.iter().find_map(|entity| {
-			let (attr_entity, inner_key, value) =
-				attributes.get(entity).ok()?;
-			if inner_key.as_str() == key {
-				Some((attr_entity, value))
-			} else {
-				None
-			}
-		})
-	};
-
-	for (entity, tag, attrs, children) in query.iter() {
+	for (entity, tag, children) in query.iter() {
 		// entirely skip is:inline
-		if let Some((attr_ent, _)) = find_attr(&attrs, "is:inline") {
+		if let Some((attr_ent, _)) = attributes.find(entity, "is:inline") {
 			// its done its job, remove it
 			commands.entity(attr_ent).despawn();
 			continue;
@@ -76,17 +58,6 @@ pub fn extract_lang_nodes(
 			}
 			"style" => {
 				commands.entity(entity).insert(StyleElement);
-			}
-			"code" => {
-				let code_el = if let Some((attr_ent, Some(text))) =
-					find_attr(&attrs, "lang")
-				{
-					commands.entity(attr_ent).despawn();
-					CodeElement::new(&text.0)
-				} else {
-					CodeElement::default()
-				};
-				commands.entity(entity).insert(code_el);
 			}
 			_ => {
 				// skip non-lang nodes
@@ -107,14 +78,10 @@ pub fn extract_lang_nodes(
 		// Apply the hash
 		let mut hasher = rapidhash::RapidHasher::default();
 		tag.hash(&mut hasher);
-		if let Some(attrs) = attrs {
-			for (_, key, value) in
-				attrs.iter().filter_map(|attr| attributes.get(attr).ok())
-			{
-				key.hash(&mut hasher);
-				if let Some(value) = value {
-					value.hash(&mut hasher);
-				}
+		for (_, key, value) in attributes.all(entity) {
+			key.hash(&mut hasher);
+			if let Some(value) = value {
+				value.hash(&mut hasher);
 			}
 		}
 		if let Some((_, text)) = text_child {
@@ -136,9 +103,10 @@ pub fn extract_lang_nodes(
 			commands.entity(child).despawn();
 		}
 		// Collect FileInnerText
-		else if let Some((attr_entity, value)) = find_attr(&attrs, "src")
-			&& let Some(value) = value
+		else if let Some((attr_entity, Some(value))) =
+			attributes.find(entity, "src")
 		{
+			// TODO allow absolute paths?
 			commands
 				.entity(entity)
 				.insert(FileInnerText(value.0.clone()));

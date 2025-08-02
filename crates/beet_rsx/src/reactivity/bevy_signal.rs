@@ -253,8 +253,7 @@ mod test {
 		}
 
 		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin)
-			.insert_resource(TemplateFlags::None);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let (get, set) = signal("foo".to_string());
 		let template = app
 			.world_mut()

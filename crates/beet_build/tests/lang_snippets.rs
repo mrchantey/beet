@@ -12,8 +12,7 @@ fn works() {
 	let mut app = App::new();
 
 	app.add_plugins((BuildPlugin::default(), ApplyDirectivesPlugin::default()))
-		.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets))
-		.insert_resource(TemplateFlags::None);
+		.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 	let entity = app
 		.world_mut()

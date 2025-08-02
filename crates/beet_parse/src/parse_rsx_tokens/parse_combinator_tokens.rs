@@ -31,7 +31,7 @@ pub(super) fn parse_combinator_tokens(
 ) -> bevy::prelude::Result {
 	for (entity, tokens, snippet_root) in query.iter() {
 		Builder {
-			raw_text_elements: &constants.lang_node_tags,
+			raw_text_elements: &constants.raw_text_elements,
 			file_path: &snippet_root.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),

@@ -16,7 +16,12 @@ impl Router {
 		Self {
 			app_pool: AppPool::new(move || {
 				let mut app = App::new();
-				app.add_plugins((RouterPlugin, plugin.clone()));
+				app.add_plugins((
+					RouterPlugin,
+					#[cfg(not(test))]
+					LoadSnippetsPlugin,	
+					plugin.clone()
+				));
 				app.init();
 				app.update();
 				app

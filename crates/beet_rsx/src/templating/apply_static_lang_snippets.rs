@@ -80,8 +80,7 @@ mod test {
 		instance_bundle: impl Bundle,
 	) -> String {
 		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin)
-			.insert_resource(TemplateFlags::None);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let _static_ent = app.world_mut().spawn(static_bundle).id();
 		let instance_ent = app
 			.world_mut()

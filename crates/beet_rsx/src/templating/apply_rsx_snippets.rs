@@ -7,6 +7,17 @@ use beet_utils::prelude::ReadFile;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
+/// Load all file snippets from the `snippets` directory on [`Startup`].
+pub struct LoadSnippetsPlugin;
+
+impl Plugin for LoadSnippetsPlugin {
+	#[allow(unused)]
+	fn build(&self, app: &mut App) {
+		#[cfg(not(target_arch = "wasm32"))]
+		app.init_plugin(ApplyDirectivesPlugin)
+			.add_systems(Startup, load_all_file_snippets);
+	}
+}
 
 
 /// Load snippet scene if it exists.

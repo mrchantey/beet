@@ -1,5 +1,5 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 
@@ -20,6 +20,60 @@ impl AttributeOf {
 #[reflect(Component)]
 #[relationship_target(relationship = AttributeOf,linked_spawn)]
 pub struct Attributes(Vec<Entity>);
+
+
+impl Attributes {
+	/// returns the entity and value of the first attribute with the given key
+	pub fn find<'a>(
+		&self,
+		attrs: &'a Query<(Entity, &AttributeKey, Option<&TextNode>)>,
+		key: &str,
+	) -> Option<(Entity, Option<&'a TextNode>)> {
+		self.iter().find_map(|entity| {
+			let (attr_entity, item_key, value) = attrs.get(entity).ok()?;
+			if item_key.as_str() == key {
+				Some((attr_entity, value))
+			} else {
+				None
+			}
+		})
+	}
+}
+
+#[derive(SystemParam)]
+pub struct FindAttribute<'w, 's> {
+	elements: Query<'w, 's, (Entity, &'static Attributes)>,
+	attributes: Query<
+		'w,
+		's,
+		(Entity, &'static AttributeKey, Option<&'static TextNode>),
+	>,
+}
+
+impl FindAttribute<'_, '_> {
+	pub fn all<'a>(
+		&'a self,
+		entity: Entity,
+	) -> Vec<(Entity, &'a AttributeKey, Option<&'a TextNode>)> {
+		self.elements.get(entity).ok().map_or(vec![], |(_, attrs)| {
+			attrs
+				.iter()
+				.filter_map(|attr| self.attributes.get(attr).ok())
+				.collect()
+		})
+	}
+
+	pub fn find(
+		&self,
+		entity: Entity,
+		key: &str,
+	) -> Option<(Entity, Option<&TextNode>)> {
+		self.elements
+			.get(entity)
+			.ok()
+			.and_then(|(_, attrs)| attrs.find(&self.attributes, key))
+	}
+}
 
 /// An attribute key represented as a string.
 ///

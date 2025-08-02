@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use std::str::FromStr;
 
 #[derive(Default)]
 pub struct ApplyDirectivesPlugin;
@@ -27,28 +26,24 @@ impl Plugin for ApplyDirectivesPlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-		#[cfg(all(target_arch = "wasm32", not(test)))]
-		console_error_panic_hook::set_once();
-
+		#[cfg(target_arch = "wasm32")]
+		{
+			#[cfg(not(test))]
+			console_error_panic_hook::set_once();
+			app.add_systems(
+				Startup,
+				(
+					#[cfg(target_arch = "wasm32")]
+					load_client_islands.run_if(document_exists),
+				),
+			);
+		}
 
 		app.init_plugin(schedule_order_plugin)
 			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<ClientIslandRegistry>()
-			.init_resource::<TemplateFlags>()
-			.add_systems(
-				Startup,
-				(
-					|| {},
-					#[cfg(not(target_arch = "wasm32"))]
-					load_all_file_snippets.run_if(TemplateFlags::should_run(
-						TemplateFlag::LoadSnippets,
-					)),
-					#[cfg(target_arch = "wasm32")]
-					load_client_islands.run_if(document_exists),
-				),
-			)
 			.add_systems(
 				ApplyDirectives,
 				// almost all of these systems must be run in this sequence,
@@ -86,59 +81,5 @@ impl Plugin for ApplyDirectivesPlugin {
 				)
 					.chain(),
 			);
-	}
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource, Reflect)]
-#[reflect(Resource)]
-pub enum TemplateFlags {
-	/// Run with all flags enabled.
-	#[default]
-	All,
-	/// Run with no flags enabled.
-	None,
-	/// Only run with the specified flags.
-	Only(Vec<TemplateFlag>),
-}
-
-impl TemplateFlags {
-	pub fn only(flag: TemplateFlag) -> Self { Self::Only(vec![flag]) }
-	pub fn contains(&self, flag: TemplateFlag) -> bool {
-		match self {
-			Self::All => true,
-			Self::None => false,
-			Self::Only(flags) => flags.contains(&flag),
-		}
-	}
-
-	/// A predicate system for run_if conditions
-	pub fn should_run(flag: TemplateFlag) -> impl Fn(Res<Self>) -> bool {
-		move |flags| flags.contains(flag)
-	}
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
-pub enum TemplateFlag {
-	/// Load snippets from the file system.
-	LoadSnippets,
-}
-
-
-impl std::fmt::Display for TemplateFlag {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			TemplateFlag::LoadSnippets => write!(f, "snippets"),
-		}
-	}
-}
-
-impl FromStr for TemplateFlag {
-	type Err = String;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s.to_lowercase().as_str() {
-			"load-snippets" => Ok(TemplateFlag::LoadSnippets),
-			_ => Err(format!("Unknown flag: {}", s)),
-		}
 	}
 }

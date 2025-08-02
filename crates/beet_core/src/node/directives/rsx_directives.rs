@@ -60,19 +60,16 @@ impl SlotTarget {
 /// this does not address slot children, ie `<div slot="foo">`
 pub fn extract_slot_targets(
 	mut commands: Commands,
-	attributes: Query<&Attributes>,
 	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
-	attributes_query: Query<(Entity, &AttributeKey, Option<&TextNode>)>,
+	attributes: FindAttribute,
 ) {
 	for (node_ent, node_tag) in query.iter() {
 		if **node_tag != "slot" {
 			continue;
 		}
 		let target = attributes
-			.iter_descendants(node_ent)
-			.filter_map(|a| attributes_query.get(a).ok())
-			.find(|(_, key, _)| ***key == "name")
-			.map(|(entity, _, value)| {
+			.find(node_ent, "name")
+			.map(|(entity, value)| {
 				commands.entity(entity).despawn();
 				if let Some(value) = value.as_ref() {
 					SlotTarget::Named(value.0.clone())

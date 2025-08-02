@@ -80,7 +80,12 @@ pub fn tokenize_combinator_exprs_mapped(
 			}
 		}
 		// combinator removes braces so we put them back
-		let expr_tokens = syn::parse_str(&format!("{{{expr}}}"))?;
+		let expr_tokens =
+			syn::parse_str(&format!("{{{expr}}}")).map_err(|e| {
+				bevyhow!(
+					"Failed to parse combinator expression.\nInput: {expr}\nError: {e}"
+				)
+			})?;
 		Ok(Some(NodeExpr::new_block(expr_tokens)))
 	} else {
 		Ok(None)

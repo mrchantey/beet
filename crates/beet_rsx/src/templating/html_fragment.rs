@@ -18,8 +18,7 @@ impl HtmlFragment {
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin)
-			.insert_resource(TemplateFlags::None);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let entity = app.world_mut().spawn(bundle).id();
 		app.update();
 		let html = app

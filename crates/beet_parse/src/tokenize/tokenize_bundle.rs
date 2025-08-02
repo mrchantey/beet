@@ -118,7 +118,7 @@ mod test {
 	}
 	#[test]
 	fn inner_text_src() {
-		quote! {<code src="foo.rs"/>}
+		quote! {<style src="foo.rs"/>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect()

@@ -8,10 +8,7 @@ use syntect::parsing::SyntaxSet;
 
 pub fn parse_syntect(
 	mut commands: Commands,
-	mut query: Populated<
-		(Entity, &CodeElement, &mut InnerText),
-		Added<CodeElement>,
-	>,
+	mut query: Populated<(Entity, &CodeNode, &mut InnerText), Added<CodeNode>>,
 ) -> Result {
 	let syntax_set = SyntaxSet::load_defaults_newlines();
 	let theme_set = ThemeSet::load_defaults();
@@ -64,7 +61,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((
-				CodeElement::new("rust"),
+				CodeNode::new("rust"),
 				InnerText("let foo = rsx!{<div>{\"bar\"}</div>}".to_string()),
 			))
 			.id();

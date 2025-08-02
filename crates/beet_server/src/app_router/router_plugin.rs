@@ -16,7 +16,6 @@ impl Plugin for RouterPlugin {
 			.register_type::<RouteFilter>()
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()
-			.register_type::<TemplateFlags>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<HtmlConstants>()
 			.add_systems(Startup, insert_route_tree);

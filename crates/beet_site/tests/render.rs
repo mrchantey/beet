@@ -8,9 +8,7 @@ use sweet::prelude::*;
 #[ignore = "changes too often"]
 async fn docs() {
 	Router::new(|app: &mut App| {
-		app.insert_resource(TemplateFlags::None)
-			.world_mut()
-			.spawn(routes());
+		app.world_mut().spawn(routes());
 	})
 	.oneshot("/docs")
 	.await

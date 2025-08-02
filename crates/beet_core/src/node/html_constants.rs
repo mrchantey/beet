@@ -24,7 +24,7 @@ pub struct HtmlConstants {
 	/// Name of the wasm js and bin files, defaults to `main`
 	pub wasm_name: String,
 	/// Tags whose inner text content is 'escaped', ie not parsed as rsx
-	pub lang_node_tags: std::collections::HashSet<&'static str>,
+	pub raw_text_elements: std::collections::HashSet<&'static str>,
 	/// Tags that should not have style ids applied to them
 	pub ignore_style_id_tags: Vec<String>,
 	/// When parsing a [`HtmlDocument`], elements with these tags will be hoisted to the head of the document.
@@ -55,7 +55,10 @@ impl Default for HtmlConstants {
 			text_node_marker: "bt".into(),
 			wasm_dir: "wasm".into(),
 			wasm_name: "main".into(),
-			lang_node_tags: ["script", "style", "code"].into_iter().collect(),
+			raw_text_elements: ["script", "style","code"]
+			// raw_text_elements: ["script", "style"]
+				.into_iter()
+				.collect(),
 			ignore_style_id_tags: hoist_to_head_tags
 				.iter()
 				.cloned()
