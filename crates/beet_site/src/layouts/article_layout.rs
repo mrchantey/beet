@@ -14,7 +14,14 @@ pub fn article_layout_middleware() -> RouteHandler {
 }
 
 #[template]
-pub fn ArticleLayout() -> impl Bundle {
+pub fn ArticleLayout(
+	query: Query<&ArticleMeta, With<HandlerBundle>>,
+) -> impl Bundle {
+	for item in query.iter() {
+		// panic!("tadaa! {:?}", item);
+		// println!("ArticleMeta: {:?}", item);
+	}
+
 	let meta = ArticleMeta::default();
 	rsx! {
 		<BeetSidebarLayout>

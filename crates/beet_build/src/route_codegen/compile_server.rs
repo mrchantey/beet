@@ -30,7 +30,7 @@ pub(crate) fn compile_server(
 
 /// After compiling server (if required) export the static files.
 pub fn export_server_ssg(
-	_query: Populated<(), Changed<SourceFileRoot>>,
+	_query: Populated<(), Changed<FileExprHash>>,
 	cmd: When<Res<CargoBuildCmd>>,
 	manifest: When<Res<CargoManifest>>,
 ) -> Result {

@@ -139,7 +139,7 @@ impl CollectSidebarNode {
 
 		SidebarNode {
 			display_name: meta
-				.map(|m| m.sidebar.label.clone())
+				.map(|m| m.sidebar_label().map(|label| label.to_string()))
 				.flatten()
 				.unwrap_or_else(|| pretty_route_name(&node.route)),
 			path: if contains_endpoints {

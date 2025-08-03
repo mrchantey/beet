@@ -1,7 +1,7 @@
 //! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
 //!
 //! ```ignore
-//! //
+//! // source files that do not appear in a route collection
 //! SourceFileRoot
 //! ├── (SourceFile(foo.rs), FileExprHash)
 //! │   ├── (StaticRoot, RsxSnippetOf, RsxTokens)

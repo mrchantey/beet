@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::as_beet::*;
 use beet_utils::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -31,18 +32,43 @@ pub struct RouteFileCollection {
 pub fn import_route_file_collection(
 	mut commands: Commands,
 	collections: Query<
-		(Entity, &RouteFileCollection, Option<&MetaType>),
+		(Entity, &RouteFileCollection),
 		Changed<RouteFileCollection>,
 	>,
 ) -> Result {
-	for (entity, collection, meta_type) in collections.iter() {
+	for (entity, collection) in collections.iter() {
 		for file in ReadDir::files_recursive(&collection.src)? {
 			let file = AbsPathBuf::new(file)?;
-			let mut child =
-				commands.spawn((ChildOf(entity), SourceFile::new(file)));
-			if let Some(meta_type) = meta_type {
-				child.insert(meta_type.clone());
-			}
+			commands.spawn((ChildOf(entity), SourceFile::new(file)));
+		}
+	}
+	Ok(())
+}
+
+
+/// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
+pub fn reparent_route_collection_source_files(
+	mut commands: Commands,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
+	collections: Query<
+		(Entity, &RouteFileCollection),
+		Changed<RouteFileCollection>,
+	>,
+) -> Result {
+	// a hashmap mapping every file in a collection to that collection entity
+	let mut file_collection_map: HashMap<AbsPathBuf, Entity> =
+		HashMap::default();
+	for (entity, collection) in collections.iter() {
+		for file in ReadDir::files_recursive(&collection.src)? {
+			let abs_path = AbsPathBuf::new(file)?;
+			file_collection_map.insert(abs_path, entity);
+		}
+	}
+	// for each source file, insert as a child of the collection entity if it exists
+	for (entity, source_file) in query.iter() {
+		if let Some(collection_entity) = file_collection_map.get(&**source_file)
+		{
+			commands.entity(entity).insert(ChildOf(*collection_entity));
 		}
 	}
 	Ok(())

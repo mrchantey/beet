@@ -1,10 +1,4 @@
-/// Wrapper struct which will emit the HTML-escaped version of the contained
-/// string when passed to a format string.
-pub struct Escape<'a>(pub &'a str);
-
-
 pub struct EscapeHtml;
-
 
 impl EscapeHtml {
 	/// Escape a string for use in HTML.

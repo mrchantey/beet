@@ -53,7 +53,6 @@ pub mod as_beet {
 
 
 pub mod exports {
-	pub use html_escape;
 	#[cfg(feature = "http")]
 	pub use http;
 	#[cfg(feature = "http")]

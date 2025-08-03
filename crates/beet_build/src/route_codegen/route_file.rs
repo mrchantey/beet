@@ -15,12 +15,10 @@ use syn::parse_quote;
 
 /// A file that belongs to a [`RouteFileCollection`], spawned as its child.
 /// A [`Changed<RouteFile>`] represents a change in the [`SourceFile`] that it references.
-/// The number of child [`RouteFileMethod`] that will be spawned
-/// will be either 1 or 0..many, depending on whether the file
-/// is a 'single file route':
+/// The number of child [`RouteFileMethod`] depends on the file type:
 /// - `foo.md`: 1
 /// - `foo.rs`: 0 or more
-/// - `foo.rsx: 0 or more
+/// - `foo.rsx`: 0 or more
 #[derive(Component)]
 pub struct RouteFile {
 	/// The index of the file in the group, used for generating unique identifiers.
@@ -207,14 +205,15 @@ mod test {
 
 		let group = app
 			.world_mut()
-			.spawn(RouteFileCollection::test_site_pages())
+			.spawn((RouteFileCollection::test_site_pages(), children![
+				SourceFile::new(
+					WsPathBuf::new(
+						"crates/beet_router/src/test_site/pages/docs/index.rs",
+					)
+					.into_abs(),
+				)
+			]))
 			.id();
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/pages/docs/index.rs",
-			)
-			.into_abs(),
-		));
 
 		app.update();
 
@@ -222,8 +221,18 @@ mod test {
 			.run_system_cached(update_route_files)
 			.unwrap()
 			.unwrap();
-		let file = app.world().entity(group).get::<Children>().unwrap()[0];
-		let route_file = app.world().entity(file).get::<RouteFile>().unwrap();
+		let source_file_entity =
+			app.world().entity(group).get::<Children>().unwrap()[0];
+		let route_file_entity = app
+			.world()
+			.entity(source_file_entity)
+			.get::<Children>()
+			.unwrap()[0];
+		let route_file = app
+			.world()
+			.entity(route_file_entity)
+			.get::<RouteFile>()
+			.unwrap();
 
 		route_file
 			.mod_path

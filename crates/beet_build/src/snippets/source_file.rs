@@ -56,15 +56,12 @@ pub struct RsxSnippetOf(pub Entity);
 #[relationship_target(relationship = RsxSnippetOf,linked_spawn)]
 pub struct RsxSnippets(Vec<Entity>);
 
-
-/// Parent of every [`SourceFile`] entity, any changed child [`SourceFile`]
-/// will result in this being marked [`Changed`]
-#[derive(Component)]
-pub struct SourceFileRoot;
-
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
-/// This will run once for the initial load, afterwards [`handle_changed_files`]
+/// This will run once for the initial load, afterwards [`parse_file_watch_events`]
 /// will incrementally load changed files.
+///
+/// These files are initially loaded as children of the [`SourceFileRoot`],
+/// but may be moved to a [`RouteFileCollection`] if the path matches.
 #[cfg_attr(test, allow(dead_code))]
 pub fn load_workspace_source_files(
 	mut commands: Commands,
@@ -82,6 +79,10 @@ pub fn load_workspace_source_files(
 	Ok(())
 }
 
+/// Parent of every [`SourceFile`] entity, any changed child [`SourceFile`]
+/// will result in this being marked [`Changed`]
+#[derive(Component)]
+pub struct SourceFileRoot;
 
 
 /// Update [`SourceFile`] entities based on file watch events,
@@ -89,8 +90,8 @@ pub fn load_workspace_source_files(
 pub fn parse_file_watch_events(
 	mut commands: Commands,
 	mut events: EventReader<WatchEvent>,
+	root_entity: Query<Entity, With<SourceFileRoot>>,
 	config: When<Res<WorkspaceConfig>>,
-	mut roots: Query<(Entity, &mut SourceFileRoot)>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> bevy::prelude::Result {
 	for ev in events
@@ -103,18 +104,12 @@ pub fn parse_file_watch_events(
 		let matches =
 			existing.iter_mut().filter(|(_, file)| ***file == ev.path);
 
-		for (_, mut src_file_root) in roots.iter_mut() {
-			src_file_root.set_changed();
-		}
-
 		match ev.kind {
 			EventKind::Create(CreateKind::File) => {
-				for (root_entity, _) in roots.iter() {
-					commands.spawn((
-						ChildOf(root_entity),
-						SourceFile::new(ev.path.clone()),
-					));
-				}
+				commands.spawn((
+					ChildOf(root_entity.single()?),
+					SourceFile::new(ev.path.clone()),
+				));
 			}
 			EventKind::Remove(RemoveKind::File) => {
 				for (entity, _) in matches {

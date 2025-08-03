@@ -5,7 +5,7 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 #[sweet::test]
-#[ignore = "changes too often"]
+// #[ignore = "changes too often"]
 async fn docs() {
 	Router::new(|app: &mut App| {
 		app.world_mut().spawn(routes());
@@ -16,5 +16,5 @@ async fn docs() {
 	.await
 	.unwrap()
 	.xpect()
-	.to_be_snapshot();
+	.to_contain("Docs");
 }

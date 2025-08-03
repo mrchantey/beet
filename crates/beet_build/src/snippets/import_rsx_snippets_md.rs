@@ -9,31 +9,32 @@ use quote::ToTokens;
 /// as [`CombinatorToNodeTokens`].
 pub fn import_rsx_snippets_md(
 	mut commands: Commands,
-	query: Populated<
-		(Entity, &SourceFile, Option<&MetaType>),
-		Changed<SourceFile>,
-	>,
+	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	parents: Query<&ChildOf>,
+	meta_types: Query<&MetaType>,
 ) -> Result {
-	for (source_file_entity, path, meta_type) in query.iter() {
+	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 		// TODO md should not 
 			&& (ex == "md" || ex == "mdx")
 		{
 			trace!("markdown source file changed: {}", path.display());
 
-			commands
-				.entity(source_file_entity)
-				.despawn_related::<RsxSnippets>();
+			commands.entity(entity).despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			let mut snippet = commands.spawn((
 				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
 				StaticRoot,
-				RsxSnippetOf(source_file_entity),
+				RsxSnippetOf(entity),
 				CombinatorTokens::new(rsx_str),
 			));
-			if let Some(meta_type) = meta_type
+
+
+			if let Some(meta_type) = parents
+				.iter_ancestors_inclusive(entity)
+				.find_map(|e| meta_types.get(e).ok())
 				&& let Some(meta_block) =
 					ParseMarkdown::markdown_to_frontmatter_tokens(&file)?
 			{

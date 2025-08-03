@@ -18,3 +18,10 @@ pub struct ArticleMeta {
 	#[serde(default)]
 	pub sidebar: SidebarInfo,
 }
+
+
+impl ArticleMeta {
+	pub fn sidebar_label(&self) -> Option<&str> {
+		self.sidebar.label.as_deref().or_else(|| self.title.as_deref())
+	}
+}

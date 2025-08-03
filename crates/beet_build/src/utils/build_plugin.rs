@@ -85,6 +85,7 @@ impl Plugin for BuildPlugin {
 					// we should remove it!
 					apply_rsx_snippets,
 					parse_file_watch_events,
+					reparent_route_collection_source_files,
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
 					ParseRsxTokens.run(),
