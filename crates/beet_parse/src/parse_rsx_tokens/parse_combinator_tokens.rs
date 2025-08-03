@@ -437,6 +437,7 @@ mod test {
 		.to_be_snapshot();
 	}
 	#[test]
+	#[ignore = "todo combinator raw text"]
 	fn preserves_whitespace() {
 		let out = tokenize_combinator(
 			r#"

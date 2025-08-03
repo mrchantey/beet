@@ -1,7 +1,5 @@
-// mod deduplicate_static_lang_snippets;
 mod import_file_inner_text;
 mod import_rsx_snippets_md;
-// pub use deduplicate_static_lang_snippets::*;
 pub use import_rsx_snippets_md::*;
 mod import_rsx_snippets_rs;
 pub use import_file_inner_text::*;

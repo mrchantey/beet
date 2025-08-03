@@ -14,9 +14,9 @@ use syntect::util::LinesWithEndings;
 ///
 /// The following markdown:
 /// ```markdown
-/// ```rust
-/// let foo = bar;
-/// ```
+/// 	```rust
+/// 	let foo = bar;
+/// 	```
 /// ```
 /// Will produce the following html:
 /// ```html

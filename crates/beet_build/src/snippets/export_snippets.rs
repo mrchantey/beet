@@ -4,12 +4,7 @@ use bevy::prelude::*;
 
 
 pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
-	let rsx_snippets = world.run_system_cached(collect_rsx_snippets)?;
-	let lang_snippets = world.run_system_cached(collect_lang_snippets)?;
-	let snippets = lang_snippets
-		.into_iter()
-		.chain(rsx_snippets.into_iter())
-		.collect::<Vec<_>>();
+	let snippets = world.run_system_cached(collect_rsx_snippets)?;
 	if snippets.is_empty() {
 		return Ok(());
 	}
@@ -62,24 +57,6 @@ fn collect_rsx_snippets(
 		})
 		.collect()
 }
-/// Collect all changed [`LangSnippet`], returning the output path
-/// and all entities that are part of the snippet.
-fn collect_lang_snippets(
-	query: Query<(Entity, &LangSnippetPath), Changed<StaticLangNode>>,
-	children: Query<&Children>,
-) -> Vec<(AbsPathBuf, Vec<Entity>)> {
-	debug!("{} lang snippets changed", query.iter().count());
-	query
-		.into_iter()
-		.map(|(entity, path)| {
-			(
-				path.into_abs(),
-				children.iter_descendants_inclusive(entity).collect(),
-			)
-		})
-		.collect()
-}
-
 
 #[cfg(test)]
 mod test {

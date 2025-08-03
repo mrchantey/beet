@@ -52,7 +52,6 @@ impl Plugin for ApplyDirectivesPlugin {
 					apply_rsx_snippets,
 					apply_style_id_attributes,
 					apply_slots,
-					apply_static_lang_snippets,
 					apply_requires_dom_idx,
 					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,

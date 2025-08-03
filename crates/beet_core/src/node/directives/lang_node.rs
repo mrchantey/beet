@@ -14,7 +14,6 @@ pub type LangDirectives = (
 	CodeNode,
 	LangSnippetHash,
 	LangSnippetPath,
-	StaticLangNode,
 	InnerText,
 	FileInnerText,
 );
@@ -49,19 +48,6 @@ impl std::fmt::Display for LangSnippetHash {
 		write!(f, "{}", self.0)
 	}
 }
-
-
-/// The deduplicated form of a 'lang node' is a clone of the original,
-/// this marker indicates this is the canonical deduplicated version,
-/// and should be used to filter for processing so that we arent performing
-/// duplicated work on the same node.
-#[derive(Debug, Component, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[reflect(Component)]
-#[component(immutable)]
-pub struct StaticLangNode;
-
 
 /// The replacement for [`InnerText`] after the lang snippet has been
 /// extracted, referencing the path to the snippet scene file.

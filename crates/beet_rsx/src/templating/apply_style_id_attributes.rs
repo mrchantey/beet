@@ -69,6 +69,9 @@ impl ApplyAttributes<'_, '_> {
 				AttributeOf::new(entity),
 				// hash will be converted to attribute key in compress_style_ids.rs
 				styleid.clone(),
+				AttributeKey::new(
+					self.html_constants.style_id_attribute(styleid.0),
+				),
 			));
 		}
 		for template in self
@@ -145,6 +148,16 @@ mod test {
 		.xpect()
 		.to_be_snapshot();
 	}
+	// #[test]
+	// fn visits_templates() {
+	// 	HtmlDocument::parse_bundle(rsx! {
+	// 		<style {replace_hash()}/>
+	// 		<MyTemplate/>
+	// 		<MyTemplate/>
+	// 	})
+	// 	.xpect()
+	// 	.to_be_snapshot();
+	// }
 	#[test]
 	fn applies_to_slots() {
 		HtmlDocument::parse_bundle(rsx! {
