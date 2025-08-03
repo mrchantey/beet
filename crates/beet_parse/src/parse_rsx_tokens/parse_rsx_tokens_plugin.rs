@@ -64,7 +64,6 @@ impl Plugin for ParseRsxTokensPlugin {
 						extract_inner_text_file,
 						extract_inner_text_element,
 						extract_inner_text_directive,
-						// lang nodes must run first, hashes raw attributes not extracted directives
 						extract_lang_nodes,
 						collect_md_code_nodes,
 						extract_code_nodes,
@@ -82,7 +81,7 @@ impl Plugin for ParseRsxTokensPlugin {
 						.chain()
 						.before(ModifyRsxTree),
 					(
-						|| {},
+						parse_snippet_hash,
 						#[cfg(feature = "syntect")]
 						parse_syntect,
 						#[cfg(feature = "css")]

@@ -5,23 +5,22 @@ use std::hash::Hasher;
 
 
 /// For elements with a `script`, `style` or `code` tag, and without an
-/// `is:inline` attribute, parse as a lang node:
+/// `node:inline` attribute, parse as a lang node:
 /// - insert a [`LangSnippetHash`]
 /// - insert a [`ScriptElement`]
 /// - insert a [`StyleElement`]
 pub fn extract_lang_nodes(
 	mut commands: Commands,
-	query: Populated<(Entity, &NodeTag, Option<&InnerText>), Added<NodeTag>>,
+	query: Populated<(Entity, &NodeTag), Added<NodeTag>>,
 	attributes: FindAttribute,
 ) {
-	for (entity, tag, inner_text) in query.iter() {
-		// entirely skip is:inline
-		if let Some((attr_ent, _)) = attributes.find(entity, "is:inline") {
+	for (entity, tag) in query.iter() {
+		// entirely skip node:inline
+		if let Some((attr_ent, _)) = attributes.find(entity, "node:inline") {
 			// its done its job, remove it
 			commands.entity(attr_ent).despawn();
 			continue;
 		}
-
 		// Insert the element type
 		match tag.as_str() {
 			"script" => {
@@ -31,22 +30,42 @@ pub fn extract_lang_nodes(
 				commands.entity(entity).insert(StyleElement);
 			}
 			_ => {
-				// skip non-lang nodes
 				continue;
 			}
 		}
+	}
+}
 
+/// Insert a [`LangSnippetHash`]  script and style nodes.
+/// This runs after [`ModifyRsxTree`], allowing modifications to be made
+/// before the hash is calculated.
+pub fn parse_snippet_hash(
+	mut commands: Commands,
+	query: Populated<
+		(
+			Entity,
+			&NodeTag,
+			Option<&InnerText>,
+			// all directives that would effect the node
+			Option<&StyleScope>,
+			Option<&HtmlHoistDirective>,
+		),
+		Or<(Added<ScriptElement>, Added<StyleElement>)>,
+	>,
+	attributes: FindAttribute,
+) {
+	for (entity, tag, inner_text, scope, hoist) in query.iter() {
 		// Apply the hash
 		let mut hasher = rapidhash::RapidHasher::default();
 		tag.hash(&mut hasher);
 		for (_, key, value) in attributes.all(entity) {
 			key.hash(&mut hasher);
-			if let Some(value) = value {
-				value.hash(&mut hasher);
-			}
+			value.hash(&mut hasher);
 		}
-		// white space sensitive hash of text content, important for <code>
 		inner_text.hash(&mut hasher);
+		scope.hash(&mut hasher);
+		hoist.hash(&mut hasher);
+
 		commands
 			.entity(entity)
 			.insert(LangSnippetHash::new(hasher.finish()));
@@ -85,6 +104,7 @@ mod test {
 			))
 			.id();
 		world.run_system_cached(super::extract_lang_nodes).unwrap();
+		world.run_system_cached(super::parse_snippet_hash).unwrap();
 		let hash1 = world.entity(entity1).get::<LangSnippetHash>().unwrap();
 		let hash2 = world.entity(entity2).get::<LangSnippetHash>().unwrap();
 		let hash3 = world.entity(entity3).get::<LangSnippetHash>().unwrap();

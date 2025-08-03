@@ -7,7 +7,7 @@
     FragmentNode,
     related! {
         Children[(NodeTag(String::from("style")), ElementNode { self_closing : true
-        }, StyleElement, LangSnippetHash(6353593457304550519u64), { #[cfg(not(feature
+        }, StyleElement, LangSnippetHash(6850375090345973503u64), { #[cfg(not(feature
         = "client"))] { InnerText::new(include_str!("foo.rs")) } #[cfg(feature =
         "client")] { () } })]
     },

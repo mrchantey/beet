@@ -73,7 +73,6 @@ a.leaf{
 }
 
 a {
-	background-color: blue;
 	display: block;
 	width: 100%;
 	border-radius: var(--bt-border-radius);
