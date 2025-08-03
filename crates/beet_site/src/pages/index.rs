@@ -35,24 +35,16 @@ pub fn get() -> impl Bundle {
 				</ul>
 				<h2>"Very Bevy Web UI"</h2>
 					<ClientCounter client:load initial=1 />
-					<code src="../content/web-ui.rs"/>
+					<pre node:code lang="rust" src="../content/web-ui.rs"/>
 				<h2>"Very Bevy Server Actions"</h2>
 				<p>"Pop open the dev tools to see your requests in flight!"</p>
 				<ServerCounter client:load initial=1 />
-					<code src="../content/server-actions.rs"/>
+					<pre node:code lang="rust" src="../content/server-actions.rs"/>
 				<h2>"Very Bevy Agents"</h2>
-					<code src="../content/realtime-agents.rs"/>
+					<pre node:code lang="rust" src="../content/realtime-agents.rs"/>
 				</div>
 			</ContentLayout>
 		</BeetContext>
-		<style scope:global>
-		pre{
-			padding: 1.em;
-			font-size: 1.1.em;
-			max-width: 45.em;
-			width: 45.em;
-		}
-		</style>
 		<style>
 		.container{
 			display: flex;

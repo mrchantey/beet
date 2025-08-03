@@ -26,5 +26,30 @@ impl CodeNode {
 			theme: None,
 		}
 	}
-	
+}
+
+
+
+pub fn extract_code_nodes(
+	mut commands: Commands,
+	query: Populated<Entity, Added<ElementNode>>,
+	attributes: FindAttribute,
+) {
+	for node_ent in query.iter() {
+		if let Some((attr_entity, _)) = attributes.find(node_ent, "node:code") {
+			commands.entity(attr_entity).despawn();
+
+			let lang =
+				attributes.find_value(node_ent, "lang").map(|(entity, v)| {
+					commands.entity(entity).despawn();
+					v.0.clone()
+				});
+			let theme =
+				attributes.find_value(node_ent, "theme").map(|(entity, v)| {
+					commands.entity(entity).despawn();
+					v.0.clone()
+				});
+			commands.entity(node_ent).insert(CodeNode { lang, theme });
+		}
+	}
 }

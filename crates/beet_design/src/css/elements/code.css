@@ -1,4 +1,9 @@
 
+pre.syntect-code{
+			padding: 1em;
+			font-size: 1.1em;
+}
+
 pre,
 code,
 kbd,

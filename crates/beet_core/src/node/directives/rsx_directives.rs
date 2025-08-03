@@ -60,7 +60,7 @@ impl SlotTarget {
 /// this does not address slot children, ie `<div slot="foo">`
 pub fn extract_slot_targets(
 	mut commands: Commands,
-	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
+	query: Populated<(Entity, &NodeTag), Added<ElementNode>>,
 	attributes: FindAttribute,
 ) {
 	for (node_ent, node_tag) in query.iter() {

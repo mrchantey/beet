@@ -73,6 +73,14 @@ impl FindAttribute<'_, '_> {
 			.ok()
 			.and_then(|(_, attrs)| attrs.find(&self.attributes, key))
 	}
+	pub fn find_value(
+		&self,
+		entity: Entity,
+		key: &str,
+	) -> Option<(Entity, &TextNode)> {
+		self.find(entity, key)
+			.and_then(|(attr_entity, value)| value.map(|v| (attr_entity, v)))
+	}
 
 
 	/// Collect all classes from the attributes of the given entity.

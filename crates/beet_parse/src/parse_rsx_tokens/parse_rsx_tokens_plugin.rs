@@ -60,13 +60,14 @@ impl Plugin for ParseRsxTokensPlugin {
 						parse_combinator_tokens,
 						#[cfg(feature = "rsx")]
 						parse_rstml_tokens,
+						// extractors
 						extract_inner_text_file,
 						extract_inner_text_element,
 						extract_inner_text_directive,
-						// collect_md_code_nodes,
-						// extractors
 						// lang nodes must run first, hashes raw attributes not extracted directives
 						extract_lang_nodes,
+						collect_md_code_nodes,
+						extract_code_nodes,
 						extract_slot_targets,
 						try_extract_directive::<SlotChild>,
 						try_extract_directive::<ClientLoadDirective>,
