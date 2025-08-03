@@ -73,6 +73,18 @@ impl FindAttribute<'_, '_> {
 			.ok()
 			.and_then(|(_, attrs)| attrs.find(&self.attributes, key))
 	}
+
+
+	/// Collect all classes from the attributes of the given entity.
+	pub fn classes(&self, entity: Entity) -> Vec<String> {
+		self.find(entity, "class").map_or(vec![], |(_, value)| {
+			value
+				.map(|text| {
+					text.as_str().split_whitespace().map(String::from).collect()
+				})
+				.unwrap_or_default()
+		})
+	}
 }
 
 /// An attribute key represented as a string.

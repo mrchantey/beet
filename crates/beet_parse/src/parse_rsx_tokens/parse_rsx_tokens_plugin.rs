@@ -44,6 +44,10 @@ impl Plugin for ParseRsxTokensPlugin {
 			.world()
 			.resource::<HtmlConstants>();
 		let rstml_parser = create_rstml_parser(constants);
+
+		#[cfg(feature = "syntect")]
+		app.init_resource::<SyntectConfig>();
+
 		app.insert_non_send_resource(rstml_parser)
 			.insert_schedule_before(Update, ParseRsxTokens)
 			.configure_sets(ParseRsxTokens, ModifyRsxTree)
@@ -59,6 +63,7 @@ impl Plugin for ParseRsxTokensPlugin {
 						extract_inner_text_file,
 						extract_inner_text_element,
 						extract_inner_text_directive,
+						// collect_md_code_nodes,
 						// extractors
 						// lang nodes must run first, hashes raw attributes not extracted directives
 						extract_lang_nodes,

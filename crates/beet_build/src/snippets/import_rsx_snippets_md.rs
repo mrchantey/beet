@@ -27,7 +27,6 @@ pub fn import_rsx_snippets_md(
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
-
 			let mut snippet = commands.spawn((
 				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
 				StaticRoot,

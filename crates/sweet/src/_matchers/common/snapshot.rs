@@ -57,14 +57,14 @@ impl<T> Matcher<T> {
 	/// Snapshots are saved using test name so only one snapshot per test is allowed.
 	/// # Panics
 	/// If the snapshot file cannot be read or written.
-	pub fn to_be_snapshot<M>(&self)
+	pub fn to_be_snapshot<M>(&self)-> &Self
 	where
 		T: StringComp<M>,
 	{
 		#[cfg(target_arch = "wasm32")]
 		{
 			beet_utils::log!("snapshot not yet supported on wasm32");
-			return;
+			return self;
 		}
 		#[cfg(not(target_arch = "wasm32"))]
 		{
@@ -73,13 +73,14 @@ impl<T> Matcher<T> {
 				Ok(Some(expected)) => self.assert_diff(&expected, &received),
 				Ok(None) => {
 					// snapshot saved, no assertion made
-					return;
+					return self;
 				}
 				Err(e) => {
 					self.assert(false, &e.to_string());
 				}
 			}
 		}
+		self
 	}
 }
 

@@ -1,4 +1,5 @@
 mod event_observer;
+mod escape_html;
 pub use event_observer::*;
 pub mod snippet_root;
 pub use snippet_root::*;
@@ -12,6 +13,7 @@ mod workspace_config;
 pub use workspace_config::*;
 pub mod rsx_nodes;
 pub use rsx_nodes::*;
+pub use escape_html::*;
 mod web_nodes;
 pub use web_nodes::*;
 mod attribute;

@@ -142,6 +142,7 @@ impl HtmlBuilder<'_, '_> {
 			html.push('>');
 
 			if let Some(inner_text) = inner_text {
+				//TODO this is inner html not text
 				html.push_str(&inner_text.0);
 			}
 
@@ -377,5 +378,15 @@ mod test {
 		)
 		.xpect()
 		.to_be_snapshot();
+	}
+	#[test]
+	fn escapes() {
+		HtmlFragment::parse_bundle(rsx! {
+			<pre>
+				<code class="language-rust">fn foobar() -> String {}</code>
+			</pre>
+		})
+			.xpect()
+			.to_be_snapshot();
 	}
 }

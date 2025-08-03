@@ -1,1 +1,1 @@
-"<pre style=\"background-color:#2b303b;\">\n<span style=\"color:#b48ead;\">let</span><span style=\"color:#c0c5ce;\"> foo = rsx!{&lt;div&gt;{&quot;</span><span style=\"color:#a3be8c;\">bar</span><span style=\"color:#c0c5ce;\">&quot;}&lt;/div&gt;}</span></pre>\n"
+"<span style=\"color:#b48ead;\">fn </span><span style=\"color:#8fa1b3;\">foobar</span><span style=\"color:#c0c5ce;\">() -&gt; String {}</span>"

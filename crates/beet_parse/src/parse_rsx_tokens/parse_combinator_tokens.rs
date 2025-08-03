@@ -397,10 +397,10 @@ mod test {
 
 	#[test]
 	fn template_attributes_mixed() {
-		"<MyTemplate foo={
+		r#"<MyTemplate foo={
 			let bar = <br/>;
 			bar
-		} />"
+		} />"#
 			.xmap(parse)
 			.to_be_snapshot();
 	}
@@ -435,5 +435,30 @@ mod test {
 "#
 		.xmap(parse)
 		.to_be_snapshot();
+	}
+	#[test]
+	fn preserves_whitespace() {
+		let out = tokenize_combinator(
+			r#"
+<pre><code class="language-rust">// A simple Rust function
+fn fibonacci(n: u32) -&gt; u32 {
+    match n {
+        0 =&gt; 0,
+        1 =&gt; 1,
+        _ =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+fn main() {
+    let result = fibonacci(10);
+    println!("The 10th Fibonacci number is: {}", result);
+}
+</code></pre>		
+		"#,
+			WsPathBuf::new(file!()),
+		)
+		.unwrap();
+		out.to_string().xpect().to_contain("\nfn main()");
+		out.xpect().to_be_snapshot();
 	}
 }
