@@ -231,7 +231,7 @@ fn apply_template_locations(
 	let mut get_on_spawn = |idx: &ExprIdx| -> Result<OnSpawnDeferred> {
 		let out = instance_exprs.remove(idx).ok_or_else(|| {
 			bevyhow!(
-				"
+				"Apply Snippets Error:
 Error resolving static root for snippet at {snippet_root}
 The instance root is missing an ExprIdx found in the static root.
 Instance idxs: 	{instance_keys:?}
@@ -262,7 +262,7 @@ Expected idx: 	{idx}
 	}
 	if !instance_exprs.is_empty() {
 		bevybail!(
-			"
+			"Apply Snippets Error:
 Error resolving static root for snippet at {snippet_root}
 Not all ExprIdx were applied.
 The static root is missing idxs found in the instance root:
