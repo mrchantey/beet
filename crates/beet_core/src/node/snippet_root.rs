@@ -9,6 +9,7 @@ pub type RootComponents = (
 	SnippetRoot,
 	StaticRoot,
 	InstanceRoot,
+	ResolvedRoot,
 	ExprIdx,
 	DomIdx,
 	RequiresDomIdx,
@@ -112,6 +113,16 @@ pub struct StaticRoot;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct InstanceRoot;
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
+)]
+
+/// An [`InstanceRoot`] that has had its [`StaticRoot`] applied
+#[reflect(Default, Component)]
+#[require(InstanceRoot)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct ResolvedRoot;
 
 /// Utility for getting the closest [`SnippetRoot`] ancestor of the entity,
 ///

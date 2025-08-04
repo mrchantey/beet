@@ -20,20 +20,6 @@ impl Plugin for LoadSnippetsPlugin {
 	}
 }
 
-pub struct ApplySnippetsPlugin;
-
-/// This schedule will first apply static rsx snippets to newly
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
-pub struct ApplySnippets;
-
-
-impl Plugin for ApplySnippetsPlugin {
-	fn build(&self, app: &mut App) {
-		app.add_systems(ApplySnippets, apply_rsx_snippets);
-	}
-}
-
-
 
 /// Load snippet scene if it exists.
 // temp whole file until fine-grained loading is implemented
@@ -69,6 +55,18 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 }
 
 
+pub struct ApplySnippetsPlugin;
+
+/// This schedule will first apply static rsx snippets to newly
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ApplySnippets;
+
+
+impl Plugin for ApplySnippetsPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(ApplySnippets, apply_rsx_snippets);
+	}
+}
 
 /// When a [`SnippetRoot`] is added to an entity,
 /// recusively apply each [`StaticRoot`]
@@ -94,9 +92,31 @@ fn apply_rsx_snippets(world: &mut World) -> Result {
 			break;
 		}
 	}
-
 	Ok(())
 }
+
+// /// When a [`SnippetRoot`] is added to an entity,
+// /// recusively apply each [`StaticRoot`]
+// fn apply_rsx_snippets(
+// 	mut commands: Commands,
+// 	query: Populated<Entity, (With<InstanceRoot>, Without<ResolvedRoot>)>,
+// ) -> Result {
+// 	for entity in query.iter() {
+// 		commands
+// 			.run_system_cached_with(apply_static_rsx.pipe(maybe_panic), entity);
+// 		commands.run_system_cached_with(
+// 			flush_on_spawn_deferred_recursive.pipe(maybe_panic),
+// 			entity,
+// 		);
+// 		commands.entity(entity).insert(ResolvedRoot);
+// 	}
+// 	println!("run it again!");
+// 	// if this system ran new unresolved snippet instances may have been created,
+// 	// so run the schedule again.
+// 	commands.run_schedule(ApplySnippets);
+
+// 	Ok(())
+// }
 
 fn maybe_panic(result: In<Result<()>>) {
 	if let Err(err) = result.0 {
@@ -136,12 +156,7 @@ fn apply_static_rsx(
 	// take all [`OnSpawnDeferred`] methods from the instance,
 	// then entirely clear it.
 	// this must be done before clearing and cloning are executed.
-	// TODO attributes too?
 	let mut instance_expr_map = HashMap::new();
-
-	// commands.run_system_cached_with(log_component_names, instance_root);
-	// commands.run_system_cached_with(log_component_names, static_root);
-
 
 	// take all [`OnSpawnDeferred`] methods from the instance,
 	// then entirely clear it.
@@ -158,25 +173,18 @@ fn apply_static_rsx(
 			}
 		}
 	}
-	// println!("Instance entity: {:?}", instance_root);
-	// println!("Static entity: {:?}", static_root);
-	// println!("Here, loc:{:?}", expressions.iter().collect::<Vec<_>>());
-	// println!("Here, loc:{:?}", instance_expr_map);
 
-
+	// we've taken all expressions, now we can clear the instance root
+	// for repoplulating with the static root.
 	commands
 		.entity(instance_root)
 		.despawn_related::<Children>()
 		.despawn_related::<TemplateRoot>()
 		.despawn_related::<Attributes>()
-		.retain::<(
-			SnippetRoot,
-			InstanceRoot,
-			HtmlDocument,
-			HtmlFragment,
-			ChildOf,
-			TemplateOf,
-		)>();
+		// we've already taken all expressions
+		.remove::<ExprIdx>();
+
+	// commands.run_system_cached_with(log_component_names, instance_root);
 
 	// apply the snippet tree
 	commands
@@ -305,13 +313,42 @@ mod test {
 	use sweet::prelude::*;
 
 	fn world() -> World {
-		let world = World::new();
-
-		// world
-		// 	.register_component_hooks::<InstanceRoot>()
-		// 	.on_add(apply_rsx_snippets_hook);
-		world
+		let mut app = App::new();
+		app.add_plugins(ApplySnippetsPlugin);
+		std::mem::take(app.world_mut())
 	}
+
+
+	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
+		let mut world = world();
+		// convert an instance to a snippet with the same SnippetRoot
+		let _snippet = world
+			.spawn((StaticRoot, rsx_snippet))
+			.remove::<InstanceRoot>()
+			.insert(SnippetRoot::default())
+			.id();
+		let instance =
+			world.spawn(instance).insert(SnippetRoot::default()).id();
+
+		world.run_schedule(ApplySnippets);
+
+		world.run_system_once(apply_slots).ok(); // no matching entities ok
+		world
+			.run_system_once_with(render_fragment, instance)
+			.unwrap()
+	}
+
+	fn parse_instance(instance: impl Bundle) -> String {
+		let mut world = world();
+		let instance = world.spawn(instance).id();
+
+		world.run_schedule(ApplySnippets);
+		world.run_system_once(apply_slots).ok(); // no matching entities ok
+		world
+			.run_system_once_with(render_fragment, instance)
+			.unwrap()
+	}
+
 
 	#[test]
 	fn retains_parent() {
@@ -330,34 +367,13 @@ mod test {
 			.remove::<InstanceRoot>()
 			.insert(SnippetRoot::default())
 			.id();
-		world
-			.run_system_cached(apply_rsx_snippets)
-			.unwrap()
-			.unwrap();
+		world.run_schedule(ApplySnippets);
 
 		world
 			.run_system_cached_with(render_fragment, parent)
 			.unwrap()
 			.xpect()
 			.to_be("<main><span/></main>");
-	}
-
-	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
-		let mut world = world();
-		// convert an instance to a snippet with the same SnippetRoot
-		let _snippet = world
-			.spawn((StaticRoot, rsx_snippet))
-			.remove::<InstanceRoot>()
-			.insert(SnippetRoot::default())
-			.id();
-		let instance =
-			world.spawn(instance).insert(SnippetRoot::default()).id();
-
-		world.run_system_once(apply_rsx_snippets).unwrap().unwrap();
-		world.run_system_once(apply_slots).ok(); // no matching entities ok
-		world
-			.run_system_once_with(render_fragment, instance)
-			.unwrap()
 	}
 
 	#[test]
@@ -509,26 +525,17 @@ mod test {
 			.insert(idx2)
 			.id();
 
-		world.run_system_once(apply_rsx_snippets).unwrap().unwrap();
+		world.run_schedule(ApplySnippets);
+
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()
 			.xpect()
 			.to_be("<main><span/></main>");
 	}
-}
-
-
-#[cfg(test)]
-mod test_flush_recursive {
-	use super::*;
-	use crate::as_beet::*;
-	use crate::templating::apply_slots;
-	use bevy::ecs::system::RunSystemOnce;
-	use sweet::prelude::*;
 
 	#[test]
-	fn bfs_order() {
+	fn flush_on_spawn_bfs_order() {
 		let (val, set_val) = signal::<Vec<u32>>(Vec::new());
 
 		let mut world = World::new();
@@ -573,33 +580,21 @@ mod test_flush_recursive {
 		expect(val()).to_be(vec![0, 1, 2, 3, 4]);
 	}
 
-
-	fn parse(instance: impl Bundle) -> String {
-		let mut world = World::new();
-		let instance = world.spawn(instance).id();
-
-		world.run_system_once(apply_rsx_snippets).unwrap().unwrap();
-		world.run_system_once(apply_slots).ok(); // no matching entities ok
-		world
-			.run_system_once_with(render_fragment, instance)
-			.unwrap()
-	}
-
 	#[test]
-	fn templates() {
+	fn flush_on_spawn_templates() {
 		#[template]
 		fn MyTemplate() -> impl Bundle {
 			rsx! {<div/>}
 		}
 
-		parse(rsx! {
+		parse_instance(rsx! {
 			<MyTemplate/>
 		})
 		.xpect()
 		.to_be_str("<div/>");
 	}
 	#[test]
-	fn attribute_blocks() {
+	fn flush_on_spawn_attribute_blocks() {
 		#[derive(Default, Buildable, AttributeBlock)]
 		struct MyAttributeBlock {
 			class: String,
@@ -612,7 +607,7 @@ mod test_flush_recursive {
 			rsx! {<div {attrs}/>}
 		}
 
-		parse(rsx! {
+		parse_instance(rsx! {
 			<MyTemplate class="foo"/>
 		})
 		.xpect()

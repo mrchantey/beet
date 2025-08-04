@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_rsx::prelude::ApplySnippets;
 use beet_utils::utils::PipelineTarget;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
@@ -90,6 +91,7 @@ impl RouteHandler {
 			match world.run_system_once_with(handler.clone(), input) {
 				Ok(out) => {
 					world.spawn((HandlerBundle, out));
+					world.run_schedule(ApplySnippets);
 				}
 				Err(err) => {
 					world.insert_resource(err.into_response());
