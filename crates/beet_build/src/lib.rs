@@ -1,3 +1,20 @@
+//! This module is responsible for codegen and live reloading.
+//!
+//! There are several steps involved:
+//! ## Source Files
+//! - Startup - For every file specified in the [`WorkspaceConfig`], load a [`SourceFile`]
+//! - WatchEvent::Create - create a new corresponding [`SourceFile`]
+//! - WatchEvent::Remove - remove every matching [`SourceFile`]
+//! - WatchEvent::Modify - find the root source file and mark it as [`Changed`], despawning all children
+//!
+//! ## Rsx Snippets
+//!
+//! Load [`RsxSnippets`] for each [`SourceFile`], 
+//!
+//! ## RouteCodegen
+//!
+//! - Reparent any [`SourceFile`] to its matching [`RouteFileCollection`] if any
+//!
 //! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
 //!
 //! ```ignore
@@ -27,6 +44,9 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(let_chains, if_let_guard, result_flattening, exit_status_error)]
+#[allow(unused)]
+use crate::prelude::*;
+
 
 mod route_codegen;
 mod snippets;

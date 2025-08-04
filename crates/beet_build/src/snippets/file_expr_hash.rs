@@ -1,6 +1,5 @@
 use super::HashNonSnippetRust;
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
@@ -50,7 +49,6 @@ pub fn update_file_expr_hash(
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
-	rsx_snippets: Query<&RsxSnippets>,
 	snippet_roots: Query<&SnippetRoot>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	attributes: Query<&Attributes>,
@@ -71,12 +69,11 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(source_file)?;
-		for node in rsx_snippets
-			.iter_descendants(entity)
-			.flat_map(|child| template_roots.iter_descendants_inclusive(child))
-			.flat_map(|en| children.iter_descendants_inclusive(en))
+		for node in children.iter_descendants(entity)
+		.flat_map(|child| template_roots.iter_descendants_inclusive(child))
+		.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
-			// hash macro idxs
+			// hash snippet file location
 			if let Ok(idx) = snippet_roots.get(node) {
 				idx.hash(&mut hasher);
 			}
@@ -147,7 +144,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				SourceFile::new(WsPathBuf::new(file!()).into_abs()),
-				related! {RsxSnippets[related! {TemplateRoot[bundle]}]},
+				children![related! {TemplateRoot[bundle]}],
 			))
 			.id();
 		// reset macro idxs for testing

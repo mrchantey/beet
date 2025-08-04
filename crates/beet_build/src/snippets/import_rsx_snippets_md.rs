@@ -9,25 +9,24 @@ use quote::ToTokens;
 /// as [`CombinatorToNodeTokens`].
 pub fn import_rsx_snippets_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 	parents: Query<&ChildOf>,
 	meta_types: Query<&MetaType>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
-		// TODO md should not 
+		// TODO md should parse html only
 			&& (ex == "md" || ex == "mdx")
 		{
 			trace!("markdown source file changed: {}", path.display());
 
-			commands.entity(entity).despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			let mut snippet = commands.spawn((
 				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
 				StaticRoot,
-				RsxSnippetOf(entity),
+				ChildOf(entity),
 				CombinatorTokens::new(rsx_str),
 			));
 
@@ -78,7 +77,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
@@ -101,7 +100,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

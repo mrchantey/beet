@@ -10,16 +10,19 @@ use bevy::prelude::*;
 /// with an `InnerText` containing the file contents.
 pub fn import_file_inner_text(
 	mut commands: Commands,
-	query: Populated<(Entity, &FileInnerText)>,
+	query: Populated<(Entity, &FileInnerText), Added<FileInnerText>>,
 	parents: Query<&ChildOf>,
-	snippets_of: Query<&RsxSnippetOf>,
-	source_files: Query<(Entity, &SourceFile, Option<&SourceFileRefTarget>)>,
+	source_files: Query<(Entity, &SourceFile, Option<&WatchedFiles>)>,
 ) -> Result<()> {
-	for (entity, file) in query.iter() {
-		let snippet_of = snippets_of.get(parents.root_ancestor(entity))?;
-		let (source_file_ent, source_file, target) =
-			source_files.get(snippet_of.0)?;
-		let path = source_file.parent().unwrap_or_default().join(&file.0);
+	for (entity, file_text) in query.iter() {
+		// get the parent source file
+		let (source_file_ent, source_file, watched_files) = parents
+			.iter_ancestors(entity)
+			.find_map(|en| source_files.get(en).ok())
+			.ok_or_else(|| {
+				bevyhow!("FileInnerText has no SourceFile parent: {entity:?}")
+			})?;
+		let path = source_file.parent().unwrap_or_default().join(&file_text.0);
 		let contents = ReadFile::to_string(&path)?;
 
 		// 1. change the FileInnerText to InnerText
@@ -31,19 +34,29 @@ pub fn import_file_inner_text(
 			// this is ok because this method is only used for live reloading
 			.insert(InnerText::new(contents));
 
-		// 2. link the source files
+		// 2. ensure the file is being watched
 		if false
-			== target
-				.map(|target| {
-					target
+			== watched_files
+				.map(|children| {
+					children
 						.iter()
 						.filter_map(|ent| source_files.get(ent).ok())
 						.any(|(_, file, _)| **file == path)
 				})
 				.unwrap_or(false)
 		{
-			commands
-				.spawn((SourceFileRef(source_file_ent), SourceFile::new(path)));
+			if let Some((watched_entity, _, _)) =
+				source_files.iter().find(|(_, file, _)| ***file == path)
+			{
+				commands
+					.entity(watched_entity)
+					// TODO many-many relations
+					.insert(FileWatchedBy(source_file_ent));
+			} else {
+				warn!(
+					"file included by 'src=..' tag not found, changes will not be watched: {path:?}"
+				);
+			}
 		}
 	}
 	Ok(())
@@ -85,22 +98,22 @@ mod test {
 			.to_be(&InnerText::new(expected));
 
 		// links source files
-		app.world_mut().query_once::<&SourceFileRef>()[0]
+		app.world_mut().query_once::<&ChildOf>()[1]
 			.0
 			.xpect()
 			.to_be(file);
 
 		app.world_mut()
-			.query_once::<&SourceFileRef>()
+			.query_once::<&ChildOf>()
 			.len()
 			.xpect()
-			.to_be(1);
+			.to_be(2);
 		app.update();
-		// second update does not spawn a new SourceFileRef
+		// second update does not spawn a new ChildOf
 		app.world_mut()
-			.query_once::<&SourceFileRef>()
+			.query_once::<&ChildOf>()
 			.len()
 			.xpect()
-			.to_be(1);
+			.to_be(2);
 	}
 }

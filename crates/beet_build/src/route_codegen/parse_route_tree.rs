@@ -37,7 +37,10 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	mut query: Populated<(Entity, &mut CodegenFile), Changed<RouteCodegenRoot>>,
+	mut query: Populated<
+		(Entity, &mut CodegenFile),
+		(Added<CodegenFile>, With<RouteCodegenRoot>),
+	>,
 	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,

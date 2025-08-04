@@ -8,7 +8,7 @@ use beet::prelude::*;
 
 
 pub fn get() -> impl Bundle {
-	let num_requests = AppState::get().num_requests;
+	let num_requests = AppState::get().num_requests + 1;
 	rsx! {
 		<Layout>
 		<h1>Beet Demo</h1>

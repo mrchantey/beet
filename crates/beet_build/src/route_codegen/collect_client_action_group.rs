@@ -22,7 +22,7 @@ impl Default for CollectClientActions {
 pub fn collect_client_action_group(
 	mut query: Populated<
 		(&mut CodegenFile, &CollectClientActions, &ChildOf),
-		Changed<CollectClientActions>,
+		Added<CodegenFile>,
 	>,
 	children: Query<&Children>,
 	methods: Query<&RouteFileMethod>,

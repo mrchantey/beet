@@ -26,6 +26,7 @@ impl Default for WorkspaceConfig {
 		Self {
 			filter: GlobFilter::default()
 				.with_exclude("*/target/*")
+				.with_exclude("*/codegen/*")
 				.with_exclude("*/.cache/*")
 				.with_exclude("*/node_modules/*"),
 			root_dir: {

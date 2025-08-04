@@ -11,9 +11,9 @@ use syn::parse_quote;
 pub fn collect_route_files(
 	mut query: Populated<
 		(&mut CodegenFile, &RouteFileCollection, &Children),
-		Changed<RouteFileCollection>,
+		Added<CodegenFile>,
 	>,
-	route_files: Query<(&RouteFile, &Children)>,
+	route_files: Query<(&RouteSourceFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
 ) -> Result {
 	for (mut codegen_file, collection, collection_children) in query.iter_mut()
@@ -97,7 +97,6 @@ pub fn collect_route_files(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -106,12 +105,6 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/test_docs/hello.md",
-			)
-			.into_abs(),
-		));
 		app.world_mut().spawn(RouteFileCollection::test_site_docs());
 		app.update();
 		app.world_mut()

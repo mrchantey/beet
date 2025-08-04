@@ -14,7 +14,7 @@ pub fn import_rsx_snippets_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
@@ -22,7 +22,6 @@ pub fn import_rsx_snippets_rs(
 		{
 			trace!("rust source file changed: {}", path.display());
 
-			commands.entity(entity).despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
@@ -62,7 +61,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			self.commands.spawn((
 				SnippetRoot::new_from_tokens(self.file.clone(), &tokens),
 				StaticRoot,
-				RsxSnippetOf(self.source_file),
+				ChildOf(self.source_file),
 				RstmlTokens::new(tokens),
 			));
 		}
@@ -90,7 +89,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

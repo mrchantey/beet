@@ -3,4 +3,4 @@ title = "foobar"
 +++
 
 
-All about docs.
+All about docs.fkl

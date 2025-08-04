@@ -33,7 +33,7 @@ pub fn import_route_file_collection(
 	mut commands: Commands,
 	collections: Query<
 		(Entity, &RouteFileCollection),
-		Changed<RouteFileCollection>,
+		Added<RouteFileCollection>,
 	>,
 ) -> Result {
 	for (entity, collection) in collections.iter() {
@@ -46,14 +46,12 @@ pub fn import_route_file_collection(
 }
 
 
-/// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
+/// Whenever a [`SourceFile`] is created, reparent to a corresponding [`RouteFileCollection`],
+/// if any.
 pub fn reparent_route_collection_source_files(
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
-	collections: Query<
-		(Entity, &RouteFileCollection),
-		Changed<RouteFileCollection>,
-	>,
+	collections: Query<(Entity, &RouteFileCollection)>,
 ) -> Result {
 	// a hashmap mapping every file in a collection to that collection entity
 	let mut file_collection_map: HashMap<AbsPathBuf, Entity> =
@@ -61,6 +59,15 @@ pub fn reparent_route_collection_source_files(
 	for (entity, collection) in collections.iter() {
 		for file in ReadDir::files_recursive(&collection.src)? {
 			let abs_path = AbsPathBuf::new(file)?;
+			if file_collection_map.contains_key(&abs_path) {
+				bevybail!(
+					"
+Error: Collection Overlap: {}
+This file appears in multple collections,
+Please constrain the collection filters or roots",
+					abs_path
+				);
+			}
 			file_collection_map.insert(abs_path, entity);
 		}
 	}
@@ -161,6 +168,12 @@ impl RouteFileCollection {
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
+			children![SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/pages/docs/index.rs",
+				)
+				.into_abs(),
+			)],
 		)
 	}
 	#[cfg(test)]
@@ -182,6 +195,12 @@ impl RouteFileCollection {
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
+			children![SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/test_docs/index.mdx",
+				)
+				.into_abs(),
+			)],
 		)
 	}
 }

@@ -64,7 +64,6 @@ impl<T> Matcher<T> {
 		#[cfg(target_arch = "wasm32")]
 		{
 			beet_utils::log!("snapshot not yet supported on wasm32");
-			return self;
 		}
 		#[cfg(not(target_arch = "wasm32"))]
 		{
@@ -73,7 +72,6 @@ impl<T> Matcher<T> {
 				Ok(Some(expected)) => self.assert_diff(&expected, &received),
 				Ok(None) => {
 					// snapshot saved, no assertion made
-					return self;
 				}
 				Err(e) => {
 					self.assert(false, &e.to_string());

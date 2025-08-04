@@ -16,8 +16,8 @@ impl Plugin for RouteCodegenPlugin {
 		app.init_schedule(RouteCodegen).add_systems(
 			RouteCodegen,
 			(
-				reset_changed_codegen,
-				update_route_files,
+				reset_codegen_files,
+				create_route_files,
 				// create the child routes
 				parse_route_file_rs,
 				parse_route_file_md,
@@ -50,8 +50,6 @@ pub fn export_route_codegen(
 
 /// Marker type indicating the (usually `mod.rs`) file
 /// containing reexports and static route trees.
-/// This component is marked [`Changed`] when recompilation
-/// is required.
 #[derive(Debug, Clone, Default, Component)]
 #[require(CodegenFile=default_codegen_file())]
 pub struct RouteCodegenRoot;

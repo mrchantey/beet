@@ -16,6 +16,7 @@ use std::path::Path;
 // #[component(immutable)]
 #[require(FileExprHash)]
 pub struct SourceFile {
+	/// The path to this source file
 	path: AbsPathBuf,
 }
 
@@ -26,35 +27,6 @@ impl SourceFile {
 impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
-
-/// Types like [`RouteFile`] and files added via include_str!
-/// exist outside of the [`SourceFile`] tree,
-/// but need to reference it to get its rsx children.
-/// This entity will be despawned when the [`SourceFile`] is despawned.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship(relationship_target = SourceFileRefTarget)]
-pub struct SourceFileRef(pub Entity);
-
-/// All references to this [`SourceFile`]
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship_target(relationship = SourceFileRef,linked_spawn)]
-pub struct SourceFileRefTarget(Vec<Entity>);
-
-
-/// Reference to the [`SourceFile`] of this rsx snippet.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship(relationship_target = RsxSnippets)]
-pub struct RsxSnippetOf(pub Entity);
-
-/// Rsx snippets of this [`SourceFile`], we use non-parent relations
-/// to avoid missing parent in fine-grained scene exports.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship_target(relationship = RsxSnippetOf,linked_spawn)]
-pub struct RsxSnippets(Vec<Entity>);
 
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`parse_file_watch_events`]
@@ -68,7 +40,7 @@ pub fn load_workspace_source_files(
 	config: When<Res<WorkspaceConfig>>,
 ) -> bevy::prelude::Result {
 	commands.spawn((
-		SourceFileRoot,
+		NonCollectionSourceFiles,
 		Children::spawn(SpawnIter(
 			config
 				.get_files()?
@@ -79,10 +51,24 @@ pub fn load_workspace_source_files(
 	Ok(())
 }
 
-/// Parent of every [`SourceFile`] entity, any changed child [`SourceFile`]
-/// will result in this being marked [`Changed`]
+/// Parent of every [`SourceFile`] entity that exists outside of a [`RouteFileCollection`].
 #[derive(Component)]
-pub struct SourceFileRoot;
+pub struct NonCollectionSourceFiles;
+
+/// A [`SourceFile`] watched by another [`SourceFile`]
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = WatchedFiles)]
+// TODO many-many relations
+pub struct FileWatchedBy(pub Entity);
+
+
+/// A collection of [`SourceFile`] entities that this [`SourceFile`] is watching.
+/// If any child changes this should also change.
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = FileWatchedBy, linked_spawn)]
+pub struct WatchedFiles(Vec<Entity>);
 
 
 /// Update [`SourceFile`] entities based on file watch events,
@@ -90,19 +76,21 @@ pub struct SourceFileRoot;
 pub fn parse_file_watch_events(
 	mut commands: Commands,
 	mut events: EventReader<WatchEvent>,
-	root_entity: Query<Entity, With<SourceFileRoot>>,
+	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> bevy::prelude::Result {
 	for ev in events
 		.read()
-		// we only care about files that a builder will want to save
+		// we only care about files specified in the config
 		.filter(|ev| config.passes(&ev.path))
 	{
 		tracing::debug!("SourceFile event: {}", ev);
 
-		let matches =
-			existing.iter_mut().filter(|(_, file)| ***file == ev.path);
+		let matches = existing
+			.iter_mut()
+			.filter(|(_, file)| ***file == ev.path)
+			.map(|(en, _)| en);
 
 		match ev.kind {
 			EventKind::Create(CreateKind::File) => {
@@ -112,17 +100,13 @@ pub fn parse_file_watch_events(
 				));
 			}
 			EventKind::Remove(RemoveKind::File) => {
-				for (entity, _) in matches {
+				for entity in matches {
 					commands.entity(entity).despawn();
 				}
 			}
 			EventKind::Modify(_) => {
-				for (entity, mut file) in matches {
-					file.set_changed();
-					commands.run_system_cached_with(
-						propagate_source_file_changes,
-						entity,
-					);
+				for entity in matches {
+					commands.run_system_cached_with(reset_file, entity);
 				}
 			}
 			other => {
@@ -134,16 +118,21 @@ pub fn parse_file_watch_events(
 }
 
 
-// if a [`SourceFile`] is changed, notify source files that depend
-// on it.
-fn propagate_source_file_changes(
+/// Runs for any [`SourceFile`] that changes:
+/// - mark it as [`Added`]
+/// - remove all [`Children`]
+/// If it has a [`FileWatchedBy`] component, also run for that parent
+fn reset_file(
 	In(entity): In<Entity>,
-	query: Query<&SourceFileRef>,
-	mut files: Query<&mut SourceFile>,
+	mut commands: Commands,
+	mut files: Query<(Entity, &mut SourceFile, Option<&FileWatchedBy>)>,
 ) {
-	if let Ok(ref_target) = query.get(entity)
-		&& let Ok(mut file) = files.get_mut(ref_target.0)
-	{
-		file.set_changed();
+	if let Ok((entity, mut file, parent)) = files.get_mut(entity) {
+		trace!("Resetting Source File: {}", file.path);
+		file.set_added();
+		commands.entity(entity).despawn_related::<Children>();
+		if let Some(parent) = parent {
+			commands.run_system_cached_with(reset_file, **parent);
+		}
 	}
 }

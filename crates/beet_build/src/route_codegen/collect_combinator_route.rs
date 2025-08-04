@@ -15,23 +15,27 @@ pub struct CombinatorRouteCodegen;
 /// tokenize it and append to the [`CodegenFile`].
 pub fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query = world
-		.query_filtered::<(Entity,&SourceFileRef), (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
+		.query_filtered::<(Entity,&ChildOf), (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
 		);
-	for (entity, source_file_ref) in query
+	for (entity, parent) in query
 		.iter(world)
-		.map(|(entity, source_file)| (entity, **source_file))
+		.map(|(entity, parent)| (entity, parent.parent()))
 		.collect::<Vec<_>>()
 	{
-		let snippets = world
-			.entity(source_file_ref)
-			.get::<RsxSnippets>()
-			.expect("Combinator Source File should have RsxSnippets");
-
-		assert!(
-			snippets.len() == 1,
-			"Combinator Source File should have exactly one RsxSnippet"
-		);
-		let static_root = snippets[0];
+		let Some(static_root) = world
+			.entity(parent)
+			.get::<Children>()
+			.map(|children| {
+				children
+					.iter()
+					.find(|child| world.entity(*child).contains::<StaticRoot>())
+			})
+			.flatten()
+		else {
+			bevybail!(
+				"CombinatorRouteCodegen has no StaticRoot child: {entity:?}"
+			);
+		};
 
 		// this is a static but we need an instance, the only difference being
 		// StaticRoot vs InstanceRoot
@@ -44,12 +48,6 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			.entity_mut(static_root)
 			.remove::<InstanceRoot>()
 			.insert(StaticRoot);
-
-
-		// let foo = world
-		// 	.component_names_related::<Children>(instance_root)
-		// 	.iter_to_string_indented();
-		// println!("Children of instance root: \n{}", foo);
 
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
@@ -70,7 +68,6 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -81,13 +78,6 @@ mod test {
 		app.add_plugins(BuildPlugin::default())
 			.world_mut()
 			.spawn(RouteFileCollection::test_site_docs());
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/test_docs/hello.md",
-			)
-			.into_abs(),
-		));
-
 
 		app.update();
 		app.world_mut()
