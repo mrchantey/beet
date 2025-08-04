@@ -26,7 +26,35 @@ pub struct RouteFileCollection {
 	pub filter: GlobFilter,
 	pub category: RouteCollectionCategory,
 }
+impl RouteFileCollection {
+	pub fn new(src: AbsPathBuf) -> Self {
+		Self {
+			src,
+			..Default::default()
+		}
+	}
 
+	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
+		self
+	}
+
+	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
+		path.starts_with(&self.src) && self.filter.passes(path)
+	}
+
+	/// Get the
+	fn read_files(&self) -> Result<Vec<AbsPathBuf>> {
+		let mut files = Vec::new();
+		for file in ReadDir::files_recursive(&self.src)? {
+			let abs_path = AbsPathBuf::new(file)?;
+			if self.passes_filter(&abs_path) {
+				files.push(abs_path);
+			}
+		}
+		Ok(files)
+	}
+}
 
 /// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
 pub fn import_route_file_collection(
@@ -57,18 +85,17 @@ pub fn reparent_route_collection_source_files(
 	let mut file_collection_map: HashMap<AbsPathBuf, Entity> =
 		HashMap::default();
 	for (entity, collection) in collections.iter() {
-		for file in ReadDir::files_recursive(&collection.src)? {
-			let abs_path = AbsPathBuf::new(file)?;
-			if file_collection_map.contains_key(&abs_path) {
+		for file in collection.read_files()? {
+			if file_collection_map.contains_key(&file) {
 				bevybail!(
 					"
 Error: Collection Overlap: {}
 This file appears in multple collections,
 Please constrain the collection filters or roots",
-					abs_path
+					file
 				);
 			}
-			file_collection_map.insert(abs_path, entity);
+			file_collection_map.insert(file, entity);
 		}
 	}
 	// for each source file, insert as a child of the collection entity if it exists
@@ -118,22 +145,6 @@ impl RouteCollectionCategory {
 }
 
 impl RouteFileCollection {
-	pub fn new(src: AbsPathBuf) -> Self {
-		Self {
-			src,
-			..Default::default()
-		}
-	}
-
-	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
-		self.filter = filter;
-		self
-	}
-
-	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
-		path.starts_with(&self.src) && self.filter.passes(path)
-	}
-
 	#[cfg(test)]
 	pub fn test_site() -> impl Bundle {
 		(

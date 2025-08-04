@@ -96,7 +96,7 @@ pub fn reset_codegen_files(
 	}
 }
 
-/// Add a [`RouteSourceFile`] to any newl created [`SourceFile`]
+/// Add a [`RouteSourceFile`] to any newly created [`SourceFile`]
 /// that is a child of a [`RouteFileCollection`].
 pub(super) fn create_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
@@ -113,7 +113,7 @@ pub(super) fn create_route_files(
 			.iter_ancestors(entity)
 			.find_map(|en| collections.get(en).ok())
 		else {
-			// this source file is not a descendent of a collection,
+			// this source file is not a descendent of a collection
 			continue;
 		};
 
@@ -128,7 +128,7 @@ pub(super) fn create_route_files(
 
 		let index = index_counter.next(collection_entity);
 
-		debug!("Creating new RouteFile: {}", file.path());
+		debug!("Creating new RouteSourceFile: {}", file.path());
 
 		commands.entity(entity).insert(RouteSourceFile {
 			index,

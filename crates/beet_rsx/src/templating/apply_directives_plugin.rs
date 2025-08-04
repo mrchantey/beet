@@ -46,8 +46,6 @@ impl Plugin for ApplyDirectivesPlugin {
 			.init_resource::<ClientIslandRegistry>()
 			.add_systems(
 				ApplyDirectives,
-				// almost all of these systems must be run in this sequence,
-				// with one or two exceptions but we're single threaded anyway (faster cold-start)
 				(
 					apply_rsx_snippets,
 					apply_style_id_attributes,
@@ -55,7 +53,6 @@ impl Plugin for ApplyDirectivesPlugin {
 					apply_requires_dom_idx,
 					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,
-					// in cl
 					#[cfg(any(not(target_arch = "wasm32"), test))]
 					apply_root_dom_idx,
 					rearrange_html_document,

@@ -17,8 +17,8 @@ pub fn article_layout_middleware() -> RouteHandler {
 pub fn ArticleLayout(
 	query: Query<&ArticleMeta, With<HandlerBundle>>,
 ) -> impl Bundle {
-	for item in query.iter() {
-		// panic!("tadaa! {:?}", item);
+	for _item in query.iter() {
+		panic!("tadaa! {:?}", _item);
 		// println!("ArticleMeta: {:?}", item);
 	}
 
