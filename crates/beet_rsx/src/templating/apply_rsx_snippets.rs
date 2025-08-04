@@ -4,6 +4,7 @@ use beet_core::prelude::WorldMutExt;
 use beet_core::prelude::*;
 use beet_utils::prelude::ReadDir;
 use beet_utils::prelude::ReadFile;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
@@ -18,6 +19,20 @@ impl Plugin for LoadSnippetsPlugin {
 			.add_systems(Startup, load_all_file_snippets);
 	}
 }
+
+pub struct ApplySnippetsPlugin;
+
+/// This schedule will first apply static rsx snippets to newly
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ApplySnippets;
+
+
+impl Plugin for ApplySnippetsPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(ApplySnippets, apply_rsx_snippets);
+	}
+}
+
 
 
 /// Load snippet scene if it exists.
@@ -57,7 +72,7 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 
 /// When a [`SnippetRoot`] is added to an entity,
 /// recusively apply each [`StaticRoot`]
-pub fn apply_rsx_snippets(world: &mut World) -> Result {
+fn apply_rsx_snippets(world: &mut World) -> Result {
 	let mut query = world.query_filtered::<Entity, With<InstanceRoot>>();
 	let mut visited = Vec::new();
 

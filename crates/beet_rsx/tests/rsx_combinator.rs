@@ -13,16 +13,14 @@ fn rsx_combinator() {
 	let (get, set) = signal(String::new());
 
 	let mut app = App::new();
-	let button = app
-		.world_mut()
+	app.add_plugins(ApplySnippetsPlugin);
+	let world = app.world_mut();
+	let button = world
 		.spawn(rsx_combinator! {"<button onclick={move|ev|set(ev.value())}>click me</button>"})
 		.get::<Children>()
 		.unwrap()[0];
-	app.world_mut()
-		.run_system_cached(apply_rsx_snippets)
-		.unwrap()
-		.unwrap();
-	app.world_mut()
+	world.run_schedule(ApplySnippets);
+	world
 		.entity_mut(button)
 		.trigger(OnClick::new(MockEvent::new("foo")));
 	get().xpect().to_be("foo");

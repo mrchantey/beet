@@ -7,6 +7,7 @@ pub fn article_layout_middleware() -> RouteHandler {
 	RouteHandler::layer(|world: &mut World| {
 		let entity =
 			world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+		
 		world.spawn((HtmlDocument, rsx! {
 			<ArticleLayout>{entity}</ArticleLayout>
 		}));
@@ -15,7 +16,7 @@ pub fn article_layout_middleware() -> RouteHandler {
 
 #[template]
 pub fn ArticleLayout(
-	query: Query<&ArticleMeta, With<HandlerBundle>>,
+	query: Query<&ArticleMeta>,
 ) -> impl Bundle {
 	for _item in query.iter() {
 		panic!("tadaa! {:?}", _item);

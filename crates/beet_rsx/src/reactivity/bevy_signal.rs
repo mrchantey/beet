@@ -13,6 +13,7 @@ impl Plugin for SignalsPlugin {
 	#[rustfmt::skip]
 	fn build(&self, app: &mut App) {
 		app
+    .init_plugin(ApplySnippetsPlugin)
 			.init_plugin(schedule_order_plugin)
 			.add_systems(
 				PropagateSignals,
@@ -126,7 +127,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -177,10 +177,7 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		let text = app.world().entity(div).get::<Children>().unwrap()[0];
-		app.world_mut()
-			.run_system_once(apply_rsx_snippets)
-			.unwrap()
-			.unwrap();
+		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(text)
@@ -214,10 +211,7 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
-		app.world_mut()
-			.run_system_once(apply_rsx_snippets)
-			.unwrap()
-			.unwrap();
+		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(attr)

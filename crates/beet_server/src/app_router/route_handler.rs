@@ -147,7 +147,7 @@ impl RouteHandler {
 	}
 
 
-	/// A route handler that passively runs a system, 
+	/// A route handler that passively runs a system,
 	/// without expecting any system input or output.
 	pub fn layer<T, Marker>(handler: T) -> Self
 	where

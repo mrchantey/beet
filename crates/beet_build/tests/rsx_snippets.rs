@@ -2,7 +2,7 @@
 //! to an instance, using two seperate apps.
 //!
 //! This could also be considered the integration test for
-//! [`apply_rsx_snippets`]
+//! [`ApplySnippets`]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
@@ -136,11 +136,11 @@ fn nested_template() {
 
 
 
-// create a common idx for matching in apply_rsx_snippets
+// create a common idx for matching in [`ApplySnippets`]
 fn common_idx() -> SnippetRoot {
 	SnippetRoot::new_file_line_col(file!(), line!(), column!())
 }
-// create a common idx for matching in apply_rsx_snippets
+// create a common idx for matching in [`ApplySnippets`]
 fn common_idx_nested() -> SnippetRoot {
 	SnippetRoot::new_file_line_col(file!(), line!(), column!())
 }

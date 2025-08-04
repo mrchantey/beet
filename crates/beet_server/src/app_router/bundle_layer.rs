@@ -23,6 +23,7 @@ pub fn bundle_to_html(world: &mut World) -> HttpResult<Html> {
 			.ok_or_else(|| HttpError::not_found())?
 	};
 	world.entity_mut(entity).insert(HtmlDocument);
+	world.run_schedule(ApplySnippets);
 	world.run_schedule(ApplyDirectives);
 	let html = world.run_system_cached_with(render_fragment, entity)?;
 	Ok(Html(html))

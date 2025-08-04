@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::*;
-use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
@@ -79,11 +78,6 @@ impl Plugin for BuildPlugin {
 			.add_systems(
 				BuildSequence,
 				(
-					// style roundtrip breaks without resolving templates,
-					// im not sure if this should be here, doesnt it indicate
-					// we're relying on exprs in templates?
-					// we should remove it!
-					apply_rsx_snippets,
 					parse_file_watch_events,
 					reparent_route_collection_source_files,
 					import_rsx_snippets_rs,
