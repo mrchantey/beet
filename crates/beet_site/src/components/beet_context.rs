@@ -8,7 +8,7 @@ use beet::prelude::*;
 pub fn BeetContext() -> impl Bundle {
 	ReactiveApp::insert_resource(Brand {
 		title: "Beet".into(),
-		description: "A Rust web framework".into(),
+		description: "An ECS metaframework".into(),
 		site_url: "https://beetstack.dev".into(),
 		version: env!("CARGO_PKG_VERSION").into(),
 	});

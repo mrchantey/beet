@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A very bevy metaframework</strong>
+    <strong>An ECS metaframework</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -26,9 +26,9 @@ Its *very* early days so your mileage may vary depending on the crate of interes
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
 
-## `beet_flow`
+## `beeet_flow`
 
-Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ecs) that powers Bevy. These can be used for a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning. They are also decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
+Control flow crates for use in a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning.
 
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
@@ -38,7 +38,7 @@ Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ec
 | [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
 
 
-## `rsx`
+## `beet_rsx`
 
 An exploration of a rusty `jsx`, and the tools required to maximize performance and developer productivity. 
 
@@ -59,9 +59,8 @@ General utilities including a test runner, file watcher etc.
 | [`sweet-cli`](https://crates.io/crates/sweet-cli)                 | 🐣      | Cross-platform utilities and dev tools |
 
 
-## `crates`
+## `misc`
 
-Top level crates that depend on several of the above.
 
 | Crate                                           | Status | Description                  |
 | ----------------------------------------------- | ------ | ---------------------------- |
