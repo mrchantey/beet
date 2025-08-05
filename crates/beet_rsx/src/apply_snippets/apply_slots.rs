@@ -48,15 +48,15 @@ use bevy::prelude::*;
 /// 3. For each slot, apply to the slot target.
 /// 4. Move the [`TemplateRoot`] relation to a [`Children`].
 /// 5. Remove any fallback children from slot targets which are used.
-pub(super) fn apply_slots(
+pub fn apply_slots(
 	mut commands: Commands,
 	children: Query<&Children>,
+	query: Populated<(Entity, &TemplateRoot, Option<&NodeTag>)>,
 	slot_targets: Query<(Entity, &SlotTarget)>,
 	slot_children: Query<(Entity, &SlotChild)>,
-	query: Populated<(Entity, &TemplateRoot, &NodeTag)>,
 ) -> Result {
 	for (node_entity, root, node_tag) in query.iter() {
-		// let node_tag = node_tag.map(|tag| tag.as_str()).unwrap_or("Unnamed");
+		let node_tag = node_tag.map(|tag| tag.as_str()).unwrap_or("Unnamed");
 		let (named_slots, default_slots) =
 			collect_slot_children(node_entity, &children, &slot_children);
 

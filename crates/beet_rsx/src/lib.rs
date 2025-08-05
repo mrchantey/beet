@@ -5,6 +5,7 @@
 // #![deny(missing_docs)]
 //!
 pub use beet_rsx_macros::*;
+pub mod apply_snippets;
 pub mod reactivity;
 pub mod templating;
 #[cfg(target_arch = "wasm32")]
@@ -13,6 +14,7 @@ pub mod wasm;
 #[rustfmt::skip]
 pub mod prelude {
 	pub use beet_rsx_macros::*;
+	pub use crate::apply_snippets::*;
 	pub use crate::reactivity::*;
 	pub use crate::templating::*;
 	#[cfg(target_arch = "wasm32")]

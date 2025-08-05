@@ -3,11 +3,8 @@ use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-/// Add this component to have it populated with HTML on the next update cycle.
-/// See [`HtmlDocument`] for hoisting and correct html structure.
-#[derive(Default, Component, Deref, DerefMut, Reflect)]
-#[reflect(Default, Component)]
-pub struct HtmlFragment(pub String);
+/// Utilities for rendering HTML fragments.
+pub struct HtmlFragment;
 
 impl HtmlFragment {
 	/// returns the HTML string representation of a given [`Bundle`].
@@ -27,15 +24,6 @@ impl HtmlFragment {
 			.unwrap();
 		app.world_mut().despawn(entity);
 		html
-	}
-}
-/// A parallelizable system to render all HTML fragments in the world.
-pub(super) fn render_html_fragments(
-	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
-	builder: HtmlBuilder,
-) {
-	for (entity, mut html) in query.iter_mut() {
-		builder.parse(entity, &mut html);
 	}
 }
 /// A one-off system to render a single HTML fragment.
@@ -386,7 +374,7 @@ mod test {
 				<code class="language-rust">fn foobar() -> String {}</code>
 			</pre>
 		})
-			.xpect()
-			.to_be_snapshot();
+		.xpect()
+		.to_be_snapshot();
 	}
 }

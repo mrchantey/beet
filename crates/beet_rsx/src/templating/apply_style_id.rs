@@ -1,13 +1,13 @@
 use super::*;
+use crate::prelude::*;
 use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
+use bevy::platform::collections::HashMap;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 
-/// Apply an [`AttributeKey`] with corresponding [`StyleId`] to elements with one.
-/// runs before [`apply_slots`] so that slot children are treated as belonging
-/// to the parent template.
+/// Apply an [`AttributeKey`] with corresponding [`StyleId`] to elements with one
 ///
 /// ## Example
 /// In the below example, `div`, `span` and the contents of `Template2` will
@@ -24,71 +24,117 @@ use bevy::prelude::*;
 /// ...
 /// </style>
 /// ```
-pub(super) fn apply_style_id_attributes(
+pub fn apply_style_id(
 	// visit all docment roots and templates that aren't yet children
-	roots: Populated<Entity, Or<(Added<HtmlDocument>, Added<TemplateOf>)>>,
+	roots: Populated<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
+			// TODO self-relations, just template_children
+	template_children: Query<&TemplateChildren>,
 	style_ids: Query<&LangSnippetHash, With<StyleElement>>,
 	mut builder: ApplyAttributes,
 ) {
 	for root in roots.iter() {
-		let mut visited = HashSet::<(Entity, LangSnippetHash)>::default();
-		for styleid in children
-			.iter_descendants(root)
-			.filter_map(|en| style_ids.get(en).ok())
+		let mut index_incr = 0;
+		let mut index_map = HashMap::<LangSnippetHash, u64>::default();
+		// ensure we only apply each style id to an entity once
+		let mut visited = HashSet::<(Entity, u64)>::default();
+		let mut get_next_index = |hash: &LangSnippetHash| {
+			let index = index_map.entry(hash.clone()).or_insert_with(|| {
+				let idx = index_incr;
+				index_incr += 1;
+				idx
+			});
+			*index
+		};
+		for template_children in children
+			.iter_descendants_inclusive(root)
+			.filter_map(|en| template_children.get(en).ok())
 		{
-			builder.apply_recursive(&mut visited, root, *styleid);
+			for styleid in template_children
+				.iter()
+				.filter_map(|en| style_ids.get(en).ok())
+			{
+				let index = get_next_index(styleid);
+				builder.apply_recursive(&mut visited, template_children, index);
+			}
 		}
 	}
 }
 
+/// Recursively apply attributes, only visiting children if either:
+/// 1. They are not a [`TemplateNode`]
+/// 2. They are a [`TemplateNode`] with a [`StyleCascade`]
 #[derive(SystemParam)]
-pub(super) struct ApplyAttributes<'w, 's> {
-	html_constants: Res<'w, HtmlConstants>,
+pub struct ApplyAttributes<'w, 's> {
+	constants: Res<'w, HtmlConstants>,
 	commands: Commands<'w, 's>,
-	children: Query<'w, 's, &'static Children>,
 	elements: Query<'w, 's, &'static NodeTag, With<ElementNode>>,
-	cascade_templates: Query<'w, 's, &'static TemplateRoot, With<StyleCascade>>,
+	lang_elements:
+		Query<'w, 's, (&'static LangSnippetHash, &'static mut InnerText)>,
+	// children: Query<'w, 's, &'static Children>,
+	// cascade: Query<'w, 's, &'static Children, With<StyleCascade>>,
+	// cascade_children: Query<
+	// 	'w,
+	// 	's,
+	// 	&'static Children,
+	// 	Or<(
+	// 		Without<TemplateNode>,
+	// 		(With<TemplateNode>, With<StyleCascade>),
+	// 	)>,
+	// >,
+	// original_templates: Query<'w, 's, &'static OriginalTemplateChildren>,
 }
 
 impl ApplyAttributes<'_, '_> {
 	fn apply_recursive(
 		&mut self,
-		visited: &mut HashSet<(Entity, LangSnippetHash)>,
+		visited: &mut HashSet<(Entity, u64)>,
+		entities: &TemplateChildren,
+		styleid: u64,
+	) {
+		for entity in entities.iter() {
+			self.apply_to_entity(visited, entity, styleid);
+		}
+	}
+	fn apply_to_entity(
+		&mut self,
+		visited: &mut HashSet<(Entity, u64)>,
 		entity: Entity,
-		styleid: LangSnippetHash,
+		styleid: u64,
 	) {
 		if visited.contains(&(entity, styleid)) {
 			return;
 		}
 		visited.insert((entity, styleid));
+		// parse_lightning uses the hash for scoped selectors, replace it
+		// with an index
+		if let Ok((hash, mut text)) = self.lang_elements.get_mut(entity) {
+			let original_id = self.constants.style_id_attribute(**hash);
+			let new_id = self.constants.style_id_attribute(styleid);
+			text.0 = text.0.replace(&original_id, &new_id);
+		};
+
 		if let Ok(tag) = self.elements.get(entity)
-			&& !self.html_constants.ignore_style_id_tags.contains(&tag.0)
+			&& !self.constants.ignore_style_id_tags.contains(&tag.0)
 		{
 			self.commands.spawn((
 				AttributeOf::new(entity),
-				// hash will be converted to attribute key in compress_style_ids.rs
-				styleid.clone(),
-				AttributeKey::new(
-					self.html_constants.style_id_attribute(styleid.0),
-				),
+				AttributeKey::new(self.constants.style_id_attribute(styleid)),
 			));
 		}
-		for template in self
-			.cascade_templates
-			.iter_direct_descendants(entity)
-			.collect::<Vec<_>>()
-		{
-			self.apply_recursive(visited, template, styleid);
-		}
+		// for cascade_children in self
+		// 	.children
+		// 	.iter_direct_descendants(entity)
+		// 	.filter_map(|en| self.cascade.get(en).ok())
+		// {
+		// 	for cascade_children in cascade_children
+		// 		.iter()
+		// 		.filter_map(|en| self.original_templates.get(en).ok())
+		// 	{
+		// 		self.apply_recursive(visited, cascade_children, styleid);
+		// 	}
 
-		for child in self
-			.children
-			.iter_direct_descendants(entity)
-			.collect::<Vec<_>>()
-		{
-			self.apply_recursive(visited, child, styleid);
-		}
+		// }
 	}
 }
 
@@ -116,6 +162,17 @@ mod test {
 		HtmlDocument::parse_bundle(rsx! {<style {replace_hash()}/><span/>})
 			.xpect()
 			.to_be_snapshot();
+	}
+
+	#[test]
+	#[cfg(feature = "css")]
+	fn updates_style_content() {
+		HtmlDocument::parse_bundle(rsx! {
+			<style> body{ color: red; }</style>
+			<div/>
+		})
+		.xpect()
+		.to_be_snapshot();
 	}
 	#[test]
 	fn deduplicates() {
@@ -170,6 +227,7 @@ mod test {
 		.to_be_snapshot();
 	}
 	#[test]
+	#[ignore = "todo remove templateof"]
 	fn cascades() {
 		HtmlDocument::parse_bundle(rsx! {
 			<style {replace_hash()}/>

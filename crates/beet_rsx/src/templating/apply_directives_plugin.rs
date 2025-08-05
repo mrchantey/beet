@@ -50,8 +50,7 @@ impl Plugin for ApplyDirectivesPlugin {
 			.add_systems(
 				ApplyDirectives,
 				(
-					apply_style_id_attributes,
-					apply_slots,
+					apply_style_id,
 					apply_requires_dom_idx,
 					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,
@@ -64,8 +63,6 @@ impl Plugin for ApplyDirectivesPlugin {
 					insert_hydration_scripts,
 					hoist_document_elements,
 					insert_event_playback_attribute,
-					compress_style_ids,
-					render_html_fragments,
 					#[cfg(target_arch = "wasm32")]
 					(
 						mount_client_only,
