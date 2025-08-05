@@ -52,7 +52,6 @@ pub fn apply_template_children(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::apply_snippets::flush_on_spawn_deferred_recursive;
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
@@ -93,8 +92,7 @@ mod test {
 			})
 			.id();
 		world
-			.run_system_cached_with(flush_on_spawn_deferred_recursive, root)
-			.unwrap()
+			.run_system_cached(OnSpawnDeferred::flush)
 			.unwrap();
 		world.run_system_cached(apply_template_children).unwrap();
 

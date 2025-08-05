@@ -205,4 +205,5 @@ mod test {
 
 		expect(&*numbers.lock().unwrap()).to_be(&[1, 2, 3]);
 	}
+
 }

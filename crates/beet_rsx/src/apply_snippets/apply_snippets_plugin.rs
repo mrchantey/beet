@@ -8,69 +8,43 @@ use bevy::prelude::*;
 
 pub struct ApplySnippetsPlugin;
 
-/// This schedule will first apply static rsx snippets to newly
+/// This schedule recursively resolves each newly added [`InstanceRoot`]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ApplySnippets;
 
-
 impl Plugin for ApplySnippetsPlugin {
+	#[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app.add_systems(
+		app.init_plugin(schedule_order_plugin).add_systems(
 			ApplySnippets,
-			(apply_rsx_snippets, apply_template_children, apply_slots).chain(),
+			(
+				apply_static_and_flush,
+				apply_template_children,
+				apply_slots,
+			)
+				.chain(),
 		);
 	}
 }
 
 /// When a [`SnippetRoot`] is added to an entity,
 /// recusively apply each [`StaticRoot`]
-fn apply_rsx_snippets(world: &mut World) -> Result {
-	let mut query = world.query_filtered::<Entity, With<InstanceRoot>>();
-	let mut visited = Vec::new();
-
-	loop {
-		let mut any_visited = false;
-		for entity in query.iter(world).collect::<Vec<_>>() {
-			if visited.contains(&entity) {
-				continue;
-			}
-			visited.push(entity);
-			any_visited = true;
-			world.run_system_cached_with(apply_static_rsx, entity)??;
-			world.run_system_cached_with(
-				flush_on_spawn_deferred_recursive,
-				entity,
-			)??;
-		}
-		if !any_visited {
-			break;
-		}
+fn apply_static_and_flush(world: &mut World) -> Result {
+	let mut query = world
+		.query_filtered::<Entity, (With<InstanceRoot>, Without<ResolvedRoot>)>(
+		);
+	while let Some(entity) = query.iter(world).next() {
+		// println!("Applying static rsx for {entity}");
+		world.entity_mut(entity).insert(ResolvedRoot);
+		world.run_system_cached_with(apply_static_rsx, entity)??;
+		world.run_system_cached_with(
+			flush_on_spawn_deferred_recursive,
+			entity,
+		)??;
 	}
+
 	Ok(())
 }
-
-// /// When a [`SnippetRoot`] is added to an entity,
-// /// recusively apply each [`StaticRoot`]
-// fn apply_rsx_snippets(
-// 	mut commands: Commands,
-// 	query: Populated<Entity, (With<InstanceRoot>, Without<ResolvedRoot>)>,
-// ) -> Result {
-// 	for entity in query.iter() {
-// 		commands
-// 			.run_system_cached_with(apply_static_rsx.pipe(maybe_panic), entity);
-// 		commands.run_system_cached_with(
-// 			flush_on_spawn_deferred_recursive.pipe(maybe_panic),
-// 			entity,
-// 		);
-// 		commands.entity(entity).insert(ResolvedRoot);
-// 	}
-// 	println!("run it again!");
-// 	// if this system ran new unresolved snippet instances may have been created,
-// 	// so run the schedule again.
-// 	commands.run_schedule(ApplySnippets);
-
-// 	Ok(())
-// }
 
 fn maybe_panic(result: In<Result<()>>) {
 	if let Err(err) = result.0 {
@@ -151,7 +125,7 @@ fn apply_static_rsx(
 		});
 
 	// if the snippet root is a ChildOf that would override the instance,
-	// we need to reapply it.
+	// we need to reapply it. cant use builder.deny because thats recursive
 	if let Ok(child_of) = deny_root.get(instance_root) {
 		if let Some(child_of) = child_of {
 			commands.entity(instance_root).insert(child_of.clone());
@@ -231,8 +205,6 @@ Remaining idxs: {:?}
 }
 
 
-/// Add this system for [`OnSpawnDeferred`] behavior.
-/// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
 pub(super) fn flush_on_spawn_deferred_recursive(
 	In(root): In<Entity>,
 	mut commands: Commands,
@@ -256,6 +228,8 @@ pub(super) fn flush_on_spawn_deferred_recursive(
 	Ok(())
 }
 
+/// Add this system for [`OnSpawnDeferred`] behavior.
+/// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
 
 /// more tests in static_scene_roundtrip.rs
 #[cfg(test)]
@@ -283,6 +257,8 @@ mod test {
 		let instance =
 			world.spawn(instance).insert(SnippetRoot::default()).id();
 
+		world.run_schedule(ApplySnippets);
+		// Safely runs multiple times
 		world.run_schedule(ApplySnippets);
 
 		world
@@ -536,6 +512,7 @@ mod test {
 			.unwrap();
 		expect(val()).to_be(vec![0, 1, 2, 3, 4]);
 	}
+
 
 	#[test]
 	fn flush_on_spawn_templates() {
