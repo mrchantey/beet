@@ -28,7 +28,6 @@ pub fn apply_style_id(
 	// visit all docment roots and templates that aren't yet children
 	roots: Populated<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
-			// TODO self-relations, just template_children
 	template_children: Query<&TemplateChildren>,
 	style_ids: Query<&LangSnippetHash, With<StyleElement>>,
 	mut builder: ApplyAttributes,
@@ -71,18 +70,8 @@ pub struct ApplyAttributes<'w, 's> {
 	elements: Query<'w, 's, &'static NodeTag, With<ElementNode>>,
 	lang_elements:
 		Query<'w, 's, (&'static LangSnippetHash, &'static mut InnerText)>,
-	// children: Query<'w, 's, &'static Children>,
-	// cascade: Query<'w, 's, &'static Children, With<StyleCascade>>,
-	// cascade_children: Query<
-	// 	'w,
-	// 	's,
-	// 	&'static Children,
-	// 	Or<(
-	// 		Without<TemplateNode>,
-	// 		(With<TemplateNode>, With<StyleCascade>),
-	// 	)>,
-	// >,
-	// original_templates: Query<'w, 's, &'static OriginalTemplateChildren>,
+	cascade: Query<'w, 's, &'static Children, With<StyleCascade>>,
+	template_children: Query<'w, 's, &'static TemplateChildren>,
 }
 
 impl ApplyAttributes<'_, '_> {
@@ -106,14 +95,14 @@ impl ApplyAttributes<'_, '_> {
 			return;
 		}
 		visited.insert((entity, styleid));
-		// parse_lightning uses the hash for scoped selectors, replace it
-		// with an index
+		// replace parse_lightning selector hashes with an index
 		if let Ok((hash, mut text)) = self.lang_elements.get_mut(entity) {
 			let original_id = self.constants.style_id_attribute(**hash);
 			let new_id = self.constants.style_id_attribute(styleid);
 			text.0 = text.0.replace(&original_id, &new_id);
 		};
 
+		// add the attribute to allowed elements
 		if let Ok(tag) = self.elements.get(entity)
 			&& !self.constants.ignore_style_id_tags.contains(&tag.0)
 		{
@@ -122,19 +111,22 @@ impl ApplyAttributes<'_, '_> {
 				AttributeKey::new(self.constants.style_id_attribute(styleid)),
 			));
 		}
-		// for cascade_children in self
-		// 	.children
-		// 	.iter_direct_descendants(entity)
-		// 	.filter_map(|en| self.cascade.get(en).ok())
-		// {
-		// 	for cascade_children in cascade_children
-		// 		.iter()
-		// 		.filter_map(|en| self.original_templates.get(en).ok())
-		// 	{
-		// 		self.apply_recursive(visited, cascade_children, styleid);
-		// 	}
 
-		// }
+		// apply to templates marked with style:cascade
+		if let Ok(cascade) = self.cascade.get(entity) {
+			for template_children in cascade
+				.iter()
+				.filter_map(|en| {
+					self.template_children
+						.get(en)
+						.map(|children| children.clone())
+						.ok()
+				})
+				.collect::<Vec<_>>()
+			{
+				self.apply_recursive(visited, &template_children, styleid);
+			}
+		}
 	}
 }
 
@@ -215,6 +207,7 @@ mod test {
 	// 	.xpect()
 	// 	.to_be_snapshot();
 	// }
+
 	#[test]
 	fn applies_to_slots() {
 		HtmlDocument::parse_bundle(rsx! {
@@ -227,7 +220,20 @@ mod test {
 		.to_be_snapshot();
 	}
 	#[test]
-	#[ignore = "todo remove templateof"]
+	fn expressions() {
+		let foo = rsx! {
+			<div/>
+		};
+
+		HtmlDocument::parse_bundle(rsx! {
+			<style {replace_hash()}/>
+			{foo}
+		})
+		.xpect()
+		.to_be_snapshot();
+	}
+
+	#[test]
 	fn cascades() {
 		HtmlDocument::parse_bundle(rsx! {
 			<style {replace_hash()}/>
@@ -236,6 +242,7 @@ mod test {
 		.xpect()
 		.to_be_snapshot();
 	}
+
 	#[test]
 	fn nested_template() {
 		#[template]

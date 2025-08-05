@@ -1,6 +1,8 @@
 use beet_core::prelude::*;
 use bevy::prelude::*;
 
+use crate::prelude::HtmlDocument;
+
 
 /// A node which is a descendant of a template root
 #[derive(Debug, Deref, Reflect, Component)]
@@ -10,7 +12,7 @@ pub struct TemplateChildOf(Entity);
 
 /// Added to the root of a template, pointing to all nodes which are
 /// descendants of the template root, excluding other templates.
-#[derive(Debug, Deref, Reflect, Component)]
+#[derive(Debug, Clone, Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship_target(relationship = TemplateChildOf, linked_spawn)]
 pub struct TemplateChildren(Vec<Entity>);
@@ -25,9 +27,11 @@ pub fn apply_template_children(
 		(
 			Added<InstanceRoot>,
 			Or<(
-				// document root, also considered a template
+				// instance without parent is a root
 				Without<ChildOf>,
-				// template
+				// documents are roots
+				With<HtmlDocument>,
+				// templates are roots
 				With<TemplateOf>,
 			)>,
 		),
@@ -36,12 +40,7 @@ pub fn apply_template_children(
 	// node_tags: Query<&NodeTag>,
 ) {
 	for root in template_roots.iter() {
-		// TODO self-relations, iter_descendants_inclusive
 		for child in children.iter_descendants(root) {
-			// let name = node_tags
-			// 	.get(child)
-			// 	.map(|tag| tag.0.as_str())
-			// 	.unwrap_or("unknown");
 			commands.entity(child).insert(TemplateChildOf(root));
 		}
 	}
@@ -86,7 +85,9 @@ mod test {
 		let root = world
 			.spawn(rsx! {
 				<div>
-					<MyTemplate/>
+					<MyTemplate>
+						<span>
+					</MyTemplate>
 					<MyTemplate/>
 				</div>
 			})
@@ -97,8 +98,13 @@ mod test {
 			.unwrap();
 		world.run_system_cached(apply_template_children).unwrap();
 
-		let nodes = world.entity(root).get::<TemplateChildren>().unwrap();
-		nodes.len().xpect().to_be(3);
+		world
+			.entity(root)
+			.get::<TemplateChildren>()
+			.unwrap()
+			.len()
+			.xpect()
+			.to_be(4); // div, mytemplate, span, mytemplate
 
 		world
 			.query_once::<&TemplateChildren>()
