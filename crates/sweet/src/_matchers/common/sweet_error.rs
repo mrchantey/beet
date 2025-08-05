@@ -58,6 +58,10 @@ impl SweetError {
 
 	#[allow(unused)]
 	pub fn new(message: impl Into<String>, mut assertion_depth: usize) -> Self {
+		// 2025-07-16 had to add this to correct the backtrace depth after
+		// a fresh Cargo.lock, not sure what moved but this is so brittle
+		assertion_depth += 2;
+
 		// not sure why the windows backtrace is so much deeper
 		#[cfg(target_os = "windows")]
 		{
@@ -108,6 +112,7 @@ impl SweetError {
 				{
 					break Ok(loc);
 				}
+				// why do this?
 				assertion_depth += 1;
 			} else {
 				anyhow::bail!(

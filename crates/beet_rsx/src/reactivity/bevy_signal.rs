@@ -1,32 +1,55 @@
 use crate::prelude::*;
-use beet_core::node::AttributeLit;
-use beet_core::node::IntoTemplateBundle;
+use beet_core::prelude::*;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use flume::Receiver;
+use std::borrow::Cow;
 
-/// System Set for [`SignalsPlugin`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct SignalsSet;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct PropagateSignals;
 
 pub struct SignalsPlugin;
 impl Plugin for SignalsPlugin {
+	#[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app.configure_sets(Update, SignalsSet.after(TemplateSet))
+		app
+    .init_plugin(ApplySnippetsPlugin)
+			.init_plugin(schedule_order_plugin)
 			.add_systems(
-				Update,
-				(receive_text_node_signals, receive_attribute_value_signals)
-					.in_set(SignalsSet),
+				PropagateSignals,
+				(
+					receive_string_signals::<String>,
+					receive_string_signals::<&'static str>,
+					receive_string_signals::<Cow<'static, str>>,
+					receive_bool_signals::<bool>,
+					receive_num_signals::<f32>,
+					receive_num_signals::<f64>,
+					receive_num_signals::<u8>,
+					receive_num_signals::<u16>,
+					receive_num_signals::<u32>,
+					// receive_num_signals::<u64>,
+					receive_num_signals::<i8>,
+					receive_num_signals::<i16>,
+					receive_num_signals::<i32>,
+					// receive_num_signals::<i64>,
+					#[cfg(feature = "bevy_default")]
+					propagate_text_signals,
+					#[cfg(target_arch = "wasm32")]
+					(update_text_nodes, update_attribute_values)
+						.chain()
+						.run_if(document_exists),
+				)
+					.chain(),
 			);
 	}
 }
-
-/// When building without `bevy_default` we assume the target is the web
-#[cfg(not(feature = "bevy_default"))]
-pub type TextSpan = beet_core::node::TextNode;
-
+/// Non generic marker to indicate this entity receives signals.
+#[derive(Default, Component)]
+pub struct ReceivesSignals;
 /// A component with a [`flume::Receiver`] that can be used to propagate changes
 /// throughout the app, for instance in [`receive_text_signals`].
 #[derive(Component)]
+#[require(ReceivesSignals)]
 pub struct SignalReceiver<T>(Receiver<T>);
 
 impl<T: 'static + Send + Sync> SignalReceiver<T> {
@@ -42,46 +65,68 @@ impl<T: 'static + Send + Sync> SignalReceiver<T> {
 	}
 }
 
-pub(crate) fn receive_text_node_signals(
-	mut query: Populated<(&mut TextSpan, &SignalReceiver<String>)>,
+pub(crate) fn receive_string_signals<
+	T: 'static + Send + Sync + Into<String>,
+>(
+	mut query: Populated<(&mut TextNode, &SignalReceiver<T>)>,
 ) {
-	for (mut text, update) in query.iter_mut() {
-		while let Ok(new_text) = update.0.try_recv() {
-			text.0 = new_text;
+	for (mut lit, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val);
 		}
 	}
 }
-pub(crate) fn receive_attribute_value_signals(
-	mut query: Populated<(&mut AttributeLit, &SignalReceiver<String>)>,
+pub(crate) fn receive_bool_signals<
+	T: 'static + Send + Sync + Clone + Into<bool>,
+>(
+	mut query: Populated<(&mut TextNode, &mut BoolNode, &SignalReceiver<T>)>,
 ) {
-	for (mut lit, update) in query.iter_mut() {
-		while let Ok(new_text) = update.0.try_recv() {
-			*lit = AttributeLit::new(new_text);
+	for (mut lit, mut num, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val.clone().into().to_string());
+			*num = BoolNode::new(val);
+		}
+	}
+}
+pub(crate) fn receive_num_signals<
+	T: 'static + Send + Sync + Clone + Into<f64>,
+>(
+	mut query: Populated<(&mut TextNode, &mut NumberNode, &SignalReceiver<T>)>,
+) {
+	for (mut lit, mut num, update) in query.iter_mut() {
+		while let Ok(val) = update.0.try_recv() {
+			*lit = TextNode::new(val.clone().into().to_string());
+			*num = NumberNode::new(val);
 		}
 	}
 }
 
-impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
-	for Getter<T>
-{
-	fn into_node_bundle(self) -> impl Bundle {
-		// changes here should be reflected in maybe_signal.rs
-		let get_str = move || self.get().to_string();
-		(TextSpan::new(get_str()), SignalReceiver::new(get_str))
+/// In bevy_default pass changed TextNode values to TextSpan
+#[cfg(feature = "bevy_default")]
+fn propagate_text_signals(
+	mut query: Populated<(&mut TextSpan, &TextNode), Changed<TextNode>>,
+) {
+	for (mut span, text) in query.iter_mut() {
+		**span = text.0.clone();
 	}
-	fn into_attribute_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		let get_str = move || self.get().to_string();
-		(AttributeLit::new(get_str()), SignalReceiver::new(get_str))
+}
+
+/// Adds both the received valus and a SignalReceiver to the entity
+impl<T, M> IntoBundle<(Self, M)> for Getter<T>
+where
+	T: 'static + Send + Sync + Clone + IntoBundle<M>,
+{
+	fn into_bundle(self) -> impl Bundle {
+		(
+			self.get().into_bundle(),
+			SignalReceiver::new(move || self.get()),
+		)
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -94,12 +139,12 @@ mod test {
 
 		let entity = app
 			.world_mut()
-			.spawn((TextSpan::new("foo".to_string()), SignalReceiver::new(get)))
+			.spawn((TextNode::new("foo".to_string()), SignalReceiver::new(get)))
 			.id();
 
 		app.world()
 			.entity(entity)
-			.get::<TextSpan>()
+			.get::<TextNode>()
 			.unwrap()
 			.0
 			.xref()
@@ -112,7 +157,7 @@ mod test {
 
 		app.world()
 			.entity(entity)
-			.get::<TextSpan>()
+			.get::<TextNode>()
 			.unwrap()
 			.0
 			.xref()
@@ -125,21 +170,18 @@ mod test {
 	fn nodes() {
 		let mut app = App::new();
 		app.add_plugins(SignalsPlugin);
-		let (get, set) = signal(5);
+		let (get, set) = signal(5u32);
 		let div = app
 			.world_mut()
 			.spawn(rsx! {<div>{get}</div>})
 			.get::<Children>()
 			.unwrap()[0];
-		app.world_mut()
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
 		let text = app.world().entity(div).get::<Children>().unwrap()[0];
+		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(text)
-			.get::<TextSpan>()
+			.get::<TextNode>()
 			.unwrap()
 			.0
 			.xref()
@@ -151,7 +193,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(text)
-			.get::<TextSpan>()
+			.get::<TextNode>()
 			.unwrap()
 			.0
 			.xref()
@@ -168,15 +210,12 @@ mod test {
 			.spawn(rsx! {<div class={get}/>})
 			.get::<Children>()
 			.unwrap()[0];
-		app.world_mut()
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
 		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
+		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -188,7 +227,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -208,7 +247,7 @@ mod test {
 		}
 
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let (get, set) = signal("foo".to_string());
 		let template = app
 			.world_mut()
@@ -227,7 +266,7 @@ mod test {
 
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()
@@ -239,7 +278,7 @@ mod test {
 		app.update();
 		app.world()
 			.entity(attr)
-			.get::<AttributeLit>()
+			.get::<TextNode>()
 			.unwrap()
 			.to_string()
 			.xref()

@@ -104,7 +104,6 @@ pub trait EventExt {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::as_beet::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -113,15 +112,13 @@ mod test {
 		let (get, set) = signal(String::from("foo"));
 
 		let mut app = App::new();
+		app.add_plugins(ApplySnippetsPlugin);
 		let world = app.world_mut();
 		let entity = world
 			.spawn(rsx! {<button onclick=move|ev|set(ev.value())/>})
 			.get::<Children>()
 			.unwrap()[0];
-		world
-			.run_system_once(apply_snippets_to_instances)
-			.unwrap()
-			.unwrap();
+		world.run_schedule(ApplySnippets);
 		world
 			.entity_mut(entity)
 			.trigger(OnClick::new(MockEvent::new("bar")));

@@ -44,7 +44,9 @@ mod test {
 	#[test]
 	fn test_html_comment() {
 		assert_eq!(
-			parser(html_comment).parse("<!--a - > comment->-->").unwrap(),
+			parser(html_comment)
+				.parse("<!--a - > comment->-->")
+				.unwrap(),
 			((), "")
 		);
 	}

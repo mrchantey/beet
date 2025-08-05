@@ -13,6 +13,7 @@ pub struct RunNew {
 impl RunNew {
 	pub async fn run(self) -> Result {
 		let mut command = Command::new("cargo");
+		// TODO lock down to commit matching the cli release
 		command
 			.arg("generate")
 			.arg("--git")

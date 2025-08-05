@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_utils::prelude::*;
 use sea_query::DeleteStatement;
 use sea_query::ForeignKeyCreateStatement;
 use sea_query::ForeignKeyDropStatement;
@@ -17,7 +18,6 @@ use sea_query::TableRenameStatement;
 use sea_query::TableTruncateStatement;
 use sea_query::UpdateStatement;
 use sea_query::WithQuery;
-use beet_utils::prelude::*;
 
 pub trait StatementBuilder: SchemaBuilder + QueryBuilder {}
 impl<T: SchemaBuilder + QueryBuilder> StatementBuilder for T {}

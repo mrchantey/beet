@@ -71,8 +71,7 @@ mod test {
 		};
 
 		expect(a().unwrap_err().to_string()).to_be("literal\n");
-		expect(b().unwrap_err().to_string())
-			.to_be("fmt literal inline 12\n");
+		expect(b().unwrap_err().to_string()).to_be("fmt literal inline 12\n");
 		expect(c().unwrap_err().to_string()).to_be("fmt literal 12\n");
 	}
 }

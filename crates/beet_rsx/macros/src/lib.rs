@@ -64,11 +64,22 @@ pub fn derive_props(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
 /// Mark a function as a template function.
+/// This creates a struct of the same name, passing all prop attributes
+/// to the fields.
 ///
 /// ## Example
 ///
 /// ```rust ignore
 /// #[template]
+/// fn MyTemplate(hidden:bool) -> impl Bundle {
+/// 	rsx!{<div hidden={hidden}>hello world</div>}
+/// }
+/// ```
+/// Top level and field attributes are applied to the struct:
+///
+/// ```rust ignore
+/// #[template]
+/// #[derive(Clone)]
 /// fn MyTemplate(hidden:bool) -> impl Bundle {
 /// 	rsx!{<div hidden={hidden}>hello world</div>}
 /// }
@@ -97,7 +108,7 @@ pub fn derive_buildable(
 /// Types that can be used as an attribute block, where each field
 /// is applied as [`Attributes`](beet_core::prelude::Attributes) of the entity.
 /// Use [`#[field(flatten)]`] for the key to be discarded, and the value to be
-/// applied by calling `into_node_bundle`. This allows for a nested [`AttributeBlock`].
+/// applied by calling `into_bundle`. This allows for a nested [`AttributeBlock`].
 ///
 ///
 ///

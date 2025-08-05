@@ -1,0 +1,129 @@
+//! An example of basic server-side rendering (SSR) with beet.
+//!
+//! ```sh
+//! cargo run --example ssr --features=server,css
+//! ```
+use beet::prelude::*;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
+fn main() {
+	App::new()
+		.add_plugins((RouterPlugin, BeetRunner))
+		.add_systems(Startup, setup)
+		.run();
+}
+
+// #[rustfmt::skip]
+fn setup(mut commands: Commands) {
+	commands.spawn(children![
+		(
+			RouteFilter::new("/"),
+			RouteHandler::bundle(HttpMethod::Get, || rsx! {<Home/>})
+		),
+		(
+			RouteFilter::new("/foo"),
+			RouteHandler::new(HttpMethod::Get, || "bar")
+		),
+		(
+			// this entity has no endpoint so will be called for every request
+			// that matches the filter
+			RouteFilter::new("/hello-layer"),
+			RouteHandler::layer(modify_request_layer),
+			// children are run in sequence
+			children![RouteHandler::bundle(
+				HttpMethod::Get,
+				|req: Res<Request>| {
+					let body = req.body_str().unwrap_or_default();
+					rsx! {
+						<Style/>
+						<main>
+							<div> hello {body}</div>
+							<a href="/">go home</a>
+						</main>
+					}
+				}
+			)]
+		)
+	]);
+}
+
+// modifies the request body to "jimmy"
+fn modify_request_layer(mut req: ResMut<Request>) { req.set_body("jimmy"); }
+
+#[template]
+fn Home() -> impl Bundle {
+	let mut state = AppState::get();
+	let uptime = state.started.elapsed();
+	let uptime = format!("{:.2}", uptime.as_secs_f32());
+	let num_requests = state.num_requests;
+
+	state.num_requests += 1;
+	AppState::set(state);
+	rsx! {
+		<Style/>
+		<main>
+			<div>hello world!</div>
+			<div>uptime: {uptime} seconds</div>
+			<div>request count: {num_requests}</div>
+			<a href="/hello-layer">visit jimmy</a>
+			{
+				match num_requests % 7 {
+					0 => rsx! {
+						<div>
+						Congratulations you are visitor number {num_requests}!
+						</div>
+					}.any_bundle(),
+					_ => ().any_bundle(),
+				}
+			}
+		</main>
+	}
+}
+
+#[derive(Clone)]
+struct AppState {
+	started: std::time::Instant,
+	num_requests: u32,
+}
+impl AppState {
+	pub fn get() -> AppState { APP_STATE.lock().unwrap().clone() }
+	pub fn set(state: AppState) { *APP_STATE.lock().unwrap() = state; }
+}
+static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
+	Mutex::new(AppState {
+		started: std::time::Instant::now(),
+		num_requests: 0,
+	})
+});
+
+
+
+
+#[template]
+fn Style() -> impl Bundle {
+	// css is much easier to write with the rsx_combinator macro
+	// as many common css tokens like `1em` or `a:visited` are not valid rust tokens
+	rsx_combinator! {r"
+<style scope:global>
+	main {
+		padding-top: 2em;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		height: 100vh;
+	}
+	a {
+		color: #90ee90;
+	}
+	a:visited {
+		color: #3399ff;
+	}
+	body {
+		font-size: 1.4em;
+		font-family: system-ui, sans-serif;
+		background: black;
+		color: white;
+	}
+</style>"}
+}

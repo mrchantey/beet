@@ -5,22 +5,25 @@ use bevy::prelude::*;
 use syn::Ident;
 use syn::ItemFn;
 
-/// The signature of a route file method
-#[derive(Debug, Clone, Deref, Component)]
-pub struct RouteFileMethodSyn(Unspan<ItemFn>);
-impl RouteFileMethodSyn {
-	pub fn new(func: ItemFn) -> Self { Self(func.into()) }
-}
-/// Tokens for a function that may be used as a route.
+/// Tokens for a function that may be used as a route:
+///
+/// ```ignore
+/// pub fn get()->impl Bundle{
+/// ..
+/// }
+///
+/// pub fn post()->impl IntoResponse{
+/// ..
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
-	/// Whether this handler has an associated `meta_` method,
-	/// ie for `my_route::post()` this would be `my_route::meta_post()`.
-	pub meta: RouteFileMethodMeta,
 	/// A reasonable route path generated from this file's local path,
 	/// and a method matching either the functions signature, or
 	/// `get` in the case of single file routes like markdown.
 	pub route_info: RouteInfo,
+	/// The signature of a route file method
+	pub item: Unspan<ItemFn>,
 }
 impl AsRef<RouteFileMethod> for RouteFileMethod {
 	fn as_ref(&self) -> &RouteFileMethod { self }
@@ -28,27 +31,45 @@ impl AsRef<RouteFileMethod> for RouteFileMethod {
 
 
 impl RouteFileMethod {
+	/// create a new route file method with the given route info
+	/// and a default function signature matching the method name.
 	pub fn new(route_info: impl Into<RouteInfo>) -> Self {
+		let route_info = route_info.into();
+		let method = route_info.method.to_string_lowercase();
+		let method_ident = quote::format_ident!("{method}");
 		Self {
-			route_info: route_info.into(),
-			meta: Default::default(),
+			route_info,
+			item: Unspan::new(&syn::parse_quote!(
+				fn #method_ident() {}
+			)),
 		}
 	}
-	pub fn new_with_config(
-		route_info: impl Into<RouteInfo>,
-		meta: RouteFileMethodMeta,
-	) -> Self {
+	pub fn new_with(route_info: impl Into<RouteInfo>, item: &ItemFn) -> Self {
+		let route_info = route_info.into();
 		Self {
-			route_info: route_info.into(),
-			meta,
+			route_info,
+			item: Unspan::new(item),
 		}
 	}
+
 	pub fn from_path(
 		local_path: impl AsRef<std::path::Path>,
 		method: HttpMethod,
 	) -> Self {
 		let route = RoutePath::from_file_path(local_path).unwrap();
 		Self::new(RouteInfo::new(route, method))
+	}
+
+	/// Whether the return type of this method is a `Result`.
+	pub fn returns_result(&self) -> bool {
+		if let syn::ReturnType::Type(_, ty) = &self.item.sig.output {
+			if let syn::Type::Path(syn::TypePath { path, .. }) = &**ty {
+				if let Some(seg) = path.segments.last() {
+					return seg.ident == "Result";
+				}
+			}
+		}
+		false
 	}
 }
 
@@ -78,5 +99,34 @@ impl RouteFileMethodMeta {
 			RouteFileMethodMeta::File => syn::parse_quote!(#mod_ident::meta),
 			RouteFileMethodMeta::Collection => syn::parse_quote!(Self::meta),
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn returns_result() {
+		RouteFileMethod::new_with(
+			"",
+			&syn::parse_quote!(
+				fn get() {}
+			),
+		)
+		.returns_result()
+		.xpect()
+		.to_be_false();
+		RouteFileMethod::new_with(
+			"",
+			&syn::parse_quote!(
+				fn get() -> Result<(), ()> {}
+			),
+		)
+		.returns_result()
+		.xpect()
+		.to_be_true();
 	}
 }

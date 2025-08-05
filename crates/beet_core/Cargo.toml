@@ -10,15 +10,35 @@ description = "Core utilities for the beet ecosystem"
 repository.workspace = true
 
 
+[[example]]
+name = "to_tokens"
+path = "examples/to_tokens.rs"
+required-features = ["tokens"]
+
+[[test]]
+name = "to_tokens"
+path = "tests/to_tokens.rs"
+required-features = ["tokens"]
+
+
 [features]
 default = ["bevy"]
 bevy = ["dep:bevy", "beet_core_macros"]
 bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
-serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
+serde = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ron",
+	"dep:toml",
+	"dep:serde_urlencoded",
+]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+# TODO merge with net feature
+http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
+# is this nessecary?
 web = [
-	"dep:http",
+	"http",
 	"dep:wasm-bindgen",
 	"dep:wasm-bindgen-futures",
 	"dep:console_error_panic_hook",
@@ -26,8 +46,9 @@ web = [
 	"dep:js-sys",
 ]
 
-server = [
-	"dep:http",
+axum = [
+	"http",
+	"fs",
 	"dep:axum",
 	"dep:axum-extra",
 	"dep:axum-server",
@@ -38,18 +59,9 @@ server = [
 	"dep:glob",
 	"dep:futures",
 	"dep:tokio",
-	"beet_utils/fs",
 ]
-net = [
-	"dep:http",
-	"dep:reqwest",
-	"dep:serde",
-	"dep:serde_json",
-	"dep:http",
-	"dep:http-body-util",
-	"dep:url",
-	"dep:serde_urlencoded",
-]
+fs = ["beet_utils/fs"]
+net = ["http", "serde", "dep:reqwest", "web"]
 rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]
 tokens = [
@@ -63,10 +75,12 @@ tokens = [
 
 
 [dependencies]
+tracing.workspace = true
 beet_utils.workspace = true
 beet_core_macros = { workspace = true, optional = true }
 rapidhash.workspace = true
 send_wrapper.workspace = true
+variadics_please.workspace = true
 
 # bevy dependencies (optional)
 bevy = { workspace = true, optional = true }
@@ -99,6 +113,7 @@ extend.workspace = true
 # html utilities (available on all targets)
 html-escape = "0.2"
 http = { workspace = true, optional = true }
+bytes = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)
@@ -205,3 +220,7 @@ features = [
 
 [dev-dependencies]
 sweet.workspace = true
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

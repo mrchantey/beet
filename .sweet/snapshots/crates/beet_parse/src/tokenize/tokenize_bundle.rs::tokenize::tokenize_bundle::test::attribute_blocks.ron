@@ -1,0 +1,13 @@
+(
+    SnippetRoot {
+        file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),
+        start: LineCol { line: 1u32, col: 0u32 },
+    },
+    InstanceRoot,
+    FragmentNode,
+    related! {
+        Children[(NodeTag(String::from("input")), ElementNode { self_closing : true
+        }, related!(Attributes[(AttributeKey::new("hidden"),
+        OnSpawnDeferred::insert(val.into_bundle()), ExprIdx(0u32))]))]
+    },
+)

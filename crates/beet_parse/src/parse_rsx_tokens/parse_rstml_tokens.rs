@@ -6,7 +6,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
-use quote::quote;
 use rstml::Parser;
 use rstml::ParserConfig;
 use rstml::node::KVAttributeValue;
@@ -20,50 +19,12 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprLit;
 use syn::spanned::Spanned;
-
-// we must use `std::collections::HashSet` because thats what rstml uses
-type HashSet<T> = std::collections::HashSet<T>;
 /// definition for the rstml custom node, currently unused
 pub(super) type RstmlCustomNode = rstml::Infallible;
 
-/// Hashset of element tag names that should be self-closing.
-#[derive(Debug, Clone, Resource)]
-pub struct RstmlConfig {
-	pub raw_text_elements: HashSet<&'static str>,
-	pub self_closing_elements: HashSet<&'static str>,
-}
-
-impl Default for RstmlConfig {
-	fn default() -> Self {
-		Self {
-			raw_text_elements: ["script", "style"].into_iter().collect(),
-			self_closing_elements: [
-				"area", "base", "br", "col", "embed", "hr", "img", "input",
-				"link", "meta", "param", "source", "track", "wbr",
-			]
-			.into_iter()
-			.collect(),
-		}
-	}
-}
-
-impl RstmlConfig {
-	pub(super) fn into_parser(self) -> Parser<RstmlCustomNode> {
-		let config = ParserConfig::new()
-			.recover_block(true)
-			.always_self_closed_elements(self.self_closing_elements)
-			.raw_text_elements(self.raw_text_elements)
-			// here we define the rsx! macro as the constant thats used
-			// to resolve raw text blocks more correctly
-			.macro_call_pattern(quote!(rsx! {%%}))
-			.custom_node::<RstmlCustomNode>();
-		Parser::new(config)
-	}
-}
-
 /// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.
 #[derive(Debug, Clone, Deref, Component)]
-#[require(MacroIdx)]
+#[require(SnippetRoot)]
 pub struct RstmlTokens(SendWrapper<TokenStream>);
 impl RstmlTokens {
 	pub fn new(tokens: TokenStream) -> Self { Self(SendWrapper::new(tokens)) }
@@ -85,15 +46,32 @@ impl TokensDiagnostics {
 }
 
 
-/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`MacroIdx`]
+pub fn create_rstml_parser(
+	constants: &HtmlConstants,
+) -> Parser<RstmlCustomNode> {
+	Parser::new(
+		ParserConfig::new()
+			.recover_block(true)
+			.always_self_closed_elements(
+				constants.self_closing_elements.clone(),
+			)
+			.raw_text_elements(constants.raw_text_elements.clone())
+			// here we define the rsx! macro as the constant thats used
+			// to resolve raw text blocks more correctly
+			.macro_call_pattern(quote::quote!(rsx! {%%}))
+			.custom_node::<RstmlCustomNode>(),
+	)
+}
+
+/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`SnippetRoot`]
 pub(super) fn parse_rstml_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	rstml_config: Res<RstmlConfig>,
+	constants: Res<HtmlConstants>,
 	parser: NonSend<Parser<RstmlCustomNode>>,
-	query: Populated<(Entity, &MacroIdx, &RstmlTokens), Added<RstmlTokens>>,
+	query: Populated<(Entity, &SnippetRoot, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
-	for (entity, macro_idx, handle) in query.iter() {
+	for (entity, snippet_root, handle) in query.iter() {
 		let tokens = handle.clone().take();
 		// this is the key to matching statically analyzed macros
 		// with instantiated ones
@@ -103,8 +81,8 @@ pub(super) fn parse_rstml_tokens(
 		let mut collected_elements = CollectedElements::default();
 
 		let children = RstmlToWorld {
-			file_path: &macro_idx.file,
-			rstml_config: &rstml_config,
+			constants: &constants,
+			file_path: &snippet_root.file,
 			collected_elements: &mut collected_elements,
 			diagnostics: &mut diagnostics,
 			commands: &mut commands,
@@ -122,7 +100,7 @@ pub(super) fn parse_rstml_tokens(
 
 struct RstmlToWorld<'w, 's, 'a> {
 	file_path: &'a WsPathBuf,
-	rstml_config: &'a RstmlConfig,
+	constants: &'a HtmlConstants,
 	collected_elements: &'a mut CollectedElements,
 	diagnostics: &'a mut Vec<Diagnostic>,
 	commands: &'a mut Commands<'w, 's>,
@@ -182,7 +160,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Text(node) => {
 				self.commands.entity(entity).insert((
-					TextNode(node.value.value()),
+					TextNode::new(node.value.value()),
 					FileSpanOf::<TextNode>::new(file_span),
 					SpanOf::<TextNode>::new(node_span),
 				));
@@ -193,7 +171,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					text = self.mend_style_raw_text(&text);
 				}
 				self.commands.entity(entity).insert((
-					TextNode(text),
+					TextNode::new(text),
 					FileSpanOf::<TextNode>::new(file_span),
 					SpanOf::<TextNode>::new(node_span),
 				));
@@ -361,7 +339,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
-								entity.insert(lit_to_attr(lit));
+								insert_lit(&mut entity, lit);
 							} else {
 								// non-literal expression, needs an ExprIdx
 								entity.insert(self.expr_idx.next());
@@ -434,7 +412,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	) {
 		if element.children.is_empty()
 			|| !self
-				.rstml_config
+				.constants
 				.self_closing_elements
 				.contains(element.open_tag.name.to_string().as_str())
 		{
@@ -458,12 +436,13 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> (App, Entity) {
+	fn parse(tokens: TokenStream) -> (World, Entity) {
 		let mut app = App::new();
 		app.add_plugins(ParseRsxTokensPlugin);
-		let entity = app.world_mut().spawn(RstmlTokens::new(tokens)).id();
-		app.update();
-		(app, entity)
+		let mut world = std::mem::take(app.world_mut());
+		let entity = world.spawn(RstmlTokens::new(tokens)).id();
+		world.run_schedule(ParseRsxTokens);
+		(world, entity)
 	}
 
 
@@ -489,14 +468,17 @@ mod test {
 	#[test]
 	fn style_tags() {
 		let (mut app, _) = parse(quote! {
-			<style>
+			<style scope:global>
 			body{
 				font-size: 1.em;
 			}
 			</style>
 		});
-		expect(app.query_once::<&LangContent>()[0]).to_be(
-			&LangContent::InnerText("body { font-size : 1 em ; }".to_string()),
-		);
+		#[cfg(feature = "css")]
+		expect(app.query_once::<&InnerText>()[0])
+			.to_be(&InnerText("body {\n  font-size: 1 em;\n}\n".to_string()));
+		#[cfg(not(feature = "css"))]
+		expect(app.query_once::<&InnerText>()[0])
+			.to_be(&InnerText("body { font-size : 1 em ; }".to_string()));
 	}
 }

@@ -1,10 +1,7 @@
 use crate::prelude::*;
 use beet_core::as_beet::*;
-use beet_core::prelude::bevyhow;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
-use quote::quote;
-use syn::Block;
 use syn::ItemFn;
 
 
@@ -12,96 +9,45 @@ use syn::ItemFn;
 /// Added to the root of route files that have been parsed into a tree via
 /// [`CombinatorTokens`], ie `.md` and `.rsx` files.
 #[derive(Debug, Clone, Component)]
-pub struct CombinatorRouteCodegen {
-	/// Optional metadata, this is the frontmatter of markdown files
-	pub meta: Option<Unspan<Block>>,
-}
-
-impl CombinatorRouteCodegen {
-	/// Create a new [`CombinatorRouteCodegen`] with the given metadata
-	pub fn new(meta: Option<Block>) -> Self {
-		Self {
-			meta: meta.map(|val| Unspan::new(&val)),
-		}
-	}
-}
-
-/// insert the config function into the codegen file if it exists
-pub fn collect_combinator_route_meta(
-	mut query: Populated<
-		(Entity, &mut CodegenFile, &CombinatorRouteCodegen),
-		Changed<CombinatorRouteCodegen>,
-	>,
-	parents: Query<&ChildOf>,
-	collections: Query<&RouteFileCollection>,
-) -> Result {
-	for (entity, mut codegen_file, combinator_codegen) in query.iter_mut() {
-		let collection = parents
-			.iter_ancestors(entity)
-			.find_map(|e| collections.get(e).ok())
-			.ok_or_else(|| {
-				bevyhow!("failed to find parent RouteFileCollection")
-			})?;
-		let meta_block = match &combinator_codegen.meta {
-			Some(meta) => quote! {
-				#meta.map_err(|err|{
-					format!("Failed to parse meta: {}", err)
-				}).unwrap()
-			},
-			None => quote!(Default::default()),
-		};
-		let meta_type = &collection.meta_type;
-		codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-			#[allow(unused)]
-			pub fn meta()-> #meta_type{
-				#meta_block
-			}
-		));
-	}
-	Ok(())
-}
+pub struct CombinatorRouteCodegen;
 
 /// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
 /// tokenize it and append to the [`CodegenFile`].
 pub fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query = world
-		.query_filtered::<(Entity,&SourceFileRef), (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
+		.query_filtered::<(Entity,&ChildOf), (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
 		);
-	for (entity, source_file_ref) in query
+	for (entity, parent) in query
 		.iter(world)
-		.map(|(entity, source_file)| (entity, **source_file))
+		.map(|(entity, parent)| (entity, parent.parent()))
 		.collect::<Vec<_>>()
 	{
-		let snippets = world
-			.entity(source_file_ref)
-			.get::<RsxSnippets>()
-			.expect("Combinator Source File should have RsxSnippets");
+		let Some(static_root) = world
+			.entity(parent)
+			.get::<Children>()
+			.map(|children| {
+				children
+					.iter()
+					.find(|child| world.entity(*child).contains::<StaticRoot>())
+			})
+			.flatten()
+		else {
+			bevybail!(
+				"CombinatorRouteCodegen has no StaticRoot child: {entity:?}"
+			);
+		};
 
-		assert!(
-			snippets.len() == 1,
-			"Combinator Source File should have exactly one RsxSnippet"
-		);
-		let snippet_root = snippets[0];
-
-
-		// this is a snippet but we need an instance, the only difference being
-		// RsxSnippetRoot vs InstanceRoot
-		let instance_root = world
-			.entity_mut(snippet_root)
-			.clone_and_spawn_with(|builder| {
-				builder
-					.deny::<RsxSnippetRoot>()
-					.linked_cloning(true)
-					.add_observers(true);
-			});
-		world.entity_mut(instance_root).insert(InstanceRoot);
-		let tokens = tokenize_bundle(world, instance_root)?;
-		world.entity_mut(instance_root).despawn();
-
-		// let foo = world
-		// 	.component_names_related::<Children>(instance_root)
-		// 	.iter_to_string_indented();
-		// println!("Children of instance root: \n{}", foo);
+		// this is a static but we need an instance, the only difference being
+		// StaticRoot vs InstanceRoot
+		world
+			.entity_mut(static_root)
+			.remove::<StaticRoot>()
+			.insert(InstanceRoot);
+		let tokens = tokenize_bundle(world, static_root)?;
+		world
+			.entity_mut(static_root)
+			.remove::<InstanceRoot>()
+			.insert(StaticRoot);
 
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
@@ -122,99 +68,25 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use quote::ToTokens;
-	use quote::quote;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs())
+		app.add_plugins(BuildPlugin::default())
 			.world_mut()
 			.spawn(RouteFileCollection::test_site_docs());
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/test_docs/hello.md",
-			)
-			.into_abs(),
-		));
-
 
 		app.update();
-		app
-			.world_mut()
+		app.world_mut()
 			.query_filtered_once::<&CodegenFile, With<CombinatorRouteCodegen>>(
 			)[0]
-			.build_output()
-			.unwrap()
-			.to_token_stream()
-			.to_string().xpect().to_be_str(quote!{
-				#![doc = r" 🌱🌱🌱 This file has been auto generated by Beet."]
-				#![doc = r" 🌱🌱🌱 Any changes will be overridden if the file is regenerated."]
-				#[allow(unused_imports)]
-				use beet::prelude::*;
-				#[allow(unused_imports)]
-				use crate as test_site;
-
-				#[allow(unused)]
-				pub fn meta() -> () {
-					{
-						beet::exports::toml::from_str("title = \"hello\"\n[sidebar]\norder = 2\n")
-					}
-					.map_err(|err| {
-						format!("Failed to parse meta: {}", err)
-					})
-					.unwrap()
-				}
-
-				pub fn get() -> impl Bundle {
-					(
-						BeetRoot,
-						InstanceRoot,
-						MacroIdx {
-							file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
-							start: LineCol { line: 1u32, col: 0u32 }
-						},
-						FragmentNode,
-						related! {
-							Children [
-								(
-									NodeTag(String::from("h1")),
-									ElementNode { self_closing: false },
-									related! {
-										Children [
-											TextNode(String::from("Hello"))
-										]
-									}
-								),
-								(
-									NodeTag(String::from("p")),
-									ElementNode { self_closing: false },
-									related! {
-										Children [
-											TextNode(String::from("This page is all about saying")),
-											(
-												ExprIdx(0u32),
-												BlockNode,
-												OnSpawnTemplate::new_insert(#[allow(unused_braces)]{"hello" }.into_node_bundle()))
-										]
-									}
-								),
-								(
-									NodeTag(String::from("main")),
-									ElementNode { self_closing: false },
-									related! {
-										Children [
-											TextNode(String::from("## Nested Heading\n\tnested markdown doesnt work yet"))
-										]
-									}
-								)
-							]
-						}
-					)
-				}
-		}.to_string());
+		.build_output()
+		.unwrap()
+		.to_token_stream()
+		.xpect()
+		.to_be_snapshot();
 	}
 }

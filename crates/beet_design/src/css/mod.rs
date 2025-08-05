@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[template]
-pub fn Css() -> impl Bundle {
+pub fn BeetDesignCss() -> impl Bundle {
 	rsx! {
 		<style scope:global src="./elements/code.css" />
 		<style scope:global src="./elements/details.css" />

@@ -1,11 +1,12 @@
 use beet_core::prelude::AppExt;
+use beet_core::prelude::init_pretty_tracing;
 use bevy::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::RwLock;
 
-use crate::prelude::TemplatePlugin;
+use crate::prelude::ApplyDirectivesPlugin;
 
 /// Temporary solution until reactivity in bevy.
 pub struct ReactiveApp;
@@ -19,7 +20,7 @@ static CREATE_APP: LazyLock<
 > = LazyLock::new(|| {
 	Arc::new(RwLock::new(Box::new(|| {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
+		app.add_plugins(ApplyDirectivesPlugin);
 		app
 	})))
 });
@@ -32,6 +33,7 @@ impl ReactiveApp {
 	/// Consume the app, running it once then
 	/// storing it in a [`thread_local`] and returning immediately.
 	pub fn runner(mut app: App) -> AppExit {
+		init_pretty_tracing(bevy::log::Level::DEBUG);
 		app.init();
 		app.update();
 		APP.with(move |app_ref| {

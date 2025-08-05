@@ -27,7 +27,7 @@ impl DomTextBinding {
 pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
-pub(super) fn update_text_nodes(
+pub(crate) fn update_text_nodes(
 	_: TempNonSendMarker,
 	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
 ) -> Result<()> {
@@ -40,68 +40,70 @@ pub(super) fn update_text_nodes(
 
 /// The attributes of elements are applied in the render html step,
 /// updating is applied to the DOM *properties* of the element
-pub(super) fn update_attribute_values(
+pub(crate) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
-		(&AttributeKey, &AttributeLit, &DomElementBinding),
-		Changed<AttributeLit>,
+		(
+			&AttributeKey,
+			&DomElementBinding,
+			&TextNode,
+			Option<&NumberNode>,
+			Option<&BoolNode>,
+		),
+		Changed<TextNode>,
 	>,
 ) -> Result<()> {
-	for (key, value, el) in query.iter() {
+	for (key, el, text, num, bool) in query.iter() {
+		let value = if let Some(num) = num {
+			wasm_bindgen::JsValue::from_f64(**num)
+		} else if let Some(bool) = bool {
+			wasm_bindgen::JsValue::from_bool(**bool)
+		} else {
+			wasm_bindgen::JsValue::from_str(&**text)
+		};
+
 		// el.set_attribute(&key.0, &value.to_string())
 		// 	.map_err(|err| format!("{err:?}"))?;
 		// TODO use heck for camelCase conversion
 		js_sys::Reflect::set(
 			el.inner().as_ref(),
 			&wasm_bindgen::JsValue::from_str(&key.0),
-			&attribute_lit_to_js_value(value)?,
+			&value,
 		)
 		.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
 }
 
-fn attribute_lit_to_js_value(
-	value: &AttributeLit,
-) -> Result<wasm_bindgen::JsValue> {
-	match value {
-		AttributeLit::String(s) => Ok(wasm_bindgen::JsValue::from_str(s)),
-		AttributeLit::Number(n) => Ok(wasm_bindgen::JsValue::from_f64(*n)),
-		AttributeLit::Boolean(b) => Ok(wasm_bindgen::JsValue::from_bool(*b)),
-	}
-}
-
-/// lazily uncollapse text nodes and bind to the DOM
-pub(super) fn bind_text_nodes(
+/// lazily attach the text nodes to the DOM with the following steps:
+/// 1. find the parent element of the text node
+/// 2. find the marker comment node
+/// 3. assign the text node to the next sibling of the marker comment
+/// 4. remove the marker comments
+pub(crate) fn bind_text_nodes(
 	mut commands: Commands,
+	constants: Res<HtmlConstants>,
 	mut get_binding: GetDomBinding,
 	parents: Query<&ChildOf>,
-	elements: Query<(Entity, &DomIdx, &TextNodeParent)>,
+	elements: Query<(Entity, &DomIdx), With<ElementNode>>,
 	query: Populated<
-		Entity,
+		(Entity, &DomIdx),
 		(
 			Changed<TextNode>,
-			(
-				With<SignalReceiver<String>>,
-				Without<DomTextBinding>,
-				Without<AttributeOf>,
-			),
+			With<ReceivesSignals>,
+			Without<DomTextBinding>,
+			Without<AttributeOf>,
 		),
 	>,
 ) -> Result<()> {
-	for entity in query.iter() {
+	for (entity, dom_idx) in query.iter() {
 		// 1. get the parent element
-		let Some((parent_entity, parent_idx, text_node_parent)) = parents
+		let Some((parent_entity, parent_idx)) = parents
 			.iter_ancestors(entity)
 			.find_map(|ancestor| elements.get(ancestor).ok())
 		else {
 			return Err(format!(
-				r#"
-TextNode {entity} has no parent ElementNode
-Please ensure that any text nodes are wrapped in an ElementNode:
-✅ # Good: rsx!{{<div>{{my_signal}}</div>}}
-❌ # Bad:	rsx!{{my_signal}}
-"#,
+				"Reactive TextNode with {dom_idx} with has no parent ElementNode"
 			)
 			.into());
 		};
@@ -109,62 +111,65 @@ Please ensure that any text nodes are wrapped in an ElementNode:
 		let element = get_binding.get_element(parent_entity, *parent_idx)?;
 		let children = element.child_nodes();
 
-		// 2. uncollapse child text nodes
-		for child in text_node_parent.text_nodes.iter() {
-			// get the collapsed node
-			let collapsed_text_node =
-				children.item(child.child_index as u32).ok_or_else(|| {
-					format!(
-						"TextNodeParent {} has no child at index {}",
-						parent_idx, child.child_index
-					)
-				})?;
-			let mut current_node: web_sys::Text = collapsed_text_node
-				.dyn_into()
-				.map_err(|_| format!("Could not convert child to text node"))?;
+		// 2. find the marker comment node
+		let expected_data =
+			format!("{}|{}", constants.text_node_marker, dom_idx.0);
 
-
-			// iterate over the split positions and split the text node,
-			// assigning the uncollapsed nodes to entities as required
-			for (entity, position) in child
-				.split_positions
-				.iter()
-				// dont split the last position
-				.take(child.split_positions.len().saturating_sub(1))
+		let mut comment_idx = None;
+		for i in 0..children.length() {
+			let child = children.item(i).unwrap();
+			if child.node_type() == web_sys::Node::COMMENT_NODE
+				&& child.node_value().as_deref() == Some(&expected_data)
 			{
-				// assign the text node to the entity if its dynamic
-				if let Some(entity) = entity {
-					commands.entity(*entity).insert(DomTextBinding(
-						SendWrapper::new(current_node.clone()),
-					));
-				}
-				//https://developer.mozilla.org/en-US/docs/Web/API/Text/splitText
-				current_node =
-					current_node.split_text(*position as u32).unwrap();
-			}
-
-			// handle the last entity
-			if let Some(entity) =
-				child.split_positions.last().and_then(|(entity, _)| *entity)
-			{
-				commands.entity(entity).insert(DomTextBinding(
-					SendWrapper::new(current_node.clone()),
-				));
+				comment_idx = Some(i);
+				break;
 			}
 		}
+
+		let Some(comment_idx) = comment_idx else {
+			return Err(format!(
+				"Could not find marker comment for text node {dom_idx}"
+			)
+			.into());
+		};
+
+		// 3. assign the DomTextBinding
+		let node = children
+			.item(comment_idx + 1)
+			.ok_or_else(|| {
+				format!("No text node after marker comment for {dom_idx}")
+			})?
+			.dyn_into::<web_sys::Text>()
+			.map_err(|_| {
+				format!("Node after marker comment is not a TextNode")
+			})?;
+
+		commands
+			.entity(entity)
+			.insert(DomTextBinding(SendWrapper::new(node)));
+
+		// 4. remove marker comments
+		// im not sure about this, its a bit of a vanity thing so it looks prettier in dev tools
+		// but doing ths means if somebody calls normalize() we lose our text nodes
+		children.item(comment_idx + 2).map(|after| {
+			element.remove_child(&after).ok();
+		});
+		children.item(comment_idx).map(|comment| {
+			element.remove_child(&comment).ok();
+		});
 	}
 	Ok(())
 }
 
-pub(super) fn bind_attribute_values(
+pub(crate) fn bind_attribute_values(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	elements: Query<(Entity, &DomIdx)>,
 	query: Populated<
 		(Entity, &AttributeOf),
 		(
-			Changed<AttributeLit>,
-			(With<SignalReceiver<String>>, Without<DomElementBinding>),
+			Changed<TextNode>,
+			(With<ReceivesSignals>, Without<DomElementBinding>),
 		),
 	>,
 ) -> Result<()> {
@@ -185,7 +190,7 @@ pub(super) fn bind_attribute_values(
 	Ok(())
 }
 
-pub(super) fn bind_events(
+pub(crate) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	query: Populated<
@@ -237,7 +242,7 @@ pub(super) fn bind_events(
 
 
 #[derive(SystemParam)]
-pub(super) struct GetDomBinding<'w, 's> {
+pub(crate) struct GetDomBinding<'w, 's> {
 	commands: Commands<'w, 's>,
 	elements: Query<'w, 's, &'static DomElementBinding>,
 	constants: Res<'w, HtmlConstants>,

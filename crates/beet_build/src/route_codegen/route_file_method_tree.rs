@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_router::as_beet::Entity;
 use beet_utils::prelude::VecExt;
 use beet_utils::utils::Tree;
 use bevy::prelude::*;

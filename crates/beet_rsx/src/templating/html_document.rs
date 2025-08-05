@@ -1,17 +1,17 @@
 use super::*;
-use beet_core::prelude::bevyhow;
 use beet_core::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::bevyhow;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 
 
 /// Added to the *top-level* [`InstanceRoot`], and useful for getting the document root,
 /// rather than the root of a single macro.
-/// 
+///
 /// When recursing [`Children`] or [`TemplateRoot`] it is reccomended to use this type as the
-/// starting point, its very easy to create unexpected behavior by starting at something like [`BeetRoot`],
+/// starting point, its very easy to create unexpected behavior by starting at something like [`SnippetRoot`],
 /// which appears all over the place.
-/// 
+///
 /// Add this node to any bundle to have it rearranged into a valid HTML document structure.
 /// The resulting structure is guaranteed to have the following layout:
 /// ```text
@@ -77,7 +77,7 @@ pub(super) fn rearrange_html_document(
 pub(super) fn hoist_document_elements(
 	mut commands: Commands,
 	constants: Res<HtmlConstants>,
-	documents: Populated<(Entity, Option<&MacroIdx>), Added<HtmlDocument>>,
+	documents: Populated<(Entity, Option<&SnippetRoot>), Added<HtmlDocument>>,
 	children: Query<&Children>,
 	node_tags: Query<&NodeTag>,
 	directives: Query<&HtmlHoistDirective>,
@@ -211,10 +211,9 @@ fn script(content: impl Into<String>) -> impl Bundle {
 		ElementNode::open(),
 		NodeTag::new("script"),
 		related!(
-			Attributes
-				[(AttributeKey::new("type"), AttributeLit::new("module"),)]
+			Attributes[(AttributeKey::new("type"), TextNode::new("module"),)]
 		),
-		children![TextNode::new(content)],
+		children![TextNode::new(content.into())],
 	)
 }
 
@@ -273,18 +272,19 @@ mod test {
 			"<!DOCTYPE html><html><head><br/></head><body></body></html>",
 		);
 	}
+
 	#[test]
-	fn hoist_tag() {
-		HtmlDocument::parse_bundle(rsx! {<style></style>})
+	#[cfg(feature = "css")]
+	fn hoist_style_tag() {
+		HtmlDocument::parse_bundle(rsx! {<style>foo{}</style>})
 			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head><style></style></head><body></body></html>",
-			);
-		HtmlDocument::parse_bundle(
-			rsx! {<script></script><br/>},
-		)
-		.xpect()
-		.to_be_str("<!DOCTYPE html><html><head><script></script></head><body><br/></body></html>");
+			.to_be_snapshot();
+	}
+	#[test]
+	fn hoist_script_tag() {
+		HtmlDocument::parse_bundle(rsx! {<script></script><br/>})
+			.xpect()
+			.to_be_snapshot();
 	}
 	#[test]
 	fn hoist_top_tag() {
@@ -293,7 +293,7 @@ mod test {
 		)
 		.xpect()
 		.to_be_str(
-			"<!DOCTYPE html><html><head><script/></head><body></body></html>",
+			"<!DOCTYPE html><html><head><script></script></head><body></body></html>",
 		);
 	}
 	#[test]
@@ -303,17 +303,13 @@ mod test {
 	)
 	.xpect()
 	.to_be_str(
-		"<!DOCTYPE html><html><head><span/></head><body><script/><br/></body></html>",
+		"<!DOCTYPE html><html><head><span/></head><body><script></script><br/></body></html>",
 	);
 	}
 	#[test]
 	fn hydration_scripts() {
-		HtmlDocument::parse_bundle(
-		rsx! {<div client:load>},
-	)
-	.xpect()
-	.to_be_str(
-		"<!DOCTYPE html><html><head><script type=\"module\">\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div data-beet-dom-idx=\"0\"/></body></html>",
-	);
+		HtmlDocument::parse_bundle(rsx! {<div client:load>})
+			.xpect()
+			.to_be_snapshot();
 	}
 }

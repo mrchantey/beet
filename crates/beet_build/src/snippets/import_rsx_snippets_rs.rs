@@ -14,7 +14,7 @@ pub fn import_rsx_snippets_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
@@ -22,7 +22,6 @@ pub fn import_rsx_snippets_rs(
 		{
 			trace!("rust source file changed: {}", path.display());
 
-			commands.entity(entity).despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
@@ -60,9 +59,9 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
-				RsxSnippetOf(self.source_file),
-				RsxSnippetRoot,
-				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
+				SnippetRoot::new_from_tokens(self.file.clone(), &tokens),
+				StaticRoot,
+				ChildOf(self.source_file),
 				RstmlTokens::new(tokens),
 			));
 		}
@@ -73,7 +72,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::as_beet::render_fragment;
+	use beet_rsx::prelude::*;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -81,7 +80,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 		let test_site_index =
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
 		let entity = app
@@ -90,7 +89,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

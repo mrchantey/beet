@@ -41,89 +41,6 @@ pub fn unbounded_bundle(items: Vec<TokenStream>) -> TokenStream {
 	}
 }
 
-/// Define a function for tokenizing each listed component, all of which
-/// must implement [`TokenizeSelf`].
-macro_rules! tokenize_maybe_spanned {
-		($name:ident,$($type:ty),* $(,)?) => {
-			pub fn $name(
-				world: &World,
-				items: &mut Vec<TokenStream>,
-				entity: Entity
-			) -> Result<()> {
-				$(
-					if let Some(value) = tokenize_maybe_spanned::<$type>(world, entity)? {
-						items.push(value);
-					}
-				)*
-				Ok(())
-			}
-	};
-}
-
-
-tokenize_maybe_spanned![
-	tokenize_roots,
-	BeetRoot,
-	RsxSnippetRoot,
-	InstanceRoot,
-	ResolvedRoot,
-	MacroIdx,
-	ExprIdx,
-];
-tokenize_maybe_spanned![
-	tokenize_rsx_nodes,
-	NodeTag,
-	FragmentNode,
-	TemplateNode,
-	TextNode,
-	BlockNode
-];
-
-tokenize_maybe_spanned!(
-	tokenize_web_nodes,
-	DoctypeNode,
-	CommentNode,
-	ElementNode,
-);
-
-#[rustfmt::skip]
-tokenize_maybe_spanned!(
-	tokenize_rsx_directives, 
-	SlotChild, 
-	SlotTarget
-);
-
-tokenize_maybe_spanned!(
-	tokenize_web_directives,
-	HtmlHoistDirective,
-	ClientLoadDirective,
-	ClientOnlyDirective,
-	StyleScope,
-	StyleCascade,
-	LangContent
-);
-
-
-pub(super) fn tokenize_maybe_spanned<T: Component + TokenizeSelf>(
-	world: &World,
-	entity: Entity,
-) -> Result<Option<TokenStream>> {
-	let entity = world.entity(entity);
-	match (
-		entity.get::<T>(),
-		entity.get::<SpanOf<T>>(),
-	) {
-		(Some(value), Some(span)) => {
-			let value = value.self_token_stream();
-			Ok(Some(quote::quote_spanned! { **span =>
-				#value
-			}))
-		}
-		(Some(value), None) => Ok(Some(value.self_token_stream())),
-		_ => Ok(None),
-	}
-}
-
 
 /// Return the [`AttributeKey`] if it exists,
 /// and its span or [`Span::call_site()`].
@@ -136,9 +53,7 @@ pub(super) fn maybe_spanned_attr_key(
 		entity.get::<AttributeKey>(),
 		entity.get::<SpanOf<AttributeKey>>(),
 	) {
-		(Some(key), Some(span)) => {
-			Some((key.to_string(), span.clone().take()))
-		}
+		(Some(key), Some(span)) => Some((key.to_string(), span.clone().take())),
 		(Some(key), None) => Some((key.to_string(), Span::call_site())),
 		_ => None,
 	}

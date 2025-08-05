@@ -1,81 +1,122 @@
 use crate::prelude::*;
 use beet_core::as_beet::*;
 use beet_utils::prelude::*;
-use bevy::ecs::relationship::RelatedSpawner;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Config included in the `beet.toml` file for a collection.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RouteFileConfig {
-	/// Exclude the routes in this collection from the route tree.
-	/// Usually this should be true for pages and false for actions.
-	#[serde(flatten)]
-	pub collection: RouteFileCollection,
-	#[serde(flatten)]
-	pub codegen: CodegenFile,
-	#[serde(flatten)]
-	pub modify_route: ModifyRoutePath,
-}
 
+/// Added alongside a [`SourceFile`] for easy cohersion of route meta
+#[derive(Debug, PartialEq, Clone, Component)]
+pub struct MetaType(pub Unspan<syn::Type>);
 
-impl RouteFileConfig {
-	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
-		let client_actions_codegen =
-			if self.collection.category == RouteCollectionCategory::Actions {
-				let codegen = self.codegen.clone_info(
-					CollectClientActions::path(&self.codegen.output),
-				);
-				Some(codegen)
-			} else {
-				None
-			};
-
-		let mut collection_entity =
-			spawner.spawn((self.collection, self.codegen, self.modify_route));
-		if let Some(client_actions_codegen) = client_actions_codegen {
-			collection_entity.with_child((
-				client_actions_codegen,
-				CollectClientActions::default(),
-			));
-		}
-	}
+impl MetaType {
+	pub fn new(ty: syn::Type) -> Self { Self(Unspan::new(&ty)) }
 }
 
 /// Definition for a group of route files that should be collected together,
 /// including pages and actions.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Component)]
+#[derive(Debug, PartialEq, Clone, Component)]
 #[require(CodegenFile)]
 pub struct RouteFileCollection {
-	/// Optionally set the group name, used for codegen file names
-	/// like `FooRouterPlugin`, otherwise falls back to the
-	/// [`CodegenFile::output`] filename.
-	#[serde(rename = "name")]
-	pub name: Option<String>,
-	/// Passed to [`CodegenFile::pkg_name`]
-	#[serde(rename = "package_name")]
-	pub pkg_name: Option<String>,
 	/// The directory where the files are located.
-	#[serde(rename = "path")]
 	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
-	#[serde(flatten)]
 	pub filter: GlobFilter,
-	/// Specify the meta type, used for the file group codegen and individual
-	/// route codegen like `.md` and `.rsx` files.
-	#[serde(default = "default_meta", with = "syn_type_serde")]
-	pub meta_type: Unspan<syn::Type>,
-	#[serde(default = "default_state", with = "syn_type_serde")]
-	pub router_state_type: Unspan<syn::Type>,
-	#[serde(default)]
 	pub category: RouteCollectionCategory,
 }
-fn default_meta() -> Unspan<syn::Type> { Unspan::parse_str("()").unwrap() }
-fn default_state() -> Unspan<syn::Type> {
-	Unspan::parse_str("AppRouterState").unwrap()
+impl RouteFileCollection {
+	pub fn new(src: AbsPathBuf) -> Self {
+		Self {
+			src,
+			..Default::default()
+		}
+	}
+
+	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
+		self
+	}
+
+	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
+		path.starts_with(&self.src) && self.filter.passes(path)
+	}
+
+	/// Get the
+	fn read_files(&self) -> Result<Vec<AbsPathBuf>> {
+		let mut files = Vec::new();
+		for file in ReadDir::files_recursive(&self.src)? {
+			let abs_path = AbsPathBuf::new(file)?;
+			if self.passes_filter(&abs_path) {
+				files.push(abs_path);
+			}
+		}
+		Ok(files)
+	}
 }
 
+/// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
+pub fn import_route_file_collection(
+	mut commands: Commands,
+	collections: Query<
+		(Entity, &RouteFileCollection),
+		Added<RouteFileCollection>,
+	>,
+) -> Result {
+	for (entity, collection) in collections.iter() {
+		for file in ReadDir::files_recursive(&collection.src)? {
+			let file = AbsPathBuf::new(file)?;
+			commands.spawn((ChildOf(entity), SourceFile::new(file)));
+		}
+	}
+	Ok(())
+}
+
+
+/// Whenever a [`SourceFile`] is created, reparent to a corresponding [`RouteFileCollection`],
+/// if any.
+pub fn reparent_route_collection_source_files(
+	mut commands: Commands,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
+	collections: Query<(Entity, &RouteFileCollection)>,
+) -> Result {
+	// a hashmap mapping every file in a collection to that collection entity
+	let mut file_collection_map: HashMap<AbsPathBuf, Entity> =
+		HashMap::default();
+	for (entity, collection) in collections.iter() {
+		for file in collection.read_files()? {
+			if file_collection_map.contains_key(&file) {
+				bevybail!(
+					"
+Error: Collection Overlap: {}
+This file appears in multple collections,
+Please constrain the collection filters or roots",
+					file
+				);
+			}
+			file_collection_map.insert(file, entity);
+		}
+	}
+	// for each source file, insert as a child of the collection entity if it exists
+	for (entity, source_file) in query.iter() {
+		if let Some(collection_entity) = file_collection_map.get(&**source_file)
+		{
+			commands.entity(entity).insert(ChildOf(*collection_entity));
+		}
+	}
+	Ok(())
+}
+
+impl Default for RouteFileCollection {
+	fn default() -> Self {
+		Self {
+			src: Default::default(),
+			filter: Default::default(),
+			category: Default::default(),
+		}
+	}
+}
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RouteCollectionCategory {
@@ -95,40 +136,15 @@ impl RouteCollectionCategory {
 			Self::Actions => false,
 		}
 	}
-}
-
-
-impl Default for RouteFileCollection {
-	fn default() -> Self {
-		Self {
-			name: None,
-			pkg_name: None,
-			category: Default::default(),
-			src: Default::default(),
-			filter: Default::default(),
-			meta_type: default_meta(),
-			router_state_type: default_state(),
+	pub fn cache_strategy(&self) -> CacheStrategy {
+		match self {
+			Self::Pages => CacheStrategy::Static,
+			Self::Actions => CacheStrategy::Dynamic,
 		}
 	}
 }
 
 impl RouteFileCollection {
-	pub fn new(src: AbsPathBuf) -> Self {
-		Self {
-			src,
-			..Default::default()
-		}
-	}
-
-	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
-		self.filter = filter;
-		self
-	}
-
-	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
-		path.starts_with(&self.src) && self.filter.passes(path)
-	}
-
 	#[cfg(test)]
 	pub fn test_site() -> impl Bundle {
 		(
@@ -163,6 +179,12 @@ impl RouteFileCollection {
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
+			children![SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/pages/docs/index.rs",
+				)
+				.into_abs(),
+			)],
 		)
 	}
 	#[cfg(test)]
@@ -184,6 +206,12 @@ impl RouteFileCollection {
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
+			children![SourceFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/test_docs/index.mdx",
+				)
+				.into_abs(),
+			)],
 		)
 	}
 }

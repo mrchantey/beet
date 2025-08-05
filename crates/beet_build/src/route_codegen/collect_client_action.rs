@@ -1,7 +1,8 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
+use quote::quote;
 use syn::FnArg;
-use syn::Ident;
 use syn::ItemFn;
 use syn::Pat;
 use syn::PatIdent;
@@ -12,53 +13,60 @@ use syn::TypePath;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 
-/// For a given [`RouteFileMethod::item_fn`] which is a valid [`axum::handler::Handler`],
+/// For a given [`RouteFileMethod::item_fn`],
 /// create an equivelent client side function to call it.
-///
 ///
 #[derive(Default)]
 pub struct ParseClientAction;
 
 impl ParseClientAction {
-	pub fn client_func(&self, route_info: &RouteInfo, func: &ItemFn) -> ItemFn {
-		let parsed_inputs = Self::parse_inputs(route_info, func);
-		let (return_type, error_type) = Self::parse_output(func);
+	pub fn client_func(&self, action: &RouteFileMethod) -> ItemFn {
+		let parsed_inputs = Self::parse_inputs(&action.item);
+		// let (return_type, error_type) = Self::parse_output(item);
 
-		let fn_ident = &func.sig.ident;
-		let route_info = route_info.self_token_stream();
+		let fn_ident = &action.item.sig.ident;
+		let fn_return_type = match &action.item.sig.output {
+			syn::ReturnType::Default => parse_quote! { () },
+			syn::ReturnType::Type(_, ty) => ty.clone(),
+		};
+		let method = &action.route_info.method.self_token_stream();
+		let path = &action.route_info.path.to_string_lossy();
+		// let route_info = route_info.self_token_stream();
 
-		let docs = func.attrs.iter().filter_map(|attr| {
-			if attr.path().is_ident("doc") {
-				Some(attr.clone())
-			} else {
-				None
+		let docs = &action
+			.item
+			.attrs
+			.iter()
+			.filter_map(|attr| {
+				if attr.path().is_ident("doc") {
+					Some(attr.clone())
+				} else {
+					None
+				}
+			})
+			.collect::<Vec<_>>();
+
+		let dot_send = match action.returns_result() {
+			true => quote! { .send_fallible() },
+			false => quote! { .send() },
+		};
+
+		let (fn_args, body) = match parsed_inputs {
+			Some((fn_args, param_names)) => {
+				(fn_args, quote! { .with_body(#param_names) })
 			}
-		});
+			None => (Punctuated::new(), Default::default()),
+		};
 
-
-		match parsed_inputs {
-			Some((fn_args, param_names)) => parse_quote! {
-				#(#docs)*
-				pub async fn #fn_ident(#fn_args) -> ServerActionResult<#return_type, #error_type> {
-					CallServerAction::request(#route_info, #param_names).await
-				}
-			},
-			None => parse_quote! {
-				#(#docs)*
-				pub async fn #fn_ident() -> ServerActionResult<#return_type, #error_type> {
-					CallServerAction::request_no_data(#route_info).await
-				}
-			},
-		}
-	}
-
-	/// Extractors that can be mapped to client side.
-	/// This will be an extractor that either works with the url or the body,
-	/// depending on the method.
-	fn input_extractors(method: HttpMethod) -> Vec<Ident> {
-		match method.has_body() {
-			true => vec![parse_quote! { Json }],
-			false => vec![parse_quote! { JsonQuery }],
+		parse_quote! {
+			#(#docs)*
+			#[allow(unused)]
+			pub async fn #fn_ident(#fn_args) -> Result<#fn_return_type> {
+				ServerActionRequest::new(#method, #path)
+					#body
+					#dot_send
+					.await
+			}
 		}
 	}
 	/// For given function inputs, return the inputs for the client function
@@ -70,30 +78,28 @@ impl ParseClientAction {
 	/// |---																		|	---																|
 	/// |`fn foo()` 														| `None`														|
 	/// |`fn foo(some_extractor: SomeExtractor)`| `None`														|
-	/// |`fn foo(a: Json<i32>)` 								| `Some([a: i32], a)`								|
-	/// |`fn foo(Json(a): Json<i32>)` 					| `Some([a: i32], a)`								|
-	/// |`fn foo(args: Json<(i32,i32)>)` 				| `Some([args: (i32, i32)], args])`	|
-	/// |`fn foo(Json((a,b)): Json<(i32,i32)>)` | `Some([a: i32, b: i32], (a, b))`	|
+	/// |`fn foo(a: In<i32>)` 									| `Some([a: i32], a)`								|
+	/// |`fn foo(In(a): In<i32>)` 							| `Some([a: i32], a)`								|
+	/// |`fn foo(args: In<(i32,i32)>)` 					| `Some([args: (i32, i32)], args])`	|
+	/// |`fn foo(In((a,b)): In<(i32,i32)>)` 		| `Some([a: i32, b: i32], (a, b))`	|
 	fn parse_inputs(
-		route_info: &RouteInfo,
 		func: &ItemFn,
 	) -> Option<(Punctuated<FnArg, Token![,]>, Pat)> {
-		// Find the first input that matches an extractor
-		let Some(extractor_arg) = func.sig.inputs.iter().find_map(|arg| {
-			if let FnArg::Typed(pat_type) = arg {
-				if let Type::Path(type_path) = &*pat_type.ty {
-					if let Some(last) = type_path.path.segments.last() {
-						if Self::input_extractors(route_info.method)
-							.iter()
-							.any(|extractor| last.ident == *extractor)
-						{
-							return Some(pat_type);
+		// Get the type of the first argument if it is an In<T>
+		let Some(extractor_arg) =
+			func.sig.inputs.iter().next().and_then(|arg| {
+				if let FnArg::Typed(pat_type) = arg {
+					if let Type::Path(type_path) = &*pat_type.ty {
+						if let Some(last) = type_path.path.segments.last() {
+							if last.ident == "In" {
+								return Some(pat_type);
+							}
 						}
 					}
 				}
-			}
-			None
-		}) else {
+				None
+			})
+		else {
 			return None;
 		};
 
@@ -214,112 +220,12 @@ impl ParseClientAction {
 			_ => return None,
 		};
 	}
-
-	/// For given function output, return the output and error types for the client function, unwrapping
-	/// whatever was inside the extractor, if any.
-	///
-	/// ## Examples:
-	/// |Input                                                                                  | Output                                 |
-	/// |---                                                                                    | ---                                    |
-	/// |`fn foo()`                                                                            | `((), ())`                             |
-	/// |`fn foo() -> Bar`                                                                     | `(Bar, ())`                            |
-	/// |`fn foo() -> ActionResult<Foo, Bar>`                                                  | `(Foo, Bar)`                           |
-	/// |`fn foo() -> ActionResult<Json<Foo>, Json<Bar>>`                                      | `(Foo, Bar)`                           |
-	/// |`fn foo() -> ActionResult<Json<Result<u32, u32>>, Json<ActionError<u32>>>`            | `(Result<u32, u32>, ActionError<u32>)` |
-	/// |`fn foo() -> ActionError<Bar>`                                                        | `((), Bar)`                            |
-	/// |`fn foo() -> ActionError<Json<Bar>>`                                                  | `((), Bar)`                            |
-	/// |`fn foo() -> Json<u32>`                                                               | `(u32, ())`                            |
-	/// |`fn foo() -> Result<Json<u64>>`                                                       | `(u64, ())`                            |
-	/// |`fn foo() -> Result<Json<i32>, Bar>`                                                  | `(i32, Bar)`                           |
-	/// |`fn foo() -> Result<Json<Result<u32, u32>>>`                                          | `(Result<u32, u32>, ())`               |
-	fn parse_output(func: &ItemFn) -> (Type, Type) {
-		// recursively unwraps the extractor type,
-		// ie Json<ActionError<Json<u32>>> becomes u32
-		fn is_action_error(ty: &Type) -> bool {
-			if let Type::Path(TypePath { path, .. }) = ty {
-				if let Some(seg) = path.segments.last() {
-					if seg.ident == "ActionError" {
-						return true;
-					}
-				}
-			}
-			false
-		}
-
-
-		fn unwrap_extractors(ty: &Type) -> &Type {
-			if let Type::Path(TypePath { path, .. }) = ty {
-				if let Some(seg) = path.segments.last() {
-					if seg.ident == "Json" || seg.ident == "ActionError" {
-						if let syn::PathArguments::AngleBracketed(args) =
-							&seg.arguments
-						{
-							if let Some(syn::GenericArgument::Type(inner_ty)) =
-								args.args.first()
-							{
-								return unwrap_extractors(inner_ty);
-							}
-						}
-					}
-				}
-			}
-			ty
-		}
-
-		/// Unwraps a `Result<T,E>` or `ActionResult<T,E>`
-		fn unwrap_result_like(ty: &Type) -> Option<(Type, Type)> {
-			if let Type::Path(TypePath { path, .. }) = ty {
-				if let Some(seg) = path.segments.last() {
-					if seg.ident == "Result" || seg.ident == "ActionResult" {
-						if let syn::PathArguments::AngleBracketed(args) =
-							&seg.arguments
-						{
-							let mut args_iter =
-								args.args.iter().filter_map(|a| match a {
-									syn::GenericArgument::Type(t) => Some(t),
-									_ => None,
-								});
-							let t = args_iter
-								.next()
-								.map(unwrap_extractors)
-								.cloned()
-								.unwrap_or_else(|| parse_quote! { () });
-							let e = args_iter
-								.next()
-								.map(unwrap_extractors)
-								.cloned()
-								// the default E type of ActionResult is String
-								.unwrap_or_else(|| parse_quote! { String });
-							return Some((t, e));
-						}
-					}
-				}
-			}
-			None
-		}
-
-		match &func.sig.output {
-			syn::ReturnType::Default => {
-				(parse_quote! { () }, parse_quote! { () })
-			}
-			syn::ReturnType::Type(_, ty) => {
-				if let Some((t, e)) = unwrap_result_like(ty) {
-					(t, e)
-				} else if is_action_error(ty) {
-					(parse_quote! { () }, unwrap_extractors(ty).clone())
-				} else {
-					(unwrap_extractors(ty).clone(), parse_quote! { () })
-				}
-			}
-		}
-	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::RouteInfo;
-use beet_utils::utils::PipelineTarget;
+	use beet_utils::utils::PipelineTarget;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -327,14 +233,11 @@ use beet_utils::utils::PipelineTarget;
 
 	#[test]
 	fn parse_inputs() {
-		fn assert(inputs: &str, expected: Option<(&str, &str)>) {
+		fn parse(inputs: &str) -> Option<(String, String)> {
 			let inputs: TokenStream = syn::parse_str(&inputs).unwrap();
-			ParseClientAction::parse_inputs(
-				&RouteInfo::post("/add"),
-				&syn::parse_quote! {
-					fn post(#inputs){}
-				},
-			)
+			ParseClientAction::parse_inputs(&syn::parse_quote! {
+				fn post(#inputs){}
+			})
 			.xmap(|idents| {
 				idents.map(|(a, b)| {
 					(
@@ -343,100 +246,53 @@ use beet_utils::utils::PipelineTarget;
 					)
 				})
 			})
-			.xmap(expect)
-			.to_be(expected.map(|(a, b)| (a.to_string(), b.to_string())));
 		}
-		#[rustfmt::skip]
-{
-assert("", None);
-assert("foo: Bar", None);
-assert("foo: Json<u32>", Some(("foo : u32", "foo")));
-assert("Json(foo): Json<u32>", Some(("foo : u32", "foo")));
-assert("foo: Json<(u32)>", Some(("foo : (u32)", "foo")));
-assert("foo: Json<(u32,u32)>", Some(("foo : (u32 , u32)", "foo")));
-assert("Json((foo,bar)): Json<(u32,u32)>",Some(("foo : u32 , bar : u32", "(foo , bar)")));
-}
+		parse("").xpect().to_be_none();
+		parse("foo: Bar").xpect().to_be_none();
+		parse("foo: In<u32>")
+			.unwrap()
+			.xpect()
+			.to_be(("foo : u32".into(), "foo".into()));
+		parse("In(foo): In<u32>")
+			.unwrap()
+			.xpect()
+			.to_be(("foo : u32".into(), "foo".into()));
+		parse("foo: In<(u32)>")
+			.unwrap()
+			.xpect()
+			.to_be(("foo : (u32)".into(), "foo".into()));
+		parse("foo: In<(u32,u32)>")
+			.unwrap()
+			.xpect()
+			.to_be(("foo : (u32 , u32)".into(), "foo".into()));
+		parse("In((foo,bar)): In<(u32,u32)>")
+			.unwrap()
+			.xpect()
+			.to_be(("foo : u32 , bar : u32".into(), "(foo , bar)".into()));
 	}
-	#[test]
-	fn parse_output() {
-		fn assert(output: &str, expected: (&str, &str)) {
-			let output: TokenStream = syn::parse_str(output).unwrap();
-			let (ty, err) = ParseClientAction::parse_output(&parse_quote! {
-				fn post() -> #output{}
-			});
-			expect((
-				ty.to_token_stream().to_string(),
-				err.to_token_stream().to_string(),
-			))
-			.to_be((expected.0.to_string(), expected.1.to_string()));
-		}
-		// No output
-		let (ty, err) = ParseClientAction::parse_output(&parse_quote! {
-			fn post(){}
-		});
-		expect((
-			ty.to_token_stream().to_string(),
-			err.to_token_stream().to_string(),
-		))
-		.to_be(("()".to_string(), "()".to_string()));
-
-		#[rustfmt::skip]
-		{
-assert("Bar", ("Bar", "()"));
-assert("Json<u32>", ("u32", "()"));
-assert("Json<Result<u32 , i32>>", ("Result < u32 , i32 >", "()"));
-assert("Result<Foo, Bar>", ("Foo", "Bar"));
-assert("Result<Json<u64>>", ("u64", "String"));
-assert("Result<Json<i32>, Bar>", ("i32", "Bar"));
-assert("Result<Json<Result<u32 , u32>>>",("Result < u32 , u32 >", "String"));
-assert("ActionResult<i32,i64>",("i32", "i64"));
-assert("ActionResult<i32>",("i32", "String"));
-assert("Result<Bar, ActionError<Bar>>", ("Bar", "Bar"));
-assert("ActionResult<Json<Result<u32 , u32>>, Json<ActionError<u32>>>",("Result < u32 , u32 >", "u32"));
-assert("ActionError<Json<Bar>>", ("()", "Bar"));
-		}
-	}
-
-
-
 
 	#[test]
 	fn get() {
-		fn assert(
-			func: syn::ItemFn,
-			expected: syn::ItemFn,
-		) -> (String, String) {
-			let received = ParseClientAction
-				.client_func(&"/add".into(), &func)
-				.to_token_stream()
-				.to_string();
-			(received, expected.to_token_stream().to_string())
-		}
-		assert(parse_quote! {
-			fn get() {
-				1 + 1
-			}
-		},parse_quote! {
-			pub async fn get() -> ServerActionResult<(), ()> {
-				CallServerAction::request_no_data(RouteInfo { path: RoutePath(std::path::PathBuf::from("/add")), method: HttpMethod::Get }).await
-			}
-		}).xmap(|(received, expected)| {
-			expect(received).to_be(expected);
-		});
-
-		assert(parse_quote! {
-			fn get(JsonQuery((a,b)):JsonQuery<(i32,i64)>)->Result<Json<Result<u32>>> {
-				1 + 1
-			}
-		},parse_quote! {
-			pub async fn get(a: i32, b: i64) -> ServerActionResult<Result<u32>, String> {
-				CallServerAction::request(RouteInfo { 
-					path: RoutePath(std::path::PathBuf::from("/add")), 
-					method: HttpMethod::Get 
-				}, (a, b)).await
-			}
-		}).xmap(|(received, expected)| {
-			expect(received).to_be(expected);
-		});
+		ParseClientAction
+			.client_func(&RouteFileMethod::new_with("/add", &parse_quote! {
+				fn get() {
+					1 + 1
+				}
+			}))
+			.to_token_stream()
+			.xpect()
+			.to_be_snapshot();
+	}
+	#[test]
+	fn get_with_result() {
+		ParseClientAction
+			.client_func(&RouteFileMethod::new_with("/add", &parse_quote! {
+				fn get(In((a,b)): In<(i32,i64)>) -> Result<u32, String> {
+					Ok(Ok(1 + 1))
+				}
+			}))
+			.to_token_stream()
+			.xpect()
+			.to_be_snapshot();
 	}
 }

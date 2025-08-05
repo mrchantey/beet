@@ -1,7 +1,7 @@
+use beet_core::prelude::When;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
-use beet_core::prelude::When;
 
 
 /// Translates the agent up and down in a sine wave.

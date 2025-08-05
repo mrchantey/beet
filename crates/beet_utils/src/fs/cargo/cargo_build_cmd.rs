@@ -107,13 +107,24 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
-	pub fn push_feature(&mut self, feature: impl Into<String>) {
+	pub fn parse() -> Self { Parser::parse() }
+	pub fn no_default_features(mut self) -> Self {
+		self.no_default_features = true;
+		self
+	}
+	pub fn target(mut self, target: impl Into<String>) -> Self {
+		self.target = Some(target.into());
+		self
+	}
+
+	pub fn push_feature(&mut self, feature: impl Into<String>) -> &mut Self {
 		let feature = feature.into();
 		if let Some(features) = &mut self.features {
 			features.push_str(&format!(",{}", feature));
 		} else {
 			self.features = Some(feature);
 		}
+		self
 	}
 	/// ## Panics
 	///
@@ -179,7 +190,7 @@ impl CargoBuildCmd {
 	}
 
 	/// Blocking spawn of the cargo build command
-	pub fn spawn(&self) -> Result<()> {
+	pub fn spawn(&self) -> Result<&Self> {
 		let CargoBuildCmd {
 			cmd,
 			package,
@@ -347,7 +358,7 @@ impl CargoBuildCmd {
 		command.args(&args);
 
 		command.status()?.exit_ok()?;
-		Ok(())
+		Ok(self)
 	}
 }
 

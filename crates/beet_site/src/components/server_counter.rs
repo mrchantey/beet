@@ -1,11 +1,9 @@
 #[allow(unused)]
 use crate::prelude::*;
 use beet::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 #[template]
-#[derive(Serialize, Deserialize)]
+#[derive(Reflect)]
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	#[allow(unused)]
 	let (get, set) = signal(initial);
@@ -14,7 +12,10 @@ pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 		#[cfg(target_arch = "wasm32")]
 		{
 			spawn_local(async move {
-				set(actions::add(get(), 1).await.unwrap());
+				let value = actions::add(get(), 1)
+					.await
+					.expect("ServerCounter: failed to fetch from server");
+				set(value);
 			});
 		}
 	};

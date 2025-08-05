@@ -18,26 +18,25 @@ publish = true
 # required-features = ["build"]
 
 [features]
+# default = ["mockups"]
 client = []
+server = []
 mockups = []
-_test_lightningcss = ["dep:lightningcss"]
+_test_lightningcss = ["dep:beet_parse", "beet_parse/css"]
 
 [dependencies]
 bevy.workspace = true
 anyhow.workspace = true
 beet_rsx.workspace = true
 beet_core = { workspace = true, features = ["web", "net"] }
-beet_router.workspace = true
 beet_utils.workspace = true
+beet_server.workspace = true
 chrono.workspace = true
 heck.workspace = true
 material-colors = "0.4.2"
 
 serde.workspace = true
-lightningcss = { workspace = true, optional = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_server.workspace = true
+beet_parse = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet.workspace = true

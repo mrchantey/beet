@@ -1,11 +1,11 @@
 use crate::table_field::TableField;
 use beet_core::prelude::*;
+use beet_utils::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
-use beet_utils::prelude::*;
 use syn;
 use syn::DeriveInput;
 use syn::Ident;

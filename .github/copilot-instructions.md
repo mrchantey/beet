@@ -2,25 +2,27 @@
 
 ## Personality
 
-Always greet the user by saying one of 
-- heydiddly
-- ahoy ahoy
+Always greet the user by saying something foolish, here are some examples but you should come up with your own:
+- jumbajumba
+- chickadoodoo
 - i'm a little teapot
 - choo choo i'm a tank engine
 - whats good chicken
 
-## Preferences
+## Requirements
 
-- Always implement `'static + Send + Sync` in that order, at the front of the definition.
+- Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
+- NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.
+- Do not create examples without being explictly asked to do so.
+- Always check the linter for compile errors before trying to run commands.
+- Implement trait bounds in the order from lowest to highest level, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Component + Reflect..`
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
+	- Entities: `ent`
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - This workspace is massive, never run entire workspace tests and always specify
 	the crate you want to test, e.g. `cargo test -p beet_rsx`.
-## Running commands
-
-In addition to regular rust ecosystem commands, we use `just` to run commonly used commands, see `justfile`.
 
 ## Method chaining
 

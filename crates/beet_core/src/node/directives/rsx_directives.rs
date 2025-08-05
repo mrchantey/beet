@@ -1,13 +1,8 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-pub fn extract_rsx_directives_plugin(app: &mut App) {
-	app.add_plugins(extract_directive_plugin::<SlotChild>)
-		.add_systems(
-			Update,
-			slot_target_directive.in_set(ExtractDirectivesSet),
-		);
-}
+/// Specify types for variadic functions like TokenizeComponent
+pub type RsxDirectives = (SlotChild, SlotTarget);
 
 /// Directive indicating a node should be moved to the slot with the given name.
 /// All nodes without this directive are moved to the default slot.
@@ -24,19 +19,12 @@ pub enum SlotChild {
 }
 
 impl TemplateDirective for SlotChild {
-	fn try_from_attribute(
-		key: &str,
-		value: Option<&AttributeLit>,
-	) -> Option<Self> {
+	fn try_from_attribute(key: &str, value: Option<&TextNode>) -> Option<Self> {
 		match (key, value) {
-			("slot", Some(AttributeLit::String(value)))
-				if value.as_str() == "default" =>
-			{
+			("slot", Some(value)) if value.as_str() == "default" => {
 				Some(Self::Default)
 			}
-			("slot", Some(AttributeLit::String(value))) => {
-				Some(Self::Named(value.to_string()))
-			}
+			("slot", Some(value)) => Some(Self::Named(value.to_string())),
 			("slot", None) => Some(Self::Default),
 			_ => None,
 		}
@@ -68,26 +56,23 @@ impl SlotTarget {
 	}
 }
 
-
-// convert all nodes with the `slot` tag into a `SlotTarget`
-fn slot_target_directive(
+/// convert all nodes with the `slot` tag into a `SlotTarget`,
+/// this does not address slot children, ie `<div slot="foo">`
+pub fn extract_slot_targets(
 	mut commands: Commands,
-	attributes: Query<&Attributes>,
-	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
-	attributes_query: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
+	query: Populated<(Entity, &NodeTag), Added<ElementNode>>,
+	attributes: FindAttribute,
 ) {
 	for (node_ent, node_tag) in query.iter() {
 		if **node_tag != "slot" {
 			continue;
 		}
 		let target = attributes
-			.iter_descendants(node_ent)
-			.filter_map(|a| attributes_query.get(a).ok())
-			.find(|(_, key, _)| ***key == "name")
-			.map(|(entity, _, value)| {
+			.find(node_ent, "name")
+			.map(|(entity, value)| {
 				commands.entity(entity).despawn();
-				if let Some(AttributeLit::String(value)) = value.as_ref() {
-					SlotTarget::Named(value.clone())
+				if let Some(value) = value.as_ref() {
+					SlotTarget::Named(value.0.clone())
 				} else {
 					SlotTarget::Default
 				}
@@ -120,7 +105,7 @@ mod test {
 			.spawn((ElementNode::self_closing(), NodeTag("slot".to_string())))
 			.id();
 		app.world_mut()
-			.run_system_once(slot_target_directive)
+			.run_system_once(extract_slot_targets)
 			.unwrap();
 
 		app.world_mut()
@@ -138,15 +123,13 @@ mod test {
 				ElementNode::self_closing(),
 				NodeTag("slot".to_string()),
 				related!(
-					Attributes[(
-						AttributeKey::new("name"),
-						"foo".into_attribute_bundle()
-					)]
+					Attributes
+						[(AttributeKey::new("name"), "foo".into_bundle())]
 				),
 			))
 			.id();
 		app.world_mut()
-			.run_system_once(slot_target_directive)
+			.run_system_once(extract_slot_targets)
 			.unwrap();
 
 		app.world_mut()

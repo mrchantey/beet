@@ -2,6 +2,9 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(let_chains)]
 
+#[cfg(feature = "http")]
+mod http_utils;
+
 pub mod node;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
@@ -9,12 +12,10 @@ pub mod tokens_utils;
 pub use beet_core_macros::*;
 
 #[cfg(feature = "bevy")]
-pub mod bevy_utils;
+mod bevy_utils;
 #[cfg(feature = "net")]
 pub mod net;
-#[cfg(feature = "net")]
-pub use net::cross_fetch;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub mod server;
 #[cfg(feature = "web")]
 pub mod web;
@@ -25,13 +26,14 @@ pub mod prelude {
 	pub use crate::bevybail;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevyhow;
-	#[cfg(feature = "net")]
-	pub use crate::net::*;
+	#[cfg(feature = "http")]
+	pub use crate::http_utils::*;
 	pub use crate::node::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	#[allow(unused)]
 	#[cfg(feature = "web")]
 	pub use crate::web::prelude::*;
 	pub use beet_core_macros::*;
@@ -51,9 +53,9 @@ pub mod as_beet {
 
 
 pub mod exports {
-	#[cfg(feature = "net")]
+	#[cfg(feature = "http")]
 	pub use http;
-	#[cfg(feature = "net")]
+	#[cfg(feature = "http")]
 	pub use http_body_util;
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;

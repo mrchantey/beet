@@ -1,9 +1,7 @@
 use super::HashNonSnippetRust;
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
 use beet_parse::prelude::*;
-use beet_router::as_beet::TemplateRoot;
 use bevy::prelude::*;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
@@ -51,17 +49,16 @@ pub fn update_file_expr_hash(
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
-	rsx_snippets: Query<&RsxSnippets>,
-	macro_idxs: Query<&MacroIdx>,
+	snippet_roots: Query<&SnippetRoot>,
 	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	attributes: Query<&Attributes>,
 	// dont hash literal attribute values, they can be updated via snippets
-	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<AttributeLit>)>,
+	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<TextNode>)>,
 	// hash all template attributes, they are currently used to build functions
 	// should change when bevy has native templates
 	template_attrs: Query<(
 		Option<&AttributeKey>,
-		Option<&AttributeLit>,
+		Option<&TextNode>,
 		Option<&NodeExpr>,
 	)>,
 ) -> Result {
@@ -72,13 +69,12 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(source_file)?;
-		for node in rsx_snippets
-			.iter_descendants(entity)
-			.flat_map(|child| template_roots.iter_descendants_inclusive(child))
-			.flat_map(|en| children.iter_descendants_inclusive(en))
+		for node in children.iter_descendants(entity)
+		.flat_map(|child| template_roots.iter_descendants_inclusive(child))
+		.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
-			// hash macro idxs
-			if let Ok(idx) = macro_idxs.get(node) {
+			// hash snippet file location
+			if let Ok(idx) = snippet_roots.get(node) {
 				idx.hash(&mut hasher);
 			}
 
@@ -131,6 +127,7 @@ pub fn update_file_expr_hash(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
+	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
@@ -139,7 +136,7 @@ mod test {
 
 	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
 
-	fn hash_inner(bundle: impl Bundle, remove_macro_idxs: bool) -> u64 {
+	fn hash_inner(bundle: impl Bundle, remove_snippet_roots: bool) -> u64 {
 		let mut app = App::new();
 		app.init_resource::<TemplateMacros>()
 			.add_systems(Update, update_file_expr_hash);
@@ -147,16 +144,16 @@ mod test {
 			.world_mut()
 			.spawn((
 				SourceFile::new(WsPathBuf::new(file!()).into_abs()),
-				related! {RsxSnippets[related! {TemplateRoot[bundle]}]},
+				children![related! {TemplateRoot[bundle]}],
 			))
 			.id();
 		// reset macro idxs for testing
-		if remove_macro_idxs {
+		if remove_snippet_roots {
 			for entity in app
 				.world_mut()
-				.query_filtered_once::<Entity, With<MacroIdx>>()
+				.query_filtered_once::<Entity, With<SnippetRoot>>()
 			{
-				app.world_mut().entity_mut(entity).remove::<MacroIdx>();
+				app.world_mut().entity_mut(entity).remove::<SnippetRoot>();
 			}
 		}
 		app.update();
@@ -233,7 +230,7 @@ mod test {
 		.to_be(hash(rsx_tokens! {<Foo><Bar><Bazz>bar</Bazz></Bar></Foo>}));
 	}
 	#[test]
-	fn macro_idxs() {
+	fn snippet_roots() {
 		// different LineCol means different hash
 		expect(hash_inner(rsx_tokens! {<div>{1}</div>}, false))
 			.not()
@@ -243,7 +240,7 @@ mod test {
 	#[test]
 	fn doesnt_change() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 
 		let index_path = WsPathBuf::new(
 			"crates/beet_router/src/test_site/pages/docs/index.rs",

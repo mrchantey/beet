@@ -31,6 +31,11 @@ pub fn tokenize_element_attributes(
 			match (key, value) {
 				// 1. Key with value
 				(Some((key_str, key)), Some(mut value)) => {
+					attr_components.push(quote! {AttributeKey::new(#key)});
+					// both events and attributes get a key
+					// attribute values added to child entity,
+					// event handlers added to parent entity.
+					// this technique is also used in `derive_attribute_block.rs`
 					if is_event(&key_str, &value) {
 						// event syntax sugar (inferred trigger types)
 						tokenize_event_handler(
@@ -38,9 +43,13 @@ pub fn tokenize_element_attributes(
 							key.span(),
 							&mut value,
 						)?;
+						let parsed = value.bundle_tokens();
+						attr_components.push(quote! {
+								OnSpawnDeferred::insert_parent::<AttributeOf>(#parsed)
+						});
+					} else {
+						attr_components.push(value.insert_deferred());
 					}
-					attr_components.push(quote! {AttributeKey::new(#key)});
-					attr_components.push(value.attribute_bundle_tokens());
 				}
 				// 3. Key without value
 				(Some((_, key)), None) => {
@@ -48,7 +57,7 @@ pub fn tokenize_element_attributes(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(value.node_bundle_tokens());
+					entity_components.push(value.insert_deferred());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}
@@ -84,61 +93,31 @@ pub fn tokenize_element_attributes(
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
-	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> Matcher<String> {
+	fn parse(tokens: TokenStream) -> Matcher<TokenStream> {
 		tokenize_rstml(tokens, WsPathBuf::new(file!()))
 			.unwrap()
-			.to_string()
 			.xpect()
 	}
 
 	#[test]
-	fn key_value() {
+	fn key() {
 		quote! {
 			<span hidden/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					related!(Attributes[
-						AttributeKey::new("hidden")
-					])
-				)]}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
+	}
+	#[test]
+	fn key_value() {
 		quote! {
 			<span hidden=true/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					related!(Attributes[(
-						AttributeKey::new("hidden"),
-						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 	#[test]
 	fn block() {
@@ -146,21 +125,7 @@ mod test {
 			<span {foo}/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 	#[test]
 	fn events() {
@@ -168,52 +133,23 @@ mod test {
 			<span onclick={foo}/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {
-				(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx {
-						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),
-						start: LineCol { line: 1u32, col: 0u32 }
-					},
-					FragmentNode,
-					related! {
-						Children[(
-							NodeTag(String::from("span")),
-							ElementNode { self_closing: true },
-							related!(Attributes[(
-								AttributeKey::new("onclick"),
-								OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_attribute_bundle()),
-								ExprIdx(0u32)
-							)])
-						)]
-					}
-				)
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
+	}
+	#[test]
+	fn js_events() {
 		quote! {
 			<span onclick="some_js_func"/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("span")),
-					ElementNode { self_closing: true },
-					related!(Attributes[(
-						AttributeKey::new("onclick"),
-						OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		.to_be_snapshot();
+	}
+	#[test]
+	fn lang_src() {
+		quote! {
+			<style src="./foobar"/>
+		}
+		.xmap(parse)
+		.to_be_snapshot();
 	}
 	#[test]
 	fn all() {
@@ -227,45 +163,6 @@ mod test {
 			/>
 		}
 		.xmap(parse)
-		.to_be_str(
-			quote! {
-				(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx {
-						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),
-						start: LineCol { line: 1u32, col: 0u32 }
-					},
-					FragmentNode,
-					related! {
-						Children[(
-							ExprIdx(0u32),
-							NodeTag(String::from("span")),
-							ElementNode { self_closing: true },
-							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-							related!(Attributes[
-								AttributeKey::new("hidden"),
-								(
-									AttributeKey::new("class"),
-									OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
-								),
-								(
-									AttributeKey::new("onmousemove"),
-									OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
-								),
-								(
-									AttributeKey::new("onclick"),
-									OnSpawnTemplate::new_insert(
-										#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_attribute_bundle()
-									),
-									ExprIdx(1u32)
-								)
-							])
-						)]
-					}
-				)
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 }

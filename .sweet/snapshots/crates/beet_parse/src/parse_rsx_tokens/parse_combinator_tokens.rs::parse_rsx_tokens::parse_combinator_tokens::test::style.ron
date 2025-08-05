@@ -1,0 +1,21 @@
+(
+    SnippetRoot {
+        file: WsPathBuf::new(
+            "crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs",
+        ),
+        start: LineCol { line: 1u32, col: 0u32 },
+    },
+    InstanceRoot,
+    FragmentNode,
+    related! {
+        Children[TextNode(String::from("\n")), (NodeTag(String::from("div")),
+        ElementNode { self_closing : false },
+        InnerText(String::from("hello world"))), (NodeTag(String::from("style")),
+        ElementNode { self_closing : false }, StyleElement,
+        LangSnippetHash(17358285461052746250u64),
+        InnerText(String::from("main[data-beet-style-id-17358285461052746250] {\n  padding-top: 2em;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  height: 100vh;\n}\n\na[data-beet-style-id-17358285461052746250] {\n  color: #90ee90;\n}\n\na:visited[data-beet-style-id-17358285461052746250] {\n  color: #39f;\n}\n"))),
+        (NodeTag(String::from("style")), ElementNode { self_closing : false },
+        StyleScope::Global, StyleElement, LangSnippetHash(1459075080648219441u64),
+        InnerText(String::from("body {\n  font-size: 1.4em;\n  font-family: system-ui, sans-serif;\n  background: #000;\n  color: #fff;\n}\n")))]
+    },
+)

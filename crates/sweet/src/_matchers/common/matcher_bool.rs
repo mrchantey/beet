@@ -12,6 +12,7 @@ mod test {
 
 	#[test]
 	fn bool() {
+		// expect(true).to_be_false();
 		expect(true).to_be_true();
 		expect(false).not().to_be_true();
 

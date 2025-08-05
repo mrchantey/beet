@@ -217,6 +217,25 @@ val_string	= "foo"
 	}
 
 	#[test]
+	fn code_blocks() {
+		ParseMarkdown::markdown_to_rsx_str(
+			"`let foo = bar;`",
+		).xpect()
+		.to_be("<p><code>let foo = bar;</code></p>");
+	ParseMarkdown::markdown_to_rsx_str(
+			r#"
+```rust
+let foo = bar;
+
+let bazz = boo;
+```
+"#,
+		).xpect()
+		// preserves whitespace
+		.to_be("<pre><code class=\"language-rust\">let foo = bar;\n\nlet bazz = boo;\n</code></pre>");
+	}
+
+	#[test]
 	#[ignore = "todo"]
 	fn yaml_frontmatter() {
 		// let yaml = r#"

@@ -153,6 +153,29 @@ impl<'a> NamedField<'a> {
 		}
 	}
 
+	/// Check the ident of the last segment of [`Self::ty`],
+	/// generics are ignored.
+	pub fn last_segment_matches(&self, val: &str) -> bool {
+		match self.ty {
+			Type::Path(p) => p
+				.path
+				.segments
+				.last()
+				.map_or(false, |segment| segment.ident == val),
+			Type::Reference(r) => {
+				if let Type::Path(p) = &*r.elem {
+					p.path
+						.segments
+						.last()
+						.map_or(false, |segment| segment.ident == val)
+				} else {
+					false
+				}
+			}
+			_ => false,
+		}
+	}
+
 	/// Returns the inner type of an Option, unwrapping Option<T> to T.
 	fn option_inner(ty: &Type) -> &Type {
 		if let Type::Path(p) = ty {

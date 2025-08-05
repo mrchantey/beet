@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+mod beet_plugins;
+
 #[cfg(feature = "build")]
 pub use beet_build as build;
 #[cfg(feature = "connect")]
@@ -18,11 +20,9 @@ pub use beet_ml as ml;
 pub use beet_parse as parse;
 // #[cfg(feature = "query")]
 // pub use beet_query as query;
-#[cfg(feature = "router")]
-pub use beet_router as router;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(feature = "beet_server")]
 pub use beet_server as server;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
@@ -33,6 +33,7 @@ pub use beet_utils::elog;
 pub use beet_utils::log;
 pub use beet_utils::noop;
 pub mod prelude {
+	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
 	#[cfg(feature = "connect")]
@@ -50,18 +51,22 @@ pub mod prelude {
 	pub use crate::parse::prelude::*;
 	// #[cfg(feature = "query")]
 	// pub use crate::query::prelude::*;
-	#[cfg(feature = "router")]
-	pub use crate::router::prelude::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use crate::server::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
+	#[cfg(feature = "beet_server")]
+	pub use crate::server::prelude::*;
 	#[cfg(feature = "sim")]
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 	pub use crate::utils::prelude::*;
+	/// hack to fix bevy macros
+	pub use bevy::ecs as bevy_ecs;
 	pub use bevy::prelude::*;
+	/// hack to fix bevy macros
+	pub use bevy::reflect as bevy_reflect;
+	// beet workflows make heavy use of `RunSystemOnce` to run systems
+	pub use bevy::ecs::system::RunSystemOnce;
 }
 pub mod exports {
 	#[cfg(feature = "build")]
@@ -71,8 +76,6 @@ pub mod exports {
 	pub use crate::design::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::exports::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use crate::server::exports::*;
 	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;
@@ -82,6 +85,7 @@ pub mod exports {
 	pub use beet_sim::exports::*;
 	#[cfg(feature = "spatial")]
 	pub use beet_spatial::exports::*;
+	pub use bevy;
 }
 #[cfg(test)]
 mod test {

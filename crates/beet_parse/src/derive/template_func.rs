@@ -1,9 +1,10 @@
 use crate::prelude::*;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use quote::quote;
+use syn::Ident;
 use syn::ItemFn;
 use syn::Result;
+use syn::ReturnType;
 
 pub fn template_func(input: ItemFn) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
@@ -31,7 +32,7 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	let (_, type_generics, where_clause) = func.sig.generics.split_for_impl();
 	let ident = &func.sig.ident;
 
-	let fields = fields.iter().map(|f| {
+	let fields = prop_fields(fields).map(|f| {
 		let ident = &f.ident;
 		let attrs = &f.attrs;
 		let ty = f.ty;
@@ -55,71 +56,215 @@ fn impl_template_bundle(
 	func: &ItemFn,
 	fields: &[NodeField],
 ) -> Result<TokenStream> {
-	let (impl_generics, type_generics, where_clause) =
-		func.sig.generics.split_for_impl();
-	let ident = &func.sig.ident;
-
-	let destructure = fields.iter().map(|field| {
-		let mutability = field
-			.mutability
-			.map(|m| m.to_token_stream())
-			.unwrap_or_default();
+	let destructure_props = prop_fields(fields).map(|field| {
+		let mutability = field.mutability;
 		let ident = &field.ident;
 		quote! {
 			#mutability #ident
 		}
 	});
+
+	let param_fields = system_param_fields(fields).map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+		let attrs = &field.attrs;
+		let mutability = field.mutability;
+		quote! {
+			#(#attrs)*
+			#mutability #ident: #ty
+		}
+	});
+	let ident = &func.sig.ident;
+	let (impl_generics, type_generics, where_clause) =
+		func.sig.generics.split_for_impl();
+
+	let return_type = capture_lifetimes(func.sig.output.clone());
+
 	let body = &func.block.stmts;
-	let return_type = &func.sig.output;
+	let entity_ident = entity_param_ident(fields)
+		.cloned()
+		.unwrap_or_else(|| Ident::new("entity", ident.span()));
+
+	let err_msg =
+		format!("Error running template system for `{}`: {{}}", ident);
+
+
+	let returns_result = if let ReturnType::Type(_, ty) = &return_type
+		&& let syn::Type::Path(type_path) = &**ty
+	{
+		type_path
+			.path
+			.segments
+			.last()
+			.map_or(false, |segment| segment.ident == "Result")
+	} else {
+		false
+	};
+	let maybe_unwrap = if returns_result {
+		quote! { .unwrap_or_exit() }
+	} else {
+		Default::default()
+	};
 
 	Ok(quote! {
-	impl #impl_generics IntoTemplateBundle<Self> for #ident #type_generics #where_clause {
-		fn into_node_bundle(self) #return_type {
-			let Self{#(#destructure),*} = self;
-			#(#body)*
+
+	impl #impl_generics #ident #type_generics #where_clause {
+		pub fn system(#[allow(unused_variables)]In((#entity_ident, input)): In<(Entity,Self)>, #(#param_fields),*) #return_type{
+				let Self { #(#destructure_props),* } = input;
+				#(#body)*
+		}
+	}
+
+	impl #impl_generics IntoBundle<Self> for #ident #type_generics #where_clause {
+		fn into_bundle(self) -> impl Bundle {
+			OnSpawn::new(move |entity_world_mut: &mut EntityWorldMut| {
+				let id = entity_world_mut.id();
+				let bundle = entity_world_mut.world_scope(|world| {
+					world.run_system_cached_with(Self::system, (id,self)).map_err(|err|
+						bevyhow!(#err_msg, err)
+					).unwrap_or_exit()
+				})#maybe_unwrap;
+				entity_world_mut.insert(bundle.into_bundle());
+			})
 		}
 	}
 	})
 }
 
+/// Any type in the ReturnTyle that is an impl will need an additional `use<>`
+/// constraint, required for valid bevy systems.
+/// https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html
+fn capture_lifetimes(mut return_type: ReturnType) -> ReturnType {
+	fn impl_recursive(ty: &mut syn::Type) {
+		match ty {
+			syn::Type::Path(type_path) => {
+				for segment in &mut type_path.path.segments {
+					if let syn::PathArguments::AngleBracketed(args) =
+						&mut segment.arguments
+					{
+						for arg in &mut args.args {
+							if let syn::GenericArgument::Type(ty) = arg {
+								impl_recursive(ty);
+							}
+						}
+					}
+				}
+			}
+			syn::Type::ImplTrait(impl_trait) => {
+				impl_trait.bounds.push(syn::parse_quote! { use<> });
+			}
+			_ => {}
+		}
+	}
+
+
+	if let ReturnType::Type(_, ty) = &mut return_type {
+		impl_recursive(&mut *ty);
+	}
+	return_type
+}
+
+
+const SYSTEM_PARAM_IDENTS: [&str; 7] = [
+	"World",
+	"Commands",
+	"Res",
+	"ResMut",
+	"Query",
+	"Populated",
+	"When",
+];
+
+/// Gets all non system param fields
+fn prop_fields<'a>(
+	fields: &'a [NodeField],
+) -> impl Iterator<Item = &'a NodeField<'a>> {
+	fields
+		.iter()
+		.filter(|f| !f.last_segment_matches("Entity"))
+		.filter(|f| {
+			!SYSTEM_PARAM_IDENTS
+				.iter()
+				.any(|id| f.last_segment_matches(id))
+		})
+}
+
+fn system_param_fields<'a>(
+	fields: &'a [NodeField],
+) -> impl Iterator<Item = &'a NodeField<'a>> {
+	fields
+		.iter()
+		.filter(|f| !f.last_segment_matches("Entity"))
+		.filter(|f| {
+			SYSTEM_PARAM_IDENTS
+				.iter()
+				.any(|id| f.last_segment_matches(id))
+		})
+}
+
+
+fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
+	fields
+		.iter()
+		.find(|field| field.last_segment_matches("Entity"))
+		.map(|field| field.ident)
+}
 
 
 #[cfg(test)]
 mod test {
+	use super::capture_lifetimes;
 	use crate::prelude::*;
-	use quote::quote;
 	use sweet::prelude::*;
+	use syn::PathSegment;
+
+	#[test]
+	fn capture_lifetimes_test() {
+		capture_lifetimes(syn::parse_quote! {-> impl Bundle })
+			.xpect()
+			.to_be(syn::parse_quote! {-> impl Bundle + use<> });
+		capture_lifetimes(syn::parse_quote! {-> Result<impl Bundle, ()> })
+			.xpect()
+			.to_be(syn::parse_quote! {-> Result<impl Bundle + use<>, ()> });
+	}
+
+
+	#[test]
+	fn segments() {
+		let a: PathSegment = syn::parse_quote! {Foo};
+		expect(a.ident).to_be("Foo");
+		let a: PathSegment = syn::parse_quote! {Foo<Bar>};
+		expect(a.ident).to_be("Foo");
+	}
 
 	#[test]
 	fn simple() {
 		template_func(syn::parse_quote! {
-			/// probably the best templating layout
+			/// probably the best templating layout ever
 			pub(crate) fn MyNode(
 				/// some comment
 				foo:u32,
 				mut bar:u32
 			) -> impl Bundle{()}
 		})
-		.to_string()
 		.xpect()
-		.to_be(
-			quote! {
-			use beet::prelude::*;
-			#[doc = r" probably the best templating layout"]
-			#[derive(Props)]
-			pub(crate) struct MyNode {
-				#[doc = r" some comment"]
-				pub foo: u32,
-				pub bar: u32
-			}
-			impl IntoTemplateBundle<Self> for MyNode {
-				fn into_node_bundle(self) -> impl Bundle {
-					let Self { foo, mut bar } = self;
-					()
-				}
-			}
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
+	}
+	#[test]
+	fn complex() {
+		template_func(syn::parse_quote! {
+			/// probably the best templating layout ever
+			pub(crate) fn MyNode(
+				/// some comment
+				foo:u32,
+				mut bar:u32,
+				my_entity:Entity,
+				world: &mut World,
+				res: Res<Time>,
+				mut query: Query<&mut Transform>,
+			) -> impl Bundle{()}
+		})
+		.xpect()
+		.to_be_snapshot();
 	}
 }

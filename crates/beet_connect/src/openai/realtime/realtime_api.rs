@@ -1,8 +1,6 @@
 use super::types::*;
 use crate::openai::*;
-use beet_core::cross_fetch::Request;
-use beet_core::cross_fetch::ResponseInner;
-use beet_core::prelude::*;
+// use bevy::prelude::*;
 
 /// REST API endpoint to generate ephemeral session tokens for use in client-side applications.
 pub struct RealtimeApi;
@@ -13,17 +11,21 @@ impl RealtimeApi {
 	/// https://platform.openai.com/docs/api-reference/realtime-sessions
 	pub async fn create(
 		req: RealtimeSessionCreateRequest,
-	) -> OpenAiResult<RealtimeSessionCreateResponse> {
-		Request::new("https://api.openai.com/v1/realtime/sessions")
-			.method(HttpMethod::Post)
-			.auth_bearer(&OpenAiKey::get()?)
-			.body(req)?
-			.send()
-			.await?
-			.into_result()?
-			.body::<RealtimeSessionCreateResponse>()
-			.await?
-			.xok()
+	) -> Result<RealtimeSessionCreateResponse> {
+		Request::new(
+			HttpMethod::Post,
+			"https://api.openai.com/v1/realtime/sessions",
+		)
+		.with_auth_bearer(&OpenAiKey::get()?)
+		.with_json_body(&req)
+		.unwrap()
+		.send()
+		.await?
+		.into_result()
+		.await?
+		.json::<RealtimeSessionCreateResponse>()
+		.await?
+		.xok()
 	}
 }
 
@@ -43,7 +45,7 @@ mod test {
 			..Default::default()
 		})
 		.await
-		.unwrap().xmap(|res|res.voice).xmap(expect).to_be(Some(Box::new(types::VoiceIdsShared::Ash)));
+		.unwrap().xmap(|res|res.voice).xpect().to_be(Some(Box::new(types::VoiceIdsShared::Ash)));
 
 		// println!("{:#?}", res);
 	}

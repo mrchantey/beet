@@ -3,11 +3,8 @@ use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-/// Add this component to have it populated with HTML on the next update cycle.
-/// See [`HtmlDocument`] for hoisting and correct html structure.
-#[derive(Default, Component, Deref, DerefMut, Reflect)]
-#[reflect(Default, Component)]
-pub struct HtmlFragment(pub String);
+/// Utilities for rendering HTML fragments.
+pub struct HtmlFragment;
 
 impl HtmlFragment {
 	/// returns the HTML string representation of a given [`Bundle`].
@@ -18,8 +15,7 @@ impl HtmlFragment {
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin)
-			.insert_resource(TemplateFlags::None);
+		app.add_plugins(ApplyDirectivesPlugin);
 		let entity = app.world_mut().spawn(bundle).id();
 		app.update();
 		let html = app
@@ -28,15 +24,6 @@ impl HtmlFragment {
 			.unwrap();
 		app.world_mut().despawn(entity);
 		html
-	}
-}
-/// A parallelizable system to render all HTML fragments in the world.
-pub(super) fn render_html_fragments(
-	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
-	builder: HtmlBuilder,
-) {
-	for (entity, mut html) in query.iter_mut() {
-		builder.parse(entity, &mut html);
 	}
 }
 /// A one-off system to render a single HTML fragment.
@@ -55,7 +42,7 @@ pub(super) fn insert_event_playback_attribute(
 		(With<EventTarget>, Added<DomIdx>),
 	>,
 	// potential event attributes
-	attributes: Query<(Entity, &AttributeKey), Without<AttributeLit>>,
+	attributes: Query<(Entity, &AttributeKey), Without<TextNode>>,
 ) {
 	for (idx, attrs) in query.iter() {
 		for (attr_entity, _) in attrs
@@ -63,13 +50,11 @@ pub(super) fn insert_event_playback_attribute(
 			.filter_map(|attr| attributes.get(attr).ok())
 			.filter(|(_, key)| key.starts_with("on"))
 		{
-			commands
-				.entity(attr_entity)
-				.insert(AttributeLit::new(format!(
-					"{}({}, event)",
-					html_constants.event_handler,
-					idx.inner()
-				)));
+			commands.entity(attr_entity).insert(TextNode::new(format!(
+				"{}({}, event)",
+				html_constants.event_handler,
+				idx.inner()
+			)));
 		}
 	}
 }
@@ -79,54 +64,54 @@ pub(super) fn insert_event_playback_attribute(
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct HtmlBuilder<'w, 's> {
-	elements: Query<'w,'s,(
-		&'static ElementNode,
-		&'static NodeTag,
-		Option<&'static Attributes>,
-		Option<&'static Children>
-	)>,
-	fragments: Query<'w, 's,(
+	fragment_nodes: Query<'w, 's,(
 		&'static FragmentNode,
 		&'static Children
 	)>,
-	attributes: Query<'w,'s,(
-		&'static AttributeKey,
-		Option<&'static AttributeLit>
+	doctype_nodes: Query<'w, 's, &'static DoctypeNode>,
+	comment_nodes: Query<'w, 's, &'static CommentNode>,
+	text_nodes: Query<'w, 's, &'static TextNode, Without<AttributeOf>>,
+	element_nodes: Query<'w,'s,(
+		&'static ElementNode,
+		&'static NodeTag,
+		Option<&'static InnerText>,
+		Option<&'static Attributes>,
+		Option<&'static Children>
 	)>,
-	doctypes: Query<'w, 's, &'static DoctypeNode>,
-	comments: Query<'w, 's, &'static CommentNode>,
-	texts: Query<'w, 's, &'static TextNode>,
+	attribute_nodes: Query<'w,'s,(
+		&'static AttributeKey,
+		Option<&'static TextNode>
+	)>,
 }
 
 impl HtmlBuilder<'_, '_> {
 	fn parse(&self, entity: Entity, html: &mut String) {
-		if let Ok(_) = self.doctypes.get(entity) {
+		if let Ok(_) = self.doctype_nodes.get(entity) {
 			html.push_str("<!DOCTYPE html>");
 		}
-		if let Ok(comment) = self.comments.get(entity) {
-			html.push_str(&format!("<!-- {} -->", comment.0));
+		if let Ok(comment) = self.comment_nodes.get(entity) {
+			html.push_str(&format!("<!--{}-->", comment.0));
 		}
-		if let Ok(text) = self.texts.get(entity) {
-			html.push_str(&text.0);
+		if let Ok(text) = self.text_nodes.get(entity) {
+			html.push_str(&text);
 		}
-		if let Ok((_, children)) = self.fragments.get(entity) {
+		if let Ok((_, children)) = self.fragment_nodes.get(entity) {
 			for child in children.iter() {
 				self.parse(child, html);
 			}
 		}
-		if let Ok((element, tag, attributes, children)) =
-			self.elements.get(entity)
+		if let Ok((element, tag, inner_text, attributes, children)) =
+			self.element_nodes.get(entity)
 		{
-			if element.self_closing && **tag == "style" {
-				panic!("self closing style tags are not allowed in HTML");
-			}
+			let is_self_closing =
+				element.self_closing && **tag != "style" && **tag != "script";
 
 			html.push_str(&format!("<{}", tag.0));
 			// add attributes
 			if let Some(attrs) = attributes {
 				for (key, value) in attrs
 					.iter()
-					.filter_map(|attr| self.attributes.get(attr).ok())
+					.filter_map(|attr| self.attribute_nodes.get(attr).ok())
 				{
 					html.push(' ');
 					html.push_str(&key);
@@ -138,12 +123,17 @@ impl HtmlBuilder<'_, '_> {
 				}
 			}
 
-			if element.self_closing {
+			if is_self_closing {
 				html.push_str("/>");
 				return;
-			} else {
-				html.push('>');
 			}
+			html.push('>');
+
+			if let Some(inner_text) = inner_text {
+				//TODO this is inner html not text
+				html.push_str(&inner_text.0);
+			}
+
 			if let Some(children) = children {
 				for child in children.iter() {
 					self.parse(child, html);
@@ -175,7 +165,7 @@ mod test {
 		rsx! {<!-- "howdy" -->}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<!-- howdy -->");
+			.to_be("<!--howdy-->");
 	}
 
 	#[test]
@@ -260,10 +250,10 @@ mod test {
 
 	#[test]
 	fn attribute_in_self_closing_tag() {
-		rsx! {<img src="image.jpg"/>}
+		rsx! {<img src="/image.jpg"/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<img src=\"image.jpg\"/>");
+			.to_be("<img src=\"/image.jpg\"/>");
 	}
 
 	#[test]
@@ -286,6 +276,7 @@ mod test {
 	}
 
 	#[template]
+	#[derive(Reflect)]
 	fn Template() -> impl Bundle {
 		rsx! {<div class="container"><span>hello</span></div>}
 	}
@@ -294,6 +285,16 @@ mod test {
 		rsx! {
 			"outer"
 			<Template/>
+		}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect()
+		.to_be("outer<div class=\"container\"><span>hello</span></div>");
+	}
+	#[test]
+	fn client_islands() {
+		rsx! {
+			"outer"
+			<Template client:load/>
 		}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
@@ -326,8 +327,54 @@ mod test {
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}
-			.xmap(HtmlDocument::parse_bundle)
+			.xmap(HtmlDocument::parse_bundle).xpect()
+		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
+	}
+
+	#[test]
+	#[cfg(feature = "css")]
+	fn style_inline() {
+		HtmlFragment::parse_bundle(rsx! {<style>body { color: red; }</style>})
 			.xpect()
-			.to_contain("<div data-beet-dom-idx=\"0\">foo</div>");
+			.to_be_snapshot();
+	}
+
+	#[test]
+	#[cfg(not(feature = "client"))]
+	fn style_src() {
+		HtmlFragment::parse_bundle(
+			rsx! {<style src="../../tests/test_file.css"/>},
+		)
+		.xpect()
+		.to_be_snapshot();
+	}
+
+
+
+	#[test]
+	fn script() {
+		HtmlFragment::parse_bundle(
+			rsx! {<script type="pizza">let foo = "bar"</script>},
+		)
+		.xpect()
+		.to_be_str("<script type=\"pizza\">let foo = \"bar\"</script>");
+	}
+	#[test]
+	fn code() {
+		HtmlFragment::parse_bundle(
+			rsx! {<code lang="js">let foo = "bar"</code>},
+		)
+		.xpect()
+		.to_be_snapshot();
+	}
+	#[test]
+	fn escapes() {
+		HtmlFragment::parse_bundle(rsx! {
+			<pre>
+				<code class="language-rust">fn foobar() -> String {}</code>
+			</pre>
+		})
+		.xpect()
+		.to_be_snapshot();
 	}
 }

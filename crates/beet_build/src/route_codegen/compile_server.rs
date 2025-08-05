@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::When;
+use beet_core::{node::StaticRoot, prelude::When};
 use beet_rsx::as_beet::PathExt;
 use beet_utils::prelude::CargoBuildCmd;
 use bevy::prelude::*;
@@ -20,14 +20,18 @@ pub(crate) fn compile_server(
 	}
 
 	debug!("Building server binary");
-	cmd.spawn()?;
+	cmd.clone()
+		.no_default_features()
+		.push_feature("server")
+		.spawn()?;
 	Ok(())
 }
 
 
-/// After compiling server (if required) export the static files.
+/// After compiling server (if required) export the static files if *any*
+/// [`StaticRoot`] has changed.
 pub fn export_server_ssg(
-	_query: Populated<(), Changed<SourceFileRoot>>,
+	_query: Populated<(), Changed<StaticRoot>>,
 	cmd: When<Res<CargoBuildCmd>>,
 	manifest: When<Res<CargoManifest>>,
 ) -> Result {
@@ -39,7 +43,7 @@ pub fn export_server_ssg(
 	);
 	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
-		.arg("export-static")
+		.arg("export-html")
 		.status()?
 		.exit_ok()?;
 	Ok(())

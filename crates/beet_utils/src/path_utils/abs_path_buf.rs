@@ -36,6 +36,7 @@ macro_rules! abs_file {
 /// For these reasons the path is serialized and deserialized relative to the workspace root,
 /// using [`FsExt::workspace_root`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
 pub struct AbsPathBuf(pub PathBuf);
 
 impl Default for AbsPathBuf {

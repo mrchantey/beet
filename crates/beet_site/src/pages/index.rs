@@ -2,72 +2,6 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-const WEB_UI_DEMO: &str = r#"
-#[template]
-fn Counter(input: u32) -> impl Bundle {
-	let (value, set_value) = signal(input);
-	rsx! {
-		<div>
-			<button onclick={move |_| set_value(value() + 1)}>
-				"Count: " {value}
-			</button>
-		</div>
-	}
-}
-"#;
-
-const SERVER_ACTIONS_DEMO: &str = r#"
-// actions/add.rs
-pub async fn get(input: JsonQuery<(i32, i32)>) -> Json<i32> {
-	Json(input.0 + input.1)
-}
-
-// components/server_counter.rs
-#[template]
-pub fn ServerCounter(initial: i32) -> impl Bundle {
-	let (get, set) = signal(initial);
-
-	let onclick = move |_: Trigger<OnClick>| {
-			spawn_local(async move {
-				set(actions::add(get(), 1).await.unwrap());
-			});
-	};
-
-	rsx! {
-		<div>
-			<Button
-				variant=ButtonVariant::Outlined
-				onclick=onclick>
-				Server Cookie Count: {get}
-			</Button>
-		</div>
-	}
-}
-"#;
-
-
-const BEHAVIOR_DEMO: &str = r#"
-#[template]
-fn SayHello(name: String) -> impl Bundle {
-	(
-		Name::new("My Behavior"),
-		Sequence,
-		RunOnSpawn,
-		children![
-			(
-				Name::new("Hello"),
-				ReturnWith(RunResult::Success)
-			),
-			(
-				Name::new(name),
-				ReturnWith(RunResult::Success)
-			)
-		]
-	)
-}
-"#;
-
-
 pub fn get() -> impl Bundle {
 	rsx! {
 		<BeetContext>
@@ -79,7 +13,7 @@ pub fn get() -> impl Bundle {
 				<Card style:cascade class="hero">
 				<p>"Build applications that grow with Bevy ECS at every layer of the stack."
 				<br/><br/>
-				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>				
+				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>
 				"Beet is under construction, basic development workflows are incomplete and untested. If this project is of interest please come and say hi in the"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy/beet discord channel</a>.</p>
 					<footer>
 						<Link
@@ -94,20 +28,20 @@ pub fn get() -> impl Bundle {
 							>Get Started</Link>
 					</footer>
 				</Card>
-				<h2>Very Bevy</h2>
+				<h2>A Very Bevy Metaframework</h2>
 				<ul>
-				<li>"100% Open"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
-				<li>"100% Bevy"<br/>"Bevy primitives all the way down, including the beet cli!"</li>
+				<li>"Very Bevy Licencing"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
+				<li>"Very Bevy Architecture"<br/>"Bevy primitives all the way down"</li>
 				</ul>
 				<h2>"Very Bevy Web UI"</h2>
 					<ClientCounter client:load initial=1 />
-				<Code style:cascade content=WEB_UI_DEMO/>
+					<pre node:code lang="rust" src="../content/web-ui.rs"/>
 				<h2>"Very Bevy Server Actions"</h2>
 				<p>"Pop open the dev tools to see your requests in flight!"</p>
 				<ServerCounter client:load initial=1 />
-				<Code style:cascade content=SERVER_ACTIONS_DEMO/>
-				<h2>"Very Bevy Behavior"</h2>
-				<Code style:cascade content=BEHAVIOR_DEMO/>
+					<pre node:code lang="rust" src="../content/server-actions.rs"/>
+				<h2>"Very Bevy Agents"</h2>
+					<pre node:code lang="rust" src="../content/realtime-agents.rs"/>
 				</div>
 			</ContentLayout>
 		</BeetContext>
@@ -118,10 +52,6 @@ pub fn get() -> impl Bundle {
 			align-items: center;
 			padding-top: 3.em;
 			gap:1.em;
-		}
-		pre{
-			max-width: 45.em;
-			width: 45.em;
 		}
 		.hero{
 			width: 30.em;

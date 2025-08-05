@@ -32,7 +32,6 @@ pub impl Rc<RefCell<App>> {
 			self.borrow_mut().update();
 		})
 	}
-	
 	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_forever(self) -> impl std::future::Future<Output = ()> {
 		async {

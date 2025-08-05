@@ -1,0 +1,80 @@
+use super::*;
+use crate::prelude::*;
+use beet_core::prelude::*;
+use bevy::ecs::schedule::ScheduleLabel;
+use bevy::prelude::*;
+
+#[derive(Default)]
+pub struct ApplyDirectivesPlugin;
+
+
+/// A schedule for completely building templates,
+/// this will run before each [`Update`] schedule and can be
+/// executed manually after adding unresolved templates to the world.
+/// (see beet_server bundle_layer.rs for an example)
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ApplyDirectives;
+
+
+
+pub(crate) fn schedule_order_plugin(app: &mut App) {
+	app.insert_schedule_before(Update, ApplySnippets)
+		.insert_schedule_after(ApplySnippets, ApplyDirectives)
+		.insert_schedule_after(ApplyDirectives, PropagateSignals);
+}
+
+impl Plugin for ApplyDirectivesPlugin {
+	fn build(&self, app: &mut App) {
+		bevy::ecs::error::GLOBAL_ERROR_HANDLER
+			.set(bevy::ecs::error::panic)
+			.ok();
+		#[cfg(target_arch = "wasm32")]
+		{
+			#[cfg(not(test))]
+			console_error_panic_hook::set_once();
+			app.add_systems(
+				Startup,
+				(
+					#[cfg(target_arch = "wasm32")]
+					load_client_islands.run_if(document_exists),
+				),
+			);
+		}
+
+		app.init_plugin(ApplySnippetsPlugin)
+			.init_plugin(schedule_order_plugin)
+			.add_plugins((SignalsPlugin, NodeTypesPlugin))
+			.init_resource::<HtmlConstants>()
+			.init_resource::<WorkspaceConfig>()
+			.init_resource::<ClientIslandRegistry>()
+			.add_systems(
+				ApplyDirectives,
+				(
+					apply_style_id,
+					apply_requires_dom_idx,
+					#[cfg(all(target_arch = "wasm32", not(test)))]
+					apply_client_island_dom_idx,
+					#[cfg(any(not(target_arch = "wasm32"), test))]
+					apply_root_dom_idx,
+					rearrange_html_document,
+					apply_reactive_text_nodes,
+					#[cfg(feature = "scene")]
+					apply_client_islands,
+					insert_hydration_scripts,
+					hoist_document_elements,
+					insert_event_playback_attribute,
+					#[cfg(target_arch = "wasm32")]
+					(
+						mount_client_only,
+						event_playback.run_if(run_once),
+						bind_events,
+						bind_text_nodes,
+						bind_attribute_values,
+					)
+						.chain()
+						.run_if(document_exists),
+				)
+					.chain(),
+			);
+	}
+}

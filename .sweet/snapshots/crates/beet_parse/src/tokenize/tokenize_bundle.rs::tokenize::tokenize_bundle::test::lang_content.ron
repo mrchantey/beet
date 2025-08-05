@@ -1,0 +1,12 @@
+(
+    SnippetRoot {
+        file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),
+        start: LineCol { line: 1u32, col: 0u32 },
+    },
+    InstanceRoot,
+    FragmentNode,
+    related! {
+        Children[(NodeTag(String::from("style")), ElementNode { self_closing : false
+        }, LangContent::InnerText(String::from("foo")))]
+    },
+)

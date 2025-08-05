@@ -1,6 +1,9 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
+
+/// Specify types for variadic functions like TokenizeComponent
+pub type WebNodes = (DoctypeNode, CommentNode, ElementNode, AttributeKey);
+
 
 /// Indicates a Html Doctype Node, [W3 Docs](https://www.w3schools.com/tags/tag_doctype.ASP)
 #[derive(Debug, Default, Copy, Clone, Component, Reflect)]
@@ -16,6 +19,11 @@ pub struct DoctypeNode;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct CommentNode(pub String);
+
+impl CommentNode {
+	/// Creates a new [`CommentNode`] with the given content.
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+}
 
 /// Indicates a Html Element Node, [W3 Docs](https://www.w3schools.com/jsref/prop_node_nodetype.asp).
 /// For the tag see [`NodeTag`].

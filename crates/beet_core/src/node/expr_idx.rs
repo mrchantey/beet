@@ -4,9 +4,9 @@ use bevy::prelude::*;
 
 /// The index in which an expression appears in a template macro, assigned
 /// in the order of the visitor that spawned it, ie rstml or rsx combinator.
-/// Combining this with [`MacroIdx`] we can uniquely identify
+/// Combining this with [`SnippetRoot`] we can uniquely identify
 /// a template macro in a file, and the order of expressions inside it.
-/// This is assigned to every node and attribute with an [`OnSpawnTemplate`]
+/// This is assigned to every node and attribute with a [`OnSpawnDeferred`]
 #[derive(
 	Debug, Copy, Clone, PartialEq, Eq, Hash, Deref, Reflect, Component,
 )]

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -19,14 +20,18 @@ pub type SweetFutFunc =
 	Box<dyn Send + Sync + Fn() -> Pin<Box<dyn SweetTestFuture>>>;
 
 type FutCell = Arc<Mutex<Option<SweetFutFunc>>>;
-
 thread_local! {
 	static FUTURE: FutCell = Arc::new(Mutex::new(None));
+	static CURRENT_TEST_DESC: RefCell<Option<TestDesc>> = RefCell::new(None);
 }
 
 pub struct SweetTestCollector;
 
 impl SweetTestCollector {
+	pub fn current_test_desc() -> Option<TestDesc> {
+		CURRENT_TEST_DESC.with(|cell| cell.borrow().clone())
+	}
+
 	/// # Panics
 	/// If called outside of [`Self::set`]
 	pub fn register<F: SweetTestFuture>(fut: fn() -> F) {
@@ -45,7 +50,9 @@ impl SweetTestCollector {
 	where
 		F: FnOnce() -> R,
 	{
-		// let val = Arc::new(Mutex::new(None));
+		CURRENT_TEST_DESC.with(|cell| {
+			*cell.borrow_mut() = Some(desc.clone());
+		});
 		FUTURE.with(|val| {
 			let out = func();
 			if let Some(fut) = val.lock().unwrap().take() {

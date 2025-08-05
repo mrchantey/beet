@@ -1,13 +1,13 @@
-use std::ops::DerefMut;
+use crate::prelude::NodeExpr;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
+use std::ops::DerefMut;
 use syn::Expr;
 use syn::ExprClosure;
 use syn::Ident;
 use syn::Pat;
 use syn::parse_quote;
-use crate::prelude::NodeExpr;
 
 /// Events are any attribute keys that start with `on`,
 /// and the value is not a string literal.
@@ -30,7 +30,7 @@ pub fn tokenize_event_handler(
 	match expr {
 		Expr::Closure(closure) => {
 			process_closure(closure, &ident);
-			// wrap closures in a block so we can safely call .into_node_bundle()
+			// wrap closures in a block so we can safely call .into_bundle()
 			// on the closure itsself
 			*expr = syn::parse_quote! {{#closure}}
 		}

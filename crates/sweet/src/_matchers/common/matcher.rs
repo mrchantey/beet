@@ -1,9 +1,10 @@
 //TODO should probably be in matcher module
 
 /// The base struct for all matchers.
-pub struct Matcher<T> {
+pub struct Matcher<T, M = ()> {
 	pub value: T,
 	pub negated: bool,
+	phantom: std::marker::PhantomData<M>,
 }
 
 
@@ -13,6 +14,7 @@ impl<T> Matcher<T> {
 		Matcher {
 			value,
 			negated: false,
+			phantom: std::marker::PhantomData,
 		}
 	}
 

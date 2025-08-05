@@ -34,22 +34,20 @@ impl CachedStatementMap {
 		>,
 	) -> Result<CachedStatement> {
 		let key = rapidhash::rapidhash(stmt.as_bytes());
-		#[cfg(not(all(feature = "tokio", not(target_arch = "wasm32"))))]
-		if let Some(cached) = self.read().expect("poisoned").get(&key) {
-			Ok(cached.clone())
-		} else {
-			let cached = CachedStatement {
-				inner: prepare().await?,
-			};
-			self.write().expect("poisoned").insert(key, cached.clone());
-			Ok(cached)
-		}
 		#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 		if let Some(cached) = self.read().await.get(&key) {
 			Ok(cached.clone())
 		} else {
 			let cached = prepare().await?;
 			self.write().await.insert(key, cached.clone());
+			Ok(cached)
+		}
+		#[cfg(not(all(feature = "tokio", not(target_arch = "wasm32"))))]
+		if let Some(cached) = self.read().expect("poisoned").get(&key) {
+			Ok(cached.clone())
+		} else {
+			let cached = prepare().await?;
+			self.write().expect("poisoned").insert(key, cached.clone());
 			Ok(cached)
 		}
 	}

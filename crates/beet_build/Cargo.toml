@@ -13,11 +13,14 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["markdown"]
+default = ["markdown", "css"]
+css = [
+	# "beet_rsx/css", do we want this?
+	"beet_parse/css",
+]
 # should usually be enabled but slows down rust analyzer
 # default = ["markdown", "css"] 
 markdown = ["dep:pulldown-cmark"]
-css = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [[test]]
 name = "lang_snippets"
@@ -31,10 +34,9 @@ required-features = ["css"]
 [dependencies]
 #💡 Internal
 beet_rsx = { workspace = true, features = ["tokens"] }
-beet_core = { workspace = true, features = ["bevy_scene", "tokens"] }
+beet_core = { workspace = true, features = ["fs", "bevy_scene", "tokens"] }
 beet_parse.workspace = true
-beet_utils.workspace = true
-beet_router.workspace = true
+beet_utils = { workspace = true, features = ["fs"] }
 
 #💡 Utils
 thiserror.workspace = true
@@ -61,11 +63,7 @@ serde_json.workspace = true
 prettyplease.workspace = true
 cargo-manifest = "0.19"
 pulldown-cmark = { version = "0.13", optional = true }
-
-#💡 style
-parcel_selectors = { workspace = true, optional = true }
-# TODO direct dep, not workspace. this should be the only place
-lightningcss = { workspace = true, optional = true }
+clap.workspace = true
 
 #💡 Bevy
 bevy = { workspace = true, features = ["bevy_scene"] }

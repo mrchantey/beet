@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use syn::Expr;
 use syn::Ident;
 use syn::Item;
 use syn::ItemFn;
@@ -38,7 +37,10 @@ use syn::parse_quote;
 /// }
 /// ```
 pub fn parse_route_tree(
-	mut query: Populated<(Entity, &mut CodegenFile), Changed<RouteCodegenRoot>>,
+	mut query: Populated<
+		(Entity, &mut CodegenFile),
+		(Added<CodegenFile>, With<RouteCodegenRoot>),
+	>,
 	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
@@ -61,7 +63,6 @@ pub fn parse_route_tree(
 		let tree = RouteFileMethodTree::from_methods(child_methods);
 		let parser = Parser { query: methods };
 		codegen.add_item(parser.routes_mod_tree(&tree));
-		codegen.add_item(parser.collect_func(&tree));
 	}
 }
 
@@ -82,17 +83,6 @@ impl<'a> Parser<'_, '_, 'a> {
 	fn get(&self, entity: Entity) -> &RouteFileMethod {
 		self.query.get(entity).expect(
 			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
-		)
-	}
-
-	fn collect_func(&self, tree: &RouteFileMethodTree) -> ItemFn {
-		let route_tree = self.collect_route_node(tree);
-		syn::parse_quote!(
-			/// Collect the static route tree
-			#[allow(unused, missing_docs)]
-			pub fn route_path_tree() -> RoutePathTree {
-				#route_tree
-			}
 		)
 	}
 
@@ -123,34 +113,6 @@ impl<'a> Parser<'_, '_, 'a> {
 			}
 		))
 	}
-
-	fn collect_route_node(&self, tree: &RouteFileMethodTree) -> Expr {
-		let children = tree
-			.children
-			.iter()
-			.map(|child| self.collect_route_node(child))
-			.collect::<Vec<_>>();
-
-		let path = match &tree.funcs.iter().next() {
-			Some(value) => {
-				let value = self.get(**value);
-				let path = value.route_info.path.to_string_lossy().to_string();
-				let path: Expr = syn::parse_quote!(Some(RoutePath::new(#path)));
-				path
-			}
-			None => {
-				syn::parse_quote!(None)
-			}
-		};
-
-		let name = &tree.name;
-
-		syn::parse_quote!(RoutePathTree {
-			name: #name.into(),
-			path: #path,
-			children: vec![#(#children),*],
-		})
-	}
 }
 
 #[cfg(test)]
@@ -162,7 +124,6 @@ mod test {
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
-	use syn::ItemFn;
 	use syn::ItemMod;
 
 	fn world() -> World {
@@ -274,61 +235,6 @@ mod test {
 			}
 		};
 		expect(mod_item.to_token_stream().to_string())
-			.to_be_str(expected.to_token_stream().to_string());
-	}
-	#[test]
-	fn creates_collect_tree() {
-		let mut world = world();
-		let methods = world
-			.query_once::<(Entity, &RouteFileMethod)>()
-			.iter()
-			.copied()
-			.collect();
-		let tree = RouteFileMethodTree::from_methods(methods);
-		let mut query = world.query::<&RouteFileMethod>();
-		let query = query.query(&world);
-		let func = Parser { query }.collect_func(&tree);
-
-		let expected: ItemFn = syn::parse_quote! {
-			#[doc = r" Collect the static route tree"]
-			#[allow(unused, missing_docs)]
-			pub fn route_path_tree() -> RoutePathTree {
-				RoutePathTree {
-					name: "routes".into(),
-					path: Some(RoutePath::new("/")),
-					children: vec![
-						RoutePathTree {
-							name: "bazz".into(),
-							path: Some(RoutePath::new("/bazz")),
-							children: vec![],
-						},
-						RoutePathTree {
-							name: "foo".into(),
-							path: None,
-							children: vec![
-								RoutePathTree {
-									name: "bar".into(),
-									path: Some(RoutePath::new("/foo/bar")),
-									children: vec![],
-								},
-								RoutePathTree {
-									name: "bazz".into(),
-									path: Some(RoutePath::new("/foo/bazz")),
-									children: vec![
-										RoutePathTree {
-											name: "boo".into(),
-											path: Some(RoutePath::new("/foo/bazz/boo")),
-											children: vec![],
-										}
-									],
-								}
-							],
-						}
-					],
-				}
-			}
-		};
-		expect(func.to_token_stream().to_string())
 			.to_be_str(expected.to_token_stream().to_string());
 	}
 }

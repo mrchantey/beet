@@ -1,11 +1,24 @@
+#![allow(unused)]
 use crate::prelude::*;
 use beet::prelude::*;
 
 
 #[template]
-pub fn BeetSidebarLayout() -> impl Bundle {
-	let sidebar_nodes =
-		route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
+pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
+	let sidebar_nodes = world
+		.run_system_cached_with(
+			CollectSidebarNode::collect,
+			CollectSidebarNode {
+				include_filter: GlobFilter::default()
+					.with_include("/")
+					.with_include("/docs*")
+					.with_include("/blog*")
+					.with_include("/design*"),
+				expanded_filter: GlobFilter::default().with_include("/docs"),
+			}
+		)?
+		.children;
+	// let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>
 		<PageLayout>
@@ -35,6 +48,7 @@ pub fn BeetSidebarLayout() -> impl Bundle {
 			/* padding: 0 10em 0 2em; */
 			/* padding: 0 calc(var(--content-padding-width) - var(--sidebar-width)) 0 0; */
 		}
-		</style>
+		</style>	
 	}
+	.xok()
 }

@@ -1,30 +1,43 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-
-pub mod codegen;
+#[cfg(any(feature = "server", feature = "client"))]
+#[path = "codegen/client_actions.rs"]
+pub mod client_actions;
+#[cfg(any(feature = "server", feature = "client"))]
+mod codegen;
+#[cfg(any(feature = "server", feature = "client"))]
 pub mod components;
+#[cfg(any(feature = "server", feature = "client"))]
 pub mod layouts;
 
-// doesnt have to be wasm, but at least not run when compiling server
-// because stale references
-#[path = "codegen/client_islands.rs"]
-#[cfg(feature = "client")]
-pub mod client_islands;
+#[cfg(feature = "server")]
+mod routes;
 
-pub use codegen::actions;
+#[cfg(feature = "launch")]
+mod collections;
+
+#[cfg(any(feature = "server", feature = "client"))]
+pub use crate::client_actions::routes as actions;
 
 pub mod prelude {
-	#[cfg(feature = "client")]
-	pub use super::client_islands::*;
-	pub use super::codegen::actions;
-	pub use super::codegen::actions::ActionsPlugin;
-	pub use super::codegen::docs::DocsPlugin;
-	pub use super::codegen::blog::BlogPlugin;
-	pub use super::codegen::pages::*;
-	pub use super::layouts::*;
-	// pub use super::types::*;
-	pub use super::*;
-	pub use crate::codegen::route_path_tree;
+	#[cfg(any(feature = "server", feature = "client"))]
+	pub use super::actions;
+	#[cfg(feature = "server")]
+	pub use crate::codegen::actions::actions_routes;
+	#[cfg(feature = "server")]
+	pub use crate::codegen::blog::blog_routes;
+	#[cfg(feature = "server")]
+	pub use crate::codegen::docs::docs_routes;
+	#[cfg(feature = "server")]
+	pub use crate::codegen::pages::pages_routes;
+	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::codegen::routes;
+	#[cfg(feature = "launch")]
+	pub use crate::collections::*;
+	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::components::*;
+	#[cfg(any(feature = "server", feature = "client"))]
+	pub use crate::layouts::*;
+	#[cfg(feature = "server")]
+	pub use crate::routes::*;
 }

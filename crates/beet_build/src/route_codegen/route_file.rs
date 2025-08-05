@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::RoutePath;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
@@ -14,15 +13,12 @@ use syn::parse_quote;
 
 
 /// A file that belongs to a [`RouteFileCollection`], spawned as its child.
-/// A [`Changed<RouteFile>`] represents a change in the [`SourceFile`] that it references.
-/// The number of child [`RouteFileMethod`] that will be spawned
-/// will be either 1 or 0..many, depending on whether the file
-/// is a 'single file route':
+/// The number of child [`RouteFileMethod`] depends on the file type:
 /// - `foo.md`: 1
 /// - `foo.rs`: 0 or more
-/// - `foo.rsx: 0 or more
-#[derive(Component)]
-pub struct RouteFile {
+/// - `foo.rsx`: 0 or more
+#[derive(Debug, Component)]
+pub struct RouteSourceFile {
 	/// The index of the file in the group, used for generating unique identifiers.
 	pub index: usize,
 	/// The local path to the rust file containing the routes.
@@ -39,7 +35,7 @@ pub struct RouteFile {
 	pub route_path: RoutePath,
 }
 
-impl RouteFile {
+impl RouteSourceFile {
 	/// The identifier for the module import in the generated code.
 	pub fn mod_ident(&self) -> syn::Ident {
 		Ident::new(&format!("route{}", self.index), Span::call_site())
@@ -52,7 +48,7 @@ impl RouteFile {
 		let cfg: Option<Attribute> = match category {
 			RouteCollectionCategory::Pages => None,
 			RouteCollectionCategory::Actions => Some(parse_quote! {
-				#[cfg(not(feature = "client"))]
+				#[cfg(feature = "server")]
 			}),
 		};
 
@@ -82,101 +78,64 @@ impl CollectionIndexCounter {
 
 
 
-/// When a [`FileExprHash`] changes, for every [`RouteFileCollection`]
-/// that matches the file:
-/// - mark the collection as changed
-/// - mark the root as changed if it exists
-/// - reset collection and root codegen
-pub fn reset_changed_codegen(
-	changed_exprs: Populated<&SourceFile, Changed<FileExprHash>>,
-	mut roots: Query<
-		(&mut RouteCodegenRoot, &mut CodegenFile),
-		// divergent queries
-		Without<RouteFileCollection>,
-	>,
-	mut collections: Query<(
-		&mut RouteFileCollection,
-		&mut CodegenFile,
-		Option<&ChildOf>,
-	)>,
+/// Reset every [`CodegenFile`] ancestor of a changed [`FileExprHash`],
+/// includiing both [`RouteFileCollection`] and [`RouteCodegenRoot`]
+pub fn reset_codegen_files(
+	changed_exprs: Populated<Entity, Changed<FileExprHash>>,
+	mut parent_codegen: Query<&mut CodegenFile>,
+	parents: Query<&ChildOf>,
 ) {
 	for file in changed_exprs.iter() {
-		for (mut collection, mut collection_codegen, parent) in collections
-			.iter_mut()
-			.filter(|(collection, _, _)| collection.passes_filter(file))
-		{
-			parent
-				.map(|parent| roots.get_mut(parent.parent()).ok())
-				.flatten()
-				.map(|(mut root, mut root_codegen)| {
-					root.set_changed();
-					root_codegen.clear_items();
-				});
-			collection.set_changed();
-			collection_codegen.clear_items();
+		for parent in parents.iter_ancestors(file) {
+			if let Ok(mut codegen) = parent_codegen.get_mut(parent) {
+				trace!("Resetting changed codegen: {}", codegen.output);
+				codegen.set_added();
+				codegen.clear_items();
+			}
 		}
 	}
 }
 
-
-/// When a [`FileExprHash`] changes, create a corresponding [`RouteFile`]
-/// for each file group that it matches if it doesnt exist,
-/// otherwise mark it as changed.
-/// A [`Changed<FileExprHash>`] will also result in a [`Changed<RouteFileCollection>`]
-pub(super) fn update_route_files(
+/// Add a [`RouteSourceFile`] to any newly created [`SourceFile`]
+/// that is a child of a [`RouteFileCollection`].
+pub(super) fn create_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
-	changed_exprs: Populated<(Entity, &SourceFile), Changed<FileExprHash>>,
+	mut query: Populated<
+		(Entity, &SourceFile),
+		(Added<SourceFile>, Without<RouteSourceFile>),
+	>,
 	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
-	children: Query<&Children>,
-	mut route_files: Query<(&SourceFileRef, &mut RouteFile)>,
+	parents: Query<&ChildOf>,
 ) -> Result {
-	for (file_entity, file) in changed_exprs.iter() {
-		for (collection_entity, collection, codegen) in collections
-			.iter()
-			.filter(|(_, collection, _)| collection.passes_filter(file))
-		{
-			// check if there is a match, if so mark as changed.
-			// otherwise create a new RouteFile
-			if !children.iter_direct_descendants(collection_entity).any(
-				|child| match route_files.get_mut(child) {
-					Ok((source_file_ref, mut route_file))
-						if **source_file_ref == file_entity =>
-					{
-						debug!("Marking RouteFile changed: {}", file.path(),);
-						route_file.set_changed();
-						true
-					}
-					_ => false,
-				},
-			) {
-				// no existing route file found, create a new one
-				let mod_path =
-					PathExt::create_relative(&codegen.output_dir()?, &file)?;
-				let route_path =
-					PathExt::create_relative(&collection.src, &file)?
-						.xmap(RoutePath::from_file_path)?;
+	for (entity, file) in query.iter_mut() {
+		let Some((collection_entity, collection, codegen)) = parents
+			.iter_ancestors(entity)
+			.find_map(|en| collections.get(en).ok())
+		else {
+			// this source file is not a descendent of a collection
+			continue;
+		};
 
-				let source_file_collection_rel =
-					PathExt::create_relative(&collection.src, &file)?;
+		// no existing route file found, create a new one
+		let mod_path = PathExt::create_relative(&codegen.output_dir()?, &file)?;
+		let route_path = PathExt::create_relative(&collection.src, &file)?
+			.xmap(RoutePath::from_file_path)?;
+
+		let source_file_collection_rel =
+			PathExt::create_relative(&collection.src, &file)?;
 
 
-				let index = index_counter.next(collection_entity);
+		let index = index_counter.next(collection_entity);
 
-				debug!("Creating new RouteFile: {}", file.path());
+		debug!("Creating new RouteSourceFile: {}", file.path());
 
-				commands.spawn((
-					ChildOf(collection_entity),
-					SourceFileRef(file_entity),
-					RouteFile {
-						index,
-						source_file_collection_rel,
-						mod_path,
-						route_path,
-					},
-				));
-			}
-		}
+		commands.entity(entity).insert(RouteSourceFile {
+			index,
+			source_file_collection_rel,
+			mod_path,
+			route_path,
+		});
 	}
 	Ok(())
 }
@@ -186,7 +145,6 @@ pub(super) fn update_route_files(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use crate::route_codegen::update_route_files;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use std::ops::Deref;
@@ -196,27 +154,22 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 
 		let group = app
 			.world_mut()
 			.spawn(RouteFileCollection::test_site_pages())
 			.id();
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/pages/docs/index.rs",
-			)
-			.into_abs(),
-		));
 
 		app.update();
 
-		app.world_mut()
-			.run_system_cached(update_route_files)
-			.unwrap()
+		let source_file_entity =
+			app.world().entity(group).get::<Children>().unwrap()[0];
+		let route_file = app
+			.world()
+			.entity(source_file_entity)
+			.get::<RouteSourceFile>()
 			.unwrap();
-		let file = app.world().entity(group).get::<Children>().unwrap()[0];
-		let route_file = app.world().entity(file).get::<RouteFile>().unwrap();
 
 		route_file
 			.mod_path

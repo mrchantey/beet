@@ -1,16 +1,10 @@
 use beet_core::prelude::*;
-use beet_rsx::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
-pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
-	let rsx_snippets = world.run_system_cached(collect_rsx_snippets)?;
-	let lang_snippets = world.run_system_cached(collect_lang_snippets)?;
-	let snippets = lang_snippets
-		.into_iter()
-		.chain(rsx_snippets.into_iter())
-		.collect::<Vec<_>>();
+pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
+	let snippets = world.run_system_cached(collect_rsx_snippets)?;
 	if snippets.is_empty() {
 		return Ok(());
 	}
@@ -45,11 +39,11 @@ pub(super) fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 	Ok(())
 }
 
-/// Collect all changed [`RsxSnippetRoot`]s, returning the output path
+/// Collect all changed [`StaticRoot`]s, returning the output path
 /// and all entities that are part of the snippet.
 fn collect_rsx_snippets(
 	config: Res<WorkspaceConfig>,
-	query: Query<(Entity, &MacroIdx), Changed<RsxSnippetRoot>>,
+	query: Query<(Entity, &SnippetRoot), Changed<StaticRoot>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
 	debug!("{} rsx snippets changed", query.iter().count());
@@ -63,30 +57,11 @@ fn collect_rsx_snippets(
 		})
 		.collect()
 }
-/// Collect all changed [`LangSnippet`], returning the output path
-/// and all entities that are part of the snippet.
-fn collect_lang_snippets(
-	query: Query<(Entity, &LangSnippetPath), Changed<LangSnippet>>,
-	children: Query<&Children>,
-) -> Vec<(AbsPathBuf, Vec<Entity>)> {
-	debug!("{} lang snippets changed", query.iter().count());
-	query
-		.into_iter()
-		.map(|(entity, path)| {
-			(
-				path.into_abs(),
-				children.iter_descendants_inclusive(entity).collect(),
-			)
-		})
-		.collect()
-}
-
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::node::MacroIdx;
-	use beet_router::as_beet::WorkspaceConfig;
+	use beet_core::node::SnippetRoot;
 	use beet_rsx::as_beet::*;
 	// use beet_utils::prelude::*;
 	use bevy::prelude::*;
@@ -95,17 +70,15 @@ mod test {
 	#[test]
 	fn rsx_snippets() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin {
-			skip_load_workspace: true,
-			skip_write_to_fs: false,
-			..default()
-		});
+		app.add_plugins(BuildPlugin::default())
+			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
+
 
 		let test_site_index =
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
 
 		let snippet_path = WorkspaceConfig::default()
-			.rsx_snippet_path(&MacroIdx::new_file_line_col(
+			.rsx_snippet_path(&SnippetRoot::new_file_line_col(
 				&test_site_index.to_string_lossy(),
 				7,
 				8,
@@ -126,22 +99,20 @@ mod test {
 		expect(saved.len()).to_be_greater_than(1000);
 	}
 	#[test]
+	#[ignore = "lang snippet exports is a wip"]
 	fn lang_snippets() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin {
-			skip_load_workspace: true,
-			skip_write_to_fs: false,
-			..default()
-		});
+		app.add_plugins(BuildPlugin::default())
+			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 		let path = WorkspaceConfig::default()
 			.lang_snippet_path(&WsPathBuf::new(file!()), 0)
 			.into_abs();
 
-		let _entity = app
-			.world_mut()
-			.spawn(rsx! {<style>div{color:blue;}</style>})
-			.id();
+		// let _entity = app
+		// 	.world_mut()
+		// 	.spawn((HtmlDocument, rsx! {<style>div{color:blue;}</style>}))
+		// 	.id();
 
 		FsExt::remove(&path).ok();
 

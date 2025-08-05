@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::prelude::*;
+use anyhow::Result;
 use clap::Parser;
 use notify::event::CreateKind;
 use notify::event::RemoveKind;
@@ -114,7 +114,7 @@ impl FsWatcher {
 			_tx: debouncer,
 			filter: self.filter.clone(),
 		});
-		
+
 		#[cfg(target_arch = "wasm32")]
 		unreachable!();
 	}

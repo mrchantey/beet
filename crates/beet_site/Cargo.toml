@@ -14,17 +14,20 @@ keywords.workspace = true
 
 
 [features]
-default = ["beet/web-server", "beet/native-tls"]
+default = ["launch", "server", "client"]
+# default = ["beet/web-server", "beet/native-tls"]
 # used by beet cli for building prod server
-deploy = ["beet/web-server", "beet/lambda"]
+launch = ["beet/launch"]
+server = ["beet/server", "beet_design/mockups", "beet_design/server"]
+deploy = ["server", "beet/lambda"]
 # used by beet cli for building client
-client = ["beet/web-client"]
+client = ["beet/client", "beet_design/mockups", "beet_design/client"]
 
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
 beet.workspace = true
-beet_design = { workspace = true, features = ["mockups"] }
+beet_design.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }

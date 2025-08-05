@@ -1,103 +1,95 @@
 use super::*;
+#[allow(unused)]
+use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::schedule::SystemSet;
+use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use std::cell::RefCell;
 
-/// System set for the [`ParseRsxTokensPlugin`] to extract directives
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ParseRsxTokensSet;
-
-/// A plugin for parsing raw rstml token streams and combinator strings into
+/// A sequence for parsing raw rstml token streams and combinator strings into
 /// rsx trees, then extracting directives.
-#[derive(Default)]
-pub struct ParseRsxTokensPlugin;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct ParseRsxTokens;
 
+impl ParseRsxTokens {
+	/// Spawn the bundle, run the function with it, then return the result.
+	pub fn parse_and_run<O>(
+		bundle: impl Bundle,
+		func: impl FnOnce(&World, Entity) -> O,
+	) -> Result<O> {
+		// TODO cost 100us creating an app per macro, we should cache thread
+		// local app, wait for BeetMain pattern
+		let mut app = App::new();
+		app.add_plugins(ParseRsxTokensPlugin);
+		let world = app.world_mut();
+		let entity = world.spawn(bundle).id();
+		world.run_schedule(ParseRsxTokens);
+		let out = func(world, entity);
+		Ok(out)
+	}
+}
+
+/// A system set for modifying the rsx tree after parsing tokens and extracting directives,
+/// but before running additional parsers like `lightning`.
+/// This gives downstream plugins a chance to modify the rsx tree
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ModifyRsxTree;
+
+#[derive(Debug, Default, Clone)]
+pub struct ParseRsxTokensPlugin;
 
 impl Plugin for ParseRsxTokensPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<RstmlConfig>()
-			.configure_sets(
-				Update,
-				ExtractDirectivesSet.in_set(ParseRsxTokensSet),
-			)
+		let constants = app
+			.init_resource::<HtmlConstants>()
+			.world()
+			.resource::<HtmlConstants>();
+		let rstml_parser = create_rstml_parser(constants);
+
+		#[cfg(feature = "syntect")]
+		app.init_resource::<SyntectConfig>();
+
+		app.insert_non_send_resource(rstml_parser)
+			.insert_schedule_before(Update, ParseRsxTokens)
+			.configure_sets(ParseRsxTokens, ModifyRsxTree)
 			.add_systems(
-				Update,
+				ParseRsxTokens,
 				(
-					(parse_combinator_tokens, parse_rstml_tokens)
-						.in_set(ParseRsxTokensSet)
-						.before(ExtractDirectivesSet),
-					collapse_combinator_exprs
-						.in_set(ParseRsxTokensSet)
-						.after(ExtractDirectivesSet),
+					(
+						// parsing raw tokens
+						#[cfg(feature = "rsx")]
+						parse_combinator_tokens,
+						#[cfg(feature = "rsx")]
+						parse_rstml_tokens,
+						// extractors
+						extract_inner_text_file,
+						extract_inner_text_element,
+						extract_inner_text_directive,
+						extract_lang_nodes,
+						collect_md_code_nodes,
+						extract_code_nodes,
+						extract_slot_targets,
+						try_extract_directive::<SlotChild>,
+						try_extract_directive::<ClientLoadDirective>,
+						try_extract_directive::<ClientOnlyDirective>,
+						try_extract_directive::<HtmlHoistDirective>,
+						try_extract_directive::<StyleScope>,
+						try_extract_directive::<StyleCascade>,
+						// collect combinator exprs last
+						#[cfg(feature = "rsx")]
+						collapse_combinator_exprs,
+					)
+						.chain()
+						.before(ModifyRsxTree),
+					(
+						parse_snippet_hash,
+						#[cfg(feature = "syntect")]
+						parse_syntect,
+						#[cfg(feature = "css")]
+						parse_lightning,
+					)
+						.chain()
+						.after(ModifyRsxTree),
 				),
-			)
-			.add_plugins((
-				extract_rsx_directives_plugin,
-				extract_web_directives_plugin,
-			));
-
-		// cache the rstml parser to avoid recreating every frame
-		let rstml_config = app.world().resource::<RstmlConfig>();
-		app.insert_non_send_resource(rstml_config.clone().into_parser());
+			);
 	}
-}
-
-
-
-thread_local! {
-	static TOKENS_APP: RefCell<Option<App>> = RefCell::new(None);
-}
-
-
-/// Access a shared `thread_local!` [`App`] used by the [`NodeTokensPlugin`].
-// The idea is to save every single macro from spinning up an app
-// but this needs to be benched.
-// TODO it breaks rust-analyzer for some reason so is currently disabled.
-pub struct TokensApp;
-
-impl TokensApp {
-	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
-		let mut app = App::new();
-		app.add_plugins(ParseRsxTokensPlugin);
-		func(&mut app)
-	}
-	//	TODO static app breaks rust analyzer?
-	pub fn with_broken<O>(func: impl FnOnce(&mut App) -> O) -> O {
-		TOKENS_APP.with(|app_cell| {
-			// Initialize the app if needed
-			let mut app_ref = app_cell.borrow_mut();
-			if app_ref.is_none() {
-				let mut app = App::new();
-				app.add_plugins(ParseRsxTokensPlugin);
-				*app_ref = Some(app);
-			}
-
-			// Now we can safely unwrap and use the app
-			let app = app_ref.as_mut().unwrap();
-
-			let out = func(app);
-			assert_empty(app);
-			out
-		})
-	}
-}
-
-fn assert_empty(app: &App) {
-	if app.world().entities().is_empty() {
-		return;
-	}
-	let mut err = String::from("TokensApp contains entities after use\n");
-	for entity in app.world().iter_entities() {
-		let entity = entity.id();
-		let info = app.world().inspect_entity(entity).unwrap();
-		err.push_str(&format!(
-			"Entity {}\n{}",
-			entity,
-			info.map(|i| format!("\t{}", i.name()))
-				.collect::<Vec<_>>()
-				.join("\n")
-		));
-	}
-	panic!("{err}");
 }

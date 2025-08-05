@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core_macros::ImplBundle;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
@@ -33,4 +34,5 @@ impl<E: 'static + Send + Sync + Event> BundleEffect for EventHandler<E> {
 /// as an attribute.
 #[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(RequiresDomIdx)]
 pub struct EventTarget;

@@ -1,9 +1,6 @@
 use crate::prelude::*;
-use beet_utils::prelude::AbsPathBuf;
 use bevy::prelude::*;
 use syn::Item;
-use syn::ItemMod;
-use syn::ItemUse;
 
 /// Added as a child of any [`RouteFileCollection`] with a [`RouteFileCategory::Action`],
 /// meaning a client actions codegen will be created.
@@ -14,27 +11,6 @@ pub struct CollectClientActions {
 	pub collapse_nodes: bool,
 }
 
-impl CollectClientActions {
-	pub fn path(actions_codegen: &AbsPathBuf) -> AbsPathBuf {
-		let mut path = actions_codegen.clone();
-		let stem = path
-			.file_stem()
-			.expect("Actions codegen path must have a file stem");
-		{
-			let stem = format!("client_{}.rs", stem.to_string_lossy());
-			path.set_file_name(stem);
-		}
-		path
-	}
-
-	pub fn ident(actions_codegen: &AbsPathBuf) -> syn::Ident {
-		let stem = actions_codegen
-			.file_stem()
-			.expect("Actions codegen path must have a file stem");
-		quote::format_ident!("client_{}", stem.to_string_lossy())
-	}
-}
-
 impl Default for CollectClientActions {
 	fn default() -> Self {
 		Self {
@@ -43,38 +19,19 @@ impl Default for CollectClientActions {
 	}
 }
 
-
-pub fn add_client_codegen_to_actions_export(
-	query: Populated<&ChildOf, Changed<CollectClientActions>>,
-	mut collection_codegen: Query<&mut CodegenFile, With<RouteFileCollection>>,
-) -> Result {
-	for child in query.iter() {
-		let mut codegen = collection_codegen.get_mut(child.parent())?;
-
-		let ident = CollectClientActions::ident(&codegen.output);
-		codegen.add_item::<ItemMod>(syn::parse_quote! {
-			pub mod #ident;
-		});
-		codegen.add_item::<ItemUse>(syn::parse_quote! {
-			pub use #ident::routes::actions::*;
-		});
-	}
-	Ok(())
-}
-
 pub fn collect_client_action_group(
 	mut query: Populated<
 		(&mut CodegenFile, &CollectClientActions, &ChildOf),
-		Changed<CollectClientActions>,
+		Added<CodegenFile>,
 	>,
 	children: Query<&Children>,
-	methods: Query<(&RouteFileMethod, &RouteFileMethodSyn)>,
+	methods: Query<&RouteFileMethod>,
 ) {
 	for (mut codegen_file, collect, childof) in query.iter_mut() {
 		let child_methods = children
 			.iter_descendants(childof.parent())
 			.filter_map(|child| {
-				methods.get(child).map(|(r, _)| (child, r)).ok()
+				methods.get(child).map(|method| (child, method)).ok()
 			})
 			.collect::<Vec<_>>();
 		debug!("Collecting {} client actions", child_methods.len());
@@ -91,13 +48,13 @@ pub fn collect_client_action_group(
 }
 
 
-struct Builder<'w, 's, 'a, 'b, 'c> {
+struct Builder<'w, 's, 'a, 'b> {
 	collect: &'a CollectClientActions,
-	query: Query<'w, 's, (&'b RouteFileMethod, &'c RouteFileMethodSyn)>,
+	query: Query<'w, 's, &'b RouteFileMethod>,
 }
 
-impl Builder<'_, '_, '_, '_, '_> {
-	fn get(&self, entity: Entity) -> (&RouteFileMethod, &RouteFileMethodSyn) {
+impl Builder<'_, '_, '_, '_> {
+	fn get(&self, entity: Entity) -> &RouteFileMethod {
 		self.query.get(entity).expect(
 			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
 		)
@@ -118,8 +75,8 @@ impl Builder<'_, '_, '_, '_, '_> {
 			tree.children.iter().map(|child| self.mod_tree_inner(child));
 
 		let items = tree.funcs.iter().map(|tokens| {
-			let (route, func) = self.get(*tokens);
-			ParseClientAction.client_func(&route.route_info, &func)
+			let method = self.get(*tokens);
+			ParseClientAction.client_func(&method)
 		});
 
 		syn::parse_quote! {
@@ -179,13 +136,14 @@ mod test {
 	use super::Builder;
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
+	use beet_rsx::as_beet::RouteInfo;
 	use beet_utils::utils::PipelineTarget;
 	use bevy::prelude::*;
+	use proc_macro2::TokenStream;
 	use quote::ToTokens;
-	use quote::quote;
 	use sweet::prelude::*;
 
-	fn mod_tree(methods: Vec<(RouteFileMethod, RouteFileMethodSyn)>) -> String {
+	fn mod_tree(methods: Vec<RouteFileMethod>) -> TokenStream {
 		let mut world = World::new();
 		world.spawn_batch(methods);
 
@@ -196,135 +154,33 @@ mod test {
 			.collect();
 		let tree = RouteFileMethodTree::from_methods(methods);
 
-		let mut query =
-			world.query::<(&RouteFileMethod, &RouteFileMethodSyn)>();
+		let mut query = world.query::<&RouteFileMethod>();
 		let query = query.query(&world);
 		let builder = Builder {
 			collect: &CollectClientActions::default(),
 			query,
 		};
-		builder
-			.mod_tree(&tree)
-			.xmap(|item| item.to_token_stream().to_string())
+		builder.mod_tree(&tree).xmap(|item| item.to_token_stream())
 	}
 
 	#[test]
 	fn simple() {
-		mod_tree(vec![(
-			RouteFileMethod::new("/bazz"),
-			RouteFileMethodSyn::new(syn::parse_quote!(
-				fn get() {}
-			)),
-		)])
-		.xpect()
-		.to_be_str(
-			quote! {
-				#[allow(missing_docs)]
-				pub mod routes {
-					#[allow(unused_imports)]
-					use super::*;
-					pub async fn bazz() -> ServerActionResult<(), ()> {
-						CallServerAction::request_no_data(RouteInfo {
-							path: RoutePath(std::path::PathBuf::from("/bazz")),
-							method: HttpMethod::Get
-						}).await
-					}
-				}
-			}
-			.to_string(),
-		);
+		mod_tree(vec![RouteFileMethod::new("/bazz")])
+			.xpect()
+			.to_be_snapshot();
 	}
 
 
 	#[test]
 	fn correct_tree_structure() {
 		mod_tree(vec![
-			(
-				RouteFileMethod::new("bazz"),
-				RouteFileMethodSyn::new(syn::parse_quote!(
-					fn get() {}
-				)),
-			),
-			(
-				RouteFileMethod::new("foo/bar"),
-				RouteFileMethodSyn::new(syn::parse_quote!(
-					fn get() {}
-				)),
-			),
-			(
-				RouteFileMethod::new("foo/boo"),
-				RouteFileMethodSyn::new(syn::parse_quote!(
-					fn get() {}
-				)),
-			),
-			(
-				RouteFileMethod::new("foo/boo"),
-				RouteFileMethodSyn::new(syn::parse_quote!(
-					fn post() {}
-				)),
-			),
-			(
-				RouteFileMethod::new("foo/bing/bong"),
-				RouteFileMethodSyn::new(syn::parse_quote!(
-					fn post() {}
-				)),
-			),
+			RouteFileMethod::new("bazz"),
+			RouteFileMethod::new("foo/bar"),
+			RouteFileMethod::new("foo/boo"),
+			RouteFileMethod::new(RouteInfo::post("foo/boo")),
+			RouteFileMethod::new(RouteInfo::post("foo/bing/bong")),
 		])
 		.xpect()
-		.to_be_str(
-			quote! {
-				#[allow(missing_docs)]
-				pub mod routes {
-					#[allow(unused_imports)]
-					use super::*;
-					pub async fn bazz() -> ServerActionResult<(), ()> {
-						CallServerAction::request_no_data(RouteInfo {
-							path: RoutePath(std::path::PathBuf::from("bazz")),
-							method: HttpMethod::Get
-						}).await
-					}
-					#[allow(missing_docs)]
-					pub mod foo {
-						#[allow(unused_imports)]
-						use super::*;
-						pub async fn bar() -> ServerActionResult<(), ()> {
-							CallServerAction::request_no_data(RouteInfo {
-								path: RoutePath(std::path::PathBuf::from("foo/bar")),
-								method: HttpMethod::Get
-							}).await
-						}
-						#[allow(missing_docs)]
-						pub mod boo {
-							#[allow(unused_imports)]
-							use super::*;
-							pub async fn get() -> ServerActionResult<(), ()> {
-								CallServerAction::request_no_data(RouteInfo {
-									path: RoutePath(std::path::PathBuf::from("foo/boo")),
-									method: HttpMethod::Get
-								}).await
-							}
-							pub async fn post() -> ServerActionResult<(), ()> {
-								CallServerAction::request_no_data(RouteInfo {
-									path: RoutePath(std::path::PathBuf::from("foo/boo")),
-									method: HttpMethod::Get
-								}).await
-							}
-						}
-						#[allow(missing_docs)]
-						pub mod bing {
-							#[allow(unused_imports)]
-							use super::*;
-							pub async fn bong() -> ServerActionResult<(), ()> {
-								CallServerAction::request_no_data(RouteInfo {
-									path: RoutePath(std::path::PathBuf::from("foo/bing/bong")),
-									method: HttpMethod::Get
-								}).await
-							}
-						}
-					}
-				}
-			}
-			.to_string(),
-		);
+		.to_be_snapshot();
 	}
 }

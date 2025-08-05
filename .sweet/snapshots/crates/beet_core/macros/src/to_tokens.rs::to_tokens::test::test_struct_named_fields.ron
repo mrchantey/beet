@@ -1,0 +1,14 @@
+impl beet::prelude::TokenizeSelf for Test {
+    fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+        use beet::exports::quote;
+        use beet::exports::proc_macro2;
+        let inner = self.inner.self_token_stream();
+        let value = self.value.self_token_stream();
+        tokens
+            .extend(
+                quote::quote! {
+                    Test { inner : # inner, value : # value }
+                },
+            );
+    }
+}

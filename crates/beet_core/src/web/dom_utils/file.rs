@@ -76,21 +76,3 @@ pub async fn upload_bytes(accept: Option<&str>) -> Result<Vec<u8>, JsValue> {
 	bytes.copy_to(&mut vec);
 	Ok(vec)
 }
-
-
-pub async fn fetch_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
-	let res = fetch(url).await?;
-	let bytes = JsFuture::from(res.array_buffer().anyhow()?)
-		.await
-		.anyhow()?;
-	let bytes = Uint8Array::new(&bytes);
-	let mut vec = Vec::with_capacity(bytes.length() as usize);
-	bytes.copy_to(&mut vec);
-	Ok(vec)
-}
-
-pub async fn fetch_text(url: &str) -> anyhow::Result<String> {
-	let res = fetch(url).await?;
-	let text = JsFuture::from(res.text().anyhow()?).await.anyhow()?;
-	Ok(text.as_string().expect("response.text() must be string"))
-}

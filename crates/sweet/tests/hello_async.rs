@@ -12,18 +12,18 @@ async fn returns_err() -> Result<(), String> { Err("foo".to_string()) }
 #[tokio::test]
 #[should_panic]
 async fn dummy2() {
-	beet_utils::sleep_secs(1).await;
+	beet_utils::prelude::sleep_secs(1).await;
 	panic!("waddup")
 }
 #[sweet::test]
 // #[should_panic]
-async fn dummy3() { beet_utils::sleep_secs(1).await; }
+async fn dummy3() { beet_utils::prelude::sleep_secs(1).await; }
 #[sweet::test]
 // #[should_panic]
-async fn dummy4() { beet_utils::sleep_secs(1).await; }
+async fn dummy4() { beet_utils::prelude::sleep_secs(1).await; }
 #[sweet::test]
 #[should_panic]
 async fn dummy5() {
-	beet_utils::sleep_secs(1).await;
+	beet_utils::prelude::sleep_secs(1).await;
 	panic!("whaya");
 }

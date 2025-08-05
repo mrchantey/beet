@@ -94,7 +94,7 @@ impl<T> Clone for ArenaHandle<T> {
 			_phantom: std::marker::PhantomData,
 		}
 	}
-}  
+}
 
 impl<T: Clone + 'static> ArenaHandle<T> {
 	/// Get a clone of the object

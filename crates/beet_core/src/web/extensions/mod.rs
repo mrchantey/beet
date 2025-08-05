@@ -1,21 +1,12 @@
-pub mod array;
-#[allow(unused_imports)]
+mod array;
 pub use self::array::*;
-pub mod closure;
-#[allow(unused_imports)]
+mod closure;
 pub use self::closure::*;
-pub mod document;
-#[allow(unused_imports)]
+mod document;
 pub use self::document::*;
-pub mod element;
-#[allow(unused_imports)]
+mod element;
 pub use self::element::*;
-pub mod iframe;
-#[allow(unused_imports)]
+mod iframe;
 pub use self::iframe::*;
-pub mod response;
-#[allow(unused_imports)]
-pub use self::response::*;
-pub mod result;
-#[allow(unused_imports)]
+mod result;
 pub use self::result::*;

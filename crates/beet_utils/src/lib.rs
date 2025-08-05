@@ -1,6 +1,5 @@
 #![feature(exit_status_error)]
 pub use utils::log::*;
-pub use utils::sleep::*;
 pub mod arena;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -8,7 +7,6 @@ pub mod fs;
 pub mod path_utils;
 pub mod utils;
 pub mod prelude {
-	pub use crate::abs_file;
 	pub use crate::arena::*;
 	pub use crate::dir;
 	pub use crate::extensions::*;

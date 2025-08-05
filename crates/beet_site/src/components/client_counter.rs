@@ -1,9 +1,7 @@
 use beet::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 #[template]
-#[derive(Serialize, Deserialize)]
+#[derive(Reflect)]
 pub fn ClientCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 

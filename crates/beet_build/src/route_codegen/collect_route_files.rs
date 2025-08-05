@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::bevyhow;
-use beet_core::prelude::TokenizeSelf;
+use beet_core::prelude::*;
 use bevy::prelude::*;
-use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse_quote;
@@ -13,17 +11,14 @@ use syn::parse_quote;
 pub fn collect_route_files(
 	mut query: Populated<
 		(&mut CodegenFile, &RouteFileCollection, &Children),
-		Changed<RouteFileCollection>,
+		Added<CodegenFile>,
 	>,
-	route_files: Query<(&RouteFile, &Children)>,
+	route_files: Query<(&RouteSourceFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
 ) -> Result {
 	for (mut codegen_file, collection, collection_children) in query.iter_mut()
 	{
-		let mut route_infos = Vec::<TokenStream>::new();
-		let mut route_handlers = Vec::<TokenStream>::new();
-		let mut route_metas = Vec::<syn::Path>::new();
-		let mut contains_file_meta = false;
+		let mut children = Vec::<TokenStream>::new();
 
 		for (route_file, route_file_children) in collection_children
 			.iter()
@@ -32,115 +27,65 @@ pub fn collect_route_files(
 			codegen_file.add_item(route_file.item_mod(collection.category));
 			let mod_ident = route_file.mod_ident();
 
-			for method in route_file_children
+			for route_file_method in route_file_children
 				.iter()
 				.filter_map(|child| methods.get(child).ok())
 			{
-				let method_name =
-					method.route_info.method.to_string_lowercase();
+				let func_ident = &route_file_method.item.sig.ident;
 
-				if method.meta == RouteFileMethodMeta::Collection {
-					contains_file_meta = true;
-				}
+				let endpoint = Endpoint::new_with(
+					route_file_method.route_info.method,
+					collection.category.cache_strategy(),
+				)
+				.self_token_stream();
 
-				let http_method = quote::format_ident!("{method_name}",);
-				let route_info = method.route_info.self_token_stream();
-				let meta_ident = method.meta.ident(&mod_ident, &method_name);
-
-				match collection.category {
+				let is_async = route_file_method.item.sig.asyncness.is_some();
+				let handler = match collection.category {
 					RouteCollectionCategory::Pages => {
-						// All page routes are BundleRoutes, so use add_bundle_route
-						// for middleware support
-						route_handlers.push(parse_quote! {
-								router = plugin.add_bundle_route(
-									router,
-									#route_info,
-									#mod_ident::#http_method,
-									#meta_ident()
-								);
-						});
+						// page routes are presumed to be bundles
+						match is_async {
+							true => quote! {
+								RouteHandler::async_bundle(#endpoint, #mod_ident::#func_ident)
+							},
+							false => quote! {
+								RouteHandler::bundle(#endpoint, #mod_ident::#func_ident)
+							},
+						}
 					}
 					RouteCollectionCategory::Actions => {
+						let out_ty = match route_file_method.returns_result() {
+							true => quote! { JsonResult },
+							false => quote! { Json },
+						};
 						// Action routes may be any kind of route
-						route_handlers.push(quote! {
-								router = plugin.add_route(router,#route_info, #mod_ident::#http_method);
-						});
+						quote! {
+							RouteHandler::action(
+								#endpoint,
+								#mod_ident::#func_ident.pipe(#out_ty::pipe)
+							)
+						}
 					}
-				}
-				route_metas.push(meta_ident);
-				route_infos.push(route_info);
+				};
+				let filter =
+					RouteFilter::new(&route_file_method.route_info.path)
+						.self_token_stream();
+
+
+				children.push(quote! {(
+					#filter,
+					#handler
+				)});
 			}
 		}
 
 
-		let collection_name = if let Some(name) = &collection.name {
-			name.clone()
-		} else {
-			codegen_file
-				.output
-				.file_stem()
-				.map(|name| name.to_string_lossy().to_string())
-				.ok_or_else(|| bevyhow!("failed"))?
-		};
+		let collection_name = codegen_file.name();
+		let collection_ident = quote::format_ident!("{collection_name}_routes");
 
-		let router_plugin_ident = quote::format_ident!(
-			"{}Plugin",
-			collection_name.to_upper_camel_case()
-		);
-
-		codegen_file.add_item::<syn::ItemStruct>(parse_quote! {
-			#[derive(Debug, Default, Clone)]
-			pub struct #router_plugin_ident;
-		});
-
-		let default_meta: Option<syn::ItemFn> = if contains_file_meta {
-			Some(parse_quote! {
-				/// The default meta for routes that do not have a specific
-				/// meta defined.
-				fn meta() -> <Self as RouterPlugin>::Meta {
-					Default::default()
-				}
-			})
-		} else {
-			None
-		};
-
-		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
-			#[cfg(not(feature = "client"))]
-			impl #router_plugin_ident {
-				#default_meta
-			}
-		});
-		let meta_ty = &collection.meta_type;
-		let router_state_type = &collection.router_state_type;
-		let is_static = collection.category.include_in_route_tree();
-
-		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
-			#[cfg(not(feature = "client"))]
-			impl RouterPlugin for #router_plugin_ident {
-				type State = #router_state_type;
-				type Meta = #meta_ty;
-
-				fn is_static(&self) -> bool {
-					#is_static
-				}
-
-				fn routes(&self)-> Vec<RouteInfo> {
-					vec![#(#route_infos),*]
-				}
-
-				fn meta(&self) -> Vec<Self::Meta> {
-					vec![#(#route_metas()),*]
-				}
-
-				fn add_routes_with(&self,
-					mut router: beet::exports::axum::Router<Self::State>,
-					plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
-				)
-					-> beet::exports::axum::Router<Self::State> {
-						#(#route_handlers)*
-					router
-				}
+		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
+			#[cfg(feature = "server")]
+			pub fn #collection_ident() -> impl Bundle {
+				children![#(#children),*]
 			}
 		});
 	}
@@ -152,7 +97,6 @@ pub fn collect_route_files(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
@@ -160,70 +104,15 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
-		app.world_mut().spawn(SourceFile::new(
-			WsPathBuf::new(
-				"crates/beet_router/src/test_site/test_docs/hello.md",
-			)
-			.into_abs(),
-		));
+		app.add_plugins(BuildPlugin::default());
 		app.world_mut().spawn(RouteFileCollection::test_site_docs());
 		app.update();
-		app
-			.world_mut()
+		app.world_mut()
 			.query_filtered_once::<&CodegenFile, With<RouteFileCollection>>()[0]
 			.build_output()
 			.unwrap()
 			.to_token_stream()
-			.to_string()
 			.xpect()
-			.to_be_str(quote::quote! {
-				#![doc = r" 🌱🌱🌱 This file has been auto generated by Beet."]
-				#![doc = r" 🌱🌱🌱 Any changes will be overridden if the file is regenerated."]
-				#[allow(unused_imports)]
-				use beet::prelude::*;
-				#[allow(unused_imports)]
-				use crate as test_site;
-				#[path = "hello.rs"]
-				pub mod route0;
-				#[derive(Debug, Default, Clone)]
-				pub struct TestDocsPlugin;
-				#[cfg(not(feature = "client"))]
-				impl TestDocsPlugin {}
-				#[cfg(not(feature = "client"))]
-				impl RouterPlugin for TestDocsPlugin {
-					type State = AppRouterState;
-					type Meta = ();
-					fn is_static(&self) -> bool {
-						true
-					}
-					fn routes(&self) -> Vec<RouteInfo> {
-						vec![RouteInfo {
-							path: RoutePath(std::path::PathBuf::from("/hello")),
-							method: HttpMethod::Get
-						}]
-					}
-					fn meta(&self) -> Vec<Self::Meta> {
-						vec![route0::meta()]
-					}
-					fn add_routes_with(
-						&self,
-						mut router: beet::exports::axum::Router<Self::State>,
-						plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
-					) -> beet::exports::axum::Router<Self::State> {
-						router = plugin.add_bundle_route(
-							router,
-							RouteInfo {
-								path: RoutePath(std::path::PathBuf::from("/hello")),
-								method: HttpMethod::Get
-							},
-							route0::get,
-							route0::meta()
-						);
-						router
-					}
-				}
-
-			}.to_string());
+			.to_be_snapshot();
 	}
 }

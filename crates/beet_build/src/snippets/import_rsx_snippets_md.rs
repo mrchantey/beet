@@ -3,32 +3,51 @@ use beet_core::prelude::*;
 use beet_parse::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use quote::ToTokens;
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert
 /// as [`CombinatorToNodeTokens`].
 pub fn import_rsx_snippets_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Changed<SourceFile>>,
+	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
+	parents: Query<&ChildOf>,
+	meta_types: Query<&MetaType>,
 ) -> Result {
-	for (source_file_entity, path) in query.iter() {
+	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
-		// TODO md should not 
+		// TODO md should parse html only
 			&& (ex == "md" || ex == "mdx")
 		{
 			trace!("markdown source file changed: {}", path.display());
 
-			commands
-				.entity(source_file_entity)
-				.despawn_related::<RsxSnippets>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
-			commands.spawn((
-				RsxSnippetOf(source_file_entity),
-				RsxSnippetRoot,
-				MacroIdx::new(path.into_ws_path()?, LineCol::default()),
+			let mut snippet = commands.spawn((
+				SnippetRoot::new(path.into_ws_path()?, LineCol::default()),
+				StaticRoot,
+				ChildOf(entity),
 				CombinatorTokens::new(rsx_str),
 			));
+
+
+			if let Some(meta_type) = parents
+				.iter_ancestors_inclusive(entity)
+				.find_map(|e| meta_types.get(e).ok())
+				&& let Some(meta_block) =
+					ParseMarkdown::markdown_to_frontmatter_tokens(&file)?
+			{
+				let meta_type = &meta_type.0;
+				let err_msg = format!(
+					"Failed to parse frontmatter into {}",
+					meta_type.to_token_stream().to_string(),
+				);
+				// snippet roots are always fragments
+				snippet.with_child(NodeExpr::new(syn::parse_quote! {{
+					let meta: #meta_type = #meta_block.expect(#err_msg);
+					meta
+				}}));
+			}
 		}
 	}
 	Ok(())
@@ -38,7 +57,7 @@ pub fn import_rsx_snippets_md(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::as_beet::render_fragment;
+	use beet_rsx::prelude::*;
 	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -46,7 +65,7 @@ mod test {
 	#[test]
 	fn parse_md() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(
@@ -58,7 +77,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
@@ -69,7 +88,7 @@ mod test {
 	#[test]
 	fn parse_mdx() {
 		let mut app = App::new();
-		app.add_plugins(BuildPlugin::without_fs());
+		app.add_plugins(BuildPlugin::default());
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(
@@ -81,7 +100,7 @@ mod test {
 			.id();
 
 		app.update();
-		let child = app.world().entity(entity).get::<RsxSnippets>().unwrap()[0];
+		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()

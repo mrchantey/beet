@@ -4,13 +4,14 @@ use beet_core::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use std::collections::HashSet;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree, which can then
 /// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_bundle`]
 /// or [`tokenize_bundle_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
-#[require(MacroIdx)]
+#[require(SnippetRoot)]
 pub struct CombinatorTokens(String);
 
 impl CombinatorTokens {
@@ -21,16 +22,17 @@ impl CombinatorTokens {
 
 pub(super) fn parse_combinator_tokens(
 	_: TempNonSendMarker,
+	constants: Res<HtmlConstants>,
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &CombinatorTokens, &MacroIdx),
+		(Entity, &CombinatorTokens, &SnippetRoot),
 		Added<CombinatorTokens>,
 	>,
 ) -> bevy::prelude::Result {
-	for (entity, tokens, macro_idx) in query.iter() {
+	for (entity, tokens, snippet_root) in query.iter() {
 		Builder {
-			verbatim_tags: &["script", "style", "code"],
-			file_path: &macro_idx.file,
+			raw_text_elements: &constants.raw_text_elements,
+			file_path: &snippet_root.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
@@ -43,7 +45,9 @@ pub(super) fn parse_combinator_tokens(
 
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 struct Builder<'w, 's, 'a> {
-	verbatim_tags: &'a [&'a str],
+	// the content of these tags will not be parsed and instead inserted
+	// as a [`TextNode`]
+	raw_text_elements: &'a HashSet<&'static str>,
 	file_path: &'a WsPathBuf,
 	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,
@@ -165,11 +169,11 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		tag_str: &str,
 		children: RsxChildren,
 	) -> Result<Vec<Entity>> {
-		if self.verbatim_tags.contains(&tag_str) {
+		if self.raw_text_elements.contains(&tag_str) {
 			vec![
 				self.commands
 					.spawn((
-						TextNode(children.to_html()),
+						TextNode::new(children.to_html()),
 						FileSpanOf::<TextNode>::new(self.default_file_span()),
 					))
 					.id(),
@@ -190,7 +194,8 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			RsxChild::Element(el) => self.rsx_element(el),
 			RsxChild::Text(text) => self.rsx_text(text),
 			RsxChild::CodeBlock(code_block) => {
-				let entity = self.commands.spawn((BlockNode,self.expr_idx.next())).id();
+				let entity =
+					self.commands.spawn((BlockNode, self.expr_idx.next())).id();
 				self.rsx_parsed_expression(entity, code_block)?;
 				entity.xok()
 			}
@@ -200,7 +205,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn rsx_text(&mut self, text: RsxText) -> Result<Entity> {
 		self.commands
 			.spawn((
-				TextNode(text.0.to_string()),
+				TextNode::new(text.0.to_string()),
 				FileSpanOf::<TextNode>::new(self.default_file_span()),
 			))
 			.id()
@@ -238,21 +243,21 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							val.into_bundle(),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							val.into_bundle(),
 						));
 					}
 					RsxAttributeValue::Str(val) => {
 						let val = val.to_string_unquoted();
 						entity.insert((
 							NodeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val),
+							TextNode::new(val),
 						));
 					}
 					RsxAttributeValue::Element(value) => {
@@ -284,275 +289,70 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
-	use quote::quote;
+	use proc_macro2::TokenStream;
 	use sweet::prelude::*;
 
-	fn parse(str: &str) -> Matcher<String> {
+	fn parse(str: &str) -> Matcher<TokenStream> {
 		tokenize_combinator(str, WsPathBuf::new(file!()))
 			.unwrap()
-			.to_string()
 			.xpect()
 	}
 
 	#[test]
-	fn element() {
-		"<br/>".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true}
-				)]}
-			)}
-			.to_string(),
-		);
-	}
+	fn element() { "<br/>".xmap(parse).to_be_snapshot(); }
 	#[test]
 	fn fragment() {
 		"<br/><br/>"
 			.xmap(|str| {
 				tokenize_combinator(str, WsPathBuf::new(file!()))
 					.unwrap()
-					.to_string()
 					.xpect()
 			})
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						NodeTag(String::from("br")),
-						ElementNode{self_closing:true}
-					),(
-						NodeTag(String::from("br")),
-						ElementNode{self_closing:true}
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 	#[test]
-	fn unclosed() {
-		"<div align=\"center\" />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("div")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("align"),
-						OnSpawnTemplate::new_insert("center".into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
-	}
+	fn unclosed() { "<div align=\"center\" />".xmap(parse).to_be_snapshot(); }
 
 	#[test]
-	fn text() {
-		"<div>hello</div>".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("div")),
-					ElementNode{self_closing:false},
-					related!{Children[TextNode(String::from("hello"))]}
-				)]}
-			)}
-			.to_string(),
-		);
-	}
+	fn text() { "<div>hello</div>".xmap(parse).to_be_snapshot(); }
 
 	#[test]
-	fn block() {
-		r#"{"hello"}"#.xmap(parse).to_be_str(
-			quote! {
-				(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx {
-						file: WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),
-						start: LineCol { line: 1u32, col: 0u32 }
-					},
-					FragmentNode,
-					related! {
-						Children [
-							(
-								ExprIdx(0u32),
-								BlockNode,
-								OnSpawnTemplate::new_insert(
-									#[allow(unused_braces)]{ "hello" }.into_node_bundle()
-								)
-							)
-						]
-					}
-				)
-			}
-			.to_string(),
-		);
-	}
+	fn block() { r#"{"hello"}"#.xmap(parse).to_be_snapshot(); }
 
 
 
 	#[test]
 	fn element_attributes_default() {
-		"<br foo />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[AttributeKey::new("foo")])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_string() {
-		"<br foo=\"bar\"/>".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("foo"),
-						OnSpawnTemplate::new_insert("bar".into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo=\"bar\"/>".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_bool() {
-		"<br foo=true />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("foo"),
-						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo=true />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_number() {
-		"<br foo=20 />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("foo"),
-						OnSpawnTemplate::new_insert(20f64.into_attribute_bundle())
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo=20 />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_block_value() {
-		"<br foo={bar} />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("foo"),
-						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_attribute_bundle()),
-						ExprIdx(0u32)
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo={bar} />".xmap(parse).to_be_snapshot();
 	}
 	#[test]
 	fn element_attributes_spread() {
-		"<br {...bar} />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx {
-					file: WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),
-					start: LineCol { line: 1u32, col: 0u32 }
-				},
-				FragmentNode,
-				related! { Children [(
-					ExprIdx(0u32),
-					NodeTag(String::from("br")),
-					ElementNode { self_closing: true },
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br {...bar} />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_element() {
-		"<br foo={<br/>} />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						AttributeKey::new("foo"),
-							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{(
-								NodeTag(String::from("br")),
-								ElementNode { self_closing: true }
-							)}.into_attribute_bundle()),
-						ExprIdx(0u32)
-					)])
-				)]}
-			)}
-			.to_string(),
-		);
+		"<br foo={<br/>} />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
@@ -562,204 +362,104 @@ mod test {
 			bar
 		} />"
 			.xmap(parse)
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						NodeTag(String::from("br")),
-						ElementNode{self_closing:true},
-						related!(Attributes[(
-							AttributeKey::new("foo"),
-							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-								let bar = (
-									NodeTag(String::from("br")),
-									ElementNode{self_closing:true}
-								);
-								bar
-							}.into_attribute_bundle()),
-							ExprIdx(0u32)
-						)])
-					)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_default() {
-		"<MyTemplate foo />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_string() {
-		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_bool() {
-		"<MyTemplate foo=true />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo=true />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_number() {
-		"<MyTemplate foo=20 />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo=20 />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_ident() {
-		"<MyTemplate foo={bar} />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ bar }).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo={bar} />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_element() {
-		"<MyTemplate foo={<br/>} />".xmap(parse).to_be_str(
-			quote! {(
-				BeetRoot,
-				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-				FragmentNode,
-				related!{Children[(
-					ExprIdx(0u32),
-					NodeTag(String::from("MyTemplate")),
-					FragmentNode,
-					TemplateNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ (
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						) }).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-			)}
-			.to_string(),
-		);
+		"<MyTemplate foo={<br/>} />".xmap(parse).to_be_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_mixed() {
-		"<MyTemplate foo={
+		r#"<MyTemplate foo={
 			let bar = <br/>;
 			bar
-		} />"
+		} />"#
 			.xmap(parse)
-			.to_be_str(
-				quote! {(
-					BeetRoot,
-					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
-					FragmentNode,
-					related!{Children[(
-						ExprIdx(0u32),
-						NodeTag(String::from("MyTemplate")),
-						FragmentNode,
-						TemplateNode,
-						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-							let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{
-								let bar = (
-									NodeTag(String::from("br")),
-									ElementNode{self_closing:true}
-								);
-								bar
-							}).build();
-						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}.into_node_bundle())
-				)]}
-				)}
-				.to_string(),
-			);
+			.to_be_snapshot();
+	}
+	#[cfg(feature = "css")]
+	#[test]
+	fn style() {
+		r#"
+<div> hello world </div>
+<style>
+	main{
+		padding-top: 2em;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		height: 100vh;
+	}
+	a {
+		color: #90ee90;
+	}
+	a:visited {
+		color: #3399ff;
+	}
+</style>
+<style scope:global>
+	body{
+		font-size: 1.4em;
+		font-family: system-ui, sans-serif;
+		background: black;
+		color: white;
+	}
+</style>
+"#
+		.xmap(parse)
+		.to_be_snapshot();
+	}
+	#[test]
+	#[ignore = "todo combinator raw text"]
+	fn preserves_whitespace() {
+		let out = tokenize_combinator(
+			r#"
+<pre><code class="language-rust">// A simple Rust function
+fn fibonacci(n: u32) -&gt; u32 {
+    match n {
+        0 =&gt; 0,
+        1 =&gt; 1,
+        _ =&gt; fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+
+fn main() {
+    let result = fibonacci(10);
+    println!("The 10th Fibonacci number is: {}", result);
+}
+</code></pre>		
+		"#,
+			WsPathBuf::new(file!()),
+		)
+		.unwrap();
+		out.to_string().xpect().to_contain("\nfn main()");
+		out.xpect().to_be_snapshot();
 	}
 }

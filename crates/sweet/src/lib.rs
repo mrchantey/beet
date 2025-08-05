@@ -6,7 +6,7 @@
 #![feature(panic_payload_as_str)]
 // implement FnMut for MockFunc
 #![feature(unboxed_closures)]
-#![cfg_attr(feature = "nightly", feature(fn_traits))]
+#![cfg_attr(feature = "nightly", feature(fn_traits, backtrace_frames))]
 // #![feature(panic_payload_as_str)]
 
 /// Matchers and utilities for running webdriver tests

@@ -11,10 +11,19 @@
 # just test-ci
 # ```
 #
-
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
+
+# it keeps asking for bigger stacks.. this is 1GB :(
+export RUST_MIN_STACK := '1073741824'
+# export RUST_MIN_STACK := '268435456'
+# min-stack := 'RUST_MIN_STACK=134217728'
+# min-stack := 'RUST_MIN_STACK=67108864'
+# min-stack := 'RUST_MIN_STACK=33554432'
+test-threads:= '--test-threads=8'
+
+
 # max cargo build jobs
 
 default:
@@ -94,11 +103,25 @@ build-csr:
 	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
 	sweet serve target/examples/csr
 	
+build-demo-site *args:
+	cd examples/demo_site && cargo launch
+	cd examples/demo_site && cargo build 	--no-default-features --features=client --target wasm32-unknown-unknown
+	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/demo_site.wasm
+
+launch *args:
+	cargo launch -w {{args}}
+
+demo-site *args:
+	cd examples/demo_site && cargo launch -- --watch {{args}}
+
 run-hydration:
 	just watch just build-hydration
 
+run-ssr:
+	just watch cargo run --example ssr --features=server
+
 build-hydration:
-	cargo run --example hydration
+	cargo run --example hydration --features=css
 	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
 	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
 	sweet serve target/examples/hydration
@@ -118,9 +141,6 @@ leptosfmt *args:
 	crates/beet_design/**/*.rs 				\
 	crates/beet_design/**/**/*.rs 		\
 	crates/beet_design/**/**/**/*.rs 	\
-	crates/beet_router/**/*.rs 				\
-	crates/beet_router/**/**/*.rs 		\
-	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -135,28 +155,6 @@ run-bevy-rsx:
 run-bevy-rsx-if-ok:
 	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
-# rm -rf ./target
-# mkdir -p ./target/wasm-example
-# --html-dir 	target/wasm-example 							\
-
-run-dom-rsx:
-	just cli watch 																\
-	--package beet 																\
-	--example dom_rsx 														\
-	--templates-root-dir examples/rsx/dom_rsx.rs 	\
-	--wasm 																				\
-	--static																			\
-
-# | just watch 'just build-wasm beet dom_rsx'
-# sweet serve ./target/wasm-example | \
-
-run-test-site:
-	cargo run -p beet_router --example collect_routes
-	cargo run -p beet_router --example templates
-	cargo run -p beet_router --example html
-	sweet serve target/test_site
-# --templates-root-dir crates \
-
 #just cli watch -p beet_site {{args}}
 build-site *args:
 	just cli build -p beet_site {{args}}
@@ -170,15 +168,6 @@ deploy-site *args:
 
 #💡 Test
 
-# it keeps asking for bigger stacks? a mold thing?
-min-stack := 'RUST_MIN_STACK=134217728'
-# min-stack := 'RUST_MIN_STACK=67108864'
-# min-stack := 'RUST_MIN_STACK=33554432'
-test-threads:= '--test-threads=8'
-# Run tests for ci, not using workspace cos somehow bevy_default still getting pulled in
-# cargo test --workspace runs with 16MB stack and max 8 cores
-# {{min-stack}} cargo test --workspace 			--lib											{{args}} -- {{test-threads}}
-# {{min-stack}} cargo test --workspace 			--doc	--features=_doctest	{{args}} -- {{test-threads}}
 
 test-fmt:
 	cargo fmt 				--check
@@ -195,58 +184,46 @@ test-fs *args:
 test-beet-utils *args:
 	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
 
+# cargo test -p beet_rsx					 	 	 																										{{args}} -- {{test-threads}}
 test-rsx *args:
-	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx					 	 	 																								{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_site 						--all-features																			{{args}} -- {{test-threads}}
+	cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
+	cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
+	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
+	cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}	
+	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
+	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
+	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
+	cargo test -p beet_site 						--all-features																			{{args}} -- {{test-threads}}
 	
 test-flow *args:
-	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
+	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
+	cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 
-#{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
+#cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-utils *args:
-	{{min-stack}} cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
+	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 
 test-all-lib *args:
-	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
+	cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
 test-all-doc *args:
-	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
+	cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
 test-all:
 	just test-utils
 	just test-flow
 	just test-rsx
-
-# rebuilding bevy_render for wasm results in 'no space left on device'
-test-all-old *args:
-	just test-ci
-	just test-all-lib 																																								{{args}}
-	just test-all-doc 																																								{{args}}
-	{{min-stack}}	cargo test -p beet_rsx	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
-	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
-	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
-
-#cargo test -p beet_spatial
-#cargo test -p beet_sim
-#cargo test -p beet_ml
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
@@ -275,17 +252,17 @@ clear-ice:
 
 clear-artifacts:
 	just clear-ice
-	rm -rf target
-	rm -rf crates/beet_router/src/test_site/codegen
 	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
+	rm -rf examples/demo_site/src/codegen
+	rm -rf examples/demo_site/Cargo.lock
+	rm -rf target
 
 # massive purge
 clear-all:
 	just clear-artifacts
 	cargo clean
 	rm -rf $CARGO_TARGET_DIR
-# rm -rf ./Cargo.lock
 
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}
@@ -318,7 +295,6 @@ publish-all *args:
 	just publish beet_parse      			{{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx        			{{args}} || true
-	just publish beet_router          {{args}} || true
 	just publish beet_build      			{{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_design 					{{args}} || true

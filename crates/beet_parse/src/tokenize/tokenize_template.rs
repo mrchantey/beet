@@ -54,7 +54,7 @@ pub fn tokenize_template(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(value.node_bundle_tokens());
+					entity_components.push(value.insert_deferred());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}
@@ -67,33 +67,50 @@ pub fn tokenize_template(
 		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 
-	// we create an inner tuple, so that we can define the template
-	// and reuuse it for serialization
-	let mut inner_items = Vec::new();
-	if entity.contains::<ClientLoadDirective>()
+	let template_def = quote! {
+			<#template_ident as Props>::Builder::default()
+			#(#prop_assignments)*
+			.build()
+	};
+
+	// NodeExpr::new_block(value)
+
+	let inner = if entity.contains::<ClientLoadDirective>()
 		|| entity.contains::<ClientOnlyDirective>()
 	{
-		inner_items.push(quote! {
-			#[cfg(not(target_arch = "wasm32"))]
-			{TemplateSerde::new(&template)},
-			#[cfg(target_arch = "wasm32")]
-			{()}
-		});
-	}
-	// the output of a template is *children!*, ie the template is a fragment.
-	// this is important to avoid duplicate components like NodeTag
-	inner_items
-		.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
+		// this also adds a TemplateRoot::spawn() via component hook using a reflect clone
+		syn::parse_quote! {
+			ClientIslandRoot::new(#template_def)
+		}
+	} else {
+		syn::parse_quote! {
+			TemplateRoot::spawn(Spawn(#template_def.into_bundle()))
+		}
+	};
+	entity_components.push(NodeExpr::new(inner).insert_deferred());
 
-	let items = unbounded_bundle(inner_items);
-
-	let node_expr = NodeExpr::new_block(syn::parse_quote! {{
-		let template = <#template_ident as Props>::Builder::default()
-				#(#prop_assignments)*
-				.build();
-		#items
-	}});
-
-	entity_components.push(node_expr.node_bundle_tokens());
 	Ok(())
+}
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_utils::prelude::*;
+	use proc_macro2::TokenStream;
+	use quote::quote;
+	use sweet::prelude::*;
+
+	fn parse(tokens: TokenStream) -> Matcher<TokenStream> {
+		tokenize_rstml(tokens, WsPathBuf::new(file!()))
+			.unwrap()
+			.xpect()
+	}
+
+	#[test]
+	fn key_value() {
+		quote! {
+			<Foo bar client:load/>
+		}
+		.xmap(parse)
+		.to_be_snapshot();
+	}
 }
