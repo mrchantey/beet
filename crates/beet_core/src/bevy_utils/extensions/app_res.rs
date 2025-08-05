@@ -32,7 +32,6 @@ pub impl Rc<RefCell<App>> {
 			self.borrow_mut().update();
 		})
 	}
-
 	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_forever(self) -> impl std::future::Future<Output = ()> {
 		async {
@@ -40,8 +39,8 @@ pub impl Rc<RefCell<App>> {
 			crate::web::loop_forever().await;
 		}
 	}
-
-	#[cfg(target_arch = "wasm32")]
+	
+	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_while_mounted(self) {
 		todo!("broken in 12.1?");
 		// let mut app = self.borrow_mut();
