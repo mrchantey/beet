@@ -34,7 +34,7 @@ pub struct LaunchRunner {
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
 	#[command(flatten)]
-	pub(crate) sst_config: Option<SstConfig>,
+	pub(crate) infra_config: Option<InfraConfig>,
 	#[command(flatten)]
 	pub(crate) lambda_config: Option<LambdaConfig>,
 }
@@ -59,8 +59,8 @@ impl LaunchRunner {
 		app.insert_resource(flags);
 		app.insert_resource(self.build_cmd.clone());
 
-		if let Some(sst_config) = &self.sst_config {
-			app.insert_resource(sst_config.clone());
+		if let Some(infra_config) = &self.infra_config {
+			app.insert_resource(infra_config.clone());
 		}
 		if let Some(lambda_config) = &self.lambda_config {
 			app.insert_resource(lambda_config.clone());

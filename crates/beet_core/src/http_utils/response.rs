@@ -65,6 +65,31 @@ impl PartialEq for Response {
 impl Response {
 	pub fn ok() -> Self { Self::from_status(StatusCode::OK) }
 	pub fn not_found() -> Self { Self::from_status(StatusCode::NOT_FOUND) }
+	pub fn temporary_redirect(location: impl Into<String>) -> Self {
+		Self::from_parts(
+			http::response::Builder::new()
+				.status(StatusCode::TEMPORARY_REDIRECT)
+				.header(http::header::LOCATION, location.into())
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			Default::default(),
+		)
+	}
+	pub fn permanent_redirect(location: impl Into<String>) -> Self {
+		Self::from_parts(
+			http::response::Builder::new()
+				.status(StatusCode::MOVED_PERMANENTLY)
+				.header(http::header::LOCATION, location.into())
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0,
+			Default::default(),
+			// "Redirecting...".into(),// does that produce fouc?
+		)
+	}
 	pub fn status(&self) -> StatusCode { self.parts.status }
 	pub fn from_status(status: StatusCode) -> Self {
 		Self::from_parts(

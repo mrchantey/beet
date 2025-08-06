@@ -30,6 +30,7 @@ serde = [
 	"dep:serde",
 	"dep:serde_json",
 	"dep:ron",
+	"dep:clap",
 	"dep:toml",
 	"dep:serde_urlencoded",
 ]

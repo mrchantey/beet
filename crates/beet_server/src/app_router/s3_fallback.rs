@@ -8,7 +8,7 @@ pub struct S3Client(pub Client);
 
 
 
-pub fn s3_fallback(path: RoutePath, _client: Res<S3Client>) -> impl Bundle {
+pub fn s3_fallback(path: RoutePath, _client: Res<S3Client>) -> impl IntoResponse {
 
 	if path.extension().is_some() {
 		todo!("permanent redirect");

@@ -48,7 +48,7 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 pub fn deploy_lambda(
 	workspace_config: Res<WorkspaceConfig>,
 	lambda_config: Res<LambdaConfig>,
-	infra: InfraUtils,
+	infra: InfraParams,
 ) -> Result {
 	let binary_name = infra.binary_name();
 
@@ -92,7 +92,7 @@ pub fn deploy_lambda(
 }
 
 
-pub fn lambda_log(infra: InfraUtils) -> Result {
+pub fn lambda_log(infra: InfraParams) -> Result {
 	let mut cmd = Command::new("aws");
 	let function_name = infra.lambda_func_name();
 	println!("🌱 Watching Lambda logs {function_name}\n   {cmd:?}");
@@ -112,7 +112,7 @@ pub fn lambda_log(infra: InfraUtils) -> Result {
 
 pub fn sync_bucket(
 	ws_config: Res<WorkspaceConfig>,
-	infra: InfraUtils,
+	infra: InfraParams,
 ) -> Result {
 	let bucket_name = infra.bucket_name();
 
