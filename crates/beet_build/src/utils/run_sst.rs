@@ -1,5 +1,6 @@
 use crate::utils::CargoManifest;
 use beet_utils::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use clap::Parser;
 use heck::ToKebabCase;
@@ -39,6 +40,36 @@ pub fn deploy_sst(
 }
 
 
+#[derive(SystemParam)]
+pub struct InfraUtils<'w> {
+	build_cmd: Res<'w, CargoBuildCmd>,
+	manifest: Res<'w, CargoManifest>,
+	sst_config: Res<'w, SstConfig>,
+}
+
+impl InfraUtils<'_> {
+	pub fn binary_name(&self) -> String {
+		self.build_cmd.binary_name(self.manifest.package_name())
+	}
+
+	pub fn lambda_func_name(&self) -> String {
+		self.sst_config
+			.lambda_func_name(&self.build_cmd, &self.manifest)
+	}
+	pub fn bucket_name(&self) -> String {
+		self.sst_config.bucket_name(&self.build_cmd, &self.manifest)
+	}
+
+	pub fn resource_name(&self, resource_name: &str) -> String {
+		self.sst_config.resource_name(
+			&self.build_cmd,
+			&self.manifest,
+			resource_name,
+		)
+	}
+}
+
+
 impl SstConfig {
 	/// Specify the stage name used. if the build command specifies release,
 	/// this defaults to `prod`, otherwise `dev`.
@@ -52,16 +83,35 @@ impl SstConfig {
 		})
 	}
 
-	/// binary-resource-stage convention to match
-	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
 	pub fn lambda_func_name(
 		&self,
 		build_cmd: &CargoBuildCmd,
 		manifest: &CargoManifest,
 	) -> String {
-		let binary_name = build_cmd.binary_name(manifest.package_name());
+		self.resource_name(build_cmd, manifest, "lambda")
+	}
+
+	pub fn bucket_name(
+		&self,
+		build_cmd: &CargoBuildCmd,
+		manifest: &CargoManifest,
+	) -> String {
+		self.resource_name(build_cmd, manifest, "bucket")
+	}
+
+	/// binary-resource-stage convention to match
+	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
+	fn resource_name(
+		&self,
+		build_cmd: &CargoBuildCmd,
+		manifest: &CargoManifest,
+		resource_name: &str,
+	) -> String {
+		let binary_name = build_cmd
+			.binary_name(manifest.package_name())
+			.to_kebab_case();
 		let stage = self.stage(build_cmd);
-		format! {"{}-lambda-{}",binary_name.to_kebab_case(),stage}
+		format! {"{binary_name}-{resource_name}-{stage}"}
 	}
 
 	fn run_sst(&self, build_cmd: &CargoBuildCmd, subcommand: &str) -> Result {

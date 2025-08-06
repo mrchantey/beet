@@ -19,7 +19,7 @@ pub struct LambdaConfig {
 }
 
 
-pub fn lambda_build(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
+pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 	let build_cmd = build_cmd
 		.clone()
 		.cmd("build")
@@ -45,14 +45,12 @@ pub fn lambda_build(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 }
 
 /// Deploy to lambda, using best effort to determine the binary name
-pub fn lambda_deploy(
-	build_cmd: Res<CargoBuildCmd>,
-	manifest: Res<CargoManifest>,
+pub fn deploy_lambda(
 	workspace_config: Res<WorkspaceConfig>,
 	lambda_config: Res<LambdaConfig>,
-	sst_config: Res<SstConfig>,
+	infra: InfraUtils,
 ) -> Result {
-	let binary_name = build_cmd.binary_name(manifest.package_name());
+	let binary_name = infra.binary_name();
 
 	let html_dir = workspace_config
 		.html_dir
@@ -84,7 +82,7 @@ pub fn lambda_deploy(
 		cmd.arg("--region").arg(region);
 	};
 
-	let function_name = sst_config.lambda_func_name(&build_cmd, &manifest);
+	let function_name = infra.lambda_func_name();
 	cmd.arg(&function_name);
 
 	// Print the full command before executing
@@ -94,23 +92,40 @@ pub fn lambda_deploy(
 }
 
 
-pub fn lambda_log(
-	build_cmd: Res<CargoBuildCmd>,
-	manifest: Res<CargoManifest>,
-	sst_config: Res<SstConfig>,
-) -> Result {
+pub fn lambda_log(infra: InfraUtils) -> Result {
 	let mut cmd = Command::new("aws");
-	let function_name = sst_config.lambda_func_name(&build_cmd, &manifest);
+	let function_name = infra.lambda_func_name();
+	println!("🌱 Watching Lambda logs {function_name}\n   {cmd:?}");
 	cmd.arg("logs")
 		.arg("tail")
 		.arg(format!("/aws/lambda/{function_name}"))
 		.arg("--format")
-		.arg("short")// detailed,short,json
+		.arg("short") // detailed,short,json
 		.arg("--since")
 		.arg("2m")
-		.arg("--follow");
+		.arg("--follow")
+		.status()?
+		.exit_ok()?
+		.xok()
+}
 
-	println!("🌱 Watching Lambda logs {function_name}\n   {cmd:?}");
 
-	cmd.status()?.exit_ok()?.xok()
+pub fn sync_bucket(
+	ws_config: Res<WorkspaceConfig>,
+	infra: InfraUtils,
+) -> Result {
+	let bucket_name = infra.bucket_name();
+
+	let src = &ws_config.html_dir.into_abs().to_string();
+	let dst = format!("s3://{bucket_name}");
+
+	let mut cmd = Command::new("aws");
+	cmd.arg("s3")
+		.arg("sync")
+		.arg(&src)
+		.arg(&dst)
+		.arg("--delete")
+		.status()?
+		.exit_ok()?
+		.xok()
 }

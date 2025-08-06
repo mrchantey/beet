@@ -31,7 +31,18 @@ export default $config({
     const resourceName = (resourceType: string) =>
       `${appName}-${resourceType}-${$app.stage}`;
 
-    // 1. create the api gateway
+    // 1. create the s3 bucket for serving static html
+    const _bucket = new sst.aws.Bucket(resourceName("bucket"), {
+      name: resourceName("bucket"),
+      access: "public",
+      transform: {
+        bucket: (args: any) => {
+          args.bucket = resourceName("bucket");
+        },
+      },
+    });
+
+    // 2. create the api gateway
     const gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
       domain: {
         name: `${domainPrefix}${domainName}`,
@@ -39,13 +50,13 @@ export default $config({
       },
       cors: true,
       transform: {
-        stage: (args:any) => {
+        stage: (args: any) => {
           args.name = "$default";
           args.autoDeploy = true;
         },
       },
     });
-    // 2. create the lambda function
+    // 3. create the lambda function
     const func = new sst.aws.Function(resourceName("lambda"), {
       // this name *must* match RunInfra::lambda_func_name
       name: resourceName("lambda"),
@@ -61,7 +72,11 @@ export default $config({
           actions: [
             "s3:*",
           ],
-          resources: ["*"],
+          resources: [
+            "*",
+            // bucket.arn,
+            // `${bucket.arn}/*`,
+          ],
         },
         {
           actions: [
@@ -74,7 +89,7 @@ export default $config({
       ],
     });
 
-    // 3. point the gateway's default route to the function
+    // 4. point the gateway's default route to the function
     const _route = gateway.route("$default", func.arn);
   },
 });

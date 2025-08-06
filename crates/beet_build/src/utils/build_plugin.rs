@@ -102,8 +102,10 @@ impl Plugin for BuildPlugin {
 						.run_if(BuildFlag::CompileClient.should_run()),
 					run_server.run_if(BuildFlag::RunServer.should_run()),
 					deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
-					lambda_build.run_if(BuildFlag::CompileLambda.should_run()),
-					lambda_deploy.run_if(BuildFlag::DeployLambda.should_run()),
+					compile_lambda
+						.run_if(BuildFlag::CompileLambda.should_run()),
+					deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
+					sync_bucket.run_if(BuildFlag::SyncBucket.should_run()),
 					lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),

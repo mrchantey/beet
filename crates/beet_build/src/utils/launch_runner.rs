@@ -210,6 +210,8 @@ pub enum BuildFlag {
 	DeployLambda,
 	/// Watch the lambda function logs
 	WatchLambda,
+	/// Sync the s3 bucket
+	SyncBucket,
 }
 
 impl BuildFlag {
@@ -233,6 +235,7 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
 			BuildFlag::DeployLambda => write!(f, "deploy-lambda"),
 			BuildFlag::WatchLambda => write!(f, "watch-lambda"),
+			BuildFlag::SyncBucket => write!(f, "sync-bucket"),
 		}
 	}
 }
@@ -253,6 +256,7 @@ impl FromStr for BuildFlag {
 			"compile-lambda" => Ok(BuildFlag::CompileLambda),
 			"deploy-lambda" => Ok(BuildFlag::DeployLambda),
 			"watch-lambda" => Ok(BuildFlag::WatchLambda),
+			"sync-bucket" => Ok(BuildFlag::SyncBucket),
 			_ => Err(format!("Unknown flag: {}", s)),
 		}
 	}
