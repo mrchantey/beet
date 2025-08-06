@@ -16,6 +16,7 @@ publish = true
 default = ["axum", "reload"]
 # wip: axum features behind this flag
 axum = ["dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
+aws = ["dep:aws-sdk-s3"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 
@@ -50,6 +51,7 @@ tower = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
 lambda_http = { version = "0.16", optional = true }
+aws-sdk-s3 = { version = "1", optional = true }
 
 [dev-dependencies]
 sweet.workspace = true

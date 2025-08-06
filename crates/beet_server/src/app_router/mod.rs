@@ -1,10 +1,14 @@
 mod clone_world;
 mod collect_html;
 mod router_plugin;
+#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+mod s3_fallback;
 mod server_runner;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub use axum_runner::*;
 pub use collect_html::*;
+#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+pub use s3_fallback::*;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_runner;
 mod bundle_layer;

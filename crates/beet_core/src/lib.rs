@@ -3,7 +3,7 @@
 #![feature(let_chains)]
 
 #[cfg(feature = "http")]
-mod http_utils;
+pub mod http_utils;
 
 pub mod node;
 #[cfg(feature = "tokens")]

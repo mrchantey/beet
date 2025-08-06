@@ -12,6 +12,14 @@ pub struct Javascript(pub String);
 pub struct Png(pub String);
 
 
+/// The uri path of the request
+impl From<Request> for RoutePath {
+	fn from(value: Request) -> Self {
+		let path = value.parts.uri.path();
+		Self::new(path)
+	}
+}
+
 impl Into<Html> for String {
 	fn into(self) -> Html { Html(self) }
 }
@@ -24,7 +32,6 @@ impl Into<Javascript> for String {
 impl Into<Png> for String {
 	fn into(self) -> Png { Png(self) }
 }
-
 
 pub struct JsonResult<T, E> {
 	pub result: Result<T, E>,

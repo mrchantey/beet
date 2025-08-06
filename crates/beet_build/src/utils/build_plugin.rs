@@ -90,7 +90,8 @@ impl Plugin for BuildPlugin {
 					import_rsx_snippets_md,
 					ParseRsxTokens.run(),
 					update_file_expr_hash,
-					RouteCodegen.run().run_if(BuildFlag::Codegen.should_run()),
+					RouteCodegen.run(),
+					// .run_if(BuildFlag::Codegen.should_run()),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
 					export_route_codegen
