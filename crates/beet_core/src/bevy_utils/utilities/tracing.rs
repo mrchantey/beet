@@ -3,7 +3,8 @@ use bevy::log::tracing_subscriber;
 use bevy::log::tracing_subscriber::EnvFilter;
 
 
-/// Opinionated tracing defaults for bevy,
+/// Opinionated tracing defaults for bevy, using the provided level
+/// if none in environment variables.
 /// if already initialized, this will do nothing
 pub fn init_pretty_tracing(level: tracing::Level) {
 	let sub = tracing_subscriber::fmt()
@@ -22,9 +23,8 @@ pub fn init_pretty_tracing(level: tracing::Level) {
 						"tower_http=debug,axum::rejection=trace,wgpu=error,naga=warn,bevy_app=warn",
 						// "{}=debug,tower_http=debug,axum::rejection=trace,wgpu=error,naga=warn,bevy_app=warn",
 						// env!("CARGO_CRATE_NAME")
-					))
+					)).add_directive(level.into())
 				})
-				.add_directive(level.into()),
 		);
 	#[cfg(debug_assertions)]
 	// remove timestamps from the output in debug mode

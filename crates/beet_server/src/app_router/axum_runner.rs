@@ -63,6 +63,13 @@ impl AxumRunner {
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
 		let mut router = Self::router(app.world_mut());
+		trace!("This is Trace");
+		info!("This is Info");
+		debug!("This is Debug");
+		warn!("This is Warn");
+		error!("This is Error");
+		#[cfg(feature = "lambda")]
+		lambda_http::tracing::error!("Waddup");
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
@@ -97,12 +104,10 @@ impl AxumRunner {
 			router = router.layer(
 				tower_http::trace::TraceLayer::new_for_http()
 					.make_span_with(
-						tower_http::trace::DefaultMakeSpan::new()
-							.level(self.tracing),
+						tower_http::trace::DefaultMakeSpan::new(), // .level(self.runner.tracing),
 					)
 					.on_response(
-						tower_http::trace::DefaultOnResponse::new()
-							.level(self.tracing),
+						tower_http::trace::DefaultOnResponse::new(), // .level(self.runner.tracing),
 					),
 			);
 		}

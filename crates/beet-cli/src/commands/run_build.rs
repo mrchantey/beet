@@ -18,23 +18,11 @@ pub enum RunMode {
 
 
 impl RunBuild {
-	pub fn load_binary_name(&self) -> Result<String> {
-		let manifest = CargoManifest::load()?;
-		let package_name = manifest.package_name();
-		Ok(self.build_cmd.binary_name(package_name))
-	}
-
-	pub fn workspace_config(&self) -> Result<WorkspaceConfig> {
-		todo!("load from toml, bsn or cli args");
-		// Ok(WorkspaceConfig::default())
-	}
 
 	#[allow(unused)]
-	pub async fn run(self, _run_mode: RunMode) -> Result {
-		todo!("pass run mode");
-		let mut app = App::new();
-
-		app.add_plugins(BuildPlugin::default())
+	pub async fn run(self) -> Result {
+		App::new()
+			.add_plugins(BuildPlugin::default())
 			.set_runner(LaunchRunner::runner)
 			.run()
 			.into_result()

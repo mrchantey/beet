@@ -4,7 +4,6 @@ use beet_rsx::as_beet::ResultExtDisplay;
 #[allow(unused_imports)]
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
-use tracing::Level;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]
 use crate::prelude::*;
@@ -19,21 +18,9 @@ pub struct ServerRunner {
 	/// Specify the router mode
 	#[command(subcommand)]
 	pub mode: Option<RouterMode>,
-	/// The tracing level to use for the app.
-	#[arg(long, default_value = "info")]
-	// tracing: Level::WARN,
-	pub tracing: Level,
 }
 impl Default for ServerRunner {
-	fn default() -> Self {
-		Self {
-			mode: None,
-			#[cfg(test)]
-			tracing: Level::WARN,
-			#[cfg(not(test))]
-			tracing: Level::INFO,
-		}
-	}
+	fn default() -> Self { Self { mode: None } }
 }
 
 
@@ -77,8 +64,14 @@ impl ServerRunner {
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run(self, mut app: App) -> Result {
-		#[cfg(not(feature = "lambda"))]
-		init_pretty_tracing(bevy::log::Level::DEBUG);
+		
+		#[cfg(not(feature = "lambda"))]{
+			#[cfg(test)]
+			let level = tracing::Level::WARN;
+			#[cfg(not(test))]
+			let level = tracing::Level::DEBUG;
+			init_pretty_tracing(level);
+		}
 
 		let mode = self.mode.unwrap_or_default();
 		if let RouterMode::Ssg = mode {}
@@ -88,8 +81,9 @@ impl ServerRunner {
 				return self.export_html(&mut app);
 			}
 			RouterMode::Ssg => {
-				// despawn all static endpoints, they will be loaded from the html dir
+				#[cfg(not(feature = "lambda"))]
 				self.export_html(&mut app)?;
+				// despawn all static endpoints, they will be loaded from the html dir
 				for (entity, _) in app
 					.world_mut()
 					.run_system_cached(ResolvedEndpoint::collect_static_get)?

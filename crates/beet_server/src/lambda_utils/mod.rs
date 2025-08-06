@@ -23,7 +23,8 @@ where
 	tracing::init_default_subscriber();
 	tracing::info!("🌱 listening for requests");
 
-	lambda_http::run(handler)
-		.await
-		.map_err(|err| anyhow::anyhow!("{}", err))
+	lambda_http::run(handler).await.map_err(|err| {
+		tracing::error!("Error running lambda: {:?}", err);
+		anyhow::anyhow!("{}", err)
+	})
 }

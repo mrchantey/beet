@@ -5,22 +5,38 @@ use bevy::prelude::*;
 use clap::Parser;
 use std::str::FromStr;
 use std::time::Duration;
+use clap::Subcommand;
+use dotenv::dotenv;
 
 
-
-
-
+/// Entrypoint for a beet launch sequence.
+/// All environment variables in a `.env` file in the current directory will be loaded.
 #[derive(Debug, Default, Clone, Parser)]
 pub struct LaunchRunner {
 	#[arg(short, long)]
 	pub watch: bool,
+	#[command(subcommand)]
+	pub launch_cmd: Option<LaunchCmd>,
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
 	pub(crate) build_cmd: CargoBuildCmd,
-	/// Only execute the provided build steps,
-	/// options are "routes", "snippets", "client-islands", "compile-server", "export-ssg", "compile-wasm", "run-server"
+	/// Only execute the provided build steps, options are:
+	/// - import-snippets
+	/// - export-snippets
+	/// - codegen
+	/// - compile-server
+	/// - compile-wasm
+	/// - export-ssg
+	/// - run-server
+	/// - deploy-sst
+	/// - compile-lambda
+	/// - deploy-lambda
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
+	#[command(flatten)]
+	pub(crate) sst_config: Option<SstConfig>,
+	#[command(flatten)]
+	pub(crate) lambda_config: Option<LambdaConfig>,
 }
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
@@ -29,12 +45,25 @@ fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 impl LaunchRunner {
 	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
+		dotenv().ok();
 		init_pretty_tracing(bevy::log::Level::DEBUG);
 
-		if !self.only.is_empty() {
-			app.insert_resource(BuildFlags::Only(self.only.clone()));
-		}
+		let flags = if let Some(launch_cmd) = self.launch_cmd {
+			launch_cmd.into()
+		} else if self.only.is_empty() {
+			LaunchCmd::Run.into()
+		}else{			
+			BuildFlags::new(self.only.clone())
+		};
+		app.insert_resource(flags);
 		app.insert_resource(self.build_cmd.clone());
+
+		if let Some(sst_config) = &self.sst_config {
+			app.insert_resource(sst_config.clone());
+		}
+		if let Some(lambda_config) = &self.lambda_config {
+			app.insert_resource(lambda_config.clone());
+		}
 
 		let result = match self.watch {
 			true => self.watch(app),
@@ -42,6 +71,9 @@ impl LaunchRunner {
 		};
 		result
 	}
+
+	/// Run in watch mode, running again if any file
+	/// specified in the [`WorkspaceConfig`] changes.
 	#[tokio::main]
 	async fn watch(self, mut app: App) -> AppExit {
 		let config = app
@@ -64,3 +96,166 @@ impl LaunchRunner {
 		.await
 	}
 }
+
+/// High level [`BuildFlag`] combinations
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Subcommand)]
+pub enum LaunchCmd {
+	/// Exports snippets and codegen, then compiles and runs the server.
+	#[default]
+	Run,
+	Codegen,
+	Snippets,
+	Serve,
+	Deploy,
+	/// Update the lambda function
+	Lambda,
+}
+
+impl LaunchCmd {
+	#[rustfmt::skip]
+	pub fn into_flags(&self) -> Vec<BuildFlag> {
+		match self {
+			Self::Run => vec![]
+				.xtend(Self::Codegen.into_flags())
+				.xtend(Self::Snippets.into_flags())
+				.xtend(Self::Serve.into_flags()),
+			Self::Snippets => vec![
+				BuildFlag::ImportSnippets,
+				BuildFlag::ExportSnippets,
+			],
+			Self::Codegen => vec![
+				BuildFlag::ImportSnippets, 
+				BuildFlag::Codegen
+			],
+			Self::Serve => vec![
+				BuildFlag::CompileServer,
+				BuildFlag::CompileWasm,
+				BuildFlag::ExportSsg,
+				BuildFlag::RunServer,
+			],
+			Self::Deploy => vec![
+				BuildFlag::DeploySst,
+				BuildFlag::CompileLambda,
+				BuildFlag::DeployLambda,
+				BuildFlag::WatchLambda,
+			],
+			Self::Lambda => vec![
+				BuildFlag::CompileLambda,
+				BuildFlag::DeployLambda,
+				BuildFlag::WatchLambda,
+			],
+		}
+	}
+}
+
+impl Into<BuildFlags> for LaunchCmd {
+	fn into(self) -> BuildFlags { BuildFlags::Only(self.into_flags()) }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+pub enum BuildFlags {
+	/// Run with all flags enabled.
+	#[cfg_attr(not(test), default)]
+	All,
+	#[cfg_attr(test, default)]
+	/// Run with no flags enabled.
+	None,
+	/// Only run with the specified flags.
+	Only(Vec<BuildFlag>),
+}
+
+impl BuildFlags {
+	pub fn new(mut flags: Vec<BuildFlag>) -> Self {
+		if flags.is_empty() {
+			Self::None
+		} else {
+			flags.sort();
+			flags.dedup();
+			Self::Only(flags)
+		}
+	}
+
+	pub fn only(flag: BuildFlag) -> Self { Self::Only(vec![flag]) }
+	pub fn contains(&self, flag: BuildFlag) -> bool {
+		match self {
+			Self::All => true,
+			Self::None => false,
+			Self::Only(flags) => flags.contains(&flag),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BuildFlag {
+	/// Load all snippets defined in the [`WorkspaceConfig`]
+	ImportSnippets,
+	/// Generate File Snippet Scenes
+	ExportSnippets,
+	/// Generate Router Codegen
+	Codegen,
+	/// Compile the server binary
+	CompileServer,
+	/// Compile the wasm client binary
+	CompileWasm,
+	/// Run the server to export static html, this re-runs on snippet changes
+	ExportSsg,
+	/// Run the server
+	RunServer,
+	/// Run `sst deploy`, syncing local config with cloud infra
+	DeploySst,
+	/// Build the lambda function
+	CompileLambda,
+	/// Deploy the lambda function
+	DeployLambda,
+	/// Watch the lambda function logs
+	WatchLambda,
+}
+
+impl BuildFlag {
+	/// A predicate system for run_if conditions
+	pub fn should_run(self) -> impl Fn(Res<BuildFlags>) -> bool {
+		move |flags| flags.contains(self)
+	}
+}
+
+impl std::fmt::Display for BuildFlag {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			BuildFlag::ImportSnippets => write!(f, "import-snippets"),
+			BuildFlag::ExportSnippets => write!(f, "export-snippets"),
+			BuildFlag::Codegen => write!(f, "codegen"),
+			BuildFlag::CompileServer => write!(f, "compile-server"),
+			BuildFlag::ExportSsg => write!(f, "export-ssg"),
+			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
+			BuildFlag::RunServer => write!(f, "run-server"),
+			BuildFlag::DeploySst => write!(f, "deploy-sst"),
+			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
+			BuildFlag::DeployLambda => write!(f, "deploy-lambda"),
+			BuildFlag::WatchLambda => write!(f, "watch-lambda"),
+		}
+	}
+}
+
+impl FromStr for BuildFlag {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s.to_lowercase().as_str() {
+			"import-snippets" => Ok(BuildFlag::ImportSnippets),
+			"export-snippets" => Ok(BuildFlag::ExportSnippets),
+			"codegen" => Ok(BuildFlag::Codegen),
+			"compile-server" => Ok(BuildFlag::CompileServer),
+			"export-ssg" => Ok(BuildFlag::ExportSsg),
+			"compile-wasm" => Ok(BuildFlag::CompileWasm),
+			"run-server" => Ok(BuildFlag::RunServer),
+			"deploy-sst" => Ok(BuildFlag::DeploySst),
+			"compile-lambda" => Ok(BuildFlag::CompileLambda),
+			"deploy-lambda" => Ok(BuildFlag::DeployLambda),
+			"watch-lambda" => Ok(BuildFlag::WatchLambda),
+			_ => Err(format!("Unknown flag: {}", s)),
+		}
+	}
+}
+
+
+

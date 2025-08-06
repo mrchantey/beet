@@ -5,7 +5,6 @@ use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use cargo_manifest::Manifest;
-use std::str::FromStr;
 
 
 #[derive(Resource, Deref)]
@@ -68,6 +67,8 @@ impl Plugin for BuildPlugin {
 			.insert_schedule_before(Update, BuildSequence)
 			.init_resource::<BuildFlags>()
 			.init_resource::<WorkspaceConfig>()
+			.init_resource::<SstConfig>()
+			.init_resource::<LambdaConfig>()
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
@@ -84,94 +85,22 @@ impl Plugin for BuildPlugin {
 					import_rsx_snippets_md,
 					ParseRsxTokens.run(),
 					update_file_expr_hash,
-					RouteCodegen.run(),
+					RouteCodegen.run().run_if(BuildFlag::Codegen.should_run()),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
-					export_route_codegen.run_if(BuildFlag::Routes.should_run()),
+					export_route_codegen
+						.run_if(BuildFlag::Codegen.should_run()),
 					compile_server
 						.run_if(BuildFlag::CompileServer.should_run()),
 					export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),
 					compile_client.run_if(BuildFlag::CompileWasm.should_run()),
 					run_server.run_if(BuildFlag::RunServer.should_run()),
+					deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
+					lambda_build.run_if(BuildFlag::CompileLambda.should_run()),
+					lambda_deploy.run_if(BuildFlag::DeployLambda.should_run()),
+					lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),
 			);
-	}
-}
-
-
-
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
-pub enum BuildFlags {
-	/// Run with all flags enabled.
-	#[cfg_attr(not(test), default)]
-	All,
-	#[cfg_attr(test, default)]
-	/// Run with no flags enabled.
-	None,
-	/// Only run with the specified flags.
-	Only(Vec<BuildFlag>),
-}
-
-impl BuildFlags {
-	pub fn only(flag: BuildFlag) -> Self { Self::Only(vec![flag]) }
-	pub fn contains(&self, flag: BuildFlag) -> bool {
-		match self {
-			Self::All => true,
-			Self::None => false,
-			Self::Only(flags) => flags.contains(&flag),
-		}
-	}
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildFlag {
-	ImportSnippets,
-	/// Generate File Snippet Scenes
-	ExportSnippets,
-	/// Generate Router Codegen
-	Routes,
-	CompileServer,
-	ExportSsg,
-	CompileWasm,
-	RunServer,
-}
-
-impl BuildFlag {
-	/// A predicate system for run_if conditions
-	pub fn should_run(self) -> impl Fn(Res<BuildFlags>) -> bool {
-		move |flags| flags.contains(self)
-	}
-}
-
-impl std::fmt::Display for BuildFlag {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			BuildFlag::ImportSnippets => write!(f, "import-snippets"),
-			BuildFlag::ExportSnippets => write!(f, "export-snippets"),
-			BuildFlag::Routes => write!(f, "routes"),
-			BuildFlag::CompileServer => write!(f, "compile-server"),
-			BuildFlag::ExportSsg => write!(f, "export-ssg"),
-			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
-			BuildFlag::RunServer => write!(f, "run-server"),
-		}
-	}
-}
-
-impl FromStr for BuildFlag {
-	type Err = String;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s.to_lowercase().as_str() {
-			"import-snippets" => Ok(BuildFlag::ImportSnippets),
-			"export-snippets" => Ok(BuildFlag::ExportSnippets),
-			"routes" => Ok(BuildFlag::Routes),
-			"compile-server" => Ok(BuildFlag::CompileServer),
-			"export-ssg" => Ok(BuildFlag::ExportSsg),
-			"compile-wasm" => Ok(BuildFlag::CompileWasm),
-			"run-server" => Ok(BuildFlag::RunServer),
-			_ => Err(format!("Unknown flag: {}", s)),
-		}
 	}
 }

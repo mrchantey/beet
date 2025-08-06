@@ -40,9 +40,9 @@ where
 	}
 }
 
-impl<T> IntoBundle<Self> for Option<T>
+impl<T, M> IntoBundle<(Self, M)> for Option<T>
 where
-	T: 'static + Send + Sync + IntoBundle<Self>,
+	T: IntoBundle<M>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		match self {

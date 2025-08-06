@@ -107,6 +107,15 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
+	pub fn cmd(mut self, cmd: impl Into<String>) -> Self {
+		self.cmd = cmd.into();
+		self
+	}
+
+	pub fn release(mut self) -> Self {
+		self.release = true;
+		self
+	}
 	pub fn parse() -> Self { Parser::parse() }
 	pub fn no_default_features(mut self) -> Self {
 		self.no_default_features = true;
@@ -114,6 +123,14 @@ impl CargoBuildCmd {
 	}
 	pub fn target(mut self, target: impl Into<String>) -> Self {
 		self.target = Some(target.into());
+		self
+	}
+	pub fn trailing_arg(mut self, arg: impl Into<String>) -> Self {
+		self.trailing_args.push(arg.into());
+		self
+	}
+	pub fn with_feature(mut self, feature: impl Into<String>) -> Self {
+		self.push_feature(feature);
 		self
 	}
 
@@ -189,8 +206,10 @@ impl CargoBuildCmd {
 		path
 	}
 
-	/// Blocking spawn of the cargo build command
-	pub fn spawn(&self) -> Result<&Self> {
+
+	/// Returns the arguments to be passed to the cargo command,
+	/// excluding `cargo` itself.
+	pub fn get_args(&self) -> Vec<&str> {
 		let CargoBuildCmd {
 			cmd,
 			package,
@@ -224,6 +243,7 @@ impl CargoBuildCmd {
 			offline,
 			frozen,
 		} = self;
+
 
 		// Collect args in a vector for printing
 		let mut args = Vec::new();
@@ -349,6 +369,12 @@ impl CargoBuildCmd {
 				args.push(arg);
 			}
 		}
+		args
+	}
+
+	/// Blocking spawn of the cargo build command
+	pub fn spawn(&self) -> Result<&Self> {
+		let args = self.get_args();
 
 		// Print the command
 		debug!("Running: cargo {}", args.join(" "));
