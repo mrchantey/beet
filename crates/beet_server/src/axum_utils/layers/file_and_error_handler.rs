@@ -20,8 +20,8 @@ pub fn file_and_error_handler(
 > + Clone
 + Send
 + 'static {
-	async fn handle_404() -> (StatusCode, &'static str) {
-		(StatusCode::NOT_FOUND, "File Not found")
+	async fn handle_404() -> StatusCode {
+		StatusCode::NOT_FOUND
 	}
 
 	let serve_dir = ServeDir::new(file_dir)
@@ -37,6 +37,7 @@ pub fn file_and_error_handler(
 			tower::service_fn(move |req: Request| {
 				let mut req = req;
 				let mut uri = req.uri().to_string();
+
 				// Extract the last path component
 				// Check if the last component has a file extension
 				if !uri
@@ -53,6 +54,7 @@ pub fn file_and_error_handler(
 				}
 
 				svc.call(req)
+
 			})
 		})
 		.service(serve_dir)

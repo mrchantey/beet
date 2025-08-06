@@ -64,14 +64,7 @@ impl ServerRunner {
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run(self, mut app: App) -> Result {
-		
-		#[cfg(not(feature = "lambda"))]{
-			#[cfg(test)]
-			let level = tracing::Level::WARN;
-			#[cfg(not(test))]
-			let level = tracing::Level::DEBUG;
-			init_pretty_tracing(level);
-		}
+		PrettyTracing::default().init();
 
 		let mode = self.mode.unwrap_or_default();
 		if let RouterMode::Ssg = mode {}

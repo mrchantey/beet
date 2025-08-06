@@ -104,6 +104,8 @@ pub fn lambda_log(
 	cmd.arg("logs")
 		.arg("tail")
 		.arg(format!("/aws/lambda/{function_name}"))
+		.arg("--format")
+		.arg("short")// detailed,short,json
 		.arg("--since")
 		.arg("2m")
 		.arg("--follow");

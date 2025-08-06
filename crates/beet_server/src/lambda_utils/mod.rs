@@ -20,7 +20,8 @@ where
 		std::env::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true");
 	};
 	// required to enable CloudWatch error logging by the runtime
-	tracing::init_default_subscriber();
+	// tracing::init_default_subscriber(); //deprecated use PrettyTracing instead
+
 	tracing::info!("🌱 listening for requests");
 
 	lambda_http::run(handler).await.map_err(|err| {

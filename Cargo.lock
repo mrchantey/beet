@@ -487,9 +487,9 @@ dependencies = [
 
 [[package]]
 name = "aws_lambda_events"
-version = "0.16.1"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "144ec7565561115498a288850cc6a42b279e09b6c4b88f623eecb9c8ca96c08c"
+checksum = "f3cd5d79ca6be17e6cdc157fccf22a0190a8c83ea0e04dc8a4429aea65627740"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -700,7 +700,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -730,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -759,6 +759,7 @@ dependencies = [
  "bevy",
  "cargo-manifest",
  "clap",
+ "dotenv",
  "flume",
  "futures",
  "heck 0.4.1",
@@ -783,7 +784,7 @@ dependencies = [
 
 [[package]]
 name = "beet_connect"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -800,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -851,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -864,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -882,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -903,7 +904,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -919,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "extend",
@@ -932,7 +933,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -965,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -991,10 +992,10 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_core",
  "beet_query_macros",
  "beet_utils",
@@ -1012,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1027,7 +1028,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1058,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1068,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1083,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1112,7 +1113,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1123,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet",
@@ -1136,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1156,7 +1157,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -3350,6 +3351,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
 name = "downcast-rs"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5283,15 +5290,13 @@ dependencies = [
 
 [[package]]
 name = "lambda_http"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b470cea1ec37b96e9543870a33c1f4b9e243754fe5892668efa3125ea12784"
+checksum = "ae130903c5ecaf238bb2e08c22d678e330d72aefc1f503bd02a18f4fcc5e8e12"
 dependencies = [
  "aws_lambda_events",
- "base64 0.22.1",
  "bytes",
  "encoding_rs",
- "futures",
  "futures-util",
  "http 1.3.1",
  "http-body 1.0.1",
@@ -5310,20 +5315,18 @@ dependencies = [
 
 [[package]]
 name = "lambda_runtime"
-version = "0.13.0"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed49669d6430292aead991e19bf13153135a884f916e68f32997c951af637ebe"
+checksum = "b155960b864ababcc5ab553c9336e46db8ed0ad1cd38dc3be9e7c37b177aa310"
 dependencies = [
  "async-stream",
  "base64 0.22.1",
  "bytes",
  "futures",
  "http 1.3.1",
- "http-body 1.0.1",
  "http-body-util",
  "http-serde",
  "hyper 1.6.0",
- "hyper-util",
  "lambda_runtime_api_client",
  "pin-project",
  "serde",
@@ -5331,16 +5334,15 @@ dependencies = [
  "serde_path_to_error",
  "tokio",
  "tokio-stream",
- "tower 0.4.13",
- "tower-layer",
+ "tower 0.5.2",
  "tracing",
 ]
 
 [[package]]
 name = "lambda_runtime_api_client"
-version = "0.11.1"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c90a10f094475a34a04da2be11686c4dcfe214d93413162db9ffdff3d3af293a"
+checksum = "5e55fdc596aea5afeb406e549990b4fb4bfd7bbfe4f574282c4c3aacf22e73e7"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -5350,9 +5352,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.6.0",
  "hyper-util",
- "tokio",
- "tower 0.4.13",
- "tower-service",
+ "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
 ]
@@ -8437,7 +8437,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -8454,7 +8454,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.7-dev.0"
+version = "0.0.7-dev.1"
 dependencies = [
  "anyhow",
  "proc-macro2",

@@ -44,19 +44,22 @@ impl Plugin for BuildPlugin {
 			.set(bevy::ecs::error::panic)
 			.ok();
 
-		#[cfg(not(test))]
-		app.insert_resource(
-			//todo parse the package name etc, this is used for compiling server and client
-			// but a verbatim parse() confuses the cli
-			CargoBuildCmd::default(),
-		)
-		.insert_resource(CargoManifest::load().unwrap())
-		.add_systems(
+		app.add_systems(
 			Startup,
-			// alternatively use import_route_file_collection to only load
-			// source files used by file based routes
-			load_workspace_source_files
-				.run_if(BuildFlag::ImportSnippets.should_run()),
+			(
+				|mut commands: Commands| {
+					// ensure at least one FileExprHash is present to trigger
+					// listeners at least once
+					commands.spawn((
+						Name::new("empty FileExprHash"),
+						FileExprHash::default(),
+					));
+				},
+				// alternatively use import_route_file_collection to only load
+				// source files used by file based routes
+				load_workspace_source_files
+					.run_if(BuildFlag::ImportSnippets.should_run()),
+			),
 		);
 
 		app.add_event::<WatchEvent>()
@@ -65,7 +68,9 @@ impl Plugin for BuildPlugin {
 			.init_plugin(RouteCodegenPlugin)
 			.init_plugin(NodeTypesPlugin)
 			.insert_schedule_before(Update, BuildSequence)
+			.insert_resource(CargoManifest::load().unwrap())
 			.init_resource::<BuildFlags>()
+			.init_resource::<CargoBuildCmd>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<SstConfig>()
 			.init_resource::<LambdaConfig>()
@@ -93,7 +98,8 @@ impl Plugin for BuildPlugin {
 					compile_server
 						.run_if(BuildFlag::CompileServer.should_run()),
 					export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),
-					compile_client.run_if(BuildFlag::CompileWasm.should_run()),
+					compile_client
+						.run_if(BuildFlag::CompileClient.should_run()),
 					run_server.run_if(BuildFlag::RunServer.should_run()),
 					deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
 					lambda_build.run_if(BuildFlag::CompileLambda.should_run()),

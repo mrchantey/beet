@@ -46,7 +46,7 @@ impl LaunchRunner {
 	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
 		dotenv().ok();
-		init_pretty_tracing(bevy::log::Level::DEBUG);
+		PrettyTracing::default().init();
 
 		let flags = if let Some(launch_cmd) = self.launch_cmd {
 			launch_cmd.into()
@@ -55,6 +55,7 @@ impl LaunchRunner {
 		}else{			
 			BuildFlags::new(self.only.clone())
 		};
+
 		app.insert_resource(flags);
 		app.insert_resource(self.build_cmd.clone());
 
@@ -129,7 +130,7 @@ impl LaunchCmd {
 			],
 			Self::Serve => vec![
 				BuildFlag::CompileServer,
-				BuildFlag::CompileWasm,
+				BuildFlag::CompileClient,
 				BuildFlag::ExportSsg,
 				BuildFlag::RunServer,
 			],
@@ -196,7 +197,7 @@ pub enum BuildFlag {
 	/// Compile the server binary
 	CompileServer,
 	/// Compile the wasm client binary
-	CompileWasm,
+	CompileClient,
 	/// Run the server to export static html, this re-runs on snippet changes
 	ExportSsg,
 	/// Run the server
@@ -226,7 +227,7 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::Codegen => write!(f, "codegen"),
 			BuildFlag::CompileServer => write!(f, "compile-server"),
 			BuildFlag::ExportSsg => write!(f, "export-ssg"),
-			BuildFlag::CompileWasm => write!(f, "compile-wasm"),
+			BuildFlag::CompileClient => write!(f, "compile-client"),
 			BuildFlag::RunServer => write!(f, "run-server"),
 			BuildFlag::DeploySst => write!(f, "deploy-sst"),
 			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
@@ -246,7 +247,7 @@ impl FromStr for BuildFlag {
 			"codegen" => Ok(BuildFlag::Codegen),
 			"compile-server" => Ok(BuildFlag::CompileServer),
 			"export-ssg" => Ok(BuildFlag::ExportSsg),
-			"compile-wasm" => Ok(BuildFlag::CompileWasm),
+			"compile-client" => Ok(BuildFlag::CompileClient),
 			"run-server" => Ok(BuildFlag::RunServer),
 			"deploy-sst" => Ok(BuildFlag::DeploySst),
 			"compile-lambda" => Ok(BuildFlag::CompileLambda),

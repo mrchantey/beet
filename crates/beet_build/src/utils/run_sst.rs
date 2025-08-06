@@ -7,12 +7,28 @@ use std::process::Command;
 
 /// A very light wrapper around sst, adapted to a few beet specific conventions
 /// like ensuring commands are run in the `infra` directory.
-#[derive(Debug, Default, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Parser, Resource)]
 pub struct SstConfig {
+	/// The default stage for development.
+	#[arg(long, default_value = "dev")]
+	pub dev_stage: String,
+	/// The default stage for production.
+	#[arg(long, default_value = "prod")]
+	pub prod_stage: String,
 	/// Optionally specify the sst stage name used, which will otherwise be inferred
-	/// from debug/release build.
+	/// from debug/release build, defaulting to `dev` or `prod`.
 	#[arg(long)]
 	pub stage: Option<String>,
+}
+
+impl Default for SstConfig {
+	fn default() -> Self {
+		SstConfig {
+			dev_stage: "dev".to_string(),
+			prod_stage: "prod".to_string(),
+			stage: None,
+		}
+	}
 }
 
 pub fn deploy_sst(
@@ -26,12 +42,12 @@ pub fn deploy_sst(
 impl SstConfig {
 	/// Specify the stage name used. if the build command specifies release,
 	/// this defaults to `prod`, otherwise `dev`.
-	pub fn stage(&self, build_cmd: &CargoBuildCmd) -> String {
-		self.stage.clone().unwrap_or_else(|| {
+	pub fn stage(&self, build_cmd: &CargoBuildCmd) -> &str {
+		self.stage.as_ref().unwrap_or_else(|| {
 			if build_cmd.release {
-				"prod".to_string()
+				&self.prod_stage
 			} else {
-				"dev".to_string()
+				&self.dev_stage
 			}
 		})
 	}

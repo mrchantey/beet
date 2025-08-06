@@ -1,5 +1,4 @@
-use beet_core::prelude::AppExt;
-use beet_core::prelude::init_pretty_tracing;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -33,7 +32,7 @@ impl ReactiveApp {
 	/// Consume the app, running it once then
 	/// storing it in a [`thread_local`] and returning immediately.
 	pub fn runner(mut app: App) -> AppExit {
-		init_pretty_tracing(bevy::log::Level::DEBUG);
+		PrettyTracing::default().init();
 		app.init();
 		app.update();
 		APP.with(move |app_ref| {

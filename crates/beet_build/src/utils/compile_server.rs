@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::{node::StaticRoot, prelude::When};
+use beet_core::node::StaticRoot;
 use beet_rsx::as_beet::PathExt;
 use beet_utils::prelude::CargoBuildCmd;
 use bevy::prelude::*;
@@ -10,7 +10,7 @@ use std::process::Command;
 pub(crate) fn compile_server(
 	_query: Populated<(), Changed<FileExprHash>>,
 	mut handle: ResMut<ServerHandle>,
-	cmd: When<Res<CargoBuildCmd>>,
+	cmd: Res<CargoBuildCmd>,
 ) -> Result {
 	// if the server is already running, kill it
 	// before the snippets are exported because
@@ -32,8 +32,8 @@ pub(crate) fn compile_server(
 /// [`StaticRoot`] has changed.
 pub fn export_server_ssg(
 	_query: Populated<(), Changed<StaticRoot>>,
-	cmd: When<Res<CargoBuildCmd>>,
-	manifest: When<Res<CargoManifest>>,
+	cmd: Res<CargoBuildCmd>,
+	manifest: Res<CargoManifest>,
 ) -> Result {
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
@@ -66,8 +66,8 @@ impl Drop for ServerHandle {
 pub(crate) fn run_server(
 	_query: Populated<(), Changed<FileExprHash>>,
 	mut handle: ResMut<ServerHandle>,
-	cmd: When<Res<CargoBuildCmd>>,
-	manifest: When<Res<CargoManifest>>,
+	cmd: Res<CargoBuildCmd>,
+	manifest: Res<CargoManifest>,
 ) -> Result {
 	if let Some(child) = &mut handle.0 {
 		child.kill()?;

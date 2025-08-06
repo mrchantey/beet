@@ -99,7 +99,7 @@ impl AxumRunner {
 		};
 
 
-		#[cfg(not(debug_assertions))]
+		#[cfg(any(not(debug_assertions), feature = "lambda"))]
 		{
 			router = router.layer(
 				tower_http::trace::TraceLayer::new_for_http()

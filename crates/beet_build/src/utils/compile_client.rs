@@ -7,11 +7,13 @@ use std::process::Command;
 
 pub fn compile_client(
 	_query: Populated<(), Changed<FileExprHash>>,
-	html_constants: When<Res<HtmlConstants>>,
-	cmd: When<Res<CargoBuildCmd>>,
-	manifest: When<Res<CargoManifest>>,
-	config: When<Res<WorkspaceConfig>>,
+	html_constants: Res<HtmlConstants>,
+	cmd: Res<CargoBuildCmd>,
+	manifest: Res<CargoManifest>,
+	config: Res<WorkspaceConfig>,
 ) -> Result {
+	debug!("🌱 Building client binary");
+
 	let exe_path = cmd
 		.clone()
 		.target("wasm32-unknown-unknown")
@@ -20,7 +22,6 @@ pub fn compile_client(
 		.spawn()?
 		.exe_path(manifest.package_name());
 
-	debug!("Building client binary");
 	wasm_bindgen(&html_constants, &config.html_dir, &exe_path)?;
 	if cmd.release {
 		wasm_opt(&html_constants, &config.html_dir)?;
@@ -52,7 +53,7 @@ fn wasm_bindgen(
 
 // TODO wasm opt
 fn wasm_opt(html_constants: &HtmlConstants, html_dir: &Path) -> Result<()> {
-	debug!("Optimizing wasm binary");
+	debug!("🌱 Optimizing wasm binary");
 	let wasm_file = html_dir.join(format!(
 		"{}/{}_bg.wasm",
 		&html_constants.wasm_dir.display(),
@@ -70,8 +71,8 @@ fn wasm_opt(html_constants: &HtmlConstants, html_dir: &Path) -> Result<()> {
 		.exit_ok()?;
 
 	let size_after = std::fs::metadata(&wasm_file)?.len();
-	trace!(
-		"Reduced wasm binary from {} to {}",
+	debug!(
+		"🌱 Reduced wasm binary from {} to {}",
 		format!("{} KB", size_before as usize / 1024),
 		format!("{} KB", size_after as usize / 1024)
 	);

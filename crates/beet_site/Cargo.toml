@@ -21,7 +21,7 @@ launch = ["beet/launch"]
 server = ["beet/server", "beet_design/mockups", "beet_design/server"]
 deploy = ["server", "beet/lambda"]
 # used by beet cli for building client
-client = ["beet/client", "beet_design/mockups", "beet_design/client"]
+client = ["beet/client", "beet_design/mockups"]
 
 [dependencies]
 anyhow.workspace = true
