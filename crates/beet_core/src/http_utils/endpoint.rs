@@ -109,6 +109,12 @@ impl ResolvedEndpoint {
 			})
 			.collect()
 	}
+	/// If the endpoint is a static HTML endpoint
+	// TODO check the content type, maybe store on the endpoint?
+	pub fn is_static_html(&self) -> bool {
+		self.method() == HttpMethod::Get
+			&& self.cache_strategy() == CacheStrategy::Static
+	}
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]

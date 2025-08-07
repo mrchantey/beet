@@ -4,9 +4,10 @@ mod client_actions;
 #[cfg(any(feature = "server", feature = "client"))]
 mod codegen;
 // templates may rely on codegen like actions so exclude from launch builds
+#[cfg(feature = "server")]
+mod routes;
 #[cfg(any(feature = "server", feature = "client"))]
 mod templates;
-
 
 #[cfg(feature = "launch")]
 mod collections;
@@ -27,6 +28,8 @@ pub mod prelude {
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(feature = "launch")]
 	pub use crate::collections::*;
+	#[cfg(feature = "server")]
+	pub use crate::routes::*;
 	pub use crate::*;
 }
 

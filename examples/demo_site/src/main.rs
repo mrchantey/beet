@@ -19,35 +19,21 @@ fn main() {
 
 #[cfg(feature = "launch")]
 fn launch_plugin(app: &mut App) {
-	app.world_mut().spawn((
-		RouteCodegenRoot::default(),
-		children![
-			pages_collection(), 
-			docs_collection(), 
-			actions_collection()
-		],
-	));
+	app.world_mut().spawn(collections());
 }
 
 #[cfg(feature = "server")]
 fn server_plugin(app: &mut App) {
-	app.insert_resource(Router::new(|app:&mut App|{app.world_mut().spawn((
-		children![
-			pages_routes(), 
-			docs_routes(), 
-			actions_routes()
-		],
-		// this is placed last to ensure it runs after all handlers
-		RouteHandler::layer(|| {
-			let mut state = AppState::get();
-			state.num_requests += 1;
-			AppState::set(state);
-		}),
-	));}));
+	// create a router, specifying the plugin for Router Apps
+	app.insert_resource(Router::new(|app:&mut App|{
+		app.world_mut().spawn(routes());
+	}));
 }
 
 #[cfg(feature = "client")]
 fn client_plugin(app: &mut App) {
+	// clients load a scene file from the html,
+	// so we need to register any type with a client load directive
 	app
 		.register_type::<ClientIslandRoot<ClientCounter>>()
 		.register_type::<ClientIslandRoot<ServerCounter>>();

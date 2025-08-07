@@ -2,7 +2,15 @@ use beet::exports::syn;
 use beet::prelude::*;
 
 
-pub fn pages_collection() -> impl Bundle {
+pub fn collections() -> impl Bundle {
+	(RouteCodegenRoot::default(), children![
+		pages_collection(),
+		docs_collection(),
+		actions_collection()
+	])
+}
+
+fn pages_collection() -> impl Bundle {
 	(
 		RouteFileCollection {
 			src: AbsPathBuf::new_workspace_rel("src/pages").unwrap(),
@@ -13,7 +21,7 @@ pub fn pages_collection() -> impl Bundle {
 		),
 	)
 }
-pub fn docs_collection() -> impl Bundle {
+fn docs_collection() -> impl Bundle {
 	(
 		RouteFileCollection {
 			src: AbsPathBuf::new_workspace_rel("src/docs").unwrap(),
@@ -29,7 +37,7 @@ pub fn docs_collection() -> impl Bundle {
 		),
 	)
 }
-pub fn actions_collection() -> impl Bundle {
+fn actions_collection() -> impl Bundle {
 	let actions_path =
 		AbsPathBuf::new_workspace_rel("src/codegen/actions.rs").unwrap();
 

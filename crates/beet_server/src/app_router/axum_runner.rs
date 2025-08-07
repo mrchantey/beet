@@ -28,6 +28,7 @@ impl AxumRunner {
 			.cloned()
 			.unwrap_or_default();
 		let beet_router = world.resource::<Router>().clone();
+		let router_mode = world.resource::<RouterMode>().clone();
 
 		let beet_router2 = beet_router.clone();
 		let handler = move |axum_req: axum::extract::Request| async move {
@@ -45,12 +46,19 @@ impl AxumRunner {
 			}
 		};
 
-		let app_pool_endpoints = beet_router
+		for (_, endpoint) in beet_router
 			.pop()
 			.run_system_once(ResolvedEndpoint::collect)
-			.unwrap();
-
-		for (_, endpoint) in app_pool_endpoints {
+			.unwrap()
+			.into_iter()
+			.filter(|(_, info)| {
+				// only register non-static endpoints in ssg
+				if matches!(router_mode, RouterMode::Ssg) {
+					!info.is_static_html()
+				} else {
+					true
+				}
+			}) {
 			let segments = segments_to_axum(endpoint.segments().clone());
 			let method = method_to_axum(endpoint.method());
 			trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
@@ -63,13 +71,6 @@ impl AxumRunner {
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
 		let mut router = Self::router(app.world_mut());
-		trace!("This is Trace");
-		info!("This is Info");
-		debug!("This is Debug");
-		warn!("This is Warn");
-		error!("This is Error");
-		#[cfg(feature = "lambda")]
-		lambda_http::tracing::error!("Waddup");
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());

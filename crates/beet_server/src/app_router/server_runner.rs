@@ -24,7 +24,7 @@ impl Default for ServerRunner {
 }
 
 
-#[derive(Default, Copy, Clone, Subcommand)]
+#[derive(Default, Copy, Clone, Resource, Subcommand)]
 pub enum RouterMode {
 	/// Do not add static routes to the router, instead loading them from
 	/// the `html_dir`.
@@ -67,7 +67,7 @@ impl ServerRunner {
 		PrettyTracing::default().init();
 
 		let mode = self.mode.unwrap_or_default();
-		if let RouterMode::Ssg = mode {}
+		app.insert_resource(mode.clone());
 
 		match mode {
 			RouterMode::ExportHtml => {
@@ -76,14 +76,6 @@ impl ServerRunner {
 			RouterMode::Ssg => {
 				#[cfg(not(feature = "lambda"))]
 				self.export_html(&mut app)?;
-				// despawn all static endpoints, they will be loaded from the html dir
-				for (entity, _) in app
-					.world_mut()
-					.run_system_cached(ResolvedEndpoint::collect_static_get)?
-					.into_iter()
-				{
-					app.world_mut().entity_mut(entity).despawn();
-				}
 			}
 			RouterMode::Ssr => {}
 		}
