@@ -14,35 +14,6 @@ use std::sync::Arc;
 pub struct HandlerBundle;
 
 
-// use beet_rsx::as_beet::*;
-
-// trait AsyncFallbackHandler<Fut>:
-// 	'static + Send + Sync + Fn(&mut World) -> Fut
-// {
-// }
-// impl<Fut, T> AsyncFallbackHandler<Fut> for T
-// where
-// 	Fut: Future<Output = String>,
-// 	T: 'static + Send + Sync + Fn(&mut World) -> Fut,
-// {
-// }
-
-
-// #[template]
-// pub fn AsyncFallback<Fut>(
-// 	handler: Box<dyn AsyncFallbackHandler<Fut>>,
-// ) -> impl Bundle
-// where
-// 	Fut: Future<Output = String>,
-// {
-// 	RouteHandler::async_layer(move |mut world: World| {
-// 		async move {
-// 			let out = handler(&mut world).await;
-// 			world.insert_resource(out.into_response());
-// 			world
-// 		}
-// 	})
-// }
 
 // fn foobar() {
 // 	let a = rsx! {
