@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
@@ -7,21 +9,39 @@ use bevy::prelude::*;
 
 /// A marker component added to a [`Bucket`] to indicate it is used as an Object Storage Fallback.
 /// There should be only one such bucket in the app.
-/// The object storage fallback has two functions:
-/// 1. If the requested path has an extension, create a permanent redirect to the public URL
-/// 2. If the requested path does not have an extension, append `/index.html` and serve the file as HTML.
-/// Serving static files as redirects lightens the load on the server, 
+/// Serving static files as redirects lightens the load on the server,
 /// and serving html through the server makes cors simpler.
 #[derive(Component)]
-pub struct ObjectStorageFallback;
+pub struct ObjectStorageBucket;
 
 
-pub async fn object_storage_fallback(
+pub fn object_storage_fallback(
+	bucket: Bucket,
+	path: impl Into<PathBuf>,
+) -> impl Bundle {
+	let path = RoutePath::new(path);
+	let path_clone = path.clone();
+	(
+		bucket,
+		RouteHandler::async_layer(async move |mut world| {
+		let path = path_clone.clone();
+		if !world.contains_resource::<Response>() {
+			let response = object_storage_handler(&mut world, path).await.into_response();
+			world.insert_resource(response);
+		}
+		world
+	}))
+}
+
+/// The object storage handler has two functions:
+/// 1. If the requested path has an extension, create a permanent redirect to the public URL
+/// 2. If the requested path does not have an extension, append `/index.html` and serve the file as HTML.
+pub async fn object_storage_handler(
 	world: &mut World,
 	path: RoutePath,
 ) -> Result<Response> {
 	let bucket = world
-		.query_filtered::<&Bucket, With<ObjectStorageFallback>>()
+		.query_filtered::<&Bucket, With<ObjectStorageBucket>>()
 		.single(world)?;
 
 	if let Some(_extension) = path.extension() {
@@ -49,9 +69,9 @@ mod test {
 	async fn redirect() {
 		let mut world = World::new();
 		let (bucket, _drop) = Bucket::new_test().await;
-		world.spawn((ObjectStorageFallback, bucket));
+		world.spawn((ObjectStorageBucket, bucket));
 		let path = RoutePath::from("style.css");
-		let response = object_storage_fallback(&mut world, path).await.unwrap();
+		let response = object_storage_handler(&mut world, path).await.unwrap();
 		response
 			.status()
 			.xpect()
@@ -70,9 +90,9 @@ mod test {
 		let path = "docs/index.html";
 		let body = "<h1>Hello, world!</h1>";
 		bucket.insert(path, body).await.unwrap();
-		world.spawn((ObjectStorageFallback, bucket));
+		world.spawn((ObjectStorageBucket, bucket));
 		let path = RoutePath::from("docs");
-		let response = object_storage_fallback(&mut world, path).await.unwrap();
+		let response = object_storage_handler(&mut world, path).await.unwrap();
 		response
 			.into_result()
 			.await

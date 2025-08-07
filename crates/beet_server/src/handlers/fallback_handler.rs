@@ -5,20 +5,19 @@ use bevy::prelude::*;
 
 
 impl RouteHandler {
-
-
 	// pub fn fallback<M>(handler: impl EndpointSystem<M>) -> impl Bundle{
 
 	// 	RouteHandler::new
 
-	// } 
+	// }
 
 
 	/// An async [`RouteHandler`] that will only run if there is no [`Response`] resource in the world.
 	pub fn fallback_async<Handler, Fut, Out>(handler: Handler) -> RouteHandler
 	where
-		Handler: 'static + Send + Sync + Clone + Fn(&mut World) -> Fut,
-		Fut: 'static + Send + Future<Output = Out>,
+		for<'a> Handler:
+			'static + Send + Sync + Clone + Fn(&'a mut World) -> Fut,
+		for<'a> Fut: 'a + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
 		RouteHandler::async_layer(move |mut world: World| {

@@ -27,3 +27,24 @@ where
 		self
 	}
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn works() {
+		fn assert_endpoint_system<I, O, M, M2>(
+			_: impl EndpointSystem<M2, In = I, Out = O, Marker = M>,
+		) {
+		}
+
+		assert_endpoint_system(|| {});
+		// assert_endpoint_system(async || {});
+
+		// expect(true).to_be_false();
+	}
+}

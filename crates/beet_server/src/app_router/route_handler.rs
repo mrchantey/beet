@@ -177,7 +177,7 @@ impl RouteHandler {
 	/// An async route handler with output inserted as a [`Response`]
 	pub fn async_system<Handler, Fut, Out>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + Fn(&mut World) -> Fut,
+		Handler: 'static + Send + Sync + Clone + FnOnce(&mut World) -> Fut,
 		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
@@ -193,7 +193,7 @@ impl RouteHandler {
 	/// An async route handler with output inserted as a [`Response`]
 	pub fn new_async<Handler, Fut, Out>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + Fn(World) -> Fut,
+		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
@@ -211,7 +211,7 @@ impl RouteHandler {
 	/// with a [`HandlerBundle`] component.
 	pub fn async_bundle<Handler, Fut, Out>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + Fn(World) -> Fut,
+		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + Bundle,
 	{
@@ -228,7 +228,7 @@ impl RouteHandler {
 	/// An async route handler with output inserted as a [`Response`]
 	pub fn async_layer<Handler, Fut>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + Fn(World) -> Fut,
+		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = World>,
 	{
 		RouteHandler(Arc::new(move |world: World| {
