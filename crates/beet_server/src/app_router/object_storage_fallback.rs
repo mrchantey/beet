@@ -37,6 +37,7 @@ pub async fn object_storage_fallback(
 }
 
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

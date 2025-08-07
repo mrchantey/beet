@@ -78,7 +78,7 @@ fn impl_template_bundle(
 	let (impl_generics, type_generics, where_clause) =
 		func.sig.generics.split_for_impl();
 
-	let return_type = capture_lifetimes(func.sig.output.clone());
+	let return_type = with_captured_lifetimes(&func);
 
 	let body = &func.block.stmts;
 	let entity_ident = entity_param_ident(fields)
@@ -134,8 +134,8 @@ fn impl_template_bundle(
 /// Any type in the ReturnTyle that is an impl will need an additional `use<>`
 /// constraint, required for valid bevy systems.
 /// https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html
-fn capture_lifetimes(mut return_type: ReturnType) -> ReturnType {
-	fn impl_recursive(ty: &mut syn::Type) {
+fn with_captured_lifetimes(func: &ItemFn) -> ReturnType {
+	fn impl_recursive(func: &ItemFn, ty: &mut syn::Type) {
 		match ty {
 			syn::Type::Path(type_path) => {
 				for segment in &mut type_path.path.segments {
@@ -144,22 +144,30 @@ fn capture_lifetimes(mut return_type: ReturnType) -> ReturnType {
 					{
 						for arg in &mut args.args {
 							if let syn::GenericArgument::Type(ty) = arg {
-								impl_recursive(ty);
+								impl_recursive(func, ty);
 							}
 						}
 					}
 				}
 			}
 			syn::Type::ImplTrait(impl_trait) => {
-				impl_trait.bounds.push(syn::parse_quote! { use<> });
+				let bound = if func.sig.generics.params.is_empty() {
+					syn::parse_quote! { use<> }
+				} else {
+					let (_, type_generics, _) =
+						func.sig.generics.split_for_impl();
+					syn::parse_quote! { use #type_generics }
+				};
+
+				impl_trait.bounds.push(bound);
 			}
 			_ => {}
 		}
 	}
 
-
+	let mut return_type = func.sig.output.clone();
 	if let ReturnType::Type(_, ty) = &mut return_type {
-		impl_recursive(&mut *ty);
+		impl_recursive(func, &mut *ty);
 	}
 	return_type
 }
@@ -213,19 +221,24 @@ fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
 
 #[cfg(test)]
 mod test {
-	use super::capture_lifetimes;
+	use super::with_captured_lifetimes;
 	use crate::prelude::*;
 	use sweet::prelude::*;
 	use syn::PathSegment;
 
 	#[test]
 	fn capture_lifetimes_test() {
-		capture_lifetimes(syn::parse_quote! {-> impl Bundle })
-			.xpect()
-			.to_be(syn::parse_quote! {-> impl Bundle + use<> });
-		capture_lifetimes(syn::parse_quote! {-> Result<impl Bundle, ()> })
-			.xpect()
-			.to_be(syn::parse_quote! {-> Result<impl Bundle + use<>, ()> });
+		with_captured_lifetimes(&syn::parse_quote! {
+			fn foo<T>() -> impl Bundle {}
+		})
+		.xpect()
+		.to_be(syn::parse_quote! {-> impl Bundle + use<T> });
+
+		with_captured_lifetimes(
+			&syn::parse_quote! {fn bar() -> Result<impl Bundle, ()>{} },
+		)
+		.xpect()
+		.to_be(syn::parse_quote! {-> Result<impl Bundle + use<>, ()> });
 	}
 
 
