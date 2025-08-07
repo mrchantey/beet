@@ -15,8 +15,9 @@ publish = true
 [features]
 default = ["axum", "reload"]
 # wip: axum features behind this flag
-axum = ["dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
-aws = ["dep:aws-sdk-s3"]
+axum = ["tokio", "dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
+tokio = ["dep:tokio"]
+aws = ["tokio", "dep:aws-sdk-s3", "dep:aws-config"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 
@@ -45,13 +46,16 @@ futures.workspace = true
 
 
 #💡 server
-tokio = { workspace = true, default-features = true }
+tokio = { workspace = true, optional = true, default-features = true }
 axum = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
 lambda_http = { version = "0.16", optional = true }
 aws-sdk-s3 = { version = "1", optional = true }
+aws-config = { version = "1", optional = true, features = [
+	"behavior-version-latest",
+] }
 
 [dev-dependencies]
 sweet.workspace = true

@@ -80,8 +80,9 @@ impl RoutePath {
 	}
 
 	/// Creates a route join even if the other route path begins with `/`
-	pub fn join(&self, new_path: &RoutePath) -> Self {
-		let new_path = new_path.0.strip_prefix("/").unwrap_or(&new_path.0);
+	pub fn join(&self, new_path: impl AsRef<Path>) -> Self {
+		let new_path = new_path.as_ref();
+		let new_path = new_path.strip_prefix("/").unwrap_or(new_path);
 		if new_path == Path::new("") {
 			self.clone()
 		} else {

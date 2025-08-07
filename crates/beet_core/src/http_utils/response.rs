@@ -77,6 +77,7 @@ impl Response {
 			Default::default(),
 		)
 	}
+	/// Create a response with a 301 MOVED_PERMANENTLY status code
 	pub fn permanent_redirect(location: impl Into<String>) -> Self {
 		Self::from_parts(
 			http::response::Builder::new()
@@ -120,9 +121,19 @@ impl Response {
 		)
 	}
 
+	pub fn header(
+		&self,
+		header: http::header::HeaderName,
+	) -> Result<Option<&str>> {
+		match self.parts.headers.get(&header) {
+			Some(value) => Ok(Some(value.to_str()?)),
+			None => Ok(None),
+		}
+	}
+
 	/// Check whether a header exactly matches the given value,
-	/// do not use this for checks like `ConteTnt-Type` as they may
-	/// have additional parameters like `charset=utf-8`.
+	/// do not use this for checks like `Content-Type` as they may
+	/// have additional parameters like `application/json; charset=utf-8`.
 	pub fn header_matches(
 		&self,
 		header: http::header::HeaderName,
@@ -134,7 +145,8 @@ impl Response {
 			.map_or(false, |v| v == value)
 	}
 	/// Check whether a header contains the given value, use this for
-	/// checks like `Content-Type`.
+	/// checks like `Content-Type` where the value may have additional parameters
+	/// like `application/json; charset=utf-8`.
 	pub fn header_contains(
 		&self,
 		header: http::header::HeaderName,
