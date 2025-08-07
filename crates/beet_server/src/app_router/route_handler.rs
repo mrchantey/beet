@@ -31,7 +31,7 @@ pub struct RouteHandler(Arc<RouteHandlerFunc>);
 type RouteHandlerFunc = dyn 'static
 	+ Send
 	+ Sync
-	+ Fn(World) -> Pin<Box<dyn Future<Output = World> + Send>>;
+	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 
 fn no_request_err<T>() -> HttpError {
@@ -47,6 +47,11 @@ to remove the request resource, try explicitly adding an Endpoint to each
 }
 
 impl RouteHandler {
+	/// handlers are infallible, any error is inserted into [`RouteHandlerOutput`]
+	pub async fn run(&self, world: World, entity: Entity) -> World {
+		(self.0)(world, entity).await
+	}
+
 	/// A route handler with output inserted as a [`Response`]
 	pub fn new<T, In, InErr, Out, Marker>(
 		endpoint: impl Into<Endpoint>,
@@ -163,7 +168,7 @@ impl RouteHandler {
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<(), (), Marker>,
 	{
-		RouteHandler(Arc::new(move |mut world: World| {
+		RouteHandler(Arc::new(move |mut world: World, _| {
 			match world.run_system_once(handler.clone()) {
 				Ok(_) => {}
 				Err(err) => {
@@ -174,30 +179,15 @@ impl RouteHandler {
 		}))
 	}
 
-	/// An async route handler with output inserted as a [`Response`]
-	pub fn async_system<Handler, Fut, Out>(handler: Handler) -> Self
-	where
-		Handler: 'static + Send + Sync + Clone + FnOnce(&mut World) -> Fut,
-		Fut: 'static + Send + Future<Output = Out>,
-		Out: 'static + Send + Sync + IntoResponse,
-	{
-		Self::async_layer(move |mut world: World| {
-			let func = handler.clone();
-			async move {
-				let out = func(&mut world).await;
-				world.insert_resource(out.into_response());
-				world
-			}
-		})
-	}
-	/// An async route handler with output inserted as a [`Response`]
+	/// An async route handler with output inserted as a [`Response`].
+	/// This handler must return a tuple of [`(World, Out)`] 
 	pub fn new_async<Handler, Fut, Out>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::async_layer(move |world: World| {
+		Self::layer_async(move |world: World| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -209,13 +199,13 @@ impl RouteHandler {
 
 	/// An async route handler returning a bundle, which is inserted into the world
 	/// with a [`HandlerBundle`] component.
-	pub fn async_bundle<Handler, Fut, Out>(handler: Handler) -> Self
+	pub fn bundle_async<Handler, Fut, Out>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + Bundle,
 	{
-		Self::async_layer(move |world: World| {
+		Self::layer_async(move |world: World| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -226,19 +216,16 @@ impl RouteHandler {
 	}
 
 	/// An async route handler with output inserted as a [`Response`]
-	pub fn async_layer<Handler, Fut>(handler: Handler) -> Self
+	pub fn layer_async<Handler, Fut>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = World>,
 	{
-		RouteHandler(Arc::new(move |world: World| {
+		RouteHandler(Arc::new(move |world: World, _| {
 			let func = handler.clone();
 			Box::pin(async move { func(world).await })
 		}))
 	}
-
-	/// handlers are infallible, any error is inserted into [`RouteHandlerOutput`]
-	pub async fn run(&self, world: World) -> World { (self.0)(world).await }
 }
 
 #[cfg(test)]

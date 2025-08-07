@@ -23,14 +23,15 @@ pub fn object_storage_fallback(
 	let path_clone = path.clone();
 	(
 		bucket,
-		RouteHandler::async_layer(async move |mut world| {
-		let path = path_clone.clone();
-		if !world.contains_resource::<Response>() {
-			let response = object_storage_handler(&mut world, path).await.into_response();
+		RouteHandler::layer_async(async move |mut world| {
+			let path = path_clone.clone();
+			let response = object_storage_handler(&mut world, path)
+				.await
+				.into_response();
 			world.insert_resource(response);
-		}
-		world
-	}))
+			world
+		}),
+	)
 }
 
 /// The object storage handler has two functions:

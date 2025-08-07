@@ -128,7 +128,7 @@ impl Router {
 			// Check 3: Endpoint
 			if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
 				if
-				// endpoints may only run if exact match
+				// endpoints may only run if exact path match
 				!parts.path().is_empty() || 
 				// method must match
 				endpoint.method() != parts.method()
@@ -143,7 +143,7 @@ impl Router {
 			{
 				*world.inner_mut() = handler
 					.clone()
-					.run(std::mem::take(world.inner_mut()))
+					.run(std::mem::take(world.inner_mut()),entity)
 					.await;
 			}
 		}

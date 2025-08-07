@@ -1,7 +1,20 @@
 use crate::prelude::*;
 use beet_rsx::as_beet::*;
+// use bevy::ecs::system::BoxedSystem;
 use bevy::prelude::*;
 
+/// Add this to a [`RouteHandler`] to ensure it only runs if there is no [`Response`] resource
+// #[derive(Component)]
+// pub struct RunIf(Box<dyn Fn(&mut World) -> bool + Send + Sync>);
+
+// impl RunIf {
+// 	pub fn no_response() -> Self {
+// 		Self(Box::new(|world: &mut World| {
+// 			!world.contains_resource::<Response>()
+// 		}))
+// 	}
+// 	pub fn should_run(&self, world: &mut World) -> bool { (self.0)(world) }
+// }
 
 
 impl RouteHandler {
@@ -20,7 +33,7 @@ impl RouteHandler {
 		for<'a> Fut: 'a + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		RouteHandler::async_layer(move |mut world: World| {
+		RouteHandler::layer_async(move |mut world: World| {
 			let handler = handler.clone();
 			async move {
 				if !world.contains_resource::<Response>() {
@@ -59,7 +72,7 @@ mod test {
 	async fn skips_async() {
 		Router::new(|app: &mut App| {
 			app.world_mut().spawn(children![
-				RouteHandler::async_system(|_| async { "endpoint" }),
+				RouteHandler::new_async(|world| async { (world,"endpoint") }),
 				RouteHandler::fallback_async(|_| async { "fallback" })
 			]);
 		})
