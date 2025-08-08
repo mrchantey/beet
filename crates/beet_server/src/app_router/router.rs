@@ -21,11 +21,6 @@ impl Plugin for RouterAppPlugin {
 				#[cfg(not(test))]
 				LoadSnippetsPlugin,
 			))
-			.register_type::<MethodFilter>()
-			.register_type::<Endpoint>()
-			.register_type::<PathFilter>()
-			.register_type::<WorkspaceConfig>()
-			.register_type::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()

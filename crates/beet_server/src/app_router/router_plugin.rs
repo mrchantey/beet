@@ -10,7 +10,7 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(ApplyDirectivesPlugin)
+		app
 			.register_type::<MethodFilter>()
 			.register_type::<Endpoint>()
 			.register_type::<PathFilter>()
@@ -19,7 +19,7 @@ impl Plugin for RouterPlugin {
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
-			.add_systems(Startup, (insert_route_tree, clone_parent_world));
+			.add_systems(Startup, clone_parent_world);
 	}
 }
 
