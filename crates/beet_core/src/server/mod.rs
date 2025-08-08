@@ -119,14 +119,14 @@ impl Server {
 		}
 
 		if self.secure {
-			#[cfg(feature = "rustls")]
+			#[cfg(feature = "rustls-tls")]
 			{
 				self.serve_secure(router).await
 			}
-			#[cfg(not(feature = "rustls"))]
+			#[cfg(not(feature = "rustls-tls"))]
 			{
 				anyhow::bail!(
-					"secure mode is not enabled, please enable the 'rustls' feature"
+					"secure mode is not enabled, please enable the 'rustls-tls' feature"
 				);
 			}
 		} else {

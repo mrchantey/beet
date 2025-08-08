@@ -8,11 +8,11 @@ use std::sync::LazyLock;
 pub async fn send_reqwest(req: Request) -> Result<Response> {
 	static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(|| Client::new());
 
-	#[cfg(not(any(feature = "rustls", feature = "native-tls")))]
+	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
 	{
 		if req.parts.uri.scheme_str() == Some("https") {
 			bevybail!(
-				"Please enable either the `rustls` or `native-tls` feature to use HTTPS requests."
+				"Please enable either the `rustls-tls` or `native-tls` feature to use HTTPS requests."
 			);
 		}
 	}

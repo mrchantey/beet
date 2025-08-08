@@ -69,7 +69,7 @@ axum = [
 ]
 fs = ["beet_utils/fs"]
 net = ["http", "serde", "dep:reqwest", "web"]
-rustls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
+rustls-tls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
 native-tls = ["net", "reqwest?/default"]
 tokens = [
 	"serde",

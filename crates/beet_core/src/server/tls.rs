@@ -18,7 +18,7 @@ impl Server {
 		Ok(())
 	}
 
-	#[cfg(feature = "rustls")]
+	#[cfg(feature = "rustls-tls")]
 	pub async fn serve_secure(&self, router: Router) -> Result<()> {
 		let cert = include_bytes!("_self_signed_certs/cert.pem");
 		let key = include_bytes!("_self_signed_certs/key.pem");
