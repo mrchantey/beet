@@ -192,7 +192,7 @@ http-body-util = "0.1"
 
 #💡 server
 axum = { version = "0.8", features = ["macros"] }
-axum-server = { version = "0.7", features = ["tls-rustls"] }
+axum-server = { version = "0.7" }
 axum-extra = "0.10"
 tower = "0.5"
 tower-livereload = { version = "0.9" }

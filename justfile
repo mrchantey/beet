@@ -190,7 +190,7 @@ test-rsx *args:
 	cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
-	cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	cargo test -p beet_server						 	 	 																								{{args}} -- {{test-threads}}
 	cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}	
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}

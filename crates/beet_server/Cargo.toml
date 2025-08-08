@@ -19,7 +19,12 @@ axum = ["tokio", "dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
 tokio = ["dep:tokio"]
 aws = ["tokio", "dep:aws-sdk-s3", "dep:aws-config"]
 reload = ["tower-livereload"]
-lambda = ["dep:lambda_http"]
+lambda = ["rustls-tls", "dep:lambda_http"]
+rustls-tls = [
+	"beet_core/rustls-tls",
+	"aws-config?/rustls",
+	"aws-sdk-s3?/rustls",
+]
 
 [dependencies]
 beet_utils = { workspace = true }
@@ -52,8 +57,15 @@ tower = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
 lambda_http = { version = "0.16", optional = true }
-aws-sdk-s3 = { version = "1", optional = true }
-aws-config = { version = "1", optional = true, features = [
+aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
+	# defaults without rustls
+	"sigv4a",
+	"default-https-client",
+	"rt-tokio",
+] }
+aws-config = { version = "1", optional = true, default-features = false, features = [
+	"default-https-client",
+	"rt-tokio",
 	"behavior-version-latest",
 ] }
 
