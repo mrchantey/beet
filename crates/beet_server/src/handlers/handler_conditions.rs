@@ -14,9 +14,20 @@ type Predicate = dyn 'static
 
 
 impl HandlerConditions {
-	/// A predicate that will run only if there is no [`Response`] in the world.
+	/// A predicate that will run only if:
+	/// 1. There is a [`Request`]
+	/// 2. There is no [`Response`]
 	pub fn fallback() -> Self {
-		Self::default().system(|res: Option<Res<Response>>| res.is_none())
+		Self::default().system(
+			|req: Option<Res<Request>>, res: Option<Res<Response>>| {
+				// println!(
+				// 	"Running fallback predicate with req: {:?}, res: {:?}",
+				// 	req.is_some(),
+				// 	res.is_some()
+				// );
+				req.is_some() && res.is_none()
+			},
+		)
 	}
 
 	pub fn system<Marker>(
@@ -64,6 +75,7 @@ impl HandlerConditions {
 			}));
 		self
 	}
+	/// Returns false if any predicate returns false.
 	pub async fn should_run(
 		&self,
 		mut world: World,

@@ -36,7 +36,13 @@ serde = [
 ]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 # TODO merge with net feature
-http = ["dep:http", "dep:http-body-util", "dep:url", "dep:bytes"]
+http = [
+	"dep:http",
+	"dep:http-body-util",
+	"dep:url",
+	"dep:bytes",
+	"dep:mime_guess",
+]
 # is this nessecary?
 web = [
 	"http",
@@ -91,7 +97,6 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
-url = { version = "2", optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 http-body-util = { workspace = true, optional = true }
 
@@ -113,6 +118,8 @@ extend.workspace = true
 
 # html utilities (available on all targets)
 html-escape = "0.2"
+url = { version = "2", optional = true }
+mime_guess = { version = "2", optional = true }
 http = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 

@@ -3,7 +3,6 @@ use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
 use beet_core::prelude::*;
-use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
@@ -28,7 +27,6 @@ impl AxumRunner {
 			.cloned()
 			.unwrap_or_default();
 		let beet_router = world.resource::<Router>().clone();
-		let router_mode = world.resource::<RouterMode>().clone();
 
 		let beet_router2 = beet_router.clone();
 		let handler = move |axum_req: axum::extract::Request| async move {
@@ -46,25 +44,29 @@ impl AxumRunner {
 			}
 		};
 
-		for (_, endpoint) in beet_router
-			.pop()
-			.run_system_once(ResolvedEndpoint::collect)
-			.unwrap()
-			.into_iter()
-			.filter(|(_, info)| {
-				// only register non-static endpoints in ssg
-				if matches!(router_mode, RouterMode::Ssg) {
-					!info.is_static_html()
-				} else {
-					true
-				}
-			}) {
-			let segments = segments_to_axum(endpoint.segments().clone());
-			let method = method_to_axum(endpoint.method());
-			trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
-			axum_router = axum_router
-				.route(&segments, routing::on(method, handler.clone()));
-		}
+		trace!("Registering catch-all endpoint");
+		axum_router = axum_router.route("/", routing::any(handler.clone()));
+		axum_router = axum_router.route("/{*any_path}", routing::any(handler));
+		// let router_mode = world.resource::<RouterMode>().clone();
+		// for (_, endpoint) in beet_router
+		// 	.pop()
+		// 	.run_system_once(ResolvedEndpoint::collect)
+		// 	.unwrap()
+		// 	.into_iter()
+		// 	.filter(|(_, info)| {
+		// 		// only register non-static endpoints in ssg
+		// 		if matches!(router_mode, RouterMode::Ssg) {
+		// 			!info.is_static_html()
+		// 		} else {
+		// 			true
+		// 		}
+		// 	}) {
+		// 	let segments = segments_to_axum(endpoint.segments().clone());
+		// 	let method = method_to_axum(endpoint.method());
+		// 	trace!("Registering endpoint: {} {}", endpoint.method(), &segments);
+		// 	axum_router = axum_router
+		// 		.route(&segments, routing::on(method, handler.clone()));
+		// }
 		axum_router
 	}
 
@@ -80,14 +82,14 @@ impl AxumRunner {
 			.html_dir
 			.into_abs();
 
-		match self.runner.mode.unwrap_or_default() {
-			RouterMode::Ssg => {
-				debug!("Serving static files from:\n{}", &html_dir);
-				router =
-					router.fallback_service(file_and_error_handler(&html_dir));
-			}
-			_ => {}
-		};
+		// match self.runner.mode.unwrap_or_default() {
+		// 	RouterMode::Ssg => {
+		// 		debug!("Serving static files from:\n{}", &html_dir);
+		// 		router =
+		// 			router.fallback_service(file_and_error_handler(&html_dir));
+		// 	}
+		// 	_ => {}
+		// };
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
 		let reload_handle = match self.runner.mode.unwrap_or_default() {
@@ -161,6 +163,7 @@ fn get_reload(
 	(livereload, reload_handle)
 }
 
+#[allow(unused)]
 fn method_to_axum(method: HttpMethod) -> MethodFilter {
 	match method {
 		HttpMethod::Get => MethodFilter::GET,
@@ -177,6 +180,7 @@ fn method_to_axum(method: HttpMethod) -> MethodFilter {
 
 /// Convert a vector of [`PathSegment`] to a string representation for axum routing
 /// using axum >0.8 syntax.
+#[allow(unused)]
 fn segments_to_axum(segments: Vec<PathSegment>) -> String {
 	let path = segments
 		.into_iter()

@@ -179,6 +179,17 @@ impl Response {
 		}
 	}
 
+	/// Create a response with the given body, guessing the content type
+	/// based on the file extension, defaulting to `application/octet-stream`
+	/// if the extension is not recognized.
+	pub fn ok_mime_guess(
+		body: impl AsRef<[u8]>,
+		path: impl AsRef<std::path::Path>,
+	) -> Self {
+		let mime_type = mime_guess::from_path(path).first_or_octet_stream();
+		Self::ok_body(body, mime_type.as_ref())
+	}
+
 	pub async fn text(self) -> Result<String> {
 		let bytes = self.body.into_bytes().await?;
 		String::from_utf8(bytes.to_vec())?.xok()

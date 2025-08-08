@@ -1,4 +1,3 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use anyhow::Result;
 use bevy::prelude::*;
@@ -25,6 +24,14 @@ impl std::fmt::Display for RoutePath {
 	}
 }
 
+/// The uri path of the request, if the request has no leading slash
+/// this will be empty.
+impl From<Request> for RoutePath {
+	fn from(value: Request) -> Self {
+		let path = value.parts.uri.path();
+		Self::new(path)
+	}
+}
 
 impl From<String> for RoutePath {
 	fn from(value: String) -> Self { Self(PathBuf::from(value)) }

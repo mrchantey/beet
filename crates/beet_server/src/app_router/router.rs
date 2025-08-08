@@ -9,6 +9,22 @@ pub struct Router {
 	app_pool: AppPool,
 }
 
+#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+fn default_handlers(
+	mut commands: Commands,
+	config:Res<WorkspaceConfig>){
+	
+	let provider = FsBucketProvider::new(
+		config.html_dir.into_abs()
+	);
+
+	commands.spawn((
+		Bucket::new(provider,""),
+		HandlerConditions::fallback(),
+		bucket_handler(),
+	));	
+}
+
 impl Router {
 	/// Create a new [`Router`] with the given plugin, which should add
 	/// routes to the app either directly or in a [`Startup`] system.
@@ -22,6 +38,9 @@ impl Router {
 					LoadSnippetsPlugin,	
 					plugin.clone()
 				));
+				#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+				app.add_systems(Startup, default_handlers);
+
 				app.init();
 				app.update();
 				app
@@ -276,7 +295,7 @@ mod test {
 			));
 		});
 		router
-			.oneshot_str("sdjhkfds")
+			.oneshot_str("/sdjhkfds")
 			.await
 			.unwrap_err()
 			.to_string()

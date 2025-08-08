@@ -21,16 +21,29 @@ pub fn bucket_handler() -> impl Bundle {
 	})
 }
 
+// TODO precompressed variants, ie `index.html.br`
 async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
+	debug!("serving from bucket: {}", path);
 	if let Some(_extension) = path.extension() {
 		let url = bucket.public_url(&path.to_string()).await?;
-		Ok(Response::permanent_redirect(url))
+		if url.starts_with("file://") {
+			// the fs bucket will return a file:// url which is an ERR_UNSAFE_REDIRECT
+			// so just serve the file directly
+			bucket
+				.get(&path.to_string())
+				.await
+				.map(|bytes| Response::ok_mime_guess(bytes, path))
+				.map_err(|_| HttpError::not_found().into())
+		} else {
+			Ok(Response::permanent_redirect(url))
+		}
 	} else {
 		let path = path.join("index.html");
-		match bucket.get(&path.to_string()).await {
-			Ok(bytes) => Ok(Response::ok_body(bytes, "text/html")),
-			Err(_) => Ok(StatusCode::NOT_FOUND.into_response()),
-		}
+		bucket
+			.get(&path.to_string())
+			.await
+			.map(|bytes| Response::ok_body(bytes, "text/html"))
+			.map_err(|_| HttpError::not_found().into())
 	}
 }
 
@@ -45,9 +58,31 @@ mod test {
 
 
 	#[sweet::test]
+	async fn serves_fs() {
+		let (bucket, _drop) = Bucket::new_test().await;
+		let body = "body { color: red; }";
+		bucket.insert("style.css", body).await.unwrap();
+		let path = RoutePath::from("/style.css");
+		let response = super::from_bucket(&bucket, path).await.unwrap();
+		response
+			.into_result()
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect()
+			.to_be(body);
+	}
+	#[sweet::test]
+	#[ignore = "no longer redirects"]
 	async fn redirect() {
 		let (bucket, _drop) = Bucket::new_test().await;
-		let path = RoutePath::from("style.css");
+		bucket
+			.insert("style.css", "body { color: red; }")
+			.await
+			.unwrap();
+		let path = RoutePath::from("/style.css");
 		let response = super::from_bucket(&bucket, path).await.unwrap();
 		response
 			.status()
