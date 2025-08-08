@@ -175,14 +175,15 @@ fn method_to_axum(method: HttpMethod) -> MethodFilter {
 	}
 }
 
-/// Convert a vector of RouteSegment to a string representation for axum routing
-fn segments_to_axum(segments: Vec<RouteSegment>) -> String {
+/// Convert a vector of [`PathSegment`] to a string representation for axum routing
+/// using axum >0.8 syntax.
+fn segments_to_axum(segments: Vec<PathSegment>) -> String {
 	let path = segments
 		.into_iter()
 		.map(|segment| match segment {
-			RouteSegment::Static(seg) => seg,
-			RouteSegment::Dynamic(seg) => format!("{{{seg}}}"),
-			RouteSegment::Wildcard(seg) => format!("{{*{seg}}}"),
+			PathSegment::Static(seg) => seg,
+			PathSegment::Dynamic(seg) => format!("{{{seg}}}"),
+			PathSegment::Wildcard(seg) => format!("{{*{seg}}}"),
 		})
 		.collect::<Vec<_>>()
 		.join("/");
@@ -202,7 +203,7 @@ mod test {
 		app.add_plugins(RouterPlugin).insert_resource(Router::new(
 			|app: &mut App| {
 				app.world_mut().spawn((
-					RouteFilter::new("pizza"),
+					PathFilter::new("pizza"),
 					RouteHandler::new(HttpMethod::Get, || "hello world!"),
 				));
 			},

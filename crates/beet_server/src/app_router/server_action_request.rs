@@ -174,21 +174,21 @@ mod test {
 		world.insert_resource(Router::new(|app: &mut App| {
 			app.world_mut().spawn(children![
 				(
-					RouteFilter::new("/add"),
+					PathFilter::new("/add"),
 					RouteHandler::action(
 						HttpMethod::Get,
 						add_via_get.pipe(Json::pipe)
 					)
 				),
 				(
-					RouteFilter::new("/add"),
+					PathFilter::new("/add"),
 					RouteHandler::action(
 						HttpMethod::Post,
 						add_via_post.pipe(Json::pipe)
 					)
 				),
 				(
-					RouteFilter::new("/increment_if_positive"),
+					PathFilter::new("/increment_if_positive"),
 					RouteHandler::action(
 						HttpMethod::Get,
 						increment_if_positive.pipe(JsonResult::pipe)

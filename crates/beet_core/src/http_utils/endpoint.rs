@@ -40,13 +40,13 @@ impl Into<Endpoint> for HttpMethod {
 pub struct ResolvedEndpoint {
 	endpoint: Endpoint,
 	path: RoutePath,
-	segments: Vec<RouteSegment>,
+	segments: Vec<PathSegment>,
 }
 
 impl ResolvedEndpoint {
 	pub fn new(
 		endpoint: impl Into<Endpoint>,
-		segments: Vec<RouteSegment>,
+		segments: Vec<PathSegment>,
 	) -> Self {
 		let path = RoutePath::from(
 			segments
@@ -66,13 +66,13 @@ impl ResolvedEndpoint {
 		self.endpoint.cache_strategy
 	}
 	pub fn endpoint(&self) -> &Endpoint { &self.endpoint }
-	pub fn segments(&self) -> &Vec<RouteSegment> { &self.segments }
+	pub fn segments(&self) -> &Vec<PathSegment> { &self.segments }
 	pub fn path(&self) -> &RoutePath { &self.path }
 
 	pub fn collect(
 		query: Query<(Entity, &Endpoint)>,
 		parents: Query<&ChildOf>,
-		path_filters: Query<&RouteFilter>,
+		path_filters: Query<&PathFilter>,
 	) -> Vec<(Entity, Self)> {
 		query
 			.iter()
@@ -146,21 +146,21 @@ mod test {
 	fn collect() {
 		let mut world = World::new();
 		world.spawn((
-			RouteFilter::new("foo"),
+			PathFilter::new("foo"),
 			Endpoint::new(HttpMethod::Get),
 			children![
 				children![
 					(
-						RouteFilter::new("*bar"), 
+						PathFilter::new("*bar"), 
 						Endpoint::new(HttpMethod::Post)
 					),
-					RouteFilter::new("bazz")
+					PathFilter::new("bazz")
 				],
 				(
-					RouteFilter::new("qux"),
+					PathFilter::new("qux"),
 				),
 				(
-					RouteFilter::new(":quax"), 
+					PathFilter::new(":quax"), 
 					Endpoint::new(HttpMethod::Post)
 				),
 			],
@@ -173,21 +173,21 @@ mod test {
 			ResolvedEndpoint::new(
 				HttpMethod::Get,
 				vec![
-					RouteSegment::Static("foo".into()),
+					PathSegment::Static("foo".into()),
 				],
 			),
 			ResolvedEndpoint::new(
 				HttpMethod::Post,
 				vec![
-					RouteSegment::Static("foo".into()),
-					RouteSegment::Wildcard("bar".into()),
+					PathSegment::Static("foo".into()),
+					PathSegment::Wildcard("bar".into()),
 				],
 			),
 			ResolvedEndpoint::new(
 				HttpMethod::Post,
 				vec![
-					RouteSegment::Static("foo".into()),
-					RouteSegment::Dynamic("quax".into()),
+					PathSegment::Static("foo".into()),
+					PathSegment::Dynamic("quax".into()),
 				],
 			),
 		]);

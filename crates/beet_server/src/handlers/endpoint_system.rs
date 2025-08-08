@@ -33,7 +33,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

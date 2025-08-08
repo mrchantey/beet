@@ -1,0 +1,122 @@
+use beet_rsx::as_beet::*;
+use bevy::prelude::*;
+use std::pin::Pin;
+use std::sync::Arc;
+
+/// A collection of predicates that must pass for a [`RouteHandler`] to run.
+#[derive(Default, Component, Clone)]
+pub struct HandlerConditions(Vec<Arc<Predicate>>);
+
+type Predicate = dyn 'static
+	+ Send
+	+ Sync
+	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = (World, bool)> + Send>>;
+
+
+impl HandlerConditions {
+	/// A predicate that will run only if there is no [`Response`] in the world.
+	pub fn fallback() -> Self {
+		Self::default().system(|res: Option<Res<Response>>| res.is_none())
+	}
+
+	pub fn system<Marker>(
+		mut self,
+		pred: impl 'static + Send + Sync + Clone + IntoSystem<(), bool, Marker>,
+	) -> Self {
+		self.0.push(Arc::new(move |mut world: World, _: Entity| {
+			let pred = pred.clone();
+			Box::pin(async move {
+				match world.run_system_cached(pred) {
+					Ok(out) => (world, out),
+					Err(err) => {
+						world.insert_resource(
+							HttpError::from(err).into_response(),
+						);
+						(world, false)
+					}
+				}
+			})
+		}));
+		self
+	}
+	pub fn entity_system<Marker>(
+		mut self,
+		pred: impl 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ IntoSystem<In<Entity>, bool, Marker>,
+	) -> Self {
+		self.0
+			.push(Arc::new(move |mut world: World, entity: Entity| {
+				let pred = pred.clone();
+				Box::pin(async move {
+					match world.run_system_cached_with(pred, entity) {
+						Ok(out) => (world, out),
+						Err(err) => {
+							world.insert_resource(
+								HttpError::from(err).into_response(),
+							);
+							(world, false)
+						}
+					}
+				})
+			}));
+		self
+	}
+	pub async fn should_run(
+		&self,
+		mut world: World,
+		entity: Entity,
+	) -> (World, bool) {
+		for pred in &self.0 {
+			match pred(world, entity).await {
+				(world, false) => return (world, false),
+				(world2, true) => world = world2,
+			}
+		}
+		(world, true)
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[rustfmt::skip]
+	#[sweet::test]
+	async fn runs_async() {
+		Router::new(|app: &mut App| {
+			app.world_mut().spawn((
+					HandlerConditions::fallback(),
+					RouteHandler::new(HttpMethod::Get,|| "fallback")
+			));
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("fallback");
+	}
+	#[rustfmt::skip]
+	#[sweet::test]
+	async fn skips_async() {
+		Router::new(|app: &mut App| {
+			app.world_mut().spawn(children![
+				RouteHandler::new(HttpMethod::Get,|| "endpoint"),
+				(
+					HandlerConditions::fallback(),
+					RouteHandler::new(HttpMethod::Get,|| "fallback")
+				)
+			]);
+		})
+		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("endpoint");
+	}
+}

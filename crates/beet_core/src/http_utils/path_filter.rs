@@ -18,22 +18,22 @@ use std::path::Path;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
-pub struct RouteFilter {
+pub struct PathFilter {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
-	pub segments: Vec<RouteSegment>,
+	pub segments: Vec<PathSegment>,
 }
 
 
-impl RouteFilter {
-	/// Create a new `RouteFilter` with the given path which is split into segments.
+impl PathFilter {
+	/// Create a new `PathFilter` with the given path which is split into segments.
 	pub fn new(path: impl AsRef<Path>) -> Self {
 		let segments = path
 			.as_ref()
 			.to_string_lossy()
 			.split('/')
 			.filter(|s| !s.is_empty())
-			.map(RouteSegment::new)
+			.map(PathSegment::new)
 			.collect::<Vec<_>>();
 		Self { segments }
 	}
@@ -71,7 +71,7 @@ impl RouteFilter {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum RouteSegment {
+pub enum PathSegment {
 	/// A static segment, the `foo` in `/foo`
 	Static(String),
 	/// A dynamic segment, the `foo` in `/:foo`
@@ -80,7 +80,7 @@ pub enum RouteSegment {
 	Wildcard(String),
 }
 
-impl RouteSegment {
+impl PathSegment {
 	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
 	///
 	/// ## Panics
@@ -90,9 +90,9 @@ impl RouteSegment {
 		// trim leading and trailing slashes
 		let trimmed = segment.trim_matches('/');
 		if trimmed.is_empty() {
-			panic!("RouteSegment cannot be empty");
+			panic!("PathSegment cannot be empty");
 		} else if trimmed.contains('/') {
-			panic!("RouteSegment cannot contain internal slashes: {}", segment);
+			panic!("PathSegment cannot contain internal slashes: {}", segment);
 		} else if trimmed.starts_with(':') {
 			Self::Dynamic(trimmed[1..].to_string())
 		} else if trimmed.starts_with('*') {
@@ -115,21 +115,21 @@ impl RouteSegment {
 	pub fn matches(&self, segment: Option<&String>) -> ControlFlow<()> {
 		match (self, segment) {
 			// static match, continue with remaining path
-			(RouteSegment::Static(val), Some(other)) if val == other => {
+			(PathSegment::Static(val), Some(other)) if val == other => {
 				ControlFlow::Continue(())
 			}
 			// dynamic will always match, continue with remaining path
-			(RouteSegment::Dynamic(_), Some(_)) => ControlFlow::Continue(()),
+			(PathSegment::Dynamic(_), Some(_)) => ControlFlow::Continue(()),
 			// wildcard consumes the rest of the path, continue with empty path
-			(RouteSegment::Wildcard(_), Some(_)) => {
+			(PathSegment::Wildcard(_), Some(_)) => {
 				ControlFlow::Continue(Default::default())
 			}
 			// only a wildcard permits an empty path
-			(RouteSegment::Wildcard(_), None) => {
+			(PathSegment::Wildcard(_), None) => {
 				ControlFlow::Continue(Default::default())
 			}
 			// break if empty path or no matching static
-			(RouteSegment::Static(_) | RouteSegment::Dynamic(_), _) => {
+			(PathSegment::Static(_) | PathSegment::Dynamic(_), _) => {
 				ControlFlow::Break(())
 			}
 		}
@@ -179,7 +179,7 @@ mod test {
 		filter: &str,
 		request: &str,
 	) -> Matcher<ControlFlow<(), RouteParts>> {
-		RouteFilter::new(filter)
+		PathFilter::new(filter)
 			.matches(RouteParts::new(request, HttpMethod::Get))
 			.xpect()
 	}

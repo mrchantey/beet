@@ -11,8 +11,8 @@ pub fn routes() -> impl Bundle {
 		blog_routes(),
 		actions_routes(),
 		beet_design::mockups::mockups_routes(),
-		(RouteFilter::new("docs"), article_layout_middleware()),
-		(RouteFilter::new("blog"), article_layout_middleware()),
-		(RouteFilter::new("design"), article_layout_middleware()),
+		(PathFilter::new("docs"), article_layout_middleware()),
+		(PathFilter::new("blog"), article_layout_middleware()),
+		(PathFilter::new("design"), article_layout_middleware()),
 	],)
 }

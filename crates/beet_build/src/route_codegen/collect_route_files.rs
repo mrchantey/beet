@@ -67,7 +67,7 @@ pub fn collect_route_files(
 					}
 				};
 				let filter =
-					RouteFilter::new(&route_file_method.route_info.path)
+					PathFilter::new(&route_file_method.route_info.path)
 						.self_token_stream();
 
 

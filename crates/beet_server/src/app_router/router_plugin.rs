@@ -13,7 +13,7 @@ impl Plugin for RouterPlugin {
 		app.init_plugin(ApplyDirectivesPlugin)
 			.register_type::<MethodFilter>()
 			.register_type::<Endpoint>()
-			.register_type::<RouteFilter>()
+			.register_type::<PathFilter>()
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()

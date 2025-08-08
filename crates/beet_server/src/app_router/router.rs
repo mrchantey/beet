@@ -100,8 +100,8 @@ impl Router {
 					continue;
 				}
 			}
-			// Check 2: RouteFilter
-			if let Some(filter) = world.entity(entity).get::<RouteFilter>() {
+			// Check 2: PathFilter
+			if let Some(filter) = world.entity(entity).get::<PathFilter>() {
 				match filter.matches(parts.clone()) {
 					ControlFlow::Break(_) => {
 						// path does not match, skip this entity
@@ -133,6 +133,19 @@ impl Router {
 				// method must match
 				endpoint.method() != parts.method()
 				{
+					continue;
+				}
+			}
+
+
+			// Check 4: HandlerPredicates
+			if let Some(predicates) =
+				world.entity(entity).get::<HandlerConditions>().cloned()
+			{
+				let (world2, should_run) =
+					predicates.should_run(std::mem::take(world.inner_mut()), entity).await;
+				*world.inner_mut() = world2;
+				if !should_run {
 					continue;
 				}
 			}
@@ -192,27 +205,27 @@ mod test {
 	async fn parse(route: &str) -> Vec<u32> {
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
-				// RouteFilter::new("/"),
+				// PathFilter::new("/"),
 				RouteHandler::layer(|mut res: ResMut<Foo>| {
 					res.push(0);
 				}),
 			));
 			app.world_mut().spawn(children![
 				(
-					RouteFilter::new("foo"),
+					PathFilter::new("foo"),
 					RouteHandler::layer(|mut res: ResMut<Foo>| {
 						res.push(1);
 					}),
 					children![
 						(
-							RouteFilter::new("bar"),
+							PathFilter::new("bar"),
 							Endpoint::new(HttpMethod::Get),
 							RouteHandler::layer(|mut res: ResMut<Foo>| {
 								res.push(2);
 							}),
 						),
 						(
-							RouteFilter::new("bazz"),
+							PathFilter::new("bazz"),
 							Endpoint::new(HttpMethod::Delete),
 							RouteHandler::layer(|mut res: ResMut<Foo>| {
 								res.push(3);
@@ -258,7 +271,7 @@ mod test {
 	async fn simple() {
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
-				RouteFilter::new("pizza"),
+				PathFilter::new("pizza"),
 				RouteHandler::new(HttpMethod::Get, || "hawaiian"),
 			));
 		});
@@ -280,10 +293,10 @@ mod test {
 	async fn endpoint_with_children() {
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
-				RouteFilter::new("foo"),
+				PathFilter::new("foo"),
 				RouteHandler::new(HttpMethod::Get, || "foo"),
 				children![(
-					RouteFilter::new("bar"),
+					PathFilter::new("bar"),
 					RouteHandler::new(HttpMethod::Get, || "bar")
 				),],
 			));
@@ -311,14 +324,14 @@ mod test {
 				),
 				children![
 					(
-						RouteFilter::new("foo"),
+						PathFilter::new("foo"),
 						RouteHandler::new(HttpMethod::Get, || "foo")
 					),
-					(RouteFilter::new("bar"), children![(
-						RouteFilter::new("baz"),
+					(PathFilter::new("bar"), children![(
+						PathFilter::new("baz"),
 						RouteHandler::new(HttpMethod::Get, || "baz")
 					)]),
-					(RouteFilter::new("boo"),),
+					(PathFilter::new("boo"),),
 				],
 			));
 			app.world_mut()

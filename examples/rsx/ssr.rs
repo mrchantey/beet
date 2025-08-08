@@ -18,17 +18,17 @@ fn main() {
 fn setup(mut commands: Commands) {
 	commands.spawn(children![
 		(
-			RouteFilter::new("/"),
+			PathFilter::new("/"),
 			RouteHandler::bundle(HttpMethod::Get, || rsx! {<Home/>})
 		),
 		(
-			RouteFilter::new("/foo"),
+			PathFilter::new("/foo"),
 			RouteHandler::new(HttpMethod::Get, || "bar")
 		),
 		(
 			// this entity has no endpoint so will be called for every request
 			// that matches the filter
-			RouteFilter::new("/hello-layer"),
+			PathFilter::new("/hello-layer"),
 			RouteHandler::layer(modify_request_layer),
 			// children are run in sequence
 			children![RouteHandler::bundle(

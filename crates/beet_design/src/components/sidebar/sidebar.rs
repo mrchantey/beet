@@ -168,7 +168,7 @@ mod test {
 		let mut world = World::new();
 
 		world.spawn((Endpoint::new(HttpMethod::Get), children![(
-			RouteFilter::new("docs"),
+			PathFilter::new("docs"),
 			Endpoint::new(HttpMethod::Get),
 			ArticleMeta {
 				title: Some("Docs".to_string()),
@@ -179,7 +179,7 @@ mod test {
 				..Default::default()
 			},
 			children![(
-				RouteFilter::new("testing"),
+				PathFilter::new("testing"),
 				Endpoint::new(HttpMethod::Get),
 				ArticleMeta {
 					title: Some("Partying".to_string()),
