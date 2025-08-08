@@ -5,6 +5,7 @@
 #[cfg(feature = "http")]
 pub mod http_utils;
 
+pub mod actions;
 pub mod node;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
@@ -21,6 +22,7 @@ pub mod server;
 pub mod web;
 
 pub mod prelude {
+	pub use crate::actions::*;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
