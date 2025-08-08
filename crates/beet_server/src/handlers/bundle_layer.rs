@@ -41,6 +41,7 @@ where
 	};
 
 	(
+		HandlerConditions::is_ssr(),
 		endpoint.into(),
 		RouteHandler::layer(move |world: &mut World| {
 		if let Err(err) = handler(world) {

@@ -3,15 +3,18 @@ use beet::prelude::*;
 
 
 
-pub fn article_layout_middleware() -> RouteHandler {
-	RouteHandler::layer(|world: &mut World| {
-		let entity =
-			world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+pub fn article_layout_middleware() -> impl Bundle {
+	(
+		HandlerConditions::is_ssr(),
+		RouteHandler::layer(|world: &mut World| {
+			let entity =
+				world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
 
-		world.spawn((HtmlDocument, rsx! {
-			<ArticleLayout>{entity}</ArticleLayout>
-		}));
-	})
+			world.spawn((HtmlDocument, rsx! {
+				<ArticleLayout>{entity}</ArticleLayout>
+			}));
+		}),
+	)
 }
 
 #[template]

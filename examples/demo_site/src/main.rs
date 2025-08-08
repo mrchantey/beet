@@ -25,9 +25,7 @@ fn launch_plugin(app: &mut App) {
 #[cfg(feature = "server")]
 fn server_plugin(app: &mut App) {
 	// create a router, specifying the plugin for Router Apps
-	app.insert_resource(Router::new(|app:&mut App|{
-		app.world_mut().spawn(routes());
-	}));
+	app.insert_resource(Router::new_bundle(routes));
 }
 
 #[cfg(feature = "client")]

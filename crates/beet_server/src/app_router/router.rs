@@ -21,6 +21,7 @@ pub struct Router {
 /// insert the default handlers that assist with
 fn default_handlers(
 	mut commands: Commands,
+#[allow(unused)]
 	config:Res<WorkspaceConfig>,
 	query: Query<Entity, With<RouterRoot>>,
 )->Result{
