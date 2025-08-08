@@ -77,7 +77,7 @@ impl AbsPathBuf {
 	}
 
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be an absolute path path.
+	/// be an absolute path.
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = self.0.join(path).clean();
 		Self(path)

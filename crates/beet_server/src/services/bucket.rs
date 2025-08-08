@@ -12,7 +12,14 @@ pub struct Bucket {
 	/// This may be S3, a local filesystem, or any other storage provider.
 	provider: Box<dyn BucketProvider>,
 }
-
+impl Clone for Bucket {
+	fn clone(&self) -> Self {
+		Self {
+			name: self.name.clone(),
+			provider: self.provider.box_clone(),
+		}
+	}
+}
 
 impl Bucket {
 	pub fn new(provider: impl BucketProvider, name: impl Into<String>) -> Self {
@@ -64,6 +71,8 @@ impl Bucket {
 
 
 pub trait BucketProvider: 'static + Send + Sync {
+	fn box_clone(&self) -> Box<dyn BucketProvider>;
+
 	/// Get the region of the provider
 	fn region(&self) -> Option<String>;
 	/// Check if the bucket exists

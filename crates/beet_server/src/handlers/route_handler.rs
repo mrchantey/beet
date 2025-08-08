@@ -180,14 +180,14 @@ impl RouteHandler {
 	}
 
 	/// An async route handler with output inserted as a [`Response`].
-	/// This handler must return a tuple of [`(World, Out)`] 
+	/// This handler must return a tuple of [`(World, Out)`]
 	pub fn new_async<Handler, Fut, Out>(handler: Handler) -> Self
 	where
 		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::layer_async(move |world: World| {
+		Self::layer_async(move |world,_| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -205,7 +205,7 @@ impl RouteHandler {
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + Bundle,
 	{
-		Self::layer_async(move |world: World| {
+		Self::layer_async(move |world, _| {
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
@@ -218,12 +218,12 @@ impl RouteHandler {
 	/// An async route handler with output inserted as a [`Response`]
 	pub fn layer_async<Handler, Fut>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
+		Handler: 'static + Send + Sync + Clone + FnOnce(World, Entity) -> Fut,
 		Fut: 'static + Send + Future<Output = World>,
 	{
-		RouteHandler(Arc::new(move |world: World, _| {
+		RouteHandler(Arc::new(move |world, entity| {
 			let func = handler.clone();
-			Box::pin(async move { func(world).await })
+			Box::pin(async move { func(world, entity).await })
 		}))
 	}
 }

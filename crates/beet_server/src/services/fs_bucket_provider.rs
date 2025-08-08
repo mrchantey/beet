@@ -31,12 +31,14 @@ impl Bucket {
 			.join(&name);
 		let bucket = Self::new(provider, &name);
 		bucket.ensure_exists().await.unwrap();
+
+		// bucket.insert("test.html", "<h1>Test</h1>").await.unwrap();
 		(bucket, RemoveOnDrop::new(path))
 	}
 }
 
 
-
+#[derive(Debug, Clone)]
 pub struct FsBucketProvider {
 	/// The root path for the filesystem bucket provider,
 	/// all created buckets will be under this path.
@@ -50,9 +52,16 @@ impl FsBucketProvider {
 	pub fn new(root: impl Into<AbsPathBuf>) -> Self {
 		Self { root: root.into() }
 	}
+	/// Resolve the path for a bucket and key, handling leading slashes.
+	fn resolve_path(&self, bucket_name: &str, key: &str) -> AbsPathBuf {
+		let key = key.trim_start_matches('/');
+		self.root.join(bucket_name).join(key)
+	}
 }
 
 impl BucketProvider for FsBucketProvider {
+	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+
 	fn region(&self) -> Option<String> { None }
 
 	fn bucket_exists(
@@ -92,7 +101,7 @@ impl BucketProvider for FsBucketProvider {
 		key: &str,
 		body: Bytes,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let path = self.root.join(bucket_name).join(key);
+		let path = self.resolve_path(bucket_name, key);
 		Box::pin(async move {
 			if let Some(parent) = path.parent() {
 				tokio::fs::create_dir_all(parent).await?;
@@ -106,7 +115,7 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 		key: &str,
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
-		let path = self.root.join(bucket_name).join(key);
+		let path = self.resolve_path(bucket_name, key);
 		Box::pin(async move {
 			let body_bytes = tokio::fs::read(path).await?;
 			Ok(Bytes::from(body_bytes))
@@ -117,7 +126,7 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 		key: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let path = self.root.join(bucket_name).join(key);
+		let path = self.resolve_path(bucket_name, key);
 		Box::pin(async move {
 			tokio::fs::remove_file(path).await?;
 			Ok(())
@@ -129,7 +138,7 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 		key: &str,
 	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
-		let path = self.root.join(bucket_name).join(key);
+		let path = self.resolve_path(bucket_name, key);
 		Box::pin(async move {
 			let public_url = format!("file://{}", path.to_string());
 			Ok(public_url)
@@ -162,7 +171,14 @@ mod test {
 		let body = Bytes::from("test_body");
 
 		bucket.insert(key, body.clone()).await.unwrap();
-		bucket.get(key).await.unwrap().xpect().to_be(body);
+		bucket.get(key).await.unwrap().xpect().to_be(body.clone());
+		bucket
+			// handles leading slashes
+			.get(&format!("/{key}"))
+			.await
+			.unwrap()
+			.xpect()
+			.to_be(body);
 
 		bucket.delete(key).await.unwrap();
 		bucket.get(key).await.xpect().to_be_err();

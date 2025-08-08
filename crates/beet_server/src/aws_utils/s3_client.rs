@@ -30,6 +30,10 @@ impl S3Client {
 }
 
 impl BucketProvider for S3Client {
+	fn box_clone(&self) -> Box<dyn BucketProvider> {
+		Box::new(Self(self.0.clone()))
+	}
+
 	fn region(&self) -> Option<String> {
 		self.0.config().region().map(|r| r.to_string())
 	}
