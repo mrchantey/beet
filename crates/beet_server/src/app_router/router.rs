@@ -9,6 +9,35 @@ use std::ops::ControlFlow;
 #[derive(Component)]
 pub struct RouterRoot;
 
+
+
+pub struct RouterAppPlugin;
+
+impl Plugin for RouterAppPlugin {
+	fn build(&self, app: &mut App) {
+		app
+			.add_plugins((
+				ApplyDirectivesPlugin,
+				#[cfg(not(test))]
+				LoadSnippetsPlugin,
+			))
+			.register_type::<MethodFilter>()
+			.register_type::<Endpoint>()
+			.register_type::<PathFilter>()
+			.register_type::<WorkspaceConfig>()
+			.register_type::<HtmlConstants>()
+			.init_resource::<WorkspaceConfig>()
+			.init_resource::<RenderMode>()
+			.init_resource::<HtmlConstants>()
+			.add_systems(Startup, (
+				insert_route_tree,
+				default_handlers
+			));
+	}
+}
+
+
+
 /// Collection of systems for collecting and running and route handlers
 /// This type serves as the intermediarybetween the main app and the route handlers.
 #[derive(Clone,Resource)]
@@ -44,15 +73,15 @@ fn default_handlers(
 
 impl Router {
 
-	/// Create a new [`Router`] with the given plugin, adding default handlers.
+	/// Create a new [`Router`] with the given plugin and the [`RouterAppPlugin`].
 	pub fn new(plugin: impl ClonePlugin) -> Self {
 		let plugin = ClonePluginContainer::new(plugin);
 		Self::new_no_defaults(move |app:&mut App|{
 			plugin.add_to_app(app);
-			app.add_systems(Startup, default_handlers);
+			app.init_plugin(RouterAppPlugin);
 		})
 	}
-	/// Create a new [`Router`] with the given plugin, default handlers are not added.
+	/// Create a new [`Router`] with the given plugin, without the [`RouterAppPlugin`].
 	pub fn new_no_defaults(plugin: impl ClonePlugin) -> Self {
 		Self {
 			plugin: ClonePluginContainer(plugin.box_clone()),
@@ -70,13 +99,16 @@ impl Router {
 			));
 		})
 	}
-
+	pub fn with_plugin(mut self, plugin: impl ClonePlugin) -> Self {
+		self.add_plugin(plugin);
+		self
+	}
 
 	/// Creates a new [`Plugin`] which will first add the [`Self::plugin`]
 	/// and then the new plugin.
-	pub fn add_plugin(&mut self, plugin: impl ClonePlugin) {
+	pub fn add_plugin(&mut self, new_plugin: impl ClonePlugin) {
 		let current_plugin = self.plugin.clone();
-		let new_plugin = ClonePluginContainer::new(plugin);
+		let new_plugin = ClonePluginContainer::new(new_plugin);
 		let plugin = move |app:&mut App|{
 			current_plugin.add_to_app(app);
 			new_plugin.add_to_app(app);
@@ -88,11 +120,6 @@ impl Router {
 	fn create_app_pool(plugin: impl ClonePlugin) -> AppPool {
 		AppPool::new(move || {
 			let mut app = App::new();
-			app.add_plugins((
-				RouterPlugin,
-				#[cfg(not(test))]
-				LoadSnippetsPlugin,
-			));
 			plugin.add_to_app(&mut app);
 			app.init();
 			app.update();
@@ -102,27 +129,6 @@ impl Router {
 
 	pub fn world(&self) -> PooledWorld {
 		self.app_pool.pop()
-	}
-
-	pub fn from_world(&self,world:&mut World)->Result<Self>{
-
-		let render_mode = world.resource::<RenderMode>().clone();
-		let mut this = self.clone();
-		this.add_plugin(move |app: &mut App| {
-			app.insert_resource(render_mode.clone());
-			},
-		);
-		let mut world = this.app_pool.pop();
-		let num_roots = world
-			.query_filtered_once::<(), With<RouterRoot>>()
-			.len();
-		if num_roots != 1 {
-			bevybail!(
-				"Router apps must have exactly one `RouterRoot`, found {num_roots}",
-			);
-		}
-
-		Ok(this)
 	}
 
 

@@ -44,10 +44,10 @@ where
 		HandlerConditions::is_ssr(),
 		endpoint.into(),
 		RouteHandler::layer(move |world: &mut World| {
-		if let Err(err) = handler(world) {
-			world.insert_resource(err);
-		}
-		})
+			if let Err(err) = handler(world) {
+				world.insert_resource(err);
+			}
+		}),
 	)
 }
 
@@ -137,6 +137,9 @@ mod test {
 				}
 			})
 		})
+		.with_plugin(|app: &mut App| {
+			app.insert_resource(RenderMode::Ssr);
+		})
 		.oneshot_str("/")
 		.await
 		.unwrap()
@@ -162,7 +165,11 @@ mod test {
 					}));
 				}),
 			]
-		}).oneshot_str("/")
+		})
+		.with_plugin(|app: &mut App| {
+			app.insert_resource(RenderMode::Ssr);
+		})
+		.oneshot_str("/")
 		.await
 		.unwrap()
 		.xpect()

@@ -196,7 +196,7 @@ mod test {
 				),
 			]
 		}));
-		let router = AxumRunner::router(&mut world).unwrap();
+		let router = AxumRunner::router(&mut world);
 		let _handle = serve(router).await;
 		test_get().await;
 		test_post().await;

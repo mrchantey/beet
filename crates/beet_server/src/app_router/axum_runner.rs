@@ -21,13 +21,12 @@ impl AxumRunner {
 
 	/// Create a new [`axum::Router`] using the current app's world.
 	/// All handlers will get the world from the [`AppPool`]
-	pub fn router(world: &mut World) -> Result<axum::Router> {
+	pub fn router(world: &mut World) -> axum::Router {
 		let mut axum_router = world
 			.get_non_send_resource::<axum::Router>()
 			.cloned()
 			.unwrap_or_default();
-		let beet_router =
-			world.resource::<Router>().clone().from_world(world)?;
+		let beet_router = world.resource::<Router>().clone();
 
 		let handler = move |axum_req: axum::extract::Request| async move {
 			match async move {
@@ -67,12 +66,12 @@ impl AxumRunner {
 		// 	axum_router = axum_router
 		// 		.route(&segments, routing::on(method, handler.clone()));
 		// }
-		Ok(axum_router)
+		axum_router
 	}
 
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
-		let mut router = Self::router(app.world_mut())?;
+		let mut router = Self::router(app.world_mut());
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
@@ -212,7 +211,6 @@ mod test {
 		// these tests also test the roundtrip CloneWorld mechanism
 		// catching errors like missing app.register_type::<T>()
 		AxumRunner::router(app.world_mut())
-			.unwrap()
 			.oneshot_res("/dsfkdsl")
 			.await
 			.unwrap()
@@ -220,7 +218,6 @@ mod test {
 			.xpect()
 			.to_be(StatusCode::NOT_FOUND);
 		AxumRunner::router(app.world_mut())
-			.unwrap()
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()

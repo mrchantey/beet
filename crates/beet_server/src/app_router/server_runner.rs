@@ -1,5 +1,3 @@
-#[cfg(not(feature = "lambda"))]
-use beet_core::prelude::*;
 use beet_rsx::as_beet::ResultExtDisplay;
 #[allow(unused_imports)]
 use beet_rsx::prelude::*;
@@ -32,7 +30,6 @@ impl Default for ServerRunner {
 	}
 }
 
-
 #[derive(Default, Copy, Clone, Resource, PartialEq, Eq, Subcommand)]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
@@ -44,26 +41,10 @@ pub enum RenderMode {
 }
 
 impl ServerRunner {
-	// #[cfg(target_arch = "wasm32")]
-	// pub fn from_url_params() -> anyhow::Result<Self> {
-	// 	// TODO actually parse from search params
-	// 	Ok(Self {
-	// 		is_static: false,
-	// 		html_dir: "".into(),
-	// 	})
-	// }
 
-	pub fn runner(mut app: App) -> AppExit {
-		app.init();
-		app.update();
-		// allow setup to decide to exit
-		match app.should_exit() {
-			Some(exit) => return exit,
-			None => {
-				Self::parse().run(app).unwrap_or_exit();
-				AppExit::Success
-			}
-		}
+	pub fn runner(app: App) -> AppExit {
+		Self::parse().run(app).unwrap_or_exit();
+		AppExit::Success
 	}
 	#[cfg(target_arch = "wasm32")]
 	fn run(self, _: App) -> Result {
@@ -75,17 +56,20 @@ impl ServerRunner {
 
 		let mode = self.mode.unwrap_or_default();
 		app.insert_resource(mode.clone());
-
-		if self.export_static {
-			return self.export_static(&mut app);
+		app.init();
+		app.update();
+		if let Some(exit) = app.should_exit() {
+			exit.into_result()
+		} else if self.export_static {
+			self.export_static(&mut app)
+		} else {
+			#[cfg(feature = "axum")]
+			{
+				AxumRunner::new(self).run(app)
+			}
+			#[cfg(not(feature = "axum"))]
+			todo!("hyper router");
 		}
-
-		#[cfg(feature = "axum")]
-		{
-			AxumRunner::new(self).run(app)
-		}
-		#[cfg(not(feature = "axum"))]
-		todo!("hyper router");
 	}
 
 	/// Export static html files, with the router in SSG mode.

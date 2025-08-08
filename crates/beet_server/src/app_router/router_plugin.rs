@@ -19,6 +19,33 @@ impl Plugin for RouterPlugin {
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
-			.add_systems(Startup, insert_route_tree);
+			.add_systems(Startup, (insert_route_tree, clone_parent_world));
 	}
+}
+
+
+/// Copy some types from the parent world to the router world.
+fn clone_parent_world(world: &mut World) -> Result {
+	if let Some(mut router) = world.remove_resource::<Router>() {
+		let render_mode = world.resource::<RenderMode>().clone();
+
+
+		router.add_plugin(move |app: &mut App| {
+			app.insert_resource(render_mode.clone());
+		});
+
+		// check its valid
+		let mut router_world = router.world();
+		let num_roots = router_world
+			.query_filtered_once::<(), With<RouterRoot>>()
+			.len();
+		if num_roots != 1 {
+			bevybail!(
+				"Router apps must have exactly one `RouterRoot`, found {num_roots}",
+			);
+		}
+
+		world.insert_resource(router);
+	}
+	Ok(())
 }

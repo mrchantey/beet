@@ -15,7 +15,7 @@ pub async fn collect_html(
 	let workspace_config = world.resource::<WorkspaceConfig>();
 	let html_dir = workspace_config.html_dir.into_abs();
 
-	let router = world.resource::<Router>().clone().from_world(world)?;
+	let router = world.resource::<Router>();
 
 	router
 		.world()
