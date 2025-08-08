@@ -4,11 +4,79 @@ use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 
 
+/// Marker type indicating this entity was spawned via [`RouteHandler::new_bundle`].
+#[derive(Component)]
+pub struct HandlerBundle;
+
+
+/// A route handler returning a bundle, which is inserted into the world
+/// with a [`HandlerBundle`] component.
+pub fn bundle_endpoint<T, In, InErr, Out, Marker>(
+	endpoint: impl Into<Endpoint>,
+	handler: T,
+) -> impl Bundle
+where
+	T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
+	In: 'static + SystemInput,
+	for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
+	InErr: IntoResponse,
+	Out: 'static + Send + Sync + Bundle,
+{
+	let handler = move |world: &mut World| -> Result<(), Response> {
+		let input = world
+			.remove_resource::<Request>()
+			.ok_or_else(|| no_request_err::<T>())?
+			.try_into()
+			.map_err(|err: InErr| err.into_response())?;
+		match world.run_system_cached_with(handler.clone(), input) {
+			Ok(out) => {
+				world.spawn((HandlerBundle, out));
+				// world.run_schedule(ApplySnippets);
+			}
+			Err(err) => {
+				world.insert_resource(HttpError::from(err).into_response());
+			}
+		}
+		Ok(())
+	};
+
+	(
+		endpoint.into(),
+		RouteHandler::layer(move |world: &mut World| {
+		if let Err(err) = handler(world) {
+			world.insert_resource(err);
+		}
+		})
+	)
+}
+
+
+/// An async route handler returning a bundle, which is inserted into the world
+/// with a [`HandlerBundle`] component.
+pub fn bundle_endpoint_async<Handler, Fut, Out>(
+	handler: Handler,
+) -> RouteHandler
+where
+	Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
+	Fut: 'static + Send + Future<Output = (World, Out)>,
+	Out: 'static + Send + Sync + Bundle,
+{
+	RouteHandler::layer_async(move |world, _| {
+		let func = handler.clone();
+		async move {
+			let (mut world, out) = func(world).await;
+			world.spawn((HandlerBundle, out));
+			world
+		}
+	})
+}
+
+
 /// A system for converting bundles into HTML responses, automatically
 /// run by the router if no [`Response`] is set.
 /// - First checks for a [`HtmlDocument`] and renders that one,
 /// - otherwise searches for a [`HandlerBundle`].
-pub fn html_bundle_handler() -> impl Bundle {
+pub fn bundle_to_html_handler() -> impl Bundle {
 	RouteHandler::layer(system.pipe(insert_response_if_error))
 }
 
@@ -31,8 +99,6 @@ fn system(world: &mut World) -> Result {
 		.iter()
 		.next()
 	{
-		// let entity =
-		// 	.ok_or_else(|| HttpError::not_found())?;
 		world.entity_mut(entity).insert(HtmlDocument);
 		entity
 	} else {
@@ -64,11 +130,11 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		Router::new_bundle(|| {
-			children![RouteHandler::bundle(HttpMethod::Get, || {
+			bundle_endpoint(HttpMethod::Get, || {
 				rsx! {
 					<MyTemplate foo=42/>
 				}
-			}),]
+			})
 		})
 		.oneshot_str("/")
 		.await
@@ -82,7 +148,7 @@ mod test {
 	async fn middleware() {
 		Router::new_bundle(|| {
 			children![
-				RouteHandler::bundle(HttpMethod::Get, || {
+				bundle_endpoint(HttpMethod::Get, || {
 					rsx! {
 						<MyTemplate foo=42/>
 					}

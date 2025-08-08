@@ -33,7 +33,7 @@ impl Default for ServerRunner {
 }
 
 
-#[derive(Default, Copy, Clone, Resource, Subcommand)]
+#[derive(Default, Copy, Clone, Resource, PartialEq, Eq, Subcommand)]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
 	/// to serve files from the bucket.

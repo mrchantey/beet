@@ -7,22 +7,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-
-/// Marker type indicating this entity was spawned via [`RouteHandler::new_bundle`].
-#[derive(Component)]
-pub struct HandlerBundle;
-
-
-
-// fn foobar() {
-// 	let a = rsx! {
-// 		<AsyncFallback handler=|_| async move {
-// 			"hello"
-// 		} />
-// 	};
-// }
-
-
 /// An asynchronous route handler, accepting and returning a [`World`].
 #[derive(Clone, Component)]
 pub struct RouteHandler(Arc<RouteHandlerFunc>);
@@ -33,7 +17,7 @@ type RouteHandlerFunc = dyn 'static
 	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = World> + Send>>;
 
 
-fn no_request_err<T>() -> HttpError {
+pub fn no_request_err<T>() -> HttpError {
 	HttpError::internal_error(format!(
 		"
 Handler Error: {}\n\n
@@ -82,44 +66,6 @@ impl RouteHandler {
 		.xmap(move |handler| (endpoint.into(), handler))
 	}
 
-	/// A route handler returning a bundle, which is inserted into the world
-	/// with a [`HandlerBundle`] component.
-	pub fn bundle<T, In, InErr, Out, Marker>(
-		endpoint: impl Into<Endpoint>,
-		handler: T,
-	) -> (Endpoint, Self)
-	where
-		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
-		In: 'static + SystemInput,
-		for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
-		InErr: IntoResponse,
-		Out: 'static + Send + Sync + Bundle,
-	{
-		let handler = move |world: &mut World| -> Result<(), Response> {
-			let input = world
-				.remove_resource::<Request>()
-				.ok_or_else(|| no_request_err::<T>())?
-				.try_into()
-				.map_err(|err: InErr| err.into_response())?;
-			match world.run_system_cached_with(handler.clone(), input) {
-				Ok(out) => {
-					world.spawn((HandlerBundle, out));
-					// world.run_schedule(ApplySnippets);
-				}
-				Err(err) => {
-					world.insert_resource(HttpError::from(err).into_response());
-				}
-			}
-			Ok(())
-		};
-
-		Self::layer(move |world: &mut World| {
-			if let Err(err) = handler(world) {
-				world.insert_resource(err);
-			}
-		})
-		.xmap(move |handler| (endpoint.into(), handler))
-	}
 
 	/// A route handler accepting an input type to be extracted from the request.
 	/// - For requests with no body, ie `GET`, the input is deserialized from the query parameters.
@@ -196,23 +142,6 @@ impl RouteHandler {
 		})
 	}
 
-	/// An async route handler returning a bundle, which is inserted into the world
-	/// with a [`HandlerBundle`] component.
-	pub fn bundle_async<Handler, Fut, Out>(handler: Handler) -> Self
-	where
-		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
-		Fut: 'static + Send + Future<Output = (World, Out)>,
-		Out: 'static + Send + Sync + Bundle,
-	{
-		Self::layer_async(move |world, _| {
-			let func = handler.clone();
-			async move {
-				let (mut world, out) = func(world).await;
-				world.spawn((HandlerBundle, out));
-				world
-			}
-		})
-	}
 
 	/// An async route handler with output inserted as a [`Response`]
 	pub fn layer_async<Handler, Fut>(handler: Handler) -> Self
@@ -249,21 +178,6 @@ mod test {
 			.status()
 			.xpect()
 			.to_be(StatusCode::OK);
-	}
-	#[sweet::test]
-	async fn bundle() {
-		fn foo(_bar: Query<Entity>) -> impl Bundle + use<> {
-			rsx! {<div>hello</div>}
-		}
-
-		Router::new_bundle(|| RouteHandler::bundle(HttpMethod::Get, foo))
-			.oneshot_str("/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be(
-				"<!DOCTYPE html><html><head></head><body><div>hello</div></body></html>",
-			);
 	}
 	#[sweet::test]
 	async fn body() {

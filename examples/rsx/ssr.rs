@@ -19,7 +19,7 @@ fn setup(mut commands: Commands) {
 	commands.spawn(children![
 		(
 			PathFilter::new("/"),
-			RouteHandler::bundle(HttpMethod::Get, || rsx! {<Home/>})
+			bundle_endpoint(HttpMethod::Get, || rsx! {<Home/>})
 		),
 		(
 			PathFilter::new("/foo"),
@@ -31,19 +31,16 @@ fn setup(mut commands: Commands) {
 			PathFilter::new("/hello-layer"),
 			RouteHandler::layer(modify_request_layer),
 			// children are run in sequence
-			children![RouteHandler::bundle(
-				HttpMethod::Get,
-				|req: Res<Request>| {
-					let body = req.body_str().unwrap_or_default();
-					rsx! {
-						<Style/>
-						<main>
-							<div> hello {body}</div>
-							<a href="/">go home</a>
-						</main>
-					}
+			children![bundle_endpoint(HttpMethod::Get, |req: Res<Request>| {
+				let body = req.body_str().unwrap_or_default();
+				rsx! {
+					<Style/>
+					<main>
+						<div> hello {body}</div>
+						<a href="/">go home</a>
+					</main>
 				}
-			)]
+			})]
 		)
 	]);
 }

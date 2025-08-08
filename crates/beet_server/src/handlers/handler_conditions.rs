@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 use std::pin::Pin;
@@ -14,7 +15,7 @@ type Predicate = dyn 'static
 
 
 impl HandlerConditions {
-	/// A predicate that will run only if:
+	/// Runs only if:
 	/// 1. There is a [`Request`]
 	/// 2. There is no [`Response`]
 	pub fn fallback() -> Self {
@@ -29,8 +30,15 @@ impl HandlerConditions {
 			},
 		)
 	}
+	/// Runs if there is no [`Response`].
 	pub fn no_response() -> Self {
 		Self::default().system(|res: Option<Res<Response>>| res.is_none())
+	}
+	/// Runs if the router is in [`RenderMode::Ssr`].
+	pub fn is_ssr() -> Self {
+		Self::default().system(|render_mode: Res<RenderMode>| {
+			*render_mode == RenderMode::Ssr
+		})
 	}
 
 	pub fn system<Marker>(

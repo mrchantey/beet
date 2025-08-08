@@ -29,7 +29,7 @@ fn default_handlers(
 	let mut root = commands.entity(root);
 	root.with_child((
 		HandlerConditions::no_response(),
-		html_bundle_handler(),
+		bundle_to_html_handler(),
 	));
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 	root.with_child((
@@ -58,7 +58,8 @@ impl Router {
 			app_pool: Self::create_app_pool(plugin),
 		}
 	}
-
+/// Convenience method to create a new [`Router`] with a bundle of routes, 
+/// adding the [`RouterRoot`] component.
 	pub fn new_bundle<B>(func: impl 'static + Send + Sync + Clone + FnOnce() -> B) -> Self 
 		where B: Bundle{
 		Self::new(move |app:&mut App|{

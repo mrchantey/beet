@@ -45,10 +45,10 @@ pub fn collect_route_files(
 						// page routes are presumed to be bundles
 						match is_async {
 							true => quote! {
-								RouteHandler::async_bundle(#endpoint, #mod_ident::#func_ident)
+								bundle_endpoint_async(#endpoint, #mod_ident::#func_ident)
 							},
 							false => quote! {
-								RouteHandler::bundle(#endpoint, #mod_ident::#func_ident)
+								bundle_endpoint(#endpoint, #mod_ident::#func_ident)
 							},
 						}
 					}
