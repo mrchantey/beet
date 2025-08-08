@@ -11,9 +11,9 @@ use std::future::Future;
 use std::pin::Pin;
 
 #[derive(Clone, Deref, DerefMut, Resource)]
-pub struct S3Client(pub Client);
+pub struct S3Provider(pub Client);
 
-impl S3Client {
+impl S3Provider {
 	pub async fn create() -> Self {
 		let config = aws_config::load_from_env().await;
 		Self(Client::new(&config))
@@ -29,7 +29,7 @@ impl S3Client {
 	}
 }
 
-impl BucketProvider for S3Client {
+impl BucketProvider for S3Provider {
 	fn box_clone(&self) -> Box<dyn BucketProvider> {
 		Box::new(Self(self.0.clone()))
 	}
@@ -190,14 +190,14 @@ mod test {
 	#[tokio::test]
 	#[ignore = "expensive"]
 	async fn s3_client() {
-		let s3_client_resource = S3Client::create().await;
+		let s3_client_resource = S3Provider::create().await;
 		let _inner_client = &s3_client_resource.0;
 	}
 
 	#[tokio::test]
 	#[ignore = "expensive"]
 	async fn s3_bucket_crud() -> Result<()> {
-		let client = S3Client::create().await;
+		let client = S3Provider::create().await;
 
 		let bucket = Bucket::new(client, BUCKET_NAME.to_string());
 		bucket.ensure_exists().await?;
@@ -248,7 +248,7 @@ mod test {
 	#[tokio::test]
 	#[ignore = "expensive"]
 	async fn s3_public_url() -> Result<()> {
-		let client = S3Client::create().await;
+		let client = S3Provider::create().await;
 		Bucket::new(client, BUCKET_NAME.to_string())
 			.public_url(TEST_KEY)
 			.await?
