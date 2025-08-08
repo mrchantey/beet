@@ -27,8 +27,12 @@ impl AxumRunner {
 			.cloned()
 			.unwrap_or_default();
 		let beet_router = world.resource::<Router>().clone();
+		let render_mode = world.resource::<RenderMode>().clone();
 
-		let beet_router2 = beet_router.clone();
+		let mut beet_router2 = beet_router.clone();
+		beet_router2.add_plugin(move |app: &mut App| {
+			app.insert_resource(render_mode.clone());
+		});
 		let handler = move |axum_req: axum::extract::Request| async move {
 			match async move {
 				let beet_req = Request::from_axum(axum_req, &()).await?;
@@ -92,13 +96,10 @@ impl AxumRunner {
 		// };
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
-		let reload_handle = match self.runner.mode.unwrap_or_default() {
-			RouterMode::Ssg => {
-				let (reload_layer, reload_handle) = get_reload(html_dir);
-				router = router.layer(reload_layer);
-				Some(reload_handle)
-			}
-			_ => None,
+		let reload_handle = {
+			let (reload_layer, reload_handle) = get_reload(html_dir);
+			router = router.layer(reload_layer);
+			Some(reload_handle)
 		};
 
 

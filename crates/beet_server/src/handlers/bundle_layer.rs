@@ -8,26 +8,41 @@ use bevy::prelude::*;
 /// run by the router if no [`Response`] is set.
 /// - First checks for a [`HtmlDocument`] and renders that one,
 /// - otherwise searches for a [`HandlerBundle`].
-pub fn bundle_to_html(world: &mut World) -> HttpResult<Html> {
+pub fn html_bundle_handler() -> impl Bundle {
+	RouteHandler::layer(system.pipe(insert_response_if_error))
+}
+
+fn insert_response_if_error(In(result): In<Result>, mut commands: Commands) {
+	if let Err(err) = result {
+		commands.insert_resource(err.into_response());
+	}
+}
+
+
+fn system(world: &mut World) -> Result {
 	let entity = if let Some(&entity) = world
 		.query_filtered_once::<Entity, With<HtmlDocument>>()
 		.iter()
 		.next()
 	{
 		entity
-	} else {
-		let entity = *world
-			.query_filtered_once::<Entity, With<HandlerBundle>>()
-			.iter()
-			.next()
-			.ok_or_else(|| HttpError::not_found())?;
+	} else if let Some(&entity) = world
+		.query_filtered_once::<Entity, With<HandlerBundle>>()
+		.iter()
+		.next()
+	{
+		// let entity =
+		// 	.ok_or_else(|| HttpError::not_found())?;
 		world.entity_mut(entity).insert(HtmlDocument);
 		entity
+	} else {
+		return Ok(());
 	};
 	world.run_schedule(ApplySnippets);
 	world.run_schedule(ApplyDirectives);
 	let html = world.run_system_cached_with(render_fragment, entity)?;
-	Ok(Html(html))
+	world.insert_resource(Html(html).into_response());
+	Ok(())
 }
 
 /// A [`RouteHandler`]

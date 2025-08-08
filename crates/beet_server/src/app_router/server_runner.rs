@@ -15,25 +15,32 @@ use clap::Subcommand;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct ServerRunner {
+	/// Only export the static html files to the [`WorkspaceConfig::html_dir`],
+	/// and immediately exit.
+	#[arg(long)]
+	pub export_static: bool,
 	/// Specify the router mode
 	#[command(subcommand)]
-	pub mode: Option<RouterMode>,
+	pub mode: Option<RenderMode>,
 }
 impl Default for ServerRunner {
-	fn default() -> Self { Self { mode: None } }
+	fn default() -> Self {
+		Self {
+			export_static: false,
+			mode: None,
+		}
+	}
 }
 
 
 #[derive(Default, Copy, Clone, Resource, Subcommand)]
-pub enum RouterMode {
-	/// Do not add static routes to the router, instead loading them from
-	/// the `html_dir`.
+pub enum RenderMode {
+	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
+	/// to serve files from the bucket.
 	#[default]
 	Ssg,
-	/// Add static routes to the router, rendering them on each request.
+	/// All static html [`RouteHandler`] funcs will run instead of using the [`bucket_handler`].
 	Ssr,
-	/// Export static html and wasm scene, then exit.
-	ExportHtml,
 }
 
 impl ServerRunner {
@@ -69,16 +76,10 @@ impl ServerRunner {
 		let mode = self.mode.unwrap_or_default();
 		app.insert_resource(mode.clone());
 
-		match mode {
-			RouterMode::ExportHtml => {
-				return self.export_html(&mut app);
-			}
-			RouterMode::Ssg => {
-				#[cfg(not(feature = "lambda"))]
-				self.export_html(&mut app)?;
-			}
-			RouterMode::Ssr => {}
+		if self.export_static {
+			return self.export_static(&mut app);
 		}
+
 		#[cfg(feature = "axum")]
 		{
 			AxumRunner::new(self).run(app)
@@ -87,14 +88,16 @@ impl ServerRunner {
 		todo!("hyper router");
 	}
 
-	/// Export static html files
+	/// Export static html files, with the router in SSG mode.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[tokio::main]
-	async fn export_html(&self, app: &mut App) -> Result {
+	async fn export_static(&self, app: &mut App) -> Result {
+		// force ssr to ensure static handlers run
+		app.insert_resource(RenderMode::Ssr);
 		let html = collect_html(app.world_mut()).await?;
 
 		for (path, html) in html {
-			debug!("Exporting html to {}", path);
+			trace!("Exporting html to {}", path);
 			FsExt::write(path, &html)?;
 		}
 		Ok(())

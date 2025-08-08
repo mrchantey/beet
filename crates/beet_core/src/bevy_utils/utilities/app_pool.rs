@@ -61,6 +61,10 @@ impl AppPool {
 		}
 	}
 
+	pub fn constructor(&self) -> Arc<dyn 'static + Send + Sync + Fn() -> App> {
+		self.constructor.clone()
+	}
+
 	pub fn num_constructed(&self) -> usize {
 		*self.num_constructed.read().unwrap()
 	}

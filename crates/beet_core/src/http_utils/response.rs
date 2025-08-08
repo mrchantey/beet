@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_utils::utils::PipelineTarget;
-use bevy::ecs::system::RunSystemError;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;
@@ -267,19 +266,20 @@ impl Response {
 }
 
 
-// not specific enough
-// impl Into<Response> for () {
-// 	fn into(self) -> Response { Response::ok() }
-// }
-
-
 impl Into<Response> for BevyError {
 	fn into(self) -> Response { HttpError::from_opaque(self).into() }
 }
 
-impl Into<Response> for RunSystemError {
-	fn into(self) -> Response { HttpError::from_opaque(self).into() }
-}
+// impl Into<Response> for RunSystemError {
+// 	fn into(self) -> Response { HttpError::from_opaque(self).into() }
+// }
+
+// impl<T> IntoResponse for T where T:Into<HttpError> {
+// 	fn into_response(self) -> Response {
+// 		let error: HttpError = self.into();
+// 		error.into()
+// 	}
+// }
 
 impl IntoResponse for Bytes {
 	fn into_response(self) -> Response {

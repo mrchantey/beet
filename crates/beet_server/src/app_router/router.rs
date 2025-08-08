@@ -2,51 +2,90 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::ops::ControlFlow;
+
+
+/// Mark the root entity of the router, every router app must have exactly one
+/// of these.
+#[derive(Component)]
+pub struct RouterRoot;
+
 /// Collection of systems for collecting and running and route handlers
 /// This type serves as the intermediarybetween the main app and the route handlers.
-#[derive(Clone, Deref, DerefMut, Resource)]
+#[derive(Clone,Resource)]
 pub struct Router {
+	/// An app pool constructed from the given plugin.
 	app_pool: AppPool,
+	plugin: ClonePluginContainer,
 }
 
-#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+/// insert the default handlers that assist with
 fn default_handlers(
 	mut commands: Commands,
 	config:Res<WorkspaceConfig>){
-	
-	let provider = FsBucketProvider::new(
-		config.html_dir.into_abs()
-	);
 
-	commands.spawn((
-		Bucket::new(provider,""),
-		HandlerConditions::fallback(),
-		bucket_handler(),
-	));	
+	commands.spawn(children![
+		(
+			HandlerConditions::no_response(),
+			html_bundle_handler(),
+		),
+		#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+		(
+			Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),""),
+			HandlerConditions::fallback(),
+			bucket_handler(),
+		)
+	]);
 }
 
 impl Router {
-	/// Create a new [`Router`] with the given plugin, which should add
-	/// routes to the app either directly or in a [`Startup`] system.
-	pub fn new(plugin: impl 'static + Send + Sync + Clone + Plugin) -> Self {
+	/// Create a new [`Router`] with the given plugin, adding default handlers.
+	pub fn new(plugin: impl ClonePlugin) -> Self {
+		let plugin = ClonePluginContainer::new(plugin);
+		Self::new_no_defaults(move |app:&mut App|{
+			app.add_systems(Startup, default_handlers);
+			plugin.add_to_app(app);
+		})
+	}
+	/// Create a new [`Router`] with the given plugin, default handlers are not added.
+	pub fn new_no_defaults(plugin: impl ClonePlugin) -> Self {
 		Self {
-			app_pool: AppPool::new(move || {
-				let mut app = App::new();
-				app.add_plugins((
-					RouterPlugin,
-					#[cfg(not(test))]
-					LoadSnippetsPlugin,	
-					plugin.clone()
-				));
-				#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-				app.add_systems(Startup, default_handlers);
-
-				app.init();
-				app.update();
-				app
-			}),
+			plugin: ClonePluginContainer(plugin.box_clone()),
+			app_pool: Self::create_app_pool(plugin),
 		}
 	}
+
+	/// Creates a new [`Plugin`] which will first add the [`Self::plugin`]
+	/// and then the new plugin.
+	pub fn add_plugin(&mut self, plugin: impl ClonePlugin) {
+		let current_plugin = self.plugin.clone();
+		let new_plugin = ClonePluginContainer::new(plugin);
+		let plugin = move |app:&mut App|{
+			current_plugin.add_to_app(app);
+			new_plugin.add_to_app(app);
+		};
+		self.plugin = ClonePluginContainer(plugin.box_clone());
+		self.app_pool = Self::create_app_pool(plugin);
+	}
+	
+	fn create_app_pool(plugin: impl ClonePlugin) -> AppPool {
+		AppPool::new(move || {
+			let mut app = App::new();
+			app.add_plugins((
+				RouterPlugin,
+				#[cfg(not(test))]
+				LoadSnippetsPlugin,
+			));
+			plugin.add_to_app(&mut app);
+			app.init();
+			app.update();
+			app
+		})
+	}
+
+	pub fn world(&self) -> PooledWorld {
+		self.app_pool.pop()
+	}
+
 
 	/// Handle a single request, returning the response or a 404 if not found.
 	pub async fn oneshot(&self, req: impl Into<Request>) -> Response {
@@ -79,13 +118,9 @@ impl Router {
 				.await;
 		}
 
-		let response =
-			if let Some(response) = world.remove_resource::<Response>() {
-				response
-			} else {
-				// if no response try building one from a bundle
-				bundle_to_html(world.inner_mut()).into_response()
-			};
+		let response =world.remove_resource::<Response>().unwrap_or_else(|| {
+			Response::not_found()
+		});
 
 		trace!("Returning Response: {:#?}", response);
 		trace!("Route handler completed in: {:.2?}", start_time.elapsed());

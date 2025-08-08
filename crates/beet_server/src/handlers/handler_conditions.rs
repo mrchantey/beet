@@ -29,6 +29,9 @@ impl HandlerConditions {
 			},
 		)
 	}
+	pub fn no_response() -> Self {
+		Self::default().system(|res: Option<Res<Response>>| res.is_none())
+	}
 
 	pub fn system<Marker>(
 		mut self,

@@ -170,7 +170,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = World::new();
-		world.init_resource::<RouterMode>();
+		world.init_resource::<RenderMode>();
 		world.insert_resource(Router::new(|app: &mut App| {
 			app.world_mut().spawn(children![
 				(

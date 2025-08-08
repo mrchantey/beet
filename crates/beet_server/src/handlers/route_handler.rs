@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
 // use beet_rsx::prelude::*;
 use beet_utils::utils::PipelineTarget;
-use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use serde::de::DeserializeOwned;
 use std::future::Future;
@@ -102,13 +101,13 @@ impl RouteHandler {
 				.ok_or_else(|| no_request_err::<T>())?
 				.try_into()
 				.map_err(|err: InErr| err.into_response())?;
-			match world.run_system_once_with(handler.clone(), input) {
+			match world.run_system_cached_with(handler.clone(), input) {
 				Ok(out) => {
 					world.spawn((HandlerBundle, out));
 					// world.run_schedule(ApplySnippets);
 				}
 				Err(err) => {
-					world.insert_resource(err.into_response());
+					world.insert_resource(HttpError::from(err).into_response());
 				}
 			}
 			Ok(())
@@ -169,10 +168,10 @@ impl RouteHandler {
 		T: 'static + Send + Sync + Clone + IntoSystem<(), (), Marker>,
 	{
 		RouteHandler(Arc::new(move |mut world: World, _| {
-			match world.run_system_once(handler.clone()) {
+			match world.run_system_cached(handler.clone()) {
 				Ok(_) => {}
 				Err(err) => {
-					world.insert_resource(err.into_response());
+					world.insert_resource(HttpError::from(err).into_response());
 				}
 			}
 			Box::pin(async move { world })

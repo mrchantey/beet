@@ -43,7 +43,7 @@ pub fn export_server_ssg(
 	);
 	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
-		.arg("export-html")
+		.arg("--export-static")
 		.status()?
 		.exit_ok()?;
 	Ok(())

@@ -18,7 +18,7 @@ pub async fn collect_html(
 	let router = world.resource::<Router>().clone();
 
 	router
-		.pop()
+		.world()
 		.run_system_cached(ResolvedEndpoint::collect_static_get)?
 		.into_iter()
 		// TODO parallel
