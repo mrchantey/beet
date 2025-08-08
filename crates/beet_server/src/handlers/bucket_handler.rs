@@ -52,7 +52,6 @@ async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use http::header::LOCATION;
 	use sweet::prelude::*;
 
@@ -120,12 +119,12 @@ mod test {
 			.insert("index.html", "<div>fallback</div>")
 			.await
 			.unwrap();
-		Router::new(move |app: &mut App| {
-			app.world_mut().spawn((
+		Router::new_bundle(move || {
+			(
 				HandlerConditions::fallback(),
 				bucket.clone(),
 				super::bucket_handler(),
-			));
+			)
 		})
 		.oneshot_str("/")
 		.await

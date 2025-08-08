@@ -171,8 +171,8 @@ mod test {
 	async fn works() {
 		let mut world = World::new();
 		world.init_resource::<RenderMode>();
-		world.insert_resource(Router::new(|app: &mut App| {
-			app.world_mut().spawn(children![
+		world.insert_resource(Router::new_bundle(|| {
+			children![
 				(
 					PathFilter::new("/add"),
 					RouteHandler::action(
@@ -194,10 +194,10 @@ mod test {
 						increment_if_positive.pipe(JsonResult::pipe)
 					)
 				),
-			]);
+			]
 		}));
-
-		let _handle = serve(AxumRunner::router(&mut world)).await;
+		let router = AxumRunner::router(&mut world).unwrap();
+		let _handle = serve(router).await;
 		test_get().await;
 		test_post().await;
 		test_result().await;

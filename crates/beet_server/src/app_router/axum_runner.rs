@@ -21,22 +21,18 @@ impl AxumRunner {
 
 	/// Create a new [`axum::Router`] using the current app's world.
 	/// All handlers will get the world from the [`AppPool`]
-	pub fn router(world: &mut World) -> axum::Router {
+	pub fn router(world: &mut World) -> Result<axum::Router> {
 		let mut axum_router = world
 			.get_non_send_resource::<axum::Router>()
 			.cloned()
 			.unwrap_or_default();
-		let beet_router = world.resource::<Router>().clone();
-		let render_mode = world.resource::<RenderMode>().clone();
+		let beet_router =
+			world.resource::<Router>().clone().from_world(world)?;
 
-		let mut beet_router2 = beet_router.clone();
-		beet_router2.add_plugin(move |app: &mut App| {
-			app.insert_resource(render_mode.clone());
-		});
 		let handler = move |axum_req: axum::extract::Request| async move {
 			match async move {
 				let beet_req = Request::from_axum(axum_req, &()).await?;
-				beet_router2
+				beet_router
 					.handle_request(beet_req)
 					.await
 					.xok::<BevyError>()
@@ -71,12 +67,12 @@ impl AxumRunner {
 		// 	axum_router = axum_router
 		// 		.route(&segments, routing::on(method, handler.clone()));
 		// }
-		axum_router
+		Ok(axum_router)
 	}
 
 	#[tokio::main]
 	pub async fn run(self, mut app: App) -> Result {
-		let mut router = Self::router(app.world_mut());
+		let mut router = Self::router(app.world_mut())?;
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
@@ -205,18 +201,18 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins(RouterPlugin).insert_resource(Router::new(
-			|app: &mut App| {
-				app.world_mut().spawn((
+		app.add_plugins(RouterPlugin)
+			.insert_resource(Router::new_bundle(|| {
+				(
 					PathFilter::new("pizza"),
 					RouteHandler::new(HttpMethod::Get, || "hello world!"),
-				));
-			},
-		));
+				)
+			}));
 
 		// these tests also test the roundtrip CloneWorld mechanism
 		// catching errors like missing app.register_type::<T>()
 		AxumRunner::router(app.world_mut())
+			.unwrap()
 			.oneshot_res("/dsfkdsl")
 			.await
 			.unwrap()
@@ -224,6 +220,7 @@ mod test {
 			.xpect()
 			.to_be(StatusCode::NOT_FOUND);
 		AxumRunner::router(app.world_mut())
+			.unwrap()
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()

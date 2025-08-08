@@ -104,11 +104,11 @@ mod test {
 	#[rustfmt::skip]
 	#[sweet::test]
 	async fn runs_async() {
-		Router::new(|app: &mut App| {
-			app.world_mut().spawn((
+		Router::new_bundle(|| {
+			(
 					HandlerConditions::fallback(),
 					RouteHandler::new(HttpMethod::Get,|| "fallback")
-			));
+			)
 		})
 		.oneshot_str("/")
 		.await
@@ -119,14 +119,14 @@ mod test {
 	#[rustfmt::skip]
 	#[sweet::test]
 	async fn skips_async() {
-		Router::new(|app: &mut App| {
-			app.world_mut().spawn(children![
+		Router::new_bundle(|| {
+			children![
 				RouteHandler::new(HttpMethod::Get,|| "endpoint"),
 				(
 					HandlerConditions::fallback(),
 					RouteHandler::new(HttpMethod::Get,|| "fallback")
 				)
-			]);
+			]
 		})
 		.oneshot_str("/")
 		.await

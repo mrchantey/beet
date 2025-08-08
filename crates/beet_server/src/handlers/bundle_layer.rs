@@ -63,15 +63,12 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		Router::new(|app: &mut App| {
-			app.world_mut().spawn(children![RouteHandler::bundle(
-				HttpMethod::Get,
-				|| {
-					rsx! {
-						<MyTemplate foo=42/>
-					}
+		Router::new_bundle(|| {
+			children![RouteHandler::bundle(HttpMethod::Get, || {
+				rsx! {
+					<MyTemplate foo=42/>
 				}
-			),]);
+			}),]
 		})
 		.oneshot_str("/")
 		.await
@@ -83,8 +80,8 @@ mod test {
 	}
 	#[sweet::test]
 	async fn middleware() {
-		Router::new(|app: &mut App| {
-			app.world_mut().spawn(children![
+		Router::new_bundle(|| {
+			children![
 				RouteHandler::bundle(HttpMethod::Get, || {
 					rsx! {
 						<MyTemplate foo=42/>
@@ -97,7 +94,7 @@ mod test {
 						"middleware!" {entity}
 					}));
 				}),
-			]);
+			]
 		}).oneshot_str("/")
 		.await
 		.unwrap()
