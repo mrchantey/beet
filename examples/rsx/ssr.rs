@@ -20,23 +20,23 @@ fn setup(mut commands: Commands) {
 	commands.insert_resource(Router::new_no_defaults(|app: &mut App| {
 		app.init_plugin(RouterAppPlugin);
 		app.world_mut().spawn((RouterRoot, children![
+			// bundles are served as html documents
 			(
 				PathFilter::new("/"),
 				bundle_endpoint(HttpMethod::Get, || rsx! {<Home/>})
 			),
+			// common types implement IntoResponse
 			(
 				PathFilter::new("/foo"),
 				RouteHandler::new(HttpMethod::Get, || "bar")
 			),
+			// middleware example
 			(
-				// this entity has no endpoint so will be called for every request
-				// that matches the filter
 				PathFilter::new("/hello-layer"),
-				RouteHandler::layer(modify_request_layer),
 				// children are run in sequence
-				children![bundle_endpoint(
-					HttpMethod::Get,
-					|req: Res<Request>| {
+				children![
+					RouteHandler::layer(modify_request),
+					bundle_endpoint(HttpMethod::Get, |req: In<Request>| {
 						let body = req.body_str().unwrap_or_default();
 						rsx! {
 							<Style/>
@@ -45,15 +45,27 @@ fn setup(mut commands: Commands) {
 								<a href="/">go home</a>
 							</main>
 						}
-					}
-				)]
+					}),
+					RouteHandler::layer(modify_response),
+				]
 			)
 		]));
 	}));
 }
 
 // modifies the request body to "jimmy"
-fn modify_request_layer(mut req: ResMut<Request>) { req.set_body("jimmy"); }
+fn modify_request(mut req: ResMut<Request>) { req.set_body("jimmy"); }
+fn modify_response(world: &mut World) {
+	let entity = world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+
+	world.spawn((HtmlDocument, rsx! {
+		<Style/>
+		<article>
+		<h1>Warm greetings!</h1>
+		{entity}</article>
+	}));
+}
+
 
 #[template]
 fn Home() -> impl Bundle {
@@ -110,7 +122,7 @@ fn Style() -> impl Bundle {
 	// as many common css tokens like `1em` or `a:visited` are not valid rust tokens
 	rsx_combinator! {r"
 <style scope:global>
-	main {
+	main,article {
 		padding-top: 2em;
 		display: flex;
 		flex-direction: column;

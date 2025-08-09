@@ -118,9 +118,10 @@ impl BucketProvider for FsBucketProvider {
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			let body_bytes = tokio::fs::read(path)
-				.await
-				.map_err(|_err| HttpError::not_found())?;
+			let body_bytes = tokio::fs::read(&path).await.map_err(|_err| {
+				// error!("File not found: {}", path);
+				HttpError::not_found()
+			})?;
 			Ok(Bytes::from(body_bytes))
 		})
 	}

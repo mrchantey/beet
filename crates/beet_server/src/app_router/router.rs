@@ -56,7 +56,7 @@ fn default_handlers(
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 		
 	if bucket_handlers.is_empty() {
-		debug!("Inserting default bucket file handler");
+		trace!("Inserting default bucket file handler");
 		root.with_child((
 			Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),""),
 			HandlerConditions::fallback(),
@@ -126,6 +126,7 @@ impl Router {
 
 	pub fn with_parent_world(&mut self, parent: &World) -> Result<()>{
 		let render_mode = parent.resource::<RenderMode>().clone();
+
 		self.add_plugin(move |app: &mut App| {
 			app.insert_resource(render_mode.clone());
 		});
@@ -177,6 +178,7 @@ impl Router {
 
 		trace!("Handling request: {:#?}", request);
 		world.insert_resource(request);
+
 
 		let root = world.query_filtered::<Entity, With<RouterRoot>>().single(&world).expect(
 			"Router apps must have exactly one `RouterRoot`",

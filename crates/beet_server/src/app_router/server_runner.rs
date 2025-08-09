@@ -54,7 +54,9 @@ impl ServerRunner {
 	async fn run(self, mut app: App) -> Result {
 		PrettyTracing::default().init();
 
-		if !app.world().contains_resource::<RenderMode>() {
+		if self.export_static {
+			app.insert_resource(RenderMode::Ssr);
+		} else if !app.world().contains_resource::<RenderMode>() {
 			app.insert_resource(self.mode.unwrap_or_default());
 		}
 		app.init();
@@ -81,8 +83,6 @@ impl ServerRunner {
 	/// Export static html files, with the router in SSG mode.
 	#[cfg(not(target_arch = "wasm32"))]
 	async fn export_static(&self, app: &mut App) -> Result {
-		// force ssr to ensure static handlers run
-		app.insert_resource(RenderMode::Ssr);
 		let html = collect_html(app.world_mut()).await?;
 
 		for (path, html) in html {

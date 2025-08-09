@@ -73,20 +73,10 @@ impl AxumRunner {
 		let mut router = Self::router(world);
 
 		router = router.merge(state_utils_routes());
-		// .layer(NormalizePathLayer::trim_trailing_slash());
-		let html_dir = world.resource::<WorkspaceConfig>().html_dir.into_abs();
-
-		// match self.runner.mode.unwrap_or_default() {
-		// 	RouterMode::Ssg => {
-		// 		debug!("Serving static files from:\n{}", &html_dir);
-		// 		router =
-		// 			router.fallback_service(file_and_error_handler(&html_dir));
-		// 	}
-		// 	_ => {}
-		// };
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
 		let reload_handle = {
+			let html_dir = world.resource::<WorkspaceConfig>().html_dir.into_abs();
 			let (reload_layer, reload_handle) = get_reload(html_dir);
 			router = router.layer(reload_layer);
 			Some(reload_handle)

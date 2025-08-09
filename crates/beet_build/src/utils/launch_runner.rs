@@ -121,6 +121,7 @@ impl LaunchCmd {
 			Self::Run => vec![]
 				.xtend(Self::Codegen.into_flags())
 				.xtend(Self::Snippets.into_flags())
+				.xtend(vec![BuildFlag::CompileClient])
 				.xtend(Self::Serve.into_flags()),
 			Self::Snippets => vec![
 				BuildFlag::ImportSnippets,
@@ -132,7 +133,6 @@ impl LaunchCmd {
 			],
 			Self::Serve => vec![
 				BuildFlag::CompileServer,
-				// BuildFlag::CompileClient,
 				BuildFlag::ExportSsg,
 				BuildFlag::RunServer,
 			],
@@ -145,7 +145,7 @@ impl LaunchCmd {
 				BuildFlag::SyncBucket,
 			],
 			Self::Deploy => vec![
-				BuildFlag::DeploySst,
+				// BuildFlag::DeploySst,
 				]
 				.xtend(Self::Static.into_flags())
 				.xtend(Self::Lambda.into_flags())
