@@ -29,7 +29,7 @@ impl S3Provider {
 			.await;
 		Self(Client::new(&config))
 	}
-
+	/// s3 buckets dont want a leading slash in the key
 	fn resolve_key(&self, path: &RoutePath) -> String {
 		path.to_string().trim_start_matches('/').to_string()
 	}

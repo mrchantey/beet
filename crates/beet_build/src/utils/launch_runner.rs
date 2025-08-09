@@ -107,6 +107,8 @@ pub enum LaunchCmd {
 	Codegen,
 	Snippets,
 	Serve,
+	/// Build the client and server, export static html and syncs the s3 bucket.
+	Static,
 	Deploy,
 	/// Update the lambda function
 	Lambda,
@@ -134,12 +136,20 @@ impl LaunchCmd {
 				BuildFlag::ExportSsg,
 				BuildFlag::RunServer,
 			],
+			Self::Static => vec![
+				BuildFlag::ImportSnippets,
+				BuildFlag::ExportSnippets,
+				BuildFlag::CompileServer,
+				BuildFlag::CompileClient,
+				BuildFlag::ExportSsg,
+				BuildFlag::SyncBucket,
+			],
 			Self::Deploy => vec![
 				BuildFlag::DeploySst,
-				BuildFlag::CompileLambda,
-				BuildFlag::DeployLambda,
-				BuildFlag::WatchLambda,
-			],
+				]
+				.xtend(Self::Static.into_flags())
+				.xtend(Self::Lambda.into_flags())
+			,
 			Self::Lambda => vec![
 				BuildFlag::CompileLambda,
 				BuildFlag::DeployLambda,
