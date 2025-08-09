@@ -125,6 +125,7 @@ impl BucketProvider for S3Provider {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		let key = key.to_string();
+		println!("Getting object from bucket: {}, key: {}", bucket_name, key);
 		Box::pin(async move {
 			let get_result = client
 				.get_object()
@@ -132,7 +133,7 @@ impl BucketProvider for S3Provider {
 				.key(&key)
 				.send()
 				.await?;
-
+			println!("Object retrieved successfully.");
 			let body_bytes = get_result.body.collect().await?.into_bytes();
 			Ok(body_bytes)
 		})

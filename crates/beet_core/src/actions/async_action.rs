@@ -28,7 +28,7 @@ impl AsyncAction {
 		&self,
 		world: World,
 		entity: Entity,
-	) -> Pin<Box<dyn Future<Output = World>>> {
+	) -> Pin<Box<dyn Send + Future<Output = World>>> {
 		(self.0)(world, entity)
 	}
 }
@@ -36,7 +36,7 @@ impl AsyncAction {
 type AsyncActionFunc = dyn 'static
 	+ Send
 	+ Sync
-	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = World>>>;
+	+ Fn(World, Entity) -> Pin<Box<dyn Send + Future<Output = World>>>;
 
 
 /// A set of collected [`AsyncAction`] to be run by the [`AsyncRunner`].
@@ -45,10 +45,10 @@ pub struct AsyncActionSet(pub Vec<(Entity, AsyncAction)>);
 
 impl AsyncActionSet {
 	pub async fn collect_and_run(mut world: World) -> World {
-		world
+		let set = world
 			.run_system_cached(Self::collect)
-			.unwrap(/*infallible system params */)
-			.run(world).await
+			.unwrap(/*infallible system params */);
+		set.run(world).await
 	}
 
 

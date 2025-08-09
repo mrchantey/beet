@@ -1,3 +1,4 @@
+use bevy::log::debug;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -39,4 +40,9 @@ pub fn log_val(val: &str) {
 /// cross-platform way of logging a key and value
 pub fn log_kvp(key: &str, val: impl std::fmt::Display) {
 	log!("{key}: {val}");
+}
+
+
+pub fn log_debug(val: &str) {
+	debug!("{val}");
 }

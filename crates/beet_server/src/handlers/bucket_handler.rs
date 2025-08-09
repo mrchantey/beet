@@ -2,23 +2,28 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 
-
-
+/// Marker type added to bucket file handlers, used by the
+/// [`RouterAppPlugin`] to insert a default if none are present.
+#[derive(Component)]
+pub struct BucketFileHandler;
 
 /// Add this handler alongside a [`Bucket`] resource to serve files from the bucket.
 /// Serves static files from the provided bucket
 /// 1. If the requested path has an extension, create a permanent redirect to the public URL
 /// 2. If the requested path does not have an extension, append `/index.html` and serve the file as HTML.
-pub fn bucket_handler() -> impl Bundle {
-	RouteHandler::layer_async(async move |mut world, entity| {
-		let path = world.remove_resource::<Request>().unwrap();
-		let path: RoutePath = path.into();
-		let entity = world.entity(entity);
-		let bucket = entity.get::<Bucket>().unwrap();
-		let response = from_bucket(bucket, path).await.into_response();
-		world.insert_resource(response);
-		world
-	})
+pub fn bucket_file_handler() -> impl Bundle {
+	(
+		BucketFileHandler,
+		RouteHandler::layer_async(async move |mut world, entity| {
+			let path = world.remove_resource::<Request>().unwrap();
+			let path: RoutePath = path.into();
+			let entity = world.entity(entity);
+			let bucket = entity.get::<Bucket>().unwrap();
+			let response = from_bucket(bucket, path).await.into_response();
+			world.insert_resource(response);
+			world
+		}),
+	)
 }
 
 // TODO precompressed variants, ie `index.html.br`
@@ -32,8 +37,9 @@ async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
 			bucket
 				.get(&path.to_string())
 				.await
-				.map(|bytes| Response::ok_mime_guess(bytes, path))
-				.map_err(|_| HttpError::not_found().into())
+				.map(|bytes| Response::ok_mime_guess(bytes, path))?
+				.xok()
+			// .map_err(|_| HttpError::not_found().into())
 		} else {
 			Ok(Response::permanent_redirect(url))
 		}
@@ -42,8 +48,9 @@ async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
 		bucket
 			.get(&path.to_string())
 			.await
-			.map(|bytes| Response::ok_body(bytes, "text/html"))
-			.map_err(|_| HttpError::not_found().into())
+			.map(|bytes| Response::ok_body(bytes, "text/html"))?
+			.xok()
+		// .map_err(|_| HttpError::not_found().into())
 	}
 }
 
@@ -123,7 +130,7 @@ mod test {
 			(
 				HandlerConditions::fallback(),
 				bucket.clone(),
-				super::bucket_handler(),
+				super::bucket_file_handler(),
 			)
 		})
 		.oneshot_str("/")

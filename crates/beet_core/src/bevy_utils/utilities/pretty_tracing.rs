@@ -53,6 +53,9 @@ impl PrettyTracing {
 					.add_directive("naga=warn".parse().unwrap())
 					.add_directive("bevy_app=warn".parse().unwrap())
 					.add_directive("walrus=warn".parse().unwrap())
+					.add_directive("aws=warn".parse().unwrap())
+					.add_directive("hyper-util=warn".parse().unwrap())
+					// .add_directive("beet_utils=warn".parse().unwrap())
 					.add_directive(log_level.into()),
 			)
 			.with_writer(std::io::stdout);

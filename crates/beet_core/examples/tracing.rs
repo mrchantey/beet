@@ -10,4 +10,5 @@ fn main() {
 	debug!("This is Debug");
 	warn!("This is Warn");
 	error!("This is Error");
+	beet_utils::log_debug("hello from beet_utils");
 }

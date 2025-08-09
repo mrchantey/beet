@@ -43,11 +43,12 @@ pub struct Router {
 }
 
 /// insert the default handlers that assist with
+#[allow(unused_variables)]
 fn default_handlers(
 	mut commands: Commands,
-#[allow(unused)]
 	config:Res<WorkspaceConfig>,
 	query: Query<Entity, With<RouterRoot>>,
+	bucket_handlers: Query<(), With<BucketFileHandler>>,
 )->Result{
 
 	let root = query.single()?;
@@ -57,12 +58,15 @@ fn default_handlers(
 		bundle_to_html_handler(),
 	));
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-	root.with_child((
-		Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),""),
-		HandlerConditions::fallback(),
-		bucket_handler(),
-	));
-
+		
+	if bucket_handlers.is_empty() {
+		debug!("Inserting default bucket file handler");
+		root.with_child((
+			Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),""),
+			HandlerConditions::fallback(),
+			bucket_file_handler(),
+		));
+	}
 	Ok(())
 }
 
@@ -122,8 +126,26 @@ impl Router {
 		})
 	}
 
-	pub fn world(&self) -> PooledWorld {
-		self.app_pool.pop()
+	/// Pop an app from the pool and run async actions on it.
+	pub async fn construct_world(&self) -> PooledWorld {
+		let mut world = self.app_pool.pop();
+		let world2 = std::mem::take(world.inner_mut());
+		*world.inner_mut() = AsyncActionSet::collect_and_run(world2).await;
+		world
+	}
+
+	// check the router world has required components
+	pub fn validate(&self) -> Result {
+		let mut router_world = self.app_pool.pop();
+		let num_roots = router_world
+			.query_filtered_once::<(), With<RouterRoot>>()
+			.len();
+		if num_roots != 1 {
+			bevybail!(
+				"Router apps must have exactly one `RouterRoot`, found {num_roots}",
+			);
+		}
+		Ok(())
 	}
 
 
@@ -139,9 +161,8 @@ impl Router {
 
 	/// Handle a request in the world, returning the response
 	pub async fn handle_request(&self, request: Request) -> Response {
-		// let mut world = self.app_pool.pop();
 		// TODO proper pooling, this creates new app each time
-		let mut world = self.app_pool.pop();
+		let mut world = self.construct_world().await;
 
 		let start_time = CrossInstant::now();
 

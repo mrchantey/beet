@@ -69,17 +69,12 @@ impl AxumRunner {
 		axum_router
 	}
 
-	#[tokio::main]
-	pub async fn run(self, mut app: App) -> Result {
-		let mut router = Self::router(app.world_mut());
+	pub async fn run(self, world: &mut World) -> Result {
+		let mut router = Self::router(world);
 
 		router = router.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
-		let html_dir = app
-			.world()
-			.resource::<WorkspaceConfig>()
-			.html_dir
-			.into_abs();
+		let html_dir = world.resource::<WorkspaceConfig>().html_dir.into_abs();
 
 		// match self.runner.mode.unwrap_or_default() {
 		// 	RouterMode::Ssg => {

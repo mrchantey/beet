@@ -10,8 +10,7 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			.register_type::<MethodFilter>()
+		app.register_type::<MethodFilter>()
 			.register_type::<Endpoint>()
 			.register_type::<PathFilter>()
 			.register_type::<WorkspaceConfig>()
@@ -33,18 +32,7 @@ fn clone_parent_world(world: &mut World) -> Result {
 		router.add_plugin(move |app: &mut App| {
 			app.insert_resource(render_mode.clone());
 		});
-
-		// check its valid
-		let mut router_world = router.world();
-		let num_roots = router_world
-			.query_filtered_once::<(), With<RouterRoot>>()
-			.len();
-		if num_roots != 1 {
-			bevybail!(
-				"Router apps must have exactly one `RouterRoot`, found {num_roots}",
-			);
-		}
-
+		router.validate()?;
 		world.insert_resource(router);
 	}
 	Ok(())

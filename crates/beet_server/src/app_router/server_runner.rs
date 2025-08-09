@@ -41,7 +41,6 @@ pub enum RenderMode {
 }
 
 impl ServerRunner {
-
 	pub fn runner(app: App) -> AppExit {
 		Self::parse().run(app).unwrap_or_exit();
 		AppExit::Success
@@ -51,21 +50,27 @@ impl ServerRunner {
 		todo!("wasm runner");
 	}
 	#[cfg(not(target_arch = "wasm32"))]
-	fn run(self, mut app: App) -> Result {
+	#[tokio::main]
+	async fn run(self, mut app: App) -> Result {
 		PrettyTracing::default().init();
 
 		let mode = self.mode.unwrap_or_default();
 		app.insert_resource(mode.clone());
 		app.init();
+
+		let world = std::mem::take(app.world_mut());
+		*app.world_mut() = AsyncActionSet::collect_and_run(world).await;
+
 		app.update();
+		
 		if let Some(exit) = app.should_exit() {
 			exit.into_result()
 		} else if self.export_static {
-			self.export_static(&mut app)
+			self.export_static(&mut app).await
 		} else {
 			#[cfg(feature = "axum")]
 			{
-				AxumRunner::new(self).run(app)
+				AxumRunner::new(self).run(app.world_mut()).await
 			}
 			#[cfg(not(feature = "axum"))]
 			todo!("hyper router");
@@ -74,7 +79,6 @@ impl ServerRunner {
 
 	/// Export static html files, with the router in SSG mode.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[tokio::main]
 	async fn export_static(&self, app: &mut App) -> Result {
 		// force ssr to ensure static handlers run
 		app.insert_resource(RenderMode::Ssr);

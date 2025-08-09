@@ -130,7 +130,7 @@ impl LaunchCmd {
 			],
 			Self::Serve => vec![
 				BuildFlag::CompileServer,
-				BuildFlag::CompileClient,
+				// BuildFlag::CompileClient,
 				BuildFlag::ExportSsg,
 				BuildFlag::RunServer,
 			],
