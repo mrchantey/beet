@@ -9,40 +9,47 @@ use std::sync::Mutex;
 
 fn main() {
 	App::new()
-		.add_plugins((RouterPlugin, BeetRunner))
+		.add_plugins(BeetPlugins)
 		.add_systems(Startup, setup)
+		.insert_resource(RenderMode::Ssr)
 		.run();
 }
 
 // #[rustfmt::skip]
 fn setup(mut commands: Commands) {
-	commands.spawn(children![
-		(
-			PathFilter::new("/"),
-			bundle_endpoint(HttpMethod::Get, || rsx! {<Home/>})
-		),
-		(
-			PathFilter::new("/foo"),
-			RouteHandler::new(HttpMethod::Get, || "bar")
-		),
-		(
-			// this entity has no endpoint so will be called for every request
-			// that matches the filter
-			PathFilter::new("/hello-layer"),
-			RouteHandler::layer(modify_request_layer),
-			// children are run in sequence
-			children![bundle_endpoint(HttpMethod::Get, |req: Res<Request>| {
-				let body = req.body_str().unwrap_or_default();
-				rsx! {
-					<Style/>
-					<main>
-						<div> hello {body}</div>
-						<a href="/">go home</a>
-					</main>
-				}
-			})]
-		)
-	]);
+	commands.insert_resource(Router::new_no_defaults(|app: &mut App| {
+		app.init_plugin(RouterAppPlugin);
+		app.world_mut().spawn((RouterRoot, children![
+			(
+				PathFilter::new("/"),
+				bundle_endpoint(HttpMethod::Get, || rsx! {<Home/>})
+			),
+			(
+				PathFilter::new("/foo"),
+				RouteHandler::new(HttpMethod::Get, || "bar")
+			),
+			(
+				// this entity has no endpoint so will be called for every request
+				// that matches the filter
+				PathFilter::new("/hello-layer"),
+				RouteHandler::layer(modify_request_layer),
+				// children are run in sequence
+				children![bundle_endpoint(
+					HttpMethod::Get,
+					|req: Res<Request>| {
+						let body = req.body_str().unwrap_or_default();
+						rsx! {
+							<Style/>
+							<main>
+								<div> hello {body}</div>
+								<a href="/">go home</a>
+							</main>
+						}
+					}
+				)]
+			)
+		]));
+	}));
 }
 
 // modifies the request body to "jimmy"

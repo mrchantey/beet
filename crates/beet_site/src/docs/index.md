@@ -3,6 +3,9 @@ title= "Docs"
 +++
 
 ## Quickstart
+
+> TODO update for `0.0.7` 
+
 In this quick start we will create a new website, deploy it to aws lambda and remove it. 
 
 ### Build Dependencies
@@ -32,7 +35,7 @@ curl -fsSL https://cargo-lambda.info/install.sh | sh
 We can begin by setting up a new application:
 
 ```sh
-cargo binstall beet
+cargo binstall beet-cli --version=0.0.6
 beet new && cd beet_new_web
 beet run
 ```

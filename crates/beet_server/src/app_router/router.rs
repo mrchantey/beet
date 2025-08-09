@@ -16,11 +16,7 @@ pub struct RouterAppPlugin;
 impl Plugin for RouterAppPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			.add_plugins((
-				ApplyDirectivesPlugin,
-				#[cfg(not(test))]
-				LoadSnippetsPlugin,
-			))
+			.add_plugins(ApplyDirectivesPlugin)
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
@@ -49,7 +45,7 @@ fn default_handlers(
 	config:Res<WorkspaceConfig>,
 	query: Query<Entity, With<RouterRoot>>,
 	bucket_handlers: Query<(), With<BucketFileHandler>>,
-)->Result{
+) -> Result {
 
 	let root = query.single()?;
 	let mut root = commands.entity(root);
@@ -78,6 +74,8 @@ impl Router {
 		Self::new_no_defaults(move |app:&mut App|{
 			plugin.add_to_app(app);
 			app.init_plugin(RouterAppPlugin);
+			#[cfg(not(test))]
+			app.add_plugins(LoadSnippetsPlugin);
 		})
 	}
 	/// Create a new [`Router`] with the given plugin, without the [`RouterAppPlugin`].
@@ -87,8 +85,8 @@ impl Router {
 			app_pool: Self::create_app_pool(plugin),
 		}
 	}
-/// Convenience method to create a new [`Router`] with a bundle of routes, 
-/// adding the [`RouterRoot`] component.
+	/// Convenience method to create a new [`Router`] with a bundle of routes, 
+	/// adding the [`RouterRoot`] component.
 	pub fn new_bundle<B>(func: impl 'static + Send + Sync + Clone + FnOnce() -> B) -> Self 
 		where B: Bundle{
 		Self::new(move |app:&mut App|{
@@ -124,6 +122,15 @@ impl Router {
 			app.update();
 			app
 		})
+	}
+
+	pub fn with_parent_world(&mut self, parent: &World) -> Result<()>{
+		let render_mode = parent.resource::<RenderMode>().clone();
+		self.add_plugin(move |app: &mut App| {
+			app.insert_resource(render_mode.clone());
+		});
+		self.validate()?;
+		Ok(())
 	}
 
 	/// Pop an app from the pool and run async actions on it.

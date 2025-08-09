@@ -1,5 +1,6 @@
 +++
 title = "The Full Moon Harvest #1"
+created= "2024-06-10"
 +++
 
 I'm very excited for the `0.0.6-rc.3` of beet, now available.
@@ -9,13 +10,13 @@ I'm very excited for the `0.0.6-rc.3` of beet, now available.
 <br/>
 <br/>
 
-In May I [spoke at the bevy meetup](https://youtu.be/JeXOajFv8Dk) about unifying structural representations (games, dom trees, behavior etc), since then I've only become more certain this is how I want to develop applications. One language (rust), one paradigm (bevy ecs) across the entire stack. 
+In March I [spoke at the bevy meetup](https://youtu.be/JeXOajFv8Dk) about unifying structural representations (games, dom trees, behavior etc), since then I've only become more certain this is how I want to develop applications. One language (rust), one paradigm (bevy ecs) across the entire stack. 
 
 The biggest missing piece of this picture is the DOM so this has been my focus. I got the first implementation wrong though, thinking it would be overkill to use bevy for the web parser etc.
 
 ```js
 // bevy as a feature
-beet_rsx
+beet
 ├── html
 └── bevy
 ```
@@ -25,8 +26,7 @@ It was working but it was not beautiful and much less maintainable, so I [threw 
 // bevy as a foundation
 bevy
 └── beet
-    └── beet_rsx
-        └── html
+    └── html
 ```
 
 And that brings us to today, the first RC for the fullstack bevy experience with a growing list of features:

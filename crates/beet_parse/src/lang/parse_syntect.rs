@@ -102,6 +102,9 @@ fn lang_aliases(lang: &str) -> &str {
 		"txt" => "plain text",
 		"text" => "plain text",
 		"plaintext" => "plain text",
+		// toml not yet supported
+		"toml" => "yaml",
+		"jsx" => "javascript",
 		other => other,
 	}
 }

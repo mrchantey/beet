@@ -19,7 +19,7 @@ default = ["launch", "server", "client"]
 # used by beet cli for building prod server
 launch = ["beet/launch"]
 server = ["beet/server", "beet_design/mockups", "beet_design/server"]
-deploy = ["server", "beet/lambda"]
+deploy = ["server", "beet/aws", "beet/lambda"]
 # used by beet cli for building client
 client = ["beet/client", "beet_design/mockups"]
 

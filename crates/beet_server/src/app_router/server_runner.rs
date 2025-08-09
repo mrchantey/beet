@@ -30,7 +30,7 @@ impl Default for ServerRunner {
 	}
 }
 
-#[derive(Default, Copy, Clone, Resource, PartialEq, Eq, Subcommand)]
+#[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq, Subcommand)]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
 	/// to serve files from the bucket.
@@ -54,15 +54,16 @@ impl ServerRunner {
 	async fn run(self, mut app: App) -> Result {
 		PrettyTracing::default().init();
 
-		let mode = self.mode.unwrap_or_default();
-		app.insert_resource(mode.clone());
+		if !app.world().contains_resource::<RenderMode>() {
+			app.insert_resource(self.mode.unwrap_or_default());
+		}
 		app.init();
 
 		let world = std::mem::take(app.world_mut());
 		*app.world_mut() = AsyncActionSet::collect_and_run(world).await;
 
 		app.update();
-		
+
 		if let Some(exit) = app.should_exit() {
 			exit.into_result()
 		} else if self.export_static {
