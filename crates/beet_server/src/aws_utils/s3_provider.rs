@@ -99,12 +99,12 @@ impl BucketProvider for S3Provider {
 	fn insert(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 		body: Bytes,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = key.to_string();
+		let key = path.to_string();
 		Box::pin(async move {
 			client
 				.put_object()
@@ -120,12 +120,12 @@ impl BucketProvider for S3Provider {
 	fn get(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = key.to_string();
-		println!("Getting object from bucket: {}, key: {}", bucket_name, key);
+		let key = path.to_string();
+		// println!("Getting object from bucket: {}, key: {}", bucket_name, key);
 		Box::pin(async move {
 			let get_result = client
 				.get_object()
@@ -133,7 +133,7 @@ impl BucketProvider for S3Provider {
 				.key(&key)
 				.send()
 				.await?;
-			println!("Object retrieved successfully.");
+			// println!("Object retrieved successfully.");
 			let body_bytes = get_result.body.collect().await?.into_bytes();
 			Ok(body_bytes)
 		})
@@ -142,11 +142,11 @@ impl BucketProvider for S3Provider {
 	fn delete(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = key.to_string();
+		let key = path.to_string();
 		Box::pin(async move {
 			client
 				.delete_object()
@@ -161,16 +161,16 @@ impl BucketProvider for S3Provider {
 	fn public_url(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
 		let region = self.0.config().region().map(|r| r.to_string());
 		let bucket_name = bucket_name.to_string();
-		let key = key.to_string();
+		let path = path.to_string();
 		Box::pin(async move {
 			let region_str = region.unwrap_or_else(|| "us-west-2".to_string());
 			let public_url = format!(
-				"https://{}.s3.{}.amazonaws.com/{}",
-				bucket_name, region_str, key
+				"https://{}.s3.{}.amazonaws.com{}",
+				bucket_name, region_str, path
 			);
 			Ok(public_url)
 		})
@@ -184,7 +184,9 @@ mod test {
 
 	const BUCKET_NAME: &str = "beet-test";
 	// const BUCKET_NAME: &str = "beet-test";
-	const TEST_KEY: &str = "test-file.txt";
+	fn test_key()->RoutePath {
+		RoutePath::from("test-file.txt")
+	}
 	const TEST_CONTENT: &str = "Hello, beet S3 test!";
 	const UPDATED_CONTENT: &str = "Updated beet S3 content!";
 
@@ -206,16 +208,18 @@ mod test {
 		// Verify bucket exists
 		bucket.exists().await.xpect().to_be_ok();
 
+		let test_key = test_key();
+
 		// CREATE - Upload a test file
 		bucket
-			.insert(TEST_KEY, TEST_CONTENT)
+			.insert(&test_key, TEST_CONTENT)
 			.await
 			.xpect()
 			.to_be_ok();
 
 		// READ - Download and verify the file
 		bucket
-			.get(TEST_KEY)
+			.get(&test_key)
 			.await
 			.unwrap()
 			.to_vec()
@@ -224,14 +228,14 @@ mod test {
 
 		// UPDATE - Modify the file
 		bucket
-			.insert(TEST_KEY, UPDATED_CONTENT)
+			.insert(&test_key, UPDATED_CONTENT)
 			.await
 			.xpect()
 			.to_be_ok();
 
 		// Verify update
 		bucket
-			.get(TEST_KEY)
+			.get(&test_key)
 			.await
 			.unwrap()
 			.to_vec()
@@ -239,10 +243,10 @@ mod test {
 			.to_be(UPDATED_CONTENT.as_bytes().to_vec());
 
 		// DELETE - Remove the test file
-		bucket.delete(TEST_KEY).await.xpect().to_be_ok();
+		bucket.delete(&test_key).await.xpect().to_be_ok();
 
 		// Verify deletion
-		bucket.get(TEST_KEY).await.xpect().to_be_err();
+		bucket.get(&test_key).await.xpect().to_be_err();
 		Ok(())
 	}
 
@@ -250,12 +254,13 @@ mod test {
 	#[ignore = "expensive"]
 	async fn s3_public_url() -> Result<()> {
 		let client = S3Provider::create().await;
+		let test_key = test_key();
 		Bucket::new(client, BUCKET_NAME.to_string())
-			.public_url(TEST_KEY)
+			.public_url(&test_key)
 			.await?
 			.xpect()
 			.to_be(format!(
-				"https://{BUCKET_NAME}.s3.us-west-2.amazonaws.com/{TEST_KEY}"
+				"https://{BUCKET_NAME}.s3.us-west-2.amazonaws.com{test_key}"
 			));
 
 		Ok(())

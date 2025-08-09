@@ -56,11 +56,11 @@ impl HttpError {
 		} else {
 			// we are about to lose the internal bevy message, so log it
 			// and return an opaque error
-			error!("Internal BevyError: {}", error);
+			error!("Internal Error: {}", error);
 			#[cfg(debug_assertions)]
 			{
 				HttpError::internal_error(format!(
-					"Internal Error (debug): {}",
+					"Internal Error: {}\n\nThis error will *not* be returned to the client in release builds.",
 					error
 				))
 			}

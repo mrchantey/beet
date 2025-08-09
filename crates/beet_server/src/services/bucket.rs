@@ -1,7 +1,7 @@
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use std::pin::Pin;
-
 
 /// Cross-service storage bucket representation
 #[derive(Component)]
@@ -52,20 +52,20 @@ impl Bucket {
 
 	pub async fn insert(
 		&self,
-		key: &str,
+		path: &RoutePath,
 		body: impl Into<Bytes>,
 	) -> Result<()> {
-		self.provider.insert(&self.name, key, body.into()).await
+		self.provider.insert(&self.name, path, body.into()).await
 	}
-	pub async fn get(&self, key: &str) -> Result<Bytes> {
-		self.provider.get(&self.name, key).await
+	pub async fn get(&self, path: &RoutePath) -> Result<Bytes> {
+		self.provider.get(&self.name, path).await
 	}
-	pub async fn delete(&self, key: &str) -> Result<()> {
-		self.provider.delete(&self.name, key).await
+	pub async fn delete(&self, path: &RoutePath) -> Result<()> {
+		self.provider.delete(&self.name, path).await
 	}
 
-	pub async fn public_url(&self, key: &str) -> Result<String> {
-		self.provider.public_url(&self.name, key).await
+	pub async fn public_url(&self, path: &RoutePath) -> Result<String> {
+		self.provider.public_url(&self.name, path).await
 	}
 }
 
@@ -110,20 +110,20 @@ pub trait BucketProvider: 'static + Send + Sync {
 	fn insert(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 		body: Bytes,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
 	/// Get an object from the bucket
 	fn get(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>>;
 	/// Delete an object from the bucket
 	fn delete(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
 	/// Get the public URL of an object in the bucket. For example:
 	/// - fs `file:///data/buckets/my-bucket/key`
@@ -131,6 +131,6 @@ pub trait BucketProvider: 'static + Send + Sync {
 	fn public_url(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>>;
 }

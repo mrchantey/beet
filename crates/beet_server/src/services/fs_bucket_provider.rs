@@ -53,9 +53,10 @@ impl FsBucketProvider {
 		Self { root: root.into() }
 	}
 	/// Resolve the path for a bucket and key, handling leading slashes.
-	fn resolve_path(&self, bucket_name: &str, key: &str) -> AbsPathBuf {
-		let key = key.trim_start_matches('/');
-		self.root.join(bucket_name).join(key)
+	fn resolve_path(&self, bucket_name: &str, path: &RoutePath) -> AbsPathBuf {
+		self.root
+			.join(bucket_name)
+			.join(path.to_string().trim_start_matches('/'))
 	}
 }
 
@@ -98,10 +99,10 @@ impl BucketProvider for FsBucketProvider {
 	fn insert(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 		body: Bytes,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let path = self.resolve_path(bucket_name, key);
+		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			if let Some(parent) = path.parent() {
 				tokio::fs::create_dir_all(parent).await?;
@@ -113,20 +114,22 @@ impl BucketProvider for FsBucketProvider {
 	fn get(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
-		let path = self.resolve_path(bucket_name, key);
+		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			let body_bytes = tokio::fs::read(path).await?;
+			let body_bytes = tokio::fs::read(path)
+				.await
+				.map_err(|_err| HttpError::not_found())?;
 			Ok(Bytes::from(body_bytes))
 		})
 	}
 	fn delete(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let path = self.resolve_path(bucket_name, key);
+		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			tokio::fs::remove_file(path).await?;
 			Ok(())
@@ -136,9 +139,9 @@ impl BucketProvider for FsBucketProvider {
 	fn public_url(
 		&self,
 		bucket_name: &str,
-		key: &str,
+		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
-		let path = self.resolve_path(bucket_name, key);
+		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			let public_url = format!("file://{}", path.to_string());
 			Ok(public_url)
@@ -167,21 +170,21 @@ mod test {
 		use bytes::Bytes;
 
 		let (bucket, _drop) = Bucket::new_test().await;
-		let key = "test_key";
+		let path = RoutePath::from("/test_path");
 		let body = Bytes::from("test_body");
 
-		bucket.insert(key, body.clone()).await.unwrap();
-		bucket.get(key).await.unwrap().xpect().to_be(body.clone());
+		bucket.insert(&path, body.clone()).await.unwrap();
+		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
 		bucket
 			// handles leading slashes
-			.get(&format!("/{key}"))
+			.get(&path)
 			.await
 			.unwrap()
 			.xpect()
 			.to_be(body);
 
-		bucket.delete(key).await.unwrap();
-		bucket.get(key).await.xpect().to_be_err();
+		bucket.delete(&path).await.unwrap();
+		bucket.get(&path).await.xpect().to_be_err();
 
 		bucket.remove().await.unwrap();
 		bucket.exists().await.unwrap().xpect().to_be_false();

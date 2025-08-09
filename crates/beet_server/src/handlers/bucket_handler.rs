@@ -19,7 +19,7 @@ pub fn bucket_file_handler() -> impl Bundle {
 			let path: RoutePath = path.into();
 			let entity = world.entity(entity);
 			let bucket = entity.get::<Bucket>().unwrap();
-			let response = from_bucket(bucket, path).await.into_response();
+			let response = from_bucket(bucket, &path).await.into_response();
 			world.insert_resource(response);
 			world
 		}),
@@ -27,15 +27,15 @@ pub fn bucket_file_handler() -> impl Bundle {
 }
 
 // TODO precompressed variants, ie `index.html.br`
-async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
+async fn from_bucket(bucket: &Bucket, path: &RoutePath) -> Result<Response> {
 	debug!("serving from bucket: {}", path);
 	if let Some(_extension) = path.extension() {
-		let url = bucket.public_url(&path.to_string()).await?;
+		let url = bucket.public_url(&path).await?;
 		if url.starts_with("file://") {
 			// the fs bucket will return a file:// url which is an ERR_UNSAFE_REDIRECT
 			// so just serve the file directly
 			bucket
-				.get(&path.to_string())
+				.get(path)
 				.await
 				.map(|bytes| Response::ok_mime_guess(bytes, path))?
 				.xok()
@@ -44,9 +44,8 @@ async fn from_bucket(bucket: &Bucket, path: RoutePath) -> Result<Response> {
 			Ok(Response::permanent_redirect(url))
 		}
 	} else {
-		let path = path.join("index.html");
 		bucket
-			.get(&path.to_string())
+			.get(&path.join("index.html"))
 			.await
 			.map(|bytes| Response::ok_body(bytes, "text/html"))?
 			.xok()
@@ -67,9 +66,9 @@ mod test {
 	async fn serves_fs() {
 		let (bucket, _drop) = Bucket::new_test().await;
 		let body = "body { color: red; }";
-		bucket.insert("style.css", body).await.unwrap();
 		let path = RoutePath::from("/style.css");
-		let response = super::from_bucket(&bucket, path).await.unwrap();
+		bucket.insert(&path, body).await.unwrap();
+		let response = super::from_bucket(&bucket, &path).await.unwrap();
 		response
 			.into_result()
 			.await
@@ -84,12 +83,10 @@ mod test {
 	#[ignore = "no longer redirects"]
 	async fn redirect() {
 		let (bucket, _drop) = Bucket::new_test().await;
-		bucket
-			.insert("style.css", "body { color: red; }")
-			.await
-			.unwrap();
 		let path = RoutePath::from("/style.css");
-		let response = super::from_bucket(&bucket, path).await.unwrap();
+		bucket.insert(&path, "body { color: red; }").await.unwrap();
+		let path = RoutePath::from("/style.css");
+		let response = super::from_bucket(&bucket, &path).await.unwrap();
 		response
 			.status()
 			.xpect()
@@ -104,11 +101,14 @@ mod test {
 	#[sweet::test]
 	async fn html() {
 		let (bucket, _drop) = Bucket::new_test().await;
-		let path = "docs/index.html";
 		let body = "<h1>Hello, world!</h1>";
-		bucket.insert(path, body).await.unwrap();
-		let path = RoutePath::from("docs");
-		let response = super::from_bucket(&bucket, path).await.unwrap();
+		bucket
+			.insert(&RoutePath::from("/docs/index.html"), body)
+			.await
+			.unwrap();
+		let response = super::from_bucket(&bucket, &RoutePath::from("docs"))
+			.await
+			.unwrap();
 		response
 			.into_result()
 			.await
@@ -122,10 +122,8 @@ mod test {
 	#[sweet::test]
 	async fn as_fallback() {
 		let (bucket, _drop) = Bucket::new_test().await;
-		bucket
-			.insert("index.html", "<div>fallback</div>")
-			.await
-			.unwrap();
+		let path = RoutePath::from("/index.html");
+		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		Router::new_bundle(move || {
 			(
 				HandlerConditions::fallback(),
