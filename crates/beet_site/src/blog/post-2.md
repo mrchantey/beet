@@ -2,14 +2,15 @@
 title = "The Full Moon Harvest #2"
 +++
 
-The stack bevyfication continues this harvest, with ecs continuing to prove itsself as the anything paradigm!
+# The Full Moon Harvest #2
 
+The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!
 
 ## A Very Bevy Router
 
-Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have quite different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do. 
+Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do. 
 
-`beet_server` addresses the ergonomics of webframework stuff like multiple rendering strategies (ssr,ssg) and middleware beyond opaque `Request/Response` types.
+`beet_server` addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque `Request/Response` types.
 
 ```rust
 

@@ -2,6 +2,7 @@
 title = "The Full Moon Harvest #1"
 created= "2024-06-10"
 +++
+# The Full Moon Harvest #1
 
 I'm very excited for the `0.0.6-rc.3` of beet, now available.
 
