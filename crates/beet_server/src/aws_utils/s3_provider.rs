@@ -14,9 +14,11 @@ use std::pin::Pin;
 pub struct S3Provider(pub Client);
 
 impl S3Provider {
+	/// Create a new S3 client with the default region: `us-west-2`
 	pub async fn create() -> Self {
-		let config = aws_config::load_from_env().await;
-		Self(Client::new(&config))
+		Self::create_with_region("us-west-2").await
+		// let config = aws_config::load_from_env().await;
+		// Self(Client::new(&config))
 	}
 	/// Create a new S3 client with a specific region, ie `us-west-2`
 	pub async fn create_with_region(region: &str) -> Self {
@@ -26,6 +28,10 @@ impl S3Provider {
 			.load()
 			.await;
 		Self(Client::new(&config))
+	}
+
+	fn resolve_key(&self, path: &RoutePath) -> String {
+		path.to_string().trim_start_matches('/').to_string()
 	}
 }
 
@@ -104,7 +110,7 @@ impl BucketProvider for S3Provider {
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = path.to_string();
+		let key = self.resolve_key(path);
 		Box::pin(async move {
 			client
 				.put_object()
@@ -124,7 +130,7 @@ impl BucketProvider for S3Provider {
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = path.to_string();
+		let key = self.resolve_key(path);
 		// println!("Getting object from bucket: {}, key: {}", bucket_name, key);
 		Box::pin(async move {
 			let get_result = client
@@ -146,7 +152,7 @@ impl BucketProvider for S3Provider {
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = path.to_string();
+		let key = self.resolve_key(path);
 		Box::pin(async move {
 			client
 				.delete_object()
@@ -163,17 +169,12 @@ impl BucketProvider for S3Provider {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
-		let region = self.0.config().region().map(|r| r.to_string());
+		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
 		let bucket_name = bucket_name.to_string();
-		let path = path.to_string();
-		Box::pin(async move {
-			let region_str = region.unwrap_or_else(|| "us-west-2".to_string());
-			let public_url = format!(
-				"https://{}.s3.{}.amazonaws.com{}",
-				bucket_name, region_str, path
-			);
-			Ok(public_url)
-		})
+		let key = self.resolve_key(path);
+		let public_url =
+			format!("https://{bucket_name}.s3.{region}.amazonaws.com/{key}",);
+		Box::pin(async move { Ok(public_url) })
 	}
 }
 
@@ -183,22 +184,38 @@ mod test {
 	use sweet::prelude::*;
 
 	const BUCKET_NAME: &str = "beet-test";
-	// const BUCKET_NAME: &str = "beet-test";
-	fn test_key()->RoutePath {
-		RoutePath::from("test-file.txt")
-	}
+	fn test_key() -> RoutePath { RoutePath::from("test-file.txt") }
 	const TEST_CONTENT: &str = "Hello, beet S3 test!";
 	const UPDATED_CONTENT: &str = "Updated beet S3 content!";
 
 	#[tokio::test]
-	#[ignore = "expensive"]
+	#[ignore = "hits remote s3"]
 	async fn s3_client() {
 		let s3_client_resource = S3Provider::create().await;
 		let _inner_client = &s3_client_resource.0;
 	}
 
 	#[tokio::test]
-	#[ignore = "expensive"]
+	#[ignore = "hits remote s3"]
+	async fn infra_bucket() -> Result<()> {
+		let client = S3Provider::create().await;
+
+		let bucket = Bucket::new(client, "beet-site-bucket-dev".to_string());
+		bucket.ensure_exists().await?;
+		bucket.exists().await.xpect().to_be_ok();
+
+		// READ - Download and verify the file
+		bucket
+			.get(&RoutePath::new("index.html"))
+			.await
+			.unwrap()
+			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+			.xpect()
+			.to_start_with("<!DOCTYPE html>");
+		Ok(())
+	}
+	#[tokio::test]
+	#[ignore = "hits remote s3"]
 	async fn s3_bucket_crud() -> Result<()> {
 		let client = S3Provider::create().await;
 
@@ -251,7 +268,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	#[ignore = "expensive"]
+	#[ignore = "hits remote s3"]
 	async fn s3_public_url() -> Result<()> {
 		let client = S3Provider::create().await;
 		let test_key = test_key();

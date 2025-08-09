@@ -83,6 +83,7 @@ mod event_types_wasm {
 				fn value(&self) -> String {
 					self.current_target()
 						.unwrap()
+						// TODO this breaks for textarea
 						.unchecked_into::<web_sys::HtmlInputElement>()
 						.value()
 				}
