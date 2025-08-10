@@ -32,32 +32,8 @@ pub struct JsonResult<T, E> {
 	pub result: Result<T, E>,
 	/// The status code to return in case of an error,
 	/// defaults to 418 (I'm a teapot).
-	#[cfg_attr(feature = "serde", serde(with = "status_code_serde",))]
+	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub err_status: StatusCode,
-}
-
-#[cfg(feature = "serde")]
-mod status_code_serde {
-	use super::*;
-	use serde::Deserialize;
-	pub fn serialize<S>(
-		status: &StatusCode,
-		serializer: S,
-	) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		serializer.serialize_u16(status.as_u16())
-	}
-
-	#[cfg(feature = "serde")]
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		let code = u16::deserialize(deserializer)?;
-		StatusCode::from_u16(code).map_err(serde::de::Error::custom)
-	}
 }
 
 

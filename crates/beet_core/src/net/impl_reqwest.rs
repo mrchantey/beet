@@ -12,7 +12,7 @@ pub async fn send_reqwest(req: Request) -> Result<Response> {
 	{
 		if req.parts.uri.scheme_str() == Some("https") {
 			bevybail!(
-				"Please enable either the `rustls-tls` or `native-tls` feature to use HTTPS requests."
+				"Please enable either `beet/rustls-tls` or `beet/native-tls` feature to use HTTPS requests."
 			);
 		}
 	}

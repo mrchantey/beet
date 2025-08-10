@@ -13,8 +13,10 @@ pub type HttpResult<T> = std::result::Result<T, HttpError>;
 /// By default non http [`BevyError`] messages will be logged and an opaque error will be returned to the client
 /// in release builds
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HttpError {
 	/// The HTTP status code
+	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub status_code: StatusCode,
 	/// The error message
 	pub message: String,
@@ -128,5 +130,31 @@ impl From<HttpError> for Response {
 impl axum::response::IntoResponse for HttpError {
 	fn into_response(self) -> axum::response::Response {
 		(self.status_code, self.message).into_response()
+	}
+}
+
+
+
+#[cfg(feature = "serde")]
+pub mod status_code_serde {
+	use super::*;
+	use serde::Deserialize;
+	pub fn serialize<S>(
+		status: &StatusCode,
+		serializer: S,
+	) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.serialize_u16(status.as_u16())
+	}
+
+	#[cfg(feature = "serde")]
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		let code = u16::deserialize(deserializer)?;
+		StatusCode::from_u16(code).map_err(serde::de::Error::custom)
 	}
 }

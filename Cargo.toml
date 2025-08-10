@@ -230,8 +230,8 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow"]
 #💡 helper features
 launch = ["build"]
-server = ["beet_server", "design", "net", "serde"]
-deploy = ["server", "aws", "lambda"]
+server = ["beet_server", "design", "net", "serde", "native-tls"]
+deploy = ["beet_server", "design", "net", "serde", "aws", "lambda"]
 client = [
 	"rsx",
 	"design",
@@ -246,6 +246,7 @@ beet_server = ["dep:beet_server"]
 
 #💡 fine-grained
 native-tls = ["beet_core/native-tls"]
+rustls-tls = ["beet_core/rustls-tls"]
 serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_core/rand"]
 connect = ["dep:beet_connect"]
@@ -259,7 +260,7 @@ rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 axum = ["beet_core/axum"]
-lambda = ["server", "beet_server/lambda", "beet_core/rustls-tls"]
+lambda = ["beet_server/lambda", "beet_core/rustls-tls"]
 aws = ["beet_server/aws"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
