@@ -1,8 +1,6 @@
 use beet_core::prelude::*;
-// use beet_rsx::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
-use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -66,47 +64,6 @@ impl RouteHandler {
 		.xmap(move |handler| (endpoint.into(), handler))
 	}
 
-
-	/// A route handler accepting an input type to be extracted from the request.
-	/// - For requests with no body, ie `GET`, the input is deserialized from the query parameters.
-	/// - For requests with a body, ie `POST`, `PUT`, etc, the input is deserialized from the body.
-	pub fn action<T, Input, Out, Marker>(
-		endpoint: impl Into<Endpoint>,
-		handler: T,
-	) -> (Endpoint, Self)
-	where
-		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
-		Input: 'static + SystemInput,
-		for<'a> Input::Inner<'a>: DeserializeOwned,
-		Out: 'static + Send + Sync + IntoResponse,
-	{
-		let endpoint = endpoint.into();
-		match endpoint.method().has_body() {
-			// ie `POST`, `PUT`, etc
-			true => Self::new(
-				endpoint,
-				move |val: In<Json<Input::Inner<'_>>>,
-				      world: &mut World|
-				      -> Result<Out> {
-					let out = world
-						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(out)
-				},
-			),
-			// ie `GET`, `DELETE`, etc
-			false => Self::new(
-				endpoint,
-				move |val: In<JsonQueryParams<Input::Inner<'_>>>,
-				      world: &mut World|
-				      -> Result<Out> {
-					let out = world
-						.run_system_cached_with(handler.clone(), val.0.0)?;
-					Ok(out)
-				},
-			),
-		}
-	}
-
 	/// A route handler that passively runs a system,
 	/// without expecting any system input or output.
 	pub fn layer<T, Marker>(handler: T) -> Self
@@ -126,16 +83,36 @@ impl RouteHandler {
 
 	/// An async route handler with output inserted as a [`Response`].
 	/// This handler must return a tuple of [`(World, Out)`]
-	pub fn new_async<Handler, Fut, Out>(handler: Handler) -> Self
+	pub fn new_async<Handler, In, InErr, Fut, Out>(handler: Handler) -> Self
 	where
-		Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
+		In: TryFrom<Request, Error = InErr>,
+		InErr: IntoResponse,
+		Handler:
+			'static + Send + Sync + Clone + FnOnce(World, In, Entity) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
 		Out: 'static + Send + Sync + IntoResponse,
 	{
-		Self::layer_async(move |world, _| {
+		Self::layer_async(move |mut world, entity| {
 			let func = handler.clone();
 			async move {
-				let (mut world, out) = func(world).await;
+				let Ok(input) = world
+					.remove_resource::<Request>()
+					.ok_or_else(|| no_request_err::<Handler>())
+					.map_err(|err| {
+						world.insert_resource(err.into_response());
+						Err::<(), ()>(())
+					})
+				else {
+					return world;
+				};
+				let Ok(input) = input.try_into().map_err(|err: InErr| {
+					world.insert_resource(err.into_response());
+					Err::<(), ()>(())
+				}) else {
+					return world;
+				};
+
+				let (mut world, out) = func(world, input, entity).await;
 				world.insert_resource(out.into_response());
 				world
 			}

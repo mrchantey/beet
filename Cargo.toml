@@ -231,6 +231,7 @@ default = ["flow"]
 #💡 helper features
 launch = ["build"]
 server = ["beet_server", "design", "net", "serde"]
+deploy = ["server", "aws", "lambda"]
 client = [
 	"rsx",
 	"design",
@@ -384,7 +385,7 @@ required-features = ["flow"]
 [[example]]
 name = "malenia"
 path = "examples/flow/malenia.rs"
-required-features = ["flow"]
+required-features = ["flow", "rand"]
 
 [[example]]
 name = "repeat_while"
