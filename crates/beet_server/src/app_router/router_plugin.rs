@@ -16,7 +16,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
-			.init_resource::<InfraConfig>()
+			// .init_resource::<PackageConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
 			.add_systems(PostStartup, Router::clone_parent_world);

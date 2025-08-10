@@ -31,6 +31,8 @@ pub struct LaunchRunner {
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
 	#[clap(flatten)]
+	pub(crate) config_args: ConfigArgs,
+	#[clap(flatten)]
 	pub(crate) lambda_config: LambdaConfig,
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[clap(flatten)]
@@ -43,11 +45,9 @@ fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 impl LaunchRunner {
 	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
-
-
 		dotenv().ok();
 		PrettyTracing::default().init();
-
+		app.add_plugins(self.config_args);
 		let flags = if let Some(launch_cmd) = self.launch_cmd {
 			launch_cmd.into()
 		} else if self.only.is_empty() {
@@ -55,7 +55,6 @@ impl LaunchRunner {
 		}else{			
 			BuildFlags::new(self.only)
 		};
-
 		app.insert_resource(flags);
 		app.insert_resource(self.build_cmd);
 		app.insert_resource(self.lambda_config);

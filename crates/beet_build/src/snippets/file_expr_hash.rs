@@ -117,7 +117,7 @@ pub fn update_file_expr_hash(
 		} else {
 			"CHANGED"
 		};
-		debug!("FileExprHash {status} {}", source_file.path());
+		trace!("FileExprHash {status} {}", source_file.path());
 		hash.set_if_neq(FileExprHash::new(new_hash));
 	}
 	Ok(())

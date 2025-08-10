@@ -4,21 +4,22 @@ use bevy::prelude::*;
 use std::process::Command;
 
 
-pub fn deploy_sst(infra_config: Res<InfraConfig>) -> Result {
-	run_sst(&infra_config, "deploy")
+pub fn deploy_sst(pkg_config: Res<PackageConfig>) -> Result {
+	run_sst(&pkg_config, "deploy")
 }
 
 
 
-fn run_sst(infra_config: &InfraConfig, subcommand: &str) -> Result {
-	let mut args = vec!["sst", subcommand];
-	let stage = infra_config.stage();
-	args.push("--stage");
-	args.push(&stage);
-
+fn run_sst(pkg_config: &PackageConfig, subcommand: &str) -> Result {
 	let sst_dir = std::env::current_dir()?.join("infra").canonicalize()?;
 	let mut cmd = Command::new("npx");
-	cmd.current_dir(sst_dir).args(args);
+
+	cmd.current_dir(sst_dir).args(vec![
+		"sst",
+		subcommand,
+		"--stage",
+		&pkg_config.stage(),
+	]);
 	// .arg("--config")
 	// .arg("infra/sst.config.ts")
 

@@ -1,7 +1,114 @@
 use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use heck::ToKebabCase;
 use std::path::Path;
+
+
+/// arguments to modify config fields, then added to the app for propagation
+/// when launch binary runs the server.
+#[derive(Debug, Default, Clone, Resource)]
+#[cfg_attr(
+	all(feature = "serde", not(target_arch = "wasm32")),
+	derive(clap::Parser)
+)]
+pub struct ConfigArgs {
+	// The pulumi stage to use for deployments and infra resource names
+	#[cfg_attr(all(feature = "serde", not(target_arch = "wasm32")), arg(long))]
+	pub stage: Option<String>,
+}
+
+impl ConfigArgs {
+	/// Convert this struct into a vector of command line arguments,
+	/// for passing to server and client binaries.
+	pub fn into_args(&self) -> Vec<String> {
+		let mut args = vec![];
+		if let Some(stage) = self.stage.clone() {
+			args.push("--stage".to_string());
+			args.push(stage);
+		}
+		args
+	}
+}
+
+impl Plugin for ConfigArgs {
+	fn build(&self, app: &mut App) {
+		app.insert_resource(self.clone());
+		if let Some(stage) = &self.stage {
+			app.world_mut().resource_mut::<PackageConfig>().stage =
+				stage.clone();
+		}
+	}
+}
+
+/// Settings for the package, usually set via `package_config_from_env!()`.
+#[derive(Debug, Clone, Resource, Reflect)]
+#[reflect(Resource)]
+pub struct PackageConfig {
+	/// The name of the package set via `CARGO_PKG_NAME`
+	pub name: String,
+	/// The version of the package set via `CARGO_PKG_VERSION`
+	pub version: String,
+	/// The description of the package set via `CARGO_PKG_DESCRIPTION`
+	pub description: String,
+	/// The repository URL of the package, if available
+	pub repository: Option<String>,
+	/// The infrastructure stage for this build,
+	/// defaults to `dev` in debug builds and `prod` in release builds
+	pub stage: String,
+}
+
+impl PackageConfig {
+	pub fn name(&self) -> &str { &self.name }
+	pub fn version(&self) -> &str { &self.version }
+	pub fn description(&self) -> &str { &self.description }
+	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
+	pub fn stage(&self) -> &str { &self.stage }
+
+
+	pub fn default_lambda_name(&self) -> String { self.resource_name("lambda") }
+	pub fn default_bucket_name(&self) -> String { self.resource_name("bucket") }
+
+	/// Prefixes the binary name and suffixes the stage to the provided name,
+	/// for example `lambda` becomes `my-site-lambda-dev`
+	/// this binary-resource-stage convention must match sst config
+	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
+	pub fn resource_name(&self, name: &str) -> String {
+		let binary_name = self.name.to_kebab_case();
+		let stage = self.stage.as_str();
+		format! {"{binary_name}-{name}-{stage}"}
+	}
+}
+
+
+
+/// Macro to create a `PackageConfig` from environment variables set by Cargo.
+/// ## Example
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_core::prelude::*;
+/// let mut world = World::new();
+/// world.insert_resource(package_config_from_env!());
+/// ```
+#[macro_export]
+macro_rules! package_config_from_env {
+	() => {
+		$crate::prelude::PackageConfig {
+			name: env!("CARGO_PKG_NAME").to_string(),
+			version: env!("CARGO_PKG_VERSION").to_string(),
+			description: env!("CARGO_PKG_DESCRIPTION").to_string(),
+			repository: option_env!("CARGO_PKG_REPOSITORY")
+				.map(|s| s.to_string()),
+			stage: if cfg!(debug_assertions) {
+				"dev".to_string()
+			} else {
+				"prod".to_string()
+			},
+		}
+	};
+}
+
+
 
 /// Config for the scene containing all information that can be statically extracted
 /// from files, including html, parsed styles etc.
@@ -87,5 +194,21 @@ impl WorkspaceConfig {
 			.filter(|path| self.filter.passes(path))
 			.map(|path| AbsPathBuf::new(path))
 			.collect()
+	}
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		package_config_from_env!()
+			.resource_name("lambda")
+			.xpect()
+			.to_be("beet-core-lambda-dev");
 	}
 }

@@ -31,6 +31,7 @@ pub mod prelude {
 	#[cfg(feature = "http")]
 	pub use crate::http_utils::*;
 	pub use crate::node::*;
+	pub use crate::package_config_from_env;
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
 	#[cfg(feature = "tokens")]

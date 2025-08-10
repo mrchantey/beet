@@ -5,32 +5,35 @@ use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]
 use crate::prelude::*;
-use clap::Parser;
-use clap::Subcommand;
 
 
 /// Cli args for running a beet server.
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[cfg_attr(feature = "serde", derive(clap::Parser))]
+#[cfg_attr(feature = "serde", command(version, about, long_about = None))]
 pub struct ServerRunner {
 	/// Only export the static html files to the [`WorkspaceConfig::html_dir`],
 	/// and immediately exit.
-	#[arg(long)]
+	#[cfg_attr(feature = "serde", arg(long))]
 	pub export_static: bool,
+	#[cfg_attr(feature = "serde", clap(flatten))]
+	#[allow(unused)]
+	pub(crate) config_args: ConfigArgs,
 	/// Specify the router mode
-	#[command(subcommand)]
+	#[cfg_attr(feature = "serde", command(subcommand))]
 	pub mode: Option<RenderMode>,
 }
 impl Default for ServerRunner {
 	fn default() -> Self {
 		Self {
 			export_static: false,
+			config_args: Default::default(),
 			mode: None,
 		}
 	}
 }
 
-#[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq, Subcommand)]
+#[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(clap::Subcommand))]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
 	/// to serve files from the bucket.
@@ -42,7 +45,13 @@ pub enum RenderMode {
 
 impl ServerRunner {
 	pub fn runner(app: App) -> AppExit {
-		Self::parse().run(app).unwrap_or_exit();
+		#[cfg(not(feature = "serde"))]
+		todo!("wasm runner");
+		#[cfg(feature = "serde")]
+		{
+			use clap::Parser;
+			Self::parse().run(app).unwrap_or_exit();
+		}
 		AppExit::Success
 	}
 	#[cfg(target_arch = "wasm32")]
@@ -53,6 +62,7 @@ impl ServerRunner {
 	#[tokio::main]
 	async fn run(self, mut app: App) -> Result {
 		PrettyTracing::default().init();
+		app.add_plugins(self.config_args);
 
 		if self.export_static {
 			app.insert_resource(RenderMode::Ssr);
@@ -65,15 +75,14 @@ impl ServerRunner {
 		*app.world_mut() = AsyncActionSet::collect_and_run(world).await;
 
 		app.update();
-
 		if let Some(exit) = app.should_exit() {
 			exit.into_result()
 		} else if self.export_static {
-			self.export_static(&mut app).await
+			Self::export_static(&mut app).await
 		} else {
 			#[cfg(feature = "axum")]
 			{
-				AxumRunner::new(self).run(app.world_mut()).await
+				AxumRunner::new().run(app.world_mut()).await
 			}
 			#[cfg(not(feature = "axum"))]
 			todo!("hyper router");
@@ -82,7 +91,7 @@ impl ServerRunner {
 
 	/// Export static html files, with the router in SSG mode.
 	#[cfg(not(target_arch = "wasm32"))]
-	async fn export_static(&self, app: &mut App) -> Result {
+	async fn export_static(app: &mut App) -> Result {
 		let html = collect_html(app.world_mut()).await?;
 
 		for (path, html) in html {

@@ -52,6 +52,24 @@ fn default_handlers(
 		HandlerConditions::no_response(),
 		bundle_to_html_handler(),
 	));
+
+	root.with_child((
+		PathFilter::new("/app-info"),
+		bundle_endpoint(HttpMethod::Get, |config:Res<PackageConfig>|{
+			let PackageConfig {name, description, version, stage, ..} = config.clone();
+			rsx!{
+				<main>
+					<h1>App Info</h1>
+					<p>Name: {name}</p>
+					<p>Description: {description}</p>
+					<p>Version: {version}</p>
+					<p>Stage: {stage}</p>
+				</main>
+			}			
+})
+	));
+
+
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 		{
 		#[cfg(feature = "aws")]
@@ -134,10 +152,10 @@ impl Router {
 			.remove_resource::<Router>()
 			.ok_or_else(|| bevyhow!("No Router resource found"))?;
 		let render_mode = world.resource::<RenderMode>().clone();
-		let infra_config = world.resource::<InfraConfig>().clone();
+		let package_config = world.resource::<PackageConfig>().clone();
 		router.add_plugin(move |app: &mut App| {
 			app.insert_resource(render_mode.clone());
-			app.insert_resource(infra_config.clone());
+			app.insert_resource(package_config.clone());
 		});
 		router.validate()?;
 		world.insert_resource(router);

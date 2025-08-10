@@ -1,4 +1,3 @@
-use crate::app_router::server_runner::ServerRunner;
 use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
@@ -12,11 +11,11 @@ use tokio::task::JoinHandle;
 // use tower_http::normalize_path::NormalizePathLayer;
 
 pub struct AxumRunner {
-	pub runner: ServerRunner,
+	// pub runner: ServerRunner,
 }
 
 impl AxumRunner {
-	pub fn new(runner: ServerRunner) -> Self { Self { runner } }
+	pub fn new() -> Self { Self {} }
 
 
 	/// Create a new [`axum::Router`] using the current app's world.
@@ -76,7 +75,8 @@ impl AxumRunner {
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
 		let reload_handle = {
-			let html_dir = world.resource::<WorkspaceConfig>().html_dir.into_abs();
+			let html_dir =
+				world.resource::<WorkspaceConfig>().html_dir.into_abs();
 			let (reload_layer, reload_handle) = get_reload(html_dir);
 			router = router.layer(reload_layer);
 			Some(reload_handle)

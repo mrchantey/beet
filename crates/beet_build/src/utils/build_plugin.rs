@@ -72,7 +72,6 @@ impl Plugin for BuildPlugin {
 			.init_resource::<BuildFlags>()
 			.init_resource::<CargoBuildCmd>()
 			.init_resource::<WorkspaceConfig>()
-			.init_resource::<InfraConfig>()
 			.init_resource::<LambdaConfig>()
 			.init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()

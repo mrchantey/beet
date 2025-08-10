@@ -22,11 +22,11 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 	let build_cmd = build_cmd
 		.clone()
 		.cmd("build")
+		// force release, debug builds are generally way to big (450 MB) for lambda ( max 65 MB)
+		.release()
 		// beet binaries should default to 'server' with 'native-tls' but we need
 		// to disable that to specify 'deploy' feature
 		.no_default_features()
-		// force release, debug builds are generally way to big for lambda (450 MB > 65 MB)
-		.release()
 		.with_feature("deploy");
 
 	println!("🌱 Compiling lambda binary");
@@ -47,9 +47,9 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 pub fn deploy_lambda(
 	workspace_config: Res<WorkspaceConfig>,
 	lambda_config: Res<LambdaConfig>,
-	infra: Res<InfraConfig>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
-	let binary_name = infra.binary_name();
+	let binary_name = pkg_config.name();
 
 	let html_dir = workspace_config
 		.html_dir
@@ -81,7 +81,7 @@ pub fn deploy_lambda(
 		cmd.arg("--region").arg(region);
 	};
 
-	let lambda_name = infra.default_lambda_name();
+	let lambda_name = pkg_config.default_lambda_name();
 	cmd.arg(&lambda_name);
 
 	// Print the full command before executing
@@ -91,9 +91,9 @@ pub fn deploy_lambda(
 }
 
 
-pub fn lambda_log(infra: Res<InfraConfig>) -> Result {
+pub fn lambda_log(pkg_config: Res<PackageConfig>) -> Result {
 	let mut cmd = Command::new("aws");
-	let lambda_name = infra.default_lambda_name();
+	let lambda_name = pkg_config.default_lambda_name();
 	println!("🌱 Watching Lambda logs {lambda_name}\n   {cmd:?}");
 	cmd.arg("logs")
 		.arg("tail")
@@ -111,9 +111,9 @@ pub fn lambda_log(infra: Res<InfraConfig>) -> Result {
 
 pub fn sync_bucket(
 	ws_config: Res<WorkspaceConfig>,
-	infra: Res<InfraConfig>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
-	let bucket_name = infra.default_bucket_name();
+	let bucket_name = pkg_config.default_bucket_name();
 
 	let src = &ws_config.html_dir.into_abs().to_string();
 	let dst = format!("s3://{bucket_name}");

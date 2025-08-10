@@ -1,7 +1,8 @@
 use crate::prelude::*;
-use beet_core::node::StaticRoot;
+use beet_core::prelude::*;
 use beet_rsx::as_beet::PathExt;
 use beet_utils::prelude::CargoBuildCmd;
+use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use std::process::Command;
 
@@ -19,10 +20,12 @@ pub(crate) fn compile_server(
 		child.kill()?;
 	}
 
-	debug!("Building server binary");
 	cmd.clone()
 		.no_default_features()
 		.push_feature("server")
+		// .xtap(|cmd| {
+		// 	debug!("Building server binary \n{:?}", cmd);
+		// })
 		.spawn()?;
 	Ok(())
 }
@@ -34,16 +37,20 @@ pub fn export_server_ssg(
 	_query: Populated<(), Changed<StaticRoot>>,
 	cmd: Res<CargoBuildCmd>,
 	manifest: Res<CargoManifest>,
+	config_args: Res<ConfigArgs>,
 ) -> Result {
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
-	debug!(
-		"Running server binary to generate static files \n{}",
-		exe_path.display()
-	);
 	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
 		.arg("--export-static")
+		.args(&config_args.into_args())
+		.xtap(|cmd| {
+			debug!(
+				"Running server binary to generate static files \n{:?}",
+				cmd
+			);
+		})
 		.status()?
 		.exit_ok()?;
 	Ok(())
@@ -68,18 +75,20 @@ pub(crate) fn run_server(
 	mut handle: ResMut<ServerHandle>,
 	cmd: Res<CargoBuildCmd>,
 	manifest: Res<CargoManifest>,
+	config_args: Res<ConfigArgs>,
 ) -> Result {
 	if let Some(child) = &mut handle.0 {
 		child.kill()?;
 	}
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
-	debug!(
-		"Running server binary to generate static files \n{}",
-		exe_path.display()
-	);
 	PathExt::assert_exists(&exe_path)?;
-	let child = Command::new(&exe_path).spawn()?;
+	let child = Command::new(&exe_path)
+		.args(&config_args.into_args())
+		.xtap(|cmd| {
+			debug!("Running server \n{:?}", cmd);
+		})
+		.spawn()?;
 	handle.0 = Some(child);
 
 	Ok(())
