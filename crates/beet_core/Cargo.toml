@@ -38,6 +38,7 @@ rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 # TODO merge with net feature
 http = [
 	"dep:http",
+	"dep:heck",
 	"dep:http-body-util",
 	"dep:url",
 	"dep:bytes",

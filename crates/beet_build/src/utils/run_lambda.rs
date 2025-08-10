@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -48,7 +47,7 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 pub fn deploy_lambda(
 	workspace_config: Res<WorkspaceConfig>,
 	lambda_config: Res<LambdaConfig>,
-	infra: InfraParams,
+	infra: Res<InfraConfig>,
 ) -> Result {
 	let binary_name = infra.binary_name();
 
@@ -82,23 +81,23 @@ pub fn deploy_lambda(
 		cmd.arg("--region").arg(region);
 	};
 
-	let function_name = infra.lambda_func_name();
-	cmd.arg(&function_name);
+	let lambda_name = infra.default_lambda_name();
+	cmd.arg(&lambda_name);
 
 	// Print the full command before executing
-	println!("🌱 Deploying Lambda Binary to {function_name}\n   {cmd:?}");
+	println!("🌱 Deploying Lambda Binary to {lambda_name}\n   {cmd:?}");
 
 	cmd.status()?.exit_ok()?.xok()
 }
 
 
-pub fn lambda_log(infra: InfraParams) -> Result {
+pub fn lambda_log(infra: Res<InfraConfig>) -> Result {
 	let mut cmd = Command::new("aws");
-	let function_name = infra.lambda_func_name();
-	println!("🌱 Watching Lambda logs {function_name}\n   {cmd:?}");
+	let lambda_name = infra.default_lambda_name();
+	println!("🌱 Watching Lambda logs {lambda_name}\n   {cmd:?}");
 	cmd.arg("logs")
 		.arg("tail")
-		.arg(format!("/aws/lambda/{function_name}"))
+		.arg(format!("/aws/lambda/{lambda_name}"))
 		.arg("--format")
 		.arg("short") // detailed,short,json
 		.arg("--since")
@@ -112,9 +111,9 @@ pub fn lambda_log(infra: InfraParams) -> Result {
 
 pub fn sync_bucket(
 	ws_config: Res<WorkspaceConfig>,
-	infra: InfraParams,
+	infra: Res<InfraConfig>,
 ) -> Result {
-	let bucket_name = infra.bucket_name();
+	let bucket_name = infra.default_bucket_name();
 
 	let src = &ws_config.html_dir.into_abs().to_string();
 	let dst = format!("s3://{bucket_name}");

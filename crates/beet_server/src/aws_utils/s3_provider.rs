@@ -10,8 +10,21 @@ use bytes::Bytes;
 use std::future::Future;
 use std::pin::Pin;
 
+pub fn s3_bucket() -> impl Bundle {
+	AsyncAction::new(async move |mut world, entity| {
+		let bucket_name = world.resource::<InfraConfig>().default_bucket_name();
+		debug!("Connecting to S3 bucket: {bucket_name}");
+		let provider = S3Provider::create().await;
+		world
+			.entity_mut(entity)
+			.insert(Bucket::new(provider, bucket_name));
+		world
+	})
+}
+
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
+
 
 impl S3Provider {
 	/// Create a new S3 client with the default region: `us-west-2`

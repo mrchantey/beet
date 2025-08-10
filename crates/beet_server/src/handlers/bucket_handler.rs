@@ -2,28 +2,22 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 
-/// Marker type added to bucket file handlers, used by the
-/// [`RouterAppPlugin`] to insert a default if none are present.
-#[derive(Component)]
-pub struct BucketFileHandler;
+
 
 /// Add this handler alongside a [`Bucket`] resource to serve files from the bucket.
 /// Serves static files from the provided bucket
 /// 1. If the requested path has an extension, create a permanent redirect to the public URL
 /// 2. If the requested path does not have an extension, append `/index.html` and serve the file as HTML.
 pub fn bucket_file_handler() -> impl Bundle {
-	(
-		BucketFileHandler,
-		RouteHandler::layer_async(async move |mut world, entity| {
-			let path = world.remove_resource::<Request>().unwrap();
-			let path: RoutePath = path.into();
-			let entity = world.entity(entity);
-			let bucket = entity.get::<Bucket>().unwrap();
-			let response = from_bucket(bucket, &path).await.into_response();
-			world.insert_resource(response);
-			world
-		}),
-	)
+	(RouteHandler::layer_async(async move |mut world, entity| {
+		let path = world.remove_resource::<Request>().unwrap();
+		let path: RoutePath = path.into();
+		let entity = world.entity(entity);
+		let bucket = entity.get::<Bucket>().unwrap();
+		let response = from_bucket(bucket, &path).await.into_response();
+		world.insert_resource(response);
+		world
+	}),)
 }
 
 // TODO precompressed variants, ie `index.html.br`

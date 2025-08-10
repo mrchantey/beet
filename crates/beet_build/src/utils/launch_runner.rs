@@ -17,9 +17,6 @@ pub struct LaunchRunner {
 	pub watch: bool,
 	#[command(subcommand)]
 	pub launch_cmd: Option<LaunchCmd>,
-	/// 🦀 the commands that will be used to build the binary 🦀
-	#[command(flatten)]
-	pub(crate) build_cmd: CargoBuildCmd,
 	/// Only execute the provided build steps, options are:
 	/// - import-snippets
 	/// - export-snippets
@@ -33,10 +30,11 @@ pub struct LaunchRunner {
 	/// - deploy-lambda
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
-	#[command(flatten)]
-	pub(crate) infra_config: Option<InfraConfig>,
-	#[command(flatten)]
-	pub(crate) lambda_config: Option<LambdaConfig>,
+	#[clap(flatten)]
+	pub(crate) lambda_config: LambdaConfig,
+	/// 🦀 the commands that will be used to build the binary 🦀
+	#[clap(flatten)]
+	pub(crate) build_cmd: CargoBuildCmd,
 }
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
@@ -45,6 +43,8 @@ fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 impl LaunchRunner {
 	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
+
+
 		dotenv().ok();
 		PrettyTracing::default().init();
 
@@ -53,21 +53,15 @@ impl LaunchRunner {
 		} else if self.only.is_empty() {
 			LaunchCmd::Run.into()
 		}else{			
-			BuildFlags::new(self.only.clone())
+			BuildFlags::new(self.only)
 		};
 
 		app.insert_resource(flags);
-		app.insert_resource(self.build_cmd.clone());
-
-		if let Some(infra_config) = &self.infra_config {
-			app.insert_resource(infra_config.clone());
-		}
-		if let Some(lambda_config) = &self.lambda_config {
-			app.insert_resource(lambda_config.clone());
-		}
+		app.insert_resource(self.build_cmd);
+		app.insert_resource(self.lambda_config);
 
 		let result = match self.watch {
-			true => self.watch(app),
+			true => Self::watch(app),
 			false => app.run_once(),
 		};
 		result
@@ -76,7 +70,7 @@ impl LaunchRunner {
 	/// Run in watch mode, running again if any file
 	/// specified in the [`WorkspaceConfig`] changes.
 	#[tokio::main]
-	async fn watch(self, mut app: App) -> AppExit {
+	async fn watch(mut app: App) -> AppExit {
 		let config = app
 			.init_resource::<WorkspaceConfig>()
 			.world()
@@ -109,6 +103,7 @@ pub enum LaunchCmd {
 	Serve,
 	/// Build the client and server, export static html and syncs the s3 bucket.
 	Static,
+	/// Deploys the pulumi infra and lambda function.
 	Deploy,
 	/// Update the lambda function
 	Lambda,

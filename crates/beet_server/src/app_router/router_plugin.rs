@@ -16,19 +16,9 @@ impl Plugin for RouterPlugin {
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()
+			.init_resource::<InfraConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
-			.add_systems(PostStartup, clone_parent_world);
+			.add_systems(PostStartup, Router::clone_parent_world);
 	}
-}
-
-/// Copy some types from the parent world to the router world.
-fn clone_parent_world(world: &mut World) -> Result {
-
-	let mut router = world
-		.remove_resource::<Router>()
-		.ok_or_else(|| bevyhow!("No Router resource found"))?;
-	router.with_parent_world(world)?;
-	world.insert_resource(router);
-	Ok(())
 }

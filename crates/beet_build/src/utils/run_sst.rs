@@ -1,101 +1,18 @@
-use crate::utils::CargoManifest;
 use beet_core::prelude::*;
 use beet_utils::prelude::*;
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use heck::ToKebabCase;
 use std::process::Command;
 
-/// Convenience methods for information that spans multiple resources
-#[derive(SystemParam)]
-pub struct InfraParams<'w> {
-	build_cmd: Res<'w, CargoBuildCmd>,
-	manifest: Res<'w, CargoManifest>,
-	infra_config: Res<'w, InfraConfig>,
-}
 
-impl InfraParams<'_> {
-	pub fn binary_name(&self) -> String {
-		self.build_cmd.binary_name(self.manifest.package_name())
-	}
-
-	pub fn lambda_func_name(&self) -> String {
-		lambda_func_name(&self.infra_config, &self.build_cmd, &self.manifest)
-	}
-	pub fn bucket_name(&self) -> String {
-		bucket_name(&self.infra_config, &self.build_cmd, &self.manifest)
-	}
-
-	/// resouce type may be "lambda", "bucket", etc.
-	pub fn resource_name(&self, resource_type: &str) -> String {
-		build_resource_name(
-			&self.infra_config,
-			&self.build_cmd,
-			&self.manifest,
-			resource_type,
-		)
-	}
-}
-
-/// Specify the stage name used. if the build command specifies release,
-/// this defaults to `prod`, otherwise `dev`.
-fn stage<'a>(infra_config: &'a InfraConfig, build_cmd: &CargoBuildCmd) -> &'a str {
-	infra_config.stage.as_ref().unwrap_or_else(|| {
-		if build_cmd.release {
-			&infra_config.prod_stage
-		} else {
-			&infra_config.dev_stage
-		}
-	})
-}
-
-fn lambda_func_name(
-	infra_config: &InfraConfig,
-	build_cmd: &CargoBuildCmd,
-	manifest: &CargoManifest,
-) -> String {
-	build_resource_name(infra_config, build_cmd, manifest, "lambda")
-}
-
-fn bucket_name(
-	infra_config: &InfraConfig,
-	build_cmd: &CargoBuildCmd,
-	manifest: &CargoManifest,
-) -> String {
-	build_resource_name(infra_config, build_cmd, manifest, "bucket")
-}
-
-/// binary-resource-stage convention to match
-/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
-fn build_resource_name(
-	infra_config: &InfraConfig,
-	build_cmd: &CargoBuildCmd,
-	manifest: &CargoManifest,
-	resource_name: &str,
-) -> String {
-	let binary_name = build_cmd
-		.binary_name(manifest.package_name())
-		.to_kebab_case();
-	let stage = stage(infra_config, build_cmd);
-	format! {"{binary_name}-{resource_name}-{stage}"}
-}
-
-pub fn deploy_sst(
-	build_cmd: Res<CargoBuildCmd>,
-	infra_config: Res<InfraConfig>,
-) -> Result {
-	run_sst(&infra_config, &build_cmd, "deploy")
+pub fn deploy_sst(infra_config: Res<InfraConfig>) -> Result {
+	run_sst(&infra_config, "deploy")
 }
 
 
 
-fn run_sst(
-	infra_config: &InfraConfig,
-	build_cmd: &CargoBuildCmd,
-	subcommand: &str,
-) -> Result {
+fn run_sst(infra_config: &InfraConfig, subcommand: &str) -> Result {
 	let mut args = vec!["sst", subcommand];
-	let stage = stage(infra_config, build_cmd);
+	let stage = infra_config.stage();
 	args.push("--stage");
 	args.push(&stage);
 
@@ -176,24 +93,5 @@ impl SstSubcommand {
 			SstSubcommand::Tunnel => "tunnel",
 			SstSubcommand::Diagnostic => "diagnostic",
 		}
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-	use crate::prelude::*;
-	use beet_utils::fs::CargoBuildCmd;
-	use sweet::prelude::*;
-
-	#[test]
-	fn works() {
-		lambda_func_name(
-			&InfraConfig::default(),
-			&CargoBuildCmd::default(),
-			&CargoManifest::load().unwrap(),
-		)
-		.xpect()
-		.to_be("beet-lambda-dev");
 	}
 }

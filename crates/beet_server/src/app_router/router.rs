@@ -44,7 +44,6 @@ fn default_handlers(
 	mut commands: Commands,
 	config:Res<WorkspaceConfig>,
 	query: Query<Entity, With<RouterRoot>>,
-	bucket_handlers: Query<(), With<BucketFileHandler>>,
 ) -> Result {
 
 	let root = query.single()?;
@@ -54,15 +53,18 @@ fn default_handlers(
 		bundle_to_html_handler(),
 	));
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-		
-	if bucket_handlers.is_empty() {
+		{
+		#[cfg(feature = "aws")]
+		let bucket = s3_bucket();
+		#[cfg(not(feature = "aws"))]
+		let bucket = Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),"");
+
 		trace!("Inserting default bucket file handler");
 		root.with_child((
-			Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),""),
+			bucket,
 			HandlerConditions::fallback(),
 			bucket_file_handler(),
-		));
-	}
+		));}
 	Ok(())
 }
 
@@ -124,15 +126,25 @@ impl Router {
 		})
 	}
 
-	pub fn with_parent_world(&mut self, parent: &World) -> Result<()>{
-		let render_mode = parent.resource::<RenderMode>().clone();
 
-		self.add_plugin(move |app: &mut App| {
+
+	/// Copy some types from the parent world to the router world.
+	pub fn clone_parent_world(world: &mut World) -> Result {
+		let mut router = world
+			.remove_resource::<Router>()
+			.ok_or_else(|| bevyhow!("No Router resource found"))?;
+		let render_mode = world.resource::<RenderMode>().clone();
+		let infra_config = world.resource::<InfraConfig>().clone();
+		router.add_plugin(move |app: &mut App| {
 			app.insert_resource(render_mode.clone());
+			app.insert_resource(infra_config.clone());
 		});
-		self.validate()?;
+		router.validate()?;
+		world.insert_resource(router);
 		Ok(())
 	}
+
+
 
 	/// Pop an app from the pool and run async actions on it.
 	pub async fn construct_world(&self) -> PooledWorld {
