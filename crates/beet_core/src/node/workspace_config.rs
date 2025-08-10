@@ -8,13 +8,10 @@ use std::path::Path;
 /// arguments to modify config fields, then added to the app for propagation
 /// when launch binary runs the server.
 #[derive(Debug, Default, Clone, Resource)]
-#[cfg_attr(
-	all(feature = "serde", not(target_arch = "wasm32")),
-	derive(clap::Parser)
-)]
+#[cfg_attr(feature = "serde", derive(clap::Parser))]
 pub struct ConfigArgs {
 	// The pulumi stage to use for deployments and infra resource names
-	#[cfg_attr(all(feature = "serde", not(target_arch = "wasm32")), arg(long))]
+	#[cfg_attr(feature = "serde", arg(long))]
 	pub stage: Option<String>,
 }
 
