@@ -58,11 +58,23 @@ pub fn collect_route_files(
 							false => quote! { Json },
 						};
 						// Action routes may be any kind of route
-						quote! {
-							RouteHandler::action(
-								#endpoint,
-								#mod_ident::#func_ident.pipe(#out_ty::pipe)
-							)
+
+						match is_async {
+							true => quote! {
+								action_endpoint_async(
+									#endpoint,
+									async move |val,mut world,entity|{
+										let out = #mod_ident::#func_ident(val, &mut world, entity).await;
+										(world, #out_ty::new(out))
+									}
+								)
+							},
+							false => quote! {
+								action_endpoint(
+									#endpoint,
+									#mod_ident::#func_ident.pipe(#out_ty::pipe)
+								)
+							},
 						}
 					}
 				};

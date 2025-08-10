@@ -75,6 +75,7 @@ impl<T, E> From<Result<T, E>> for JsonResult<T, E> {
 }
 
 impl<T, E> JsonResult<T, E> {
+	pub fn new(val: Result<T, E>) -> Self { Self::from(val) }
 	/// Convenience function for system piping
 	pub fn pipe(val: In<Result<T, E>>) -> Self { Self::from(val.0) }
 	pub fn pipe_with_status(
@@ -115,6 +116,7 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 pub struct Json<T>(pub T);
 
 impl<T> Json<T> {
+	pub fn new(val: T) -> Self { Self(val) }
 	/// Convenience function for system piping
 	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
 }

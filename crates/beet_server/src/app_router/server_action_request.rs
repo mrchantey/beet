@@ -175,21 +175,21 @@ mod test {
 			children![
 				(
 					PathFilter::new("/add"),
-					RouteHandler::action(
+					action_endpoint(
 						HttpMethod::Get,
 						add_via_get.pipe(Json::pipe)
 					)
 				),
 				(
 					PathFilter::new("/add"),
-					RouteHandler::action(
+					action_endpoint(
 						HttpMethod::Post,
 						add_via_post.pipe(Json::pipe)
 					)
 				),
 				(
 					PathFilter::new("/increment_if_positive"),
-					RouteHandler::action(
+					action_endpoint(
 						HttpMethod::Get,
 						increment_if_positive.pipe(JsonResult::pipe)
 					)
