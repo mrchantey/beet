@@ -12,7 +12,7 @@ use std::path::Path;
 /// Adde to an entity used to represent an file included
 /// in the [`WorkspaceConfig`]. These are loaded for different
 /// purposes by [`SnippetsPlugin`] and [`RouteCodegenSequence`].
-#[derive(Debug, Clone, PartialEq, Eq, Component, Deref)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Component, Deref)]
 // #[component(immutable)]
 #[require(FileExprHash)]
 pub struct SourceFile {

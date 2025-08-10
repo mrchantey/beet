@@ -101,14 +101,18 @@ pub fn reset_codegen_files(
 pub(super) fn create_route_files(
 	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
-	mut query: Populated<
+	query: Populated<
 		(Entity, &SourceFile),
 		(Added<SourceFile>, Without<RouteSourceFile>),
 	>,
 	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
 	parents: Query<&ChildOf>,
 ) -> Result {
-	for (entity, file) in query.iter_mut() {
+	// sort the items so the index is stable
+	let mut items = query.iter().collect::<Vec<_>>();
+	items.sort_by_key(|(_, file)| (*file).clone());
+
+	for (entity, file) in items.into_iter() {
 		let Some((collection_entity, collection, codegen)) = parents
 			.iter_ancestors(entity)
 			.find_map(|en| collections.get(en).ok())

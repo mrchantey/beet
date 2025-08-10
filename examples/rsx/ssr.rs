@@ -62,7 +62,8 @@ fn modify_response(world: &mut World) {
 		<Style/>
 		<article>
 		<h1>Warm greetings!</h1>
-		{entity}</article>
+			{entity}
+		</article>
 	}));
 }
 
