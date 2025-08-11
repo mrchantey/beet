@@ -1,7 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(if_let_guard)]
-
 mod app_router;
 #[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 mod aws_utils;

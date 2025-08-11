@@ -72,9 +72,9 @@ fn default_handlers(
 
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 		{
-		#[cfg(feature = "aws")]
+		#[cfg(all(feature = "aws", not(test)))]
 		let bucket = s3_bucket();
-		#[cfg(not(feature = "aws"))]
+		#[cfg(not(all(feature = "aws", not(test))))]
 		let bucket = Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),"");
 
 		trace!("Inserting default bucket file handler");
