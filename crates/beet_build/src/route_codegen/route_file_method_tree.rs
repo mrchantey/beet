@@ -66,9 +66,8 @@ impl RouteFileMethodTree {
 			let ident =
 				syn::Ident::new(&self.name, proc_macro2::Span::call_site());
 			syn::parse_quote!(
-				#[allow(missing_docs)]
+				#[allow(unused, missing_docs)]
 				pub mod #ident {
-					#[allow(unused_imports)]
 					use super::*;
 					#item
 					#(#children)*

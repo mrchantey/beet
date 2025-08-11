@@ -34,7 +34,7 @@ fn launch_plugin(app: &mut App) {
 
 #[cfg(feature = "server")]
 fn server_plugin(app: &mut App) {
-	app.insert_resource(Router::new_bundle(routes));
+	app.insert_resource(Router::new_bundle(router_bundle));
 }
 
 #[cfg(feature = "client")]

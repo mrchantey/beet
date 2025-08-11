@@ -3,8 +3,7 @@ use beet::prelude::*;
 
 
 
-
-pub fn routes() -> impl Bundle {
+pub fn router_bundle() -> impl Bundle {
 	children![
 		pages_routes(),
 		docs_routes(),

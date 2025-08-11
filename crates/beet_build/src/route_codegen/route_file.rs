@@ -79,7 +79,7 @@ impl CollectionIndexCounter {
 
 
 /// Reset every [`CodegenFile`] ancestor of a changed [`FileExprHash`],
-/// includiing both [`RouteFileCollection`] and [`RouteCodegenRoot`]
+/// includiing both [`RouteFileCollection`] and [`StaticRouteTree`]
 pub fn reset_codegen_files(
 	changed_exprs: Populated<Entity, Changed<FileExprHash>>,
 	mut parent_codegen: Query<&mut CodegenFile>,

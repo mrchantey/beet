@@ -1,6 +1,4 @@
 use super::*;
-use crate::prelude::*;
-use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 
@@ -33,30 +31,4 @@ impl Plugin for RouteCodegenPlugin {
 				.chain(),
 		);
 	}
-}
-
-/// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
-pub fn export_route_codegen(
-	query: Populated<&CodegenFile, Changed<CodegenFile>>,
-) -> bevy::prelude::Result {
-	let num_files = query.iter().count();
-	info!("Exporting {} codegen files...", num_files);
-	for codegen_file in query.iter() {
-		codegen_file.build_and_write()?;
-	}
-	Ok(())
-}
-
-
-/// Marker type indicating the (usually `mod.rs`) file
-/// containing reexports and static route trees.
-#[derive(Debug, Clone, Default, Component)]
-#[require(CodegenFile=default_codegen_file())]
-pub struct RouteCodegenRoot;
-
-
-fn default_codegen_file() -> CodegenFile {
-	CodegenFile::new(
-		AbsPathBuf::new_workspace_rel("src/codegen/mod.rs").unwrap(),
-	)
 }

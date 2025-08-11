@@ -7,7 +7,7 @@ use sweet::prelude::*;
 #[sweet::test]
 // #[ignore = "changes too often"]
 async fn docs() {
-	Router::new_bundle(routes)
+	Router::new_bundle(router_bundle)
 	.oneshot("/docs")
 	.await
 	.text()

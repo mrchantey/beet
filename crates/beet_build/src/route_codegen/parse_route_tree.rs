@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
@@ -7,6 +8,13 @@ use syn::Ident;
 use syn::Item;
 use syn::ItemFn;
 use syn::parse_quote;
+
+/// Marks an entity for generating a static route tree for
+/// every route in this entities root, allowing this file
+/// to be nested under a `mod.rs`:
+///
+#[derive(Debug, Clone, Default, Component)]
+pub struct StaticRouteTree;
 
 /// Create a tree of routes from a list of [`FuncTokens`],
 /// that can then be converted to an [`ItemMod`] to be used in the router.
@@ -39,15 +47,19 @@ use syn::parse_quote;
 pub fn parse_route_tree(
 	mut query: Populated<
 		(Entity, &mut CodegenFile),
-		(Added<CodegenFile>, With<RouteCodegenRoot>),
+		(Added<CodegenFile>, With<StaticRouteTree>),
 	>,
 	collections: Query<(Entity, &RouteFileCollection)>,
 	methods: Query<&RouteFileMethod>,
+	parents: Query<&ChildOf>,
 	children: Query<&Children>,
 ) {
 	for (entity, mut codegen) in query.iter_mut() {
+		let root = parents.root_ancestor(entity);
+
+
 		let child_methods = children
-			.iter_descendants(entity)
+			.iter_descendants_inclusive(root)
 			.filter_map(|e| collections.get(e).ok())
 			.filter(|(_, collection)| {
 				collection.category.include_in_route_tree()
@@ -122,9 +134,9 @@ mod test {
 	use beet_core::prelude::RouteInfo;
 	use beet_core::prelude::WorldMutExt;
 	use bevy::prelude::*;
+	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;
-	use syn::ItemMod;
 
 	fn world() -> World {
 		let mut world = World::new();
@@ -139,7 +151,7 @@ mod test {
 		world
 	}
 
-	fn parse(methods: Vec<RouteFileMethod>) -> String {
+	fn parse(methods: Vec<RouteFileMethod>) -> TokenStream {
 		let mut world = World::new();
 		world.spawn_batch(methods);
 		let tree = RouteFileMethodTree::from_methods(
@@ -152,37 +164,17 @@ mod test {
 		let mut query = world.query::<&RouteFileMethod>();
 		let query = query.query(&world);
 		let mod_item = Parser { query }.routes_mod_tree(&tree);
-		mod_item.to_token_stream().to_string()
+		mod_item.to_token_stream()
 	}
 
 	#[test]
 	fn single() {
-		let expected: ItemMod = syn::parse_quote! {
-			#[allow(missing_docs)]
-			pub mod routes {
-				#[allow(unused_imports)]
-				use super::*;
-				 /// Get the local route path
-				 pub fn index() -> &'static str { "/" }
-			}
-		};
 		parse(vec![RouteFileMethod::new("/")])
 			.xpect()
-			.to_be_str(expected.to_token_stream().to_string());
+			.to_be_snapshot();
 	}
 	#[test]
-	fn empty() {
-		let expected: ItemMod = syn::parse_quote! {
-			#[allow(missing_docs)]
-			pub mod routes {
-				#[allow(unused_imports)]
-				use super::*;
-			}
-		};
-		parse(vec![])
-			.xpect()
-			.to_be_str(expected.to_token_stream().to_string());
-	}
+	fn empty() { parse(vec![]).xpect().to_be_snapshot(); }
 
 	#[test]
 	fn creates_mod() {
@@ -195,46 +187,10 @@ mod test {
 		let tree = RouteFileMethodTree::from_methods(methods);
 		let mut query = world.query::<&RouteFileMethod>();
 		let query = query.query(&world);
-		let mod_item = Parser { query }.routes_mod_tree(&tree);
-
-		let expected: ItemMod = syn::parse_quote! {
-			#[allow(missing_docs)]
-			pub mod routes {
-				#[allow(unused_imports)]
-				use super::*;
-				#[doc = r" Get the local route path"]
-				pub fn index() -> &'static str {
-					"/"
-				}
-				#[doc = r" Get the local route path"]
-				pub fn bazz() -> &'static str {
-					"/bazz"
-				}
-				#[allow(missing_docs)]
-				pub mod foo {
-					#[allow(unused_imports)]
-					use super::*;
-					#[doc = r" Get the local route path"]
-					pub fn bar() -> &'static str {
-						"/foo/bar"
-					}
-					#[allow(missing_docs)]
-					pub mod bazz {
-						#[allow(unused_imports)]
-						use super::*;
-						#[doc = r" Get the local route path"]
-						pub fn index() -> &'static str {
-							"/foo/bazz"
-						}
-						#[doc = r" Get the local route path"]
-						pub fn boo() -> &'static str {
-							"/foo/bazz/boo"
-						}
-					}
-				}
-			}
-		};
-		expect(mod_item.to_token_stream().to_string())
-			.to_be_str(expected.to_token_stream().to_string());
+		Parser { query }
+			.routes_mod_tree(&tree)
+			.to_token_stream()
+			.xpect()
+			.to_be_snapshot();
 	}
 }

@@ -1,0 +1,32 @@
+#[allow(unused, missing_docs)]
+pub mod routes {
+    use super::*;
+    /// Get the local route path
+    pub fn index() -> &'static str {
+        "/"
+    }
+    /// Get the local route path
+    pub fn bazz() -> &'static str {
+        "/bazz"
+    }
+    #[allow(unused, missing_docs)]
+    pub mod foo {
+        use super::*;
+        /// Get the local route path
+        pub fn bar() -> &'static str {
+            "/foo/bar"
+        }
+        #[allow(unused, missing_docs)]
+        pub mod bazz {
+            use super::*;
+            /// Get the local route path
+            pub fn index() -> &'static str {
+                "/foo/bazz"
+            }
+            /// Get the local route path
+            pub fn boo() -> &'static str {
+                "/foo/bazz/boo"
+            }
+        }
+    }
+}

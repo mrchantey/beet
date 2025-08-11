@@ -93,8 +93,7 @@ impl Plugin for BuildPlugin {
 					// .run_if(BuildFlag::Codegen.should_run()),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
-					export_route_codegen
-						.run_if(BuildFlag::Codegen.should_run()),
+					export_codegen.run_if(BuildFlag::Codegen.should_run()),
 					compile_server
 						.run_if(BuildFlag::CompileServer.should_run()),
 					export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),

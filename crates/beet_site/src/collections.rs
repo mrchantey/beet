@@ -3,7 +3,6 @@ use beet::prelude::*;
 
 pub fn collections() -> impl Bundle {
 	(
-		RouteCodegenRoot::default(),
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel(
 				"crates/beet_site/src/codegen/mod.rs",
@@ -11,12 +10,25 @@ pub fn collections() -> impl Bundle {
 			.unwrap(),
 		),
 		children![
+			static_route_tree(),
 			pages_collection(),
 			docs_collection(),
 			blog_collection(),
 			design_mockups_collection(),
 			actions_collection()
 		],
+	)
+}
+
+fn static_route_tree() -> impl Bundle {
+	(
+		StaticRouteTree::default(),
+		CodegenFile::new(
+			AbsPathBuf::new_workspace_rel(
+				"crates/beet_site/src/codegen/route_tree.rs",
+			)
+			.unwrap(),
+		),
 	)
 }
 
