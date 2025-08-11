@@ -18,7 +18,6 @@
   </h3>
 </div>
 
-Beet is a set of crates for making and running Bevy apps.
 Its *very* early days so your mileage may vary depending on the crate of interest:
 
 **readiness meter**
@@ -28,7 +27,7 @@ Its *very* early days so your mileage may vary depending on the crate of interes
 
 ## `beeet_flow`
 
-Control flow crates for use in a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning.
+Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and Reinforcement Learning.
 
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |

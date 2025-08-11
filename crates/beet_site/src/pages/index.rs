@@ -28,11 +28,11 @@ pub fn get() -> impl Bundle {
 							>Get Started</Link>
 					</footer>
 				</Card>
-				<h2>A Very Bevy Metaframework</h2>
-				<ul>
-				<li>"Very Bevy Licencing"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
-				<li>"Very Bevy Architecture"<br/>"Bevy primitives all the way down"</li>
-				</ul>
+				// <h2>A Very Bevy Metaframework</h2>
+				// <ul>
+				// <li>"Very Bevy Licencing"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
+				// <li>"Very Bevy Architecture"<br/>"Bevy primitives all the way down"</li>
+				// </ul>
 				<h2>"Very Bevy Web UI"</h2>
 					<ClientCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/web-ui.rs"/>

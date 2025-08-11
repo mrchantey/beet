@@ -22,7 +22,7 @@ pub(crate) fn compile_server(
 
 	cmd.clone()
 		.no_default_features()
-		.push_feature("server")
+		.push_feature("server-local")
 		// .xtap(|cmd| {
 		// 	debug!("Building server binary \n{:?}", cmd);
 		// })

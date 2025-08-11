@@ -22,6 +22,8 @@ pub struct BeetRunner;
 impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
 		// order matters, last flag wins
+		#[cfg(not(any(feature = "launch", feature = "server", feature = "client")))]
+		panic!("No runner feature enabled. Please enable one of: launch, server, client.");
 		
 		#[cfg(feature = "launch")]
 		app.set_runner(LaunchRunner::runner);

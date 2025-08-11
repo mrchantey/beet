@@ -27,7 +27,7 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 		// beet binaries should default to 'server' with 'native-tls' but we need
 		// to disable that to specify 'deploy' feature
 		.no_default_features()
-		.with_feature("deploy");
+		.with_feature("server-lambda");
 
 	println!("🌱 Compiling lambda binary");
 
