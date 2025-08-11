@@ -2,15 +2,25 @@ use crate::prelude::*;
 use chrono::Datelike;
 
 #[template]
-pub fn Footer() -> impl Bundle {
-	let Brand { title, version, .. } = ReactiveApp::resource::<Brand>();
+pub fn Footer(config: Res<PackageConfig>) -> impl Bundle {
+	let PackageConfig {
+		name,
+		version,
+		stage,
+		..
+	} = config.as_ref();
+
 	let current_year = chrono::Utc::now().year();
-	let footer_text = format!("&copy; {title} {current_year}");
+	let footer_text = format!("&copy; {name} {current_year}");
+
+	let mut build_text = format!("v{version}");
 
 	#[cfg(debug_assertions)]
-	let version = format!("v{version} (dev)");
-	#[cfg(not(debug_assertions))]
-	let version = format!("v{version}");
+	build_text.push_str(" | build=debug");
+
+	if stage != "prod" {
+		build_text.push_str(&format!(" | stage={stage}"));
+	}
 
 	// <!-- <a href="/privacy-policy">Privacy</a> -->
 	// <!-- <a href="/terms-of-service">Terms</a> -->
@@ -19,7 +29,7 @@ pub fn Footer() -> impl Bundle {
 		<footer id="page-footer">
 			<span>{footer_text}</span>
 			<slot/>
-			<span id="footer-version">{version}</span>
+			<span>{build_text}</span>
 		</footer>
 		<style>
 		footer {

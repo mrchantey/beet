@@ -8,7 +8,7 @@ use sweet::prelude::*;
 async fn works() {
 	let mut app = App::new();
 	app.add_plugins(RouterAppPlugin);
-	app.world_mut().spawn((RouterRoot,router_bundle()));
+	app.world_mut().spawn((RouterRoot, routes_bundle()));
 	app.init().update();
 	app.world_mut()
 		.run_system_cached_with(
@@ -26,5 +26,4 @@ async fn works() {
 		.to_string()
 		.xpect()
 		.to_be_snapshot();
-
 }

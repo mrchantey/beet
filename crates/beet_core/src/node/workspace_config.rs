@@ -5,36 +5,41 @@ use heck::ToKebabCase;
 use std::path::Path;
 
 
-/// arguments to modify config fields, then added to the app for propagation
-/// when launch binary runs the server.
+/// A struct for propagating settings from the `launch` binary to the
+/// `server` and `client` binaries via command line arguments.
+/// Arguments are then applied to the [`PackageConfig`] resource.
 #[derive(Debug, Default, Clone, Resource)]
 #[cfg_attr(feature = "serde", derive(clap::Parser))]
 pub struct ConfigArgs {
-	// The pulumi stage to use for deployments and infra resource names
-	#[cfg_attr(feature = "serde", arg(long))]
-	pub stage: Option<String>,
+	/// The pulumi stage to use for deployments and infra resource names.
+	/// By default this is set to `dev` in debug builds and `prod` in release builds.
+	#[cfg_attr(feature = "serde", arg(long,default_value_t = default_stage()))]
+	pub stage: String,
+}
+
+fn default_stage() -> String {
+	if cfg!(debug_assertions) {
+		"dev".to_string()
+	} else {
+		"prod".to_string()
+	}
 }
 
 impl ConfigArgs {
 	/// Convert this struct into a vector of command line arguments,
 	/// for passing to server and client binaries.
 	pub fn into_args(&self) -> Vec<String> {
-		let mut args = vec![];
-		if let Some(stage) = self.stage.clone() {
-			args.push("--stage".to_string());
-			args.push(stage);
-		}
-		args
+		let Self { stage } = self.clone();
+
+		vec!["--stage".to_string(), stage]
 	}
 }
 
 impl Plugin for ConfigArgs {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(self.clone());
-		if let Some(stage) = &self.stage {
-			app.world_mut().resource_mut::<PackageConfig>().stage =
-				stage.clone();
-		}
+		app.world_mut().resource_mut::<PackageConfig>().stage =
+			self.stage.clone();
 	}
 }
 

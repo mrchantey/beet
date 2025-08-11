@@ -10,7 +10,7 @@ pub fn collections() -> impl Bundle {
 			.unwrap(),
 		),
 		children![
-			static_route_tree(),
+			route_tree(),
 			pages_collection(),
 			docs_collection(),
 			blog_collection(),
@@ -20,7 +20,7 @@ pub fn collections() -> impl Bundle {
 	)
 }
 
-fn static_route_tree() -> impl Bundle {
+fn route_tree() -> impl Bundle {
 	(
 		StaticRouteTree::default(),
 		CodegenFile::new(

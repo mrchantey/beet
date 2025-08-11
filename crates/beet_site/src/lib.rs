@@ -19,7 +19,7 @@ pub mod components;
 pub mod layouts;
 
 #[cfg(feature = "server")]
-mod router;
+mod routes;
 
 #[cfg(feature = "launch")]
 mod collections;
@@ -47,5 +47,5 @@ pub mod prelude {
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::route_tree::routes;
 	#[cfg(feature = "server")]
-	pub use crate::router::*;
+	pub use crate::routes::*;
 }
