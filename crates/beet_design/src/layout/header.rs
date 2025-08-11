@@ -4,14 +4,13 @@ use crate::prelude::*;
 #[template]
 pub fn Header(
 	#[field(into, default = "/".to_string())] home_route: String,
+	config: Res<PackageConfig>,
 ) -> impl Bundle {
-	let Brand { title, .. } = ReactiveApp::resource::<Brand>();
-
 	rsx! {
 		<header>
 			<a class="app-bar-title button-like" href={home_route}>
 				// <Logo/>
-				{title}
+				{config.name.clone()}
 			</a>
 			<slot />
 			<nav>

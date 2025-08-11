@@ -44,6 +44,8 @@ impl Plugin for ConfigArgs {
 }
 
 /// Settings for the package, usually set via `pkg_config!()`.
+/// This resource is required for all beet applications and should be consistent
+/// across launch, server and client binaries.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct PackageConfig {
@@ -53,7 +55,9 @@ pub struct PackageConfig {
 	pub version: String,
 	/// The description of the package set via `CARGO_PKG_DESCRIPTION`
 	pub description: String,
-	/// The repository URL of the package, if available
+	/// The homepage URL of the package, set via `CARGO_PKG_HOMEPAGE`
+	pub homepage: String,
+	/// The repository URL of the package, set via `CARGO_PKG_REPOSITORY` if available
 	pub repository: Option<String>,
 	/// The infrastructure stage for this build,
 	/// defaults to `dev` in debug builds and `prod` in release builds
@@ -66,7 +70,6 @@ impl PackageConfig {
 	pub fn description(&self) -> &str { &self.description }
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
 	pub fn stage(&self) -> &str { &self.stage }
-
 
 	pub fn default_lambda_name(&self) -> String { self.resource_name("lambda") }
 	pub fn default_bucket_name(&self) -> String { self.resource_name("bucket") }
@@ -99,12 +102,16 @@ macro_rules! pkg_config {
 			name: env!("CARGO_PKG_NAME").to_string(),
 			version: env!("CARGO_PKG_VERSION").to_string(),
 			description: env!("CARGO_PKG_DESCRIPTION").to_string(),
+			homepage: env!("CARGO_PKG_HOMEPAGE").to_string(),
 			repository: option_env!("CARGO_PKG_REPOSITORY")
 				.map(|s| s.to_string()),
-			stage: if cfg!(debug_assertions) {
-				"dev".to_string()
-			} else {
-				"prod".to_string()
+			stage: {
+				if cfg!(debug_assertions) {
+					"dev"
+				} else {
+					"prod"
+				}
+				.to_string()
 			},
 		}
 	};
