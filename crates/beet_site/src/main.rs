@@ -15,7 +15,10 @@ fn main() {
 			#[cfg(feature = "client")]
 			client_plugin,
 		))
-		.insert_resource(pkg_config!())
+		.insert_resource(PackageConfig{
+			title:"Beet".to_string(),
+			..pkg_config!()
+		})
 		.run();
 }
 

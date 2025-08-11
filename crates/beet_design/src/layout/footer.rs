@@ -4,14 +4,14 @@ use chrono::Datelike;
 #[template]
 pub fn Footer(config: Res<PackageConfig>) -> impl Bundle {
 	let PackageConfig {
-		name,
+		title,
 		version,
 		stage,
 		..
 	} = config.as_ref();
 
 	let current_year = chrono::Utc::now().year();
-	let footer_text = format!("&copy; {name} {current_year}");
+	let footer_text = format!("&copy; {title} {current_year}");
 
 	let mut build_text = format!("v{version}");
 

@@ -10,7 +10,7 @@ pub fn Header(
 		<header>
 			<a class="app-bar-title button-like" href={home_route}>
 				// <Logo/>
-				{config.name.clone()}
+				{config.title.clone()}
 			</a>
 			<slot />
 			<nav>

@@ -49,7 +49,7 @@ pub fn deploy_lambda(
 	lambda_config: Res<LambdaConfig>,
 	pkg_config: Res<PackageConfig>,
 ) -> Result {
-	let binary_name = pkg_config.name();
+	let binary_name = pkg_config.binary_name();
 
 	let html_dir = workspace_config
 		.html_dir

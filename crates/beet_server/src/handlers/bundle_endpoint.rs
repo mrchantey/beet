@@ -121,12 +121,20 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
+	fn some_endpoint(_: Query<()>) -> impl Bundle + use<> {
+		rsx! {
+			<div>some endpoint</div>
+		}
+	}
+
 	#[template]
 	pub fn MyTemplate(foo: u32) -> impl Bundle {
 		rsx! {
 			<div>foo: {foo}</div>
 		}
 	}
+	#[sweet::test]
+	fn compiles() { bundle_endpoint(HttpMethod::Get, some_endpoint); }
 
 	#[sweet::test]
 	async fn works() {

@@ -49,8 +49,10 @@ impl Plugin for ConfigArgs {
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct PackageConfig {
+	/// The pretty name of the package
+	pub title: String,
 	/// The name of the package set via `CARGO_PKG_NAME`
-	pub name: String,
+	pub binary_name: String,
 	/// The version of the package set via `CARGO_PKG_VERSION`
 	pub version: String,
 	/// The description of the package set via `CARGO_PKG_DESCRIPTION`
@@ -65,7 +67,7 @@ pub struct PackageConfig {
 }
 
 impl PackageConfig {
-	pub fn name(&self) -> &str { &self.name }
+	pub fn binary_name(&self) -> &str { &self.binary_name }
 	pub fn version(&self) -> &str { &self.version }
 	pub fn description(&self) -> &str { &self.description }
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
@@ -79,7 +81,7 @@ impl PackageConfig {
 	/// this binary-resource-stage convention must match sst config
 	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
 	pub fn resource_name(&self, name: &str) -> String {
-		let binary_name = self.name.to_kebab_case();
+		let binary_name = self.binary_name.to_kebab_case();
 		let stage = self.stage.as_str();
 		format! {"{binary_name}-{name}-{stage}"}
 	}
@@ -99,7 +101,8 @@ impl PackageConfig {
 macro_rules! pkg_config {
 	() => {
 		$crate::prelude::PackageConfig {
-			name: env!("CARGO_PKG_NAME").to_string(),
+			title: env!("CARGO_PKG_NAME").to_string(),
+			binary_name: env!("CARGO_PKG_NAME").to_string(),
 			version: env!("CARGO_PKG_VERSION").to_string(),
 			description: env!("CARGO_PKG_DESCRIPTION").to_string(),
 			homepage: env!("CARGO_PKG_HOMEPAGE").to_string(),

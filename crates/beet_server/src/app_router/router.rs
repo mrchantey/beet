@@ -56,11 +56,11 @@ fn default_handlers(
 	root.with_child((
 		PathFilter::new("/app-info"),
 		bundle_endpoint(HttpMethod::Get, |config:Res<PackageConfig>|{
-			let PackageConfig {name, description, version, stage, ..} = config.clone();
+			let PackageConfig {title, description, version, stage, ..} = config.clone();
 			rsx!{
 				<main>
 					<h1>App Info</h1>
-					<p>Name: {name}</p>
+					<p>Title: {title}</p>
 					<p>Description: {description}</p>
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
