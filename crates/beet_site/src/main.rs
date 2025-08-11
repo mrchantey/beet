@@ -14,7 +14,7 @@ fn main() {
 			#[cfg(feature = "client")]
 			client_plugin,
 		))
-		.insert_resource(package_config_from_env!())
+		.insert_resource(pkg_config!())
 		.run();
 }
 

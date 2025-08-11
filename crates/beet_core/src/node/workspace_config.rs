@@ -38,7 +38,7 @@ impl Plugin for ConfigArgs {
 	}
 }
 
-/// Settings for the package, usually set via `package_config_from_env!()`.
+/// Settings for the package, usually set via `pkg_config!()`.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct PackageConfig {
@@ -85,10 +85,10 @@ impl PackageConfig {
 /// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// let mut world = World::new();
-/// world.insert_resource(package_config_from_env!());
+/// world.insert_resource(pkg_config!());
 /// ```
 #[macro_export]
-macro_rules! package_config_from_env {
+macro_rules! pkg_config {
 	() => {
 		$crate::prelude::PackageConfig {
 			name: env!("CARGO_PKG_NAME").to_string(),
@@ -203,7 +203,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		package_config_from_env!()
+		pkg_config!()
 			.resource_name("lambda")
 			.xpect()
 			.to_be("beet-core-lambda-dev");
