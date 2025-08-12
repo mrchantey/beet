@@ -195,7 +195,7 @@ test-rsx *args:
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
-	cargo test -p beet_site 						--features=server 																	{{args}} -- {{test-threads}}
+	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
 	
 test-flow *args:
 	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}

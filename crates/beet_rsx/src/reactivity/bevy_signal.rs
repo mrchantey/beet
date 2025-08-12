@@ -43,7 +43,9 @@ impl Plugin for SignalsPlugin {
 			);
 	}
 }
-/// Non generic marker to indicate this entity receives signals.
+/// Automatically added to every [`SignalReceiver<T>`],
+/// this non generic marker is used to flag *any* entity that can receive signals
+/// regardless of the type.
 #[derive(Default, Component)]
 pub struct ReceivesSignals;
 /// A component with a [`flume::Receiver`] that can be used to propagate changes

@@ -1079,7 +1079,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet",
@@ -1128,7 +1128,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1163,7 +1163,7 @@ dependencies = [
 
 [[package]]
 name = "beet_connect"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1232,7 +1232,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -1245,7 +1245,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1263,7 +1263,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "extend",
@@ -1313,7 +1313,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1346,7 +1346,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1372,7 +1372,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -1393,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1408,7 +1408,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1439,7 +1439,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1449,7 +1449,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -1499,7 +1499,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1510,7 +1510,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet",
@@ -1523,7 +1523,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1543,7 +1543,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -9185,7 +9185,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -9202,7 +9202,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.7-dev.3"
+version = "0.0.7-dev.4"
 dependencies = [
  "anyhow",
  "proc-macro2",

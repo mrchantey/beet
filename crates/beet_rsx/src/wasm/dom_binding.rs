@@ -27,53 +27,6 @@ impl DomTextBinding {
 pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
-pub(crate) fn update_text_nodes(
-	_: TempNonSendMarker,
-	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
-) -> Result<()> {
-	for (text, node) in query.iter() {
-		node.set_data(text);
-	}
-	Ok(())
-}
-
-
-/// The attributes of elements are applied in the render html step,
-/// updating is applied to the DOM *properties* of the element
-pub(crate) fn update_attribute_values(
-	_: TempNonSendMarker,
-	query: Populated<
-		(
-			&AttributeKey,
-			&DomElementBinding,
-			&TextNode,
-			Option<&NumberNode>,
-			Option<&BoolNode>,
-		),
-		Changed<TextNode>,
-	>,
-) -> Result<()> {
-	for (key, el, text, num, bool) in query.iter() {
-		let value = if let Some(num) = num {
-			wasm_bindgen::JsValue::from_f64(**num)
-		} else if let Some(bool) = bool {
-			wasm_bindgen::JsValue::from_bool(**bool)
-		} else {
-			wasm_bindgen::JsValue::from_str(&**text)
-		};
-
-		// el.set_attribute(&key.0, &value.to_string())
-		// 	.map_err(|err| format!("{err:?}"))?;
-		// TODO use heck for camelCase conversion
-		js_sys::Reflect::set(
-			el.inner().as_ref(),
-			&wasm_bindgen::JsValue::from_str(&key.0),
-			&value,
-		)
-		.map_err(|err| format!("{err:?}"))?;
-	}
-	Ok(())
-}
 
 /// lazily attach the text nodes to the DOM with the following steps:
 /// 1. find the parent element of the text node
@@ -81,20 +34,20 @@ pub(crate) fn update_attribute_values(
 /// 3. assign the text node to the next sibling of the marker comment
 /// 4. remove the marker comments
 pub(crate) fn bind_text_nodes(
-	mut commands: Commands,
-	constants: Res<HtmlConstants>,
-	mut get_binding: GetDomBinding,
-	parents: Query<&ChildOf>,
-	elements: Query<(Entity, &DomIdx), With<ElementNode>>,
 	query: Populated<
 		(Entity, &DomIdx),
 		(
-			Changed<TextNode>,
+			With<TextNode>,
 			With<ReceivesSignals>,
 			Without<DomTextBinding>,
 			Without<AttributeOf>,
 		),
 	>,
+	mut commands: Commands,
+	constants: Res<HtmlConstants>,
+	mut get_binding: GetDomBinding,
+	parents: Query<&ChildOf>,
+	elements: Query<(Entity, &DomIdx), With<ElementNode>>,
 ) -> Result<()> {
 	for (entity, dom_idx) in query.iter() {
 		// 1. get the parent element
@@ -161,6 +114,17 @@ pub(crate) fn bind_text_nodes(
 	Ok(())
 }
 
+pub(crate) fn update_text_nodes(
+	_: TempNonSendMarker,
+	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
+) -> Result<()> {
+	for (text, node) in query.iter() {
+		node.set_data(text);
+	}
+	Ok(())
+}
+
+
 pub(crate) fn bind_attribute_values(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
@@ -186,6 +150,42 @@ pub(crate) fn bind_attribute_values(
 		commands
 			.entity(entity)
 			.insert(DomElementBinding(SendWrapper::new(element)));
+	}
+	Ok(())
+}
+/// The attributes of elements are applied in the render html step,
+/// updating is applied to the DOM *properties* of the element
+pub(crate) fn update_attribute_values(
+	_: TempNonSendMarker,
+	query: Populated<
+		(
+			&AttributeKey,
+			&DomElementBinding,
+			&TextNode,
+			Option<&NumberNode>,
+			Option<&BoolNode>,
+		),
+		Changed<TextNode>,
+	>,
+) -> Result<()> {
+	for (key, el, text, num, bool) in query.iter() {
+		let value = if let Some(num) = num {
+			wasm_bindgen::JsValue::from_f64(**num)
+		} else if let Some(bool) = bool {
+			wasm_bindgen::JsValue::from_bool(**bool)
+		} else {
+			wasm_bindgen::JsValue::from_str(&**text)
+		};
+
+		// el.set_attribute(&key.0, &value.to_string())
+		// 	.map_err(|err| format!("{err:?}"))?;
+		// TODO use heck for camelCase conversion
+		js_sys::Reflect::set(
+			el.inner().as_ref(),
+			&wasm_bindgen::JsValue::from_str(&key.0),
+			&value,
+		)
+		.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
 }

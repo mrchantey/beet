@@ -145,6 +145,7 @@ mod test {
 		let bucket = Bucket::new(provider, "test-bucket");
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
+		bucket.remove().await.unwrap();
 		bucket.exists().await.unwrap().xpect().to_be_false();
 		bucket.insert(&path, body.clone()).await.unwrap();
 		bucket.exists().await.unwrap().xpect().to_be_true();
