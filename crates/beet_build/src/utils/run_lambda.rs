@@ -18,7 +18,10 @@ pub struct LambdaConfig {
 }
 
 
-pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
+pub fn compile_lambda(
+	build_cmd: Res<CargoBuildCmd>,
+	pkg_config: Res<PackageConfig>,
+) -> Result<()> {
 	let build_cmd = build_cmd
 		.clone()
 		.cmd("build")
@@ -29,15 +32,17 @@ pub fn compile_lambda(build_cmd: Res<CargoBuildCmd>) -> Result<()> {
 		.no_default_features()
 		.with_feature("server-lambda");
 
-	println!("🌱 Compiling lambda binary");
-
 	let mut cmd = Command::new("cargo");
 
 	// TODO we should support all lambda build featire
 	cmd.arg("lambda")
+		.envs(pkg_config.envs())
 		.args(build_cmd.get_args())
 		.arg("--lambda-dir")
 		.arg("target/lambda/crates")
+		.xtap(|cmd| {
+			debug!("🌱 Building lambda binary\n{:?}", cmd);
+		})
 		.status()?
 		.exit_ok()?
 		.xok()

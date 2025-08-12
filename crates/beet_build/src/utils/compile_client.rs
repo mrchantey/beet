@@ -11,19 +11,27 @@ pub fn compile_client(
 	cmd: Res<CargoBuildCmd>,
 	manifest: Res<CargoManifest>,
 	config: Res<WorkspaceConfig>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
-	debug!("🌱 Building client binary");
-
-	let exe_path = cmd
+	let build_cmd = cmd
 		.clone()
 		.target("wasm32-unknown-unknown")
 		.no_default_features()
-		.push_feature("client")
-		.spawn()?
-		.exe_path(manifest.package_name());
+		.with_feature("client");
+
+	Command::new("cargo")
+		.args(cmd.get_args())
+		.envs(pkg_config.envs())
+		.xtap(|cmd| {
+			debug!("🌱 Building client binary\n{:?}", cmd);
+		})
+		.status()?
+		.exit_ok()?;
+
+	let exe_path = build_cmd.exe_path(manifest.package_name());
 
 	wasm_bindgen(&html_constants, &config.html_dir, &exe_path)?;
-	if cmd.release {
+	if build_cmd.release {
 		wasm_opt(&html_constants, &config.html_dir)?;
 	}
 	Ok(())

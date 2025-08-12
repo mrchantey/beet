@@ -17,7 +17,7 @@ pub struct ServerRunner {
 	pub export_static: bool,
 	#[cfg_attr(feature = "serde", clap(flatten))]
 	#[allow(unused)]
-	pub(crate) config_args: ConfigArgs,
+	pub(crate) config_overrides: ConfigOverrides,
 	/// Specify the router mode
 	#[cfg_attr(feature = "serde", command(subcommand))]
 	pub mode: Option<RenderMode>,
@@ -26,7 +26,7 @@ impl Default for ServerRunner {
 	fn default() -> Self {
 		Self {
 			export_static: false,
-			config_args: Default::default(),
+			config_overrides: Default::default(),
 			mode: None,
 		}
 	}
@@ -62,7 +62,7 @@ impl ServerRunner {
 	#[tokio::main]
 	async fn run(self, mut app: App) -> Result {
 		PrettyTracing::default().init();
-		app.add_plugins(self.config_args);
+		app.add_plugins(self.config_overrides);
 
 		if self.export_static {
 			app.insert_resource(RenderMode::Ssr);

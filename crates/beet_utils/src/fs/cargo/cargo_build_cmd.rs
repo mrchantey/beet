@@ -129,6 +129,7 @@ impl CargoBuildCmd {
 		self.trailing_args.push(arg.into());
 		self
 	}
+
 	pub fn with_feature(mut self, feature: impl Into<String>) -> Self {
 		self.push_feature(feature);
 		self

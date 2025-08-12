@@ -5,41 +5,25 @@ use heck::ToKebabCase;
 use std::path::Path;
 
 
-/// A struct for propagating settings from the `launch` binary to the
-/// `server` and `client` binaries via command line arguments.
-/// Arguments are then applied to the [`PackageConfig`] resource.
+/// Override settings typically set via environment variables like `BEET_STAGE`.
 #[derive(Debug, Default, Clone, Resource)]
 #[cfg_attr(feature = "serde", derive(clap::Parser))]
-pub struct ConfigArgs {
+pub struct ConfigOverrides {
+	/// Override the `BEET_STAGE` environment variable.
 	/// The pulumi stage to use for deployments and infra resource names.
 	/// By default this is set to `dev` in debug builds and `prod` in release builds.
-	#[cfg_attr(feature = "serde", arg(long,default_value_t = default_stage()))]
-	pub stage: String,
+	#[cfg_attr(feature = "serde", arg(long))]
+	pub stage: Option<String>,
 }
 
-fn default_stage() -> String {
-	if cfg!(debug_assertions) {
-		"dev".to_string()
-	} else {
-		"prod".to_string()
-	}
-}
 
-impl ConfigArgs {
-	/// Convert this struct into a vector of command line arguments,
-	/// for passing to server and client binaries.
-	pub fn into_args(&self) -> Vec<String> {
-		let Self { stage } = self.clone();
-
-		vec!["--stage".to_string(), stage]
-	}
-}
-
-impl Plugin for ConfigArgs {
+impl Plugin for ConfigOverrides {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(self.clone());
-		app.world_mut().resource_mut::<PackageConfig>().stage =
-			self.stage.clone();
+		if let Some(stage) = &self.stage {
+			app.world_mut().resource_mut::<PackageConfig>().stage =
+				stage.clone();
+		}
 	}
 }
 
@@ -76,6 +60,18 @@ impl PackageConfig {
 	pub fn default_lambda_name(&self) -> String { self.resource_name("lambda") }
 	pub fn default_bucket_name(&self) -> String { self.resource_name("bucket") }
 
+	/// Returns a vec of environment variables
+	#[rustfmt::skip]
+	pub fn envs(&self)->Vec<(String,String)>{
+		vec![
+			// ("BEET_BINARY_NAME".to_string(),self.binary_name().to_string()),
+			// ("BEET_VERSION".to_string(),self.version().to_string()),
+			// ("BEET_DESCRIPTION".to_string(),self.description().to_string()),
+			("BEET_STAGE".to_string(),self.stage().to_string()),
+		]
+	}
+
+
 	/// Prefixes the binary name and suffixes the stage to the provided name,
 	/// for example `lambda` becomes `my-site-lambda-dev`
 	/// this binary-resource-stage convention must match sst config
@@ -87,15 +83,35 @@ impl PackageConfig {
 	}
 }
 
+impl std::fmt::Display for PackageConfig {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f, "Package Config")?;
+		writeln!(f, "title: {}", self.title)?;
+		writeln!(f, "binary_name: {}", self.binary_name)?;
+		writeln!(f, "version: {}", self.version)?;
+		writeln!(f, "description: {}", self.description)?;
+		writeln!(f, "homepage: {}", self.homepage)?;
+		if let Some(repo) = &self.repository {
+			writeln!(f, "repository: {}", repo)?;
+		} else {
+			writeln!(f, "repository: None")?;
+		}
+		writeln!(f, "stage: {}", self.stage)?;
+		Ok(())
+	}
+}
 
-
-/// Macro to create a `PackageConfig` from environment variables set by Cargo.
+/// Macro to create a `PackageConfig` from compile time environment variables set by Cargo.
+/// This saves boilerplate for various `env!` environment variables.
 /// ## Example
 /// ```
 /// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// let mut world = World::new();
-/// world.insert_resource(pkg_config!());
+/// world.insert_resource(PackageConfig {
+/// 	title: "My Site".to_string(),
+/// 	..pkg_config!()
+/// });
 /// ```
 #[macro_export]
 macro_rules! pkg_config {
@@ -108,14 +124,7 @@ macro_rules! pkg_config {
 			homepage: env!("CARGO_PKG_HOMEPAGE").to_string(),
 			repository: option_env!("CARGO_PKG_REPOSITORY")
 				.map(|s| s.to_string()),
-			stage: {
-				if cfg!(debug_assertions) {
-					"dev"
-				} else {
-					"prod"
-				}
-				.to_string()
-			},
+			stage: option_env!("BEET_STAGE").unwrap_or("dev").to_string(),
 		}
 	};
 }

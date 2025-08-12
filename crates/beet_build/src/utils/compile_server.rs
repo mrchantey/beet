@@ -11,7 +11,8 @@ use std::process::Command;
 pub(crate) fn compile_server(
 	_query: Populated<(), Changed<FileExprHash>>,
 	mut handle: ResMut<ServerHandle>,
-	cmd: Res<CargoBuildCmd>,
+	build_cmd: Res<CargoBuildCmd>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
 	// if the server is already running, kill it
 	// before the snippets are exported because
@@ -20,14 +21,19 @@ pub(crate) fn compile_server(
 		child.kill()?;
 	}
 
-	cmd.clone()
+	let build_cmd = build_cmd
+		.clone()
 		.no_default_features()
-		.push_feature("server-local")
-		// .xtap(|cmd| {
-		// 	debug!("Building server binary \n{:?}", cmd);
-		// })
-		.spawn()?;
-	Ok(())
+		.with_feature("server-local");
+	Command::new("cargo")
+		.args(build_cmd.get_args())
+		.envs(pkg_config.envs())
+		.xtap(|cmd| {
+			debug!("Building server binary\n{:?}", cmd);
+		})
+		.status()?
+		.exit_ok()?
+		.xok()
 }
 
 
@@ -37,14 +43,14 @@ pub fn export_server_ssg(
 	_query: Populated<(), Changed<StaticRoot>>,
 	cmd: Res<CargoBuildCmd>,
 	manifest: Res<CargoManifest>,
-	config_args: Res<ConfigArgs>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
 	PathExt::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
+		.envs(pkg_config.envs())
 		.arg("--export-static")
-		.args(&config_args.into_args())
 		.xtap(|cmd| {
 			debug!(
 				"Running server binary to generate static files \n{:?}",
@@ -52,8 +58,8 @@ pub fn export_server_ssg(
 			);
 		})
 		.status()?
-		.exit_ok()?;
-	Ok(())
+		.exit_ok()?
+		.xok()
 }
 
 /// A handle to the server process
@@ -75,7 +81,7 @@ pub(crate) fn run_server(
 	mut handle: ResMut<ServerHandle>,
 	cmd: Res<CargoBuildCmd>,
 	manifest: Res<CargoManifest>,
-	config_args: Res<ConfigArgs>,
+	pkg_config: Res<PackageConfig>,
 ) -> Result {
 	if let Some(child) = &mut handle.0 {
 		child.kill()?;
@@ -84,7 +90,7 @@ pub(crate) fn run_server(
 	let exe_path = cmd.exe_path(manifest.package_name());
 	PathExt::assert_exists(&exe_path)?;
 	let child = Command::new(&exe_path)
-		.args(&config_args.into_args())
+		.envs(pkg_config.envs())
 		.xtap(|cmd| {
 			debug!("Running server \n{:?}", cmd);
 		})
