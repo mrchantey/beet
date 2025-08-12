@@ -18,7 +18,7 @@ mod bevy_utils;
 pub mod net;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 pub mod server;
-#[cfg(feature = "web")]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
 
 pub mod prelude {
@@ -36,8 +36,7 @@ pub mod prelude {
 	pub use crate::server::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
-	#[allow(unused)]
-	#[cfg(feature = "web")]
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use crate::web::prelude::*;
 	pub use beet_core_macros::*;
 }

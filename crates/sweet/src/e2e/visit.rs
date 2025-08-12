@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_utils::prelude::*;
-use beet_utils::utils::AsyncUtils;
 use fantoccini::Client;
 use fantoccini::ClientBuilder;
 use std::time::Duration;
@@ -57,7 +56,7 @@ Please ensure the --e2e flag was passed to the test:
 /// - If the webdriver is not running
 /// - If the page cannot be reached
 pub async fn visit_with_opts(url: &str, opts: VisitOptions) -> Result<Page> {
-	let client = AsyncUtils::retry_async(
+	let client = async_ext::retry_async(
 		async || -> Result<Client> {
 			let headless_args = if opts.headless {
 				r#""--headless","--disable-gpu""#

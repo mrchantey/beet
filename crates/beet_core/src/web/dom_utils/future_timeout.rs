@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_utils::prelude::*;
 use js_sys::Array;
 use js_sys::Promise;
 use std::cell::RefCell;
@@ -24,7 +25,7 @@ where
 	let prom = Promise::new(&mut move |resolve, _reject| {
 		let fut = fut.take().unwrap_throw();
 		let out = out2.clone();
-		spawn_local(async move {
+		async_ext::spawn_local(async move {
 			let result = fut().await;
 			*out.borrow_mut() = Some(result);
 			resolve.call0(&JsValue::NULL).unwrap();

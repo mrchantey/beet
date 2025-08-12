@@ -1,5 +1,3 @@
-pub mod actions_test;
-pub use actions_test::*;
 pub mod beet_context;
 pub mod beet_header_links;
 pub mod client_counter;
