@@ -9,6 +9,9 @@ use std::process::Command;
 /// Deploy to AWS Lambda in release mode.
 #[derive(Debug, Default, Clone, Parser, Resource)]
 pub struct LambdaConfig {
+	/// A list of environment variables to pass to the lambda function
+	// #[clap(flatten)]
+	// pub env_filter: GlobFilter,
 	/// Specify the region to deploy the lambda function to
 	#[arg(long)]
 	pub region: Option<String>,
@@ -21,7 +24,7 @@ pub struct LambdaConfig {
 pub fn compile_lambda(
 	build_cmd: Res<CargoBuildCmd>,
 	pkg_config: Res<PackageConfig>,
-) -> Result<()> {
+) -> Result {
 	let build_cmd = build_cmd
 		.clone()
 		.cmd("build")
@@ -65,7 +68,6 @@ pub fn deploy_lambda(
 		// .into_abs()
 		.to_string();
 
-
 	let mut cmd = Command::new("cargo");
 	cmd.arg("lambda")
 		.arg("deploy")
@@ -79,6 +81,18 @@ pub fn deploy_lambda(
 		.arg("--binary-name")
 		.arg(&binary_name);
 
+	let vars = env_ext::vars_filtered(
+		GlobFilter::default().with_include("OPENAI_API_KEY"),
+	);
+	if !vars.is_empty() {
+		cmd.arg("--env-var").arg(
+			vars.into_iter()
+				.map(|(key, value)| format!("{key}={value}"))
+				.collect::<Vec<_>>()
+				.join(","),
+		);
+	}
+
 	if let Some(iam_role) = &lambda_config.iam_role {
 		cmd.arg("--iam-role").arg(iam_role);
 	}
@@ -90,7 +104,9 @@ pub fn deploy_lambda(
 	cmd.arg(&lambda_name);
 
 	// Print the full command before executing
-	println!("🌱 Deploying Lambda Binary to {lambda_name}\n   {cmd:?}");
+	// println!("🌱 Deploying Lambda Binary to {lambda_name}\n   {cmd:?}");
+	// TODO print command with redacted environment variables
+	println!("🌱 Deploying Lambda Binary to {lambda_name}");
 
 	cmd.status()?.exit_ok()?.xok()
 }
