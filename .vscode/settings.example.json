@@ -11,6 +11,7 @@
 		// "beet/server",
 	],
 	"deno.enable": true,
+	"deno.disablePaths": ["target","examples/todo-app/target"],
 	"files.exclude": {
 		"infra/.sst": true,
 		"**/.git": true,

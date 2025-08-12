@@ -5,7 +5,7 @@
 #![doc = include_str!("../README.md")]
 /// Color theme and utilities
 pub mod color;
-pub mod components;
+pub mod templates;
 pub mod css;
 pub mod html_elements;
 /// Collection of interactive components
@@ -25,7 +25,7 @@ pub mod mockups;
 /// Commonly used components for beet_design
 pub mod prelude {
 	pub use crate::color::*;
-	pub use crate::components::*;
+	pub use crate::templates::*;
 	pub use crate::css::*;
 	pub use crate::csx;
 	pub use crate::html_elements::*;
