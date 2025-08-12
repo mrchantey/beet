@@ -1,6 +1,19 @@
 use beet::exports::syn;
 use beet::prelude::*;
 
+
+pub fn launch_plugin(app: &mut App) {
+
+	let mut config = WorkspaceConfig::default();
+	config.filter
+		.include("*/crates/beet_design/src/**/*")
+		.include("*/crates/beet_site/src/**/*");
+
+	app.insert_resource(config);
+
+	app.world_mut().spawn(collections());
+}
+
 pub fn collections() -> impl Bundle {
 	(
 		CodegenFile::new(

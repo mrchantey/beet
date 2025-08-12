@@ -22,24 +22,6 @@ fn main() {
 		.run();
 }
 
-#[cfg(feature = "launch")]
-fn launch_plugin(app: &mut App) {
-
-	let mut config = WorkspaceConfig::default();
-	config.filter
-		.include("*/crates/beet_design/src/**/*")
-		.include("*/crates/beet_site/src/**/*");
-
-	app.insert_resource(config);
-
-	app.world_mut().spawn(collections());
-}
-
-#[cfg(feature = "server")]
-fn server_plugin(app: &mut App) {
-	app.insert_resource(Router::new_bundle(routes_bundle));
-}
-
 #[cfg(feature = "client")]
 fn client_plugin(app: &mut App) {
 	app

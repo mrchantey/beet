@@ -18,11 +18,10 @@ pub mod components;
 #[cfg(any(feature = "server", feature = "client"))]
 pub mod layouts;
 
-#[cfg(feature = "server")]
-mod routes;
-
 #[cfg(feature = "launch")]
-mod collections;
+mod launch;
+#[cfg(feature = "server")]
+mod server;
 
 #[cfg(any(feature = "server", feature = "client"))]
 pub use crate::client_actions::routes as actions;
@@ -38,14 +37,14 @@ pub mod prelude {
 	pub use crate::codegen::docs::docs_routes;
 	#[cfg(feature = "server")]
 	pub use crate::codegen::pages::pages_routes;
-	#[cfg(feature = "launch")]
-	pub use crate::collections::*;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::components::*;
+	#[cfg(feature = "launch")]
+	pub use crate::launch::*;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::layouts::*;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::route_tree::routes;
 	#[cfg(feature = "server")]
-	pub use crate::routes::*;
+	pub use crate::server::*;
 }
