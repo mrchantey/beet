@@ -85,7 +85,6 @@ impl PackageConfig {
 
 impl std::fmt::Display for PackageConfig {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "Package Config")?;
 		writeln!(f, "title: {}", self.title)?;
 		writeln!(f, "binary_name: {}", self.binary_name)?;
 		writeln!(f, "version: {}", self.version)?;

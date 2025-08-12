@@ -20,7 +20,7 @@ pub fn compile_client(
 		.with_feature("client");
 
 	Command::new("cargo")
-		.args(cmd.get_args())
+		.args(build_cmd.get_args())
 		.envs(pkg_config.envs())
 		.xtap(|cmd| {
 			debug!("🌱 Building client binary\n{:?}", cmd);

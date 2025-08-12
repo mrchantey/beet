@@ -44,6 +44,16 @@ impl Plugin for BeetRunner {
 	}
 }
 
-fn print_config(pkg_config: Res<PackageConfig>) {
-	info!("{}", *pkg_config);
+#[allow(unused)]
+fn print_config(
+	pkg_config: Res<PackageConfig>,
+) {
+	#[cfg(feature = "launch")]
+	let binary = "Launch";
+	#[cfg(feature = "server")]
+	let binary = "Server";
+	#[cfg(feature = "client")]
+	let binary = "Client";
+
+	info!("\n🌱 Running Beet\nbinary: {binary}\n{}", *pkg_config);
 }
