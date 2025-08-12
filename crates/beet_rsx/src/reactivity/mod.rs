@@ -8,3 +8,5 @@ mod maybe_signal;
 pub use maybe_signal::*;
 mod bevy_signal;
 pub use bevy_signal::*;
+mod template_signal;
+pub use template_signal::*;
