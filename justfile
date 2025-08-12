@@ -103,16 +103,16 @@ build-csr:
 	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
 	sweet serve target/examples/csr
 	
-build-demo-site *args:
-	cd examples/demo_site && cargo launch
-	cd examples/demo_site && cargo build 	--no-default-features --features=client --target wasm32-unknown-unknown
-	cd examples/demo_site && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/demo_site.wasm
+build-todo-app *args:
+	cd examples/todo-app && cargo launch
+	cd examples/todo-app && cargo build 	--no-default-features --features=client --target wasm32-unknown-unknown
+	cd examples/todo-app && wasm-bindgen --out-dir target/client/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/todo-app.wasm
 
 launch *args:
 	cargo launch -w {{args}}
 
-demo-site *args:
-	cd examples/demo_site && cargo launch -- --watch {{args}}
+todo-app *args:
+	cd examples/todo-app && cargo launch -- --watch {{args}}
 
 run-hydration:
 	just watch just build-hydration
@@ -254,8 +254,8 @@ clear-artifacts:
 	just clear-ice
 	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
-	rm -rf examples/demo_site/src/codegen
-	rm -rf examples/demo_site/Cargo.lock
+	rm -rf examples/todo-app/src/codegen
+	rm -rf examples/todo-app/Cargo.lock
 	rm -rf target
 
 # massive purge

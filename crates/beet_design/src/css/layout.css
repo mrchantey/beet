@@ -17,7 +17,7 @@
   --bt-outline-width: 0.125rem;
 	
 	/* animation */
-  --bt-transition: 0.2s ease-in-out;
+  --bt-transition: 0.15s cubic-bezier(.4,0,.2,1);;
 
 	/* layout */
 	--bt-md-primary-tab-container-height: 32px;

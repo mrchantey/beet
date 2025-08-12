@@ -11,7 +11,7 @@ pub fn get() -> impl Bundle {
 	let num_requests = AppState::get().num_requests;
 	rsx! {
 		<Layout>
-		<h1>Beet Demo</h1>
+		<h1>Todo App</h1>
 		<div>
 			"Greetings visitor " {num_requests}
 		</div>

@@ -1,5 +1,6 @@
 [package]
 name = "beet_site"
+publish = false
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,13 +16,10 @@ keywords.workspace = true
 
 [features]
 default = ["launch", "server", "client"]
-# default = ["beet/web-server", "beet/native-tls"]
-# used by beet cli for building prod server
 launch = ["beet/launch"]
 server = ["beet/server", "beet_design/mockups", "beet_design/server"]
 server-local = ["server", "beet/native-tls"]
 server-lambda = ["server", "beet/aws", "beet/lambda"]
-# used by beet cli for building client
 client = ["beet/client", "beet_design/mockups"]
 
 [dependencies]

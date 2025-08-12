@@ -1,7 +1,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(unused)]
 use beet::prelude::*;
-use demo_site::prelude::*;
+use todo_app::prelude::*;
 
 fn main() {
 	App::new()
@@ -14,18 +14,8 @@ fn main() {
 			#[cfg(feature = "client")]
 			client_plugin,
 		))
+		.insert_resource(pkg_config!())
 		.run();
-}
-
-#[cfg(feature = "launch")]
-fn launch_plugin(app: &mut App) {
-	app.world_mut().spawn(collections());
-}
-
-#[cfg(feature = "server")]
-fn server_plugin(app: &mut App) {
-	// create a router, specifying the plugin for Router Apps
-	app.insert_resource(Router::new_bundle(routes));
 }
 
 #[cfg(feature = "client")]

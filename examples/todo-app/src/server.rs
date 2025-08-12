@@ -1,10 +1,12 @@
 use crate::prelude::*;
 
 
+pub fn server_plugin(app: &mut App) {
+	// create a router, specifying the plugin for Router Apps
+	app.insert_resource(Router::new_bundle(routes));
+}
 
-
-
-pub fn routes()-> impl Bundle {
+fn routes()-> impl Bundle {
 	(children![
 		pages_routes(),
 		docs_routes(),

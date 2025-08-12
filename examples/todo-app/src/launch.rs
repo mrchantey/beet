@@ -1,13 +1,29 @@
 use beet::exports::syn;
 use beet::prelude::*;
 
+pub fn launch_plugin(app: &mut App) { app.world_mut().spawn(collections()); }
 
-pub fn collections() -> impl Bundle {
-	(RouteCodegenRoot::default(), children![
-		pages_collection(),
-		docs_collection(),
-		actions_collection()
-	])
+fn collections() -> impl Bundle {
+	(
+		CodegenFile::new(
+			AbsPathBuf::new_workspace_rel("src/codegen/mod.rs").unwrap(),
+		),
+		children![
+			route_tree(),
+			pages_collection(),
+			docs_collection(),
+			actions_collection()
+		],
+	)
+}
+
+fn route_tree() -> impl Bundle {
+	(
+		StaticRouteTree::default(),
+		CodegenFile::new(
+			AbsPathBuf::new_workspace_rel("src/codegen/route_tree.rs").unwrap(),
+		),
+	)
 }
 
 fn pages_collection() -> impl Bundle {
