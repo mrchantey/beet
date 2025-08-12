@@ -4,7 +4,6 @@ use beet::prelude::*;
 #[template]
 #[derive(Reflect)]
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
-	#[allow(unused)]
 	let (get, set) = signal(initial);
 
 	let onclick = move |_: Trigger<OnClick>| {

@@ -1,13 +1,12 @@
+use crate::bevyhow;
+use bevy::ecs::error::BevyError;
 use extend::ext;
 use wasm_bindgen::JsValue;
 
 #[ext]
 pub impl<T> Result<T, JsValue> {
-	/// Map a `Result<T,JsValue>` to an [`anyhow::Result`].
-	fn anyhow(self) -> anyhow::Result<T> {
-		match self {
-			Ok(v) => Ok(v),
-			Err(e) => Err(anyhow::anyhow!("{:?}", e)),
-		}
+	/// Map a [`Result<T,JsValue>`] to a [`Result<T, BevyError>`].
+	fn map_jserr(self) -> Result<T, BevyError> {
+		self.map_err(|err| bevyhow!("{err:?}"))
 	}
 }

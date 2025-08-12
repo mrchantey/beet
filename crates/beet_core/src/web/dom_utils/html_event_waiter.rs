@@ -118,6 +118,10 @@ mod test {
 	#[sweet::test]
 	#[ignore = "requires dom"]
 	async fn html_event_waiter() {
-		HtmlEventWaiter::new("click").wait().await.anyhow().unwrap();
+		HtmlEventWaiter::new("click")
+			.wait()
+			.await
+			.map_jserr()
+			.unwrap();
 	}
 }

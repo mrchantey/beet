@@ -7,7 +7,7 @@ mod aws_utils;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
 mod handlers;
-#[cfg(feature = "lambda")]
+#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
 mod services;
 
@@ -22,7 +22,7 @@ pub mod prelude {
 	pub use crate::app_router::*;
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::axum_utils::*;
-	#[cfg(feature = "lambda")]
+	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 	pub use crate::lambda_utils::*;
 
 	pub(crate) use internal::*;

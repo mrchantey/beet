@@ -5,10 +5,7 @@ use http::HeaderValue;
 use http::StatusCode;
 use http::header::HeaderName;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
 
-
-fn js_err(err: JsValue) -> BevyError { bevyhow!("{err:?}") }
 
 pub(crate) async fn send_wasm(request: Request) -> Result<Response> {
 	let request: web_sys::Request = request.try_into()?;
@@ -16,8 +13,8 @@ pub(crate) async fn send_wasm(request: Request) -> Result<Response> {
 	let promise = window.fetch_with_request(&request);
 	let resp_js = wasm_bindgen_futures::JsFuture::from(promise)
 		.await
-		.map_err(js_err)?;
-	let resp = resp_js.dyn_into::<web_sys::Response>().map_err(js_err)?;
+		.map_jserr()?;
+	let resp = resp_js.dyn_into::<web_sys::Response>().map_jserr()?;
 
 	Response::from_web_sys(resp).await
 }
@@ -32,15 +29,15 @@ impl TryInto<web_sys::Request> for Request {
 			init.set_body(&js_sys::Uint8Array::from(body.as_ref()));
 		}
 		let url = self.parts.uri.to_string();
-		let request = web_sys::Request::new_with_str_and_init(&url, &init)
-			.map_err(js_err)?;
+		let request =
+			web_sys::Request::new_with_str_and_init(&url, &init).map_jserr()?;
 
 		for (name, value) in self.parts.headers.iter() {
 			let name_str = name.as_str();
 			let value_str = value.to_str().map_err(|e| {
 				bevyhow!("Failed to set header {}: {}", name_str, e)
 			})?;
-			request.headers().set(name_str, value_str).map_err(js_err)?;
+			request.headers().set(name_str, value_str).map_jserr()?;
 		}
 		Ok(request)
 	}
@@ -59,10 +56,10 @@ impl Response {
 		let mut headers = http::HeaderMap::new();
 		let headers_iter = resp.headers();
 		let js_iter = js_sys::try_iter(&headers_iter)
-			.map_err(js_err)?
+			.map_jserr()?
 			.ok_or_else(|| bevyhow!("no iterator"))?;
 		for entry in js_iter {
-			let entry = entry.map_err(js_err)?;
+			let entry = entry.map_jserr()?;
 			let arr = js_sys::Array::from(&entry);
 			if arr.length() == 2 {
 				let key = arr.get(0).as_string().unwrap_or_default();
@@ -77,10 +74,10 @@ impl Response {
 		}
 
 		let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
-			resp.array_buffer().map_err(js_err)?,
+			resp.array_buffer().map_jserr()?,
 		)
 		.await
-		.map_err(js_err)?;
+		.map_jserr()?;
 		let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
 		let mut body = vec![0; array_buffer.length() as usize];
 		array_buffer.copy_to(&mut body);
