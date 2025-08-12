@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_utils::exports::notify::EventKind;
 use beet_utils::exports::notify::event::CreateKind;
+use beet_utils::exports::notify::event::ModifyKind;
 use beet_utils::exports::notify::event::RemoveKind;
 use beet_utils::prelude::WatchEvent;
 use beet_utils::prelude::*;
@@ -90,7 +91,8 @@ pub fn parse_file_watch_events(
 		let matches = existing
 			.iter_mut()
 			.filter(|(_, file)| ***file == ev.path)
-			.map(|(en, _)| en);
+			.map(|(en, _)| en)
+			.collect::<Vec<_>>();
 
 		match ev.kind {
 			EventKind::Create(CreateKind::File) => {
@@ -98,6 +100,20 @@ pub fn parse_file_watch_events(
 					ChildOf(root_entity.single()?),
 					SourceFile::new(ev.path.clone()),
 				));
+			}
+			// emitted for both the from and to renames so
+			// assume if no matches, its the To event
+			EventKind::Modify(ModifyKind::Name(_)) => {
+				if matches.is_empty() {
+					commands.spawn((
+						ChildOf(root_entity.single()?),
+						SourceFile::new(ev.path.clone()),
+					));
+				} else {
+					for entity in matches {
+						commands.entity(entity).despawn();
+					}
+				}
 			}
 			EventKind::Remove(RemoveKind::File) => {
 				for entity in matches {

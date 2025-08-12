@@ -17,7 +17,7 @@ pub fn ContentLayout() -> impl Bundle {
 				main {
 					/* min-height:100dvh; */
 					min-height: var(--bt-main-height);
-					padding: 1.em var(--bt-content-padding-width);
+					padding: 1.em var(--bt-content-padding-width) 1.em var(--bt-content-padding-width);
 				}
 				main img {
 					max-width: 100%;

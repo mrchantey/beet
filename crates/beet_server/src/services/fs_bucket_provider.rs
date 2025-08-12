@@ -18,6 +18,7 @@ impl Drop for RemoveOnDrop {
 }
 
 impl Bucket {
+	/// create a new [`FsBucketProvider`] in target/test_buckets
 	pub async fn new_test() -> (Self, RemoveOnDrop) {
 		static TEST_BUCKET_COUNTER: AtomicU64 = AtomicU64::new(0);
 

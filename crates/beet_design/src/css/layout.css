@@ -27,7 +27,7 @@
 	--bt-max-page-width: 48rem;
 	--bt-max-header-width: 56rem;
 	/* using vw instead of 100% is consistent even when scrollbar appears */
-	--bt-content-padding-width: calc(max((100dvw - var(--bt-max-header-width)) * 0.5, 1.em));
+	--bt-content-padding-width: calc(max((100dvw - var(--bt-max-header-width)) * 0.5, 1em));
 	--bt-main-height: calc(100dvh - var(--bt-header-height) - var(--bt-footer-height));
 	--bt-main-height-subheader: calc(100dvh - var(--bt-header-height) - var(--bt-footer-height) - var(--bt-subheader-height));
 }
