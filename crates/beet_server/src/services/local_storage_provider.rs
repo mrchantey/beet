@@ -8,9 +8,9 @@ use std::pin::Pin;
 
 /// A bucket provider backed by browser localStorage.
 #[derive(Debug, Clone)]
-pub struct LocalStorageBucketProvider;
+pub struct LocalStorageProvider;
 
-impl LocalStorageBucketProvider {
+impl LocalStorageProvider {
 	pub fn new() -> Self { Self }
 
 	/// Compose the localStorage key for a given bucket and path.
@@ -28,7 +28,7 @@ impl LocalStorageBucketProvider {
 	}
 }
 
-impl BucketProvider for LocalStorageBucketProvider {
+impl BucketProvider for LocalStorageProvider {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { None }
@@ -141,7 +141,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let provider = super::LocalStorageBucketProvider::new();
+		let provider = LocalStorageProvider::new();
 		let bucket = Bucket::new(provider, "test-bucket");
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
