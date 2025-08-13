@@ -92,23 +92,174 @@ pub fn flush_signals(
 }
 
 #[derive(Component)]
-#[require(ReceivesSignals)] // temp we'll deprecate ReceivesSignals
 pub struct Effect(SystemId);
-
 
 
 #[cfg(test)]
 mod test {
+	use crate::as_beet::*;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
+	#[test]
+	fn app_signals() {
+		let mut app = App::new();
+		app.add_plugins(SignalsPlugin);
+
+		let (get, set) = signal("foo".to_string());
+
+		let entity = app
+			.world_mut()
+			.spawn((TextNode::new("foo".to_string()), get.into_bundle()))
+			.id();
+
+		app.world()
+			.entity(entity)
+			.get::<TextNode>()
+			.unwrap()
+			.0
+			.xref()
+			.xpect()
+			.to_be("foo");
+
+		set("bar".to_string());
+
+		app.update();
+
+		app.world()
+			.entity(entity)
+			.get::<TextNode>()
+			.unwrap()
+			.0
+			.xref()
+			.xpect()
+			.to_be("bar");
+	}
 
 
+	#[test]
+	fn nodes() {
+		let mut app = App::new();
+		app.add_plugins(SignalsPlugin);
+		let (get, set) = signal(5u32);
+		let div = app
+			.world_mut()
+			.spawn(rsx! {<div>{get}</div>})
+			.get::<Children>()
+			.unwrap()[0];
+		let text = app.world().entity(div).get::<Children>().unwrap()[0];
+		app.world_mut().run_schedule(ApplySnippets);
 
+		app.world()
+			.entity(text)
+			.get::<TextNode>()
+			.unwrap()
+			.0
+			.xref()
+			.xpect()
+			.to_be("5");
+
+		set(10);
+
+		app.update();
+		app.world()
+			.entity(text)
+			.get::<TextNode>()
+			.unwrap()
+			.0
+			.xref()
+			.xpect()
+			.to_be("10");
+	}
+	#[test]
+	fn attributes() {
+		let mut app = App::new();
+		app.add_plugins(SignalsPlugin);
+		let (get, set) = signal("foo");
+		let div = app
+			.world_mut()
+			.spawn(rsx! {<div class={get}/>})
+			.get::<Children>()
+			.unwrap()[0];
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
+		app.world_mut().run_schedule(ApplySnippets);
+
+		app.world()
+			.entity(attr)
+			.get::<TextNode>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("foo");
+
+		set("bar");
+
+		app.update();
+		app.world()
+			.entity(attr)
+			.get::<TextNode>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("bar");
+	}
+	#[test]
+	fn attribute_blocks() {
+		#[derive(Default, Buildable, AttributeBlock)]
+		struct Foo {
+			class: Option<MaybeSignal<String>>,
+		}
+
+		#[template]
+		fn Bar(#[field(flatten)] foo: Foo) -> impl Bundle {
+			rsx! { <div {foo}/> }
+		}
+
+		let mut app = App::new();
+		app.add_plugins(ApplyDirectivesPlugin);
+		let (get, set) = signal("foo".to_string());
+		let template = app
+			.world_mut()
+			.spawn(rsx! {<Bar class={get}/>})
+			.get::<Children>()
+			.unwrap()[0];
+		app.update();
+		let template_inner =
+			app.world().entity(template).get::<Children>().unwrap()[0];
+		let div = app
+			.world()
+			.entity(template_inner)
+			.get::<Children>()
+			.unwrap()[0];
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
+
+		app.world()
+			.entity(attr)
+			.get::<TextNode>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("foo");
+
+		set("bar".to_string());
+
+		app.update();
+		app.world()
+			.entity(attr)
+			.get::<TextNode>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("bar");
+	}
 	#[sweet::test]
-	async fn works() {
+	async fn reactive_app() {
 		use beet_utils::time_ext;
 
 		let mut app = App::new();

@@ -8,10 +8,10 @@ use bevy::prelude::*;
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
 	attributes: Query<(Entity, &Attributes)>,
-	dyn_attrs: Query<(), (With<AttributeOf>, Added<ReceivesSignals>)>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<Effect>)>,
 	dyn_text_nodes: Query<
 		Entity,
-		(With<TextNode>, With<ReceivesSignals>, Without<AttributeOf>),
+		(With<TextNode>, With<Effect>, Without<AttributeOf>),
 	>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,
@@ -29,7 +29,7 @@ pub fn apply_requires_dom_idx(
 			.find(|e| elements.contains(*e))
 			.ok_or_else(|| {
 				bevyhow!(
-					"TextNode with ReceivesSignals must have an ElementNode parent"
+					"TextNode with Effect must have an ElementNode parent"
 				)
 			})?;
 		commands.entity(entity).insert(RequiresDomIdx);

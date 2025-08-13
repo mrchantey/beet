@@ -38,7 +38,7 @@ pub(crate) fn bind_text_nodes(
 		(Entity, &DomIdx),
 		(
 			With<TextNode>,
-			With<ReceivesSignals>,
+			With<Effect>,
 			Without<DomTextBinding>,
 			Without<AttributeOf>,
 		),
@@ -133,7 +133,7 @@ pub(crate) fn bind_attribute_values(
 		(Entity, &AttributeOf),
 		(
 			Changed<TextNode>,
-			(With<ReceivesSignals>, Without<DomElementBinding>),
+			(With<Effect>, Without<DomElementBinding>),
 		),
 	>,
 ) -> Result<()> {
