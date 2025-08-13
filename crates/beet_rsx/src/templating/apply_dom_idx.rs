@@ -117,7 +117,7 @@ mod test {
 	#[test]
 	fn applies_ids() {
 		let mut app = App::new();
-		app.add_plugins(ApplySnippetsPlugin);
+		app.add_plugins((ApplySnippetsPlugin, SignalsPlugin));
 		let world = app.world_mut();
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);

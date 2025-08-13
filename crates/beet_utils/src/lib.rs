@@ -1,5 +1,7 @@
 #![feature(exit_status_error)]
 pub use utils::log::*;
+pub use utils::time_ext;
+pub use utils::async_ext;
 pub mod arena;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

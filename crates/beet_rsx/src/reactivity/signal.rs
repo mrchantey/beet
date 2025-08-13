@@ -148,10 +148,6 @@ impl<T: 'static + Send + Clone> Setter<T> {
 		for callback in callbacks.iter() {
 			callback.lock().unwrap()();
 		}
-
-		// TEMPORARY: a quick-and-dirty way to trigger an update in the static
-		// app on change, we need to think of a cleaner way to do this
-		super::ReactiveApp::try_update();
 	}
 }
 #[cfg(feature = "nightly")]

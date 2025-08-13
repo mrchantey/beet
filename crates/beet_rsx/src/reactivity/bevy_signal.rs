@@ -15,9 +15,11 @@ impl Plugin for SignalsPlugin {
 		app
     .init_plugin(ApplySnippetsPlugin)
 			.init_plugin(schedule_order_plugin)
+			.init_resource::<DirtySignals>()
 			.add_systems(
 				PropagateSignals,
 				(
+					flush_signals,
 					receive_string_signals::<String>,
 					receive_string_signals::<&'static str>,
 					receive_string_signals::<Cow<'static, str>>,
@@ -114,17 +116,17 @@ fn propagate_text_signals(
 }
 
 /// Adds both the received valus and a SignalReceiver to the entity
-impl<T, M> IntoBundle<(Self, M)> for Getter<T>
-where
-	T: 'static + Send + Sync + Clone + IntoBundle<M>,
-{
-	fn into_bundle(self) -> impl Bundle {
-		(
-			self.get().into_bundle(),
-			SignalReceiver::new(move || self.get()),
-		)
-	}
-}
+// impl<T, M> IntoBundle<(Self, M)> for Getter<T>
+// where
+// 	T: 'static + Send + Sync + Clone + IntoBundle<M>,
+// {
+// 	fn into_bundle(self) -> impl Bundle {
+// 		(
+// 			self.get().into_bundle(),
+// 			SignalReceiver::new(move || self.get()),
+// 		)
+// 	}
+// }
 
 #[cfg(test)]
 mod test {

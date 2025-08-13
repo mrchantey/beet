@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::cell::RefCell;
@@ -5,9 +6,9 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::RwLock;
 
-use crate::prelude::ApplyDirectivesPlugin;
-
-/// Temporary solution until reactivity in bevy.
+/// A thread local application designed for run-on-event patterns
+/// like the DOM. The default app simply adds the [`ApplyDirectivesPlugin`]
+/// but this can be overridden with [`ReactiveApp::set_create_app`]
 pub struct ReactiveApp;
 thread_local! {
 	static APP: RefCell<Option<App>> = RefCell::new(None);
@@ -19,7 +20,7 @@ static CREATE_APP: LazyLock<
 > = LazyLock::new(|| {
 	Arc::new(RwLock::new(Box::new(|| {
 		let mut app = App::new();
-		app.add_plugins(ApplyDirectivesPlugin);
+		app.add_plugins((ApplyDirectivesPlugin, SignalsPlugin));
 		app
 	})))
 });
@@ -87,13 +88,44 @@ impl ReactiveApp {
 			app.should_exit()
 		})
 	}
-	/// Wrapper for [`World::insert_resource`].
-	pub fn insert_resource<T: Resource>(resource: T) {
-		Self::with(|app| app.world_mut().insert_resource(resource));
-	}
 
-	/// Wrapper for [`World::resource`].
-	pub fn resource<T: Clone + Resource>() -> T {
-		Self::with(|app| app.world().resource::<T>().clone())
+	/// Currently the native version of [`Self::queue_update`] is simply
+	/// [`Self::try_update`]
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn queue_update() { Self::try_update(); }
+
+	/// Queues a [microtask](https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask) for update if none is set already,
+	/// unlike `request_animation_frame` this will run before
+	/// the next render.
+	#[cfg(target_arch = "wasm32")]
+	pub fn queue_update() {
+		use wasm_bindgen::JsCast;
+		use wasm_bindgen::closure::Closure;
+		static UPDATE_QUEUED: LazyLock<Arc<std::sync::Mutex<bool>>> =
+			LazyLock::new(|| Arc::new(std::sync::Mutex::new(false)));
+
+		// Avoid scheduling multiple microtasks
+		let update_flag = UPDATE_QUEUED.clone();
+		{
+			let mut is_queued = update_flag.lock().unwrap();
+			if *is_queued {
+				return;
+			}
+			*is_queued = true;
+		}
+
+		// Schedule a microtask that runs before the next render
+		let update_flag_for_task = update_flag.clone();
+		let func = Closure::once_into_js(move || {
+			{
+				let mut is_queued = update_flag_for_task.lock().unwrap();
+				*is_queued = false;
+			}
+			let _ = Self::try_update();
+		});
+		let func_js: js_sys::Function = func.unchecked_into();
+		if let Some(win) = web_sys::window() {
+			let _ = win.queue_microtask(&func_js);
+		}
 	}
 }
