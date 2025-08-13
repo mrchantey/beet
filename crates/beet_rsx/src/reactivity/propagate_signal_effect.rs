@@ -26,9 +26,8 @@ pub fn propagate_signal_effect(world: DeferredWorld, cx: HookContext) {
 	});
 }
 
-/// An mpsc channel for signals to emit a 'this entity is dirty' event.
-/// In combination with a mechanism like `request_animation_frame` this can
-/// be used as a reactivity mechanism.
+/// An mpsc channel for signals to emit a 'this entity is dirty' event,
+/// see [`flush_signals`]
 #[derive(Resource)]
 pub struct DirtySignals {
 	send: Sender<Entity>,

@@ -5,13 +5,57 @@ use bevy::prelude::*;
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;
+use web_sys::HtmlElement;
+
+#[derive(SystemParam)]
+pub(crate) struct DomBinding<'w, 's> {
+	commands: Commands<'w, 's>,
+	elements: Query<'w, 's, &'static DomElementBinding>,
+	constants: Res<'w, HtmlConstants>,
+}
+
+impl DomBinding<'_, '_> {
+	/// Returns the element bound to this entity or finds the element in the dom
+	/// with the provided [`DomIdx`] and insert a [`DomElementBinding`]
+	pub fn get_or_bind_element(
+		&mut self,
+		entity: Entity,
+		idx: DomIdx,
+	) -> Result<HtmlElement> {
+		if let Ok(binding) = self.elements.get(entity) {
+			return Ok(binding.inner().clone());
+		}
+		let query =
+			format!("[{}='{}']", self.constants.dom_idx_key, idx.inner());
+		if let Some(el) = web_sys::window()
+			.unwrap()
+			.document()
+			.unwrap()
+			.query_selector(&query)
+			.unwrap()
+		{
+			let el = el.dyn_into::<HtmlElement>().unwrap();
+
+			self.commands
+				.entity(entity)
+				.insert(DomElementBinding(SendWrapper::new(el.clone())));
+			return Ok(el);
+		} else {
+			return Err(format!(
+				"Element with DomIdx {} not found",
+				idx.inner()
+			)
+			.into());
+		}
+	}
+}
 
 
 /// Added to element entities and dynamic attribute entities
 #[derive(Component, Deref)]
-pub struct DomElementBinding(SendWrapper<web_sys::HtmlElement>);
+pub struct DomElementBinding(SendWrapper<HtmlElement>);
 impl DomElementBinding {
-	pub fn inner(&self) -> &web_sys::HtmlElement { self.0.as_ref() }
+	pub fn inner(&self) -> &HtmlElement { self.0.as_ref() }
 }
 
 /// Binding to a DOM text node
@@ -22,13 +66,56 @@ impl DomTextBinding {
 }
 
 
-/// Track a created closure, usually to ensure it is not dropped
+/// Track a created closure to ensure it is not dropped
 #[derive(Component, Deref)]
 pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
 
-/// lazily attach the text nodes to the DOM with the following steps:
+pub(crate) fn bind_element_nodes(
+	query: Populated<
+		(Entity, &DomIdx),
+		(
+			With<ElementNode>,
+			With<SignalEffect>,
+			Without<DomElementBinding>,
+		),
+	>,
+	mut binding: DomBinding,
+) -> Result<()> {
+	for (entity, dom_idx) in query.iter() {
+		binding.get_or_bind_element(entity, *dom_idx)?;
+	}
+	Ok(())
+}
+
+
+pub(crate) fn update_element_nodes(
+	query: Populated<
+		(Entity, &DomElementBinding),
+		(With<ElementNode>, Changed<SignalEffect>),
+	>,
+	diff: DiffElement,
+) {
+	for (entity, binding) in query.iter() {
+		diff.apply(entity, binding.inner().clone())
+	}
+}
+
+#[derive(SystemParam)]
+pub(crate) struct DiffElement<'w, 's> {
+	elements: Query<'w, 's, &'static NodeTag>,
+	constants: Res<'w, HtmlConstants>,
+}
+
+impl DiffElement<'_, '_> {
+	///
+	fn apply(&self, entity: Entity, element: HtmlElement) {
+		panic!("todo apply diff");
+	}
+}
+
+/// Attach the text nodes to the DOM with the following steps:
 /// 1. find the parent element of the text node
 /// 2. find the marker comment node
 /// 3. assign the text node to the next sibling of the marker comment
@@ -45,7 +132,7 @@ pub(crate) fn bind_text_nodes(
 	>,
 	mut commands: Commands,
 	constants: Res<HtmlConstants>,
-	mut get_binding: GetDomBinding,
+	mut binding: DomBinding,
 	parents: Query<&ChildOf>,
 	elements: Query<(Entity, &DomIdx), With<ElementNode>>,
 ) -> Result<()> {
@@ -61,7 +148,8 @@ pub(crate) fn bind_text_nodes(
 			.into());
 		};
 
-		let element = get_binding.get_element(parent_entity, *parent_idx)?;
+		let element =
+			binding.get_or_bind_element(parent_entity, *parent_idx)?;
 		let children = element.child_nodes();
 
 		// 2. find the marker comment node
@@ -127,7 +215,7 @@ pub(crate) fn update_text_nodes(
 
 pub(crate) fn bind_attribute_values(
 	mut commands: Commands,
-	mut get_binding: GetDomBinding,
+	mut get_binding: DomBinding,
 	elements: Query<(Entity, &DomIdx)>,
 	query: Populated<
 		(Entity, &AttributeOf),
@@ -146,7 +234,8 @@ pub(crate) fn bind_attribute_values(
 			.into());
 		};
 
-		let element = get_binding.get_element(parent_entity, *parent_idx)?;
+		let element =
+			get_binding.get_or_bind_element(parent_entity, *parent_idx)?;
 		commands
 			.entity(entity)
 			.insert(DomElementBinding(SendWrapper::new(element)));
@@ -192,7 +281,7 @@ pub(crate) fn update_attribute_values(
 
 pub(crate) fn bind_events(
 	mut commands: Commands,
-	mut get_binding: GetDomBinding,
+	mut get_binding: DomBinding,
 	query: Populated<
 		(Entity, &DomIdx, &Attributes),
 		(With<EventTarget>, Added<DomIdx>),
@@ -207,7 +296,7 @@ pub(crate) fn bind_events(
 		{
 			let attr_key = attr_key.clone();
 			let attr_key2 = attr_key.clone();
-			let element = get_binding.get_element(el_entity, *idx)?;
+			let element = get_binding.get_or_bind_element(el_entity, *idx)?;
 			// remove the temp event playback attribute
 			element.remove_attribute(&attr_key).ok();
 
@@ -238,46 +327,4 @@ pub(crate) fn bind_events(
 		}
 	}
 	Ok(())
-}
-
-
-#[derive(SystemParam)]
-pub(crate) struct GetDomBinding<'w, 's> {
-	commands: Commands<'w, 's>,
-	elements: Query<'w, 's, &'static DomElementBinding>,
-	constants: Res<'w, HtmlConstants>,
-}
-
-impl GetDomBinding<'_, '_> {
-	pub fn get_element(
-		&mut self,
-		entity: Entity,
-		idx: DomIdx,
-	) -> Result<web_sys::HtmlElement> {
-		if let Ok(binding) = self.elements.get(entity) {
-			return Ok(binding.inner().clone());
-		}
-		let query =
-			format!("[{}='{}']", self.constants.dom_idx_key, idx.inner());
-		if let Some(el) = web_sys::window()
-			.unwrap()
-			.document()
-			.unwrap()
-			.query_selector(&query)
-			.unwrap()
-		{
-			let el = el.dyn_into::<web_sys::HtmlElement>().unwrap();
-
-			self.commands
-				.entity(entity)
-				.insert(DomElementBinding(SendWrapper::new(el.clone())));
-			return Ok(el);
-		} else {
-			return Err(format!(
-				"Element with DomIdx {} not found",
-				idx.inner()
-			)
-			.into());
-		}
-	}
 }

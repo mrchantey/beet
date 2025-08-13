@@ -69,6 +69,7 @@ impl Plugin for ApplyDirectivesPlugin {
 						event_playback.run_if(run_once),
 						bind_events,
 						bind_text_nodes,
+						bind_element_nodes,
 						bind_attribute_values,
 					)
 						.chain()

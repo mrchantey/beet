@@ -1,11 +1,11 @@
 # Command runners are great for individual projects
 # but as a metaframework these are all signs of painpoints in the workflow
 # arguments should be config files, shell command chains should be beet subcommands etc
-# 
+#
 # Anyway for now this is useful, but if you feel like making a change here, consider instead
 # adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
-# 
-# ```rust 
+#
+# ```rust
 # cargo binstall just
 # just --list
 # just test-ci
@@ -81,7 +81,7 @@ run example *args:
 	just watch just run-ci {{example}} {{args}}
 
 run-feat example *args:
-	just run {{example}} --all-features {{args}} 
+	just run {{example}} --all-features {{args}}
 
 # Run an example without watching
 run-ci example *args:
@@ -95,14 +95,14 @@ run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
 run-csr:
+	cargo run --example csr --features=client
 	just watch just build-csr
 
 build-csr:
-	cargo run --example csr
-	cargo build --example csr --target-dir=target --features=rsx --target wasm32-unknown-unknown
-	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
+	cargo build --example csr --features=client --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
 	sweet serve target/examples/csr
-	
+
 build-todo-app *args:
 	cd examples/todo-app && cargo launch
 	cd examples/todo-app && cargo build 	--no-default-features --features=client --target wasm32-unknown-unknown
@@ -191,12 +191,12 @@ test-rsx *args:
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
 	cargo test -p beet_server						 	 	 																								{{args}} -- {{test-threads}}
-	cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}	
+	cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
-	
+
 test-flow *args:
 	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
 	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}

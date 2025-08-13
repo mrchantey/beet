@@ -20,7 +20,11 @@ impl Plugin for SignalsPlugin {
 					#[cfg(feature = "bevy_default")]
 					propagate_text_signals,
 					#[cfg(target_arch = "wasm32")]
-					(update_text_nodes, update_attribute_values)
+					(
+						update_element_nodes,
+						update_attribute_values,
+						update_text_nodes,
+					)
 						.chain()
 						.run_if(document_exists),
 				)

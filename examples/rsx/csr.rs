@@ -6,9 +6,9 @@
 //!
 //! Here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh
-//! cargo run --example csr
-//! cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown
-//! wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
+//! cargo run --example csr --features=client
+//! cargo build --example csr --features=client --target wasm32-unknown-unknown
+//! wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
 //! sweet serve target/examples/csr
 //! ```
 //!
@@ -19,7 +19,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins(ApplyDirectivesPlugin)
-    .add_systems(Startup, |mut commands: Commands| {	
+    .add_systems(Startup, |mut commands: Commands| {
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
 			commands.spawn(rsx! {<Counter client:only initial=7/>});
 		})

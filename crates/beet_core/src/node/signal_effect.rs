@@ -9,6 +9,9 @@ use bevy::prelude::*;
 
 
 /// Basic primitives required for downstream crates to implement reactivity,
+/// This type should be marked [`Changed`] when its associated signal changes,
+/// which is important for cases like bundle signals where there is no one component
+/// to watch for changes.
 /// see beet_rsx::reactivity::propagate_signal_effect.rs
 // This is implemented here due to orphan rule
 #[derive(Component, Clone)]
@@ -74,15 +77,19 @@ where
 		OnSpawn::new(move |entity| {
 			let id = entity.id();
 			let system_id = entity.world_scope(move |world| {
-				world.register_system(move |mut query: Query<&mut TextNode>| {
-					if let Ok(mut text) = query.get_mut(id) {
+				world.register_system(
+					(move |mut query: Query<(
+						&mut SignalEffect,
+						&mut TextNode,
+					)>|
+					      -> Result {
+						let (mut signal, mut text) = query.get_mut(id)?;
+						signal.set_changed();
 						text.0 = self.clone()().to_string();
-					} else {
-						warn!(
-							"Effect expected an entity with a Text node, none found"
-						);
-					}
-				})
+						Ok(())
+					})
+					.pipe(handle_result),
+				)
 			});
 
 			entity.insert((
@@ -90,6 +97,12 @@ where
 				SignalEffect::new(self, system_id),
 			));
 		})
+	}
+}
+
+fn handle_result(result: In<Result>) {
+	if let Err(err) = result.0 {
+		panic!("Signal Effect Error: {}", err);
 	}
 }
 
@@ -103,14 +116,22 @@ where
 		OnSpawn::new(move |entity| {
 			let id = entity.id();
 			let system_id = entity.world_scope(move |world| {
-				world.register_system(move |mut commands: Commands| {
-					// TODO diffing?
-					commands
-						.entity(id)
+				world.register_system(
+					(move |mut commands: Commands,
+					       mut query: Query<&mut SignalEffect>|
+					      -> Result {
+						query.get_mut(id)?.set_changed();
 						// remove everything but the SignalEffect
-						.retain::<SignalEffect>()
-						.insert(self.clone()());
-				})
+						commands
+							.entity(id)
+							.despawn_related::<Children>()
+							.despawn_related::<Attributes>()
+							.retain::<SignalEffect>()
+							.insert(self.clone()());
+						Ok(())
+					})
+					.pipe(handle_result),
+				)
 			});
 
 			entity.insert((self.clone()(), SignalEffect::new(self, system_id)));
