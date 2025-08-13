@@ -12,7 +12,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "bevy"]
+default = ["serde", "bevy", "nightly"]
+nightly = []
 serde = ["dep:serde"]
 bevy = ["dep:bevy"]
 tokio = ["dep:tokio"]

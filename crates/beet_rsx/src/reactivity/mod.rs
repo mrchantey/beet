@@ -1,5 +1,3 @@
-mod signal;
-pub use signal::*;
 mod events;
 pub use events::*;
 mod reactive_app;
@@ -8,5 +6,5 @@ mod maybe_signal;
 pub use maybe_signal::*;
 mod signals_plugin;
 pub use signals_plugin::*;
-mod template_signal;
-pub use template_signal::*;
+mod propagate_signal_effect;
+pub use propagate_signal_effect::*;

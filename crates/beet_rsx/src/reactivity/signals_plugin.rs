@@ -8,10 +8,9 @@ pub struct PropagateSignals;
 
 pub struct SignalsPlugin;
 impl Plugin for SignalsPlugin {
-	#[rustfmt::skip]
+	// #[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app
-    .init_plugin(ApplySnippetsPlugin)
+		app.init_plugin(ApplySnippetsPlugin)
 			.init_plugin(schedule_order_plugin)
 			.init_resource::<DirtySignals>()
 			.add_systems(
@@ -27,6 +26,10 @@ impl Plugin for SignalsPlugin {
 				)
 					.chain(),
 			);
+
+		app.world_mut()
+			.register_component_hooks::<SignalEffect>()
+			.on_add(propagate_signal_effect);
 	}
 }
 
@@ -39,4 +42,3 @@ fn propagate_text_signals(
 		**span = text.0.clone();
 	}
 }
-

@@ -1,53 +1,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::system::SystemId;
+use beet_utils::prelude::*;
+use bevy::ecs::component::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use flume::Receiver;
 use flume::Sender;
 
-// creates an OnSpawn that performs the following:
-// 1. Add a [`TextNode`] with the initial getter value
-// 2. Create an [`effect`] to send a [`DirtySignals`] and queue [`ReactiveApp`]update
-// 3. Add an [`Effect`] system to update the text node on change.
-impl<T> IntoBundle<Self> for Getter<T>
-where
-	T: 'static + Send + Sync + Clone + ToString,
-{
-	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
-			entity.insert(TextNode::new(self.clone()().to_string()));
-			let id = entity.id();
-			let sender = entity
-				.world_scope(|world| world.resource::<DirtySignals>().sender());
-			let func = self.clone();
+// Subscribe to changes in a [`SignalEffect`] and queue a deduplicated app update,
+// which will call the effect in [`flush_signals`].
+// This is seperate from the Getter IntoBundle impl due to orphan rule
+pub fn propagate_signal_effect(world: DeferredWorld, cx: HookContext) {
+	let entity = cx.entity;
+	let signal = world.entity(entity).get::<SignalEffect>()
+		.unwrap(/* must exist */);
+	let subscribe = signal.effect_subscriber();
 
-			// create an effect that will run whenever func is updated.
-			// in web this will RequestAnimationFrame, we may need an
-			// equivelent for native.
-			effect(move || {
-				// subscribe to changes
-				let _ = func.clone()();
-				// ignore errors if receiver dropped
-				sender.send(id).ok();
-				ReactiveApp::queue_update();
-				// request animation frame
-			});
-			let system_id = entity.world_scope(move |world| {
-				world.register_system(move |mut query: Query<&mut TextNode>| {
-					if let Ok(mut text) = query.get_mut(id) {
-						text.0 = self.clone()().to_string();
-					} else {
-						// warn?
-						warn!(
-							"Effect expected an entity with a Text node, none found"
-						);
-					}
-				})
-			});
+	let sender = world.resource::<DirtySignals>().sender();
 
-			entity.insert(Effect(system_id));
-		})
-	}
+	effect(move || {
+		subscribe();
+		// ignore errors if receiver dropped
+		sender.send(entity).ok();
+		ReactiveApp::queue_update();
+	});
 }
 
 /// An mpsc channel for signals to emit a 'this entity is dirty' event.
@@ -71,12 +47,11 @@ impl DirtySignals {
 }
 
 
-/// Collects all [`DirtySignals::recv`], then deduplicates and
-/// runs each effect.
+/// Collects all [`DirtySignals::recv`], then runs each effect deduplicated.
 pub fn flush_signals(
 	mut commands: Commands,
 	dirty: ResMut<DirtySignals>,
-	effects: Query<&Effect>,
+	effects: Query<&SignalEffect>,
 ) {
 	let mut entities = Vec::new();
 	while let Ok(entity) = dirty.recv.try_recv() {
@@ -86,14 +61,10 @@ pub fn flush_signals(
 	entities.dedup();
 	for entity in entities {
 		if let Ok(effect) = effects.get(entity) {
-			commands.run_system(effect.0);
+			commands.run_system(effect.system_id());
 		}
 	}
 }
-
-#[derive(Component)]
-pub struct Effect(SystemId);
-
 
 #[cfg(test)]
 mod test {
@@ -140,7 +111,7 @@ mod test {
 
 
 	#[test]
-	fn nodes() {
+	fn text_nodes() {
 		let mut app = App::new();
 		app.add_plugins(SignalsPlugin);
 		let (get, set) = signal(5u32);
@@ -173,6 +144,8 @@ mod test {
 			.xpect()
 			.to_be("10");
 	}
+
+
 	#[test]
 	fn attributes() {
 		let mut app = App::new();
@@ -258,6 +231,11 @@ mod test {
 			.xpect()
 			.to_be("bar");
 	}
+
+	#[test]
+	fn bundle_node() {}
+
+
 	#[sweet::test]
 	async fn reactive_app() {
 		use beet_utils::time_ext;

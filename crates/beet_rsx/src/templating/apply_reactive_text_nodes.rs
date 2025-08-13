@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 
@@ -7,7 +6,7 @@ pub fn apply_reactive_text_nodes(
 	constants: Res<HtmlConstants>,
 	query: Populated<
 		(Entity, &ChildOf, &DomIdx),
-		(With<TextNode>, With<Effect>, Without<AttributeOf>),
+		(With<TextNode>, With<SignalEffect>, Without<AttributeOf>),
 	>,
 	children: Query<&Children>,
 ) -> Result {

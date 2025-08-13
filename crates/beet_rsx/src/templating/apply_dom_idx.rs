@@ -8,10 +8,10 @@ use bevy::prelude::*;
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
 	attributes: Query<(Entity, &Attributes)>,
-	dyn_attrs: Query<(), (With<AttributeOf>, Added<Effect>)>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalEffect>)>,
 	dyn_text_nodes: Query<
 		Entity,
-		(With<TextNode>, With<Effect>, Without<AttributeOf>),
+		(With<TextNode>, With<SignalEffect>, Without<AttributeOf>),
 	>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,

@@ -1,7 +1,10 @@
-#![feature(exit_status_error)]
+#![cfg_attr(
+	feature = "nightly",
+	feature(fn_traits, unboxed_closures, exit_status_error)
+)]
+pub use utils::async_ext;
 pub use utils::log::*;
 pub use utils::time_ext;
-pub use utils::async_ext;
 pub mod arena;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

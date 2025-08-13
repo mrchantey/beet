@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -176,14 +176,13 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn signals() {
 		let (get, set) = signal(7);
-		expect(get()).to_be(7);
-		set(10);
-		expect(get()).to_be(10);
+		assert_eq!(get.get(), 7);
+		set.set(10);
+		assert_eq!(get.get(), 10);
 	}
 	#[test]
 	fn effects() {
@@ -192,19 +191,19 @@ mod test {
 		let effect_called_clone = effect_called.clone();
 
 		effect(move || {
-			get(); // subscribe to changes
+			get.get(); // subscribe to changes
 			*effect_called_clone.lock().unwrap() += 1;
 		});
 
-		expect(get()).to_be(0);
-		expect(*effect_called.lock().unwrap()).to_be(1);
+		assert_eq!(get.get(), 0);
+		assert_eq!(*effect_called.lock().unwrap(), 1);
 
-		set(1);
-		expect(get()).to_be(1);
-		expect(*effect_called.lock().unwrap()).to_be(2);
+		set.set(1);
+		assert_eq!(get.get(), 1);
+		assert_eq!(*effect_called.lock().unwrap(), 2);
 
-		set(2);
-		expect(get()).to_be(2);
-		expect(*effect_called.lock().unwrap()).to_be(3);
+		set.set(2);
+		assert_eq!(get.get(), 2);
+		assert_eq!(*effect_called.lock().unwrap(), 3);
 	}
 }
