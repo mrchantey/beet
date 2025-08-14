@@ -69,6 +69,8 @@ pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
 
+
+/// Bind each [`ElementNode`] with a [`SignalEffect`] and [`DomIdx`]
 pub(crate) fn bind_element_nodes(
 	query: Populated<
 		(Entity, &DomIdx),
@@ -153,8 +155,7 @@ pub(crate) fn bind_text_nodes(
 		commands.entity(entity).insert(DomNodeBinding::new(node));
 
 		// 4. remove marker comments
-		// im not sure about this, its a bit of a vanity thing so it looks prettier in dev tools
-		// but doing ths means if somebody calls normalize() we lose our text nodes
+		// im not sure about this, if somebody calls normalize() we lose our text nodes
 		// children.item(comment_idx + 2).map(|after| {
 		// 	element.remove_child(&after).ok();
 		// });
@@ -191,6 +192,50 @@ pub(crate) fn bind_attribute_values(
 		let element =
 			dom_binding.get_or_bind_element(parent_entity, *parent_idx)?;
 		commands.entity(entity).insert(DomNodeBinding::new(element));
+	}
+	Ok(())
+}
+
+
+pub(crate) fn bind_events(
+	mut commands: Commands,
+	mut get_binding: DomBinding,
+	query: Populated<(Entity, &DomIdx), (With<EventTarget>, Added<DomIdx>)>,
+	find_attribute: FindAttribute,
+) -> Result<()> {
+	for (el_entity, idx) in query.iter() {
+		for (attr_entity, attr_key) in find_attribute.events(el_entity) {
+			let attr_key = attr_key.clone();
+			let attr_key2 = attr_key.clone();
+			let element = get_binding.get_or_bind_element(el_entity, *idx)?;
+			// remove the temp event playback attribute
+			element.remove_attribute(&attr_key).ok();
+
+			let func = move |ev: web_sys::Event| {
+				ReactiveApp::with(|app| {
+					let mut commands = app.world_mut().commands();
+					let mut commands = commands.entity(el_entity);
+					BeetEvent::trigger(&mut commands, &attr_key, ev);
+					// apply commands
+					app.world_mut().flush();
+					// we must update the app manually to flush any signals,
+					// they will not be able to update the app themselves because
+					// ReactiveApp is already borrowd
+					app.update();
+				})
+			};
+
+			let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
+			element
+				.add_event_listener_with_callback(
+					&attr_key2.replace("on", ""),
+					closure.as_ref().unchecked_ref(),
+				)
+				.unwrap();
+			commands
+				.entity(attr_entity)
+				.insert(DomClosureBinding(SendWrapper::new(closure)));
+		}
 	}
 	Ok(())
 }
@@ -248,49 +293,6 @@ pub(crate) fn update_attribute_values(
 			&value,
 		)
 		.map_err(|err| format!("{err:?}"))?;
-	}
-	Ok(())
-}
-
-pub(crate) fn bind_events(
-	mut commands: Commands,
-	mut get_binding: DomBinding,
-	query: Populated<(Entity, &DomIdx), (With<EventTarget>, Added<DomIdx>)>,
-	find_attribute: FindAttribute,
-) -> Result<()> {
-	for (el_entity, idx) in query.iter() {
-		for (attr_entity, attr_key) in find_attribute.events(el_entity) {
-			let attr_key = attr_key.clone();
-			let attr_key2 = attr_key.clone();
-			let element = get_binding.get_or_bind_element(el_entity, *idx)?;
-			// remove the temp event playback attribute
-			element.remove_attribute(&attr_key).ok();
-
-			let func = move |ev: web_sys::Event| {
-				ReactiveApp::with(|app| {
-					let mut commands = app.world_mut().commands();
-					let mut commands = commands.entity(el_entity);
-					BeetEvent::trigger(&mut commands, &attr_key, ev);
-					// apply commands
-					app.world_mut().flush();
-					// we must update the app manually to flush any signals,
-					// they will not be able to update the app themselves because
-					// ReactiveApp is already borrowd
-					app.update();
-				})
-			};
-
-			let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
-			element
-				.add_event_listener_with_callback(
-					&attr_key2.replace("on", ""),
-					closure.as_ref().unchecked_ref(),
-				)
-				.unwrap();
-			commands
-				.entity(attr_entity)
-				.insert(DomClosureBinding(SendWrapper::new(closure)));
-		}
 	}
 	Ok(())
 }

@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -7,7 +6,6 @@ use web_sys::HtmlElement;
 
 #[derive(SystemParam)]
 pub(crate) struct DomDiff<'w, 's> {
-	commands: Commands<'w, 's>,
 	fragment_nodes: Query<'w, 's, (), With<FragmentNode>>,
 	element_nodes: Query<
 		'w,
@@ -19,7 +17,6 @@ pub(crate) struct DomDiff<'w, 's> {
 	comment_nodes: Query<'w, 's, &'static CommentNode>,
 	text_nodes: Query<'w, 's, &'static mut TextNode, Without<AttributeOf>>,
 	children: Query<'w, 's, &'static Children>,
-	constants: Res<'w, HtmlConstants>,
 	attributes: Query<'w, 's, &'static Attributes>,
 	attribute_nodes: Query<
 		'w,
@@ -32,8 +29,6 @@ pub(crate) struct DomDiff<'w, 's> {
 		),
 		With<AttributeOf>,
 	>,
-	requires_node_binding:
-		Query<'w, 's, Entity, (With<SignalEffect>, Without<DomNodeBinding>)>,
 }
 
 impl DomDiff<'_, '_> {
@@ -89,7 +84,7 @@ impl DomDiff<'_, '_> {
 		parent: &web_sys::Element,
 		node: &web_sys::Node,
 	) -> Result {
-		let node = if let Ok((node_tag, _)) = self.element_nodes.get(entity) {
+		let _node = if let Ok((node_tag, _)) = self.element_nodes.get(entity) {
 			match node.dyn_ref::<web_sys::Element>() {
 				Some(element)
 					if node_tag.to_lowercase()
@@ -135,11 +130,6 @@ impl DomDiff<'_, '_> {
 		} else {
 			node.clone()
 		};
-		if self.requires_node_binding.contains(entity) {
-			self.commands
-				.entity(entity)
-				.insert(DomNodeBinding::new(node));
-		}
 
 		Ok(())
 	}
@@ -227,15 +217,6 @@ impl DomDiff<'_, '_> {
 				entity_attributes.iter().any(|(k, _, _, _)| k.0 == name);
 			if !exists {
 				element.remove_attribute(&name).map_jserr()?;
-			}
-		}
-
-		// 3. ensure dom node bindings
-		for attr in self.attributes.iter_direct_descendants(entity) {
-			if self.requires_node_binding.contains(attr) {
-				self.commands
-					.entity(attr)
-					.insert(DomNodeBinding::new(element.clone()));
 			}
 		}
 		Ok(())
