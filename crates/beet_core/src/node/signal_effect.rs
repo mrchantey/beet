@@ -5,8 +5,11 @@ use beet_utils::prelude::*;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
-
-
+/// Mark an entity as requiring a [`DomBinding`], often added to nodes
+/// with a [`SignalEffect`], and also their parent [`ElementNode`]
+/// in the case of a [`FragmentNode`]
+#[derive(Default, Component, Clone)]
+pub struct RequiresDomBinding;
 
 /// Basic primitives required for downstream crates to implement reactivity,
 /// This type should be marked [`Changed`] when its associated signal changes,
@@ -15,6 +18,7 @@ use bevy::prelude::*;
 /// see beet_rsx::reactivity::propagate_signal_effect.rs
 // This is implemented here due to orphan rule
 #[derive(Component, Clone)]
+#[require(RequiresDomBinding)]
 pub struct SignalEffect {
 	system_id: SystemId,
 	/// A function that calls the getter, so calling it inside a
@@ -108,9 +112,23 @@ fn handle_result(result: In<Result>) {
 
 pub struct BundleGetterIntoBundle;
 
-impl<T> IntoBundle<Self> for Getter<T>
+/// for bundles and vecs of bundles
+trait BundleLike<M1, M2>: IntoBundle<M1> {}
+struct BundleIntoBundleLike;
+impl<T, M> BundleLike<M, BundleIntoBundleLike> for T where
+	T: IntoBundle<M> + Bundle
+{
+}
+impl<T, M> BundleLike<M, Self> for Vec<T>
 where
-	T: 'static + Send + Sync + Clone + Bundle,
+	Vec<T>: IntoBundle<M>,
+	T: Bundle,
+{
+}
+
+impl<T, M1, M2> IntoBundle<(Self, M1, M2)> for Getter<T>
+where
+	T: 'static + Send + Sync + Clone + BundleLike<M1, M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
@@ -126,15 +144,18 @@ where
 							.entity(id)
 							.despawn_related::<Children>()
 							.despawn_related::<Attributes>()
-							.retain::<SignalEffect>()
-							.insert(self.clone()());
+							.retain::<(SignalEffect, ChildOf)>()
+							.insert(self.clone()().into_bundle());
 						Ok(())
 					})
 					.pipe(handle_result),
 				)
 			});
 
-			entity.insert((self.clone()(), SignalEffect::new(self, system_id)));
+			entity.insert((
+				self.clone()().into_bundle(),
+				SignalEffect::new(self, system_id),
+			));
 		})
 	}
 }

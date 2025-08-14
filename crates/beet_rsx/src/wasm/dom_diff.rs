@@ -5,7 +5,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 
 #[derive(SystemParam)]
-pub(crate) struct DomDiff<'w, 's> {
+pub struct DomDiff<'w, 's> {
 	fragment_nodes: Query<'w, 's, (), With<FragmentNode>>,
 	element_nodes: Query<
 		'w,
@@ -18,15 +18,11 @@ pub(crate) struct DomDiff<'w, 's> {
 	text_nodes: Query<'w, 's, &'static mut TextNode, Without<AttributeOf>>,
 	children: Query<'w, 's, &'static Children>,
 	attributes: Query<'w, 's, &'static Attributes>,
+	constants: Res<'w, HtmlConstants>,
 	attribute_nodes: Query<
 		'w,
 		's,
-		(
-			&'static AttributeKey,
-			Option<&'static TextNode>,
-			Option<&'static NumberNode>,
-			Option<&'static BoolNode>,
-		),
+		(&'static AttributeKey, Option<&'static TextNode>),
 		With<AttributeOf>,
 	>,
 }
@@ -38,36 +34,49 @@ impl DomDiff<'_, '_> {
 		parent: &web_sys::Element,
 		entity: Entity,
 	) -> Result<web_sys::Node> {
-		let node = if let Ok((tag, _)) = self.element_nodes.get(entity) {
-			web_sys::window()
-				.unwrap()
-				.document()
-				.unwrap()
-				.create_element(&tag)
-				.unwrap()
-				.into()
+		let node = self.create_node(parent, entity)?;
+		parent.append_child(&node).map_jserr()?;
+		self.diff_node(entity, parent, &node)?;
+		Ok(node)
+	}
+
+	fn create_node(
+		&mut self,
+		parent: &web_sys::Element,
+		entity: Entity,
+	) -> Result<web_sys::Node> {
+		let document = web_sys::window()
+			.ok_or_else(|| bevyhow!("no window"))?
+			.document()
+			.ok_or_else(|| bevyhow!("no document"))?;
+		if let Ok((tag, _)) = self.element_nodes.get(entity) {
+			// check which namespace we're in and apply it
+			// TODO foreignObject
+			let ns = parent.namespace_uri();
+			let node: web_sys::Node = match ns.as_deref() {
+				Some("http://www.w3.org/2000/svg") => document
+					.create_element_ns(Some("http://www.w3.org/2000/svg"), &tag)
+					.map_jserr()?
+					.into(),
+				Some("http://www.w3.org/1998/Math/MathML") => document
+					.create_element_ns(
+						Some("http://www.w3.org/1998/Math/MathML"),
+						&tag,
+					)
+					.map_jserr()?
+					.into(),
+				_ => document.create_element(&tag).map_jserr()?.into(),
+			};
+			Ok(node)
 		} else if let Ok(text) = self.text_nodes.get(entity) {
-			web_sys::window()
-				.unwrap()
-				.document()
-				.unwrap()
-				.create_text_node(&text.0)
-				.into()
+			Ok(document.create_text_node(&text.0).into())
 		} else if let Ok(comment) = self.comment_nodes.get(entity) {
-			web_sys::window()
-				.unwrap()
-				.document()
-				.unwrap()
-				.create_comment(&**comment)
-				.into()
+			Ok(document.create_comment(&**comment).into())
 		} else if let Ok(_) = self.doctype_nodes.get(entity) {
 			todo!("create doctype?");
 		} else {
 			bevybail!("entity is not a node")
-		};
-		parent.append_child(&node).unwrap();
-		self.diff_node(entity, parent, &node)?;
-		Ok(node)
+		}
 	}
 
 	fn remove_node(
@@ -84,21 +93,32 @@ impl DomDiff<'_, '_> {
 		parent: &web_sys::Element,
 		node: &web_sys::Node,
 	) -> Result {
-		let _node = if let Ok((node_tag, _)) = self.element_nodes.get(entity) {
+		let mut needs_replace = false;
+
+		if let Ok((node_tag, _)) = self.element_nodes.get(entity) {
 			match node.dyn_ref::<web_sys::Element>() {
-				Some(element)
-					if node_tag.to_lowercase()
-						== element.tag_name().to_lowercase() =>
-				{
-					// tags match, perform diff
-					self.diff_attributes(entity, element)?;
-					self.diff_children(entity, element)?;
-					node.clone()
+				Some(element) => {
+					let ns = element.namespace_uri();
+					let desired = node_tag.tag();
+					let actual = element.tag_name();
+					let tags_match = match ns.as_deref() {
+						Some("http://www.w3.org/1999/xhtml") | None => {
+							// html is not case sensitive, element.tag_name() often capitalized
+							desired.eq_ignore_ascii_case(actual.as_str())
+						}
+						// other namespaces may be case sensitive
+						_ => desired == actual.as_str(),
+					};
+					if tags_match {
+						// tags match, perform diff
+						self.diff_attributes(entity, element)?;
+						self.diff_children(entity, element)?;
+					} else {
+						needs_replace = true;
+					}
 				}
-				_ => {
-					// dom node is not an element or the tags dont match
-					self.remove_node(parent, node)?;
-					self.append_node(parent, entity)?
+				None => {
+					needs_replace = true;
 				}
 			}
 		} else if let Ok(entity_text) = self.text_nodes.get(entity) {
@@ -107,11 +127,9 @@ impl DomDiff<'_, '_> {
 					if entity_text.0 != dom_text.data() {
 						dom_text.set_data(&entity_text.0);
 					}
-					node.clone()
 				}
 				None => {
-					self.remove_node(parent, node)?;
-					self.append_node(parent, entity)?
+					needs_replace = true;
 				}
 			}
 		} else if let Ok(entity_comment) = self.comment_nodes.get(entity) {
@@ -120,16 +138,18 @@ impl DomDiff<'_, '_> {
 					if entity_comment.0 != dom_comment.data() {
 						dom_comment.set_data(&entity_comment.0);
 					}
-					node.clone()
 				}
 				None => {
-					self.remove_node(parent, node)?;
-					self.append_node(parent, entity)?
+					needs_replace = true;
 				}
 			}
-		} else {
-			node.clone()
-		};
+		}
+
+		if needs_replace {
+			let new_node = self.create_node(parent, entity)?;
+			parent.replace_child(&new_node, node).map_jserr()?;
+			self.diff_node(entity, parent, &new_node)?;
+		}
 
 		Ok(())
 	}
@@ -142,7 +162,6 @@ impl DomDiff<'_, '_> {
 	) -> Result {
 		// 1. check for InnerText, if so only do this check
 		if let Ok((_, Some(inner_text))) = self.element_nodes.get(entity) {
-			beet_utils::log!("inner text found!");
 			let html_el =
 				element.dyn_ref::<HtmlElement>().ok_or_else(|| {
 					bevyhow!(
@@ -150,7 +169,6 @@ impl DomDiff<'_, '_> {
 					)
 				})?;
 			if html_el.inner_text() != **inner_text {
-				beet_utils::log!("no match, setting inner text");
 				html_el.set_inner_text(&*inner_text);
 			}
 			return Ok(());
@@ -158,24 +176,28 @@ impl DomDiff<'_, '_> {
 
 		// 2: iterate entity children, update existing DOM child or append if missing
 		let entity_children = self.child_nodes(entity);
-		let dom_children = element.child_nodes();
-		let num_dom_children = dom_children.length() as usize;
+		let node_list = element.child_nodes();
+		let mut dom_children = Vec::with_capacity(node_list.length() as usize);
+		for i in 0..node_list.length() {
+			if let Some(child) = node_list.item(i) {
+				dom_children.push(child);
+			}
+		}
 		for index in 0..entity_children.len() {
 			let entity_child = entity_children[index];
-			if index < num_dom_children {
-				let dom_child = dom_children.get(index as u32).unwrap();
-				self.diff_node(entity_child, &element, &dom_child)?;
+			if index < dom_children.len() {
+				let dom_child = &dom_children[index];
+				self.diff_node(entity_child, &element, dom_child)?;
 			} else {
 				self.append_node(&element, entity_child)?;
 			}
 		}
 
 		// 3: remove any extra DOM children beyond the number of entity children
-		let num_dom_children = dom_children.length() as usize;
-		if num_dom_children > entity_children.len() {
-			for index in (entity_children.len()..num_dom_children).rev() {
-				let dom_child = dom_children.get(index as u32).unwrap();
-				self.remove_node(&element, &dom_child)?;
+		if dom_children.len() > entity_children.len() {
+			for index in (entity_children.len()..dom_children.len()).rev() {
+				let dom_child = &dom_children[index];
+				self.remove_node(&element, dom_child)?;
 			}
 		}
 		Ok(())
@@ -195,27 +217,63 @@ impl DomDiff<'_, '_> {
 			.collect::<Vec<_>>();
 
 		// 1: ensure all entity attributes exist in DOM with correct values
-		for (key, text, _, _) in &entity_attributes {
-			let desired = text.map(|t| t.0.as_ref()).unwrap_or("");
+		for &(key, text) in &entity_attributes {
+			let desired = text.map(|t| t.0.as_ref()).unwrap_or("").to_string();
+			if desired == "false" {
+				element.remove_attribute(&key.0).map_jserr()?;
+				continue;
+			}
+
 			match element.get_attribute(&key.0) {
 				Some(current) => {
 					if current != desired {
-						element.set_attribute(key, desired).map_jserr()?;
+						element.set_attribute(&key.0, &desired).map_jserr()?;
 					}
 				}
 				None => {
-					element.set_attribute(key, desired).map_jserr()?;
+					if key.is_event()
+						&& let Some(text) = text
+						&& text.contains(&self.constants.event_handler)
+					{
+						// ignore event handler attributes we're already at runtime,
+						// they will be bound directly to the dom in bind_events
+					} else {
+						element.set_attribute(&key.0, &desired).map_jserr()?;
+					}
 				}
 			}
 		}
 
-		// 2: remove any DOM attributes not present in entity
+		// 2: remove any DOM attributes not present in entity (using allow-list)
+		let managed: std::collections::HashSet<String> =
+			entity_attributes.iter().map(|(k, _)| k.0.clone()).collect();
 		let num_dom_attributes = el_attributes.length() as usize;
 		for index in (0..num_dom_attributes).rev() {
-			let name = el_attributes.get(index as u32).as_string().unwrap();
-			let exists =
-				entity_attributes.iter().any(|(k, _, _, _)| k.0 == name);
-			if !exists {
+			let name = match el_attributes.get(index as u32).as_string() {
+				Some(n) => n,
+				None => continue,
+			};
+			// skip attributes that are present or protected
+			if managed.contains(&name) {
+				continue;
+			}
+			let is_protected = name == self.constants.dom_idx_key
+				|| name == self.constants.style_id_key;
+			let allowed_delete = !is_protected
+				&& (name.starts_with("aria-")
+					|| name.starts_with("data-")
+					|| matches!(
+						name.as_str(),
+						"class"
+							| "style" | "id" | "src"
+							| "href" | "alt" | "title"
+							| "type" | "name" | "placeholder"
+							| "role" | "value" | "checked"
+							| "disabled" | "selected"
+							| "multiple" | "readonly"
+							| "tabindex"
+					));
+			if allowed_delete {
 				element.remove_attribute(&name).map_jserr()?;
 			}
 		}

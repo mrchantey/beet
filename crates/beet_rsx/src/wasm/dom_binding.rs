@@ -52,8 +52,11 @@ impl DomBinding<'_, '_> {
 }
 
 
-/// Bind an entity to a [`web_sys::Node`], added to each
-/// [`TextNode`], [`ElementNode`] and [`AttributeOf`] with a [`SignalEffect`]
+/// Bind an entity to a [`web_sys::Node`], added to each with a [`RequiresDomBinding`]
+/// - [`TextNode`]
+/// - [`CommentNode`]
+/// - [`ElementNode`]
+/// - [`AttributeOf`]
 #[derive(Component, Deref)]
 pub struct DomNodeBinding(SendWrapper<web_sys::Node>);
 impl DomNodeBinding {
@@ -70,13 +73,13 @@ pub struct DomClosureBinding(
 );
 
 
-/// Bind each [`ElementNode`] with a [`SignalEffect`] and [`DomIdx`]
+/// Bind each [`ElementNode`] with a [`RequiresDomBinding`] and [`DomIdx`]
 pub(crate) fn bind_element_nodes(
 	query: Populated<
 		(Entity, &DomIdx),
 		(
 			With<ElementNode>,
-			With<SignalEffect>,
+			With<RequiresDomBinding>,
 			Without<DomNodeBinding>,
 		),
 	>,
@@ -97,8 +100,8 @@ pub(crate) fn bind_text_nodes(
 	query: Populated<
 		(Entity, &DomIdx),
 		(
-			With<TextNode>,
-			With<SignalEffect>,
+			Or<(With<TextNode>, With<CommentNode>)>,
+			With<RequiresDomBinding>,
 			Without<DomNodeBinding>,
 			Without<AttributeOf>,
 		),
@@ -176,7 +179,7 @@ pub(crate) fn bind_attribute_values(
 		(Entity, &AttributeOf),
 		(
 			Changed<TextNode>,
-			(With<SignalEffect>, Without<DomNodeBinding>),
+			(With<RequiresDomBinding>, Without<DomNodeBinding>),
 		),
 	>,
 ) -> Result<()> {
@@ -256,6 +259,31 @@ pub(crate) fn update_dom_nodes(
 		let node = binding.inner().clone();
 		let parent = node.parent_element().unwrap();
 		diff.diff_node(entity, &parent, &node)?;
+	}
+	Ok(())
+}
+
+/// Apply a [`DomDiff`] for any changed [`SignalEffect`]
+/// with a [`TextNode`] or [`ElementNode`]
+pub(crate) fn update_fragments(
+	query: Populated<Entity, (Changed<SignalEffect>, With<FragmentNode>)>,
+	mut diff: DomDiff,
+	parents: Query<&ChildOf>,
+	elements: Query<(Entity, &DomNodeBinding)>,
+) -> Result {
+	for entity in query.iter() {
+		let (el_entity,el_binding) = parents.iter_ancestors(entity).find_map(|parent|{
+			elements.get(parent).ok()
+		}).ok_or_else(|| {
+			bevyhow!(
+				"FragmentNode with SignalEffect must have an ElementNode with DomNodeBinding\n
+				was the DomIdx correctly applied to the ElementNode?"
+			)
+		})?;
+
+		let node = el_binding.inner().clone();
+		let parent = node.parent_element().unwrap();
+		diff.diff_node(el_entity, &parent, &node)?;
 	}
 	Ok(())
 }

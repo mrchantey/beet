@@ -3,8 +3,8 @@ use beet_core::as_beet::*;
 use bevy::prelude::*;
 
 /// Some cases cant just use a `#[requires(RequiresDomIdx)]`,
-/// like the parent element of a dynamic attribute. This system applies the
-/// [RequiresDomIdx] attribute to those entities.
+/// like the parent element of a dynamic attribute, fragment or text node.
+/// This system applies the [RequiresDomIdx] attribute to those entities.
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
 	attributes: Query<(Entity, &Attributes)>,
@@ -13,25 +13,46 @@ pub fn apply_requires_dom_idx(
 		Entity,
 		(With<TextNode>, With<SignalEffect>, Without<AttributeOf>),
 	>,
+	dyn_fragments: Query<Entity, (With<FragmentNode>, Added<SignalEffect>)>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,
 ) -> Result {
-	for (entity, _) in attributes
-		.iter()
-		.filter(|(_, attrs)| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
-	{
-		commands.entity(entity).insert(RequiresDomIdx);
+	// 1. fragments
+	for entity in dyn_fragments.iter() {
+		let parent = parents
+			.iter_ancestors(entity)
+			.find(|e| elements.contains(*e))
+			.ok_or_else(|| {
+				bevyhow!(
+					"FragmentNode with SignalEffect must have an ElementNode parent"
+				)
+			})?;
+		// fragment nodes do not need an idx
+		commands
+			.entity(parent)
+			.insert((RequiresDomIdx, RequiresDomBinding));
 	}
 
+	// 2. text nodes
 	for entity in dyn_text_nodes.iter() {
 		let parent = parents
 			.iter_ancestors(entity)
 			.find(|e| elements.contains(*e))
 			.ok_or_else(|| {
-				bevyhow!("TextNode with Effect must have an ElementNode parent")
+				bevyhow!(
+					"TextNode with SignalEffect must have an ElementNode parent"
+				)
 			})?;
+		// text node also needs idx for creating the boundary comment nodes
 		commands.entity(entity).insert(RequiresDomIdx);
 		commands.entity(parent).insert(RequiresDomIdx);
+	}
+	// 3. attributes
+	for (entity, _) in attributes
+		.iter()
+		.filter(|(_, attrs)| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
+	{
+		commands.entity(entity).insert(RequiresDomIdx);
 	}
 	Ok(())
 }

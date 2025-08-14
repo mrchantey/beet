@@ -22,6 +22,7 @@ impl Plugin for SignalsPlugin {
 					#[cfg(target_arch = "wasm32")]
 					(
 						update_dom_nodes,
+						update_fragments,
 						update_attribute_values,
 					)
 						.chain()

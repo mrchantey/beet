@@ -10,14 +10,15 @@ use web_sys::Event;
 /// A system that runs once after hydration to playback any events
 /// that occured while the wasm was loading.
 pub(crate) fn event_playback(
-	constants: Res<HtmlConstants>,
-	mut commands: Commands,
 	query: Populated<
 		(Entity, &DomIdx, &Attributes),
 		(With<EventTarget>, Added<DomIdx>),
 	>,
+	constants: Res<HtmlConstants>,
+	mut commands: Commands,
 	attribute_query: Query<&AttributeKey>,
 ) -> Result<()> {
+	beet_utils::log!("we playin boyz.");
 	let event_map: HashMap<(DomIdx, &AttributeKey), Entity> = query
 		.iter()
 		.map(|(entity, idx, attributes)| {
