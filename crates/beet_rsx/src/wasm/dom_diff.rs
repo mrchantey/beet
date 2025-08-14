@@ -33,6 +33,8 @@ pub(crate) struct DomDiff<'w, 's> {
 		),
 		With<AttributeOf>,
 	>,
+	requires_element_binding:
+		Query<'w, 's, Entity, (With<SignalEffect>, Without<DomElementBinding>)>,
 }
 
 impl DomDiff<'_, '_> {
@@ -280,6 +282,7 @@ impl DomDiff<'_, '_> {
 				.entity(entity)
 				.insert(DomElementBinding::new(node.clone()));
 			self.diff_attributes(entity, node.clone())?;
+
 			for child in self.child_nodes(entity) {
 				self.append_node(&node, child)?;
 			}
@@ -295,8 +298,12 @@ impl DomDiff<'_, '_> {
 				.entity(entity)
 				.insert(DomTextBinding::new(node.clone()));
 			Ok(node.dyn_into::<web_sys::Node>().unwrap())
+		} else if let Ok(_comment) = self.comment_nodes.get(entity) {
+			todo!("append comment node")
+		} else if let Ok(_doctype) = self.doctype_nodes.get(entity) {
+			todo!("append doctype node")
 		} else {
-			bevybail!("entity is neither element nor text")
+			bevybail!("entity is not a node")
 		}
 	}
 	fn remove_node(
