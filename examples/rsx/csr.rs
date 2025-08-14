@@ -18,12 +18,12 @@ use beet::prelude::*;
 #[cfg(target_arch = "wasm32")]
 fn main() {
 	App::new()
-		.add_plugins(ApplyDirectivesPlugin)
+    .insert_resource(pkg_config!())
+		.add_plugins(BeetPlugins)
     .add_systems(Startup, |mut commands: Commands| {
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
 			commands.spawn(rsx! {<Counter client:only initial=7/>});
 		})
-		.set_runner(ReactiveApp::runner)
     .run();
 }
 
@@ -32,6 +32,11 @@ fn main() {
 	let html = r#"
 <!DOCTYPE html>
 <html lang="en">
+<head>
+	<style>
+	
+	</style>
+</head>
 <body>
 	<script type="module">
 	import init from './wasm/main.js'

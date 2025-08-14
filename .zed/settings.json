@@ -7,9 +7,15 @@
 		"rust-analyzer": {
 			"initialization_options": {
 				"cargo": {
-					"target": "wasm32-unknown-unknown"
+					// "target": "wasm32-unknown-unknown"
 				}
 			}
+		}
+	},
+	"diagnostics": {
+		"cargo": {
+			// disables running cargo check on save
+			"fetch_cargo_diagnostics": true
 		}
 	},
 	"file_scan_exclusions": [
