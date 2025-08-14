@@ -77,7 +77,9 @@ pub struct StyleElement;
 /// like `script`,`style` or `code` which require further processing.
 ///
 /// Adding an [`InnerText`] also adds a [`ElementNode::open`].
-#[derive(Debug, Default, Clone, PartialEq, Hash, Component, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Hash, Deref, DerefMut, Component, Reflect,
+)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]

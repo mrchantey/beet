@@ -62,15 +62,23 @@ impl TemplateDirective for ClientLoadDirective {
 
 /// aka Client Side Rendering, do not create a server-side version of this node,
 /// and instead mount it directly on the client.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[require(RequiresDomIdx)]
 pub struct ClientOnlyDirective {
-	/// Optionally specify the element to mount to, defaulting to the body
-	pub root_id: Option<String>,
+	/// The id of the root element, defaulting to "root"
+	pub root_id: String,
+}
+
+impl Default for ClientOnlyDirective {
+	fn default() -> Self {
+		Self {
+			root_id: "root".to_string(),
+		}
+	}
 }
 
 impl TemplateDirective for ClientOnlyDirective {
@@ -78,7 +86,7 @@ impl TemplateDirective for ClientOnlyDirective {
 		match (key, value) {
 			("client:only", None) => Some(Self::default()),
 			("client:only", Some(text)) => Some(Self {
-				root_id: Some(text.0.clone()),
+				root_id: text.0.clone(),
 			}),
 			_ => None,
 		}

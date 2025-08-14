@@ -49,6 +49,7 @@ fn main() {
 				throw error
 	})
 	</script>
+	<div id="root"></div>
 </body>
 </html>
 "#;
@@ -61,14 +62,14 @@ fn main() {
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	let (style, set_style) = signal("display: block;");
-
+	// rsx!("hello world")
 	rsx! {
 			<p>Count: {get}</p>
 			<button onclick={move || set(get()+1)}>Increment</button>
 			<button
 				style={style}
 				onclick={move || set_style("display: none;")}>
-				Hide Me
+				"Hide Me"
 			</button>
 	}
 }

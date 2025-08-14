@@ -38,7 +38,7 @@ impl DomBinding<'_, '_> {
 
 			self.commands
 				.entity(entity)
-				.insert(DomElementBinding(SendWrapper::new(el.clone())));
+				.insert(DomElementBinding::new(el.clone()));
 			return Ok(el);
 		} else {
 			return Err(format!(
@@ -55,6 +55,7 @@ impl DomBinding<'_, '_> {
 #[derive(Component, Deref)]
 pub struct DomElementBinding(SendWrapper<HtmlElement>);
 impl DomElementBinding {
+	pub fn new(el: web_sys::HtmlElement) -> Self { Self(SendWrapper::new(el)) }
 	pub fn inner(&self) -> &HtmlElement { self.0.as_ref() }
 }
 
@@ -62,6 +63,7 @@ impl DomElementBinding {
 #[derive(Component, Deref)]
 pub struct DomTextBinding(SendWrapper<web_sys::Text>);
 impl DomTextBinding {
+	pub fn new(text: web_sys::Text) -> Self { Self(SendWrapper::new(text)) }
 	pub fn inner(&self) -> &web_sys::Text { self.0.as_ref() }
 }
 
@@ -88,20 +90,6 @@ pub(crate) fn bind_element_nodes(
 	}
 	Ok(())
 }
-
-
-pub(crate) fn update_element_nodes(
-	query: Populated<(Entity, &DomElementBinding), Changed<SignalEffect>>,
-	mut diff: DomDiff,
-) -> Result {
-	for (entity, binding) in query.iter() {
-		let el = binding.inner().clone();
-		// let parent = el.parent_element().unwrap();
-		diff.diff_element(entity, el)?;
-	}
-	Ok(())
-}
-
 
 /// Attach the text nodes to the DOM with the following steps:
 /// 1. find the parent element of the text node
@@ -173,9 +161,7 @@ pub(crate) fn bind_text_nodes(
 				format!("Node after marker comment is not a TextNode")
 			})?;
 
-		commands
-			.entity(entity)
-			.insert(DomTextBinding(SendWrapper::new(node)));
+		commands.entity(entity).insert(DomTextBinding::new(node));
 
 		// 4. remove marker comments
 		// im not sure about this, its a bit of a vanity thing so it looks prettier in dev tools
@@ -190,16 +176,6 @@ pub(crate) fn bind_text_nodes(
 	Ok(())
 }
 
-pub(crate) fn update_text_nodes(
-	_: TempNonSendMarker,
-	query: Populated<(Entity, &DomTextBinding), Changed<TextNode>>,
-	mut diff: DomDiff,
-) -> Result<()> {
-	for (entity, node) in query.iter() {
-		diff.diff_text(entity, node.inner().clone())?;
-	}
-	Ok(())
-}
 
 
 pub(crate) fn bind_attribute_values(
@@ -227,10 +203,37 @@ pub(crate) fn bind_attribute_values(
 			get_binding.get_or_bind_element(parent_entity, *parent_idx)?;
 		commands
 			.entity(entity)
-			.insert(DomElementBinding(SendWrapper::new(element)));
+			.insert(DomElementBinding::new(element));
 	}
 	Ok(())
 }
+
+
+pub(crate) fn update_element_nodes(
+	query: Populated<(Entity, &DomElementBinding), Changed<SignalEffect>>,
+	mut diff: DomDiff,
+) -> Result {
+	for (entity, binding) in query.iter() {
+		let el = binding.inner().clone();
+		// let parent = el.parent_element().unwrap();
+		diff.diff_element(entity, el)?;
+	}
+	Ok(())
+}
+
+
+pub(crate) fn update_text_nodes(
+	_: TempNonSendMarker,
+	query: Populated<(Entity, &DomTextBinding), Changed<SignalEffect>>,
+	mut diff: DomDiff,
+) -> Result<()> {
+	for (entity, node) in query.iter() {
+		diff.diff_text(entity, node.inner().clone())?;
+	}
+	Ok(())
+}
+
+
 /// The attributes of elements are applied in the render html step,
 /// updating is applied to the DOM *properties* of the element
 pub(crate) fn update_attribute_values(
