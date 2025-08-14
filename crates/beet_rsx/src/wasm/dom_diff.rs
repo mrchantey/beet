@@ -89,13 +89,19 @@ impl DomDiff<'_, '_> {
 		parent: &web_sys::Element,
 		node: &web_sys::Node,
 	) -> Result {
-		let node = if self.element_nodes.contains(entity) {
+		let node = if let Ok((node_tag, _)) = self.element_nodes.get(entity) {
 			match node.dyn_ref::<web_sys::Element>() {
-				Some(element) => {
-					self.diff_element(entity, element)?;
+				Some(element)
+					if node_tag.to_lowercase()
+						== element.tag_name().to_lowercase() =>
+				{
+					// tags match, perform diff
+					self.diff_attributes(entity, element)?;
+					self.diff_children(entity, element)?;
 					node.clone()
 				}
-				None => {
+				_ => {
+					// dom node is not an element or the tags dont match
 					self.remove_node(parent, node)?;
 					self.append_node(parent, entity)?
 				}
@@ -138,64 +144,31 @@ impl DomDiff<'_, '_> {
 		Ok(())
 	}
 
-	/// Apply a diff to element tag attributes and children
-	///
-	/// ## Errors
-	/// - The entity is not an [`ElementNode`]
-	/// - The tags dont match and the element does not have a parent
-	fn diff_element(
-		&mut self,
-		entity: Entity,
-		element: &web_sys::Element,
-	) -> Result {
-		let (node_tag, inner_text) = self.element_nodes.get(entity)?;
-
-		if node_tag.to_lowercase() == element.tag_name().to_lowercase() {
-			// tags match, perform diff
-			// 1. inner text
-			if let Some(inner_text) = inner_text {
-				let html_el =
-					element.dyn_ref::<HtmlElement>().ok_or_else(|| {
-						bevyhow!(
-							"Entity has an InnerText but element is not a HtmlElement"
-						)
-					})?;
-				if html_el.inner_text() != **inner_text {
-					html_el.set_inner_text(&*inner_text);
-				}
-			}
-			// 2. attributes
-			self.diff_attributes(entity, element)?;
-			// 3. children
-			self.diff_children(entity, element)?;
-		} else {
-			// tag name mismatch, remove and append
-			let parent = element.parent_element().ok_or_else(|| {
-				bevyhow!("DomDiff: Cannot diff an element without a parent")
-			})?;
-			self.remove_node(
-				&parent,
-				element.dyn_ref::<web_sys::Node>().unwrap(),
-			)?;
-			// caution! this could result in infinite loop if appended element
-			// doesnt have matching tag name
-			self.append_node(&parent, entity)?;
-		}
-
-
-		Ok(())
-	}
-
-	/// Apply a diff to children, ignoring element tag and attributes
+	/// Apply a diff to children, the entity may be an [`ElementNode`] or [`FragmentNode`]
 	pub fn diff_children(
 		&mut self,
 		entity: Entity,
 		element: &web_sys::Element,
 	) -> Result {
-		let dom_children = element.child_nodes();
-		let entity_children = self.child_nodes(entity);
+		// 1. check for InnerText, if so only do this check
+		if let Ok((_, Some(inner_text))) = self.element_nodes.get(entity) {
+			beet_utils::log!("inner text found!");
+			let html_el =
+				element.dyn_ref::<HtmlElement>().ok_or_else(|| {
+					bevyhow!(
+						"Entity has an InnerText but element is not a HtmlElement"
+					)
+				})?;
+			if html_el.inner_text() != **inner_text {
+				beet_utils::log!("no match, setting inner text");
+				html_el.set_inner_text(&*inner_text);
+			}
+			return Ok(());
+		}
 
-		// Phase 1: iterate entity children, update existing DOM child or append if missing
+		// 2: iterate entity children, update existing DOM child or append if missing
+		let entity_children = self.child_nodes(entity);
+		let dom_children = element.child_nodes();
 		let num_dom_children = dom_children.length() as usize;
 		for index in 0..entity_children.len() {
 			let entity_child = entity_children[index];
@@ -207,7 +180,7 @@ impl DomDiff<'_, '_> {
 			}
 		}
 
-		// Phase 2: remove any extra DOM children beyond the number of entity children
+		// 3: remove any extra DOM children beyond the number of entity children
 		let num_dom_children = dom_children.length() as usize;
 		if num_dom_children > entity_children.len() {
 			for index in (entity_children.len()..num_dom_children).rev() {

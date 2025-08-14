@@ -40,6 +40,7 @@ impl Attributes {
 	}
 }
 
+/// A helper [`SystemParam`] for getting attributes from an element
 #[derive(SystemParam)]
 pub struct FindAttribute<'w, 's> {
 	elements: Query<'w, 's, (Entity, &'static Attributes)>,
@@ -59,6 +60,20 @@ impl FindAttribute<'_, '_> {
 			attrs
 				.iter()
 				.filter_map(|attr| self.attributes.get(attr).ok())
+				.collect()
+		})
+	}
+
+	pub fn events<'a>(
+		&'a self,
+		entity: Entity,
+	) -> Vec<(Entity, &'a AttributeKey)> {
+		self.elements.get(entity).ok().map_or(vec![], |(_, attrs)| {
+			attrs
+				.iter()
+				.filter_map(|attr| self.attributes.get(attr).ok())
+				.filter(|(_, key, _)| key.is_event())
+				.map(|(entity, key, _)| (entity, key))
 				.collect()
 		})
 	}
@@ -111,4 +126,6 @@ pub struct AttributeKey(pub String);
 
 impl AttributeKey {
 	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
+	/// If key starts with 'on' its considered an event
+	pub fn is_event(&self) -> bool { self.0.starts_with("on") }
 }

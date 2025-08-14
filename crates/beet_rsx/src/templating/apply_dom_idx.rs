@@ -2,8 +2,8 @@ use crate::prelude::*;
 use beet_core::as_beet::*;
 use bevy::prelude::*;
 
-/// Some cases cant just use a `#[requires(RequiresDomIdx)]` attribute,
-/// like SignalReceive<String> or its parent. This system applies the
+/// Some cases cant just use a `#[requires(RequiresDomIdx)]`,
+/// like the parent element of a dynamic attribute. This system applies the
 /// [RequiresDomIdx] attribute to those entities.
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
@@ -28,9 +28,7 @@ pub fn apply_requires_dom_idx(
 			.iter_ancestors(entity)
 			.find(|e| elements.contains(*e))
 			.ok_or_else(|| {
-				bevyhow!(
-					"TextNode with Effect must have an ElementNode parent"
-				)
+				bevyhow!("TextNode with Effect must have an ElementNode parent")
 			})?;
 		commands.entity(entity).insert(RequiresDomIdx);
 		commands.entity(parent).insert(RequiresDomIdx);
@@ -80,7 +78,10 @@ pub(super) fn apply_client_island_dom_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
 	// definition of a root: any fragment or element without a parent
-	roots: Populated<(Entity, &DomIdx), (Added<DomIdx>, Without<ChildOf>)>,
+	roots: Populated<
+		(Entity, &DomIdx),
+		(Added<DomIdx>, Without<ChildOf>, Without<AttributeOf>),
+	>,
 	children: Query<&Children>,
 	requires_idx: Query<(), Added<RequiresDomIdx>>,
 ) {

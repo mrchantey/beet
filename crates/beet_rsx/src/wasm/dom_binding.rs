@@ -155,12 +155,12 @@ pub(crate) fn bind_text_nodes(
 		// 4. remove marker comments
 		// im not sure about this, its a bit of a vanity thing so it looks prettier in dev tools
 		// but doing ths means if somebody calls normalize() we lose our text nodes
-		children.item(comment_idx + 2).map(|after| {
-			element.remove_child(&after).ok();
-		});
-		children.item(comment_idx).map(|comment| {
-			element.remove_child(&comment).ok();
-		});
+		// children.item(comment_idx + 2).map(|after| {
+		// 	element.remove_child(&after).ok();
+		// });
+		// children.item(comment_idx).map(|comment| {
+		// 	element.remove_child(&comment).ok();
+		// });
 	}
 	Ok(())
 }
@@ -255,18 +255,11 @@ pub(crate) fn update_attribute_values(
 pub(crate) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: DomBinding,
-	query: Populated<
-		(Entity, &DomIdx, &Attributes),
-		(With<EventTarget>, Added<DomIdx>),
-	>,
-	attribute_query: Query<(Entity, &AttributeKey)>,
+	query: Populated<(Entity, &DomIdx), (With<EventTarget>, Added<DomIdx>)>,
+	find_attribute: FindAttribute,
 ) -> Result<()> {
-	for (el_entity, idx, attributes) in query.iter() {
-		for (attr_entity, attr_key) in attributes
-			.iter()
-			.filter_map(|attr| attribute_query.get(attr).ok())
-			.filter(|(_, key)| key.starts_with("on"))
-		{
+	for (el_entity, idx) in query.iter() {
+		for (attr_entity, attr_key) in find_attribute.events(el_entity) {
 			let attr_key = attr_key.clone();
 			let attr_key2 = attr_key.clone();
 			let element = get_binding.get_or_bind_element(el_entity, *idx)?;
