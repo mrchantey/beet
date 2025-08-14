@@ -21,9 +21,8 @@ impl Plugin for SignalsPlugin {
 					propagate_text_signals,
 					#[cfg(target_arch = "wasm32")]
 					(
-						update_element_nodes,
+						update_dom_nodes,
 						update_attribute_values,
-						update_text_nodes,
 					)
 						.chain()
 						.run_if(document_exists),

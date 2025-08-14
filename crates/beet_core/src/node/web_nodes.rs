@@ -14,7 +14,7 @@ pub type WebNodes = (DoctypeNode, CommentNode, ElementNode, AttributeKey);
 pub struct DoctypeNode;
 
 /// Indicates a Html Comment Node, [W3 Docs](https://www.w3schools.com/tags/tag_comment.asp)
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::bevyhow;
 use beet_core::node::ClientOnlyDirective;
 use bevy::prelude::*;
-use wasm_bindgen::JsCast;
 
 pub(crate) fn mount_client_only(
 	query: Populated<
@@ -22,11 +21,9 @@ pub(crate) fn mount_client_only(
 					"Client Only: Root Element with id '{}' not found",
 					&directive.root_id
 				)
-			})?
-			.dyn_into::<web_sys::HtmlElement>()
-			.unwrap();
+			})?;
 		// the entity is a SnippetRoot not an element so only diff children
-		diff.diff_children(entity, root)?;
+		diff.diff_children(entity, &root)?;
 	}
 	Ok(())
 }
