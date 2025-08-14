@@ -34,7 +34,10 @@ fn main() {
 <html lang="en">
 <head>
 	<style>
-	
+	body{
+		color: #ddd;
+		background-color: #333;
+	}
 	</style>
 </head>
 <body>

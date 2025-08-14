@@ -91,29 +91,17 @@ pub(crate) fn bind_element_nodes(
 
 
 pub(crate) fn update_element_nodes(
-	query: Populated<
-		(Entity, &DomElementBinding),
-		(With<ElementNode>, Changed<SignalEffect>),
-	>,
-	diff: DiffElement,
-) {
+	query: Populated<(Entity, &DomElementBinding), Changed<SignalEffect>>,
+	mut diff: DomDiff,
+) -> Result {
 	for (entity, binding) in query.iter() {
-		diff.apply(entity, binding.inner().clone())
+		let el = binding.inner().clone();
+		// let parent = el.parent_element().unwrap();
+		diff.diff_element(entity, el)?;
 	}
+	Ok(())
 }
 
-#[derive(SystemParam)]
-pub(crate) struct DiffElement<'w, 's> {
-	elements: Query<'w, 's, &'static NodeTag>,
-	constants: Res<'w, HtmlConstants>,
-}
-
-impl DiffElement<'_, '_> {
-	///
-	fn apply(&self, entity: Entity, element: HtmlElement) {
-		panic!("todo apply diff");
-	}
-}
 
 /// Attach the text nodes to the DOM with the following steps:
 /// 1. find the parent element of the text node
@@ -204,10 +192,11 @@ pub(crate) fn bind_text_nodes(
 
 pub(crate) fn update_text_nodes(
 	_: TempNonSendMarker,
-	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
+	query: Populated<(Entity, &DomTextBinding), Changed<TextNode>>,
+	mut diff: DomDiff,
 ) -> Result<()> {
-	for (text, node) in query.iter() {
-		node.set_data(text);
+	for (entity, node) in query.iter() {
+		diff.diff_text(entity, node.inner().clone())?;
 	}
 	Ok(())
 }
