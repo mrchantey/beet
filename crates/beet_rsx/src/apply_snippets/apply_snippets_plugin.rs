@@ -269,20 +269,6 @@ mod test {
 			.unwrap()
 	}
 
-	fn parse_instance(instance: impl Bundle) -> String {
-		let mut world = world();
-		let instance = world.spawn(instance).id();
-
-		world.run_schedule(ApplySnippets);
-		world
-			.run_system_once(crate::apply_snippets::apply_slots)
-			.ok(); // no matching entities ok
-		world
-			.run_system_once_with(render_fragment, instance)
-			.unwrap()
-	}
-
-
 	#[test]
 	fn retains_parent() {
 		let mut world = world();
@@ -428,44 +414,64 @@ mod test {
 		.xpect()
 		.to_be("5");
 	}
+
+
 	#[test]
-	#[ignore = "not sure how to test this this"]
-	fn bundle_templates() {
-		let bundle = MyTemplate { initial: 3 };
-
-		let idx1 = SnippetRoot::new_file_line_col(file!(), line!(), column!());
-		let idx2 = SnippetRoot::new_file_line_col(file!(), line!(), column!());
-
+	fn child_already_resolved() {
 		let mut world = world();
-		let child = world.spawn(bundle.into_bundle()).insert(idx2.clone()).id();
-		let instance = world
-			.spawn((
-				InstanceRoot,
-				idx1.clone(),
-				NodeTag(String::from("main")),
-				ElementNode::open(),
-			))
-			.add_child(child)
-			.insert(idx1.clone())
-			.id();
+		let child_idx =
+			SnippetRoot::new_file_line_col(file!(), line!(), column!());
+		let parent_idx =
+			SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
-		let _tree1 = world
-			.spawn((rsx! {<span>{}</span>}, StaticRoot))
-			.insert(idx1)
-			.id();
-		let _tree2 = world
-			.spawn((rsx! {<span>{}</span>}, StaticRoot))
-			.insert(idx2)
-			.id();
+		let child_instance = rsx! {
+			<div>pasta is <MyTemplate initial=3/></div>
+		};
+		let child_static = rsx! {
+			<div>pizza is <MyTemplate initial=4/></div>
+		};
+
+
+		let child = world.spawn(child_instance).insert(child_idx.clone()).id();
+		world
+			.spawn(child_static)
+			.remove::<InstanceRoot>()
+			.insert((StaticRoot, child_idx));
 
 		world.run_schedule(ApplySnippets);
-
 		world
-			.run_system_once_with(render_fragment, instance)
+			.run_system_once_with(render_fragment, child)
 			.unwrap()
 			.xpect()
-			.to_be("<main><span/></main>");
+			.to_be("<div>pizza is 3</div>");
+
+		let parent_instance = rsx! {
+			<article>
+				<h1>all about pasta</h1>
+				{child}
+			</article>
+		};
+		let parent_static = rsx! {
+			<article>
+				<h1>all about pizza</h1>
+				{child}
+			</article>
+		};
+		let parent =
+			world.spawn(parent_instance).insert(parent_idx.clone()).id();
+		world
+			.spawn(parent_static)
+			.remove::<InstanceRoot>()
+			.insert((StaticRoot, parent_idx));
+
+		world.run_schedule(ApplySnippets);
+		world
+			.run_system_once_with(render_fragment, parent)
+			.unwrap()
+			.xpect()
+			.to_be("<article><h1>all about pizza</h1><div>pizza is 3</div></article>");
 	}
+
 
 	#[test]
 	fn flush_on_spawn_bfs_order() {
@@ -513,6 +519,18 @@ mod test {
 		expect(val()).to_be(vec![0, 1, 2, 3, 4]);
 	}
 
+	fn parse_instance(instance: impl Bundle) -> String {
+		let mut world = world();
+		let instance = world.spawn(instance).id();
+
+		world.run_schedule(ApplySnippets);
+		world
+			.run_system_once(crate::apply_snippets::apply_slots)
+			.ok(); // no matching entities ok
+		world
+			.run_system_once_with(render_fragment, instance)
+			.unwrap()
+	}
 
 	#[test]
 	fn flush_on_spawn_templates() {
