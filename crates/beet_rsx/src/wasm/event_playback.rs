@@ -18,7 +18,6 @@ pub(crate) fn event_playback(
 	mut commands: Commands,
 	attribute_query: Query<&AttributeKey>,
 ) -> Result<()> {
-	beet_utils::log!("we playin boyz.");
 	let event_map: HashMap<(DomIdx, &AttributeKey), Entity> = query
 		.iter()
 		.map(|(entity, idx, attributes)| {

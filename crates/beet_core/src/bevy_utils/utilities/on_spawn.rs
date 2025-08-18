@@ -142,6 +142,36 @@ impl OnSpawnDeferred {
 	}
 }
 
+/// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
+#[derive(ImplBundle)]
+pub struct CloneBundleEffect(pub Box<dyn CloneEntityFunc>);
+
+impl CloneBundleEffect {
+	/// Create a new [`OnSpawnCloneable`] effect.
+	pub fn new(func: impl CloneEntityFunc) -> Self { Self(Box::new(func)) }
+}
+
+impl BundleEffect for CloneBundleEffect {
+	fn apply(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
+}
+
+impl Clone for CloneBundleEffect {
+	fn clone(&self) -> Self { Self(self.0.box_clone()) }
+}
+
+pub trait CloneEntityFunc:
+	'static + Send + Sync + Fn(&mut EntityWorldMut)
+{
+	fn box_clone(&self) -> Box<dyn CloneEntityFunc>;
+}
+impl<T> CloneEntityFunc for T
+where
+	T: 'static + Send + Sync + Clone + Fn(&mut EntityWorldMut),
+{
+	fn box_clone(&self) -> Box<dyn CloneEntityFunc> { Box::new(self.clone()) }
+}
+
+
 
 #[cfg(test)]
 mod test {
@@ -205,5 +235,4 @@ mod test {
 
 		expect(&*numbers.lock().unwrap()).to_be(&[1, 2, 3]);
 	}
-
 }

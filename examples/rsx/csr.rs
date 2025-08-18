@@ -64,7 +64,6 @@ fn main() {
 #[derive(Reflect)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
-	let (style, set_style) = signal("display: block;");
 
 	rsx! {
 		<article>
@@ -107,9 +106,12 @@ fn List() -> impl Bundle {
 				NodeTag::new("div"),
 				InnerText::new(format!("thingie number {}", prev.len())),
 			));
+			// let len = prev.len() as u32;
+			// beet::log!("len: {len}");
 			// prev.push(rsx! {<div>Thingie number {prev.len()}</div>});
 		});
 	};
+
 	let remove_seventh = move || {
 		set_children.update(|prev| {
 			if prev.len() > 6 {
