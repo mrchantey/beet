@@ -1,0 +1,224 @@
+use std::sync::Arc;
+
+use crate::prelude::*;
+use beet_utils::prelude::*;
+use bevy::ecs::system::SystemId;
+use bevy::prelude::*;
+
+/// Mark an entity as requiring a [`DomBinding`], often added to nodes
+/// with a [`SignalEffect`], and also their parent [`ElementNode`]
+/// in the case of a [`FragmentNode`]
+#[derive(Default, Component, Clone)]
+pub struct RequiresDomBinding;
+
+/// Basic primitives required for downstream crates to implement reactivity,
+/// This type should be marked [`Changed`] when its associated signal changes,
+/// which is important for cases like bundle signals where there is no one component
+/// to watch for changes.
+/// see beet_rsx::reactivity::propagate_signal_effect.rs
+// This is implemented here due to orphan rule
+#[derive(Component, Clone)]
+#[require(RequiresDomBinding)]
+pub struct SignalEffect {
+	system_id: SystemId,
+	/// A function that calls the getter, so calling it inside a
+	/// new [`effect`] will subscribe to its changes.
+	effect_subscriber: Arc<dyn 'static + Send + Sync + Fn()>,
+}
+
+impl SignalEffect {
+	pub fn new<T: Clone + 'static + Send + Sync>(
+		getter: Getter<T>,
+		system_id: SystemId,
+	) -> Self {
+		let effect_subscriber = Arc::new(move || {
+			let _ = getter.get();
+		});
+		SignalEffect {
+			system_id,
+			effect_subscriber,
+		}
+	}
+	pub fn system_id(&self) -> SystemId { self.system_id }
+	pub fn effect_subscriber(&self) -> Arc<dyn 'static + Send + Sync + Fn()> {
+		self.effect_subscriber.clone()
+	}
+}
+
+
+pub struct PrimitiveGetterIntoBundle;
+
+/// we dont want to blanket impl ToString because collision
+/// with Bundle impl, feel free to open pr to add more as required.
+trait Primitive: ToString {}
+impl Primitive for String {}
+impl Primitive for &'static str {}
+impl<'a> Primitive for std::borrow::Cow<'a, str> {}
+
+impl Primitive for i8 {}
+impl Primitive for i16 {}
+impl Primitive for i32 {}
+impl Primitive for i64 {}
+impl Primitive for i128 {}
+impl Primitive for isize {}
+
+impl Primitive for u8 {}
+impl Primitive for u16 {}
+impl Primitive for u32 {}
+impl Primitive for u64 {}
+impl Primitive for u128 {}
+impl Primitive for usize {}
+
+impl Primitive for f32 {}
+impl Primitive for f64 {}
+
+
+impl<T> IntoBundle<(Self, PrimitiveGetterIntoBundle)> for Getter<T>
+where
+	T: 'static + Send + Sync + Clone + Primitive,
+{
+	fn into_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |entity| {
+			let id = entity.id();
+			let system_id = entity.world_scope(move |world| {
+				world.register_system(
+					(move |mut query: Query<(
+						&mut SignalEffect,
+						&mut TextNode,
+					)>|
+					      -> Result {
+						let (mut signal, mut text) = query.get_mut(id)?;
+						signal.set_changed();
+						text.0 = self.clone()().to_string();
+						Ok(())
+					})
+					.pipe(handle_result),
+				)
+			});
+
+			entity.insert((
+				TextNode::new(self.clone()().to_string()),
+				SignalEffect::new(self, system_id),
+			));
+		})
+	}
+}
+
+fn handle_result(result: In<Result>) {
+	if let Err(err) = result.0 {
+		panic!("Signal Effect Error: {}", err);
+	}
+}
+
+pub struct BundleGetterIntoBundle;
+
+/// for bundles and vecs of bundles
+trait BundleLike<M1, M2>: IntoBundle<M1> {}
+struct BundleIntoBundleLike;
+impl<T, M> BundleLike<M, BundleIntoBundleLike> for T where
+	T: IntoBundle<M> + Bundle
+{
+}
+impl<T, M> BundleLike<M, Self> for Vec<T>
+where
+	Vec<T>: IntoBundle<M>,
+	T: Bundle,
+{
+}
+
+impl<T, M1, M2> IntoBundle<(Self, M1, M2)> for Getter<T>
+where
+	T: 'static + Send + Sync + Clone + BundleLike<M1, M2>,
+{
+	fn into_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |entity| {
+			let id = entity.id();
+			let system_id = entity.world_scope(move |world| {
+				world.register_system(
+					(move |mut commands: Commands,
+					       mut query: Query<&mut SignalEffect>|
+					      -> Result {
+						query.get_mut(id)?.set_changed();
+						// remove everything but the SignalEffect
+						commands
+							.entity(id)
+							.despawn_related::<Children>()
+							.despawn_related::<Attributes>()
+							.retain::<(SignalEffect, ChildOf)>()
+							.insert(self.clone()().into_bundle());
+						Ok(())
+					})
+					.pipe(handle_result),
+				)
+			});
+
+			entity.insert((
+				self.clone()().into_bundle(),
+				SignalEffect::new(self, system_id),
+			));
+		})
+	}
+}
+
+
+// more tests in beet_rsx::reactivity::propagate_signal_effect.rs
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_utils::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn primitive_getter() {
+		let (get, set) = signal("bob".to_string());
+
+		let mut world = World::new();
+		let entity = world.spawn(get.into_bundle()).id();
+		let assert = |world: &World, name: &str| {
+			world
+				.entity(entity)
+				.get::<TextNode>()
+				.unwrap()
+				.xpect()
+				.to_be(&TextNode::new(name.to_owned()));
+		};
+
+		assert(&world, "bob");
+		set("bill".to_string());
+		assert(&world, "bob");
+		let system = world
+			.entity(entity)
+			.get::<SignalEffect>()
+			.unwrap()
+			.system_id();
+		world.run_system(system).unwrap();
+		assert(&world, "bill");
+	}
+	#[test]
+	fn bundle_getter() {
+		let (get, set) = signal(Name::new("bob"));
+
+		let mut world = World::new();
+		let entity = world.spawn(get.into_bundle()).id();
+		let assert = |world: &World, name: &str| {
+			world
+				.entity(entity)
+				.get::<Name>()
+				.unwrap()
+				.xpect()
+				.to_be(&Name::new(name.to_owned()));
+		};
+
+		assert(&world, "bob");
+		set(Name::new("bill"));
+		assert(&world, "bob");
+		let system = world
+			.entity(entity)
+			.get::<SignalEffect>()
+			.unwrap()
+			.system_id();
+		world.run_system(system).unwrap();
+		assert(&world, "bill");
+	}
+}

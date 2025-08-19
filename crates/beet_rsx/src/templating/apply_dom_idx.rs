@@ -2,38 +2,57 @@ use crate::prelude::*;
 use beet_core::as_beet::*;
 use bevy::prelude::*;
 
-/// Some cases cant just use a `#[requires(RequiresDomIdx)]` attribute,
-/// like SignalReceive<String> or its parent. This system applies the
-/// [RequiresDomIdx] attribute to those entities.
+/// Some cases cant just use a `#[requires(RequiresDomIdx)]`,
+/// like the parent element of a dynamic attribute, fragment or text node.
+/// This system applies the [RequiresDomIdx] attribute to those entities.
 pub fn apply_requires_dom_idx(
 	mut commands: Commands,
 	attributes: Query<(Entity, &Attributes)>,
-	dyn_attrs: Query<(), (With<AttributeOf>, Added<ReceivesSignals>)>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalEffect>)>,
 	dyn_text_nodes: Query<
 		Entity,
-		(With<TextNode>, With<ReceivesSignals>, Without<AttributeOf>),
+		(With<TextNode>, With<SignalEffect>, Without<AttributeOf>),
 	>,
+	dyn_fragments: Query<Entity, (With<FragmentNode>, Added<SignalEffect>)>,
 	parents: Query<&ChildOf>,
 	elements: Query<Entity, With<ElementNode>>,
 ) -> Result {
-	for (entity, _) in attributes
-		.iter()
-		.filter(|(_, attrs)| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
-	{
-		commands.entity(entity).insert(RequiresDomIdx);
+	// 1. fragments
+	for entity in dyn_fragments.iter() {
+		let parent = parents
+			.iter_ancestors(entity)
+			.find(|e| elements.contains(*e))
+			.ok_or_else(|| {
+				bevyhow!(
+					"FragmentNode with SignalEffect must have an ElementNode parent"
+				)
+			})?;
+		// fragment nodes do not need an idx
+		commands
+			.entity(parent)
+			.insert((RequiresDomIdx, RequiresDomBinding));
 	}
 
+	// 2. text nodes
 	for entity in dyn_text_nodes.iter() {
 		let parent = parents
 			.iter_ancestors(entity)
 			.find(|e| elements.contains(*e))
 			.ok_or_else(|| {
 				bevyhow!(
-					"TextNode with ReceivesSignals must have an ElementNode parent"
+					"TextNode with SignalEffect must have an ElementNode parent"
 				)
 			})?;
+		// text node also needs idx for creating the boundary comment nodes
 		commands.entity(entity).insert(RequiresDomIdx);
 		commands.entity(parent).insert(RequiresDomIdx);
+	}
+	// 3. attributes
+	for (entity, _) in attributes
+		.iter()
+		.filter(|(_, attrs)| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
+	{
+		commands.entity(entity).insert(RequiresDomIdx);
 	}
 	Ok(())
 }
@@ -80,7 +99,10 @@ pub(super) fn apply_client_island_dom_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
 	// definition of a root: any fragment or element without a parent
-	roots: Populated<(Entity, &DomIdx), (Added<DomIdx>, Without<ChildOf>)>,
+	roots: Populated<
+		(Entity, &DomIdx),
+		(Added<DomIdx>, Without<ChildOf>, Without<AttributeOf>),
+	>,
 	children: Query<&Children>,
 	requires_idx: Query<(), Added<RequiresDomIdx>>,
 ) {
@@ -117,7 +139,7 @@ mod test {
 	#[test]
 	fn applies_ids() {
 		let mut app = App::new();
-		app.add_plugins(ApplySnippetsPlugin);
+		app.add_plugins((ApplySnippetsPlugin, SignalsPlugin));
 		let world = app.world_mut();
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);

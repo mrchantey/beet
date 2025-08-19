@@ -1,6 +1,8 @@
 mod dom_binding;
+mod dom_diff;
 mod load_client_islands;
 pub use dom_binding::*;
+pub use dom_diff::*;
 pub(crate) use load_client_islands::*;
 mod client_only;
 mod event_playback;

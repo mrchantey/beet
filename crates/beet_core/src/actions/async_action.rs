@@ -164,7 +164,7 @@ mod test {
 	use std::time::Duration;
 
 	use crate::prelude::*;
-	use beet_utils::utils::sleep;
+	use beet_utils::time_ext::sleep;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

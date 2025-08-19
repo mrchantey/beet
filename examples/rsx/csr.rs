@@ -6,9 +6,9 @@
 //!
 //! Here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh
-//! cargo run --example csr
-//! cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown
-//! wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
+//! cargo run --example csr --features=client
+//! cargo build --example csr --features=client --target wasm32-unknown-unknown
+//! wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
 //! sweet serve target/examples/csr
 //! ```
 //!
@@ -18,12 +18,16 @@ use beet::prelude::*;
 #[cfg(target_arch = "wasm32")]
 fn main() {
 	App::new()
-		.add_plugins(ApplyDirectivesPlugin)
-    .add_systems(Startup, |mut commands: Commands| {	
+    .insert_resource(pkg_config!())
+		.add_plugins(BeetPlugins)
+    .add_systems(Startup, |mut commands: Commands| {
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
-			commands.spawn(rsx! {<Counter client:only initial=7/>});
+			commands.spawn((HtmlDocument, rsx! {
+				// <Counter client:only initial=7/>
+				// <AttributeChanged client:only/>
+				<List client:only/>
+			}));
 		})
-		.set_runner(ReactiveApp::runner)
     .run();
 }
 
@@ -32,6 +36,14 @@ fn main() {
 	let html = r#"
 <!DOCTYPE html>
 <html lang="en">
+<head>
+	<style>
+	body{
+		color: #ddd;
+		background-color: #333;
+	}
+	</style>
+</head>
 <body>
 	<script type="module">
 	import init from './wasm/main.js'
@@ -41,6 +53,7 @@ fn main() {
 				throw error
 	})
 	</script>
+	<div id="root"></div>
 </body>
 </html>
 "#;
@@ -48,19 +61,69 @@ fn main() {
 }
 
 #[template]
-// components with client directives must be serde
 #[derive(Reflect)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
+
+	rsx! {
+		<article>
+			<p>Count: {get}</p>
+			<button onclick={move || set(get()+1)}>Increment</button>
+		</article>
+	}
+}
+
+#[template]
+#[derive(Reflect)]
+fn AttributeChanged() -> impl Bundle {
 	let (style, set_style) = signal("display: block;");
 
 	rsx! {
-			<p>Count: {get}</p>
-			<button onclick={move || set(get()+1)}>Increment</button>
+		<article>
+			<button onclick={move || set_style("display: block;")}>Show Them</button>
 			<button
 				style={style}
 				onclick={move || set_style("display: none;")}>
-				Hide Me
+				"Hide Me"
 			</button>
+		</article>
+	}
+}
+#[template]
+// components with client directives must be serde
+#[derive(Reflect)]
+fn List() -> impl Bundle {
+	let (get_children, set_children) = signal(vec![(
+		ElementNode::open(),
+		NodeTag::new("div"),
+		InnerText::new(format!("thingie group")),
+	)]);
+
+	let add_thingie = move || {
+		set_children.update(|prev| {
+			prev.push((
+				ElementNode::open(),
+				NodeTag::new("div"),
+				InnerText::new(format!("thingie number {}", prev.len())),
+			));
+			// let len = prev.len() as u32;
+			// beet::log!("len: {len}");
+			// prev.push(rsx! {<div>Thingie number {prev.len()}</div>});
+		});
+	};
+
+	let remove_seventh = move || {
+		set_children.update(|prev| {
+			if prev.len() > 6 {
+				prev.remove(6);
+			}
+		});
+	};
+	rsx! {
+		<article>
+			<button onclick={move ||add_thingie()}>Add Thingie</button>
+			<button onclick={move ||remove_seventh()}>Remove 7th Thingie</button>
+			{get_children}
+		</article>
 	}
 }

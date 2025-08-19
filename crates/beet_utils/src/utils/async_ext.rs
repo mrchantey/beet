@@ -17,7 +17,7 @@ pub async fn retry<T, E>(
 				}
 			}
 		}
-		crate::utils::sleep(debounce).await;
+		crate::time_ext::sleep(debounce).await;
 	}
 }
 

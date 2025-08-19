@@ -93,6 +93,7 @@ impl HtmlBuilder<'_, '_> {
 			html.push_str(&format!("<!--{}-->", comment.0));
 		}
 		if let Ok(text) = self.text_nodes.get(entity) {
+			// TODO escape html!
 			html.push_str(&text);
 		}
 		if let Ok((_, children)) = self.fragment_nodes.get(entity) {
@@ -130,7 +131,7 @@ impl HtmlBuilder<'_, '_> {
 			html.push('>');
 
 			if let Some(inner_text) = inner_text {
-				//TODO this is inner html not text
+				//TODO escape html!
 				html.push_str(&inner_text.0);
 			}
 

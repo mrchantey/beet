@@ -5,9 +5,17 @@
 {
 	"lsp": {
 		"rust-analyzer": {
-			"cargo": {
-				// "features": "all"
+			"initialization_options": {
+				"cargo": {
+					// "target": "wasm32-unknown-unknown"
+				}
 			}
+		}
+	},
+	"diagnostics": {
+		"cargo": {
+			// disables running cargo check on save
+			// "fetch_cargo_diagnostics": true
 		}
 	},
 	"file_scan_exclusions": [
@@ -16,7 +24,7 @@
 		"LICENSE-APACHE.txt",
 		"LICENSE-MIT.txt",
 		"**/node_modules",
-		"**/target",
+		// "**/target",
 		"**/.DS_Store",
 		"**/*.log",
 		"**/Cargo.lock"

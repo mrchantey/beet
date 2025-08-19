@@ -1,10 +1,10 @@
-mod signal;
-pub use signal::*;
 mod events;
 pub use events::*;
 mod reactive_app;
 pub use reactive_app::*;
 mod maybe_signal;
 pub use maybe_signal::*;
-mod bevy_signal;
-pub use bevy_signal::*;
+mod signals_plugin;
+pub use signals_plugin::*;
+mod propagate_signal_effect;
+pub use propagate_signal_effect::*;

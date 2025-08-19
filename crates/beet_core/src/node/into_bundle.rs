@@ -19,14 +19,24 @@ pub trait IntoBundle<M> {
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
 	fn into_bundle(self) -> impl Bundle;
 }
-#[derive(Reflect)]
 pub struct BundleMarker;
 
 impl<T: Bundle> IntoBundle<BundleMarker> for T {
 	fn into_bundle(self) -> impl Bundle { self }
 }
 
-/// Observers
+// collision with Getter: IntoBundle
+// pub struct ClosureMarker;
+
+// impl<T, U, M> IntoBundle<(ClosureMarker, U, M)> for T
+// where
+// 	T: FnOnce() -> U,
+// 	U: IntoBundle<M>,
+// {
+// 	fn into_bundle(self) -> impl Bundle { self().into_bundle() }
+// }
+
+
 pub struct ObserverMarker;
 
 impl<T, E, B: Bundle, M> IntoBundle<(ObserverMarker, E, B, M)> for T
@@ -133,12 +143,12 @@ impl IntoBundle<Self> for u32 {
 	}
 }
 
-// impl IntoBundle<Self> for u64 {
-// 	fn into_bundle(self) -> impl Bundle {
-// 		let value = self as f64;
-// 		(TextNode::new(value.to_string()), NumberNode::new(value))
-// 	}
-// }
+impl IntoBundle<Self> for u64 {
+	fn into_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
 
 // impl IntoBundle<Self> for u128 {
 // 	fn into_bundle(self) -> impl Bundle {
@@ -147,12 +157,12 @@ impl IntoBundle<Self> for u32 {
 // 	}
 // }
 
-// impl IntoBundle<Self> for usize {
-// 	fn into_bundle(self) -> impl Bundle {
-// 		let value = self as f64;
-// 		(TextNode::new(value.to_string()), NumberNode::new(value))
-// 	}
-// }
+impl IntoBundle<Self> for usize {
+	fn into_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
 
 impl IntoBundle<Self> for i8 {
 	fn into_bundle(self) -> impl Bundle {
@@ -175,12 +185,12 @@ impl IntoBundle<Self> for i32 {
 	}
 }
 
-// impl IntoBundle<Self> for i64 {
-// 	fn into_bundle(self) -> impl Bundle {
-// 		let value = self as f64;
-// 		(TextNode::new(value.to_string()), NumberNode::new(value))
-// 	}
-// }
+impl IntoBundle<Self> for i64 {
+	fn into_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
 
 // impl IntoBundle<Self> for i128 {
 // 	fn into_bundle(self) -> impl Bundle {
@@ -189,12 +199,12 @@ impl IntoBundle<Self> for i32 {
 // 	}
 // }
 
-// impl IntoBundle<Self> for isize {
-// 	fn into_bundle(self) -> impl Bundle {
-// 		let value = self as f64;
-// 		(TextNode::new(value.to_string()), NumberNode::new(value))
-// 	}
-// }
+impl IntoBundle<Self> for isize {
+	fn into_bundle(self) -> impl Bundle {
+		let value = self as f64;
+		(TextNode::new(value.to_string()), NumberNode::new(value))
+	}
+}
 
 
 #[cfg(test)]

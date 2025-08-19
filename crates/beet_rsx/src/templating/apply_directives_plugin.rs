@@ -54,7 +54,7 @@ impl Plugin for ApplyDirectivesPlugin {
 					apply_requires_dom_idx,
 					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,
-					#[cfg(any(not(target_arch = "wasm32"), test))]
+					// #[cfg(any(not(target_arch = "wasm32"), test))]
 					apply_root_dom_idx,
 					rearrange_html_document,
 					apply_reactive_text_nodes,
@@ -69,6 +69,7 @@ impl Plugin for ApplyDirectivesPlugin {
 						event_playback.run_if(run_once),
 						bind_events,
 						bind_text_nodes,
+						bind_element_nodes,
 						bind_attribute_values,
 					)
 						.chain()
