@@ -12,7 +12,9 @@ pub fn observe_triggers<E: Event + Clone>(world: &mut World) -> Func<E> {
 	func
 }
 
-pub fn observe_trigger_names<E: Event>(world: &mut World) -> Func<String> {
+pub fn observe_trigger_names<E: EntityEvent>(
+	world: &mut World,
+) -> Func<String> {
 	let func: Func<String> = mock_func(|a| a);
 	let func2 = func.clone();
 	world.add_observer(move |on_result: Trigger<E>, query: Query<&Name>| {

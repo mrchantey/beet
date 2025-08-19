@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 /// An event triggered on an [`ActionEntity`], propagated to the observers automatically
 /// with observers registered by the [run_plugin].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, EntityEvent)]
 pub struct OnResultAction<T = RunResult> {
 	/// The payload of the result.
 	/// By analogy if an action is a function, this would be the returned value.
@@ -82,7 +82,7 @@ impl<T> OnResultAction<T> {
 ///
 /// It is not allowed to trigger this directly because that would
 /// break the routing model of beet, instead see [OnResultAction].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, EntityEvent)]
 pub struct OnResult<T = RunResult> {
 	/// The payload of the result.
 	/// By analogy if an action is a function, this would be the returned value.
@@ -100,7 +100,7 @@ pub struct OnResult<T = RunResult> {
 /// See [HighestScore] for an example usage.
 /// It is not allowed to trigger this directly because that would
 /// break the routing model of beet, instead see [OnResultAction].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, EntityEvent)]
 pub struct OnChildResult<T = RunResult> {
 	/// The payload of the result.
 	/// By analogy if an action is a function, this would be the returned value.

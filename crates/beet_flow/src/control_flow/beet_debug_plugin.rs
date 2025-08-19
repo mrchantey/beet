@@ -126,7 +126,7 @@ impl Plugin for BeetDebugPlugin {
 /// A helper event for logging messages.
 /// This must use the [`EventReader`] pattern instead of observers
 /// because the 'stack' nature of observers results in a reverse order.
-#[derive(Debug, Event)]
+#[derive(Debug, BufferedEvent)]
 pub struct OnLogMessage {
 	/// The message to log
 	pub msg: Cow<'static, str>,

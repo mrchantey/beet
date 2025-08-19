@@ -88,7 +88,10 @@ impl From<BevyError> for HttpError {
 	fn from(err: BevyError) -> HttpError { Self::from_opaque(err) }
 }
 impl From<RunSystemError> for HttpError {
-	fn from(err: RunSystemError) -> HttpError { Self::from_opaque(err) }
+	fn from(err: RunSystemError) -> HttpError {
+		let err = bevyhow!("{}", err);
+		Self::from_opaque(err)
+	}
 }
 impl<In, Out> From<RegisteredSystemError<In, Out>> for HttpError
 where

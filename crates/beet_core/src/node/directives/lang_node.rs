@@ -1,6 +1,6 @@
 use crate::as_beet::*;
 use beet_utils::prelude::*;
-use bevy::ecs::component::HookContext;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use std::hash::Hash;

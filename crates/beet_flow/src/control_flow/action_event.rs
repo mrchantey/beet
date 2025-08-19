@@ -49,7 +49,7 @@ pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	}
 }
 /// Common functions for [`OnRun`] and [`OnResult`] triggers.
-pub trait ObserverEvent: Event + Debug {
+pub trait ObserverEvent: EntityEvent + Debug {
 	/// Get the action entity for this event.
 	fn action(&self) -> Entity;
 	/// Get the origin entity for this event.

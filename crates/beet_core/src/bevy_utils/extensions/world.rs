@@ -2,6 +2,7 @@ use beet_utils::utils::Tree;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
+use bevy::ecs::query::ReleaseStateQueryData;
 use bevy::prelude::*;
 use extend::ext;
 /// system version
@@ -129,24 +130,29 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
 	/// used for one-off queries, otherwise [`World::query`] should be preferred.
-	fn query_once<'a, D: QueryData>(&'a mut self) -> Vec<D::Item<'a>> {
+	fn query_once<'w, D>(&'w mut self) -> Vec<D::Item<'w, 'static>>
+	where
+		D: QueryData + ReleaseStateQueryData,
+	{
 		let world = self.into_world_mut();
-		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
+		let mut query = world.query::<D>();
+		query.iter_mut(world).map(D::release_state).collect()
 	}
-
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
 	/// used for one-off queries, otherwise [`World::query_filtered`] should be preferred.
-	fn query_filtered_once<'a, D: QueryData, F: QueryFilter>(
-		&'a mut self,
-	) -> Vec<D::Item<'a>> {
+	fn query_filtered_once<'w, D, F>(&'w mut self) -> Vec<D::Item<'w, 'static>>
+	where
+		D: QueryData + ReleaseStateQueryData,
+		F: QueryFilter,
+	{
 		let world = self.into_world_mut();
 		world
 			.query_filtered::<D, F>()
 			.iter_mut(world)
-			.collect::<Vec<_>>()
+			.map(D::release_state)
+			.collect()
 	}
-
 	/// Shorthand for removing all components of a given type.
 	fn remove<C: Component>(&mut self) -> Vec<C> {
 		let world = self.into_world_mut();

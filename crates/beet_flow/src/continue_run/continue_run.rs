@@ -1,8 +1,8 @@
+use crate::prelude::Remove;
 use crate::prelude::*;
-use bevy::ecs::component::HookContext;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
-
 
 /// This will add the [`Running`] component to the behavior when [`OnRun`] is triggered,
 /// and remove it when [`OnResult`] is triggered.

@@ -36,11 +36,14 @@ fn apply_static_and_flush(world: &mut World) -> Result {
 	while let Some(entity) = query.iter(world).next() {
 		// println!("Applying static rsx for {entity}");
 		world.entity_mut(entity).insert(ResolvedRoot);
-		world.run_system_cached_with(apply_static_rsx, entity)??;
-		world.run_system_cached_with(
+		world.run_system_cached_with::<In<Entity>, (), _, _>(
+			apply_static_rsx,
+			entity,
+		)?;
+		world.run_system_cached_with::<In<Entity>, (), _, _>(
 			flush_on_spawn_deferred_recursive,
 			entity,
-		)??;
+		)?;
 	}
 
 	Ok(())
@@ -117,7 +120,7 @@ fn apply_static_rsx(
 	// apply the snippet tree
 	commands
 		.entity(static_root)
-		.clone_with(instance_root, |builder| {
+		.clone_with_opt_out(instance_root, |builder| {
 			builder
 				.deny::<(SnippetRoot, StaticRoot)>()
 				.linked_cloning(true)
@@ -469,7 +472,9 @@ mod test {
 			.run_system_once_with(render_fragment, parent)
 			.unwrap()
 			.xpect()
-			.to_be("<article><h1>all about pizza</h1><div>pizza is 3</div></article>");
+			.to_be(
+				"<article><h1>all about pizza</h1><div>pizza is 3</div></article>",
+			);
 	}
 
 

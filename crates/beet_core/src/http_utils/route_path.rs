@@ -246,11 +246,12 @@ impl std::fmt::Display for RoutePathTree {
 
 #[cfg(test)]
 mod test {
+
 	#[test]
 	fn children_are_sorted() {
-		let ent1 = Entity::from_raw(1);
-		let ent2 = Entity::from_raw(2);
-		let ent3 = Entity::from_raw(3);
+		let ent1 = Entity::from_num(1);
+		let ent2 = Entity::from_num(2);
+		let ent3 = Entity::from_num(3);
 		let paths = vec![
 			(ent1, RoutePath::new("/zeta")),
 			(ent2, RoutePath::new("/alpha")),
@@ -262,7 +263,7 @@ mod test {
 		expect(child_names).to_be(vec!["/alpha", "/beta", "/zeta"]);
 	}
 	use crate::prelude::*;
-	use bevy::prelude::Entity;
+	use bevy::{ecs::entity::EntityRow, prelude::Entity};
 	use sweet::prelude::*;
 
 	#[test]
@@ -299,10 +300,10 @@ mod test {
 	#[test]
 	fn route_path_tree_from_paths() {
 		// Dummy entity values for testing
-		let ent1 = Entity::from_raw(1);
-		let ent2 = Entity::from_raw(2);
-		let ent3 = Entity::from_raw(3);
-		let ent4 = Entity::from_raw(4);
+		let ent1 = Entity::from_num(1);
+		let ent2 = Entity::from_num(2);
+		let ent3 = Entity::from_num(3);
+		let ent4 = Entity::from_num(4);
 		let paths = vec![
 			(ent1, RoutePath::new("/foo/bar")),
 			(ent2, RoutePath::new("/foo/baz")),

@@ -76,7 +76,7 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			TreeNode::new(Some(&Running::new(Entity::from_raw(10))))
+			TreeNode::new(Some(&Running::new(Entity::from_num(10))))
 				.with_leaf(None)
 				.with_leaf(None)
 				.with_child(TreeNode::new(None).with_leaf(None))

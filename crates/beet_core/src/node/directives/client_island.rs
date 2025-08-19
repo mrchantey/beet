@@ -76,7 +76,7 @@ where
 	type Mutability = Immutable;
 
 	// self register for the scene
-	fn on_add() -> Option<bevy::ecs::component::ComponentHook> {
+	fn on_add() -> Option<bevy::ecs::lifecycle::ComponentHook> {
 		Some(|mut world, cx| {
 			let entity = cx.entity;
 			world.commands().queue(move |world: &mut World| {

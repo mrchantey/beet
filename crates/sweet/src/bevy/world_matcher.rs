@@ -24,10 +24,6 @@ impl SweetMut<World> for &mut App {
 #[ext(name=WorldMutExtMatcher)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: SweetMut<World>> Matcher<W> {
-	fn query<'a, D: QueryData>(&'a mut self) -> Vec<D::Item<'a>> {
-		let world = self.value.sweet_mut();
-		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
-	}
 	fn num_components<T: Component>(&mut self) -> Matcher<usize> {
 		let world = self.value.sweet_mut();
 		let mut arr = world.query::<&T>();

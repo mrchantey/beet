@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct Remove<E: ObserverEvent, B: Bundle> {
+pub struct Remove<E: EntityEvent + ObserverEvent, B: Bundle> {
 	/// The target entity to remove the bundle from.
 	pub target_entity: TargetEntity,
 	phantom: PhantomData<(E, B)>,

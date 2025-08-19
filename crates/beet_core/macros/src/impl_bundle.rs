@@ -45,12 +45,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 				_ids: &mut impl FnMut(Option<bevy::ecs::component::ComponentId>),
 			) {
 			}
-
-			fn register_required_components(
-				_components: &mut bevy::ecs::component::ComponentsRegistrator,
-				_required_components: &mut bevy::ecs::component::RequiredComponents,
-			) {
-			}
 		}
 	})
 }

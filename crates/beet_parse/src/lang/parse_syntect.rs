@@ -238,7 +238,7 @@ mod test {
 				InnerText("fn foobar() -> String\n{}".to_string()),
 			))
 			.id();
-		world.run_system_cached(parse_syntect).unwrap().unwrap();
+		world.run_system_cached::<(), _, _>(parse_syntect).unwrap();
 
 		world
 			.entity(entity)

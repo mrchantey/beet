@@ -25,7 +25,7 @@ pub impl<
 		entity: Entity,
 	) -> DirectDescendantIter
 	where
-		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 	{
 		DirectDescendantIter::new(self, entity)
 	}
@@ -36,7 +36,7 @@ pub impl<
 		entity: Entity,
 	) -> Chain<std::iter::Once<Entity>, AncestorIter<'w, 's, D, F, R>>
 	where
-		D::ReadOnly: QueryData<Item<'w> = &'w R>,
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w R>,
 	{
 		Iterator::chain(std::iter::once(entity), self.iter_ancestors(entity))
 	}
@@ -47,7 +47,7 @@ pub impl<
 		entity: Entity,
 	) -> Chain<std::iter::Once<Entity>, DescendantIter<'w, 's, D, F, S>>
 	where
-		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 	{
 		Iterator::chain(std::iter::once(entity), self.iter_descendants(entity))
 	}
@@ -58,7 +58,7 @@ pub impl<
 		entity: Entity,
 	) -> Chain<std::iter::Once<Entity>, DescendantDepthFirstIter<'w, 's, D, F, S>>
 	where
-		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 		SourceIter<'w, S>: DoubleEndedIterator,
 	{
 		Iterator::chain(
@@ -83,7 +83,7 @@ impl DirectDescendantIter {
 		entity: Entity,
 	) -> Self
 	where
-		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 	{
 		let mut items = children_query
 			.get(entity)

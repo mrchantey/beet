@@ -64,7 +64,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		#[derive(Event)]
+		#[derive(EntityEvent)]
 		struct Foo(u32);
 
 		let bucket = mock_bucket::<u32>();

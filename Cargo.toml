@@ -109,7 +109,7 @@ beet = { path = "", version = "0.0.7-dev.8" }
 
 #💡 local
 ## git for IntoPipeSystem: Clone
-bevy = { git = "https://github.com/mrchantey/bevy", branch = "bevy-0.16-patches", default-features = false, features = [
+bevy = { git = "https://github.com/mrchantey/bevy", branch = "next-gen-scenes-2", default-features = false, features = [
 	# bevy = { version = "0.16", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	# for most oneshot apps multi-threaded coldstart is much slower than
@@ -117,7 +117,7 @@ bevy = { git = "https://github.com/mrchantey/bevy", branch = "bevy-0.16-patches"
 	# instead we should par_iter inside systems
 	# "multi_threaded",
 	# "track_location",
-	"configurable_error_handler",
+	# "configurable_error_handler",
 	"bevy_log",
 	"bevy_color",
 ] }
