@@ -47,7 +47,7 @@ fn main() {
 <body>
 	<script type="module">
 	import init from './wasm/main.js'
-	init('./wasm/main_bg.wasm')
+	init({module_or_path: './wasm/main_bg.wasm'})
 		.catch((error) => {
 			if (!error.message.startsWith("Using exceptions for control flow,"))
 				throw error

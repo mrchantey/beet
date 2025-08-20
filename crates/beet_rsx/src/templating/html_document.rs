@@ -177,7 +177,7 @@ fn load_wasm_script(html_constants: &HtmlConstants) -> impl Bundle {
 	script(format!(
 		r#"
 		import init from '{js_path}'
-		init('{bin_path}')
+		init({{ module_or_path: '{bin_path}' }})
 			.catch((error) => {{
 				if (!error.message.startsWith("Using exceptions for control flow,"))
 					throw error
