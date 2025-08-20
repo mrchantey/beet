@@ -13,8 +13,8 @@ pub struct RequiresDomBinding;
 
 /// Basic primitives required for downstream crates to implement reactivity,
 /// This type should be marked [`Changed`] when its associated signal changes,
-/// which is important for cases like bundle signals where there is no one component
-/// to watch for changes.
+/// which is important for cases like bundle signals where the 'whole entity' should
+/// be watched for changes instead of a single component.
 /// see beet_rsx::reactivity::propagate_signal_effect.rs
 // This is implemented here due to orphan rule
 #[derive(Component, Clone)]
@@ -139,7 +139,9 @@ where
 					       mut query: Query<&mut SignalEffect>|
 					      -> Result {
 						query.get_mut(id)?.set_changed();
-						// remove everything but the SignalEffect
+						// remove everything but the SignalEffect and relations
+						// we arent doing any fine-grained diffing here, instead
+						// we diff the actual dom
 						commands
 							.entity(id)
 							.despawn_related::<Children>()

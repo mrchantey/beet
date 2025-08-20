@@ -93,22 +93,16 @@ fn AttributeChanged() -> impl Bundle {
 // components with client directives must be serde
 #[derive(Reflect)]
 fn List() -> impl Bundle {
-	let (get_children, set_children) = signal(vec![(
-		ElementNode::open(),
-		NodeTag::new("div"),
-		InnerText::new(format!("thingie group")),
+	let (get_children, set_children) = signal(vec![CloneBundleEffect::insert(
+		move || rsx! {<div>all the thingies</div>},
 	)]);
 
 	let add_thingie = move || {
 		set_children.update(|prev| {
-			prev.push((
-				ElementNode::open(),
-				NodeTag::new("div"),
-				InnerText::new(format!("thingie number {}", prev.len())),
+			let len = prev.len();
+			prev.push(CloneBundleEffect::insert(
+				move || rsx! {<div>Thingie number {len}</div>},
 			));
-			// let len = prev.len() as u32;
-			// beet::log!("len: {len}");
-			// prev.push(rsx! {<div>Thingie number {prev.len()}</div>});
 		});
 	};
 

@@ -18,11 +18,8 @@ where
 }
 
 
-
-
-
 /// A [`BundleEffect`] that runs a function when the entity is spawned.
-#[derive(ImplBundle)]
+#[derive(Clone, ImplBundle)]
 pub struct OnSpawn<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
 	pub F,
 );
@@ -149,6 +146,16 @@ pub struct CloneBundleEffect(pub Box<dyn CloneEntityFunc>);
 impl CloneBundleEffect {
 	/// Create a new [`OnSpawnCloneable`] effect.
 	pub fn new(func: impl CloneEntityFunc) -> Self { Self(Box::new(func)) }
+	/// Immediately inserts the bundle returned from this method
+	pub fn insert<F, O>(func: F) -> Self
+	where
+		F: 'static + Send + Sync + Clone + FnOnce() -> O,
+		O: Bundle,
+	{
+		Self::new(move |entity| {
+			entity.insert(func.clone()());
+		})
+	}
 }
 
 impl BundleEffect for CloneBundleEffect {
@@ -170,7 +177,6 @@ where
 {
 	fn box_clone(&self) -> Box<dyn CloneEntityFunc> { Box::new(self.clone()) }
 }
-
 
 
 #[cfg(test)]

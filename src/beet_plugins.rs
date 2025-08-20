@@ -53,5 +53,14 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	#[cfg(feature = "client")]
 	let binary = "Client";
 
+	#[cfg(not(any(
+		feature = "launch",
+		feature = "server",
+		feature = "client"
+	)))]
+	panic!(
+		"No runner feature enabled. Please enable one of: launch, server, client."
+	);
+
 	info!("\n🌱 Running Beet\nbinary: {binary}\n{}", *pkg_config);
 }

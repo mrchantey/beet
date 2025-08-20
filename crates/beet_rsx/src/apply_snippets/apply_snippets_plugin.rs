@@ -8,6 +8,11 @@ use bevy::prelude::*;
 
 pub struct ApplySnippetsPlugin;
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ApplySnippetsSet;
+
+
 /// This schedule recursively resolves each newly added [`InstanceRoot`]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ApplySnippets;
@@ -22,7 +27,7 @@ impl Plugin for ApplySnippetsPlugin {
 				apply_template_children,
 				apply_slots,
 			)
-				.chain(),
+				.chain().in_set(ApplySnippetsSet),
 		);
 	}
 }
@@ -469,7 +474,9 @@ mod test {
 			.run_system_once_with(render_fragment, parent)
 			.unwrap()
 			.xpect()
-			.to_be("<article><h1>all about pizza</h1><div>pizza is 3</div></article>");
+			.to_be(
+				"<article><h1>all about pizza</h1><div>pizza is 3</div></article>",
+			);
 	}
 
 
