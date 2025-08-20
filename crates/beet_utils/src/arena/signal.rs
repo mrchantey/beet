@@ -150,6 +150,11 @@ impl<T: 'static + Send + Clone> Setter<T> {
 		}
 	}
 }
+
+impl<T: 'static + Send + Clone> Setter<Vec<T>> {
+	pub fn push(&self, new_val: T) { self.update(|vec| vec.push(new_val)); }
+}
+
 #[cfg(feature = "nightly")]
 impl<T: 'static + Send + Clone> std::ops::Fn<(T,)> for Setter<T> {
 	extern "rust-call" fn call(&self, args: (T,)) -> Self::Output {

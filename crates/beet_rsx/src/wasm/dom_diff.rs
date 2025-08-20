@@ -4,8 +4,11 @@ use bevy::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlElement;
 
+use crate::wasm::DomNodeBinding;
+
 #[derive(SystemParam)]
 pub struct DomDiff<'w, 's> {
+	commands: Commands<'w, 's>,
 	fragment_nodes: Query<'w, 's, (), With<FragmentNode>>,
 	element_nodes: Query<
 		'w,
@@ -25,6 +28,7 @@ pub struct DomDiff<'w, 's> {
 		(&'static AttributeKey, Option<&'static TextNode>),
 		With<AttributeOf>,
 	>,
+	dom_node_bindings: Query<'w, 's, &'static DomNodeBinding>,
 }
 
 impl DomDiff<'_, '_> {
@@ -49,7 +53,7 @@ impl DomDiff<'_, '_> {
 			.ok_or_else(|| bevyhow!("no window"))?
 			.document()
 			.ok_or_else(|| bevyhow!("no document"))?;
-		if let Ok((tag, _)) = self.element_nodes.get(entity) {
+		let node = if let Ok((tag, _)) = self.element_nodes.get(entity) {
 			// check which namespace we're in and apply it
 			// TODO foreignObject
 			let ns = parent.namespace_uri();
@@ -67,16 +71,18 @@ impl DomDiff<'_, '_> {
 					.into(),
 				_ => document.create_element(&tag).map_jserr()?.into(),
 			};
-			Ok(node)
+			node
 		} else if let Ok(text) = self.text_nodes.get(entity) {
-			Ok(document.create_text_node(&text.0).into())
+			document.create_text_node(&text.0).into()
 		} else if let Ok(comment) = self.comment_nodes.get(entity) {
-			Ok(document.create_comment(&**comment).into())
+			document.create_comment(&**comment).into()
 		} else if let Ok(_) = self.doctype_nodes.get(entity) {
 			todo!("create doctype?");
 		} else {
 			bevybail!("entity is not a node")
-		}
+		};
+
+		Ok(node)
 	}
 
 	fn remove_node(
@@ -148,10 +154,30 @@ impl DomDiff<'_, '_> {
 		if needs_replace {
 			let new_node = self.create_node(parent, entity)?;
 			parent.replace_child(&new_node, node).map_jserr()?;
+			// INFINITE LOOP:
+			// should be Ok because guaranteed to match created node
 			self.diff_node(entity, parent, &new_node)?;
+		} else {
+			self.diff_node_binding(entity, &node);
 		}
 
 		Ok(())
+	}
+
+
+	/// This diff is unusual because it modifies the entity, not the dom.
+	/// for now just apply a DomNodeBinding to all elements and their attributes.
+	/// in the future we could narrow this with something like RequiresDomBinding
+	fn diff_node_binding(&mut self, entity: Entity, node: &web_sys::Node) {
+		if let Ok(binding) = self.dom_node_bindings.get(entity)
+			&& binding.nodes_eq(node)
+		{
+			return;
+		} else {
+			self.commands
+				.entity(entity)
+				.insert(DomNodeBinding::new(node.clone()));
+		}
 	}
 
 	/// Apply a diff to children, the entity may be an [`ElementNode`] or [`FragmentNode`]
@@ -176,13 +202,18 @@ impl DomDiff<'_, '_> {
 
 		// 2: iterate entity children, update existing DOM child or append if missing
 		let entity_children = self.child_nodes(entity);
-		let node_list = element.child_nodes();
-		let mut dom_children = Vec::with_capacity(node_list.length() as usize);
-		for i in 0..node_list.length() {
-			if let Some(child) = node_list.item(i) {
-				dom_children.push(child);
+		let dom_children = {
+			// NodeList to Vec
+			let node_list = element.child_nodes();
+			let mut dom_children =
+				Vec::with_capacity(node_list.length() as usize);
+			for i in 0..node_list.length() {
+				if let Some(child) = node_list.item(i) {
+					dom_children.push(child);
+				}
 			}
-		}
+			dom_children
+		};
 		for index in 0..entity_children.len() {
 			let entity_child = entity_children[index];
 			if index < dom_children.len() {
@@ -235,7 +266,7 @@ impl DomDiff<'_, '_> {
 						&& let Some(text) = text
 						&& text.contains(&self.constants.event_handler)
 					{
-						// ignore event handler attributes we're already at runtime,
+						// ignore event handler attributes, we're already at runtime so
 						// they will be bound directly to the dom in bind_events
 					} else {
 						element.set_attribute(&key.0, &desired).map_jserr()?;
@@ -277,6 +308,12 @@ impl DomDiff<'_, '_> {
 				element.remove_attribute(&name).map_jserr()?;
 			}
 		}
+
+		// 3. Diff node binding
+		for attr in self.attributes.iter_direct_descendants(entity) {
+			self.diff_node_binding(attr, &element);
+		}
+
 		Ok(())
 	}
 

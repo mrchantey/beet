@@ -27,10 +27,10 @@ pub(crate) fn mount_client_only(
 	}
 	Ok(())
 }
-/// ensure all text nodes are collapsed, critical when mounting
-/// nodes via append_child
-#[allow(unused)]
-fn normalize() { web_sys::window().unwrap().document().unwrap().normalize(); }
+// /// ensure all text nodes are collapsed, critical when mounting
+// /// nodes via append_child
+// #[allow(unused)]
+// fn normalize() { web_sys::window().unwrap().document().unwrap().normalize(); }
 
 // fn mount(html: &str) {
 // 	// let html = HtmlFragment::parse_bundle(bundle);

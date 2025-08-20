@@ -59,18 +59,21 @@ impl DomBinding<'_, '_> {
 /// - [`CommentNode`]
 /// - [`ElementNode`]
 /// - [`AttributeOf`]
-#[derive(Component, Deref)]
+#[derive(Component, Deref, DerefMut)]
 pub struct DomNodeBinding(SendWrapper<web_sys::Node>);
 impl DomNodeBinding {
 	pub fn new(node: impl Into<web_sys::Node>) -> Self {
 		Self(SendWrapper::new(node.into()))
 	}
 	pub fn inner(&self) -> &web_sys::Node { self.0.as_ref() }
+	/// Performs a strict equality `js ===` on two nodes, ensuring
+	/// they point to the same instance
+	pub fn nodes_eq(&self, other: &web_sys::Node) -> bool { &*self.0 == other }
 }
 
 
 /// Bind each [`ElementNode`] with a [`RequiresDomBinding`] and [`DomIdx`]
-pub(crate) fn bind_element_nodes(
+pub(crate) fn bind_dom_idx_elements(
 	query: Populated<
 		(Entity, &DomIdx),
 		(
@@ -92,7 +95,7 @@ pub(crate) fn bind_element_nodes(
 /// 2. find the marker comment node
 /// 3. assign the text node to the next sibling of the marker comment
 /// 4. remove the marker comments
-pub(crate) fn bind_text_nodes(
+pub(crate) fn bind_dom_idx_text_nodes(
 	query: Populated<
 		(Entity, &DomIdx),
 		(
@@ -167,7 +170,7 @@ pub(crate) fn bind_text_nodes(
 
 
 
-pub(crate) fn bind_attribute_values(
+pub(crate) fn bind_dom_idx_attributes(
 	mut commands: Commands,
 	mut dom_binding: DomBinding,
 	elements: Query<(Entity, &DomIdx)>,
@@ -196,35 +199,50 @@ pub(crate) fn bind_attribute_values(
 }
 
 /// Track a created closure to ensure it is not dropped
-#[derive(Component, Deref)]
+#[derive(Component)]
 #[component(on_remove=on_remove_dom_closure)]
-struct DomClosureBinding(
-	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
-);
-
-
-fn on_remove_dom_closure(world: DeferredWorld, cx: HookContext) {
-	beet_utils::log!("removing dom closure..");
-	// if let Some(el) = world.entity(cx.entity).get::<DomNodeBinding>() {}
+struct DomClosureBinding {
+	event_name: String,
+	element: SendWrapper<web_sys::Element>,
+	closure:
+		SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 }
+
+/// if the closure is an attribute event, ensure
+fn on_remove_dom_closure(world: DeferredWorld, cx: HookContext) {
+	if let Some(binding) = world.entity(cx.entity).get::<DomClosureBinding>() {
+		binding
+			.element
+			.remove_event_listener_with_callback(
+				&binding.event_name,
+				binding.closure.as_ref().as_ref().unchecked_ref(),
+			)
+			.unwrap();
+	}
+}
+
 
 pub(crate) fn bind_events(
 	mut commands: Commands,
-	mut get_binding: DomBinding,
-	query: Populated<(Entity, &DomIdx), (With<EventTarget>, Added<DomIdx>)>,
+	query: Populated<
+		(Entity, &DomNodeBinding),
+		(With<EventTarget>, Added<DomNodeBinding>),
+	>,
 	find_attribute: FindAttribute,
 ) -> Result<()> {
-	for (el_entity, idx) in query.iter() {
+	for (el_entity, binding) in query.iter() {
+		let Some(element) = binding.dyn_ref::<web_sys::Element>() else {
+			bevybail!("DomNodeBinding with EventTarget is not an element")
+		};
+
 		for (attr_entity, attr_key) in find_attribute.events(el_entity) {
 			let attr_key = attr_key.clone();
 			let attr_key2 = attr_key.clone();
-			let element = get_binding.get_or_bind_element(el_entity, *idx)?;
 			// remove the temp event playback attribute
 			element.remove_attribute(&attr_key).ok();
 
 			let func = move |ev: web_sys::Event| {
 				ReactiveApp::with(|app| {
-					beet_utils::log!("html event triggered..");
 					let mut commands = app.world_mut().commands();
 					let mut commands = commands.entity(el_entity);
 					BeetEvent::trigger(&mut commands, &attr_key, ev);
@@ -236,18 +254,20 @@ pub(crate) fn bind_events(
 					app.update();
 				})
 			};
-
 			let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
-			element
+			let event_name = attr_key2.replace("on", "");
+			binding
 				.add_event_listener_with_callback(
 					&attr_key2.replace("on", ""),
 					closure.as_ref().unchecked_ref(),
 				)
 				.unwrap();
 			// closure.forget();
-			commands
-				.entity(attr_entity)
-				.insert(DomClosureBinding(SendWrapper::new(closure)));
+			commands.entity(attr_entity).insert(DomClosureBinding {
+				event_name,
+				closure: SendWrapper::new(closure),
+				element: SendWrapper::new(element.clone()),
+			});
 		}
 	}
 	Ok(())

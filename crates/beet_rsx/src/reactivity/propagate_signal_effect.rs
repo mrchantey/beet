@@ -54,10 +54,10 @@ pub fn flush_signals(
 ) {
 	let mut entities = Vec::new();
 	while let Ok(entity) = dirty.recv.try_recv() {
-		entities.push(entity);
+		if !entities.contains(&entity) {
+			entities.push(entity);
+		}
 	}
-	entities.sort();
-	entities.dedup();
 	for entity in entities {
 		if let Ok(effect) = effects.get(entity) {
 			commands.run_system(effect.system_id());

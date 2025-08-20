@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use crate::prelude::*;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
+use std::sync::Arc;
 
 /// Mark an entity as requiring a [`DomBinding`], often added to nodes
 /// with a [`SignalEffect`], and also their parent [`ElementNode`]

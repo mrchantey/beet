@@ -67,10 +67,10 @@ impl Plugin for ApplyDirectivesPlugin {
 					(
 						mount_client_only,
 						event_playback.run_if(run_once),
+						bind_dom_idx_text_nodes,
+						bind_dom_idx_elements,
+						bind_dom_idx_attributes,
 						bind_events,
-						bind_text_nodes,
-						bind_element_nodes,
-						bind_attribute_values,
 					)
 						.chain()
 						.run_if(document_exists),

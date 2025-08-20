@@ -8,7 +8,8 @@ use wasm_bindgen::JsCast;
 use web_sys::Event;
 
 /// A system that runs once after hydration to playback any events
-/// that occured while the wasm was loading.
+/// that occured while the wasm was loading. These are applied directly
+/// to the bevy event listeners, no element or [`DomNodeBinding`] is involved.
 pub(crate) fn event_playback(
 	query: Populated<
 		(Entity, &DomIdx, &Attributes),
