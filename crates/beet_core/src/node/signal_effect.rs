@@ -1,7 +1,5 @@
 use std::sync::Arc;
-
 use crate::prelude::*;
-use beet_utils::prelude::*;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
@@ -27,12 +25,12 @@ pub struct SignalEffect {
 }
 
 impl SignalEffect {
-	pub fn new<T: Clone + 'static + Send + Sync>(
-		getter: Getter<T>,
-		system_id: SystemId,
-	) -> Self {
+	pub fn new<Func, Out>(func: Func, system_id: SystemId) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
+	{
 		let effect_subscriber = Arc::new(move || {
-			let _ = getter.get();
+			let _ = func.clone()();
 		});
 		SignalEffect {
 			system_id,
@@ -73,13 +71,15 @@ impl Primitive for f32 {}
 impl Primitive for f64 {}
 
 
-impl<T> IntoBundle<(Self, PrimitiveGetterIntoBundle)> for Getter<T>
+impl<Func, Out> IntoBundle<(Out, PrimitiveGetterIntoBundle)> for Func
 where
-	T: 'static + Send + Sync + Clone + Primitive,
+	Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
+	Out: 'static + Send + Sync + Clone + Primitive,
 {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
 			let id = entity.id();
+			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
 				world.register_system(
 					(move |mut query: Query<(
@@ -89,7 +89,7 @@ where
 					      -> Result {
 						let (mut signal, mut text) = query.get_mut(id)?;
 						signal.set_changed();
-						text.0 = self.clone()().to_string();
+						text.0 = this.clone()().to_string();
 						Ok(())
 					})
 					.pipe(handle_result),
@@ -126,13 +126,15 @@ where
 {
 }
 
-impl<T, M1, M2> IntoBundle<(Self, M1, M2)> for Getter<T>
+impl<Func, Out, M1, M2> IntoBundle<(Out, M1, M2)> for Func
 where
-	T: 'static + Send + Sync + Clone + BundleLike<M1, M2>,
+	Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
+	Out: 'static + Send + Sync + Clone + BundleLike<M1, M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
 			let id = entity.id();
+			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
 				world.register_system(
 					(move |mut commands: Commands,
@@ -147,7 +149,7 @@ where
 							.despawn_related::<Children>()
 							.despawn_related::<Attributes>()
 							.retain::<(SignalEffect, ChildOf)>()
-							.insert(self.clone()().into_bundle());
+							.insert(this.clone()().into_bundle());
 						Ok(())
 					})
 					.pipe(handle_result),
@@ -163,6 +165,14 @@ where
 }
 
 
+// #[cfg(not(feature = "nightly"))]
+// impl<T, M> IntoBundle<(Self, T, M)> for beet_utils::prelude::Getter<T>
+// where
+// 	T: 'static + Send + Sync + IntoBundle<M>,
+// {
+// 	fn into_bundle(self) -> impl Bundle { self.get().into_bundle() }
+// }
+
 // more tests in beet_rsx::reactivity::propagate_signal_effect.rs
 #[cfg(test)]
 mod test {
@@ -170,6 +180,13 @@ mod test {
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
+
+
+	#[cfg(not(feature = "nightly"))]
+	#[test]
+	fn stable() {
+		// panic!();
+	}
 
 	#[test]
 	fn primitive_getter() {

@@ -36,6 +36,16 @@ impl<T: Bundle> IntoBundle<BundleMarker> for T {
 // 	fn into_bundle(self) -> impl Bundle { self().into_bundle() }
 // }
 
+#[extend::ext]
+pub impl<T, M> T
+where
+	T: 'static + Send + Sync + Clone + IntoBundle<M>,
+{
+	fn any_bundle_clone(self) -> OnSpawnClone {
+		OnSpawnClone::insert(move || self.clone().into_bundle())
+	}
+}
+
 
 pub struct ObserverMarker;
 

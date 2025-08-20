@@ -22,7 +22,8 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["bevy"]
+default = ["bevy", "nightly"]
+nightly = ["beet_utils/nightly"]
 bevy = ["dep:bevy", "beet_core_macros"]
 bevy_default = ["bevy", "bevy/default"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]

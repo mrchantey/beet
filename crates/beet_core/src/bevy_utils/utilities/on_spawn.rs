@@ -139,11 +139,11 @@ impl OnSpawnDeferred {
 	}
 }
 
-/// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
+/// A [`Clone`] version of [`OnSpawnBoxed`]
 #[derive(ImplBundle)]
-pub struct CloneBundleEffect(pub Box<dyn CloneEntityFunc>);
+pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
-impl CloneBundleEffect {
+impl OnSpawnClone {
 	/// Create a new [`OnSpawnCloneable`] effect.
 	pub fn new(func: impl CloneEntityFunc) -> Self { Self(Box::new(func)) }
 	/// Immediately inserts the bundle returned from this method
@@ -158,11 +158,11 @@ impl CloneBundleEffect {
 	}
 }
 
-impl BundleEffect for CloneBundleEffect {
+impl BundleEffect for OnSpawnClone {
 	fn apply(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
 
-impl Clone for CloneBundleEffect {
+impl Clone for OnSpawnClone {
 	fn clone(&self) -> Self { Self(self.0.box_clone()) }
 }
 

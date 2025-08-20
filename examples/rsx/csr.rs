@@ -93,16 +93,22 @@ fn AttributeChanged() -> impl Bundle {
 // components with client directives must be serde
 #[derive(Reflect)]
 fn List() -> impl Bundle {
-	let (get_children, set_children) = signal(vec![CloneBundleEffect::insert(
-		move || rsx! {<div>all the thingies</div>},
-	)]);
+	let (get_children, set_children) = signal(vec![]);
 
 	let add_thingie = move || {
 		set_children.update(|prev| {
 			let len = prev.len();
-			prev.push(CloneBundleEffect::insert(
-				move || rsx! {<div>Thingie number {len}</div>},
-			));
+			prev.push(OnSpawnClone::insert(move || {
+				rsx! {<div>Thingie number {len}
+
+				<button onclick={move||{
+					beet::log!("removing item at {len}");
+					set_children.update(|prev|{
+						prev.remove(len);
+					})
+				}}>remove</button>
+				</div>}
+			}));
 		});
 	};
 
@@ -113,6 +119,9 @@ fn List() -> impl Bundle {
 			}
 		});
 	};
+
+	add_thingie();
+
 	rsx! {
 		<article>
 			<button onclick={move ||add_thingie()}>Add Thingie</button>

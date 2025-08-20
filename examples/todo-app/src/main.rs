@@ -27,5 +27,6 @@ fn client_plugin(app: &mut App) {
 	// so we need to register any type with a client load directive
 	app
 		.register_type::<ClientIslandRoot<ClientCounter>>()
+		.register_type::<ClientIslandRoot<TodoList>>()
 		.register_type::<ClientIslandRoot<ServerCounter>>();
 }

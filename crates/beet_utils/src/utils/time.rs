@@ -42,6 +42,27 @@ impl CrossInstant {
 			self.start.elapsed()
 		}
 	}
+
+	pub fn add(&self, duration: Duration) -> Self {
+		CrossInstant {
+			#[cfg(target_arch = "wasm32")]
+			start: self.start + duration.as_millis() as f64 / 1000.0,
+			#[cfg(not(target_arch = "wasm32"))]
+			start: self.start + duration,
+		}
+	}
+
+	pub fn unix_epoch(&self) -> Duration {
+		#[cfg(target_arch = "wasm32")]
+		{
+			let elapsed_secs = (Self::performance_now() - self.start) / 1000.0;
+			Duration::from_secs_f64(elapsed_secs)
+		}
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			self.start.elapsed()
+		}
+	}
 }
 
 

@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::component::HookContext;
 use bevy::ecs::system::SystemParam;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
@@ -65,12 +67,6 @@ impl DomNodeBinding {
 	}
 	pub fn inner(&self) -> &web_sys::Node { self.0.as_ref() }
 }
-
-/// Track a created closure to ensure it is not dropped
-#[derive(Component, Deref)]
-pub struct DomClosureBinding(
-	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
-);
 
 
 /// Bind each [`ElementNode`] with a [`RequiresDomBinding`] and [`DomIdx`]
@@ -199,6 +195,18 @@ pub(crate) fn bind_attribute_values(
 	Ok(())
 }
 
+/// Track a created closure to ensure it is not dropped
+#[derive(Component, Deref)]
+#[component(on_remove=on_remove_dom_closure)]
+struct DomClosureBinding(
+	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
+);
+
+
+fn on_remove_dom_closure(world: DeferredWorld, cx: HookContext) {
+	beet_utils::log!("removing dom closure..");
+	// if let Some(el) = world.entity(cx.entity).get::<DomNodeBinding>() {}
+}
 
 pub(crate) fn bind_events(
 	mut commands: Commands,
@@ -216,6 +224,7 @@ pub(crate) fn bind_events(
 
 			let func = move |ev: web_sys::Event| {
 				ReactiveApp::with(|app| {
+					beet_utils::log!("html event triggered..");
 					let mut commands = app.world_mut().commands();
 					let mut commands = commands.entity(el_entity);
 					BeetEvent::trigger(&mut commands, &attr_key, ev);
@@ -235,6 +244,7 @@ pub(crate) fn bind_events(
 					closure.as_ref().unchecked_ref(),
 				)
 				.unwrap();
+			// closure.forget();
 			commands
 				.entity(attr_entity)
 				.insert(DomClosureBinding(SendWrapper::new(closure)));

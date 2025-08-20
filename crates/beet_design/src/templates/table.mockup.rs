@@ -19,18 +19,16 @@ pub fn get() -> impl Bundle {
 				 <th>Occupation</th>
 				 <th></th>
 			 </tr>
-			 <tr>
 			 {users.iter().map(|(name, age, occupation)| {
 				 rsx! {
 					<tr>
-					 	<td>{name}</td>
-					 	<td>{age}</td>
-					 	<td>{occupation}</td>
-					 	<td><Button>View Profile</Button></td>
+						 <td>{name}</td>
+						 <td>{age}</td>
+						 <td>{occupation}</td>
+						 <td><Button>View Profile</Button></td>
 					</tr>
 				 }
 			 }).collect::<Vec<_>>()}
-			 </tr>
 		 </Table>
 	}
 }

@@ -8,7 +8,13 @@ use bevy::prelude::*;
 /// - `head`: The table header, which should contain `<tr>` elements.
 /// - `foot`: The table footer, which should contain `<tr>` elements.
 /// - `default`: The body of the table, which should contain `<tr>` elements.
-///
+///	## Example
+/// 
+/// ```
+/// # use beet_rsx::as_beet::*;
+/// 
+/// 
+/// ```
 #[template]
 pub fn Table() -> impl Bundle {
 	rsx! {
