@@ -4,6 +4,8 @@ use crate::prelude::*;
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
+	pub tabindex: Option<String>,
+	pub autofocus: Option<bool>,
 	pub onchange: Option<EventHandler<OnChange>>,
 	pub oninput: Option<EventHandler<OnInput>>,
 	pub onclick: Option<EventHandler<OnClick>>,
@@ -92,9 +94,9 @@ mod test {
 	}
 	#[test]
 	fn renders() {
-		rsx! { <Button 
+		rsx! { <Button
 			disabled=true
-			id="foo"			
+			id="foo"
 			onclick=|_| {} />
 		}
 			.xmap(HtmlDocument::parse_bundle)

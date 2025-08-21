@@ -1,4 +1,6 @@
 #![allow(unused)]
+use std::sync::Arc;
+
 use crate::prelude::*;
 use beet::prelude::*;
 
@@ -31,12 +33,12 @@ pub fn TodoList() -> impl Bundle {
 
 	rsx! {
 		 <Table>
-			<tr slot="head">
-				 <th>Description</th>
-				 <th>State</th>
-				 <th>Actions</th>
-				 <th></th>
-			</tr>
+			// <tr slot="head">
+			// 	 <th></th>
+			// 	 <th></th>
+			// 	 <th>Actions</th>
+			// 	 <th></th>
+			// </tr>
 			<NewItem create={move|item| set_items.update(move|items|items.push(item))}/>
 			{items_table}
 		 </Table>
@@ -62,7 +64,9 @@ fn TodoItemView(
 			 // <td>{item.created}</td>
 			 // <td>{occupation}</td>
 				 <td>
-					<Button onclick=move||remove()>Remove</Button>
+					<Button
+						variant=ButtonVariant::Outlined
+						onclick=move||remove()>Remove</Button>
 				</td>
 		</tr>
 	}
@@ -76,24 +80,31 @@ fn NewItem(
 	let (description, set_description) = signal(String::new());
 
 
-	let add_item = move || {
+	let add_item = Arc::new(move || {
 		create(TodoItem {
 			description: description(),
 			created: CrossInstant::now(),
 			due: CrossInstant::now(),
 		});
 		set_description(String::new());
-	};
+	});
 
 	rsx! {
 		<tr>
 			<td>
 				<TextField
+					autofocus
 					value={description}
-					onchange=move |ev|{set_description(ev.value())}/>
+					onchange=move |ev|{set_description(ev.value())}
+					// onkeydown=move|ev|{
+					// 		// if ev.key() == "Enter" {
+					// 		// 	(add_item.clone())();
+					// 		// }
+					// 	}
+						/>
 			</td>
 			<td>
-				<Button onclick=move|| add_item()>Create</Button>
+				<Button onclick=move|| (add_item.clone())()>Create</Button>
 			</td>
 		</tr>
 	}

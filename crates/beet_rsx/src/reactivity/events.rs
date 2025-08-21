@@ -23,6 +23,7 @@ impl MockEvent {
 			value: value.into(),
 		}
 	}
+	pub fn key() -> String { unimplemented!() }
 }
 impl EventExt for MockEvent {
 	fn value(&self) -> String { self.value.clone() }
@@ -158,7 +159,6 @@ define_events! {
 "waiting" | OnWaiting | web_sys::Event,
 "wheel" | OnWheel | web_sys::WheelEvent,
 }
-
 
 #[cfg(target_arch = "wasm32")]
 mod wasm_utils {
