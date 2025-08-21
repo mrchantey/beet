@@ -1,5 +1,7 @@
 mod bucket;
+mod in_memory_provider;
 pub use bucket::*;
+pub use in_memory_provider::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
 mod fs_provider;
 #[cfg(target_arch = "wasm32")]

@@ -126,36 +126,21 @@ impl BucketProvider for LocalStorageProvider {
 
 	fn public_url(
 		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
-		let key = Self::storage_key(bucket_name, path);
-		Box::pin(async move { Ok(format!("localstorage://{}", key)) })
+		_bucket_name: &str,
+		_path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	{
+		Box::pin(async move { Ok(None) })
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
 		let provider = LocalStorageProvider::new();
-		let bucket = Bucket::new(provider, "test-bucket");
-		let path = RoutePath::from("/test_path");
-		let body = bytes::Bytes::from("test_body");
-		bucket.remove().await.unwrap();
-		bucket.exists().await.unwrap().xpect().to_be_false();
-		bucket.insert(&path, body.clone()).await.unwrap();
-		bucket.exists().await.unwrap().xpect().to_be_true();
-		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
-		bucket.get(&path).await.unwrap().xpect().to_be(body);
-
-		bucket.delete(&path).await.unwrap();
-		bucket.get(&path).await.xpect().to_be_err();
-
-		bucket.remove().await.unwrap();
-		bucket.exists().await.unwrap().xpect().to_be_false();
+		super::super::bucket_test::run(provider).await;
 	}
 }

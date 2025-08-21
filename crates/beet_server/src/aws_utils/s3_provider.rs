@@ -181,13 +181,13 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>> {
+	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>> {
 		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
 		let public_url =
 			format!("https://{bucket_name}.s3.{region}.amazonaws.com/{key}",);
-		Box::pin(async move { Ok(public_url) })
+		Box::pin(async move { Ok(Some(public_url)) })
 	}
 }
 

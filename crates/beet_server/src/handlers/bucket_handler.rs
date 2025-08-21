@@ -24,18 +24,15 @@ pub fn bucket_file_handler() -> impl Bundle {
 async fn from_bucket(bucket: &Bucket, path: &RoutePath) -> Result<Response> {
 	debug!("serving from bucket: {}", path);
 	if let Some(_extension) = path.extension() {
-		let url = bucket.public_url(&path).await?;
-		if url.starts_with("file://") {
-			// the fs bucket will return a file:// url which is an ERR_UNSAFE_REDIRECT
-			// so just serve the file directly
+		if let Some(url) = bucket.public_url(&path).await? {
+			Ok(Response::permanent_redirect(url))
+		} else {
+			// some buckets like fs bucket dont have a url so just serve the file directly
 			bucket
 				.get(path)
 				.await
 				.map(|bytes| Response::ok_mime_guess(bytes, path))?
 				.xok()
-			// .map_err(|_| HttpError::not_found().into())
-		} else {
-			Ok(Response::permanent_redirect(url))
 		}
 	} else {
 		bucket
@@ -58,7 +55,7 @@ mod test {
 
 	#[sweet::test]
 	async fn serves_fs() {
-		let (bucket, _drop) = Bucket::new_test().await;
+		let bucket = Bucket::new_test().await;
 		let body = "body { color: red; }";
 		let path = RoutePath::from("/style.css");
 		bucket.insert(&path, body).await.unwrap();
@@ -76,7 +73,7 @@ mod test {
 	#[sweet::test]
 	#[ignore = "no longer redirects"]
 	async fn redirect() {
-		let (bucket, _drop) = Bucket::new_test().await;
+		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("/style.css");
 		bucket.insert(&path, "body { color: red; }").await.unwrap();
 		let path = RoutePath::from("/style.css");
@@ -94,13 +91,13 @@ mod test {
 	}
 	#[sweet::test]
 	async fn html() {
-		let (bucket, _drop) = Bucket::new_test().await;
+		let bucket = Bucket::new_test().await;
 		let body = "<h1>Hello, world!</h1>";
 		bucket
 			.insert(&RoutePath::from("/docs/index.html"), body)
 			.await
 			.unwrap();
-		let response = super::from_bucket(&bucket, &RoutePath::from("docs"))
+		let response = super::from_bucket(&bucket, &RoutePath::from("/docs"))
 			.await
 			.unwrap();
 		response
@@ -115,7 +112,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn as_fallback() {
-		let (bucket, _drop) = Bucket::new_test().await;
+		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		Router::new_bundle(move || {

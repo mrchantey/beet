@@ -64,7 +64,7 @@ impl Bucket {
 		self.provider.delete(&self.name, path).await
 	}
 
-	pub async fn public_url(&self, path: &RoutePath) -> Result<String> {
+	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
 		self.provider.public_url(&self.name, path).await
 	}
 }
@@ -132,5 +132,34 @@ pub trait BucketProvider: 'static + Send + Sync {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<String>> + Send + 'static>>;
+	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>;
+}
+
+
+
+
+#[cfg(test)]
+pub(super) mod bucket_test {
+	use crate::prelude::Bucket;
+	use crate::prelude::BucketProvider;
+	use beet_rsx::as_beet::RoutePath;
+	use sweet::prelude::*;
+
+	pub async fn run(provider: impl BucketProvider) {
+		let bucket = Bucket::new(provider, "test-bucket");
+		let path = RoutePath::from("/test_path");
+		let body = bytes::Bytes::from("test_body");
+		bucket.remove().await.ok();
+		bucket.exists().await.unwrap().xpect().to_be_false();
+		bucket.insert(&path, body.clone()).await.unwrap();
+		bucket.exists().await.unwrap().xpect().to_be_true();
+		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
+		bucket.get(&path).await.unwrap().xpect().to_be(body);
+
+		bucket.delete(&path).await.unwrap();
+		bucket.get(&path).await.xpect().to_be_err();
+
+		bucket.remove().await.unwrap();
+		bucket.exists().await.unwrap().xpect().to_be_false();
+	}
 }
