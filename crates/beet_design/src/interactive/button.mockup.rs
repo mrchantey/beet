@@ -5,7 +5,6 @@ pub fn get() -> impl Bundle {
 	rsx! { <Inner client:load /> }
 }
 
-// temp until global client:load
 #[template]
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {

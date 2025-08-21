@@ -1,0 +1,14 @@
+.bt-c-select {
+	padding: 0em;
+	cursor: pointer;
+	opacity: var(--bt-opacity);
+}
+
+.bt-c-select--outlined {
+	border: var(--bt-border-width) solid var(--bt-color-text);
+	/*--bt-color-background: transparent;*/
+}
+/*
+.bt-c-select--text {
+	--bt-color-background: transparent;
+}*/

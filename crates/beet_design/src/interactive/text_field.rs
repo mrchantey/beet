@@ -26,9 +26,8 @@ impl TextFieldVariant {
 #[template]
 pub fn TextField(
 	#[field(default)] variant: TextFieldVariant,
-	#[field(flatten=BaseHtmlAttributes)] attrs: InputHtmlAttributes,
+	#[field(flatten=BaseHtmlAttributes)] mut attrs: InputHtmlAttributes,
 ) -> impl Bundle {
-	let mut attrs = attrs;
 	attrs.push_class(format!(
 		"bt-c-input bt-c-input--{}",
 		variant.class_suffix()
