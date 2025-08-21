@@ -245,7 +245,7 @@ pub(crate) fn bind_events(
 				ReactiveApp::with(|app| {
 					let mut commands = app.world_mut().commands();
 					let mut commands = commands.entity(el_entity);
-					BeetEvent::trigger(&mut commands, &attr_key, ev);
+					DomEvent::trigger(&mut commands, &attr_key, ev);
 					// apply commands
 					app.world_mut().flush();
 					// we must update the app manually to flush any signals,

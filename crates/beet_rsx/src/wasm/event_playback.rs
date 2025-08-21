@@ -53,7 +53,7 @@ pub(crate) fn event_playback(
 			if let Some(entity) = event_map
 				.get(&(DomIdx::new(dom_idx), &AttributeKey::new(&event_type)))
 			{
-				BeetEvent::trigger(
+				DomEvent::trigger(
 					&mut commands.entity(*entity),
 					&event_type,
 					event,

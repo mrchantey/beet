@@ -51,6 +51,7 @@ pub fn reexport_child_codegen(
 			let relative_path = relative_path.to_string_lossy();
 			let name = quote::format_ident!("{child_name}");
 			codegen.add_item::<ItemMod>(syn::parse_quote! {
+				#[allow(unused, missing_docs)]
 				#[path = #relative_path]
 				pub mod #name;
 			});

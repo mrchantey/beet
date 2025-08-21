@@ -73,19 +73,28 @@ fn TodoItemView(
 fn NewItem(
 	create: Box<dyn 'static + Send + Sync + Fn(TodoItem)>,
 ) -> impl Bundle {
-	let (get, set) = signal(TodoItem {
-		description: "new item".into(),
-		created: CrossInstant::now(),
-		due: CrossInstant::now(),
-	});
+	let (description, set_description) = signal(String::new());
+
+
+	let add_item = move || {
+		create(TodoItem {
+			description: description(),
+			created: CrossInstant::now(),
+			due: CrossInstant::now(),
+		});
+		set_description(String::new());
+	};
 
 	rsx! {
 		<tr>
-			// <TextField value={move ||get().description}/>
-			<td>{move || get().description}</td>
-			<td/>
-			<td><Button onclick=move||create(get())>Create</Button></td>
+			<td>
+				<TextField
+					value={description}
+					onchange=move |ev|{set_description(ev.value())}/>
+			</td>
+			<td>
+				<Button onclick=move|| add_item()>Create</Button>
+			</td>
 		</tr>
-
 	}
 }

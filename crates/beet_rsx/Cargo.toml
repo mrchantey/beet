@@ -63,7 +63,26 @@ console_log.workspace = true
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
-web-sys.workspace = true
+web-sys = { workspace = true, features = [
+# dom events
+"AnimationEvent",
+"BeforeUnloadEvent",
+"ClipboardEvent",
+"DragEvent",
+"FocusEvent",
+"HashChangeEvent",
+"InputEvent",
+"KeyboardEvent",
+"MouseEvent",
+"PageTransitionEvent",
+"PopStateEvent",
+"ProgressEvent",
+"StorageEvent",
+"TouchEvent",
+"TransitionEvent",
+"UiEvent",
+"WheelEvent",
+] }
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
