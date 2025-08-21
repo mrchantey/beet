@@ -4,7 +4,8 @@ use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
-/// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver) to help with type inference
+/// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver)
+/// which will also insert an [`EventTarget`]
 #[derive(ImplBundle)]
 pub struct EventHandler<E: 'static + Send + Sync + Event> {
 	observer: Observer,

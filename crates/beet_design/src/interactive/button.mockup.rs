@@ -10,11 +10,10 @@ pub fn get() -> impl Bundle {
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
 	let (value, set_value) = signal(0);
-	let val2 = value.clone();
 	rsx! {
 			<h2>Interactivity</h2>
 			<p id="interactive-text">value: {value}</p>
-			<Button id="interactive-button" onclick=move|_|set_value(val2() + 1)>Increment</Button>
+			<Button id="interactive-button" onclick=move||set_value(value() + 1)>Increment</Button>
 			<h2>Variants</h2>
 			<div>
 				<Button variant=ButtonVariant::Primary>		Primary 	</Button>

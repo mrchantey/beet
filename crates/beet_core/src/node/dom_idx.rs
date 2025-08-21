@@ -1,4 +1,3 @@
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 
@@ -49,4 +48,5 @@ impl DomIdx {
 #[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[require(RequiresDomBinding)]
 pub struct RequiresDomIdx;
