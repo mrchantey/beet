@@ -172,8 +172,10 @@ impl DomDiff<'_, '_> {
 		if let Ok(binding) = self.dom_node_bindings.get(entity)
 			&& binding.nodes_eq(node)
 		{
+			// beet_utils::log!("diff node binding: {entity:?} match");
 			return;
 		} else {
+			// beet_utils::log!("diff node binding: {entity:?} inserting");
 			self.commands
 				.entity(entity)
 				.insert(DomNodeBinding::new(node.clone()));

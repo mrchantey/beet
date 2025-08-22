@@ -31,6 +31,7 @@ impl Plugin for SignalsPlugin {
 						update_dom_nodes,
 						update_fragments,
 						update_attribute_values,
+						bind_events,
 					)
 						.chain()
 						.run_if(document_exists),

@@ -70,7 +70,7 @@ impl Plugin for ApplyDirectivesPlugin {
 						bind_dom_idx_text_nodes,
 						bind_dom_idx_elements,
 						bind_dom_idx_attributes,
-						bind_events,
+						// bind_events,
 					)
 						.chain()
 						.run_if(document_exists),
