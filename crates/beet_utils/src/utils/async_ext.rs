@@ -1,6 +1,9 @@
 use crate::utils::CrossInstant;
 use std::time::Duration;
 
+pub use futures::future::try_join_all;
+
+
 /// Retries a function until it returns Ok or the timeout is reached.
 pub async fn retry<T, E>(
 	func: impl AsyncFn() -> Result<T, E>,
@@ -32,7 +35,7 @@ where
 	// tokio::task::spawn_local(fut).await.expect("Task panicked")
 }
 /// Cross platform spawn_local function
-#[cfg(all(not(target_arch="wasm32"),feature = "tokio"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
 pub fn spawn_local<F>(fut: F) -> tokio::task::JoinHandle<F::Output>
 where
 	F: Future + 'static,
