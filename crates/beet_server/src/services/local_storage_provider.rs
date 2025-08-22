@@ -141,6 +141,6 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let provider = LocalStorageProvider::new();
-		super::super::bucket_test::run(provider).await;
+		bucket_test::run(provider).await;
 	}
 }

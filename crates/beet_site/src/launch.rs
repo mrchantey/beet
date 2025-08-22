@@ -3,9 +3,9 @@ use beet::prelude::*;
 
 
 pub fn launch_plugin(app: &mut App) {
-
 	let mut config = WorkspaceConfig::default();
-	config.filter
+	config
+		.filter
 		.include("*/crates/beet_design/src/**/*")
 		.include("*/crates/beet_site/src/**/*");
 
@@ -107,7 +107,7 @@ fn design_mockups_collection() -> impl Bundle {
 			..default()
 		},
 		ModifyRoutePath::default()
-			.base_route("/design")
+			.base_route("/docs/design")
 			.replace_route(".mockup", ""),
 		MetaType::new(syn::parse_quote!(crate::prelude::ArticleMeta)),
 		CodegenFile::new(

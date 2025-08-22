@@ -17,6 +17,19 @@ impl ReadFile {
 	pub fn to_bytes(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 		std::fs::read(&path).map_err(|e| FsError::io(path, e))
 	}
+	#[cfg(feature = "tokio")]
+	pub async fn to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
+		tokio::fs::read_to_string(&path)
+			.await
+			.map_err(|e| FsError::io(path, e))
+	}
+
+	#[cfg(feature = "tokio")]
+	pub async fn to_bytes_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
+		tokio::fs::read(&path)
+			.await
+			.map_err(|e| FsError::io(path, e))
+	}
 
 
 	pub fn hash_file(path: impl AsRef<Path>) -> FsResult<u64> {

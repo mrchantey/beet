@@ -3,7 +3,6 @@ use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bytes::Bytes;
 use std::future::Future;
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -23,7 +22,7 @@ impl Bucket {
 /// A bucket provider using a simple nested hashmap
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryProvider(
-	pub Arc<RwLock<HashMap<String, HashMap<PathBuf, Bytes>>>>,
+	pub Arc<RwLock<HashMap<String, HashMap<RoutePath, Bytes>>>>,
 );
 
 impl InMemoryProvider {
@@ -74,9 +73,23 @@ impl BucketProvider for InMemoryProvider {
 			.entry(bucket_name.to_string())
 			.or_insert_with(HashMap::new)
 			.xmap(|bucket| {
-				bucket.insert(path.to_path_buf(), body);
+				bucket.insert(path.clone(), body);
 			});
 		Box::pin(async move { Ok(()) })
+	}
+
+	fn list(
+		&self,
+		bucket_name: &str,
+	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	{
+		let mut buckets = self.0.write().unwrap();
+		let result = buckets
+			.get_mut(bucket_name)
+			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+			.map(|bucket| bucket.keys().cloned().collect());
+
+		Box::pin(async move { result })
 	}
 
 	fn get(
@@ -90,7 +103,7 @@ impl BucketProvider for InMemoryProvider {
 			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
 			.map(|bucket| {
 				bucket
-					.get(&path.to_path_buf())
+					.get(path)
 					.cloned()
 					.ok_or_else(|| bevyhow!("item not found: {path}"))
 			})
@@ -109,7 +122,7 @@ impl BucketProvider for InMemoryProvider {
 			.get_mut(bucket_name)
 			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
 			.map(|bucket| {
-				bucket.remove(&path.to_path_buf());
+				bucket.remove(path);
 			});
 
 		Box::pin(async move { result })
@@ -132,6 +145,6 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let provider = InMemoryProvider::new();
-		super::super::bucket_test::run(provider).await;
+		bucket_test::run(provider).await;
 	}
 }

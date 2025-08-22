@@ -57,6 +57,9 @@ impl Bucket {
 	) -> Result<()> {
 		self.provider.insert(&self.name, path, body.into()).await
 	}
+	pub async fn list(&self) -> Result<Vec<RoutePath>> {
+		self.provider.list(&self.name).await
+	}
 	pub async fn get(&self, path: &RoutePath) -> Result<Bytes> {
 		self.provider.get(&self.name, path).await
 	}
@@ -113,6 +116,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 		path: &RoutePath,
 		body: Bytes,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
+	/// List all items in the bucket
+	fn list(
+		&self,
+		bucket_name: &str,
+	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>;
 	/// Get an object from the bucket
 	fn get(
 		&self,
@@ -139,20 +147,27 @@ pub trait BucketProvider: 'static + Send + Sync {
 
 
 #[cfg(test)]
-pub(super) mod bucket_test {
+pub mod bucket_test {
 	use crate::prelude::Bucket;
 	use crate::prelude::BucketProvider;
 	use beet_rsx::as_beet::RoutePath;
 	use sweet::prelude::*;
 
 	pub async fn run(provider: impl BucketProvider) {
-		let bucket = Bucket::new(provider, "test-bucket");
+		let bucket = Bucket::new(provider, "beet-test-bucket-849302");
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
 		bucket.remove().await.ok();
 		bucket.exists().await.unwrap().xpect().to_be_false();
+		bucket.ensure_exists().await.unwrap();
 		bucket.insert(&path, body.clone()).await.unwrap();
 		bucket.exists().await.unwrap().xpect().to_be_true();
+		bucket
+			.list()
+			.await
+			.unwrap()
+			.xpect()
+			.to_be(vec![path.clone()]);
 		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
 		bucket.get(&path).await.unwrap().xpect().to_be(body);
 

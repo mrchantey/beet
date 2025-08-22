@@ -37,7 +37,7 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
 		let path = self.root.join(bucket_name);
-		Box::pin(async move { Ok(path.exists()) })
+		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
 	}
 
 	fn create_bucket(
@@ -45,9 +45,8 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let path = self.root.join(bucket_name);
-		let create_bucket_req = tokio::fs::create_dir_all(path);
 		Box::pin(async move {
-			create_bucket_req.await?;
+			tokio::fs::create_dir_all(path).await?;
 			Ok(())
 		})
 	}
@@ -58,7 +57,7 @@ impl BucketProvider for FsBucketProvider {
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
-			tokio::fs::remove_dir_all(path).await?;
+			FsExt::remove_async(path).await?;
 			Ok(())
 		})
 	}
@@ -71,13 +70,32 @@ impl BucketProvider for FsBucketProvider {
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			if let Some(parent) = path.parent() {
-				tokio::fs::create_dir_all(parent).await?;
-			}
-			tokio::fs::write(path, body).await?;
+			FsExt::write_async(path, body).await?;
 			Ok(())
 		})
 	}
+
+	fn list(
+		&self,
+		bucket_name: &str,
+	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	{
+		let bucket_path = self.root.join(bucket_name);
+		Box::pin(async move {
+			ReadDir::files_recursive_async(&bucket_path)
+				.await?
+				.into_iter()
+				.map(|path| {
+					let path = path
+						.strip_prefix(&bucket_path)
+						.unwrap_or_else(|_| path.as_path());
+					RoutePath::new(path)
+				})
+				.collect::<Vec<_>>()
+				.xok()
+		})
+	}
+
 	fn get(
 		&self,
 		bucket_name: &str,
@@ -85,11 +103,11 @@ impl BucketProvider for FsBucketProvider {
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			let body_bytes = tokio::fs::read(&path).await.map_err(|_err| {
-				// error!("File not found: {}", path);
-				HttpError::not_found()
-			})?;
-			Ok(Bytes::from(body_bytes))
+			ReadFile::to_bytes_async(&path)
+				.await
+				.map_err(|_| HttpError::not_found())?
+				.xmap(Bytes::from)
+				.xok()
 		})
 	}
 	fn delete(
@@ -124,6 +142,6 @@ mod test {
 		let dir = "target/test_buckets/test-bucket-001";
 		let provider =
 			FsBucketProvider::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
-		super::super::bucket_test::run(provider).await;
+		bucket_test::run(provider).await;
 	}
 }

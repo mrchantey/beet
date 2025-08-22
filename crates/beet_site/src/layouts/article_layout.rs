@@ -20,6 +20,7 @@ pub fn article_layout_middleware() -> impl Bundle {
 #[template]
 pub fn ArticleLayout(query: Query<&ArticleMeta>) -> impl Bundle {
 	for _item in query.iter() {
+		// blocked on immediately resolved templates
 		panic!("tadaa! {:?}", _item);
 		// println!("ArticleMeta: {:?}", item);
 	}

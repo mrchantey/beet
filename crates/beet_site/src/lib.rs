@@ -2,6 +2,10 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 
 #[cfg(any(feature = "server", feature = "client"))]
+#[path = "codegen/docs/mod.rs"]
+pub mod docs;
+
+#[cfg(any(feature = "server", feature = "client"))]
 #[path = "codegen/client_actions.rs"]
 pub mod client_actions;
 
@@ -10,7 +14,7 @@ pub mod client_actions;
 pub mod route_tree;
 
 #[cfg(feature = "server")]
-mod codegen;
+pub mod codegen;
 
 #[cfg(any(feature = "server", feature = "client"))]
 pub mod components;

@@ -12,7 +12,8 @@ use std::pin::Pin;
 
 pub fn s3_bucket() -> impl Bundle {
 	AsyncAction::new(async move |mut world, entity| {
-		let bucket_name = world.resource::<PackageConfig>().default_bucket_name();
+		let bucket_name =
+			world.resource::<PackageConfig>().default_bucket_name();
 		debug!("Connecting to S3 bucket: {bucket_name}");
 		let provider = S3Provider::create().await;
 		world
@@ -110,6 +111,49 @@ impl BucketProvider for S3Provider {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
+			// List all objects in the bucket and delete them
+			let mut continuation_token = None;
+			loop {
+				let mut req = client.list_objects_v2().bucket(&bucket_name);
+				if let Some(token) = &continuation_token {
+					req = req.continuation_token(token);
+				}
+				let list_result = req.send().await?;
+				let contents = list_result.contents.unwrap_or_default();
+
+				if !contents.is_empty() {
+					let delete_objects = aws_sdk_s3::types::Delete::builder()
+						.set_objects(Some(
+							contents
+								.into_iter()
+								.filter_map(|obj| {
+									obj.key.map(|k| {
+										aws_sdk_s3::types::ObjectIdentifier::builder().key(k).build()
+									})
+								})
+								.collect::<Result<_, _>>()?,
+						))
+						.build()?;
+
+					client
+						.delete_objects()
+						.bucket(&bucket_name)
+						.delete(delete_objects)
+						.send()
+						.await?;
+				}
+
+				if list_result.is_truncated == Some(true) {
+					continuation_token = list_result.next_continuation_token;
+					if continuation_token.is_none() {
+						break;
+					}
+				} else {
+					break;
+				}
+			}
+
+			// Now delete the bucket itself
 			client.delete_bucket().bucket(&bucket_name).send().await?;
 			Ok(())
 		})
@@ -133,6 +177,44 @@ impl BucketProvider for S3Provider {
 				.send()
 				.await?;
 			Ok(())
+		})
+	}
+
+	fn list(
+		&self,
+		bucket_name: &str,
+	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	{
+		let client = self.0.clone();
+		let bucket_name = bucket_name.to_string();
+		Box::pin(async move {
+			let mut paths = Vec::new();
+			let mut continuation_token = None;
+
+			loop {
+				let mut req = client.list_objects_v2().bucket(&bucket_name);
+				if let Some(token) = &continuation_token {
+					req = req.continuation_token(token);
+				}
+				let list_result = req.send().await?;
+				let contents = list_result.contents.unwrap_or_default();
+				paths.extend(
+					contents
+						.into_iter()
+						.filter_map(|obj| obj.key.map(RoutePath::new)),
+				);
+
+				if list_result.is_truncated == Some(true) {
+					continuation_token = list_result.next_continuation_token;
+					if continuation_token.is_none() {
+						break;
+					}
+				} else {
+					break;
+				}
+			}
+
+			Ok(paths)
 		})
 	}
 
@@ -181,7 +263,8 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>> {
+	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	{
 		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
@@ -196,16 +279,18 @@ mod test {
 	use super::*;
 	use sweet::prelude::*;
 
-	const BUCKET_NAME: &str = "beet-test";
-	fn test_key() -> RoutePath { RoutePath::from("test-file.txt") }
-	const TEST_CONTENT: &str = "Hello, beet S3 test!";
-	const UPDATED_CONTENT: &str = "Updated beet S3 content!";
 
 	#[tokio::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_client() {
-		let s3_client_resource = S3Provider::create().await;
-		let _inner_client = &s3_client_resource.0;
+		let _s3_client_resource = S3Provider::create().await;
+	}
+
+	#[tokio::test]
+	#[ignore = "hits remote s3"]
+	async fn s3_bucket_crud() {
+		let provider = S3Provider::create().await;
+		bucket_test::run(provider).await;
 	}
 
 	#[tokio::test]
@@ -227,70 +312,21 @@ mod test {
 			.to_start_with("<!DOCTYPE html>");
 		Ok(())
 	}
-	#[tokio::test]
-	#[ignore = "hits remote s3"]
-	async fn s3_bucket_crud() -> Result<()> {
-		let client = S3Provider::create().await;
-
-		let bucket = Bucket::new(client, BUCKET_NAME.to_string());
-		bucket.ensure_exists().await?;
-
-		// Verify bucket exists
-		bucket.exists().await.xpect().to_be_ok();
-
-		let test_key = test_key();
-
-		// CREATE - Upload a test file
-		bucket
-			.insert(&test_key, TEST_CONTENT)
-			.await
-			.xpect()
-			.to_be_ok();
-
-		// READ - Download and verify the file
-		bucket
-			.get(&test_key)
-			.await
-			.unwrap()
-			.to_vec()
-			.xpect()
-			.to_be(TEST_CONTENT.as_bytes().to_vec());
-
-		// UPDATE - Modify the file
-		bucket
-			.insert(&test_key, UPDATED_CONTENT)
-			.await
-			.xpect()
-			.to_be_ok();
-
-		// Verify update
-		bucket
-			.get(&test_key)
-			.await
-			.unwrap()
-			.to_vec()
-			.xpect()
-			.to_be(UPDATED_CONTENT.as_bytes().to_vec());
-
-		// DELETE - Remove the test file
-		bucket.delete(&test_key).await.xpect().to_be_ok();
-
-		// Verify deletion
-		bucket.get(&test_key).await.xpect().to_be_err();
-		Ok(())
-	}
 
 	#[tokio::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() -> Result<()> {
+		let bucket_name: &str = "beet-test";
+
 		let client = S3Provider::create().await;
-		let test_key = test_key();
-		Bucket::new(client, BUCKET_NAME.to_string())
+		let test_key = RoutePath::from("test-file.txt");
+		Bucket::new(client, bucket_name.to_string())
 			.public_url(&test_key)
 			.await?
+			.unwrap()
 			.xpect()
 			.to_be(format!(
-				"https://{BUCKET_NAME}.s3.us-west-2.amazonaws.com{test_key}"
+				"https://{bucket_name}.s3.us-west-2.amazonaws.com{test_key}"
 			));
 
 		Ok(())

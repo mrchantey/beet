@@ -58,6 +58,16 @@ impl FsExt {
 		Ok(())
 	}
 
+	/// Async: remove a directory and all its contents
+	#[cfg(feature = "tokio")]
+	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult<()> {
+		let path = path.as_ref();
+		tokio::fs::remove_dir_all(path)
+			.await
+			.map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
+
 
 	// pub fn dir_contains(path: PathBuf, pattern: &str) -> bool {
 	// 	let pattern = Pattern::new(pattern).unwrap();
@@ -122,6 +132,25 @@ impl FsExt {
 				.map_err(|err| FsError::io(parent, err))?;
 		}
 		fs::write(path, data).map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
+
+	/// Async version of write: Write a file, ensuring the path exists
+	#[cfg(feature = "tokio")]
+	pub async fn write_async(
+		path: impl AsRef<Path>,
+		data: impl AsRef<[u8]>,
+	) -> FsResult<()> {
+		use tokio::fs;
+		let path = path.as_ref();
+		if let Some(parent) = path.parent() {
+			fs::create_dir_all(parent)
+				.await
+				.map_err(|err| FsError::io(parent, err))?;
+		}
+		fs::write(path, data)
+			.await
+			.map_err(|err| FsError::io(path, err))?;
 		Ok(())
 	}
 
