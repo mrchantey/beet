@@ -11,11 +11,14 @@ pub enum RunTestsMode {
 	Headed,
 }
 
+pub const DEFAULT_WEBDRIVER_PORT:u16 = 4444;
+
 pub struct VisitOptions {
 	/// Sometimes webdriver takes a moment to start up,
 	/// we will retry until it is available
 	pub timeout: Duration,
 	pub headless: bool,
+	/// The port for the webdriver process
 	pub webdriver_port: u16,
 }
 impl Default for VisitOptions {
@@ -23,7 +26,7 @@ impl Default for VisitOptions {
 		Self {
 			timeout: Duration::from_secs(5),
 			headless: true,
-			webdriver_port: 4444,
+			webdriver_port: DEFAULT_WEBDRIVER_PORT,
 		}
 	}
 }
@@ -56,7 +59,7 @@ Please ensure the --e2e flag was passed to the test:
 /// - If the webdriver is not running
 /// - If the page cannot be reached
 pub async fn visit_with_opts(url: &str, opts: VisitOptions) -> Result<Page> {
-	let client = async_ext::retry_async(
+	let client = async_ext::retry(
 		async || -> Result<Client> {
 			let headless_args = if opts.headless {
 				r#""--headless","--disable-gpu""#

@@ -1,35 +1,32 @@
-use crate::prelude::TestRunnerConfig;
+use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::utils::PipelineTarget;
-use std::env;
-use std::path::PathBuf;
+#[cfg(feature = "e2e")]
+use beet_utils::prelude::*;
 use std::process::Child;
-use std::process::Command;
 
 
-/// if the e2e flag is set, start the chromedriver
-/// and return the child process
-///
-/// TODO install if doesnt exist
-pub fn try_run_e2e(config: &TestRunnerConfig) -> Result<Option<Child>> {
-	if config.e2e {
-		let home_dir = env::var("HOME")
-			.map_err(|e| anyhow::anyhow!("Failed to get HOME: {e}"))?;
-		let chromedriver_path = PathBuf::from(home_dir)
-			.join("chrome-for-testing/chromedriver-linux64/chromedriver");
-		Command::new(chromedriver_path)
-			.arg("--port=4444")
-			.arg("--silent")
-			// .arg("--verbose")
-			.spawn()
-			.map_err(|e| anyhow::anyhow!("Failed to start chromedriver: {e}"))?
-			.xsome()
-			.xok()
-	} else {
-		Ok(None)
+/// start the chromedriver and return the child process
+pub fn run_chromedriver(config: &TestRunnerConfig) -> Result<Option<Child>> {
+	if !config.e2e {
+		return Ok(None);
 	}
+	#[cfg(not(feature = "e2e"))]
+{	
+	anyhow::bail!("e2e feature must be enabled for use with the e2e flag, try 'cargo test --features=sweet/e2e -- --e2e'")
+}	
+#[cfg(feature = "e2e")]
+	{std::process::Command::new("nix-shell")
+		.args(&[
+			"-p",
+			"chromium",
+			"chromedriver",
+			"--run",
+			&format!("chromedriver --port={DEFAULT_WEBDRIVER_PORT} --silent"),
+		])
+		.spawn()?
+		.xsome()
+		.xok()}
 }
-
 
 /*
 Options

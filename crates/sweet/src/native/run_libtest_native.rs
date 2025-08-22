@@ -12,7 +12,7 @@ pub fn run_libtest_native(tests: &[&test::TestDescAndFn]) -> Result<()> {
 
 	let mut logger = RunnerLogger::start(config.clone(), &tests);
 
-	let chromedriver_process = try_run_e2e(&config)?;
+	let chromedriver_process = run_chromedriver(&config)?;
 
 	let recv_result_handle = std::thread::spawn(move || {
 		tokio::runtime::Builder::new_current_thread()
