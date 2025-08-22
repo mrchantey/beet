@@ -41,7 +41,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories in a directory, not recursive
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn all_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			files: true,
@@ -62,7 +62,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all dirs in a directory, not recursive
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn dirs_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			dirs: true,
@@ -82,7 +82,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files in a directory, not recursive
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn files_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			files: true,
@@ -104,7 +104,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories recursively
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn all_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -129,7 +129,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all subdirectories recursively
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn dirs_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -153,7 +153,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files recursively
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn files_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -215,7 +215,7 @@ impl ReadDir {
 
 	/// Async version: Read dir with the provided options. if the root is a file, the
 	/// file will be returned.
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	pub async fn read_async(
 		&self,
 		root: impl AsRef<Path>,
@@ -228,7 +228,7 @@ impl ReadDir {
 		Ok(paths)
 	}
 
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
 	async fn read_inner_async(
 		&self,
 		file_or_dir: impl AsRef<Path>,

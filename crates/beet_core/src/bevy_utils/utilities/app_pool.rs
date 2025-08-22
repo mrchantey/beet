@@ -27,12 +27,12 @@ use std::sync::RwLock;
 ///
 /// let pool2 = pool.clone();
 /// std::thread::spawn(move || {
-/// 	assert_eq!(pool2.get().world().resource::<Foo>().0, 1);
+/// 	assert_eq!(pool2.pop().resource::<Foo>().0, 1);
 /// 	// will have no effect on the main thread's app
-/// 	pool2.get().insert_resource(Foo(2));
+/// 	pool2.pop().insert_resource(Foo(2));
 /// }).join().unwrap();
 ///
-/// assert_eq!(pool.get().world().resource::<Foo>().0, 1);
+/// assert_eq!(pool.pop().resource::<Foo>().0, 1);
 #[derive(Clone)]
 pub struct AppPool {
 	/// The constructor to create a new app instance, if the instance is

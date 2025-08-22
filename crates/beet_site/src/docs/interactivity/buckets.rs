@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use beet::prelude::*;
 
 
@@ -12,15 +14,97 @@ pub fn get() -> impl Bundle {
 #[template]
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
-	let _provider = InMemoryProvider::new();
+	#[cfg(target_arch = "wasm32")]
+	let provider = LocalStorageProvider::new();
+	#[cfg(not(target_arch = "wasm32"))]
+	let provider = InMemoryProvider::new();
 
-	// let bucket = Bucket::new(provider, "buckets-demo");
+	let bucket = Bucket::new(provider, "buckets-demo");
 
+	let (items, set_items) = signal::<Vec<OnSpawnClone>>(default());
+	let (on_change, trigger_change) = signal(());
+	let (bucket, _) = signal(bucket);
 
+	#[cfg(target_arch = "wasm32")]
+	effect(move || {
+		let _changed = on_change();
 
+		async_ext::spawn_local(async move {
+			let remove = Arc::new(move |path: RoutePath| {
+				async_ext::spawn_local(async move {
+					bucket().delete(&path).await.unwrap();
+					trigger_change();
+				});
+			});
 
+			// let remove = remove.clone();
+
+			bucket()
+				.list()
+				.await
+				.unwrap()
+				.into_iter()
+				.map(|item| {
+					let item2 = item.clone();
+					let remove = remove.clone();
+					OnSpawnClone::insert(move || {
+						let item = item2.clone();
+						let remove = remove.clone();
+						rsx! {<tr>
+						<td>{item.to_string()}</td>
+						<td><Button onclick=move||{(remove.clone())(item2.clone())}>Remove</Button></td>
+						</tr>}
+					})
+				})
+				.collect::<Vec<_>>()
+				.xmap(set_items);
+		});
+	});
+
+	let add_item = move |text: String| {
+		let timestamp = CrossInstant::now().unix_epoch().as_millis();
+		let path = RoutePath::new(format!("item-{timestamp}"));
+		async_ext::spawn_local(async move {
+			bucket().insert(&path, text).await.unwrap();
+			trigger_change(());
+		});
+	};
 
 	rsx! {
-		<div>loaded!</div>
+		<h1>Buckets</h1>
+		<NewItem add_item=add_item/>
+		<Table>
+			{items}
+		</Table>
+	}
+}
+#[template]
+fn NewItem(
+	add_item: Box<dyn 'static + Send + Sync + Fn(String)>,
+) -> impl Bundle {
+	let (description, set_description) = signal(String::new());
+
+	let on_add = Arc::new(move || {
+		add_item(description());
+	});
+
+	rsx! {
+		<tr>
+			<td>
+				<TextField
+					autofocus
+					value={description}
+					onchange=move |ev|{set_description(ev.value())}
+					// onkeydown=move|ev|{
+					// 		// if ev.key() == "Enter" {
+					// 		// 	(add_item.clone())();
+					// 		// }
+					// 	}
+						/>
+			</td>
+			<td>
+				<Button onclick=move|| (on_add.clone())()>Create</Button>
+			</td>
+		</tr>
 	}
 }

@@ -46,12 +46,26 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 pub struct SidebarNode {
 	/// A Title Case name for the group
 	pub display_name: String,
-	/// if this node has a route, this is its path
+	/// if this node has a route, this is its full path
 	pub path: Option<RoutePath>,
 	/// all paths available at this level of the tree
 	pub children: Vec<SidebarNode>,
 	/// expanded portions of the tree
 	pub expanded: bool,
+}
+
+impl SidebarNode {
+	/// Collect all paths in dfs pre-order
+	pub fn paths(&self) -> Vec<RoutePath> {
+		let mut paths = Vec::new();
+		if let Some(path) = &self.path {
+			paths.push(path.clone());
+		}
+		for child in &self.children {
+			paths.extend(child.paths());
+		}
+		paths
+	}
 }
 
 impl std::fmt::Display for SidebarNode {

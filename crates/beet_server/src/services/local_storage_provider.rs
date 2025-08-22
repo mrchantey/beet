@@ -13,9 +13,13 @@ pub struct LocalStorageProvider;
 impl LocalStorageProvider {
 	pub fn new() -> Self { Self }
 
+	fn bucket_prefix(bucket_name: &str) -> String {
+		format!("bucket:{}:", bucket_name)
+	}
+
 	/// Compose the localStorage key for a given bucket and path.
 	fn storage_key(bucket_name: &str, path: &RoutePath) -> String {
-		format!("bucket:{}:{}", bucket_name, path.to_string())
+		Self::bucket_prefix(bucket_name).xtend(&path.to_string())
 	}
 
 	fn local_storage() -> web_sys::Storage {
@@ -37,7 +41,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
-		let prefix = format!("bucket:{}:", bucket_name);
+		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			for i in 0..storage.length().unwrap_or(0) {
@@ -63,7 +67,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let prefix = format!("bucket:{}:", bucket_name);
+		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let keys: Vec<String> = (0..storage.length().unwrap_or(0))
@@ -89,6 +93,22 @@ impl BucketProvider for LocalStorageProvider {
 			let storage = Self::local_storage();
 			storage.set_item(&key, &value).map_jserr()?;
 			Ok(())
+		})
+	}
+
+	fn list(
+		&self,
+		bucket_name: &str,
+	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	{
+		let prefix = Self::bucket_prefix(bucket_name);
+		Box::pin(async move {
+			let storage = Self::local_storage();
+			let keys: Vec<RoutePath> = (0..storage.length().unwrap_or(0))
+				.filter_map(|i| storage.key(i).ok().flatten())
+				.filter_map(|k| k.strip_prefix(&prefix).map(RoutePath::new))
+				.collect();
+			Ok(keys)
 		})
 	}
 

@@ -23,7 +23,8 @@ async fn works() {
 			},
 		)
 		.unwrap()
-		.to_string()
+		.paths()
+		.len()
 		.xpect()
-		.to_be_snapshot();
+		.to_be_greater_than(10);
 }

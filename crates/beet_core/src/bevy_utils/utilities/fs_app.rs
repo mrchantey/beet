@@ -12,8 +12,7 @@ use std::time::Duration;
 ///
 /// ```rust no_run
 /// # use bevy::prelude::*;
-/// # use beet::prelude::*;
-/// # use beet_cli::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 /// App::new()
 /// 	.run_async(FsApp::default().runner());
