@@ -9148,6 +9148,7 @@ name = "sweet"
 version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
+ "axum 0.8.4",
  "backtrace",
  "beet_utils",
  "bevy",

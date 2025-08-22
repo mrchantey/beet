@@ -1,8 +1,9 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 use fantoccini::Client;
 
 
-#[derive(Debug)]
+#[derive(Debug, Deref, DerefMut)]
 pub struct Page {
 	pub client: Client,
 }
@@ -18,10 +19,6 @@ impl Page {
 
 impl AsRef<Page> for Page {
 	fn as_ref(&self) -> &Page { self }
-}
-impl std::ops::Deref for Page {
-	type Target = Client;
-	fn deref(&self) -> &Self::Target { &self.client }
 }
 
 impl<T: AsRef<Page>> Matcher<T> {

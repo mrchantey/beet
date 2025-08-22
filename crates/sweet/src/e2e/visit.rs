@@ -11,7 +11,7 @@ pub enum RunTestsMode {
 	Headed,
 }
 
-pub const DEFAULT_WEBDRIVER_PORT:u16 = 4444;
+pub const DEFAULT_WEBDRIVER_PORT: u16 = 4444;
 
 pub struct VisitOptions {
 	/// Sometimes webdriver takes a moment to start up,
@@ -29,6 +29,29 @@ impl Default for VisitOptions {
 			webdriver_port: DEFAULT_WEBDRIVER_PORT,
 		}
 	}
+}
+
+/// Serves the axum router on a port incremented from {DEFAULT_WEBDRIVER_PORT}
+/// so test routers can be served concurrently. The port is then used
+/// to prepend the provided path, so `/foo` becomes `http://127.0.0.1:4445/foo`
+pub async fn serve_and_visit(
+	router: axum::Router,
+	path: impl AsRef<std::path::Path>,
+) -> (Page, (tokio::task::JoinHandle<()>, u16)) {
+	use std::sync::atomic::AtomicU16;
+	use std::sync::atomic::Ordering;
+
+	static NEXT_PORT: AtomicU16 = AtomicU16::new(DEFAULT_WEBDRIVER_PORT + 1);
+	let port = NEXT_PORT.fetch_add(1, Ordering::SeqCst);
+	let addr = format!("127.0.0.1:{}", port);
+	let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+	let server = tokio::spawn(async move {
+		axum::serve(listener, router).await.unwrap();
+	});
+	let url = format!("http://{addr}{}", path.as_ref().display());
+	let page = visit(&url).await;
+
+	(page, (server, port))
 }
 
 /// Visit a page, returning the [Page]
@@ -92,19 +115,41 @@ pub async fn visit_with_opts(url: &str, opts: VisitOptions) -> Result<Page> {
 
 #[cfg(test)]
 mod test {
+	use crate::e2e::serve_and_visit;
 	use crate::prelude::*;
 	use anyhow::Result;
 	use fantoccini::Locator;
 
 	#[crate::test]
+	#[ignore="external url"]
 	async fn works() -> Result<()> {
-		let c = visit("https://en.wikipedia.org/wiki/Foobar").await.client;
-		let url = c.current_url().await?;
+		let page = visit("https://en.wikipedia.org/wiki/Foobar").await.client;
+		let url = page.current_url().await?;
 		assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-		c.find(Locator::Css(".mw-disambig")).await?.click().await?;
-		c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
-		let url = c.current_url().await?;
-		assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+		page.find(Locator::Css(".mw-disambig"))
+			.await?
+			.click()
+			.await?;
+		page.find(Locator::LinkText("Foo Lake"))
+			.await?
+			.click()
+			.await?;
+		let url = page.current_url().await?;
+		expect(url.as_str()).to_be("https://en.wikipedia.org/wiki/Foo_Lake");
+		Ok(())
+	}
+
+	#[crate::test]
+	async fn test_serve_and_visit() -> Result<()> {
+		use axum::Router;
+		use axum::routing::get;
+		let router = Router::new().route("/foo", get(async || "hello world!"));
+		let (page, _) = serve_and_visit(router, "/foo").await;
+		let url = page.current_url().await?;
+		expect(url).to_end_with("/foo");
+		let body = page.find(Locator::Css("body")).await?.text().await?;
+		expect(body).to_contain("hello world!");
+
 		Ok(())
 	}
 }

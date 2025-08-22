@@ -15,10 +15,11 @@ keywords.workspace = true
 default = ["bevy", "serde", "nightly", "tokens"]
 # allow for fn_traits, ie mock_fn(3);
 nightly = []
-tokens = ["dep:proc-macro2", "dep:syn", "dep:quote","dep:prettyplease"]
+tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 bevy = ["dep:bevy"]
-e2e = ["dep:fantoccini", "serde", "beet_utils/tokio"]
+e2e = ["serde", "axum", "beet_utils/tokio", "dep:fantoccini"]
+axum = ["dep:axum"]
 
 [dependencies]
 #💡 internal 
@@ -33,6 +34,7 @@ web-time = "1"
 log.workspace = true
 pretty_env_logger.workspace = true
 colorize.workspace = true
+axum = { workspace = true, optional = true }
 backtrace = "0.3"
 # pretty_assertions
 yansi = "1"
