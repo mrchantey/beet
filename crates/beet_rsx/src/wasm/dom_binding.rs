@@ -248,10 +248,6 @@ pub(crate) fn bind_events(
 					DomEvent::trigger(&mut commands, &attr_key, ev);
 					// apply commands
 					app.world_mut().flush();
-					// we must update the app manually to flush any signals,
-					// they will not be able to update the app themselves because
-					// ReactiveApp is already borrowd
-					app.update();
 				})
 			};
 			let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);

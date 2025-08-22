@@ -52,15 +52,20 @@ impl CrossInstant {
 		}
 	}
 
-	pub fn unix_epoch(&self) -> Duration {
+	/// ## Panics
+	///
+	/// Panics if the system time is before the Unix epoch.
+	pub fn unix_epoch() -> Duration {
 		#[cfg(target_arch = "wasm32")]
 		{
-			let elapsed_secs = (Self::performance_now() - self.start) / 1000.0;
-			Duration::from_secs_f64(elapsed_secs)
+			let date = js_sys::Date::new_0();
+			Duration::from_secs_f64(date.get_time() / 1000.0)
 		}
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			self.start.elapsed()
+			std::time::SystemTime::now()
+				.duration_since(std::time::UNIX_EPOCH)
+				.expect("SystemTime::now is before UNIX_EPOH")
 		}
 	}
 }

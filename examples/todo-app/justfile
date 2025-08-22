@@ -1,0 +1,4 @@
+
+
+launch *args:
+	cargo launch -- -w {{args}}
