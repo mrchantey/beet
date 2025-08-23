@@ -4,11 +4,10 @@
 	"rust-analyzer.cargo.features": [
 		"beet/server",
 		"beet/client",
-		"beet/launch"
-		// "file_based_routes/config",
-		// "file_based_routes/server",
-		// "file_based_routes/client",
-		// "beet/server",
+		"beet/launch",
+		"beet/lambda",
+		"beet/css",
+		"beet/aws"
 	],
 	"deno.enable": true,
 	"deno.disablePaths": ["target","examples/todo-app/target"],

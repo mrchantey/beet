@@ -22,27 +22,19 @@ fn main() {
 		.add_plugins(BeetPlugins)
     .add_systems(Startup, |mut commands: Commands| {
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
-			commands.spawn((HtmlDocument, rsx! {
-				// <Counter client:only initial=7/>
-				// <AttributeChanged client:only/>
-				<List client:only/>
-			}));
+			commands.spawn(rsx! {<MyApp client:only/>});
 		})
     .run();
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
+	// usually this would be built using templating like rsx!{}
+	// but we're hardcoding here to clearly demonstrate the ''
 	let html = r#"
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<style>
-	body{
-		color: #ddd;
-		background-color: #333;
-	}
-	</style>
 </head>
 <body>
 	<script type="module">
@@ -61,7 +53,24 @@ fn main() {
 }
 
 #[template]
+// components with client directives must be serde
 #[derive(Reflect)]
+fn MyApp() -> impl Bundle {
+	rsx! {
+		<style scope:global>
+		body{
+			color: #ddd;
+			background-color: #333;
+		}
+		</style>
+		// <Counter initial=7/>
+		// <AttributeChanged />
+		<List/>
+	}
+}
+
+
+#[template]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
@@ -74,7 +83,6 @@ fn Counter(initial: u32) -> impl Bundle {
 }
 
 #[template]
-#[derive(Reflect)]
 fn AttributeChanged() -> impl Bundle {
 	let (style, set_style) = signal("display: block;");
 
@@ -90,8 +98,6 @@ fn AttributeChanged() -> impl Bundle {
 	}
 }
 #[template]
-// components with client directives must be serde
-#[derive(Reflect)]
 fn List() -> impl Bundle {
 	let (get_children, set_children) =
 		signal::<Vec<(usize, String)>>(Vec::new());

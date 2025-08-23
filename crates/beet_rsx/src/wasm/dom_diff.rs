@@ -204,6 +204,7 @@ impl DomDiff<'_, '_> {
 
 		// 2: iterate entity children, update existing DOM child or append if missing
 		let entity_children = self.child_nodes(entity);
+
 		let dom_children = {
 			// NodeList to Vec
 			let node_list = element.child_nodes();

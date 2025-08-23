@@ -7,12 +7,13 @@
 		"rust-analyzer": {
 			"initialization_options": {
 				"cargo": {
-					// "target": "wasm32-unknown-unknown",
+					"target": "wasm32-unknown-unknown",
 					"features": [
 						"beet/server",
 						"beet/client",
 						"beet/launch",
 						"beet/lambda",
+						"beet/css",
 						"beet/aws"
 					]
 				}

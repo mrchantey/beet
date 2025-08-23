@@ -129,8 +129,37 @@ impl ApplyAttributes<'_, '_> {
 		}
 	}
 }
-
-
+/// All identical <script> and <style> elements can be deduplicated,
+/// with the remaining element usually hoisted to the head unless
+/// otherwise specified
+// TODO this should probably actually merge the elements, cleaner in prod
+pub fn deduplicate_lang_nodes(
+	mut commands: Commands,
+	roots: Populated<Entity, Added<HtmlDocument>>,
+	children: Query<&Children>,
+	hashes: Query<(Entity, &LangSnippetHash)>,
+) {
+	for root in roots.iter() {
+		let mut visited = HashSet::new();
+		for (entity, hash) in children
+			.iter_descendants(root)
+			.filter_map(|child| hashes.get(child).ok())
+		{
+			if visited.contains(hash) {
+				commands.entity(entity).despawn();
+			} else {
+				visited.insert(hash.clone());
+				// add the hash as an attribute for debugging
+				#[cfg(all(debug_assertions, not(test)))]
+				commands.spawn((
+					AttributeOf::new(entity),
+					AttributeKey::new("data-lang-hash"),
+					TextNode::new(hash.to_string()),
+				));
+			}
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {
@@ -170,6 +199,7 @@ mod test {
 	fn deduplicates() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
+			<style {replace_hash()}/>
 			<style {replace_hash()}/>
 			<style {replace_hash()}/>
 			</div>

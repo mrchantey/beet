@@ -1,5 +1,4 @@
 use crate::as_beet::*;
-use beet_utils::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
@@ -13,7 +12,6 @@ pub type LangDirectives = (
 	StyleElement,
 	CodeNode,
 	LangSnippetHash,
-	LangSnippetPath,
 	InnerText,
 	FileInnerText,
 );
@@ -26,7 +24,6 @@ pub type LangDirectives = (
 /// - [`InnerText`]
 /// - [`StyleScope`]
 /// - [`HtmlHoistDirective`]
-/// - [`AttributeKey`]
 /// This is used for several purposes:
 /// - deduplication of lang nodes
 /// - assigning unique style ids to css content
@@ -48,15 +45,6 @@ impl std::fmt::Display for LangSnippetHash {
 		write!(f, "{}", self.0)
 	}
 }
-
-/// The replacement for [`InnerText`] after the lang snippet has been
-/// extracted, referencing the path to the snippet scene file.
-#[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[reflect(Component)]
-// #[component(immutable)]
-pub struct LangSnippetPath(pub WsPathBuf);
 
 
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
@@ -120,16 +108,11 @@ pub struct FileInnerText(
 impl TokenizeSelf for FileInnerText {
 	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		let path = &self.0;
-		tokens.extend(quote::quote! {{
-			#[cfg(not(feature = "client"))]
-			{
+		// it would be nice to exclude this in client side but that doesnt work
+		// for dynamically added content.
+		tokens.extend(quote::quote! {
 				InnerText::new(include_str!(#path))
-			}
-			#[cfg(feature = "client")]
-			{
-				()
-			}
-		}});
+		});
 	}
 }
 

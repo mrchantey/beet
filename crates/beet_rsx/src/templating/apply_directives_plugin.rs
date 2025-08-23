@@ -51,6 +51,7 @@ impl Plugin for ApplyDirectivesPlugin {
 				ApplyDirectives,
 				(
 					apply_style_id,
+					deduplicate_lang_nodes,
 					apply_requires_dom_idx,
 					#[cfg(all(target_arch = "wasm32", not(test)))]
 					apply_client_island_dom_idx,
