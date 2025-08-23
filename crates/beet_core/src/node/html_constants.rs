@@ -55,8 +55,8 @@ impl Default for HtmlConstants {
 			text_node_marker: "bt".into(),
 			wasm_dir: "wasm".into(),
 			wasm_name: "main".into(),
-			raw_text_elements: ["script", "style","code"]
-			// raw_text_elements: ["script", "style"]
+			raw_text_elements: ["script", "style", "code"]
+				// raw_text_elements: ["script", "style"]
 				.into_iter()
 				.collect(),
 			ignore_style_id_tags: hoist_to_head_tags
@@ -78,6 +78,10 @@ impl HtmlConstants {
 	/// Returns the attribute key for the style id
 	pub fn style_id_attribute(&self, id: u64) -> String {
 		format!("{}-{}", self.style_id_key, id)
+	}
+	/// Added by the [parse_lightning] step, and replaced by the apply_style_id step
+	pub fn style_id_attribute_placeholder(&self) -> String {
+		format!("{}-PLACEHOLDER", self.style_id_key)
 	}
 
 	pub fn wasm_bin_url(&self) -> String {

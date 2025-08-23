@@ -81,7 +81,6 @@ impl Plugin for ParseRsxTokensPlugin {
 						.chain()
 						.before(ModifyRsxTree),
 					(
-						parse_snippet_hash,
 						#[cfg(feature = "syntect")]
 						parse_syntect,
 						#[cfg(feature = "css")]

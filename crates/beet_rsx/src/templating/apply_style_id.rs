@@ -68,8 +68,7 @@ pub struct ApplyAttributes<'w, 's> {
 	constants: Res<'w, HtmlConstants>,
 	commands: Commands<'w, 's>,
 	elements: Query<'w, 's, &'static NodeTag, With<ElementNode>>,
-	lang_elements:
-		Query<'w, 's, (&'static LangSnippetHash, &'static mut InnerText)>,
+	lang_elements: Query<'w, 's, &'static mut InnerText, With<StyleElement>>,
 	cascade: Query<'w, 's, &'static Children, With<StyleCascade>>,
 	template_children: Query<'w, 's, &'static TemplateChildren>,
 }
@@ -96,8 +95,8 @@ impl ApplyAttributes<'_, '_> {
 		}
 		visited.insert((entity, styleid));
 		// replace parse_lightning selector hashes with an index
-		if let Ok((hash, mut text)) = self.lang_elements.get_mut(entity) {
-			let original_id = self.constants.style_id_attribute(**hash);
+		if let Ok(mut text) = self.lang_elements.get_mut(entity) {
+			let original_id = self.constants.style_id_attribute_placeholder();
 			let new_id = self.constants.style_id_attribute(styleid);
 			text.0 = text.0.replace(&original_id, &new_id);
 		};
@@ -125,37 +124,6 @@ impl ApplyAttributes<'_, '_> {
 				.collect::<Vec<_>>()
 			{
 				self.apply_recursive(visited, &template_children, styleid);
-			}
-		}
-	}
-}
-/// All identical <script> and <style> elements can be deduplicated,
-/// with the remaining element usually hoisted to the head unless
-/// otherwise specified
-// TODO this should probably actually merge the elements, cleaner in prod
-pub fn deduplicate_lang_nodes(
-	mut commands: Commands,
-	roots: Populated<Entity, Added<HtmlDocument>>,
-	children: Query<&Children>,
-	hashes: Query<(Entity, &LangSnippetHash)>,
-) {
-	for root in roots.iter() {
-		let mut visited = HashSet::new();
-		for (entity, hash) in children
-			.iter_descendants(root)
-			.filter_map(|child| hashes.get(child).ok())
-		{
-			if visited.contains(hash) {
-				commands.entity(entity).despawn();
-			} else {
-				visited.insert(hash.clone());
-				// add the hash as an attribute for debugging
-				#[cfg(all(debug_assertions, not(test)))]
-				commands.spawn((
-					AttributeOf::new(entity),
-					AttributeKey::new("data-lang-hash"),
-					TextNode::new(hash.to_string()),
-				));
 			}
 		}
 	}

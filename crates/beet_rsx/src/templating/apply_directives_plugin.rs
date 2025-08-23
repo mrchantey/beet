@@ -50,6 +50,7 @@ impl Plugin for ApplyDirectivesPlugin {
 			.add_systems(
 				ApplyDirectives,
 				(
+					apply_lang_snippet_hashes,
 					apply_style_id,
 					deduplicate_lang_nodes,
 					apply_requires_dom_idx,

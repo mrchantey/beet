@@ -8,7 +8,7 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = Attributes)]
-pub struct AttributeOf(Entity);
+pub struct AttributeOf(pub Entity);
 
 impl AttributeOf {
 	pub fn new(value: Entity) -> Self { Self(value) }
