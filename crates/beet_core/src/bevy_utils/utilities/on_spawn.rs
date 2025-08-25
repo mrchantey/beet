@@ -69,6 +69,20 @@ impl OnSpawnDeferred {
 		Self(Box::new(func))
 	}
 
+	/// Run the function for the parent of this entity
+	pub fn parent<R: Relationship>(
+		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
+	) -> Self {
+		Self::new(move |entity| {
+			let Some(parent) = entity.get::<R>() else {
+				bevybail!(
+					"OnSpawnDeferred::insert_parent: Entity does not have a parent"
+				);
+			};
+			let parent = parent.get();
+			entity.world_scope(move |world| func(&mut world.entity_mut(parent)))
+		})
+	}
 
 	/// Insert this bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {
@@ -80,16 +94,8 @@ impl OnSpawnDeferred {
 
 	/// When flushed, insert this bundle into the parent of the entity.
 	pub fn insert_parent<R: Relationship>(bundle: impl Bundle) -> Self {
-		Self::new(move |entity| {
-			let Some(parent) = entity.get::<R>() else {
-				bevybail!(
-					"OnSpawnDeferred::new_insert_parent: Entity does not have a parent"
-				);
-			};
-			let parent = parent.get();
-			entity.world_scope(move |world| {
-				world.entity_mut(parent).insert(bundle);
-			});
+		Self::parent::<R>(move |entity| {
+			entity.insert(bundle);
 			Ok(())
 		})
 	}

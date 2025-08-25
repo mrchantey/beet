@@ -47,6 +47,14 @@ pub fn tokenize_element_attributes(
 						attr_components.push(quote! {
 								OnSpawnDeferred::insert_parent::<AttributeOf>(#parsed)
 						});
+					} else if key_str == "ref" {
+						let value = value.inner_parsed();
+						attr_components.push(quote! {
+								OnSpawnDeferred::parent::<AttributeOf>(move |entity|{
+									#value.set(entity.id());
+									Ok(())
+								})
+						});
 					} else {
 						attr_components.push(value.insert_deferred());
 					}
@@ -123,6 +131,14 @@ mod test {
 	fn block() {
 		quote! {
 			<span {foo}/>
+		}
+		.xmap(parse)
+		.to_be_snapshot();
+	}
+	#[test]
+	fn r#ref() {
+		quote! {
+			<span ref=span_ref/>
 		}
 		.xmap(parse)
 		.to_be_snapshot();

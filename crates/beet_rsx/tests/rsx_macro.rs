@@ -9,7 +9,7 @@ use sweet::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn rsx_macro() {
+fn reactivity() {
 	let (get, set) = signal(String::new());
 
 	let mut app = App::new();
@@ -34,4 +34,23 @@ fn inner_text() {
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<code>let foo = {bar};</code>");
+}
+
+
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn r#ref() {
+	let (get, set) = signal(Entity::PLACEHOLDER);
+
+	let mut app = App::new();
+	app.add_plugins(ApplySnippetsPlugin);
+	let world = app.world_mut();
+	let div = world
+		.spawn(rsx! {<div ref=set/>})
+		.get::<Children>()
+		.unwrap()[0];
+	get().xpect().to_be(Entity::PLACEHOLDER);
+	world.run_schedule(ApplySnippets);
+	get().xpect().to_be(div);
 }
