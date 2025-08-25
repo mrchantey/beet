@@ -30,6 +30,10 @@ impl EventExt for MockEvent {
 	fn value(&self) -> String { self.value.clone() }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl EventExt for web_sys::Event {
+	fn value(&self) -> String { wasm_utils::event_target_value(self) }
+}
 
 macro_rules! define_events {
 	($(

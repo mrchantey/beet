@@ -114,7 +114,7 @@ pub struct BundleGetterIntoBundle;
 
 /// for bundles and vecs of bundles
 trait BundleLike<M1, M2>: IntoBundle<M1> {}
-struct BundleIntoBundleLike;
+pub struct BundleIntoBundleLike;
 impl<T, M> BundleLike<M, BundleIntoBundleLike> for T where
 	T: IntoBundle<M> + Bundle
 {
@@ -129,7 +129,7 @@ where
 impl<Func, Out, M1, M2> IntoBundle<(Out, M1, M2)> for Func
 where
 	Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
-	Out: 'static + Send + Sync + Clone + BundleLike<M1, M2>,
+	Out: 'static + Send + Sync + BundleLike<M1, M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {

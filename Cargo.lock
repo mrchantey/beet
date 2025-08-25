@@ -1259,6 +1259,7 @@ dependencies = [
  "material-colors",
  "serde",
  "sweet",
+ "web-sys",
 ]
 
 [[package]]

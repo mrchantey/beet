@@ -38,5 +38,9 @@ material-colors = "0.4.2"
 serde.workspace = true
 beet_parse = { workspace = true, optional = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { workspace = true, features = ["HtmlFormElement", "FormData"] }
+
+
 [dev-dependencies]
 sweet.workspace = true
