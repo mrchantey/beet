@@ -84,21 +84,48 @@ struct Parser<'w, 's, 'a> {
 }
 
 impl<'a> Parser<'_, '_, 'a> {
-	fn routes_mod_tree(&self, tree: &RouteFileMethodTree) -> Item {
-		tree.mod_tree(move |node| {
-			self.clone()
-				.tree_path_func(node)
-				.map(|n| n.into())
-				.unwrap_or(Item::Verbatim(TokenStream::default()))
-		})
-	}
 	fn get(&self, entity: Entity) -> &RouteFileMethod {
 		self.query.get(entity).expect(
 			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
 		)
 	}
 
-	fn tree_path_func(self, tree: &RouteFileMethodTree) -> Option<ItemFn> {
+	fn routes_mod_tree(&self, tree: &RouteFileMethodTree) -> Item {
+		self.mod_tree_recursive(tree, true)
+	}
+
+	/// Create a tree [`syn::Item`], if it has children then wrap in a module
+	/// of the same name as the node.
+	fn mod_tree_recursive(
+		&self,
+		tree: &RouteFileMethodTree,
+		root: bool,
+	) -> Item {
+		let item = self.tree_path_func(tree);
+		if !root && tree.children.is_empty() {
+			item.map(|item| item.into())
+				.unwrap_or(Item::Verbatim(TokenStream::default()))
+		} else {
+			let children = tree
+				.children
+				.iter()
+				.map(|child| self.mod_tree_recursive(child, false));
+			let ident = syn::Ident::new(
+				&tree.name.to_string(),
+				proc_macro2::Span::call_site(),
+			);
+			syn::parse_quote!(
+				#[allow(unused, missing_docs)]
+				pub mod #ident {
+					use super::*;
+					#item
+					#(#children)*
+				}
+			)
+		}
+	}
+
+	fn tree_path_func(&self, tree: &RouteFileMethodTree) -> Option<ItemFn> {
 		// just use the first method, each func should have the same route path
 		let Some(route) = &tree.funcs.iter().next() else {
 			return None;
@@ -117,15 +144,52 @@ impl<'a> Parser<'_, '_, 'a> {
 		} else {
 			Ident::new("index", Span::call_site())
 		};
-		let route_path = route.route_info.path.to_string_lossy().to_string();
-		Some(parse_quote!(
-			/// Get the local route path
-			pub fn #route_ident()->&'static str{
-				#route_path
+		let segments = PathSegment::parse(&route.route_info.path);
+		let is_static = segments.iter().all(|segment| segment.is_static());
+
+		let func = if is_static {
+			let route_path =
+				route.route_info.path.to_string_lossy().to_string();
+			parse_quote!(
+				pub fn #route_ident()-> &'static str{
+					#route_path
+				}
+			)
+		} else {
+			let dyn_idents = segments
+				.iter()
+				.filter_map(|segment| {
+					if segment.is_static() {
+						None
+					} else {
+						Some(Ident::new(segment.as_str(), Span::call_site()))
+					}
+				})
+				.collect::<Vec<_>>();
+
+			let raw_str = segments
+				.iter()
+				.map(|segment| {
+					if segment.is_static() {
+						segment.as_str()
+					} else {
+						"{}"
+					}
+				})
+				.collect::<Vec<_>>()
+				.join("/");
+			let raw_str = format!("/{raw_str}");
+
+			parse_quote! {
+				pub fn #route_ident(#(#dyn_idents: &str),*) -> String{
+					format!(#raw_str, #(#dyn_idents),*)
+				}
 			}
-		))
+		};
+		Some(func)
 	}
 }
+
 
 #[cfg(test)]
 mod test {
@@ -173,6 +237,14 @@ mod test {
 			.xpect()
 			.to_be_snapshot();
 	}
+
+	#[test]
+	fn dynamic() {
+		parse(vec![RouteFileMethod::new("/foo/:bar/*bazz")])
+			.xpect()
+			.to_be_snapshot();
+	}
+
 	#[test]
 	fn empty() { parse(vec![]).xpect().to_be_snapshot(); }
 

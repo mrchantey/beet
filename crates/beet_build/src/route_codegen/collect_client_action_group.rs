@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use proc_macro2::Span;
 use syn::Item;
 
 /// Added as a child of any [`RouteFileCollection`] with a [`RouteFileCategory::Action`],
@@ -70,7 +71,7 @@ impl Builder<'_, '_, '_, '_> {
 		}
 	}
 	fn mod_tree_inner(&self, tree: &RouteFileMethodTree) -> Item {
-		let ident = syn::Ident::new(&tree.name, proc_macro2::Span::call_site());
+		let ident = syn::Ident::new(&tree.name.to_string(), Span::call_site());
 		let children =
 			tree.children.iter().map(|child| self.mod_tree_inner(child));
 

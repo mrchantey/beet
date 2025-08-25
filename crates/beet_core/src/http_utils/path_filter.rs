@@ -28,14 +28,9 @@ pub struct PathFilter {
 impl PathFilter {
 	/// Create a new `PathFilter` with the given path which is split into segments.
 	pub fn new(path: impl AsRef<Path>) -> Self {
-		let segments = path
-			.as_ref()
-			.to_string_lossy()
-			.split('/')
-			.filter(|s| !s.is_empty())
-			.map(PathSegment::new)
-			.collect::<Vec<_>>();
-		Self { segments }
+		Self {
+			segments: PathSegment::parse(path),
+		}
 	}
 
 	/// Consume a segment of the path for each segment in the filter,
@@ -81,12 +76,36 @@ pub enum PathSegment {
 }
 
 impl PathSegment {
+	/// Parse a path into a [`Vec<PathSegment>`]
+	/// ## Panics
+	/// - Panics if contains a wildcard pattern that isnt last
+	pub fn parse(path: impl AsRef<Path>) -> Vec<Self> {
+		let segments = path
+			.as_ref()
+			.to_string_lossy()
+			.split('/')
+			.filter(|s| !s.is_empty())
+			.map(PathSegment::new)
+			.collect::<Vec<_>>();
+
+		for (index, segment) in segments.iter().enumerate() {
+			if matches!(segment, PathSegment::Wildcard(_))
+				&& index != segments.len() - 1
+			{
+				panic!("Wildcard pattern must be last");
+			}
+		}
+
+		segments
+	}
+
 	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
 	///
 	/// ## Panics
 	/// - Panics if the segment is empty after trimming leading and trailing slashes.
 	/// - Panics if the segment contains internal slashes '/'
-	pub fn new(segment: &str) -> Self {
+	pub fn new(segment: impl AsRef<str>) -> Self {
+		let segment = segment.as_ref();
 		// trim leading and trailing slashes
 		let trimmed = segment.trim_matches('/');
 		if trimmed.is_empty() {
@@ -134,8 +153,42 @@ impl PathSegment {
 			}
 		}
 	}
+	pub fn is_static(&self) -> bool {
+		match self {
+			PathSegment::Static(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn as_str(&self) -> &str { self.as_ref() }
 }
 
+impl AsRef<str> for PathSegment {
+	fn as_ref(&self) -> &str {
+		match self {
+			PathSegment::Static(s) => s,
+			PathSegment::Dynamic(s) => s,
+			PathSegment::Wildcard(s) => s,
+		}
+	}
+}
+
+impl From<&str> for PathSegment {
+	fn from(value: &str) -> Self { Self::new(value) }
+}
+impl From<String> for PathSegment {
+	fn from(value: String) -> Self { Self::new(value) }
+}
+/// Print the segment as-is without dynamic and wildcard annotations
+impl std::fmt::Display for PathSegment {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			PathSegment::Static(s) => write!(f, "{}", s),
+			PathSegment::Dynamic(s) => write!(f, "{}", s),
+			PathSegment::Wildcard(s) => write!(f, "{}", s),
+		}
+	}
+}
 
 /// A [`RoutePath`] split into segments for easier matching,
 /// where each segment is guaranteed to be:

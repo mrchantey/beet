@@ -1,7 +1,6 @@
 #[allow(unused, missing_docs)]
 pub mod routes {
     use super::*;
-    /// Get the local route path
     pub fn index() -> &'static str {
         "/"
     }

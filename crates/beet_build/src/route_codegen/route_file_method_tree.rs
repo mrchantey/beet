@@ -1,14 +1,14 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::VecExt;
 use beet_utils::utils::Tree;
 use bevy::prelude::*;
-use syn::Item;
 
 #[derive(Debug, Clone)]
 pub struct RouteFileMethodTree {
 	/// The route path for this part of the tree. It may be
 	/// a parent or leaf node.
-	pub name: String,
+	pub name: PathSegment,
 	/// A list of entities with a [`RouteFileMethod`] component
 	/// that are associated with this route. These usually
 	/// originate from a single file but may come from sepearate collections
@@ -20,9 +20,9 @@ pub struct RouteFileMethodTree {
 }
 
 impl RouteFileMethodTree {
-	pub fn new(name: impl Into<String>) -> Self {
+	pub fn new(segment: impl Into<PathSegment>) -> Self {
 		Self {
-			name: name.into(),
+			name: segment.into(),
 			funcs: Vec::new(),
 			children: Vec::new(),
 		}
@@ -39,40 +39,8 @@ impl RouteFileMethodTree {
 			.collect::<Vec<_>>();
 
 		Tree {
-			value: self.name.clone(),
+			value: self.name.to_string(),
 			children,
-		}
-	}
-
-
-	/// Create a tree [`syn::Item`], if it has children then wrap in a module
-	/// of the same name as the node.
-	pub fn mod_tree(&self, map_item: impl Fn(&Self) -> Item + Clone) -> Item {
-		self.mod_tree_inner(map_item, true)
-	}
-	pub fn mod_tree_inner(
-		&self,
-		map_item: impl Fn(&Self) -> Item + Clone,
-		root: bool,
-	) -> Item {
-		let item = map_item(self);
-		if !root && self.children.is_empty() {
-			item
-		} else {
-			let children = self
-				.children
-				.iter()
-				.map(|child| child.mod_tree_inner(map_item.clone(), false));
-			let ident =
-				syn::Ident::new(&self.name, proc_macro2::Span::call_site());
-			syn::parse_quote!(
-				#[allow(unused, missing_docs)]
-				pub mod #ident {
-					use super::*;
-					#item
-					#(#children)*
-				}
-			)
 		}
 	}
 
@@ -101,7 +69,7 @@ impl RouteFileMethodTree {
 					{
 						current = VecExt::entry_or_insert_with(
 							&mut current.children,
-							|child| child.name == str,
+							|child| child.name.as_str() == str,
 							|| RouteFileMethodTree::new(str),
 						);
 					}

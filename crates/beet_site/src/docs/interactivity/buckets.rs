@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use beet::prelude::*;
+use std::sync::Arc;
 
 
 
@@ -99,6 +98,7 @@ fn NewItem(
 
 	let on_add = Arc::new(move || {
 		add_item(description());
+		set_description(Default::default());
 	});
 
 	rsx! {
