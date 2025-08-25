@@ -15,15 +15,11 @@ pub struct RouterAppPlugin;
 
 impl Plugin for RouterAppPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			.add_plugins(ApplyDirectivesPlugin)
+		app.add_plugins(ApplyDirectivesPlugin)
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
-			.add_systems(Startup, (
-				insert_route_tree,
-				default_handlers
-			));
+			.add_systems(Startup, (insert_route_tree, default_handlers));
 	}
 }
 
@@ -31,7 +27,7 @@ impl Plugin for RouterAppPlugin {
 
 /// Collection of systems for collecting and running and route handlers
 /// This type serves as the intermediarybetween the main app and the route handlers.
-#[derive(Clone,Resource)]
+#[derive(Clone, Resource)]
 pub struct Router {
 	/// An app pool constructed from the given plugin.
 	app_pool: AppPool,
@@ -42,10 +38,9 @@ pub struct Router {
 #[allow(unused_variables)]
 fn default_handlers(
 	mut commands: Commands,
-	config:Res<WorkspaceConfig>,
+	config: Res<WorkspaceConfig>,
 	query: Query<Entity, With<RouterRoot>>,
 ) -> Result {
-
 	let root = query.single()?;
 	let mut root = commands.entity(root);
 	root.with_child((
@@ -55,9 +50,15 @@ fn default_handlers(
 
 	root.with_child((
 		PathFilter::new("/app-info"),
-		bundle_endpoint(HttpMethod::Get, |config:Res<PackageConfig>|{
-			let PackageConfig {title, description, version, stage, ..} = config.clone();
-			rsx!{
+		bundle_endpoint(HttpMethod::Get, |config: Res<PackageConfig>| {
+			let PackageConfig {
+				title,
+				description,
+				version,
+				stage,
+				..
+			} = config.clone();
+			rsx! {
 				<main>
 					<h1>App Info</h1>
 					<p>Title: {title}</p>
@@ -65,33 +66,34 @@ fn default_handlers(
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
 				</main>
-			}			
-})
+			}
+		}),
 	));
 
 
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-		{
+	{
 		#[cfg(all(feature = "aws", not(test)))]
 		let bucket = s3_bucket();
 		#[cfg(not(all(feature = "aws", not(test))))]
-		let bucket = Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()),"");
+		let bucket =
+			Bucket::new(FsBucketProvider::new(config.html_dir.into_abs()), "");
 
 		trace!("Inserting default bucket file handler");
 		root.with_child((
 			bucket,
 			HandlerConditions::fallback(),
 			bucket_file_handler(),
-		));}
+		));
+	}
 	Ok(())
 }
 
 impl Router {
-
 	/// Create a new [`Router`] with the given plugin and the [`RouterAppPlugin`].
 	pub fn new(plugin: impl ClonePlugin) -> Self {
 		let plugin = ClonePluginContainer::new(plugin);
-		Self::new_no_defaults(move |app:&mut App|{
+		Self::new_no_defaults(move |app: &mut App| {
 			plugin.add_to_app(app);
 			app.init_plugin(RouterAppPlugin);
 			#[cfg(not(test))]
@@ -105,15 +107,16 @@ impl Router {
 			app_pool: Self::create_app_pool(plugin),
 		}
 	}
-	/// Convenience method to create a new [`Router`] with a bundle of routes, 
+	/// Convenience method to create a new [`Router`] with a bundle of routes,
 	/// adding the [`RouterRoot`] component.
-	pub fn new_bundle<B>(func: impl 'static + Send + Sync + Clone + FnOnce() -> B) -> Self 
-		where B: Bundle{
-		Self::new(move |app:&mut App|{
-			app.world_mut().spawn((
-				RouterRoot,
-				func.clone()(),
-			));
+	pub fn new_bundle<B>(
+		func: impl 'static + Send + Sync + Clone + FnOnce() -> B,
+	) -> Self
+	where
+		B: Bundle,
+	{
+		Self::new(move |app: &mut App| {
+			app.world_mut().spawn((RouterRoot, func.clone()()));
 		})
 	}
 	pub fn with_plugin(mut self, plugin: impl ClonePlugin) -> Self {
@@ -126,14 +129,14 @@ impl Router {
 	pub fn add_plugin(&mut self, new_plugin: impl ClonePlugin) {
 		let current_plugin = self.plugin.clone();
 		let new_plugin = ClonePluginContainer::new(new_plugin);
-		let plugin = move |app:&mut App|{
+		let plugin = move |app: &mut App| {
 			current_plugin.add_to_app(app);
 			new_plugin.add_to_app(app);
 		};
 		self.plugin = ClonePluginContainer(plugin.box_clone());
 		self.app_pool = Self::create_app_pool(plugin);
 	}
-	
+
 	fn create_app_pool(plugin: impl ClonePlugin) -> AppPool {
 		AppPool::new(move || {
 			let mut app = App::new();
@@ -210,17 +213,18 @@ impl Router {
 		world.insert_resource(request);
 
 
-		let root = world.query_filtered::<Entity, With<RouterRoot>>().single(&world).expect(
-			"Router apps must have exactly one `RouterRoot`",
-		);
+		let root = world
+			.query_filtered::<Entity, With<RouterRoot>>()
+			.single(&world)
+			.expect("Router apps must have exactly one `RouterRoot`");
 		// let mut owned_world = std::mem::take(world);
 		world = self
 			.handle_request_recursive(world, route_parts.clone(), root)
 			.await;
 
-		let response =world.remove_resource::<Response>().unwrap_or_else(|| {
-			Response::not_found()
-		});
+		let response = world
+			.remove_resource::<Response>()
+			.unwrap_or_else(|| Response::not_found());
 
 		trace!("Returning Response: {:#?}", response);
 		trace!("Route handler completed in: {:.2?}", start_time.elapsed());
@@ -283,7 +287,7 @@ impl Router {
 			if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
 				if
 				// endpoints may only run if exact path match
-				!parts.path().is_empty() || 
+				!parts.path().is_empty() ||
 				// method must match
 				endpoint.method() != parts.method()
 				{
@@ -296,8 +300,9 @@ impl Router {
 			if let Some(predicates) =
 				world.entity(entity).get::<HandlerConditions>().cloned()
 			{
-				let (world2, should_run) =
-					predicates.should_run(std::mem::take(world.inner_mut()), entity).await;
+				let (world2, should_run) = predicates
+					.should_run(std::mem::take(world.inner_mut()), entity)
+					.await;
 				*world.inner_mut() = world2;
 				if !should_run {
 					continue;
@@ -310,7 +315,7 @@ impl Router {
 			{
 				*world.inner_mut() = handler
 					.clone()
-					.run(std::mem::take(world.inner_mut()),entity)
+					.run(std::mem::take(world.inner_mut()), entity)
 					.await;
 			}
 		}
@@ -326,7 +331,7 @@ pub fn insert_route_tree(world: &mut World) {
 	let endpoints = world.run_system_cached(ResolvedEndpoint::collect).unwrap();
 	let paths = endpoints
 		.into_iter()
-		.map(|(entity, endpoint)| (entity, endpoint.path().clone()))
+		.map(|(entity, endpoint)| (entity, endpoint.annotated_path().clone()))
 		.collect();
 	world.insert_resource(RoutePathTree::from_paths(paths));
 }
@@ -344,7 +349,7 @@ mod test {
 	#[sweet::test]
 	async fn beet_route_works() {
 		let router = Router::new_bundle(|| {
-				RouteHandler::new(HttpMethod::Get, || "hello world!")
+			RouteHandler::new(HttpMethod::Get, || "hello world!")
 		});
 		router
 			.oneshot_str("/")
@@ -359,47 +364,48 @@ mod test {
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
 				// PathFilter::new("/"),
-				RouterRoot,				
+				RouterRoot,
 				RouteHandler::layer(|mut res: ResMut<Foo>| {
 					res.push(0);
 				}),
 				children![
-				(
-					PathFilter::new("foo"),
-					RouteHandler::layer(|mut res: ResMut<Foo>| {
-						res.push(1);
-					}),
-					children![
-						(
-							PathFilter::new("bar"),
-							Endpoint::new(HttpMethod::Get),
-							RouteHandler::layer(|mut res: ResMut<Foo>| {
-								res.push(2);
-							}),
-						),
-						(
-							PathFilter::new("bazz"),
-							Endpoint::new(HttpMethod::Delete),
-							RouteHandler::layer(|mut res: ResMut<Foo>| {
-								res.push(3);
-							}),
-						),
-						(
-							// no endpoint, always runs if parent matches
-							RouteHandler::layer(|mut res: ResMut<Foo>| {
-								res.push(4);
-							}),
-						),
-					],
-				),
-				(RouteHandler::layer(
-					|mut commands: Commands, res: ResMut<Foo>| {
-						commands.insert_resource(
-							Json(res.0.clone()).into_response(),
-						);
-					}
-				),)
-			]));
+					(
+						PathFilter::new("foo"),
+						RouteHandler::layer(|mut res: ResMut<Foo>| {
+							res.push(1);
+						}),
+						children![
+							(
+								PathFilter::new("bar"),
+								Endpoint::new(HttpMethod::Get),
+								RouteHandler::layer(|mut res: ResMut<Foo>| {
+									res.push(2);
+								}),
+							),
+							(
+								PathFilter::new("bazz"),
+								Endpoint::new(HttpMethod::Delete),
+								RouteHandler::layer(|mut res: ResMut<Foo>| {
+									res.push(3);
+								}),
+							),
+							(
+								// no endpoint, always runs if parent matches
+								RouteHandler::layer(|mut res: ResMut<Foo>| {
+									res.push(4);
+								}),
+							),
+						],
+					),
+					(RouteHandler::layer(
+						|mut commands: Commands, res: ResMut<Foo>| {
+							commands.insert_resource(
+								Json(res.0.clone()).into_response(),
+							);
+						}
+					),)
+				],
+			));
 
 			app.world_mut().init_resource::<Foo>();
 		});
@@ -443,6 +449,21 @@ mod test {
 			.to_be_str("hawaiian");
 	}
 	#[sweet::test]
+	async fn dynamic() {
+		Router::new_bundle(|| {
+			(PathFilter::new("foo"), children![(
+				PathFilter::new(":bar"),
+				RouteHandler::new(HttpMethod::Get, || "hawaiian")
+			),])
+		})
+		.oneshot_str("/foo/bazz")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("hawaiian");
+	}
+
+	#[sweet::test]
 	async fn endpoint_with_children() {
 		let router = Router::new_bundle(|| {
 			(
@@ -451,8 +472,7 @@ mod test {
 				children![(
 					PathFilter::new("bar"),
 					RouteHandler::new(HttpMethod::Get, || "bar")
-				),
-				],
+				),],
 			)
 		});
 		router

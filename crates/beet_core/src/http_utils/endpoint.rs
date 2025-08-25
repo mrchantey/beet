@@ -39,15 +39,14 @@ impl Into<Endpoint> for HttpMethod {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ResolvedEndpoint {
 	endpoint: Endpoint,
-	path: RoutePath,
-	segments: Vec<PathSegment>,
+	/// The path for this endpoint with annotated non-static segments,
+	/// ie foo/:bar/*bazz
+	annotated_path: RoutePath,
+	segments: RouteSegments,
 }
 
 impl ResolvedEndpoint {
-	pub fn new(
-		endpoint: impl Into<Endpoint>,
-		segments: Vec<PathSegment>,
-	) -> Self {
+	pub fn new(endpoint: impl Into<Endpoint>, segments: RouteSegments) -> Self {
 		let path = RoutePath::from(
 			segments
 				.iter()
@@ -57,7 +56,7 @@ impl ResolvedEndpoint {
 		);
 		Self {
 			endpoint: endpoint.into(),
-			path,
+			annotated_path: path,
 			segments,
 		}
 	}
@@ -66,8 +65,8 @@ impl ResolvedEndpoint {
 		self.endpoint.cache_strategy
 	}
 	pub fn endpoint(&self) -> &Endpoint { &self.endpoint }
-	pub fn segments(&self) -> &Vec<PathSegment> { &self.segments }
-	pub fn path(&self) -> &RoutePath { &self.path }
+	pub fn segments(&self) -> &RouteSegments { &self.segments }
+	pub fn annotated_path(&self) -> &RoutePath { &self.annotated_path }
 
 	pub fn collect(
 		query: Query<(Entity, &Endpoint)>,
@@ -91,13 +90,19 @@ impl ResolvedEndpoint {
 						}
 					}
 				}
-				(entity, Self::new(endpoint.clone(), segments))
+				(
+					entity,
+					Self::new(endpoint.clone(), RouteSegments::new(segments)),
+				)
 			})
 			.collect()
 	}
 
 	/// Collect all static GET endpoints from the world,
-	/// used for differentiating ssg paths
+	/// used for differentiating ssg paths:
+	/// - Method must be GET
+	/// - All segments must be [`PathSegment::Static`]
+	/// - The cache strategy must be [`CacheStrategy::Static`]
 	pub fn collect_static_get(world: &mut World) -> Vec<(Entity, Self)> {
 		world
 			.run_system_cached(Self::collect)
@@ -105,6 +110,7 @@ impl ResolvedEndpoint {
 			.into_iter()
 			.filter(|(_, info)| {
 				info.method() == HttpMethod::Get
+					&& info.segments().is_static()
 					&& info.cache_strategy() == CacheStrategy::Static
 			})
 			.collect()
@@ -151,7 +157,7 @@ mod test {
 			children![
 				children![
 					(
-						PathFilter::new("*bar"), 
+						PathFilter::new("*bar"),
 						Endpoint::new(HttpMethod::Post)
 					),
 					PathFilter::new("bazz")
@@ -160,7 +166,7 @@ mod test {
 					PathFilter::new("qux"),
 				),
 				(
-					PathFilter::new(":quax"), 
+					PathFilter::new(":quax"),
 					Endpoint::new(HttpMethod::Post)
 				),
 			],
@@ -172,23 +178,15 @@ mod test {
 		.xpect().to_be(vec![
 			ResolvedEndpoint::new(
 				HttpMethod::Get,
-				vec![
-					PathSegment::Static("foo".into()),
-				],
+				RouteSegments::parse("/foo")
 			),
 			ResolvedEndpoint::new(
 				HttpMethod::Post,
-				vec![
-					PathSegment::Static("foo".into()),
-					PathSegment::Wildcard("bar".into()),
-				],
+				RouteSegments::parse("/foo/*bar")
 			),
 			ResolvedEndpoint::new(
 				HttpMethod::Post,
-				vec![
-					PathSegment::Static("foo".into()),
-					PathSegment::Dynamic("quax".into()),
-				],
+				RouteSegments::parse("/foo/:quax")
 			),
 		]);
 	}

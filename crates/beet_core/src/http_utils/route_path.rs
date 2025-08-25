@@ -7,7 +7,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// Describes an absolute path to a route, beginning with `/`.
-/// 
+///
 /// ```txt
 /// https://example.com/foo/bar.txt
 /// 									 ^^^^^^^^^^^^
@@ -152,7 +152,7 @@ impl RoutePathTree {
 			.unwrap_or("")
 	}
 
-	/// Returns true if this node has no entities (not an endpoint)
+	/// Returns true if this node has endpoints
 	pub fn contains_endpoints(&self) -> bool { !self.endpoints.is_empty() }
 
 	/// Builds a RoutePathTree from a list of (Entity, RoutePath)
@@ -167,7 +167,7 @@ impl RoutePathTree {
 				.collect()
 		}
 
-		// Build a trie-like structure
+		// Build a tree-like structure
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,

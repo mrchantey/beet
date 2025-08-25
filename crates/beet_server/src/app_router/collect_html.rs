@@ -24,13 +24,13 @@ pub async fn collect_html(
 		.into_iter()
 		// TODO parallel
 		.map(async |(_, info)| -> Result<Option<(AbsPathBuf, String)>> {
-			debug!("building html for {}", info.path());
+			debug!("building html for {}", info.annotated_path());
 			use http::header::CONTENT_TYPE;
 
 			let route_path =
-				html_dir.join(&info.path().as_relative()).join("index.html");
+				html_dir.join(&info.annotated_path().as_relative()).join("index.html");
 
-			let route_info = RouteInfo::new(info.path().clone(), info.method());
+			let route_info = RouteInfo::new(info.annotated_path().clone(), info.method());
 
 			let res = router.oneshot(route_info).await.into_result().await?;
 			// debug!("building html for {}", info.path());

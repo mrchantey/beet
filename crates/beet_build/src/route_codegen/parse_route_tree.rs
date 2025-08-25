@@ -144,10 +144,9 @@ impl<'a> Parser<'_, '_, 'a> {
 		} else {
 			Ident::new("index", Span::call_site())
 		};
-		let segments = PathSegment::parse(&route.route_info.path);
-		let is_static = segments.iter().all(|segment| segment.is_static());
+		let segments = RouteSegments::parse(&route.route_info.path);
 
-		let func = if is_static {
+		let func = if segments.is_static() {
 			let route_path =
 				route.route_info.path.to_string_lossy().to_string();
 			parse_quote!(

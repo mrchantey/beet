@@ -21,7 +21,7 @@ use std::path::Path;
 pub struct PathFilter {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
-	pub segments: Vec<PathSegment>,
+	pub segments: RouteSegments,
 }
 
 
@@ -29,7 +29,7 @@ impl PathFilter {
 	/// Create a new `PathFilter` with the given path which is split into segments.
 	pub fn new(path: impl AsRef<Path>) -> Self {
 		Self {
-			segments: PathSegment::parse(path),
+			segments: RouteSegments::parse(path),
 		}
 	}
 
@@ -45,7 +45,7 @@ impl PathFilter {
 		}
 
 		// check each segment against the path
-		for segment in &self.segments {
+		for segment in self.segments.iter() {
 			let next = parts.path.pop_front();
 			match segment.matches(next.as_ref()) {
 				ControlFlow::Break(_) => {
@@ -58,6 +58,66 @@ impl PathFilter {
 	}
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]
+pub struct RouteSegments {
+	segments: Vec<PathSegment>,
+	is_static: bool,
+}
+
+impl std::ops::Deref for RouteSegments {
+	type Target = Vec<PathSegment>;
+	fn deref(&self) -> &Self::Target { &self.segments }
+}
+
+impl RouteSegments {
+	/// Parse a path into [`RouteSegments`]
+	/// ## Panics
+	/// - Panics if contains a wildcard pattern that isnt last
+	pub fn parse(path: impl AsRef<Path>) -> Self {
+		let segments = path
+			.as_ref()
+			.to_string_lossy()
+			.split('/')
+			.filter(|s| !s.is_empty())
+			.map(PathSegment::new)
+			.collect::<Vec<_>>();
+
+		for (index, segment) in segments.iter().enumerate() {
+			if matches!(segment, PathSegment::Wildcard(_))
+				&& index != segments.len() - 1
+			{
+				panic!("Wildcard pattern must be last");
+			}
+		}
+
+		Self::new(segments)
+	}
+
+	/// Called by to_tokens, this should never be used directly
+	pub fn _from_raw(segments: Vec<PathSegment>, is_static: bool) -> Self {
+		Self {
+			segments,
+			is_static,
+		}
+	}
+
+	pub fn new(segments: Vec<PathSegment>) -> Self {
+		let is_static = segments.iter().all(|segment| segment.is_static());
+		Self {
+			segments,
+			is_static,
+		}
+	}
+	/// Returns true if all segments are a [`PathSegment::Static`]
+	pub fn is_static(&self) -> bool { self.is_static }
+}
+impl Default for RouteSegments {
+	fn default() -> Self { Self::new(Vec::new()) }
+}
 
 /// A segment of a route path, stripped of:
 /// - leading & trailing slashes `/`
@@ -76,29 +136,6 @@ pub enum PathSegment {
 }
 
 impl PathSegment {
-	/// Parse a path into a [`Vec<PathSegment>`]
-	/// ## Panics
-	/// - Panics if contains a wildcard pattern that isnt last
-	pub fn parse(path: impl AsRef<Path>) -> Vec<Self> {
-		let segments = path
-			.as_ref()
-			.to_string_lossy()
-			.split('/')
-			.filter(|s| !s.is_empty())
-			.map(PathSegment::new)
-			.collect::<Vec<_>>();
-
-		for (index, segment) in segments.iter().enumerate() {
-			if matches!(segment, PathSegment::Wildcard(_))
-				&& index != segments.len() - 1
-			{
-				panic!("Wildcard pattern must be last");
-			}
-		}
-
-		segments
-	}
-
 	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
 	///
 	/// ## Panics

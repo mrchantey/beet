@@ -4,7 +4,7 @@ use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 
 
-/// Marker type indicating this entity was spawned via [`RouteHandler::new_bundle`].
+/// Marker type indicating this entity was spawned via [`bundle_endpoint`].
 #[derive(Component)]
 pub struct HandlerBundle;
 
