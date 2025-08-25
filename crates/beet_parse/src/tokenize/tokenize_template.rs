@@ -7,6 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
+
 pub fn tokenize_template(
 	world: &World,
 	entity_components: &mut Vec<TokenStream>,
@@ -27,7 +28,7 @@ pub fn tokenize_template(
 		for attr_entity in attrs.iter() {
 			let key = maybe_spanned_attr_key(world, attr_entity).map(
 				|(key, span)| {
-					let ident = Ident::new(&key, span);
+					let ident = non_reserved_key(&key, span);
 					(key, ident)
 				},
 			);
@@ -73,8 +74,6 @@ pub fn tokenize_template(
 			.build()
 	};
 
-	// NodeExpr::new_block(value)
-
 	let inner = if entity.contains::<ClientLoadDirective>()
 		|| entity.contains::<ClientOnlyDirective>()
 	{
@@ -91,6 +90,93 @@ pub fn tokenize_template(
 
 	Ok(())
 }
+
+fn non_reserved_key(key: &str, span: Span) -> Ident {
+	use bevy::platform::collections::HashSet;
+	use std::sync::LazyLock;
+
+	/// All reserved keywords as defined in https://doc.rust-lang.org/reference/keywords.html
+	static RESERVED_KEYWORDS: LazyLock<HashSet<&'static str>> =
+		LazyLock::new(|| {
+			[
+				// All editions
+				"as",
+				"break",
+				"const",
+				"continue",
+				"crate",
+				"else",
+				"enum",
+				"extern",
+				"false",
+				"fn",
+				"for",
+				"if",
+				"impl",
+				"in",
+				"let",
+				"loop",
+				"match",
+				"mod",
+				"move",
+				"mut",
+				"pub",
+				"ref",
+				"return",
+				"self",
+				"Self",
+				"static",
+				"struct",
+				"super",
+				"trait",
+				"true",
+				"type",
+				"unsafe",
+				"use",
+				"where",
+				"while",
+				// 2018 edition
+				"async",
+				"await",
+				"dyn",
+				// Reserved for future use
+				"abstract",
+				"become",
+				"box",
+				"do",
+				"final",
+				"macro",
+				"override",
+				"priv",
+				"typeof",
+				"unsized",
+				"virtual",
+				"yield",
+				// Reserved 2018
+				"try",
+				// Reserved 2024
+				"gen",
+				// Weak keywords
+				"'static",
+				"macro_rules",
+				"raw",
+				"safe",
+				"union",
+			]
+			.iter()
+			.copied()
+			.collect()
+		});
+	if RESERVED_KEYWORDS.contains(&key) {
+		Ident::new_raw(&key, span)
+	} else if let Some(inner) = key.strip_prefix("r#") {
+		// already escaped
+		Ident::new_raw(&inner, span)
+	} else {
+		Ident::new(key, span)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -109,6 +195,14 @@ mod test {
 	fn key_value() {
 		quote! {
 			<Foo bar client:load/>
+		}
+		.xmap(parse)
+		.to_be_snapshot();
+	}
+	#[test]
+	fn reserved_names() {
+		quote! {
+			<Foo type="bar"/>
 		}
 		.xmap(parse)
 		.to_be_snapshot();

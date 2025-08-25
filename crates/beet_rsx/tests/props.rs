@@ -12,6 +12,7 @@ fn works() {
 		<MyNode
 			is_required=38
 			is_boxed=|| 3
+			type="foo"
 			is_no_into="foobar".into()
 			is_optional=3
 			is_marker_into=3
@@ -22,9 +23,8 @@ fn works() {
 		/>
 	}
 	.xmap(HtmlFragment::parse_bundle)
-	.xpect().to_be(
-		"<div><p>is_optional: Some(3)</p><p>is_required: 38</p><p>is_default: 7</p><p>is_generic_default: Foo(PhantomData<u32>)</p><p>is_into: \"foobar\"</p><p>is_boxed: 3</p><p>is_flatten.class: \"kablamo\"</p><p>is_flatten.id: Some(\"bar\")</p><p>is_flatten.disabled: None</p><p>is_marker_into: \"3\"</p><p>is_maybe_signal: Getter(7)</p></div>"
-	);
+	.xpect()
+	.to_be_snapshot();
 }
 
 #[allow(unused)]
@@ -55,6 +55,7 @@ fn MyNode(
 	is_required: u32,
 	is_boxed: Box<dyn Fn() -> u32 + Send + Sync>,
 	is_optional: Option<u32>,
+	r#type: String,
 	#[field(default = 7)] is_default: u32,
 	#[field(default)] is_generic_default: Foo<u32>,
 	#[field(no_into)] is_no_into: String,
@@ -75,6 +76,7 @@ fn MyNode(
 			<p>is_default: {format!("{:?}", is_default)}</p>
 			<p>is_generic_default: {format!("{:?}", is_generic_default)}</p>
 			<p>is_into: {format!("{:?}", is_no_into)}</p>
+			<p>type: {format!("{:?}", r#type)}</p>
 			<p>is_boxed: {format!("{:?}", (is_boxed)())}</p>
 			<p>is_flatten.class: {format!("{:?}", is_flatten.class)}</p>
 			<p>is_flatten.id: {format!("{:?}", is_flatten.id)}</p>

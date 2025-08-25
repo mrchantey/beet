@@ -8,10 +8,10 @@ use sweet::prelude::*;
 #[test]
 fn hello() {
 	#[template]
-	fn Hello(name: String) -> impl Bundle {
+	fn Hello(name: String, r#type: String) -> impl Bundle {
 		rsx! {<div>hello {name}</div>}
 	}
-	rsx! {<Hello name="bill"/>}
+	rsx! {<Hello name="bill" type="foo"/>}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<div>hello bill</div>");

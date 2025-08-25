@@ -23,7 +23,8 @@ impl MockEvent {
 			value: value.into(),
 		}
 	}
-	pub fn key() -> String { unimplemented!() }
+	pub fn key(&self) -> String { unimplemented!() }
+	pub fn prevent_default(&self) { unimplemented!() }
 }
 impl EventExt for MockEvent {
 	fn value(&self) -> String { self.value.clone() }

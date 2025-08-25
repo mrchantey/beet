@@ -4,6 +4,8 @@ use crate::prelude::*;
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
+	pub r#type: Option<String>,
+	pub name: Option<String>,
 	pub tabindex: Option<String>,
 	pub autofocus: Option<bool>,
 	pub onchange: Option<EventHandler<OnChange>>,
@@ -30,7 +32,6 @@ pub struct AnchorHtmlAttributes {
 pub struct InputHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
-	pub r#type: Option<String>,
 	pub disabled: Option<bool>,
 	pub required: Option<bool>,
 	pub value: Option<MaybeSignal<String>>,
