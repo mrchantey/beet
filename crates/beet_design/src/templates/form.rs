@@ -11,7 +11,7 @@ pub fn Form(
 	#[field(default)]
 	bubble_up: bool,
 	onsubmit_dyn: Box<dyn 'static + Send + Sync + Fn(DynamicStruct)>,
-	#[field(flatten=BaseHtmlAttributes)] attrs: AnchorHtmlAttributes,
+	#[field(flatten)] attrs: BaseHtmlAttributes,
 ) -> impl Bundle {
 	// let (entity, set_entity) = signal(Entity::PLACEHOLDER);
 

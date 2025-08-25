@@ -1,4 +1,7 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use std::pin::Pin;
@@ -28,6 +31,21 @@ impl Bucket {
 			provider: Box::new(provider),
 		}
 	}
+	/// Create a new bucket with a platform dependent provider
+	/// - wasm: [`LocalStorageProvider`]
+	/// - native: [`FsBucketProvider`] with root: `.cache/buckets`
+	pub fn new_local(name: impl Into<String>) -> Self {
+		#[cfg(target_arch = "wasm32")]
+		let provider = LocalStorageProvider::new();
+		#[cfg(not(target_arch = "wasm32"))]
+		let provider = FsBucketProvider::new(
+			AbsPathBuf::new_workspace_rel(".cache/buckets").unwrap(),
+		);
+
+		Self::new(provider, name)
+	}
+
+
 	/// Get the name of the bucket, ie `my-bucket`
 	pub fn name(&self) -> &str { &self.name }
 

@@ -14,12 +14,7 @@ pub fn get() -> impl Bundle {
 #[template]
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
-	#[cfg(target_arch = "wasm32")]
-	let provider = LocalStorageProvider::new();
-	#[cfg(not(target_arch = "wasm32"))]
-	let provider = InMemoryProvider::new();
-
-	let bucket = Bucket::new(provider, "buckets-demo");
+	let bucket = Bucket::new_local("buckets-demo");
 
 	let (items, set_items) = signal::<Vec<OnSpawnClone>>(default());
 	let (on_change, trigger_change) = signal(());

@@ -132,7 +132,7 @@ fn impl_template_bundle(
 	})
 }
 
-/// Any type in the ReturnTyle that is an impl will need an additional `use<>`
+/// Any type in the ReturnType that is an impl will need an additional `use<>`
 /// constraint, required for valid bevy systems.
 /// https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html
 fn with_captured_lifetimes(func: &ItemFn) -> ReturnType {
