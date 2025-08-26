@@ -11,7 +11,8 @@ pub struct RouterPlugin;
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<MethodFilter>()
-			.register_type::<Endpoint>()
+			.register_type::<HttpMethod>()
+			.register_type::<CacheStrategy>()
 			.register_type::<PathFilter>()
 			.register_type::<WorkspaceConfig>()
 			.register_type::<HtmlConstants>()

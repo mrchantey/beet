@@ -2,6 +2,21 @@ use crate::as_beet::*;
 use bevy::prelude::*;
 use std::fmt;
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Default, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub enum CacheStrategy {
+	/// An endpoint that may produce different responses for the same path and method,
+	/// and should not be cached
+	#[default]
+	Dynamic,
+	/// An endpoint that always returns the same response for a given
+	/// path and method, making it suitable for ssg and caching.
+	Static,
+}
+
+
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
 /// and quite error prone in this high level context. For example
 /// `http::method::from_str("get") != http::Method::GET` due to
@@ -11,8 +26,19 @@ use std::fmt;
 /// Additionally the naming convention follows Rusty conventions rather
 /// than HTTP conventions, ie `Get` instead of `GET`.
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Copy,
+	Component,
+	Reflect,
 )]
+#[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {

@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
-use beet_utils::utils::PipelineTarget;
+use bevy::ecs::component::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
@@ -7,7 +8,23 @@ use std::sync::Arc;
 
 /// An asynchronous route handler, accepting and returning a [`World`].
 #[derive(Clone, Component)]
+#[component(on_add=collect_route_segments)]
 pub struct RouteHandler(Arc<RouteHandlerFunc>);
+
+/// Insert a [`RouteSegments`] containing the [`PathFilter`] for this
+/// handler and its ancestors.
+fn collect_route_segments(mut world: DeferredWorld, cx: HookContext) {
+	let entity = cx.entity;
+	world
+		.commands()
+		.queue(move |world: &mut World| -> Result<()> {
+			let segments =
+				world.run_system_cached_with(RouteSegments::collect, entity)?;
+			world.entity_mut(entity).insert(segments);
+			Ok(())
+		});
+}
+
 
 type RouteHandlerFunc = dyn 'static
 	+ Send
@@ -20,8 +37,8 @@ pub fn no_request_err<T>() -> HttpError {
 		"
 Handler Error: {}\n\n
 No request found in world. This can occur when two handlers compete
-to remove the request resource, try explicitly adding an Endpoint to each
-	
+to remove the request resource, try adding an ExactPath component to endpoints
+that consume the request
 	",
 		std::any::type_name::<T>()
 	))
@@ -33,11 +50,10 @@ impl RouteHandler {
 		(self.0)(world, entity).await
 	}
 
-	/// A route handler with output inserted as a [`Response`]
-	pub fn new<T, In, InErr, Out, Marker>(
-		endpoint: impl Into<Endpoint>,
-		handler: T,
-	) -> (Endpoint, Self)
+	/// A route handler with output inserted as a [`Response`], these add
+	/// an [`ExactPath`] component which means the path must not contain
+	/// trailing segments to match this handler.
+	pub fn endpoint<T, In, InErr, Out, Marker>(handler: T) -> (ExactPath, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		Out: 'static + Send + Sync + IntoResponse,
@@ -57,11 +73,19 @@ impl RouteHandler {
 			Ok(out)
 		};
 
-		Self::layer(move |world: &mut World| {
-			let res = handler(world).into_response();
-			world.insert_resource(res);
-		})
-		.xmap(move |handler| (endpoint.into(), handler))
+		(
+			ExactPath,
+			Self::layer(move |world: &mut World| {
+				let res = handler(world).into_response();
+				world.insert_resource(res);
+			}),
+		)
+	}
+
+	/// Create a route handler that will simply return a 200 Ok response.
+	pub fn ok() -> (ExactPath, Self) {
+		fn noop() {}
+		Self::endpoint(noop)
 	}
 
 	/// A route handler that passively runs a system,
@@ -141,7 +165,7 @@ mod test {
 
 	#[sweet::test]
 	async fn not_found() {
-		Router::new_bundle(|| RouteHandler::new(HttpMethod::Get, || "howdy"))
+		Router::new_bundle(|| RouteHandler::endpoint(|| "howdy"))
 			.oneshot("/foobar")
 			.await
 			.xpect()
@@ -149,7 +173,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn works() {
-		Router::new_bundle(|| RouteHandler::new(HttpMethod::Get, || "howdy"))
+		Router::new_bundle(|| RouteHandler::endpoint(|| "howdy"))
 			.oneshot("/")
 			.await
 			.status()
@@ -158,7 +182,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn body() {
-		Router::new_bundle(|| RouteHandler::new(HttpMethod::Get, || "hello"))
+		Router::new_bundle(|| RouteHandler::endpoint(|| "hello"))
 			.oneshot_str("/")
 			.await
 			.unwrap()
@@ -173,7 +197,7 @@ mod test {
 				RouteHandler::layer(|mut req: ResMut<Request>| {
 					req.set_body("jimmy");
 				}),
-				RouteHandler::new(HttpMethod::Get, |req: In<Request>| {
+				RouteHandler::endpoint(|req: In<Request>| {
 					let body = req.body_str().unwrap_or_default();
 					format!("hello {}", body)
 				}),

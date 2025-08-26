@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.7-dev.13"
+version = "0.0.7-dev.14"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "An ECS metaframework built with bevy"
@@ -81,31 +81,31 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet_utils = { path = "crates/beet_utils", version = "0.0.7-dev.13" }
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.7-dev.13" }
+beet_utils = { path = "crates/beet_utils", version = "0.0.7-dev.14" }
+sweet_macros = { path = "crates/sweet/macros", version = "0.0.7-dev.14" }
 sweet = { path = "crates/sweet", version = "0.4.2-rc.1" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.7-dev.13" }
-beet_core = { path = "crates/beet_core", version = "0.0.7-dev.13" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.7-dev.14" }
+beet_core = { path = "crates/beet_core", version = "0.0.7-dev.14" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.7-dev.13" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.7-dev.13" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.7-dev.13" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.7-dev.13" }
-beet_build = { path = "crates/beet_build", version = "0.0.7-dev.13" }
-beet_design = { path = "crates/beet_design", version = "0.0.7-dev.13" }
-beet_server = { path = "crates/beet_server", version = "0.0.7-dev.13" }
-beet_query = { path = "crates/beet_query", version = "0.0.7-dev.13" }
-beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.13" }
-beet_connect = { path = "crates/beet_connect", version = "0.0.7-dev.13" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.7-dev.14" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.7-dev.14" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.7-dev.14" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.7-dev.14" }
+beet_build = { path = "crates/beet_build", version = "0.0.7-dev.14" }
+beet_design = { path = "crates/beet_design", version = "0.0.7-dev.14" }
+beet_server = { path = "crates/beet_server", version = "0.0.7-dev.14" }
+beet_query = { path = "crates/beet_query", version = "0.0.7-dev.14" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.14" }
+beet_connect = { path = "crates/beet_connect", version = "0.0.7-dev.14" }
 
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.13" }
-beet_flow = { path = "crates/beet_flow", version = "0.0.7-dev.13" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.7-dev.13" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.7-dev.13" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.7-dev.13" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.7-dev.13" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.14" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.7-dev.14" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.7-dev.14" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.7-dev.14" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.7-dev.14" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.7-dev.14" }
 
-beet = { path = "", version = "0.0.7-dev.13" }
+beet = { path = "", version = "0.0.7-dev.14" }
 
 #💡 local
 ## git for IntoPipeSystem: Clone

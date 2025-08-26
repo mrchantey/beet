@@ -12,80 +12,68 @@ use std::future::Future;
 /// To support the [`JsonResult`] pattern, the handler must return a type that implements [`IntoResponse`],
 /// regular types can be mapped by using `my_action.pipe(Json::pipe)`.
 pub fn action_endpoint<T, Input, Out, Marker>(
-	endpoint: impl Into<Endpoint>,
+	method: HttpMethod,
 	handler: T,
-) -> (Endpoint, RouteHandler)
+) -> (HttpMethod, (ExactPath, RouteHandler))
 where
 	T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
 	Input: 'static + SystemInput,
 	for<'a> Input::Inner<'a>: DeserializeOwned,
 	Out: 'static + Send + Sync + IntoResponse,
 {
-	let endpoint = endpoint.into();
-	match endpoint.method().has_body() {
+	let handler = match method.has_body() {
 		// ie `POST`, `PUT`, etc
-		true => RouteHandler::new(
-			endpoint,
+		true => RouteHandler::endpoint(
 			move |val: In<Json<Input::Inner<'_>>>,
-						world: &mut World|
-						-> Result<Out> {
-				let out = world
-					.run_system_cached_with(handler.clone(), val.0.0)?;
+			      world: &mut World|
+			      -> Result<Out> {
+				let out =
+					world.run_system_cached_with(handler.clone(), val.0.0)?;
 				Ok(out)
 			},
 		),
 		// ie `GET`, `DELETE`, etc
-		false => RouteHandler::new(
-			endpoint,
+		false => RouteHandler::endpoint(
 			move |val: In<JsonQueryParams<Input::Inner<'_>>>,
-						world: &mut World|
-						-> Result<Out> {
-				let out = world
-					.run_system_cached_with(handler.clone(), val.0.0)?;
+			      world: &mut World|
+			      -> Result<Out> {
+				let out =
+					world.run_system_cached_with(handler.clone(), val.0.0)?;
 				Ok(out)
 			},
 		),
-	}
+	};
+	(method, handler)
 }
 pub fn action_endpoint_async<T, Input, Fut, Out>(
-	endpoint: impl Into<Endpoint>,
+	method: HttpMethod,
 	handler: T,
-) -> (Endpoint, RouteHandler)
+) -> (HttpMethod, RouteHandler)
 where
 	T: 'static + Send + Sync + Clone + Fn(In<Input>, World, Entity) -> Fut,
 	Input: 'static + Send + Sync + DeserializeOwned,
 	Out: 'static + Send + Sync + IntoResponse,
 	Fut: 'static + Send + Future<Output = (World, Out)>,
 {
-	let endpoint = endpoint.into();
-	match endpoint.method().has_body() {
+	let handler = match method.has_body() {
 		// ie `POST`, `PUT`, etc
-		true => (
-			endpoint,
-			RouteHandler::new_async(
-				async move |world: World,
-										input: Json<Input>,
-										entity: Entity| {
-					let (world, out) =
-						handler(In(input.0), world, entity).await;
-					(world, out)
-				},
-			),
+		true => RouteHandler::new_async(
+			async move |world: World, input: Json<Input>, entity: Entity| {
+				let (world, out) = handler(In(input.0), world, entity).await;
+				(world, out)
+			},
 		),
 		// ie `GET`, `DELETE`, etc
-		false => (
-			endpoint,
-			RouteHandler::new_async(
-				async move |world: World,
-										input: JsonQueryParams<Input>,
-										entity: Entity| {
-					let (world, out) =
-						handler(In(input.0), world, entity).await;
-					(world, out)
-				},
-			),
+		false => RouteHandler::new_async(
+			async move |world: World,
+			            input: JsonQueryParams<Input>,
+			            entity: Entity| {
+				let (world, out) = handler(In(input.0), world, entity).await;
+				(world, out)
+			},
 		),
-	}
+	};
+	(method, handler)
 }
 
 

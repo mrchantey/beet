@@ -15,7 +15,8 @@ where
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait PipelineTarget: Sized {
-	/// Similar to [`Iterator::map`] but for any type, not just iterators.
+	/// Similar to [`Iterator::map`] but for any type, not just iterators,
+	/// allowing for method chaining.
 	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
 	/// Similar to [`Iterator::inspect`] but for any type, not just iterators.
 	fn xtap(mut self, func: impl FnOnce(&mut Self)) -> Self {

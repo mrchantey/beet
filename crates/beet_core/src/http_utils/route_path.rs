@@ -61,6 +61,13 @@ impl std::ops::Deref for RoutePath {
 impl AsRef<Path> for RoutePath {
 	fn as_ref(&self) -> &Path { self.0.as_path() }
 }
+impl AsRef<str> for RoutePath {
+	fn as_ref(&self) -> &str { self.0.to_str().unwrap_or_default() }
+}
+
+impl Into<Request> for RoutePath {
+	fn into(self) -> Request { Request::new(HttpMethod::Get, self) }
+}
 
 impl TryInto<Uri> for RoutePath {
 	type Error = InvalidUri;

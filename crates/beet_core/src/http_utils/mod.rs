@@ -1,11 +1,8 @@
-mod endpoint;
-#[cfg(feature = "bevy")]
 mod extractors;
-mod response;
 mod path_filter;
-pub use endpoint::*;
-pub use response::*;
+mod response;
 pub use path_filter::*;
+pub use response::*;
 mod request;
 pub use request::*;
 mod http_error;

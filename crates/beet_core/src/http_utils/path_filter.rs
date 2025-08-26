@@ -1,6 +1,7 @@
 #[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use http::request::Parts;
 use std::collections::VecDeque;
@@ -8,10 +9,13 @@ use std::ops::ControlFlow;
 use std::path::Path;
 
 
+/// Endpoints with this component will only run if there are no trailing
+/// path segments.
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component)]
+pub struct ExactPath;
 
-
-
-/// A filter for matching routes based on path segments and HTTP methods.
+/// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
@@ -51,7 +55,13 @@ impl PathFilter {
 				ControlFlow::Break(_) => {
 					return ControlFlow::Break(());
 				}
-				ControlFlow::Continue(()) => {}
+				ControlFlow::Continue(()) => {
+					if matches!(segment, PathSegment::Wildcard(_)) {
+						// wildcards match and consume all remaining segments
+						parts.path = Default::default();
+						return ControlFlow::Continue(parts);
+					}
+				}
 			}
 		}
 		ControlFlow::Continue(parts)
@@ -59,7 +69,10 @@ impl PathFilter {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+)]
+#[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]
@@ -74,6 +87,25 @@ impl std::ops::Deref for RouteSegments {
 }
 
 impl RouteSegments {
+	pub fn collect(
+		entity: In<Entity>,
+		parents: Query<&ChildOf>,
+		filters: Query<&PathFilter>,
+	) -> RouteSegments {
+		parents
+			.iter_ancestors_inclusive(*entity)
+			.filter_map(|entity| filters.get(entity).ok())
+			.collect::<Vec<_>>()
+			.into_iter()
+			.cloned()
+			// reverse to start from the root
+			.rev()
+			.flat_map(|filter| filter.segments.segments)
+			.collect::<Vec<_>>()
+			.xmap(Self::new)
+	}
+
+
 	/// Parse a path into [`RouteSegments`]
 	/// ## Panics
 	/// - Panics if contains a wildcard pattern that isnt last
@@ -114,6 +146,16 @@ impl RouteSegments {
 	}
 	/// Returns true if all segments are a [`PathSegment::Static`]
 	pub fn is_static(&self) -> bool { self.is_static }
+
+
+	pub fn annotated_route_path(&self) -> RoutePath {
+		self.segments
+			.iter()
+			.map(|segment| segment.to_string_annotated())
+			.collect::<Vec<_>>()
+			.join("/")
+			.xmap(RoutePath::new)
+	}
 }
 impl Default for RouteSegments {
 	fn default() -> Self { Self::new(Vec::new()) }

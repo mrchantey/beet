@@ -8,7 +8,7 @@ The stack bevyfication continues this harvest, with ecs proving to be the anythi
 
 ## A Very Bevy Router
 
-Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do. 
+Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do.
 
 `beet_server` addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque `Request/Response` types.
 
@@ -18,11 +18,11 @@ fn routes() -> impl Bundle {
   children![
     (
       PathFilter::new("/hello"),
-      bundle_endpoint(HttpMethod::Get, || rsx!{<div>hello world!</div>}),
+      bundle_endpoint( || rsx!{<div>hello world!</div>}),
     ),
     (
       HandlerConditions::fallback(),
-      bundle_endpoint(HttpMethod::Get, || rsx!{<div>fallback</div>}),
+      bundle_endpoint( || rsx!{<div>fallback</div>}),
     )
   ]
 }
@@ -34,7 +34,7 @@ Thanks to our bevy router, server actions are now regular systems:
 
 ```rust
 // add.rs
-pub fn get(params: In<(i32, i32)>) -> i32 { 
+pub fn get(params: In<(i32, i32)>) -> i32 {
   params.0 + params.1
 }
 ```
@@ -81,7 +81,7 @@ fn bucket_fallback() -> impl Bundle {
 
 ## Goodbye CLI
 
-Config files are a bug not a feature, even I found the `beet.toml` hard to work with and I'm the one who wrote it! 
+Config files are a bug not a feature, even I found the `beet.toml` hard to work with and I'm the one who wrote it!
 Previously the cli would load the config file into an tree of entities, now these are declared directly by the user, gated behind the `launch` feature.
 
 ```rust

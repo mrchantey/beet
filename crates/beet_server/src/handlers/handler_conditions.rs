@@ -115,7 +115,7 @@ mod test {
 		Router::new_bundle(|| {
 			(
 					HandlerConditions::fallback(),
-					RouteHandler::new(HttpMethod::Get,|| "fallback")
+					RouteHandler::endpoint(|| "fallback")
 			)
 		})
 		.oneshot_str("/")
@@ -129,10 +129,10 @@ mod test {
 	async fn skips_async() {
 		Router::new_bundle(|| {
 			children![
-				RouteHandler::new(HttpMethod::Get,|| "endpoint"),
+				RouteHandler::endpoint(|| "endpoint"),
 				(
 					HandlerConditions::fallback(),
-					RouteHandler::new(HttpMethod::Get,|| "fallback")
+					RouteHandler::endpoint(|| "fallback")
 				)
 			]
 		})

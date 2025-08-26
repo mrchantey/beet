@@ -20,20 +20,26 @@ pub async fn collect_html(
 	router
 		.construct_world()
 		.await
-		.run_system_cached(ResolvedEndpoint::collect_static_get)?
+		.run_system_cached(static_get_routes)?
 		.into_iter()
 		// TODO parallel
-		.map(async |(_, info)| -> Result<Option<(AbsPathBuf, String)>> {
-			debug!("building html for {}", info.annotated_path());
+		.map(async |(_, path)| -> Result<Option<(AbsPathBuf, String)>> {
+			debug!("building html for {}", &path);
 			use http::header::CONTENT_TYPE;
 
 			let route_path =
-				html_dir.join(&info.annotated_path().as_relative()).join("index.html");
+				html_dir.join(&path.as_relative()).join("index.html");
 
-			let route_info = RouteInfo::new(info.annotated_path().clone(), info.method());
+			// let route_info = RouteInfo::get(path.clone());
 
-			let res = router.oneshot(route_info).await.into_result().await?;
-			// debug!("building html for {}", info.path());
+			let res = router
+				.oneshot(path.clone())
+				.await
+				.into_result()
+				.await
+				.map_err(|err| {
+					bevyhow!("failed to build html for {}\n{}", &path, err)
+				})?;
 
 			// we are only collecting html responses, other static endpoints
 			// are not exported

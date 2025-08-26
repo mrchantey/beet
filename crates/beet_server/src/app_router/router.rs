@@ -10,7 +10,7 @@ use std::ops::ControlFlow;
 pub struct RouterRoot;
 
 
-
+/// Plugin added to the [`AppPool`] app for each handler
 pub struct RouterAppPlugin;
 
 impl Plugin for RouterAppPlugin {
@@ -19,14 +19,17 @@ impl Plugin for RouterAppPlugin {
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>()
-			.add_systems(Startup, (insert_route_tree, default_handlers));
+			.add_systems(
+				Startup,
+				(default_handlers, insert_route_tree).chain(),
+			);
 	}
 }
 
 
 
 /// Collection of systems for collecting and running and route handlers
-/// This type serves as the intermediarybetween the main app and the route handlers.
+/// This type serves as the intermediary between the main app and the route handlers.
 #[derive(Clone, Resource)]
 pub struct Router {
 	/// An app pool constructed from the given plugin.
@@ -34,7 +37,7 @@ pub struct Router {
 	plugin: ClonePluginContainer,
 }
 
-/// insert the default handlers that assist with
+/// insert the default handlers for health checks and basic info
 #[allow(unused_variables)]
 fn default_handlers(
 	mut commands: Commands,
@@ -43,14 +46,12 @@ fn default_handlers(
 ) -> Result {
 	let root = query.single()?;
 	let mut root = commands.entity(root);
-	root.with_child((
-		HandlerConditions::no_response(),
-		bundle_to_html_handler(),
-	));
 
 	root.with_child((
 		PathFilter::new("/app-info"),
-		bundle_endpoint(HttpMethod::Get, |config: Res<PackageConfig>| {
+		CacheStrategy::Static,
+		HttpMethod::Get,
+		bundle_endpoint(|config: Res<PackageConfig>| {
 			let PackageConfig {
 				title,
 				description,
@@ -70,6 +71,10 @@ fn default_handlers(
 		}),
 	));
 
+	root.with_child((
+		HandlerConditions::no_response(),
+		bundle_to_html_handler(),
+	));
 
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 	{
@@ -258,6 +263,7 @@ impl Router {
 					continue;
 				}
 			}
+
 			// Check 2: PathFilter
 			if let Some(filter) = world.entity(entity).get::<PathFilter>() {
 				match filter.matches(parts.clone()) {
@@ -283,18 +289,18 @@ impl Router {
 				}
 			}
 
-			// Check 3: Endpoint
-			if let Some(endpoint) = world.entity(entity).get::<Endpoint>() {
-				if
-				// endpoints may only run if exact path match
-				!parts.path().is_empty() ||
-				// method must match
-				endpoint.method() != parts.method()
-				{
-					continue;
-				}
+			// Check 3: Method and Path
+			if !parts.path().is_empty()
+				&& world.entity(entity).contains::<ExactPath>()
+			{
+				continue;
 			}
-
+			if let Some(method) = world.entity(entity).get::<HttpMethod>()
+				// method must match if specified
+				&& *method != parts.method()
+			{
+				continue;
+			}
 
 			// Check 4: HandlerPredicates
 			if let Some(predicates) =
@@ -323,16 +329,9 @@ impl Router {
 	}
 }
 
-
-
-
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
 pub fn insert_route_tree(world: &mut World) {
-	let endpoints = world.run_system_cached(ResolvedEndpoint::collect).unwrap();
-	let paths = endpoints
-		.into_iter()
-		.map(|(entity, endpoint)| (entity, endpoint.annotated_path().clone()))
-		.collect();
+	let paths = world.run_system_cached(static_get_routes).unwrap();
 	world.insert_resource(RoutePathTree::from_paths(paths));
 }
 
@@ -347,10 +346,24 @@ mod test {
 	struct Foo(Vec<u32>);
 
 	#[sweet::test]
-	async fn beet_route_works() {
-		let router = Router::new_bundle(|| {
-			RouteHandler::new(HttpMethod::Get, || "hello world!")
+	async fn app_info() {
+		let router = Router::new(|app: &mut App| {
+			app.insert_resource(RenderMode::Ssr)
+				.insert_resource(pkg_config!())
+				.world_mut()
+				.spawn(RouterRoot);
 		});
+		router
+			.oneshot_str("/app-info")
+			.await
+			.unwrap()
+			.xpect()
+			.to_be_snapshot();
+	}
+	#[sweet::test]
+	async fn beet_route_works() {
+		let router =
+			Router::new_bundle(|| RouteHandler::endpoint(|| "hello world!"));
 		router
 			.oneshot_str("/")
 			.await
@@ -377,14 +390,13 @@ mod test {
 						children![
 							(
 								PathFilter::new("bar"),
-								Endpoint::new(HttpMethod::Get),
 								RouteHandler::layer(|mut res: ResMut<Foo>| {
 									res.push(2);
 								}),
 							),
 							(
 								PathFilter::new("bazz"),
-								Endpoint::new(HttpMethod::Delete),
+								HttpMethod::Delete,
 								RouteHandler::layer(|mut res: ResMut<Foo>| {
 									res.push(3);
 								}),
@@ -397,13 +409,13 @@ mod test {
 							),
 						],
 					),
-					(RouteHandler::layer(
+					RouteHandler::layer(
 						|mut commands: Commands, res: ResMut<Foo>| {
 							commands.insert_resource(
 								Json(res.0.clone()).into_response(),
 							);
 						}
-					),)
+					)
 				],
 			));
 
@@ -431,7 +443,7 @@ mod test {
 		let router = Router::new_bundle(|| {
 			(
 				PathFilter::new("pizza"),
-				RouteHandler::new(HttpMethod::Get, || "hawaiian"),
+				RouteHandler::endpoint(|| "hawaiian"),
 			)
 		});
 		router
@@ -453,7 +465,7 @@ mod test {
 		Router::new_bundle(|| {
 			(PathFilter::new("foo"), children![(
 				PathFilter::new(":bar"),
-				RouteHandler::new(HttpMethod::Get, || "hawaiian")
+				RouteHandler::endpoint(|| "hawaiian")
 			),])
 		})
 		.oneshot_str("/foo/bazz")
@@ -468,10 +480,10 @@ mod test {
 		let router = Router::new_bundle(|| {
 			(
 				PathFilter::new("foo"),
-				RouteHandler::new(HttpMethod::Get, || "foo"),
+				RouteHandler::endpoint(|| "foo"),
 				children![(
 					PathFilter::new("bar"),
-					RouteHandler::new(HttpMethod::Get, || "bar")
+					RouteHandler::endpoint(|| "bar")
 				),],
 			)
 		});
@@ -493,18 +505,20 @@ mod test {
 		let router = Router::new(|app: &mut App| {
 			app.world_mut().spawn((
 				RouterRoot,
-				RouteHandler::new(
-					HttpMethod::Get,
-					|tree: Res<RoutePathTree>| tree.to_string(),
-				),
+				CacheStrategy::Static,
+				RouteHandler::endpoint(|tree: Res<RoutePathTree>| {
+					tree.to_string()
+				}),
 				children![
 					(
 						PathFilter::new("foo"),
-						RouteHandler::new(HttpMethod::Get, || "foo")
+						CacheStrategy::Static,
+						RouteHandler::endpoint(|| "foo")
 					),
 					(PathFilter::new("bar"), children![(
 						PathFilter::new("baz"),
-						RouteHandler::new(HttpMethod::Get, || "baz")
+						CacheStrategy::Static,
+						RouteHandler::endpoint(|| "baz")
 					)]),
 					(PathFilter::new("boo"),),
 				],

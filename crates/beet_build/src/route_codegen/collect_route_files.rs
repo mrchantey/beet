@@ -33,11 +33,11 @@ pub fn collect_route_files(
 			{
 				let func_ident = &route_file_method.item.sig.ident;
 
-				let endpoint = Endpoint::new_with(
-					route_file_method.route_info.method,
-					collection.category.cache_strategy(),
-				)
-				.self_token_stream();
+
+				let method =
+					route_file_method.route_info.method.self_token_stream();
+				let cache_strategy =
+					collection.category.cache_strategy().self_token_stream();
 
 				let is_async = route_file_method.item.sig.asyncness.is_some();
 				let handler = match collection.category {
@@ -45,10 +45,10 @@ pub fn collect_route_files(
 						// page routes are presumed to be bundles
 						match is_async {
 							true => quote! {
-								bundle_endpoint_async(#endpoint, #mod_ident::#func_ident)
+								bundle_endpoint_async(#mod_ident::#func_ident)
 							},
 							false => quote! {
-								bundle_endpoint(#endpoint, #mod_ident::#func_ident)
+								bundle_endpoint(#mod_ident::#func_ident)
 							},
 						}
 					}
@@ -62,7 +62,7 @@ pub fn collect_route_files(
 						match is_async {
 							true => quote! {
 								action_endpoint_async(
-									#endpoint,
+									#method,
 									async move |val,mut world,entity|{
 										let out = #mod_ident::#func_ident(val, &mut world, entity).await;
 										(world, #out_ty::new(out))
@@ -71,22 +71,38 @@ pub fn collect_route_files(
 							},
 							false => quote! {
 								action_endpoint(
-									#endpoint,
+									#method,
 									#mod_ident::#func_ident.pipe(#out_ty::pipe)
 								)
 							},
 						}
 					}
 				};
-				let filter =
+				let path_filter =
 					PathFilter::new(&route_file_method.route_info.path)
 						.self_token_stream();
 
 
-				children.push(quote! {(
-					#filter,
-					#handler
-				)});
+				let bundle = match collection.category {
+					RouteCollectionCategory::Actions => {
+						// actions already have the method specified
+						quote! {(
+							#path_filter,
+							#handler,
+							#cache_strategy
+						)}
+					}
+					_ => {
+						quote! {(
+							#path_filter,
+							#handler,
+							#method,
+							#cache_strategy
+						)}
+					}
+				};
+
+				children.push(bundle);
 			}
 		}
 

@@ -21,22 +21,16 @@ fn setup(mut commands: Commands) {
 		app.init_plugin(RouterAppPlugin);
 		app.world_mut().spawn((RouterRoot, children![
 			// bundles are served as html documents
-			(
-				PathFilter::new("/"),
-				bundle_endpoint(HttpMethod::Get, || rsx! {<Home/>})
-			),
+			(PathFilter::new("/"), bundle_endpoint(|| rsx! {<Home/>})),
 			// common types implement IntoResponse
-			(
-				PathFilter::new("/foo"),
-				RouteHandler::new(HttpMethod::Get, || "bar")
-			),
+			(PathFilter::new("/foo"), RouteHandler::endpoint(|| "bar")),
 			// middleware example
 			(
 				PathFilter::new("/hello-layer"),
 				// children are run in sequence
 				children![
 					RouteHandler::layer(modify_request),
-					bundle_endpoint(HttpMethod::Get, |req: In<Request>| {
+					bundle_endpoint(|req: In<Request>| {
 						let body = req.body_str().unwrap_or_default();
 						rsx! {
 							<Style/>

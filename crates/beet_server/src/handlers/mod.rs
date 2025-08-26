@@ -1,9 +1,9 @@
 mod action_handler;
 mod handler_conditions;
 pub use handler_conditions::*;
-mod endpoint_system;
+mod endpoint;
 pub use action_handler::*;
-pub use endpoint_system::*;
+pub use endpoint::*;
 mod bucket_handler;
 mod bundle_endpoint;
 pub use bundle_endpoint::*;

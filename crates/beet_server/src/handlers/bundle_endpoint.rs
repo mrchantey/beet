@@ -11,10 +11,7 @@ pub struct HandlerBundle;
 
 /// A route handler returning a bundle, which is inserted into the world
 /// with a [`HandlerBundle`] component.
-pub fn bundle_endpoint<T, In, InErr, Out, Marker>(
-	endpoint: impl Into<Endpoint>,
-	handler: T,
-) -> impl Bundle
+pub fn bundle_endpoint<T, In, InErr, Out, Marker>(handler: T) -> impl Bundle
 where
 	T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 	In: 'static + SystemInput,
@@ -41,8 +38,8 @@ where
 	};
 
 	(
+		ExactPath,
 		HandlerConditions::is_ssr(),
-		endpoint.into(),
 		RouteHandler::layer(move |world: &mut World| {
 			if let Err(err) = handler(world) {
 				world.insert_resource(err);
@@ -54,22 +51,23 @@ where
 
 /// An async route handler returning a bundle, which is inserted into the world
 /// with a [`HandlerBundle`] component.
-pub fn bundle_endpoint_async<Handler, Fut, Out>(
-	handler: Handler,
-) -> RouteHandler
+pub fn bundle_endpoint_async<Handler, Fut, Out>(handler: Handler) -> impl Bundle
 where
 	Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
 	Fut: 'static + Send + Future<Output = (World, Out)>,
 	Out: 'static + Send + Sync + Bundle,
 {
-	RouteHandler::layer_async(move |world, _| {
-		let func = handler.clone();
-		async move {
-			let (mut world, out) = func(world).await;
-			world.spawn((HandlerBundle, out));
-			world
-		}
-	})
+	(
+		ExactPath,
+		RouteHandler::layer_async(move |world, _| {
+			let func = handler.clone();
+			async move {
+				let (mut world, out) = func(world).await;
+				world.spawn((HandlerBundle, out));
+				world
+			}
+		}),
+	)
 }
 
 
@@ -134,12 +132,12 @@ mod test {
 		}
 	}
 	#[sweet::test]
-	fn compiles() { bundle_endpoint(HttpMethod::Get, some_endpoint); }
+	fn compiles() { bundle_endpoint(some_endpoint); }
 
 	#[sweet::test]
 	async fn works() {
 		Router::new_bundle(|| {
-			bundle_endpoint(HttpMethod::Get, || {
+			bundle_endpoint(|| {
 				rsx! {
 					<MyTemplate foo=42/>
 				}
@@ -160,7 +158,7 @@ mod test {
 	async fn middleware() {
 		Router::new_bundle(|| {
 			children![
-				bundle_endpoint(HttpMethod::Get, || {
+				bundle_endpoint(|| {
 					rsx! {
 						<MyTemplate foo=42/>
 					}

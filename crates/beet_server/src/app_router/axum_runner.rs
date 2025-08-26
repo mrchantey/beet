@@ -189,7 +189,7 @@ mod test {
 			.insert_resource(Router::new_bundle(|| {
 				(
 					PathFilter::new("pizza"),
-					RouteHandler::new(HttpMethod::Get, || "hello world!"),
+					RouteHandler::endpoint(|| "hello world!"),
 				)
 			}));
 

@@ -181,9 +181,9 @@ mod test {
 	fn collect_sidebar_node() {
 		let mut world = World::new();
 
-		world.spawn((Endpoint::new(HttpMethod::Get), children![(
+		world.spawn((RouteHandler::ok(), children![(
 			PathFilter::new("docs"),
-			Endpoint::new(HttpMethod::Get),
+			RouteHandler::ok(),
 			ArticleMeta {
 				title: Some("Docs".to_string()),
 				sidebar: SidebarInfo {
@@ -194,7 +194,7 @@ mod test {
 			},
 			children![(
 				PathFilter::new("testing"),
-				Endpoint::new(HttpMethod::Get),
+				RouteHandler::ok(),
 				ArticleMeta {
 					title: Some("Partying".to_string()),
 					sidebar: SidebarInfo {
@@ -206,6 +206,12 @@ mod test {
 			)]
 		),]));
 		world.run_system_cached(insert_route_tree).unwrap();
+		world
+			.resource::<RoutePathTree>()
+			.to_string()
+			.xpect()
+			.to_be("/\n/docs\n/docs/testing\n");
+
 		world
 			.run_system_cached_with(
 				CollectSidebarNode::collect,
