@@ -14,7 +14,7 @@ use std::future::Future;
 pub fn action_endpoint<T, Input, Out, Marker>(
 	method: HttpMethod,
 	handler: T,
-) -> (HttpMethod, (ExactPath, RouteHandler))
+) -> (HttpMethod, (Endpoint, RouteHandler))
 where
 	T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
 	Input: 'static + SystemInput,

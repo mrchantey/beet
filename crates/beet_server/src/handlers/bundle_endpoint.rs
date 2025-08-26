@@ -38,7 +38,7 @@ where
 	};
 
 	(
-		ExactPath,
+		Endpoint,
 		HandlerConditions::is_ssr(),
 		RouteHandler::layer(move |world: &mut World| {
 			if let Err(err) = handler(world) {
@@ -58,7 +58,7 @@ where
 	Out: 'static + Send + Sync + Bundle,
 {
 	(
-		ExactPath,
+		Endpoint,
 		RouteHandler::layer_async(move |world, _| {
 			let func = handler.clone();
 			async move {

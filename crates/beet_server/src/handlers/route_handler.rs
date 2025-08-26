@@ -53,7 +53,7 @@ impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`], these add
 	/// an [`ExactPath`] component which means the path must not contain
 	/// trailing segments to match this handler.
-	pub fn endpoint<T, In, InErr, Out, Marker>(handler: T) -> (ExactPath, Self)
+	pub fn endpoint<T, In, InErr, Out, Marker>(handler: T) -> (Endpoint, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		Out: 'static + Send + Sync + IntoResponse,
@@ -74,7 +74,7 @@ impl RouteHandler {
 		};
 
 		(
-			ExactPath,
+			Endpoint,
 			Self::layer(move |world: &mut World| {
 				let res = handler(world).into_response();
 				world.insert_resource(res);
@@ -83,7 +83,7 @@ impl RouteHandler {
 	}
 
 	/// Create a route handler that will simply return a 200 Ok response.
-	pub fn ok() -> (ExactPath, Self) {
+	pub fn ok() -> (Endpoint, Self) {
 		fn noop() {}
 		Self::endpoint(noop)
 	}

@@ -291,7 +291,7 @@ impl Router {
 
 			// Check 3: Method and Path
 			if !parts.path().is_empty()
-				&& world.entity(entity).contains::<ExactPath>()
+				&& world.entity(entity).contains::<Endpoint>()
 			{
 				continue;
 			}

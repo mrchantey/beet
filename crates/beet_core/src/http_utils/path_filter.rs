@@ -9,11 +9,11 @@ use std::ops::ControlFlow;
 use std::path::Path;
 
 
-/// Endpoints with this component will only run if there are no trailing
-/// path segments.
+/// Endpoints will only run if there are no trailing path segments,
+/// unlike middleware which may run for multiple child paths.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct ExactPath;
+pub struct Endpoint;
 
 /// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
