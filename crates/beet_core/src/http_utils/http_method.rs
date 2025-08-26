@@ -1,3 +1,4 @@
+#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 use std::fmt;
@@ -180,10 +181,6 @@ impl Into<MethodFilter> for Vec<HttpMethod> {
 
 impl MethodFilter {
 	pub fn new(methods: Vec<HttpMethod>) -> Self { methods.into() }
-
-	pub fn matches(&self, parts: &RouteParts) -> bool {
-		self.methods.contains(&parts.method)
-	}
 
 	pub fn merge(mut self, other: MethodFilter) -> MethodFilter {
 		self.extend(other.methods);

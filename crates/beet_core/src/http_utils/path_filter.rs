@@ -2,11 +2,17 @@
 use crate::as_beet::*;
 use crate::prelude::*;
 use beet_utils::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use http::request::Parts;
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::path::Path;
+
+
+/// A list of [`RouteSegment::Dynamic`] and [`RouteSegment::Wildcard`]
+/// values extracted during path matching.
+#[derive(Default, Resource, Deref, DerefMut)]
+pub struct DynSegmentMap(HashMap<String, String>);
 
 
 /// Endpoints will only run if there are no trailing path segments,
@@ -43,34 +49,28 @@ impl PathFilter {
 	/// returning the remaining path if all segments match.
 	pub fn matches(
 		&self,
-		mut parts: RouteParts,
-	) -> ControlFlow<(), RouteParts> {
+		dyn_map: &mut HashMap<String, String>,
+		path: &mut VecDeque<String>,
+	) -> ControlFlow<(), ()> {
 		// if segments is empty, only the root path is valid
-		if self.segments.is_empty() && !parts.path.is_empty() {
+		if self.segments.is_empty() && !path.is_empty() {
 			return ControlFlow::Break(());
 		}
 
 		// check each segment against the path
 		for segment in self.segments.iter() {
-			let next = parts.path.pop_front();
-			match segment.matches(next.as_ref()) {
+			match segment.matches(dyn_map, path) {
 				ControlFlow::Break(_) => {
 					return ControlFlow::Break(());
 				}
-				ControlFlow::Continue(()) => {
-					if matches!(segment, PathSegment::Wildcard(_)) {
-						// wildcards match and consume all remaining segments
-						parts.path = Default::default();
-						return ControlFlow::Continue(parts);
-					}
-				}
+				ControlFlow::Continue(()) => {}
 			}
 		}
-		ControlFlow::Continue(parts)
+		ControlFlow::Continue(())
 	}
 }
 
-
+/// Unlike [`PathFilter`] this type contains a full path to the endpoint
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
 )]
@@ -212,21 +212,35 @@ impl PathSegment {
 
 	/// Attempts to match the segment against a path,
 	/// returning the remaining path if it matches.
-	pub fn matches(&self, segment: Option<&String>) -> ControlFlow<()> {
-		match (self, segment) {
+	pub fn matches(
+		&self,
+		dyn_map: &mut HashMap<String, String>,
+		path: &mut VecDeque<String>,
+	) -> ControlFlow<()> {
+		match (self, path.pop_front()) {
 			// static match, continue with remaining path
-			(PathSegment::Static(val), Some(other)) if val == other => {
+			(PathSegment::Static(val), Some(other)) if val == &other => {
 				ControlFlow::Continue(())
 			}
 			// dynamic will always match, continue with remaining path
-			(PathSegment::Dynamic(_), Some(_)) => ControlFlow::Continue(()),
+			(PathSegment::Dynamic(key), Some(value)) => {
+				dyn_map.insert(key.clone(), value);
+				ControlFlow::Continue(())
+			}
 			// wildcard consumes the rest of the path, continue with empty path
-			(PathSegment::Wildcard(_), Some(_)) => {
-				ControlFlow::Continue(Default::default())
+			(PathSegment::Wildcard(key), Some(mut value)) => {
+				// consume rest of path
+				while let Some(next) = path.pop_front() {
+					value.push('/');
+					value.push_str(&next);
+				}
+				dyn_map.insert(key.clone(), value);
+				ControlFlow::Continue(())
 			}
 			// only a wildcard permits an empty path
-			(PathSegment::Wildcard(_), None) => {
-				ControlFlow::Continue(Default::default())
+			(PathSegment::Wildcard(key), None) => {
+				dyn_map.insert(key.clone(), "".to_string());
+				ControlFlow::Continue(())
 			}
 			// break if empty path or no matching static
 			(PathSegment::Static(_) | PathSegment::Dynamic(_), _) => {
@@ -271,52 +285,42 @@ impl std::fmt::Display for PathSegment {
 	}
 }
 
-/// A [`RoutePath`] split into segments for easier matching,
-/// where each segment is guaranteed to be:
-/// - non-empty
-/// - not contain internal slashes `/`
-#[derive(Debug, Default, Clone)]
-pub struct RouteParts {
-	pub(super) method: HttpMethod,
-	/// Non-empty segments of the path,
-	path: VecDeque<String>,
+pub fn route_path_queue(path: &str) -> VecDeque<String> {
+	path.split('/')
+		.filter(|s| !s.is_empty())
+		.map(|s| s.to_string())
+		.collect::<VecDeque<_>>()
 }
 
-impl RouteParts {
-	/// Create a new `RouteParts` from a path without a query and method.
-	pub fn new(path: &str, method: HttpMethod) -> Self {
-		Self {
-			method,
-			path: path
-				.split('/')
-				.filter(|s| !s.is_empty())
-				.map(|s| s.to_string())
-				.collect::<VecDeque<_>>(),
-		}
-	}
-	/// Parse the uri
-	pub fn from_parts(parts: &Parts) -> Self {
-		Self::new(parts.uri.path(), parts.method.clone().into())
-	}
-	pub fn method(&self) -> HttpMethod { self.method }
-	pub fn path(&self) -> &VecDeque<String> { &self.path }
-}
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use bevy::platform::collections::HashMap;
 	use std::ops::ControlFlow;
 	use sweet::prelude::*;
 
 	fn expect_segment(
 		filter: &str,
 		request: &str,
-	) -> Matcher<ControlFlow<(), RouteParts>> {
+	) -> Matcher<ControlFlow<(), ()>> {
 		PathFilter::new(filter)
-			.matches(RouteParts::new(request, HttpMethod::Get))
+			.matches(&mut Default::default(), &mut route_path_queue(request))
 			.xpect()
 	}
+
+	fn run_with_map(
+		filter: &str,
+		request: &str,
+	) -> (ControlFlow<(), ()>, HashMap<String, String>) {
+		let mut captured: HashMap<String, String> = Default::default();
+		let mut path_parts = route_path_queue(request);
+		let flow =
+			PathFilter::new(filter).matches(&mut captured, &mut path_parts);
+		(flow, captured)
+	}
+
 	#[test]
 	fn root() {
 		expect_segment("/", "/").to_continue();
@@ -324,6 +328,11 @@ mod test {
 		expect_segment("", "/").to_continue();
 		expect_segment("/", "").to_continue();
 		expect_segment("/", "/foo").to_break();
+
+		for (filter, request) in [("/", "/"), ("", ""), ("", "/"), ("/", "")] {
+			let (_flow, map) = run_with_map(filter, request);
+			expect(map.is_empty()).to_be_true();
+		}
 	}
 	#[test]
 	fn static_path() {
@@ -333,6 +342,16 @@ mod test {
 		expect_segment("foo", "foo/bar").to_continue();
 		expect_segment("foo/bar", "foo").to_break();
 		expect_segment("/", "/foo").to_break();
+
+		for (filter, request) in [
+			("/foobar", "foobar"),
+			("foobar", "/foobar"),
+			("foo/bar", "foo/bar"),
+			("foo", "foo/bar"),
+		] {
+			let (_flow, map) = run_with_map(filter, request);
+			expect(map.is_empty()).to_be_true();
+		}
 	}
 	#[test]
 	fn dynamic_path() {
@@ -343,6 +362,28 @@ mod test {
 		expect_segment("/:foo", "bar/baz").to_continue();
 		expect_segment("/:foo/:baz", "bar").to_break();
 		expect_segment("/:foo", "").to_break();
+
+		let (_flow, map) = run_with_map("/:foo", "bar");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("/:foo", "/bar");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("/:foo/:baz", "bar/baz");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.get("baz").cloned()).to_be(Some("baz".to_string()));
+		expect(map.len()).to_be(2);
+
+		let (_flow, map) = run_with_map("/:foo/:baz", "/bar/baz");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.get("baz").cloned()).to_be(Some("baz".to_string()));
+		expect(map.len()).to_be(2);
+
+		let (_flow, map) = run_with_map("/:foo", "bar/baz");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.len()).to_be(1);
 	}
 	#[test]
 	fn wildcard_path() {
@@ -354,5 +395,29 @@ mod test {
 		expect_segment("foo/*bar", "foo").to_continue();
 		expect_segment("foo/*bar", "bar").to_break();
 		expect_segment("/*foo", "").to_continue();
+
+		let (_flow, map) = run_with_map("/*foo", "bar");
+		expect(map.get("foo").cloned()).to_be(Some("bar".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("/*foo", "bar/baz");
+		expect(map.get("foo").cloned()).to_be(Some("bar/baz".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("/*foo", "/bar/baz");
+		expect(map.get("foo").cloned()).to_be(Some("bar/baz".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("foo/*bar", "foo/bar/baz");
+		expect(map.get("bar").cloned()).to_be(Some("bar/baz".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("foo/*bar", "foo");
+		expect(map.get("bar").cloned()).to_be(Some("".to_string()));
+		expect(map.len()).to_be(1);
+
+		let (_flow, map) = run_with_map("/*foo", "");
+		expect(map.get("foo").cloned()).to_be(Some("".to_string()));
+		expect(map.len()).to_be(1);
 	}
 }

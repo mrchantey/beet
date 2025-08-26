@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
+use std::collections::VecDeque;
 use std::ops::ControlFlow;
 
 
@@ -18,6 +19,7 @@ impl Plugin for RouterAppPlugin {
 		app.add_plugins(ApplyDirectivesPlugin)
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
+			.init_resource::<DynSegmentMap>()
 			.init_resource::<HtmlConstants>()
 			.add_systems(
 				Startup,
@@ -213,7 +215,8 @@ impl Router {
 
 		let start_time = CrossInstant::now();
 
-		let route_parts = RouteParts::from_parts(&request.parts);
+		let route_parts = route_path_queue(&request.parts.uri.path());
+		let method = request.method();
 
 		trace!("Handling request: {:#?}", request);
 		world.insert_resource(request);
@@ -225,7 +228,7 @@ impl Router {
 			.expect("Router apps must have exactly one `RouterRoot`");
 		// let mut owned_world = std::mem::take(world);
 		world = self
-			.handle_request_recursive(world, route_parts.clone(), root)
+			.handle_request_recursive(world, method, route_parts, root)
 			.await;
 
 		let response = world
@@ -241,42 +244,39 @@ impl Router {
 	async fn handle_request_recursive(
 		&self,
 		mut world: PooledWorld,
-		parts: RouteParts,
+		req_method: HttpMethod,
+		req_path: VecDeque<String>,
 		root_entity: Entity,
 	) -> PooledWorld {
 		struct StackFrame {
 			entity: Entity,
-			parts: RouteParts,
+			req_path: VecDeque<String>,
 		}
 
 		let mut stack = vec![StackFrame {
 			entity: root_entity,
-			parts,
+			req_path,
 		}];
 
-		while let Some(StackFrame { entity, mut parts }) = stack.pop() {
-			// Check 1: MethodFilter
-			if let Some(method_filter) =
-				world.entity(entity).get::<MethodFilter>()
-			{
-				if !method_filter.matches(&parts) {
-					// method does not match, skip this entity
-					continue;
-				}
-			}
+		while let Some(StackFrame {
+			entity,
+			mut req_path,
+		}) = stack.pop()
+		{
+			let mut dyn_map =
+				world.remove_resource::<DynSegmentMap>().unwrap_or_default();
 
 			// Check 2: PathFilter
 			if let Some(filter) = world.entity(entity).get::<PathFilter>() {
-				match filter.matches(parts.clone()) {
+				match filter.matches(&mut dyn_map, &mut req_path) {
 					ControlFlow::Break(_) => {
 						// path does not match, skip this entity
 						continue;
 					}
-					ControlFlow::Continue(remaining_parts) => {
-						parts = remaining_parts;
-					}
+					ControlFlow::Continue(()) => {}
 				}
 			}
+			world.insert_resource(dyn_map);
 
 			// at this point add children, even if the endpoint doesnt match
 			// a child might
@@ -285,20 +285,20 @@ impl Router {
 				for child in children.iter().rev() {
 					stack.push(StackFrame {
 						entity: child,
-						parts: parts.clone(),
+						req_path: req_path.clone(),
 					});
 				}
 			}
 
 			// Check 3: Method and Path
-			if !parts.path().is_empty()
+			if !req_path.is_empty()
 				&& world.entity(entity).contains::<Endpoint>()
 			{
 				continue;
 			}
 			if let Some(method) = world.entity(entity).get::<HttpMethod>()
 				// method must match if specified
-				&& *method != parts.method()
+				&& *method != req_method
 			{
 				continue;
 			}
@@ -478,14 +478,16 @@ mod test {
 		Router::new_bundle(|| {
 			(PathFilter::new("foo"), children![(
 				PathFilter::new(":bar"),
-				RouteHandler::endpoint(|| "hawaiian")
+				RouteHandler::endpoint(|paths: Res<DynSegmentMap>| {
+					format!("path is {}", paths.get("bar").unwrap())
+				})
 			),])
 		})
 		.oneshot_str("/foo/bazz")
 		.await
 		.unwrap()
 		.xpect()
-		.to_be_str("hawaiian");
+		.to_be_str("path is bazz");
 	}
 
 	#[sweet::test]

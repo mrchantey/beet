@@ -9,10 +9,10 @@ pub fn get() -> impl Bundle {
 
 #[template]
 #[derive(Reflect)]
-pub fn Inner() -> impl Bundle {
+pub fn Inner(paths: Res<DynSegmentMap>) -> impl Bundle {
 	let _bucket = Bucket::new_local("buckets-demo");
 
-	rsx! {<div>howdy</div>
+	rsx! {<div>howdy {paths.get("bucket_id").unwrap()}</div>
 
 	}
 }
