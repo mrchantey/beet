@@ -250,17 +250,17 @@ impl Router {
 	) -> PooledWorld {
 		struct StackFrame {
 			entity: Entity,
-			req_path: VecDeque<String>,
+			current_path: VecDeque<String>,
 		}
 
 		let mut stack = vec![StackFrame {
 			entity: root_entity,
-			req_path,
+			current_path: req_path,
 		}];
 
 		while let Some(StackFrame {
 			entity,
-			mut req_path,
+			mut current_path,
 		}) = stack.pop()
 		{
 			let mut dyn_map =
@@ -268,7 +268,7 @@ impl Router {
 
 			// Check 2: PathFilter
 			if let Some(filter) = world.entity(entity).get::<PathFilter>() {
-				match filter.matches(&mut dyn_map, &mut req_path) {
+				match filter.matches(&mut dyn_map, &mut current_path) {
 					ControlFlow::Break(_) => {
 						// path does not match, skip this entity
 						continue;
@@ -285,13 +285,13 @@ impl Router {
 				for child in children.iter().rev() {
 					stack.push(StackFrame {
 						entity: child,
-						req_path: req_path.clone(),
+						current_path: current_path.clone(),
 					});
 				}
 			}
 
 			// Check 3: Method and Path
-			if !req_path.is_empty()
+			if !current_path.is_empty()
 				&& world.entity(entity).contains::<Endpoint>()
 			{
 				continue;

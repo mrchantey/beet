@@ -11,7 +11,7 @@ use std::path::Path;
 
 /// A list of [`RouteSegment::Dynamic`] and [`RouteSegment::Wildcard`]
 /// values extracted during path matching.
-#[derive(Default, Resource, Deref, DerefMut)]
+#[derive(Default, Clone, Resource, Deref, DerefMut, Reflect)]
 pub struct DynSegmentMap(HashMap<String, String>);
 
 
