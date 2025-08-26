@@ -39,7 +39,6 @@ where
 
 	(
 		Endpoint,
-		HandlerConditions::is_ssr(),
 		RouteHandler::layer(move |world: &mut World| {
 			if let Err(err) = handler(world) {
 				world.insert_resource(err);

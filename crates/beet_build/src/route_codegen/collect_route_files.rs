@@ -33,23 +33,39 @@ pub fn collect_route_files(
 			{
 				let func_ident = &route_file_method.item.sig.ident;
 
+				let segments =
+					RouteSegments::parse(&route_file_method.route_info.path);
+				let mut components = vec![
+					collection.category.cache_strategy().self_token_stream(),
+					PathFilter::new(&route_file_method.route_info.path)
+						.self_token_stream(),
+				];
 
 				let method =
 					route_file_method.route_info.method.self_token_stream();
-				let cache_strategy =
-					collection.category.cache_strategy().self_token_stream();
 
 				let is_async = route_file_method.item.sig.asyncness.is_some();
-				let handler = match collection.category {
+				match collection.category {
 					RouteCollectionCategory::Pages => {
+						components.push(method);
 						// page routes are presumed to be bundles
 						match is_async {
-							true => quote! {
+							true => components.push(quote! {
 								bundle_endpoint_async(#mod_ident::#func_ident)
-							},
-							false => quote! {
+							}),
+							false => components.push(quote! {
 								bundle_endpoint(#mod_ident::#func_ident)
-							},
+							}),
+						}
+
+						// TODO this is a brittle check
+						if segments.is_static()
+							&& collection.category.cache_strategy()
+								== CacheStrategy::Static
+							&& route_file_method.route_info.method
+								== HttpMethod::Get
+						{
+							components.push(quote! {HandlerConditions::is_ssr()})
 						}
 					}
 					RouteCollectionCategory::Actions => {
@@ -60,7 +76,7 @@ pub fn collect_route_files(
 						// Action routes may be any kind of route
 
 						match is_async {
-							true => quote! {
+							true => components.push(quote! {
 								action_endpoint_async(
 									#method,
 									async move |val,mut world,entity|{
@@ -68,41 +84,18 @@ pub fn collect_route_files(
 										(world, #out_ty::new(out))
 									}
 								)
-							},
-							false => quote! {
+							}),
+							false => components.push(quote! {
 								action_endpoint(
 									#method,
 									#mod_ident::#func_ident.pipe(#out_ty::pipe)
 								)
-							},
+							}),
 						}
 					}
 				};
-				let path_filter =
-					PathFilter::new(&route_file_method.route_info.path)
-						.self_token_stream();
 
-
-				let bundle = match collection.category {
-					RouteCollectionCategory::Actions => {
-						// actions already have the method specified
-						quote! {(
-							#path_filter,
-							#handler,
-							#cache_strategy
-						)}
-					}
-					_ => {
-						quote! {(
-							#path_filter,
-							#handler,
-							#method,
-							#cache_strategy
-						)}
-					}
-				};
-
-				children.push(bundle);
+				children.push(quote! {(#(#components),*)});
 			}
 		}
 

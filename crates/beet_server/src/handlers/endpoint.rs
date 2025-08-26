@@ -17,6 +17,7 @@ pub struct EndpointQuery<'w, 's> {
 			Option<&'static HttpMethod>,
 			Option<&'static CacheStrategy>,
 		),
+		With<Endpoint>,
 	>,
 }
 /// Collect all entities with a [`RouteHandler`]

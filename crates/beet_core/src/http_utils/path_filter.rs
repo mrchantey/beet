@@ -18,6 +18,8 @@ pub struct Endpoint;
 /// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
+/// Unlike [`RouteSegments`] this type contains *sections* of the full route path,
+/// not nessecarily the entire path.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
@@ -122,7 +124,7 @@ impl RouteSegments {
 			if matches!(segment, PathSegment::Wildcard(_))
 				&& index != segments.len() - 1
 			{
-				panic!("Wildcard pattern must be last");
+				panic!("Malformed Route Path: Wildcard pattern must be last");
 			}
 		}
 

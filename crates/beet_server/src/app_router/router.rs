@@ -51,6 +51,7 @@ fn default_handlers(
 		PathFilter::new("/app-info"),
 		CacheStrategy::Static,
 		HttpMethod::Get,
+		HandlerConditions::is_ssr(),
 		bundle_endpoint(|config: Res<PackageConfig>| {
 			let PackageConfig {
 				title,
@@ -346,30 +347,42 @@ mod test {
 	struct Foo(Vec<u32>);
 
 	#[sweet::test]
-	async fn app_info() {
-		let router = Router::new(|app: &mut App| {
-			app.insert_resource(RenderMode::Ssr)
-				.insert_resource(pkg_config!())
-				.world_mut()
-				.spawn(RouterRoot);
-		});
-		router
-			.oneshot_str("/app-info")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_snapshot();
-	}
-	#[sweet::test]
-	async fn beet_route_works() {
-		let router =
-			Router::new_bundle(|| RouteHandler::endpoint(|| "hello world!"));
-		router
+	async fn works() {
+		Router::new_bundle(|| RouteHandler::endpoint(|| "hello world!"))
 			.oneshot_str("/")
 			.await
 			.unwrap()
 			.xpect()
 			.to_be_str("hello world!");
+	}
+	#[sweet::test]
+	async fn dynamic_path() {
+		Router::new_bundle(|| {
+			(
+				PathFilter::new("/foo/:bar"),
+				RouteHandler::endpoint(|| "hello world!"),
+			)
+		})
+		.oneshot_str("/foo/bazz")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_str("hello world!");
+	}
+
+	#[sweet::test]
+	async fn app_info() {
+		Router::new(|app: &mut App| {
+			app.insert_resource(RenderMode::Ssr)
+				.insert_resource(pkg_config!())
+				.world_mut()
+				.spawn(RouterRoot);
+		})
+		.oneshot_str("/app-info")
+		.await
+		.unwrap()
+		.xpect()
+		.to_be_snapshot();
 	}
 
 
@@ -430,7 +443,7 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn works() {
+	async fn tree_order() {
 		parse("/").await.xpect().to_be(vec![0]);
 		parse("/foo").await.xpect().to_be(vec![0, 1, 4]);
 		parse("/foo/chicken").await.xpect().to_be(vec![0, 1, 4]);
