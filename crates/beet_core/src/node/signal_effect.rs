@@ -48,33 +48,58 @@ pub struct PrimitiveGetterIntoBundle;
 
 /// we dont want to blanket impl ToString because collision
 /// with Bundle impl, feel free to open pr to add more as required.
-trait Primitive: ToString {}
-impl Primitive for String {}
-impl Primitive for &'static str {}
-impl<'a> Primitive for std::borrow::Cow<'a, str> {}
+trait Primitive<M> {
+	fn primitive_string(&self) -> String;
+}
+macro_rules! impl_primitive {
+    ($($ty:ty),*) => {
+        $(
+            impl Primitive<Self> for $ty {
+                fn primitive_string(&self) -> String {
+                    self.to_string()
+                }
+            }
+        )*
+    };
+}
 
-impl Primitive for i8 {}
-impl Primitive for i16 {}
-impl Primitive for i32 {}
-impl Primitive for i64 {}
-impl Primitive for i128 {}
-impl Primitive for isize {}
+impl_primitive!(
+	String,
+	&'static str,
+	std::borrow::Cow<'_, str>,
+	i8,
+	i16,
+	i32,
+	i64,
+	i128,
+	isize,
+	u8,
+	u16,
+	u32,
+	u64,
+	u128,
+	usize,
+	f32,
+	f64
+);
 
-impl Primitive for u8 {}
-impl Primitive for u16 {}
-impl Primitive for u32 {}
-impl Primitive for u64 {}
-impl Primitive for u128 {}
-impl Primitive for usize {}
+impl<T, M> Primitive<(Self, M)> for Option<T>
+where
+	T: Primitive<M>,
+{
+	fn primitive_string(&self) -> String {
+		match self {
+			Some(value) => value.primitive_string(),
+			None => String::new(),
+		}
+	}
+}
 
-impl Primitive for f32 {}
-impl Primitive for f64 {}
 
-
-impl<Func, Out> IntoBundle<(Out, PrimitiveGetterIntoBundle)> for Func
+impl<Func, Out, M> IntoBundle<(Out, M)> for Func
 where
 	Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
-	Out: 'static + Send + Sync + Clone + Primitive,
+	Out: 'static + Send + Sync + Clone + Primitive<M>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
@@ -89,7 +114,7 @@ where
 					      -> Result {
 						let (mut signal, mut text) = query.get_mut(id)?;
 						signal.set_changed();
-						text.0 = this.clone()().to_string();
+						text.0 = this.clone()().primitive_string();
 						Ok(())
 					})
 					.pipe(handle_result),
@@ -97,7 +122,7 @@ where
 			});
 
 			entity.insert((
-				TextNode::new(self.clone()().to_string()),
+				TextNode::new(self.clone()().primitive_string()),
 				SignalEffect::new(self, system_id),
 			));
 		})
@@ -110,7 +135,7 @@ fn handle_result(result: In<Result>) {
 	}
 }
 
-pub struct BundleGetterIntoBundle;
+// pub struct BundleGetterIntoBundle;
 
 /// for bundles and vecs of bundles
 trait BundleLike<M1, M2>: IntoBundle<M1> {}

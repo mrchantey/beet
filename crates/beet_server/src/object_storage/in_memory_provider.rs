@@ -119,7 +119,7 @@ impl BucketProvider for InMemoryProvider {
 				bucket
 					.get(path)
 					.cloned()
-					.ok_or_else(|| bevyhow!("item not found: {path}"))
+					.ok_or_else(|| bevyhow!("Object not found: {path}"))
 			})
 			.flatten();
 
@@ -135,8 +135,11 @@ impl BucketProvider for InMemoryProvider {
 		let result = buckets
 			.get_mut(bucket_name)
 			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-			.map(|bucket| {
-				bucket.remove(path);
+			.and_then(|bucket| {
+				bucket
+					.remove(path)
+					.map(|_| ())
+					.ok_or_else(|| bevyhow!("Object not found: {path}"))
 			});
 
 		Box::pin(async move { result })

@@ -11,9 +11,12 @@ pub fn ErrorText() -> impl Bundle {
 		</div>
 		<style>
 			div{
+				display: block;
 				background-color: var(--bt-color-error);
 				color: var(--bt-color-on-error);
+				border-radius:var(--bt-border-radius);
 			}
 		</style>
 	}
 }
+// padding: 0 var(--bt-spacing);

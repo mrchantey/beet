@@ -52,7 +52,7 @@ pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 			// 	// onchange=move |ev|{set_data(ev.value())}
 			// />
 			<div>{move ||data().unwrap_or_default()}</div>
-			<div>{move ||err().unwrap_or_default()}</div>
+			<ErrorText>{err}</ErrorText>
 		</div>
 	}
 }

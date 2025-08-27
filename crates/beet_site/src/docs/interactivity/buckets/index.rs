@@ -14,7 +14,8 @@ pub fn get() -> impl Bundle {
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
 	let (items, set_items) = signal::<Vec<OnSpawnClone>>(default());
-	let (on_change, trigger_change) = signal(());
+	let (on_change, reload_items) = signal(());
+	let (err, set_err) = signal::<Option<String>>(None);
 	let (bucket, _) = signal(Bucket::new_local("buckets-demo"));
 
 	#[cfg(feature = "client")]
@@ -22,33 +23,20 @@ pub fn Inner() -> impl Bundle {
 		let _changed = on_change();
 
 		async_ext::spawn_local(async move {
-			let remove = Arc::new(move |path: RoutePath| {
-				async_ext::spawn_local(async move {
-					bucket().remove(&path).await.unwrap();
-					trigger_change(());
-				});
-			});
-
 			bucket()
 				.list()
 				.await
 				.unwrap()
 				.into_iter()
 				.map(|path| {
-					let item2 = path.clone();
-					let remove = remove.clone();
 					OnSpawnClone::insert(move || {
-						let item = item2.clone();
-						let remove = remove.clone();
 						rsx! {
-							<tr>
-								<td>{item.to_string()}</td>
-								<td>
-									<Button
-										variant=ButtonVariant::Outlined
-										 onclick=move||{(remove.clone())(item2.clone())}>Remove</Button>
-								</td>
-							</tr>
+							<Item
+								path=path
+								bucket=bucket
+								reload=reload_items
+								set_err=set_err
+							/>
 						}
 					})
 				})
@@ -60,32 +48,92 @@ pub fn Inner() -> impl Bundle {
 	rsx! {
 		<h1>Buckets</h1>
 		<p>This example uses local storage to manage a list of items</p>
+		<ErrorText>{err}</ErrorText>
 		<Table>
 		<tr slot="head">
 			<td></td>
 			<td></td>
-			<td></td>
 		</tr>
-			<NewItem bucket=bucket/>
+			<NewItem bucket=bucket set_err=set_err/>
 			{items}
 		</Table>
 	}
 }
 #[template]
-fn NewItem(bucket: Getter<Bucket>) -> impl Bundle {
-	let (name, set_name) = signal(String::new());
+fn Item(
+	path: RoutePath,
+	bucket: Getter<Bucket>,
+	set_err: Setter<Option<String>>,
+	reload: Setter<()>,
+) -> impl Bundle {
+	let (path, _) = signal(path);
+	let remove = move || {
+		async_ext::spawn_local(async move {
+			match bucket().remove(&path()).await {
+				Ok(()) => {
+					reload(());
+				}
+				Err(err) => set_err(Some(err.to_string())),
+			}
+		});
+	};
+
+	let visit = move || {
+		let route = routes::docs::interactivity::buckets::bucket_id(
+			&path().to_string(),
+		);
+		navigate::to_page(&route);
+	};
+
+	rsx! {
+		<tr>
+			<td>{path()}</td>
+			<td>
+				<div>
+				<Button
+					variant=ButtonVariant::Outlined
+					 onclick=move||visit()>Visit</Button>
+				<Button
+					variant=ButtonVariant::Error
+					 onclick=move||remove()>Remove</Button>
+						</div>
+			</td>
+		</tr>
+		<style>
+			div{
+				display:flex;
+				flex-direction:row;
+				gap: var(--bt-spacing);
+			}
+		</style>
+	}
+}
+
+
+#[template]
+fn NewItem(
+	bucket: Getter<Bucket>,
+
+	set_err: Setter<Option<String>>,
+) -> impl Bundle {
+	let (name, set_name) = signal("my-object".to_string());
 
 	let on_add = move || {
 		// let timestamp = CrossInstant::unix_epoch().as_millis();
 		// let path = RoutePath::new(format!("item-{timestamp}"));
 		async_ext::spawn_local(async move {
 			let path = name();
-			bucket()
-				.insert(&path.clone().into(), "hello world!")
+			match bucket()
+				.try_insert(&path.clone().into(), "hello world!")
 				.await
-				.unwrap();
-			let route = routes::docs::interactivity::buckets::bucket_id(&path);
-			navigate::to_page(&route);
+			{
+				Ok(()) => {
+					let route =
+						routes::docs::interactivity::buckets::bucket_id(&path);
+					navigate::to_page(&route);
+				}
+				Err(err) => set_err(Some(err.to_string())),
+			}
 		});
 	};
 

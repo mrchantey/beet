@@ -52,18 +52,6 @@ where
 	}
 }
 
-
-// collision with Getter: IntoBundle
-// pub struct ClosureMarker;
-
-// impl<T, U, M> IntoBundle<(ClosureMarker, U, M)> for T
-// where
-// 	T: FnOnce() -> U,
-// 	U: IntoBundle<M>,
-// {
-// 	fn into_bundle(self) -> impl Bundle { self().into_bundle() }
-// }
-
 #[extend::ext(name=AnyBundleCloneExt)]
 pub impl<T, M> T
 where
@@ -135,6 +123,10 @@ impl IntoBundle<Self> for Entity {
 
 impl IntoBundle<Self> for String {
 	fn into_bundle(self) -> impl Bundle { TextNode::new(self) }
+}
+#[cfg(feature = "http")]
+impl IntoBundle<Self> for RoutePath {
+	fn into_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 }
 impl IntoBundle<Self> for &String {
 	fn into_bundle(self) -> impl Bundle { TextNode::new(self.clone()) }

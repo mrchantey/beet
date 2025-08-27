@@ -76,6 +76,20 @@ impl Bucket {
 	) -> Result<()> {
 		self.provider.insert(&self.name, path, body.into()).await
 	}
+
+	/// Try to insert the object, returning an error if it already exists
+	pub async fn try_insert(
+		&self,
+		path: &RoutePath,
+		body: impl Into<Bytes>,
+	) -> Result<()> {
+		if self.exists(path).await? {
+			bevybail!("Object already exists: {}", path)
+		} else {
+			self.insert(path, body).await
+		}
+	}
+
 	/// Check if the object exists
 	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
 		self.provider.exists(&self.name, path).await
@@ -216,6 +230,7 @@ pub mod bucket_test {
 		bucket.bucket_exists().await.unwrap().xpect().to_be_false();
 		bucket.bucket_try_create().await.unwrap();
 		bucket.exists(&path).await.unwrap().xpect().to_be(false);
+		bucket.remove(&path).await.xpect().to_be_err();
 		bucket.insert(&path, body.clone()).await.unwrap();
 		bucket.bucket_exists().await.unwrap().xpect().to_be_true();
 		bucket.exists(&path).await.unwrap().xpect().to_be(true);

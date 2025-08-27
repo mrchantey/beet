@@ -5,17 +5,19 @@
 	justify-content: center;
 	cursor: pointer;
 	--bt-prev-transition: opacity var(--bt-transition);
-	transition: opacity var(--bt-transition), transform var(--bt-transition);
+	transition:
+		opacity var(--bt-transition),
+		transform var(--bt-transition);
 }
 
 a.bt-c-button {
 	text-decoration: none;
 	/* undo the margin applied by default to anchor tags */
-	margin-left:unset;
-	margin-right:unset;
+	margin-left: unset;
+	margin-right: unset;
 }
 a.bt-c-button:visited {
-	color:var(--bt-color-text);
+	color: var(--bt-color-text);
 }
 
 .bt-c-button .bt-c-icon {
@@ -36,7 +38,6 @@ a.bt-c-button:visited {
 	--bt-opacity: var(--bt-opacity-disabled);
 }
 
-
 .bt-c-button--primary {
 	--bt-color-text: var(--bt-color-on-primary);
 	--bt-color-background: var(--bt-color-primary);
@@ -49,6 +50,10 @@ a.bt-c-button:visited {
 .bt-c-button--tertiary {
 	--bt-color-text: var(--bt-color-on-tertiary);
 	--bt-color-background: var(--bt-color-tertiary);
+}
+.bt-c-button--error {
+	--bt-color-text: var(--bt-color-on-error);
+	--bt-color-background: var(--bt-color-error);
 }
 
 .bt-c-button--outlined {
@@ -65,7 +70,7 @@ a.bt-c-button:visited {
 	position: relative;
 }
 
-.bt-c-button--icon>* {
+.bt-c-button--icon > * {
 	position: absolute;
 	top: 50%;
 	left: 50%;
@@ -84,5 +89,4 @@ a.bt-c-button:visited {
 	color: inherit;
 	font-style: inherit;
 	font-weight: inherit;
-
 }

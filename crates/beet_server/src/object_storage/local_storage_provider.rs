@@ -90,8 +90,7 @@ impl BucketProvider for LocalStorageProvider {
 		let key = Self::storage_key(bucket_name, path);
 		let value = BASE64_STANDARD.encode(body);
 		Box::pin(async move {
-			let storage = Self::local_storage();
-			storage.set_item(&key, &value).map_jserr()?;
+			Self::local_storage().set_item(&key, &value).map_jserr()?;
 			Ok(())
 		})
 	}
@@ -132,14 +131,13 @@ impl BucketProvider for LocalStorageProvider {
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
 		let key = Self::storage_key(bucket_name, path);
 		Box::pin(async move {
-			let storage = Self::local_storage();
-			let value = storage.get_item(&key).map_jserr()?;
+			let value = Self::local_storage().get_item(&key).map_jserr()?;
 			match value {
 				Some(val) => {
 					let bytes = BASE64_STANDARD.decode(val)?;
 					Ok(Bytes::from(bytes))
 				}
-				None => bevybail!("Item not found in localStorage: {}", key),
+				None => bevybail!("Object not found: {}", key),
 			}
 		})
 	}
@@ -150,10 +148,20 @@ impl BucketProvider for LocalStorageProvider {
 		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let key = Self::storage_key(bucket_name, path);
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		let path = path.clone();
+
 		Box::pin(async move {
-			let storage = Self::local_storage();
-			storage.remove_item(&key).map_jserr()?;
-			Ok(())
+			match this.exists(&bucket_name, &path).await? {
+				true => {
+					Self::local_storage().remove_item(&key).map_jserr()?;
+					Ok(())
+				}
+				false => {
+					bevybail!("Object not found: {}", key);
+				}
+			}
 		})
 	}
 

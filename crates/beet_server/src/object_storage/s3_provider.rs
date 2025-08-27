@@ -273,17 +273,26 @@ impl BucketProvider for S3Provider {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
-		let client = self.0.clone();
+		let this = self.clone();
 		let bucket_name = bucket_name.to_string();
-		let key = self.resolve_key(path);
+		let path = path.clone();
+		let key = this.resolve_key(&path);
+
 		Box::pin(async move {
-			client
-				.delete_object()
-				.bucket(&bucket_name)
-				.key(&key)
-				.send()
-				.await?;
-			Ok(())
+			match this.exists(&bucket_name, &path).await? {
+				true => {
+					this.0
+						.delete_object()
+						.bucket(&bucket_name)
+						.key(&key)
+						.send()
+						.await?;
+					Ok(())
+				}
+				false => {
+					bevybail!("Object not found: {}", key);
+				}
+			}
 		})
 	}
 

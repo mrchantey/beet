@@ -9,6 +9,7 @@ pub enum ButtonVariant {
 	Tertiary,
 	Text,
 	Outlined,
+	Error,
 }
 
 impl ButtonVariant {
@@ -20,6 +21,7 @@ impl ButtonVariant {
 			ButtonVariant::Tertiary => "tertiary",
 			ButtonVariant::Text => "text",
 			ButtonVariant::Outlined => "outlined",
+			ButtonVariant::Error => "error",
 		}
 	}
 }
