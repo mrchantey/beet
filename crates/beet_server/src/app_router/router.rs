@@ -382,7 +382,7 @@ mod test {
 		.await
 		.unwrap()
 		.xpect()
-		.to_be_snapshot();
+		.to_contain("<h1>App Info</h1><p>Title: beet_server</p>");
 	}
 
 

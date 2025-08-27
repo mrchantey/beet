@@ -1,5 +1,7 @@
 pub mod async_ext;
+mod clone_func;
 mod pipeline;
+pub use clone_func::*;
 pub use pipeline::*;
 pub use tree::*;
 pub mod log;

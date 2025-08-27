@@ -49,6 +49,11 @@ impl OnSpawnBoxed {
 	) -> Self {
 		Self(Box::new(func))
 	}
+	pub fn insert(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			entity.insert(bundle);
+		})
+	}
 }
 
 impl BundleEffect for OnSpawnBoxed {
