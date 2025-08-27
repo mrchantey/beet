@@ -13,11 +13,9 @@ pub fn get() -> impl Bundle {
 #[template]
 #[derive(Reflect)]
 pub fn Inner() -> impl Bundle {
-	let bucket = Bucket::new_local("buckets-demo");
-
 	let (items, set_items) = signal::<Vec<OnSpawnClone>>(default());
 	let (on_change, trigger_change) = signal(());
-	let (bucket, _) = signal(bucket);
+	let (bucket, _) = signal(Bucket::new_local("buckets-demo"));
 
 	#[cfg(target_arch = "wasm32")]
 	effect(move || {

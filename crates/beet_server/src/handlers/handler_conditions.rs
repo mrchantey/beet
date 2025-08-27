@@ -30,6 +30,13 @@ impl HandlerConditions {
 			},
 		)
 	}
+
+	pub fn contains_handler_bundle() -> Self {
+		Self::default().system(|query: Query<(), With<HandlerBundle>>| {
+			query.iter().next().is_some()
+		})
+	}
+
 	/// Runs if there is no [`Response`].
 	pub fn no_response() -> Self {
 		Self::default().system(|res: Option<Res<Response>>| res.is_none())

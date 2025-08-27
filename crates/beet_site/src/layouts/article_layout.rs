@@ -5,10 +5,12 @@ use beet::prelude::*;
 
 pub fn article_layout_middleware() -> impl Bundle {
 	(
-		HandlerConditions::is_ssr(),
+		HandlerConditions::contains_handler_bundle(),
 		RouteHandler::layer(|world: &mut World| {
-			let entity =
-				world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+			let entity = world
+				.query_filtered::<Entity, With<HandlerBundle>>()
+				.single(world)
+				.unwrap(/*checked in handler conditions*/);
 
 			world.spawn((HtmlDocument, rsx! {
 				<ArticleLayout>{entity}</ArticleLayout>
