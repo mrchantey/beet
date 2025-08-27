@@ -4,6 +4,7 @@ use bytes::Bytes;
 use http::HeaderValue;
 use http::StatusCode;
 use http::header::HeaderName;
+use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 
 
@@ -73,26 +74,60 @@ impl Response {
 			}
 		}
 
-		let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
-			resp.array_buffer().map_jserr()?,
-		)
-		.await
-		.map_jserr()?;
-		let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
-		let mut body = vec![0; array_buffer.length() as usize];
-		array_buffer.copy_to(&mut body);
-		let bytes = Bytes::from(body);
+		let is_bytes = headers
+			.get("content-length")
+			.and_then(|v| v.to_str().ok())
+			.and_then(|s| s.parse::<u64>().ok())
+			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 
-		let mut builder = http::Response::builder();
-		builder = builder.status(status);
+		let body: Body = if is_bytes {
+			// body is bytes
+			let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
+				resp.array_buffer().map_jserr()?,
+			)
+			.await
+			.map_jserr()?;
+			let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
+			let mut bytes_vec = vec![0; array_buffer.length() as usize];
+			array_buffer.copy_to(&mut bytes_vec);
+			Body::Bytes(Bytes::from(bytes_vec))
+		} else {
+			// body is stream
+			use bytes::Bytes;
+			use futures::stream;
+			use js_sys::Uint8Array;
+			use wasm_bindgen::prelude::*;
+			use wasm_bindgen_futures::JsFuture;
+			use web_sys::ReadableStreamDefaultReader;
+			let body = resp.body().ok_or_else(|| bevyhow!("No body"))?;
+
+			let reader: ReadableStreamDefaultReader =
+				body.get_reader().dyn_into().unwrap();
+
+			let byte_stream = stream::unfold(reader, |reader| async move {
+				let chunk = JsFuture::from(reader.read()).await.ok()?;
+				let done =
+					js_sys::Reflect::get(&chunk, &JsValue::from_str("done"))
+						.ok()?
+						.as_bool()?;
+				if done {
+					return None;
+				}
+
+				let value =
+					js_sys::Reflect::get(&chunk, &JsValue::from_str("value"))
+						.ok()?;
+				let bytes = Uint8Array::new(&value).to_vec();
+				Some((Ok(Bytes::from(bytes)), reader))
+			});
+
+			Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
+		};
+
+		let mut builder = http::Response::builder().status(status);
 		for (key, value) in headers.iter() {
 			builder = builder.header(key, value);
 		}
-		let http_response = builder.body(bytes.clone())?;
-		let (parts, body) = http_response.into_parts();
-		Ok(Response {
-			parts,
-			body: body.into(),
-		})
+		Ok(builder.body(body)?.into())
 	}
 }

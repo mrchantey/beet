@@ -34,11 +34,28 @@ impl TryInto<reqwest::Request> for Request {
 
 impl Response {
 	pub async fn try_from_reqwest(mut res: reqwest::Response) -> Result<Self> {
-		let mut builder = http::Response::builder();
-		if let Some(headers) = builder.headers_mut() {
-			std::mem::swap(headers, res.headers_mut());
-		}
-		let res = builder.status(res.status()).body(res.bytes().await?)?;
-		Ok(res.into())
+		let mut builder = http::Response::builder().status(res.status());
+		let headers = builder.headers_mut().unwrap();
+		std::mem::swap(headers, res.headers_mut());
+
+		let headers = res.headers();
+		let is_bytes = headers
+			.get("content-length")
+			.and_then(|v| v.to_str().ok())
+			.and_then(|s| s.parse::<u64>().ok())
+			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
+
+		let body = if is_bytes {
+			Body::Bytes(res.bytes().await?.into())
+		} else {
+			use futures::TryStreamExt;
+			use send_wrapper::SendWrapper;
+
+			Body::Stream(SendWrapper::new(Box::pin(
+				res.bytes_stream().map_err(BevyError::from),
+			)))
+		};
+
+		Ok(builder.body(body)?.into())
 	}
 }

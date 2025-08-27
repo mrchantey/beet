@@ -2,10 +2,14 @@ use crate::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use bytes::Bytes;
+use futures::Stream;
+use futures::StreamExt;
 use http::StatusCode;
 use http::header::CONTENT_TYPE;
 use http::response;
+use send_wrapper::SendWrapper;
 use std::convert::Infallible;
+use std::pin::Pin;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
 /// will be returned.
@@ -17,8 +21,7 @@ pub struct Response {
 
 pub enum Body {
 	Bytes(Bytes),
-	// TODO
-	Stream,
+	Stream(SendWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>>>>>),
 }
 
 impl Into<Body> for Bytes {
@@ -29,20 +32,41 @@ impl std::fmt::Debug for Body {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Body::Bytes(bytes) => write!(f, "Body::Bytes({:?})", bytes),
-			Body::Stream => write!(f, "Body::Stream(...)"),
+			Body::Stream(_) => write!(f, "Body::Stream(...)"),
 		}
 	}
 }
 
 impl Body {
-	pub async fn into_bytes(self) -> Result<Bytes> {
+	/// Any body with a content length greater than this will be parsed as a stream.
+	pub const MAX_BUFFER_SIZE: usize = 1 * 1024 * 1024; // 1 MB
+
+	pub async fn into_bytes(mut self) -> Result<Bytes> {
 		match self {
 			Body::Bytes(bytes) => Ok(bytes),
-			Body::Stream => {
-				todo!()
+			Body::Stream(_) => {
+				let mut buffer = bytes::BytesMut::new();
+				while let Some(chunk) = self.next().await? {
+					buffer.extend_from_slice(&chunk);
+				}
+				Ok(buffer.freeze())
 			}
 		}
 	}
+
+	pub async fn next(&mut self) -> Result<Option<Bytes>> {
+		match self {
+			Body::Bytes(bytes) if !bytes.is_empty() => {
+				Ok(Some(std::mem::take(bytes)))
+			}
+			Body::Bytes(_) => Ok(None),
+			Body::Stream(stream) => match stream.next().await {
+				Some(result) => Ok(Some(result?)),
+				None => Ok(None),
+			},
+		}
+	}
+
 	pub fn bytes_eq(&self, other: &Self) -> bool {
 		match (self, other) {
 			(Body::Bytes(a), Body::Bytes(b)) => a == b,
@@ -292,13 +316,10 @@ impl IntoResponse for &[u8] {
 	}
 }
 
-impl From<http::Response<Bytes>> for Response {
-	fn from(res: http::Response<Bytes>) -> Self {
+impl From<http::Response<Body>> for Response {
+	fn from(res: http::Response<Body>) -> Self {
 		let (parts, body) = res.into_parts();
-		Response {
-			parts,
-			body: body.into(),
-		}
+		Response { parts, body }
 	}
 }
 

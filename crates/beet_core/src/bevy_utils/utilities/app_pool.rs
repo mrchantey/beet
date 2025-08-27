@@ -161,6 +161,7 @@ mod tests {
 		main_app.resource::<Foo>().0.xpect().to_be(2);
 
 		// Spawn a thread and check isolation
+		#[cfg(not(target_arch = "wasm32"))]
 		let pool2 = pool.clone();
 		#[cfg(not(target_arch = "wasm32"))]
 		std::thread::spawn(move || {
