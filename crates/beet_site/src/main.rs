@@ -28,7 +28,7 @@ fn client_plugin(app: &mut App) {
 		.register_type::<ClientIslandRoot<beet_design::mockups::route4::Inner>>()
 		.register_type::<ClientIslandRoot<beet_design::mockups::route5::Inner>>()
 		.register_type::<ClientIslandRoot<beet_design::mockups::route6::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route7::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::route8::Inner>>()
 		.register_type::<ClientIslandRoot<beet_site::codegen::docs::route2::Inner>>()
 		.register_type::<ClientIslandRoot<beet_site::codegen::docs::route3::Inner>>()
 		.register_type::<ClientIslandRoot<ClientCounter>>()

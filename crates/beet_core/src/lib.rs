@@ -63,8 +63,8 @@ pub mod exports {
 	pub use proc_macro2;
 	#[cfg(feature = "tokens")]
 	pub use quote;
-	#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
-	pub use reqwest;
+	// #[cfg(all(feature = "net", not(target_arch = "wasm32")))]
+	// pub use reqwest;
 	#[cfg(feature = "serde")]
 	pub use ron;
 	pub use send_wrapper::SendWrapper;
@@ -72,4 +72,8 @@ pub mod exports {
 	pub use syn;
 	#[cfg(feature = "serde")]
 	pub use toml;
+	#[cfg(feature = "http")]
+	pub use url;
+	#[cfg(feature = "http")]
+	pub use url::Url;
 }

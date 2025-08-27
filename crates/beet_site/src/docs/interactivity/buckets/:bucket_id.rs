@@ -3,61 +3,56 @@ use std::sync::Arc;
 
 
 pub fn get(paths: Res<DynSegmentMap>) -> impl use<> + Bundle {
-	let bucket_id = paths.get("bucket_id").unwrap().clone();
+	let bucket_id =
+		paths.get("bucket_id").unwrap().clone().xmap(RoutePath::new);
 	rsx! { <Inner bucket_id=bucket_id client:load /> }
 }
 
 
 #[template]
 #[derive(Reflect)]
-pub fn Inner(bucket_id: String) -> impl Bundle {
+pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 	let (bucket, _) = signal(Bucket::new_local("buckets-demo"));
-	// let (content, set_content) = signal(None);
+	let (bucket_id, _) = signal(bucket_id);
+	let (data, set_data) = signal::<Option<String>>(None);
+	let (err, set_err) = signal::<Option<String>>(None);
 
-	// #[cfg(target_arch = "wasm32")]
-	// effect(move || {
-	// 	// let _changed = on_change();
+	// initialize the data
+	#[cfg(feature = "client")]
+	effect(move || {
+		async_ext::spawn_local(async move {
+			match bucket().get(&bucket_id()).await {
+				Ok(data) => {
+					let data = String::from_utf8_lossy(&data).to_string();
+					beet::log!("got data: {data}");
+					set_data(Some(data))
+				}
+				Err(err) => set_err(Some(err.to_string())),
+			}
+		});
+	});
 
-	// 	async_ext::spawn_local(async move {
-	// 		bucket()
-	// 			.get(bucket_id)
-	// 			.await
-	// 			.unwrap()
-	// 			.into_iter()
-	// 			.map(async |path| {
-	// 				let data = bucket().get(&path).await?;
-	// 				Ok::<_, BevyError>((path, data))
-	// 			})
-	// 			.xmap(async_ext::try_join_all)
-	// 			.await
-	// 			.unwrap()
-	// 			.into_iter()
-	// 			.map(|(path, data)| {
-	// 				let item2 = path.clone();
-	// 				let remove = remove.clone();
-	// 				OnSpawnClone::insert(move || {
-	// 					let item = item2.clone();
-	// 					let remove = remove.clone();
-	// 					rsx! {
-	// 						<tr>
-	// 							<td>{item.to_string()}</td>
-	// 							<td>{String::from_utf8_lossy(&data).to_string()}</td>
-	// 							<td>
-	// 								<Button onclick=move||{(remove.clone())(item2.clone())}>Remove</Button>
-	// 							</td>
-	// 						</tr>
-	// 					}
-	// 				})
-	// 			})
-	// 			.collect::<Vec<_>>()
-	// 			.xmap(set_items);
-	// 	});
-	// });
 
+	// update local storage with the new data
+	#[cfg(feature = "client")]
+	effect(move || {
+		if let Some(data) = data() {
+			async_ext::spawn_local(async move {
+				bucket().insert(&bucket_id(), data).await.unwrap();
+			});
+		}
+	});
 
 	rsx! {
 		<div>
-			howdy {bucket_id}
+		<h1>{bucket_id().to_string()}</h1>
+			// <TextField
+			// 	autofocus
+			// 	// value={move ||data().unwrap_or_default()}
+			// 	// onchange=move |ev|{set_data(ev.value())}
+			// />
+			<div>{move ||data().unwrap_or_default()}</div>
+			<div>{move ||err().unwrap_or_default()}</div>
 		</div>
 	}
 }

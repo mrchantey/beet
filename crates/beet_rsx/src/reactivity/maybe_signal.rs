@@ -20,13 +20,13 @@ impl<T: 'static + Send + Clone> MaybeSignal<T> {
 
 impl<T, M1, M2> IntoBundle<(Self, M1, M2)> for MaybeSignal<T>
 where
-	T: IntoBundle<M1>,
+	T: 'static + Send + Sync + IntoBundle<M1>,
 	Getter<T>: IntoBundle<M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		match self {
-			Self::Const(val) => val.into_bundle().any_bundle(),
-			Self::Getter(getter) => getter.into_bundle().any_bundle(),
+			Self::Const(val) => val.any_bundle(),
+			Self::Getter(getter) => getter.any_bundle(),
 		}
 	}
 }

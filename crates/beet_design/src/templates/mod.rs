@@ -1,6 +1,8 @@
 mod design_system;
+mod error_text;
 mod sidebar;
 pub use design_system::*;
+pub use error_text::*;
 pub use sidebar::*;
 mod table;
 pub use table::*;

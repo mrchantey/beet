@@ -1,7 +1,5 @@
-mod bundle;
 mod schedule;
 mod world;
-pub use self::bundle::*;
 pub use self::schedule::*;
 pub use world::*;
 mod app;

@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use beet::prelude::*;
 use std::sync::Arc;
-
 
 
 
@@ -17,15 +17,14 @@ pub fn Inner() -> impl Bundle {
 	let (on_change, trigger_change) = signal(());
 	let (bucket, _) = signal(Bucket::new_local("buckets-demo"));
 
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(feature = "client")]
 	effect(move || {
 		let _changed = on_change();
 
 		async_ext::spawn_local(async move {
 			let remove = Arc::new(move |path: RoutePath| {
-				// beet::log!("removing..");
 				async_ext::spawn_local(async move {
-					bucket().delete(&path).await.unwrap();
+					bucket().remove(&path).await.unwrap();
 					trigger_change(());
 				});
 			});
@@ -35,15 +34,7 @@ pub fn Inner() -> impl Bundle {
 				.await
 				.unwrap()
 				.into_iter()
-				.map(async |path| {
-					let data = bucket().get(&path).await?;
-					Ok::<_, BevyError>((path, data))
-				})
-				.xmap(async_ext::try_join_all)
-				.await
-				.unwrap()
-				.into_iter()
-				.map(|(path, data)| {
+				.map(|path| {
 					let item2 = path.clone();
 					let remove = remove.clone();
 					OnSpawnClone::insert(move || {
@@ -52,9 +43,10 @@ pub fn Inner() -> impl Bundle {
 						rsx! {
 							<tr>
 								<td>{item.to_string()}</td>
-								<td>{String::from_utf8_lossy(&data).to_string()}</td>
 								<td>
-									<Button onclick=move||{(remove.clone())(item2.clone())}>Remove</Button>
+									<Button
+										variant=ButtonVariant::Outlined
+										 onclick=move||{(remove.clone())(item2.clone())}>Remove</Button>
 								</td>
 							</tr>
 						}
@@ -65,15 +57,6 @@ pub fn Inner() -> impl Bundle {
 		});
 	});
 
-	let add_item = move |text: String| {
-		let timestamp = CrossInstant::unix_epoch().as_millis();
-		let path = RoutePath::new(format!("item-{timestamp}"));
-		async_ext::spawn_local(async move {
-			bucket().insert(&path, text).await.unwrap();
-			trigger_change(());
-		});
-	};
-
 	rsx! {
 		<h1>Buckets</h1>
 		<p>This example uses local storage to manage a list of items</p>
@@ -83,34 +66,40 @@ pub fn Inner() -> impl Bundle {
 			<td></td>
 			<td></td>
 		</tr>
-			<NewItem add_item=add_item/>
+			<NewItem bucket=bucket/>
 			{items}
 		</Table>
 	}
 }
 #[template]
-fn NewItem(
-	add_item: Box<dyn 'static + Send + Sync + Fn(String)>,
-) -> impl Bundle {
-	let (description, set_description) = signal(String::new());
+fn NewItem(bucket: Getter<Bucket>) -> impl Bundle {
+	let (name, set_name) = signal(String::new());
 
-	let on_add = Arc::new(move || {
-		add_item(description());
-		set_description(Default::default());
-	});
+	let on_add = move || {
+		// let timestamp = CrossInstant::unix_epoch().as_millis();
+		// let path = RoutePath::new(format!("item-{timestamp}"));
+		async_ext::spawn_local(async move {
+			let path = name();
+			bucket()
+				.insert(&path.clone().into(), "hello world!")
+				.await
+				.unwrap();
+			let route = routes::docs::interactivity::buckets::bucket_id(&path);
+			navigate::to_page(&route);
+		});
+	};
 
 	rsx! {
 		<tr>
 			<td>
 				<TextField
 					autofocus
-					value={description}
-					onchange=move |ev|{set_description(ev.value())}
+					value={name}
+					onchange=move |ev|{set_name(ev.value())}
 						/>
 			</td>
-			<td></td>
 			<td>
-				<Button onclick=move|| (on_add.clone())()>Create</Button>
+				<Button onclick=move|| on_add()>Create</Button>
 			</td>
 		</tr>
 	}

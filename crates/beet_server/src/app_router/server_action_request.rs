@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::exports::Url;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use serde::Serialize;
@@ -9,14 +10,14 @@ use std::sync::Mutex;
 /// the url for the server.
 /// On native builds this defaults to `http://127.0.0.1:3000`.
 /// On wasm builds this is set to the current origin.
-static SERVER_URL: LazyLock<Mutex<RoutePath>> = LazyLock::new(|| {
+static SERVER_URL: LazyLock<Mutex<Url>> = LazyLock::new(|| {
 	#[cfg(not(target_arch = "wasm32"))]
 	let path = "http://127.0.0.1:3000";
 	#[cfg(target_arch = "wasm32")]
 	let path = beet_utils::exports::web_sys::window()
 		.and_then(|w| w.location().origin().ok())
 		.unwrap();
-	Mutex::new(path.into())
+	Mutex::new(Url::parse(&path).unwrap())
 });
 
 
@@ -52,8 +53,8 @@ impl ServerActionRequest<()> {
 }
 
 impl ServerActionRequest {
-	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
-	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
+	pub fn get_server_url() -> Url { SERVER_URL.lock().unwrap().clone() }
+	pub fn set_server_url(url: Url) { *SERVER_URL.lock().unwrap() = url; }
 }
 
 impl<Req> ServerActionRequest<Req> {
@@ -133,6 +134,7 @@ where
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
+	use beet_core::exports::url::Url;
 	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -156,10 +158,9 @@ mod test {
 		// random port assigned
 		let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 		let addr = listener.local_addr().unwrap();
-		ServerActionRequest::set_server_url(RoutePath::new(format!(
-			"http://{}",
-			addr
-		)));
+		ServerActionRequest::set_server_url(
+			Url::parse(&format!("http://{}", addr)).unwrap(),
+		);
 
 		// Start the server in a separate task, dropped on exit
 		tokio::spawn(async move {

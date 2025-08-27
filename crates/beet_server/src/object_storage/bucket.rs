@@ -68,7 +68,7 @@ impl Bucket {
 	pub async fn bucket_remove(&self) -> Result<()> {
 		self.provider.bucket_remove(&self.name).await
 	}
-
+	/// Insert an object into the bucket
 	pub async fn insert(
 		&self,
 		path: &RoutePath,
@@ -76,24 +76,49 @@ impl Bucket {
 	) -> Result<()> {
 		self.provider.insert(&self.name, path, body.into()).await
 	}
+	/// Check if the object exists
 	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
 		self.provider.exists(&self.name, path).await
 	}
+	/// List all objects in this bucket
 	pub async fn list(&self) -> Result<Vec<RoutePath>> {
 		self.provider.list(&self.name).await
 	}
+	/// Get the data for the object at the specified path
 	pub async fn get(&self, path: &RoutePath) -> Result<Bytes> {
 		self.provider.get(&self.name, path).await
 	}
-	pub async fn delete(&self, path: &RoutePath) -> Result<()> {
+
+	/// Get the data for all items in this bucket
+	///
+	/// ## Caution
+	/// This is potentially a very expensive operation and should
+	/// only be used in special circumstances, prefer [`Self::list`]
+	/// and [`Self::get`] in most circumstances.
+	pub async fn get_all(&self) -> Result<Vec<(RoutePath, Bytes)>> {
+		self.list()
+			.await?
+			.into_iter()
+			.map(async |path| {
+				let data = self.get(&path).await?;
+				Ok::<_, BevyError>((path, data))
+			})
+			.xmap(async_ext::try_join_all)
+			.await
+	}
+
+	/// Remove an object from the bucket
+	pub async fn remove(&self, path: &RoutePath) -> Result<()> {
 		self.provider.remove(&self.name, path).await
 	}
 
+	/// Get the public URL for the object at the specified path, if applicable
 	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
 		self.provider.public_url(&self.name, path).await
 	}
+	/// Get the region of this buckets [`BucketProvider`]
+	pub async fn region(&self) -> Option<String> { self.provider.region() }
 }
-
 
 pub trait BucketProvider: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
@@ -203,7 +228,7 @@ pub mod bucket_test {
 		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
 		bucket.get(&path).await.unwrap().xpect().to_be(body);
 
-		bucket.delete(&path).await.unwrap();
+		bucket.remove(&path).await.unwrap();
 		bucket.get(&path).await.xpect().to_be_err();
 
 		bucket.bucket_remove().await.unwrap();

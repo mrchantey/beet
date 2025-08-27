@@ -39,14 +39,14 @@ impl From<Request> for RoutePath {
 }
 
 impl From<String> for RoutePath {
-	fn from(value: String) -> Self { Self(PathBuf::from(value)) }
+	fn from(value: String) -> Self { Self::new(value) }
 }
 impl From<&str> for RoutePath {
-	fn from(value: &str) -> Self { Self(PathBuf::from(value)) }
+	fn from(value: &str) -> Self { Self::new(value) }
 }
 
 impl From<PathBuf> for RoutePath {
-	fn from(value: PathBuf) -> Self { Self(value) }
+	fn from(value: PathBuf) -> Self { Self::new(value) }
 }
 
 impl Into<PathBuf> for RoutePath {
@@ -82,8 +82,7 @@ impl RoutePath {
 	pub fn new(path: impl Into<PathBuf>) -> Self {
 		let path_buf = path.into();
 		let path_str = path_buf.to_string_lossy();
-		// Only add a leading slash if there is no protocol (like http://, file://, etc.)
-		if path_str.contains("://") || path_str.starts_with('/') {
+		if path_str.starts_with('/') {
 			Self(path_buf)
 		} else {
 			Self(PathBuf::from(format!("/{}", path_str)))

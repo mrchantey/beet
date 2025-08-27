@@ -25,6 +25,34 @@ impl<T: Bundle> IntoBundle<BundleMarker> for T {
 	fn into_bundle(self) -> impl Bundle { self }
 }
 
+#[extend::ext(name = AnyBundleExt)]
+pub impl<T, M> T
+where
+	T: IntoBundle<M>,
+{
+	/// Converts the bundle to be inserted via [`OnSpawnBoxed`], allowing branches
+	/// to return the same type.
+	///
+	/// ## Example
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
+	///
+	/// let bundle = if true {
+	/// 	().any_bundle()
+	/// } else {
+	/// 	Name::new("foo").any_bundle()
+	/// };
+	///```
+	fn any_bundle(self) -> OnSpawnBoxed {
+		let bundle = self.into_bundle();
+		OnSpawnBoxed::new(move |entity| {
+			entity.insert(bundle);
+		})
+	}
+}
+
+
 // collision with Getter: IntoBundle
 // pub struct ClosureMarker;
 
@@ -36,11 +64,13 @@ impl<T: Bundle> IntoBundle<BundleMarker> for T {
 // 	fn into_bundle(self) -> impl Bundle { self().into_bundle() }
 // }
 
-#[extend::ext]
+#[extend::ext(name=AnyBundleCloneExt)]
 pub impl<T, M> T
 where
 	T: 'static + Send + Sync + Clone + IntoBundle<M>,
 {
+	/// Like [`AnyBundleExt::any_bundle`] but returns a [`Clone`]
+	/// type.
 	fn any_bundle_clone(self) -> OnSpawnClone {
 		OnSpawnClone::insert(move || self.clone().into_bundle())
 	}
@@ -66,7 +96,7 @@ where
 {
 	fn into_bundle(self) -> impl Bundle {
 		match self {
-			Some(item) => item.into_bundle().any_bundle(),
+			Some(item) => item.any_bundle(),
 			None => OnSpawnBoxed::new(|_| {}),
 		}
 	}

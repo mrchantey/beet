@@ -6,6 +6,7 @@ mod common_systems;
 mod fs_app;
 mod garbage_collect;
 mod id_counter;
+pub mod navigate;
 mod on_spawn;
 mod pretty_tracing;
 pub use app_pool::*;
