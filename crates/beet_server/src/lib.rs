@@ -2,20 +2,16 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(if_let_guard, result_flattening)]
 mod app_router;
-#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
-mod aws_utils;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
 mod handlers;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
-mod services;
+mod object_storage;
 
 pub mod prelude {
-	#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
-	pub use crate::aws_utils::*;
 	pub use crate::handlers::*;
-	pub use crate::services::*;
+	pub use crate::object_storage::*;
 
 	pub use http::StatusCode;
 
