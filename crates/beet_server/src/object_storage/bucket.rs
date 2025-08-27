@@ -49,23 +49,24 @@ impl Bucket {
 	/// Get the name of the bucket, ie `my-bucket`
 	pub fn name(&self) -> &str { &self.name }
 
+
+	/// Create the bucket if it does not exist
+	pub async fn bucket_create(&self) -> Result<()> {
+		self.provider.bucket_create(&self.name).await
+	}
+
 	/// Check if the bucket exists, creating it if necessary
-	pub async fn ensure_exists(&self) -> Result<()> {
-		self.provider.ensure_exists(&self.name).await
+	pub async fn bucket_try_create(&self) -> Result<()> {
+		self.provider.bucket_try_create(&self.name).await
 	}
 
 	/// Check if the bucket exists
-	pub async fn exists(&self) -> Result<bool> {
+	pub async fn bucket_exists(&self) -> Result<bool> {
 		self.provider.bucket_exists(&self.name).await
 	}
 	/// Remove the bucket
-	pub async fn remove(&self) -> Result<()> {
-		self.provider.delete_bucket(&self.name).await
-	}
-
-	/// Create the bucket if it does not exist
-	pub async fn create(&self) -> Result<()> {
-		self.provider.create_bucket(&self.name).await
+	pub async fn bucket_remove(&self) -> Result<()> {
+		self.provider.bucket_remove(&self.name).await
 	}
 
 	pub async fn insert(
@@ -75,6 +76,9 @@ impl Bucket {
 	) -> Result<()> {
 		self.provider.insert(&self.name, path, body.into()).await
 	}
+	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
+		self.provider.exists(&self.name, path).await
+	}
 	pub async fn list(&self) -> Result<Vec<RoutePath>> {
 		self.provider.list(&self.name).await
 	}
@@ -82,7 +86,7 @@ impl Bucket {
 		self.provider.get(&self.name, path).await
 	}
 	pub async fn delete(&self, path: &RoutePath) -> Result<()> {
-		self.provider.delete(&self.name, path).await
+		self.provider.remove(&self.name, path).await
 	}
 
 	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
@@ -102,23 +106,25 @@ pub trait BucketProvider: 'static + Send + Sync {
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>>;
 	/// Create the bucket
-	fn create_bucket(
+	fn bucket_create(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
-	/// Delete the bucket
-	fn delete_bucket(
+	/// Remove the bucket
+	/// ## Caution
+	/// This operation is potentially very destructive, use with care!
+	fn bucket_remove(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
 
 	/// Ensure the bucket exists, creating it if necessary
-	fn ensure_exists(
+	fn bucket_try_create(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
 		let exists_fut = self.bucket_exists(bucket_name);
-		let create_fut = self.create_bucket(bucket_name);
+		let create_fut = self.bucket_create(bucket_name);
 		Box::pin(async move {
 			if exists_fut.await? {
 				Ok(())
@@ -145,8 +151,14 @@ pub trait BucketProvider: 'static + Send + Sync {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>>;
+	/// Check if an object exists in the bucket
+	fn exists(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>>;
 	/// Delete an object from the bucket
-	fn delete(
+	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
@@ -175,11 +187,13 @@ pub mod bucket_test {
 		let bucket = Bucket::new(provider, "beet-test-bucket-849302");
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
-		bucket.remove().await.ok();
-		bucket.exists().await.unwrap().xpect().to_be_false();
-		bucket.ensure_exists().await.unwrap();
+		bucket.bucket_remove().await.ok();
+		bucket.bucket_exists().await.unwrap().xpect().to_be_false();
+		bucket.bucket_try_create().await.unwrap();
+		bucket.exists(&path).await.unwrap().xpect().to_be(false);
 		bucket.insert(&path, body.clone()).await.unwrap();
-		bucket.exists().await.unwrap().xpect().to_be_true();
+		bucket.bucket_exists().await.unwrap().xpect().to_be_true();
+		bucket.exists(&path).await.unwrap().xpect().to_be(true);
 		bucket
 			.list()
 			.await
@@ -192,7 +206,7 @@ pub mod bucket_test {
 		bucket.delete(&path).await.unwrap();
 		bucket.get(&path).await.xpect().to_be_err();
 
-		bucket.remove().await.unwrap();
-		bucket.exists().await.unwrap().xpect().to_be_false();
+		bucket.bucket_remove().await.unwrap();
+		bucket.bucket_exists().await.unwrap().xpect().to_be_false();
 	}
 }

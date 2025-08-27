@@ -40,7 +40,7 @@ impl BucketProvider for FsBucketProvider {
 		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
 	}
 
-	fn create_bucket(
+	fn bucket_create(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -51,7 +51,7 @@ impl BucketProvider for FsBucketProvider {
 		})
 	}
 
-	fn delete_bucket(
+	fn bucket_remove(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -95,6 +95,14 @@ impl BucketProvider for FsBucketProvider {
 				.xok()
 		})
 	}
+	fn exists(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+		let path = self.resolve_path(bucket_name, path);
+		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
+	}
 
 	fn get(
 		&self,
@@ -110,7 +118,7 @@ impl BucketProvider for FsBucketProvider {
 				.xok()
 		})
 	}
-	fn delete(
+	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,

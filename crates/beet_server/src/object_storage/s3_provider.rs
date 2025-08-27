@@ -4,6 +4,7 @@ use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::bevybail;
 use bevy::prelude::*;
 use bytes::Bytes;
@@ -79,7 +80,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn create_bucket(
+	fn bucket_create(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -104,7 +105,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn delete_bucket(
+	fn bucket_remove(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -180,6 +181,33 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
+	fn exists(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+		let client = self.0.clone();
+		let bucket_name = bucket_name.to_string();
+		let key = self.resolve_key(path);
+		Box::pin(async move {
+			let head_result = client
+				.head_object()
+				.bucket(&bucket_name)
+				.key(&key)
+				.send()
+				.await;
+			match head_result {
+				Ok(_) => Ok(true),
+				Err(SdkError::ServiceError(service_err))
+					if let HeadObjectError::NotFound(_) = service_err.err() =>
+				{
+					Ok(false)
+				}
+				Err(err) => Err(err.into()),
+			}
+		})
+	}
+
 	fn list(
 		&self,
 		bucket_name: &str,
@@ -240,7 +268,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn delete(
+	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
@@ -279,16 +307,9 @@ mod test {
 	use super::*;
 	use sweet::prelude::*;
 
-
 	#[tokio::test]
 	#[ignore = "hits remote s3"]
-	async fn s3_client() {
-		let _s3_client_resource = S3Provider::create().await;
-	}
-
-	#[tokio::test]
-	#[ignore = "hits remote s3"]
-	async fn s3_bucket_crud() {
+	async fn works() {
 		let provider = S3Provider::create().await;
 		bucket_test::run(provider).await;
 	}
@@ -299,8 +320,8 @@ mod test {
 		let client = S3Provider::create().await;
 
 		let bucket = Bucket::new(client, "beet-site-bucket-dev".to_string());
-		bucket.ensure_exists().await?;
-		bucket.exists().await.xpect().to_be_ok();
+		bucket.bucket_try_create().await?;
+		bucket.bucket_exists().await.xpect().to_be_ok();
 
 		// READ - Download and verify the file
 		bucket

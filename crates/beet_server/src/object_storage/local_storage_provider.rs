@@ -55,7 +55,7 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn create_bucket(
+	fn bucket_create(
 		&self,
 		_bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -63,7 +63,7 @@ impl BucketProvider for LocalStorageProvider {
 		Box::pin(async { Ok(()) })
 	}
 
-	fn delete_bucket(
+	fn bucket_remove(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -93,6 +93,19 @@ impl BucketProvider for LocalStorageProvider {
 			let storage = Self::local_storage();
 			storage.set_item(&key, &value).map_jserr()?;
 			Ok(())
+		})
+	}
+
+	fn exists(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+		let key = Self::storage_key(bucket_name, path);
+		Box::pin(async move {
+			let storage = Self::local_storage();
+			let value = storage.get_item(&key).map_jserr()?;
+			Ok(value.is_some())
 		})
 	}
 
@@ -131,7 +144,7 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn delete(
+	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,

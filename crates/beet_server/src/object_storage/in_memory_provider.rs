@@ -13,7 +13,7 @@ impl Bucket {
 	pub async fn new_test() -> Self {
 		let provider = InMemoryProvider::new();
 		let bucket = Self::new(provider, "test-bucket");
-		bucket.ensure_exists().await.unwrap();
+		bucket.bucket_try_create().await.unwrap();
 		bucket
 	}
 }
@@ -42,7 +42,7 @@ impl BucketProvider for InMemoryProvider {
 		Box::pin(async move { Ok(exists) })
 	}
 
-	fn create_bucket(
+	fn bucket_create(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -54,7 +54,7 @@ impl BucketProvider for InMemoryProvider {
 		Box::pin(async { Ok(()) })
 	}
 
-	fn delete_bucket(
+	fn bucket_remove(
 		&self,
 		bucket_name: &str,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
@@ -76,6 +76,20 @@ impl BucketProvider for InMemoryProvider {
 				bucket.insert(path.clone(), body);
 			});
 		Box::pin(async move { Ok(()) })
+	}
+
+	fn exists(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+		let mut buckets = self.0.write().unwrap();
+		let result = buckets
+			.get_mut(bucket_name)
+			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+			.map(|bucket| bucket.contains_key(path));
+
+		Box::pin(async move { result })
 	}
 
 	fn list(
@@ -112,7 +126,7 @@ impl BucketProvider for InMemoryProvider {
 		Box::pin(async move { result })
 	}
 
-	fn delete(
+	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
