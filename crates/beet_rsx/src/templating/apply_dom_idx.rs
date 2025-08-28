@@ -27,10 +27,8 @@ pub fn apply_requires_dom_idx(
 					"FragmentNode with SignalEffect must have an ElementNode parent"
 				)
 			})?;
-		// fragment nodes do not need an idx
-		commands
-			.entity(parent)
-			.insert((RequiresDomIdx, RequiresDomBinding));
+		// fragment nodes do not need an idx, but their parents do
+		commands.entity(parent).insert(RequiresDomIdx);
 	}
 
 	// 2. text nodes

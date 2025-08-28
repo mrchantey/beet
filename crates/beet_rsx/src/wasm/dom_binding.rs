@@ -305,7 +305,7 @@ pub(crate) fn update_fragments(
 			elements.get(parent).ok()
 		}).ok_or_else(|| {
 			bevyhow!(
-				"FragmentNode with SignalEffect must have an ElementNode with DomNodeBinding\n
+				"FragmentNode with SignalEffect must have an ElementNode parent with DomNodeBinding\n
 				was the DomIdx correctly applied to the ElementNode?"
 			)
 		})?;

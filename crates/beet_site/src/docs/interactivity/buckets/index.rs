@@ -54,7 +54,11 @@ pub fn Inner() -> impl Bundle {
 			<td></td>
 			<td></td>
 		</tr>
-			<NewItem bucket=bucket set_err=set_err/>
+			<NewItem
+				bucket=bucket
+				set_err=set_err
+				reload=reload_items
+				/>
 			{items}
 		</Table>
 	}
@@ -109,14 +113,12 @@ fn Item(
 #[template]
 fn NewItem(
 	bucket: Getter<Bucket>,
-
+	reload: Setter<()>,
 	set_err: Setter<Option<String>>,
 ) -> impl Bundle {
 	let (name, set_name) = signal("my-object".to_string());
 
 	let on_add = move || {
-		// let timestamp = CrossInstant::unix_epoch().as_millis();
-		// let path = RoutePath::new(format!("item-{timestamp}"));
 		async_ext::spawn_local(async move {
 			let path = name();
 			match bucket()
@@ -124,9 +126,7 @@ fn NewItem(
 				.await
 			{
 				Ok(()) => {
-					let route =
-						routes::docs::interactivity::buckets::bucket_id(&path);
-					navigate::to_page(&route);
+					reload(());
 				}
 				Err(err) => set_err(Some(err.to_string())),
 			}
