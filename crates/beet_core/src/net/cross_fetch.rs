@@ -162,20 +162,12 @@ mod test_response {
 	use sweet::prelude::*;
 
 
-	const HTTPBIN: &str = "https://httpbin.org";
-
-	#[derive(Debug, PartialEq, serde::Deserialize)]
-	struct Res {
-		data: Body,
-	}
-	#[derive(Debug, PartialEq, serde::Deserialize)]
-	struct Body {
-		foo: String,
-	}
+	// const HTTPBIN: &str = "https://httpbin.org";
+	const HTTPBIN: &str = "https://httpbin.dev";
 
 	#[sweet::test]
 	#[ignore = "flaky httpbin"]
-	async fn works() {
+	async fn post() {
 		Request::post(format!("{HTTPBIN}/post"))
 			.with_body(&serde_json::json!({"foo": "bar"}).to_string())
 			.send()
@@ -187,5 +179,22 @@ mod test_response {
 			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
 			.xpect()
 			.to_be("bar");
+	}
+	#[sweet::test]
+	#[ignore = "flaky httpbin"]
+	async fn stream() {
+		let res = Request::get(format!("{HTTPBIN}/stream/3"))
+			.send()
+			.await
+			.unwrap();
+
+		matches!(res.body, Body::Stream(_)).xpect().to_be_true();
+
+		res.text()
+			.await
+			.unwrap().len()
+			.xpect()
+			.to_be_greater_than(200)
+			.to_be_less_than(1000);
 	}
 }
