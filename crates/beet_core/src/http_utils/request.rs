@@ -59,13 +59,18 @@ impl Request {
 		self
 	}
 
+	/// Add a json body, and set the content type to application/json
 	#[cfg(feature = "serde")]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,
 	) -> Result<Self, serde_json::Error> {
+		use beet_utils::utils::PipelineTarget;
+
 		let body = serde_json::to_string(body)?;
-		Ok(self.with_body(body))
+		self.with_body(body)
+			.with_content_type("application/json")
+			.xok()
 	}
 
 	pub fn set_body(&mut self, body: impl AsRef<[u8]>) -> &mut Self {
@@ -89,6 +94,15 @@ impl Request {
 			http::header::AUTHORIZATION,
 			http::header::HeaderValue::from_str(&format!("Bearer {}", token))
 				.unwrap(),
+		);
+		self
+	}
+
+	/// Set the content type header.
+	pub fn with_content_type(mut self, content_type: &str) -> Self {
+		self.parts.headers.insert(
+			http::header::CONTENT_TYPE,
+			http::header::HeaderValue::from_str(content_type).unwrap(),
 		);
 		self
 	}

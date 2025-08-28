@@ -19,9 +19,11 @@ keywords.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
-beet_core = { workspace = true, features = ["bevy", "net"] }
+dotenv.workspace = true
+beet_core = { workspace = true, features = ["bevy", "net", "native-tls"] }
 beet_utils.workspace = true
 serde.workspace = true
+base64.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"
 http.workspace = true

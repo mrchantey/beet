@@ -5,7 +5,6 @@ use bytes::Bytes;
 use futures::Stream;
 use futures::StreamExt;
 use http::StatusCode;
-use http::header::CONTENT_TYPE;
 use http::response;
 use send_wrapper::SendWrapper;
 use std::convert::Infallible;
@@ -278,12 +277,13 @@ impl Response {
 	/// extracting the status code and message from the body.
 	/// For a method that checks the status code see [`Response::into_result`].
 	pub async fn into_error(self) -> HttpError {
-		let is_text = self.header_contains(CONTENT_TYPE, "text/plain");
+		// let is_text = self.header_contains(CONTENT_TYPE, "text/plain");
 		let status = self.status();
 		let Ok(bytes) = self.body.into_bytes().await else {
 			return HttpError::internal_error("Failed to read response body");
 		};
-		let message = if is_text && !bytes.is_empty() {
+		let message = if !bytes.is_empty() {
+			// let message = if is_text && !bytes.is_empty() {
 			String::from_utf8_lossy(&bytes).to_string()
 		} else {
 			Default::default()

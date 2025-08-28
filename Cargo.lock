@@ -1166,9 +1166,11 @@ name = "beet_connect"
 version = "0.0.7-dev.2"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "beet_core",
  "beet_utils",
  "bevy",
+ "dotenv",
  "http 1.3.1",
  "serde",
  "serde_json",

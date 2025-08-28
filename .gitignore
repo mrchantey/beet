@@ -4,6 +4,7 @@ assets.tar.gz
 target
 .rustc_info.json
 .env
+.cache
 .vscode/settings.json
 dump.txt
 

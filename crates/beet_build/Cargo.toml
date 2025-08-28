@@ -62,7 +62,7 @@ serde_json.workspace = true
 #💡 Parsing
 prettyplease.workspace = true
 cargo-manifest = "0.19"
-dotenv = "0.15"
+dotenv.workspace = true
 pulldown-cmark = { version = "0.13", optional = true }
 clap.workspace = true
 
