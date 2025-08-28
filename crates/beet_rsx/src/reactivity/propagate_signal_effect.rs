@@ -183,7 +183,7 @@ mod test {
 	fn attribute_blocks() {
 		#[derive(Default, Buildable, AttributeBlock)]
 		struct Foo {
-			class: Option<MaybeSignal<String>>,
+			class: Option<DerivedGetter<String>>,
 		}
 
 		#[template]

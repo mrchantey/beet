@@ -34,7 +34,7 @@ pub struct InputHtmlAttributes {
 	pub base_attrs: BaseHtmlAttributes,
 	pub disabled: Option<bool>,
 	pub required: Option<bool>,
-	pub value: Option<MaybeSignal<String>>,
+	pub value: Option<DerivedGetter<String>>,
 }
 
 #[derive(Default, Buildable, AttributeBlock)]

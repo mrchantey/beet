@@ -54,12 +54,12 @@ impl<'a> NodeField<'a> {
 
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
-	/// - is_boxed:				`(Default, 				impl SomeType, 					Box::new(value))`
-	/// - EventHandler<E>:`(<E,B,M>, 				impl IntoObserverSystem<E, B, M>,,		EventHandler::new(value)`
-	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
-	/// - into_type:			`(into_generics,	into_type, into_func							)`
-	/// - is_into: 				`(Default, 				impl Into<SomeType>, 		value.into())		`
-	/// - verbatim: 			`(Default, 				SomeType, 							value)					`
+	/// - is_boxed:					`(Default, 				impl SomeType, 					Box::new(value))`
+	/// - EventHandler<E>:	`(<E,B,M>, 				impl IntoObserverSystem<E, B, M>,,		EventHandler::new(value)`
+	/// - DerivedGetter<T>:	`(<M>, 						impl IntoDerivedGetter,		value.into_derived_getter())`
+	/// - into_type:				`(into_generics,	into_type, into_func)`
+	/// - is_into: 					`(Default, 				impl Into<SomeType>, 		value.into())		`
+	/// - verbatim: 				`(Default, 				SomeType, 							value)					`
 	pub fn assign_tokens(
 		field: &NamedField,
 	) -> Result<(TokenStream, Type, Expr)> {
@@ -80,11 +80,11 @@ impl<'a> NodeField<'a> {
 				parse_quote! { impl bevy::ecs::system::IntoObserverSystem<#ty,B,M> },
 				parse_quote! { EventHandler::new(value) },
 			)),
-			// 2. handle MaybeSignal<T>
-			Some((seg, ty)) if seg.ident == "MaybeSignal" => Ok((
+			// 2. handle DerivedGetter<T>
+			Some((seg, ty)) if seg.ident == "DerivedGetter" => Ok((
 				parse_quote! {<M>},
-				parse_quote! { impl beet::prelude::IntoMaybeSignal<#ty,M> },
-				parse_quote! { value.into_maybe_signal() },
+				parse_quote! { impl beet::prelude::IntoDerivedGetter<#ty,M> },
+				parse_quote! { value.into_derived_getter() },
 			)),
 			// 3. handle into_type attribute
 			_ if let Some(ty) = field

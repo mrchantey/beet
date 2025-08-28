@@ -11,6 +11,13 @@ use send_wrapper::SendWrapper;
 use std::convert::Infallible;
 use std::pin::Pin;
 
+
+#[cfg(target_arch = "wasm32")]
+type DynBytesStream = dyn Stream<Item = Result<Bytes>>;
+/// Axum requires Stream to be Send
+#[cfg(not(target_arch = "wasm32"))]
+type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send;
+
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
 /// will be returned.
 #[derive(Debug, Resource)]
@@ -21,7 +28,7 @@ pub struct Response {
 
 pub enum Body {
 	Bytes(Bytes),
-	Stream(SendWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>>>>>),
+	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
 }
 
 impl Into<Body> for Bytes {

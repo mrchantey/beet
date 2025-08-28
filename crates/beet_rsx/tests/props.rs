@@ -16,7 +16,7 @@ fn works() {
 			is_no_into="foobar".into()
 			is_optional=3
 			is_marker_into=3
-			is_maybe_signal=get
+			is_derived_getter=get
 			class="kablamo"
 			onclick=|| println!("hello world")
 			id="bar"
@@ -65,7 +65,7 @@ fn MyNode(
 	#[field(into_generics = "<M>")]
 	#[field(into_func=marker_into_string)]
 	is_marker_into: String,
-	is_maybe_signal: MaybeSignal<u32>,
+	is_derived_getter: DerivedGetter<u32>,
 	// #[field(foo)]
 	// is_bad_macro: String,
 ) -> impl Bundle {
@@ -82,7 +82,7 @@ fn MyNode(
 			<p>is_flatten.id: {format!("{:?}", is_flatten.id)}</p>
 			<p>is_flatten.disabled: {format!("{:?}", is_flatten.disabled)}</p>
 			<p>is_marker_into: {format!("{:?}", is_marker_into)}</p>
-			<p>is_maybe_signal: {format!("{:?}", is_maybe_signal)}</p>
+			<p>is_derived_getter: {format!("{:?}", is_derived_getter)}</p>
 		</div>
 	}
 }
