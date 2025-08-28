@@ -22,14 +22,14 @@ where
 	fn clone(&self) -> Self { Self(self.0.clone_func_box_clone()) }
 }
 
-pub trait CloneFuncTrait<In, Out>: 'static + Send {
+pub trait CloneFuncTrait<In, Out>: 'static + Send + Sync {
 	fn clone_func_box_clone(&self) -> Box<dyn CloneFuncTrait<In, Out>>;
 	fn call_func(&self, input: In) -> Out;
 }
 
 impl<In, Out, F> CloneFuncTrait<In, Out> for F
 where
-	F: 'static + Send + Clone + FnOnce(In) -> Out,
+	F: 'static + Send + Sync + Clone + FnOnce(In) -> Out,
 {
 	fn clone_func_box_clone(&self) -> Box<dyn CloneFuncTrait<In, Out>> {
 		Box::new(self.clone())

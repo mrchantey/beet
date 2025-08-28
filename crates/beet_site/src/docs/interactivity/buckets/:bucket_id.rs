@@ -1,6 +1,8 @@
 use beet::prelude::*;
 use std::sync::Arc;
 
+use crate::prelude::routes;
+
 
 pub fn get(paths: Res<DynSegmentMap>) -> impl use<> + Bundle {
 	let bucket_id =
@@ -43,16 +45,26 @@ pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 		}
 	});
 
+	let all_items = routes::docs::interactivity::buckets::index();
+
 	rsx! {
 		<div>
 		<h1>{bucket_id().to_string()}</h1>
-			// <TextField
-			// 	autofocus
-			// 	// value={move ||data().unwrap_or_default()}
-			// 	// onchange=move |ev|{set_data(ev.value())}
-			// />
-			<div>{move ||data().unwrap_or_default()}</div>
-			<ErrorText>{err}</ErrorText>
+		<Link variant=ButtonVariant::Outlined href=all_items>All Items</Link>
+			<ErrorText value={err}/>
+		<TextArea
+				autofocus
+				value={move ||data().unwrap_or_default()}
+				oninput=move |ev|{set_data(Some(ev.value()))}
+				rows=40
+			/>
 		</div>
+		<style>
+			div{
+				display:flex;
+				flex-direction:column;
+				gap:var(--bt-spacing);
+			}
+		</style>
 	}
 }

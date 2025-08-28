@@ -1,4 +1,6 @@
 use beet_core::prelude::*;
+use beet_utils::prelude::CloneFunc;
+use beet_utils::utils::CloneFuncTrait;
 use bevy::prelude::*;
 
 
@@ -6,39 +8,40 @@ use bevy::prelude::*;
 /// - a constant value `T`
 /// - a [`Getter<T>`]
 /// - a function that returns `T`, ie a derived signal
+#[derive(Clone)]
 pub struct DerivedGetter<T: 'static> {
-	get_value: Box<dyn 'static + Send + Sync + Fn() -> T>,
-	get_bundle: Box<dyn 'static + Send + Sync + Fn() -> OnSpawnBoxed>,
+	get_value: CloneFunc<(), T>,
+	get_bundle: CloneFunc<(), OnSpawnBoxed>,
 }
 
 impl<T: 'static> DerivedGetter<T> {
 	pub fn new(
-		get_value: impl 'static + Send + Sync + Fn() -> T,
-		get_bundle: impl 'static + Send + Sync + Fn() -> OnSpawnBoxed,
+		get_value: impl CloneFuncTrait<(), T>,
+		get_bundle: impl CloneFuncTrait<(), OnSpawnBoxed>,
 	) -> Self {
 		DerivedGetter {
-			get_value: Box::new(get_value),
-			get_bundle: Box::new(get_bundle),
+			get_value: CloneFunc::new(get_value),
+			get_bundle: CloneFunc::new(get_bundle),
 		}
 	}
 
 	/// Get the inner value, either by cloning the const
 	/// or calling the func
-	pub fn value(&self) -> T { (self.get_value)() }
+	pub fn get(&self) -> T { (self.get_value)(()) }
 }
 
 impl<T, M> IntoBundle<(Self, M)> for DerivedGetter<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,
 {
-	fn into_bundle(self) -> impl Bundle { (self.get_bundle)() }
+	fn into_bundle(self) -> impl Bundle { (self.get_bundle)(()) }
 }
 
 impl<T: 'static + Send + Clone + std::fmt::Debug> std::fmt::Debug
 	for DerivedGetter<T>
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "DerivedGetter({:?})", self.value())
+		write!(f, "DerivedGetter({:?})", self.get())
 	}
 }
 
@@ -46,7 +49,7 @@ impl<T: 'static + Send + Clone + std::fmt::Display> std::fmt::Display
 	for DerivedGetter<T>
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.value().fmt(f)
+		self.get().fmt(f)
 	}
 }
 
@@ -64,8 +67,8 @@ where
 		let val = self.into();
 		let val2 = val.clone();
 		DerivedGetter::new(
-			move || val.clone(),
-			move || OnSpawnBoxed::insert(val2.clone().into_bundle()),
+			move |_| val.clone(),
+			move |_| OnSpawnBoxed::insert(val2.clone().into_bundle()),
 		)
 	}
 }
@@ -79,12 +82,33 @@ where
 		let self2 = self.clone();
 
 		DerivedGetter::new(
-			move || (self.clone())(),
-			move || OnSpawnBoxed::insert((self2.clone()).into_bundle()),
+			move |_| (self.clone())(),
+			move |_| OnSpawnBoxed::insert((self2.clone()).into_bundle()),
 		)
 	}
 }
+// cant impl fn because multiple impls, derived getter has a special impl
+// #[cfg(feature = "nightly")]
+// impl<T: 'static + Send + Sync> FnOnce<()> for DerivedGetter<T> {
+// 	type Output = T;
+// 	extern "rust-call" fn call_once(self, _args: ()) -> Self::Output {
+// 		self.value()
+// 	}
+// }
 
+// #[cfg(feature = "nightly")]
+// impl<T: 'static + Send + Sync> FnMut<()> for DerivedGetter<T> {
+// 	extern "rust-call" fn call_mut(&mut self, _args: ()) -> Self::Output {
+// 		self.value()
+// 	}
+// }
+
+// #[cfg(feature = "nightly")]
+// impl<T: 'static + Send + Sync> Fn<()> for DerivedGetter<T> {
+// 	extern "rust-call" fn call(&self, _args: ()) -> Self::Output {
+// 		self.value()
+// 	}
+// }
 
 #[cfg(test)]
 mod test {
@@ -98,8 +122,8 @@ mod test {
 
 		let sig: DerivedGetter<&str> = get.into_derived_getter();
 		// let sig = get.into_derived_getter();
-		sig.value().xpect().to_be("foo");
+		sig.get().xpect().to_be("foo");
 		set("bar");
-		sig.value().xpect().to_be("bar");
+		sig.get().xpect().to_be("bar");
 	}
 }

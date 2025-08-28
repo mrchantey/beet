@@ -48,7 +48,7 @@ pub fn Inner() -> impl Bundle {
 	rsx! {
 		<h1>Buckets</h1>
 		<p>This example uses local storage to manage a list of items</p>
-		<ErrorText>{err}</ErrorText>
+		<ErrorText value={err}/>
 		<Table>
 		<tr slot="head">
 			<td></td>
@@ -78,21 +78,17 @@ fn Item(
 		});
 	};
 
-	let visit = move || {
-		let route = routes::docs::interactivity::buckets::bucket_id(
-			&path().to_string(),
-		);
-		navigate::to_page(&route);
-	};
+	let route =
+		routes::docs::interactivity::buckets::bucket_id(&path().to_string());
 
 	rsx! {
 		<tr>
 			<td>{path()}</td>
 			<td>
 				<div>
-				<Button
+				<Link
 					variant=ButtonVariant::Outlined
-					 onclick=move||visit()>Visit</Button>
+					 href=route>Visit</Link>
 				<Button
 					variant=ButtonVariant::Error
 					 onclick=move||remove()>Remove</Button>

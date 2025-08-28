@@ -3,15 +3,15 @@ use crate::prelude::*;
 pub fn get() -> impl Bundle {
 	rsx! {
 		<div>
-		<ErrorText>"this is an error"</ErrorText>
+		<ErrorText value=Some("this is an error".to_string())/>
 		<div>below is an empty error</div>
-		<ErrorText></ErrorText>
+			<ErrorText value=None></ErrorText>
 		<div>that was an empty error</div>
 		</div>
 		<style>
-			div{
-				display:flex;
-			}
+			// div{
+			// 	display:flex;
+			// }
 		</style>
 	}
 }

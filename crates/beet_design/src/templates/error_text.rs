@@ -4,19 +4,25 @@ use bevy::prelude::*;
 
 
 #[template]
-pub fn ErrorText() -> impl Bundle {
+pub fn ErrorText(value: DerivedGetter<Option<String>>) -> impl Bundle {
 	rsx! {
 		<div>
-			<slot/>
+		{move ||
+			if let Some(val) = value.get(){
+				rsx!{<span>{val}</span>}.any_bundle()
+			}else{
+				().any_bundle()
+			}
+		}
 		</div>
 		<style>
-			div{
+			span{
 				display: block;
 				background-color: var(--bt-color-error);
 				color: var(--bt-color-on-error);
 				border-radius:var(--bt-border-radius);
+				padding: 0 var(--bt-spacing);
 			}
 		</style>
 	}
 }
-// padding: 0 var(--bt-spacing);
