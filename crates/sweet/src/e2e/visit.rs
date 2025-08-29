@@ -121,7 +121,7 @@ mod test {
 	use fantoccini::Locator;
 
 	#[crate::test]
-	#[ignore="external url"]
+	#[ignore = "external url"]
 	async fn works() -> Result<()> {
 		let page = visit("https://en.wikipedia.org/wiki/Foobar").await.client;
 		let url = page.current_url().await?;

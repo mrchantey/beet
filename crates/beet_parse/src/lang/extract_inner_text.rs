@@ -153,11 +153,9 @@ mod test {
 	fn text_child() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((
-				ElementNode::open(),
-				NodeTag::new("style"), children![TextNode::new(
-				"div { color: red; }"
-			)]))
+			.spawn((ElementNode::open(), NodeTag::new("style"), children![
+				TextNode::new("div { color: red; }")
+			]))
 			.id();
 		world
 			.run_system_cached(super::extract_inner_text_element)

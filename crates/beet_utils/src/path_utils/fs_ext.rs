@@ -59,7 +59,7 @@ impl FsExt {
 	}
 
 	/// Async: remove a directory and all its contents
-	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
+	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult<()> {
 		let path = path.as_ref();
 		tokio::fs::remove_dir_all(path)
@@ -136,7 +136,7 @@ impl FsExt {
 	}
 
 	/// Async version of write: Write a file, ensuring the path exists
-	#[cfg(all(feature = "tokio",not(target_arch="wasm32")))]
+	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 	pub async fn write_async(
 		path: impl AsRef<Path>,
 		data: impl AsRef<[u8]>,

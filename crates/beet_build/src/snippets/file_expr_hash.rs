@@ -69,9 +69,10 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(source_file)?;
-		for node in children.iter_descendants(entity)
-		.flat_map(|child| template_roots.iter_descendants_inclusive(child))
-		.flat_map(|en| children.iter_descendants_inclusive(en))
+		for node in children
+			.iter_descendants(entity)
+			.flat_map(|child| template_roots.iter_descendants_inclusive(child))
+			.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
 			// hash snippet file location
 			if let Ok(idx) = snippet_roots.get(node) {

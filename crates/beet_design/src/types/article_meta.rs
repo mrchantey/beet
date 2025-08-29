@@ -22,6 +22,9 @@ pub struct ArticleMeta {
 
 impl ArticleMeta {
 	pub fn sidebar_label(&self) -> Option<&str> {
-		self.sidebar.label.as_deref().or_else(|| self.title.as_deref())
+		self.sidebar
+			.label
+			.as_deref()
+			.or_else(|| self.title.as_deref())
 	}
 }

@@ -117,7 +117,7 @@ impl NonSendArenaMap {
 	pub fn get_mut<H: NonSendHandle>(
 		&self,
 		handle: &H,
-	) -> Option<RefMut<'_,H::ObjectType>> {
+	) -> Option<RefMut<'_, H::ObjectType>> {
 		let objects = self.objects.borrow_mut();
 
 		RefMut::filter_map(objects, |map| {
@@ -171,14 +171,14 @@ pub trait NonSendHandle: Sized {
 	/// Get a reference to the object in the arena
 	/// ## Panics
 	/// Panics if the object has been manually removed.
-	fn get(&self) -> Ref<'_,Self::ObjectType> {
+	fn get(&self) -> Ref<'_, Self::ObjectType> {
 		self.get_arena().get(self).expect(PANIC_MSG)
 	}
 
 	/// Get a mutable reference to the object in the arena
 	/// ## Panics
 	/// Panics if the object has been manually removed.
-	fn get_mut(&self) -> RefMut<'_,Self::ObjectType> {
+	fn get_mut(&self) -> RefMut<'_, Self::ObjectType> {
 		self.get_arena().get_mut(self).expect(PANIC_MSG)
 	}
 

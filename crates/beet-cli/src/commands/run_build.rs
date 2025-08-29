@@ -18,7 +18,6 @@ pub enum RunMode {
 
 
 impl RunBuild {
-
 	#[allow(unused)]
 	pub async fn run(self) -> Result {
 		App::new()

@@ -91,9 +91,7 @@ mod test {
 				</div>
 			})
 			.id();
-		world
-			.run_system_cached(OnSpawnDeferred::flush)
-			.unwrap();
+		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		world.run_system_cached(apply_template_children).unwrap();
 
 		world

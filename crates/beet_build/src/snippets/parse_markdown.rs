@@ -218,11 +218,10 @@ val_string	= "foo"
 
 	#[test]
 	fn code_blocks() {
+		ParseMarkdown::markdown_to_rsx_str("`let foo = bar;`")
+			.xpect()
+			.to_be("<p><code>let foo = bar;</code></p>");
 		ParseMarkdown::markdown_to_rsx_str(
-			"`let foo = bar;`",
-		).xpect()
-		.to_be("<p><code>let foo = bar;</code></p>");
-	ParseMarkdown::markdown_to_rsx_str(
 			r#"
 ```rust
 let foo = bar;

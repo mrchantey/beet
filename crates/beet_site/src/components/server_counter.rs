@@ -7,12 +7,12 @@ pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
 	let onclick = move |_: Trigger<OnClick>| {
-			async_ext::spawn_local(async move {
-				let value = actions::add(get(), 1)
-					.await
-					.expect("ServerCounter: failed to fetch from server");
-				set(value);
-			});
+		async_ext::spawn_local(async move {
+			let value = actions::add(get(), 1)
+				.await
+				.expect("ServerCounter: failed to fetch from server");
+			set(value);
+		});
 	};
 
 	rsx! {

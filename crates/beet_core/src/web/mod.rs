@@ -12,7 +12,7 @@ mod extensions;
 pub use self::extensions::*;
 
 pub mod prelude {
-		pub use super::dom_utils::*;
-		pub use super::extensions::*;
-		pub use super::logging::*;
+	pub use super::dom_utils::*;
+	pub use super::extensions::*;
+	pub use super::logging::*;
 }

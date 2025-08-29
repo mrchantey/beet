@@ -57,7 +57,7 @@ impl<T> Matcher<T> {
 	/// Snapshots are saved using test name so only one snapshot per test is allowed.
 	/// # Panics
 	/// If the snapshot file cannot be read or written.
-	pub fn to_be_snapshot<M>(&self)-> &Self
+	pub fn to_be_snapshot<M>(&self) -> &Self
 	where
 		T: StringComp<M>,
 	{

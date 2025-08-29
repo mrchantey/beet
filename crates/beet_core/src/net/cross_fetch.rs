@@ -192,7 +192,8 @@ mod test_response {
 
 		res.text()
 			.await
-			.unwrap().len()
+			.unwrap()
+			.len()
 			.xpect()
 			.to_be_greater_than(200)
 			.to_be_less_than(1000);

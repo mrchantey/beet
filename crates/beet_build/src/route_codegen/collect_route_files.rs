@@ -65,7 +65,8 @@ pub fn collect_route_files(
 							&& route_file_method.route_info.method
 								== HttpMethod::Get
 						{
-							components.push(quote! {HandlerConditions::is_ssr()})
+							components
+								.push(quote! {HandlerConditions::is_ssr()})
 						}
 					}
 					RouteCollectionCategory::Actions => {

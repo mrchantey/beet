@@ -15,7 +15,7 @@ pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
 					.with_include("/blog*")
 					.with_include("/design*"),
 				expanded_filter: GlobFilter::default().with_include("/docs"),
-			}
+			},
 		)?
 		.children;
 	// let sidebar_nodes = todo!("get route tree");

@@ -11,21 +11,27 @@ pub fn run_chromedriver(config: &TestRunnerConfig) -> Result<Option<Child>> {
 		return Ok(None);
 	}
 	#[cfg(not(feature = "e2e"))]
-{	
-	anyhow::bail!("e2e feature must be enabled for use with the e2e flag, try 'cargo test --features=sweet/e2e -- --e2e'")
-}	
-#[cfg(feature = "e2e")]
-	{std::process::Command::new("nix-shell")
-		.args(&[
-			"-p",
-			"chromium",
-			"chromedriver",
-			"--run",
-			&format!("chromedriver --port={DEFAULT_WEBDRIVER_PORT} --silent"),
-		])
-		.spawn()?
-		.xsome()
-		.xok()}
+	{
+		anyhow::bail!(
+			"e2e feature must be enabled for use with the e2e flag, try 'cargo test --features=sweet/e2e -- --e2e'"
+		)
+	}
+	#[cfg(feature = "e2e")]
+	{
+		std::process::Command::new("nix-shell")
+			.args(&[
+				"-p",
+				"chromium",
+				"chromedriver",
+				"--run",
+				&format!(
+					"chromedriver --port={DEFAULT_WEBDRIVER_PORT} --silent"
+				),
+			])
+			.spawn()?
+			.xsome()
+			.xok()
+	}
 }
 
 /*

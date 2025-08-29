@@ -39,7 +39,7 @@ pub impl Rc<RefCell<App>> {
 			crate::web::loop_forever().await;
 		}
 	}
-	
+
 	#[cfg(all(target_arch = "wasm32", feature = "web"))]
 	fn run_while_mounted(self) {
 		todo!("broken in 12.1?");

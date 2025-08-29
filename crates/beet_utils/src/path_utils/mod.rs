@@ -1,6 +1,6 @@
+pub mod env_ext;
 mod path_ext;
 mod ws_path_buf;
-pub mod env_ext;
 pub use path_ext::*;
 pub use ws_path_buf::*;
 mod fs_error;

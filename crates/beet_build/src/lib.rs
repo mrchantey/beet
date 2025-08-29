@@ -9,7 +9,7 @@
 //!
 //! ## Rsx Snippets
 //!
-//! Load [`RsxSnippets`] for each [`SourceFile`], 
+//! Load [`RsxSnippets`] for each [`SourceFile`],
 //!
 //! ## RouteCodegen
 //!
