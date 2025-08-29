@@ -1,22 +1,18 @@
 use crate::prelude::*;
 use beet::prelude::*;
-use std::sync::Arc;
-
-
-
-
-pub fn get() -> impl Bundle {
-	rsx! { <Inner client:load /> }
-}
-
 
 #[template]
+#[cfg_attr(feature = "server", allow(unused))]
 #[derive(Reflect)]
-pub fn Inner() -> impl Bundle {
+pub fn BucketList(
+	#[field(into)] bucket_name: String,
+	route_prefix: String,
+) -> impl Bundle {
 	let (items, set_items) = signal::<Vec<OnSpawnClone>>(default());
 	let (on_change, reload_items) = signal(());
+	let route_prefix = getter(route_prefix.trim_end_matches("/").to_string());
 	let (err, set_err) = signal::<Option<String>>(None);
-	let (bucket, _) = signal(Bucket::new_local("buckets-demo"));
+	let bucket = getter(Bucket::new_local(bucket_name));
 
 	#[cfg(feature = "client")]
 	effect(move || {
@@ -34,6 +30,7 @@ pub fn Inner() -> impl Bundle {
 							<Item
 								path=path
 								bucket=bucket
+								route_prefix=route_prefix()
 								reload=reload_items
 								set_err=set_err
 							/>
@@ -69,6 +66,7 @@ fn Item(
 	bucket: Getter<Bucket>,
 	set_err: Setter<Option<String>>,
 	reload: Setter<()>,
+	route_prefix: String,
 ) -> impl Bundle {
 	let (path, _) = signal(path);
 	let remove = move || {
@@ -82,8 +80,8 @@ fn Item(
 		});
 	};
 
-	let route =
-		routes::docs::interactivity::buckets::bucket_id(&path().to_string());
+	let route = format!("{route_prefix}{}", path());
+	// routes::docs::interactivity::buckets::bucket_id(&.to_string());
 
 	rsx! {
 		<tr>

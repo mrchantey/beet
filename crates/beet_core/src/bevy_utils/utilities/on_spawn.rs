@@ -54,6 +54,11 @@ impl OnSpawnBoxed {
 			entity.insert(bundle);
 		})
 	}
+	pub fn insert_resource(resource: impl Resource) -> Self {
+		Self::new(move |entity| {
+			entity.world_scope(move |world| world.insert_resource(resource));
+		})
+	}
 }
 
 impl BundleEffect for OnSpawnBoxed {

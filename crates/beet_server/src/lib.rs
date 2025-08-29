@@ -8,10 +8,12 @@ mod handlers;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
 mod object_storage;
+mod templates;
 
 pub mod prelude {
 	pub use crate::handlers::*;
 	pub use crate::object_storage::*;
+	pub use crate::templates::*;
 
 	pub use http::StatusCode;
 

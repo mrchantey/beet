@@ -5,14 +5,12 @@
 #![doc = include_str!("../README.md")]
 /// Color theme and utilities
 pub mod color;
-pub mod templates;
 pub mod css;
 pub mod html_elements;
-/// Collection of interactive components
-pub mod interactive;
 /// Collection of layout components
 pub mod layout;
 pub mod macros;
+pub mod templates;
 /// Structs for use as context in components
 pub mod types;
 // /// Collection of mockups for all components
@@ -25,15 +23,14 @@ pub mod mockups;
 /// Commonly used components for beet_design
 pub mod prelude {
 	pub use crate::color::*;
-	pub use crate::templates::*;
 	pub use crate::css::*;
 	pub use crate::csx;
 	pub use crate::html_elements::*;
-	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	pub use crate::macros::*;
 	#[cfg(feature = "mockups")]
 	pub use crate::mockups::*;
+	pub use crate::templates::*;
 	pub use crate::types::*;
 	// pub(crate) use beet_rsx::as_beet::*;
 	#[allow(unused)]
@@ -44,7 +41,6 @@ pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_core::prelude::*;
 			pub use beet_rsx::prelude::*;
-			#[cfg(not(target_arch = "wasm32"))]
 			pub use beet_server::prelude::*;
 			pub use beet_utils::prelude::*;
 			#[allow(unused)]

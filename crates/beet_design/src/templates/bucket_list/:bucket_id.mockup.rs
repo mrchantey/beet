@@ -1,8 +1,4 @@
-use beet::prelude::*;
-use std::sync::Arc;
-
-use crate::prelude::routes;
-
+use crate::prelude::*;
 
 pub fn get(paths: Res<DynSegmentMap>) -> impl use<> + Bundle {
 	let bucket_id =
@@ -26,7 +22,6 @@ pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 			match bucket().get(&bucket_id()).await {
 				Ok(data) => {
 					let data = String::from_utf8_lossy(&data).to_string();
-					beet::log!("got data: {data}");
 					set_data(Some(data))
 				}
 				Err(err) => set_err(Some(err.to_string())),
@@ -45,7 +40,8 @@ pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 		}
 	});
 
-	let all_items = routes::docs::interactivity::buckets::index();
+	let all_items = "/docs/design/templates/bucket_list";
+	// let all_items = routes::docs::interactivity::buckets::index();
 
 	rsx! {
 		<div>

@@ -2,6 +2,11 @@ use crate::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+
+/// Convenience function for creating a getter for ergonomics
+pub fn getter<T: 'static + Send + Clone>(value: T) -> Getter<T> {
+	signal(value).0
+}
 /// Very simple implementation of signals used for testing and demos
 pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
 	let signal = Signal::new(value);
