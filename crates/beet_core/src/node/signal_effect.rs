@@ -67,6 +67,7 @@ impl_primitive!(
 	String,
 	&'static str,
 	std::borrow::Cow<'_, str>,
+	bool,
 	i8,
 	i16,
 	i32,

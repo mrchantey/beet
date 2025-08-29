@@ -16,7 +16,7 @@ pub struct BaseHtmlAttributes {
 pub struct ButtonHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
-	pub disabled: Option<bool>,
+	pub disabled: Option<DerivedGetter<bool>>,
 }
 
 
@@ -32,7 +32,7 @@ pub struct AnchorHtmlAttributes {
 pub struct InputHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
-	pub disabled: Option<bool>,
+	pub disabled: Option<DerivedGetter<bool>>,
 	pub required: Option<bool>,
 	pub value: Option<DerivedGetter<String>>,
 }

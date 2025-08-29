@@ -3,10 +3,10 @@ use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
-use std::str::FromStr;
-use std::time::Duration;
 use clap::Subcommand;
 use dotenv::dotenv;
+use std::str::FromStr;
+use std::time::Duration;
 
 
 /// Entrypoint for a beet launch sequence.
@@ -52,7 +52,7 @@ impl LaunchRunner {
 			launch_cmd.into()
 		} else if self.only.is_empty() {
 			LaunchCmd::Run.into()
-		}else{			
+		} else {
 			BuildFlags::new(self.only)
 		};
 		app.insert_resource(flags);
@@ -122,7 +122,7 @@ impl LaunchCmd {
 				BuildFlag::ExportSnippets,
 			],
 			Self::Codegen => vec![
-				BuildFlag::ImportSnippets, 
+				BuildFlag::ImportSnippets,
 				BuildFlag::Codegen
 			],
 			Self::Serve => vec![
@@ -265,6 +265,3 @@ impl FromStr for BuildFlag {
 		}
 	}
 }
-
-
-
