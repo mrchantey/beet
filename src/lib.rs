@@ -3,10 +3,10 @@
 #![doc = include_str!("../README.md")]
 mod beet_plugins;
 
+#[cfg(feature = "connect")]
+pub use beet_agent as agent;
 #[cfg(feature = "build")]
 pub use beet_build as build;
-#[cfg(feature = "connect")]
-pub use beet_connect as connect;
 pub use beet_core as core;
 #[cfg(feature = "design")]
 pub use beet_design as design;

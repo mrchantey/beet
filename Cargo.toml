@@ -61,7 +61,7 @@ members = [
 	"crates/beet_spatial",
 
 	## 💡 RSX
-	"crates/beet_connect",
+	"crates/beet_agent",
 	"crates/beet_design",
 	"crates/beet_query",
 	"crates/beet_query/macros",
@@ -96,7 +96,7 @@ beet_design = { path = "crates/beet_design", version = "0.0.7-dev.5" }
 beet_server = { path = "crates/beet_server", version = "0.0.7-dev.5" }
 beet_query = { path = "crates/beet_query", version = "0.0.7-dev.5" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.5" }
-beet_connect = { path = "crates/beet_connect", version = "0.0.7-dev.5" }
+beet_agent = { path = "crates/beet_agent", version = "0.0.7-dev.5" }
 
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.5" }
 beet_flow = { path = "crates/beet_flow", version = "0.0.7-dev.5" }
@@ -253,7 +253,7 @@ rustls-tls = ["beet_core/rustls-tls", "beet_server/rustls-tls"]
 serde = ["beet_utils/serde"]
 nightly = ["beet_core/nightly", "beet_utils/nightly"]
 rand = ["beet_utils/rand", "beet_core/rand"]
-connect = ["dep:beet_connect"]
+connect = ["dep:beet_agent"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
@@ -307,7 +307,7 @@ beet_parse = { workspace = true, optional = true }
 beet_server = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
-beet_connect = { workspace = true, optional = true }
+beet_agent = { workspace = true, optional = true }
 # beet_query = { workspace = true, optional = true }
 
 #💡 flow

@@ -9,7 +9,6 @@ Various client library wrappers for external apis.
 
 OpenAI provides bindings for the Open API spec, they can be generated for rust with the following:
 
-
 ```sh
 # Download the 1MB yaml file
 curl -o openapi.yaml https://raw.githubusercontent.com/openai/openai-openapi/refs/heads/master/openapi.yaml

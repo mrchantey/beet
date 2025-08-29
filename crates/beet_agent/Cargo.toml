@@ -1,5 +1,5 @@
 [package]
-name = "beet_connect"
+name = "beet_agent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
