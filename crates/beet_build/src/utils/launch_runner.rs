@@ -34,18 +34,18 @@ pub struct LaunchRunner {
 	pub(crate) config_overrides: ConfigOverrides,
 	#[clap(flatten)]
 	pub(crate) lambda_config: LambdaConfig,
-	/// 🦀 the commands that will be used to build the binary 🦀
-	#[clap(flatten)]
-	pub(crate) build_cmd: CargoBuildCmd,
+	#[arg(short, long)]
+	pub package: Option<String>,
+	// /// 🦀 the commands that will be used to build the binary 🦀
+	// #[clap(flatten)]
+	// pub(crate) build_cmd: CargoBuildCmd,
 }
 
 fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 
 
 impl LaunchRunner {
-	pub fn runner(app: App) -> AppExit {
-		Self::parse().run(app)
-	}
+	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
 	pub fn run(self, mut app: App) -> AppExit {
 		dotenv().ok();
 		PrettyTracing::default().init();
@@ -58,7 +58,9 @@ impl LaunchRunner {
 			BuildFlags::new(self.only)
 		};
 		app.insert_resource(flags);
-		app.insert_resource(self.build_cmd);
+		let mut build_cmd = CargoBuildCmd::default();
+		build_cmd.package = self.package;
+		app.insert_resource(build_cmd);
 		app.insert_resource(self.lambda_config);
 
 		let result = match self.watch {
