@@ -312,11 +312,14 @@ mod test {
 	#[test]
 	#[should_panic = "The instance is missing an ExprIdx.."]
 	fn instance_missing_idx() {
-		parse(rsx! {
-			<div>
-				<br />
-			</div>
-		}, rsx! { <div>{7}</div> });
+		parse(
+			rsx! {
+				<div>
+					<br />
+				</div>
+			},
+			rsx! { <div>{7}</div> },
+		);
 	}
 
 
@@ -362,24 +365,26 @@ mod test {
 	}
 	#[test]
 	fn attribute_values() {
-		parse(
-			rsx! { <main key=7 /> },
-			rsx! {
-				<div>
-					<span key=()></span>
-					<br />
-				</div>
-			},
-		)
+		let val1 = 1;
+		let val2 = 7;
+		parse(rsx! { <main key=val2 /> }, rsx! {
+			<div>
+				<span key=val1></span>
+				<br />
+			</div>
+		})
 		.xpect()
 		.to_be("<div><span key=\"7\"></span><br/></div>");
 	}
 	#[test]
 	fn events() {
 		// didnt panic
-		parse(rsx! { <main onclick=|| {} /> }, rsx! { <main oninput=|| {} /> })
-			.xpect()
-			.to_be("<main oninput/>");
+		parse(
+			rsx! { <main onclick=|| {} /> },
+			rsx! { <main oninput=|| {} /> },
+		)
+		.xpect()
+		.to_be("<main oninput/>");
 	}
 
 	#[test]
@@ -388,23 +393,24 @@ mod test {
 		struct Foo {
 			key: u32,
 		}
-		parse(
-			rsx! { <main {Foo { key: 9 }} /> },
-			rsx! {
-				<div>
-					<span {()}></span>
-					<br />
-				</div>
-			},
-		)
+		parse(rsx! { <main {Foo { key: 9 }} /> }, rsx! {
+			<div>
+				<span {()}></span>
+				<br />
+			</div>
+		})
 		.xpect()
 		.to_be("<div><span key=\"9\"></span><br/></div>");
 	}
 	#[test]
-	fn root() { parse(rsx! { {7} }, rsx! {
-		hello
-		{()}
-	}).xpect().to_be("hello7"); }
+	fn root() {
+		parse(rsx! { {7} }, rsx! {
+			hello
+			{()}
+		})
+		.xpect()
+		.to_be("hello7");
+	}
 
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
@@ -464,8 +470,10 @@ mod test {
 		let parent_idx =
 			SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
-		let child_instance = rsx! { <div>pasta is <MyTemplate initial=3 /></div> };
-		let child_static = rsx! { <div>pizza is <MyTemplate initial=4 /></div> };
+		let child_instance =
+			rsx! { <div>pasta is <MyTemplate initial=3 /></div> };
+		let child_static =
+			rsx! { <div>pizza is <MyTemplate initial=4 /></div> };
 
 
 		let child = world.spawn(child_instance).insert(child_idx.clone()).id();
@@ -578,8 +586,8 @@ mod test {
 		}
 
 		parse_instance(rsx! { <MyTemplate /> })
-		.xpect()
-		.to_be_str("<div/>");
+			.xpect()
+			.to_be_str("<div/>");
 	}
 	#[test]
 	fn flush_on_spawn_attribute_blocks() {
@@ -596,7 +604,7 @@ mod test {
 		}
 
 		parse_instance(rsx! { <MyTemplate class="foo" /> })
-		.xpect()
-		.to_be_str("<div class=\"foo\"/>");
+			.xpect()
+			.to_be_str("<div class=\"foo\"/>");
 	}
 }

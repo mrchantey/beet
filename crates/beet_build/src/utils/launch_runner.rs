@@ -43,7 +43,9 @@ fn parse_flags(s: &str) -> Result<BuildFlag, String> { BuildFlag::from_str(s) }
 
 
 impl LaunchRunner {
-	pub fn runner(app: App) -> AppExit { Self::parse().run(app) }
+	pub fn runner(app: App) -> AppExit {
+		Self::parse().run(app)
+	}
 	pub fn run(self, mut app: App) -> AppExit {
 		dotenv().ok();
 		PrettyTracing::default().init();

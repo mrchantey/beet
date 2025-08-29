@@ -7,6 +7,7 @@ use std::process::Command;
 
 
 /// Deploy to AWS Lambda in release mode.
+// TODO infra as entities
 #[derive(Debug, Default, Clone, Parser, Resource)]
 pub struct LambdaConfig {
 	/// A list of environment variables to pass to the lambda function

@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 
-/// An async function that accelts and returns an owned [`World`], to be run
+/// An async function that accepts and returns an owned [`World`], to be run
 /// by the [`AsyncActionSet`].
 ///
 #[derive(Clone, Component)]
