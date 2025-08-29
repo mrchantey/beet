@@ -50,11 +50,13 @@ use crate::prelude::*;
 
 mod route_codegen;
 mod snippets;
+// mod templates;
 mod utils;
 
 pub mod prelude {
 	pub use crate::route_codegen::*;
 	pub use crate::snippets::*;
+	// pub use crate::templates::*;
 	pub use crate::utils::*;
 }
 pub mod exports {
