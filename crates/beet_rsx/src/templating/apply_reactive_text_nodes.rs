@@ -50,18 +50,14 @@ mod test {
 
 	#[test]
 	fn ignores_static() {
-		HtmlDocument::parse_bundle(rsx! {
-			<div>hello {"world"}</div>
-		})
+		HtmlDocument::parse_bundle(rsx! { <div>hello {"world"}</div> })
 		.xpect()
 		.to_be_str("<!DOCTYPE html><html><head></head><body><div>hello world</div></body></html>");
 	}
 	#[test]
 	fn simple() {
 		let (get, _set) = signal("world".to_string());
-		HtmlDocument::parse_bundle(rsx! {
-		<div>hello {get}</div>
-	})
+		HtmlDocument::parse_bundle(rsx! { <div>hello {get}</div> })
 	.xpect()
 	.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">hello <!--bt|1-->world<!--/bt--></div></body></html>");
 	}
@@ -69,7 +65,8 @@ mod test {
 	fn Adjective() -> impl Bundle {
 		let (get, _set) = signal("and".to_string());
 		rsx! {
-			"lazy "{get}
+			"lazy "
+			{get}
 			<slot />
 		}
 	}

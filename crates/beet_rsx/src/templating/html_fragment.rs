@@ -154,7 +154,7 @@ mod test {
 
 	#[test]
 	fn doctype() {
-		rsx! {<!doctype/>}
+		rsx! { <!DOCTYPE /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!DOCTYPE html>");
@@ -163,7 +163,7 @@ mod test {
 	#[test]
 	fn comment() {
 		// comment (in rstml must be quoted)
-		rsx! {<!-- "howdy" -->}
+		rsx! { <!-- "howdy" --> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!--howdy-->");
@@ -171,7 +171,7 @@ mod test {
 
 	#[test]
 	fn raw_text() {
-		rsx! {howdy}
+		rsx! { howdy }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
@@ -179,7 +179,7 @@ mod test {
 
 	#[test]
 	fn quoted_text() {
-		rsx! {"howdy"}
+		rsx! { "howdy" }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
@@ -187,7 +187,7 @@ mod test {
 
 	#[test]
 	fn fragment() {
-		rsx! {<>"howdy"</>}
+		rsx! { <>"howdy"</> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
@@ -195,7 +195,7 @@ mod test {
 
 	#[test]
 	fn block() {
-		rsx! {{"howdy"}}
+		rsx! { {"howdy"} }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
@@ -203,7 +203,7 @@ mod test {
 
 	#[test]
 	fn self_closing_tag() {
-		rsx! {<br/>}
+		rsx! { <br /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<br/>");
@@ -211,7 +211,7 @@ mod test {
 
 	#[test]
 	fn not_self_closing_tag() {
-		rsx! {<span>hello</span>}
+		rsx! { <span>hello</span> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span>hello</span>");
@@ -219,7 +219,11 @@ mod test {
 
 	#[test]
 	fn child_elements() {
-		rsx! {<span><span>hello</span></span>}
+		rsx! {
+			<span>
+				<span>hello</span>
+			</span>
+		}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span><span>hello</span></span>");
@@ -227,7 +231,7 @@ mod test {
 
 	#[test]
 	fn simple_attribute() {
-		rsx! {<div class="container"></div>}
+		rsx! { <div class="container"></div> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\"></div>");
@@ -235,7 +239,7 @@ mod test {
 
 	#[test]
 	fn multiple_attributes() {
-		rsx! {<div class="container" id="main"></div>}
+		rsx! { <div class="container" id="main"></div> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\" id=\"main\"></div>");
@@ -243,7 +247,7 @@ mod test {
 
 	#[test]
 	fn boolean_attribute() {
-		rsx! {<input disabled/>}
+		rsx! { <input disabled /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<input disabled/>");
@@ -251,7 +255,7 @@ mod test {
 
 	#[test]
 	fn attribute_in_self_closing_tag() {
-		rsx! {<img src="/image.jpg"/>}
+		rsx! { <img src="/image.jpg" /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<img src=\"/image.jpg\"/>");
@@ -259,7 +263,11 @@ mod test {
 
 	#[test]
 	fn complex_nested_with_attributes() {
-		rsx! {<div class="wrapper"><span id="text">content</span></div>}
+		rsx! {
+			<div class="wrapper">
+				<span id="text">content</span>
+			</div>
+		}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
@@ -270,7 +278,7 @@ mod test {
 	#[test]
 	fn expr_attributes() {
 		let val = true;
-		rsx! {<input hidden=val/>}
+		rsx! { <input hidden=val /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<input hidden=\"true\"/>");
@@ -279,13 +287,17 @@ mod test {
 	#[template]
 	#[derive(Reflect)]
 	fn Template() -> impl Bundle {
-		rsx! {<div class="container"><span>hello</span></div>}
+		rsx! {
+			<div class="container">
+				<span>hello</span>
+			</div>
+		}
 	}
 	#[test]
 	fn templates() {
 		rsx! {
 			"outer"
-			<Template/>
+			<Template />
 		}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
@@ -295,7 +307,7 @@ mod test {
 	fn client_islands() {
 		rsx! {
 			"outer"
-			<Template client:load/>
+			<Template client:load />
 		}
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
@@ -303,7 +315,7 @@ mod test {
 	}
 	#[test]
 	fn events() {
-		rsx! {<div onclick={||{}}/>}
+		rsx! { <div onclick=|| {} /> }
 			.xmap(HtmlDocument::parse_bundle)
 			.xpect()
 			.to_contain(
@@ -313,11 +325,12 @@ mod test {
 	#[test]
 	fn iterators() {
 		rsx! {
-			<div>{vec![
-				rsx! {<span>foo</span>},
-				rsx! {<span>bar</span>},
-				rsx! {<span>baz</span>},
-					]}
+			<div>
+				{vec![
+					rsx! { <span>foo</span> },
+					rsx! { <span>bar</span> },
+					rsx! { <span>baz</span> },
+				]}
 			</div>
 		}
 		.xmap(HtmlFragment::parse_bundle)
@@ -327,7 +340,7 @@ mod test {
 	#[test]
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
-		rsx! {<div>{get}</div>}
+		rsx! { <div>{get}</div> }
 			.xmap(HtmlDocument::parse_bundle).xpect()
 		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
 	}
@@ -344,7 +357,7 @@ mod test {
 	#[cfg(not(feature = "client"))]
 	fn style_src() {
 		HtmlFragment::parse_bundle(
-			rsx! {<style src="../../tests/test_file.css"/>},
+			rsx! { <style src="../../tests/test_file.css" /> },
 		)
 		.xpect()
 		.to_be_snapshot();
@@ -355,7 +368,7 @@ mod test {
 	#[test]
 	fn script() {
 		HtmlFragment::parse_bundle(
-			rsx! {<script type="pizza">let foo = "bar"</script>},
+			rsx! { <script type="pizza">let foo = "bar"</script> },
 		)
 		.xpect()
 		.to_be_str("<script type=\"pizza\">let foo = \"bar\"</script>");
@@ -363,7 +376,7 @@ mod test {
 	#[test]
 	fn code() {
 		HtmlFragment::parse_bundle(
-			rsx! {<code lang="js">let foo = "bar"</code>},
+			rsx! { <code lang="js">let foo = "bar"</code> },
 		)
 		.xpect()
 		.to_be_snapshot();

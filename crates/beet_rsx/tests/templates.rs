@@ -9,9 +9,9 @@ use sweet::prelude::*;
 fn hello() {
 	#[template]
 	fn Hello(name: String, r#type: String) -> impl Bundle {
-		rsx! {<div>hello {name}</div>}
+		rsx! { <div>hello {name}</div> }
 	}
-	rsx! {<Hello name="bill" type="foo"/>}
+	rsx! { <Hello name="bill" type="foo" /> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<div>hello bill</div>");
@@ -20,9 +20,9 @@ fn hello() {
 fn entity_id() {
 	#[template]
 	fn EntityId(entity: Entity) -> impl Bundle {
-		rsx! {<div>hello {entity.to_string()}</div>}
+		rsx! { <div>hello {entity.to_string()}</div> }
 	}
-	rsx! {<EntityId />}
+	rsx! { <EntityId /> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<div>hello 4v1</div>");
@@ -33,9 +33,13 @@ fn entity_id() {
 fn result() {
 	#[template]
 	fn ReturnsResult() -> Result<impl Bundle> {
-		rsx! {<div><slot/></div>}.xok()
+		rsx! {
+			<div>
+				<slot />
+			</div>
+		}.xok()
 	}
-	rsx! {<ReturnsResult>howdy</ReturnsResult>}
+	rsx! { <ReturnsResult>howdy</ReturnsResult> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<div>howdy</div>");

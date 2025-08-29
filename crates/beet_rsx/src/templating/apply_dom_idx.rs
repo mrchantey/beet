@@ -143,10 +143,8 @@ mod test {
 		let (get, _set) = signal(2);
 		let div = world
 			.spawn((HtmlDocument, rsx! {
-				<div onclick=||{}>
-					"child 1"
-					<span>"child with signal"{get}</span>
-					"child 2"
+				<div onclick=|| {}>
+					"child 1" <span>"child with signal"{get}</span> "child 2"
 				</div>
 			}))
 			.get::<Children>()

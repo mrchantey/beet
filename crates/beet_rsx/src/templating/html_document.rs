@@ -226,7 +226,7 @@ mod test {
 
 	#[test]
 	fn text() {
-		HtmlDocument::parse_bundle(rsx! {hello world})
+		HtmlDocument::parse_bundle(rsx! { hello world })
 			.xpect()
 			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body>hello world</body></html>",
@@ -234,13 +234,16 @@ mod test {
 	}
 	#[test]
 	fn elements() {
-		HtmlDocument::parse_bundle(rsx! {<br/>}).xpect().to_be_str(
+		HtmlDocument::parse_bundle(rsx! { <br /> }).xpect().to_be_str(
 			"<!DOCTYPE html><html><head></head><body><br/></body></html>",
 		);
 	}
 	#[test]
 	fn fragment() {
-		HtmlDocument::parse_bundle(rsx! {<br/><br/>})
+		HtmlDocument::parse_bundle(rsx! {
+			<br />
+			<br />
+		})
 			.xpect()
 			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
@@ -254,7 +257,12 @@ mod test {
 	}
 	#[test]
 	fn ignores_incomplete() {
-		HtmlDocument::parse_bundle(rsx! {<head><br/></head><br/>})
+		HtmlDocument::parse_bundle(rsx! {
+			<head>
+				<br />
+			</head>
+			<br />
+		})
 			.xpect()
 			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body><head><br/></head><br/></body></html>",
@@ -265,7 +273,14 @@ mod test {
 	#[should_panic(expected = "Invalid HTML document: no body tag found")]
 	fn partial() {
 		HtmlDocument::parse_bundle(
-			rsx! {<!DOCTYPE html><html><head><br/></head></html>},
+			rsx! {
+				<!DOCTYPE html>
+				<html>
+					<head>
+						<br />
+					</head>
+				</html>
+			},
 		)
 		.xpect()
 		.to_be_str(
@@ -276,20 +291,30 @@ mod test {
 	#[test]
 	#[cfg(feature = "css")]
 	fn hoist_style_tag() {
-		HtmlDocument::parse_bundle(rsx! {<style>foo{}</style>})
+		HtmlDocument::parse_bundle(rsx! { <style>foo{}</style> })
 			.xpect()
 			.to_be_snapshot();
 	}
 	#[test]
 	fn hoist_script_tag() {
-		HtmlDocument::parse_bundle(rsx! {<script></script><br/>})
+		HtmlDocument::parse_bundle(rsx! {
+			<script></script>
+			<br />
+		})
 			.xpect()
 			.to_be_snapshot();
 	}
 	#[test]
 	fn hoist_top_tag() {
 		HtmlDocument::parse_bundle(
-			rsx! {<script/><!DOCTYPE html><html><head></head><body></body></html>},
+			rsx! {
+				<script />
+				<!DOCTYPE html>
+				<html>
+					<head></head>
+					<body></body>
+				</html>
+			},
 		)
 		.xpect()
 		.to_be_str(
@@ -299,7 +324,18 @@ mod test {
 	#[test]
 	fn hoist_directive() {
 		HtmlDocument::parse_bundle(
-		rsx! {<!DOCTYPE html><html><head><br hoist:body/></head><body><span hoist:head/><script hoist:none/></body></html>},
+		rsx! {
+			<!DOCTYPE html>
+			<html>
+				<head>
+					<br hoist:body />
+				</head>
+				<body>
+					<span hoist:head />
+					<script hoist:none />
+				</body>
+			</html>
+		},
 	)
 	.xpect()
 	.to_be_str(

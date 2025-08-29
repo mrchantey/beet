@@ -12,9 +12,7 @@ pub fn article_layout_middleware() -> impl Bundle {
 				.single(world)
 				.unwrap(/*checked in handler conditions*/);
 
-			world.spawn((HtmlDocument, rsx! {
-				<ArticleLayout>{entity}</ArticleLayout>
-			}));
+			world.spawn((HtmlDocument, rsx! { <ArticleLayout>{entity}</ArticleLayout> }));
 		}),
 	)
 }
@@ -30,8 +28,7 @@ pub fn ArticleLayout(query: Query<&ArticleMeta>) -> impl Bundle {
 	let meta = ArticleMeta::default();
 	rsx! {
 		<BeetSidebarLayout>
-			{meta.title.map(|title|rsx!{<h1>{title}</h1>})}
-			<slot/>
+			{meta.title.map(|title| rsx! { <h1>{title}</h1> })} <slot />
 		</BeetSidebarLayout>
 	}
 }

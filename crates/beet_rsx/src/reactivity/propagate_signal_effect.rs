@@ -116,7 +116,7 @@ mod test {
 		let (get, set) = signal(5u32);
 		let div = app
 			.world_mut()
-			.spawn(rsx! {<div>{get}</div>})
+			.spawn(rsx! { <div>{get}</div> })
 			.get::<Children>()
 			.unwrap()[0];
 		let text = app.world().entity(div).get::<Children>().unwrap()[0];
@@ -152,7 +152,7 @@ mod test {
 		let (get, set) = signal("foo");
 		let div = app
 			.world_mut()
-			.spawn(rsx! {<div class={get}/>})
+			.spawn(rsx! { <div class=get /> })
 			.get::<Children>()
 			.unwrap()[0];
 		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
@@ -188,7 +188,7 @@ mod test {
 
 		#[template]
 		fn Bar(#[field(flatten)] foo: Foo) -> impl Bundle {
-			rsx! { <div {foo}/> }
+			rsx! { <div {foo} /> }
 		}
 
 		let mut app = App::new();
@@ -196,7 +196,7 @@ mod test {
 		let (get, set) = signal("foo".to_string());
 		let template = app
 			.world_mut()
-			.spawn(rsx! {<Bar class={get}/>})
+			.spawn(rsx! { <Bar class=get /> })
 			.get::<Children>()
 			.unwrap()[0];
 		app.update();

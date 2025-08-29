@@ -137,7 +137,10 @@ mod test {
 
 	#[template]
 	fn MyTemplate() -> impl Bundle {
-		rsx! {<div/><slot/>}
+		rsx! {
+			<div />
+			<slot />
+		}
 	}
 
 	fn replace_hash() -> impl Bundle {
@@ -148,7 +151,10 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		HtmlDocument::parse_bundle(rsx! {<style {replace_hash()}/><span/>})
+		HtmlDocument::parse_bundle(rsx! {
+			<style {replace_hash()} />
+			<span />
+		})
 			.xpect()
 			.to_be_snapshot();
 	}
@@ -167,9 +173,9 @@ mod test {
 	fn deduplicates() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {replace_hash()}/>
-			<style {replace_hash()}/>
-			<style {replace_hash()}/>
+				<style {replace_hash()} />
+				<style {replace_hash()} />
+				<style {replace_hash()} />
 			</div>
 		})
 		.xpect()
@@ -179,8 +185,8 @@ mod test {
 	fn assigns_id_to_all() {
 		HtmlDocument::parse_bundle(rsx! {
 			<div>
-			<style {replace_hash()}/>
-			<span/>
+				<style {replace_hash()} />
+				<span />
 			</div>
 		})
 		.xpect()
@@ -189,8 +195,8 @@ mod test {
 	#[test]
 	fn ignores_templates() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {replace_hash()}/>
-			<MyTemplate/>
+			<style {replace_hash()} />
+			<MyTemplate />
 		})
 		.xpect()
 		.to_be_snapshot();
@@ -209,9 +215,9 @@ mod test {
 	#[test]
 	fn applies_to_slots() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {replace_hash()}/>
+			<style {replace_hash()} />
 			<MyTemplate>
-				<span/>
+				<span />
 			</MyTemplate>
 		})
 		.xpect()
@@ -219,12 +225,10 @@ mod test {
 	}
 	#[test]
 	fn expressions() {
-		let foo = rsx! {
-			<div/>
-		};
+		let foo = rsx! { <div /> };
 
 		HtmlDocument::parse_bundle(rsx! {
-			<style {replace_hash()}/>
+			<style {replace_hash()} />
 			{foo}
 		})
 		.xpect()
@@ -234,8 +238,8 @@ mod test {
 	#[test]
 	fn cascades() {
 		HtmlDocument::parse_bundle(rsx! {
-			<style {replace_hash()}/>
-			<MyTemplate style:cascade/>
+			<style {replace_hash()} />
+			<MyTemplate style:cascade />
 		})
 		.xpect()
 		.to_be_snapshot();
@@ -251,9 +255,7 @@ mod test {
 			}
 		}
 
-		HtmlDocument::parse_bundle(rsx! {
-			<StyledTemplate/>
-		})
+		HtmlDocument::parse_bundle(rsx! { <StyledTemplate /> })
 		.xpect()
 		.to_be_snapshot();
 	}
@@ -273,7 +275,7 @@ mod test {
 			"}
 		}
 
-		HtmlDocument::parse_bundle(rsx! {<Style/>})
+		HtmlDocument::parse_bundle(rsx! { <Style /> })
 			.xpect()
 			.to_be_snapshot();
 	}

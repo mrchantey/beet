@@ -50,9 +50,9 @@ pub fn Form(
 
 	rsx! {
 		<form {attrs} onsubmit=onsubmit>
-			<slot/>
+			<slot />
 		</form>
-		<style src="form.css"/>
+		<style src="form.css" />
 	}
 }
 

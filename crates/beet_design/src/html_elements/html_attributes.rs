@@ -91,15 +91,11 @@ mod test {
 	fn Button(
 		#[field(flatten = BaseHtmlAttributes)] attrs: ButtonHtmlAttributes,
 	) -> impl Bundle {
-		rsx! {<button {attrs}/>}
+		rsx! { <button {attrs} /> }
 	}
 	#[test]
 	fn renders() {
-		rsx! { <Button
-			disabled=true
-			id="foo"
-			onclick=|_| {} />
-		}
+		rsx! { <Button disabled=true id="foo" onclick=|_| {} /> }
 			.xmap(HtmlDocument::parse_bundle)
 			.xpect()
 			.to_contain(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-dom-idx="0"/>"#);

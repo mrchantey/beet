@@ -16,7 +16,7 @@ fn reactivity() {
 	app.add_plugins(ApplySnippetsPlugin);
 	let world = app.world_mut();
 	let button = world
-		.spawn(rsx! {<button onclick=move|ev|set(ev.value())>click me</button>})
+		.spawn(rsx! { <button onclick=move |ev| set(ev.value())>click me</button> })
 		.get::<Children>()
 		.unwrap()[0];
 	world.run_schedule(ApplySnippets);
@@ -30,7 +30,7 @@ fn reactivity() {
 #[test]
 fn inner_text() {
 	let code = "let foo = {bar};";
-	rsx! {<code inner:text=code />}
+	rsx! { <code inner:text=code /> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<code>let foo = {bar};</code>");
@@ -47,7 +47,7 @@ fn r#ref() {
 	app.add_plugins(ApplySnippetsPlugin);
 	let world = app.world_mut();
 	let div = world
-		.spawn(rsx! {<div ref=set/>})
+		.spawn(rsx! { <div ref=set /> })
 		.get::<Children>()
 		.unwrap()[0];
 	get().xpect().to_be(Entity::PLACEHOLDER);

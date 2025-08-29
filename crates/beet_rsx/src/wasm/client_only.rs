@@ -65,9 +65,7 @@ mod test {
 	}
 
 	fn setup(mut commands: Commands) {
-		commands.spawn(rsx! {
-			<Counter client:only initial=7/>
-		});
+		commands.spawn(rsx! { <Counter client:only initial=7 /> });
 	}
 
 	#[template]
@@ -76,8 +74,8 @@ mod test {
 		let (get, set) = signal(initial);
 
 		rsx! {
-				<p>Count: {get}</p>
-				<button onclick={move ||set(get()+1)}>Increment</button>
+			<p>Count: {get}</p>
+			<button onclick=move || set(get() + 1)>Increment</button>
 		}
 	}
 }

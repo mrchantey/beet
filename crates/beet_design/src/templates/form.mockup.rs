@@ -5,9 +5,7 @@ use bevy::reflect::DynamicStruct;
 
 
 pub fn get() -> impl Bundle {
-	rsx! {
-		<Inner client:load/>
-	}
+	rsx! { <Inner client:load /> }
 }
 
 
@@ -28,22 +26,24 @@ pub fn Inner() -> impl Bundle {
 
 	rsx! {
 		<article>
-		<Form onsubmit_dyn=onsubmit>
-			<TextField name="name"/>
-			<Button type="submit">Submit</Button>
-			<div>
-			{move||{
-				match get(){
-				Some(val)=>{
-					rsx!{hello {val.name}}.any_bundle()
-				}
-				None=>{
-					rsx!{Please submit the form}.any_bundle()
-				}
-				}
-			}}
-			</div>
-		</Form>
+			<Form onsubmit_dyn=onsubmit>
+				<TextField name="name" />
+				<Button type="submit">Submit</Button>
+				<div>
+					{move || {
+						match get() {
+							Some(val) => {
+								rsx! {
+									hello
+									{val.name}
+								}
+									.any_bundle()
+							}
+							None => rsx! { Please submit the form }.any_bundle(),
+						}
+					}}
+				</div>
+			</Form>
 		</article>
 	}
 }

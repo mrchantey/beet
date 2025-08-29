@@ -57,7 +57,7 @@ mod test {
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {
-		rsx! {<div>hello world!</div> }
+		rsx! { <div>hello world!</div> }
 	}
 
 
@@ -65,9 +65,7 @@ mod test {
 	fn works_no_children() {
 		let mut world = World::new();
 		let root = world
-			.spawn(rsx! {
-				<div/>
-			})
+			.spawn(rsx! { <div /> })
 			.id();
 		world.run_system_cached(apply_template_children).unwrap();
 		world

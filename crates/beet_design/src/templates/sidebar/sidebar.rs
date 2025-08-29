@@ -269,9 +269,7 @@ mod test {
 			expanded: true,
 		}];
 
-		rsx! {
-			<Sidebar nodes=nodes />
-		}
+		rsx! { <Sidebar nodes=nodes /> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_contain("Partying");

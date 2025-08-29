@@ -16,10 +16,9 @@ pub fn ServerCounter(initial: i32) -> impl Bundle {
 
 	rsx! {
 		<div>
-			<Button
-				variant=ButtonVariant::Outlined
-				onclick=onclick>
-				Server Cookie Count: {get}
+			<Button variant=ButtonVariant::Outlined onclick=onclick>
+				Server Cookie Count:
+				{get}
 			</Button>
 		</div>
 	}

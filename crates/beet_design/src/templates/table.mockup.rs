@@ -12,23 +12,28 @@ pub fn get() -> impl Bundle {
 
 
 	rsx! {
-		 <Table>
-			 <tr slot="head">
-				 <th>Name</th>
-				 <th>Age</th>
-				 <th>Occupation</th>
-				 <th></th>
-			 </tr>
-			 {users.iter().map(|(name, age, occupation)| {
-				 rsx! {
-					<tr>
-						 <td>{name}</td>
-						 <td>{age}</td>
-						 <td>{occupation}</td>
-						 <td><Button>View Profile</Button></td>
-					</tr>
-				 }
-			 }).collect::<Vec<_>>()}
-		 </Table>
+		<Table>
+			<tr slot="head">
+				<th>Name</th>
+				<th>Age</th>
+				<th>Occupation</th>
+				<th></th>
+			</tr>
+			{users
+				.iter()
+				.map(|(name, age, occupation)| {
+					rsx! {
+						<tr>
+							<td>{name}</td>
+							<td>{age}</td>
+							<td>{occupation}</td>
+							<td>
+								<Button>View Profile</Button>
+							</td>
+						</tr>
+					}
+				})
+				.collect::<Vec<_>>()}
+		</Table>
 	}
 }

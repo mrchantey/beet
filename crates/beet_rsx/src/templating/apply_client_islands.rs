@@ -128,9 +128,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(ApplyDirectivesPlugin::default());
 
-		parse(&mut app, rsx! {
-			<MyTemplate foo=3 client:only />
-		})
+		parse(&mut app, rsx! { <MyTemplate foo=3 client:only /> })
 		.unwrap()
 		.xpect()
 		.to_be_snapshot();

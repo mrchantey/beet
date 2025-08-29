@@ -43,17 +43,13 @@ pub fn BucketList(
 	});
 
 	rsx! {
-		<ErrorText value={err}/>
+		<ErrorText value=err />
 		<Table>
-		<tr slot="head">
-			<td></td>
-			<td></td>
-		</tr>
-			<NewItem
-				bucket=bucket
-				set_err=set_err
-				reload=reload_items
-				/>
+			<tr slot="head">
+				<td></td>
+				<td></td>
+			</tr>
+			<NewItem bucket=bucket set_err=set_err reload=reload_items />
 			{items}
 		</Table>
 	}
@@ -134,12 +130,12 @@ fn NewItem(
 			<td>
 				<TextField
 					autofocus
-					value={name}
-					onchange=move |ev|{set_name(ev.value())}
-						/>
+					value=name
+					onchange=move |ev| { set_name(ev.value()) }
+				/>
 			</td>
 			<td>
-				<Button onclick=move|| on_add()>Create</Button>
+				<Button onclick=move || on_add()>Create</Button>
 			</td>
 		</tr>
 	}

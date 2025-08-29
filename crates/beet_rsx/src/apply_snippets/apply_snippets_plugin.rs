@@ -279,15 +279,15 @@ mod test {
 		let mut world = world();
 
 		let child = world
-			.spawn(rsx! {<div/>})
+			.spawn(rsx! { <div /> })
 			.insert(SnippetRoot::default())
 			.id();
-		let parent = world.spawn(rsx! {<main></main>}).id();
+		let parent = world.spawn(rsx! { <main></main> }).id();
 		let main = world.entity(parent).get::<Children>().unwrap()[0];
 		world.entity_mut(main).add_child(child);
 
 		let _snippet = world
-			.spawn((rsx! {<span/>}, StaticRoot))
+			.spawn((rsx! { <span /> }, StaticRoot))
 			.remove::<InstanceRoot>()
 			.insert(SnippetRoot::default())
 			.id();
@@ -303,21 +303,34 @@ mod test {
 	#[test]
 	#[should_panic = "Not all ExprIdx were applied.."]
 	fn rsx_snippet_missing_idx() {
-		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
+		parse(rsx! { <div>{7}</div> }, rsx! {
+			<div>
+				<br />
+			</div>
+		});
 	}
 	#[test]
 	#[should_panic = "The instance is missing an ExprIdx.."]
 	fn instance_missing_idx() {
-		parse(rsx! {<div><br/></div>}, rsx! {<div>{7}</div>});
+		parse(rsx! {
+			<div>
+				<br />
+			</div>
+		}, rsx! { <div>{7}</div> });
 	}
 
 
 	#[test]
 	fn block_nodes() {
 		parse(
-			rsx! {<main>{7}</main>},
+			rsx! { <main>{7}</main> },
 			// because ExprIdx matches, this should be replace with 7
-			rsx! {<div><span>{()}</span><br/></div>},
+			rsx! {
+				<div>
+					<span>{()}</span>
+					<br />
+				</div>
+			},
 		)
 		.xpect()
 		.to_be("<div><span>7</span><br/></div>");
@@ -335,9 +348,14 @@ mod test {
 	#[test]
 	fn iterators() {
 		parse(
-			rsx! {<main>{vec!["a","b","c"]}</main>},
+			rsx! { <main>{vec!["a", "b", "c"]}</main> },
 			// because ExprIdx matches, this should be replace with 7
-			rsx! {<div><span>{()}</span><br/></div>},
+			rsx! {
+				<div>
+					<span>{()}</span>
+					<br />
+				</div>
+			},
 		)
 		.xpect()
 		.to_be("<div><span>abc</span><br/></div>");
@@ -345,8 +363,13 @@ mod test {
 	#[test]
 	fn attribute_values() {
 		parse(
-			rsx! {<main key={7}/>},
-			rsx! {<div><span key={()}></span><br/></div>},
+			rsx! { <main key=7 /> },
+			rsx! {
+				<div>
+					<span key=()></span>
+					<br />
+				</div>
+			},
 		)
 		.xpect()
 		.to_be("<div><span key=\"7\"></span><br/></div>");
@@ -354,7 +377,7 @@ mod test {
 	#[test]
 	fn events() {
 		// didnt panic
-		parse(rsx! {<main onclick={||{}}/>}, rsx! {<main oninput={||{}}/>})
+		parse(rsx! { <main onclick=|| {} /> }, rsx! { <main oninput=|| {} /> })
 			.xpect()
 			.to_be("<main oninput/>");
 	}
@@ -366,18 +389,26 @@ mod test {
 			key: u32,
 		}
 		parse(
-			rsx! {<main {Foo{key:9}}/>},
-			rsx! {<div><span {()}></span><br/></div>},
+			rsx! { <main {Foo { key: 9 }} /> },
+			rsx! {
+				<div>
+					<span {()}></span>
+					<br />
+				</div>
+			},
 		)
 		.xpect()
 		.to_be("<div><span key=\"9\"></span><br/></div>");
 	}
 	#[test]
-	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }
+	fn root() { parse(rsx! { {7} }, rsx! {
+		hello
+		{()}
+	}).xpect().to_be("hello7"); }
 
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
-		rsx! {{initial}}
+		rsx! { {initial} }
 	}
 	#[template]
 	fn SomeOtherName() -> impl Bundle { () }
@@ -385,10 +416,14 @@ mod test {
 	#[test]
 	fn template_simple() {
 		parse(
-			rsx! {<MyTemplate initial=3/>},
+			rsx! { <MyTemplate initial=3 /> },
 			// the name doesnt matter, a <SomeTitleCase/> is treated the same as
 			// any other block {}
-			rsx! {<span><SomeOtherName/></span>},
+			rsx! {
+				<span>
+					<SomeOtherName />
+				</span>
+			},
 		)
 		.xpect()
 		.to_be("<span>3</span>");
@@ -399,7 +434,7 @@ mod test {
 		parse(
 			// attributes are resolved here, there is only one ExprIdx
 			// in this tree
-			rsx! {<MyTemplate initial=val/>},
+			rsx! { <MyTemplate initial=val /> },
 			// this is something like the static/tokens representation
 			// of a template, ie attributes have not been resolved yet,
 			// this test ensures we dont try to resolve them
@@ -429,12 +464,8 @@ mod test {
 		let parent_idx =
 			SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
-		let child_instance = rsx! {
-			<div>pasta is <MyTemplate initial=3/></div>
-		};
-		let child_static = rsx! {
-			<div>pizza is <MyTemplate initial=4/></div>
-		};
+		let child_instance = rsx! { <div>pasta is <MyTemplate initial=3 /></div> };
+		let child_static = rsx! { <div>pizza is <MyTemplate initial=4 /></div> };
 
 
 		let child = world.spawn(child_instance).insert(child_idx.clone()).id();
@@ -543,12 +574,10 @@ mod test {
 	fn flush_on_spawn_templates() {
 		#[template]
 		fn MyTemplate() -> impl Bundle {
-			rsx! {<div/>}
+			rsx! { <div /> }
 		}
 
-		parse_instance(rsx! {
-			<MyTemplate/>
-		})
+		parse_instance(rsx! { <MyTemplate /> })
 		.xpect()
 		.to_be_str("<div/>");
 	}
@@ -563,12 +592,10 @@ mod test {
 		fn MyTemplate(
 			#[field(flatten)] attrs: MyAttributeBlock,
 		) -> impl Bundle {
-			rsx! {<div {attrs}/>}
+			rsx! { <div {attrs} /> }
 		}
 
-		parse_instance(rsx! {
-			<MyTemplate class="foo"/>
-		})
+		parse_instance(rsx! { <MyTemplate class="foo" /> })
 		.xpect()
 		.to_be_str("<div class=\"foo\"/>");
 	}

@@ -203,7 +203,7 @@ mod test {
 		app.add_plugins(ApplySnippetsPlugin);
 		let world = app.world_mut();
 		let ent = world
-			.spawn(rsx! { <button onclick=move|ev| set(ev.value()) /> })
+			.spawn(rsx! { <button onclick=move |ev| set(ev.value()) /> })
 			.get::<Children>()
 			.unwrap()[0];
 		world.run_schedule(ApplySnippets);

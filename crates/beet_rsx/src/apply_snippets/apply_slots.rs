@@ -177,7 +177,7 @@ mod test {
 	fn Span() -> impl Bundle {
 		rsx! {
 			<span>
-			<slot />
+				<slot />
 			</span>
 		}
 	}
@@ -250,10 +250,10 @@ mod test {
 		#[template]
 		fn Layout() -> impl Bundle {
 			rsx! {
-			<Header>
-			<slot name="header" slot="default" />
-			</Header>
-				}
+				<Header>
+					<slot name="header" slot="default" />
+				</Header>
+			}
 		}
 
 		#[template]

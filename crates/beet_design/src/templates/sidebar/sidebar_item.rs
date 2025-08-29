@@ -45,7 +45,7 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 		rsx! {
 			// {group}
 			<details class="bm-c-sidebar__sublist" data-always-expand=expanded>
-			// open is handled in js
+				// open is handled in js
 				<summary>{item}</summary>
 				<ul class=class>{children}</ul>
 			</details>
