@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "client"), allow(unused))]
 use crate::prelude::*;
 
 pub fn get(paths: Res<DynSegmentMap>) -> impl use<> + Bundle {

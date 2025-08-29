@@ -5,12 +5,12 @@ use beet::prelude::*;
 #[allow(unused_imports)]
 use crate as test_site;
 #[path = "index.rs"]
-pub mod route0;
+pub mod _index;
 #[cfg(feature = "server")]
 pub fn test_docs_routes() -> impl Bundle {
     children![
         (CacheStrategy::Static, PathFilter { segments : RouteSegments::_from_raw(vec![],
-        true) }, HttpMethod::Get, bundle_endpoint(route0::get),
+        true) }, HttpMethod::Get, bundle_endpoint(_index::get),
         HandlerConditions::is_ssr())
     ]
 }

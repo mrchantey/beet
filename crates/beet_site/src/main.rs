@@ -26,11 +26,11 @@ fn main() {
 fn client_plugin(app: &mut App) {
 	app
 		.register_type::<ClientIslandRoot<beet_design::templates::BucketList>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route11::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route4::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route9::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route6::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::route8::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_text_field_mockup::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_bucket_list_bucket_id_mockup::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_select_mockup::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_button_mockup::Inner>>()
+		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_form_mockup::Inner>>()
 		.register_type::<ClientIslandRoot<ClientCounter>>()
 		.register_type::<ClientIslandRoot<ServerCounter>>();
 }

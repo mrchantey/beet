@@ -1,8 +1,8 @@
+#![cfg_attr(not(feature = "client"), allow(unused))]
 use crate::prelude::*;
 use beet::prelude::*;
 
 #[template]
-#[cfg_attr(feature = "server", allow(unused))]
 #[derive(Reflect)]
 pub fn BucketList(
 	#[field(into)] bucket_name: String,

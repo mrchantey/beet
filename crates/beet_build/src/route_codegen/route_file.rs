@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::RoutePath;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use std::path::PathBuf;
@@ -19,8 +18,6 @@ use syn::parse_quote;
 /// - `foo.rsx`: 0 or more
 #[derive(Debug, Component)]
 pub struct RouteSourceFile {
-	/// The index of the file in the group, used for generating unique identifiers.
-	pub index: usize,
 	/// The local path to the rust file containing the routes.
 	/// By default this is the [`SourceFile`] relative to the
 	/// [`CodegenFile::output_dir`] but may be modified with `bypass_change_detection`,
@@ -38,7 +35,8 @@ pub struct RouteSourceFile {
 impl RouteSourceFile {
 	/// The identifier for the module import in the generated code.
 	pub fn mod_ident(&self) -> syn::Ident {
-		Ident::new(&format!("route{}", self.index), Span::call_site())
+		let path = path_to_ident(&self.route_path.to_string_lossy());
+		Ident::new(&path, Span::call_site())
 	}
 	/// The module import for the generated code.
 	/// For Actions this will only export in non-wasm builds
@@ -62,22 +60,6 @@ impl RouteSourceFile {
 	}
 }
 
-#[derive(Default, Resource)]
-pub(super) struct CollectionIndexCounter(HashMap<Entity, usize>);
-
-impl CollectionIndexCounter {
-	/// Get the next index for the given collection entity,
-	/// incrementing the counter for the next call.
-	pub fn next(&mut self, entity: Entity) -> usize {
-		let index = self.0.entry(entity).or_default();
-		let current_index = *index;
-		*index += 1;
-		current_index
-	}
-}
-
-
-
 /// Reset every [`CodegenFile`] ancestor of a changed [`FileExprHash`],
 /// includiing both [`RouteFileCollection`] and [`StaticRouteTree`]
 pub fn reset_codegen_files(
@@ -99,13 +81,12 @@ pub fn reset_codegen_files(
 /// Add a [`RouteSourceFile`] to any newly created [`SourceFile`]
 /// that is a child of a [`RouteFileCollection`].
 pub(super) fn create_route_files(
-	mut index_counter: Local<CollectionIndexCounter>,
 	mut commands: Commands,
 	query: Populated<
 		(Entity, &SourceFile),
 		(Added<SourceFile>, Without<RouteSourceFile>),
 	>,
-	collections: Query<(Entity, &RouteFileCollection, &CodegenFile)>,
+	collections: Query<(&RouteFileCollection, &CodegenFile)>,
 	parents: Query<&ChildOf>,
 ) -> Result {
 	// sort the items so the index is stable
@@ -113,7 +94,7 @@ pub(super) fn create_route_files(
 	items.sort_by_key(|(_, file)| (*file).clone());
 
 	for (entity, file) in items.into_iter() {
-		let Some((collection_entity, collection, codegen)) = parents
+		let Some((collection, codegen)) = parents
 			.iter_ancestors(entity)
 			.find_map(|en| collections.get(en).ok())
 		else {
@@ -129,13 +110,9 @@ pub(super) fn create_route_files(
 		let source_file_collection_rel =
 			PathExt::create_relative(&collection.src, &file)?;
 
-
-		let index = index_counter.next(collection_entity);
-
 		debug!("Creating new RouteSourceFile: {}", file.path());
 
 		commands.entity(entity).insert(RouteSourceFile {
-			index,
 			source_file_collection_rel,
 			mod_path,
 			route_path,
@@ -144,13 +121,44 @@ pub(super) fn create_route_files(
 	Ok(())
 }
 
+fn path_to_ident(path: &str) -> String {
+	let mut ident = String::new();
+	let mut chars = path.chars();
 
+	// Handle first character
+	if let Some(first) = chars.next() {
+		if first.is_ascii_alphabetic() || first == '_' {
+			ident.push(first);
+		} else {
+			ident.push('_');
+			if first.is_ascii_digit() {
+				ident.push(first);
+			}
+		}
+	}
+
+	for ch in chars {
+		if ch.is_ascii_alphanumeric() || ch == '_' {
+			ident.push(ch);
+		} else {
+			ident.push('_');
+		}
+	}
+	if ident.is_empty() {
+		"index".to_string()
+	} else if ident == "_" {
+		"_index".to_string()
+	} else {
+		ident.replace("__", "_")
+	}
+}
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
+	use quote::ToTokens;
 	use std::ops::Deref;
 	use std::path::PathBuf;
 	use sweet::prelude::*;
@@ -186,5 +194,11 @@ mod test {
 			.deref()
 			.xpect()
 			.to_be(&PathBuf::from("/docs"));
+
+		route_file
+			.item_mod(RouteCollectionCategory::Pages)
+			.to_token_stream()
+			.xpect()
+			.to_be_snapshot();
 	}
 }
