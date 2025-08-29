@@ -43,8 +43,6 @@ pub fn BucketList(
 	});
 
 	rsx! {
-		<h1>Buckets</h1>
-		<p>This example uses local storage to manage a list of items</p>
 		<ErrorText value={err}/>
 		<Table>
 		<tr slot="head">

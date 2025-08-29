@@ -14,6 +14,8 @@ publish = true
 
 [features]
 default = ["axum", "reload"]
+# for conditional compilation in hooks
+client = []
 # wip: axum features behind this flag
 axum = ["tokio", "dep:axum", "dep:tower", "dep:tower-http", "beet_core/axum"]
 tokio = ["dep:tokio", "serde"]

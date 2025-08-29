@@ -241,6 +241,7 @@ client = [
 	"net",
 	"serde",
 	"beet_server",
+	"beet_server/client",
 	"beet_design/client",
 ]
 

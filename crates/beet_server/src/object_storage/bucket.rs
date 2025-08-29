@@ -45,6 +45,10 @@ impl Bucket {
 		Self::new(provider, name)
 	}
 
+	/// Create a [`BucketItem`] for interactively working with a bucket item
+	pub fn item(&self, path: RoutePath) -> BucketItem {
+		BucketItem::new(self.clone(), path)
+	}
 
 	/// Get the name of the bucket, ie `my-bucket`
 	pub fn name(&self) -> &str { &self.name }
