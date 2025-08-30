@@ -16,3 +16,7 @@ pub use local_storage_provider::*;
 pub use s3_provider::*;
 #[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 mod s3_provider;
+#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+pub use dynamo_provider::*;
+#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+mod dynamo_provider;
