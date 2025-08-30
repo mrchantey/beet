@@ -13,14 +13,15 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-
+rustls-tls = ["beet_core/rustls-tls"]
+native-tls = ["beet_core/native-tls"]
 
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
 dotenv.workspace = true
-beet_core = { workspace = true, features = ["bevy", "net", "native-tls"] }
+beet_core = { workspace = true, features = ["bevy", "net"] }
 beet_utils.workspace = true
 serde.workspace = true
 base64.workspace = true
@@ -31,3 +32,12 @@ http.workspace = true
 [dev-dependencies]
 tokio.workspace = true
 sweet.workspace = true
+
+[[test]]
+name = "chat"
+path = "tests/chat.rs"
+required-features = ["native-tls"]
+[[test]]
+name = "image"
+path = "tests/image.rs"
+required-features = ["native-tls"]
