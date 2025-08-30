@@ -8,11 +8,11 @@ mod handlers;
 mod http_utils;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
-mod net;
 mod object_storage;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod server;
 mod templates;
+mod transport;
 
 pub mod prelude {
 	pub use crate::handlers::*;
@@ -37,6 +37,7 @@ pub mod prelude {
 		pub use beet_rsx::prelude::*;
 		pub use beet_utils::prelude::*;
 	}
+	pub use bevy::tasks::futures_lite::StreamExt;
 }
 
 

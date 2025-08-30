@@ -3,7 +3,7 @@
 #![doc = include_str!("../README.md")]
 mod beet_plugins;
 
-#[cfg(feature = "connect")]
+#[cfg(feature = "agent")]
 pub use beet_agent as agent;
 #[cfg(feature = "build")]
 pub use beet_build as build;
@@ -33,11 +33,11 @@ pub use beet_utils::elog;
 pub use beet_utils::log;
 pub use beet_utils::noop;
 pub mod prelude {
+	#[cfg(feature = "agent")]
+	pub use crate::agent::prelude::*;
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
-	#[cfg(feature = "connect")]
-	pub use crate::connect::prelude::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;

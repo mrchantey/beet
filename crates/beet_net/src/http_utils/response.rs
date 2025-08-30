@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
+use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
 use futures::Stream;
-use futures::StreamExt;
 use http::StatusCode;
 use http::response;
 use send_wrapper::SendWrapper;
@@ -28,6 +28,27 @@ pub struct Response {
 pub enum Body {
 	Bytes(Bytes),
 	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
+}
+
+impl Stream for Body {
+	type Item = Result<Bytes>;
+
+	fn poll_next(
+		mut self: Pin<&mut Self>,
+		cx: &mut std::task::Context<'_>,
+	) -> std::task::Poll<Option<Self::Item>> {
+		match &mut *self {
+			Body::Bytes(bytes) => {
+				if !bytes.is_empty() {
+					let taken = std::mem::take(bytes);
+					std::task::Poll::Ready(Some(Ok(taken)))
+				} else {
+					std::task::Poll::Ready(None)
+				}
+			}
+			Body::Stream(stream) => Pin::new(stream).poll_next(cx),
+		}
+	}
 }
 
 impl Into<Body> for Bytes {

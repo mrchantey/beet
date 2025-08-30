@@ -1352,6 +1352,7 @@ dependencies = [
  "bytes",
  "clap",
  "crc-fast",
+ "eventsource-stream",
  "extend",
  "futures",
  "html-escape",
@@ -1410,7 +1411,7 @@ name = "beet_query"
 version = "0.0.7-dev.5"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_core",
  "beet_net",
  "beet_query_macros",
@@ -4077,6 +4078,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "eventsource-stream"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74fef4569247a5f429d9156b9d0a2599914385dd189c539334c625d8099d90ab"
+dependencies = [
+ "futures-core",
+ "nom",
  "pin-project-lite",
 ]
 
