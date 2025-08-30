@@ -112,6 +112,7 @@ impl BucketProvider for S3Provider {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
+			// Only empty buckets can be deleted
 			// List all objects in the bucket and delete them
 			let mut continuation_token = None;
 			loop {
