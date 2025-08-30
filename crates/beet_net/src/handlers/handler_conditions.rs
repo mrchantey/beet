@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use std::pin::Pin;
 use std::sync::Arc;
 
 /// A collection of predicates that must pass for a [`RouteHandler`] to run.
@@ -10,7 +9,7 @@ pub struct HandlerConditions(Vec<Arc<Predicate>>);
 type Predicate = dyn 'static
 	+ Send
 	+ Sync
-	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = (World, bool)> + Send>>;
+	+ Fn(World, Entity) -> SendBoxedFuture<(World, bool)>;
 
 
 impl HandlerConditions {

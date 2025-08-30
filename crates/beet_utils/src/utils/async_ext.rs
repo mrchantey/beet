@@ -1,8 +1,11 @@
 use crate::utils::CrossInstant;
+use std::pin::Pin;
 use std::time::Duration;
 
 pub use futures::future::try_join_all;
 
+/// A 'static + Send, making it suitable for use-cases like tokio::spawn
+pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 
 /// Retries a function until it returns Ok or the timeout is reached.
 pub async fn retry<T, E>(

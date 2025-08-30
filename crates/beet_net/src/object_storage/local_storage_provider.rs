@@ -3,8 +3,6 @@ use base64::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use js_sys::wasm_bindgen::JsCast;
-use std::future::Future;
-use std::pin::Pin;
 
 /// A bucket provider backed by browser localStorage.
 #[derive(Debug, Clone)]
@@ -40,7 +38,7 @@ impl BucketProvider for LocalStorageProvider {
 	fn bucket_exists(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -58,7 +56,7 @@ impl BucketProvider for LocalStorageProvider {
 	fn bucket_create(
 		&self,
 		_bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		// No-op for localStorage
 		Box::pin(async { Ok(()) })
 	}
@@ -66,7 +64,7 @@ impl BucketProvider for LocalStorageProvider {
 	fn bucket_remove(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -86,7 +84,7 @@ impl BucketProvider for LocalStorageProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let key = Self::storage_key(bucket_name, path);
 		let value = BASE64_STANDARD.encode(body);
 		Box::pin(async move {
@@ -99,7 +97,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let key = Self::storage_key(bucket_name, path);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -111,7 +109,7 @@ impl BucketProvider for LocalStorageProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
 	{
 		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
@@ -128,7 +126,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<Bytes>> {
 		let key = Self::storage_key(bucket_name, path);
 		Box::pin(async move {
 			let value = Self::local_storage().get_item(&key).map_jserr()?;
@@ -146,7 +144,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let key = Self::storage_key(bucket_name, path);
 		let this = self.clone();
 		let bucket_name = bucket_name.to_string();
@@ -169,7 +167,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Option<String>>>
 	{
 		Box::pin(async move { Ok(None) })
 	}

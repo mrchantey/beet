@@ -11,7 +11,7 @@ impl Response {
 	}
 }
 
-
+#[cfg(feature = "native-tls")]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

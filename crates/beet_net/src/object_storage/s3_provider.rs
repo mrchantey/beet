@@ -8,8 +8,6 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::bevybail;
 use bevy::prelude::*;
 use bytes::Bytes;
-use std::future::Future;
-use std::pin::Pin;
 
 pub fn s3_bucket() -> impl Bundle {
 	AsyncAction::new(async move |mut world, entity| {
@@ -62,7 +60,7 @@ impl BucketProvider for S3Provider {
 	fn bucket_exists(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -83,7 +81,7 @@ impl BucketProvider for S3Provider {
 	fn bucket_create(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -108,7 +106,7 @@ impl BucketProvider for S3Provider {
 	fn bucket_remove(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -166,7 +164,7 @@ impl BucketProvider for S3Provider {
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
@@ -186,7 +184,7 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
@@ -212,7 +210,7 @@ impl BucketProvider for S3Provider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
 	{
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
@@ -251,7 +249,7 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<Bytes>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
@@ -273,7 +271,7 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let this = self.clone();
 		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
@@ -301,7 +299,7 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Option<String>>>
 	{
 		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
 		let bucket_name = bucket_name.to_string();

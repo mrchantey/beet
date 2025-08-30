@@ -3,7 +3,6 @@ use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 /// An asynchronous route handler, accepting and returning a [`World`].
@@ -26,10 +25,8 @@ fn collect_route_segments(mut world: DeferredWorld, cx: HookContext) {
 }
 
 
-type RouteHandlerFunc = dyn 'static
-	+ Send
-	+ Sync
-	+ Fn(World, Entity) -> Pin<Box<dyn Future<Output = World> + Send>>;
+type RouteHandlerFunc =
+	dyn 'static + Send + Sync + Fn(World, Entity) -> SendBoxedFuture<World>;
 
 
 pub fn no_request_err<T>() -> HttpError {

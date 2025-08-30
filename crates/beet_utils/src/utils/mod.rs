@@ -1,6 +1,7 @@
 pub mod async_ext;
 mod clone_func;
 mod pipeline;
+pub use async_ext::SendBoxedFuture;
 pub use clone_func::*;
 pub use pipeline::*;
 pub use tree::*;

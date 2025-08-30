@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
-use std::pin::Pin;
 
 /// Cross-service storage bucket representation
 #[derive(Component)]
@@ -147,25 +146,25 @@ pub trait BucketProvider: 'static + Send + Sync {
 	fn bucket_exists(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<bool>>;
 	/// Create the bucket
 	fn bucket_create(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<()>>;
 	/// Remove the bucket
 	/// ## Caution
 	/// This operation is potentially very destructive, use with care!
 	fn bucket_remove(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<()>>;
 
 	/// Ensure the bucket exists, creating it if necessary
 	fn bucket_try_create(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let exists_fut = self.bucket_exists(bucket_name);
 		let create_fut = self.bucket_create(bucket_name);
 		Box::pin(async move {
@@ -182,30 +181,30 @@ pub trait BucketProvider: 'static + Send + Sync {
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<()>>;
 	/// List all items in the bucket
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>;
 	/// Get an object from the bucket
 	fn get(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<Bytes>>;
 	/// Check if an object exists in the bucket
 	fn exists(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<bool>>;
 	/// Delete an object from the bucket
 	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<()>>;
 	/// Get the public URL of an object in the bucket. For example:
 	/// - fs `file:///data/buckets/my-bucket/key`
 	/// - s3 `https://my-bucket.s3.us-west-2.amazonaws.com/key`
@@ -213,7 +212,7 @@ pub trait BucketProvider: 'static + Send + Sync {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>;
+	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
 

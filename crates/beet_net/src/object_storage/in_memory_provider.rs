@@ -2,8 +2,6 @@ use crate::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bytes::Bytes;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -37,7 +35,7 @@ impl BucketProvider for InMemoryProvider {
 	fn bucket_exists(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let exists = self.0.read().unwrap().contains_key(bucket_name);
 		Box::pin(async move { Ok(exists) })
 	}
@@ -45,7 +43,7 @@ impl BucketProvider for InMemoryProvider {
 	fn bucket_create(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		self.0
 			.write()
 			.unwrap()
@@ -57,7 +55,7 @@ impl BucketProvider for InMemoryProvider {
 	fn bucket_remove(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		self.0.write().unwrap().remove(bucket_name);
 		Box::pin(async move { Ok(()) })
 	}
@@ -67,7 +65,7 @@ impl BucketProvider for InMemoryProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let mut buckets = self.0.write().unwrap();
 		buckets
 			.entry(bucket_name.to_string())
@@ -82,7 +80,7 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let mut buckets = self.0.write().unwrap();
 		let result = buckets
 			.get_mut(bucket_name)
@@ -95,7 +93,7 @@ impl BucketProvider for InMemoryProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
 	{
 		let mut buckets = self.0.write().unwrap();
 		let result = buckets
@@ -110,7 +108,7 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<Bytes>> {
 		let mut buckets = self.0.write().unwrap();
 		let result = buckets
 			.get_mut(bucket_name)
@@ -130,7 +128,7 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let mut buckets = self.0.write().unwrap();
 		let result = buckets
 			.get_mut(bucket_name)
@@ -149,7 +147,7 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Option<String>>>
 	{
 		Box::pin(async move { Ok(None) })
 	}

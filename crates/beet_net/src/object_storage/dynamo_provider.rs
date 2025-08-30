@@ -7,8 +7,6 @@ use aws_sdk_dynamodb::operation::describe_table::DescribeTableError;
 use beet_core::bevybail;
 use bevy::prelude::*;
 use bytes::Bytes;
-use std::future::Future;
-use std::pin::Pin;
 
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct DynamoDbProvider(pub Client);
@@ -42,7 +40,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn bucket_exists(
 		&self,
 		table_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -74,7 +72,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn bucket_create(
 		&self,
 		table_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -111,7 +109,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn bucket_remove(
 		&self,
 		table_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -125,7 +123,7 @@ impl BucketProvider for DynamoDbProvider {
 		table_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		let key = self.resolve_key(path);
@@ -147,7 +145,7 @@ impl BucketProvider for DynamoDbProvider {
 		&self,
 		table_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		let key = self.resolve_key(path);
@@ -180,7 +178,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn list(
 		&self,
 		table_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
 	{
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
@@ -205,7 +203,7 @@ impl BucketProvider for DynamoDbProvider {
 		&self,
 		table_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<Bytes>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		let key = self.resolve_key(path);
@@ -233,7 +231,7 @@ impl BucketProvider for DynamoDbProvider {
 		&self,
 		table_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		let key = self.resolve_key(path);
@@ -253,7 +251,7 @@ impl BucketProvider for DynamoDbProvider {
 		&self,
 		_table_name: &str,
 		_path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Option<String>>>
 	{
 		Box::pin(async move { Ok(None) })
 	}

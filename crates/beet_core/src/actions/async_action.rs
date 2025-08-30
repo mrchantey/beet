@@ -1,9 +1,8 @@
 use crate::prelude::*;
 // use beet_rsx::prelude::*;
-use beet_utils::utils::PipelineTarget;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 
@@ -24,19 +23,13 @@ impl AsyncAction {
 			Box::pin(func.clone()(world, entity))
 		}))
 	}
-	pub fn run(
-		&self,
-		world: World,
-		entity: Entity,
-	) -> Pin<Box<dyn Send + Future<Output = World>>> {
+	pub fn run(&self, world: World, entity: Entity) -> SendBoxedFuture<World> {
 		(self.0)(world, entity)
 	}
 }
 
-type AsyncActionFunc = dyn 'static
-	+ Send
-	+ Sync
-	+ Fn(World, Entity) -> Pin<Box<dyn Send + Future<Output = World>>>;
+type AsyncActionFunc =
+	dyn 'static + Send + Sync + Fn(World, Entity) -> SendBoxedFuture<World>;
 
 
 /// A set of collected [`AsyncAction`] to be run by the [`AsyncRunner`].

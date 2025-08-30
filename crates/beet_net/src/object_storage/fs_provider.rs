@@ -2,8 +2,6 @@ use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
-use std::pin::Pin;
-
 
 
 #[derive(Debug, Clone)]
@@ -36,7 +34,7 @@ impl BucketProvider for FsBucketProvider {
 	fn bucket_exists(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
 	}
@@ -44,7 +42,7 @@ impl BucketProvider for FsBucketProvider {
 	fn bucket_create(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
 			tokio::fs::create_dir_all(path).await?;
@@ -55,7 +53,7 @@ impl BucketProvider for FsBucketProvider {
 	fn bucket_remove(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
 			FsExt::remove_async(path).await?;
@@ -68,7 +66,7 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			FsExt::write_async(path, body).await?;
@@ -79,7 +77,7 @@ impl BucketProvider for FsBucketProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<RoutePath>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
 	{
 		let bucket_path = self.root.join(bucket_name);
 		Box::pin(async move {
@@ -100,7 +98,7 @@ impl BucketProvider for FsBucketProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
 	}
@@ -109,7 +107,7 @@ impl BucketProvider for FsBucketProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Bytes>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			ReadFile::to_bytes_async(&path)
@@ -123,7 +121,7 @@ impl BucketProvider for FsBucketProvider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> {
+	) -> SendBoxedFuture<Result<()>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
 			tokio::fs::remove_file(path).await?;
@@ -135,7 +133,7 @@ impl BucketProvider for FsBucketProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> Pin<Box<dyn Future<Output = Result<Option<String>>> + Send + 'static>>
+	) -> SendBoxedFuture<Result<Option<String>>>
 	{
 		Box::pin(async move { Ok(None) })
 	}
