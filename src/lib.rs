@@ -22,8 +22,8 @@ pub use beet_parse as parse;
 // pub use beet_query as query;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
-#[cfg(feature = "beet_server")]
-pub use beet_server as server;
+#[cfg(feature = "beet_net")]
+pub use beet_net as server;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
@@ -53,7 +53,7 @@ pub mod prelude {
 	// pub use crate::query::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
-	#[cfg(feature = "beet_server")]
+	#[cfg(feature = "beet_net")]
 	pub use crate::server::prelude::*;
 	#[cfg(feature = "sim")]
 	pub use crate::sim::prelude::*;

@@ -190,8 +190,8 @@ test-rsx *args:
 	cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
-	cargo test -p beet_server						 	 	 																								{{args}} -- {{test-threads}}
-	cargo test -p beet_server 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
+	cargo test -p beet_net						 	 	 																								{{args}} -- {{test-threads}}
+	cargo test -p beet_net 	--lib 	--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
@@ -296,7 +296,7 @@ publish-all *args:
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx        			{{args}} || true
 	just publish beet_build      			{{args}} || true
-	just publish beet_server       		{{args}} || true
+	just publish beet_net       		{{args}} || true
 	just publish beet_design 					{{args}} || true
 	@echo 'Publishing Flow Crates'
 	just publish beet_flow_macros     {{args}} || true

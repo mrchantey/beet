@@ -1,5 +1,5 @@
 [package]
-name = "beet_server"
+name = "beet_net"
 version.workspace = true
 edition.workspace = true
 description = "Serve applications with axum and deploy with cargo-lambda."

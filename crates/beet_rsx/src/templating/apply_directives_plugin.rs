@@ -12,7 +12,7 @@ pub struct ApplyDirectivesPlugin;
 /// A schedule for completely building templates,
 /// this will run before each [`Update`] schedule and can be
 /// executed manually after adding unresolved templates to the world.
-/// (see beet_server bundle_layer.rs for an example)
+/// (see beet_net bundle_layer.rs for an example)
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ApplyDirectives;
 

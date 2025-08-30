@@ -382,7 +382,7 @@ mod test {
 		.await
 		.unwrap()
 		.xpect()
-		.to_contain("<h1>App Info</h1><p>Title: beet_server</p>");
+		.to_contain("<h1>App Info</h1><p>Title: beet_net</p>");
 	}
 
 

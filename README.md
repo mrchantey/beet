@@ -53,7 +53,7 @@ General utilities including a test runner, file watcher etc.
 | Crate                                                             | Status | Description                            |
 | ----------------------------------------------------------------- | ------ | -------------------------------------- |
 | [`beet_bevy`](https://crates.io/crates/beet_bevy)                 | 🐉      | Bevy utilities                         |
-| [`beet_server_utils`](https://crates.io/crates/beet_server_utils) | 🐉      | Simple file server with live reload    |
+| [`beet_net_utils`](https://crates.io/crates/beet_net_utils) | 🐉      | Simple file server with live reload    |
 | [`sweet`](https://crates.io/crates/sweet)                         | 🐣      | A pretty cross platform test runner    |
 | [`sweet-cli`](https://crates.io/crates/sweet-cli)                 | 🐣      | Cross-platform utilities and dev tools |
 

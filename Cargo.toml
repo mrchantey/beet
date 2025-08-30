@@ -67,7 +67,7 @@ members = [
 	"crates/beet_query/macros",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
-	"crates/beet_server",
+	"crates/beet_net",
 
 	## 💡 Sweet
 	"crates/beet_core",
@@ -93,7 +93,7 @@ beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.7-dev.5" }
 beet_rsx = { path = "crates/beet_rsx", version = "0.0.7-dev.5" }
 beet_build = { path = "crates/beet_build", version = "0.0.7-dev.5" }
 beet_design = { path = "crates/beet_design", version = "0.0.7-dev.5" }
-beet_server = { path = "crates/beet_server", version = "0.0.7-dev.5" }
+beet_net = { path = "crates/beet_net", version = "0.0.7-dev.5" }
 beet_query = { path = "crates/beet_query", version = "0.0.7-dev.5" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.5" }
 beet_agent = { path = "crates/beet_agent", version = "0.0.7-dev.5" }
@@ -233,23 +233,23 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow", "nightly"]
 #💡 helper features
 launch = ["build"]
-server = ["beet_server", "design", "net", "serde"]
+server = ["beet_net", "design", "net", "serde"]
 client = [
 	"rsx",
 	"design",
 	"web",
 	"net",
 	"serde",
-	"beet_server",
-	"beet_server/client",
+	"beet_net",
+	"beet_net/client",
 	"beet_design/client",
 ]
 
-beet_server = ["dep:beet_server"]
+beet_net = ["dep:beet_net"]
 
 #💡 fine-grained
 native-tls = ["beet_core/native-tls"]
-rustls-tls = ["beet_core/rustls-tls", "beet_server/rustls-tls"]
+rustls-tls = ["beet_core/rustls-tls", "beet_net/rustls-tls"]
 serde = ["beet_utils/serde"]
 nightly = ["beet_core/nightly", "beet_utils/nightly"]
 rand = ["beet_utils/rand", "beet_core/rand"]
@@ -265,8 +265,8 @@ rsx = ["dep:beet_rsx"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 # 💡 Server
 axum = ["beet_core/axum"]
-lambda = ["beet_server/lambda", "beet_core/rustls-tls"]
-aws = ["beet_server/aws"]
+lambda = ["beet_net/lambda", "beet_core/rustls-tls"]
+aws = ["beet_net/aws"]
 
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
@@ -304,7 +304,7 @@ beet_core.workspace = true
 #💡 rsx
 beet_rsx = { workspace = true, optional = true }
 beet_parse = { workspace = true, optional = true }
-beet_server = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_agent = { workspace = true, optional = true }

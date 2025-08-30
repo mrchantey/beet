@@ -10,7 +10,7 @@ The stack bevyfication continues this harvest, with ecs proving to be the anythi
 
 Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do.
 
-`beet_server` addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque `Request/Response` types.
+`beet_net` addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque `Request/Response` types.
 
 ```rust
 
