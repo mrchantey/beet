@@ -1,8 +1,6 @@
 # Command runners are great for individual projects
 # but as a metaframework these are all signs of painpoints in the workflow
-# arguments should be config files, shell command chains should be beet subcommands etc
-#
-# Anyway for now this is useful, but if you feel like making a change here, consider instead
+# For now this is useful, but if you feel like making a change here, consider instead
 # adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
 #
 # ```rust
@@ -11,9 +9,7 @@
 # just test-ci
 # ```
 #
-set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
-crates := 'beet beet_spatial beet_flow'
 
 # it keeps asking for bigger stacks.. this is 1GB :(
 export RUST_MIN_STACK := '1073741824'
@@ -22,9 +18,6 @@ export RUST_MIN_STACK := '1073741824'
 # min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'
 test-threads:= '--test-threads=8'
-
-
-# max cargo build jobs
 
 default:
 	just --list --unsorted

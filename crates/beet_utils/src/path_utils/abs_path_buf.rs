@@ -24,7 +24,7 @@ macro_rules! abs_file {
 	};
 }
 
-/// A newtype `PathBuf` with several indications:
+/// A newtype `PathBuf` representing an absolute unix file path with several indications:
 /// 1. the path is absolute, ie [`std::path::absolute`] is called
 /// 2. the path is cleaned using [`path_clean`]
 ///

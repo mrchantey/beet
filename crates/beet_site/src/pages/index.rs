@@ -9,7 +9,7 @@ pub fn get() -> impl Bundle {
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
 				<h1>Beet</h1>
-				<p><b>"Bevy Everywhere"</b></p>
+				<p><b>"The Bevy Expansion Pack"</b></p>
 				<Card style:cascade class="hero">
 				<p>"Build applications that grow with Bevy ECS at every layer of the stack."
 				<br/><br/>

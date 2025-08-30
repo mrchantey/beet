@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>An ECS metaframework</strong>
+    <strong>The Bevy Expansion Pack</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
