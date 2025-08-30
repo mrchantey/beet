@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use anyhow::Result;
 use bevy::prelude::*;
 use http::Uri;
@@ -20,6 +20,10 @@ pub struct RoutePath(pub PathBuf);
 impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }
 }
+impl IntoBundle<Self> for RoutePath {
+	fn into_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
+}
+
 
 /// routes shouldnt have os specific paths
 /// so we allow to_string

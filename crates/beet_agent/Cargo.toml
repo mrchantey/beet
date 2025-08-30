@@ -13,15 +13,16 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-rustls-tls = ["beet_core/rustls-tls"]
-native-tls = ["beet_core/native-tls"]
+rustls-tls = ["beet_net/rustls-tls"]
+native-tls = ["beet_net/native-tls"]
 
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
 dotenv.workspace = true
-beet_core = { workspace = true, features = ["bevy", "net"] }
+beet_core = { workspace = true, features = ["bevy"] }
+beet_net.workspace = true
 beet_utils.workspace = true
 serde.workspace = true
 base64.workspace = true

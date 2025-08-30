@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 

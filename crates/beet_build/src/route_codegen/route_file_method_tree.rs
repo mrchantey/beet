@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_utils::prelude::VecExt;
 use beet_utils::utils::Tree;
 use bevy::prelude::*;
@@ -87,7 +87,7 @@ impl RouteFileMethodTree {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

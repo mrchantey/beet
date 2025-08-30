@@ -114,7 +114,6 @@ fn system(world: &mut World) -> Result {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::as_beet::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

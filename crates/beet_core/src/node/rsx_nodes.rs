@@ -93,7 +93,7 @@ pub struct BlockNode;
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[cfg_attr(feature = "bevy_default", require(bevy::prelude::TextSpan))]
+#[cfg_attr(feature = "bevy_text", require(bevy::prelude::TextSpan))]
 pub struct TextNode(pub String);
 impl TextNode {
 	pub fn new(val: impl Into<String>) -> Self { Self(val.into()) }
@@ -114,7 +114,7 @@ impl TextNode {
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[cfg_attr(feature = "bevy_default", require(bevy::prelude::TextSpan))]
+#[cfg_attr(feature = "bevy_text", require(bevy::prelude::TextSpan))]
 #[require(TextNode)]
 pub struct NumberNode(pub f64);
 
@@ -139,7 +139,7 @@ impl NumberNode {
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[cfg_attr(feature = "bevy_default", require(bevy::prelude::TextSpan))]
+#[cfg_attr(feature = "bevy_text", require(bevy::prelude::TextSpan))]
 #[require(TextNode)]
 pub struct BoolNode(pub bool);
 impl BoolNode {

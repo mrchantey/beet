@@ -1,5 +1,5 @@
 #[cfg(feature = "tokens")]
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt;
 

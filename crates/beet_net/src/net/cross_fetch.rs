@@ -7,7 +7,7 @@ impl Request {
 		{
 			super::impl_web_sys::send_wasm(self).await
 		}
-		#[cfg(not(target_arch = "wasm32"))]
+		#[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
 		{
 			super::impl_reqwest::send_reqwest(self).await
 		}
@@ -149,6 +149,7 @@ mod test_request {
 	// fn bad_url_fails() { Request::get("/foobar"); }
 	#[test]
 	#[should_panic]
+	#[cfg(not(target_arch = "wasm32"))] // sweet panic catch broken :(
 	fn invalid_header_fails() {
 		Request::get("http://localhost").with_header("bad\nheader", "val");
 	}

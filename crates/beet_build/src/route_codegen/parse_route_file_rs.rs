@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_utils::prelude::ReadFile;
 use bevy::prelude::*;
 use std::str::FromStr;
@@ -60,7 +60,7 @@ pub fn parse_route_file_rs(
 #[cfg(test)]
 mod test {
 	use super::super::*;
-	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

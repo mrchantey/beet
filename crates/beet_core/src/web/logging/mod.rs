@@ -7,6 +7,3 @@ pub use self::log_filter::*;
 pub mod replace_func;
 #[allow(unused_imports)]
 pub use self::replace_func::*;
-pub mod set_panic_hook;
-#[allow(unused_imports)]
-pub use self::set_panic_hook::*;

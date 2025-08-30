@@ -1,6 +1,5 @@
-use beet_rsx::as_beet::ResultExtDisplay;
-#[allow(unused_imports)]
-use beet_rsx::prelude::*;
+use crate::prelude::*;
+
 use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::RoutePath;
+use beet_net::prelude::RoutePath;
 use beet_utils::prelude::PathExt;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;

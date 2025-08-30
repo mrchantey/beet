@@ -5,13 +5,18 @@ mod app_router;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
 mod handlers;
+mod http_utils;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
+mod net;
 mod object_storage;
+#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
+mod server;
 mod templates;
 
 pub mod prelude {
 	pub use crate::handlers::*;
+	pub use crate::http_utils::*;
 	pub use crate::object_storage::*;
 	pub use crate::templates::*;
 
@@ -22,13 +27,22 @@ pub mod prelude {
 	pub use crate::axum_utils::*;
 	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 	pub use crate::lambda_utils::*;
+	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
+	pub use crate::server::*;
 
 	pub(crate) use internal::*;
 	#[allow(unused_imports)]
 	mod internal {
-		pub use beet_core::prelude::*;
-		pub use beet_rsx::as_beet::*;
+		pub use beet_core::as_beet::*;
 		pub use beet_rsx::prelude::*;
 		pub use beet_utils::prelude::*;
 	}
+}
+
+
+pub mod exports {
+	pub use http;
+	pub use http_body_util;
+	pub use url;
+	pub use url::Url;
 }

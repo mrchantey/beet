@@ -22,32 +22,15 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["bevy", "nightly"]
+default = ["nightly", "bevy"]
 nightly = ["beet_utils/nightly"]
-bevy = ["dep:bevy", "beet_core_macros"]
-bevy_default = ["bevy", "bevy/default"]
+bevy = ["dep:bevy"]
+bevy_text = ["bevy", "bevy/bevy_text"]
 bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
-serde = [
-	"dep:serde",
-	"dep:serde_json",
-	"dep:ron",
-	"dep:clap",
-	"dep:toml",
-	"dep:serde_urlencoded",
-]
+serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
-# TODO merge with net feature
-http = [
-	"dep:http",
-	"dep:http-body-util",
-	"dep:url",
-	"dep:bytes",
-	"dep:mime_guess",
-	"dep:futures",
-]
 # is this nessecary?
 web = [
-	"http",
 	"dep:wasm-bindgen",
 	"dep:wasm-bindgen-futures",
 	"dep:console_error_panic_hook",
@@ -55,23 +38,7 @@ web = [
 	"dep:js-sys",
 ]
 
-axum = [
-	"http",
-	"fs",
-	"dep:axum",
-	"dep:axum-extra",
-	"dep:axum-server",
-	"dep:tower",
-	"dep:tower-http",
-	"dep:tower-livereload",
-	"dep:clap",
-	"dep:glob",
-	"dep:tokio",
-]
 fs = ["beet_utils/fs"]
-net = ["http", "serde", "dep:reqwest", "web"]
-rustls-tls = ["axum-server?/tls-rustls", "reqwest?/rustls-tls"]
-native-tls = ["net", "reqwest?/default"]
 tokens = [
 	"serde",
 	"dep:syn",
@@ -84,7 +51,7 @@ tokens = [
 [dependencies]
 tracing.workspace = true
 beet_utils.workspace = true
-beet_core_macros = { workspace = true, optional = true }
+beet_core_macros.workspace = true
 rapidhash.workspace = true
 send_wrapper.workspace = true
 variadics_please.workspace = true
@@ -92,14 +59,12 @@ variadics_please.workspace = true
 # bevy dependencies (optional)
 bevy = { workspace = true, optional = true }
 
-# net dependencies (optional)
-clap = { workspace = true, optional = true }
+# serde
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
-serde_urlencoded = { version = "0.7", optional = true }
-http-body-util = { workspace = true, optional = true }
 
 # tokens dependencies (optional)
 heck = { workspace = true }
@@ -117,14 +82,6 @@ anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 
-# html utilities (available on all targets)
-html-escape = "0.2"
-futures = { workspace = true, optional = true }
-url = { version = "2", optional = true }
-mime_guess = { version = "2", optional = true }
-http = { workspace = true, optional = true }
-bytes = { workspace = true, optional = true }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # server-specific dependencies (optional)
 glob = { workspace = true, optional = true }
@@ -132,22 +89,9 @@ glob = { workspace = true, optional = true }
 # async (server-specific)
 tokio = { workspace = true, optional = true }
 
-# http (server-specific)
-axum = { workspace = true, optional = true }
-axum-extra = { workspace = true, optional = true }
-axum-server = { workspace = true, optional = true }
-tower = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
-tower-livereload = { workspace = true, optional = true }
-
-# net (native-specific)
-reqwest = { version = "0.12", default-features = false, optional = true, features = ["stream"] }
-
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys = { workspace = true, optional = true }
-
 # web dependencies (WASM only)
+js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }

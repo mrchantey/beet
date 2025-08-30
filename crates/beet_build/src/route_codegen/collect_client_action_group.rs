@@ -137,7 +137,7 @@ mod test {
 	use super::Builder;
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
-	use beet_rsx::as_beet::RouteInfo;
+	use beet_net::prelude::*;
 	use beet_utils::utils::PipelineTarget;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;

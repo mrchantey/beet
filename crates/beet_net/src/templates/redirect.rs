@@ -1,6 +1,5 @@
-use beet_rsx::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
-
 
 #[template]
 pub fn TemporaryRedirect(href: String) -> impl Bundle {

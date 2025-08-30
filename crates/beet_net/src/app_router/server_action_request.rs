@@ -1,11 +1,11 @@
 use crate::prelude::*;
-use beet_core::exports::Url;
-use beet_core::prelude::*;
+
 use bevy::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 use std::sync::Mutex;
+use url::Url;
 
 /// the url for the server.
 /// On native builds this defaults to `http://127.0.0.1:3000`.
@@ -134,12 +134,11 @@ where
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
-	use beet_core::exports::url::Url;
-	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 	use tokio::net::TcpListener;
 	use tokio::task::JoinHandle;
+	use url::Url;
 
 	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
 	fn add_via_post(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }

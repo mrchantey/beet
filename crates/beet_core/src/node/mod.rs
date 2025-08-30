@@ -1,3 +1,5 @@
+//! beet_parse uses a self-tokenizing pattern so need the actual types, for this reason
+//! we put them here, upstream of beet_rsx to resolve beet_parse -> beet_rsx_macros -> beet_rsx
 mod escape_html;
 mod event_observer;
 mod signal_effect;

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
@@ -194,8 +195,8 @@ impl<'a> Parser<'_, '_, 'a> {
 mod test {
 	use super::Parser;
 	use crate::prelude::*;
-	use beet_core::prelude::RouteInfo;
 	use beet_core::prelude::WorldMutExt;
+	use beet_net::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;

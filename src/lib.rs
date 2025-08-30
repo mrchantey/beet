@@ -20,10 +20,10 @@ pub use beet_ml as ml;
 pub use beet_parse as parse;
 // #[cfg(feature = "query")]
 // pub use beet_query as query;
-#[cfg(feature = "rsx")]
-pub use beet_rsx as rsx;
 #[cfg(feature = "beet_net")]
 pub use beet_net as server;
+#[cfg(feature = "rsx")]
+pub use beet_rsx as rsx;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
@@ -81,6 +81,8 @@ pub mod exports {
 	pub use beet_examples::exports::*;
 	#[cfg(feature = "ml")]
 	pub use beet_ml::exports::*;
+	#[cfg(feature = "net")]
+	pub use beet_net::exports::*;
 	#[cfg(feature = "sim")]
 	pub use beet_sim::exports::*;
 	#[cfg(feature = "spatial")]

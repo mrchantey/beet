@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_rsx::as_beet::*;
 use bevy::prelude::*;
 use std::pin::Pin;
 use std::sync::Arc;

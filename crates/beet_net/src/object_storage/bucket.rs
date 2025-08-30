@@ -221,9 +221,7 @@ pub trait BucketProvider: 'static + Send + Sync {
 
 #[cfg(test)]
 pub mod bucket_test {
-	use crate::prelude::Bucket;
-	use crate::prelude::BucketProvider;
-	use beet_rsx::as_beet::RoutePath;
+	use crate::prelude::*;
 	use sweet::prelude::*;
 
 	pub async fn run(provider: impl BucketProvider) {

@@ -22,22 +22,3 @@ pub fn close_on_esc(
 		exit.write(AppExit::Success);
 	}
 }
-
-/// Toggles fullscreen mode when F11 is pressed.
-#[cfg(feature = "bevy_default")]
-pub fn toggle_fullscreen(
-	input: When<Res<ButtonInput<KeyCode>>>,
-	mut windows: Populated<&mut Window>,
-) {
-	use bevy::window::WindowMode;
-	if input.just_pressed(KeyCode::F11) {
-		for mut window in windows.iter_mut() {
-			window.mode = match window.mode {
-				WindowMode::Windowed => {
-					WindowMode::BorderlessFullscreen(MonitorSelection::Current)
-				}
-				_ => WindowMode::Windowed,
-			};
-		}
-	}
-}
