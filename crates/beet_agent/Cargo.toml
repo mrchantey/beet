@@ -17,13 +17,14 @@ rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
 
 [dependencies]
+# rig-core = { version = "0.18" }
 anyhow.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
 dotenv.workspace = true
 beet_core = { workspace = true, features = ["bevy"] }
 beet_net.workspace = true
-beet_utils.workspace = true
+beet_utils = { workspace = true, features = ["serde"] }
 serde.workspace = true
 base64.workspace = true
 serde_json.workspace = true

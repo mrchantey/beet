@@ -1,3 +1,7 @@
+#[cfg(feature = "serde")]
+mod value;
+#[cfg(feature = "serde")]
+pub use value::*;
 mod vec;
 pub use vec::*;
 pub mod duration;

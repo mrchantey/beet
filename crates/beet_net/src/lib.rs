@@ -46,4 +46,5 @@ pub mod exports {
 	pub use http_body_util;
 	pub use url;
 	pub use url::Url;
+	pub use eventsource_stream;
 }

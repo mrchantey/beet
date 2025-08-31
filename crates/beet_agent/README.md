@@ -17,9 +17,5 @@ curl -o openapi.yaml https://raw.githubusercontent.com/openai/openai-openapi/ref
 npm install @openapitools/openapi-generator-cli -g
 
 # generate the bindings
-openapi-generator-cli generate 	\
---skip-validate-spec 						\
--i openapi.yaml 								\
--g rust 												\
--o rust_bindings 								\
+openapi-generator-cli generate 	--skip-validate-spec -i openapi.yaml -g rust -o rust_bindings
 ```

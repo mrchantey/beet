@@ -7,6 +7,9 @@ target
 .cache
 .vscode/settings.json
 dump.txt
+openapi.yaml
+openapitools.json
+rust_bindings
 
 tests/assert.rs
 tests/expect.rs

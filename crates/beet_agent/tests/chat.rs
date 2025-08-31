@@ -37,6 +37,7 @@ async fn works() {
 	while let Some(Ok(text)) = res.next().await {
 		use serde_json::Value;
 
+
 		let Ok(json) = serde_json::from_str::<Value>(&text.data) else {
 			done(&text.data);
 			break;

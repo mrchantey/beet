@@ -14,7 +14,7 @@ keywords.workspace = true
 [features]
 default = ["serde", "bevy", "nightly"]
 nightly = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "dep:serde_json"]
 bevy = ["dep:bevy"]
 tokio = ["dep:tokio"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
@@ -43,6 +43,7 @@ rapidhash.workspace = true
 bevy = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
 
