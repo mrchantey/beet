@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
+mod async_system;
 mod impl_bundle;
 mod sendit;
 mod to_tokens;
@@ -77,4 +78,13 @@ pub fn derive_sendit(
 #[proc_macro_derive(ImplBundle)]
 pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	impl_bundle::impl_bundle(input).into()
+}
+
+
+#[proc_macro_attribute]
+pub fn async_system(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	async_system::async_system(attr, item).into()
 }
