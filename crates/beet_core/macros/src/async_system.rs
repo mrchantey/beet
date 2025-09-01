@@ -1,5 +1,4 @@
 use proc_macro2::Ident;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
@@ -13,7 +12,6 @@ use syn::token::Comma;
 use syn::{
 	self,
 };
-
 
 pub fn async_system(
 	attr: proc_macro::TokenStream,
@@ -38,10 +36,44 @@ fn is_top_level_await_stmt(stmt: &Stmt) -> bool {
 				false
 			}
 		}
-		Stmt::Expr(expr, _) => matches!(expr, Expr::Await(_)),
+		Stmt::Expr(Expr::Await(_), _) => true,
 		_ => false,
 	}
 }
+
+fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
+	let mut sig = input.sig;
+	// Remove async from the top-level function
+	sig.asyncness = None;
+
+	// Prepend AsyncCommands to system params
+	let mut new_inputs: Punctuated<FnArg, Comma> = Punctuated::new();
+	new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
+	for arg in sig.inputs.clone() {
+		new_inputs.push(arg);
+	}
+	sig.inputs = new_inputs;
+
+	let closure_params = sig.inputs.clone();
+
+	let spawn_method = if is_local {
+		syn::parse_quote!(spawn_and_run)
+	} else {
+		syn::parse_quote!(spawn_and_run_local)
+	};
+
+	let body = build_nested(&input.block.stmts, &closure_params, &spawn_method);
+	let attrs = input.attrs;
+	let vis = input.vis;
+	Ok(quote! {
+		#(#attrs)*
+		#[allow(unused_mut, unused_variables)]
+		#vis #sig {
+			#body
+		}
+	})
+}
+
 
 fn build_nested(
 	stmts: &[Stmt],
@@ -59,8 +91,9 @@ fn build_nested(
 		let inner = build_nested(after, closure_params, spawn_method);
 		quote! {
 			#(#before)*
-			spawn_async.#spawn_method(async move {
+			__async_commands.#spawn_method(async move {
 				#await_stmt
+				#[allow(unused_mut, unused_variables)]
 				move |#closure_params| {
 					#inner
 				}
@@ -71,34 +104,29 @@ fn build_nested(
 	}
 }
 
-fn parse(mut input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
-	let mut sig = input.sig.clone();
-	// Remove async from the top-level function
-	sig.asyncness = None;
 
-	// Prepend SpawnAsync to system params
-	let mut new_inputs: Punctuated<FnArg, Comma> = Punctuated::new();
-	new_inputs.push(parse_quote!(mut spawn_async: SpawnAsync));
-	for arg in sig.inputs.clone() {
-		new_inputs.push(arg);
+
+#[cfg(test)]
+mod test {
+	use super::parse;
+	use sweet::prelude::*;
+
+	#[test]
+	fn async_system() {
+		parse(
+			syn::parse_quote! {
+				async fn my_system(mut commands: Commands, mut query: Query<&mut Name>) {
+					let stmt1 = 0;
+					let stmt2 = stmt1.await;
+					let stmt3 = 0;
+					let stmt4 = stmt3.await;
+					println!("query: {}", query);
+				}
+			},
+			false,
+		)
+		.unwrap()
+		.xpect()
+		.to_be_snapshot();
 	}
-	sig.inputs = new_inputs;
-
-	let closure_params = sig.inputs.clone();
-
-	let spawn_method = if is_local {
-		Ident::new("spawn_and_run_async_local", Span::call_site())
-	} else {
-		Ident::new("spawn_and_run_async", Span::call_site())
-	};
-
-	let body = build_nested(&input.block.stmts, &closure_params, &spawn_method);
-	let attrs = input.attrs;
-	let vis = input.vis;
-	Ok(quote! {
-		#(#attrs)*
-		#vis #sig {
-			#body
-		}
-	})
 }
