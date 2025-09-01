@@ -12,16 +12,18 @@ fn main() {
 		.run();
 }
 
-
-
 #[derive(Default, Resource)]
 struct Count(usize);
 
+
+
 #[async_system]
 async fn await_return(world: &mut World) {
+	// await statements are moved so assign the future
+	// to avoid moving &mut World
 	let fut = world.run_system_cached(returns_count).unwrap();
 	let count = fut.await;
-	// println!("returned count: {}", count);
+	println!("returned count: {}", count);
 }
 
 ///

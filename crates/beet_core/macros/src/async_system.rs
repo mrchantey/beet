@@ -34,6 +34,7 @@ struct Parser {
 	spawn_method: Ident,
 	stream_method: Ident,
 	ret_sender: Option<Ident>,
+	world_ident: Option<Ident>,
 }
 
 fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
@@ -41,13 +42,39 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 	// Remove async from the top-level function
 	sig.asyncness = None;
 
-	// Prepend AsyncCommands to system params
-	let mut new_inputs: Punctuated<FnArg, Comma> = Punctuated::new();
-	new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
-	for arg in sig.inputs.clone() {
-		new_inputs.push(arg);
+	// Determine if a &mut World parameter exists; if so, derive __async_commands from it.
+	let world_ident: Option<Ident> = sig.inputs.iter().find_map(|arg| {
+		if let FnArg::Typed(pat_ty) = arg {
+			if let syn::Type::Reference(tyref) = &*pat_ty.ty {
+				if tyref.mutability.is_some() {
+					if let syn::Type::Path(tp) = &*tyref.elem {
+						if tp.qself.is_none() {
+							if let Some(seg) = tp.path.segments.last() {
+								if seg.ident == "World" {
+									if let syn::Pat::Ident(pat_ident) =
+										&*pat_ty.pat
+									{
+										return Some(pat_ident.ident.clone());
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		None
+	});
+
+	// Only prepend AsyncCommands if we don't have &mut World
+	if world_ident.is_none() {
+		let mut new_inputs: Punctuated<FnArg, Comma> = Punctuated::new();
+		new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
+		for arg in sig.inputs.clone() {
+			new_inputs.push(arg);
+		}
+		sig.inputs = new_inputs;
 	}
-	sig.inputs = new_inputs;
 
 	let closure_params = sig.inputs.clone();
 
@@ -85,6 +112,7 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 			spawn_method: spawn_method.clone(),
 			stream_method: stream_method.clone(),
 			ret_sender: Some(syn::parse_quote!(__beet_return_tx)),
+			world_ident: world_ident.clone(),
 		};
 		let nested = parser.build_nested(&input.block.stmts, true);
 
@@ -119,8 +147,14 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 			spawn_method: spawn_method.clone(),
 			stream_method: stream_method.clone(),
 			ret_sender: None,
+			world_ident: world_ident.clone(),
 		};
-		parser.build_nested(&input.block.stmts, false)
+		{
+			let nested = parser.build_nested(&input.block.stmts, false);
+			quote! {
+				#nested
+			}
+		}
 	};
 
 	let attrs = input.attrs;
@@ -160,10 +194,11 @@ impl Parser {
 				});
 
 				let before_inner = self.build_nested(before, false);
+				let __async_commands_expr = self.async_commands_tokens();
 				return quote! {
 					#before_inner
 					#pre_clone
-					__async_commands.#stream_method(#stream_expr, move |#pat| {
+					#__async_commands_expr.#stream_method(#stream_expr, move |#pat| {
 						#[allow(unused_mut, unused_variables)]
 						move |#closure_params| {
 							#body_inner
@@ -183,10 +218,11 @@ impl Parser {
 				});
 
 				let before_inner = self.build_nested(before, false);
+				let __async_commands_expr = self.async_commands_tokens();
 				return quote! {
 					#before_inner
 					#pre_clone
-					__async_commands.#spawn_method(async move {
+					#__async_commands_expr.#spawn_method(async move {
 						#await_stmt
 						#[allow(unused_mut, unused_variables)]
 						move |#closure_params| {
@@ -335,6 +371,13 @@ impl Parser {
 			}
 		} else {
 			quote! { if #cond { #then_inner } }
+		}
+	}
+	fn async_commands_tokens(&self) -> TokenStream {
+		if let Some(world_ident) = &self.world_ident {
+			quote! { AsyncCommands{ commands: #world_ident.commands()} }
+		} else {
+			quote! { __async_commands }
 		}
 	}
 }

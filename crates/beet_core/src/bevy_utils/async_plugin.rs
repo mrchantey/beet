@@ -132,7 +132,7 @@ where
 
 #[derive(SystemParam)]
 pub struct AsyncCommands<'w, 's> {
-	commands: Commands<'w, 's>,
+	pub commands: Commands<'w, 's>,
 }
 
 impl AsyncCommands<'_, '_> {
@@ -292,6 +292,11 @@ mod tests {
 
 	#[derive(Resource)]
 	struct Count(usize);
+
+	#[async_system]
+	async fn exclusive_async_system(world: &mut World) {
+		let _ = future::yield_now().await;
+	}
 
 	#[test]
 	fn futures() {
