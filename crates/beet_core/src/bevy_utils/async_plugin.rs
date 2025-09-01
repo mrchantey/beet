@@ -361,4 +361,41 @@ mod tests {
 			.to_be(0);
 		app.world_mut().resource::<Count>().0.xpect().to_be(3);
 	}
+
+	#[sweet::test]
+	async fn returns_value_future() {
+		let mut app = App::new();
+		app.insert_resource(Count(10))
+			.add_plugins((MinimalPlugins, AsyncPlugin));
+
+		#[async_system]
+		async fn my_system(mut count: ResMut<Count>) -> usize {
+			let _ = future::yield_now().await;
+			let before = count.0;
+			count.0 += 5;
+			let _ = future::yield_now().await;
+			before + count.0
+		}
+
+		let fut = app.world_mut().run_system_cached(my_system).unwrap();
+		app.world_mut()
+			.query_once::<&AsyncStreamTask>()
+			.iter()
+			.count()
+			.xpect()
+			.to_be(1);
+
+		// Progress async work to completion
+		app.update();
+		app.update();
+
+		fut.await.xpect().to_be(25);
+		// After completion, the stream task should be removed
+		app.world_mut()
+			.query_once::<&AsyncStreamTask>()
+			.iter()
+			.count()
+			.xpect()
+			.to_be(0);
+	}
 }

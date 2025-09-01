@@ -111,12 +111,66 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 		syn::parse_quote!(spawn_for_each_stream)
 	};
 
-	let body = build_nested(
-		&input.block.stmts,
-		&closure_params,
-		&spawn_method,
-		&stream_method,
-	);
+	// If the function has a return type, adapt the signature to return a Future
+	// that resolves with the value sent over an async_channel receiver.
+	let return_ty = match &sig.output {
+		syn::ReturnType::Type(_, ty) => Some((*ty).clone()),
+		_ => None,
+	};
+
+	let body = if let Some(ret_ty) = return_ty.clone() {
+		// Change the signature to return a pinned boxed Future of the original return type.
+		if is_local {
+			sig.output = parse_quote!(-> ::std::pin::Pin<Box<dyn ::core::future::Future<Output = #ret_ty> + 'static>>);
+		} else {
+			sig.output = parse_quote!(-> ::std::pin::Pin<Box<dyn ::core::future::Future<Output = #ret_ty> + Send + 'static>>);
+		}
+
+		// Build nested body with awareness of a return-value sender.
+		let __ret_tx_ident: Ident = syn::parse_quote!(__beet_return_tx);
+		let nested = build_nested(
+			&input.block.stmts,
+			&closure_params,
+			&spawn_method,
+			&stream_method,
+			Some(&__ret_tx_ident),
+		);
+
+		quote! {
+			let (__beet_return_tx, __beet_return_rx) = ::async_channel::bounded::<#ret_ty>(1);
+			#nested
+			{
+				// Box and pin the returned async block into the concrete pinned boxed future
+				// type required by the rewritten signature. Cast to the exact trait object
+				// type so the function item has a concrete return type.
+				#[allow(unused_imports)]
+				use ::std::boxed::Box;
+				#[allow(unused_imports)]
+				use ::std::pin::Pin;
+				#[allow(unused_mut, unused_variables)]
+				{
+					#[allow(unused_unsafe)]
+					let __beet_boxed = ::std::boxed::Box::pin(async move {
+						match __beet_return_rx.recv().await {
+							Ok(v) => v,
+							Err(_) => panic!("async_system return channel closed"),
+						}
+					});
+					// Cast to the concrete pinned trait-object type expected by the signature.
+					__beet_boxed as _
+				}
+			}
+		}
+	} else {
+		build_nested(
+			&input.block.stmts,
+			&closure_params,
+			&spawn_method,
+			&stream_method,
+			None,
+		)
+	};
+
 	let attrs = input.attrs;
 	let vis = input.vis;
 	Ok(quote! {
@@ -134,6 +188,7 @@ fn build_nested(
 	closure_params: &Punctuated<FnArg, Comma>,
 	spawn_method: &Ident,
 	stream_method: &Ident,
+	ret_sender: Option<&Ident>,
 ) -> TokenStream {
 	// Iterate over all statements and find the first one that is either a
 	// streaming `while let ... = ...await { ... }` or a top-level await stmt.
@@ -151,17 +206,27 @@ fn build_nested(
 				closure_params,
 				spawn_method,
 				stream_method,
+				ret_sender,
 			);
 			let after_inner = build_nested(
 				after,
 				closure_params,
 				spawn_method,
 				stream_method,
+				ret_sender,
 			);
+
+			// If returning a value, prepare a clone before creating the closure so
+			// the closure captures the clone (avoids moving the original sender
+			// into the closure and making it FnOnce).
+			let pre_clone = ret_sender.map(|ident| {
+				quote! { let #ident = #ident.clone(); }
+			});
 
 			// Emit a single call to the streaming API.
 			return quote! {
 				#(#before)*
+				#pre_clone
 				__async_commands.#stream_method(#stream_expr, move |#pat| {
 					#[allow(unused_mut, unused_variables)]
 					move |#closure_params| {
@@ -182,10 +247,16 @@ fn build_nested(
 				closure_params,
 				spawn_method,
 				stream_method,
+				ret_sender,
 			);
+
+			let pre_clone = ret_sender.map(|ident| {
+				quote! { let #ident = #ident.clone(); }
+			});
 
 			return quote! {
 				#(#before)*
+				#pre_clone
 				__async_commands.#spawn_method(async move {
 					#await_stmt
 					#[allow(unused_mut, unused_variables)]
@@ -193,6 +264,21 @@ fn build_nested(
 						#inner
 					}
 				});
+			};
+		}
+	}
+
+	// No special statements found; if we have a return sender and the final
+	// statement is a tail expression, send its value and finish.
+	if let Some(ret_tx) = ret_sender {
+		if let Some(Stmt::Expr(expr, None)) = stmts.last() {
+			let before = &stmts[..stmts.len().saturating_sub(1)];
+			return quote! {
+				#(#before)*
+				{
+					let __beet_value = { #expr };
+					let _ = #ret_tx.try_send(__beet_value);
+				}
 			};
 		}
 	}
