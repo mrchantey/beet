@@ -52,9 +52,9 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 	let closure_params = sig.inputs.clone();
 
 	let spawn_method: Ident = if is_local {
-		syn::parse_quote!(spawn_and_run)
-	} else {
 		syn::parse_quote!(spawn_and_run_local)
+	} else {
+		syn::parse_quote!(spawn_and_run)
 	};
 
 	// choose the streaming method name based on local vs non-local
@@ -86,7 +86,7 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 			stream_method: stream_method.clone(),
 			ret_sender: Some(syn::parse_quote!(__beet_return_tx)),
 		};
-		let nested = parser.build_nested(&input.block.stmts);
+		let nested = parser.build_nested(&input.block.stmts, true);
 
 		quote! {
 			let (__beet_return_tx, __beet_return_rx) = ::async_channel::bounded::<#ret_ty>(1);
@@ -120,7 +120,7 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 			stream_method: stream_method.clone(),
 			ret_sender: None,
 		};
-		parser.build_nested(&input.block.stmts)
+		parser.build_nested(&input.block.stmts, false)
 	};
 
 	let attrs = input.attrs;
@@ -136,13 +136,12 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 
 
 impl Parser {
-	fn build_nested(&self, stmts: &[Stmt]) -> TokenStream {
+	fn build_nested(&self, stmts: &[Stmt], allow_tail: bool) -> TokenStream {
 		let closure_params = &self.closure_params;
 		let spawn_method = &self.spawn_method;
 		let stream_method = &self.stream_method;
 
-		// Iterate over all statements and find the first one that is either a
-		// streaming `while let ... = ...await { ... }` or a top-level await stmt.
+		// Look for streaming loops or top-level awaits in this statement list.
 		for (idx, stmt) in stmts.iter().enumerate() {
 			// Handle streaming `while let ... = ...await { ... }`
 			if let Some((pat, stream_expr, body_block)) =
@@ -152,19 +151,17 @@ impl Parser {
 				let after = &stmts[idx + 1..];
 
 				// Recursively process the loop body (it may contain awaits)
-				let body_inner = self.build_nested(&body_block.stmts);
-				let after_inner = self.build_nested(after);
+				let body_inner = self.build_nested(&body_block.stmts, false);
+				let after_inner = self.build_nested(after, allow_tail);
 
-				// If returning a value, prepare a clone before creating the closure so
-				// the closure captures the clone (avoids moving the original sender
-				// into the closure and making it FnOnce).
+				// If returning a value, clone sender so closures capture clones.
 				let pre_clone = self.ret_sender.as_ref().map(|ident| {
 					quote! { let #ident = #ident.clone(); }
 				});
 
-				// Emit a single call to the streaming API.
+				let before_inner = self.build_nested(before, false);
 				return quote! {
-					#(#before)*
+					#before_inner
 					#pre_clone
 					__async_commands.#stream_method(#stream_expr, move |#pat| {
 						#[allow(unused_mut, unused_variables)]
@@ -179,14 +176,15 @@ impl Parser {
 				let before = &stmts[..idx];
 				let await_stmt = stmt;
 				let after = &stmts[idx + 1..];
-				let inner = self.build_nested(after);
+				let inner = self.build_nested(after, allow_tail);
 
 				let pre_clone = self.ret_sender.as_ref().map(|ident| {
 					quote! { let #ident = #ident.clone(); }
 				});
 
+				let before_inner = self.build_nested(before, false);
 				return quote! {
-					#(#before)*
+					#before_inner
 					#pre_clone
 					__async_commands.#spawn_method(async move {
 						#await_stmt
@@ -199,61 +197,145 @@ impl Parser {
 			}
 		}
 
-		// No special statements found; if we have a return sender then either:
-		// - if there is an explicit top-level `return` statement anywhere in
-		//   `stmts`, send that returned value and finish early (don't process
-		//   following statements), or
-		// - if the final statement is a tail expression, send its value and
-		//   finish.
+		// Early-return and tail-expression handling when a return sender exists.
 		if let Some(ret_tx) = self.ret_sender.as_ref() {
-			// Handle an explicit top-level `return` statement.
-			// We only consider returns that are top-level statements in the
-			// function body (not nested inside inner blocks). If one is found,
-			// send the returned value and stop processing subsequent statements
-			// so the function behaves like an early return.
+			// Explicit top-level `return ...;`
 			for (idx, stmt) in stmts.iter().enumerate() {
-				match stmt {
-					// Match `return expr;` and `return expr` as top-level Stmt::Expr
-					Stmt::Expr(syn::Expr::Return(ret_expr), _) => {
-						let before = &stmts[..idx];
-						// If the return has an expression use it, otherwise use unit.
-						let ret_value = if let Some(expr) = &ret_expr.expr {
-							quote! { #expr }
-						} else {
-							quote! { () }
-						};
-						let pre_clone = self.ret_sender.as_ref().map(|ident| {
-							quote! { let #ident = #ident.clone(); }
-						});
-						return quote! {
-							#(#before)*
-							#pre_clone
-							{
-								let __beet_value = { #ret_value };
-								let _ = #ret_tx.try_send(__beet_value);
-							}
-						};
-					}
-					_ => {}
+				if let Stmt::Expr(syn::Expr::Return(ret_expr), _) = stmt {
+					let before = &stmts[..idx];
+					let ret_value = if let Some(expr) = &ret_expr.expr {
+						quote! { #expr }
+					} else {
+						quote! { () }
+					};
+					let pre_clone = self.ret_sender.as_ref().map(|ident| {
+						quote! { let #ident = #ident.clone(); }
+					});
+					return quote! {
+						#(#before)*
+						#pre_clone
+						{
+							let __beet_value = { #ret_value };
+							let _ = #ret_tx.try_send(__beet_value);
+						}
+					};
 				}
 			}
 
-			// No explicit return found; if the last statement is a tail expression,
-			// send its value and finish.
-			if let Some(Stmt::Expr(expr, None)) = stmts.last() {
-				let before = &stmts[..stmts.len().saturating_sub(1)];
-				return quote! {
-					#(#before)*
-					{
-						let __beet_value = { #expr };
-						let _ = #ret_tx.try_send(__beet_value);
-					}
-				};
+			// Tail expression: only send at the terminal continuation of the top-level function.
+			if allow_tail {
+				if let Some(Stmt::Expr(expr, None)) = stmts.last() {
+					let before = &stmts[..stmts.len().saturating_sub(1)];
+					return quote! {
+						#(#before)*
+						{
+							let __beet_value = { #expr };
+							let _ = #ret_tx.try_send(__beet_value);
+						}
+					};
+				}
 			}
 		}
 
-		// No special statements found; just return the original statements.
-		quote! { #(#stmts)* }
+		// Fallback: rebuild nested constructs (blocks/ifs/loops) so inner awaits/streams/returns are handled.
+		let rebuilt: Vec<TokenStream> = stmts
+			.iter()
+			.map(|s| {
+				self.rebuild_stmt(s, allow_tail)
+					.unwrap_or_else(|| quote! { #s })
+			})
+			.collect();
+		quote! { #(#rebuilt)* }
+	}
+
+	// Rebuild a statement if it contains a nested block/if/loop that may include awaits/returns.
+	fn rebuild_stmt(
+		&self,
+		stmt: &Stmt,
+		allow_tail: bool,
+	) -> Option<TokenStream> {
+		match stmt {
+			Stmt::Expr(Expr::Block(b), semi) => {
+				let inner = self.build_block(&b.block, allow_tail);
+				if semi.is_some() {
+					Some(quote! { { #inner }; })
+				} else {
+					Some(quote! { { #inner } })
+				}
+			}
+			Stmt::Expr(Expr::If(ife), semi) => {
+				let toks = self.build_if(ife, allow_tail);
+				if semi.is_some() {
+					Some(quote! { #toks; })
+				} else {
+					Some(quote! { #toks })
+				}
+			}
+			// Non-streaming while loops: rebuild their body.
+			Stmt::Expr(Expr::While(w), semi) => {
+				if match_while_let_await(stmt).is_none() {
+					let body = self.build_nested(&w.body.stmts, false);
+					let cond = &w.cond;
+					if semi.is_some() {
+						Some(quote! { while #cond { #body }; })
+					} else {
+						Some(quote! { while #cond { #body } })
+					}
+				} else {
+					None
+				}
+			}
+			// Generic loop with nested awaits.
+			Stmt::Expr(Expr::Loop(lp), semi) => {
+				let body = self.build_nested(&lp.body.stmts, false);
+				if semi.is_some() {
+					Some(quote! { loop { #body }; })
+				} else {
+					Some(quote! { loop { #body } })
+				}
+			}
+			// For loops with nested awaits.
+			Stmt::Expr(Expr::ForLoop(fl), semi) => {
+				let pat = &fl.pat;
+				let expr = &fl.expr;
+				let body = self.build_nested(&fl.body.stmts, false);
+				if semi.is_some() {
+					Some(quote! { for #pat in #expr { #body }; })
+				} else {
+					Some(quote! { for #pat in #expr { #body } })
+				}
+			}
+			_ => None,
+		}
+	}
+
+	// Rebuild a bare block using nested processing of its statements.
+	fn build_block(&self, block: &syn::Block, allow_tail: bool) -> TokenStream {
+		self.build_nested(&block.stmts, allow_tail)
+	}
+
+	// Rebuild an `if` expression, recursing into then/else branches.
+	fn build_if(&self, ife: &syn::ExprIf, _allow_tail: bool) -> TokenStream {
+		let cond = &ife.cond;
+		let then_inner = self.build_nested(&ife.then_branch.stmts, false);
+		if let Some((_, else_expr)) = &ife.else_branch {
+			match else_expr.as_ref() {
+				Expr::If(else_if) => {
+					let else_tokens = self.build_if(else_if, false);
+					quote! { if #cond { #then_inner } else #else_tokens }
+				}
+				Expr::Block(else_block) => {
+					let else_inner =
+						self.build_nested(&else_block.block.stmts, false);
+					quote! { if #cond { #then_inner } else { #else_inner } }
+				}
+				other => {
+					quote! { if #cond { #then_inner } else { #other } }
+				}
+			}
+		} else {
+			quote! { if #cond { #then_inner } }
+		}
 	}
 }
 

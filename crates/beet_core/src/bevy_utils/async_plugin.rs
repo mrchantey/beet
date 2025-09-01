@@ -305,9 +305,9 @@ mod tests {
 			assert_eq!(count.0, 0);
 			count.0 += 1;
 			let _ = future::yield_now().await;
-			// {
-			// 	let _ = future::yield_now().await;
-			// }
+			{
+				let _ = future::yield_now().await;
+			}
 			assert_eq!(count.0, 1);
 			count.0 += 1;
 			let _ = future::yield_now().await;
@@ -322,6 +322,7 @@ mod tests {
 			.count()
 			.xpect()
 			.to_be(1);
+		app.update();
 		app.update();
 		app.update();
 		app.update();
@@ -343,9 +344,9 @@ mod tests {
 		async fn my_system(mut count: ResMut<Count>) {
 			let mut stream = StreamCounter::new(3);
 			while let index = stream.next().await {
-				// {
-				// 	let _ = future::yield_now().await;
-				// }
+				{
+					let _ = future::yield_now().await;
+				}
 				assert_eq!(index, count.0);
 				count.0 += 1;
 			}
@@ -358,6 +359,7 @@ mod tests {
 			.count()
 			.xpect()
 			.to_be(1);
+		app.update();
 		app.update();
 		app.world_mut()
 			.query_once::<&AsyncStreamTask>()
@@ -379,9 +381,10 @@ mod tests {
 			let _ = future::yield_now().await;
 			let before = count.0;
 			count.0 += 5;
-			// if count.0 == 5 {
-			// 	return count.0;
-			// }
+			if count.0 == 1 {
+				let _ = future::yield_now().await;
+				return count.0;
+			}
 			let _ = future::yield_now().await;
 			// return before + count.0;
 			before + count.0
