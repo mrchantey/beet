@@ -273,7 +273,7 @@ impl Stream for StreamCounter {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::prelude::WorldMutExt;
+	use crate::as_beet::*;
 	use beet_core_macros::async_system;
 	use futures_lite::future::block_on;
 	use sweet::prelude::*;

@@ -39,11 +39,15 @@ pub mod as_beet {
 		pub mod prelude {
 			pub use crate::prelude::*;
 		}
+		pub mod exports {
+			pub use crate::exports::*;
+		}
 	}
 }
 
 
 pub mod exports {
+	pub use async_channel;
 	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use js_sys;
 	#[cfg(feature = "tokens")]

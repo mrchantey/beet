@@ -89,7 +89,7 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 		let nested = parser.build_nested(&input.block.stmts, true);
 
 		quote! {
-			let (__beet_return_tx, __beet_return_rx) = ::async_channel::bounded::<#ret_ty>(1);
+			let (__beet_return_tx, __beet_return_rx) = beet::exports::async_channel::bounded::<#ret_ty>(1);
 			#nested
 			{
 				// Box and pin the returned async block into the concrete pinned boxed future
