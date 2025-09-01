@@ -66,6 +66,10 @@ clap = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 
+#💡 async
+futures-lite.workspace = true
+async-channel.workspace = true
+
 # tokens dependencies (optional)
 heck = { workspace = true }
 syn = { workspace = true, optional = true }

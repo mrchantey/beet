@@ -151,6 +151,8 @@ console_log = { version = "1", features = ["color"] }
 
 #💡 async
 futures = "0.3"
+futures-lite = { version = "2", default-features = false, features = ["alloc"] }
+async-channel = { version = "2" }
 flume = "0.11"
 rayon = "1"
 tokio = { version = "1", features = [

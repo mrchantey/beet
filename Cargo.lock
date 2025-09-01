@@ -1209,12 +1209,14 @@ name = "beet_core"
 version = "0.0.7-dev.5"
 dependencies = [
  "anyhow",
+ "async-channel",
  "beet_core_macros",
  "beet_utils",
  "bevy",
  "clap",
  "console_error_panic_hook",
  "extend",
+ "futures-lite",
  "getrandom 0.2.16",
  "glob",
  "heck 0.4.1",
