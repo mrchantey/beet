@@ -107,6 +107,9 @@ impl AgentProvider for OpenAiProvider {
 								.to_string();
 							Ok(CompletionsEvent::Created { session_id })
 						}
+						"response.in_progress" => {
+							Ok(CompletionsEvent::Other { value: json })
+						}
 						_ => {
 							Ok(CompletionsEvent::Other { value: json })
 							// if let Some(data) =

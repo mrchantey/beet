@@ -1,27 +1,42 @@
+use beet_core::prelude::*;
+use beet_utils::time_ext;
 use bevy::prelude::*;
-
+use std::time::Duration;
 
 #[tokio::main]
+#[rustfmt::skip]
 async fn main() {
-	let mut world = World::new();
-
-	world.insert_resource(Foo(42));
-	run_nested(&mut world).await;
+	App::new()
+		.add_plugins((MinimalPlugins, AsyncPlugin))
+		.add_systems(Startup, my_func).run();
 }
 
-async fn run_nested(world: &mut World) {
-	let value = my_system3(In(true), world).await.unwrap();
-	assert_eq!(value, 42);
+fn my_func(mut spawn_async: SpawnAsync, mut commands: Commands) {
+	commands.spawn(Name::new("hello world"));
+	spawn_async.spawn_and_run_async(async move {
+		let simulated_value = time_ext::sleep(Duration::from_secs(1)).await;
+		move |mut spawn_async: SpawnAsync, mut query: Query<&mut Name>| {
+			let mut item = query.single_mut().unwrap();
+			println!("name is now {:?}", item);
+			println!("simulated value: {:?}", simulated_value);
+			*item = "foobar".into();
+			spawn_async.spawn_and_run_async(async move {
+				time_ext::sleep(Duration::from_secs(1)).await;
+				move |query: Query<&Name>| {
+					println!("name is finally {:?}", query.single().unwrap());
+				}
+			})
+		}
+	});
 }
 
-#[derive(Resource, Clone)]
-struct Foo(u32);
-
-async fn my_system3(_foo: In<bool>, world: &mut World) -> Result<u32> {
-	let foo2 = world.resource::<Foo>();
-
-	tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-	let val = foo2.0;
-	Ok(val)
-}
+// async fn my_ideal_func(mut commands: Commands, mut query: Query<&mut Name>) {
+// 	commands.spawn(Name::new("hello world"));
+// 	let simulated_value = time_ext::sleep(Duration::from_secs(1)).await;
+// 	let mut item = query.single_mut().unwrap();
+// 	println!("name is now {:?}", item);
+// 	println!("simulated value: {:?}", simulated_value);
+// 	*item = "foobar".into();
+// 	time_ext::sleep(Duration::from_secs(1)).await;
+// 	println!("name is finally {:?}", query.single().unwrap());
+// }

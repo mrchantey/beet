@@ -1,0 +1,64 @@
+use bevy::ecs::system::SystemParam;
+use bevy::ecs::world::CommandQueue;
+use bevy::prelude::*;
+use bevy::tasks::AsyncComputeTaskPool;
+use bevy::tasks::Task;
+use bevy::tasks::block_on;
+use bevy::tasks::futures_lite::future;
+
+
+pub struct AsyncPlugin;
+
+impl Plugin for AsyncPlugin {
+	fn build(&self, app: &mut App) { app.add_systems(PreUpdate, handle_task); }
+}
+
+
+fn handle_task(
+	mut commands: Commands,
+	mut tasks: Query<(Entity, &mut ComputeTask)>,
+) {
+	for (entity, mut task) in &mut tasks {
+		if let Some(mut queue) = block_on(future::poll_once(&mut task.0)) {
+			commands.append(&mut queue);
+			commands.entity(entity).remove::<ComputeTask>();
+		}
+	}
+}
+
+
+#[derive(Component)]
+pub struct ComputeTask(Task<CommandQueue>);
+
+
+#[derive(SystemParam)]
+pub struct SpawnAsync<'w, 's> {
+	commands: Commands<'w, 's>,
+}
+
+impl SpawnAsync<'_, '_> {
+	pub fn spawn_async<Fut>(&mut self, fut: Fut)
+	where
+		Fut: 'static + Send + Future<Output = CommandQueue>,
+		// Out: 'static,
+	{
+		let task = AsyncComputeTaskPool::get().spawn(fut);
+		self.commands.spawn(ComputeTask(task));
+	}
+	pub fn spawn_and_run_async<Fut, Out, Marker>(&mut self, fut: Fut)
+	where
+		Fut: 'static + Send + Future<Output = Out>,
+		Out: 'static + Send + IntoSystem<(), (), Marker>,
+	{
+		let task = AsyncComputeTaskPool::get().spawn(async move {
+			let out = fut.await;
+			let mut queue = CommandQueue::default();
+			queue.push(move |world: &mut World| {
+				world.run_system_cached(out).ok();
+			});
+			// TODO: notify reactive apps that future is ready
+			queue
+		});
+		self.commands.spawn(ComputeTask(task));
+	}
+}
