@@ -230,6 +230,37 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 
 
 impl Parser {
+	// Helper: tokens that cause an early return depending on context.
+	fn early_return_tokens(&self) -> TokenStream {
+		if self.in_closure {
+			quote! { return; }
+		} else {
+			quote! { return __beet_finish(); }
+		}
+	}
+
+	// Helper: lower a `?` expression into a match that sends Err on failure and early-returns.
+	fn lower_try(&self, inner: &Expr) -> TokenStream {
+		if !(self.ret_sender.is_some() && self.ret_is_result) {
+			quote! { #inner? }
+		} else {
+			let ret_tx = self.ret_sender.as_ref().unwrap();
+			let __beet_early = self.early_return_tokens();
+			quote! {
+				{
+					let __beet_try_tmp = #inner;
+					match __beet_try_tmp {
+						Ok(__beet_ok) => __beet_ok,
+						Err(__beet_err) => {
+							let _ = #ret_tx.try_send(Err(__beet_err));
+							#__beet_early
+						}
+					}
+				}
+			}
+		}
+	}
+
 	fn build_nested(&self, stmts: &[Stmt], allow_tail: bool) -> TokenStream {
 		let closure_params = &self.closure_params;
 		let spawn_method = &self.spawn_method;
@@ -390,78 +421,34 @@ impl Parser {
 		allow_tail: bool,
 	) -> Option<TokenStream> {
 		match stmt {
-			// Handle top-level try expressions (e.g., `foo()?;`)
+			// Handle top-level try expressions (e.g., `foo()?;`) in a unified way.
 			Stmt::Expr(Expr::Try(ex_try), semi) => {
 				if self.ret_sender.is_some() && self.ret_is_result {
-					let ret_tx = self.ret_sender.as_ref().unwrap();
-					let expr_inner = &ex_try.expr;
-					let __beet_early = if self.in_closure {
-						quote! { return; }
-					} else {
-						quote! { return __beet_finish(); }
-					};
+					let lowered = self.lower_try(&ex_try.expr);
 					if semi.is_some() {
-						Some(quote! {
-							{
-								let __beet_try_tmp = #expr_inner;
-								match __beet_try_tmp {
-									Ok(__beet_ok) => __beet_ok,
-									Err(__beet_err) => {
-										let _ = #ret_tx.try_send(Err(__beet_err));
-										#__beet_early
-									}
-								}
-							};
-						})
+						Some(quote! { #lowered; })
 					} else {
-						Some(quote! {
-							{
-								let __beet_try_tmp = #expr_inner;
-								match __beet_try_tmp {
-									Ok(__beet_ok) => __beet_ok,
-									Err(__beet_err) => {
-										let _ = #ret_tx.try_send(Err(__beet_err));
-										#__beet_early
-									}
-								}
-							}
-						})
+						Some(quote! { #lowered })
 					}
 				} else {
 					None
 				}
 			}
-			// Handle let-initializer try expressions (supports both explicit `Expr::Try` and `LocalInit::diverge` `?`)
+			// Handle let-initializer try expressions, including implicit diverge `?`.
 			Stmt::Local(local) => {
 				if let Some(init) = &local.init {
 					if self.ret_sender.is_some() && self.ret_is_result {
-						// Detect `let pat = expr?;` whether parsed as Expr::Try or via LocalInit::diverge (`?`)
 						let has_qmark = matches!(&*init.expr, Expr::Try(_))
 							|| init.diverge.is_some();
 						if has_qmark {
-							let ret_tx = self.ret_sender.as_ref().unwrap();
 							let pat = &local.pat;
-							// If `expr` is `Try`, use its inner base; otherwise use the expression as-is.
 							let inner_expr = match &*init.expr {
 								Expr::Try(expr_try) => &expr_try.expr,
 								_ => &init.expr,
 							};
-							let __beet_early = if self.in_closure {
-								quote! { return; }
-							} else {
-								quote! { return __beet_finish(); }
-							};
+							let lowered = self.lower_try(inner_expr);
 							return Some(quote! {
-								let #pat = {
-									let __beet_try_tmp = #inner_expr;
-									match __beet_try_tmp {
-										Ok(__beet_ok) => __beet_ok,
-										Err(__beet_err) => {
-											let _ = #ret_tx.try_send(Err(__beet_err));
-											#__beet_early
-										}
-									}
-								};
+								let #pat = #lowered;
 							});
 						}
 					}
@@ -531,27 +518,7 @@ impl Parser {
 	fn rebuild_expr(&self, expr: &Expr) -> Option<TokenStream> {
 		if self.ret_sender.is_some() && self.ret_is_result {
 			match expr {
-				Expr::Try(ex_try) => {
-					let ret_tx = self.ret_sender.as_ref().unwrap();
-					let inner = &ex_try.expr;
-					let __beet_early = if self.in_closure {
-						quote! { return; }
-					} else {
-						quote! { return __beet_finish(); }
-					};
-					Some(quote! {
-						{
-							let __beet_try_tmp = #inner;
-							match __beet_try_tmp {
-								Ok(__beet_ok) => __beet_ok,
-								Err(__beet_err) => {
-									let _ = #ret_tx.try_send(Err(__beet_err));
-									#__beet_early
-								}
-							}
-						}
-					})
-				}
+				Expr::Try(ex_try) => Some(self.lower_try(&ex_try.expr)),
 				_ => None,
 			}
 		} else {
