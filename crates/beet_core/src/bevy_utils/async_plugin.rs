@@ -6,10 +6,8 @@ use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use bevy::tasks::Task;
-use bevy::tasks::block_on;
 use bevy::tasks::futures_lite::Stream;
 use bevy::tasks::futures_lite::StreamExt;
-use bevy::tasks::futures_lite::future;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -35,21 +33,12 @@ impl Plugin for AsyncPlugin {
 
 fn poll_async_tasks(
 	mut commands: Commands,
-	mut oneshots: Query<(Entity, &mut AsyncTask)>,
-	mut streams: Query<(Entity, &mut AsyncStreamTask)>,
+	mut tasks: Query<(Entity, &mut AsyncTask)>,
 ) {
-	// Existing one-shot handling (keeps backwards compatibility)
-	for (entity, mut task) in &mut oneshots {
-		if let Some(mut queue) = block_on(future::poll_once(&mut task.0)) {
-			commands.append(&mut queue);
-			commands.entity(entity).remove::<AsyncTask>();
-		}
-	}
-
 	// Streaming handling: drain all ready command queues produced by streams
-	for (entity, stream_task) in &mut streams {
+	for (entity, task) in &mut tasks {
 		loop {
-			match stream_task.receiver.try_recv() {
+			match task.receiver.try_recv() {
 				Ok(mut queue) => {
 					commands.append(&mut queue);
 				}
@@ -59,7 +48,7 @@ fn poll_async_tasks(
 				}
 				Err(TryRecvError::Closed) => {
 					// Producer finished and channel is closed: remove the component
-					commands.entity(entity).remove::<AsyncStreamTask>();
+					commands.entity(entity).remove::<AsyncTask>();
 					break;
 				}
 			}
@@ -67,20 +56,16 @@ fn poll_async_tasks(
 	}
 }
 
-/// Backwards-compatible one-shot task returning a `CommandQueue`.
-#[derive(Component)]
-pub struct AsyncTask(Task<CommandQueue>);
-
 /// Streaming task: background task that sends `CommandQueue` chunks as items.
 #[derive(Component)]
-pub struct AsyncStreamTask {
+pub struct AsyncTask {
 	receiver: async_channel::Receiver<CommandQueue>,
 	/// We use the receiver to detect completion but hold onto task
 	/// as it cancels on drop
 	_task: Task<()>,
 }
 
-impl AsyncStreamTask {
+impl AsyncTask {
 	#[allow(dead_code)]
 	pub(crate) fn new(
 		receiver: async_channel::Receiver<CommandQueue>,
@@ -136,17 +121,36 @@ pub struct AsyncCommands<'w, 's> {
 }
 
 impl AsyncCommands<'_, '_> {
-	/// Spawn a background future which returns a `CommandQueue`.
-	///
-	/// This is a low-level primitive used by the system. The future runs on the
-	/// compute thread pool and may produce a `CommandQueue` to be applied later.
-	pub fn spawn<Fut>(&mut self, fut: Fut)
+	pub fn spawn<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> Pin<Box<dyn Future<Output = Out>>>
 	where
-		Fut: 'static + Send + Future<Output = CommandQueue>,
+		Func: 'static + Fn(AsyncQueue) -> Fut,
+		Fut: Future<Output = Out>,
+		Out: 'static,
 	{
-		let task = AsyncComputeTaskPool::get().spawn(fut);
-		self.commands.spawn(AsyncTask(task));
+		// channel for the final output
+		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
+		// channel to be used throughout the function call
+		let (tx_queue, rx_queue) = async_channel::unbounded::<CommandQueue>();
+
+		let task = AsyncComputeTaskPool::get().spawn(async move {
+			let out = func(AsyncQueue::new(tx_queue)).await;
+			tx_out.try_send(out).expect("Failed to send output");
+		});
+		self.commands.spawn(AsyncTask::new(rx_queue, task));
+
+		Box::pin(async move {
+			match rx_out.recv().await {
+				Ok(v) => v,
+				Err(_) => {
+					panic!("async_system return channel closed");
+				}
+			}
+		})
 	}
+
 
 	/// Spawn a Future, await it on a worker, and run the resulting system on the main thread.
 	///
@@ -205,7 +209,7 @@ impl AsyncCommands<'_, '_> {
 			}
 			// Dropping the sender closes the channel and signals completion.
 		});
-		self.commands.spawn(AsyncStreamTask::new(rx, task));
+		self.commands.spawn(AsyncTask::new(rx, task));
 	}
 
 	/// Local (non-Send) variant of `spawn_for_each_stream`.
@@ -233,7 +237,7 @@ impl AsyncCommands<'_, '_> {
 				}
 			}
 		});
-		self.commands.spawn(AsyncStreamTask::new(rx, task));
+		self.commands.spawn(AsyncTask::new(rx, task));
 	}
 }
 
@@ -271,11 +275,46 @@ impl Stream for StreamCounter {
 	}
 }
 
+#[derive(Clone)]
+pub struct AsyncQueue {
+	tx: async_channel::Sender<CommandQueue>,
+}
+
+impl AsyncQueue {
+	pub fn new(tx: async_channel::Sender<CommandQueue>) -> Self { Self { tx } }
+
+	pub fn spawn<B: Bundle>(&self, bundle: B) {
+		self.send(move |world: &mut World| {
+			world.spawn(bundle);
+		});
+	}
+
+	pub fn insert_resource<R: Resource>(&self, resource: R) {
+		self.send(move |world: &mut World| {
+			world.insert_resource(resource);
+		});
+	}
+	pub fn update_resource<R: Resource>(
+		&self,
+		func: impl FnOnce(Mut<R>) + Send + 'static,
+	) {
+		self.send(move |world: &mut World| {
+			func(world.resource_mut::<R>());
+		});
+	}
+
+	pub fn send(&self, cmd: impl Command<()>) {
+		let mut queue = CommandQueue::default();
+		queue.push(cmd);
+		self.tx.try_send(queue).expect("Failed to send command. Async queues should be unbounded, was the receiver dropped?");
+	}
+}
+
+
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::as_beet::*;
-	use beet_core_macros::async_system;
+	use bevy::tasks::futures_lite::future;
 	use futures_lite::future::block_on;
 	use sweet::prelude::*;
 
@@ -291,261 +330,39 @@ mod tests {
 		block_on(async { stream.next().await }).xpect().to_be_none();
 	}
 
-	#[derive(Resource)]
+
+	#[derive(Default, Resource)]
 	struct Count(usize);
 
-	#[async_system]
-	async fn exclusive_async_system(world: &mut World) {
-		let _ = future::yield_now().await;
-	}
-
-	#[test]
-	fn futures() {
-		let mut app = App::new();
-		app.insert_resource(Count(0))
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-
-		#[async_system]
-		async fn my_system(mut count: ResMut<Count>) {
-			let _ = future::yield_now().await;
-			assert_eq!(count.0, 0);
-			count.0 += 1;
-			let _ = future::yield_now().await;
-			{
-				let _ = future::yield_now().await;
-			}
-			assert_eq!(count.0, 1);
-			count.0 += 1;
-			let _ = future::yield_now().await;
-			assert_eq!(count.0, 2);
-			count.0 += 1;
-		}
-
-		app.world_mut().run_system_cached(my_system).ok();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
-		app.update();
-		app.update();
-		app.update();
-		app.update();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-		app.world_mut().resource::<Count>().0.xpect().to_be(3);
-	}
-	#[test]
-	fn observers() {
-		let mut app = App::new();
-		app.insert_resource(Count(0))
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-
-		#[derive(Event)]
-		struct MyEvent;
-		// compiles
-		#[async_system]
-		async fn my_exclusive_observer(_: Trigger<MyEvent>, world: &mut World) {
-			let _ = future::yield_now().await;
-			assert_eq!(world.resource::<Count>().0, 0);
-			world.resource_mut::<Count>().0 += 1;
-			let _ = future::yield_now().await;
-			{
-				let _ = future::yield_now().await;
-			}
-			assert_eq!(world.resource::<Count>().0, 1);
-			world.resource_mut::<Count>().0 += 1;
-			let _ = future::yield_now().await;
-			assert_eq!(world.resource::<Count>().0, 2);
-			world.resource_mut::<Count>().0 += 1;
-		}
-
-		#[async_system]
-		async fn my_observer(_: Trigger<MyEvent>, mut count: ResMut<Count>) {
-			let _ = future::yield_now().await;
-			assert_eq!(count.0, 0);
-			count.0 += 1;
-			let _ = future::yield_now().await;
-			{
-				let _ = future::yield_now().await;
-			}
-			assert_eq!(count.0, 1);
-			count.0 += 1;
-			let _ = future::yield_now().await;
-			assert_eq!(count.0, 2);
-			count.0 += 1;
-		}
-		app.world_mut().add_observer(my_observer).trigger(MyEvent);
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
-		app.update();
-		app.update();
-		app.update();
-		app.update();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-		app.world_mut().resource::<Count>().0.xpect().to_be(3);
-	}
-	#[test]
-	fn streams() {
-		let mut app = App::new();
-		app.insert_resource(Count(0))
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-
-		#[async_system]
-		async fn my_system(mut count: ResMut<Count>) {
-			let mut stream = StreamCounter::new(3);
-			while let index = stream.next().await {
-				{
-					let _ = future::yield_now().await;
-				}
-				assert_eq!(index, count.0);
-				count.0 += 1;
-			}
-		}
-
-		app.world_mut().run_system_cached(my_system).ok();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
-		app.update();
-		app.update();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-		app.world_mut().resource::<Count>().0.xpect().to_be(3);
-	}
-
 	#[sweet::test]
-	async fn returns_value_future() {
-		#[async_system]
-		async fn my_system(mut count: ResMut<Count>) -> usize {
-			let _ = future::yield_now().await;
-			let before = count.0;
-			count.0 += 5;
-			if count.0 == 1 {
-				let _ = future::yield_now().await;
-				return count.0;
-			}
-			let _ = future::yield_now().await;
-			// return before + count.0;
-			before + count.0
-		}
-
+	async fn feels_like_async_but_isnt() {
 		let mut app = App::new();
-		app.insert_resource(Count(10))
+		app.init_resource::<Count>()
 			.add_plugins((MinimalPlugins, AsyncPlugin));
+		let fut = app
+			.world_mut()
+			.run_system_cached(|mut commands: AsyncCommands| {
+				commands.spawn(async |queue| {
+					let next = 1;
+					future::yield_now().await;
+					queue.update_resource::<Count>(move |mut count| {
+						count.0 += next
+					});
+					future::yield_now().await;
+					32
+				})
+			})
+			.unwrap();
 
-		let fut = app.world_mut().run_system_cached(my_system).unwrap();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
+		// future completed
+		fut.await.xpect().to_be(32);
 
-		// Progress async work to completion
-		app.update();
-		app.update();
+		// queue not yet applied
+		app.world_mut().resource::<Count>().0.xpect().to_be(0);
 
-		fut.await.xpect().to_be(25);
-		// After completion, the stream task should be removed
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-	}
-
-	#[sweet::test]
-	async fn complex() {
-		/// an async system using futures and streams to count to five
-		#[async_system]
-		async fn my_system(mut count: ResMut<Count>) -> usize {
-			future::yield_now().await;
-			count.0 += 1;
-			assert_eq!(count.0, 1);
-			while let index = StreamCounter::new(4).await {
-				assert_eq!(count.0, index + 1);
-				count.0 += 1;
-			}
-			assert_eq!(count.0, 5);
-			count.0
-		}
-		let mut app = App::new();
-		app.insert_resource(Count(0))
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-
-		let fut = app.world_mut().run_system_cached(my_system).unwrap();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
-
-		// Progress async work to completion
-		app.update();
 		app.update();
 
-		fut.await.xpect().to_be(5);
-		// After completion, the stream task should be removed
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-	}
-	#[sweet::test]
-	async fn results() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin));
-
-		#[async_system]
-		async fn my_system() -> Result {
-			let _ = Ok(())?;
-			let _ = future::yield_now().await;
-			// let _ = async move { Ok(()) }.await?;
-			let _ = future::yield_now().await;
-			{
-				let _ = Err("foobar".into())?;
-				let _ = future::yield_now().await;
-			}
-			let _ = future::yield_now().await;
-			let _ = Ok(())?;
-			Ok(())
-		}
-
-		let fut = app.world_mut().run_system_cached(my_system).unwrap();
-		app.update();
-		app.update();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(0);
-		fut.await.unwrap_err().to_string().xpect().to_be("foobar\n");
+		// queue now applied
+		app.world_mut().resource::<Count>().0.xpect().to_be(1);
 	}
 }
