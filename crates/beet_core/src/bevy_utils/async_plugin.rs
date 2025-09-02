@@ -526,7 +526,7 @@ mod tests {
 		async fn my_system() -> Result {
 			let _ = Ok(())?;
 			let _ = future::yield_now().await;
-			let _ = Ok(())?;
+			// let _ = async move { Ok(()) }.await?;
 			let _ = future::yield_now().await;
 			{
 				let _ = Err("foobar".into())?;

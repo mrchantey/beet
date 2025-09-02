@@ -80,15 +80,17 @@ pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	impl_bundle::impl_bundle(input).into()
 }
 
-/// Syntactic sugar for the Bevy [`AsyncComputeTaskPool`] pattern.
+/// *Syntactic Sugar* for the Bevy [`AsyncComputeTaskPool`] pattern.
 /// This macro rewrites async functions into synchronous Bevy systems by dividing by
 /// each async boundary into sequential systems. The system parameters are not
 /// moved or copied, instead freshly queried once the boundary is crossed.
 ///
-/// ## Warning
+///
+/// ## Ye Be Warned
+///
 /// Fuction body rewriting is a complex procedure, this macro is intended as a quality-of-life
-/// for when system parameters are required after a future or stream boundary. Any `.await`
-/// without this requirement should be moved to an ordinary async function and called by the
+/// for when system parameters are required after a future or stream boundary. 
+/// Any `.await` without this requirement should be moved to an ordinary async function and called by the
 /// async system.
 ///
 /// ```
