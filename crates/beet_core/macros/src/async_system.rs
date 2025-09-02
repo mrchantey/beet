@@ -66,17 +66,60 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 		None
 	});
 
-	// Only prepend AsyncCommands if we don't have &mut World
+	// Determine if the function is an observer (first param is Trigger<...>)
+	let is_observer: bool = sig
+		.inputs
+		.first()
+		.and_then(|arg| {
+			if let FnArg::Typed(pat_ty) = arg {
+				if let syn::Type::Path(tp) = &*pat_ty.ty {
+					if tp.qself.is_none() {
+						if let Some(seg) = tp.path.segments.last() {
+							return Some(seg.ident == "Trigger");
+						}
+					}
+				}
+			}
+			None
+		})
+		.unwrap_or(false);
+
+	// Insert AsyncCommands while preserving Trigger<T> as the first param for observers
 	if world_ident.is_none() {
 		let mut new_inputs: Punctuated<FnArg, Comma> = Punctuated::new();
-		new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
-		for arg in sig.inputs.clone() {
-			new_inputs.push(arg);
+		if is_observer {
+			// Keep the first parameter (Trigger<...>) first
+			if let Some(first) = sig.inputs.first().cloned() {
+				new_inputs.push(first);
+			}
+			// Insert AsyncCommands after Trigger
+			new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
+			// Then push the rest of the original params
+			for arg in sig.inputs.iter().skip(1).cloned() {
+				new_inputs.push(arg);
+			}
+		} else {
+			// Non-observers: AsyncCommands is the first param
+			new_inputs.push(parse_quote!(mut __async_commands: AsyncCommands));
+			for arg in sig.inputs.clone() {
+				new_inputs.push(arg);
+			}
 		}
 		sig.inputs = new_inputs;
 	}
 
-	let closure_params = sig.inputs.clone();
+	// Child closures never receive the Trigger<T>; drop it if this is an observer.
+	let closure_params = if is_observer {
+		let mut filtered: Punctuated<FnArg, Comma> = Punctuated::new();
+		let mut iter = sig.inputs.clone().into_iter();
+		let _ = iter.next(); // skip Trigger<...>
+		for arg in iter {
+			filtered.push(arg);
+		}
+		filtered
+	} else {
+		sig.inputs.clone()
+	};
 
 	let spawn_method: Ident = if is_local {
 		syn::parse_quote!(spawn_and_run_local)

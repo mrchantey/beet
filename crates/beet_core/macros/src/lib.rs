@@ -136,6 +136,16 @@ pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///			count.0 += 1;
 ///		}
 ///	}
+///
+/// #[derive(Event)]
+/// struct MyEvent;
+///
+/// #[async_system]
+/// async fn my_observer(event: Trigger<MyEvent>, mut count: ResMut<Count>) {
+/// 	future::yield_now().await;
+///   count.0 += 1;
+/// 	assert_eq!(count.0, 0);
+/// }
 /// ```
 #[proc_macro_attribute]
 pub fn async_system(

@@ -347,6 +347,22 @@ mod tests {
 
 		#[derive(Event)]
 		struct MyEvent;
+		// compiles
+		#[async_system]
+		async fn my_exclusive_observer(_: Trigger<MyEvent>, world: &mut World) {
+			let _ = future::yield_now().await;
+			assert_eq!(world.resource::<Count>().0, 0);
+			world.resource_mut::<Count>().0 += 1;
+			let _ = future::yield_now().await;
+			{
+				let _ = future::yield_now().await;
+			}
+			assert_eq!(world.resource::<Count>().0, 1);
+			world.resource_mut::<Count>().0 += 1;
+			let _ = future::yield_now().await;
+			assert_eq!(world.resource::<Count>().0, 2);
+			world.resource_mut::<Count>().0 += 1;
+		}
 
 		#[async_system]
 		async fn my_observer(_: Trigger<MyEvent>, mut count: ResMut<Count>) {

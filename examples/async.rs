@@ -8,17 +8,18 @@ fn main() {
 		.add_plugins((MinimalPlugins, AsyncPlugin))
 		.init_resource::<Count>()
 		.add_systems(Startup, setup)
+		.add_observer(my_observer)
 		.run();
 }
 
+/// async systems can await the output of other async systems!
 #[async_system]
 async fn setup(world: &mut World) {
-	// await statements are moved so assign the future
-	// to avoid moving &mut World
+	// await statements are moved so assign the future to release world
 	let fut = world.run_system_cached(count_to_five).unwrap();
 	let count = fut.await;
 	assert_eq!(count, 5);
-	std::process::exit(0);
+	world.trigger(MyEvent);
 }
 
 #[derive(Default, Resource)]
@@ -38,4 +39,15 @@ async fn count_to_five(mut count: ResMut<Count>) -> usize {
 		println!("count: {}", count.0);
 	}
 	count.0
+}
+
+#[derive(Event)]
+struct MyEvent;
+
+
+#[async_system]
+async fn my_observer(event: Trigger<MyEvent>, count: Res<Count>) {
+	future::yield_now().await;
+	println!("observer count: {}", count.0);
+	std::process::exit(0);
 }
