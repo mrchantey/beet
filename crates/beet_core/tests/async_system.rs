@@ -43,7 +43,7 @@ fn futures() {
 
 	app.world_mut().run_system_cached(my_system).ok();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -53,7 +53,7 @@ fn futures() {
 	app.update();
 	app.update();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -102,7 +102,7 @@ fn observers() {
 	}
 	app.world_mut().add_observer(my_observer).trigger(MyEvent);
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -112,7 +112,7 @@ fn observers() {
 	app.update();
 	app.update();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -139,7 +139,7 @@ fn streams() {
 
 	app.world_mut().run_system_cached(my_system).ok();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -147,7 +147,7 @@ fn streams() {
 	app.update();
 	app.update();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -177,7 +177,7 @@ async fn returns_value_future() {
 
 	let fut = app.world_mut().run_system_cached(my_system).unwrap();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -190,7 +190,7 @@ async fn returns_value_future() {
 	fut.await.xpect().to_be(25);
 	// After completion, the stream task should be removed
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -218,7 +218,7 @@ async fn complex() {
 
 	let fut = app.world_mut().run_system_cached(my_system).unwrap();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -231,7 +231,7 @@ async fn complex() {
 	fut.await.xpect().to_be(5);
 	// After completion, the stream task should be removed
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()
@@ -261,7 +261,7 @@ async fn results() {
 	app.update();
 	app.update();
 	app.world_mut()
-		.query_once::<&AsyncTask>()
+		.query_once::<&AsyncStreamTask>()
 		.iter()
 		.count()
 		.xpect()

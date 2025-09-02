@@ -8,7 +8,6 @@ use bevy::tasks::AsyncComputeTaskPool;
 use bevy::tasks::Task;
 use bevy::tasks::futures_lite::Stream;
 use bevy::tasks::futures_lite::StreamExt;
-
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
@@ -27,16 +26,30 @@ pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(PreUpdate, poll_async_tasks);
+		app.init_resource::<AsyncChannel>()
+			.add_systems(PreUpdate, poll_async_tasks);
 	}
 }
 
 fn poll_async_tasks(
 	mut commands: Commands,
-	mut tasks: Query<(Entity, &mut AsyncTask)>,
+	channel: Res<AsyncChannel>,
+	tasks: Query<(Entity, &AsyncTask)>,
+	mut stream_tasks: Query<(Entity, &mut AsyncStreamTask)>,
 ) {
+	while let Ok(mut queue) = channel.rx.try_recv() {
+		commands.append(&mut queue);
+	}
+
+	for (entity, task) in tasks {
+		// if block_on(future::poll_once(&mut task.0)).is_some() {
+		if task.0.is_finished() {
+			commands.entity(entity).despawn();
+		}
+	}
+
 	// Streaming handling: drain all ready command queues produced by streams
-	for (entity, task) in &mut tasks {
+	for (entity, task) in &mut stream_tasks {
 		loop {
 			match task.receiver.try_recv() {
 				Ok(mut queue) => {
@@ -48,7 +61,7 @@ fn poll_async_tasks(
 				}
 				Err(TryRecvError::Closed) => {
 					// Producer finished and channel is closed: remove the component
-					commands.entity(entity).remove::<AsyncTask>();
+					commands.entity(entity).remove::<AsyncStreamTask>();
 					break;
 				}
 			}
@@ -58,14 +71,19 @@ fn poll_async_tasks(
 
 /// Streaming task: background task that sends `CommandQueue` chunks as items.
 #[derive(Component)]
-pub struct AsyncTask {
+pub struct AsyncTask(Task<()>);
+
+
+/// Streaming task: background task that sends `CommandQueue` chunks as items.
+#[derive(Component)]
+pub struct AsyncStreamTask {
 	receiver: async_channel::Receiver<CommandQueue>,
 	/// We use the receiver to detect completion but hold onto task
 	/// as it cancels on drop
 	_task: Task<()>,
 }
 
-impl AsyncTask {
+impl AsyncStreamTask {
 	#[allow(dead_code)]
 	pub(crate) fn new(
 		receiver: async_channel::Receiver<CommandQueue>,
@@ -118,6 +136,7 @@ where
 #[derive(SystemParam)]
 pub struct AsyncCommands<'w, 's> {
 	pub commands: Commands<'w, 's>,
+	pub channel: Res<'w, AsyncChannel>,
 }
 
 impl AsyncCommands<'_, '_> {
@@ -132,20 +151,19 @@ impl AsyncCommands<'_, '_> {
 	{
 		// channel for the final output
 		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
-		// channel to be used throughout the function call
-		let (tx_queue, rx_queue) = async_channel::unbounded::<CommandQueue>();
+		let tx_queue = self.channel.tx();
 
 		let task = AsyncComputeTaskPool::get().spawn(async move {
 			let out = func(AsyncQueue::new(tx_queue)).await;
 			tx_out.try_send(out).expect("Failed to send output");
 		});
-		self.commands.spawn(AsyncTask::new(rx_queue, task));
+		self.commands.spawn(AsyncTask(task));
 
 		Box::pin(async move {
 			match rx_out.recv().await {
 				Ok(v) => v,
 				Err(_) => {
-					panic!("async_system return channel closed");
+					panic!("output channel closed");
 				}
 			}
 		})
@@ -209,7 +227,7 @@ impl AsyncCommands<'_, '_> {
 			}
 			// Dropping the sender closes the channel and signals completion.
 		});
-		self.commands.spawn(AsyncTask::new(rx, task));
+		self.commands.spawn(AsyncStreamTask::new(rx, task));
 	}
 
 	/// Local (non-Send) variant of `spawn_for_each_stream`.
@@ -237,7 +255,7 @@ impl AsyncCommands<'_, '_> {
 				}
 			}
 		});
-		self.commands.spawn(AsyncTask::new(rx, task));
+		self.commands.spawn(AsyncStreamTask::new(rx, task));
 	}
 }
 
@@ -275,6 +293,31 @@ impl Stream for StreamCounter {
 	}
 }
 
+#[derive(Resource)]
+pub struct AsyncChannel {
+	/// the sender for the async channel
+	tx: async_channel::Sender<CommandQueue>,
+	/// the receiver for the async channel, not accesible
+	rx: async_channel::Receiver<CommandQueue>,
+}
+
+impl Default for AsyncChannel {
+	fn default() -> Self {
+		let (tx, rx) = async_channel::unbounded();
+		Self { rx, tx }
+	}
+}
+
+impl AsyncChannel {
+	/// Get the sender of the channel
+	pub fn tx(&self) -> async_channel::Sender<CommandQueue> {
+		let (tx, rx) = async_channel::unbounded();
+		Self { rx, tx }.tx
+	}
+}
+
+
+/// A portable channel for sending a [`CommandQueue`] to the world
 #[derive(Clone)]
 pub struct AsyncQueue {
 	tx: async_channel::Sender<CommandQueue>,
@@ -282,6 +325,11 @@ pub struct AsyncQueue {
 
 impl AsyncQueue {
 	pub fn new(tx: async_channel::Sender<CommandQueue>) -> Self { Self { tx } }
+
+
+	pub fn run_system_with_output() {
+		todo!("return channel");
+	}
 
 	pub fn spawn<B: Bundle>(&self, bundle: B) {
 		self.send(move |world: &mut World| {
