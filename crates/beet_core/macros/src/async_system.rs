@@ -195,16 +195,26 @@ impl Parser {
 
 				let before_inner = self.build_nested(before, false);
 				let __async_commands_expr = self.async_commands_tokens();
+				let inner_clone = self.ret_sender.as_ref().map(|ident| {
+					quote! { let #ident = #ident.clone(); }
+				});
 				return quote! {
 					#before_inner
 					#pre_clone
-					#__async_commands_expr.#stream_method(#stream_expr, move |#pat| {
-						#[allow(unused_mut, unused_variables)]
-						move |#closure_params| {
-							#body_inner
-						}
-					});
-					#after_inner
+					{
+						let __beet_stream = beet::exports::futures_lite::StreamExt::map(#stream_expr, |__beet_item| Option::Some(__beet_item));
+						let __beet_stream = beet::exports::futures_lite::StreamExt::chain(__beet_stream, beet::exports::futures_lite::stream::once(Option::None));
+						#__async_commands_expr.#stream_method(__beet_stream, move |__beet_opt| {
+							#inner_clone
+							#[allow(unused_mut, unused_variables)]
+							move |#closure_params| {
+								match __beet_opt {
+									Option::Some(#pat) => { #body_inner }
+									Option::None => { #after_inner }
+								}
+							}
+						});
+					}
 				};
 			// Handle a top-level await statement
 			} else if is_top_level_await_stmt(stmt) {

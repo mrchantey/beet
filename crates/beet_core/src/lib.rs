@@ -48,6 +48,7 @@ pub mod as_beet {
 
 pub mod exports {
 	pub use async_channel;
+	pub use futures_lite;
 	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use js_sys;
 	#[cfg(feature = "tokens")]
