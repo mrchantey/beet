@@ -516,11 +516,10 @@ mod tests {
 			.xpect()
 			.to_be(0);
 	}
-	#[test]
-	fn results() {
+	#[sweet::test]
+	async fn results() {
 		let mut app = App::new();
-		app.insert_resource(Count(0))
-			.add_plugins((MinimalPlugins, AsyncPlugin));
+		app.add_plugins((MinimalPlugins, AsyncPlugin));
 
 		#[async_system]
 		async fn my_system() -> Result {
@@ -529,7 +528,7 @@ mod tests {
 			let _ = Ok(())?;
 			let _ = future::yield_now().await;
 			{
-				let _ = Ok(())?;
+				let _ = Err("foobar".into())?;
 				let _ = future::yield_now().await;
 			}
 			let _ = future::yield_now().await;
@@ -537,15 +536,7 @@ mod tests {
 			Ok(())
 		}
 
-		app.world_mut().run_system_cached(my_system).ok();
-		app.world_mut()
-			.query_once::<&AsyncStreamTask>()
-			.iter()
-			.count()
-			.xpect()
-			.to_be(1);
-		app.update();
-		app.update();
+		let fut = app.world_mut().run_system_cached(my_system).unwrap();
 		app.update();
 		app.update();
 		app.world_mut()
@@ -554,6 +545,6 @@ mod tests {
 			.count()
 			.xpect()
 			.to_be(0);
-		app.world_mut().resource::<Count>().0.xpect().to_be(3);
+		fut.await.unwrap_err().to_string().xpect().to_be("foobar\n");
 	}
 }

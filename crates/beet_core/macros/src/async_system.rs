@@ -1,6 +1,7 @@
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn;
 use syn::Expr;
 use syn::FnArg;
 use syn::ItemFn;
@@ -9,9 +10,6 @@ use syn::parse_macro_input;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
-use syn::{
-	self,
-};
 
 pub fn async_system(
 	attr: proc_macro::TokenStream,
@@ -35,7 +33,12 @@ struct Parser {
 	stream_method: Ident,
 	ret_sender: Option<Ident>,
 	world_ident: Option<Ident>,
+	// Whether the top-level return type is a Result<...>
+	ret_is_result: bool,
+	// Are we generating inside a spawned closure
+	in_closure: bool,
 }
+
 
 fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 	let mut sig = input.sig;
@@ -150,22 +153,30 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 		}
 
 		// Build nested body with awareness of a return-value sender.
+		let ret_is_result = match &*ret_ty {
+			syn::Type::Path(tp) if tp.qself.is_none() => tp
+				.path
+				.segments
+				.last()
+				.map(|s| s.ident == "Result")
+				.unwrap_or(false),
+			_ => false,
+		};
 		let parser = Parser {
 			closure_params: closure_params.clone(),
 			spawn_method: spawn_method.clone(),
 			stream_method: stream_method.clone(),
 			ret_sender: Some(syn::parse_quote!(__beet_return_tx)),
 			world_ident: world_ident.clone(),
+			ret_is_result,
+			in_closure: false,
 		};
 		let nested = parser.build_nested(&input.block.stmts, true);
 
 		quote! {
 			let (__beet_return_tx, __beet_return_rx) = beet::exports::async_channel::bounded::<#ret_ty>(1);
-			#nested
-			{
-				// Box and pin the returned async block into the concrete pinned boxed future
-				// type required by the rewritten signature. Cast to the exact trait object
-				// type so the function item has a concrete return type.
+			// Helper to produce the boxed future; used for normal exit and for early-exit on `?` before first await.
+			let __beet_finish = || {
 				#[allow(unused_imports)]
 				use ::std::boxed::Box;
 				#[allow(unused_imports)]
@@ -182,6 +193,10 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 					// Cast to the concrete pinned trait-object type expected by the signature.
 					__beet_boxed as _
 				}
+			};
+			#nested
+			{
+				__beet_finish()
 			}
 		}
 	} else {
@@ -191,6 +206,8 @@ fn parse(input: ItemFn, is_local: bool) -> syn::Result<TokenStream> {
 			stream_method: stream_method.clone(),
 			ret_sender: None,
 			world_ident: world_ident.clone(),
+			ret_is_result: false,
+			in_closure: false,
 		};
 		{
 			let nested = parser.build_nested(&input.block.stmts, false);
@@ -228,8 +245,10 @@ impl Parser {
 				let after = &stmts[idx + 1..];
 
 				// Recursively process the loop body (it may contain awaits)
-				let body_inner = self.build_nested(&body_block.stmts, false);
-				let after_inner = self.build_nested(after, allow_tail);
+				let mut child = self.clone();
+				child.in_closure = true;
+				let body_inner = child.build_nested(&body_block.stmts, false);
+				let after_inner = child.build_nested(after, allow_tail);
 
 				// If returning a value, clone sender so closures capture clones.
 				let pre_clone = self.ret_sender.as_ref().map(|ident| {
@@ -264,7 +283,11 @@ impl Parser {
 				let before = &stmts[..idx];
 				let await_stmt = stmt;
 				let after = &stmts[idx + 1..];
-				let inner = self.build_nested(after, allow_tail);
+				let inner = {
+					let mut __beet_child = self.clone();
+					__beet_child.in_closure = true;
+					__beet_child.build_nested(after, allow_tail)
+				};
 
 				let pre_clone = self.ret_sender.as_ref().map(|ident| {
 					quote! { let #ident = #ident.clone(); }
@@ -300,13 +323,11 @@ impl Parser {
 					let pre_clone = self.ret_sender.as_ref().map(|ident| {
 						quote! { let #ident = #ident.clone(); }
 					});
+					let before_inner = self.build_nested(before, false);
 					return quote! {
-						#(#before)*
+						#before_inner
 						#pre_clone
-						{
-							let __beet_value = { #ret_value };
-							let _ = #ret_tx.try_send(__beet_value);
-						}
+						#ret_tx.try_send(#ret_value).ok();
 					};
 				}
 			}
@@ -315,12 +336,37 @@ impl Parser {
 			if allow_tail {
 				if let Some(Stmt::Expr(expr, None)) = stmts.last() {
 					let before = &stmts[..stmts.len().saturating_sub(1)];
-					return quote! {
-						#(#before)*
-						{
-							let __beet_value = { #expr };
-							let _ = #ret_tx.try_send(__beet_value);
+					let before_inner = self.build_nested(before, false);
+					// If the tail expression is a try (`expr?`) and we're returning Result,
+					// convert it into a send of Ok(...) or early-send Err(...)
+					if self.ret_is_result {
+						if let Expr::Try(ex_try) = expr {
+							let inner = &ex_try.expr;
+							let __beet_early = if self.in_closure {
+								quote! { return; }
+							} else {
+								quote! { return __beet_finish(); }
+							};
+							return quote! {
+								#before_inner
+								{
+									let __beet_try_tmp = #inner;
+									match __beet_try_tmp {
+										Ok(__beet_ok) => {
+											let _ = #ret_tx.try_send(__beet_ok);
+										}
+										Err(__beet_err) => {
+											let _ = #ret_tx.try_send(Err(__beet_err));
+											#__beet_early
+										}
+									}
+								}
+							};
 						}
+					}
+					return quote! {
+						#before_inner
+						#ret_tx.try_send(#expr).ok();
 					};
 				}
 			}
@@ -344,6 +390,84 @@ impl Parser {
 		allow_tail: bool,
 	) -> Option<TokenStream> {
 		match stmt {
+			// Handle top-level try expressions (e.g., `foo()?;`)
+			Stmt::Expr(Expr::Try(ex_try), semi) => {
+				if self.ret_sender.is_some() && self.ret_is_result {
+					let ret_tx = self.ret_sender.as_ref().unwrap();
+					let expr_inner = &ex_try.expr;
+					let __beet_early = if self.in_closure {
+						quote! { return; }
+					} else {
+						quote! { return __beet_finish(); }
+					};
+					if semi.is_some() {
+						Some(quote! {
+							{
+								let __beet_try_tmp = #expr_inner;
+								match __beet_try_tmp {
+									Ok(__beet_ok) => __beet_ok,
+									Err(__beet_err) => {
+										let _ = #ret_tx.try_send(Err(__beet_err));
+										#__beet_early
+									}
+								}
+							};
+						})
+					} else {
+						Some(quote! {
+							{
+								let __beet_try_tmp = #expr_inner;
+								match __beet_try_tmp {
+									Ok(__beet_ok) => __beet_ok,
+									Err(__beet_err) => {
+										let _ = #ret_tx.try_send(Err(__beet_err));
+										#__beet_early
+									}
+								}
+							}
+						})
+					}
+				} else {
+					None
+				}
+			}
+			// Handle let-initializer try expressions (supports both explicit `Expr::Try` and `LocalInit::diverge` `?`)
+			Stmt::Local(local) => {
+				if let Some(init) = &local.init {
+					if self.ret_sender.is_some() && self.ret_is_result {
+						// Detect `let pat = expr?;` whether parsed as Expr::Try or via LocalInit::diverge (`?`)
+						let has_qmark = matches!(&*init.expr, Expr::Try(_))
+							|| init.diverge.is_some();
+						if has_qmark {
+							let ret_tx = self.ret_sender.as_ref().unwrap();
+							let pat = &local.pat;
+							// If `expr` is `Try`, use its inner base; otherwise use the expression as-is.
+							let inner_expr = match &*init.expr {
+								Expr::Try(expr_try) => &expr_try.expr,
+								_ => &init.expr,
+							};
+							let __beet_early = if self.in_closure {
+								quote! { return; }
+							} else {
+								quote! { return __beet_finish(); }
+							};
+							return Some(quote! {
+								let #pat = {
+									let __beet_try_tmp = #inner_expr;
+									match __beet_try_tmp {
+										Ok(__beet_ok) => __beet_ok,
+										Err(__beet_err) => {
+											let _ = #ret_tx.try_send(Err(__beet_err));
+											#__beet_early
+										}
+									}
+								};
+							});
+						}
+					}
+				}
+				None
+			}
 			Stmt::Expr(Expr::Block(b), semi) => {
 				let inner = self.build_block(&b.block, allow_tail);
 				if semi.is_some() {
@@ -403,27 +527,61 @@ impl Parser {
 		self.build_nested(&block.stmts, allow_tail)
 	}
 
+	// Rebuild an expression, handling try (`?`) when returning Result.
+	fn rebuild_expr(&self, expr: &Expr) -> Option<TokenStream> {
+		if self.ret_sender.is_some() && self.ret_is_result {
+			match expr {
+				Expr::Try(ex_try) => {
+					let ret_tx = self.ret_sender.as_ref().unwrap();
+					let inner = &ex_try.expr;
+					let __beet_early = if self.in_closure {
+						quote! { return; }
+					} else {
+						quote! { return __beet_finish(); }
+					};
+					Some(quote! {
+						{
+							let __beet_try_tmp = #inner;
+							match __beet_try_tmp {
+								Ok(__beet_ok) => __beet_ok,
+								Err(__beet_err) => {
+									let _ = #ret_tx.try_send(Err(__beet_err));
+									#__beet_early
+								}
+							}
+						}
+					})
+				}
+				_ => None,
+			}
+		} else {
+			None
+		}
+	}
+
 	// Rebuild an `if` expression, recursing into then/else branches.
 	fn build_if(&self, ife: &syn::ExprIf, _allow_tail: bool) -> TokenStream {
 		let cond = &ife.cond;
+		let cond_tokens =
+			self.rebuild_expr(cond).unwrap_or_else(|| quote! { #cond });
 		let then_inner = self.build_nested(&ife.then_branch.stmts, false);
 		if let Some((_, else_expr)) = &ife.else_branch {
 			match else_expr.as_ref() {
 				Expr::If(else_if) => {
 					let else_tokens = self.build_if(else_if, false);
-					quote! { if #cond { #then_inner } else #else_tokens }
+					quote! { if #cond_tokens { #then_inner } else #else_tokens }
 				}
 				Expr::Block(else_block) => {
 					let else_inner =
 						self.build_nested(&else_block.block.stmts, false);
-					quote! { if #cond { #then_inner } else { #else_inner } }
+					quote! { if #cond_tokens { #then_inner } else { #else_inner } }
 				}
 				other => {
-					quote! { if #cond { #then_inner } else { #other } }
+					quote! { if #cond_tokens { #then_inner } else { #other } }
 				}
 			}
 		} else {
-			quote! { if #cond { #then_inner } }
+			quote! { if #cond_tokens { #then_inner } }
 		}
 	}
 	fn async_commands_tokens(&self) -> TokenStream {
