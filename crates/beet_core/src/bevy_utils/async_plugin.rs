@@ -340,6 +340,49 @@ mod tests {
 		app.world_mut().resource::<Count>().0.xpect().to_be(3);
 	}
 	#[test]
+	fn observers() {
+		let mut app = App::new();
+		app.insert_resource(Count(0))
+			.add_plugins((MinimalPlugins, AsyncPlugin));
+
+		#[derive(Event)]
+		struct MyEvent;
+
+		#[async_system]
+		async fn my_observer(_: Trigger<MyEvent>, mut count: ResMut<Count>) {
+			let _ = future::yield_now().await;
+			assert_eq!(count.0, 0);
+			count.0 += 1;
+			let _ = future::yield_now().await;
+			{
+				let _ = future::yield_now().await;
+			}
+			assert_eq!(count.0, 1);
+			count.0 += 1;
+			let _ = future::yield_now().await;
+			assert_eq!(count.0, 2);
+			count.0 += 1;
+		}
+		app.world_mut().add_observer(my_observer).trigger(MyEvent);
+		app.world_mut()
+			.query_once::<&AsyncStreamTask>()
+			.iter()
+			.count()
+			.xpect()
+			.to_be(1);
+		app.update();
+		app.update();
+		app.update();
+		app.update();
+		app.world_mut()
+			.query_once::<&AsyncStreamTask>()
+			.iter()
+			.count()
+			.xpect()
+			.to_be(0);
+		app.world_mut().resource::<Count>().0.xpect().to_be(3);
+	}
+	#[test]
 	fn streams() {
 		let mut app = App::new();
 		app.insert_resource(Count(0))

@@ -81,10 +81,34 @@ pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 /// Syntactic sugar for the Bevy [`AsyncComputeTaskPool`] pattern.
+/// This macro rewrites async functions into synchronous Bevy systems by dividing
+/// each await boundary into sequential tasks.
 ///
-/// This macro rewrites async functions into synchronous Bevy systems by extracting
-/// top-level `await` futures and streams into closure systems with the same parameters
-/// scheduled after each future resolves.
+/// ## Warning
+/// Fuction body rewriting is a complex procedure, this macro is intended as a quality-of-life
+/// for when system parameters are required after a future or stream boundary. Any `.await`
+/// without this requirement should be moved to an ordinary async function and called by the
+/// async system.
+///
+/// ```
+/// #[async_system]
+/// async fn make_request() {
+///   let foo = Request::new("example.com").send().await;
+///   // bad, increased complexity for no benefit
+///   let bar = foo.json().await;
+/// }
+/// #[async_system]
+/// async fn make_request() {
+///   // good, non-essential await moved outside function body
+///   let bar = make_request_inner().await;
+/// }
+///
+/// async fn make_request_inner()-> Json {
+///   let foo = Request::new("example.com").send().await;
+///   foo.json().await
+/// }
+/// ```
+///
 /// ## Example
 /// ```
 ///
