@@ -73,6 +73,55 @@ fn poll_async_tasks(
 #[derive(Component)]
 pub struct AsyncTask(Task<()>);
 
+impl AsyncTask {
+	/// A system to reduce boilerplate in spawing async tasks,
+	/// running the provided func with an [`AsyncQueue`],
+	/// returning another future resolving to its output.
+	pub fn spawn_with_queue<Func, Fut, Out>(
+		In(func): In<Func>,
+		commands: Commands,
+		channel: Res<AsyncChannel>,
+	) -> Pin<Box<dyn Future<Output = Out>>>
+	where
+		Func: 'static + FnOnce(AsyncQueue) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
+	{
+		let tx = AsyncQueue::new(channel.tx());
+		let fut = func(tx);
+		Self::spawn(In(fut), commands)
+	}
+	/// A system to reduce boilerplate in spawing async tasks,
+	/// running the provided future, returning another future resolving to its output.
+	pub fn spawn<Fut, Out>(
+		In(fut): In<Fut>,
+		mut commands: Commands,
+	) -> Pin<Box<dyn Future<Output = Out>>>
+	where
+		// no send requirement for std AsyncComputeTaskPool
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
+	{
+		// channel for the final output
+		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
+
+		let task = AsyncComputeTaskPool::get().spawn(async move {
+			let out = fut.await;
+			tx_out.try_send(out).expect("Failed to send output");
+		});
+		commands.spawn(Self(task));
+
+		Box::pin(async move {
+			match rx_out.recv().await {
+				Ok(v) => v,
+				Err(_) => {
+					panic!("output channel closed");
+				}
+			}
+		})
+	}
+}
+
 
 /// Streaming task: background task that sends `CommandQueue` chunks as items.
 #[derive(Component)]
@@ -136,40 +185,9 @@ where
 #[derive(SystemParam)]
 pub struct AsyncCommands<'w, 's> {
 	pub commands: Commands<'w, 's>,
-	pub channel: Res<'w, AsyncChannel>,
 }
 
 impl AsyncCommands<'_, '_> {
-	pub fn spawn<Func, Fut, Out>(
-		&mut self,
-		func: Func,
-	) -> Pin<Box<dyn Future<Output = Out>>>
-	where
-		Func: 'static + Fn(AsyncQueue) -> Fut,
-		Fut: Future<Output = Out>,
-		Out: 'static,
-	{
-		// channel for the final output
-		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
-		let tx_queue = self.channel.tx();
-
-		let task = AsyncComputeTaskPool::get().spawn(async move {
-			let out = func(AsyncQueue::new(tx_queue)).await;
-			tx_out.try_send(out).expect("Failed to send output");
-		});
-		self.commands.spawn(AsyncTask(task));
-
-		Box::pin(async move {
-			match rx_out.recv().await {
-				Ok(v) => v,
-				Err(_) => {
-					panic!("output channel closed");
-				}
-			}
-		})
-	}
-
-
 	/// Spawn a Future, await it on a worker, and run the resulting system on the main thread.
 	///
 	/// This is backwards-compatible with older behaviour but implemented on top
@@ -310,10 +328,7 @@ impl Default for AsyncChannel {
 
 impl AsyncChannel {
 	/// Get the sender of the channel
-	pub fn tx(&self) -> async_channel::Sender<CommandQueue> {
-		let (tx, rx) = async_channel::unbounded();
-		Self { rx, tx }.tx
-	}
+	pub fn tx(&self) -> async_channel::Sender<CommandQueue> { self.tx.clone() }
 }
 
 
@@ -326,19 +341,14 @@ pub struct AsyncQueue {
 impl AsyncQueue {
 	pub fn new(tx: async_channel::Sender<CommandQueue>) -> Self { Self { tx } }
 
-
-	pub fn run_system_with_output() {
-		todo!("return channel");
-	}
-
 	pub fn spawn<B: Bundle>(&self, bundle: B) {
-		self.send(move |world: &mut World| {
+		self.with(move |world: &mut World| {
 			world.spawn(bundle);
 		});
 	}
 
 	pub fn insert_resource<R: Resource>(&self, resource: R) {
-		self.send(move |world: &mut World| {
+		self.with(move |world: &mut World| {
 			world.insert_resource(resource);
 		});
 	}
@@ -346,15 +356,34 @@ impl AsyncQueue {
 		&self,
 		func: impl FnOnce(Mut<R>) + Send + 'static,
 	) {
-		self.send(move |world: &mut World| {
+		self.with(move |world: &mut World| {
 			func(world.resource_mut::<R>());
 		});
 	}
 
-	pub fn send(&self, cmd: impl Command<()>) {
+	/// Queues the command
+	pub fn with(&self, func: impl Command + FnOnce(&mut World)) {
 		let mut queue = CommandQueue::default();
-		queue.push(cmd);
-		self.tx.try_send(queue).expect("Failed to send command. Async queues should be unbounded, was the receiver dropped?");
+		queue.push(func);
+		self.tx.try_send(queue).unwrap();
+	}
+	/// Queues the command, creating another channel that will resolve when
+	/// the task is complete, returing its output
+	pub fn with_then<O>(
+		&self,
+		func: impl Command + FnOnce(&mut World) -> O,
+	) -> impl Future<Output = O>
+	where
+		O: 'static + Send + Sync,
+	{
+		let (out_tx, out_rx) = async_channel::bounded(1);
+		let mut queue = CommandQueue::default();
+		queue.push(move |world: &mut World| {
+			let out = func(world);
+			out_tx.try_send(out).unwrap();
+		});
+		self.tx.try_send(queue).unwrap();
+		async move { out_rx.recv().await.unwrap() }
 	}
 }
 
@@ -383,14 +412,15 @@ mod tests {
 	struct Count(usize);
 
 	#[sweet::test]
-	async fn feels_like_async_but_isnt() {
+	async fn async_task() {
 		let mut app = App::new();
 		app.init_resource::<Count>()
 			.add_plugins((MinimalPlugins, AsyncPlugin));
 		let fut = app
 			.world_mut()
-			.run_system_cached(|mut commands: AsyncCommands| {
-				commands.spawn(async |queue| {
+			.run_system_cached_with(
+				AsyncTask::spawn_with_queue,
+				async |queue| {
 					let next = 1;
 					future::yield_now().await;
 					queue.update_resource::<Count>(move |mut count| {
@@ -398,8 +428,8 @@ mod tests {
 					});
 					future::yield_now().await;
 					32
-				})
-			})
+				},
+			)
 			.unwrap();
 
 		// future completed
