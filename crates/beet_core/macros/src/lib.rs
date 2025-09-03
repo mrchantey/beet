@@ -1,7 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-mod async_system;
 mod impl_bundle;
 mod sendit;
 mod to_tokens;
@@ -78,82 +77,4 @@ pub fn derive_sendit(
 #[proc_macro_derive(ImplBundle)]
 pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	impl_bundle::impl_bundle(input).into()
-}
-
-/// *Syntactic Sugar* for the Bevy [`AsyncComputeTaskPool`] pattern.
-/// This macro rewrites async functions into synchronous Bevy systems by dividing by
-/// each async boundary into sequential systems. The system parameters are not
-/// moved or copied, instead freshly queried once the boundary is crossed.
-///
-///
-/// ## Ye Be Warned
-///
-/// Fuction body rewriting is a complex procedure, this macro is intended as a quality-of-life
-/// for when system parameters are required after a future or stream boundary. 
-/// Any `.await` without this requirement should be moved to an ordinary async function and called by the
-/// async system.
-///
-/// ```
-/// #[async_system]
-/// async fn make_request() {
-///   let foo = Request::new("example.com").send().await;
-///   // bad, increased complexity for no benefit
-///   let bar = foo.json().await;
-/// }
-/// #[async_system]
-/// async fn make_request() {
-///   // good, non-essential await moved outside function body
-///   let bar = make_request_inner().await;
-/// }
-///
-/// async fn make_request_inner()-> Json {
-///   let foo = Request::new("example.com").send().await;
-///   foo.json().await
-/// }
-/// ```
-///
-/// ## Example
-/// ```
-///
-/// #[derive(Resource)]
-///	struct Count(usize);
-///
-/// #[async_system]
-///	async fn my_future(mut count: ResMut<Count>) {
-///		future::yield_now().await;
-/// 	assert_eq!(count.0, 0);
-///		count.0 += 1;
-///		future::yield_now().await;
-/// 	assert_eq!(count.0, 1);
-///		count.0 += 1;
-///		future::yield_now().await;
-/// 	assert_eq!(count.0, 2);
-///		count.0 += 1;
-///	}
-///
-/// #[async_system]
-///	async fn my_stream(mut count: ResMut<Count>) {
-///		let mut stream = StreamCounter::new(3);
-///		while let index = stream.next().await {
-/// 		assert_eq!(count.0, index);
-///			count.0 += 1;
-///		}
-///	}
-///
-/// #[derive(Event)]
-/// struct MyEvent;
-///
-/// #[async_system]
-/// async fn my_observer(event: Trigger<MyEvent>, mut count: ResMut<Count>) {
-/// 	future::yield_now().await;
-///   count.0 += 1;
-/// 	assert_eq!(count.0, 0);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn async_system(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	async_system::async_system(attr, item).into()
 }
