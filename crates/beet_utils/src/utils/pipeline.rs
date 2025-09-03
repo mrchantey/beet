@@ -79,6 +79,27 @@ pub trait PipelineTarget: Sized {
 	/// assert_eq!(7_u32.xinto::<u64>(), 7);
 	/// ```
 	fn xinto<T: From<Self>>(self) -> T { T::from(self) }
+
+	/// Return a `String` containing the `Debug` representation of the value.
+	///
+	/// Unlike `xdebug` which prints the value to stdout and returns the value,
+	/// this method returns the formatted debug string.
+	fn xfmt_debug(&self) -> String
+	where
+		Self: std::fmt::Debug,
+	{
+		format!("{:?}", self)
+	}
+
+	/// Return a `String` containing the `Display` representation of the value.
+	///
+	/// Similar to `xfmt_debug`, but uses the `Display` formatting instead of `Debug`.
+	fn xfmt(&self) -> String
+	where
+		Self: std::fmt::Display,
+	{
+		format!("{}", self)
+	}
 }
 impl<T: Sized> PipelineTarget for T {}
 

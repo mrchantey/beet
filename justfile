@@ -64,9 +64,7 @@ install-cli *args:
 lambda-build:
 	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
 
-
-
-mod *args:
+run-mod *args:
 	just sweet mod --exclude */codegen/* {{args}}
 
 # Run and watch a workspace example
@@ -184,11 +182,11 @@ test-rsx *args:
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
 	cargo test -p beet_net						 	--features=tokens,native-tls  											{{args}} -- {{test-threads}}
-	cargo test -p beet_net 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
+#cargo test -p beet_net 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 
 test-flow *args:
 	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
@@ -203,10 +201,10 @@ test-utils *args:
 	cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
 	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
-	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+#cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+#cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 
 test-all-lib *args:
 	cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}

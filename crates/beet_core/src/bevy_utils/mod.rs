@@ -1,6 +1,8 @@
+#[cfg(not(target_arch = "wasm32"))]
 mod async_plugin;
 mod extensions;
 mod utilities;
+#[cfg(not(target_arch = "wasm32"))]
 pub use async_plugin::*;
 pub use extensions::*;
 pub use utilities::*;
