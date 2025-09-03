@@ -1,4 +1,4 @@
-mod agent;
+mod session;
 mod openai;
-pub use agent::*;
+pub use session::*;
 pub use openai::*;

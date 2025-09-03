@@ -4,6 +4,49 @@ use serde_json::Value;
 
 #[ext]
 pub impl Value {
+	/// wraps [`Value::as_str`] with helpful error message
+	fn to_str(&self) -> Result<&str> {
+		self.as_str()
+			.ok_or_else(|| format!("Expected string, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_f64`] with helpful error message
+	fn to_f64(&self) -> Result<f64> {
+		self.as_f64()
+			.ok_or_else(|| format!("Expected f64, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_i64`] with helpful error message
+	fn to_i64(&self) -> Result<i64> {
+		self.as_i64()
+			.ok_or_else(|| format!("Expected i64, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_u64`] with helpful error message
+	fn to_u64(&self) -> Result<u64> {
+		self.as_u64()
+			.ok_or_else(|| format!("Expected u64, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_bool`] with helpful error message
+	fn to_bool(&self) -> Result<bool> {
+		self.as_bool()
+			.ok_or_else(|| format!("Expected bool, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_array`] with helpful error message
+	fn to_array(&self) -> Result<&Vec<Value>> {
+		self.as_array()
+			.ok_or_else(|| format!("Expected array, got {:?}", self).into())
+	}
+	/// wraps [`Value::as_object`] with helpful error message
+	fn to_object(&self) -> Result<&serde_json::Map<String, Value>> {
+		self.as_object()
+			.ok_or_else(|| format!("Expected object, got {:?}", self).into())
+	}
+	/// checks for null with helpful error message
+	fn to_null(&self) -> Result<()> {
+		self.is_null()
+			.then(|| ())
+			.ok_or_else(|| format!("Expected null, got {:?}", self).into())
+	}
+
+
 	/// Get a non-null field, returning a helpful error message if it is missing.
 	fn field(&self, field_name: &str) -> Result<&Value> {
 		match &self[field_name]{
@@ -16,71 +59,70 @@ pub impl Value {
 		}
 	}
 
-
 	/// Get a field as a string, returning a helpful error message if it is
 	/// missing or of a different type.
-	fn field_str(&self, field_name: &str) -> Result<String> {
+	fn field_str(&self, field_name: &str) -> Result<&str> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_str() {
-			Ok(value.to_string())
-		} else {
-			Err(format! {"Expected field '{field_name}' to be string, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_str()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be string, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as an i64, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_i64(&self, field_name: &str) -> Result<i64> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_i64() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be i64, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_i64()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be i64, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as a u64, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_u64(&self, field_name: &str) -> Result<u64> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_u64() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be u64, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_u64()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be u64, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as an f64, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_f64(&self, field_name: &str) -> Result<f64> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_f64() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be f64, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_f64()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be f64, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as a bool, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_bool(&self, field_name: &str) -> Result<bool> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_bool() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be bool, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_bool()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be bool, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as an array, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_array(&self, field_name: &str) -> Result<&Vec<Value>> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_array() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be array, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_array()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be array, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as an object, returning a helpful error message if it is
@@ -90,22 +132,23 @@ pub impl Value {
 		field_name: &str,
 	) -> Result<&serde_json::Map<String, Value>> {
 		let field = &self[field_name];
-		if let Some(value) = field.as_object() {
-			Ok(value)
-		} else {
-			Err(format! {"Expected field '{field_name}' to be object, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.as_object()
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be object, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 
 	/// Get a field as null, returning a helpful error message if it is
 	/// missing or of a different type.
 	fn field_null(&self, field_name: &str) -> Result<()> {
 		let field = &self[field_name];
-		if field.is_null() {
-			Ok(())
-		} else {
-			Err(format! {"Expected field '{field_name}' to be null, got '{}'\nParent Object: {:?}",field, self}.into())
-		}
+		field
+					.is_null()
+					.then(|| ())
+					.ok_or_else(|| {
+						format! {"Expected field '{field_name}' to be null, got '{}'\nParent Object: {:?}",field, self}.into()
+					})
 	}
 }
 

@@ -1,21 +1,22 @@
 use crate::prelude::*;
-use beet_core::bevybail;
-use beet_core::bevyhow;
+use beet_core::as_beet::*;
 use beet_net::prelude::*;
 use beet_utils::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde_json::json;
 
 const OPENAI_API_BASE_URL: &str = "https://api.openai.com/v1";
 const GPT_5_MINI: &str = "gpt-5-mini";
 
+#[derive(Component)]
+#[require(Agent)]
 pub struct OpenAiProvider {
 	api_key: String,
 	/// Model used for chat completions, defaults to [`GPT_5_MINI`]
 	completion_model: String,
-	/// Whether new requests should use the previous response id
-	stateful: bool,
-	prev_responses_id: Option<String>,
+	/// The id of the previous response
+	prev_response_id: Option<String>,
 }
 
 impl OpenAiProvider {
@@ -26,138 +27,207 @@ impl OpenAiProvider {
 		Self {
 			api_key: std::env::var("OPENAI_API_KEY").unwrap(),
 			completion_model: GPT_5_MINI.into(),
-			stateful: false,
-			prev_responses_id: None,
+			prev_response_id: None,
 		}
 	}
 
 	fn completions_req(
 		&self,
-		req: CompletionsRequest,
-		stream: bool,
+		input: &Vec<serde_json::Value>,
 	) -> Result<Request> {
 		let url = format!("{OPENAI_API_BASE_URL}/responses");
-
-		let messages = req
-			.content
-			.into_iter()
-			.map(|content| match content {
-				Content::System(InputContent::Text(TextContent(content))) => {
-					json! {{
-						"role":"system",
-						"content": content
-					}}
-				}
-				Content::User(InputContent::Text(TextContent(content))) => {
-					json! {{
-						"role":"user",
-						"content": content
-					}}
-				}
-				Content::Agent(OutputContent::Text(TextContent(content))) => {
-					json! {{
-						"role":"agent",
-						"content": content
-					}}
-				}
-			})
-			.collect::<Vec<_>>();
-
-
 		Request::post(url)
 			.with_auth_bearer(&self.api_key)
 			.with_json_body(&json! {{
 				"model": self.completion_model,
-				"stream": stream,
-				"input": messages,
+				"stream": true,
+				"input": input,
+				"previous_response_id": self.prev_response_id
 			}})?
 			.xok()
 	}
 }
 
+pub fn open_ai_provider() -> impl Bundle {
+	(
+		OpenAiProvider::from_env(),
+		EntityObserver::new(handle_openai_request),
+	)
+}
 
-impl AgentProvider for OpenAiProvider {
-	fn stream_completion(
-		&self,
-		request: CompletionsRequest,
-	) -> SendBoxedFuture<Result<CompletionsStream>> {
-		let req = self.completions_req(request, true);
-		Box::pin(async move {
-			let stream = req?.send().await?.event_source().await?;
-
-			Ok(CompletionsStream {
-				stream,
-				map_data: Box::new(|ev| {
-					use beet_utils::prelude::*;
-					use serde_json::Value;
-
-					// let data = ev.data;
-					println!("event!: {}", ev.event);
-
-					let Ok(json) = serde_json::from_str::<Value>(&ev.data)
-					else {
-						return Ok(CompletionsEvent::NoJson(ev));
-					};
-
-					match json.field_str("type")?.as_str() {
-						"response.created" => {
-							let session_id = json
-								.field("response")?
-								.field("id")?
-								.to_string();
-							Ok(CompletionsEvent::Created { session_id })
-						}
-						"response.in_progress" => {
-							Ok(CompletionsEvent::Other { value: json })
-						}
-						_ => {
-							Ok(CompletionsEvent::Other { value: json })
-							// if let Some(data) =
-							// 	json["choices"][0]["delta"]["content"].as_str()
-							// {
-							// 	Ok(CompletionsEvent::TextDelta(data.to_string()))
-							// } else {
-							// 	Ok(CompletionsEvent::Other(json))
-							// }
-
-							// bevybail!("unhandled type: {}", other)
-						}
-					}
-				}),
-			})
-		})
+fn handle_openai_request(
+	trigger: Trigger<ContentChanged>,
+	query: Query<&OpenAiProvider>,
+	mut commands: Commands,
+	session_query: SessionQuery,
+) -> Result {
+	let member_ent = trigger.target();
+	if member_ent == trigger.owner {
+		// we dont react to our own changed content
+		println!("ignoring own content");
+		return Ok(());
 	}
+	let input = session_query
+		.content_changed(&trigger)
+		.into_iter()
+		.map(|item| {
+			let role = match item.role {
+				Role::This => "assistant",
+				Role::Developer => "developer",
+				Role::Other => "user",
+			};
+			let content = match item.content {
+				Content::Text(content) => &content.0,
+			};
+			json! {{
+				"role": role,
+				"content": content
+			}}
+		})
+		.collect::<Vec<_>>();
+	let provider = query.get(member_ent)?;
+	let req = provider.completions_req(&input)?;
+
+	commands.run_system_cached_with(
+		AsyncTask::spawn_with_queue_unwrap,
+		async move |queue| {
+			let mut stream = req.send().await?.event_source().await?;
+
+			// map of content_index to entity
+			let mut content_map = HashMap::new();
+
+			while let Some(ev) = stream.next().await {
+				let ev = ev?;
+				if let Ok(body) =
+					serde_json::from_str::<serde_json::Value>(&ev.data)
+				{
+					// println!("event: {body:#?}");
+					// https://platform.openai.com/docs/api-reference/responses_streaming/response
+					match body.field_str("type")? {
+						"response.created" => {
+							// let id = body["response"]["id"].to_str()?;
+						}
+						"response.in_progress" => {}
+						"response.output_item.added" => {}
+						"response.content_part.added" => {
+							match body["part"]["type"].to_str()? {
+								"output_text" => {
+									let index =
+										body["content_index"].to_u64()?;
+									if content_map.contains_key(&index) {
+										bevybail!(
+											"Duplicate output index: {index}"
+										);
+									} else {
+										let entity = queue
+											.spawn_then((
+												ContentOwner(member_ent),
+												TextContent::default(),
+											))
+											.await;
+										content_map.insert(index, entity);
+									}
+								}
+								_ => {}
+							}
+						}
+						"response.output_text.delta" => {
+							let index = body["content_index"].to_u64()?;
+							let entity =
+								content_map.get(&index).ok_or_else(|| {
+									bevyhow!(
+										"Missing entity for index: {index}"
+									)
+								})?;
+							let new_text = body["delta"].to_str()?.to_string();
+							queue.entity(*entity).get_mut::<TextContent>(
+								move |mut content| {
+									content.push_str(&new_text);
+									println!("content: {}", **content)
+								},
+							);
+						}
+						"response.output_text.done" => {}
+						"response.content_part.done" => {}
+						"response.output_item.done" => {}
+						"response.completed" => {
+							let input_tokens =
+								body["response"]["usage"]["input_tokens"]
+									.to_u64()?;
+							let output_tokens =
+								body["response"]["usage"]["output_tokens"]
+									.to_u64()?;
+							let id =
+								body["response"]["id"].to_str()?.to_string();
+
+							queue
+								.entity(member_ent)
+								.get_mut::<OpenAiProvider>(
+									move |mut provider| {
+										provider.prev_response_id = Some(id);
+									},
+								)
+								.get_mut::<TokenUsage>(move |mut tokens| {
+									tokens.input_tokens += input_tokens;
+									tokens.output_tokens += output_tokens;
+								})
+								.trigger(ResponseComplete);
+						}
+						_ => {}
+					}
+					// return Ok(());
+				};
+			}
+			Ok(())
+		},
+	);
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::*;
+	use beet_core::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
 		dotenv::dotenv().ok();
 
-		let agent = Agent::new(OpenAiProvider::from_env());
-		let mut completions = agent.stream_completion("foobar").await.unwrap();
-		while let Some(event) = completions.next().await {
-			match event.unwrap() {
-				CompletionsEvent::Created { session_id } => {
-					println!("Received created event: {}", session_id)
-				}
-				CompletionsEvent::TextDelta(text) => {
-					println!("Received text: {}", text)
-				}
-				CompletionsEvent::Other { value } => {
-					println!("Received other data: {:#?}", value)
-				}
-				CompletionsEvent::NoJson(ev) => {
-					println!("NoJson with data: {:?}", ev)
-				}
-			}
-		}
-		// expect(true).to_be_false();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
+
+		let user = 0;
+		let agent = 1;
+		SessionBuilder::new()
+			.member(user, ())
+			.member(agent, open_ai_provider())
+			.content(user, "whats 2 + 4")
+			.build(&mut app.world_mut().commands())
+			.unwrap();
+
+		app.add_observer(
+			|ev: Trigger<ResponseComplete>,
+			 mut commands: Commands,
+			 text: Query<&TextContent>,
+			 query: Query<(&TokenUsage, &OwnedContent)>| {
+				let (_tokens, content) = query.get(ev.target()).unwrap();
+				text.get(content[0])
+					.unwrap()
+					.0
+					.xref()
+					.xpect()
+					.to_contain("6");
+				commands.send_event(AppExit::Success);
+			},
+		);
+
+		app.run_async(AsyncChannel::runner_async)
+			.await
+			.into_result()
+			.unwrap();
 	}
 }

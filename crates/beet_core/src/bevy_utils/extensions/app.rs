@@ -54,14 +54,14 @@ pub impl App {
 		})
 	}
 
-	/// Convenience method for running with an async runner,
-	/// this will [`std::mem::take`] the app and pass it to the runner.
+	/// Convenience method for running with `app.run_async`
+	/// in the case that we are already in an async runtime
 	async fn run_async(
-		&mut self,
+		self,
 		runner: impl AsyncFnOnce(App) -> AppExit + 'static,
 	) -> AppExit {
-		let app = std::mem::take(self);
-		runner(app).await
+		// let app = std::mem::take(self);
+		runner(self).await
 	}
 
 	fn run_once(&mut self) -> AppExit {
