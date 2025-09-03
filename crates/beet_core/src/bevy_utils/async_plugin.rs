@@ -44,9 +44,19 @@ fn poll_async_tasks(
 pub struct AsyncTask(Task<()>);
 
 impl AsyncTask {
+	/// A system to reduce boilerplate in spawing async tasks, running the provided
+	pub fn spawn<Fut, Out>(In(fut): In<Fut>, mut commands: Commands)
+	where
+		// no send requirement for std AsyncComputeTaskPool
+		Fut: 'static + Future<Output = Out>,
+	{
+		let task = AsyncComputeTaskPool::get().spawn(async move {
+			let _ = fut.await;
+		});
+		commands.spawn(Self(task));
+	}
 	/// A system to reduce boilerplate in spawing async tasks,
 	/// running the provided func with an [`AsyncQueue`],
-	/// returning another future resolving to its output.
 	///
 	/// ## Warning
 	///
@@ -54,44 +64,26 @@ impl AsyncTask {
 	/// the [`AsyncChannel`] must be flushed first:
 	/// - For realtime apps, this will naturally occur via [`App::run`]
 	/// - For tests and reactive apps, use a pattern like [`AsyncChannel::runner_async`]
-	pub fn spawn_with_queue_then<Func, Fut, Out>(
-		In(func): In<Func>,
-		commands: Commands,
-		channel: Res<AsyncChannel>,
-	) -> Pin<Box<dyn Future<Output = Out>>>
-	where
-		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static,
-	{
-		let tx = AsyncQueue::new(channel.tx());
-		let fut = func(tx);
-		Self::spawn_then(In(fut), commands)
-	}
-	pub fn spawn_with_queue_unwrap<Func, Fut>(
+	pub fn spawn_with_queue<Func, Fut, Out>(
 		In(func): In<Func>,
 		commands: Commands,
 		channel: Res<AsyncChannel>,
 	) where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Result>,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
 	{
-		let tx = AsyncQueue::new(channel.tx());
-		let fut = func(tx.clone());
-		// we can discard future, its still ran by
-		// bevy tasks
-		let _ = Self::spawn_then(
-			In(async move {
-				if let Err(err) = fut.await {
-					eprintln!("Async task failed: {}", err);
-					tx.send_event(AppExit::from_code(1));
-				}
-			}),
-			commands,
-		);
+		let fut = func(channel.queue());
+		Self::spawn(In(fut), commands)
 	}
+
 	/// A system to reduce boilerplate in spawing async tasks,
 	/// running the provided future, returning another future resolving to its output.
+	/// ## Returned Future
+	/// The returned future is for the *receiving channel* of the output value,
+	/// not the execution of the future itsself.
+	/// if you dont need the output value this future can be safely dropped and the system
+	/// will still run.
 	pub fn spawn_then<Fut, Out>(
 		In(fut): In<Fut>,
 		mut commands: Commands,
@@ -120,6 +112,52 @@ impl AsyncTask {
 			}
 		})
 	}
+
+	/// A system to reduce boilerplate in spawing async tasks,
+	/// running the provided func with an [`AsyncQueue`],
+	/// returning another future resolving to its output.
+	///
+	/// ## Warning
+	///
+	/// If awaiting results from methods like [`AsyncQueue::with`],
+	/// the [`AsyncChannel`] must be flushed first:
+	/// - For realtime apps, this will naturally occur via [`App::run`]
+	/// - For tests and reactive apps, use a pattern like [`AsyncChannel::runner_async`]
+	pub fn spawn_with_queue_then<Func, Fut, Out>(
+		In(func): In<Func>,
+		commands: Commands,
+		channel: Res<AsyncChannel>,
+	) -> Pin<Box<dyn Future<Output = Out>>>
+	where
+		Func: 'static + FnOnce(AsyncQueue) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
+	{
+		let fut = func(channel.queue());
+		Self::spawn_then(In(fut), commands)
+	}
+	pub fn spawn_with_queue_unwrap<Func, Fut>(
+		In(func): In<Func>,
+		commands: Commands,
+		channel: Res<AsyncChannel>,
+	) where
+		Func: 'static + FnOnce(AsyncQueue) -> Fut,
+		Fut: 'static + Future<Output = Result>,
+	{
+		let queue = channel.queue();
+		let fut = func(queue.clone());
+		// we can discard future, its still ran by
+		// bevy tasks
+		let _ = Self::spawn_then(
+			In(async move {
+				if let Err(err) = fut.await {
+					eprintln!("Async task failed: {}", err);
+					queue.send_event(AppExit::from_code(1));
+				}
+			}),
+			commands,
+		);
+	}
 }
 
 
@@ -141,6 +179,11 @@ impl Default for AsyncChannel {
 impl AsyncChannel {
 	/// Get the sender of the channel
 	pub fn tx(&self) -> async_channel::Sender<CommandQueue> { self.tx.clone() }
+	pub fn queue(&self) -> AsyncQueue {
+		AsyncQueue {
+			tx: self.tx.clone(),
+		}
+	}
 
 	/// Uses the [`AsyncChannel::rx`] as a signal to run updates,
 	/// this means that the rx in poll_async_tasks should always be empty
