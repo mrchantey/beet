@@ -234,7 +234,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 [features]
 default = ["flow", "nightly"]
 #💡 helper features
-launch = ["build"]
+launch = ["beet_net", "build"]
 server = ["beet_net", "design", "net", "serde"]
 client = [
 	"rsx",
