@@ -1,3 +1,5 @@
+// TODO use webidl or something to autogenerate these
+// possibly use templates instead
 use crate::prelude::*;
 
 #[derive(Default, Buildable, AttributeBlock)]
@@ -11,6 +13,7 @@ pub struct BaseHtmlAttributes {
 	pub onchange: Option<EventHandler<OnChange>>,
 	pub oninput: Option<EventHandler<OnInput>>,
 	pub onclick: Option<EventHandler<OnClick>>,
+	pub onkeydown: Option<EventHandler<OnKeyDown>>,
 }
 #[derive(Default, Buildable, AttributeBlock)]
 pub struct ButtonHtmlAttributes {
