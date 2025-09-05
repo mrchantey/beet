@@ -85,6 +85,10 @@ run-p crate example *args:
 run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
+
+chat:
+	sweet run -w --example chat
+
 run-csr:
 	cargo run --example csr --features=client
 	just watch just build-csr
