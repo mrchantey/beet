@@ -93,7 +93,9 @@ impl Page {
 	}
 
 	pub async fn export_pdf(&mut self) -> Result<Vec<u8>> {
+		// how to wait for full page load?
 		time_ext::sleep_secs(5).await;
+
 		let response = self
 			.send_with_backoff(json!({
 				"method": "Page.printToPDF",
@@ -107,8 +109,6 @@ impl Page {
 				}
 			}))
 			.await?;
-
-		println!("PDF response: {:?}", response);
 
 		if let Some(data) = response["result"]["data"].as_str() {
 			let pdf_bytes =
