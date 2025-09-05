@@ -1,5 +1,6 @@
 +++
 title = "The Full Moon Harvest #2"
+created= "2025-08-09"
 +++
 
 # The Full Moon Harvest #2
