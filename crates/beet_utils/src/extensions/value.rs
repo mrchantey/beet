@@ -1,9 +1,20 @@
+use bevy::ecs::error::BevyError;
 use bevy::ecs::error::Result;
 use extend::ext;
 use serde_json::Value;
 
 #[ext]
 pub impl Value {
+	fn set_field(&mut self, field: &str, value: Value) -> Result<&mut Self> {
+		if let Some(obj) = self.as_object_mut() {
+			obj.insert(field.to_string(), value);
+			Ok(self)
+		} else {
+			Err(BevyError::from(format!("Expected object, got {:?}", self)))
+		}
+	}
+
+
 	/// wraps [`Value::as_str`] with helpful error message
 	fn to_str(&self) -> Result<&str> {
 		self.as_str()

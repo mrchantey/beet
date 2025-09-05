@@ -13,6 +13,7 @@
 						"beet/client",
 						"beet/launch",
 						"beet/lambda",
+						"beet/chrome",
 						"beet/css",
 						"beet/aws"
 					]

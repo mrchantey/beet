@@ -162,6 +162,7 @@ tokio = { version = "1", features = [
 	"rt-multi-thread",
 	"time",
 ] }
+exponential-backoff = { version= "2" }
 
 #💡 macros
 
@@ -260,6 +261,7 @@ examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
 design = ["rsx", "dep:beet_design"]
+chrome = ["beet_net?/chrome"]
 # query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]

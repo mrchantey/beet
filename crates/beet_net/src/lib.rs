@@ -4,6 +4,8 @@
 mod app_router;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
+#[cfg(all(feature = "chrome", not(target_arch = "wasm32")))]
+mod chrome;
 mod handlers;
 mod http_utils;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
@@ -20,7 +22,11 @@ pub mod prelude {
 	pub use crate::object_storage::*;
 	pub use crate::templates::*;
 
+	#[cfg(all(feature = "chrome", not(target_arch = "wasm32")))]
+	pub use crate::chrome::*;
 	pub use http::StatusCode;
+	pub use url::Url;
+
 
 	pub use crate::app_router::*;
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
@@ -42,9 +48,9 @@ pub mod prelude {
 
 
 pub mod exports {
+	pub use bevy::tasks::futures_lite;
+	pub use eventsource_stream;
 	pub use http;
 	pub use http_body_util;
 	pub use url;
-	pub use url::Url;
-	pub use eventsource_stream;
 }

@@ -19,6 +19,7 @@ struct Cli {
 enum SubCommands {
 	Build(RunBuild),
 	New(RunNew),
+	ExportPdf(ExportPdf),
 }
 
 #[tokio::main]
@@ -26,5 +27,6 @@ async fn main() -> Result {
 	match Cli::parse().command {
 		SubCommands::Build(cmd) => cmd.run().await,
 		SubCommands::New(cmd) => cmd.run().await,
+		SubCommands::ExportPdf(cmd) => cmd.run().await,
 	}
 }
