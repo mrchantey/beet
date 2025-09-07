@@ -54,6 +54,9 @@ fn wasm_bindgen(
 		// alternatively es modules target: experimental-nodejs-module
 		.arg("--no-typescript")
 		.arg(&exe_path)
+		.xtap(|cmd| {
+			debug!("🌱 Running wasm-bindgen\n{:?}", cmd);
+		})
 		.status()?
 		.exit_ok()?
 		.xok()
@@ -61,7 +64,6 @@ fn wasm_bindgen(
 
 // TODO wasm opt
 fn wasm_opt(html_constants: &HtmlConstants, html_dir: &Path) -> Result<()> {
-	debug!("🌱 Optimizing wasm binary");
 	let wasm_file = html_dir.join(format!(
 		"{}/{}_bg.wasm",
 		&html_constants.wasm_dir.display(),
@@ -75,6 +77,9 @@ fn wasm_opt(html_constants: &HtmlConstants, html_dir: &Path) -> Result<()> {
 		.arg("--output")
 		.arg(&wasm_file)
 		.arg(&wasm_file)
+		.xtap(|cmd| {
+			debug!("🌱 Optimizing wasm binary\n{:?}", cmd);
+		})
 		.status()?
 		.exit_ok()?;
 
