@@ -1,6 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![feature(if_let_guard, result_flattening)]
+#![feature(if_let_guard)]
 mod app_router;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;

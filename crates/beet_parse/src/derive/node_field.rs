@@ -19,7 +19,7 @@ impl<'a> std::ops::Deref for NodeField<'a> {
 
 
 impl<'a> NodeField<'a> {
-	pub fn parse_item_fn(input: &ItemFn) -> Result<Vec<NodeField>> {
+	pub fn parse_item_fn(input: &ItemFn) -> Result<Vec<NodeField<'_>>> {
 		NamedField::parse_item_fn(input)?
 			.into_iter()
 			.map(|field| {
@@ -28,7 +28,9 @@ impl<'a> NodeField<'a> {
 			})
 			.collect()
 	}
-	pub fn parse_derive_input(input: &DeriveInput) -> Result<Vec<NodeField>> {
+	pub fn parse_derive_input(
+		input: &DeriveInput,
+	) -> Result<Vec<NodeField<'_>>> {
 		NamedField::parse_derive_input(input)?
 			.into_iter()
 			.map(|field| {

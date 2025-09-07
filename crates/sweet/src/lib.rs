@@ -3,11 +3,9 @@
 #![feature(test)]
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
-#![feature(panic_payload_as_str)]
 // implement FnMut for MockFunc
 #![feature(unboxed_closures)]
 #![cfg_attr(feature = "nightly", feature(fn_traits, backtrace_frames))]
-// #![feature(panic_payload_as_str)]
 
 /// Matchers and utilities for running webdriver tests
 #[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]

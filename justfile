@@ -34,7 +34,6 @@ init-flow:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 
-# once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
 	just cli build -p beet_site
 	cd infra && npm ci

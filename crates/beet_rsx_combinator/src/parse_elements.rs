@@ -98,7 +98,7 @@ where
 pub fn rsx_closing_element<I>(
 	name: &RsxElementName,
 	input: I,
-) -> ParseResult<RsxClosingElement, I>
+) -> ParseResult<RsxClosingElement<'_>, I>
 where
 	I: Stream<Item = char>,
 {
