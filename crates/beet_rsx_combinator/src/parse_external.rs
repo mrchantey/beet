@@ -394,22 +394,45 @@ mod test {
 
 	#[test]
 	pub fn test_rsx_spread_code_block() {
-		expect(parser(rsx_spread_code_block).parse("").is_err()).to_be(true);
-		expect(parser(rsx_spread_code_block).parse(" ").is_err()).to_be(true);
-		expect(parser(rsx_spread_code_block).parse("foo").is_err()).to_be(true);
-		expect(parser(rsx_spread_code_block).parse("{...}").is_err())
+		parser(rsx_spread_code_block)
+			.parse("")
+			.is_err()
+			.xpect()
 			.to_be(true);
-		expect(parser(rsx_spread_code_block).parse("{...foo}").unwrap())
+		parser(rsx_spread_code_block)
+			.parse(" ")
+			.is_err()
+			.xpect()
+			.to_be(true);
+		parser(rsx_spread_code_block)
+			.parse("foo")
+			.is_err()
+			.xpect()
+			.to_be(true);
+		parser(rsx_spread_code_block)
+			.parse("{...}")
+			.is_err()
+			.xpect()
+			.to_be(true);
+		parser(rsx_spread_code_block)
+			.parse("{...foo}")
+			.unwrap()
+			.xpect()
 			.to_be((RsxParsedExpression(vec!["foo".into()]), ""));
-		expect(parser(rsx_spread_code_block).parse("{ ... foo }").unwrap())
+		parser(rsx_spread_code_block)
+			.parse("{ ... foo }")
+			.unwrap()
+			.xpect()
 			.to_be((RsxParsedExpression(vec![" foo ".into()]), ""));
-		expect(parser(rsx_spread_code_block).parse("{...{foo}}").unwrap())
+		parser(rsx_spread_code_block)
+			.parse("{...{foo}}")
+			.unwrap()
+			.xpect()
 			.to_be((RsxParsedExpression(vec!["{foo}".into()]), ""));
-		expect(
-			parser(rsx_spread_code_block)
-				.parse("{ ... { foo } }")
-				.unwrap(),
-		)
-		.to_be((RsxParsedExpression(vec![" { foo } ".into()]), ""));
+		parser(rsx_spread_code_block)
+			.parse("{ ... { foo } }")
+			.unwrap()
+			.xpect()
+			.to_be((RsxParsedExpression(vec![" { foo } ".into()]), ""));
 	}
 }

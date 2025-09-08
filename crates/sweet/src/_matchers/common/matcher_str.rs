@@ -62,15 +62,15 @@ mod test {
 
 	#[test]
 	fn str() {
-		// expect("foo".to_string()).to_be("foo")?;
+		// "foo".to_string().xpect().to_be("foo")?;
 
-		expect("foobar").to_contain("bar");
-		expect("foobar").not().to_contain("baz");
+		"foobar".xpect().to_contain("bar");
+		"foobar".xpect().not().to_contain("baz");
 
-		expect("foobar").to_start_with("foo");
-		expect("foobar").not().to_start_with("bar");
+		"foobar".xpect().to_start_with("foo");
+		"foobar".xpect().not().to_start_with("bar");
 
-		expect("foobar").to_end_with("bar");
-		expect("foobar").not().to_end_with("foo");
+		"foobar".xpect().to_end_with("bar");
+		"foobar".xpect().not().to_end_with("foo");
 	}
 }

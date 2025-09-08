@@ -52,13 +52,14 @@ mod test {
 		let mut agents = world.query::<(Entity, &Transform)>();
 		let agents = agents.iter(&world);
 
-		expect(cohere_impulse(
+		cohere_impulse(
 			entity,
 			Vec3::ZERO,
 			MaxSpeed(2.),
 			&Cohere::<GroupSteerAgent>::default(),
 			agents,
-		))
+		)
+		.xpect()
 		.map(|i| i.0)
 		.to_be_close_to(Vec3::new(1.41, 1.41, 0.));
 	}

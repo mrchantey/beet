@@ -103,6 +103,6 @@ mod test {
 			MaxSpeed::default(),
 			None,
 		);
-		expect(*impulse).to_be(Vec3::new(1., 0., 0.));
+		(*impulse).xpect().to_be(Vec3::new(1., 0., 0.));
 	}
 }

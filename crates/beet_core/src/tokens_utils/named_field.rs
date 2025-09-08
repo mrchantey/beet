@@ -243,9 +243,9 @@ mod test {
 			pub foo: Option<u32>
 		};
 		let named = NamedField::parse_field(&field).unwrap();
-		expect(named.is_optional()).to_be_true();
-		expect(named.attrs.len()).to_be(1);
-		// expect(true).to_be_false();
+		named.is_optional().xpect().to_be_true();
+		named.attrs.len().xpect().to_be(1);
+		// true.xpect().to_be_false();
 	}
 	#[test]
 	fn pat_ty() {
@@ -258,8 +258,11 @@ mod test {
 		};
 
 		let named = NamedField::parse_pat_ty(&field).unwrap();
-		expect(named.is_optional()).to_be_true();
-		expect(named.inner_ty).to_be(&syn::parse_quote! { Foo<Bar> });
-		expect(named.attrs.len()).to_be(1);
+		named.is_optional().xpect().to_be_true();
+		named
+			.inner_ty
+			.xpect()
+			.to_be(&syn::parse_quote! { Foo<Bar> });
+		named.attrs.len().xpect().to_be(1);
 	}
 }

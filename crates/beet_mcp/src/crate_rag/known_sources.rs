@@ -238,11 +238,13 @@ mod test {
 
 	#[test]
 	fn works() {
-		expect(KNOWN_SOURCES.get(&ContentSourceKey::new(
-			"bevy",
-			"0.16.0",
-			ContentType::Examples,
-		)))
-		.to_be_ok();
+		KNOWN_SOURCES
+			.get(&ContentSourceKey::new(
+				"bevy",
+				"0.16.0",
+				ContentType::Examples,
+			))
+			.xpect()
+			.to_be_ok();
 	}
 }

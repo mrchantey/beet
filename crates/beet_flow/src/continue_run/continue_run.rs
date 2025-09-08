@@ -106,7 +106,7 @@ mod test {
 		// adds
 		let entity =
 			world.spawn(ContinueRun).flush_trigger(OnRun::local()).id();
-		expect(world.get::<Running>(entity)).to_be_some();
+		world.get::<Running>(entity).xpect().to_be_some();
 	}
 	#[test]
 	fn removes() {
@@ -117,14 +117,17 @@ mod test {
 			.spawn((Running::default(), ContinueRun))
 			.flush_trigger(OnResultAction::local(RunResult::Success))
 			.id();
-		expect(world.get::<Running>(entity)).to_be_none();
+		world.get::<Running>(entity).xpect().to_be_none();
 	}
 
 	#[test]
 	fn sets_orgin_on_add_default() {
 		let mut world = World::new();
 		let entity = world.spawn(Running::default()).id();
-		expect(world.get::<Running>(entity).unwrap())
+		world
+			.get::<Running>(entity)
+			.unwrap()
+			.xpect()
 			.to_be(&Running { origin: entity });
 	}
 
@@ -137,7 +140,10 @@ mod test {
 		let action = world.spawn(ContinueRun).id();
 		world.flush_trigger(OnRunAction::new(action, origin, ()));
 
-		expect(world.get::<Running>(action).unwrap())
+		world
+			.get::<Running>(action)
+			.unwrap()
+			.xpect()
 			.to_be(&Running::new(origin));
 	}
 }

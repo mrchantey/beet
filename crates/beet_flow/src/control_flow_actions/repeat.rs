@@ -100,16 +100,16 @@ mod test {
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
-		expect(&func).to_have_been_called_times(1);
+		(&func).xpect().to_have_been_called_times(1);
 		app.update();
-		expect(&func).to_have_been_called_times(2);
+		(&func).xpect().to_have_been_called_times(2);
 		app.update();
-		expect(&func).to_have_been_called_times(3);
+		(&func).xpect().to_have_been_called_times(3);
 		app.update();
 		// // even though child failed, it keeps repeating
-		expect(&func).to_have_been_called_times(4);
+		(&func).xpect().to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(5);
+		(&func).xpect().to_have_been_called_times(5);
 	}
 
 	#[test]
@@ -123,16 +123,16 @@ mod test {
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
-		expect(&func).to_have_been_called_times(1);
+		(&func).xpect().to_have_been_called_times(1);
 		app.update();
-		expect(&func).to_have_been_called_times(2);
+		(&func).xpect().to_have_been_called_times(2);
 		app.update();
-		expect(&func).to_have_been_called_times(3);
+		(&func).xpect().to_have_been_called_times(3);
 		app.update();
 		// it stopped repeating
-		expect(&func).to_have_been_called_times(3);
+		(&func).xpect().to_have_been_called_times(3);
 		app.update();
-		expect(&func).to_have_been_called_times(3);
+		(&func).xpect().to_have_been_called_times(3);
 	}
 	#[test]
 	fn repeat_child() {
@@ -146,15 +146,15 @@ mod test {
 			.with_child(SucceedTimes::new(2))
 			.flush_trigger(OnRun::local());
 
-		expect(&func).to_have_been_called_times(2);
+		(&func).xpect().to_have_been_called_times(2);
 		app.update();
-		expect(&func).to_have_been_called_times(4);
+		(&func).xpect().to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(6);
+		(&func).xpect().to_have_been_called_times(6);
 		app.update();
-		expect(&func).to_have_been_called_times(6);
+		(&func).xpect().to_have_been_called_times(6);
 		app.update();
 		// last one, it stopped repeating
-		expect(&func).to_have_been_called_times(6);
+		(&func).xpect().to_have_been_called_times(6);
 	}
 }

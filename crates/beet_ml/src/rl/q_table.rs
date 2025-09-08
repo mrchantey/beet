@@ -126,8 +126,8 @@ mod test {
 		)
 		.evaluate();
 
-		expect(eval.mean).to_be(1.);
-		expect(eval.std).to_be(0.);
-		expect(eval.total_steps).to_be(600);
+		eval.mean.xpect().to_be(1.);
+		eval.std.xpect().to_be(0.);
+		eval.total_steps.xpect().to_be(600);
 	}
 }

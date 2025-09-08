@@ -164,76 +164,87 @@ mod test {
 	#[test]
 	#[rustfmt::skip]
 	fn tag_names() {
-		expect(hash(rsx_tokens! {<div/>}))
+		hash(rsx_tokens! {<div/>}).xpect()
 		.to_be(hash(rsx_tokens! {<span/>}));
 
-		
-		expect(hash(rsx_tokens! {<Foo/>}))
-    .not()		
+
+		hash(rsx_tokens! {<Foo/>}).xpect()
+    .not()
 		.to_be(hash(rsx_tokens! {<Bar/>}));
 	}
 	#[test]
 	fn attributes() {
-		expect(hash(rsx_tokens! {<div foo/>}))
+		hash(rsx_tokens! {<div foo/>})
+			.xpect()
 			.to_be(hash(rsx_tokens! {<div bar/>}));
 	}
 	#[test]
 	fn node_blocks() {
 		//same
-		expect(hash(rsx_tokens! {<div>{1}</div>}))
+		hash(rsx_tokens! {<div>{1}</div>})
+			.xpect()
 			.to_be(hash(rsx_tokens! {<div>{1}</div>}));
 		//dif inner
-		expect(hash(rsx_tokens! {<div>{1}</div>}))
+		hash(rsx_tokens! {<div>{1}</div>})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_tokens! {<div>{2}</div>}));
 		// diff num
-		expect(hash(rsx_tokens! {<div>foo </div>}))
+		hash(rsx_tokens! {<div>foo </div>})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_tokens! {<div>bar {2}</div>}));
 	}
 	#[test]
 	fn combinator() {
 		//same
-		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
+		hash(rsx_combinator_tokens! {"<div>{1}</div>"})
+			.xpect()
 			.to_be(hash(rsx_combinator_tokens! {"<div>{1}</div>"}));
 		//dif inner
-		expect(hash(rsx_combinator_tokens! {"<div>{1}</div>"}))
+		hash(rsx_combinator_tokens! {"<div>{1}</div>"})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));
 		// diff num
-		expect(hash(rsx_combinator_tokens! {"<div></div>"}))
+		hash(rsx_combinator_tokens! {"<div></div>"})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_combinator_tokens! {"<div>{2}</div>"}));
 		// diff attribute
-		expect(hash(rsx_combinator_tokens! {"<div foo={let a = 2;a}/>"}))
+		hash(rsx_combinator_tokens! {"<div foo={let a = 2;a}/>"})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_combinator_tokens! {"<div foo={let a = 3;a}/>"}));
 	}
 	#[test]
 	fn templates() {
 		// same
-		expect(hash(rsx_tokens! {<Foo>{1}</Foo>}))
+		hash(rsx_tokens! {<Foo>{1}</Foo>})
+			.xpect()
 			.to_be(hash(rsx_tokens! {<Foo>{1}</Foo>}));
 
 		// diff
-		expect(hash(rsx_tokens! {<Foo>{1}</Foo>}))
+		hash(rsx_tokens! {<Foo>{1}</Foo>})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_tokens! {<Foo>{2}</Foo>}));
-		expect(hash(rsx_tokens! {<Foo bar=1/>}))
+		hash(rsx_tokens! {<Foo bar=1/>})
+			.xpect()
 			.not()
 			.to_be(hash(rsx_tokens! {<Foo bar=2/>}));
 
 		// diff nested
-		expect(hash(
-			rsx_tokens! {<Foo><Bar><Bazz>bar{1}</Bazz></Bar></Foo>},
-		))
-		.not()
-		.to_be(hash(rsx_tokens! {<Foo><Bar><Bazz>bar</Bazz></Bar></Foo>}));
+		hash(rsx_tokens! {<Foo><Bar><Bazz>bar{1}</Bazz></Bar></Foo>})
+			.xpect()
+			.not()
+			.to_be(hash(rsx_tokens! {<Foo><Bar><Bazz>bar</Bazz></Bar></Foo>}));
 	}
 	#[test]
 	fn snippet_roots() {
 		// different LineCol means different hash
-		expect(hash_inner(rsx_tokens! {<div>{1}</div>}, false))
+		hash_inner(rsx_tokens! {<div>{1}</div>}, false)
+			.xpect()
 			.not()
 			.to_be(hash_inner(rsx_tokens! {<div>{1}</div>}, false));
 	}
@@ -252,8 +263,8 @@ mod test {
 		app.world_mut()
 			.spawn(SourceFile::new(index_path.into_abs()));
 
-		expect(query.iter(app.world()).count()).to_be(1);
+		query.iter(app.world()).count().xpect().to_be(1);
 		app.update();
-		expect(query.iter(app.world()).count()).to_be(0);
+		query.iter(app.world()).count().xpect().to_be(0);
 	}
 }

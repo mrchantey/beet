@@ -87,7 +87,11 @@ mod test {
 		// the 'top' of a sine wave is a quarter of 1 hz
 		app.update_with_millis(250);
 
-		expect(app.world().get::<Transform>(agent).unwrap().translation)
+		app.world()
+			.get::<Transform>(agent)
+			.unwrap()
+			.translation
+			.xpect()
 			.to_be(Vec3::new(0., 1., 0.));
 	}
 }

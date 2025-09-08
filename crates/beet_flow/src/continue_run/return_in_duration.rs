@@ -91,10 +91,10 @@ mod test {
 
 		app.update_with_secs(1);
 
-		expect(&on_result).not().to_have_been_called();
+		(&on_result).xpect().not().to_have_been_called();
 
 		app.update_with_secs(10);
 
-		expect(&on_result).to_have_been_called();
+		(&on_result).xpect().to_have_been_called();
 	}
 }

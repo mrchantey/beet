@@ -68,16 +68,16 @@ mod test {
 			.id();
 		world.entity_mut(grandchild).flush_trigger(OnRun::local());
 
-		expect(&counter).to_have_been_called_times(3);
-		expect(&counter).to_have_returned_nth_with(
+		(&counter).xpect().to_have_been_called_times(3);
+		(&counter).xpect().to_have_returned_nth_with(
 			0,
 			&OnResultAction::new(grandchild, grandchild, RunResult::Success),
 		);
-		expect(&counter).to_have_returned_nth_with(
+		(&counter).xpect().to_have_returned_nth_with(
 			1,
 			&OnResultAction::new(child, grandchild, RunResult::Success),
 		);
-		expect(&counter).to_have_returned_nth_with(
+		(&counter).xpect().to_have_returned_nth_with(
 			2,
 			&OnResultAction::new(parent, grandchild, RunResult::Success),
 		);

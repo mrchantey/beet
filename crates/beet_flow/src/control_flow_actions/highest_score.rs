@@ -150,15 +150,15 @@ mod test {
 				ReturnWith(RunResult::Success),
 			))
 			.flush_trigger(OnRun::local());
-		expect(&on_request_score).to_have_been_called_times(4);
-		expect(&on_score).to_have_been_called_times(2);
+		(&on_request_score).xpect().to_have_been_called_times(4);
+		(&on_score).xpect().to_have_been_called_times(2);
 
 		#[rustfmt::skip]
-		expect(on_run()).to_be(vec![
-			"root".to_string(), 
+		on_run().xpect().to_be(vec![
+			"root".to_string(),
 			"child2".to_string()
 		]);
-		expect(on_result()).to_be(vec![
+		on_result().xpect().to_be(vec![
 			("child2".to_string(), RunResult::Success),
 			("root".to_string(), RunResult::Success),
 		]);

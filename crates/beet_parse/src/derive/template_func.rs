@@ -246,9 +246,9 @@ mod test {
 	#[test]
 	fn segments() {
 		let a: PathSegment = syn::parse_quote! {Foo};
-		expect(a.ident).to_be("Foo");
+		a.ident.xpect().to_be("Foo");
 		let a: PathSegment = syn::parse_quote! {Foo<Bar>};
-		expect(a.ident).to_be("Foo");
+		a.ident.xpect().to_be("Foo");
 	}
 
 	#[test]

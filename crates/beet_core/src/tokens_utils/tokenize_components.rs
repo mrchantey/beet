@@ -73,8 +73,8 @@ mod test {
 		RsxComponents::tokenize_if_present(&world, &mut items, entity);
 
 		// Should have two token streams
-		expect(items.len()).to_be(2);
+		items.len().xpect().to_be(2);
 		// check that the token streams are not empty
-		expect(items.iter().all(|ts| !ts.is_empty())).to_be_true();
+		items.iter().all(|ts| !ts.is_empty()).xpect().to_be_true();
 	}
 }

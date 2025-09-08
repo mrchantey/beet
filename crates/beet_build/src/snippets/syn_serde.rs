@@ -152,7 +152,7 @@ mod test {
 		let deserialized_string =
 			deserialized.item.to_token_stream().to_string();
 
-		expect(deserialized_string).to_be(original_string);
+		deserialized_string.xpect().to_be(original_string);
 
 		let invalid_json = r#"{"item": "fn invalid syntax {"}"#;
 		serde_json::from_str::<ItemWrapper>(invalid_json)

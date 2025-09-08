@@ -27,10 +27,12 @@ mod test {
 
 	#[test]
 	fn vec3() {
-		expect(Vec3::ZERO).to_be_close_to(Vec3::ZERO);
-		expect(Vec3::ZERO).not().to_be_close_to(Vec3::ONE);
-		expect(Foo(Vec3::ZERO).0).to_be_close_to(Vec3::ZERO);
-		expect(Foo(Vec3::ZERO).0)
+		Vec3::ZERO.xpect().to_be_close_to(Vec3::ZERO);
+		Vec3::ZERO.xpect().not().to_be_close_to(Vec3::ONE);
+		Foo(Vec3::ZERO).0.xpect().to_be_close_to(Vec3::ZERO);
+		Foo(Vec3::ZERO)
+			.0
+			.xpect()
 			.not()
 			.to_be_close_to(Vec3::new(0.2, 0.2, 0.2));
 	}

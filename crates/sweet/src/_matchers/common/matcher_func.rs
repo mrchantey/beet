@@ -73,20 +73,20 @@ mod test {
 		let func = mock_trigger();
 		func.call(());
 		func.call(());
-		expect(&func).to_have_been_called();
-		expect(&func).to_have_been_called_times(2);
-		expect(&func.clone()).not().to_have_been_called_times(1);
+		(&func).xpect().to_have_been_called();
+		(&func).xpect().to_have_been_called_times(2);
+		(&func.clone()).xpect().not().to_have_been_called_times(1);
 	}
 	#[test]
 	fn test_mock_func() {
 		let func = mock_func(|i| i * 2);
 		func.call(0);
 		func.call(2);
-		expect(&func).to_have_been_called();
-		expect(&func).to_have_returned_with(0);
-		expect(&func).not().to_have_returned_with(4);
-		expect(&func).nth_return(1).to_be(4);
-		expect(&func).nth_return(0).to_be(0);
-		expect(&func).nth_return(1).to_be(4);
+		(&func).xpect().to_have_been_called();
+		(&func).xpect().to_have_returned_with(0);
+		(&func).xpect().not().to_have_returned_with(4);
+		(&func).xpect().nth_return(1).to_be(4);
+		(&func).xpect().nth_return(0).to_be(0);
+		(&func).xpect().nth_return(1).to_be(4);
 	}
 }

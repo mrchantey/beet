@@ -104,24 +104,22 @@ mod test {
 
 		app.update();
 
-		expect(
-			app.world()
-				.entity(agent)
-				.get::<Transform>()
-				.unwrap()
-				.translation,
-		)
-		.to_be(Vec3::new(1., 0., 0.));
+		app.world()
+			.entity(agent)
+			.get::<Transform>()
+			.unwrap()
+			.translation
+			.xpect()
+			.to_be(Vec3::new(1., 0., 0.));
 
 		app.update_with_millis(500);
 
-		expect(
-			app.world()
-				.entity(agent)
-				.get::<Transform>()
-				.unwrap()
-				.translation,
-		)
-		.to_be_close_to(Vec3::new(-1., 0., 0.));
+		app.world()
+			.entity(agent)
+			.get::<Transform>()
+			.unwrap()
+			.translation
+			.xpect()
+			.to_be_close_to(Vec3::new(-1., 0., 0.));
 	}
 }

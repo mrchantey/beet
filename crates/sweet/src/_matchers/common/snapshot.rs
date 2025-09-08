@@ -29,7 +29,7 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 		Ok(None)
 	} else {
 		let expected = ReadFile::to_string(&save_path).map_err(|_| {
-			
+
 			anyhow::anyhow!(
 				"
 Snapshot file not found: {}
@@ -176,7 +176,7 @@ mod test {
 	struct MyStruct(u32);
 
 	#[test]
-	fn bool() { expect(MyStruct(7)).to_be_snapshot(); }
+	fn bool() { MyStruct(7).xpect().to_be_snapshot(); }
 
 	#[cfg(feature = "tokens")]
 	#[test]

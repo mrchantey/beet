@@ -71,20 +71,21 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		expect(
-			EntityTree::new_with_world(entity, &world)
-				.component_tree::<Running>(&world),
-		)
-		.to_be(
-			TreeNode::new(Some(&Running::new(Entity::from_raw(10))))
-				.with_leaf(None)
-				.with_leaf(None)
-				.with_child(TreeNode::new(None).with_leaf(None))
-				.with_child(TreeNode::new(None).with_leaf(None))
-				.with_child(
-					TreeNode::new(Some(&Running::new(Entity::from_raw(17))))
+		EntityTree::new_with_world(entity, &world)
+			.component_tree::<Running>(&world)
+			.xpect()
+			.to_be(
+				TreeNode::new(Some(&Running::new(Entity::from_raw(10))))
+					.with_leaf(None)
+					.with_leaf(None)
+					.with_child(TreeNode::new(None).with_leaf(None))
+					.with_child(TreeNode::new(None).with_leaf(None))
+					.with_child(
+						TreeNode::new(Some(&Running::new(Entity::from_raw(
+							17,
+						))))
 						.with_leaf(None),
-				), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
-		);
+					), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
+			);
 	}
 }

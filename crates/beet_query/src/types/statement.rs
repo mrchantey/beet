@@ -124,7 +124,9 @@ mod test {
 	fn works() {
 		let stmt = Foo { bar: 3 }.stmt_insert().unwrap();
 		let (placeholder, values) = stmt.build_any(&SqliteQueryBuilder);
-		expect(placeholder).to_be("INSERT INTO \"foo\" (\"bar\") VALUES (?)");
-		expect(values.0).to_be(vec![3i64.into()]);
+		placeholder
+			.xpect()
+			.to_be("INSERT INTO \"foo\" (\"bar\") VALUES (?)");
+		values.0.xpect().to_be(vec![3i64.into()]);
 	}
 }

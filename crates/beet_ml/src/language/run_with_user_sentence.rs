@@ -71,8 +71,10 @@ mod test {
 
 		world.flush_trigger(OnUserMessage::new("pizza"));
 
-		expect(&on_run).to_have_been_called_times(1);
-		expect(world.get::<Sentence>(entity))
+		(&on_run).xpect().to_have_been_called_times(1);
+		world
+			.get::<Sentence>(entity)
+			.xpect()
 			.to_be(Some(&Sentence::new("pizza")));
 	}
 }

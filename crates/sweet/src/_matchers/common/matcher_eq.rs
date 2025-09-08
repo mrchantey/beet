@@ -9,8 +9,8 @@ where
 	/// # Example
 	/// ```rust
 	/// # use sweet::prelude::*;
-	/// expect(7).to_be(7);
-	/// expect("foo").not().to_be("bar");
+	/// 7.xpect().to_be(7);
+	/// "foo".xpect().not().to_be("bar");
 	/// ```
 	pub fn to_be<T2: Debug>(&self, other: T2) -> &Self
 	where
@@ -28,8 +28,8 @@ mod test {
 
 	#[test]
 	fn equality() {
-		expect(true).to_be(true);
-		expect(false).to_be(false);
-		expect(true).not().to_be(false);
+		true.xpect().to_be(true);
+		false.xpect().to_be(false);
+		true.xpect().not().to_be(false);
 	}
 }

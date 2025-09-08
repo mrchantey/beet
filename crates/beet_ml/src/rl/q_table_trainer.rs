@@ -150,15 +150,15 @@ mod test {
 		let elapsed = now.elapsed();
 		// println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
-		expect(elapsed).to_be_greater_than(Duration::from_millis(2));
-		// expect(elapsed).to_be_less_than(Duration::from_millis(30))?;
+		elapsed.xpect().to_be_greater_than(Duration::from_millis(2));
+		// elapsed.xpect().to_be_less_than(Duration::from_millis(30))?;
 
 		let eval = trainer.evaluate();
 		// println!("{eval:?}\n");
 
 		// optimal policy = 6 steps & 100
-		expect(eval.mean).to_be(1.);
-		expect(eval.std).to_be(0.);
-		expect(eval.total_steps).to_be(600);
+		eval.mean.xpect().to_be(1.);
+		eval.std.xpect().to_be(0.);
+		eval.total_steps.xpect().to_be(600);
 	}
 }

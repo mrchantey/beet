@@ -6,17 +6,17 @@ use sweet::prelude::*;
 #[test]
 fn works() {
 	let val = StructA::<u32>::default().field_a(2);
-	expect(*val.get_field_a()).to_be(2);
+	(*val.get_field_a()).xpect().to_be(2);
 	let val = ButtonB::default()
 		.field_a(2)
 		.field_b(3)
 		.field_c(true)
 		.field_d(4)
 		.field_button_b(5);
-	expect(*val.get_field_a()).to_be(2);
-	expect(*val.get_field_b()).to_be(3);
-	expect(*val.get_field_c()).to_be(true);
-	expect(*val.get_field_d()).to_be(4);
+	(*val.get_field_a()).xpect().to_be(2);
+	(*val.get_field_b()).xpect().to_be(3);
+	(*val.get_field_c()).xpect().to_be(true);
+	(*val.get_field_d()).xpect().to_be(4);
 }
 
 

@@ -56,7 +56,8 @@ mod test {
 			.click()
 			.await
 			.unwrap();
-		expect(&page)
+		(&page)
+			.xpect()
 			.to_have_url("https://www.iana.org/help/example-domains")
 			.await;
 	}

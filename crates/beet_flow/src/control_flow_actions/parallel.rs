@@ -83,9 +83,9 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		expect(&on_run).to_have_been_called_times(3);
-		expect(&on_result).to_have_been_called_times(3);
-		expect(&on_result).to_have_returned_nth_with(
+		(&on_run).xpect().to_have_been_called_times(3);
+		(&on_result).xpect().to_have_been_called_times(3);
+		(&on_result).xpect().to_have_returned_nth_with(
 			2,
 			&OnResultAction::global(action, RunResult::Failure),
 		);
@@ -106,9 +106,9 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		expect(&on_run).to_have_been_called_times(3);
-		expect(&on_result).to_have_been_called_times(3);
-		expect(&on_result).to_have_returned_nth_with(
+		(&on_run).xpect().to_have_been_called_times(3);
+		(&on_result).xpect().to_have_been_called_times(3);
+		(&on_result).xpect().to_have_returned_nth_with(
 			2,
 			&OnResultAction::global(action, RunResult::Success),
 		);

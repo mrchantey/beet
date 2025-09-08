@@ -34,12 +34,12 @@ mod test {
 
 	#[test]
 	fn to_be_close_to() {
-		expect(0.).to_be_close_to(0.);
-		expect(-0.999).to_be_close_to(-1.);
-		expect(0.9).not().to_be_close_to(1.01);
-		expect(NewType(0.0_f64).0).to_be_close_to(0.);
+		(0.).xpect().to_be_close_to(0.);
+		(-0.999).xpect().to_be_close_to(-1.);
+		(0.9).xpect().not().to_be_close_to(1.01);
+		NewType(0.0_f64).0.xpect().to_be_close_to(0.);
 
-		expect(0.0_f32).to_be_close_to(0.);
-		expect(NewType(0.0_f32).0).to_be_close_to(0.);
+		0.0_f32.xpect().to_be_close_to(0.);
+		NewType(0.0_f32).0.xpect().to_be_close_to(0.);
 	}
 }

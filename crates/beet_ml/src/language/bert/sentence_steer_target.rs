@@ -126,7 +126,7 @@ fn sentence_steer_target<F: Component>(
 // 		world.flush();
 
 // 		let target = world.entity(agent).get::<SteerTarget>();
-// 		expect(target).not().to_be(Some(&SteerTarget::Entity(heal)));
-// 		expect(target).to_be(Some(&SteerTarget::Entity(kill)));
+// 		target.xpect().not().to_be(Some(&SteerTarget::Entity(heal)));
+// 		target.xpect().to_be(Some(&SteerTarget::Entity(kill)));
 // 	}
 // }

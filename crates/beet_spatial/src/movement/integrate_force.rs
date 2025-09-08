@@ -106,41 +106,50 @@ mod test {
 
 		app.update_with_secs(1);
 
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(velocity_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(force_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(impulse_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.));
-		expect(app.world()) // impulses are cleared each frame
+		app.world() // impulses are cleared each frame
+			.xpect()
 			.component::<Impulse>(impulse_entity)
 			.to_be(&Impulse(Vec3::ZERO));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(mass_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(0.5, 0., 0.));
 
 		app.update_with_secs(1);
 
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(velocity_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(force_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(impulse_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.));
-		expect(app.world())
+		app.world()
+			.xpect()
 			.component::<Transform>(mass_entity)
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.));

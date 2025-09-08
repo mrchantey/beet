@@ -52,6 +52,6 @@ mod test {
 		vec![1, 2, 3].xpect().to_contain_element(&2);
 		vec![1, 2, 3].xref().xpect().not().to_contain_element(&4);
 		vec![1, 2, 3].xpect().any(|val| val == &2);
-		expect(&vec![1, 2, 3]).not().any(|val| val == &4);
+		(&vec![1, 2, 3]).xpect().not().any(|val| val == &4);
 	}
 }

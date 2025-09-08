@@ -285,7 +285,9 @@ mod test {
 			.unwrap();
 
 		let results = embeddings.scores_sorted(0).unwrap();
-		expect(embeddings.sentences[results[0].0].as_ref())
+		embeddings.sentences[results[0].0]
+			.as_ref()
+			.xpect()
 			.to_be("The cat plays in the garden");
 	}
 }

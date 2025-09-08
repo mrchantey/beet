@@ -76,6 +76,6 @@ mod test {
 			}))
 			.trigger(Foo(3));
 
-		expect(&bucket).to_have_returned_with(3);
+		(&bucket).xpect().to_have_returned_with(3);
 	}
 }

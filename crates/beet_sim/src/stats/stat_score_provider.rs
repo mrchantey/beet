@@ -100,19 +100,25 @@ mod test {
 		let range = StatValue::range(-3.0..7.0);
 		let target = StatValueGoal::High;
 
-		expect(*provider.sample(StatValue(-3.), target, range.clone()))
+		(*provider.sample(StatValue(-3.), target, range.clone()))
+			.xpect()
 			.to_be(1.0);
-		expect(*provider.sample(StatValue(2.0), target, range.clone()))
+		(*provider.sample(StatValue(2.0), target, range.clone()))
+			.xpect()
 			.to_be(0.5);
-		expect(*provider.sample(StatValue(7.0), target, range.clone()))
+		(*provider.sample(StatValue(7.0), target, range.clone()))
+			.xpect()
 			.to_be(0.0);
 
 		let target = StatValueGoal::Low;
-		expect(*provider.sample(StatValue(-3.), target, range.clone()))
+		(*provider.sample(StatValue(-3.), target, range.clone()))
+			.xpect()
 			.to_be(0.0);
-		expect(*provider.sample(StatValue(2.0), target, range.clone()))
+		(*provider.sample(StatValue(2.0), target, range.clone()))
+			.xpect()
 			.to_be(0.5);
-		expect(*provider.sample(StatValue(7.0), target, range.clone()))
+		(*provider.sample(StatValue(7.0), target, range.clone()))
+			.xpect()
 			.to_be(1.0);
 	}
 
@@ -147,9 +153,9 @@ mod test {
 			))
 			.flush_trigger(OnRun::local());
 
-		expect(&on_child_score).to_have_been_called_times(2);
+		(&on_child_score).xpect().to_have_been_called_times(2);
 
-		// expect(&on_child_score).to_have_returned_nth_with(0, &0.3)?;
-		// expect(&on_child_score).to_have_returned_nth_with(1, &0.7)?;
+		// (&on_child_score).xpect().to_have_returned_nth_with(0, &0.3)?;
+		// (&on_child_score).xpect().to_have_returned_nth_with(1, &0.7)?;
 	}
 }

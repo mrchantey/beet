@@ -29,7 +29,7 @@ pub mod test_runner;
 pub mod utils;
 
 #[path = "_matchers/mod.rs"]
-/// Matchers used for assertions: `expect(true).to_be_true()`
+/// Matchers used for assertions: `true.xpect().to_be_true()`
 pub mod matchers;
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]

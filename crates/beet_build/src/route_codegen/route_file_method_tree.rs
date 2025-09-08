@@ -113,19 +113,18 @@ mod test {
 			.iter()
 			.copied()
 			.collect();
-		expect(
-			RouteFileMethodTree::from_methods(methods)
-				.into_path_tree()
-				.to_string_indented(),
-		)
-		.to_be(
-			r#"routes
+		RouteFileMethodTree::from_methods(methods)
+			.into_path_tree()
+			.to_string_indented()
+			.xpect()
+			.to_be(
+				r#"routes
   bazz
   foo
     bar
     bazz
       boo
 "#,
-		);
+			);
 	}
 }

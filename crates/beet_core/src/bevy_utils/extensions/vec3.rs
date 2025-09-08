@@ -110,17 +110,17 @@ mod test {
 		let mut rng = rand::thread_rng();
 		for _ in 0..10 {
 			let val = Vec3::random_in_cube(&mut rng);
-			expect(val.length()).to_be_less_than(2.);
+			val.length().xpect().to_be_less_than(2.);
 			// println!("random_in_cube: {val}");
 		}
 		for _ in 0..10 {
 			let val = Vec3::random_on_sphere(&mut rng);
-			expect(val.length()).to_be_close_to(1.);
+			val.length().xpect().to_be_close_to(1.);
 			// println!("random_on_sphere: {val}");
 		}
 		for _ in 0..10 {
 			let val = Vec3::random_in_sphere(&mut rng);
-			expect(val.length()).to_be_less_than(1.);
+			val.length().xpect().to_be_less_than(1.);
 			// println!("random_in_sphere: {val}");
 		}
 	}

@@ -49,7 +49,7 @@ impl ThemeToCss {
 		--bt-opacity-hover: 0.7;
 		--bt-opacity-active: 0.5;
 		--bt-opacity-disabled: 0.5;
-		
+
 		--bt-color-border: var(--bt-color-outline);
 		--bt-color-text: var(--bt-color-on-surface);
 		--bt-color-background: var(--bt-color-surface-container-lowest);
@@ -183,6 +183,6 @@ impl ThemeToCss {
 // 	fn works() {
 // 		let css = ThemeToCss::default()
 // 			.map(&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build());
-// 		expect(StyleSheet::parse(&css, ParserOptions::default())).to_be_ok();
+// 		StyleSheet::parse(&css, ParserOptions::default()).xpect().to_be_ok();
 // 	}
 // }

@@ -1,14 +1,13 @@
 use crate::prelude::*;
-/// Create a new [`Matcher`] with the provided received value.
+/// Create a new [`Matcher`] with the provided received value via the chain-only API.
 ///
 /// # Example
 ///
 /// ```rust
 /// # use sweet::prelude::*;
-/// expect(true).to_be_true();
-/// expect("foobar").not().to_start_with("bar");
+/// true.xpect().to_be_true();
+/// "foobar".xpect().not().to_start_with("bar");
 /// ```
-pub fn expect<T>(value: T) -> Matcher<T> { Matcher::new(value) }
 
 
 

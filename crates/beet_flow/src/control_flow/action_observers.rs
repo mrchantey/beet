@@ -102,6 +102,6 @@ mod test {
 
 		world.flush();
 		let observers = world.get::<ActionObservers>(entity).unwrap();
-		expect(observers.len()).to_be(2);
+		observers.len().xpect().to_be(2);
 	}
 }

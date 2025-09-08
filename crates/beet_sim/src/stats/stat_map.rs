@@ -101,11 +101,11 @@ mod test {
 
 		let mut stat_map = StatMap::from_sim_descriptor(&sim_descriptor);
 
-		expect(stat_map.map.len()).to_be(1);
-		expect(stat_map.map.get(&StatId(0)).unwrap()).to_be(&stat);
+		stat_map.map.len().xpect().to_be(1);
+		stat_map.map.get(&StatId(0)).unwrap().xpect().to_be(&stat);
 
 		stat_map.add_stat(stat.clone());
-		expect(stat_map.map.len()).to_be(2);
-		expect(stat_map.map.get(&StatId(1)).unwrap()).to_be(&stat);
+		stat_map.map.len().xpect().to_be(2);
+		stat_map.map.get(&StatId(1)).unwrap().xpect().to_be(&stat);
 	}
 }

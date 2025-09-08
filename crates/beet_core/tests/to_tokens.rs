@@ -18,7 +18,7 @@ fn named() {
 	}
 	.self_token_stream()
 	.to_string();
-	expect(foo).to_be(
+	foo.xpect().to_be(
 		quote! {Named {
 				num: 42u32,
 				string: String::from("Hello")
@@ -36,7 +36,7 @@ fn unnamed() {
 	let foo = Unnamed(42, "Hello".to_string())
 		.self_token_stream()
 		.to_string();
-	expect(foo).to_be(
+	foo.xpect().to_be(
 		quote! {
 			Unnamed(42u32, String::from("Hello"))
 		}
@@ -68,7 +68,7 @@ fn nested_struct() {
 	.self_token_stream()
 	.to_string();
 
-	expect(nested).to_be(
+	nested.xpect().to_be(
 		quote! {
 			Named2 {
 				inner: Named1 {
@@ -92,7 +92,7 @@ fn enum_variants() {
 	}
 
 	let unit = TestEnum::Unit.self_token_stream().to_string();
-	expect(unit).to_be(
+	unit.xpect().to_be(
 		quote! {
 			TestEnum::Unit
 		}
@@ -105,7 +105,7 @@ fn enum_variants() {
 	}
 	.self_token_stream()
 	.to_string();
-	expect(named).to_be(
+	named.xpect().to_be(
 		quote! {
 			TestEnum::Named {
 				value: 99u32,
@@ -118,7 +118,7 @@ fn enum_variants() {
 	let unnamed = TestEnum::Unnamed(true, "Tuple".to_string())
 		.self_token_stream()
 		.to_string();
-	expect(unnamed).to_be(
+	unnamed.xpect().to_be(
 		quote! {
 			TestEnum::Unnamed(true, String::from("Tuple"))
 		}

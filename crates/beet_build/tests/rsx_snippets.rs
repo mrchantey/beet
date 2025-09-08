@@ -21,7 +21,8 @@ fn expressions() {
 		<span>"The value is "{placeholder}</span>
 		</div>
 	});
-	expect(&scene)
+	(&scene)
+		.xpect()
 		.to_contain("SnippetRoot")
 		.to_contain("NodeTag")
 		.to_contain("ExprIdx")

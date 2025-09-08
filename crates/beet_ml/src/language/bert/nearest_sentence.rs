@@ -85,8 +85,12 @@ mod test {
 			.flush_trigger(OnRun::local());
 
 
-		expect(&on_run).to_have_been_called_times(2);
-		expect(&on_run).to_have_returned_nth_with(0, &"root".to_string());
-		expect(&on_run).to_have_returned_nth_with(1, &"kill".to_string());
+		(&on_run).xpect().to_have_been_called_times(2);
+		(&on_run)
+			.xpect()
+			.to_have_returned_nth_with(0, &"root".to_string());
+		(&on_run)
+			.xpect()
+			.to_have_returned_nth_with(1, &"kill".to_string());
 	}
 }

@@ -185,7 +185,8 @@ val_string	= "foo"
 
 	#[test]
 	fn html() {
-		expect(ParseMarkdown::markdown_to_rsx_str(MARKDOWN))
+		ParseMarkdown::markdown_to_rsx_str(MARKDOWN)
+			.xpect()
 			.to_be("<h1>hello world</h1>");
 	}
 
@@ -193,10 +194,9 @@ val_string	= "foo"
 	#[ignore = "todo"]
 	// currently text nodes of html tags are not parsed
 	fn nested_markdown() {
-		expect(ParseMarkdown::markdown_to_rsx_str(
-			r#"<div>## Subheading</div>"#,
-		))
-		.to_be("<div><h2>Subheading</h2></div>\n");
+		ParseMarkdown::markdown_to_rsx_str(r#"<div>## Subheading</div>"#)
+			.xpect()
+			.to_be("<div><h2>Subheading</h2></div>\n");
 	}
 
 	#[test]
@@ -204,7 +204,7 @@ val_string	= "foo"
 		let frontmatter =
 			ParseMarkdown::extract_frontmatter_string(MARKDOWN).unwrap();
 		let frontmatter: Frontmatter = toml::from_str(&frontmatter.0).unwrap();
-		expect(frontmatter).to_be(Frontmatter {
+		frontmatter.xpect().to_be(Frontmatter {
 			val_bool: true,
 			val_int: 83,
 			val_float: Some(3.14),

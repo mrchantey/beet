@@ -107,17 +107,17 @@ mod test {
 	#[rustfmt::skip]
 	fn works() {
 		// ignore macro inners
-		expect(hash(quote! {rsx!{1}}))
+		hash(quote! {rsx!{1}}).xpect()
 		.to_be(hash(quote! {rsx!{2}}));
 		// ignore multiple macros
-		expect(hash(quote! {rsx!{1} rsx!{1}}))
+		hash(quote! {rsx!{1} rsx!{1}}).xpect()
 		.to_be(hash(quote! {rsx!{2} rsx!{2}}));
 		// hash non-template expressions
-		expect(hash(quote! {foo}))
+		hash(quote! {foo}).xpect()
 		.not()
 		.to_be(hash(quote! {bar}));
 		// hash other macros
-		expect(hash(quote! {println!(foo)}))
+		hash(quote! {println!(foo)}).xpect()
 		.not()
 		.to_be(hash(quote! {println!(bar)}));
 	}

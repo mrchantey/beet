@@ -140,6 +140,6 @@ mod test {
 		div.set_inner_html("hello world");
 		Document::x_append_child(&div);
 
-		// expect(window().unwrap()).to_contain_text("hello world")?;
+		// window().unwrap().xpect().to_contain_text("hello world")?;
 	}
 }

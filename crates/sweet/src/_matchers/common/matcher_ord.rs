@@ -38,8 +38,8 @@ mod test {
 
 	#[test]
 	fn order() {
-		expect(0).to_be_greater_or_equal_to(0);
-		expect(10).to_be_greater_than(-10);
-		expect(10).not().to_be_greater_than(11);
+		0.xpect().to_be_greater_or_equal_to(0);
+		10.xpect().to_be_greater_than(-10);
+		10.xpect().not().to_be_greater_than(11);
 	}
 }

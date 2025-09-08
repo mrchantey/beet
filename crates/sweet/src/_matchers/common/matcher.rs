@@ -9,7 +9,7 @@ pub struct Matcher<T, M = ()> {
 
 
 impl<T> Matcher<T> {
-	/// Create a new Matcher, usually this is done via [`expect`](crate::expect).
+	/// Create a new Matcher, usually this is done via the chain-only API: `.xpect()`.
 	pub(crate) fn new(value: T) -> Matcher<T> {
 		Matcher {
 			value,
@@ -25,7 +25,7 @@ impl<T> Matcher<T> {
 	/// Negate this matcher to flip the result of an assertion.
 	/// ```rust
 	/// # use sweet::prelude::*;
-	/// expect(true).not().to_be_false();
+	/// true.xpect().not().to_be_false();
 	/// ```
 	pub fn not(&mut self) -> &mut Self {
 		self.negated = true;

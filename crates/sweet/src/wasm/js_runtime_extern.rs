@@ -34,25 +34,29 @@ mod test {
 	use crate::prelude::*;
 
 	#[test]
-	fn cwd() { expect(js_runtime::cwd()).to_contain("sweet"); }
+	fn cwd() { js_runtime::cwd().xpect().to_contain("sweet"); }
 
 	#[test]
 	#[ignore = "take hook shenanigans"]
 	// #[should_panic]
 	fn panic_to_error() {
 		let result = js_runtime::panic_to_error(&mut || panic!("it panicked"));
-		expect(&format!("{:?}", result))
+		(&format!("{:?}", result))
+			.xpect()
 			.to_start_with("Err(JsValue(RuntimeError: unreachable");
 	}
 	#[test]
 	fn read_file() {
-		expect(js_runtime::read_file("foobar")).to_be_none();
-		expect(js_runtime::read_file("Cargo.toml")).to_be_some();
-		// expect(js_runtime::read_file("Cargo.lock")).to_be_some();
+		js_runtime::read_file("foobar").xpect().to_be_none();
+		js_runtime::read_file("Cargo.toml").xpect().to_be_some();
+		// js_runtime::read_file("Cargo.lock").xpect().to_be_some();
 	}
 	#[test]
 	fn sweet_root() {
-		expect(js_runtime::sweet_root().unwrap().replace("\\", "/"))
+		js_runtime::sweet_root()
+			.unwrap()
+			.replace("\\", "/")
+			.xpect()
 			.to_end_with("beet/");
 	}
 }

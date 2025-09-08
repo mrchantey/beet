@@ -455,8 +455,10 @@ mod test {
 			</span>
 		});
 
-		expect(app.query_once::<&NodeTag>()).to_have_length(3);
-		expect(app.query_once::<&ClientLoadDirective>()).to_have_length(1);
+		app.query_once::<&NodeTag>().xpect().to_have_length(3);
+		app.query_once::<&ClientLoadDirective>()
+			.xpect()
+			.to_have_length(1);
 	}
 
 	#[test]
@@ -475,10 +477,12 @@ mod test {
 			</style>
 		});
 		#[cfg(feature = "css")]
-		expect(app.query_once::<&InnerText>()[0])
+		app.query_once::<&InnerText>()[0]
+			.xpect()
 			.to_be(&InnerText("body {\n  font-size: 1 em;\n}\n".to_string()));
 		#[cfg(not(feature = "css"))]
-		expect(app.query_once::<&InnerText>()[0])
+		app.query_once::<&InnerText>()[0]
+			.xpect()
 			.to_be(&InnerText("body { font-size : 1 em ; }".to_string()));
 	}
 }

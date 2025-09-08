@@ -119,16 +119,15 @@ mod test {
 		let row = MyTable { name: "foo".into() };
 		let stmt = row.clone().stmt_insert().unwrap();
 		db.insert(row).await.unwrap();
-		expect(db.statement_cache.read().await.len()).to_be(1);
-		expect(
-			db.statement_cache
-				.read()
-				.await
-				.get(&rapidhash::rapidhash(
-					stmt.build_any(&SqliteQueryBuilder).0.as_bytes(),
-				))
-				.is_some(),
-		)
-		.to_be_true();
+		db.statement_cache.read().await.len().xpect().to_be(1);
+		db.statement_cache
+			.read()
+			.await
+			.get(&rapidhash::rapidhash(
+				stmt.build_any(&SqliteQueryBuilder).0.as_bytes(),
+			))
+			.is_some()
+			.xpect()
+			.to_be_true();
 	}
 }

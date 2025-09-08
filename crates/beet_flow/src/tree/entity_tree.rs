@@ -56,16 +56,24 @@ mod test {
 	fn component_tree() {
 		let mut world = World::new();
 		let tree = create_tree(&mut world);
-		expect(tree.children.len()).to_be(2);
+		tree.children.len().xpect().to_be(2);
 
 		let entity = tree.children[1].value;
 		world.entity_mut(entity).insert(Name::new("child2new"));
 		let scores = tree.component_tree::<Name>(&world);
 
-		expect(scores.value).to_be(Some(&Name::new("parent")));
-		expect(scores.children[0].value).to_be(Some(&Name::new("child1")));
-		expect(scores.children[1].value).to_be(Some(&Name::new("child2new")));
-		expect(scores.children[1].children[0].value)
+		scores.value.xpect().to_be(Some(&Name::new("parent")));
+		scores.children[0]
+			.value
+			.xpect()
+			.to_be(Some(&Name::new("child1")));
+		scores.children[1]
+			.value
+			.xpect()
+			.to_be(Some(&Name::new("child2new")));
+		scores.children[1].children[0]
+			.value
+			.xpect()
 			.to_be(Some(&Name::new("grandchild1")));
 	}
 }

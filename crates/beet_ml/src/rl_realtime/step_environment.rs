@@ -138,12 +138,16 @@ mod test {
 
 		app.update();
 
-		expect(&on_result).to_have_been_called();
+		(&on_result).xpect().to_have_been_called();
 
 
 		let table = app.world().get::<FrozenLakeQTable>(session).unwrap();
-		expect(table.keys().next()).to_be(Some(&GridPos(UVec2::new(0, 0))));
+		table
+			.keys()
+			.next()
+			.xpect()
+			.to_be(Some(&GridPos(UVec2::new(0, 0))));
 		let inner = table.values().next().unwrap();
-		expect(inner.iter().next().unwrap().1).to_be(&0.);
+		inner.iter().next().unwrap().1.xpect().to_be(&0.);
 	}
 }

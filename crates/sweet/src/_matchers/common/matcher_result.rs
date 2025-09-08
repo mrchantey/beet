@@ -40,15 +40,15 @@ mod test {
 	#[test]
 	fn result() {
 		let ok = || -> anyhow::Result<()> { Ok(()) };
-		expect(ok()).to_be_ok();
-		expect(ok()).not().to_be_err();
+		ok().xpect().to_be_ok();
+		ok().xpect().not().to_be_err();
 
 		let err = || -> anyhow::Result<()> { Err(anyhow!("foo")) };
 
-		expect(err()).to_be_err();
-		expect(err()).not().to_be_ok();
+		err().xpect().to_be_err();
+		err().xpect().not().to_be_ok();
 
-		expect(err()).to_be_err_str("foo");
-		expect(err()).not().to_be_err_str("foobar");
+		err().xpect().to_be_err_str("foo");
+		err().xpect().not().to_be_err_str("foobar");
 	}
 }

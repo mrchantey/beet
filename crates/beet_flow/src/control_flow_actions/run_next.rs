@@ -95,12 +95,12 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		expect(&observed).to_have_been_called_times(2);
-		expect(&observed).to_have_returned_nth_with(
+		(&observed).xpect().to_have_been_called_times(2);
+		(&observed).xpect().to_have_returned_nth_with(
 			0,
 			&OnResultAction::global(action2, RunResult::Success),
 		);
-		expect(&observed).to_have_returned_nth_with(
+		(&observed).xpect().to_have_returned_nth_with(
 			1,
 			&OnResultAction::new(action1, action2, RunResult::Success),
 		);

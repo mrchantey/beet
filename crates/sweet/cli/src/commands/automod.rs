@@ -387,13 +387,13 @@ mod test {
 		}
 
 		let insert_lib = insert("crates/sweet/cli/src/foo.rs").unwrap();
-		expect(&insert_lib).to_contain("pub mod foo;");
-		expect(&insert_lib).to_contain("pub use crate::foo::*;");
+		(&insert_lib).xpect().to_contain("pub mod foo;");
+		(&insert_lib).xpect().to_contain("pub use crate::foo::*;");
 
 		let insert_mod =
 			insert("crates/sweet/cli/src/commands/foo.rs").unwrap();
-		expect(&insert_mod).to_contain("mod foo;");
-		expect(&insert_mod).to_contain("pub use foo::*;");
+		(&insert_mod).xpect().to_contain("mod foo;");
+		(&insert_mod).xpect().to_contain("pub use foo::*;");
 	}
 	#[test]
 	fn remove_works() {
@@ -410,15 +410,19 @@ mod test {
 		}
 
 		let remove_lib = remove("crates/sweet/cli/src/automod").unwrap();
-		expect(&remove_lib).not().to_contain("pub mod automod;");
-		expect(&remove_lib)
+		(&remove_lib).xpect().not().to_contain("pub mod automod;");
+		(&remove_lib)
+			.xpect()
 			.not()
 			.to_contain("pub use crate::automod::*;");
 
 
 		let remove_mod =
 			remove("crates/sweet/cli/src/commands/automod.rs").unwrap();
-		expect(&remove_mod).not().to_contain("pub mod automod;");
-		expect(&remove_mod).not().to_contain("pub use automod::*;");
+		(&remove_mod).xpect().not().to_contain("pub mod automod;");
+		(&remove_mod)
+			.xpect()
+			.not()
+			.to_contain("pub use automod::*;");
 	}
 }

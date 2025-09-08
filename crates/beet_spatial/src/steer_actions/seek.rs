@@ -130,7 +130,11 @@ mod test {
 
 		app.update_with_secs(1);
 
-		expect(app.world().get::<Transform>(agent).unwrap().translation)
+		app.world()
+			.get::<Transform>(agent)
+			.unwrap()
+			.translation
+			.xpect()
 			.to_be(Vec3::new(0.01, 0., 0.));
 	}
 }

@@ -71,6 +71,10 @@ mod test {
 		}
 		.run()
 		.unwrap();
-		expect(start.elapsed().as_secs_f32()).to_be_greater_than(delay);
+		start
+			.elapsed()
+			.as_secs_f32()
+			.xpect()
+			.to_be_greater_than(delay);
 	}
 }

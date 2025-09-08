@@ -100,6 +100,6 @@ mod test {
 		// world.flush();
 
 		let children = world.entity(entity).get::<Children>().unwrap();
-		expect(children.len()).to_be(2);
+		children.len().xpect().to_be(2);
 	}
 }

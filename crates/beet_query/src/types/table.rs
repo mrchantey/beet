@@ -68,12 +68,16 @@ mod test {
 
 	#[test]
 	fn works() {
-		expect(UserCols::primary_key()).to_be(Some(UserCols::Id));
-		expect(User::default().primary_value().unwrap())
+		UserCols::primary_key().xpect().to_be(Some(UserCols::Id));
+		User::default()
+			.primary_value()
+			.unwrap()
+			.xpect()
 			.to_be(Some(0u32.into_value().unwrap()));
 
-		// expect(MyTable::name()).to_be("foobar".to_string());
-		// expect(MyTableColumns::Test.into_column().name)
+		// MyTable::name().xpect().to_be("foobar".to_string());
+		// MyTableColumns::Test.into_column().name
+		// 	.xpect()
 		// 	.to_be("test".to_string());
 	}
 }

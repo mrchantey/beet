@@ -103,9 +103,9 @@ mod test {
 	#[test]
 	fn world() {
 		let mut world = World::new();
-		expect(&world).not().to_contain_resource::<Health>();
+		(&world).xpect().not().to_contain_resource::<Health>();
 		world.insert_resource(Health(5));
-		expect(&world).to_contain_resource::<Health>();
+		(&world).xpect().to_contain_resource::<Health>();
 	}
 
 	#[test]
@@ -113,26 +113,30 @@ mod test {
 		let mut app = App::new();
 		let entity = app.world_mut().spawn_empty().id();
 
-		expect(app.world())
+		app.world()
+			.xpect()
 			.not()
 			.to_have_component::<Health>(entity);
 		app.world_mut().entity_mut(entity).insert(Health(7));
-		expect(app.world()).to_have_component::<Health>(entity);
-		expect(app.world())
+		app.world().xpect().to_have_component::<Health>(entity);
+		app.world()
+			.xpect()
 			.component::<Health>(entity)
 			.to_be(&Health(7));
 
-		expect(app.world()).not().to_contain_resource::<Health>();
+		app.world().xpect().not().to_contain_resource::<Health>();
 		app.world_mut().insert_resource(Health(5));
-		expect(app.world()).to_contain_resource::<Health>();
-		expect(app.world()).resource::<Health>().to_be(&Health(5));
+		app.world().xpect().to_contain_resource::<Health>();
+		app.world().xpect().resource::<Health>().to_be(&Health(5));
 
-		expect(app.world())
+		app.world()
+			.xpect()
 			.not()
 			.to_contain_non_send_resource::<Health>();
 		app.world_mut().insert_non_send_resource(Health(5));
-		expect(app.world()).to_contain_non_send_resource::<Health>();
-		expect(app.world())
+		app.world().xpect().to_contain_non_send_resource::<Health>();
+		app.world()
+			.xpect()
 			.non_send_resource::<Health>()
 			.to_be(&Health(5));
 	}

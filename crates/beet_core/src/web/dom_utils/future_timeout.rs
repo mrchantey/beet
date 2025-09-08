@@ -62,7 +62,7 @@ mod test {
 		)
 		.await
 		.unwrap();
-		expect(a).to_be(39);
+		a.xpect().to_be(39);
 	}
 	#[sweet::test]
 	pub async fn times_out() {
@@ -73,6 +73,6 @@ mod test {
 			Duration::from_millis(500),
 		)
 		.await;
-		expect(err).to_be_err_str("Timeout");
+		err.xpect().to_be_err_str("Timeout");
 	}
 }

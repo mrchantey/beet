@@ -423,16 +423,15 @@ mod test {
 
 	#[test]
 	fn default() {
-		expect(
-			DeriveTable::parse_derive_table(parse_quote! {
+		DeriveTable::parse_derive_table(parse_quote! {
 				#[derive(Table)]
 				struct MyTable {
 					test: u32,
 				}
 			})
-			.to_string(),
-		)
-		.to_be(
+			.to_string()
+			.xpect()
+			.to_be(
 			quote! {
 				use beet::prelude::*;
 				impl Table for MyTable {
@@ -514,8 +513,7 @@ mod test {
 
 	#[test]
 	fn with_attributes() {
-		expect(
-			DeriveTable::parse_derive_table(parse_quote! {
+		DeriveTable::parse_derive_table(parse_quote! {
 				#[derive(Table)]
 				#[table(name = "foobar",if_not_exists = false)]
 				pub struct MyTable {
@@ -531,9 +529,9 @@ mod test {
 					test: u32,
 				}
 			})
-			.to_string(),
-		)
-		.to_be(
+			.to_string()
+			.xpect()
+			.to_be(
 			quote! {
 				use beet::prelude::*;
 				impl Table for MyTable {

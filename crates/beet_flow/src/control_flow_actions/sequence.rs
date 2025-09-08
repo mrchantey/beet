@@ -83,12 +83,12 @@ mod test {
 			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());
 
-		expect(on_run()).to_be(vec![
+		on_run().xpect().to_be(vec![
 			"root".to_string(),
 			"child1".to_string(),
 			"child2".to_string(),
 		]);
-		expect(on_result()).to_be(vec![
+		on_result().xpect().to_be(vec![
 			("child1".to_string(), RunResult::Success),
 			("child2".to_string(), RunResult::Success),
 			("root".to_string(), RunResult::Success),

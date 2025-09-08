@@ -269,7 +269,7 @@ mod test {
 		let tree = RoutePathTree::from_paths(paths);
 		let child_names: Vec<_> =
 			tree.children.iter().map(|c| c.route.to_string()).collect();
-		expect(child_names).to_be(vec!["/alpha", "/beta", "/zeta"]);
+		child_names.xpect().to_be(vec!["/alpha", "/beta", "/zeta"]);
 	}
 	use crate::prelude::*;
 	use bevy::prelude::Entity;
@@ -277,7 +277,7 @@ mod test {
 
 	#[test]
 	fn route_path() {
-		expect(RoutePath::new("hello").to_string()).to_be("/hello");
+		RoutePath::new("hello").to_string().xpect().to_be("/hello");
 
 		for (value, expected) in [
 			("hello", "/hello"),
@@ -291,19 +291,21 @@ mod test {
 			("/index/hi", "/index/hi"),
 			("/index/hi/", "/index/hi"),
 		] {
-			expect(RoutePath::from_file_path(value).unwrap().to_string())
+			RoutePath::from_file_path(value)
+				.unwrap()
+				.to_string()
+				.xpect()
 				.to_be(expected);
 		}
 	}
 
 	#[test]
 	fn join() {
-		expect(
-			&RoutePath::new("/foo")
-				.join(&RoutePath::new("/"))
-				.to_string(),
-		)
-		.to_be("/foo");
+		&RoutePath::new("/foo")
+			.join(&RoutePath::new("/"))
+			.to_string()
+			.xpect()
+			.to_be("/foo");
 	}
 
 	#[test]
@@ -322,8 +324,8 @@ mod test {
 		let tree = RoutePathTree::from_paths(paths.clone());
 
 		// Root node
-		expect(tree.route.to_string()).to_be("/");
-		expect(tree.contains_endpoints()).to_be_false();
+		tree.route.to_string().xpect().to_be("/");
+		tree.contains_endpoints().xpect().to_be_false();
 
 		// Find child '/foo'
 		let foo = tree
@@ -331,7 +333,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo")
 			.unwrap();
-		expect(foo.contains_endpoints()).to_be_false();
+		foo.contains_endpoints().xpect().to_be_false();
 
 		// 'bar' and 'baz' are endpoints under 'foo'
 		let bar = foo
@@ -339,15 +341,15 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/bar")
 			.unwrap();
-		expect(bar.contains_endpoints()).to_be_true();
-		expect(&bar.endpoints).to_be(&vec![ent1]);
+		bar.contains_endpoints().xpect().to_be_true();
+		(&bar.endpoints).xpect().to_be(&vec![ent1]);
 		let baz = foo
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/baz")
 			.unwrap();
-		expect(baz.contains_endpoints()).to_be_true();
-		expect(&baz.endpoints).to_be(&vec![ent2]);
+		baz.contains_endpoints().xpect().to_be_true();
+		(&baz.endpoints).xpect().to_be(&vec![ent2]);
 
 		// 'qux' is a directory, 'quux' is endpoint
 		let qux = foo
@@ -355,14 +357,14 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux")
 			.unwrap();
-		expect(qux.contains_endpoints()).to_be_false();
+		qux.contains_endpoints().xpect().to_be_false();
 		let quux = qux
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux/quux")
 			.unwrap();
-		expect(quux.contains_endpoints()).to_be_true();
-		expect(&quux.endpoints).to_be(&vec![ent3]);
+		quux.contains_endpoints().xpect().to_be_true();
+		(&quux.endpoints).xpect().to_be(&vec![ent3]);
 
 		// 'root' endpoint
 		let root = tree
@@ -370,7 +372,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/root")
 			.unwrap();
-		expect(root.contains_endpoints()).to_be_true();
-		expect(&root.endpoints).to_be(&vec![ent4]);
+		root.contains_endpoints().xpect().to_be_true();
+		(&root.endpoints).xpect().to_be(&vec![ent4]);
 	}
 }

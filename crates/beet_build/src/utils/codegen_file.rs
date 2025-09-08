@@ -194,7 +194,8 @@ mod test {
 		file.add_item::<ItemFn>(syn::parse_quote! {
 			fn test() {}
 		});
-		expect(&file.build_output().unwrap().to_token_stream().to_string())
+		(&file.build_output().unwrap().to_token_stream().to_string())
+			.xpect()
 			.to_contain("fn test () { }");
 	}
 }

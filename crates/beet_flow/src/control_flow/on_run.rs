@@ -259,7 +259,12 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
+		app.world()
+			.get::<TriggerCount>(entity)
+			.unwrap()
+			.0
+			.xpect()
+			.to_be(1);
 	}
 	#[test]
 	fn global() {
@@ -269,6 +274,11 @@ mod test {
 		let action = app.world_mut().spawn(TriggerCount::default()).id();
 		app.world_mut().flush_trigger(OnRun::global(action));
 
-		expect(app.world().get::<TriggerCount>(action).unwrap().0).to_be(1);
+		app.world()
+			.get::<TriggerCount>(action)
+			.unwrap()
+			.0
+			.xpect()
+			.to_be(1);
 	}
 }

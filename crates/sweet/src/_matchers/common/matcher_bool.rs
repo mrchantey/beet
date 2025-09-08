@@ -12,11 +12,11 @@ mod test {
 
 	#[test]
 	fn bool() {
-		// expect(true).to_be_false();
-		expect(true).to_be_true();
-		expect(false).not().to_be_true();
+		// true.xpect().to_be_false();
+		true.xpect().to_be_true();
+		false.xpect().not().to_be_true();
 
-		expect(false).to_be_false();
-		expect(true).not().to_be_false();
+		false.xpect().to_be_false();
+		true.xpect().not().to_be_false();
 	}
 }

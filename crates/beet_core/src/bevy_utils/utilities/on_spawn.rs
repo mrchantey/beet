@@ -202,7 +202,7 @@ mod test {
 
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::expect;
+	use sweet::prelude::*;
 
 	#[test]
 	fn dfs() {
@@ -226,7 +226,12 @@ mod test {
 			}),
 		));
 
-		expect(numbers.lock().unwrap().as_slice()).to_be([1, 2, 3].as_slice());
+		numbers
+			.lock()
+			.unwrap()
+			.as_slice()
+			.xpect()
+			.to_be([1, 2, 3].as_slice());
 	}
 	#[test]
 	fn on_spawn_deferred() {
@@ -252,9 +257,9 @@ mod test {
 			}),],
 		));
 
-		expect(&*numbers.lock().unwrap()).to_be(&[] as &[u32]);
+		(&*numbers.lock().unwrap()).xpect().to_be(&[] as &[u32]);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 
-		expect(&*numbers.lock().unwrap()).to_be(&[1, 2, 3]);
+		(&*numbers.lock().unwrap()).xpect().to_be(&[1, 2, 3]);
 	}
 }

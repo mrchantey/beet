@@ -318,13 +318,13 @@ mod test {
 		let val = Foo(42, "foo$\" \" &dsds?sd#@$)#@$*()".to_owned());
 
 		let query_str = JsonQueryParams::to_query_string(&val).unwrap();
-		expect(&query_str).to_start_with("data=%5B42%2C%22foo");
+		(&query_str).xpect().to_start_with("data=%5B42%2C%22foo");
 		for str in &[" ", "$", "\"", "&", "?", "#", "@", "(", ")"] {
-			expect(&query_str).not().to_contain(str);
+			(&query_str).xpect().not().to_contain(str);
 		}
 
 		let val2 =
 			JsonQueryParams::<Foo>::from_query_string(&query_str).unwrap();
-		expect(val).to_be(val2);
+		val.xpect().to_be(val2);
 	}
 }

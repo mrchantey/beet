@@ -104,7 +104,7 @@ mod test {
 		let hash1 = world.entity(entity1).get::<LangSnippetHash>().unwrap();
 		let hash2 = world.entity(entity2).get::<LangSnippetHash>().unwrap();
 		let hash3 = world.entity(entity3).get::<LangSnippetHash>().unwrap();
-		expect(hash1).not().to_be(hash2);
-		expect(hash2).to_be(hash3);
+		hash1.xpect().not().to_be(hash2);
+		hash2.xpect().to_be(hash3);
 	}
 }

@@ -562,7 +562,7 @@ mod test {
 			.run_system_cached_with(flush_on_spawn_deferred_recursive, entity)
 			.unwrap()
 			.unwrap();
-		expect(val()).to_be(vec![0, 1, 2, 3, 4]);
+		val().xpect().to_be(vec![0, 1, 2, 3, 4]);
 	}
 
 	fn parse_instance(instance: impl Bundle) -> String {

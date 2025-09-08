@@ -142,13 +142,12 @@ mod test {
 
 		let res = router.oneshot(req).await.unwrap();
 
-		expect(res.status()).to_be(StatusCode::OK);
-		expect(
-			res.headers()
-				.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-				.unwrap(),
-		)
-		.to_be("https://allowed.com");
+		res.status().xpect().to_be(StatusCode::OK);
+		res.headers()
+			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+			.unwrap()
+			.xpect()
+			.to_be("https://allowed.com");
 	}
 	#[sweet::test]
 	async fn allows_local_any() {
@@ -158,13 +157,12 @@ mod test {
 
 		let res = router.oneshot(req).await.unwrap();
 
-		expect(res.status()).to_be(StatusCode::OK);
-		expect(
-			res.headers()
-				.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-				.unwrap(),
-		)
-		.to_be("https://blocked.com");
+		res.status().xpect().to_be(StatusCode::OK);
+		res.headers()
+			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+			.unwrap()
+			.xpect()
+			.to_be("https://blocked.com");
 	}
 	#[sweet::test]
 	async fn blocks() {
@@ -174,8 +172,10 @@ mod test {
 
 		let res = router.oneshot(req).await.unwrap();
 
-		expect(res.status()).to_be(StatusCode::FORBIDDEN);
-		expect(res.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN))
+		res.status().xpect().to_be(StatusCode::FORBIDDEN);
+		res.headers()
+			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+			.xpect()
 			.to_be_none();
 	}
 	#[sweet::test]
@@ -190,8 +190,10 @@ mod test {
 
 		let res = router.oneshot(req).await.unwrap();
 
-		expect(res.status()).to_be(StatusCode::BAD_REQUEST);
-		expect(res.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN))
+		res.status().xpect().to_be(StatusCode::BAD_REQUEST);
+		res.headers()
+			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+			.xpect()
 			.to_be_none();
 	}
 }

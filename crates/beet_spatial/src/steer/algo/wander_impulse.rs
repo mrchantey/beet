@@ -52,6 +52,6 @@ mod test {
 			MaxSpeed::default(),
 			&mut source.0,
 		);
-		expect(*impulse).to_be(Vec3::ZERO);
+		(*impulse).xpect().to_be(Vec3::ZERO);
 	}
 }

@@ -42,12 +42,12 @@ mod test {
 
 	#[test]
 	fn option() {
-		expect(Some(true)).to_be_some();
-		expect(Some(true)).not().to_be_none();
+		Some(true).xpect().to_be_some();
+		Some(true).xpect().not().to_be_none();
 
-		expect(None::<bool>).to_be_none();
-		expect(None::<bool>).not().to_be_some();
+		(None::<bool>).xpect().to_be_none();
+		(None::<bool>).xpect().not().to_be_some();
 
-		expect(Some(true)).as_some().to_be(true);
+		Some(true).xpect().as_some().to_be(true);
 	}
 }

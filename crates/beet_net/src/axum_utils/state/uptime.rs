@@ -69,7 +69,7 @@ mod test {
 		tokio::time::sleep(Duration::from_millis(10)).await;
 		let time = router.oneshot_str("/").await.unwrap();
 		let time: u64 = time.parse().unwrap();
-		expect(time).to_be_greater_or_equal_to(10);
-		expect(time).to_be_less_than(20);
+		time.xpect().to_be_greater_or_equal_to(10);
+		time.xpect().to_be_less_than(20);
 	}
 }

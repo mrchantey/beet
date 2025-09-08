@@ -55,12 +55,13 @@ mod test {
 		let mut agents = world.query::<(Entity, &Transform, &Velocity)>();
 		let agents = agents.iter(&world);
 
-		expect(align_impulse(
+		align_impulse(
 			entity,
 			Vec3::ZERO,
 			&Align::<GroupSteerAgent>::default(),
 			agents,
-		))
+		)
+		.xpect()
 		.map(|i| i.0)
 		.to_be(Vec3::new(0.5, 0.5, 0.));
 		// .to_be_close_to(Vec3::new(1.41, 1.41, 0.))?;

@@ -53,7 +53,11 @@ mod test {
 	#[crate::test]
 	async fn works() {
 		let page = visit("https://example.com").await;
-		expect(&page).to_have_url("https://example.com").await;
-		expect(&page).not().to_have_url("https://foobar.com").await;
+		(&page).xpect().to_have_url("https://example.com").await;
+		(&page)
+			.xpect()
+			.not()
+			.to_have_url("https://foobar.com")
+			.await;
 	}
 }

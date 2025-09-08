@@ -135,7 +135,9 @@ mod test {
 			.click()
 			.await?;
 		let url = page.current_url().await?;
-		expect(url.as_str()).to_be("https://en.wikipedia.org/wiki/Foo_Lake");
+		url.as_str()
+			.xpect()
+			.to_be("https://en.wikipedia.org/wiki/Foo_Lake");
 		Ok(())
 	}
 
@@ -146,9 +148,9 @@ mod test {
 		let router = Router::new().route("/foo", get(async || "hello world!"));
 		let (page, _) = serve_and_visit(router, "/foo").await;
 		let url = page.current_url().await?;
-		expect(url).to_end_with("/foo");
+		url.xpect().to_end_with("/foo");
 		let body = page.find(Locator::Css("body")).await?.text().await?;
-		expect(body).to_contain("hello world!");
+		body.xpect().to_contain("hello world!");
 
 		Ok(())
 	}
