@@ -11,7 +11,7 @@ pub use beet_core_macros::*;
 
 #[cfg(feature = "bevy")]
 mod bevy_utils;
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
+#[cfg(target_arch = "wasm32")]
 pub mod web;
 
 pub mod prelude {
@@ -25,7 +25,7 @@ pub mod prelude {
 	pub use crate::pkg_config;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	#[cfg(target_arch = "wasm32")]
 	pub use crate::web::prelude::*;
 	pub use beet_core_macros::*;
 }
@@ -49,7 +49,7 @@ pub mod as_beet {
 pub mod exports {
 	pub use async_channel;
 	pub use futures_lite;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	#[cfg(target_arch = "wasm32")]
 	pub use js_sys;
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;
@@ -62,10 +62,10 @@ pub mod exports {
 	pub use syn;
 	#[cfg(feature = "serde")]
 	pub use toml;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	#[cfg(target_arch = "wasm32")]
 	pub use wasm_bindgen_futures;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	#[cfg(target_arch = "wasm32")]
 	pub use web_sys;
 }

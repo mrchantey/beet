@@ -162,6 +162,18 @@ deploy-site *args:
 
 #💡 Test
 
+test-all:
+	just test-utils
+	just test-flow
+	just test-rsx
+# cargo test --workspace -- {{args}}
+# cargo test --workspace --all-features -- {{args}}
+
+
+test-all-lib *args:
+	cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
+test-all-doc *args:
+	cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
 test-fmt:
 	cargo fmt 				--check
@@ -172,11 +184,26 @@ test-ci *args:
 	just test-rsx
 
 # upstream from sweet
-test-fs *args:
-	just watch 'cargo test -p beet_utils --lib --features fs -- --nocapture {{args}}'
-# upstream from sweet
 test-beet-utils *args:
-	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
+	just watch 'cargo test -p beet_utils --lib --all-features --nocapture -- {{args}}'
+
+#cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
+test-utils *args:
+	cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
+	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+
+test-flow *args:
+	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
+	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
+	cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+
 
 # cargo test -p beet_rsx					 	 	 																										{{args}} -- {{test-threads}}
 test-rsx *args:
@@ -191,35 +218,6 @@ test-rsx *args:
 	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
 #cargo test -p beet_net 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 
-test-flow *args:
-	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
-	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
-	cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
-	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
-	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
-
-
-#cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
-test-utils *args:
-	cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
-	cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
-	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
-	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
-#cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
-#cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
-
-test-all-lib *args:
-	cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
-test-all-doc *args:
-	cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
-
-test-all:
-	just test-utils
-	just test-flow
-	just test-rsx
-# cargo test --workspace -- {{args}}
-# cargo test --workspace --all-features -- {{args}}
 
 test crate *args:
 	sweet test -p {{crate}} --lib --watch {{args}}

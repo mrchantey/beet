@@ -1,7 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![feature(let_chains)]
-// temp until replace emoji stuff
 #![allow(unused)]
 pub mod behavior;
 pub mod plugins;

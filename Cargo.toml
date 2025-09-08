@@ -40,8 +40,6 @@ exclude = [
 	"infra",
 	"examples/todo-app",
 	"crates/beet_mcp",
-	"crates/beet_new_web",
-	"crates/beet_new_web/infra",
 ]
 
 members = [
@@ -240,7 +238,6 @@ server = ["beet_net", "design", "net", "serde"]
 client = [
 	"rsx",
 	"design",
-	"web",
 	"net",
 	"serde",
 	"beet_net",
@@ -289,7 +286,6 @@ bevy_default = [
 #💡 utils
 fs = ["beet_utils/fs"]
 net = ["dep:beet_net"]
-web = ["beet_core/web"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -348,7 +344,6 @@ axum.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-beet = { path = "", features = ["web"] }
 console_error_panic_hook.workspace = true
 web-sys.workspace = true
 # console_log.workspace = true
