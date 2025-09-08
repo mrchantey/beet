@@ -301,7 +301,7 @@ mod test {
 
 	#[test]
 	fn join() {
-		&RoutePath::new("/foo")
+		RoutePath::new("/foo")
 			.join(&RoutePath::new("/"))
 			.to_string()
 			.xpect()
@@ -325,7 +325,7 @@ mod test {
 
 		// Root node
 		tree.route.to_string().xpect().to_be("/");
-		tree.contains_endpoints().xpect().to_be_false();
+		tree.contains_endpoints().xpect_false();
 
 		// Find child '/foo'
 		let foo = tree
@@ -333,7 +333,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo")
 			.unwrap();
-		foo.contains_endpoints().xpect().to_be_false();
+		foo.contains_endpoints().xpect_false();
 
 		// 'bar' and 'baz' are endpoints under 'foo'
 		let bar = foo
@@ -341,14 +341,14 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/bar")
 			.unwrap();
-		bar.contains_endpoints().xpect().to_be_true();
+		bar.contains_endpoints().xpect_true();
 		(&bar.endpoints).xpect().to_be(&vec![ent1]);
 		let baz = foo
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/baz")
 			.unwrap();
-		baz.contains_endpoints().xpect().to_be_true();
+		baz.contains_endpoints().xpect_true();
 		(&baz.endpoints).xpect().to_be(&vec![ent2]);
 
 		// 'qux' is a directory, 'quux' is endpoint
@@ -357,13 +357,13 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux")
 			.unwrap();
-		qux.contains_endpoints().xpect().to_be_false();
+		qux.contains_endpoints().xpect_false();
 		let quux = qux
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/qux/quux")
 			.unwrap();
-		quux.contains_endpoints().xpect().to_be_true();
+		quux.contains_endpoints().xpect_true();
 		(&quux.endpoints).xpect().to_be(&vec![ent3]);
 
 		// 'root' endpoint
@@ -372,7 +372,7 @@ mod test {
 			.iter()
 			.find(|c| c.route.to_string() == "/root")
 			.unwrap();
-		root.contains_endpoints().xpect().to_be_true();
+		root.contains_endpoints().xpect_true();
 		(&root.endpoints).xpect().to_be(&vec![ent4]);
 	}
 }

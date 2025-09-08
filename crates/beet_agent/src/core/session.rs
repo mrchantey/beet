@@ -170,7 +170,7 @@ impl SessionQuery<'_, '_> {
 	pub fn content_changed(
 		&self,
 		trigger: &Trigger<ContentChanged>,
-	) -> Vec<ContentItem> {
+	) -> Vec<ContentItem<'_>> {
 		let member = trigger.target();
 		self.children
 			.iter_descendants_depth_first(trigger.session)

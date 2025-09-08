@@ -9,7 +9,7 @@ fn it_succeeds() { assert!(true) }
 fn it_succeeds2() { assert!(true) }
 #[test]
 #[should_panic]
-fn it_succeeds3() { true.xpect().to_be_false() }
+fn it_succeeds3() { true.xpect_false(); }
 
 
 // #[test]

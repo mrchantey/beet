@@ -9,24 +9,19 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
-						"beet/server",
-						"beet/client",
-						"beet/launch",
-						"beet/lambda",
-						"beet/chrome",
-						"beet/css",
-						"beet/aws"
+						"server",
+						"client",
+						"launch",
+						"lambda",
+						"chrome",
+						"css",
+						"aws"
 					]
 				}
 			}
 		}
 	},
-	"diagnostics": {
-		"cargo": {
-			// disables running cargo check on save
-			// "fetch_cargo_diagnostics": true
-		}
-	},
+	"diagnostics": {},
 	"file_scan_exclusions": [
 		"**/.git",
 		".gitattributes",

@@ -1,14 +1,9 @@
-//! These are assertions commonly used by other matchers
-//! by convention, any matcher function beginning with 'assert'
-//! is used internally, and should only be called at the top
-//! level of the matcher
 use crate::prelude::*;
 use std::fmt::Debug;
 
 
 impl<T> Matcher<T> {
 	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
-	#[allow(unused)]
 	pub(crate) fn assert_diff(
 		&self,
 		expected: impl AsRef<str>,

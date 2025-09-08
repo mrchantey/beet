@@ -143,22 +143,14 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// Get the region of the provider
 	fn region(&self) -> Option<String>;
 	/// Check if the bucket exists
-	fn bucket_exists(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<bool>>;
+	fn bucket_exists(&self, bucket_name: &str)
+	-> SendBoxedFuture<Result<bool>>;
 	/// Create the bucket
-	fn bucket_create(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>>;
+	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>>;
 	/// Remove the bucket
 	/// ## Caution
 	/// This operation is potentially very destructive, use with care!
-	fn bucket_remove(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>>;
+	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>>;
 
 	/// Ensure the bucket exists, creating it if necessary
 	fn bucket_try_create(
@@ -228,12 +220,12 @@ pub mod bucket_test {
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
 		bucket.bucket_remove().await.ok();
-		bucket.bucket_exists().await.unwrap().xpect().to_be_false();
+		bucket.bucket_exists().await.unwrap().xpect_false();
 		bucket.bucket_try_create().await.unwrap();
 		bucket.exists(&path).await.unwrap().xpect().to_be(false);
 		bucket.remove(&path).await.xpect().to_be_err();
 		bucket.insert(&path, body.clone()).await.unwrap();
-		bucket.bucket_exists().await.unwrap().xpect().to_be_true();
+		bucket.bucket_exists().await.unwrap().xpect_true();
 		bucket.exists(&path).await.unwrap().xpect().to_be(true);
 		bucket
 			.list()
@@ -248,6 +240,6 @@ pub mod bucket_test {
 		bucket.get(&path).await.xpect().to_be_err();
 
 		bucket.bucket_remove().await.unwrap();
-		bucket.bucket_exists().await.unwrap().xpect().to_be_false();
+		bucket.bucket_exists().await.unwrap().xpect_false();
 	}
 }

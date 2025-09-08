@@ -40,8 +40,8 @@ mod test {
 			.len()
 			.xpect()
 			.to_be(1);
-		world.get_entity(gb).is_err().xpect().to_be_false();
+		world.get_entity(gb).is_err().xpect_false();
 		world.despawn(entity2);
-		world.get_entity(gb).is_err().xpect().to_be_true();
+		world.get_entity(gb).is_err().xpect_true();
 	}
 }

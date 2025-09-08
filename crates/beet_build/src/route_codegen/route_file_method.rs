@@ -118,8 +118,7 @@ mod test {
 			),
 		)
 		.returns_result()
-		.xpect()
-		.to_be_false();
+		.xpect_false();
 		RouteFileMethod::new_with(
 			"",
 			&syn::parse_quote!(
@@ -127,7 +126,6 @@ mod test {
 			),
 		)
 		.returns_result()
-		.xpect()
-		.to_be_true();
+		.xpect_true();
 	}
 }

@@ -71,10 +71,7 @@ mod test {
 		}
 
 		let mut dynamic = DynamicStruct::default();
-		MyStruct::from_reflect(&dynamic)
-			.is_none()
-			.xpect()
-			.to_be_true();
+		MyStruct::from_reflect(&dynamic).is_none().xpect_true();
 		dynamic.insert("foo", 3);
 		MyStruct::from_reflect(&dynamic)
 			.unwrap()

@@ -98,9 +98,6 @@ mod test {
 	pub fn works() {
 		let app = AppRes::new();
 		let app = app.borrow_mut();
-		app.world()
-			.contains_non_send::<AppRes>()
-			.xpect()
-			.to_be_true();
+		app.world().contains_non_send::<AppRes>().xpect_true();
 	}
 }

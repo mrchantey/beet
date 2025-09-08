@@ -189,7 +189,7 @@ mod test_response {
 			.await
 			.unwrap();
 
-		matches!(res.body, Body::Stream(_)).xpect().to_be_true();
+		matches!(res.body, Body::Stream(_)).xpect_true();
 
 		res.text()
 			.await

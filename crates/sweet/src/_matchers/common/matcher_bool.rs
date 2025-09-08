@@ -1,8 +1,39 @@
 use super::*;
 
-impl Matcher<bool> {
-	pub fn to_be_true(&self) { self.assert_equal(&true); }
-	pub fn to_be_false(&self) { self.assert_equal(&false); }
+#[extend::ext(name=SweetBool)]
+pub impl bool {
+	/// Performs an assertion ensuring this value is equal to `true`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// true.xpect_true();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `true`.
+	fn xpect_true(&self) -> &Self {
+		assert_ext::assert_expected_received_display(self, &true);
+		self
+	}
+	/// Performs an assertion ensuring this value is equal to `false`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// false.xpect_false();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `false`.
+	fn xpect_false(&self) -> &Self {
+		assert_ext::assert_expected_received_display(self, &false);
+		self
+	}
 }
 
 
@@ -12,11 +43,7 @@ mod test {
 
 	#[test]
 	fn bool() {
-		// true.xpect().to_be_false();
-		true.xpect().to_be_true();
-		false.xpect().not().to_be_true();
-
-		false.xpect().to_be_false();
-		true.xpect().not().to_be_false();
+		true.xpect_true();
+		false.xpect_false();
 	}
 }

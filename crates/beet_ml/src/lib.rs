@@ -2,9 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(incomplete_features)]
 #![doc = include_str!("../README.md")]
-// feels a bit early for missing_docs
-// #![deny(missing_docs)]
-#![feature(let_chains, generic_const_exprs, const_trait_impl)]
+#![feature(generic_const_exprs, const_trait_impl)]
 
 mod utils;
 

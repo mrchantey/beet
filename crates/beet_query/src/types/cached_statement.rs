@@ -127,7 +127,6 @@ mod test {
 				stmt.build_any(&SqliteQueryBuilder).0.as_bytes(),
 			))
 			.is_some()
-			.xpect()
-			.to_be_true();
+			.xpect_true();
 	}
 }

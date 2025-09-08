@@ -329,7 +329,7 @@ mod test {
 
 		for (filter, request) in [("/", "/"), ("", ""), ("", "/"), ("/", "")] {
 			let (_flow, map) = run_with_map(filter, request);
-			map.is_empty().xpect().to_be_true();
+			map.is_empty().xpect_true();
 		}
 	}
 	#[test]
@@ -348,7 +348,7 @@ mod test {
 			("foo", "foo/bar"),
 		] {
 			let (_flow, map) = run_with_map(filter, request);
-			map.is_empty().xpect().to_be_true();
+			map.is_empty().xpect_true();
 		}
 	}
 	#[test]

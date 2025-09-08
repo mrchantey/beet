@@ -55,17 +55,14 @@ mod test {
 		world
 			.entity(is_script)
 			.contains::<ScriptElement>()
-			.xpect()
-			.to_be_true();
+			.xpect_true();
 		world
 			.entity(is_style)
 			.contains::<StyleElement>()
-			.xpect()
-			.to_be_true();
+			.xpect_true();
 		world
 			.entity(is_inline)
 			.contains::<StyleElement>()
-			.xpect()
-			.to_be_false();
+			.xpect_false();
 	}
 }

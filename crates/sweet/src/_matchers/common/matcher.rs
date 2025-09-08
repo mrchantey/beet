@@ -25,7 +25,7 @@ impl<T> Matcher<T> {
 	/// Negate this matcher to flip the result of an assertion.
 	/// ```rust
 	/// # use sweet::prelude::*;
-	/// true.xpect().not().to_be_false();
+	/// true.xpect_true();
 	/// ```
 	pub fn not(&mut self) -> &mut Self {
 		self.negated = true;

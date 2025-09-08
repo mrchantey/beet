@@ -7,7 +7,7 @@ use anyhow::Result;
 /// ```should_panic
 /// # use sweet::prelude::*;
 /// // this will panic with a MatcherErr
-/// true.xpect().to_be_false();
+/// true.xpect_false();
 /// ```
 /// The magic of sweet matchers lies here in the bactrace building.
 /// It is absolutely critical to respect call site depth when building
@@ -41,7 +41,7 @@ impl SweetError {
 	/// callsite of a users expect, ie
 	/// ```
 	/// # use sweet::prelude::*;
-	/// true.xpect().to_be_true();
+	/// true.xpect_true();
 	/// ```
 	pub const BACKTRACE_LEVEL_5: usize = 5;
 	/// callsite of Matcher::to_be, ie [Matcher::to_be_true]

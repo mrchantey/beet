@@ -36,17 +36,7 @@ In the case of `long().method().chains()` we prefer to continue chains than stor
 
 We use the custom `sweet` test runner, which prefers matchers instead of `assert!`.
 
-There are two ways of using sweet matchers:
-
-### Imperative - `expect`
-
-- `expect(true).to_be_true();`
-- `expect(0.3).to_be_close_to(0.300001);`
-- `expect(0.3).to_be_close_to(0.300001);`
-
-### Method Chaining - `xpect`
-
-- `some().long().chain().xpect().to_be_true();`
+- `some().long().chain().xpect_true();`
 - `some().long().chain().xpect().to_be_close_to(0.300001);`
 
 

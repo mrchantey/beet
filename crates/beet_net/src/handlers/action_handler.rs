@@ -83,11 +83,6 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-	struct Foo {
-		value: u32,
-	}
-
 	#[sweet::test]
 	async fn action() {
 		Router::new_bundle(|| {

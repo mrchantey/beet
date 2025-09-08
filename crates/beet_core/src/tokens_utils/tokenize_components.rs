@@ -75,6 +75,6 @@ mod test {
 		// Should have two token streams
 		items.len().xpect().to_be(2);
 		// check that the token streams are not empty
-		items.iter().all(|ts| !ts.is_empty()).xpect().to_be_true();
+		items.iter().all(|ts| !ts.is_empty()).xpect_true();
 	}
 }

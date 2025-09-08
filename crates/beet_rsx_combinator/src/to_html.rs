@@ -190,5 +190,5 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() { true.xpect().to_be_true(); }
+	fn works() { true.xpect_true(); }
 }

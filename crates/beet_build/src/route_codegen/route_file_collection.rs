@@ -238,18 +238,15 @@ mod test {
 				)
 				.into_abs(),
 			)
-			.xpect()
-			.to_be_true();
+			.xpect_true();
 		collection
 			.passes_filter(&WsPathBuf::new("foobar/index.mockup.rs").into_abs())
-			.xpect()
-			.to_be_false();
+			.xpect_false();
 		collection
 			.passes_filter(
 				&WsPathBuf::new("crates/beet_router/src/test_site/index.rs")
 					.into_abs(),
 			)
-			.xpect()
-			.to_be_false();
+			.xpect_false();
 	}
 }

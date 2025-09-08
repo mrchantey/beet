@@ -1049,7 +1049,7 @@ mod test {
 	#[test]
 	pub fn test_rsx_fragment_empty() {
 		let result = p(rsx_fragment).parse("<></>");
-		result.is_ok().xpect().to_be_true();
+		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
 		fragment.0.0.len().xpect().to_be(0);
 	}
@@ -1057,7 +1057,7 @@ mod test {
 	#[test]
 	pub fn test_rsx_fragment_with_content() {
 		let result = p(rsx_fragment).parse("<>Hello World</>");
-		result.is_ok().xpect().to_be_true();
+		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
 		fragment.0.0.len().xpect().to_be(1);
 	}
@@ -1066,7 +1066,7 @@ mod test {
 	pub fn test_rsx_fragment_with_elements() {
 		let result =
 			p(rsx_fragment).parse("<><div>content</div><span>more</span></>");
-		result.is_ok().xpect().to_be_true();
+		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
 		fragment.0.0.len().xpect().to_be(2);
 	}
@@ -1074,7 +1074,7 @@ mod test {
 	#[test]
 	pub fn test_rsx_element_includes_fragment() {
 		let result = p(rsx_element).parse("<></>");
-		result.is_ok().xpect().to_be_true();
+		result.is_ok().xpect_true();
 		let (element, _) = result.unwrap();
 		match element {
 			RsxElement::Fragment(_) => {}

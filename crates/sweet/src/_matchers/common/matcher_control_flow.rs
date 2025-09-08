@@ -32,14 +32,4 @@ impl<B, C> Matcher<ControlFlow<B, C>> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-
-	#[test]
-	fn bool() {
-		// true.xpect().to_be_false();
-		true.xpect().to_be_true();
-		false.xpect().not().to_be_true();
-
-		false.xpect().to_be_false();
-		true.xpect().not().to_be_false();
-	}
 }
