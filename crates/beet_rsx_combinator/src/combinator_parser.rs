@@ -163,6 +163,16 @@ mod test {
 	}
 
 	#[test]
+	#[ignore = "TODO"]
+	pub fn preserves_whitespace() {
+		CombinatorParser::parse("<p>i am <strong>very</strong> cool</p>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<p>i am <strong>very</strong> cool</p>");
+	}
+
+	#[test]
 	pub fn multiple_root_elements() {
 		CombinatorParser::parse("<br/><br/>")
 			.unwrap()

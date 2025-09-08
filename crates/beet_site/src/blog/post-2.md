@@ -7,6 +7,11 @@ created= "2025-08-09"
 
 The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!
 
+<iframe width="941" height="538" src="https://www.youtube.com/embed/YKiHKQJmEoU" title="Full Moon Harverst #2 | Bevy Router" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+<br/>
+<br/>
+
 ## A Very Bevy Router
 
 Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do.
