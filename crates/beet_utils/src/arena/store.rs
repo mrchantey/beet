@@ -205,6 +205,27 @@ impl<T: 'static> Store<Vec<T>> {
 	/// assert!(!rows.is_empty());
 	/// ```
 	pub fn is_empty(&self) -> bool { self.0.with(|vec| vec.is_empty()) }
+
+	/// Returns a clone of the element at `index` if it exists, without cloning the entire `Vec<T>`.
+	///
+	/// This uses an internal borrow with `with` and clones only the requested item.
+	///
+	/// ## Examples
+	/// ```rust
+	/// # use beet_utils::prelude::*;
+	/// let values = Store::<Vec<i32>>::default();
+	/// values.push(10);
+	/// values.push(20);
+	/// assert_eq!(values.get_index(0), Some(10));
+	/// assert_eq!(values.get_index(1), Some(20));
+	/// assert_eq!(values.get_index(2), None);
+	/// ```
+	pub fn get_index(&self, index: usize) -> Option<T>
+	where
+		T: Clone,
+	{
+		self.0.with(|vec| vec.get(index).cloned())
+	}
 }
 
 
@@ -236,5 +257,15 @@ mod test {
 		assert_eq!(store.len(), 1);
 		store.clear();
 		assert_eq!(store.len(), 0);
+	}
+
+	#[test]
+	fn get_index() {
+		let store = Store::<Vec<u32>>::default();
+		store.push(10);
+		store.push(20);
+		assert_eq!(store.get_index(0), Some(10));
+		assert_eq!(store.get_index(1), Some(20));
+		assert_eq!(store.get_index(2), None);
 	}
 }

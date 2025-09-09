@@ -96,12 +96,14 @@ mod test {
 			.id();
 
 		observed.len().xpect_eq(2);
-		observed.get()[0]
-			.xpect_eq(OnResultAction::global(action2, RunResult::Success));
-		observed.get()[1].xpect_eq(OnResultAction::new(
+		observed.get_index(0).xpect_eq(Some(OnResultAction::global(
+			action2,
+			RunResult::Success,
+		)));
+		observed.get_index(1).xpect_eq(Some(OnResultAction::new(
 			action1,
 			action2,
 			RunResult::Success,
-		));
+		)));
 	}
 }

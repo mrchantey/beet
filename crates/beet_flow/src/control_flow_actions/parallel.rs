@@ -85,8 +85,9 @@ mod test {
 
 		on_run.len().xpect_eq(3);
 		on_result.len().xpect_eq(3);
-		on_result.get()[2]
-			.xpect_eq(OnResultAction::global(action, RunResult::Failure));
+		on_result
+			.get_index(2)
+			.xpect_eq(Some(OnResultAction::global(action, RunResult::Failure)));
 	}
 	#[test]
 	fn succeeds() {
@@ -106,7 +107,8 @@ mod test {
 
 		on_run.len().xpect_eq(3);
 		on_result.len().xpect_eq(3);
-		on_result.get()[2]
-			.xpect_eq(OnResultAction::global(action, RunResult::Success));
+		on_result
+			.get_index(2)
+			.xpect_eq(Some(OnResultAction::global(action, RunResult::Success)));
 	}
 }

@@ -8,7 +8,7 @@ mod test {
 		func.call(0);
 		func.call(2);
 		func.called.len().xpect_eq(2);
-		func.called.get()[0].xpect_eq(0);
-		func.called.get()[1].xpect_eq(4);
+		func.called.get_index(0).xpect_eq(Some(0));
+		func.called.get_index(1).xpect_eq(Some(4));
 	}
 }

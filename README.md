@@ -18,14 +18,30 @@
   </h3>
 </div>
 
-Its *very* early days so your mileage may vary depending on the crate of interest:
+Beet is a bevy metaframework, bringing bevy architecture and principles to the rest of the stack.
+
+Thats right fam, we're going full-stack bevy. Its *very* early days so your mileage may vary depending on your application:
+
+
+
 
 **readiness meter**
 - 🦢 documented and tested
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
 
-## `beeet_flow`
+I think of the beet crates as divided into a few main categories.
+
+## Utils
+
+
+
+Crates
+| Crate                                            | Status | Description                                                       |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
+| [`sweet`](crates/sweet/Cargo.toml)      				 | 🦢     | Scenes-as-control-flow bevy library for behavior trees etc        |
+
+## Beet Flow
 
 Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and Reinforcement Learning.
 
@@ -37,9 +53,9 @@ Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and 
 | [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
 
 
-## `beet_rsx`
+## Beet Rsx
 
-An exploration of a rusty `jsx`, and the tools required to maximize performance and developer productivity. 
+Crates for building and deploying web apps.
 
 | Crate                                          | Status | Description                    |
 | ---------------------------------------------- | ------ | ------------------------------ |

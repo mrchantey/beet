@@ -53,7 +53,8 @@ mod test {
 			.id();
 
 		observed.len().xpect_eq(1);
-		observed.get()[0]
-			.xpect_eq(OnResultAction::global(entity, RunResult::Success));
+		observed
+			.get_index(0)
+			.xpect_eq(Some(OnResultAction::global(entity, RunResult::Success)));
 	}
 }

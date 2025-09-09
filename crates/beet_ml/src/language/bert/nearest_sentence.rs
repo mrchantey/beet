@@ -86,7 +86,7 @@ mod test {
 
 
 		on_run.len().xpect_eq(2);
-		on_run.get()[0].xpect_eq("root".to_string());
-		on_run.get()[1].xpect_eq("kill".to_string());
+		on_run.get_index(0).xpect_eq(Some("root".to_string()));
+		on_run.get_index(1).xpect_eq(Some("kill".to_string()));
 	}
 }
