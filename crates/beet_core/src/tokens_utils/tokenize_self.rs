@@ -253,7 +253,6 @@ mod test {
 			.to_token_stream()
 			.to_string()
 			.replace(" ", "")
-			.xpect()
-			.to_be("Option<Vec<Matcher<u32>>>");
+			.xpect_eq("Option<Vec<Matcher<u32>>>");
 	}
 }

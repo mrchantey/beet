@@ -81,9 +81,8 @@ mod test {
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
-			.xpect()
 			// only the output of the snippet, not the instance
-			.to_be("<h1>Hello</h1><p>This page is all about saying</p><main>## Nested Heading\n\tnested markdown doesnt work yet</main>");
+			.xpect_eq("<h1>Hello</h1><p>This page is all about saying</p><main>## Nested Heading\n\tnested markdown doesnt work yet</main>");
 	}
 	#[test]
 	fn parse_mdx() {
@@ -104,9 +103,8 @@ mod test {
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
-			.xpect()
 			// only the output of the snippet, not the instance
-			.to_be(
+			.xpect_eq(
 				"<h1>Docs</h1><p>Docs are good for your health</p><div>1 + 1 is</div>",
 			);
 	}

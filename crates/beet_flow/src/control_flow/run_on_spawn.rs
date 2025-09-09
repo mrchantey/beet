@@ -69,12 +69,10 @@ mod test {
 			ReturnWith(RunResult::Success),
 			RunOnSpawn::new(OnRun::local()),
 		));
-		observers().xpect().to_be(vec![]);
+		observers().xpect_eq(vec![]);
 		app.update();
 		app.world_mut().flush();
-		observers()
-			.xpect()
-			.to_be(vec![("".to_string(), RunResult::Success)]);
+		observers().xpect_eq(vec![("".to_string(), RunResult::Success)]);
 	}
 	#[test]
 	fn global() {
@@ -87,11 +85,9 @@ mod test {
 			.id();
 		app.world_mut()
 			.spawn(RunOnSpawn::new(OnRun::global(action)));
-		observers().xpect().to_be(vec![]);
+		observers().xpect_eq(vec![]);
 		app.update();
 		app.world_mut().flush();
-		observers()
-			.xpect()
-			.to_be(vec![("action".to_string(), RunResult::Success)]);
+		observers().xpect_eq(vec![("action".to_string(), RunResult::Success)]);
 	}
 }

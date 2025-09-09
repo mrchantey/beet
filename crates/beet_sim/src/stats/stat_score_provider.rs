@@ -100,26 +100,32 @@ mod test {
 		let range = StatValue::range(-3.0..7.0);
 		let target = StatValueGoal::High;
 
-		(*provider.sample(StatValue(-3.), target, range.clone()))
-			.xpect()
-			.to_be(1.0);
-		(*provider.sample(StatValue(2.0), target, range.clone()))
-			.xpect()
-			.to_be(0.5);
-		(*provider.sample(StatValue(7.0), target, range.clone()))
-			.xpect()
-			.to_be(0.0);
+		provider
+			.sample(StatValue(-3.), target, range.clone())
+			.0
+			.xpect_eq(1.0);
+		provider
+			.sample(StatValue(2.0), target, range.clone())
+			.0
+			.xpect_eq(0.5);
+		provider
+			.sample(StatValue(7.0), target, range.clone())
+			.0
+			.xpect_eq(0.0);
 
 		let target = StatValueGoal::Low;
-		(*provider.sample(StatValue(-3.), target, range.clone()))
-			.xpect()
-			.to_be(0.0);
-		(*provider.sample(StatValue(2.0), target, range.clone()))
-			.xpect()
-			.to_be(0.5);
-		(*provider.sample(StatValue(7.0), target, range.clone()))
-			.xpect()
-			.to_be(1.0);
+		provider
+			.sample(StatValue(-3.), target, range.clone())
+			.0
+			.xpect_eq(0.0);
+		provider
+			.sample(StatValue(2.0), target, range.clone())
+			.0
+			.xpect_eq(0.5);
+		provider
+			.sample(StatValue(7.0), target, range.clone())
+			.0
+			.xpect_eq(1.0);
 	}
 
 	#[test]

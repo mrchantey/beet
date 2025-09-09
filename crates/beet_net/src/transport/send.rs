@@ -33,8 +33,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 	}
 
 	#[sweet::test]
@@ -45,8 +44,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 	}
 
 	#[sweet::test]
@@ -59,8 +57,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 	}
 
 	#[sweet::test]
@@ -72,8 +69,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 	}
 
 	#[sweet::test]
@@ -85,8 +81,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 
 		Request::get(format!("{HTTPBIN}/delete"))
 			.with_method(HttpMethod::Delete)
@@ -94,8 +89,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect()
-			.to_be(200);
+			.xpect_eq(200);
 	}
 
 	#[sweet::test]
@@ -178,8 +172,7 @@ mod test_response {
 			.await
 			.unwrap()
 			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
-			.xpect()
-			.to_be("bar");
+			.xpect_eq("bar");
 	}
 	#[sweet::test]
 	#[ignore = "flaky httpbin"]

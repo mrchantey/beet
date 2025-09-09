@@ -212,6 +212,6 @@ mod test {
 			// Thanks to From<MockEvent> for MouseEvent and Into<T> in BeetEvent::new,
 			// this mirrors how downstream tests construct events.
 			.trigger(OnClick(MockEvent::new("bar")));
-		get().xpect().to_be("bar");
+		get().xpect_eq("bar");
 	}
 }

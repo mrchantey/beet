@@ -96,13 +96,14 @@ mod test {
 
 	#[test]
 	fn algo() {
-		let impulse = seek_impulse(
+		seek_impulse(
 			&Vec3::default(),
 			&Velocity::default(),
 			&Vec3::new(1., 0., 0.),
 			MaxSpeed::default(),
 			None,
-		);
-		(*impulse).xpect().to_be(Vec3::new(1., 0., 0.));
+		)
+		.0
+		.xpect_eq(Vec3::new(1., 0., 0.));
 	}
 }

@@ -287,7 +287,6 @@ mod test {
 		let results = embeddings.scores_sorted(0).unwrap();
 		embeddings.sentences[results[0].0]
 			.as_ref()
-			.xpect()
-			.to_be("The cat plays in the garden");
+			.xpect_eq("The cat plays in the garden");
 	}
 }

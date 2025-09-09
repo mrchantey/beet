@@ -97,7 +97,6 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	#[ignore = "get random"]
 	fn works() {
 		let mut app = App::new();
 

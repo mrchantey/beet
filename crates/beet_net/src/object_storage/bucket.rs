@@ -222,19 +222,14 @@ pub mod bucket_test {
 		bucket.bucket_remove().await.ok();
 		bucket.bucket_exists().await.unwrap().xpect_false();
 		bucket.bucket_try_create().await.unwrap();
-		bucket.exists(&path).await.unwrap().xpect().to_be(false);
+		bucket.exists(&path).await.unwrap().xpect_false();
 		bucket.remove(&path).await.xpect().to_be_err();
 		bucket.insert(&path, body.clone()).await.unwrap();
 		bucket.bucket_exists().await.unwrap().xpect_true();
-		bucket.exists(&path).await.unwrap().xpect().to_be(true);
-		bucket
-			.list()
-			.await
-			.unwrap()
-			.xpect()
-			.to_be(vec![path.clone()]);
-		bucket.get(&path).await.unwrap().xpect().to_be(body.clone());
-		bucket.get(&path).await.unwrap().xpect().to_be(body);
+		bucket.exists(&path).await.unwrap().xpect_true();
+		bucket.list().await.unwrap().xpect_eq(vec![path.clone()]);
+		bucket.get(&path).await.unwrap().xpect_eq(body.clone());
+		bucket.get(&path).await.unwrap().xpect_eq(body);
 
 		bucket.remove(&path).await.unwrap();
 		bucket.get(&path).await.xpect().to_be_err();

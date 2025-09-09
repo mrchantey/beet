@@ -56,9 +56,9 @@ mod test {
 		let b: BevyError = bevyhow!("fmt literal inline {foo}{bar}");
 		let c: BevyError = bevyhow!("fmt literal {}{}", 1, 2);
 		// let d: BevyError = bevyhow!(String::from("expression"));
-		a.to_string().xpect().to_be("literal\n");
-		b.to_string().xpect().to_be("fmt literal inline 12\n");
-		c.to_string().xpect().to_be("fmt literal 12\n");
+		a.to_string().xpect_eq("literal\n");
+		b.to_string().xpect_eq("fmt literal inline 12\n");
+		c.to_string().xpect_eq("fmt literal 12\n");
 
 		let a = || -> Result {
 			bevybail!("literal");
@@ -70,14 +70,10 @@ mod test {
 			bevybail!("fmt literal {}{}", 1, 2);
 		};
 
-		a().unwrap_err().to_string().xpect().to_be("literal\n");
+		a().unwrap_err().to_string().xpect_eq("literal\n");
 		b().unwrap_err()
 			.to_string()
-			.xpect()
-			.to_be("fmt literal inline 12\n");
-		c().unwrap_err()
-			.to_string()
-			.xpect()
-			.to_be("fmt literal 12\n");
+			.xpect_eq("fmt literal inline 12\n");
+		c().unwrap_err().to_string().xpect_eq("fmt literal 12\n");
 	}
 }

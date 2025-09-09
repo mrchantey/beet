@@ -66,8 +66,7 @@ mod test {
 			.text()
 			.await
 			.unwrap()
-			.xpect()
-			.to_be(body);
+			.xpect_eq(body);
 	}
 	#[sweet::test]
 	#[ignore = "no longer redirects"]
@@ -77,10 +76,7 @@ mod test {
 		bucket.insert(&path, "body { color: red; }").await.unwrap();
 		let path = RoutePath::from("/style.css");
 		let response = super::from_bucket(&bucket, &path).await.unwrap();
-		response
-			.status()
-			.xpect()
-			.to_be(StatusCode::MOVED_PERMANENTLY);
+		response.status().xpect_eq(StatusCode::MOVED_PERMANENTLY);
 		response
 			.header(LOCATION)
 			.unwrap()
@@ -106,8 +102,7 @@ mod test {
 			.text()
 			.await
 			.unwrap()
-			.xpect()
-			.to_be(body);
+			.xpect_eq(body);
 	}
 	#[sweet::test]
 	async fn as_fallback() {

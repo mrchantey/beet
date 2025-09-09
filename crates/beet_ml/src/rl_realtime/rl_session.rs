@@ -206,10 +206,10 @@ mod test {
 		params.learn_params.n_training_episodes = 1;
 		let len = app.world().entities().len();
 		app.world_mut().spawn(RlSession::new(params));
-		app.world().entities().len().xpect().to_be(len + 1);
+		app.world().entities().len().xpect_eq(len + 1);
 		app.update();
-		app.world().entities().len().xpect().to_be(len + 2);
+		app.world().entities().len().xpect_eq(len + 2);
 		app.update();
-		app.world().entities().len().xpect().to_be(len + 1);
+		app.world().entities().len().xpect_eq(len + 1);
 	}
 }

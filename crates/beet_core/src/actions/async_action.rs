@@ -177,7 +177,6 @@ mod test {
 			.entity(entity)
 			.get::<Name>()
 			.unwrap()
-			.xpect()
-			.to_be(&Name::new("Hello"));
+			.xpect_eq(Name::new("Hello"));
 	}
 }

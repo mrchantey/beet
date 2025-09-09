@@ -74,7 +74,6 @@ mod test {
 		(&on_run).xpect().to_have_been_called_times(1);
 		world
 			.get::<Sentence>(entity)
-			.xpect()
-			.to_be(Some(&Sentence::new("pizza")));
+			.xpect_eq(Some(&Sentence::new("pizza")));
 	}
 }

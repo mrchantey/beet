@@ -232,23 +232,21 @@ mod test {
 		with_captured_lifetimes(&syn::parse_quote! {
 			fn foo<T>() -> impl Bundle {}
 		})
-		.xpect()
-		.to_be(syn::parse_quote! {-> impl Bundle + use<T> });
+		.xpect_eq(syn::parse_quote! {-> impl Bundle + use<T> });
 
 		with_captured_lifetimes(
 			&syn::parse_quote! {fn bar() -> Result<impl Bundle, ()>{} },
 		)
-		.xpect()
-		.to_be(syn::parse_quote! {-> Result<impl Bundle + use<>, ()> });
+		.xpect_eq(syn::parse_quote! {-> Result<impl Bundle + use<>, ()> });
 	}
 
 
 	#[test]
 	fn segments() {
 		let a: PathSegment = syn::parse_quote! {Foo};
-		a.ident.xpect().to_be("Foo");
+		a.ident.xpect_eq("Foo");
 		let a: PathSegment = syn::parse_quote! {Foo<Bar>};
-		a.ident.xpect().to_be("Foo");
+		a.ident.xpect_eq("Foo");
 	}
 
 	#[test]

@@ -127,8 +127,7 @@ mod test {
 		world
 			.get::<Running>(entity)
 			.unwrap()
-			.xpect()
-			.to_be(&Running { origin: entity });
+			.xpect_eq(Running { origin: entity });
 	}
 
 	#[test]
@@ -143,7 +142,6 @@ mod test {
 		world
 			.get::<Running>(action)
 			.unwrap()
-			.xpect()
-			.to_be(&Running::new(origin));
+			.xpect_eq(Running::new(origin));
 	}
 }

@@ -68,12 +68,11 @@ mod test {
 
 	#[test]
 	fn works() {
-		UserCols::primary_key().xpect().to_be(Some(UserCols::Id));
+		UserCols::primary_key().xpect_eq(Some(UserCols::Id));
 		User::default()
 			.primary_value()
 			.unwrap()
-			.xpect()
-			.to_be(Some(0u32.into_value().unwrap()));
+			.xpect_eq(Some(0u32.into_value().unwrap()));
 
 		// MyTable::name().xpect().to_be("foobar".to_string());
 		// MyTableColumns::Test.into_column().name

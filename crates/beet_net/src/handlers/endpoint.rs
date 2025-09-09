@@ -91,7 +91,7 @@ mod test {
     .into_iter()
     .map(|(_, segments)| segments.annotated_route_path())
     .collect::<Vec<_>>()
-		.xpect().to_be(vec![
+		.xpect_eq(vec![
 				RoutePath::new("/foo"),
 				RoutePath::new("/foo/*bar"),
 				RoutePath::new("/foo/:quax")

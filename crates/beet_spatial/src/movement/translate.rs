@@ -75,7 +75,6 @@ mod test {
 			.get::<Transform>(agent)
 			.unwrap()
 			.translation
-			.xpect()
-			.to_be(Vec3::new(1., 0., 0.));
+			.xpect_eq(Vec3::new(1., 0., 0.));
 	}
 }

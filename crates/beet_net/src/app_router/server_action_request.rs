@@ -208,8 +208,7 @@ mod test {
 			.send::<i32>()
 			.await
 			.unwrap()
-			.xpect()
-			.to_be(8);
+			.xpect_eq(8);
 	}
 	async fn test_post() {
 		ServerActionRequest::new(HttpMethod::Post, "/add")
@@ -217,8 +216,7 @@ mod test {
 			.send::<i32>()
 			.await
 			.unwrap()
-			.xpect()
-			.to_be(17);
+			.xpect_eq(17);
 	}
 	async fn test_result() {
 		ServerActionRequest::new(HttpMethod::Get, "/increment_if_positive")
@@ -227,8 +225,7 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.xpect()
-			.to_be(8);
+			.xpect_eq(8);
 
 		ServerActionRequest::new(HttpMethod::Get, "/increment_if_positive")
 			.with_body(-7)
@@ -237,7 +234,6 @@ mod test {
 			.unwrap()
 			.unwrap_err()
 			.to_string()
-			.xpect()
-			.to_be("expected positive number, received -7");
+			.xpect_eq("expected positive number, received -7");
 	}
 }

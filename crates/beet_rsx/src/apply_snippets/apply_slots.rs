@@ -82,7 +82,7 @@ pub fn apply_slots(
 				return Err(anyhow::anyhow!(
 					"Attempted to add a child to {node_tag} which has no '{named_slot}' slot target,
 					consider adding a <slot name=\"{named_slot}\"/> to {node_tag}."
-					
+
 				)
 				.into());
 			};
@@ -203,8 +203,7 @@ mod test {
 			</MyComponent>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<html><div>Title</div><br/><div>Default</div></html>");
+		.xpect_eq("<html><div>Title</div><br/><div>Default</div></html>");
 	}
 
 	#[test]
@@ -216,16 +215,14 @@ mod test {
 			</MyComponent>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<html><span>Title</span><br/><div>Default</div></html>");
+		.xpect_eq("<html><span>Title</span><br/><div>Default</div></html>");
 	}
 
 	#[test]
 	fn fallback() {
 		rsx! { <MyComponent /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<html>Fallback Title<br/></html>");
+			.xpect_eq("<html>Fallback Title<br/></html>");
 	}
 
 	#[test]
@@ -239,8 +236,7 @@ mod test {
 			</Span>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be(
+		.xpect_eq(
 			"<span><html><div>Title</div><br/><div>Default</div></html></span>",
 		);
 	}
@@ -270,8 +266,7 @@ mod test {
 			</Layout>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<header><h1>Title</h1></header>");
+		.xpect_eq("<header><h1>Title</h1></header>");
 	}
 
 	#[test]
@@ -306,7 +301,6 @@ mod test {
 			</Layout>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<body><header><h1>Title</h1></header><main><div>Content</div></main></body>");
+		.xpect_eq("<body><header><h1>Title</h1></header><main><div>Content</div></main></body>");
 	}
 }

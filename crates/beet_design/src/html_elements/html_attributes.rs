@@ -73,8 +73,8 @@ mod test {
 	#[test]
 	fn works() {
 		let a = AnchorHtmlAttributes::default().class("foo").href("bar");
-		a.base_attrs.class.xpect().to_be(Some("foo".to_string()));
-		a.href.xpect().to_be(Some("bar".to_string()));
+		a.base_attrs.class.xpect_eq(Some("foo".to_string()));
+		a.href.xpect_eq(Some("bar".to_string()));
 	}
 
 

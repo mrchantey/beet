@@ -125,8 +125,7 @@ mod test {
 			.entity(global)
 			.get::<InnerText>()
 			.unwrap()
-			.xpect()
-			.to_be(&InnerText("div {\n  color: red;\n}\n".to_string()));
+			.xpect_eq(InnerText("div {\n  color: red;\n}\n".to_string()));
 
 		let placeholder = app
 			.world()
@@ -136,8 +135,7 @@ mod test {
 			.entity(local)
 			.get::<InnerText>()
 			.unwrap()
-			.xpect()
-			.to_be(&InnerText(format!(
+			.xpect_eq(InnerText(format!(
 				"div[{placeholder}] {{\n  color: red;\n}}\n"
 			)));
 	}

@@ -156,8 +156,7 @@ mod test {
 	fn doctype() {
 		rsx! { <!DOCTYPE /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<!DOCTYPE html>");
+			.xpect_eq("<!DOCTYPE html>");
 	}
 
 	#[test]
@@ -165,56 +164,49 @@ mod test {
 		// comment (in rstml must be quoted)
 		rsx! { <!-- "howdy" --> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<!--howdy-->");
+			.xpect_eq("<!--howdy-->");
 	}
 
 	#[test]
 	fn raw_text() {
 		rsx! { howdy }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("howdy");
+			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn quoted_text() {
 		rsx! { "howdy" }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("howdy");
+			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn fragment() {
 		rsx! { <>"howdy"</> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("howdy");
+			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn block() {
 		rsx! { {"howdy"} }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("howdy");
+			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn self_closing_tag() {
 		rsx! { <br /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<br/>");
+			.xpect_eq("<br/>");
 	}
 
 	#[test]
 	fn not_self_closing_tag() {
 		rsx! { <span>hello</span> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<span>hello</span>");
+			.xpect_eq("<span>hello</span>");
 	}
 
 	#[test]
@@ -224,41 +216,36 @@ mod test {
 				<span>hello</span>
 			</span>
 		}
-			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<span><span>hello</span></span>");
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect_eq("<span><span>hello</span></span>");
 	}
 
 	#[test]
 	fn simple_attribute() {
 		rsx! { <div class="container"></div> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<div class=\"container\"></div>");
+			.xpect_eq("<div class=\"container\"></div>");
 	}
 
 	#[test]
 	fn multiple_attributes() {
 		rsx! { <div class="container" id="main"></div> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<div class=\"container\" id=\"main\"></div>");
+			.xpect_eq("<div class=\"container\" id=\"main\"></div>");
 	}
 
 	#[test]
 	fn boolean_attribute() {
 		rsx! { <input disabled /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<input disabled/>");
+			.xpect_eq("<input disabled/>");
 	}
 
 	#[test]
 	fn attribute_in_self_closing_tag() {
 		rsx! { <img src="/image.jpg" /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<img src=\"/image.jpg\"/>");
+			.xpect_eq("<img src=\"/image.jpg\"/>");
 	}
 
 	#[test]
@@ -268,11 +255,10 @@ mod test {
 				<span id="text">content</span>
 			</div>
 		}
-			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be(
-				"<div class=\"wrapper\"><span id=\"text\">content</span></div>",
-			);
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect_eq(
+			"<div class=\"wrapper\"><span id=\"text\">content</span></div>",
+		);
 	}
 
 	#[test]
@@ -280,8 +266,7 @@ mod test {
 		let val = true;
 		rsx! { <input hidden=val /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_be("<input hidden=\"true\"/>");
+			.xpect_eq("<input hidden=\"true\"/>");
 	}
 
 	#[template]
@@ -300,8 +285,7 @@ mod test {
 			<Template />
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("outer<div class=\"container\"><span>hello</span></div>");
+		.xpect_eq("outer<div class=\"container\"><span>hello</span></div>");
 	}
 	#[test]
 	fn client_islands() {
@@ -310,8 +294,7 @@ mod test {
 			<Template client:load />
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("outer<div class=\"container\"><span>hello</span></div>");
+		.xpect_eq("outer<div class=\"container\"><span>hello</span></div>");
 	}
 	#[test]
 	fn events() {
@@ -334,8 +317,9 @@ mod test {
 			</div>
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<div><span>foo</span><span>bar</span><span>baz</span></div>");
+		.xpect_eq(
+			"<div><span>foo</span><span>bar</span><span>baz</span></div>",
+		);
 	}
 	#[test]
 	fn signal_text_nodes() {

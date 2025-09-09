@@ -154,7 +154,7 @@ mod test {
 			.unwrap()
 			.build(SqliteQueryBuilder)
 			.0;
-		stmt.xpect().to_be(
+		stmt.xpect_eq(
 			"UPDATE \"my_table\" SET \"id\" = ?, \"name\" = ?".to_string(),
 		);
 	}

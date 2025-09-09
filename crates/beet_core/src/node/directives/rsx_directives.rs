@@ -111,8 +111,7 @@ mod test {
 		app.world_mut()
 			.entity(entity)
 			.get::<SlotTarget>()
-			.xpect()
-			.to_be(Some(&SlotTarget::default()));
+			.xpect_eq(Some(&SlotTarget::default()));
 	}
 	#[test]
 	fn named_slot_target() {
@@ -135,7 +134,6 @@ mod test {
 		app.world_mut()
 			.entity(entity)
 			.get::<SlotTarget>()
-			.xpect()
-			.to_be(Some(&SlotTarget::Named("foo".to_string())));
+			.xpect_eq(Some(&SlotTarget::Named("foo".to_string())));
 	}
 }

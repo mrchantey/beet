@@ -62,19 +62,14 @@ mod test {
 
 	#[test]
 	pub fn empty() {
-		CombinatorParser::parse("")
-			.unwrap()
-			.to_html()
-			.xpect()
-			.to_be("");
+		CombinatorParser::parse("").unwrap().to_html().xpect_eq("");
 	}
 	#[test]
 	pub fn top_level_expression() {
 		CombinatorParser::parse("let a = <br/>; a")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("let a =<br/>; a");
+			.xpect_eq("let a =<br/>; a");
 	}
 
 	#[test]
@@ -82,8 +77,7 @@ mod test {
 		CombinatorParser::parse("<style>body {padding: 1em}</style>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<style>body{padding: 1em}</style>");
+			.xpect_eq("<style>body{padding: 1em}</style>");
 	}
 
 	#[test]
@@ -91,8 +85,7 @@ mod test {
 		CombinatorParser::parse("<foo>Hello world!</foo>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<foo>Hello world!</foo>");
+			.xpect_eq("<foo>Hello world!</foo>");
 	}
 
 	#[test]
@@ -102,8 +95,7 @@ mod test {
 		)
 		.unwrap()
 		.to_html()
-		.xpect()
-		.to_be(
+		.xpect_eq(
 			"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>",
 		);
 	}
@@ -113,8 +105,7 @@ mod test {
 		CombinatorParser::parse("<x-foo-bar>Hello world!</x-foo-bar>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<x-foo-bar>Hello world!</x-foo-bar>");
+			.xpect_eq("<x-foo-bar>Hello world!</x-foo-bar>");
 	}
 
 	#[test]
@@ -122,8 +113,7 @@ mod test {
 		CombinatorParser::parse("<></>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("");
+			.xpect_eq("");
 	}
 
 	#[test]
@@ -131,8 +121,7 @@ mod test {
 		CombinatorParser::parse("<><div>Hello</div></>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<div>Hello</div>");
+			.xpect_eq("<div>Hello</div>");
 	}
 
 	#[test]
@@ -140,8 +129,7 @@ mod test {
 		CombinatorParser::parse("<><div>Hello</div><span>World</span></>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<div>Hello</div><span>World</span>");
+			.xpect_eq("<div>Hello</div><span>World</span>");
 	}
 
 	#[test]
@@ -149,8 +137,7 @@ mod test {
 		CombinatorParser::parse("<>Text before<div>content</div>Text after</>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("Text before<div>content</div>Text after");
+			.xpect_eq("Text before<div>content</div>Text after");
 	}
 
 	#[test]
@@ -158,8 +145,7 @@ mod test {
 		CombinatorParser::parse("<><>Inner fragment</><div>Element</div></>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("Inner fragment<div>Element</div>");
+			.xpect_eq("Inner fragment<div>Element</div>");
 	}
 
 	#[test]
@@ -168,8 +154,7 @@ mod test {
 		CombinatorParser::parse("<p>i am <strong>very</strong> cool</p>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<p>i am <strong>very</strong> cool</p>");
+			.xpect_eq("<p>i am <strong>very</strong> cool</p>");
 	}
 
 	#[test]
@@ -177,7 +162,6 @@ mod test {
 		CombinatorParser::parse("<br/><br/>")
 			.unwrap()
 			.to_html()
-			.xpect()
-			.to_be("<br/><br/>");
+			.xpect_eq("<br/><br/>");
 	}
 }

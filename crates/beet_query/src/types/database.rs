@@ -144,7 +144,7 @@ mod test {
 		db.insert(user.clone()).await.unwrap();
 
 		// 2. READ
-		db.find::<User>(1).await.unwrap().xpect().to_be(user);
+		db.find::<User>(1).await.unwrap().xpect_eq(user);
 
 		// 3. UPDATE
 		db.update(User {
@@ -159,8 +159,7 @@ mod test {
 			.await
 			.unwrap()
 			.xmap(|u| u.name)
-			.xpect()
-			.to_be("WonderWoman".to_string());
+			.xpect_eq("WonderWoman".to_string());
 
 		// 4. DELETE
 		db.delete::<User>(1).await.unwrap();

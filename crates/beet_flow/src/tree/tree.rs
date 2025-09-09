@@ -222,8 +222,6 @@ mod test {
 	fn works() {
 		let tree = TreeNode::new(0).with_leaf(1).with_leaf(2);
 		let tree2 = tree.map(|x| x + 1);
-		tree2
-			.xpect()
-			.to_be(TreeNode::new(1).with_leaf(2).with_leaf(3));
+		tree2.xpect_eq(TreeNode::new(1).with_leaf(2).with_leaf(3));
 	}
 }

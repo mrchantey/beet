@@ -116,8 +116,7 @@ mod test {
 		RouteFileMethodTree::from_methods(methods)
 			.into_path_tree()
 			.to_string_indented()
-			.xpect()
-			.to_be(
+			.xpect_eq(
 				r#"routes
   bazz
   foo

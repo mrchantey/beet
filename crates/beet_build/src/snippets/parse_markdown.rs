@@ -186,8 +186,7 @@ val_string	= "foo"
 	#[test]
 	fn html() {
 		ParseMarkdown::markdown_to_rsx_str(MARKDOWN)
-			.xpect()
-			.to_be("<h1>hello world</h1>");
+			.xpect_eq("<h1>hello world</h1>");
 	}
 
 	#[test]
@@ -195,8 +194,7 @@ val_string	= "foo"
 	// currently text nodes of html tags are not parsed
 	fn nested_markdown() {
 		ParseMarkdown::markdown_to_rsx_str(r#"<div>## Subheading</div>"#)
-			.xpect()
-			.to_be("<div><h2>Subheading</h2></div>\n");
+			.xpect_eq("<div><h2>Subheading</h2></div>\n");
 	}
 
 	#[test]
@@ -204,7 +202,7 @@ val_string	= "foo"
 		let frontmatter =
 			ParseMarkdown::extract_frontmatter_string(MARKDOWN).unwrap();
 		let frontmatter: Frontmatter = toml::from_str(&frontmatter.0).unwrap();
-		frontmatter.xpect().to_be(Frontmatter {
+		frontmatter.xpect_eq(Frontmatter {
 			val_bool: true,
 			val_int: 83,
 			val_float: Some(3.14),
@@ -219,8 +217,7 @@ val_string	= "foo"
 	#[test]
 	fn code_blocks() {
 		ParseMarkdown::markdown_to_rsx_str("`let foo = bar;`")
-			.xpect()
-			.to_be("<p><code>let foo = bar;</code></p>");
+			.xpect_eq("<p><code>let foo = bar;</code></p>");
 		ParseMarkdown::markdown_to_rsx_str(
 			r#"
 ```rust
@@ -229,16 +226,15 @@ let foo = bar;
 let bazz = boo;
 ```
 "#,
-		).xpect()
+		)
 		// preserves whitespace
-		.to_be("<pre><code class=\"language-rust\">let foo = bar;\n\nlet bazz = boo;\n</code></pre>");
+		.xpect_eq("<pre><code class=\"language-rust\">let foo = bar;\n\nlet bazz = boo;\n</code></pre>");
 	}
 
 	#[test]
 	fn preserves_whitespace() {
 		ParseMarkdown::markdown_to_rsx_str("i am **very** cool")
-			.xpect()
-			.to_be("<p>i am <strong>very</strong> cool</p>");
+			.xpect_eq("<p>i am <strong>very</strong> cool</p>");
 	}
 
 	#[test]

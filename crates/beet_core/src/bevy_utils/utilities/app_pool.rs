@@ -154,11 +154,11 @@ mod tests {
 
 		// Main thread
 		let mut main_app = pool.pop();
-		main_app.resource::<Foo>().0.xpect().to_be(1);
+		main_app.resource::<Foo>().0.xpect_eq(1);
 
 		// Change value in main thread
 		main_app.insert_resource(Foo(2));
-		main_app.resource::<Foo>().0.xpect().to_be(2);
+		main_app.resource::<Foo>().0.xpect_eq(2);
 
 		// Spawn a thread and check isolation
 		#[cfg(not(target_arch = "wasm32"))]
@@ -167,23 +167,23 @@ mod tests {
 		std::thread::spawn(move || {
 			let mut thread_app = pool2.pop();
 			// Should be the original value, not affected by main thread
-			thread_app.resource::<Foo>().0.xpect().to_be(1);
+			thread_app.resource::<Foo>().0.xpect_eq(1);
 			thread_app.insert_resource(Foo(3));
-			thread_app.resource::<Foo>().0.xpect().to_be(3);
+			thread_app.resource::<Foo>().0.xpect_eq(3);
 		})
 		.join()
 		.unwrap();
 
 		// Main thread value should remain unchanged
-		main_app.resource::<Foo>().0.xpect().to_be(2);
+		main_app.resource::<Foo>().0.xpect_eq(2);
 
 		// One for main thread, one for the spawned thread
-		pool.num_constructed().xpect().to_be(2);
+		pool.num_constructed().xpect_eq(2);
 		pool.pop();
-		pool.num_constructed().xpect().to_be(3);
+		pool.num_constructed().xpect_eq(3);
 
-		pool.num_returned().xpect().to_be(2);
+		pool.num_returned().xpect_eq(2);
 		drop(main_app);
-		pool.num_returned().xpect().to_be(3);
+		pool.num_returned().xpect_eq(3);
 	}
 }

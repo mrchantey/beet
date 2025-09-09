@@ -225,8 +225,7 @@ mod test {
 				.entity(entity)
 				.get::<TextNode>()
 				.unwrap()
-				.xpect()
-				.to_be(&TextNode::new(name.to_owned()));
+				.xpect_eq(TextNode::new(name.to_owned()));
 		};
 
 		assert(&world, "bob");
@@ -251,8 +250,7 @@ mod test {
 				.entity(entity)
 				.get::<Name>()
 				.unwrap()
-				.xpect()
-				.to_be(&Name::new(name.to_owned()));
+				.xpect_eq(Name::new(name.to_owned()));
 		};
 
 		assert(&world, "bob");

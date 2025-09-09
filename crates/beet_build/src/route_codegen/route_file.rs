@@ -186,14 +186,12 @@ mod test {
 		route_file
 			.mod_path
 			.xref()
-			.xpect()
-			.to_be(&PathBuf::from("../pages/docs/index.rs"));
+			.xpect_eq(PathBuf::from("../pages/docs/index.rs"));
 		route_file
 			.route_path
 			.xref()
 			.deref()
-			.xpect()
-			.to_be(&PathBuf::from("/docs"));
+			.xpect_eq(PathBuf::from("/docs"));
 
 		route_file
 			.item_mod(RouteCollectionCategory::Pages)

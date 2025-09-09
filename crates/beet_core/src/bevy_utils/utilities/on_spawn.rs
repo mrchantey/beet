@@ -230,8 +230,7 @@ mod test {
 			.lock()
 			.unwrap()
 			.as_slice()
-			.xpect()
-			.to_be([1, 2, 3].as_slice());
+			.xpect_eq([1, 2, 3].as_slice());
 	}
 	#[test]
 	fn on_spawn_deferred() {
@@ -257,9 +256,9 @@ mod test {
 			}),],
 		));
 
-		(&*numbers.lock().unwrap()).xpect().to_be(&[] as &[u32]);
+		(&*numbers.lock().unwrap()).xpect_eq(&[] as &[u32]);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 
-		(&*numbers.lock().unwrap()).xpect().to_be(&[1, 2, 3]);
+		(&*numbers.lock().unwrap()).xpect_eq(&[1, 2, 3]);
 	}
 }

@@ -464,7 +464,7 @@ mod test {
 	#[test]
 	fn attribute_expr() {
 		let (mut app, _) = parse(quote! {<div foo={7} bar="baz"/>});
-		app.query_once::<&ExprIdx>().len().xpect().to_be(1);
+		app.query_once::<&ExprIdx>().len().xpect_eq(1);
 	}
 
 	#[test]
@@ -478,11 +478,9 @@ mod test {
 		});
 		#[cfg(feature = "css")]
 		app.query_once::<&InnerText>()[0]
-			.xpect()
-			.to_be(&InnerText("body {\n  font-size: 1 em;\n}\n".to_string()));
+			.xpect_eq(InnerText("body {\n  font-size: 1 em;\n}\n".to_string()));
 		#[cfg(not(feature = "css"))]
 		app.query_once::<&InnerText>()[0]
-			.xpect()
-			.to_be(&InnerText("body { font-size : 1 em ; }".to_string()));
+			.xpect_eq(InnerText("body { font-size : 1 em ; }".to_string()));
 	}
 }

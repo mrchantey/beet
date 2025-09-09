@@ -184,10 +184,8 @@ mod test {
 		use quote::quote;
 		// valid file
 		pretty_parse(quote! {fn main(){let foo = bar;}})
-			.xpect()
-			.to_be("fn main() {\n    let foo = bar;\n}\n");
+			.xpect_eq("fn main() {\n    let foo = bar;\n}\n");
 		pretty_parse(quote! {let foo = bar; let bazz = boo;})
-			.xpect()
-			.to_be("let foo = bar;\nlet bazz = boo;");
+			.xpect_eq("let foo = bar;\nlet bazz = boo;");
 	}
 }

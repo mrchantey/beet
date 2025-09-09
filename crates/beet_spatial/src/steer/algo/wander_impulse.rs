@@ -41,17 +41,15 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	#[ignore = "get random"]
 	fn works() {
-		let mut source = RandomSource::from_seed(0);
-
-		let impulse = wander_impulse(
+		wander_impulse(
 			&Vec3::default(),
 			&Velocity::default(),
 			&mut Wander::default(),
 			MaxSpeed::default(),
-			&mut source.0,
-		);
-		(*impulse).xpect().to_be(Vec3::ZERO);
+			&mut RandomSource::from_seed(0).0,
+		)
+		.0
+		.xpect_not_eq(Vec3::ZERO);
 	}
 }

@@ -397,42 +397,34 @@ mod test {
 		parser(rsx_spread_code_block)
 			.parse("")
 			.is_err()
-			.xpect()
-			.to_be(true);
+			.xpect_eq(true);
 		parser(rsx_spread_code_block)
 			.parse(" ")
 			.is_err()
-			.xpect()
-			.to_be(true);
+			.xpect_eq(true);
 		parser(rsx_spread_code_block)
 			.parse("foo")
 			.is_err()
-			.xpect()
-			.to_be(true);
+			.xpect_eq(true);
 		parser(rsx_spread_code_block)
 			.parse("{...}")
 			.is_err()
-			.xpect()
-			.to_be(true);
+			.xpect_eq(true);
 		parser(rsx_spread_code_block)
 			.parse("{...foo}")
 			.unwrap()
-			.xpect()
-			.to_be((RsxParsedExpression(vec!["foo".into()]), ""));
+			.xpect_eq((RsxParsedExpression(vec!["foo".into()]), ""));
 		parser(rsx_spread_code_block)
 			.parse("{ ... foo }")
 			.unwrap()
-			.xpect()
-			.to_be((RsxParsedExpression(vec![" foo ".into()]), ""));
+			.xpect_eq((RsxParsedExpression(vec![" foo ".into()]), ""));
 		parser(rsx_spread_code_block)
 			.parse("{...{foo}}")
 			.unwrap()
-			.xpect()
-			.to_be((RsxParsedExpression(vec!["{foo}".into()]), ""));
+			.xpect_eq((RsxParsedExpression(vec!["{foo}".into()]), ""));
 		parser(rsx_spread_code_block)
 			.parse("{ ... { foo } }")
 			.unwrap()
-			.xpect()
-			.to_be((RsxParsedExpression(vec![" { foo } ".into()]), ""));
+			.xpect_eq((RsxParsedExpression(vec![" { foo } ".into()]), ""));
 	}
 }

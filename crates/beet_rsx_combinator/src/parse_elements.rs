@@ -1051,7 +1051,7 @@ mod test {
 		let result = p(rsx_fragment).parse("<></>");
 		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
-		fragment.0.0.len().xpect().to_be(0);
+		fragment.0.0.len().xpect_eq(0);
 	}
 
 	#[test]
@@ -1059,7 +1059,7 @@ mod test {
 		let result = p(rsx_fragment).parse("<>Hello World</>");
 		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
-		fragment.0.0.len().xpect().to_be(1);
+		fragment.0.0.len().xpect_eq(1);
 	}
 
 	#[test]
@@ -1068,7 +1068,7 @@ mod test {
 			p(rsx_fragment).parse("<><div>content</div><span>more</span></>");
 		result.is_ok().xpect_true();
 		let (fragment, _) = result.unwrap();
-		fragment.0.0.len().xpect().to_be(2);
+		fragment.0.0.len().xpect_eq(2);
 	}
 
 	#[test]

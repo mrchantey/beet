@@ -358,47 +358,26 @@ mod test {
 		expect_segment("/:foo", "").xpect_break();
 
 		let (_flow, map) = run_with_map("/:foo", "bar");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("/:foo", "/bar");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("/:foo/:baz", "bar/baz");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.get("baz")
-			.cloned()
-			.xpect()
-			.to_be(Some("baz".to_string()));
-		map.len().xpect().to_be(2);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("baz").cloned().xpect_eq(Some("baz".to_string()));
+		map.len().xpect_eq(2);
 
 		let (_flow, map) = run_with_map("/:foo/:baz", "/bar/baz");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.get("baz")
-			.cloned()
-			.xpect()
-			.to_be(Some("baz".to_string()));
-		map.len().xpect().to_be(2);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.get("baz").cloned().xpect_eq(Some("baz".to_string()));
+		map.len().xpect_eq(2);
 
 		let (_flow, map) = run_with_map("/:foo", "bar/baz");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.len().xpect_eq(1);
 	}
 	#[test]
 	fn wildcard_path() {
@@ -412,39 +391,33 @@ mod test {
 		expect_segment("/*foo", "").xpect_continue();
 
 		let (_flow, map) = run_with_map("/*foo", "bar");
-		map.get("foo")
-			.cloned()
-			.xpect()
-			.to_be(Some("bar".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("/*foo", "bar/baz");
 		map.get("foo")
 			.cloned()
-			.xpect()
-			.to_be(Some("bar/baz".to_string()));
-		map.len().xpect().to_be(1);
+			.xpect_eq(Some("bar/baz".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("/*foo", "/bar/baz");
 		map.get("foo")
 			.cloned()
-			.xpect()
-			.to_be(Some("bar/baz".to_string()));
-		map.len().xpect().to_be(1);
+			.xpect_eq(Some("bar/baz".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("foo/*bar", "foo/bar/baz");
 		map.get("bar")
 			.cloned()
-			.xpect()
-			.to_be(Some("bar/baz".to_string()));
-		map.len().xpect().to_be(1);
+			.xpect_eq(Some("bar/baz".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("foo/*bar", "foo");
-		map.get("bar").cloned().xpect().to_be(Some("".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("bar").cloned().xpect_eq(Some("".to_string()));
+		map.len().xpect_eq(1);
 
 		let (_flow, map) = run_with_map("/*foo", "");
-		map.get("foo").cloned().xpect().to_be(Some("".to_string()));
-		map.len().xpect().to_be(1);
+		map.get("foo").cloned().xpect_eq(Some("".to_string()));
+		map.len().xpect_eq(1);
 	}
 }

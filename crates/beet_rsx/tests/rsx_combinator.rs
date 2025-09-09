@@ -23,5 +23,5 @@ fn rsx_combinator() {
 	world
 		.entity_mut(button)
 		.trigger(OnClick(MockEvent::new("foo")));
-	get().xpect().to_be("foo");
+	get().xpect_eq("foo");
 }

@@ -200,13 +200,11 @@ mod test {
 			.await
 			.unwrap()
 			.status()
-			.xpect()
-			.to_be(StatusCode::NOT_FOUND);
+			.xpect_eq(StatusCode::NOT_FOUND);
 		AxumRunner::router(app.world_mut())
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()
-			.xpect()
-			.to_be("hello world!".to_string());
+			.xpect_eq("hello world!".to_string());
 	}
 }

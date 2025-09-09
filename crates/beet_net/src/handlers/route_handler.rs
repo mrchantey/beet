@@ -164,8 +164,7 @@ mod test {
 		Router::new_bundle(|| RouteHandler::endpoint(|| "howdy"))
 			.oneshot("/foobar")
 			.await
-			.xpect()
-			.to_be(Response::not_found());
+			.xpect_eq(Response::not_found());
 	}
 	#[sweet::test]
 	async fn works() {
@@ -173,8 +172,7 @@ mod test {
 			.oneshot("/")
 			.await
 			.status()
-			.xpect()
-			.to_be(StatusCode::OK);
+			.xpect_eq(StatusCode::OK);
 	}
 	#[sweet::test]
 	async fn body() {
@@ -182,8 +180,7 @@ mod test {
 			.oneshot_str("/")
 			.await
 			.unwrap()
-			.xpect()
-			.to_be("hello");
+			.xpect_eq("hello");
 	}
 
 	#[sweet::test]

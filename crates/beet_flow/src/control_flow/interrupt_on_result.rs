@@ -41,11 +41,6 @@ mod test {
 			.with_child(Running::default())
 			.flush_trigger(OnResultAction::local(RunResult::Success));
 
-		world
-			.query::<&Running>()
-			.iter(&world)
-			.count()
-			.xpect()
-			.to_be(0);
+		world.query::<&Running>().iter(&world).count().xpect_eq(0);
 	}
 }

@@ -251,24 +251,19 @@ mod test {
 		parse("foo: Bar").xpect().to_be_none();
 		parse("foo: In<u32>")
 			.unwrap()
-			.xpect()
-			.to_be(("foo : u32".into(), "foo".into()));
+			.xpect_eq(("foo : u32".into(), "foo".into()));
 		parse("In(foo): In<u32>")
 			.unwrap()
-			.xpect()
-			.to_be(("foo : u32".into(), "foo".into()));
+			.xpect_eq(("foo : u32".into(), "foo".into()));
 		parse("foo: In<(u32)>")
 			.unwrap()
-			.xpect()
-			.to_be(("foo : (u32)".into(), "foo".into()));
+			.xpect_eq(("foo : (u32)".into(), "foo".into()));
 		parse("foo: In<(u32,u32)>")
 			.unwrap()
-			.xpect()
-			.to_be(("foo : (u32 , u32)".into(), "foo".into()));
+			.xpect_eq(("foo : (u32 , u32)".into(), "foo".into()));
 		parse("In((foo,bar)): In<(u32,u32)>")
 			.unwrap()
-			.xpect()
-			.to_be(("foo : u32 , bar : u32".into(), "(foo , bar)".into()));
+			.xpect_eq(("foo : u32 , bar : u32".into(), "(foo , bar)".into()));
 	}
 
 	#[test]

@@ -263,8 +263,7 @@ mod test {
 			.get::<TriggerCount>(entity)
 			.unwrap()
 			.0
-			.xpect()
-			.to_be(1);
+			.xpect_eq(1);
 	}
 	#[test]
 	fn global() {
@@ -278,7 +277,6 @@ mod test {
 			.get::<TriggerCount>(action)
 			.unwrap()
 			.0
-			.xpect()
-			.to_be(1);
+			.xpect_eq(1);
 	}
 }

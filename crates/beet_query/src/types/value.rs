@@ -247,51 +247,35 @@ mod test {
 	#[test]
 	fn test_value_conversions_integer() {
 		// Test u8 conversion
-		3u8.into_value().xpect().to_be(Ok(Value::Integer(3)));
-		255u8.into_value().xpect().to_be(Ok(Value::Integer(255)));
+		3u8.into_value().xpect_eq(Ok(Value::Integer(3)));
+		255u8.into_value().xpect_eq(Ok(Value::Integer(255)));
 
 		// Test i8 conversion
-		(-5i8).into_value().xpect().to_be(Ok(Value::Integer(-5)));
+		(-5i8).into_value().xpect_eq(Ok(Value::Integer(-5)));
 
 		// Test u16/i16 conversion
-		1000u16.into_value().xpect().to_be(Ok(Value::Integer(1000)));
-		(-1000i16)
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(-1000)));
+		1000u16.into_value().xpect_eq(Ok(Value::Integer(1000)));
+		(-1000i16).into_value().xpect_eq(Ok(Value::Integer(-1000)));
 
 		// Test u32/i32 conversion
-		100000u32
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(100000)));
+		100000u32.into_value().xpect_eq(Ok(Value::Integer(100000)));
 		(-100000i32)
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(-100000)));
+			.xpect_eq(Ok(Value::Integer(-100000)));
 
 		// Test u64 conversion - should fail if value exceeds i64::MAX
 		u64::MAX.into_value().xpect().to_be_err();
-		42u64.into_value().xpect().to_be(Ok(Value::Integer(42)));
+		42u64.into_value().xpect_eq(Ok(Value::Integer(42)));
 
 		// Test i64 conversion
-		i64::MAX
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(i64::MAX)));
-		i64::MIN
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(i64::MIN)));
+		i64::MAX.into_value().xpect_eq(Ok(Value::Integer(i64::MAX)));
+		i64::MIN.into_value().xpect_eq(Ok(Value::Integer(i64::MIN)));
 
 		// Test usize conversion
-		100usize.into_value().xpect().to_be(Ok(Value::Integer(100)));
+		100usize.into_value().xpect_eq(Ok(Value::Integer(100)));
 
 		// Test isize conversion
-		(-100isize)
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(-100)));
+		(-100isize).into_value().xpect_eq(Ok(Value::Integer(-100)));
 	}
 
 	#[test]
@@ -299,121 +283,80 @@ mod test {
 		// Test f32 conversion
 		3.14f32
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Real(3.140000104904175)));
-		(-42.5f32)
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Real(-42.5f64)));
+			.xpect_eq(Ok(Value::Real(3.140000104904175)));
+		(-42.5f32).into_value().xpect_eq(Ok(Value::Real(-42.5f64)));
 
 		// Test f64 conversion
 		3.14159265359f64
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Real(3.14159265359)));
-		f64::MAX
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Real(f64::MAX)));
-		f64::MIN
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Real(f64::MIN)));
+			.xpect_eq(Ok(Value::Real(3.14159265359)));
+		f64::MAX.into_value().xpect_eq(Ok(Value::Real(f64::MAX)));
+		f64::MIN.into_value().xpect_eq(Ok(Value::Real(f64::MIN)));
 	}
 
 	#[test]
 	fn test_value_conversions_text() {
 		// Test String conversion
 		let s = "Hello, world!".to_string();
-		s.clone().into_value().xpect().to_be(Ok(Value::Text(s)));
+		s.clone().into_value().xpect_eq(Ok(Value::Text(s)));
 
 		// Empty string
 		"".to_string()
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Text("".to_string())));
+			.xpect_eq(Ok(Value::Text("".to_string())));
 
 		// Unicode
 		let unicode = "こんにちは世界".to_string();
 		unicode
 			.clone()
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Text(unicode)));
+			.xpect_eq(Ok(Value::Text(unicode)));
 	}
 
 	#[test]
 	fn test_value_conversions_blob() {
 		// Test Vec<u8> conversion
 		let bytes = vec![1, 2, 3, 4, 5];
-		bytes
-			.clone()
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Blob(bytes)));
+		bytes.clone().into_value().xpect_eq(Ok(Value::Blob(bytes)));
 
 		// Empty blob
 		Vec::<u8>::new()
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Blob(Vec::new())));
+			.xpect_eq(Ok(Value::Blob(Vec::new())));
 	}
 
 	#[test]
 	fn test_value_option_type() {
 		// Some values
-		Some(42i64)
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Integer(42)));
+		Some(42i64).into_value().xpect_eq(Ok(Value::Integer(42)));
 		Some("hello".to_string())
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Text("hello".to_string())));
+			.xpect_eq(Ok(Value::Text("hello".to_string())));
 
 		// None values
-		Option::<i64>::None
-			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Null));
+		Option::<i64>::None.into_value().xpect_eq(Ok(Value::Null));
 		Option::<String>::None
 			.into_value()
-			.xpect()
-			.to_be(Ok(Value::Null));
+			.xpect_eq(Ok(Value::Null));
 
 		// Converting back
-		Option::<i64>::from_value(Value::Null)
-			.xpect()
-			.to_be(Ok(None));
-		Option::<i64>::from_value(Value::Integer(42))
-			.xpect()
-			.to_be(Ok(Some(42)));
+		Option::<i64>::from_value(Value::Null).xpect_eq(Ok(None));
+		Option::<i64>::from_value(Value::Integer(42)).xpect_eq(Ok(Some(42)));
 		Option::<String>::from_value(Value::Text("hello".to_string()))
-			.xpect()
-			.to_be(Ok(Some("hello".to_string())));
+			.xpect_eq(Ok(Some("hello".to_string())));
 	}
 
 	#[test]
 	fn test_from_value() {
 		// Integer conversions
-		u8::from_value(Value::Integer(42)).xpect().to_be(Ok(42u8));
-		i8::from_value(Value::Integer(-42)).xpect().to_be(Ok(-42i8));
-		u16::from_value(Value::Integer(1000))
-			.xpect()
-			.to_be(Ok(1000u16));
-		i16::from_value(Value::Integer(-1000))
-			.xpect()
-			.to_be(Ok(-1000i16));
-		u32::from_value(Value::Integer(100000))
-			.xpect()
-			.to_be(Ok(100000u32));
-		i32::from_value(Value::Integer(-100000))
-			.xpect()
-			.to_be(Ok(-100000i32));
-		u64::from_value(Value::Integer(42)).xpect().to_be(Ok(42u64));
-		i64::from_value(Value::Integer(-42))
-			.xpect()
-			.to_be(Ok(-42i64));
+		u8::from_value(Value::Integer(42)).xpect_eq(Ok(42u8));
+		i8::from_value(Value::Integer(-42)).xpect_eq(Ok(-42i8));
+		u16::from_value(Value::Integer(1000)).xpect_eq(Ok(1000u16));
+		i16::from_value(Value::Integer(-1000)).xpect_eq(Ok(-1000i16));
+		u32::from_value(Value::Integer(100000)).xpect_eq(Ok(100000u32));
+		i32::from_value(Value::Integer(-100000)).xpect_eq(Ok(-100000i32));
+		u64::from_value(Value::Integer(42)).xpect_eq(Ok(42u64));
+		i64::from_value(Value::Integer(-42)).xpect_eq(Ok(-42i64));
 
 		// Out of range conversions should fail
 		u8::from_value(Value::Integer(256)).xpect().to_be_err();
@@ -428,50 +371,35 @@ mod test {
 			.to_be_err();
 
 		// Real conversions
-		f32::from_value(Value::Real(3.14))
-			.xpect()
-			.to_be(Ok(3.14f32));
+		f32::from_value(Value::Real(3.14)).xpect_eq(Ok(3.14f32));
 		f64::from_value(Value::Real(3.14159265359))
-			.xpect()
-			.to_be(Ok(3.14159265359f64));
+			.xpect_eq(Ok(3.14159265359f64));
 
 		// Text conversions
 		String::from_value(Value::Text("hello".to_string()))
-			.xpect()
-			.to_be(Ok("hello".to_string()));
+			.xpect_eq(Ok("hello".to_string()));
 
 		// Blob conversions
 		let bytes = vec![1, 2, 3, 4, 5];
-		Vec::<u8>::from_value(Value::Blob(bytes.clone()))
-			.xpect()
-			.to_be(Ok(bytes));
+		Vec::<u8>::from_value(Value::Blob(bytes.clone())).xpect_eq(Ok(bytes));
 
 		// Cross-type conversions
 		String::from_value(Value::Blob(vec![72, 101, 108, 108, 111]))
-			.xpect()
-			.to_be(Ok("Hello".to_string()));
+			.xpect_eq(Ok("Hello".to_string()));
 		Vec::<u8>::from_value(Value::Text("Hello".to_string()))
-			.xpect()
-			.to_be(Ok(vec![72, 101, 108, 108, 111]));
+			.xpect_eq(Ok(vec![72, 101, 108, 108, 111]));
 	}
 
 	#[test]
 	fn test_value_type() {
-		(Value::Null.value_type() as u8)
-			.xpect()
-			.to_be(ValueType::Null as u8);
+		(Value::Null.value_type() as u8).xpect_eq(ValueType::Null as u8);
 		(Value::Integer(42).value_type() as u8)
-			.xpect()
-			.to_be(ValueType::Integer as u8);
-		(Value::Real(3.14).value_type() as u8)
-			.xpect()
-			.to_be(ValueType::Real as u8);
+			.xpect_eq(ValueType::Integer as u8);
+		(Value::Real(3.14).value_type() as u8).xpect_eq(ValueType::Real as u8);
 		(Value::Text("hello".to_string()).value_type() as u8)
-			.xpect()
-			.to_be(ValueType::Text as u8);
+			.xpect_eq(ValueType::Text as u8);
 		(Value::Blob(vec![1, 2, 3]).value_type() as u8)
-			.xpect()
-			.to_be(ValueType::Blob as u8);
+			.xpect_eq(ValueType::Blob as u8);
 	}
 
 	#[test]
@@ -493,9 +421,9 @@ mod test {
 			.to_be_ok_val(ValueType::Null);
 
 		// Invalid types should error
-		ValueType::from_str("INVALID").is_err().xpect().to_be(true);
-		ValueType::from_str("").is_err().xpect().to_be(true);
-		ValueType::from_str("integer").is_err().xpect().to_be(true); // Case sensitive
+		ValueType::from_str("INVALID").is_err().xpect_eq(true);
+		ValueType::from_str("").is_err().xpect_eq(true);
+		ValueType::from_str("integer").is_err().xpect_eq(true); // Case sensitive
 	}
 
 	#[test]
@@ -503,7 +431,7 @@ mod test {
 		let error = ConvertValueError::conversion_failed("test error");
 		match error {
 			ConvertValueError::ConversionFailed { error } => {
-				error.xpect().to_be("test error".to_string());
+				error.xpect_eq("test error".to_string());
 			}
 			_ => panic!("Expected ConversionFailed error"),
 		}
@@ -511,8 +439,6 @@ mod test {
 		// Test error message format
 		let error_str =
 			format!("{}", ConvertValueError::conversion_failed("test error"));
-		error_str
-			.xpect()
-			.to_be("ConvertValue Failed: test error".to_string());
+		error_str.xpect_eq("ConvertValue Failed: test error".to_string());
 	}
 }

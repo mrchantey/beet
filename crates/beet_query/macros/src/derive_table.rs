@@ -430,8 +430,7 @@ mod test {
 				}
 			})
 			.to_string()
-			.xpect()
-			.to_be(
+			.xpect_eq(
 			quote! {
 				use beet::prelude::*;
 				impl Table for MyTable {
@@ -530,8 +529,7 @@ mod test {
 				}
 			})
 			.to_string()
-			.xpect()
-			.to_be(
+			.xpect_eq(
 			quote! {
 				use beet::prelude::*;
 				impl Table for MyTable {

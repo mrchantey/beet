@@ -98,6 +98,6 @@ mod test {
 			.get::<RouteFileMethod>()
 			.unwrap()
 			.clone();
-		method.route_info.path.xpect().to_be(RoutePath::new("/"));
+		method.route_info.path.xpect_eq(RoutePath::new("/"));
 	}
 }

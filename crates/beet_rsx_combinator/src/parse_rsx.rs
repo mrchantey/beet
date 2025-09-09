@@ -76,8 +76,7 @@ mod test {
 								"#,
 			)
 			.unwrap()
-			.xpect()
-			.to_be((
+			.xpect_eq((
 				RsxElement::Normal(RsxNormalElement(
 					RsxElementName::Name("root".into()),
 					RsxAttributes::from(vec![
@@ -255,8 +254,7 @@ mod test {
 								"#,
 			)
 			.unwrap()
-			.xpect()
-			.to_be((
+			.xpect_eq((
 				RsxElement::Normal(RsxNormalElement(
 					RsxElementName::Name("Dropdown".into()),
 					RsxAttributes::from(vec![RsxAttribute::Named(

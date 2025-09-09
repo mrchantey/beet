@@ -115,7 +115,7 @@ mod test {
 			.run_system_cached(super::extract_inner_text_directive)
 			.unwrap();
 		let entity = world.entity(entity);
-		entity.contains::<Attributes>().xpect().to_be(false);
+		entity.contains::<Attributes>().xpect_false();
 		entity
 			.get::<NodeExpr>()
 			.unwrap()
@@ -144,9 +144,8 @@ mod test {
 		entity
 			.get::<FileInnerText>()
 			.unwrap()
-			.xpect()
-			.to_be(&FileInnerText("./style.css".to_string()));
-		entity.contains::<Attributes>().xpect().to_be(false);
+			.xpect_eq(FileInnerText("./style.css".to_string()));
+		entity.contains::<Attributes>().xpect_false();
 	}
 
 	#[test]
@@ -164,8 +163,7 @@ mod test {
 		entity
 			.get::<InnerText>()
 			.unwrap()
-			.xpect()
-			.to_be(&InnerText::new("div { color: red; }"));
-		entity.contains::<Children>().xpect().to_be(false);
+			.xpect_eq(InnerText::new("div { color: red; }"));
+		entity.contains::<Children>().xpect_false();
 	}
 }

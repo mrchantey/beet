@@ -38,8 +38,7 @@ mod test {
 			.get::<GarbageCollectTarget>(gb)
 			.unwrap()
 			.len()
-			.xpect()
-			.to_be(1);
+			.xpect_eq(1);
 		world.get_entity(gb).is_err().xpect_false();
 		world.despawn(entity2);
 		world.get_entity(gb).is_err().xpect_true();

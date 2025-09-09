@@ -89,7 +89,7 @@ mod test {
 		}
 		};
 
-		input.xmap(parse).unwrap().to_string().xpect().to_be(
+		input.xmap(parse).unwrap().to_string().xpect_eq(
 			quote! {
 				#[derive(Clone)]
 				pub struct FooSendit<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;

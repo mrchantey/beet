@@ -62,7 +62,7 @@ mod test {
 		)
 		.await
 		.unwrap();
-		a.xpect().to_be(39);
+		a.xpect_eq(39);
 	}
 	#[sweet::test]
 	pub async fn times_out() {

@@ -209,8 +209,7 @@ mod test {
 		world
 			.resource::<RoutePathTree>()
 			.to_string()
-			.xpect()
-			.to_be("/\n/docs\n/docs/testing\n");
+			.xpect_eq("/\n/docs\n/docs/testing\n");
 
 		world
 			.run_system_cached_with(
@@ -223,8 +222,7 @@ mod test {
 				},
 			)
 			.unwrap()
-			.xpect()
-			.to_be(SidebarNode {
+			.xpect_eq(SidebarNode {
 				display_name: "Root".to_string(),
 				path: Some(RoutePath::new("/")),
 				children: vec![SidebarNode {
@@ -270,8 +268,8 @@ mod test {
 		}];
 
 		rsx! { <Sidebar nodes=nodes /> }
-		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_contain("Partying");
+			.xmap(HtmlFragment::parse_bundle)
+			.xpect()
+			.to_contain("Partying");
 	}
 }

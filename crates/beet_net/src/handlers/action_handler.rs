@@ -98,8 +98,7 @@ mod test {
 		.json::<String>()
 		.await
 		.unwrap()
-		.xpect()
-		.to_be("hello 42");
+		.xpect_eq("hello 42");
 	}
 	#[sweet::test]
 	async fn action_async() {
@@ -119,7 +118,6 @@ mod test {
 		.json::<u32>()
 		.await
 		.unwrap()
-		.xpect()
-		.to_be(42);
+		.xpect_eq(42);
 	}
 }

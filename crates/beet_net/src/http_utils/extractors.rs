@@ -306,8 +306,7 @@ mod test {
 			.headers
 			.get("content-length")
 			.unwrap()
-			.xpect()
-			.to_be("5");
+			.xpect_eq("5");
 	}
 
 	#[test]
@@ -325,6 +324,6 @@ mod test {
 
 		let val2 =
 			JsonQueryParams::<Foo>::from_query_string(&query_str).unwrap();
-		val.xpect().to_be(val2);
+		val.xpect_eq(val2);
 	}
 }

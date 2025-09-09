@@ -444,12 +444,12 @@ mod test {
 
 	#[sweet::test]
 	async fn tree_order() {
-		parse("/").await.xpect().to_be(vec![0]);
-		parse("/foo").await.xpect().to_be(vec![0, 1, 4]);
-		parse("/foo/chicken").await.xpect().to_be(vec![0, 1, 4]);
-		parse("/foo/bar").await.xpect().to_be(vec![0, 1, 2, 4]);
+		parse("/").await.xpect_eq(vec![0]);
+		parse("/foo").await.xpect_eq(vec![0, 1, 4]);
+		parse("/foo/chicken").await.xpect_eq(vec![0, 1, 4]);
+		parse("/foo/bar").await.xpect_eq(vec![0, 1, 2, 4]);
 		// path matches, method does not
-		parse("/foo/bazz").await.xpect().to_be(vec![0, 1, 4]);
+		parse("/foo/bazz").await.xpect_eq(vec![0, 1, 4]);
 	}
 	#[sweet::test]
 	async fn simple() {
@@ -464,8 +464,7 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect()
-			.to_be("404 Not Found\n");
+			.xpect_eq("404 Not Found\n");
 		router
 			.oneshot_str("/pizza")
 			.await

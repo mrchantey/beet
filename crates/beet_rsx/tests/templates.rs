@@ -13,8 +13,7 @@ fn hello() {
 	}
 	rsx! { <Hello name="bill" type="foo" /> }
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<div>hello bill</div>");
+		.xpect_eq("<div>hello bill</div>");
 }
 #[test]
 fn entity_id() {
@@ -24,8 +23,7 @@ fn entity_id() {
 	}
 	rsx! { <EntityId /> }
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<div>hello 4v1</div>");
+		.xpect_eq("<div>hello 4v1</div>");
 }
 
 
@@ -37,10 +35,10 @@ fn result() {
 			<div>
 				<slot />
 			</div>
-		}.xok()
+		}
+		.xok()
 	}
 	rsx! { <ReturnsResult>howdy</ReturnsResult> }
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect()
-		.to_be("<div>howdy</div>");
+		.xpect_eq("<div>howdy</div>");
 }

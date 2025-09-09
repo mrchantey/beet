@@ -136,8 +136,7 @@ mod test {
 			.await?;
 		let url = page.current_url().await?;
 		url.as_str()
-			.xpect()
-			.to_be("https://en.wikipedia.org/wiki/Foo_Lake");
+			.xpect_eq("https://en.wikipedia.org/wiki/Foo_Lake");
 		Ok(())
 	}
 

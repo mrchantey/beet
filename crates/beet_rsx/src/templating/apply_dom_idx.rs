@@ -152,6 +152,6 @@ mod test {
 		world.run_schedule(ApplySnippets);
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
-		world.get::<DomIdx>(div).unwrap().xpect().to_be(&DomIdx(0));
+		world.get::<DomIdx>(div).unwrap().xpect_eq(DomIdx(0));
 	}
 }

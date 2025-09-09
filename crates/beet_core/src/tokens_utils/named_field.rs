@@ -244,7 +244,7 @@ mod test {
 		};
 		let named = NamedField::parse_field(&field).unwrap();
 		named.is_optional().xpect_true();
-		named.attrs.len().xpect().to_be(1);
+		named.attrs.len().xpect_eq(1);
 		// true.xpect_false();
 	}
 	#[test]
@@ -259,10 +259,7 @@ mod test {
 
 		let named = NamedField::parse_pat_ty(&field).unwrap();
 		named.is_optional().xpect_true();
-		named
-			.inner_ty
-			.xpect()
-			.to_be(&syn::parse_quote! { Foo<Bar> });
-		named.attrs.len().xpect().to_be(1);
+		named.inner_ty.xpect_eq(syn::parse_quote! { Foo<Bar> });
+		named.attrs.len().xpect_eq(1);
 	}
 }

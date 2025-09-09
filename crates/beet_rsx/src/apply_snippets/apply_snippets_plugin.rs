@@ -296,8 +296,7 @@ mod test {
 		world
 			.run_system_cached_with(render_fragment, parent)
 			.unwrap()
-			.xpect()
-			.to_be("<main><span/></main>");
+			.xpect_eq("<main><span/></main>");
 	}
 
 	#[test]
@@ -335,8 +334,7 @@ mod test {
 				</div>
 			},
 		)
-		.xpect()
-		.to_be("<div><span>7</span><br/></div>");
+		.xpect_eq("<div><span>7</span><br/></div>");
 	}
 	#[test]
 	fn combinator_block_nodes() {
@@ -345,8 +343,7 @@ mod test {
 			// because ExprIdx matches, this should be replace with 7
 			rsx_combinator! {"<div><span>{()}</span><br/></div>"},
 		)
-		.xpect()
-		.to_be("<div><span>7</span><br/></div>");
+		.xpect_eq("<div><span>7</span><br/></div>");
 	}
 	#[test]
 	fn iterators() {
@@ -360,8 +357,7 @@ mod test {
 				</div>
 			},
 		)
-		.xpect()
-		.to_be("<div><span>abc</span><br/></div>");
+		.xpect_eq("<div><span>abc</span><br/></div>");
 	}
 	#[test]
 	fn attribute_values() {
@@ -373,8 +369,7 @@ mod test {
 				<br />
 			</div>
 		})
-		.xpect()
-		.to_be("<div><span key=\"7\"></span><br/></div>");
+		.xpect_eq("<div><span key=\"7\"></span><br/></div>");
 	}
 	#[test]
 	fn events() {
@@ -383,8 +378,7 @@ mod test {
 			rsx! { <main onclick=|| {} /> },
 			rsx! { <main oninput=|| {} /> },
 		)
-		.xpect()
-		.to_be("<main oninput/>");
+		.xpect_eq("<main oninput/>");
 	}
 
 	#[test]
@@ -399,8 +393,7 @@ mod test {
 				<br />
 			</div>
 		})
-		.xpect()
-		.to_be("<div><span key=\"9\"></span><br/></div>");
+		.xpect_eq("<div><span key=\"9\"></span><br/></div>");
 	}
 	#[test]
 	fn root() {
@@ -408,8 +401,7 @@ mod test {
 			hello
 			{()}
 		})
-		.xpect()
-		.to_be("hello7");
+		.xpect_eq("hello7");
 	}
 
 	#[template]
@@ -431,8 +423,7 @@ mod test {
 				</span>
 			},
 		)
-		.xpect()
-		.to_be("<span>3</span>");
+		.xpect_eq("<span>3</span>");
 	}
 	#[test]
 	fn template_expr_attr() {
@@ -457,8 +448,7 @@ mod test {
 				]},
 			),
 		)
-		.xpect()
-		.to_be("5");
+		.xpect_eq("5");
 	}
 
 
@@ -486,8 +476,7 @@ mod test {
 		world
 			.run_system_once_with(render_fragment, child)
 			.unwrap()
-			.xpect()
-			.to_be("<div>pizza is 3</div>");
+			.xpect_eq("<div>pizza is 3</div>");
 
 		let parent_instance = rsx! {
 			<article>
@@ -512,8 +501,7 @@ mod test {
 		world
 			.run_system_once_with(render_fragment, parent)
 			.unwrap()
-			.xpect()
-			.to_be(
+			.xpect_eq(
 				"<article><h1>all about pizza</h1><div>pizza is 3</div></article>",
 			);
 	}
@@ -562,7 +550,7 @@ mod test {
 			.run_system_cached_with(flush_on_spawn_deferred_recursive, entity)
 			.unwrap()
 			.unwrap();
-		val().xpect().to_be(vec![0, 1, 2, 3, 4]);
+		val().xpect_eq(vec![0, 1, 2, 3, 4]);
 	}
 
 	fn parse_instance(instance: impl Bundle) -> String {

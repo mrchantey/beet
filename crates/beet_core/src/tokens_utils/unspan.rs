@@ -68,6 +68,6 @@ mod test {
 		});
 
 		let result = handle.join().unwrap();
-		result.xpect().to_be("foo");
+		result.xpect_eq("foo");
 	}
 }

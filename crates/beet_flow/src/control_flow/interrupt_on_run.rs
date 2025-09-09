@@ -73,8 +73,7 @@ mod test {
 
 		EntityTree::new_with_world(entity, &world)
 			.component_tree::<Running>(&world)
-			.xpect()
-			.to_be(
+			.xpect_eq(
 				TreeNode::new(Some(&Running::new(Entity::from_raw(10))))
 					.with_leaf(None)
 					.with_leaf(None)

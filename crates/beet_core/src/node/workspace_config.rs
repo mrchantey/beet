@@ -228,7 +228,6 @@ mod test {
 	fn works() {
 		pkg_config!()
 			.resource_name("lambda")
-			.xpect()
-			.to_be("beet-core-lambda-dev");
+			.xpect_eq("beet-core-lambda-dev");
 	}
 }

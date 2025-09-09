@@ -86,15 +86,10 @@ mod test {
 			.unwrap()
 			.clone();
 		// send_wrapper::SendWrapper::assert_send(&tokens);
-		route_method
-			.route_info
-			.method
-			.xpect()
-			.to_be(HttpMethod::Get);
+		route_method.route_info.method.xpect_eq(HttpMethod::Get);
 		route_method
 			.route_info
 			.path
-			.xpect()
-			.to_be(RoutePath::new("/docs"));
+			.xpect_eq(RoutePath::new("/docs"));
 	}
 }

@@ -94,26 +94,14 @@ mod test {
 		let expected = include_str!("../../tests/test_file.css");
 
 		app.world_mut().query_once::<&InnerText>()[0]
-			.xpect()
-			.to_be(&InnerText::new(expected));
+			.xpect_eq(InnerText::new(expected));
 
 		// links source files, child index flaky?
-		app.world_mut().query_once::<&ChildOf>()[0]
-			.0
-			.xpect()
-			.to_be(file);
+		app.world_mut().query_once::<&ChildOf>()[0].0.xpect_eq(file);
 
-		app.world_mut()
-			.query_once::<&ChildOf>()
-			.len()
-			.xpect()
-			.to_be(2);
+		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
 		app.update();
 		// second update does not spawn a new ChildOf
-		app.world_mut()
-			.query_once::<&ChildOf>()
-			.len()
-			.xpect()
-			.to_be(2);
+		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
 	}
 }

@@ -64,17 +64,14 @@ mod test {
 	#[test]
 	fn works_no_children() {
 		let mut world = World::new();
-		let root = world
-			.spawn(rsx! { <div /> })
-			.id();
+		let root = world.spawn(rsx! { <div /> }).id();
 		world.run_system_cached(apply_template_children).unwrap();
 		world
 			.entity(root)
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
-			.xpect()
-			.to_be(1);
+			.xpect_eq(1);
 	}
 	#[test]
 	fn works() {
@@ -97,13 +94,8 @@ mod test {
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
-			.xpect()
-			.to_be(4); // div, mytemplate, span, mytemplate
+			.xpect_eq(4); // div, mytemplate, span, mytemplate
 
-		world
-			.query_once::<&TemplateChildren>()
-			.len()
-			.xpect()
-			.to_be(3);
+		world.query_once::<&TemplateChildren>().len().xpect_eq(3);
 	}
 }

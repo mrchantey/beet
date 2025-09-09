@@ -91,8 +91,7 @@ mod test {
 			.unwrap()
 			.0
 			.xref()
-			.xpect()
-			.to_be("foo");
+			.xpect_eq("foo");
 
 		set("bar".to_string());
 
@@ -104,8 +103,7 @@ mod test {
 			.unwrap()
 			.0
 			.xref()
-			.xpect()
-			.to_be("bar");
+			.xpect_eq("bar");
 	}
 
 
@@ -128,8 +126,7 @@ mod test {
 			.unwrap()
 			.0
 			.xref()
-			.xpect()
-			.to_be("5");
+			.xpect_eq("5");
 
 		set(10);
 
@@ -140,8 +137,7 @@ mod test {
 			.unwrap()
 			.0
 			.xref()
-			.xpect()
-			.to_be("10");
+			.xpect_eq("10");
 	}
 
 
@@ -164,8 +160,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xref()
-			.xpect()
-			.to_be("foo");
+			.xpect_eq("foo");
 
 		set("bar");
 
@@ -176,8 +171,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xref()
-			.xpect()
-			.to_be("bar");
+			.xpect_eq("bar");
 	}
 	#[test]
 	fn attribute_blocks() {
@@ -215,8 +209,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xref()
-			.xpect()
-			.to_be("foo");
+			.xpect_eq("foo");
 
 		set("bar".to_string());
 
@@ -227,8 +220,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xref()
-			.xpect()
-			.to_be("bar");
+			.xpect_eq("bar");
 	}
 
 	#[test]
@@ -253,8 +245,7 @@ mod test {
 			.unwrap()
 			.0
 			.clone()
-			.xpect()
-			.to_be("5");
+			.xpect_eq("5");
 		app.run();
 		set(7);
 		// yield for queue_microtask
@@ -266,8 +257,7 @@ mod test {
 				.unwrap()
 				.0
 				.clone()
-				.xpect()
-				.to_be("7");
+				.xpect_eq("7");
 		});
 	}
 }

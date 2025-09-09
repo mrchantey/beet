@@ -109,8 +109,7 @@ mod test {
 			.get::<Transform>()
 			.unwrap()
 			.translation
-			.xpect()
-			.to_be(Vec3::new(1., 0., 0.));
+			.xpect_eq(Vec3::new(1., 0., 0.));
 
 		app.update_with_millis(500);
 

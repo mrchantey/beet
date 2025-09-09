@@ -107,18 +107,12 @@ mod test {
 	#[rustfmt::skip]
 	fn works() {
 		// ignore macro inners
-		hash(quote! {rsx!{1}}).xpect()
-		.to_be(hash(quote! {rsx!{2}}));
+		hash(quote! {rsx!{1}}).xpect_eq(hash(quote! {rsx!{2}}));
 		// ignore multiple macros
-		hash(quote! {rsx!{1} rsx!{1}}).xpect()
-		.to_be(hash(quote! {rsx!{2} rsx!{2}}));
+		hash(quote! {rsx!{1} rsx!{1}}).xpect_eq(hash(quote! {rsx!{2} rsx!{2}}));
 		// hash non-template expressions
-		hash(quote! {foo}).xpect()
-		.not()
-		.to_be(hash(quote! {bar}));
+		hash(quote! {foo}).xpect_not_eq(hash(quote! {bar}));
 		// hash other macros
-		hash(quote! {println!(foo)}).xpect()
-		.not()
-		.to_be(hash(quote! {println!(bar)}));
+		hash(quote! {println!(foo)}).xpect_not_eq(hash(quote! {println!(bar)}));
 	}
 }

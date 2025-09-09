@@ -110,7 +110,6 @@ mod test {
 			.route_info
 			.path
 			.to_string()
-			.xpect()
-			.to_be("/design/modify_route_file_tokens");
+			.xpect_eq("/design/modify_route_file_tokens");
 	}
 }

@@ -122,8 +122,8 @@ mod test {
 
 		let sig: DerivedGetter<&str> = get.into_derived_getter();
 		// let sig = get.into_derived_getter();
-		sig.get().xpect().to_be("foo");
+		sig.get().xpect_eq("foo");
 		set("bar");
-		sig.get().xpect().to_be("bar");
+		sig.get().xpect_eq("bar");
 	}
 }

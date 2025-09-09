@@ -119,7 +119,7 @@ mod test {
 		let row = MyTable { name: "foo".into() };
 		let stmt = row.clone().stmt_insert().unwrap();
 		db.insert(row).await.unwrap();
-		db.statement_cache.read().await.len().xpect().to_be(1);
+		db.statement_cache.read().await.len().xpect_eq(1);
 		db.statement_cache
 			.read()
 			.await

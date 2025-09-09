@@ -263,6 +263,6 @@ mod test {
 		};
 
 		let actual = parse_derive_props(input);
-		actual.to_string().xpect().to_be(expected.to_string());
+		actual.to_string().xpect_eq(expected.to_string());
 	}
 }

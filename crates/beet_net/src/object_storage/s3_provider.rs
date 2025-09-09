@@ -78,10 +78,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn bucket_create(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -103,10 +100,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn bucket_remove(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -210,8 +204,7 @@ impl BucketProvider for S3Provider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
-	{
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let client = self.0.clone();
 		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
@@ -299,8 +292,7 @@ impl BucketProvider for S3Provider {
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Option<String>>>
-	{
+	) -> SendBoxedFuture<Result<Option<String>>> {
 		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
 		let bucket_name = bucket_name.to_string();
 		let key = self.resolve_key(path);
@@ -353,8 +345,7 @@ mod test {
 			.public_url(&test_key)
 			.await?
 			.unwrap()
-			.xpect()
-			.to_be(format!(
+			.xpect_eq(format!(
 				"https://{bucket_name}.s3.us-west-2.amazonaws.com{test_key}"
 			));
 

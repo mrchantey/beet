@@ -45,7 +45,7 @@ mod test {
 			..Default::default()
 		})
 		.await
-		.unwrap().xmap(|res|res.voice).xpect().to_be(Some(Box::new(types::VoiceIdsShared::Ash)));
+		.unwrap().xmap(|res|res.voice).xpect_eq(Some(Box::new(types::VoiceIdsShared::Ash)));
 
 		// println!("{:#?}", res);
 	}

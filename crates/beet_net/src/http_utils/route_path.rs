@@ -269,7 +269,7 @@ mod test {
 		let tree = RoutePathTree::from_paths(paths);
 		let child_names: Vec<_> =
 			tree.children.iter().map(|c| c.route.to_string()).collect();
-		child_names.xpect().to_be(vec!["/alpha", "/beta", "/zeta"]);
+		child_names.xpect_eq(vec!["/alpha", "/beta", "/zeta"]);
 	}
 	use crate::prelude::*;
 	use bevy::prelude::Entity;
@@ -277,7 +277,7 @@ mod test {
 
 	#[test]
 	fn route_path() {
-		RoutePath::new("hello").to_string().xpect().to_be("/hello");
+		RoutePath::new("hello").to_string().xpect_eq("/hello");
 
 		for (value, expected) in [
 			("hello", "/hello"),
@@ -294,8 +294,7 @@ mod test {
 			RoutePath::from_file_path(value)
 				.unwrap()
 				.to_string()
-				.xpect()
-				.to_be(expected);
+				.xpect_eq(expected);
 		}
 	}
 
@@ -304,8 +303,7 @@ mod test {
 		RoutePath::new("/foo")
 			.join(&RoutePath::new("/"))
 			.to_string()
-			.xpect()
-			.to_be("/foo");
+			.xpect_eq("/foo");
 	}
 
 	#[test]
@@ -324,7 +322,7 @@ mod test {
 		let tree = RoutePathTree::from_paths(paths.clone());
 
 		// Root node
-		tree.route.to_string().xpect().to_be("/");
+		tree.route.to_string().xpect_eq("/");
 		tree.contains_endpoints().xpect_false();
 
 		// Find child '/foo'
@@ -342,14 +340,14 @@ mod test {
 			.find(|c| c.route.to_string() == "/foo/bar")
 			.unwrap();
 		bar.contains_endpoints().xpect_true();
-		(&bar.endpoints).xpect().to_be(&vec![ent1]);
+		(&bar.endpoints).xpect_eq(vec![ent1]);
 		let baz = foo
 			.children
 			.iter()
 			.find(|c| c.route.to_string() == "/foo/baz")
 			.unwrap();
 		baz.contains_endpoints().xpect_true();
-		(&baz.endpoints).xpect().to_be(&vec![ent2]);
+		baz.endpoints.xpect_eq(vec![ent2]);
 
 		// 'qux' is a directory, 'quux' is endpoint
 		let qux = foo
@@ -364,7 +362,7 @@ mod test {
 			.find(|c| c.route.to_string() == "/foo/qux/quux")
 			.unwrap();
 		quux.contains_endpoints().xpect_true();
-		(&quux.endpoints).xpect().to_be(&vec![ent3]);
+		quux.endpoints.xpect_eq(vec![ent3]);
 
 		// 'root' endpoint
 		let root = tree
@@ -373,6 +371,6 @@ mod test {
 			.find(|c| c.route.to_string() == "/root")
 			.unwrap();
 		root.contains_endpoints().xpect_true();
-		(&root.endpoints).xpect().to_be(&vec![ent4]);
+		root.endpoints.xpect_eq(vec![ent4]);
 	}
 }

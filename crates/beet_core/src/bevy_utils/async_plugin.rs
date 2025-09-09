@@ -412,15 +412,15 @@ mod tests {
 			.unwrap();
 
 		// future completed
-		fut.await.xpect().to_be(32);
+		fut.await.xpect_eq(32);
 
 		// queue not yet applied
-		app.world_mut().resource::<Count>().0.xpect().to_be(0);
+		app.world_mut().resource::<Count>().0.xpect_eq(0);
 
 		app.update();
 
 		// queue now applied
-		app.world_mut().resource::<Count>().0.xpect().to_be(1);
+		app.world_mut().resource::<Count>().0.xpect_eq(1);
 	}
 	#[sweet::test]
 	async fn async_queue() {
@@ -458,7 +458,7 @@ mod tests {
 		app.run_async(AsyncChannel::runner_async).await;
 
 		// future completed
-		fut.await.xpect().to_be(2);
+		fut.await.xpect_eq(2);
 	}
 	#[sweet::test]
 	async fn results() {

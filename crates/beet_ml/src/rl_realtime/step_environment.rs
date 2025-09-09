@@ -145,9 +145,8 @@ mod test {
 		table
 			.keys()
 			.next()
-			.xpect()
-			.to_be(Some(&GridPos(UVec2::new(0, 0))));
+			.xpect_eq(Some(&GridPos(UVec2::new(0, 0))));
 		let inner = table.values().next().unwrap();
-		inner.iter().next().unwrap().1.xpect().to_be(&0.);
+		inner.iter().next().unwrap().1.xpect_eq(&0.);
 	}
 }
