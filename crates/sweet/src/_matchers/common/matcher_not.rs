@@ -43,16 +43,30 @@ impl<T> MaybeNot<T> {
 
 	/// Performs an equality check, considering if `self`
 	/// is negated
-	pub fn passes_with_message(
+	pub fn passes_display(
 		&self,
 		result: bool,
-		message: impl AsRef<str>,
+		expected: impl std::fmt::Display,
 	) -> Result<(), String> {
 		match (result, self.is_negated()) {
 			(true, false) => Ok(()),
 			(false, true) => Ok(()),
-			(true, true) => Err(format!("NOT {}", message.as_ref())),
-			(false, false) => Err(message.as_ref().to_string()),
+			(true, true) => Err(format!("NOT {}", expected)),
+			(false, false) => Err(format!("{}", expected)),
+		}
+	}
+	/// Performs an equality check, considering if `self`
+	/// is negated
+	pub fn passes_debug(
+		&self,
+		result: bool,
+		expected: impl std::fmt::Debug,
+	) -> Result<(), String> {
+		match (result, self.is_negated()) {
+			(true, false) => Ok(()),
+			(false, true) => Ok(()),
+			(true, true) => Err(format!("NOT {:?}", expected)),
+			(false, false) => Err(format!("{:?}", expected)),
 		}
 	}
 	/// Performs an equality check, considering if `self`

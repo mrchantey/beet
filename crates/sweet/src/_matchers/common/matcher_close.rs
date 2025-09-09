@@ -47,7 +47,7 @@ where
 fn assert<T: CloseTo + Display>(expected: T, received: MaybeNot<T>, delta: T) {
 	let result = received.inner().is_close_with_delta(&expected, &delta);
 	let expected = format!("within {} of {}", delta, expected,);
-	if let Err(expected) = received.passes_with_message(result, expected) {
+	if let Err(expected) = received.passes_debug(result, expected) {
 		panic_ext::panic_expected_received_display(
 			&expected,
 			&received.inner(),
