@@ -28,9 +28,8 @@ pub mod logging;
 pub mod test_runner;
 pub mod utils;
 
-#[path = "_matchers/mod.rs"]
 /// Matchers used for assertions: `true.xpect_true()`
-pub mod matchers;
+mod matchers;
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
 pub mod native;
