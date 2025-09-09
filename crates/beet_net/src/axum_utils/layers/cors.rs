@@ -173,8 +173,7 @@ mod test {
 		res.status().xpect_eq(StatusCode::FORBIDDEN);
 		res.headers()
 			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-			.xpect()
-			.to_be_none();
+			.xpect_none();
 	}
 	#[sweet::test]
 	async fn blocks_no_req_header() {
@@ -191,7 +190,6 @@ mod test {
 		res.status().xpect_eq(StatusCode::BAD_REQUEST);
 		res.headers()
 			.get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-			.xpect()
-			.to_be_none();
+			.xpect_none();
 	}
 }

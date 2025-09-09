@@ -1,6 +1,49 @@
 use super::*;
 use std::fmt::Debug;
-use std::fmt::Display;
+
+#[extend::ext(name=SweetResult)]
+pub impl<T: Debug, E: Debug> Result<T, E> {
+	/// Performs an assertion ensuring this value is an `Ok(_)`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// Ok::<(), ()>(()).xpect_ok();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `Ok(_)`.
+	fn xpect_ok(&self) -> &Self {
+		match self {
+			Ok(_) => self,
+			Err(_) => {
+				assert_ext::panic_expected_received_display_debug("Ok", self);
+			}
+		}
+	}
+	/// Performs an assertion ensuring this value is an `Err(_)`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// Err::<(), ()>(()).xpect_err();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `Err(_)`.
+	fn xpect_err(&self) -> &Self {
+		match self {
+			Err(_) => self,
+			Ok(_) => {
+				assert_ext::panic_expected_received_display_debug("Err", self);
+			}
+		}
+	}
+}
 
 impl<T: Debug, E: Debug> Matcher<Result<T, E>> {
 	pub fn to_be_ok(&self) {
@@ -12,17 +55,6 @@ impl<T: Debug, E: Debug> Matcher<Result<T, E>> {
 		self.assert_correct(result, &"Error");
 	}
 }
-// TODO T shouldt need to be debug
-impl<T: Debug, E: Debug + Display> Matcher<Result<T, E>> {
-	pub fn to_be_err_str(&self, value: &str) {
-		if let Err(err) = &self.value {
-			let result = err.to_string() == value;
-			self.assert_correct(result, &value);
-		} else {
-			self.assert_correct_with_received(false, &"Error", &"Ok");
-		}
-	}
-}
 
 #[cfg(test)]
 mod test {
@@ -32,15 +64,10 @@ mod test {
 	#[test]
 	fn result() {
 		let ok = || -> anyhow::Result<()> { Ok(()) };
-		ok().xpect().to_be_ok();
-		ok().xpect().not().to_be_err();
+		ok().xpect_ok();
 
 		let err = || -> anyhow::Result<()> { Err(anyhow!("foo")) };
 
-		err().xpect().to_be_err();
-		err().xpect().not().to_be_ok();
-
-		err().xpect().to_be_err_str("foo");
-		err().xpect().not().to_be_err_str("foobar");
+		err().xpect_err();
 	}
 }

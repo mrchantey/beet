@@ -105,9 +105,8 @@ mod test {
 			.get_type_info(
 				std::any::TypeId::of::<ClientIslandRoot<MyTemplate>>(),
 			)
-			.xpect()
 			// OnSpawnDeferred not triggered yet
-			.to_be_none();
+			.xpect_none();
 
 		app.update();
 		let reg = app.world().resource::<AppTypeRegistry>();
@@ -115,8 +114,7 @@ mod test {
 			.get_type_info(
 				std::any::TypeId::of::<ClientIslandRoot<MyTemplate>>(),
 			)
-			.xpect()
-			.to_be_some();
+			.xpect_some();
 
 		app.world_mut()
 			.run_system_cached_with(render_fragment, entity)?
@@ -129,8 +127,8 @@ mod test {
 		app.add_plugins(ApplyDirectivesPlugin::default());
 
 		parse(&mut app, rsx! { <MyTemplate foo=3 client:only /> })
-		.unwrap()
-		.xpect()
-		.to_be_snapshot();
+			.unwrap()
+			.xpect()
+			.to_be_snapshot();
 	}
 }

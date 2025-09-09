@@ -480,7 +480,6 @@ mod tests {
 		app.run_async(AsyncChannel::runner_async)
 			.await
 			.into_result()
-			.xpect()
-			.to_be_err();
+			.xpect_err();
 	}
 }

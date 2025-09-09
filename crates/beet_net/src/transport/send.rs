@@ -117,8 +117,7 @@ mod test_request {
 		// struct Foo{
 		Request::get(format!("{HTTPBIN}/get"))
 			.parse_query_param("foo", &(1, 2))
-			.xpect()
-			.to_be_err();
+			.xpect_err();
 	}
 
 	#[sweet::test]
@@ -188,8 +187,7 @@ mod test_response {
 			.await
 			.unwrap()
 			.len()
-			.xpect()
-			.to_be_greater_than(200)
-			.to_be_less_than(1000);
+			.xpect_greater_than(200)
+			.xpect_less_than(1000);
 	}
 }

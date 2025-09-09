@@ -244,7 +244,6 @@ mod test {
 				"0.16.0",
 				ContentType::Examples,
 			))
-			.xpect()
-			.to_be_ok();
+			.xpect_ok();
 	}
 }

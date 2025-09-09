@@ -144,10 +144,10 @@ mod test {
 
 	#[test]
 	fn test_check() {
-		true.check(true).xpect().to_be_ok();
-		true.check(false).xpect().to_be_err();
-		true.xnot().check(false).xpect().to_be_ok();
-		true.xnot().check(true).xpect().to_be_err();
+		true.check(true).xpect_ok();
+		true.check(false).xpect_err();
+		true.xnot().check(false).xpect_ok();
+		true.xnot().check(true).xpect_err();
 	}
 
 	#[test]

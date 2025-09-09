@@ -155,9 +155,7 @@ mod test {
 		deserialized_string.xpect_eq(original_string);
 
 		let invalid_json = r#"{"item": "fn invalid syntax {"}"#;
-		serde_json::from_str::<ItemWrapper>(invalid_json)
-			.xpect()
-			.to_be_err();
+		serde_json::from_str::<ItemWrapper>(invalid_json).xpect_err();
 	}
 
 	#[sweet::test]
@@ -177,7 +175,6 @@ mod test {
 		serde_json::to_string(&wrapper)
 			.unwrap()
 			.xmap(|json| serde_json::from_str::<ItemWrapper>(&json))
-			.xpect()
-			.to_be_ok();
+			.xpect_ok();
 	}
 }

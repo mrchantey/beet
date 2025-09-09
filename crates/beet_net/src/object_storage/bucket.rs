@@ -223,7 +223,7 @@ pub mod bucket_test {
 		bucket.bucket_exists().await.unwrap().xpect_false();
 		bucket.bucket_try_create().await.unwrap();
 		bucket.exists(&path).await.unwrap().xpect_false();
-		bucket.remove(&path).await.xpect().to_be_err();
+		bucket.remove(&path).await.xpect_err();
 		bucket.insert(&path, body.clone()).await.unwrap();
 		bucket.bucket_exists().await.unwrap().xpect_true();
 		bucket.exists(&path).await.unwrap().xpect_true();
@@ -232,7 +232,7 @@ pub mod bucket_test {
 		bucket.get(&path).await.unwrap().xpect_eq(body);
 
 		bucket.remove(&path).await.unwrap();
-		bucket.get(&path).await.xpect().to_be_err();
+		bucket.get(&path).await.xpect_err();
 
 		bucket.bucket_remove().await.unwrap();
 		bucket.bucket_exists().await.unwrap().xpect_false();

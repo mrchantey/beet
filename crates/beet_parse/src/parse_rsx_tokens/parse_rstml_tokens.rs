@@ -455,10 +455,8 @@ mod test {
 			</span>
 		});
 
-		app.query_once::<&NodeTag>().xpect().to_have_length(3);
-		app.query_once::<&ClientLoadDirective>()
-			.xpect()
-			.to_have_length(1);
+		app.query_once::<&NodeTag>().len().xpect_eq(3);
+		app.query_once::<&ClientLoadDirective>().len().xpect_eq(1);
 	}
 
 	#[test]

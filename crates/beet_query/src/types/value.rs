@@ -264,7 +264,7 @@ mod test {
 			.xpect_eq(Ok(Value::Integer(-100000)));
 
 		// Test u64 conversion - should fail if value exceeds i64::MAX
-		u64::MAX.into_value().xpect().to_be_err();
+		u64::MAX.into_value().xpect_err();
 		42u64.into_value().xpect_eq(Ok(Value::Integer(42)));
 
 		// Test i64 conversion
@@ -359,16 +359,15 @@ mod test {
 		i64::from_value(Value::Integer(-42)).xpect_eq(Ok(-42i64));
 
 		// Out of range conversions should fail
-		u8::from_value(Value::Integer(256)).xpect().to_be_err();
-		u8::from_value(Value::Integer(-1)).xpect().to_be_err();
-		i8::from_value(Value::Integer(128)).xpect().to_be_err();
-		i8::from_value(Value::Integer(-129)).xpect().to_be_err();
+		u8::from_value(Value::Integer(256)).xpect_err();
+		u8::from_value(Value::Integer(-1)).xpect_err();
+		i8::from_value(Value::Integer(128)).xpect_err();
+		i8::from_value(Value::Integer(-129)).xpect_err();
 
 		// Wrong type conversions should fail
-		u8::from_value(Value::Real(42.0)).xpect().to_be_err();
-		i32::from_value(Value::Text("42".to_string()))
-			.xpect()
-			.to_be_err();
+		u8::from_value(Value::Real(42.0)).xpect_err();
+		i32::from_value(Value::Text("42".to_string())).xpect_err();
+
 
 		// Real conversions
 		f32::from_value(Value::Real(3.14)).xpect_eq(Ok(3.14f32));

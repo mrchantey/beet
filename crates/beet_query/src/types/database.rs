@@ -163,6 +163,6 @@ mod test {
 
 		// 4. DELETE
 		db.delete::<User>(1).await.unwrap();
-		db.find::<User>(1).await.xpect().to_be_err();
+		db.find::<User>(1).await.xpect_err();
 	}
 }

@@ -321,7 +321,7 @@ mod test {
 
 		let bucket = Bucket::new(client, "beet-site-bucket-dev".to_string());
 		bucket.bucket_try_create().await?;
-		bucket.bucket_exists().await.xpect().to_be_ok();
+		bucket.bucket_exists().await.xpect_ok();
 
 		// READ - Download and verify the file
 		bucket

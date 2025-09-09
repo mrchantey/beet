@@ -25,6 +25,5 @@ async fn works() {
 		.unwrap()
 		.paths()
 		.len()
-		.xpect()
-		.to_be_greater_than(10);
+		.xpect_greater_than(10);
 }

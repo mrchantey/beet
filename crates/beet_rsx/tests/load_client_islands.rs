@@ -12,7 +12,7 @@ fn works() {
 		.register_type::<ClientIslandRoot<Counter>>();
 
 	app.load_scene(SCENE).unwrap();
-	app.query_once::<&NodeTag>().xpect().to_have_length(2);
+	app.query_once::<&NodeTag>().len().xpect_eq(2);
 }
 
 

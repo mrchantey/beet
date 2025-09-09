@@ -88,9 +88,8 @@ mod test {
 			.unwrap();
 		world
 			.run_system_cached(parse_route_file_md)
-			.xpect()
 			// bypass_change_detection
-			.to_be_err();
+			.xpect_err();
 		let file = world.entity(collection).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let method = world

@@ -183,6 +183,6 @@ impl ThemeToCss {
 // 	fn works() {
 // 		let css = ThemeToCss::default()
 // 			.map(&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build());
-// 		StyleSheet::parse(&css, ParserOptions::default()).xpect().to_be_ok();
+// 		StyleSheet::parse(&css, ParserOptions::default()).xpect_ok();
 // 	}
 // }

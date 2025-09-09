@@ -53,7 +53,7 @@ mod test {
 
 	#[sweet::test]
 	pub async fn works() {
-		let a = future_timeout(
+		future_timeout(
 			|| async {
 				wait_for_millis(400).await;
 				39
@@ -61,18 +61,20 @@ mod test {
 			Duration::from_millis(500),
 		)
 		.await
-		.unwrap();
-		a.xpect_eq(39);
+		.unwrap()
+		.xpect_eq(39);
 	}
 	#[sweet::test]
 	pub async fn times_out() {
-		let err = future_timeout(
+		future_timeout(
 			|| async {
 				wait_for_millis(600).await;
 			},
 			Duration::from_millis(500),
 		)
-		.await;
-		err.xpect().to_be_err_str("Timeout");
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_eq("Timeout");
 	}
 }
