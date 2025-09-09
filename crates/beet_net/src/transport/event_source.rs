@@ -39,7 +39,6 @@ mod test {
 		}
 
 		// .xmap(|res| res.status())
-		// .xpect()
-		// .to_be(200);
+		// .xpect_eq(200);
 	}
 }

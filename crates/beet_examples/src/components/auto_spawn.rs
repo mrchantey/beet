@@ -73,13 +73,13 @@ impl AutoSpawn {
 
 // 		send.send(BeetMessage::Spawn{bincode})?;
 
-// 		app.world().entities().len().xpect().to_be(0)?;
+// 		app.world().entities().len().xpect_eq(0)?;
 // 		app.update();
-// 		app.world().entities().len().xpect().to_be(1)?;
+// 		app.world().entities().len().xpect_eq(1)?;
 
 // 		let first = app.world().iter_entities().next().unwrap().id();
 
-// 		(&app).xpect().component(first)?.to_be(&auto_spawn)?;
+// 		(&app).xpect().component(first)?.xpect_eq(&auto_spawn)?;
 
 // 		Ok(())
 // 	}

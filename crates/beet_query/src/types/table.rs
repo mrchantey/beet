@@ -74,9 +74,8 @@ mod test {
 			.unwrap()
 			.xpect_eq(Some(0u32.into_value().unwrap()));
 
-		// MyTable::name().xpect().to_be("foobar".to_string());
+		// MyTable::name().xpect_eq("foobar");
 		// MyTableColumns::Test.into_column().name
-		// 	.xpect()
-		// 	.to_be("test".to_string());
+		// 	.xpect_eq("test");
 	}
 }

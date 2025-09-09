@@ -62,7 +62,6 @@ mod test {
 
 	#[test]
 	fn str() {
-		// "foo".to_string().xpect().to_be("foo")?;
 
 		"foobar".xpect().to_contain("bar");
 		"foobar".xpect().not().to_contain("baz");

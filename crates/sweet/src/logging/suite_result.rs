@@ -83,8 +83,7 @@ impl SuiteResult {
 // 	fn works() -> Result<()> {
 // 		let file = std::path::Path::new(file!()).to_forward_slash();
 // 		let result = SuiteResult::new(file, 0, 0);
-// 		let end = result.end_str();
-// 		end.as_str().xpect().to_be("\u{1b}[42;1;30m PASS \u{1b}[0;39;49m \u{1b}[2mtest/common\u{1b}[0;39;49m\u{1b}[2m/\u{1b}[0;39;49m\u{1b}[1msuite_result.rs\u{1b}[0;39;49m")?;
+// 		result.end_str().as_str().xpect_eq("\u{1b}[42;1;30m PASS \u{1b}[0;39;49m \u{1b}[2mtest/common\u{1b}[0;39;49m\u{1b}[2m/\u{1b}[0;39;49m\u{1b}[1msuite_result.rs\u{1b}[0;39;49m")?;
 
 // 		Ok(())
 // 	}
