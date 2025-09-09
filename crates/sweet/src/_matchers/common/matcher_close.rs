@@ -5,22 +5,48 @@ use std::fmt::Debug;
 
 #[extend::ext(name=SweetClose)]
 pub impl<T: CloseTo + Copy + Debug> T {
+	/// Asserts that the value is close to `expected`,
+	/// using [`CloseTo::default_delta`] of `0.1` as the allowed difference.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// 0.0.xpect_close(0.01);
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not within the default delta of `expected`.
 	fn xpect_close(&self, expected: impl Into<T>) {
 		let delta = T::default_delta();
 		let expected = expected.into();
 		if !self.is_close_with_delta(&expected, &delta) {
 			let expected =
 				format!("close to {:?} within {:?}", expected, delta);
-			assert_ext::panic_expected_received_debug(&expected, self);
+			assert_ext::panic_expected_received_display_debug(&expected, self);
 		}
 	}
+	/// Asserts that the value is close to `expected`,
+	/// using the provided delta as the allowed difference.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// 3.14_f32.xpect_close_within(3.1415, 0.01_f32);
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not within the given `delta` of `expected`.
 	fn xpect_close_within(&self, expected: impl Into<T>, delta: impl Into<T>) {
 		let delta = delta.into();
 		let expected = expected.into();
 		if !self.is_close_with_delta(&expected, &delta) {
 			let expected =
 				format!("close to {:?} within {:?}", expected, delta);
-			assert_ext::panic_expected_received_debug(&expected, self);
+			assert_ext::panic_expected_received_display_debug(&expected, self);
 		}
 	}
 }
@@ -52,18 +78,21 @@ pub impl<T: CloseTo + Copy + Debug> Matcher<T>
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use bevy::prelude::Deref;
 
-	#[derive(Clone)]
+	#[derive(Clone, Deref)]
 	struct NewType<T>(pub T);
 
 	#[test]
 	fn to_be_close_to() {
-		(0.).xpect().to_be_close_to(0.);
-		(-0.999).xpect().to_be_close_to(-1.);
-		(0.9).xpect().not().to_be_close_to(1.01);
-		NewType(0.0_f64).0.xpect().to_be_close_to(0.);
+		(0.0_f64).xpect_close(0.);
+		(-0.999_f64).xpect_close(-1.);
+		NewType(0.0_f64).xpect_close(0.);
+		0.0_f64.xpect_close_within(0.5, 1.);
 
-		0.0_f32.xpect().to_be_close_to(0.);
-		NewType(0.0_f32).0.xpect().to_be_close_to(0.);
+		(0.0_f32).xpect_close(0.);
+		(-0.999_f32).xpect_close(-1.);
+		NewType(0.0_f32).xpect_close(0.);
+		0.0_f32.xpect_close_within(0.5, 1.);
 	}
 }

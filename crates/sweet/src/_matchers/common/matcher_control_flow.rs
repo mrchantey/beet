@@ -27,9 +27,3 @@ impl<B, C> Matcher<ControlFlow<B, C>> {
 		}
 	}
 }
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-}

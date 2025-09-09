@@ -1,6 +1,8 @@
 pub mod assert_ext;
 mod close_to;
 mod matcher_control_flow;
+mod matcher_not;
+pub use matcher_not::*;
 pub mod panic_ext;
 #[allow(unused_imports)]
 pub use self::close_to::*;
