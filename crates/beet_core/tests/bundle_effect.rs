@@ -23,5 +23,5 @@ fn works() {
 
 	let mut world = World::new();
 	let entity = world.spawn(Foo::<()>::default());
-	entity.get::<Bar>().xpect().to_be_some();
+	entity.get::<Bar>().xpect_some();
 }

@@ -405,20 +405,20 @@ mod test {
 	#[test]
 	fn test_value_type_from_str() {
 		ValueType::from_str("INTEGER")
-			.xpect()
-			.to_be_ok_val(ValueType::Integer);
+			.unwrap()
+			.xpect_eq(ValueType::Integer);
 		ValueType::from_str("REAL")
-			.xpect()
-			.to_be_ok_val(ValueType::Real);
+			.unwrap()
+			.xpect_eq(ValueType::Real);
 		ValueType::from_str("TEXT")
-			.xpect()
-			.to_be_ok_val(ValueType::Text);
+			.unwrap()
+			.xpect_eq(ValueType::Text);
 		ValueType::from_str("BLOB")
-			.xpect()
-			.to_be_ok_val(ValueType::Blob);
+			.unwrap()
+			.xpect_eq(ValueType::Blob);
 		ValueType::from_str("NULL")
-			.xpect()
-			.to_be_ok_val(ValueType::Null);
+			.unwrap()
+			.xpect_eq(ValueType::Null);
 
 		// Invalid types should error
 		ValueType::from_str("INVALID").is_err().xpect_eq(true);

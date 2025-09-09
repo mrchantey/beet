@@ -1,6 +1,50 @@
 use super::*;
+use std::fmt::Debug;
 
-
+#[extend::ext(name=SweetOption)]
+pub impl<T: Debug> Option<T> {
+	/// Performs an assertion ensuring this value is a `Some(_)`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// Some(1).xpect_some();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `Some(_)`.
+	fn xpect_some(&self) -> &Self {
+		match self {
+			Some(_) => self,
+			None => {
+				assert_ext::panic_expected_received_display_debug("Some", self);
+			}
+		}
+	}
+	/// Performs an assertion ensuring this value is a `None`.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// let v: Option<i32> = None;
+	/// v.xpect_none();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the value is not `None`.
+	fn xpect_none(&self) -> &Self {
+		match self {
+			None => self,
+			Some(_) => {
+				assert_ext::panic_expected_received_display_debug("None", self);
+			}
+		}
+	}
+}
 
 impl<T> Matcher<Option<T>>
 where
@@ -20,15 +64,7 @@ where
 		self.assert_correct(result, &"Some");
 	}
 
-	/// # Panics
-	/// Panics if the value is `None`
-	pub fn as_some(self) -> Matcher<T> {
-		if let Some(value) = self.value {
-			Matcher::new(value)
-		} else {
-			self.assert_with_expected_received(&"Some", &"None");
-		}
-	}
+
 	pub fn to_be_none(&self) {
 		let result = self.value.is_none();
 		self.assert_correct(result, &"None");
@@ -42,12 +78,7 @@ mod test {
 
 	#[test]
 	fn option() {
-		Some(true).xpect().to_be_some();
-		Some(true).xpect().not().to_be_none();
-
-		(None::<bool>).xpect().to_be_none();
-		(None::<bool>).xpect().not().to_be_some();
-
-		Some(true).xpect().as_some().to_be(true);
+		Some(true).xpect_some();
+		(None::<bool>).xpect_none();
 	}
 }

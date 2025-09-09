@@ -106,7 +106,7 @@ mod test {
 		// adds
 		let entity =
 			world.spawn(ContinueRun).flush_trigger(OnRun::local()).id();
-		world.get::<Running>(entity).xpect().to_be_some();
+		world.get::<Running>(entity).xpect_some();
 	}
 	#[test]
 	fn removes() {
@@ -117,7 +117,7 @@ mod test {
 			.spawn((Running::default(), ContinueRun))
 			.flush_trigger(OnResultAction::local(RunResult::Success))
 			.id();
-		world.get::<Running>(entity).xpect().to_be_none();
+		world.get::<Running>(entity).xpect_none();
 	}
 
 	#[test]

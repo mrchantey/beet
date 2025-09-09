@@ -47,8 +47,8 @@ mod test {
 	}
 	#[test]
 	fn read_file() {
-		js_runtime::read_file("foobar").xpect().to_be_none();
-		js_runtime::read_file("Cargo.toml").xpect().to_be_some();
+		js_runtime::read_file("foobar").xpect_none();
+		js_runtime::read_file("Cargo.toml").xpect_some();
 		// js_runtime::read_file("Cargo.lock").xpect().to_be_some();
 	}
 	#[test]

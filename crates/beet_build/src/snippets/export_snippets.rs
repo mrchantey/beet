@@ -96,7 +96,7 @@ mod test {
 
 		let saved = ReadFile::to_string(snippet_path).unwrap();
 		// non-empty scene file
-		saved.len().xpect().to_be_greater_than(1000);
+		saved.len().xpect_greater_than(1000);
 	}
 	#[test]
 	#[ignore = "lang snippet exports is a wip"]
@@ -120,7 +120,7 @@ mod test {
 
 		let saved = ReadFile::to_string(path).unwrap();
 		// non-empty scene file
-		saved.len().xpect().to_be_greater_than(200);
+		saved.len().xpect_greater_than(200);
 		#[cfg(feature = "css")]
 		(&saved).xpect().to_contain("div[data-beet-style-id-0]");
 		#[cfg(not(feature = "css"))]

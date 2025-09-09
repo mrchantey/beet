@@ -74,7 +74,7 @@ mod test {
 			.spawn((Running::default(), Remove::<OnRun, Running>::default()))
 			.flush_trigger(OnRun::local())
 			.id();
-		world.get::<Running>(entity).xpect().to_be_none();
+		world.get::<Running>(entity).xpect_none();
 	}
 	#[test]
 	fn on_result() {
@@ -90,6 +90,6 @@ mod test {
 			))
 			.flush_trigger(OnRun::local())
 			.id();
-		world.get::<Running>(entity).xpect().to_be_none();
+		world.get::<Running>(entity).xpect_none();
 	}
 }

@@ -247,8 +247,8 @@ mod test {
 				})
 			})
 		}
-		parse("").xpect().to_be_none();
-		parse("foo: Bar").xpect().to_be_none();
+		parse("").xpect_none();
+		parse("foo: Bar").xpect_none();
 		parse("foo: In<u32>")
 			.unwrap()
 			.xpect_eq(("foo : u32".into(), "foo".into()));

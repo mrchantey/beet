@@ -65,16 +65,6 @@ impl<T> Matcher<T> {
 			self.panic_with_expected_received(expected, received)
 		}
 	}
-
-	/// Always panics, level 3 wrapper for [Self::panic_with_expected_received]
-	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
-	pub(crate) fn assert_with_expected_received<T2: Debug, T3: Debug>(
-		&self,
-		expected: &T2,
-		received: &T3,
-	) -> ! {
-		self.panic_with_expected_received(expected, received)
-	}
 }
 
 

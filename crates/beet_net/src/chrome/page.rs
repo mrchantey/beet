@@ -143,6 +143,6 @@ mod test {
 			.unwrap();
 
 		// let bytes = export_pdf("https://beetstack.dev").await.unwrap();
-		bytes.len().xpect().to_be_greater_than(100);
+		bytes.len().xpect_greater_than(100);
 	}
 }

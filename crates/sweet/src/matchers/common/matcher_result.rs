@@ -3,14 +3,6 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 impl<T: Debug, E: Debug> Matcher<Result<T, E>> {
-	pub fn to_be_ok_val(&self, val: impl PartialEq<T> + Debug) {
-		if let Ok(v) = &self.value {
-			let result = val == *v;
-			self.assert_correct(result, &format!("{:?}", val));
-		} else {
-			self.assert_correct_with_received(false, &"Ok", &"Error");
-		}
-	}
 	pub fn to_be_ok(&self) {
 		let result = self.value.is_ok();
 		self.assert_correct(result, &"Ok");

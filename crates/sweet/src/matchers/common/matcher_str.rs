@@ -41,20 +41,6 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 	}
 }
 
-// impl<T: std::fmt::Debug + ToString> Matcher<Option<T>> {
-// 	pub fn to_be_str(&self, other: &str){
-// 		if let Some(value) = &self.value {
-// 			let result = value.to_string() == other;
-// 			let expected = format!("to be '{}'", other);
-// 			self.assert_correct(result, &expected)
-// 		} else {
-// 			let result = false;
-// 			let expected = format!("to be '{}'", other);
-// 			self.assert_correct(result, &expected)
-// 		}
-// 	}
-// }
-
 
 #[cfg(test)]
 mod test {
@@ -62,7 +48,6 @@ mod test {
 
 	#[test]
 	fn str() {
-
 		"foobar".xpect().to_contain("bar");
 		"foobar".xpect().not().to_contain("baz");
 

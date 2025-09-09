@@ -102,16 +102,10 @@ mod test {
 
 	#[test]
 	fn calculates_length() {
-		SerdeCurve::Circle.total_len().xpect().to_be_less_than(TAU);
-		SerdeCurve::Circle
-			.total_len()
-			.xpect()
-			.to_be_greater_than(6.);
-		SerdeCurve::Square.total_len().xpect().to_be_less_than(4.);
-		SerdeCurve::Square
-			.total_len()
-			.xpect()
-			.to_be_greater_than(3.8);
+		SerdeCurve::Circle.total_len().xpect_less_than(TAU);
+		SerdeCurve::Circle.total_len().xpect_greater_than(6.);
+		SerdeCurve::Square.total_len().xpect_less_than(4.);
+		SerdeCurve::Square.total_len().xpect_greater_than(3.8);
 
 
 		let ease = SerdeCurve::EaseDir2(EasingCurve::new(
@@ -119,7 +113,7 @@ mod test {
 			Dir2::Y,
 			EaseFunction::CubicInOut,
 		));
-		ease.total_len().xpect().to_be_less_than(PI);
-		ease.total_len().xpect().to_be_greater_than(1.5);
+		ease.total_len().xpect_less_than(PI);
+		ease.total_len().xpect_greater_than(1.5);
 	}
 }
