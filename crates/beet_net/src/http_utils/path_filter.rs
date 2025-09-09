@@ -299,13 +299,9 @@ mod test {
 	use std::ops::ControlFlow;
 	use sweet::prelude::*;
 
-	fn expect_segment(
-		filter: &str,
-		request: &str,
-	) -> Matcher<ControlFlow<(), ()>> {
+	fn expect_segment(filter: &str, request: &str) -> ControlFlow<(), ()> {
 		PathFilter::new(filter)
 			.matches(&mut Default::default(), &mut route_path_queue(request))
-			.xpect()
 	}
 
 	fn run_with_map(
@@ -321,11 +317,11 @@ mod test {
 
 	#[test]
 	fn root() {
-		expect_segment("/", "/").to_continue();
-		expect_segment("", "").to_continue();
-		expect_segment("", "/").to_continue();
-		expect_segment("/", "").to_continue();
-		expect_segment("/", "/foo").to_break();
+		expect_segment("/", "/").xpect_continue();
+		expect_segment("", "").xpect_continue();
+		expect_segment("", "/").xpect_continue();
+		expect_segment("/", "").xpect_continue();
+		expect_segment("/", "/foo").xpect_break();
 
 		for (filter, request) in [("/", "/"), ("", ""), ("", "/"), ("/", "")] {
 			let (_flow, map) = run_with_map(filter, request);
@@ -334,12 +330,12 @@ mod test {
 	}
 	#[test]
 	fn static_path() {
-		expect_segment("/foobar", "foobar").to_continue();
-		expect_segment("foobar", "/foobar").to_continue();
-		expect_segment("foo/bar", "foo/bar").to_continue();
-		expect_segment("foo", "foo/bar").to_continue();
-		expect_segment("foo/bar", "foo").to_break();
-		expect_segment("/", "/foo").to_break();
+		expect_segment("/foobar", "foobar").xpect_continue();
+		expect_segment("foobar", "/foobar").xpect_continue();
+		expect_segment("foo/bar", "foo/bar").xpect_continue();
+		expect_segment("foo", "foo/bar").xpect_continue();
+		expect_segment("foo/bar", "foo").xpect_break();
+		expect_segment("/", "/foo").xpect_break();
 
 		for (filter, request) in [
 			("/foobar", "foobar"),
@@ -353,13 +349,13 @@ mod test {
 	}
 	#[test]
 	fn dynamic_path() {
-		expect_segment("/:foo", "bar").to_continue();
-		expect_segment("/:foo", "/bar").to_continue();
-		expect_segment("/:foo/:baz", "bar/baz").to_continue();
-		expect_segment("/:foo/:baz", "/bar/baz").to_continue();
-		expect_segment("/:foo", "bar/baz").to_continue();
-		expect_segment("/:foo/:baz", "bar").to_break();
-		expect_segment("/:foo", "").to_break();
+		expect_segment("/:foo", "bar").xpect_continue();
+		expect_segment("/:foo", "/bar").xpect_continue();
+		expect_segment("/:foo/:baz", "bar/baz").xpect_continue();
+		expect_segment("/:foo/:baz", "/bar/baz").xpect_continue();
+		expect_segment("/:foo", "bar/baz").xpect_continue();
+		expect_segment("/:foo/:baz", "bar").xpect_break();
+		expect_segment("/:foo", "").xpect_break();
 
 		let (_flow, map) = run_with_map("/:foo", "bar");
 		map.get("foo")
@@ -406,14 +402,14 @@ mod test {
 	}
 	#[test]
 	fn wildcard_path() {
-		expect_segment("/*foo", "bar").to_continue();
-		expect_segment("/*foo", "/bar").to_continue();
-		expect_segment("/*foo", "bar/baz").to_continue();
-		expect_segment("/*foo", "/bar/baz").to_continue();
-		expect_segment("foo/*bar", "foo/bar/baz").to_continue();
-		expect_segment("foo/*bar", "foo").to_continue();
-		expect_segment("foo/*bar", "bar").to_break();
-		expect_segment("/*foo", "").to_continue();
+		expect_segment("/*foo", "bar").xpect_continue();
+		expect_segment("/*foo", "/bar").xpect_continue();
+		expect_segment("/*foo", "bar/baz").xpect_continue();
+		expect_segment("/*foo", "/bar/baz").xpect_continue();
+		expect_segment("foo/*bar", "foo/bar/baz").xpect_continue();
+		expect_segment("foo/*bar", "foo").xpect_continue();
+		expect_segment("foo/*bar", "bar").xpect_break();
+		expect_segment("/*foo", "").xpect_continue();
 
 		let (_flow, map) = run_with_map("/*foo", "bar");
 		map.get("foo")
