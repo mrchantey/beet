@@ -115,7 +115,7 @@ mod test {
 		}
 		for _ in 0..10 {
 			let val = Vec3::random_on_sphere(&mut rng);
-			val.length().xpect().to_be_close_to(1.);
+			val.length().xpect_close(1.);
 			// println!("random_on_sphere: {val}");
 		}
 		for _ in 0..10 {

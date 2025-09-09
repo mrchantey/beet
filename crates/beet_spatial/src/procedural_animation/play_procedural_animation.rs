@@ -119,7 +119,6 @@ mod test {
 			.get::<Transform>()
 			.unwrap()
 			.translation
-			.xpect()
-			.to_be_close_to(Vec3::new(-1., 0., 0.));
+			.xpect_close(Vec3::new(-1., 0., 0.));
 	}
 }

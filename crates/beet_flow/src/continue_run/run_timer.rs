@@ -70,30 +70,14 @@ mod test {
 		app.update_with_secs(1);
 
 		let timer = app.world().get::<RunTimer>(entity).unwrap();
-		timer
-			.last_started
-			.elapsed_secs()
-			.xpect()
-			.to_be_close_to(1.0);
-		timer
-			.last_stopped
-			.elapsed_secs()
-			.xpect()
-			.to_be_close_to(1.0);
+		timer.last_started.elapsed_secs().xpect_close(1.0);
+		timer.last_stopped.elapsed_secs().xpect_close(1.0);
 
 		app.world_mut().entity_mut(entity).remove::<Running>();
 		app.update_with_secs(1);
 
 		let timer = app.world().get::<RunTimer>(entity).unwrap();
-		timer
-			.last_started
-			.elapsed_secs()
-			.xpect()
-			.to_be_close_to(2.0);
-		timer
-			.last_stopped
-			.elapsed_secs()
-			.xpect()
-			.to_be_close_to(1.0);
+		timer.last_started.elapsed_secs().xpect_close(2.0);
+		timer.last_stopped.elapsed_secs().xpect_close(1.0);
 	}
 }

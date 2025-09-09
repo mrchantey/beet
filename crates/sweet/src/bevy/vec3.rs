@@ -23,13 +23,12 @@ mod test {
 
 	#[test]
 	fn vec3() {
-		Vec3::ZERO.xpect().to_be_close_to(Vec3::ZERO);
-		Vec3::ZERO.xpect().not().to_be_close_to(Vec3::ONE);
-		Foo(Vec3::ZERO).0.xpect().to_be_close_to(Vec3::ZERO);
+		Vec3::ZERO.xpect_close(Vec3::ZERO);
+		Vec3::ZERO.xnot().xpect_close(Vec3::ONE);
+		Foo(Vec3::ZERO).xpect_close(Vec3::ZERO);
 		Foo(Vec3::ZERO)
 			.0
-			.xpect()
-			.not()
-			.to_be_close_to(Vec3::new(0.2, 0.2, 0.2));
+			.xnot()
+			.xpect_close(Vec3::new(0.2, 0.2, 0.2));
 	}
 }

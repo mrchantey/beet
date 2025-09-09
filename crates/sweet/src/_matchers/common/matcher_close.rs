@@ -1,6 +1,4 @@
 use super::*;
-use extend::ext;
-use std::fmt::Debug;
 use std::fmt::Display;
 
 
@@ -57,28 +55,6 @@ fn assert<T: CloseTo + Display>(expected: T, received: MaybeNot<T>, delta: T) {
 	}
 }
 
-#[ext(name=MatcherExtClose)]
-/// Matcher Extensions for types that implement `CloseTo`: `f32`, `f64`, `Vec3`, etc.
-pub impl<T: CloseTo + Copy + Debug> Matcher<T>
-// where
-// U: CloseTo + std::fmt::Debug + Copy,
-{
-	fn to_be_close_to(&self, expected: impl Into<T>) {
-		let received = self.value;
-		let expected = expected.into();
-		let result = T::is_close(&received, &expected);
-		let expected = format!("close to {:?}", expected);
-		self.assert_correct_with_received(result, &expected, &received);
-	}
-	fn to_be_close_to_with_epsilon(&self, expected: impl Into<T>, epsilon: T) {
-		let received = self.value;
-		let expected = expected.into();
-		let result = T::is_close_with_delta(&received, &expected, &epsilon);
-		let expected = format!("close to {:?}", expected);
-		self.assert_correct_with_received(result, &expected, &received);
-	}
-}
-
 
 #[cfg(test)]
 mod test {
@@ -89,7 +65,7 @@ mod test {
 	struct NewType<T>(pub T);
 
 	#[test]
-	fn to_be_close_to() {
+	fn close_to_behavior() {
 		(0.0_f64).xpect_close(0.);
 		(0.0_f64).xnot().xpect_close(10.);
 		(0.0_f64).xpect_close(0.01);

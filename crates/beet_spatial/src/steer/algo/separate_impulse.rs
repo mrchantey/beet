@@ -60,9 +60,6 @@ mod test {
 			&Separate::<GroupSteerAgent>::default(),
 			agents,
 		)
-		.xpect()
-		.map(|i| i.0)
-		.to_be_close_to(Vec3::new(-1.6174722, -1.1763434, 0.0));
-		// .to_be_close_to(Vec3::new(-1.41, -1.41, 0.))?;
+		.xpect_close(Vec3::new(-1.6174722, -1.1763434, 0.0));
 	}
 }

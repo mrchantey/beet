@@ -57,16 +57,16 @@ mod test {
 	#[test]
 	fn works() {
 		let v = Quat::from_right();
-		v.forward().x.xpect().to_be_close_to(1.);
+		v.forward().x.xpect_close(1.);
 		let v = Quat::from_left();
-		v.forward().x.xpect().to_be_close_to(-1.);
+		v.forward().x.xpect_close(-1.);
 		let v = Quat::from_up();
-		v.forward().y.xpect().to_be_close_to(1.);
+		v.forward().y.xpect_close(1.);
 		let v = Quat::from_down();
-		v.forward().y.xpect().to_be_close_to(-1.);
+		v.forward().y.xpect_close(-1.);
 		let v = Quat::from_forward();
-		v.forward().z.xpect().to_be_close_to(1.);
+		v.forward().z.xpect_close(1.);
 		let v = Quat::from_back();
-		v.forward().z.xpect().to_be_close_to(-1.);
+		v.forward().z.xpect_close(-1.);
 	}
 }

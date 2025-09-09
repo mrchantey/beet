@@ -44,7 +44,7 @@ mod test {
 	}
 
 	#[test]
-	fn works() {
+	fn aligns() {
 		let mut world = World::new();
 
 		let entity = spawn(&mut world, Vec3::ZERO, Vec3::new(1., 0., 0.));
@@ -64,6 +64,6 @@ mod test {
 		.xpect()
 		.map(|i| i.0)
 		.to_be(Vec3::new(0.5, 0.5, 0.));
-		// .to_be_close_to(Vec3::new(1.41, 1.41, 0.))?;
+		// .xpect_close(Vec3::new(1.41, 1.41, 0.))?;
 	}
 }
