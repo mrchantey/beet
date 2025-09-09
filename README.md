@@ -41,9 +41,26 @@ General patterns and tools for application development.
 | [`sweet-cli`](crates/sweet/cli/Cargo.toml)       | 🌿      | A pretty cross platform test runner             |
 
 
-## Beet Flow
+## Control Flow
 
-Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and Reinforcement Learning.
+Control flow crates for use in behavior paradigms like behavior trees, utility AI or agentic systems.
+
+```rust
+world.spawn((
+    Name::new("My Behavior"),
+    Sequence
+  ))
+	.with_child((
+    Name::new("Hello"),
+    ReturnWith(RunResult::Success),
+  ))
+  .with_child((
+    Name::new("World"),
+    ReturnWith(RunResult::Success),
+  ))
+  .trigger(OnRun::local());
+```
+
 
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
@@ -53,9 +70,24 @@ Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and 
 | [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🌱      | Game AI simulation primitives.                 |
 
 
-## Beet Rsx
+## Web
 
 Crates for building and deploying web apps.
+
+
+```rust
+#[template]
+fn Counter(initial: i32) -> impl Bundle {
+  let (get, set) = signal(initial);
+
+  rsx! {
+    <button onclick=move |_| set(get() + 1)>
+      Cookie Count: {get}
+    </button>
+  }
+}
+```
+
 
 | Crate                                          | Status | Description                                  |
 | ---------------------------------------------- | ------ | -------------------------------------------- |
