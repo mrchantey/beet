@@ -170,7 +170,7 @@ impl BenchAssert {
 const ASSERT_FILE_PATH: &str = "./tests/assert.rs";
 const ASSERT_TEMPLATE: &str = r#"
 	use std::time::Instant;
-	#[test]	
+	#[test]
 	fn main(){
   	let start = Instant::now();
 __iterations__

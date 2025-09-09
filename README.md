@@ -18,17 +18,14 @@
   </h3>
 </div>
 
-Beet is a bevy metaframework, bringing bevy architecture and principles to the rest of the stack.
+Beet is a very bevy metaframework, bringing bevy patterns *and* principles (thats where the 'very' comes in) to the rest of the stack.
 
 Thats right fam, we're going full-stack bevy. Its *very* early days so your mileage may vary depending on your application:
 
-
-
-
 **readiness meter**
-- 🦢 documented and tested
-- 🐣 docs and tests are incomplete
-- 🐉 highly experimental, here be dragons
+- 🌳 documented and tested
+- 🌿 docs and tests are incomplete
+- 🌱 highly experimental, germinating
 
 I think of the beet crates as divided into a few main categories.
 
@@ -36,10 +33,13 @@ I think of the beet crates as divided into a few main categories.
 
 General patterns and tools for application development.
 
-Crates
-| Crate                                            | Status | Description                                                       |
-| ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
-| [`sweet`](crates/sweet/Cargo.toml)      				 | 🦢     |         |
+| Crate                                            | Status | Description                                     |
+| ------------------------------------------------ | ------ | ----------------------------------------------- |
+| [`beet_utils`](crates/beet_utils/Cargo.toml)     | 🌱      | Absolute base level utility crate               |
+| [`beet_core`](crates/beet_core/Cargo.toml)       | 🌱      | Core utilities and types for other beet crates  |
+| [`sweet`](crates/sweet/Cargo.toml)               | 🌿      | A pretty cross platform test runner             |
+| [`sweet-cli`](crates/sweet/cli/Cargo.toml)       | 🌿      | A pretty cross platform test runner             |
+
 
 ## Beet Flow
 
@@ -47,43 +47,42 @@ Control flow crates for use in behavior paradigms like Behavior Trees, LLMs and 
 
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
-| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
-| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
-| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
-| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🌳      | An ECS control flow library                    |
+| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🌿      | Spatial actions built upon beet_flow           |
+| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🌱      | Machine Learning actions built upon beet_flow  |
+| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🌱      | Game AI simulation primitives.                 |
 
 
 ## Beet Rsx
 
 Crates for building and deploying web apps.
 
-| Crate                                          | Status | Description                    |
-| ---------------------------------------------- | ------ | ------------------------------ |
-| [`beet_rsx`](crates/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
-| [`beet_router`](crates/beet_router/Cargo.toml) | 🐉      | File based router for websites |
-
-## `sweet`
-
-General utilities including a test runner, file watcher etc.
-
-| Crate                                                             | Status | Description                            |
-| ----------------------------------------------------------------- | ------ | -------------------------------------- |
-| [`beet_bevy`](https://crates.io/crates/beet_bevy)                 | 🐉      | Bevy utilities                         |
-| [`beet_net_utils`](https://crates.io/crates/beet_net_utils) | 🐉      | Simple file server with live reload    |
-| [`sweet`](https://crates.io/crates/sweet)                         | 🐣      | A pretty cross platform test runner    |
-| [`sweet-cli`](https://crates.io/crates/sweet-cli)                 | 🐣      | Cross-platform utilities and dev tools |
+| Crate                                          | Status | Description                                  |
+| ---------------------------------------------- | ------ | -------------------------------------------- |
+| [`beet_rsx`](crates/beet_rsx/Cargo.toml)       | 🌱      | A rust/bevy implementation of jsx dom interaction |
+| [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🌱      | JSX-like parser combinator for Rust          |
+| [`beet_parse`](crates/beet_parse/Cargo.toml)   | 🌱      | Parsers for various text and token formats   |
+| [`beet_build`](crates/beet_build/Cargo.toml)   | 🌱      | Codegen and compilation tooling              |
+| [`beet_net`](crates/beet_net/Cargo.toml)       | 🌱      | Cross-platform networking utilities          |
+| [`beet_design`](crates/beet_design/Cargo.toml) | 🌱      | Design system and components for beet rsx    |
+| [`beet-cli`](crates/beet-cli/Cargo.toml)       | 🌱      | Tools for building and deploying beet apps   |
+| [`beet_site`](crates/beet_site/Cargo.toml)     | 🌱      | The beet website, built with beet            |
 
 
-## `misc`
+## Experiments
 
-
-| Crate                                           | Status | Description                  |
-| ----------------------------------------------- | ------ | ---------------------------- |
-| [`beet-cli`](https://crates.io/crates/beet-cli) | 🐉      | CLI for beet authoring tools |
-| [`beet_mcp`](https://crates.io/crates/beet_mcp) | 🐉      | VectorDB MCP Server          |
+| Crate                                            | Status | Description                                               |
+| ------------------------------------------------ | ------ | --------------------------------------------------------- |
+| [`beet_agent`](crates/beet_agent/Cargo.toml)     | 🌱      | Bevy-friendly patterns for interaction with agents       |
+| [`beet_query`](crates/beet_query/Cargo.toml)     | 🌱      | Extend beet server actions with database queries         |
+| [`beet_examples`](crates/beet_examples/Cargo.toml) | 🌱      | bits and pieces for substantial beet examples            |
+| [`emby`](crates/emby/Cargo.toml)                 | 🌱      | the beetmash ambassador                                   |
+| [`beet_mcp`](crates/beet_mcp/Cargo.toml)         | 🌱      | Experimental mcp server                                   |
 
 
 ## Bevy Versions
+
+This chart is for matching a bevy version against a particular beet version.
 
 | `bevy` | `beet` |
 | ------ | ------ |
@@ -91,6 +90,3 @@ General utilities including a test runner, file watcher etc.
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
-
-## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md)

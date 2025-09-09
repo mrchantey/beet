@@ -1,3 +1,7 @@
+# 0.0.6
+
+Added web related crates.
+
 
 # 0.0.5
 
