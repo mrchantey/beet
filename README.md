@@ -34,12 +34,12 @@ I think of the beet crates as divided into a few main categories.
 
 ## Utils
 
-
+General patterns and tools for application development.
 
 Crates
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
-| [`sweet`](crates/sweet/Cargo.toml)      				 | 🦢     | Scenes-as-control-flow bevy library for behavior trees etc        |
+| [`sweet`](crates/sweet/Cargo.toml)      				 | 🦢     |         |
 
 ## Beet Flow
 
