@@ -1,6 +1,6 @@
 # `beet_mcp`
 
-An mcp server for rust developers, currently only exposing a single tool: [`crate_rag`](#crate_rag).
+Experimental mcp server, currently only exposing a single tool: [`crate_rag`](#crate_rag).
 
 ## Quickstart
 
@@ -24,7 +24,7 @@ Models can be run locally or in the cloud, I'd recommend giving local a go if yo
 	```sh
 	# install ollama
 	curl -fsSL https://ollama.com/install.sh | sh
-	# a tiny 45MB embedding model used by `cargo test` 
+	# a tiny 45MB embedding model used by `cargo test`
 	ollama pull all-minilm:latest
 	# a medium 700MB embedding model used by the mcp in `cargo run`
 	ollama pull mxbai-embed-large:latest
@@ -94,7 +94,7 @@ option 2: add this to mcp.json
 		"beet-mcp": {
 			"type": "sse",
       "url": "http://127.0.0.1:8000/sse",
-		}	
+		}
 	}
 }
 ```
@@ -119,7 +119,7 @@ For this to work we need to know the git url and commit hash for that version, f
  By default the only sources indexed by [index-all](src/bin/index-all.rs) are `bevy 0.16` docs, examples and guides. eventually these should be cli args.
 
 
-`beet_mcp` uses the approach of a [Vector Database](https://www.cloudflare.com/learning/ai/what-is-vector-database/#:~:text=A%20vector%20database%20stores%20pieces,construction%20of%20powerful%20AI%20models.) to store and query the repository. 
+`beet_mcp` uses the approach of a [Vector Database](https://www.cloudflare.com/learning/ai/what-is-vector-database/#:~:text=A%20vector%20database%20stores%20pieces,construction%20of%20powerful%20AI%20models.) to store and query the repository.
 This differs from grepping techniques in that it can match phrases that are similar in *meaning* instead of exact terms, the tradeoff being that we need to index the db beforehand.
 
 Vector DB rag has two phases:

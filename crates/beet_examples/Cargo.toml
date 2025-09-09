@@ -2,7 +2,7 @@
 name = "beet_examples"
 version.workspace = true
 edition.workspace = true
-description.workspace = true
+description = "bits and pieces for substantial beet examples"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -11,7 +11,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-# this feature is always enabled by beet if this crate is included 
+# this feature is always enabled by beet if this crate is included
 # but we use it to ensure no bevy_default for workspace tests
 bevy_default = [
 	"bevy/default",

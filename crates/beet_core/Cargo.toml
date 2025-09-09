@@ -6,7 +6,7 @@ authors.workspace = true
 documentation.workspace = true
 license.workspace = true
 readme.workspace = true
-description = "Core utilities for the beet ecosystem"
+description = "Core utilities and types for other beet crates"
 repository.workspace = true
 
 

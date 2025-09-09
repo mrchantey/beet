@@ -1,13 +1,18 @@
-# Command runners are great for individual projects
-# but as a metaframework these are all signs of painpoints in the workflow
-# For now this is useful, but if you feel like making a change here, consider instead
-# adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
+#	I'm using just to work with beet
 #
 # ```rust
 # cargo binstall just
 # just --list
 # just test-ci
 # ```
+#
+# ## Note To Devs
+#
+# Command runners are great for individual projects
+# but as a metaframework these are all signs of painpoints in the workflow
+# For now this is useful, but if you feel like making a change here, consider instead
+# adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
+#
 #
 set dotenv-load
 
@@ -24,28 +29,20 @@ default:
 
 #💡 Init
 
-# Initialize the repository, pulling assets into their respective crates.
-# Also we need to build the codegen files for rsx crates like beet_design.
-init-repo:
-	just init-flow
-	just init-rsx
-
+# Pull assets into their respective crates.
 init-flow:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 
-init-rsx:
-	just cli build -p beet_site
-	cd infra && npm ci
-	mkdir -p target/lambda/crates/beet_site || true
-	@echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
-
-init-sweet:
-	just install-chromedriver
-
 assets-pull:
 	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 	tar -xzvf ./assets.tar.gz
+	rm ./assets.tar.gz
+
+assets-push:
+	aws s3 sync ./assets s3://bevyhub-public/assets --delete
+	tar -czvf ./assets.tar.gz ./assets
+	aws s3 cp ./assets.tar.gz s3://bevyhub-public/assets.tar.gz
 	rm ./assets.tar.gz
 
 # just test-site
@@ -256,9 +253,6 @@ clear-all:
 	cargo clean
 	rm -rf $CARGO_TARGET_DIR
 
-pws *args:
-	just --shell powershell.exe --shell-arg -c {{args}}
-
 tree:
 	cargo tree --depth=2 -e=no-dev
 
@@ -311,12 +305,6 @@ watch *command:
 	--exclude '*/codegen/*' \
 	--cmd "{{command}}"
 
-assets-push:
-	aws s3 sync ./assets s3://bevyhub-public/assets --delete
-	tar -czvf ./assets.tar.gz ./assets
-	aws s3 cp ./assets.tar.gz s3://bevyhub-public/assets.tar.gz
-	rm ./assets.tar.gz
-
 #💡 Misc
 
 # Cargo search but returns one line
@@ -330,20 +318,3 @@ sweet *args:
 # Install the sweet cli
 install-sweet *args:
 	cargo install --path crates/sweet/cli {{args}}
-
-
-# creates a directory ~/chrome-for-testing and installs chrome and chromedriver there.
-# The latest version can be found at https://googlechromelabs.github.io/chrome-for-testing/
-# Previous versions can be found at
-install-chromedriver:
-	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chrome-linux64.zip -P ~/chrome-for-testing
-	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
-	mkdir -p ~/chrome-for-testing
-	unzip ~/chrome-for-testing/chrome-linux64.zip -d ~/chrome-for-testing
-	unzip ~/chrome-for-testing/chromedriver-linux64.zip -d ~/chrome-for-testing
-	chmod +x ~/chrome-for-testing/chromedriver-linux64/chromedriver
-	export PATH="$PATH:$HOME/chrome-for-testing/chromedriver-linux64"
-	echo "Chrome installed at: $HOME/chrome-for-testing/chrome-linux64/chrome"
-	echo "ChromeDriver installed at: $HOME/chrome-for-testing/chromedriver-linux64/chromedriver"
-	echo "ChromeDriver version:"
-	~/chrome-for-testing/chromedriver-linux64/chromedriver --version

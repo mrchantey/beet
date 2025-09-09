@@ -1,6 +1,7 @@
 [package]
 name = "beet_mcp"
 edition = "2024"
+description = "Experimental mcp server"
 publish = false
 default-run = "beet_mcp"
 

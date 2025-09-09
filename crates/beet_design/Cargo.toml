@@ -2,7 +2,7 @@
 name = "beet_design"
 version.workspace = true
 edition.workspace = true
-description.workspace = true
+description = "Design system and components for beet rsx"
 documentation.workspace = true
 readme.workspace = true
 homepage.workspace = true
