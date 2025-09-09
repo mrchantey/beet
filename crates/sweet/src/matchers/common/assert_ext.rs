@@ -72,15 +72,16 @@ pub fn assert_expected_received_debug<T1: Debug, T2: PartialEq<T1> + Debug>(
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn assert_result_expected_received_display<
 	Expected: Display,
-	Received: PartialEq<Expected> + Display,
+	Received: Display,
 >(
+	result: bool,
 	expected: Expected,
-	received: impl IntoMaybeNot<Received>,
-) {
-	let received = received.into_maybe_not();
-	if let Err(expected) = received.compare_display(&expected) {
+	received: MaybeNot<Received>,
+) -> MaybeNot<Received> {
+	if let Err(expected) = received.passes_display(result, &expected) {
 		panic_ext::panic_expected_received_display(&expected, &received);
 	}
+	received
 }
 
 

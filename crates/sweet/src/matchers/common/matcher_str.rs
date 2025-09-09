@@ -1,4 +1,24 @@
+use std::fmt::Display;
+
 use super::*;
+
+#[extend::ext(name=SweetString)]
+pub impl<T, U> T
+where
+	T: IntoMaybeNot<U>,
+	U: AsRef<str> + Display,
+{
+	fn xpect_contains(self, expected: impl AsRef<str>) -> U {
+		let expected = expected.as_ref();
+		let received = self.into_maybe_not();
+		let result = received.inner().as_ref().contains(expected);
+		let expected = format!("to contain '{}'", expected);
+		assert_ext::assert_result_expected_received_display(
+			result, expected, received,
+		)
+		.into_inner()
+	}
+}
 
 impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 	pub fn to_contain(&self, other: impl AsRef<str>) -> &Self {
@@ -48,7 +68,11 @@ mod test {
 
 	#[test]
 	fn str() {
-		"foobar".xpect().to_contain("bar");
+		"foobar".xpect_contains("bar");
+		// "foobar".xpect_contains("barss");
+		// "foobar".xnot().xpect_contains("bazz");
+
+
 		"foobar".xpect().not().to_contain("baz");
 
 		"foobar".xpect().to_start_with("foo");

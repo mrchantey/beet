@@ -127,19 +127,22 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 
-	trait Foo<T>: IntoMaybeNot<T>
+	#[extend::ext]
+	impl<T, U> T
 	where
-		T: PartialEq + std::fmt::Debug,
-	{
-		fn check(self, expected: T) -> Result<(), String> {
-			self.into_maybe_not().compare_debug(&expected)
-		}
-	}
-	impl<T, U> Foo<U> for T
-	where
-		T: IntoMaybeNot<U>,
+		Self: IntoMaybeNot<U>,
 		U: PartialEq + std::fmt::Debug,
 	{
+		fn check(self, expected: U) -> Result<(), String> {
+			self.into_maybe_not().compare_debug(&expected)
+		}
+		fn check_untyped<V>(self, expected: V) -> Result<(), String>
+		where
+			V: std::fmt::Debug,
+			U: PartialEq<V>,
+		{
+			self.into_maybe_not().compare_debug(&expected)
+		}
 	}
 
 	#[test]
@@ -148,6 +151,9 @@ mod test {
 		true.check(false).xpect_err();
 		true.xnot().check(false).xpect_ok();
 		true.xnot().check(true).xpect_err();
+
+		MaybeNot::Negated(false).check(false).xpect_ok();
+		// MaybeNot::Negated(false).check_untyped(false).xpect_ok();
 	}
 
 	#[test]
