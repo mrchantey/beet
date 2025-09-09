@@ -150,8 +150,8 @@ mod test {
 				ReturnWith(RunResult::Success),
 			))
 			.flush_trigger(OnRun::local());
-		(&on_request_score).xpect().to_have_been_called_times(4);
-		(&on_score).xpect().to_have_been_called_times(2);
+		on_request_score.len().xpect_eq(4);
+		on_score.len().xpect_eq(2);
 
 		#[rustfmt::skip]
 		on_run.get().xpect_eq(vec![

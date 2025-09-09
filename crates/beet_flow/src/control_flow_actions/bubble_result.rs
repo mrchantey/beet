@@ -50,7 +50,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let counter = observe_triggers::<OnResultAction>(world);
+		let on_result_action = observe_triggers::<OnResultAction>(world);
 		let mut child = Entity::PLACEHOLDER;
 		let mut grandchild = Entity::PLACEHOLDER;
 
@@ -68,18 +68,22 @@ mod test {
 			.id();
 		world.entity_mut(grandchild).flush_trigger(OnRun::local());
 
-		(&counter).xpect().to_have_been_called_times(3);
-		(&counter).xpect().to_have_returned_nth_with(
-			0,
-			&OnResultAction::new(grandchild, grandchild, RunResult::Success),
-		);
-		(&counter).xpect().to_have_returned_nth_with(
-			1,
-			&OnResultAction::new(child, grandchild, RunResult::Success),
-		);
-		(&counter).xpect().to_have_returned_nth_with(
-			2,
-			&OnResultAction::new(parent, grandchild, RunResult::Success),
-		);
+		let on_result_action = on_result_action.get();
+		on_result_action.len().xpect_eq(3);
+		on_result_action[0].xpect_eq(OnResultAction::new(
+			grandchild,
+			grandchild,
+			RunResult::Success,
+		));
+		on_result_action[1].xpect_eq(OnResultAction::new(
+			child,
+			grandchild,
+			RunResult::Success,
+		));
+		on_result_action[2].xpect_eq(OnResultAction::new(
+			parent,
+			grandchild,
+			RunResult::Success,
+		));
 	}
 }

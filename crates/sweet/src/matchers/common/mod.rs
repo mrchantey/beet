@@ -46,9 +46,6 @@ pub use self::matcher_str::*;
 mod matcher_vec;
 #[allow(unused_imports)]
 pub use self::matcher_vec::*;
-mod mock_func;
-#[allow(unused_imports)]
-pub use self::mock_func::*;
 mod sweet_error;
 #[allow(unused_imports)]
 pub use self::sweet_error::*;

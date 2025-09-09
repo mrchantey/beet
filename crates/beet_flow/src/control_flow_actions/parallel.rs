@@ -83,12 +83,10 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		(&on_run).xpect().to_have_been_called_times(3);
-		(&on_result).xpect().to_have_been_called_times(3);
-		(&on_result).xpect().to_have_returned_nth_with(
-			2,
-			&OnResultAction::global(action, RunResult::Failure),
-		);
+		on_run.len().xpect_eq(3);
+		on_result.len().xpect_eq(3);
+		on_result.get()[2]
+			.xpect_eq(OnResultAction::global(action, RunResult::Failure));
 	}
 	#[test]
 	fn succeeds() {
@@ -106,11 +104,9 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		(&on_run).xpect().to_have_been_called_times(3);
-		(&on_result).xpect().to_have_been_called_times(3);
-		(&on_result).xpect().to_have_returned_nth_with(
-			2,
-			&OnResultAction::global(action, RunResult::Success),
-		);
+		on_run.len().xpect_eq(3);
+		on_result.len().xpect_eq(3);
+		on_result.get()[2]
+			.xpect_eq(OnResultAction::global(action, RunResult::Success));
 	}
 }

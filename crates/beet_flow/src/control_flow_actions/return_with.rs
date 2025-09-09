@@ -52,10 +52,8 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		(&observed).xpect().to_have_been_called_times(1);
-		(&observed).xpect().to_have_returned_nth_with(
-			0,
-			&OnResultAction::global(entity, RunResult::Success),
-		);
+		observed.len().xpect_eq(1);
+		observed.get()[0]
+			.xpect_eq(OnResultAction::global(entity, RunResult::Success));
 	}
 }

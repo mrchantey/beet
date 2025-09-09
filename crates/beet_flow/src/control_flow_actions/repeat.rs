@@ -100,16 +100,16 @@ mod test {
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
-		(&func).xpect().to_have_been_called_times(1);
+		func.len().xpect_eq(1);
 		app.update();
-		(&func).xpect().to_have_been_called_times(2);
+		func.len().xpect_eq(2);
 		app.update();
-		(&func).xpect().to_have_been_called_times(3);
+		func.len().xpect_eq(3);
 		app.update();
 		// // even though child failed, it keeps repeating
-		(&func).xpect().to_have_been_called_times(4);
+		func.len().xpect_eq(4);
 		app.update();
-		(&func).xpect().to_have_been_called_times(5);
+		func.len().xpect_eq(5);
 	}
 
 	#[test]
@@ -123,16 +123,16 @@ mod test {
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
-		(&func).xpect().to_have_been_called_times(1);
+		func.len().xpect_eq(1);
 		app.update();
-		(&func).xpect().to_have_been_called_times(2);
+		func.len().xpect_eq(2);
 		app.update();
-		(&func).xpect().to_have_been_called_times(3);
+		func.len().xpect_eq(3);
 		app.update();
 		// it stopped repeating
-		(&func).xpect().to_have_been_called_times(3);
+		func.len().xpect_eq(3);
 		app.update();
-		(&func).xpect().to_have_been_called_times(3);
+		func.len().xpect_eq(3);
 	}
 	#[test]
 	fn repeat_child() {
@@ -146,15 +146,15 @@ mod test {
 			.with_child(SucceedTimes::new(2))
 			.flush_trigger(OnRun::local());
 
-		(&func).xpect().to_have_been_called_times(2);
+		func.len().xpect_eq(2);
 		app.update();
-		(&func).xpect().to_have_been_called_times(4);
+		func.len().xpect_eq(4);
 		app.update();
-		(&func).xpect().to_have_been_called_times(6);
+		func.len().xpect_eq(6);
 		app.update();
-		(&func).xpect().to_have_been_called_times(6);
+		func.len().xpect_eq(6);
 		app.update();
 		// last one, it stopped repeating
-		(&func).xpect().to_have_been_called_times(6);
+		func.len().xpect_eq(6);
 	}
 }

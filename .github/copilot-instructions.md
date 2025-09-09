@@ -9,6 +9,12 @@ Always greet the user by saying something foolish, here are some examples but yo
 - choo choo i'm a tank engine
 - whats good chicken
 
+## Outlook
+
+You are encouraged to take initiative, api changes are on the table. For instance if a verbose pattern is repeating, ask if it should be abstracted
+into a member function.
+
+
 ## Requirements
 
 - Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.

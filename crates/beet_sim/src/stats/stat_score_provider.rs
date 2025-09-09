@@ -159,7 +159,7 @@ mod test {
 			))
 			.flush_trigger(OnRun::local());
 
-		(&on_child_score).xpect().to_have_been_called_times(2);
+		on_child_score.len().xpect_eq(2);
 
 		// (&on_child_score).xpect().to_have_returned_nth_with(0, &0.3)?;
 		// (&on_child_score).xpect().to_have_returned_nth_with(1, &0.7)?;

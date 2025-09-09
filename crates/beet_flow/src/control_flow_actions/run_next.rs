@@ -95,14 +95,13 @@ mod test {
 			.flush_trigger(OnRun::local())
 			.id();
 
-		(&observed).xpect().to_have_been_called_times(2);
-		(&observed).xpect().to_have_returned_nth_with(
-			0,
-			&OnResultAction::global(action2, RunResult::Success),
-		);
-		(&observed).xpect().to_have_returned_nth_with(
-			1,
-			&OnResultAction::new(action1, action2, RunResult::Success),
-		);
+		observed.len().xpect_eq(2);
+		observed.get()[0]
+			.xpect_eq(OnResultAction::global(action2, RunResult::Success));
+		observed.get()[1].xpect_eq(OnResultAction::new(
+			action1,
+			action2,
+			RunResult::Success,
+		));
 	}
 }

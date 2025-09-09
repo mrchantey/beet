@@ -138,7 +138,7 @@ mod test {
 
 		app.update();
 
-		(&on_result).xpect().to_have_been_called();
+		(on_result.len() > 0).xpect_true();
 
 
 		let table = app.world().get::<FrozenLakeQTable>(session).unwrap();

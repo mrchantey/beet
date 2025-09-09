@@ -83,7 +83,6 @@ mod test {
 
 		let on_result = observe_triggers::<OnResult>(app.world_mut());
 
-
 		app.world_mut().spawn((
 			Running::default(),
 			ReturnInDuration::new(RunResult::Success, Duration::from_secs(2)),
@@ -91,10 +90,8 @@ mod test {
 
 		app.update_with_secs(1);
 
-		(&on_result).xpect().not().to_have_been_called();
-
+		on_result.is_empty().xpect_true();
 		app.update_with_secs(10);
-
-		(&on_result).xpect().to_have_been_called();
+		on_result.is_empty().xpect_false();
 	}
 }
