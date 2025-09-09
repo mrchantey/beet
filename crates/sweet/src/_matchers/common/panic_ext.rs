@@ -13,16 +13,14 @@ use std::fmt::Display;
 /// # Panics
 /// always.
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
-pub fn panic_str(str: impl AsRef<str>) -> ! {
-	SweetError::panic(str.as_ref());
-}
+pub fn panic_str(str: impl AsRef<str>) -> ! { SweetError::panic(str.as_ref()); }
 
 /// # Panics
 /// always.
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
 pub fn panic_expected_received_display<T1: Display, T2: Display>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) -> ! {
 	let expected = format!("{}", expected).green();
 	let received = format!("{}", received).red();
@@ -32,8 +30,8 @@ pub fn panic_expected_received_display<T1: Display, T2: Display>(
 /// always.
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
 pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) -> ! {
 	let expected = format!("{:?}", expected).green();
 	let received = format!("{:?}", received).red();
@@ -43,8 +41,8 @@ pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
 /// always.
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
 pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) -> ! {
 	let expected = format!("{:?}", expected).green();
 	let received = format!("{}", received).red();
@@ -54,8 +52,8 @@ pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
 /// always.
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
 pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) -> ! {
 	let expected = format!("{}", expected).green();
 	let received = format!("{:?}", received).red();

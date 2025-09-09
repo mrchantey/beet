@@ -19,53 +19,67 @@ pub fn assert(result: bool, msg: &str) {
 
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn panic_expected_received_display<T1: Display, T2: Display>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) {
 	panic_ext::panic_expected_received_display(expected, received)
 }
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) {
 	panic_ext::panic_expected_received_debug(expected, received)
 }
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) {
 	panic_ext::panic_expected_received_debug_display(expected, received)
 }
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
-	expected: &T1,
-	received: &T2,
+	expected: T1,
+	received: T2,
 ) {
 	panic_ext::panic_expected_received_display_debug(expected, received)
 }
 
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
-pub fn assert_expected_received_display<
-	T1: PartialEq<T2> + Display,
-	T2: Display,
->(
-	expected: &T1,
-	received: &T2,
-) {
-	if expected != received {
-		panic_ext::panic_expected_received_display(expected, received)
+pub fn assert_expected_received_display<Expected: Display, Received: Display>(
+	expected: Expected,
+	received: impl IntoMaybeNot<Received>,
+) where
+	Received: PartialEq<Expected>,
+{
+	let received = received.into_maybe_not();
+	if let Err(expected) = received.compare_display(&expected) {
+		panic_ext::panic_expected_received_display(&expected, &received);
 	}
 }
 
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
-pub fn assert_expected_received_debug<T1: PartialEq<T2> + Debug, T2: Debug>(
-	expected: &T1,
-	received: &T2,
+pub fn assert_expected_received_debug<T1: Debug, T2: PartialEq<T1> + Debug>(
+	expected: T1,
+	received: impl IntoMaybeNot<T2>,
 ) {
-	if expected != received {
-		panic_ext::panic_expected_received_debug(expected, received)
+	let received = received.into_maybe_not();
+	if let Err(expected) = received.compare_debug(&expected) {
+		panic_ext::panic_expected_received_display_debug(&expected, &received);
+	}
+}
+/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
+pub fn assert_result_expected_received_display<
+	Expected: Display,
+	Received: PartialEq<Expected> + Display,
+>(
+	expected: Expected,
+	received: impl IntoMaybeNot<Received>,
+) {
+	let received = received.into_maybe_not();
+	if let Err(expected) = received.compare_display(&expected) {
+		panic_ext::panic_expected_received_display(&expected, &received);
 	}
 }
 

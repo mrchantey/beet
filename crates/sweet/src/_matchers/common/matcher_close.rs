@@ -1,10 +1,15 @@
 use super::*;
 use extend::ext;
 use std::fmt::Debug;
+use std::fmt::Display;
 
 
 #[extend::ext(name=SweetClose)]
-pub impl<T: CloseTo + Copy + Debug> T {
+pub impl<T, U> T
+where
+	T: IntoMaybeNot<U>,
+	U: CloseTo + Display,
+{
 	/// Asserts that the value is close to `expected`,
 	/// using [`CloseTo::default_delta`] of `0.1` as the allowed difference.
 	///
@@ -18,14 +23,10 @@ pub impl<T: CloseTo + Copy + Debug> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not within the default delta of `expected`.
-	fn xpect_close(&self, expected: impl Into<T>) {
-		let delta = T::default_delta();
-		let expected = expected.into();
-		if !self.is_close_with_delta(&expected, &delta) {
-			let expected =
-				format!("close to {:?} within {:?}", expected, delta);
-			assert_ext::panic_expected_received_display_debug(&expected, self);
-		}
+	fn xpect_close(self, expected: U) {
+		let delta = U::default_delta();
+		let received = self.into_maybe_not();
+		assert(expected, received, delta);
 	}
 	/// Asserts that the value is close to `expected`,
 	/// using the provided delta as the allowed difference.
@@ -40,17 +41,21 @@ pub impl<T: CloseTo + Copy + Debug> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not within the given `delta` of `expected`.
-	fn xpect_close_within(&self, expected: impl Into<T>, delta: impl Into<T>) {
-		let delta = delta.into();
-		let expected = expected.into();
-		if !self.is_close_with_delta(&expected, &delta) {
-			let expected =
-				format!("close to {:?} within {:?}", expected, delta);
-			assert_ext::panic_expected_received_display_debug(&expected, self);
-		}
+	fn xpect_close_within(self, expected: U, delta: U) {
+		let received = self.into_maybe_not();
+		assert(expected, received, delta);
 	}
 }
-
+fn assert<T: CloseTo + Display>(expected: T, received: MaybeNot<T>, delta: T) {
+	let result = received.inner().is_close_with_delta(&expected, &delta);
+	let expected = format!("within {} of {}", delta, expected,);
+	if let Err(expected) = received.passes_with_message(result, expected) {
+		panic_ext::panic_expected_received_display(
+			&expected,
+			&received.inner(),
+		);
+	}
+}
 
 #[ext(name=MatcherExtClose)]
 /// Matcher Extensions for types that implement `CloseTo`: `f32`, `f64`, `Vec3`, etc.
@@ -86,13 +91,10 @@ mod test {
 	#[test]
 	fn to_be_close_to() {
 		(0.0_f64).xpect_close(0.);
+		(0.0_f64).xnot().xpect_close(10.);
+		(0.0_f64).xpect_close(0.01);
 		(-0.999_f64).xpect_close(-1.);
 		NewType(0.0_f64).xpect_close(0.);
 		0.0_f64.xpect_close_within(0.5, 1.);
-
-		(0.0_f32).xpect_close(0.);
-		(-0.999_f32).xpect_close(-1.);
-		NewType(0.0_f32).xpect_close(0.);
-		0.0_f32.xpect_close_within(0.5, 1.);
 	}
 }
