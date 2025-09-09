@@ -69,15 +69,6 @@ impl<I, O: Debug + PartialEq, F> Matcher<&MockFunc<I, O, F>> {
 mod test {
 	use crate::prelude::*;
 	#[test]
-	fn test_mock_trigger() {
-		let func = mock_trigger();
-		func.call(());
-		func.call(());
-		(&func).xpect().to_have_been_called();
-		(&func).xpect().to_have_been_called_times(2);
-		(&func.clone()).xpect().not().to_have_been_called_times(1);
-	}
-	#[test]
 	fn test_mock_func() {
 		let func = mock_func(|i| i * 2);
 		func.call(0);

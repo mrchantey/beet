@@ -15,12 +15,13 @@ categories.workspace = true
 [features]
 bevy_default = ["bevy/default"]
 reflect = ["dep:serde", "bevy/serialize"]
-# for doctest helpers 
+# for doctest helpers
 # https://github.com/rust-lang/rust/issues/67295
 _doctest = []
 
 [dependencies]
 beet_flow_macros.workspace = true
+beet_utils.workspace = true
 beet_core.workspace = true
 
 bevy.workspace = true

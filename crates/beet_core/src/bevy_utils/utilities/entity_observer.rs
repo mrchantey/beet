@@ -59,6 +59,7 @@ impl BundleEffect for EntityObserver {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -67,15 +68,14 @@ mod test {
 		#[derive(Event)]
 		struct Foo(u32);
 
-		let bucket = mock_bucket::<u32>();
-		let bucket2 = bucket.clone();
+		let store = Store::default();
 		let mut world = World::new();
 		world
 			.spawn(EntityObserver::new(move |ev: Trigger<Foo>| {
-				bucket2.call(ev.event().0)
+				store.set(ev.event().0)
 			}))
 			.trigger(Foo(3));
 
-		(&bucket).xpect().to_have_returned_with(3);
+		store.get().xpect_eq(3);
 	}
 }

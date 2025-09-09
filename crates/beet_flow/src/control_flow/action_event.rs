@@ -1,4 +1,6 @@
 use crate::prelude::*;
+#[cfg(test)]
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
@@ -69,9 +71,8 @@ impl<T: ResultPayload> ObserverEvent for OnResult<T> {
 
 /// Collect all [OnRunAction] with a [Name]
 #[cfg(test)]
-pub fn collect_on_run(world: &mut World) -> impl use<> + Fn() -> Vec<String> {
-	let func = sweet::prelude::mock_bucket();
-	let func2 = func.clone();
+pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
+	let store = Store::default();
 	world.add_observer(move |ev: Trigger<OnRunAction>, query: Query<&Name>| {
 		let action = ev.resolve_action();
 		let name = if let Ok(name) = query.get(action) {
@@ -79,18 +80,15 @@ pub fn collect_on_run(world: &mut World) -> impl use<> + Fn() -> Vec<String> {
 		} else {
 			"".to_string()
 		};
-		func2.call(name);
+		store.push(name);
 	});
-	move || func.called.lock().unwrap().clone()
+	store
 }
 
 /// Collect all [OnResultAction] with a [Name]
 #[cfg(test)]
-pub fn collect_on_result(
-	world: &mut World,
-) -> impl use<> + Fn() -> Vec<(String, RunResult)> {
-	let func = sweet::prelude::mock_bucket();
-	let func2 = func.clone();
+pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, RunResult)>> {
+	let store = Store::default();
 	world.add_observer(
 		move |ev: Trigger<OnResultAction>, query: Query<&Name>| {
 			let action = ev.resolve_action();
@@ -99,8 +97,8 @@ pub fn collect_on_result(
 			} else {
 				"".to_string()
 			};
-			func2.call((name, ev.payload.clone()));
+			store.push((name, ev.payload.clone()));
 		},
 	);
-	move || func.called.lock().unwrap().clone()
+	store
 }

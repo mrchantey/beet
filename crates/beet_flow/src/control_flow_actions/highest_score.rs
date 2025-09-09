@@ -154,11 +154,11 @@ mod test {
 		(&on_score).xpect().to_have_been_called_times(2);
 
 		#[rustfmt::skip]
-		on_run().xpect_eq(vec![
+		on_run.get().xpect_eq(vec![
 			"root".to_string(),
 			"child2".to_string()
 		]);
-		on_result().xpect_eq(vec![
+		on_result.get().xpect_eq(vec![
 			("child2".to_string(), RunResult::Success),
 			("root".to_string(), RunResult::Success),
 		]);

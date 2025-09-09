@@ -1304,6 +1304,7 @@ dependencies = [
  "beet_core",
  "beet_flow",
  "beet_flow_macros",
+ "beet_utils",
  "bevy",
  "extend",
  "log",

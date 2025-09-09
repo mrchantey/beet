@@ -1,6 +1,8 @@
 mod non_send_arena;
+mod store;
 pub use non_send_arena::*;
 mod arena;
 pub use arena::*;
+pub use store::*;
 mod signal;
 pub use signal::*;
