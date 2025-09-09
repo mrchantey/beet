@@ -1,5 +1,7 @@
+mod func_store;
 mod non_send_arena;
 mod store;
+pub use func_store::*;
 pub use non_send_arena::*;
 mod arena;
 pub use arena::*;

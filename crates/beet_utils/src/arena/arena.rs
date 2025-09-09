@@ -72,10 +72,54 @@ impl Arena {
 	pub fn is_empty() -> bool {
 		Self::get_global().objects.lock().unwrap().is_empty()
 	}
+
+	/// Execute a function with a reference to the object in this arena instance.
+	/// ## Panics
+	/// Panics if the object has been removed or the type doesn't match.
+	pub fn with_ref<T: 'static, R>(
+		&self,
+		handle: &ArenaHandle<T>,
+		f: impl FnOnce(&T) -> R,
+	) -> R {
+		let objects = self.objects.lock().unwrap();
+		let obj = objects
+			.get(&handle.id)
+			.and_then(|entry| entry.object.downcast_ref::<T>())
+			.expect(PANIC_MSG);
+		f(obj)
+	}
+
+	/// Execute a function with a mutable reference to the object in this arena instance.
+	/// ## Panics
+	/// Panics if the object has been removed or the type doesn't match.
+	pub fn with_mut<T: 'static, R>(
+		&self,
+		handle: &ArenaHandle<T>,
+		f: impl FnOnce(&mut T) -> R,
+	) -> R {
+		let mut objects = self.objects.lock().unwrap();
+		let obj = objects
+			.get_mut(&handle.id)
+			.and_then(|entry| entry.object.downcast_mut::<T>())
+			.expect(PANIC_MSG);
+		f(obj)
+	}
+
+	/// Get a cloned value of a cloneable object stored in this arena instance.
+	/// ## Panics
+	/// Panics if the object has been removed or the type doesn't match.
+	pub fn get_cloned<T: Clone + 'static>(&self, handle: &ArenaHandle<T>) -> T {
+		let objects = self.objects.lock().unwrap();
+		objects
+			.get(&handle.id)
+			.and_then(|entry| entry.object.downcast_ref::<T>())
+			.cloned()
+			.expect(PANIC_MSG)
+	}
 }
 
 const PANIC_MSG: &str = r#"
-Object does not exist in the Arena. 
+Object does not exist in the Arena.
 It may have been manually removed by another handle.
 "#;
 
@@ -98,7 +142,7 @@ impl<T> Clone for ArenaHandle<T> {
 
 impl<T: Clone + 'static> ArenaHandle<T> {
 	/// Get a clone of the object
-	/// ## Panics  
+	/// ## Panics
 	/// Panics if the object has been removed
 	pub fn get_cloned(&self) -> T {
 		let objects = Arena::get_global().objects.lock().unwrap();
@@ -177,7 +221,6 @@ mod tests {
 	}
 
 	#[test]
-	#[ignore = "race condition"]
 	fn handle_is_copy() {
 		// Check if the handle is Copy and Send
 		fn assert_copy<T: Copy>() {}
@@ -188,175 +231,172 @@ mod tests {
 
 	#[test]
 	fn test_basic_arena_operations() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		// Store different types
+		// Store different types using the local arena
 		let counter_handle =
-			Arena::insert(Counter::new("test".to_string(), 42));
-		let string_handle = Arena::insert("Hello, World!".to_string());
-		let number_handle = Arena::insert(123i32);
+			arena.insert_impl(Counter::new("test".to_string(), 42));
+		let string_handle = arena.insert_impl("Hello, World!".to_string());
+		let number_handle = arena.insert_impl(123i32);
 
-		assert_eq!(Arena::len(), 3);
+		assert_eq!(arena.objects.lock().unwrap().len(), 3);
 
-		// Access stored objects using with()
-		counter_handle.with(|counter| {
+		// Access stored objects using arena.with_ref()
+		arena.with_ref(&counter_handle, |counter| {
 			assert_eq!(counter.get_value(), 42);
 			assert_eq!(counter.get_name(), "test");
 		});
 
-		string_handle.with(|string| {
+		arena.with_ref(&string_handle, |string| {
 			assert_eq!(string, "Hello, World!");
 		});
 
-		number_handle.with(|number| {
+		arena.with_ref(&number_handle, |number| {
 			assert_eq!(*number, 123);
 		});
 
-		// Mutate objects using with_mut()
-		counter_handle.with_mut(|counter| {
+		// Mutate objects using arena.with_mut()
+		arena.with_mut(&counter_handle, |counter| {
 			counter.increment();
 			assert_eq!(counter.get_value(), 43);
 		});
 
 		// Test cloned access for cloneable types
-		let cloned_counter = counter_handle.get_cloned();
+		let cloned_counter = arena.get_cloned(&counter_handle);
 		assert_eq!(cloned_counter.get_value(), 43);
 
-		// Manual cleanup
-		let _removed_counter = counter_handle.remove();
-		let _removed_string = string_handle.remove();
-		let _removed_number = number_handle.remove();
+		// Manual cleanup using instance remove_impl
+		let _removed_counter =
+			arena.remove_impl(&counter_handle).expect(PANIC_MSG);
+		let _removed_string =
+			arena.remove_impl(&string_handle).expect(PANIC_MSG);
+		let _removed_number =
+			arena.remove_impl(&number_handle).expect(PANIC_MSG);
 
-		assert_eq!(Arena::len(), 0);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 	}
 
 	#[test]
-	#[ignore = "race condition"]
 	fn test_copy_handles() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let handle1 = Arena::insert(Counter::new("test".to_string(), 100));
+		let handle1 = arena.insert_impl(Counter::new("test".to_string(), 100));
 
 		// Copy the handle explicitly
 		let handle2 = handle1.clone();
 
 		// Both handles should work (handle1 is still valid after copy)
-		handle1.with(|counter| {
+		arena.with_ref(&handle1, |counter| {
 			assert_eq!(counter.get_value(), 100);
 		});
 
-		handle2.with(|counter| {
+		arena.with_ref(&handle2, |counter| {
 			assert_eq!(counter.get_value(), 100);
 		});
 
 		// Modify through one handle
-		handle1.with_mut(|counter| {
+		arena.with_mut(&handle1, |counter| {
 			counter.increment();
 		});
 
 		// See the change through the other handle
-		handle2.with(|counter| {
+		arena.with_ref(&handle2, |counter| {
 			assert_eq!(counter.get_value(), 101);
 		});
 
-		// Remove using one handle (this consumes the handle)
-		let removed = handle1.remove();
+		// Remove using one handle (this consumes the stored object)
+		let removed = arena.remove_impl(&handle1).expect(PANIC_MSG);
 		assert_eq!(removed.get_value(), 101);
-		assert_eq!(Arena::len(), 0);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 	}
 
 	#[test]
 	#[should_panic]
-	#[ignore = "race condition"]
 	fn test_panic_on_invalid_handle_access() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let handle1 = Arena::insert(Counter::new("test".to_string(), 42));
+		let handle1 = arena.insert_impl(Counter::new("test".to_string(), 42));
 		let handle2 = handle1.clone(); // Copy the handle
 
-		// Manual remove should invalidate all handles
-		let _removed = handle2.remove();
-		assert_eq!(Arena::len(), 0);
+		// Manual remove should invalidate the entry in this local arena
+		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 
 		// handle1 should now panic when accessed
-		handle1.with(|_| {});
+		arena.with_ref(&handle1, |_| {});
 	}
 
 	#[test]
 	#[should_panic]
-	#[ignore = "race condition"]
 	fn test_panic_on_invalid_handle_with_mut() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let handle1 = Arena::insert(Counter::new("test".to_string(), 42));
+		let handle1 = arena.insert_impl(Counter::new("test".to_string(), 42));
 		let handle2 = handle1.clone(); // Copy the handle
 
-		// Manual remove should invalidate all handles
-		let _removed = handle2.remove();
-		assert_eq!(Arena::len(), 0);
+		// Manual remove should invalidate the entry in this local arena
+		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 
 		// handle1 should now panic when accessed mutably
-		handle1.with_mut(|_| {});
+		arena.with_mut(&handle1, |_| {});
 	}
 
 	#[test]
 	#[should_panic]
-	#[ignore = "race condition"]
 	fn test_panic_on_invalid_handle_remove() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let handle1 = Arena::insert(Counter::new("test".to_string(), 42));
+		let handle1 = arena.insert_impl(Counter::new("test".to_string(), 42));
 		let handle2 = handle1.clone(); // Copy the handle
 
-		// Manual remove should invalidate all handles
-		let _removed = handle2.remove();
-		assert_eq!(Arena::len(), 0);
+		// Manual remove should invalidate the entry in this local arena
+		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 
 		// handle1 should now panic when trying to remove again
-		let _removed2 = handle1.remove();
+		let _removed2 = arena.remove_impl(&handle1).expect(PANIC_MSG);
 	}
 
 	#[test]
-	#[ignore = "race condition"]
 	fn test_multiple_objects() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let handle1 = Arena::insert(Counter::new("first".to_string(), 1));
-		let handle2 = Arena::insert(Counter::new("second".to_string(), 2));
-		let handle3 = Arena::insert("string".to_string());
+		let handle1 = arena.insert_impl(Counter::new("first".to_string(), 1));
+		let handle2 = arena.insert_impl(Counter::new("second".to_string(), 2));
+		let handle3 = arena.insert_impl("string".to_string());
 
-		assert_eq!(Arena::len(), 3);
+		assert_eq!(arena.objects.lock().unwrap().len(), 3);
 
 		// All handles should work independently
-		handle1.with(|counter| assert_eq!(counter.get_value(), 1));
-		handle2.with(|counter| assert_eq!(counter.get_value(), 2));
-		handle3.with(|string| assert_eq!(string, "string"));
+		arena.with_ref(&handle1, |counter| assert_eq!(counter.get_value(), 1));
+		arena.with_ref(&handle2, |counter| assert_eq!(counter.get_value(), 2));
+		arena.with_ref(&handle3, |string| assert_eq!(string, "string"));
 
 		// Remove objects individually
-		let _removed1 = handle1.remove();
-		assert_eq!(Arena::len(), 2);
+		let _removed1 = arena.remove_impl(&handle1).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 2);
 
-		let _removed2 = handle2.remove();
-		assert_eq!(Arena::len(), 1);
+		let _removed2 = arena.remove_impl(&handle2).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 1);
 
-		let _removed3 = handle3.remove();
-		assert_eq!(Arena::len(), 0);
+		let _removed3 = arena.remove_impl(&handle3).expect(PANIC_MSG);
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
 	}
 
 	#[test]
-	#[ignore = "race condition"]
 	fn test_clear_functionality() {
-		Arena::clear();
+		let arena = Arena::new();
 
-		let _handle1 = Arena::insert(Counter::new("test1".to_string(), 1));
-		let _handle2 = Arena::insert(Counter::new("test2".to_string(), 2));
-		let _handle3 = Arena::insert("string".to_string());
+		let _handle1 = arena.insert_impl(Counter::new("test1".to_string(), 1));
+		let _handle2 = arena.insert_impl(Counter::new("test2".to_string(), 2));
+		let _handle3 = arena.insert_impl("string".to_string());
 
-		assert_eq!(Arena::len(), 3);
+		assert_eq!(arena.objects.lock().unwrap().len(), 3);
 
-		// Clear all objects
-		Arena::clear();
-		assert_eq!(Arena::len(), 0);
-		assert!(Arena::is_empty());
+		// Clear all objects in the local arena
+		arena.objects.lock().unwrap().clear();
+		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		assert!(arena.objects.lock().unwrap().is_empty());
 	}
 }
