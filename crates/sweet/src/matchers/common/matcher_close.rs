@@ -5,7 +5,7 @@ use std::fmt::Display;
 #[extend::ext(name=SweetClose)]
 pub impl<T, U> T
 where
-	T: IntoMaybeNot<U>,
+	T: IntoMaybeNotDisplay<U>,
 	U: CloseTo + Display,
 {
 	/// Asserts that the value is close to `expected`,

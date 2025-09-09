@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[extend::ext(name=SweetNot)]
 pub impl<T> T {
 	fn xnot(self) -> MaybeNot<T> { MaybeNot::Negated(self) }
@@ -7,18 +9,6 @@ pub impl<T> T {
 pub enum MaybeNot<T> {
 	Negated(T),
 	Verbatim(T),
-}
-
-impl<T> std::fmt::Display for MaybeNot<T>
-where
-	T: std::fmt::Display,
-{
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			MaybeNot::Negated(value) => write!(f, "NOT {}", value),
-			MaybeNot::Verbatim(value) => write!(f, "{}", value),
-		}
-	}
 }
 
 impl<T> MaybeNot<T> {
@@ -110,14 +100,25 @@ impl<T> MaybeNot<T> {
 		}
 	}
 }
-
-pub trait IntoMaybeNot<T>: Sized {
+/// Blanket trait implemented for:
+/// - All `Display` types
+/// - `IntoMaybeNot<T:Display>`
+/// Useful for performing assertions where expected and received
+/// may be different types, like `&str` and `String`.
+/// This approach is similar to the into `BevyError` blanket.
+pub trait IntoMaybeNotDisplay<T>: Sized {
 	fn into_maybe_not(self) -> MaybeNot<T>;
 }
-impl<T> IntoMaybeNot<T> for T {
+impl<T> IntoMaybeNotDisplay<T> for T
+where
+	T: Display,
+{
 	fn into_maybe_not(self) -> MaybeNot<T> { MaybeNot::Verbatim(self) }
 }
-impl<T> IntoMaybeNot<T> for MaybeNot<T> {
+impl<T> IntoMaybeNotDisplay<T> for MaybeNot<T>
+where
+	T: Display,
+{
 	fn into_maybe_not(self) -> MaybeNot<T> { self }
 }
 
@@ -130,12 +131,14 @@ mod test {
 	#[extend::ext]
 	impl<T, U> T
 	where
-		Self: IntoMaybeNot<U>,
+		Self: IntoMaybeNotDisplay<U>,
 		U: PartialEq + std::fmt::Debug,
 	{
 		fn check(self, expected: U) -> Result<(), String> {
 			self.into_maybe_not().compare_debug(&expected)
 		}
+		// this only works because of MaybeNotDisplay,
+		// otherwise multiple impls
 		fn check_untyped<V>(self, expected: V) -> Result<(), String>
 		where
 			V: std::fmt::Debug,
@@ -152,8 +155,8 @@ mod test {
 		true.xnot().check(false).xpect_ok();
 		true.xnot().check(true).xpect_err();
 
-		MaybeNot::Negated(false).check(false).xpect_ok();
-		// MaybeNot::Negated(false).check_untyped(false).xpect_ok();
+		MaybeNot::Negated(false).check(true).xpect_ok();
+		MaybeNot::Negated(false).check_untyped(true).xpect_ok();
 	}
 
 	#[test]

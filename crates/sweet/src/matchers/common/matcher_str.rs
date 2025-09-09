@@ -5,14 +5,41 @@ use super::*;
 #[extend::ext(name=SweetString)]
 pub impl<T, U> T
 where
-	T: IntoMaybeNot<U>,
+	T: IntoMaybeNotDisplay<U>,
 	U: AsRef<str> + Display,
 {
+	fn xpect_str(self, expected: impl AsRef<str>) -> U {
+		let expected = expected.as_ref();
+		let received = self.into_maybe_not();
+		assert_ext::assert_diff(expected, received).into_inner()
+	}
 	fn xpect_contains(self, expected: impl AsRef<str>) -> U {
 		let expected = expected.as_ref();
 		let received = self.into_maybe_not();
 		let result = received.inner().as_ref().contains(expected);
 		let expected = format!("to contain '{}'", expected);
+		assert_ext::assert_result_expected_received_display(
+			result, expected, received,
+		)
+		.into_inner()
+	}
+
+	fn xpect_starts_with(self, expected: impl AsRef<str>) -> U {
+		let expected = expected.as_ref();
+		let received = self.into_maybe_not();
+		let result = received.inner().as_ref().starts_with(expected);
+		let expected = format!("to start with '{}'", expected);
+		assert_ext::assert_result_expected_received_display(
+			result, expected, received,
+		)
+		.into_inner()
+	}
+
+	fn xpect_ends_with(self, expected: impl AsRef<str>) -> U {
+		let expected = expected.as_ref();
+		let received = self.into_maybe_not();
+		let result = received.inner().as_ref().ends_with(expected);
+		let expected = format!("to end with '{}'", expected);
 		assert_ext::assert_result_expected_received_display(
 			result, expected, received,
 		)
@@ -28,18 +55,7 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 		self.assert_correct(result, &expected);
 		self
 	}
-	pub fn to_contain_n(&self, other: impl AsRef<str>, count: usize) -> &Self {
-		let other = other.as_ref();
-		let actual_count = self.value.as_ref().matches(other).count();
-		let result = actual_count == count;
-		let expected = format!("{count} occurances of '{}'", other);
-		self.assert_correct_with_received(
-			result,
-			&expected,
-			&format!("{actual_count} occurances\n{}", self.value.as_ref()),
-		);
-		self
-	}
+
 	pub fn to_start_with(&self, other: impl AsRef<str>) -> &Self {
 		let other = other.as_ref();
 		let result = self.value.as_ref().starts_with(other);
@@ -67,18 +83,29 @@ mod test {
 	use crate::prelude::*;
 
 	#[test]
+	#[should_panic]
+	fn err_xpect_contains() { "foobar".xpect_contains("bazz"); }
+	#[test]
+	#[should_panic]
+	fn err_xpect_str() { "foobar".xpect_str("bazz"); }
+	#[test]
+	#[should_panic]
+	fn err_xpect_not_str() { "foobar".xnot().xpect_str("foobar"); }
+
+	#[test]
 	fn str() {
 		"foobar".xpect_contains("bar");
-		// "foobar".xpect_contains("barss");
-		// "foobar".xnot().xpect_contains("bazz");
+		"foobar".xnot().xpect_contains("bazz");
 
+		"foobar".xnot().xpect_str("bazz");
+		"foobar".xpect_str("foobar");
 
 		"foobar".xpect().not().to_contain("baz");
 
-		"foobar".xpect().to_start_with("foo");
-		"foobar".xpect().not().to_start_with("bar");
+		"foobar".xpect_starts_with("foo");
+		"foobar".xnot().xpect_starts_with("bar");
 
-		"foobar".xpect().to_end_with("bar");
-		"foobar".xpect().not().to_end_with("foo");
+		"foobar".xpect_ends_with("bar");
+		"foobar".xnot().xpect_ends_with("foo");
 	}
 }

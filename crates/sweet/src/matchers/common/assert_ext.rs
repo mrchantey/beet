@@ -49,20 +49,20 @@ pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn assert_expected_received_display<Expected: Display, Received: Display>(
 	expected: Expected,
-	received: impl IntoMaybeNot<Received>,
+	received: impl IntoMaybeNotDisplay<Received>,
 ) where
 	Received: PartialEq<Expected>,
 {
 	let received = received.into_maybe_not();
 	if let Err(expected) = received.compare_display(&expected) {
-		panic_ext::panic_expected_received_display(&expected, &received);
+		panic_ext::panic_expected_received_display(&expected, received.inner());
 	}
 }
 
 /// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 pub fn assert_expected_received_debug<T1: Debug, T2: PartialEq<T1> + Debug>(
 	expected: T1,
-	received: impl IntoMaybeNot<T2>,
+	received: impl IntoMaybeNotDisplay<T2>,
 ) {
 	let received = received.into_maybe_not();
 	if let Err(expected) = received.compare_debug(&expected) {
@@ -79,20 +79,35 @@ pub fn assert_result_expected_received_display<
 	received: MaybeNot<Received>,
 ) -> MaybeNot<Received> {
 	if let Err(expected) = received.passes_display(result, &expected) {
-		panic_ext::panic_expected_received_display(&expected, &received);
+		panic_ext::panic_expected_received_display(&expected, received.inner());
 	}
 	received
 }
 
 
 /// Panics if the values are not equal
-pub fn assert_diff(expected: impl AsRef<str>, received: impl AsRef<str>) {
+pub fn assert_diff<Received: AsRef<str>>(
+	expected: impl AsRef<str>,
+	received: MaybeNot<Received>,
+) -> MaybeNot<Received> {
 	let expected = expected.as_ref();
-	let received = received.as_ref();
-	if expected != received {
-		panic_ext::panic_str(&crate::utils::pretty_diff::inline_diff(
-			expected, received,
-		));
+	let received_str = received.inner().as_ref();
+	let is_match = expected == received_str;
+	match (is_match, received.is_negated()) {
+		(true, false) => received,
+		(false, true) => received,
+		(true, true) => {
+			panic_ext::panic_expected_received_display(
+				"NOT to be string",
+				received_str,
+			);
+		}
+		(false, false) => {
+			panic_ext::panic_str(&crate::utils::pretty_diff::inline_diff(
+				expected,
+				received_str,
+			));
+		}
 	}
 }
 
