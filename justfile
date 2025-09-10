@@ -204,6 +204,7 @@ test-flow *args:
 
 # cargo test -p beet_rsx					 	 	 																										{{args}} -- {{test-threads}}
 test-rsx *args:
+	cargo test -p beet_dom						 	--features=tokens  																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
@@ -269,21 +270,12 @@ publish crate *args:
 
 publish-all *args:
 	@echo 'Publishing Utility Crates'
-	just publish beet_utils						{{args}} | true
-	just publish sweet_macros					{{args}} | true
-	just publish sweet								{{args}} | true
-	just publish beet_core_macros			{{args}} | true
-	just publish beet_core						{{args}} | true
-	just publish beet_agent					{{args}} | true
-	just publish sweet-cli						{{args}} | true
-	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx_combinator  {{args}} || true
-	just publish beet_parse      			{{args}} || true
-	just publish beet_rsx_macros      {{args}} || true
-	just publish beet_rsx        			{{args}} || true
-	just publish beet_build      			{{args}} || true
-	just publish beet_net       		{{args}} || true
-	just publish beet_design 					{{args}} || true
+	just publish beet_utils						{{args}} || true
+	just publish sweet_macros					{{args}} || true
+	just publish sweet								{{args}} || true
+	just publish beet_core_macros			{{args}} || true
+	just publish beet_core						{{args}} || true
+	just publish sweet-cli						{{args}} || true
 	@echo 'Publishing Flow Crates'
 	just publish beet_flow_macros     {{args}} || true
 	just publish beet_flow            {{args}} || true
@@ -291,6 +283,16 @@ publish-all *args:
 	just publish beet_ml              {{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
+	@echo 'Publishing Rsx Crates'
+	just publish beet_net       			{{args}} || true
+	just publish beet_agent						{{args}} || true
+	just publish beet_dom							{{args}} || true
+	just publish beet_rsx_combinator  {{args}} || true
+	just publish beet_parse      			{{args}} || true
+	just publish beet_rsx_macros      {{args}} || true
+	just publish beet_rsx        			{{args}} || true
+	just publish beet_build      			{{args}} || true
+	just publish beet_design 					{{args}} || true
 	@echo 'Publishing Top Crates'
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true

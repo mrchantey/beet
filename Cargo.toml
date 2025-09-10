@@ -66,6 +66,7 @@ members = [
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
 	"crates/beet_net",
+	"crates/beet_dom",
 
 	## 💡 Sweet
 	"crates/beet_core",
@@ -92,6 +93,7 @@ beet_rsx = { path = "crates/beet_rsx", version = "0.0.7-dev.7" }
 beet_build = { path = "crates/beet_build", version = "0.0.7-dev.7" }
 beet_design = { path = "crates/beet_design", version = "0.0.7-dev.7" }
 beet_net = { path = "crates/beet_net", version = "0.0.7-dev.7" }
+beet_dom = { path = "crates/beet_dom", version = "0.0.7-dev.7" }
 beet_query = { path = "crates/beet_query", version = "0.0.7-dev.7" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.7" }
 beet_agent = { path = "crates/beet_agent", version = "0.0.7-dev.7" }
@@ -242,10 +244,13 @@ client = [
 	"serde",
 	"beet_net",
 	"beet_net/client",
+	"beet_dom",
+	"beet_dom/client",
 	"beet_design/client",
 ]
 
 beet_net = ["dep:beet_net"]
+beet_dom = ["dep:beet_dom"]
 
 #💡 fine-grained
 native-tls = ["beet_net/native-tls"]
@@ -302,10 +307,11 @@ bevy = { workspace = true }
 beet_utils.workspace = true
 beet_core.workspace = true
 
-#💡 rsx
+#💡 web
 beet_rsx = { workspace = true, optional = true }
 beet_parse = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
+beet_dom = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_agent = { workspace = true, optional = true }

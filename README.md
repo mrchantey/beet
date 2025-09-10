@@ -20,14 +20,14 @@
 
 Beet is a very bevy metaframework, bringing bevy patterns *and* principles (thats where the 'very' comes in) to the rest of the stack.
 
-Thats right fam, we're going full-stack bevy. Its *very* early days so your mileage may vary depending on your application:
+Thats right fam, we're going full-stack bevy. Its early days so your mileage may vary depending on your application:
 
 **readiness meter**
 - 🌳 documented and tested
 - 🌿 docs and tests are incomplete
-- 🌱 highly experimental, germinating
+- 🌱 highly experimental
 
-I think of the beet crates as divided into a few main categories.
+Beet crates fall into a few main categories.
 
 ## Utils
 
@@ -95,6 +95,7 @@ fn Counter(initial: i32) -> impl Bundle {
 | [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🌱      | JSX-like parser combinator for Rust          |
 | [`beet_parse`](crates/beet_parse/Cargo.toml)   | 🌱      | Parsers for various text and token formats   |
 | [`beet_build`](crates/beet_build/Cargo.toml)   | 🌱      | Codegen and compilation tooling              |
+| [`beet_dom`](crates/beet_dom/Cargo.toml)       | 🌱      | Utilities for dom rendering and interaction   |
 | [`beet_net`](crates/beet_net/Cargo.toml)       | 🌱      | Cross-platform networking utilities          |
 | [`beet_design`](crates/beet_design/Cargo.toml) | 🌱      | Design system and components for beet rsx    |
 | [`beet-cli`](crates/beet-cli/Cargo.toml)       | 🌱      | Tools for building and deploying beet apps   |

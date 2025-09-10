@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_rsx::as_beet::*;
 use bevy::prelude::*;
-
 
 /// Marker type indicating this entity was spawned via [`bundle_endpoint`].
 #[derive(Component)]
