@@ -12,7 +12,7 @@ use sweet::prelude::*;
 #[test]
 fn it_passes(){
 	assert!(1 + 1 == 2);
-	"sweet".xpect().not().to_contain("verbose matchers");
+	"sweet".xnot().xpect_contains("verbose matchers");
 }
 
 ```

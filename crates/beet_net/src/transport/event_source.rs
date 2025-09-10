@@ -30,7 +30,7 @@ mod test {
 
 		let mut count = 0;
 		while let Some(Ok(event)) = ev.next().await {
-			event.data.xref().xpect().to_contain("It works!");
+			event.data.xref().xpect_contains("It works!");
 			if count == 2 {
 				break;
 			} else {

@@ -104,8 +104,7 @@ mod test_request {
 			.text()
 			.await
 			.unwrap()
-			.xpect()
-			.to_contain("rawbytes");
+			.xpect_contains("rawbytes");
 	}
 
 
@@ -134,8 +133,7 @@ mod test_request {
 			.text()
 			.await
 			.unwrap()
-			.xpect()
-			.to_contain("baz");
+			.xpect_contains("baz");
 	}
 
 	// #[test]

@@ -215,12 +215,7 @@ mod test {
 			 text: Query<&TextContent>,
 			 query: Query<(&TokenUsage, &OwnedContent)>| {
 				let (_tokens, content) = query.get(ev.target()).unwrap();
-				text.get(content[0])
-					.unwrap()
-					.0
-					.xref()
-					.xpect()
-					.to_contain("6");
+				text.get(content[0]).unwrap().0.xref().xpect_contains("6");
 				commands.send_event(AppExit::Success);
 			},
 		);

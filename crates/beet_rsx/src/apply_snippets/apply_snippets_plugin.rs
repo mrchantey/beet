@@ -573,9 +573,7 @@ mod test {
 			rsx! { <div /> }
 		}
 
-		parse_instance(rsx! { <MyTemplate /> })
-			.xpect()
-			.to_be_str("<div/>");
+		parse_instance(rsx! { <MyTemplate /> }).xpect_str("<div/>");
 	}
 	#[test]
 	fn flush_on_spawn_attribute_blocks() {
@@ -592,7 +590,6 @@ mod test {
 		}
 
 		parse_instance(rsx! { <MyTemplate class="foo" /> })
-			.xpect()
-			.to_be_str("<div class=\"foo\"/>");
+			.xpect_str("<div class=\"foo\"/>");
 	}
 }

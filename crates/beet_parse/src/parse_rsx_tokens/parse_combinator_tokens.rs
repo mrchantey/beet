@@ -454,12 +454,12 @@ fn main() {
     let result = fibonacci(10);
     println!("The 10th Fibonacci number is: {}", result);
 }
-</code></pre>		
+</code></pre>
 		"#,
 			WsPathBuf::new(file!()),
 		)
 		.unwrap();
-		out.to_string().xpect().to_contain("\nfn main()");
+		out.to_string().xpect_contains("\nfn main()");
 		out.xpect().to_be_snapshot();
 	}
 }

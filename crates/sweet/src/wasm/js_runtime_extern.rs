@@ -34,16 +34,15 @@ mod test {
 	use crate::prelude::*;
 
 	#[test]
-	fn cwd() { js_runtime::cwd().xpect().to_contain("sweet"); }
+	fn cwd() { js_runtime::cwd().xpect_contains("sweet"); }
 
 	#[test]
 	#[ignore = "take hook shenanigans"]
 	// #[should_panic]
 	fn panic_to_error() {
 		let result = js_runtime::panic_to_error(&mut || panic!("it panicked"));
-		(&format!("{:?}", result))
-			.xpect()
-			.to_start_with("Err(JsValue(RuntimeError: unreachable");
+		format!("{:?}", result)
+			.xpect_starts_with("Err(JsValue(RuntimeError: unreachable");
 	}
 	#[test]
 	fn read_file() {
@@ -56,7 +55,6 @@ mod test {
 		js_runtime::sweet_root()
 			.unwrap()
 			.replace("\\", "/")
-			.xpect()
-			.to_end_with("beet/");
+			.xpect_ends_with("beet/");
 	}
 }

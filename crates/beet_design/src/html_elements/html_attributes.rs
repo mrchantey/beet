@@ -100,7 +100,6 @@ mod test {
 	fn renders() {
 		rsx! { <Button disabled=true id="foo" onclick=|_| {} /> }
 			.xmap(HtmlDocument::parse_bundle)
-			.xpect()
-			.to_contain(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-dom-idx="0"/>"#);
+			.xpect_contains(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-dom-idx="0"/>"#);
 	}
 }

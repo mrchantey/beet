@@ -226,15 +226,13 @@ mod test {
 
 	#[test]
 	fn text() {
-		HtmlDocument::parse_bundle(rsx! { hello world })
-			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head></head><body>hello world</body></html>",
-			);
+		HtmlDocument::parse_bundle(rsx! { hello world }).xpect_str(
+			"<!DOCTYPE html><html><head></head><body>hello world</body></html>",
+		);
 	}
 	#[test]
 	fn elements() {
-		HtmlDocument::parse_bundle(rsx! { <br /> }).xpect().to_be_str(
+		HtmlDocument::parse_bundle(rsx! { <br /> }).xpect_str(
 			"<!DOCTYPE html><html><head></head><body><br/></body></html>",
 		);
 	}
@@ -244,14 +242,13 @@ mod test {
 			<br />
 			<br />
 		})
-			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
-			);
+		.xpect_str(
+			"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
+		);
 	}
 	#[test]
 	fn empty_fragment() {
-		HtmlDocument::parse_bundle(rsx! {</>}).xpect().to_be_str(
+		HtmlDocument::parse_bundle(rsx! {</>}).xpect_str(
 			"<!DOCTYPE html><html><head></head><body></body></html>",
 		);
 	}
@@ -263,27 +260,23 @@ mod test {
 			</head>
 			<br />
 		})
-			.xpect()
-			.to_be_str(
-				"<!DOCTYPE html><html><head></head><body><head><br/></head><br/></body></html>",
-			);
+		.xpect_str(
+			"<!DOCTYPE html><html><head></head><body><head><br/></head><br/></body></html>",
+		);
 	}
 	#[test]
 	#[ignore = "noisy"]
 	#[should_panic(expected = "Invalid HTML document: no body tag found")]
 	fn partial() {
-		HtmlDocument::parse_bundle(
-			rsx! {
-				<!DOCTYPE html>
-				<html>
-					<head>
-						<br />
-					</head>
-				</html>
-			},
-		)
-		.xpect()
-		.to_be_str(
+		HtmlDocument::parse_bundle(rsx! {
+			<!DOCTYPE html>
+			<html>
+				<head>
+					<br />
+				</head>
+			</html>
+		})
+		.xpect_str(
 			"<!DOCTYPE html><html><head><br/></head><body></body></html>",
 		);
 	}
@@ -301,23 +294,20 @@ mod test {
 			<script></script>
 			<br />
 		})
-			.xpect()
-			.to_be_snapshot();
+		.xpect()
+		.to_be_snapshot();
 	}
 	#[test]
 	fn hoist_top_tag() {
-		HtmlDocument::parse_bundle(
-			rsx! {
-				<script />
-				<!DOCTYPE html>
-				<html>
-					<head></head>
-					<body></body>
-				</html>
-			},
-		)
-		.xpect()
-		.to_be_str(
+		HtmlDocument::parse_bundle(rsx! {
+			<script />
+			<!DOCTYPE html>
+			<html>
+				<head></head>
+				<body></body>
+			</html>
+		})
+		.xpect_str(
 			"<!DOCTYPE html><html><head><script></script></head><body></body></html>",
 		);
 	}
@@ -337,8 +327,7 @@ mod test {
 			</html>
 		},
 	)
-	.xpect()
-	.to_be_str(
+	.xpect_str(
 		"<!DOCTYPE html><html><head><span/></head><body><script></script><br/></body></html>",
 	);
 	}

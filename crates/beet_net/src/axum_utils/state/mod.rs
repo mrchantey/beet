@@ -51,6 +51,6 @@ mod test {
 	#[test]
 	fn env_vars() {
 		env!("CARGO_PKG_NAME").xpect_eq("beet_net");
-		env!("CARGO_PKG_VERSION").xpect().to_start_with("0.");
+		env!("CARGO_PKG_VERSION").xpect_starts_with("0.");
 	}
 }

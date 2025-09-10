@@ -21,12 +21,12 @@ fn expressions() {
 		<span>"The value is "{placeholder}</span>
 		</div>
 	});
-	(&scene)
-		.xpect()
-		.to_contain("SnippetRoot")
-		.to_contain("NodeTag")
-		.to_contain("ExprIdx")
-		.to_contain("StaticRoot");
+	scene
+		.xref()
+		.xpect_contains("SnippetRoot")
+		.xpect_contains("NodeTag")
+		.xpect_contains("ExprIdx")
+		.xpect_contains("StaticRoot");
 
 	// println!(
 	// 	"children: {:#?}",
@@ -37,8 +37,7 @@ fn expressions() {
 	apply_and_render(&scene, rsx! {
 		<button key={1}> this will be replaced {2}</button>
 	})
-	.xpect()
-	.to_contain(
+	.xpect_contains(
 		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
 	);
 }
@@ -53,11 +52,7 @@ fn style() {
 			h1{font-size: 1px;}
 		</style>
 	});
-	apply_and_render(&scene, rsx! {"placeholder"})
-		.xpect()
-		.to_be_str(
-			"<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>",
-		);
+	apply_and_render(&scene, rsx! {"placeholder"}).xpect_str("<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>");
 }
 #[test]
 fn simple_template() {
@@ -79,8 +74,7 @@ fn simple_template() {
 			<MyTemplate initial={1} />
 		</div>
 	})
-	.xpect()
-	.to_contain("<div><h1>Roundtrip Test</h1><span>value: 1</span></div>");
+	.xpect_contains("<div><h1>Roundtrip Test</h1><span>value: 1</span></div>");
 }
 
 
@@ -130,8 +124,7 @@ fn nested_template() {
 			<NestedTemplate initial={1} />
 		</div>
 	})
-	.xpect()
-	.to_contain("<html><after>value: 1</after></html>");
+	.xpect_contains("<html><after>value: 1</after></html>");
 }
 
 

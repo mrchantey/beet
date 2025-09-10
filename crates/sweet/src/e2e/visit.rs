@@ -147,9 +147,9 @@ mod test {
 		let router = Router::new().route("/foo", get(async || "hello world!"));
 		let (page, _) = serve_and_visit(router, "/foo").await;
 		let url = page.current_url().await?;
-		url.xpect().to_end_with("/foo");
+		url.xpect_ends_with("/foo");
 		let body = page.find(Locator::Css("body")).await?.text().await?;
-		body.xpect().to_contain("hello world!");
+		body.xpect_contains("hello world!");
 
 		Ok(())
 	}

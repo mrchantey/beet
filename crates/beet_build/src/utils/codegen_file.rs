@@ -195,7 +195,6 @@ mod test {
 			fn test() {}
 		});
 		(&file.build_output().unwrap().to_token_stream().to_string())
-			.xpect()
-			.to_contain("fn test () { }");
+			.xpect_contains("fn test () { }");
 	}
 }

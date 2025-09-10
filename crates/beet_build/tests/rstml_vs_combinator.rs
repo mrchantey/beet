@@ -18,7 +18,7 @@ fn is_equal(a: impl Bundle, b: impl Bundle) {
 	let b = world
 		.component_names_related::<Children>(b)
 		.iter_to_string_indented();
-	a.xpect().to_be_str(b);
+	a.xpect_str(b);
 }
 
 

@@ -329,8 +329,7 @@ mod test {
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
-			.xpect()
-			.to_start_with("<!DOCTYPE html>");
+			.xpect_starts_with("<!DOCTYPE html>");
 		Ok(())
 	}
 

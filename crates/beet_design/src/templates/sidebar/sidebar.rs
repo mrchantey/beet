@@ -269,7 +269,6 @@ mod test {
 
 		rsx! { <Sidebar nodes=nodes /> }
 			.xmap(HtmlFragment::parse_bundle)
-			.xpect()
-			.to_contain("Partying");
+			.xpect_contains("Partying");
 	}
 }

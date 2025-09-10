@@ -81,8 +81,7 @@ mod test {
 			.header(LOCATION)
 			.unwrap()
 			.unwrap()
-			.xpect()
-			.to_end_with("/style.css");
+			.xpect_ends_with("/style.css");
 	}
 	#[sweet::test]
 	async fn html() {
@@ -119,7 +118,6 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("<div>fallback</div>");
+		.xpect_str("<div>fallback</div>");
 	}
 }

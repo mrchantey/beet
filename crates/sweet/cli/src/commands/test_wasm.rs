@@ -170,7 +170,6 @@ mod test {
 		deno_runner_path()
 			.to_string_lossy()
 			.replace("\\", "/")
-			.xpect()
-			.to_end_with("target/sweet/deno.ts");
+			.xpect_ends_with("target/sweet/deno.ts");
 	}
 }

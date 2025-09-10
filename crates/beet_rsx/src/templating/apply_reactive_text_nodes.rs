@@ -51,15 +51,13 @@ mod test {
 	#[test]
 	fn ignores_static() {
 		HtmlDocument::parse_bundle(rsx! { <div>hello {"world"}</div> })
-		.xpect()
-		.to_be_str("<!DOCTYPE html><html><head></head><body><div>hello world</div></body></html>");
+		.xpect_str("<!DOCTYPE html><html><head></head><body><div>hello world</div></body></html>");
 	}
 	#[test]
 	fn simple() {
 		let (get, _set) = signal("world".to_string());
 		HtmlDocument::parse_bundle(rsx! { <div>hello {get}</div> })
-	.xpect()
-	.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">hello <!--bt|1-->world<!--/bt--></div></body></html>");
+	.xpect_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">hello <!--bt|1-->world<!--/bt--></div></body></html>");
 	}
 	#[template]
 	fn Adjective() -> impl Bundle {
@@ -81,7 +79,6 @@ mod test {
 				<Adjective>" fat "</Adjective>"dog"
 			</div>
 		})
-		.xpect()
-		.to_be_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">The quick and brown<b>fox</b><!--bt|1-->jumps over<!--/bt--> the lazy <!--bt|2-->and<!--/bt--> fat dog</div></body></html>");
+		.xpect_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">The quick and brown<b>fox</b><!--bt|1-->jumps over<!--/bt--> the lazy <!--bt|2-->and<!--/bt--> fat dog</div></body></html>");
 	}
 }

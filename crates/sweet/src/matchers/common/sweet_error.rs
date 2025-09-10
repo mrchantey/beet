@@ -142,8 +142,7 @@ mod test {
 		let lines = msg.lines().collect::<Vec<_>>();
 
 		lines[BacktraceLocation::LINE_CONTEXT_SIZE]
-			.xpect()
-			.to_contain("let err = SweetError::new");
+			.xpect_contains("let err = SweetError::new");
 	}
 	#[test]
 	#[ignore = "use for visual testing"]

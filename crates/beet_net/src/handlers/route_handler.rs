@@ -199,7 +199,6 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("hello jimmy");
+		.xpect_str("hello jimmy");
 	}
 }

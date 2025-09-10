@@ -22,6 +22,5 @@ async fn docs() {
 		.text()
 		.await
 		.unwrap()
-		.xpect()
-		.to_contain("Docs");
+		.xpect_contains("Docs");
 }

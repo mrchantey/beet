@@ -126,8 +126,7 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("fallback");
+		.xpect_str("fallback");
 	}
 	#[rustfmt::skip]
 	#[sweet::test]
@@ -144,7 +143,6 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("endpoint");
+		.xpect_str("endpoint");
 	}
 }

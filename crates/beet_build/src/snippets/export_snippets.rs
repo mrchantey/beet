@@ -122,8 +122,8 @@ mod test {
 		// non-empty scene file
 		saved.len().xpect_greater_than(200);
 		#[cfg(feature = "css")]
-		(&saved).xpect().to_contain("div[data-beet-style-id-0]");
+		(&saved).xpect_contains("div[data-beet-style-id-0]");
 		#[cfg(not(feature = "css"))]
-		(&saved).xpect().to_contain("div{color:blue;}");
+		(&saved).xpect_contains("div{color:blue;}");
 	}
 }

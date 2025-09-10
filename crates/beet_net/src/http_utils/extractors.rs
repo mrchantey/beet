@@ -317,9 +317,9 @@ mod test {
 		let val = Foo(42, "foo$\" \" &dsds?sd#@$)#@$*()".to_owned());
 
 		let query_str = JsonQueryParams::to_query_string(&val).unwrap();
-		(&query_str).xpect().to_start_with("data=%5B42%2C%22foo");
+		(&query_str).xpect_starts_with("data=%5B42%2C%22foo");
 		for str in &[" ", "$", "\"", "&", "?", "#", "@", "(", ")"] {
-			(&query_str).xpect().not().to_contain(str);
+			(&query_str).xnot().xpect_contains(str);
 		}
 
 		let val2 =

@@ -352,8 +352,7 @@ mod test {
 			.oneshot_str("/")
 			.await
 			.unwrap()
-			.xpect()
-			.to_be_str("hello world!");
+			.xpect_str("hello world!");
 	}
 	#[sweet::test]
 	async fn dynamic_path() {
@@ -366,8 +365,7 @@ mod test {
 		.oneshot_str("/foo/bazz")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("hello world!");
+		.xpect_str("hello world!");
 	}
 
 	#[sweet::test]
@@ -381,8 +379,7 @@ mod test {
 		.oneshot_str("/app-info")
 		.await
 		.unwrap()
-		.xpect()
-		.to_contain("<h1>App Info</h1><p>Title: beet_net</p>");
+		.xpect_contains("<h1>App Info</h1><p>Title: beet_net</p>");
 	}
 
 
@@ -469,8 +466,7 @@ mod test {
 			.oneshot_str("/pizza")
 			.await
 			.unwrap()
-			.xpect()
-			.to_be_str("hawaiian");
+			.xpect_str("hawaiian");
 	}
 	#[sweet::test]
 	async fn dynamic() {
@@ -485,8 +481,7 @@ mod test {
 		.oneshot_str("/foo/bazz")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str("path is bazz");
+		.xpect_str("path is bazz");
 	}
 
 	#[sweet::test]
@@ -501,18 +496,12 @@ mod test {
 				),],
 			)
 		});
-		router
-			.oneshot_str("/foo")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_str("foo");
+		router.oneshot_str("/foo").await.unwrap().xpect_str("foo");
 		router
 			.oneshot_str("/foo/bar")
 			.await
 			.unwrap()
-			.xpect()
-			.to_be_str("bar");
+			.xpect_str("bar");
 	}
 	#[sweet::test]
 	async fn route_tree() {

@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// ```rust
 /// # use sweet::prelude::*;
 /// true.xpect_true();
-/// "foobar".xpect().not().to_start_with("bar");
+/// "foobar".xnot().xpect_starts_with("bar");
 /// ```
 
 

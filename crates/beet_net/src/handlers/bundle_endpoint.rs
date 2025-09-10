@@ -147,8 +147,7 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str(
+		.xpect_str(
 			"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
 		);
 	}
@@ -176,9 +175,6 @@ mod test {
 		.oneshot_str("/")
 		.await
 		.unwrap()
-		.xpect()
-		.to_be_str(
-				"<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>",
-			);
+		.xpect_str("<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>");
 	}
 }

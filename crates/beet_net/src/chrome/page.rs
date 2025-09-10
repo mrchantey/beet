@@ -130,6 +130,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[sweet::test]
+	#[ignore = "requires Chrome DevTools"]
 	async fn works() {
 		// let bytes = export_pdf("https://google.com").await.unwrap();
 		let devtools = ChromeDevTools::connect().await.unwrap();

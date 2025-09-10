@@ -93,8 +93,7 @@ mod test {
 		app.world_mut()
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
-			.xpect()
 			// only the output of the snippet, not the instance
-			.to_be_str("party time!");
+			.xpect_str("party time!");
 	}
 }
