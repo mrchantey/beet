@@ -35,7 +35,7 @@ pub fn short_type_path<T>() -> syn::Path {
 		"Failed to parse type name {result} into syn::Path"
 	))
 }
-
+// TODO use bevy utils instead
 fn shorten_generic_type_name(type_name: &str) -> String {
 	let mut result = String::new();
 	let mut chars = type_name.chars().peekable();
@@ -249,10 +249,10 @@ mod test {
 
 	#[test]
 	fn works() {
-		short_type_path::<Option<Vec<Matcher<u32>>>>()
+		short_type_path::<Option<Vec<u32>>>()
 			.to_token_stream()
 			.to_string()
 			.replace(" ", "")
-			.xpect_eq("Option<Vec<Matcher<u32>>>");
+			.xpect_eq("Option<Vec<u32>>");
 	}
 }

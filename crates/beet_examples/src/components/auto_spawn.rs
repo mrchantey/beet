@@ -79,7 +79,6 @@ impl AutoSpawn {
 
 // 		let first = app.world().iter_entities().next().unwrap().id();
 
-// 		(&app).xpect().component(first)?.xpect_eq(&auto_spawn)?;
 
 // 		Ok(())
 // 	}

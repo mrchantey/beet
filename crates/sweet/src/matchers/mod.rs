@@ -1,9 +1,26 @@
-mod sweet_ref;
-pub use sweet_ref::*;
-pub mod common;
-#[allow(unused_imports)]
-pub use self::common::*;
-#[cfg(target_arch = "wasm32")]
-pub mod wasm_matchers;
-#[cfg(target_arch = "wasm32")]
-pub use self::wasm_matchers::*;
+pub mod assert_ext;
+mod close_to;
+mod matcher_control_flow;
+mod matcher_not;
+pub use matcher_control_flow::*;
+pub use matcher_not::*;
+pub mod panic_ext;
+pub use self::close_to::*;
+mod matcher_bool;
+pub use self::matcher_bool::*;
+mod matcher_close;
+pub use self::matcher_close::*;
+mod matcher_eq;
+pub use self::matcher_eq::*;
+mod matcher_option;
+pub use self::matcher_option::*;
+mod matcher_ord;
+pub use self::matcher_ord::*;
+mod matcher_result;
+pub use self::matcher_result::*;
+mod matcher_str;
+pub use self::matcher_str::*;
+mod sweet_error;
+pub use self::sweet_error::*;
+mod snapshot;
+pub use snapshot::*;

@@ -61,9 +61,7 @@ mod test {
 			&Align::<GroupSteerAgent>::default(),
 			agents,
 		)
-		.xpect()
-		.map(|i| i.0)
-		.to_be(Vec3::new(0.5, 0.5, 0.));
-		// .xpect_close(Vec3::new(1.41, 1.41, 0.))?;
+		.0
+		.xpect_eq(Vec3::new(0.5, 0.5, 0.));
 	}
 }

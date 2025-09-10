@@ -1,4 +1,3 @@
-use super::*;
 use crate::prelude::*;
 use anyhow::Result;
 use beet_utils::prelude::AbsPathBuf;

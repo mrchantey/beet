@@ -200,8 +200,6 @@ mod test {
 		assert!(!pat.matches("foo"));
 		assert!(pat.matches("target"));
 		assert!(pat.matches("foo/target/foo"));
-		// let mut watcher = GlobFilter::default();
-		// watcher.exclude.xpect()
 	}
 	#[test]
 	fn passes() {

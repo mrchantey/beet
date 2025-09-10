@@ -44,9 +44,15 @@ mod test {
 
 	#[crate::test]
 	async fn works() {
-		let el = visit("https://example.com").await.find_css("h1").await;
-		el.as_ref().xpect().to_have_text("Example Domain").await;
-		el.xpect().not().to_have_text("foobar").await;
+		visit("https://example.com")
+			.await
+			.find_css("h1")
+			.await
+			.xpect_inner_text("Example Domain")
+			.await
+			.xnot()
+			.xpect_inner_text("foobar")
+			.await;
 	}
 	#[crate::test]
 	async fn links() {
@@ -56,9 +62,7 @@ mod test {
 			.click()
 			.await
 			.unwrap();
-		(&page)
-			.xpect()
-			.to_have_url("https://www.iana.org/help/example-domains")
+		page.xpect_url("https://www.iana.org/help/example-domains")
 			.await;
 	}
 }

@@ -55,28 +55,6 @@ where
 	}
 }
 
-
-impl<T> Matcher<T>
-where
-	T: Debug,
-{
-	/// Assert that the received value is equal to the expected value.
-	/// # Example
-	/// ```rust
-	/// # use sweet::prelude::*;
-	/// 7.xpect().to_be(7);
-	/// "foo".xpect().not().to_be("bar");
-	/// ```
-	pub fn to_be<T2: Debug>(&self, other: T2) -> &Self
-	where
-		T: PartialEq<T2>,
-	{
-		self.assert_equal(&other);
-		self
-	}
-}
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

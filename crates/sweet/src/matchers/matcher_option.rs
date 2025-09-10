@@ -46,31 +46,6 @@ pub impl<T: Debug> Option<T> {
 	}
 }
 
-impl<T> Matcher<Option<T>>
-where
-	T: std::fmt::Debug,
-{
-	pub fn to_be_option(&self, expected: bool) {
-		if expected {
-			let result = self.value.is_some();
-			self.assert_correct(result, &"Some");
-		} else {
-			let result = self.value.is_none();
-			self.assert_correct(result, &"None");
-		}
-	}
-	pub fn to_be_some(&self) {
-		let result = self.value.is_some();
-		self.assert_correct(result, &"Some");
-	}
-
-
-	pub fn to_be_none(&self) {
-		let result = self.value.is_none();
-		self.assert_correct(result, &"None");
-	}
-}
-
 
 #[cfg(test)]
 mod test {

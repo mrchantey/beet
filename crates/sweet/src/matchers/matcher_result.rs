@@ -45,17 +45,6 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 	}
 }
 
-impl<T: Debug, E: Debug> Matcher<Result<T, E>> {
-	pub fn to_be_ok(&self) {
-		let result = self.value.is_ok();
-		self.assert_correct(result, &"Ok");
-	}
-	pub fn to_be_err(&self) {
-		let result = self.value.is_err();
-		self.assert_correct(result, &"Error");
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

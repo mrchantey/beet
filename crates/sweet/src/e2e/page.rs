@@ -52,12 +52,12 @@ mod test {
 
 	#[crate::test]
 	async fn works() {
-		let page = visit("https://example.com").await;
-		(&page).xpect().to_have_url("https://example.com").await;
-		(&page)
-			.xpect()
-			.not()
-			.to_have_url("https://foobar.com")
+		visit("https://example.com")
+			.await
+			.xpect_url("https://example.com")
+			.await
+			.xnot()
+			.xpect_url("https://foobar.com")
 			.await;
 	}
 }

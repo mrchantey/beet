@@ -125,10 +125,10 @@ mod test {
 		app.update_with_secs(1);
 
 		app.world()
-			.xpect()
-			.component::<Transform>(agent)
-			.map(|t| t.translation)
-			.not()
-			.to_be(Vec3::ZERO);
+			.entity(agent)
+			.get::<Transform>()
+			.unwrap()
+			.translation
+			.xpect_not_eq(Vec3::ZERO);
 	}
 }
