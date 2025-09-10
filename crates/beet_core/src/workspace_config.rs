@@ -105,7 +105,7 @@ impl std::fmt::Display for PackageConfig {
 /// ## Example
 /// ```
 /// # use bevy::prelude::*;
-/// # use beet_dom::prelude::*;
+/// # use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.insert_resource(PackageConfig {
 /// 	title: "My Site".to_string(),
@@ -231,6 +231,6 @@ mod test {
 	fn works() {
 		pkg_config!()
 			.resource_name("lambda")
-			.xpect_eq("beet-dom-lambda-dev");
+			.xpect_eq("beet-core-lambda-dev");
 	}
 }

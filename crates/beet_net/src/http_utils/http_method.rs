@@ -1,4 +1,5 @@
-use beet_core::prelude::*;
+#[cfg(feature = "tokens")]
+use beet_core::prelude::ToTokens;
 use bevy::prelude::*;
 use std::fmt;
 

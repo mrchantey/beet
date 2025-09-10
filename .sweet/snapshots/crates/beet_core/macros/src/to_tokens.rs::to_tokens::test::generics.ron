@@ -1,10 +1,10 @@
-impl<U: Clone> beet::prelude::TokenizeSelf for MyGenericStruct<U>
+impl<U: Clone> beet_core::prelude::TokenizeSelf for MyGenericStruct<U>
 where
-    U: beet::prelude::TokenizeSelf,
+    U: beet_core::prelude::TokenizeSelf,
 {
-    fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-        use beet::exports::quote;
-        use beet::exports::proc_macro2;
+    fn self_tokens(&self, tokens: &mut beet_core::exports::proc_macro2::TokenStream) {
+        use beet_core::exports::quote;
+        use beet_core::exports::proc_macro2;
         let generic0 = short_type_path::<U>();
         tokens
             .extend(

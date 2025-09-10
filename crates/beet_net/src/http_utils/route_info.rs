@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+#[cfg(feature = "tokens")]
+use beet_core::prelude::ToTokens;
 use http::request::Parts;
 use std::path::PathBuf;
 

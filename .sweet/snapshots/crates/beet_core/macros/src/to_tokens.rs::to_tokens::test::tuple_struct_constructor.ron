@@ -1,7 +1,7 @@
-impl beet::prelude::TokenizeSelf for MyTupleStruct {
-    fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-        use beet::exports::quote;
-        use beet::exports::proc_macro2;
+impl beet_core::prelude::TokenizeSelf for MyTupleStruct {
+    fn self_tokens(&self, tokens: &mut beet_core::exports::proc_macro2::TokenStream) {
+        use beet_core::exports::quote;
+        use beet_core::exports::proc_macro2;
         let field0 = self.0.self_token_stream();
         let field1 = self.1.self_token_stream();
         tokens

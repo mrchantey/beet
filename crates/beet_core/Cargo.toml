@@ -25,7 +25,7 @@ required-features = ["tokens"]
 default = ["nightly"]
 nightly = ["beet_utils/nightly"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
-serde = ["dep:serde", "dep:serde_json","dep:clap", "dep:heck", "dep:ron","dep:toml"]
+serde = ["dep:serde", "dep:serde_json","dep:clap", "dep:ron","dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 fs = ["beet_utils/fs"]
@@ -56,7 +56,7 @@ ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 # workspace config
 clap = { workspace = true, optional = true }
-heck = { workspace = true, optional = true }
+heck.workspace = true
 
 #💡 async
 futures-lite.workspace = true
