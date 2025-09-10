@@ -31,6 +31,7 @@ fn reactivity() {
 }
 
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn inner_text() {
 	let code = "let foo = {bar};";

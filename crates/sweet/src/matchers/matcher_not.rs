@@ -31,6 +31,13 @@ impl<T> MaybeNot<T> {
 		}
 	}
 
+	fn format_expected(&self, expected: String) -> String {
+		match self.is_negated() {
+			true => format!("NOT {}", expected),
+			false => expected,
+		}
+	}
+
 	/// Performs an equality check, considering if `self`
 	/// is negated
 	pub fn passes_display(
@@ -41,8 +48,7 @@ impl<T> MaybeNot<T> {
 		match (result, self.is_negated()) {
 			(true, false) => Ok(()),
 			(false, true) => Ok(()),
-			(true, true) => Err(format!("NOT {}", expected)),
-			(false, false) => Err(format!("{}", expected)),
+			_ => Err(self.format_expected(format!("{}", expected))),
 		}
 	}
 	/// Performs an equality check, considering if `self`
@@ -55,8 +61,7 @@ impl<T> MaybeNot<T> {
 		match (result, self.is_negated()) {
 			(true, false) => Ok(()),
 			(false, true) => Ok(()),
-			(true, true) => Err(format!("NOT {:?}", expected)),
-			(false, false) => Err(format!("{:?}", expected)),
+			_ => Err(self.format_expected(format!("{:?}", expected))),
 		}
 	}
 	/// Performs an equality check, considering if `self`
@@ -70,21 +75,6 @@ impl<T> MaybeNot<T> {
 			MaybeNot::Verbatim(value) => value == other,
 		}
 	}
-
-	pub fn compare_debug<Expected>(
-		&self,
-		expected: &Expected,
-	) -> Result<(), String>
-	where
-		Expected: std::fmt::Debug,
-		T: PartialEq<Expected>,
-	{
-		if self.passes(expected) {
-			Ok(())
-		} else {
-			Err(format!("NOT {:?}", expected))
-		}
-	}
 	pub fn compare_display<Expected>(
 		&self,
 		expected: &Expected,
@@ -96,7 +86,21 @@ impl<T> MaybeNot<T> {
 		if self.passes(expected) {
 			Ok(())
 		} else {
-			Err(format!("NOT {}", expected))
+			Err(self.format_expected(format!("{}", expected)))
+		}
+	}
+	pub fn compare_debug<Expected>(
+		&self,
+		expected: &Expected,
+	) -> Result<(), String>
+	where
+		Expected: std::fmt::Debug,
+		T: PartialEq<Expected>,
+	{
+		if self.passes(expected) {
+			Ok(())
+		} else {
+			Err(self.format_expected(format!("{:?}", expected)))
 		}
 	}
 }

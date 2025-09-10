@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use wasm_bindgen::JsCast;

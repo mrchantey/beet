@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use extend::ext;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
@@ -12,7 +13,7 @@ pub impl Document {
 	fn x_head() -> HtmlHeadElement { Self::get().head().unwrap() }
 	fn x_body() -> HtmlElement { Self::get().body().unwrap() }
 
-	async fn x_await_load_by_id(id: &str) -> anyhow::Result<()> {
+	async fn x_await_load_by_id(id: &str) -> Result<()> {
 		HtmlEventListener::wait_with_target(
 			"load",
 			Self::get()

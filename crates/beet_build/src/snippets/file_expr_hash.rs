@@ -128,14 +128,17 @@ pub fn update_file_expr_hash(
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
 	use beet_dom::prelude::*;
+	use beet_rsx::prelude::*;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
-	use send_wrapper::SendWrapper;
 	use sweet::prelude::*;
+
+	// TODO this is a hack, macro should include it
+	use beet_parse::prelude::*;
+	use send_wrapper::SendWrapper;
 
 	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
 

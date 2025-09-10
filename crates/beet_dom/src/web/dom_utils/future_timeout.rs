@@ -1,6 +1,7 @@
 use crate::prelude::*;
-use anyhow::Result;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use js_sys::Array;
 use js_sys::Promise;
 use std::cell::RefCell;
@@ -39,7 +40,7 @@ where
 
 	match JsFuture::from(Promise::race(&arr)).await {
 		Ok(_) => Ok(out.take().unwrap()),
-		Err(_) => Err(anyhow::anyhow!("Timeout")),
+		Err(_) => Err(bevyhow!("Timeout")),
 	}
 }
 
@@ -75,6 +76,6 @@ mod test {
 		.await
 		.unwrap_err()
 		.to_string()
-		.xpect_eq("Timeout");
+		.xpect_eq("Timeout\n");
 	}
 }

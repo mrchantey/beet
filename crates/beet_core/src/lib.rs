@@ -37,6 +37,8 @@ pub mod exports {
 	pub use quote;
 	#[cfg(feature = "serde")]
 	pub use ron;
+	#[cfg(feature = "serde")]
+	pub use toml;
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::DeferredWorld;

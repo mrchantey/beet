@@ -1,5 +1,8 @@
 use crate::prelude::*;
 use base64::prelude::*;
+use beet_core::prelude::*;
+use beet_dom::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use js_sys::wasm_bindgen::JsCast;
@@ -53,18 +56,12 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn bucket_create(
-		&self,
-		_bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self, _bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		// No-op for localStorage
 		Box::pin(async { Ok(()) })
 	}
 
-	fn bucket_remove(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -109,8 +106,7 @@ impl BucketProvider for LocalStorageProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
-	{
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let prefix = Self::bucket_prefix(bucket_name);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -157,7 +153,7 @@ impl BucketProvider for LocalStorageProvider {
 					Ok(())
 				}
 				false => {
-					bevybail!("Object not found: {}", key);
+					bevybail!("Object not found: {}", key)
 				}
 			}
 		})
@@ -167,8 +163,7 @@ impl BucketProvider for LocalStorageProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> SendBoxedFuture<Result<Option<String>>>
-	{
+	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
 }

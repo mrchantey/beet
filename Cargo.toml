@@ -235,21 +235,18 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 [features]
 default = ["flow", "nightly"]
 #💡 helper features
-launch = ["beet_net", "build"]
-server = ["beet_net", "design", "net", "serde"]
+launch = ["dom","net", "build"]
+server = ["serde","dom", "net", "design"]
 client = [
 	"rsx",
 	"design",
 	"net",
 	"dom",
 	"serde",
-	"beet_net",
 	"beet_net/client",
 	"beet_dom/client",
 	"beet_design/client",
 ]
-
-beet_net = ["dep:beet_net"]
 
 #💡 fine-grained
 native-tls = ["beet_net/native-tls"]

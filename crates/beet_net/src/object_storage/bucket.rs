@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;

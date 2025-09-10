@@ -64,22 +64,3 @@ pub mod exports {
 	pub use proc_macro2_diagnostics;
 	pub use syn;
 }
-pub mod as_beet {
-	pub use beet::prelude::*;
-	pub mod beet {
-		pub use crate as build;
-		pub use beet_parse as parse;
-		pub use beet_rsx as rsx;
-		pub mod prelude {
-			pub use crate::prelude::*;
-			pub use beet_core::prelude::*;
-			pub use beet_parse::prelude::*;
-			pub use beet_rsx::prelude::*;
-			pub use beet_utils::prelude::*;
-		}
-		pub mod exports {
-			pub use crate::exports::*;
-			pub use beet_rsx::exports::*;
-		}
-	}
-}
