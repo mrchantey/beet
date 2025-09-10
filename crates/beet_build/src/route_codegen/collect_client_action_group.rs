@@ -166,9 +166,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		mod_tree(vec![RouteFileMethod::new("/bazz")])
-			.xpect()
-			.to_be_snapshot();
+		mod_tree(vec![RouteFileMethod::new("/bazz")]).xpect_snapshot();
 	}
 
 
@@ -181,7 +179,6 @@ mod test {
 			RouteFileMethod::new(RouteInfo::post("foo/boo")),
 			RouteFileMethod::new(RouteInfo::post("foo/bing/bong")),
 		])
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

@@ -246,7 +246,6 @@ mod test {
 			.unwrap()
 			.0
 			.clone()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

@@ -23,8 +23,7 @@ fn works() {
 		/>
 	}
 	.xmap(HtmlFragment::parse_bundle)
-	.xpect()
-	.to_be_snapshot();
+	.xpect_snapshot();
 }
 
 #[allow(unused)]

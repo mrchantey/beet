@@ -128,7 +128,6 @@ mod test {
 
 		parse(&mut app, rsx! { <MyTemplate foo=3 client:only /> })
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

@@ -69,8 +69,7 @@ mod test {
 		}
 		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 
 	#[test]
@@ -81,47 +80,41 @@ mod test {
 		}
 		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_empty() {
 		quote! {<style></style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text() {
 		quote! {<style node:inline>foo{}</style>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_src() {
 		quote! {<style src="foo.rs"/>}
 			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

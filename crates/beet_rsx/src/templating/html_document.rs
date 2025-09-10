@@ -285,8 +285,7 @@ mod test {
 	#[cfg(feature = "css")]
 	fn hoist_style_tag() {
 		HtmlDocument::parse_bundle(rsx! { <style>foo{}</style> })
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn hoist_script_tag() {
@@ -294,8 +293,7 @@ mod test {
 			<script></script>
 			<br />
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn hoist_top_tag() {
@@ -333,8 +331,6 @@ mod test {
 	}
 	#[test]
 	fn hydration_scripts() {
-		HtmlDocument::parse_bundle(rsx! {<div client:load>})
-			.xpect()
-			.to_be_snapshot();
+		HtmlDocument::parse_bundle(rsx! {<div client:load>}).xpect_snapshot();
 	}
 }

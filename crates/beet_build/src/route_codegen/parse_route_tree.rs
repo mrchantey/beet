@@ -232,21 +232,15 @@ mod test {
 	}
 
 	#[test]
-	fn single() {
-		parse(vec![RouteFileMethod::new("/")])
-			.xpect()
-			.to_be_snapshot();
-	}
+	fn single() { parse(vec![RouteFileMethod::new("/")]).xpect_snapshot(); }
 
 	#[test]
 	fn dynamic() {
-		parse(vec![RouteFileMethod::new("/foo/:bar/*bazz")])
-			.xpect()
-			.to_be_snapshot();
+		parse(vec![RouteFileMethod::new("/foo/:bar/*bazz")]).xpect_snapshot();
 	}
 
 	#[test]
-	fn empty() { parse(vec![]).xpect().to_be_snapshot(); }
+	fn empty() { parse(vec![]).xpect_snapshot(); }
 
 	#[test]
 	fn creates_mod() {
@@ -262,7 +256,6 @@ mod test {
 		Parser { query }
 			.routes_mod_tree(&tree)
 			.to_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

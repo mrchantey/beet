@@ -27,8 +27,7 @@ fn works() {
 	app.world_mut()
 		.run_system_cached_with(render_fragment, entity)
 		.unwrap()
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 }
 
 

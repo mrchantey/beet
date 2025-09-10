@@ -14,12 +14,10 @@ fn css() {
 		</style>
 		</div>
 	})
-	.xpect()
-	.to_be_snapshot();
+	.xpect_snapshot();
 }
 #[test]
 fn fs_src() {
 	HtmlDocument::parse_bundle(rsx! { <style src="./test_file.css" /> })
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 }

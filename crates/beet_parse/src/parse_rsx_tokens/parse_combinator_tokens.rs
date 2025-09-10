@@ -292,67 +292,63 @@ mod test {
 	use proc_macro2::TokenStream;
 	use sweet::prelude::*;
 
-	fn parse(str: &str) -> Matcher<TokenStream> {
-		tokenize_combinator(str, WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect()
+	fn parse(str: &str) -> TokenStream {
+		tokenize_combinator(str, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
-	fn element() { "<br/>".xmap(parse).to_be_snapshot(); }
+	fn element() { "<br/>".xmap(parse).xpect_snapshot(); }
 	#[test]
 	fn fragment() {
 		"<br/><br/>"
 			.xmap(|str| {
-				tokenize_combinator(str, WsPathBuf::new(file!()))
-					.unwrap()
-					.xpect()
+				tokenize_combinator(str, WsPathBuf::new(file!())).unwrap()
 			})
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
-	fn unclosed() { "<div align=\"center\" />".xmap(parse).to_be_snapshot(); }
+	fn unclosed() { "<div align=\"center\" />".xmap(parse).xpect_snapshot(); }
 
 	#[test]
-	fn text() { "<div>hello</div>".xmap(parse).to_be_snapshot(); }
+	fn text() { "<div>hello</div>".xmap(parse).xpect_snapshot(); }
 
 	#[test]
-	fn block() { r#"{"hello"}"#.xmap(parse).to_be_snapshot(); }
+	fn block() { r#"{"hello"}"#.xmap(parse).xpect_snapshot(); }
 
 
 
 	#[test]
 	fn element_attributes_default() {
-		"<br foo />".xmap(parse).to_be_snapshot();
+		"<br foo />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_string() {
-		"<br foo=\"bar\"/>".xmap(parse).to_be_snapshot();
+		"<br foo=\"bar\"/>".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_bool() {
-		"<br foo=true />".xmap(parse).to_be_snapshot();
+		"<br foo=true />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_number() {
-		"<br foo=20 />".xmap(parse).to_be_snapshot();
+		"<br foo=20 />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_block_value() {
-		"<br foo={bar} />".xmap(parse).to_be_snapshot();
+		"<br foo={bar} />".xmap(parse).xpect_snapshot();
 	}
 	#[test]
 	fn element_attributes_spread() {
-		"<br {...bar} />".xmap(parse).to_be_snapshot();
+		"<br {...bar} />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn element_attributes_element() {
-		"<br foo={<br/>} />".xmap(parse).to_be_snapshot();
+		"<br foo={<br/>} />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
@@ -362,37 +358,37 @@ mod test {
 			bar
 		} />"
 			.xmap(parse)
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_default() {
-		"<MyTemplate foo />".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_string() {
-		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo=\"bar\"/>".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_bool() {
-		"<MyTemplate foo=true />".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo=true />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_number() {
-		"<MyTemplate foo=20 />".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo=20 />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_ident() {
-		"<MyTemplate foo={bar} />".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo={bar} />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
 	fn template_attributes_element() {
-		"<MyTemplate foo={<br/>} />".xmap(parse).to_be_snapshot();
+		"<MyTemplate foo={<br/>} />".xmap(parse).xpect_snapshot();
 	}
 
 	#[test]
@@ -402,7 +398,7 @@ mod test {
 			bar
 		} />"#
 			.xmap(parse)
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[cfg(feature = "css")]
 	#[test]
@@ -434,7 +430,7 @@ mod test {
 </style>
 "#
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	#[ignore = "todo combinator raw text"]
@@ -460,6 +456,6 @@ fn main() {
 		)
 		.unwrap();
 		out.to_string().xpect_contains("\nfn main()");
-		out.xpect().to_be_snapshot();
+		out.xpect_snapshot();
 	}
 }

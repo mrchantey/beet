@@ -185,10 +185,8 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> Matcher<TokenStream> {
-		tokenize_rstml(tokens, WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect()
+	fn parse(tokens: TokenStream) -> TokenStream {
+		tokenize_rstml(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
@@ -197,7 +195,7 @@ mod test {
 			<Foo bar client:load/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn reserved_names() {
@@ -205,6 +203,6 @@ mod test {
 			<Foo type="bar"/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

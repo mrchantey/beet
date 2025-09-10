@@ -331,8 +331,7 @@ mod test {
 	#[cfg(feature = "css")]
 	fn style_inline() {
 		HtmlFragment::parse_bundle(rsx! {<style>body { color: red; }</style>})
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 
 	#[test]
@@ -341,8 +340,7 @@ mod test {
 		HtmlFragment::parse_bundle(
 			rsx! { <style src="../../tests/test_file.css" /> },
 		)
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 
 
@@ -359,8 +357,7 @@ mod test {
 		HtmlFragment::parse_bundle(
 			rsx! { <code lang="js">let foo = "bar"</code> },
 		)
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn escapes() {
@@ -369,7 +366,6 @@ mod test {
 				<code class="language-rust">fn foobar() -> String {}</code>
 			</pre>
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

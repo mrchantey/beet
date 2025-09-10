@@ -155,8 +155,7 @@ mod test {
 			<style {replace_hash()} />
 			<span />
 		})
-			.xpect()
-			.to_be_snapshot();
+		.xpect_snapshot();
 	}
 
 	#[test]
@@ -166,8 +165,7 @@ mod test {
 			<style> body{ color: red; }</style>
 			<div/>
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn deduplicates() {
@@ -178,8 +176,7 @@ mod test {
 				<style {replace_hash()} />
 			</div>
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn assigns_id_to_all() {
@@ -189,8 +186,7 @@ mod test {
 				<span />
 			</div>
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn ignores_templates() {
@@ -198,8 +194,7 @@ mod test {
 			<style {replace_hash()} />
 			<MyTemplate />
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	// #[test]
 	// fn visits_templates() {
@@ -207,10 +202,7 @@ mod test {
 	// 		<style {replace_hash()}/>
 	// 		<MyTemplate/>
 	// 		<MyTemplate/>
-	// 	})
-	// 	.xpect()
-	// 	.to_be_snapshot();
-	// }
+
 
 	#[test]
 	fn applies_to_slots() {
@@ -220,8 +212,7 @@ mod test {
 				<span />
 			</MyTemplate>
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn expressions() {
@@ -231,8 +222,7 @@ mod test {
 			<style {replace_hash()} />
 			{foo}
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 
 	#[test]
@@ -241,8 +231,7 @@ mod test {
 			<style {replace_hash()} />
 			<MyTemplate style:cascade />
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 
 	#[test]
@@ -256,8 +245,7 @@ mod test {
 		}
 
 		HtmlDocument::parse_bundle(rsx! { <StyledTemplate /> })
-		.xpect()
-		.to_be_snapshot();
+			.xpect_snapshot();
 	}
 
 	#[test]
@@ -275,8 +263,6 @@ mod test {
 			"}
 		}
 
-		HtmlDocument::parse_bundle(rsx! { <Style /> })
-			.xpect()
-			.to_be_snapshot();
+		HtmlDocument::parse_bundle(rsx! { <Style /> }).xpect_snapshot();
 	}
 }

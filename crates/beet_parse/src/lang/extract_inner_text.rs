@@ -120,8 +120,7 @@ mod test {
 			.get::<NodeExpr>()
 			.unwrap()
 			.self_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn extracts_src() {

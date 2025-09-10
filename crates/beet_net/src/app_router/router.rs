@@ -530,11 +530,6 @@ mod test {
 				.run_system_cached(insert_route_tree)
 				.unwrap();
 		});
-		router
-			.oneshot_str("/")
-			.await
-			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+		router.oneshot_str("/").await.unwrap().xpect_snapshot();
 	}
 }

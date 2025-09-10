@@ -17,7 +17,7 @@ pub fn tokenize_bundle_tokens(
 	tokenize_node_exprs_tokens(world, &mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
-	
+
 	items.xmap(unbounded_bundle).xok()
 }
 
@@ -58,22 +58,18 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse_rstml(tokens: TokenStream) -> Matcher<TokenStream> {
-		tokenize_rstml_tokens(tokens, WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect()
+	fn parse_rstml(tokens: TokenStream) -> TokenStream {
+		tokenize_rstml_tokens(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
-	fn parse_combinator(tokens: &str) -> Matcher<TokenStream> {
-		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect()
+	fn parse_combinator(tokens: &str) -> TokenStream {
+		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
-	fn element_tag_only() { parse_rstml(quote! {<br/>}).to_be_snapshot(); }
+	fn element_tag_only() { parse_rstml(quote! {<br/>}).xpect_snapshot(); }
 	#[test]
-	fn template_tag_only() { parse_rstml(quote! {<Foo/>}).to_be_snapshot(); }
+	fn template_tag_only() { parse_rstml(quote! {<Foo/>}).xpect_snapshot(); }
 	#[test]
 	fn attributes() {
 		parse_rstml(quote! {
@@ -85,25 +81,24 @@ mod test {
 			onmousemove="some_js_func"
 			onclick={|_: Trigger<OnClick>| {}}
 		/>})
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
-	fn block_node() { parse_rstml(quote! {<div>{7}</div>}).to_be_snapshot(); }
+	fn block_node() { parse_rstml(quote! {<div>{7}</div>}).xpect_snapshot(); }
 	#[test]
-	fn combinator_simple() { parse_combinator("<br/>").to_be_snapshot(); }
+	fn combinator_simple() { parse_combinator("<br/>").xpect_snapshot(); }
 	#[test]
 	fn combinator_siblings() {
 		tokenize_combinator_tokens("<br/><br/>", WsPathBuf::new(file!()))
 			.unwrap()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 
 	#[test]
 	fn combinator() {
 		parse_combinator(
 			r#"
-			<br 
+			<br
 				hidden
 				class=true
 				onmousemove="some_js_func"
@@ -111,18 +106,18 @@ mod test {
 			/>
 		"#,
 		)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn nested_combinator() {
 		parse_combinator(
-			r#"<br 
+			r#"<br
 				foo={
 					let class = "bar";
 					<div class={class}/>
 				}
 			/>"#,
 		)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

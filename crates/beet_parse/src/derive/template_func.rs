@@ -259,8 +259,7 @@ mod test {
 				mut bar:u32
 			) -> impl Bundle{()}
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn complex() {
@@ -276,7 +275,6 @@ mod test {
 				mut query: Query<&mut Transform>,
 			) -> impl Bundle{()}
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

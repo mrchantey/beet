@@ -105,10 +105,8 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	fn parse(tokens: TokenStream) -> Matcher<TokenStream> {
-		tokenize_rstml(tokens, WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect()
+	fn parse(tokens: TokenStream) -> TokenStream {
+		tokenize_rstml(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
@@ -117,7 +115,7 @@ mod test {
 			<span hidden/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn key_value() {
@@ -125,7 +123,7 @@ mod test {
 			<span hidden=true/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn block() {
@@ -133,7 +131,7 @@ mod test {
 			<span {foo}/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn r#ref() {
@@ -141,7 +139,7 @@ mod test {
 			<span ref=span_ref/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn events() {
@@ -149,7 +147,7 @@ mod test {
 			<span onclick={foo}/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn js_events() {
@@ -157,7 +155,7 @@ mod test {
 			<span onclick="some_js_func"/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn lang_src() {
@@ -165,7 +163,7 @@ mod test {
 			<style src="./foobar"/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 	#[test]
 	fn all() {
@@ -179,6 +177,6 @@ mod test {
 			/>
 		}
 		.xmap(parse)
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

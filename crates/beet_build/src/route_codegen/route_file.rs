@@ -196,7 +196,6 @@ mod test {
 		route_file
 			.item_mod(RouteCollectionCategory::Pages)
 			.to_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

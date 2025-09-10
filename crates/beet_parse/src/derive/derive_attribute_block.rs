@@ -113,7 +113,6 @@ mod test {
 				nested: OtherBlock,
 			}
 		})
-		.xpect()
-		.to_be_snapshot();
+		.xpect_snapshot();
 	}
 }

@@ -10,6 +10,42 @@ use proc_macro2::TokenStream;
 #[cfg(feature = "tokens")]
 use quote::ToTokens;
 
+#[extend::ext(name=SweetSnapshot)]
+pub impl<T, M> T
+where
+	T: StringComp<M>,
+{
+	/// Compares the value to a snapshot, saving it if the `--snap` flag is used.
+	/// Snapshots are saved using test name so only one snapshot per test is allowed.
+	/// # Panics
+	/// If the snapshot file cannot be read or written.
+	fn xpect_snapshot(&self) -> &Self {
+		#[cfg(target_arch = "wasm32")]
+		{
+			beet_utils::log!("snapshot not yet supported on wasm32");
+		}
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			let received = self.to_comp_string();
+			match parse_snapshot(&received) {
+				Ok(Some(expected)) => {
+					assert_ext::assert_diff(
+						&expected,
+						received.into_maybe_not(),
+					);
+				}
+				Ok(None) => {
+					// snapshot saved, no assertion made
+				}
+				Err(e) => {
+					assert_ext::panic(e.to_string());
+				}
+			}
+		}
+		self
+	}
+}
+
 
 // returns whether the assertion should be made
 #[allow(dead_code)]
@@ -44,41 +80,6 @@ Received:
 			)
 		})?;
 		Ok(Some(expected))
-	}
-}
-
-// #[cfg(feature = "tokens")]
-// impl<T: ToTokens> Matcher<T> {
-
-// }
-
-impl<T> Matcher<T> {
-	/// Compares the value to a snapshot, saving it if the `--snap` flag is used.
-	/// Snapshots are saved using test name so only one snapshot per test is allowed.
-	/// # Panics
-	/// If the snapshot file cannot be read or written.
-	pub fn to_be_snapshot<M>(&self) -> &Self
-	where
-		T: StringComp<M>,
-	{
-		#[cfg(target_arch = "wasm32")]
-		{
-			beet_utils::log!("snapshot not yet supported on wasm32");
-		}
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			let received = self.value.to_comp_string();
-			match parse_snapshot(&received) {
-				Ok(Some(expected)) => self.assert_diff(&expected, &received),
-				Ok(None) => {
-					// snapshot saved, no assertion made
-				}
-				Err(e) => {
-					self.assert(false, &e.to_string());
-				}
-			}
-		}
-		self
 	}
 }
 
@@ -176,7 +177,10 @@ mod test {
 	struct MyStruct(u32);
 
 	#[test]
-	fn bool() { MyStruct(7).xpect().to_be_snapshot(); }
+	fn bool() { true.xpect_snapshot(); }
+
+	#[test]
+	fn serde_struct() { MyStruct(7).xpect_snapshot(); }
 
 	#[cfg(feature = "tokens")]
 	#[test]

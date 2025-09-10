@@ -275,8 +275,7 @@ mod test {
 				}
 			}))
 			.to_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 	#[test]
 	fn get_with_result() {
@@ -287,7 +286,6 @@ mod test {
 				}
 			}))
 			.to_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

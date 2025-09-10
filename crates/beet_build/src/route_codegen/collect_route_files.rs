@@ -135,7 +135,6 @@ mod test {
 			.build_output()
 			.unwrap()
 			.to_token_stream()
-			.xpect()
-			.to_be_snapshot();
+			.xpect_snapshot();
 	}
 }

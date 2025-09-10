@@ -9,11 +9,14 @@ use crate::prelude::*;
 
 
 /// Panics if the result is false
-pub fn assert(result: bool, msg: &str) {
+pub fn assert(result: bool, msg: impl AsRef<str>) {
 	if !result {
 		panic_ext::panic_str(msg);
 	}
 }
+
+/// Panics at correct backtrace level
+pub fn panic(msg: impl AsRef<str>) { panic_ext::panic_str(msg); }
 
 
 

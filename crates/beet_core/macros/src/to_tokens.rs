@@ -242,7 +242,7 @@ mod test {
 				field2: String,
 			}
 		};
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn named_struct_constructor() {
@@ -253,7 +253,7 @@ mod test {
 				field2: String,
 			}
 		};
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 
 	#[test]
@@ -262,7 +262,7 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn tuple_struct_constructor() {
@@ -271,7 +271,7 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 
 	#[test]
@@ -284,7 +284,7 @@ mod test {
 			}
 		};
 
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn generics() {
@@ -292,6 +292,6 @@ mod test {
 			struct MyGenericStruct<U:Clone>{}
 		};
 
-		input.xmap(parse).unwrap().xpect().to_be_snapshot();
+		input.xmap(parse).unwrap().xpect_snapshot();
 	}
 }
