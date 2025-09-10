@@ -159,7 +159,7 @@ impl Default for WorkspaceConfig {
 			root_dir: {
 				#[cfg(test)]
 				{
-					WsPathBuf::new("crates/beet_router/src/test_site")
+					WsPathBuf::new("tests/test_site")
 				}
 				#[cfg(not(test))]
 				{
@@ -176,7 +176,7 @@ impl Default for WorkspaceConfig {
 impl WorkspaceConfig {
 	pub fn test_site() -> Self {
 		let mut this = Self::default();
-		this.root_dir = WsPathBuf::new("crates/beet_router/src/test_site");
+		this.root_dir = WsPathBuf::new("tests/test_site");
 		this
 	}
 

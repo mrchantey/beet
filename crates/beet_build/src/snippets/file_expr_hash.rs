@@ -237,7 +237,7 @@ mod test {
 		app.add_plugins(BuildPlugin::default());
 
 		let index_path = WsPathBuf::new(
-			"crates/beet_router/src/test_site/pages/docs/index.rs",
+			"tests/test_site/pages/docs/index.rs",
 		);
 		let mut query = app
 			.world_mut()

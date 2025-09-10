@@ -150,11 +150,11 @@ impl RouteFileCollection {
 	pub fn test_site() -> impl Bundle {
 		(
 			Self::new(
-				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
+				WsPathBuf::new("tests/test_site").into_abs(),
 			),
 			CodegenFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/codegen/mod.rs",
+					"tests/test_site/codegen/mod.rs",
 				)
 				.into_abs(),
 			)
@@ -165,7 +165,7 @@ impl RouteFileCollection {
 	pub fn test_site_pages() -> impl Bundle {
 		(
 			Self::new(
-				WsPathBuf::new("crates/beet_router/src/test_site/pages")
+				WsPathBuf::new("tests/test_site/pages")
 					.into_abs(),
 			)
 			.with_filter(
@@ -175,14 +175,14 @@ impl RouteFileCollection {
 			),
 			CodegenFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/codegen/pages.rs",
+					"tests/test_site/codegen/pages.rs",
 				)
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
 			children![SourceFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/pages/docs/index.rs",
+					"tests/test_site/pages/docs/index.rs",
 				)
 				.into_abs(),
 			)],
@@ -192,7 +192,7 @@ impl RouteFileCollection {
 	pub fn test_site_docs() -> impl Bundle {
 		(
 			Self::new(
-				WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
+				WsPathBuf::new("tests/test_site/test_docs")
 					.into_abs(),
 			)
 			.with_filter(
@@ -202,14 +202,14 @@ impl RouteFileCollection {
 			),
 			CodegenFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/codegen/test_docs.rs",
+					"tests/test_site/codegen/test_docs.rs",
 				)
 				.into_abs(),
 			)
 			.with_pkg_name("test_site"),
 			children![SourceFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/test_docs/index.mdx",
+					"tests/test_site/test_docs/index.mdx",
 				)
 				.into_abs(),
 			)],
@@ -227,14 +227,14 @@ mod test {
 	#[test]
 	fn works() {
 		let collection = RouteFileCollection::new(
-			WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
+			WsPathBuf::new("tests/test_site").into_abs(),
 		)
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"));
 
 		collection
 			.passes_filter(
 				&WsPathBuf::new(
-					"crates/beet_router/src/test_site/index.mockup.rs",
+					"tests/test_site/index.mockup.rs",
 				)
 				.into_abs(),
 			)
@@ -244,7 +244,7 @@ mod test {
 			.xpect_false();
 		collection
 			.passes_filter(
-				&WsPathBuf::new("crates/beet_router/src/test_site/index.rs")
+				&WsPathBuf::new("tests/test_site/index.rs")
 					.into_abs(),
 			)
 			.xpect_false();

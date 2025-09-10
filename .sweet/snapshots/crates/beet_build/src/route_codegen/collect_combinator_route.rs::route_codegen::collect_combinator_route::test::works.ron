@@ -7,7 +7,7 @@ use crate as test_site;
 pub fn get() -> impl Bundle {
     (
         SnippetRoot {
-            file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/index.mdx"),
+            file: WsPathBuf::new("tests/test_site/test_docs/index.mdx"),
             start: LineCol { line: 1u32, col: 0u32 },
         },
         InstanceRoot,

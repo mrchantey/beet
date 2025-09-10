@@ -71,7 +71,7 @@ mod test {
 			.world_mut()
 			.spawn(SourceFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/test_docs/hello.md",
+					"tests/test_site/test_docs/hello.md",
 				)
 				.into_abs(),
 			))
@@ -93,7 +93,7 @@ mod test {
 			.world_mut()
 			.spawn(SourceFile::new(
 				WsPathBuf::new(
-					"crates/beet_router/src/test_site/test_docs/index.mdx",
+					"tests/test_site/test_docs/index.mdx",
 				)
 				.into_abs(),
 			))

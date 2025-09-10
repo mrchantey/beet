@@ -78,7 +78,7 @@ mod test {
 
 
 		let test_site_index =
-			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
+			WsPathBuf::new("tests/test_site/pages/index.rs");
 
 		let snippet_path = WorkspaceConfig::default()
 			.rsx_snippet_path(&test_site_index, 7)

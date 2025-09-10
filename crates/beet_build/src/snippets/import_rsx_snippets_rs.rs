@@ -83,7 +83,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
 		let test_site_index =
-			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
+			WsPathBuf::new("tests/test_site/pages/index.rs");
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(test_site_index.into_abs()))
