@@ -140,10 +140,6 @@ mod test {
 
 		let on_child_score =
 			observe_triggers::<OnChildResult<ScoreValue>>(world);
-		// let on_child_score =
-		// 	observe_trigger_mapped(world, |trigger: Trigger<OnChildScore>| {
-		// 		*trigger.event().value()
-		// 	});
 
 		world
 			.spawn(HighestScore::default())
@@ -160,8 +156,5 @@ mod test {
 			.flush_trigger(OnRun::local());
 
 		on_child_score.len().xpect_eq(2);
-
-		// (&on_child_score).xpect().to_have_returned_nth_with(0, &0.3)?;
-		// (&on_child_score).xpect().to_have_returned_nth_with(1, &0.7)?;
 	}
 }

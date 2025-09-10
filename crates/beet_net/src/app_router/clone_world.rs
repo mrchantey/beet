@@ -99,7 +99,6 @@ mod test {
 		// Router::oneshot_str(&mut world2, "/")
 		// 	.await
 		// 	.unwrap()
-		// 	.xpect()
 		// 	.xpect_eq("hello world!");
 	}
 }

@@ -24,7 +24,7 @@ use crate::prelude::*;
 /// adder.call(1);
 /// adder.call(2);
 /// assert_eq!(adder.called.len(), 2);
-/// assert_eq!(adder.called.with(|v| v.clone()), vec![2, 3]);
+/// assert_eq!(adder.called.get(), vec![2, 3]);
 /// // Clean up in long-running apps
 /// adder.called.remove();
 /// adder.func.remove();
@@ -35,7 +35,7 @@ use crate::prelude::*;
 /// # use beet_utils::prelude::*;
 /// let make_ten = FuncStore::new(|n: u32| n + 10);
 /// make_ten.call0(); // uses u32::default() == 0
-/// assert_eq!(make_ten.called.with(|v| v.clone()), vec![10]);
+/// assert_eq!(make_ten.called.get(), vec![10]);
 /// make_ten.called.remove();
 /// make_ten.func.remove();
 /// ```
@@ -88,7 +88,7 @@ where
 	/// # use beet_utils::prelude::*;
 	/// let fs = FuncStore::<u32, u32, _>::new(|n| n * 2);
 	/// fs.call(3);
-	/// assert_eq!(fs.called.with(|v| v.clone()), vec![6]);
+	/// assert_eq!(fs.called.get(), vec![6]);
 	/// // Clean up
 	/// fs.called.remove();
 	/// fs.func.remove();
@@ -108,7 +108,7 @@ where
 	/// # use beet_utils::prelude::*;
 	/// let doubler = FuncStore::new(|n: u32| n * 2);
 	/// doubler.call(4);
-	/// assert_eq!(doubler.called.with(|v| v.clone()), vec![8]);
+	/// assert_eq!(doubler.called.get(), vec![8]);
 	/// // Clean up
 	/// doubler.called.remove();
 	/// doubler.func.remove();
@@ -133,7 +133,7 @@ where
 	/// # use beet_utils::prelude::*;
 	/// let make_five = FuncStore::new(|n: u32| n + 5);
 	/// make_five.call0(); // uses u32::default() == 0
-	/// assert_eq!(make_five.called.with(|v| v.clone()), vec![5]);
+	/// assert_eq!(make_five.called.get(), vec![5]);
 	/// // Clean up
 	/// make_five.called.remove();
 	/// make_five.func.remove();
@@ -160,7 +160,7 @@ where
 	/// let triple = FuncStore::new(|n: u32| n * 3);
 	/// let got = triple.call_and_get(3);
 	/// assert_eq!(got, 9);
-	/// assert_eq!(triple.called.with(|v| v.clone()), vec![9]);
+	/// assert_eq!(triple.called.get(), vec![9]);
 	/// // Clean up
 	/// triple.called.remove();
 	/// triple.func.remove();
@@ -172,27 +172,6 @@ where
 	}
 }
 
-/// Construct a `FuncStore` from a function or closure.
-///
-/// This is a convenience alias for [`FuncStore::new`].
-///
-/// Examples
-/// ```rust
-/// # use beet_utils::prelude::*;
-/// let fs = mock_func(|s: &str| s.len());
-/// fs.call("beet");
-/// assert_eq!(fs.called.with(|v| v.clone()), vec![4]);
-/// // Clean up
-/// fs.called.remove();
-/// fs.func.remove();
-/// ```
-pub fn mock_func<I, O, F>(func: F) -> FuncStore<I, O, F>
-where
-	O: 'static + Send,
-	F: 'static + Send + Fn(I) -> O,
-{
-	FuncStore::new(func)
-}
 
 /// When the `nightly` feature is enabled, `FuncStore` can be called like a regular
 /// function/closure. Each invocation records the output just like [`FuncStore::call`].
@@ -244,8 +223,19 @@ mod test {
 		func_store.call(2);
 
 		assert_eq!(func_store.called.len(), 2);
-		let outputs = func_store.called.with(|v| v.clone());
+		let outputs = func_store.called.get();
 		assert_eq!(outputs, vec![2, 3]);
+	}
+
+	#[test]
+	fn multiple_calls() {
+		let func_store = FuncStore::new(|v| v);
+
+		func_store.call(4);
+		func_store.call(5);
+
+		let outputs = func_store.called.get();
+		assert_eq!(outputs, vec![4, 5]);
 	}
 
 	#[test]
@@ -254,7 +244,7 @@ mod test {
 
 		func_store.call0();
 
-		let outputs = func_store.called.with(|v| v.clone());
+		let outputs = func_store.called.get();
 		assert_eq!(outputs, vec![5]);
 	}
 
@@ -268,18 +258,7 @@ mod test {
 		assert_eq!(first, 6);
 		assert_eq!(second, 8);
 
-		let outputs = func_store.called.with(|v| v.clone());
+		let outputs = func_store.called.get();
 		assert_eq!(outputs, vec![6, 8]);
-	}
-
-	#[test]
-	fn mock_func_alias() {
-		let func_store = mock_func(|s: &str| s.len());
-
-		func_store.call("beet");
-		func_store.call("utils");
-
-		let outputs = func_store.called.with(|v| v.clone());
-		assert_eq!(outputs, vec![4, 5]);
 	}
 }

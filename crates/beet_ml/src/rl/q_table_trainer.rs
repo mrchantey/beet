@@ -151,7 +151,6 @@ mod test {
 		// println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
 		elapsed.xpect_greater_than(Duration::from_millis(2));
-		// elapsed.xpect().to_be_less_than(Duration::from_millis(30))?;
 
 		let eval = trainer.evaluate();
 		// println!("{eval:?}\n");
