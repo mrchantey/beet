@@ -1,11 +1,10 @@
 use crate::prelude::*;
-use anyhow::Result;
 #[cfg(feature = "tokens")]
 use beet_core::prelude::ToTokens;
 use beet_dom::prelude::*;
 use bevy::prelude::*;
-use http::Uri;
 use http::uri::InvalidUri;
+use http::Uri;
 use std::path::Path;
 use std::path::PathBuf;
 

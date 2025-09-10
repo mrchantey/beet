@@ -17,7 +17,7 @@ name = "beet"
 path = "src/main.rs"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet = { workspace = true, features = ["build", "fs", "server", "chrome"] }
+beet = { workspace = true, features = ["build", "fs", "server", "chrome_dev_tools"] }
 anyhow.workspace = true
 ron.workspace = true
 clap.workspace = true

@@ -34,13 +34,19 @@ impl Bucket {
 	/// - native: [`FsBucketProvider`] with root: `.cache/buckets`
 	pub fn new_local(name: impl Into<String>) -> Self {
 		#[cfg(target_arch = "wasm32")]
-		let provider = LocalStorageProvider::new();
-		#[cfg(not(target_arch = "wasm32"))]
-		let provider = FsBucketProvider::new(
-			AbsPathBuf::new_workspace_rel(".cache/buckets").unwrap(),
+		return Self::new(LocalStorageProvider::new(), name);
+		#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+		return Self::new(
+			FsBucketProvider::new(
+				AbsPathBuf::new_workspace_rel(".cache/buckets").unwrap(),
+			),
+			name,
 		);
-
-		Self::new(provider, name)
+		#[cfg(not(any(target_arch = "wasm32", feature = "tokio")))]
+		panic!(
+			"Failed to create bucket {}, Bucket::new_local requires either the wasm32 target or the \"tokio\" feature to be enabled.",
+			name.into()
+		);
 	}
 
 	/// Create a [`BucketItem`] for interactively working with a bucket item

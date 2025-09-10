@@ -34,6 +34,7 @@ pub fn is_internal() -> bool {
 		"beet_rsx",
 		"beet_rsx_macros",
 		"beet_rsx_combinator",
+		"beet_router",
 		"beet_sim",
 		"beet_spatial",
 		"beet_utils",

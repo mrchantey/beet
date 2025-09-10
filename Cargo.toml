@@ -67,6 +67,7 @@ members = [
 	"crates/beet_rsx/macros",
 	"crates/beet_net",
 	"crates/beet_dom",
+	"crates/beet_router",
 
 	## 💡 Sweet
 	"crates/beet_core",
@@ -93,6 +94,7 @@ beet_rsx = { path = "crates/beet_rsx", version = "0.0.7-dev.7" }
 beet_build = { path = "crates/beet_build", version = "0.0.7-dev.7" }
 beet_design = { path = "crates/beet_design", version = "0.0.7-dev.7" }
 beet_net = { path = "crates/beet_net", version = "0.0.7-dev.7" }
+beet_router = { path = "crates/beet_router", version = "0.0.7-dev.7" }
 beet_dom = { path = "crates/beet_dom", version = "0.0.7-dev.7" }
 beet_query = { path = "crates/beet_query", version = "0.0.7-dev.7" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7-dev.7" }
@@ -236,39 +238,41 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow", "nightly"]
 #💡 helper features
 launch = ["dom","net", "build"]
-server = ["serde","dom", "net", "design"]
+server = ["serde","dom", "net", "router", "design"]
 client = [
 	"rsx",
 	"design",
 	"net",
 	"dom",
 	"serde",
+	"router",
 	"beet_net/client",
 	"beet_dom/client",
 	"beet_design/client",
 ]
 
 #💡 fine-grained
-native-tls = ["beet_net/native-tls"]
-rustls-tls = ["beet_net/rustls-tls"]
-serde = ["beet_utils/serde"]
+native-tls = ["beet_net?/native-tls", "beet_router?/native-tls"]
+rustls-tls = ["beet_net?/rustls-tls", "beet_router?/rustls-tls"]
+serde = ["beet_utils/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly", "beet_utils/nightly"]
 rand = ["beet_utils/rand", "beet_core/rand"]
 agent = ["dep:beet_agent"]
 dom = ["dep:beet_dom"]
+router = ["dep:beet_router"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
 design = ["rsx", "dep:beet_design"]
-chrome = ["beet_net?/chrome"]
+chrome_dev_tools = ["beet_dom?/chrome_dev_tools"]
 # query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 # 💡 Server
-axum = ["beet_net/axum"]
-lambda = ["rustls-tls", "beet_net/lambda"]
+axum = ["beet_router/axum"]
+lambda = ["rustls-tls", "beet_router/lambda"]
 aws = ["beet_net/aws"]
 
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
@@ -306,10 +310,11 @@ beet_utils.workspace = true
 beet_core.workspace = true
 
 #💡 web
-beet_rsx = { workspace = true, optional = true }
-beet_parse = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_dom = { workspace = true, optional = true }
+beet_parse = { workspace = true, optional = true }
+beet_rsx = { workspace = true, optional = true }
+beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_agent = { workspace = true, optional = true }

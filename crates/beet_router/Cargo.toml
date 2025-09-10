@@ -1,0 +1,96 @@
+[package]
+name = "beet_router"
+version.workspace = true
+edition.workspace = true
+description = "ECS router and server utilities"
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["router"]
+categories.workspace = true
+publish = true
+
+[features]
+default = ["serde", "axum", "reload"]
+tokens = ["beet_core/tokens"]
+# for conditional compilation in hooks
+client = []
+aws = ["beet_net/aws"]
+# wip: axum features behind this flag
+axum = [
+	"beet_net/axum",
+	"beet_utils/fs",
+	"tokio",
+	"dep:axum",
+	"dep:axum-extra",
+	"dep:axum-server",
+	"dep:tower",
+	"dep:tower-http",
+]
+tokio = ["dep:tokio","beet_net/tokio"]
+reload = ["tower-livereload"]
+lambda = ["rustls-tls", "dep:lambda_http"]
+serde = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:clap",
+	"dep:base64",
+	"beet_core/serde",
+]
+native-tls = []
+rustls-tls = [
+	"axum-server?/tls-rustls",
+]
+
+[dependencies]
+beet_utils = { workspace = true }
+beet_core.workspace = true
+beet_net.workspace = true
+beet_dom.workspace = true
+beet_rsx.workspace = true
+
+bevy.workspace = true
+
+# utils
+extend.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+send_wrapper.workspace = true
+
+# serde
+clap = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+
+# http
+bytes.workspace = true
+
+# async
+futures.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+
+#💡 server
+tokio = { workspace = true, optional = true, default-features = true }
+axum = { workspace = true, optional = true }
+axum-extra = { workspace = true, optional = true }
+axum-server = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-livereload = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+lambda_http = { version = "0.16", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+beet_core.workspace = true
+js-sys.workspace = true
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+web-sys = { workspace = true, features = ["Storage"] }
+
+[dev-dependencies]
+sweet.workspace = true

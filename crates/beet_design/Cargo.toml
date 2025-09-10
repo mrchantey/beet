@@ -32,6 +32,7 @@ beet_core.workspace = true
 beet_utils.workspace = true
 beet_dom.workspace = true
 beet_net.workspace = true
+beet_router.workspace = true
 chrono.workspace = true
 heck.workspace = true
 material-colors = "0.4.2"

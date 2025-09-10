@@ -91,12 +91,13 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                          | Status | Description                                  |
 | ---------------------------------------------- | ------ | -------------------------------------------- |
+| [`beet_net`](crates/beet_net/Cargo.toml)       | 🌱      | Cross-platform networking utilities          |
+| [`beet_dom`](crates/beet_dom/Cargo.toml)       | 🌱      | Utilities for dom rendering and interaction   |
+| [`beet_parse`](crates/beet_parse/Cargo.toml)   | 🌱      | Parsers for various text and token formats   |
 | [`beet_rsx`](crates/beet_rsx/Cargo.toml)       | 🌱      | A rust/bevy implementation of jsx dom interaction |
 | [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🌱      | JSX-like parser combinator for Rust          |
-| [`beet_parse`](crates/beet_parse/Cargo.toml)   | 🌱      | Parsers for various text and token formats   |
+| [`beet_router`](crates/beet_router/Cargo.toml) | 🌱      | ECS router and server utilities          |
 | [`beet_build`](crates/beet_build/Cargo.toml)   | 🌱      | Codegen and compilation tooling              |
-| [`beet_dom`](crates/beet_dom/Cargo.toml)       | 🌱      | Utilities for dom rendering and interaction   |
-| [`beet_net`](crates/beet_net/Cargo.toml)       | 🌱      | Cross-platform networking utilities          |
 | [`beet_design`](crates/beet_design/Cargo.toml) | 🌱      | Design system and components for beet rsx    |
 | [`beet-cli`](crates/beet-cli/Cargo.toml)       | 🌱      | Tools for building and deploying beet apps   |
 | [`beet_site`](crates/beet_site/Cargo.toml)     | 🌱      | The beet website, built with beet            |

@@ -24,6 +24,8 @@ pub use beet_parse as parse;
 // pub use beet_query as query;
 #[cfg(feature = "net")]
 pub use beet_net as net;
+#[cfg(feature = "router")]
+pub use beet_router as router;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
 #[cfg(feature = "sim")]
@@ -57,6 +59,8 @@ pub mod prelude {
 	// pub use crate::query::prelude::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
+	#[cfg(feature = "router")]
+	pub use crate::router::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
 	#[cfg(feature = "sim")]

@@ -13,21 +13,12 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "axum", "reload", "reqwest"]
-tokens = ["beet_core/tokens"]
+default = ["serde", "reqwest"]
 # for conditional compilation in hooks
 client = []
-# wip: axum features behind this flag
-axum = [
-	"fs",
-	"tokio",
-	"dep:axum",
-	"dep:axum-extra",
-	"dep:axum-server",
-	"dep:tower",
-	"dep:tower-http",
-]
-tokio = ["dep:tokio"]
+tokio = ["dep:tokio","beet_utils/tokio"]
+tokens = ["beet_core/tokens"]
+axum = ["dep:axum"]
 aws = [
 	"tokio",
 	"dep:crc-fast",
@@ -35,8 +26,6 @@ aws = [
 	"dep:aws-sdk-dynamodb",
 	"dep:aws-config",
 ]
-reload = ["tower-livereload"]
-lambda = ["rustls-tls", "dep:lambda_http"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
@@ -46,23 +35,19 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest"]
-websockets = ["fs", "dep:tokio-tungstenite"]
+websockets = ["dep:tokio-tungstenite"]
 native-tls = ["reqwest?/default"]
 rustls-tls = [
-	"axum-server?/tls-rustls",
 	"reqwest?/rustls-tls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls",
 ]
-fs = ["beet_utils/fs","tokio?/process"]
-chrome = ["websockets","dep:exponential-backoff"]
 
 [dependencies]
 beet_utils = { workspace = true }
 beet_core.workspace = true
 beet_dom.workspace = true
-beet_rsx.workspace = true
 
 bevy.workspace = true
 
@@ -71,7 +56,6 @@ extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-anyhow.workspace = true
 send_wrapper.workspace = true
 
 # serde
@@ -93,9 +77,9 @@ eventsource-stream = "0.2.3"
 
 # async
 futures.workspace = true
-exponential-backoff = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axum = { workspace = true, optional = true }
 # http (native)
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",
@@ -103,15 +87,8 @@ reqwest = { version = "0.12", default-features = false, optional = true, feature
 tokio-tungstenite = { version = "0.27", optional = true }
 
 #💡 server
-tokio = { workspace = true, optional = true, default-features = true }
-axum = { workspace = true, optional = true }
-axum-extra = { workspace = true, optional = true }
-axum-server = { workspace = true, optional = true }
-tower = { workspace = true, optional = true }
-tower-livereload = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
-lambda_http = { version = "0.16", optional = true }
-# lock down aws-sdk-s3 upstream, some weird nightly feature
+tokio = { workspace = true, optional = true, default-features = true, features = ["process"] }
+# lock down aws-sdk-s3 upstream, some weird nightly feature breaks it
 crc-fast = { version = "=1.3.0", optional = true }
 aws-sdk-dynamodb = { version = "1", optional = true, default-features = false, features = [
 	# defaults without rustls
@@ -131,11 +108,11 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-beet_core.workspace = true
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 web-sys = { workspace = true, features = ["Storage"] }
 
 [dev-dependencies]
+beet_net = {path = ".", features = ["tokio"] }
 sweet.workspace = true

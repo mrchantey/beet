@@ -1,5 +1,4 @@
-#[cfg(feature = "tokens")]
-use beet_core::prelude::ToTokens;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::fmt;
 
@@ -139,7 +138,7 @@ impl fmt::Display for HttpMethod {
 }
 
 impl std::str::FromStr for HttpMethod {
-	type Err = anyhow::Error;
+	type Err = BevyError;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		// case insensitive
 		Ok(match s.to_ascii_uppercase().as_str() {
@@ -152,7 +151,7 @@ impl std::str::FromStr for HttpMethod {
 			"HEAD" => HttpMethod::Head,
 			"TRACE" => HttpMethod::Trace,
 			"CONNECT" => HttpMethod::Connect,
-			_ => anyhow::bail!("Unknown HTTP method: {}", s),
+			_ => bevybail!("Unknown HTTP method: {}", s),
 		})
 	}
 }

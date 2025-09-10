@@ -13,7 +13,7 @@
 						"client",
 						"launch",
 						"lambda",
-						"chrome",
+						"chrome_dev_tools",
 						"css",
 						"aws"
 					]

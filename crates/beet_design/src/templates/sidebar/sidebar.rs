@@ -174,8 +174,8 @@ impl SidebarNode {}
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_router::prelude::*;
 	use sweet::prelude::*;
-
 
 	#[test]
 	fn collect_sidebar_node() {
