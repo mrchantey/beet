@@ -1,5 +1,5 @@
-use crate::prelude::EntityObserver;
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
@@ -36,7 +36,7 @@ where
 	/// ## Example
 	/// ```
 	/// # use bevy::prelude::*;
-	/// # use beet_core::prelude::*;
+	/// # use beet_dom::prelude::*;
 	///
 	/// let bundle = if true {
 	/// 	().any_bundle()

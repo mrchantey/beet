@@ -22,52 +22,54 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["nightly", "bevy"]
+default = ["nightly"]
 nightly = ["beet_utils/nightly"]
-bevy = ["dep:bevy"]
-bevy_text = ["bevy", "bevy/bevy_text"]
-bevy_scene = ["bevy", "bevy/bevy_scene", "serde"]
-serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
+bevy_scene = ["bevy/bevy_scene", "serde"]
+serde = ["dep:serde", "dep:serde_json","dep:clap", "dep:heck", "dep:ron"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 fs = ["beet_utils/fs"]
 tokens = [
 	"serde",
+	"beet_utils/tokens",
 	"dep:syn",
 	"dep:quote",
 	"dep:proc-macro2",
+	"dep:variadics_please",
 	"dep:proc-macro2-diagnostics",
 ]
 
 
 [dependencies]
-tracing.workspace = true
 beet_utils.workspace = true
 beet_core_macros.workspace = true
+bevy.workspace = true
+
+tracing.workspace = true
 rapidhash.workspace = true
 send_wrapper.workspace = true
-variadics_please.workspace = true
-
-# bevy dependencies (optional)
-bevy = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-clap = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
+# workspace config
+clap = { workspace = true, optional = true }
+heck = { workspace = true, optional = true }
 
 #💡 async
 futures-lite.workspace = true
 async-channel.workspace = true
 
-# tokens dependencies (optional)
-heck = { workspace = true }
+# tokens dependencies
 syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 proc-macro2-diagnostics = { workspace = true, optional = true }
+variadics_please = { workspace = true, optional = true }
+
+
 
 rand = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
@@ -84,89 +86,6 @@ glob = { workspace = true, optional = true }
 
 # async (server-specific)
 tokio = { workspace = true, optional = true }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-# web dependencies (WASM only)
-js-sys.workspace = true
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
-console_error_panic_hook.workspace = true
-
-#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
-#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
-[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-workspace = true
-features = [
-	# File
-	"File",
-	"FileList",
-	# Blob
-	'Blob',
-	'BlobEvent',
-	'BlobEventInit',
-	'BlobPropertyBag',
-	# HTML
-	"Text",
-	"Comment",
-	"Node",
-	"NodeList",
-	'Headers',
-	'Document',
-	'Element',
-	'Window',
-	'HtmlAnchorElement',
-	'HtmlButtonElement',
-	'HtmlCanvasElement',
-	'HtmlDivElement',
-	'HtmlHeadElement',
-	"HtmlInputElement",
-	'HtmlIFrameElement',
-	'HtmlLinkElement',
-	'HtmlParagraphElement',
-	'HtmlScriptElement',
-	# Style
-	'MediaQueryList',
-	# Events
-	'MouseEvent',
-	'KeyboardEvent',
-	# JS
-	'console',
-	'Navigator',
-	'Performance',
-	# Fetch
-	'Request',
-	'RequestInit',
-	'RequestMode',
-	'Response',
-	'ReadableStream',
-	'ReadableStreamDefaultReader',
-	# Blob
-	'Blob',
-	'BlobEvent',
-	'BlobEventInit',
-	'BlobPropertyBag',
-	# Url
-	'Url',
-	'History',
-	'Location',
-	'UrlSearchParams',
-	# Sockets
-	'BinaryType',
-	'FileReader',
-	'ErrorEvent',
-	'MessageEvent',
-	'ProgressEvent',
-	'WebSocket',
-	# Resize Observer
-	'ResizeObserver',
-	'ResizeObserverBoxOptions',
-	'ResizeObserverEntry',
-	'ResizeObserverOptions',
-	'ResizeObserverSize',
-	'DomRect',
-	'DomRectReadOnly',
-]
-
 
 [dev-dependencies]
 sweet.workspace = true

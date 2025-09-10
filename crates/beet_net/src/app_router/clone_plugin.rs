@@ -1,5 +1,7 @@
 #![allow(unused)]
 use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::app::Plugins;
 use bevy::ecs::schedule::ScheduleConfigs;

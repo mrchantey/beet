@@ -3,54 +3,34 @@
 #![feature(exit_status_error)]
 
 pub mod actions;
-pub mod node;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 
 pub use beet_core_macros::*;
 
-#[cfg(feature = "bevy")]
 mod bevy_utils;
-#[cfg(target_arch = "wasm32")]
-pub mod web;
+mod workspace_config;
+
 
 pub mod prelude {
+	/// macro helper
+	#[allow(unused)]
+	pub(crate) use crate as beet_core;
 	pub use crate::actions::*;
-	#[cfg(feature = "bevy")]
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
-	#[cfg(feature = "bevy")]
 	pub use crate::bevyhow;
-	pub use crate::node::*;
 	pub use crate::pkg_config;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use crate::web::prelude::*;
+	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
-}
-
-
-pub mod as_beet {
-	pub use crate::prelude::*;
-	pub use crate::*;
-	pub mod beet {
-		pub use crate::*;
-		pub mod prelude {
-			pub use crate::prelude::*;
-		}
-		pub mod exports {
-			pub use crate::exports::*;
-		}
-	}
 }
 
 
 pub mod exports {
 	pub use async_channel;
 	pub use futures_lite;
-	#[cfg(target_arch = "wasm32")]
-	pub use js_sys;
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;
 	#[cfg(feature = "tokens")]
@@ -60,12 +40,4 @@ pub mod exports {
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;
-	#[cfg(feature = "serde")]
-	pub use toml;
-	#[cfg(target_arch = "wasm32")]
-	pub use wasm_bindgen;
-	#[cfg(target_arch = "wasm32")]
-	pub use wasm_bindgen_futures;
-	#[cfg(target_arch = "wasm32")]
-	pub use web_sys;
 }

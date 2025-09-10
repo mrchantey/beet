@@ -1,3 +1,5 @@
+mod app;
+pub use self::app::*;
 mod array;
 pub use self::array::*;
 mod closure;

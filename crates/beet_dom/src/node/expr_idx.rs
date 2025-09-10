@@ -1,5 +1,5 @@
 #[cfg(feature = "tokens")]
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 /// The index in which an expression appears in a template macro, assigned

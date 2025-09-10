@@ -1,4 +1,4 @@
-use crate::prelude::*;
+// use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use heck::ToKebabCase;
@@ -105,7 +105,7 @@ impl std::fmt::Display for PackageConfig {
 /// ## Example
 /// ```
 /// # use bevy::prelude::*;
-/// # use beet_core::prelude::*;
+/// # use beet_dom::prelude::*;
 /// let mut world = World::new();
 /// world.insert_resource(PackageConfig {
 /// 	title: "My Site".to_string(),
@@ -184,11 +184,14 @@ impl WorkspaceConfig {
 
 	/// Create a file path in the format of `path/to/file:line:col.rs`,
 	/// using [`Self::snippets_dir`] as the base.
-	pub fn rsx_snippet_path(&self, idx: &SnippetRoot) -> WsPathBuf {
-		let mut path = idx.file.clone();
+	pub fn rsx_snippet_path(
+		&self,
+		path: impl AsRef<Path>,
+		start_line: u32,
+	) -> WsPathBuf {
+		let mut path = path.as_ref().to_path_buf();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
-		let snippet_file_name =
-			format!("{}:{}.rsx.ron", file_stem, idx.start.to_string());
+		let snippet_file_name = format!("{}:{}.rsx.ron", file_stem, start_line);
 		path.set_file_name(snippet_file_name);
 		self.snippets_dir.join(path)
 	}
@@ -228,6 +231,6 @@ mod test {
 	fn works() {
 		pkg_config!()
 			.resource_name("lambda")
-			.xpect_eq("beet-core-lambda-dev");
+			.xpect_eq("beet-dom-lambda-dev");
 	}
 }

@@ -1,5 +1,6 @@
 //! Types associated with the root node of a tree in beet.
-use crate::as_beet::*;
+use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -62,7 +63,7 @@ impl SnippetRoot {
 	/// Convenience for using the `file!` and friends macros.
 	/// ## Example
 	/// ```rust
-	/// use beet_core::prelude::*;
+	/// use beet_dom::prelude::*;
 	/// let idx = SnippetRoot::new_file_line_col(file!(), line!(), column!());
 	/// ```
 	pub fn new_file_line_col(file: &str, line: u32, col: u32) -> Self {

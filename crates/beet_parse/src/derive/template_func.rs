@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_utils::prelude::pkg_ext;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
@@ -15,8 +16,20 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 	let define_struct = define_struct(&input, &fields)?;
 	let impl_template_bundle = impl_template_bundle(&input, &fields)?;
 
+	let imports = if pkg_ext::is_internal() {
+		quote! {
+			use bevy::prelude::*;
+			use beet_core::prelude::*;
+			use beet_utils::prelude::*;
+		}
+	} else {
+		quote! {
+			use beet::prelude::*;
+		}
+	};
+
 	Ok(quote! {
-		use beet::prelude::*;
+		#imports
 		#define_struct
 		#impl_template_bundle
 		// #impl_props

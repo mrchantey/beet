@@ -1,4 +1,6 @@
-use crate::as_beet::*;
+use crate::prelude::*;
+#[cfg(feature = "tokens")]
+pub use beet_core::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;

@@ -1,5 +1,5 @@
 use super::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use std::hash::Hash;
@@ -78,8 +78,8 @@ pub fn deduplicate_lang_nodes(
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
-	use beet_core::prelude::*;
+	use crate::prelude::*;
+	use beet_dom::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

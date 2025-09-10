@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -9,15 +9,14 @@ pub fn tokenize_rstml(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokens::parse_and_run(
+	ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new_from_tokens(source_file, &tokens),
 			InstanceRoot,
 			RstmlTokens::new(tokens),
 		),
 		tokenize_bundle,
-	)??;
-	Ok(tokens)
+	)
 }
 
 
@@ -26,15 +25,14 @@ pub fn tokenize_rstml_tokens(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokens::parse_and_run(
+	ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new_from_tokens(source_file, &tokens),
 			InstanceRoot,
 			RstmlTokens::new(tokens),
 		),
 		tokenize_bundle_tokens,
-	)??;
-	Ok(tokens)
+	)
 }
 
 // for tests see ../tokenize_bundle.rs

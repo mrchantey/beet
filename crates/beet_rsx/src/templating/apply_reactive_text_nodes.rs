@@ -1,5 +1,7 @@
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::prelude::*;
+
 
 pub fn apply_reactive_text_nodes(
 	mut commands: Commands,
@@ -43,7 +45,7 @@ pub fn apply_reactive_text_nodes(
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

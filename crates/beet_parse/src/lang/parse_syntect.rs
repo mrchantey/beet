@@ -1,5 +1,6 @@
 use crate::prelude::NodeExpr;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::prelude::*;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
@@ -224,7 +225,7 @@ pub fn parse_syntect(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use beet_dom::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

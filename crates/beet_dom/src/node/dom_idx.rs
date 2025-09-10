@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 /// A unique identifier for this node in a templating tree,

@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::prelude::*;

@@ -1,7 +1,6 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
-
-
 
 /// Add this handler alongside a [`Bucket`] resource to serve files from the bucket.
 /// Serves static files from the provided bucket

@@ -241,16 +241,15 @@ client = [
 	"rsx",
 	"design",
 	"net",
+	"dom",
 	"serde",
 	"beet_net",
 	"beet_net/client",
-	"beet_dom",
 	"beet_dom/client",
 	"beet_design/client",
 ]
 
 beet_net = ["dep:beet_net"]
-beet_dom = ["dep:beet_dom"]
 
 #💡 fine-grained
 native-tls = ["beet_net/native-tls"]
@@ -259,6 +258,7 @@ serde = ["beet_utils/serde"]
 nightly = ["beet_core/nightly", "beet_utils/nightly"]
 rand = ["beet_utils/rand", "beet_core/rand"]
 agent = ["dep:beet_agent"]
+dom = ["dep:beet_dom"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
@@ -281,7 +281,8 @@ bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_scene",
-	"beet_core/bevy_text",
+	"beet_dom/bevy_scene",
+	"beet_dom/bevy_text",
 	"beet_examples?/bevy_default",
 	"beet_flow?/bevy_default",
 	"beet_ml?/bevy_default",

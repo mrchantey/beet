@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
-use beet_rsx::as_beet::PathExt;
-use beet_utils::prelude::CargoBuildCmd;
+use beet_dom::prelude::*;
+use beet_utils::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use std::process::Command;

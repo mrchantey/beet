@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
@@ -67,9 +67,10 @@ pub fn flush_signals(
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_dom::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

@@ -10,6 +10,8 @@ pub use beet_build as build;
 pub use beet_core as core;
 #[cfg(feature = "design")]
 pub use beet_design as design;
+#[cfg(feature = "dom")]
+pub use beet_dom as dom;
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;
 #[cfg(feature = "flow")]

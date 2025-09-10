@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core_macros::ImplBundle;
+use beet_core::prelude::*;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;

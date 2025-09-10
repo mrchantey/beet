@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::CloneFunc;
 use beet_utils::utils::CloneFuncTrait;
 use bevy::prelude::*;

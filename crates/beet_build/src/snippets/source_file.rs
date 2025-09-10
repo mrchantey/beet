@@ -4,7 +4,6 @@ use beet_utils::exports::notify::EventKind;
 use beet_utils::exports::notify::event::CreateKind;
 use beet_utils::exports::notify::event::ModifyKind;
 use beet_utils::exports::notify::event::RemoveKind;
-use beet_utils::prelude::WatchEvent;
 use beet_utils::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;

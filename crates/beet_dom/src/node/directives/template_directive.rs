@@ -13,7 +13,7 @@ pub trait TemplateDirective: 'static + Sized + Component {
 /// Generic system for extracting a [TemplateDirective] from attributes.
 /// ```rust
 /// # use bevy::prelude::*;
-/// # use beet_core::prelude::*;
+/// # use beet_dom::prelude::*;
 /// App::new().add_systems(Update, try_extract_directive::<ClientLoadDirective>);
 /// ```
 pub fn try_extract_directive<T: TemplateDirective>(

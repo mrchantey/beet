@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -51,7 +52,9 @@ fn collect_rsx_snippets(
 		.into_iter()
 		.map(|(entity, idx)| {
 			(
-				config.rsx_snippet_path(idx).into_abs(),
+				config
+					.rsx_snippet_path(&idx.file, idx.start.line)
+					.into_abs(),
 				children.iter_descendants_inclusive(entity).collect(),
 			)
 		})
@@ -61,8 +64,8 @@ fn collect_rsx_snippets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::node::SnippetRoot;
-	use beet_rsx::as_beet::*;
+	use beet_dom::prelude::*;
+	use beet_utils::prelude::*;
 	// use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -78,11 +81,7 @@ mod test {
 			WsPathBuf::new("crates/beet_router/src/test_site/pages/index.rs");
 
 		let snippet_path = WorkspaceConfig::default()
-			.rsx_snippet_path(&SnippetRoot::new_file_line_col(
-				&test_site_index.to_string_lossy(),
-				7,
-				8,
-			))
+			.rsx_snippet_path(&test_site_index, 7)
 			.into_abs();
 
 		let _entity = app

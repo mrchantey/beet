@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
@@ -92,9 +92,9 @@ pub fn extract_slot_targets(
 
 #[cfg(test)]
 mod test {
-	use super::*;
 	use crate::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
+	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

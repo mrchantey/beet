@@ -36,13 +36,6 @@ pub mod prelude {
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 	pub use crate::server::*;
 
-	pub(crate) use internal::*;
-	#[allow(unused_imports)]
-	mod internal {
-		pub use beet_core::as_beet::*;
-		pub use beet_rsx::prelude::*;
-		pub use beet_utils::prelude::*;
-	}
 	pub use bevy::tasks::futures_lite::StreamExt;
 }
 

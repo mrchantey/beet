@@ -1,8 +1,7 @@
 use super::*;
-use std::fmt::Debug;
 
 #[extend::ext(name=SweetOption)]
-pub impl<T: Debug> Option<T> {
+pub impl<T> Option<T> {
 	/// Performs an assertion ensuring this value is a `Some(_)`.
 	///
 	/// ## Example
@@ -19,7 +18,7 @@ pub impl<T: Debug> Option<T> {
 		match self {
 			Some(_) => self,
 			None => {
-				assert_ext::panic_expected_received_display_debug("Some", self);
+				assert_ext::panic_expected_received_display("Some", "None");
 			}
 		}
 	}
@@ -40,7 +39,7 @@ pub impl<T: Debug> Option<T> {
 		match self {
 			None => self,
 			Some(_) => {
-				assert_ext::panic_expected_received_display_debug("None", self);
+				assert_ext::panic_expected_received_display("None", "Some");
 			}
 		}
 	}

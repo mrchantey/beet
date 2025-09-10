@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -67,7 +68,10 @@ pub fn import_file_inner_text(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::as_beet::*;
+	use beet_core::prelude::*;
+	use beet_dom::prelude::*;
+	use beet_rsx::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

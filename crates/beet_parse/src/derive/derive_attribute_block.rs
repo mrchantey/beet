@@ -74,8 +74,11 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			});
 		})
 	};
+
+	let imports = dom_imports();
+
 	Ok(quote! {
-		use beet::prelude::*;
+		#imports
 
 		impl #impl_generics IntoBundle<Self> for #target_name #type_generics #where_clause {
 		fn into_bundle(self) -> impl Bundle{

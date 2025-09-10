@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::as_beet::*;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;

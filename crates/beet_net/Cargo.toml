@@ -60,7 +60,8 @@ chrome = ["websockets","dep:exponential-backoff"]
 
 [dependencies]
 beet_utils = { workspace = true }
-beet_core = { workspace = true, features = ["bevy"] }
+beet_core.workspace = true
+beet_dom.workspace = true
 beet_rsx.workspace = true
 
 bevy.workspace = true

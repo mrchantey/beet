@@ -5,6 +5,7 @@ use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::describe_table::DescribeTableError;
 use beet_core::bevybail;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 
@@ -37,10 +38,7 @@ impl BucketProvider for DynamoDbProvider {
 		self.0.config().region().map(|r| r.to_string())
 	}
 
-	fn bucket_exists(
-		&self,
-		table_name: &str,
-	) -> SendBoxedFuture<Result<bool>> {
+	fn bucket_exists(&self, table_name: &str) -> SendBoxedFuture<Result<bool>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -69,10 +67,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn bucket_create(
-		&self,
-		table_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self, table_name: &str) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -106,10 +101,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn bucket_remove(
-		&self,
-		table_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self, table_name: &str) -> SendBoxedFuture<Result<()>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -178,8 +170,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn list(
 		&self,
 		table_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
-	{
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let client = self.0.clone();
 		let table_name = table_name.to_string();
 		Box::pin(async move {
@@ -251,8 +242,7 @@ impl BucketProvider for DynamoDbProvider {
 		&self,
 		_table_name: &str,
 		_path: &RoutePath,
-	) -> SendBoxedFuture<Result<Option<String>>>
-	{
+	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
 }

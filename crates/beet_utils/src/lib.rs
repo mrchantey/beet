@@ -10,6 +10,8 @@ pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
 pub mod path_utils;
+#[cfg(feature = "tokens")]
+mod tokens_utils;
 pub mod utils;
 pub mod prelude {
 	pub use crate::abs_file;
@@ -21,6 +23,8 @@ pub mod prelude {
 	pub use crate::log;
 	pub use crate::log_kvp;
 	pub use crate::path_utils::*;
+	#[cfg(feature = "tokens")]
+	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;

@@ -202,13 +202,12 @@ test-flow *args:
 	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 
-# cargo test -p beet_rsx					 	 	 																										{{args}} -- {{test-threads}}
 test-rsx *args:
 	cargo test -p beet_dom						 	--features=tokens  																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{args}} -- {{test-threads}}
-	cargo test -p beet_rsx       				--lib   																						{{args}} -- {{test-threads}}
+	cargo test -p beet_rsx       				--all-features   																		{{args}} -- {{test-threads}}
 	cargo test -p beet_net						 	--features=tokens,native-tls  											{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}

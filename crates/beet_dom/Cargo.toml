@@ -13,9 +13,12 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde"]
+default = ["serde", "nightly"]
 client = []
-tokens = []
+nightly = ["beet_utils/nightly"]
+tokens = ["beet_core/tokens"]
+bevy_text = ["bevy/bevy_text"]
+bevy_scene = ["bevy/bevy_scene", "serde"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
@@ -23,25 +26,99 @@ serde = [
 ]
 
 [dependencies]
-beet_utils = { workspace = true }
-beet_core = { workspace = true }
+beet_utils.workspace = true
+beet_core.workspace = true
+
+bevy.workspace = true
+
+extend.workspace = true
+send_wrapper.workspace = true
+
 
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+# web dependencies (WASM only)
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
-web-sys = { workspace = true, features = [
-	"Document",
-	"Element",
-	"Event",
-	"EventTarget",
-	"HtmlElement",
+console_error_panic_hook.workspace = true
+
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+workspace = true
+features = [
+	# File
+	"File",
+	"FileList",
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# HTML
+	"Text",
+	"Comment",
 	"Node",
-	"Window",
-] }
+	"NodeList",
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	'HtmlAnchorElement',
+	'HtmlButtonElement',
+	'HtmlCanvasElement',
+	'HtmlDivElement',
+	'HtmlHeadElement',
+	"HtmlInputElement",
+	'HtmlIFrameElement',
+	'HtmlLinkElement',
+	'HtmlParagraphElement',
+	'HtmlScriptElement',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	# JS
+	'console',
+	'Navigator',
+	'Performance',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'Response',
+	'ReadableStream',
+	'ReadableStreamDefaultReader',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+	# Sockets
+	'BinaryType',
+	'FileReader',
+	'ErrorEvent',
+	'MessageEvent',
+	'ProgressEvent',
+	'WebSocket',
+	# Resize Observer
+	'ResizeObserver',
+	'ResizeObserverBoxOptions',
+	'ResizeObserverEntry',
+	'ResizeObserverOptions',
+	'ResizeObserverSize',
+	'DomRect',
+	'DomRectReadOnly',
+]
 
 [dev-dependencies]
 sweet.workspace = true

@@ -49,7 +49,7 @@ pub(crate) fn mount_client_only(
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	// use sweet::prelude::*;
 

@@ -1,7 +1,6 @@
 use super::*;
-use beet_core::prelude::HierarchyQueryExtExt;
-use beet_core::prelude::bevyhow;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::prelude::*;
 
 
@@ -220,7 +219,7 @@ fn script(content: impl Into<String>) -> impl Bundle {
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

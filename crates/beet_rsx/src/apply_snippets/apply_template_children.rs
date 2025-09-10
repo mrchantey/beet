@@ -1,7 +1,6 @@
-use beet_core::prelude::*;
-use bevy::prelude::*;
-
 use crate::prelude::HtmlDocument;
+use beet_dom::prelude::*;
+use bevy::prelude::*;
 
 
 /// A node which is a descendant of a template root
@@ -51,8 +50,7 @@ pub fn apply_template_children(
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use sweet::prelude::*;
 
 	#[template]

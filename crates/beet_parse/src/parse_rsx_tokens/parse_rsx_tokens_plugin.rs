@@ -2,8 +2,11 @@ use super::*;
 #[allow(unused)]
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
+use beet_utils::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
+use proc_macro2::TokenStream;
 
 /// A sequence for parsing raw rstml token streams and combinator strings into
 /// rsx trees, then extracting directives.
@@ -12,10 +15,10 @@ pub struct ParseRsxTokens;
 
 impl ParseRsxTokens {
 	/// Spawn the bundle, run the function with it, then return the result.
-	pub fn parse_and_run<O>(
+	pub fn parse_and_run(
 		bundle: impl Bundle,
-		func: impl FnOnce(&World, Entity) -> O,
-	) -> Result<O> {
+		func: impl FnOnce(&World, Entity) -> Result<TokenStream>,
+	) -> Result<TokenStream> {
 		// TODO cost 100us creating an app per macro, we should cache thread
 		// local app, wait for BeetMain pattern
 		let mut app = App::new();
@@ -23,8 +26,15 @@ impl ParseRsxTokens {
 		let world = app.world_mut();
 		let entity = world.spawn(bundle).id();
 		world.run_schedule(ParseRsxTokens);
-		let out = func(world, entity);
-		Ok(out)
+		let tokens = func(world, entity)?;
+
+		let imports = dom_imports();
+
+		quote::quote! {{
+			#imports
+			#tokens
+		}}
+		.xok()
 	}
 }
 

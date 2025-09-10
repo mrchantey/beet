@@ -1,4 +1,4 @@
-use beet_core::prelude::PrettyTracing;
+use beet_core::prelude::*;
 use tracing::*;
 
 

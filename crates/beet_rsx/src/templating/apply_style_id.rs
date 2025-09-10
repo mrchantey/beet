@@ -1,7 +1,7 @@
 use super::*;
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::platform::collections::HashMap;
 use bevy::platform::collections::HashSet;
@@ -131,7 +131,7 @@ impl ApplyAttributes<'_, '_> {
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -251,7 +251,7 @@ mod test {
 	#[test]
 	#[cfg(feature = "css")]
 	fn style_template() {
-		use crate::as_beet::*;
+		use crate::prelude::*;
 
 		#[template]
 		fn Style() -> impl Bundle {

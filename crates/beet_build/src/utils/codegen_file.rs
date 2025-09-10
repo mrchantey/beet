@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_core::as_beet::*;
+use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use heck::ToSnakeCase;

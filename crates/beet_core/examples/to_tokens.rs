@@ -1,4 +1,4 @@
-use beet_core::as_beet::*;
+use beet_core::prelude::*;
 
 
 fn main() {}

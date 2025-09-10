@@ -1,4 +1,4 @@
-use crate::utils::pound_token;
+use beet_utils::prelude::*;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -73,7 +73,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_utils::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
 

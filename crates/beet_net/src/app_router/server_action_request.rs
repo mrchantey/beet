@@ -1,5 +1,5 @@
 use crate::prelude::*;
-
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;

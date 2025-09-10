@@ -11,7 +11,7 @@ pub async fn send_reqwest(req: Request) -> Result<Response> {
 	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
 	{
 		if req.parts.uri.scheme_str() == Some("https") {
-			bevybail!(
+			beet_core::bevybail!(
 				"Please enable either `beet/rustls-tls` or `beet/native-tls` feature to use HTTPS requests."
 			);
 		}

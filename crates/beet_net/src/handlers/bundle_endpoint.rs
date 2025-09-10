@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 
 /// Marker type indicating this entity was spawned via [`bundle_endpoint`].
@@ -112,6 +113,7 @@ fn system(world: &mut World) -> Result {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_rsx::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

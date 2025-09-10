@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_core_macros::ToTokens;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use variadics_please::all_tuples;
-
 
 pub trait TokenizeComponents {
 	fn tokenize_if_present(
@@ -57,20 +57,50 @@ macro_rules! impl_tokenize_components_tuple {
 
 all_tuples!(impl_tokenize_components_tuple, 1, 15, T, t);
 
+#[derive(Debug, Clone, Component, ToTokens)]
+pub struct SpanOf<C> {
+	pub value: send_wrapper::SendWrapper<proc_macro2::Span>,
+	pub phantom: std::marker::PhantomData<C>,
+}
+
+
+impl<C> std::ops::Deref for SpanOf<C> {
+	type Target = proc_macro2::Span;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+
+impl<C> SpanOf<C> {
+	pub fn new(value: proc_macro2::Span) -> Self {
+		Self {
+			value: send_wrapper::SendWrapper::new(value),
+			phantom: std::marker::PhantomData,
+		}
+	}
+	pub fn take(self) -> proc_macro2::Span { self.value.take() }
+}
+
+
 #[cfg(test)]
 mod test {
-	use super::*;
+	use crate::prelude::*;
+	use bevy::prelude::*;
 	use sweet::prelude::*;
+
+	#[derive(Component, ToTokens)]
+	struct Foo;
+	#[derive(Component, ToTokens)]
+	struct Bar;
 
 	#[test]
 	fn works() {
 		let mut world = World::new();
-		let entity =
-			world.spawn((ElementNode::open(), NodeTag::new("div"))).id();
+		let entity = world.spawn((Foo, Bar)).id();
+
+		type List = (Foo, Bar);
 
 		let mut items = Vec::new();
 		// Test tuple implementation for (ElementNode, NodeTag)
-		RsxComponents::tokenize_if_present(&world, &mut items, entity);
+		List::tokenize_if_present(&world, &mut items, entity);
 
 		// Should have two token streams
 		items.len().xpect_eq(2);

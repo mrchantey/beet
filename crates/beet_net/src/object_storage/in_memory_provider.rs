@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bytes::Bytes;
@@ -40,10 +42,7 @@ impl BucketProvider for InMemoryProvider {
 		Box::pin(async move { Ok(exists) })
 	}
 
-	fn bucket_create(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		self.0
 			.write()
 			.unwrap()
@@ -52,10 +51,7 @@ impl BucketProvider for InMemoryProvider {
 		Box::pin(async { Ok(()) })
 	}
 
-	fn bucket_remove(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		self.0.write().unwrap().remove(bucket_name);
 		Box::pin(async move { Ok(()) })
 	}
@@ -93,8 +89,7 @@ impl BucketProvider for InMemoryProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
-	{
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let mut buckets = self.0.write().unwrap();
 		let result = buckets
 			.get_mut(bucket_name)
@@ -147,8 +142,7 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> SendBoxedFuture<Result<Option<String>>>
-	{
+	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
 }

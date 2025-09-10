@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
@@ -148,7 +148,7 @@ impl HtmlBuilder<'_, '_> {
 
 #[cfg(test)]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -330,7 +330,7 @@ mod test {
 	#[test]
 	#[cfg(feature = "css")]
 	fn style_inline() {
-		HtmlFragment::parse_bundle(rsx! {<style>body { color: red; }</style>})
+		HtmlDocument::parse_bundle(rsx! {<style>body { color: red; }</style>})
 			.xpect_snapshot();
 	}
 

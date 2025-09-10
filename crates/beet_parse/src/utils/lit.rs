@@ -1,6 +1,5 @@
 //
-
-use beet_core::node::IntoBundle;
+use beet_dom::prelude::*;
 use bevy::ecs::system::EntityCommands;
 use quote::ToTokens;
 

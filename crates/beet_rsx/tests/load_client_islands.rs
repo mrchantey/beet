@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-use beet_rsx::as_beet::*;
+use beet_dom::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::*;
 
@@ -33,13 +34,13 @@ const SCENE: &str = r#"
   entities: {
     4294967299: (
       components: {
-        "beet_core::node::directives::client_island::ClientIslandRoot<load_client_islands::Counter, load_client_islands::Counter>": (
+        "beet_dom::node::directives::client_island::ClientIslandRoot<load_client_islands::Counter, load_client_islands::Counter>": (
           value: (
             initial: 7,
           ),
         ),
-        "beet_core::node::directives::web_directives::ClientLoadDirective": (),
-        "beet_core::node::dom_idx::DomIdx": (0),
+        "beet_dom::node::directives::web_directives::ClientLoadDirective": (),
+        "beet_dom::node::dom_idx::DomIdx": (0),
       },
     ),
   },

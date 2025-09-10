@@ -23,24 +23,3 @@ pub mod prelude {
 pub mod exports {
 	pub use anyhow;
 }
-
-// rsx macros expect 'beet'
-// so import this
-// `use beet_rsx::as_beet::*;`
-// #[cfg(debug_assertions)]
-/// Internal use only
-pub mod as_beet {
-	pub use beet::prelude::*;
-	pub mod beet {
-		pub mod prelude {
-			pub use crate::prelude::*;
-			pub use beet_core::prelude::*;
-			pub use beet_utils::prelude::*;
-			#[allow(unused)]
-			pub(crate) use bevy::prelude::*;
-		}
-		pub mod exports {
-			pub use crate::exports::*;
-		}
-	}
-}

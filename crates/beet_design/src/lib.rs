@@ -31,7 +31,7 @@ pub mod prelude {
 	pub use crate::mockups::*;
 	pub use crate::templates::*;
 	pub use crate::types::*;
-	// pub(crate) use beet_rsx::as_beet::*;
+	// pub(crate) use beet_rsx::prelude::*;
 	#[allow(unused)]
 	pub(crate) use beet::prelude::*;
 	#[allow(unused)]

@@ -3,9 +3,8 @@ use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use extend::ext;
 
-#[ext]
+#[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]
 pub impl App {
 	/// Add a plugin to the app, if it hasn't been added yet.
@@ -47,13 +46,6 @@ pub impl App {
 		self
 	}
 
-	#[cfg(target_arch = "wasm32")]
-	fn run_on_animation_frame(mut self) -> crate::web::AnimationFrame {
-		crate::web::AnimationFrame::new(move || {
-			self.update();
-		})
-	}
-
 	/// Convenience method for running with `app.run_async`
 	/// in the case that we are already in an async runtime
 	async fn run_async(
@@ -86,18 +78,5 @@ pub impl App {
 	fn add_non_send_plugin(&mut self, plugin: impl NonSendPlugin) -> &mut Self {
 		plugin.build(self);
 		self
-	}
-}
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-	#[test]
-	pub fn works() {
-		let app = AppRes::new();
-		let app = app.borrow_mut();
-		app.world().contains_non_send::<AppRes>().xpect_true();
 	}
 }

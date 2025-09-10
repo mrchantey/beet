@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::types::ArticleMeta;
 use beet_core::prelude::*;
-use beet_rsx::as_beet::GlobFilter;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use heck::ToTitleCase;
 use serde::Deserialize;

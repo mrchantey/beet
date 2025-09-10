@@ -1,4 +1,4 @@
-use beet_rsx::as_beet::*;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 
 
@@ -11,7 +11,7 @@ use bevy::prelude::*;
 ///	## Example
 ///
 /// ```
-/// # use beet_rsx::as_beet::*;
+/// # use beet_rsx::prelude::*;
 ///
 ///
 /// ```

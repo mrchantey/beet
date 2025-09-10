@@ -1,4 +1,9 @@
-use beet::prelude::*;
+#[allow(unused)]
+use beet_dom::prelude::*;
+#[allow(unused)]
+use beet_core::prelude::*;
+#[allow(unused)]
+use beet_utils::prelude::*;
 impl IntoBundle<Self> for MyNode {
     fn into_bundle(self) -> impl Bundle {
         let Self { present, optional, onclick, nested } = self;

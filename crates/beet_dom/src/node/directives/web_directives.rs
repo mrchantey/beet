@@ -1,5 +1,5 @@
 use super::*;
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent

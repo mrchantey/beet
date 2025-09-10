@@ -2,6 +2,7 @@ use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
 use beet_core::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;

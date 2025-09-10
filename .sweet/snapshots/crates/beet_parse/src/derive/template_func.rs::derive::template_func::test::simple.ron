@@ -1,4 +1,6 @@
-use beet::prelude::*;
+use bevy::prelude::*;
+use beet_core::prelude::*;
+use beet_utils::prelude::*;
 /// probably the best templating layout ever
 #[derive(Props)]
 pub(crate) struct MyNode {

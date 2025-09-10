@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 
@@ -94,6 +94,7 @@ pub fn extract_inner_text_directive(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_dom::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

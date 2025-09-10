@@ -6,8 +6,10 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
+use beet_dom::prelude::*;
 use beet_parse::prelude::*;
-use beet_rsx::as_beet::*;
+use beet_rsx::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;

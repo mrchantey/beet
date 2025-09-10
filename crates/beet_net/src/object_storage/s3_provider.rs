@@ -5,9 +5,11 @@ use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
-use beet_core::bevybail;
+use beet_core::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
+
 
 pub fn s3_bucket() -> impl Bundle {
 	AsyncAction::new(async move |mut world, entity| {

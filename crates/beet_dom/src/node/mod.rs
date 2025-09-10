@@ -13,8 +13,6 @@ pub use expr_idx::*;
 pub use template::*;
 mod into_bundle;
 pub use into_bundle::*;
-mod workspace_config;
-pub use workspace_config::*;
 pub mod rsx_nodes;
 pub use escape_html::*;
 pub use rsx_nodes::*;

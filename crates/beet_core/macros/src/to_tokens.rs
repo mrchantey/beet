@@ -1,4 +1,3 @@
-use crate::utils::pound_token;
 use beet_utils::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -200,6 +199,8 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		}
 	});
 
+	let beet_core = pkg_ext::internal_or_beet("beet_core");
+
 	let mut where_clause = where_clause
 		.cloned()
 		.unwrap_or_else(|| syn::parse_quote!(where));
@@ -207,17 +208,17 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		.predicates
 		.extend(generic_idents.map(|(ident, _)| {
 			let predicate: WherePredicate = syn::parse_quote! {
-				#ident: beet::prelude::TokenizeSelf
+				#ident: #beet_core::prelude::TokenizeSelf
 			};
 			predicate
 		}));
 
 
 	quote! {
-		impl #impl_generics beet::prelude::TokenizeSelf for #ident #type_generics #where_clause {
-			fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-				use beet::exports::quote;
-				use beet::exports::proc_macro2;
+		impl #impl_generics #beet_core::prelude::TokenizeSelf for #ident #type_generics #where_clause {
+			fn self_tokens(&self, tokens: &mut #beet_core::exports::proc_macro2::TokenStream) {
+				use #beet_core::exports::quote;
+				use #beet_core::exports::proc_macro2;
 				#(#generic_defs)*
 				#content
 			}

@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;
@@ -73,7 +73,7 @@ impl FileSpan {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_core::prelude::*;
+	/// # use beet_dom::prelude::*;
 	/// let loc = FileSpan::new_with_start(file!(), line!(), column!());
 	/// ```
 	/// ## Panics
@@ -134,29 +134,4 @@ impl<C> FileSpanOf<C> {
 		}
 	}
 	pub fn take(self) -> FileSpan { self.value }
-}
-#[cfg(feature = "tokens")]
-#[derive(Debug, Clone, Component)]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct SpanOf<C> {
-	pub value: send_wrapper::SendWrapper<proc_macro2::Span>,
-	pub phantom: std::marker::PhantomData<C>,
-}
-
-
-#[cfg(feature = "tokens")]
-impl<C> std::ops::Deref for SpanOf<C> {
-	type Target = proc_macro2::Span;
-	fn deref(&self) -> &Self::Target { &self.value }
-}
-
-#[cfg(feature = "tokens")]
-impl<C> SpanOf<C> {
-	pub fn new(value: proc_macro2::Span) -> Self {
-		Self {
-			value: send_wrapper::SendWrapper::new(value),
-			phantom: std::marker::PhantomData,
-		}
-	}
-	pub fn take(self) -> proc_macro2::Span { self.value.take() }
 }

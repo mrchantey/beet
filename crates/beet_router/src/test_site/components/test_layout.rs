@@ -1,4 +1,4 @@
-use beet_rsx::as_beet::*;
+use beet_rsx::prelude::*;
 
 #[template]
 fn PageLayout(title: String) -> impl Bundle {

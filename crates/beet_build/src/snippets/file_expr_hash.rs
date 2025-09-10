@@ -1,6 +1,7 @@
 use super::HashNonSnippetRust;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
 use quote::ToTokens;
@@ -130,6 +131,7 @@ mod test {
 	use crate::as_beet::*;
 	use crate::prelude::*;
 	use beet_core::prelude::WorldMutExt;
+	use beet_dom::prelude::*;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use send_wrapper::SendWrapper;

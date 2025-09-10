@@ -1,21 +1,29 @@
-(
-    SnippetRoot {
-        file: WsPathBuf::new(
-            "crates/beet_parse/src/tokenize/tokenize_element_attributes.rs",
-        ),
-        start: LineCol { line: 1u32, col: 0u32 },
-    },
-    InstanceRoot,
-    FragmentNode,
-    related! {
-        Children[(ExprIdx(0u32), NodeTag(String::from("span")), ElementNode {
-        self_closing : true }, OnSpawnDeferred::insert(#[allow(unused_braces)] { foo
-        } .into_bundle()), related!(Attributes[AttributeKey::new("hidden"),
-        (AttributeKey::new("class"), OnSpawnDeferred::insert("foo".into_bundle())),
-        (AttributeKey::new("onmousemove"), OnSpawnDeferred::insert("some_js_func"
-        .into_bundle())), (AttributeKey::new("onclick"),
-        OnSpawnDeferred::insert_parent:: < AttributeOf > (#[allow(unused_braces)] { |
-        _ : Trigger < OnClick > | { println!("clicked"); } } .into_bundle()),
-        ExprIdx(1u32))]))]
-    },
-)
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    #[allow(unused)]
+    use beet_utils::prelude::*;
+    (
+        SnippetRoot {
+            file: WsPathBuf::new(
+                "crates/beet_parse/src/tokenize/tokenize_element_attributes.rs",
+            ),
+            start: LineCol { line: 1u32, col: 0u32 },
+        },
+        InstanceRoot,
+        FragmentNode,
+        related! {
+            Children[(ExprIdx(0u32), NodeTag(String::from("span")), ElementNode {
+            self_closing : true }, OnSpawnDeferred::insert(#[allow(unused_braces)] {
+            foo } .into_bundle()), related!(Attributes[AttributeKey::new("hidden"),
+            (AttributeKey::new("class"), OnSpawnDeferred::insert("foo"
+            .into_bundle())), (AttributeKey::new("onmousemove"),
+            OnSpawnDeferred::insert("some_js_func".into_bundle())),
+            (AttributeKey::new("onclick"), OnSpawnDeferred::insert_parent:: <
+            AttributeOf > (#[allow(unused_braces)] { | _ : Trigger < OnClick > | {
+            println!("clicked"); } } .into_bundle()), ExprIdx(1u32))]))]
+        },
+    )
+}

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use axum::Router;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use http::StatusCode;

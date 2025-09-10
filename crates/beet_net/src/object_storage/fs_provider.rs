@@ -39,10 +39,7 @@ impl BucketProvider for FsBucketProvider {
 		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
 	}
 
-	fn bucket_create(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
 			tokio::fs::create_dir_all(path).await?;
@@ -50,10 +47,7 @@ impl BucketProvider for FsBucketProvider {
 		})
 	}
 
-	fn bucket_remove(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
 			FsExt::remove_async(path).await?;
@@ -77,8 +71,7 @@ impl BucketProvider for FsBucketProvider {
 	fn list(
 		&self,
 		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>>
-	{
+	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let bucket_path = self.root.join(bucket_name);
 		Box::pin(async move {
 			ReadDir::files_recursive_async(&bucket_path)
@@ -133,8 +126,7 @@ impl BucketProvider for FsBucketProvider {
 		&self,
 		_bucket_name: &str,
 		_path: &RoutePath,
-	) -> SendBoxedFuture<Result<Option<String>>>
-	{
+	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
 }
@@ -143,6 +135,7 @@ impl BucketProvider for FsBucketProvider {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

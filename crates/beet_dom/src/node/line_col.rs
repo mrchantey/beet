@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use crate::prelude::*;
 use bevy::reflect::Reflect;
 
 /// A location in a source file, the line is 1 indexed and the column is 0 indexed,

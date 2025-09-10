@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
-use beet_core::as_beet::*;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
 use syn::Ident;

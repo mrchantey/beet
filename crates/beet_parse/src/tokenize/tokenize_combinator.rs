@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -12,15 +12,14 @@ pub fn tokenize_combinator(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokens::parse_and_run(
+	ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new(source_file, LineCol::default()),
 			InstanceRoot,
 			CombinatorTokens::new(tokens),
 		),
 		tokenize_bundle,
-	)??;
-	Ok(tokens)
+	)
 }
 
 /// Parse combinator string into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
@@ -28,13 +27,12 @@ pub fn tokenize_combinator_tokens(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = ParseRsxTokens::parse_and_run(
+	ParseRsxTokens::parse_and_run(
 		(
 			SnippetRoot::new(source_file, LineCol::default()),
 			InstanceRoot,
 			CombinatorTokens::new(tokens),
 		),
 		tokenize_bundle_tokens,
-	)??;
-	Ok(tokens)
+	)
 }

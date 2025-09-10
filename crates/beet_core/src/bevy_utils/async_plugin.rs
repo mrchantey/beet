@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use async_channel;
 use beet_utils::time_ext;
 use bevy::ecs::component::Mutable;
@@ -7,8 +8,6 @@ use bevy::tasks::AsyncComputeTaskPool;
 use bevy::tasks::Task;
 use std::future::Future;
 use std::pin::Pin;
-
-use crate::prelude::AppExt;
 
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.

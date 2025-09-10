@@ -85,7 +85,7 @@ impl<'a> NodeField<'a> {
 			// 2. handle DerivedGetter<T>
 			Some((seg, ty)) if seg.ident == "DerivedGetter" => Ok((
 				parse_quote! {<M>},
-				parse_quote! { impl beet::prelude::IntoDerivedGetter<#ty,M> },
+				parse_quote! { impl IntoDerivedGetter<#ty,M> },
 				parse_quote! { value.into_derived_getter() },
 			)),
 			// 3. handle into_type attribute
