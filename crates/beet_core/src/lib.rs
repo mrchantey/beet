@@ -6,6 +6,9 @@ pub mod actions;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 
+#[cfg(target_arch = "wasm32")]
+pub mod web_utils;
+
 pub use beet_core_macros::*;
 
 mod bevy_utils;
@@ -24,6 +27,8 @@ pub mod prelude {
 	pub use crate::pkg_config;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use crate::web_utils::*;
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
 }

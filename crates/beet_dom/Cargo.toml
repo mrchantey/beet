@@ -19,19 +19,20 @@ nightly = ["beet_utils/nightly"]
 tokens = ["beet_core/tokens"]
 bevy_text = ["bevy/bevy_text"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
+rustls-tls = ["fantoccini?/rustls-tls"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
 	"beet_core/serde",
 ]
-chrome_dev_tools = []
-# chrome_dev_tools = ["websockets","dep:exponential-backoff"]
-
+chrome_dev_tools = ["beet_net/websockets","dep:exponential-backoff"]
+webdriver = ["dep:fantoccini"]
 
 [dependencies]
 exponential-backoff = { workspace = true, optional = true }
 beet_utils.workspace = true
 beet_core.workspace = true
+beet_net.workspace = true
 
 bevy.workspace = true
 
@@ -41,6 +42,9 @@ send_wrapper.workspace = true
 
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+fantoccini = { version = "0.22", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # web dependencies (WASM only)

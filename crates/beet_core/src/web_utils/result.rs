@@ -1,9 +1,9 @@
-use beet_core::prelude::bevyhow;
+use crate::prelude::*;
 use bevy::ecs::error::BevyError;
 use extend::ext;
 use wasm_bindgen::JsValue;
 
-#[ext]
+#[ext(name= BeetCoreJsResult)]
 pub impl<T> Result<T, JsValue> {
 	/// Map a [`Result<T,JsValue>`] to a [`Result<T, BevyError>`].
 	fn map_jserr(self) -> Result<T, BevyError> {

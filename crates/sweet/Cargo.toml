@@ -18,14 +18,13 @@ nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 bevy = ["dep:bevy"]
-e2e = ["serde", "axum", "beet_utils/tokio", "dep:fantoccini"]
 axum = ["dep:axum"]
 
 [dependencies]
-#💡 internal 
+#💡 internal
 beet_utils.workspace = true
 sweet_macros.workspace = true
-#💡 misc 
+#💡 misc
 anyhow.workspace = true
 extend.workspace = true
 web-time = "1"
@@ -39,7 +38,7 @@ backtrace = "0.3"
 yansi = "1"
 diff = "0.1"
 
-#💡 parse 
+#💡 parse
 glob.workspace = true
 clap.workspace = true
 
@@ -49,7 +48,7 @@ rayon.workspace = true
 futures.workspace = true
 thread_local = "1.1.8"
 
-#💡 bevy 
+#💡 bevy
 bevy = { workspace = true, optional = true }
 
 #💡 tokens
@@ -71,7 +70,6 @@ beet_utils = { workspace = true, features = ["tokio", "fs"] }
 tokio.workspace = true
 axum = { workspace = true, optional = true }
 pin-project-lite = "0.2.15"
-fantoccini = { version = "0.21.5", optional = true, features = ["rustls-tls"] }
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]

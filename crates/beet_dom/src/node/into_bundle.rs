@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
@@ -88,6 +89,9 @@ where
 			None => OnSpawnBoxed::new(|_| {}),
 		}
 	}
+}
+impl IntoBundle<Self> for RoutePath {
+	fn into_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 }
 
 

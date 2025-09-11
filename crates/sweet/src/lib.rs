@@ -7,10 +7,6 @@
 #![feature(unboxed_closures)]
 #![cfg_attr(feature = "nightly", feature(fn_traits, backtrace_frames))]
 
-/// Matchers and utilities for running webdriver tests
-#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
-pub mod e2e;
-
 extern crate test;
 // the #[sweet::test] macro
 pub use sweet_macros;
@@ -41,8 +37,6 @@ pub mod prelude {
 	pub use crate::backtrace::*;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
-	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
-	pub use crate::e2e::*;
 	pub use crate::libtest::*;
 	pub use crate::logging::*;
 	pub use crate::matchers::*;
@@ -53,10 +47,6 @@ pub mod prelude {
 	pub use crate::utils::*;
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::wasm::*;
-	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
-	pub use fantoccini::Client;
-	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
-	pub use fantoccini::Locator;
 }
 
 pub mod as_sweet {

@@ -1,10 +1,9 @@
 use crate::prelude::*;
 #[cfg(feature = "tokens")]
 use beet_core::prelude::ToTokens;
-use beet_dom::prelude::*;
 use bevy::prelude::*;
-use http::uri::InvalidUri;
 use http::Uri;
+use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -22,9 +21,6 @@ pub struct RoutePath(pub PathBuf);
 
 impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }
-}
-impl IntoBundle<Self> for RoutePath {
-	fn into_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 }
 
 

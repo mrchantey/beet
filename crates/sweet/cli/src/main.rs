@@ -1,8 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-use anyhow::Result;
-use beet_net::prelude::Server;
-use beet_utils::prelude::FsWatchCmd;
+use beet::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
 use sweet_cli::prelude::*;
@@ -29,7 +27,7 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result {
 	match Cli::parse().command {
 		Commands::TestServer(cmd) => cmd.run(),
 		Commands::TestWasm(cmd) => cmd.run(),

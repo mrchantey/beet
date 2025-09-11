@@ -1101,7 +1101,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1133,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet",
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "beet_agent"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1172,7 +1172,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1210,7 +1210,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -1223,6 +1223,7 @@ dependencies = [
  "getrandom 0.2.16",
  "glob",
  "heck 0.4.1",
+ "js-sys",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -1240,11 +1241,13 @@ dependencies = [
  "toml",
  "tracing",
  "variadics_please",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -1257,7 +1260,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1278,14 +1281,16 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "beet_core",
+ "beet_net",
  "beet_utils",
  "bevy",
  "console_error_panic_hook",
  "exponential-backoff",
  "extend",
+ "fantoccini",
  "js-sys",
  "send_wrapper",
  "serde",
@@ -1298,7 +1303,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1319,7 +1324,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1336,7 +1341,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "extend",
@@ -1349,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1382,7 +1387,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
@@ -1390,7 +1395,6 @@ dependencies = [
  "axum 0.8.4",
  "base64 0.22.1",
  "beet_core",
- "beet_dom",
  "beet_net",
  "beet_utils",
  "bevy",
@@ -1424,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1451,7 +1455,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -1473,7 +1477,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1488,7 +1492,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "axum 0.8.4",
  "axum-extra",
@@ -1524,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1556,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1566,7 +1570,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1581,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1592,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet",
@@ -1605,7 +1609,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1625,7 +1629,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -3385,6 +3389,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_maths"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77745e017f5edba1a9c1d854f6f3a52dac8a12dd5af5d2f54aecf61e43d80d30"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "coreaudio-rs"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4227,9 +4240,9 @@ dependencies = [
 
 [[package]]
 name = "fantoccini"
-version = "0.21.5"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3a6a7a9a454c24453f9807c7f12b37e31ae43f3eb41888ae1f79a9a3e3be3f5"
+checksum = "2d0086bcd59795408c87a04f94b5a8bd62cba2856cfe656c7e6439061d95b760"
 dependencies = [
  "base64 0.22.1",
  "cookie 0.18.1",
@@ -5540,6 +5553,18 @@ dependencies = [
 
 [[package]]
 name = "icu_collections"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db2fa452206ebee18c4b5c2274dbf1de17008e874b4dc4f0aea9d01ca79e4526"
+dependencies = [
+ "displaydoc",
+ "yoke 0.7.5",
+ "zerofrom",
+ "zerovec 0.10.4",
+]
+
+[[package]]
+name = "icu_collections"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "200072f5d0e3614556f94a9930d5dc3e0662a652823904c3a75dc3b0af7fee47"
@@ -5548,7 +5573,7 @@ dependencies = [
  "potential_utf",
  "yoke 0.8.0",
  "zerofrom",
- "zerovec",
+ "zerovec 0.11.4",
 ]
 
 [[package]]
@@ -5558,10 +5583,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cde2700ccaed3872079a65fb1a78f6c0a36c91570f28755dda67bc8f7d9f00a"
 dependencies = [
  "displaydoc",
- "litemap",
- "tinystr",
- "writeable",
- "zerovec",
+ "litemap 0.8.0",
+ "tinystr 0.8.1",
+ "writeable 0.6.1",
+ "zerovec 0.11.4",
+]
+
+[[package]]
+name = "icu_locid"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13acbb8371917fc971be86fc8057c41a64b521c184808a698c02acc242dbf637"
+dependencies = [
+ "displaydoc",
+ "litemap 0.7.5",
+ "tinystr 0.7.6",
+ "writeable 0.5.5",
 ]
 
 [[package]]
@@ -5571,12 +5608,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "436880e8e18df4d7bbc06d58432329d6458cc84531f7ac5f024e93deadb37979"
 dependencies = [
  "displaydoc",
- "icu_collections",
+ "icu_collections 2.0.0",
  "icu_normalizer_data",
  "icu_properties",
- "icu_provider",
+ "icu_provider 2.0.0",
  "smallvec",
- "zerovec",
+ "zerovec 0.11.4",
 ]
 
 [[package]]
@@ -5592,13 +5629,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "016c619c1eeb94efb86809b015c58f479963de65bdb6253345c1a1276f22e32b"
 dependencies = [
  "displaydoc",
- "icu_collections",
+ "icu_collections 2.0.0",
  "icu_locale_core",
  "icu_properties_data",
- "icu_provider",
+ "icu_provider 2.0.0",
  "potential_utf",
  "zerotrie",
- "zerovec",
+ "zerovec 0.11.4",
 ]
 
 [[package]]
@@ -5609,6 +5646,23 @@ checksum = "298459143998310acd25ffe6810ed544932242d3f07083eee1084d83a71bd632"
 
 [[package]]
 name = "icu_provider"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ed421c8a8ef78d3e2dbc98a973be2f3770cb42b606e3ab18d6237c4dfde68d9"
+dependencies = [
+ "displaydoc",
+ "icu_locid",
+ "icu_provider_macros",
+ "stable_deref_trait",
+ "tinystr 0.7.6",
+ "writeable 0.5.5",
+ "yoke 0.7.5",
+ "zerofrom",
+ "zerovec 0.10.4",
+]
+
+[[package]]
+name = "icu_provider"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03c80da27b5f4187909049ee2d72f276f0d9f99a42c306bd0131ecfe04d8e5af"
@@ -5616,13 +5670,46 @@ dependencies = [
  "displaydoc",
  "icu_locale_core",
  "stable_deref_trait",
- "tinystr",
- "writeable",
+ "tinystr 0.8.1",
+ "writeable 0.6.1",
  "yoke 0.8.0",
  "zerofrom",
  "zerotrie",
- "zerovec",
+ "zerovec 0.11.4",
 ]
+
+[[package]]
+name = "icu_provider_macros"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "icu_segmenter"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a717725612346ffc2d7b42c94b820db6908048f39434504cb130e8b46256b0de"
+dependencies = [
+ "core_maths",
+ "displaydoc",
+ "icu_collections 1.5.0",
+ "icu_locid",
+ "icu_provider 1.5.0",
+ "icu_segmenter_data",
+ "utf8_iter",
+ "zerovec 0.10.4",
+]
+
+[[package]]
+name = "icu_segmenter_data"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1e52775179941363cc594e49ce99284d13d6948928d8e72c755f55e98caa1eb"
 
 [[package]]
 name = "ident_case"
@@ -6431,6 +6518,12 @@ name = "linux-raw-sys"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
+
+[[package]]
+name = "litemap"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "litemap"
@@ -7709,7 +7802,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5a7c30837279ca13e7c867e9e40053bc68740f988cb07f7ca6df43cc734b585"
 dependencies = [
- "zerovec",
+ "zerovec 0.11.4",
 ]
 
 [[package]]
@@ -9264,7 +9357,6 @@ dependencies = [
  "console_log",
  "diff",
  "extend",
- "fantoccini",
  "flume",
  "futures",
  "glob",
@@ -9292,12 +9384,10 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
- "beet_core",
- "beet_router",
- "beet_utils",
+ "beet",
  "clap",
  "prettyplease",
  "proc-macro2",
@@ -9310,7 +9400,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.7-dev.7"
+version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -9593,12 +9683,21 @@ dependencies = [
 
 [[package]]
 name = "tinystr"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
+dependencies = [
+ "displaydoc",
+]
+
+[[package]]
+name = "tinystr"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d4f6d1145dcb577acf783d4e601bc1d76a13337bb54e6233add580b07344c8b"
 dependencies = [
  "displaydoc",
- "zerovec",
+ "zerovec 0.11.4",
 ]
 
 [[package]]
@@ -10524,21 +10623,21 @@ dependencies = [
 
 [[package]]
 name = "webdriver"
-version = "0.50.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "144ab979b12d36d65065635e646549925de229954de2eb3b47459b432a42db71"
+checksum = "91d53921e1bef27512fa358179c9a22428d55778d2c2ae3c5c37a52b82ce6e92"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytes",
  "cookie 0.16.2",
  "http 0.2.12",
+ "icu_segmenter",
  "log",
  "serde",
  "serde_derive",
  "serde_json",
  "thiserror 1.0.69",
  "time",
- "unicode-segmentation",
  "url",
 ]
 
@@ -11315,6 +11414,12 @@ dependencies = [
 
 [[package]]
 name = "writeable"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
+
+[[package]]
+name = "writeable"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
@@ -11547,13 +11652,35 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa2b893d79df23bfb12d5461018d408ea19dfafe76c2c7ef6d4eba614f8ff079"
+dependencies = [
+ "yoke 0.7.5",
+ "zerofrom",
+ "zerovec-derive 0.10.3",
+]
+
+[[package]]
+name = "zerovec"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7aa2bd55086f1ab526693ecbe444205da57e25f4489879da80635a46d90e73b"
 dependencies = [
  "yoke 0.8.0",
  "zerofrom",
- "zerovec-derive",
+ "zerovec-derive 0.11.1",
+]
+
+[[package]]
+name = "zerovec-derive"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6eafa6dfb17584ea3e2bd6e76e0cc15ad7af12b09abdd1ca55961bed9b1063c6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
 ]
 
 [[package]]

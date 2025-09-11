@@ -47,7 +47,6 @@ rustls-tls = [
 [dependencies]
 beet_utils = { workspace = true }
 beet_core.workspace = true
-beet_dom.workspace = true
 
 bevy.workspace = true
 

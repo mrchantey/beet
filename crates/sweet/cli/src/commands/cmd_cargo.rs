@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet::prelude::*;
 use clap::Parser;
 
 #[derive(Debug, Parser)]

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-#[cfg(feature = "e2e")]
 use beet_utils::prelude::*;
 use std::process::Child;
 

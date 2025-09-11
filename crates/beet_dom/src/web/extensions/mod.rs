@@ -10,5 +10,3 @@ mod element;
 pub use self::element::*;
 mod iframe;
 pub use self::iframe::*;
-mod result;
-pub use self::result::*;

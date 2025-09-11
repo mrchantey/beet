@@ -1,8 +1,8 @@
 use anyhow::Result;
-use beet_utils::exports::notify::EventKind;
-use beet_utils::exports::notify::event::ModifyKind;
-use beet_utils::exports::notify::event::RenameMode;
-use beet_utils::prelude::*;
+use beet::exports::notify::EventKind;
+use beet::exports::notify::event::ModifyKind;
+use beet::exports::notify::event::RenameMode;
+use beet::prelude::*;
 use clap::Parser;
 use quote::quote;
 use rapidhash::RapidHashMap;

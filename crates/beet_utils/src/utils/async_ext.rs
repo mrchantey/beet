@@ -46,3 +46,12 @@ where
 {
 	tokio::task::spawn_local(fut)
 }
+
+
+#[cfg(all(not(target_arch = "wasm32"), not(feature = "tokio")))]
+pub fn spawn_local<F>(_: F)
+where
+	F: Future<Output = ()> + 'static,
+{
+	unimplemented!("please enable tokio feature")
+}
