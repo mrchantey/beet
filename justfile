@@ -204,7 +204,7 @@ test-flow *args:
 
 test-rsx *args:
 	cargo test -p beet_net						 	--features=tungstenite,native-tls  									{{args}} -- {{test-threads}}
-	# TODO await close socket  cargo test -p beet_net 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
+	# await close socket  cargo test -p beet_net 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_dom						 	--features=tokens  																	{{args}} -- {{test-threads}}
 	cargo test -p beet_dom 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
@@ -214,7 +214,7 @@ test-rsx *args:
 	cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{args}} -- {{test-threads}}
 	cargo test -p beet_router						 --features=tokens,native-tls  											{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
-	cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
+	# fix chrome_dev_tools cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
 

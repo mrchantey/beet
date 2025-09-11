@@ -1,7 +1,7 @@
-use super::super::dom_utils::HtmlEventListener;
 use extend::ext;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlIFrameElement;
+use crate::prelude::*;
 
 #[ext]
 #[allow(async_fn_in_trait)]

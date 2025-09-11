@@ -1,4 +1,3 @@
-use super::super::extensions::ArrayExt;
 use web_sys::UrlSearchParams;
 use web_sys::window;
 
@@ -19,7 +18,11 @@ impl SearchParams {
 	pub fn get_all(key: &str) -> Vec<String> {
 		let search = window().unwrap().location().search().unwrap();
 		let params = UrlSearchParams::new_with_str(search.as_str()).unwrap();
-		params.get_all(key).to_vec_str()
+		params
+			.get_all(key)
+			.iter()
+			.map(|v| v.as_string().unwrap())
+			.collect()
 	}
 
 	pub fn set(key: &str, value: &str) {

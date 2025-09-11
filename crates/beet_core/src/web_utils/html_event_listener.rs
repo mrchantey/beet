@@ -1,4 +1,4 @@
-use super::super::extensions::ClosureFnMutT1T2Ext;
+use crate::prelude::*;
 use beet_utils::prelude::*;
 use js_sys::Function;
 use js_sys::Promise;

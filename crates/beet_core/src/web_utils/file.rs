@@ -1,4 +1,3 @@
-use super::super::extensions::DocumentExt;
 use crate::prelude::*;
 use js_sys::Array;
 use js_sys::Uint8Array;
