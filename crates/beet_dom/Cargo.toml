@@ -25,11 +25,10 @@ serde = [
 	"dep:serde_json",
 	"beet_core/serde",
 ]
-chrome_dev_tools = ["beet_net/websockets","dep:exponential-backoff"]
+chrome_dev_tools = ["beet_net/websockets"]
 webdriver = ["dep:fantoccini"]
 
 [dependencies]
-exponential-backoff = { workspace = true, optional = true }
 beet_utils.workspace = true
 beet_core.workspace = true
 beet_net.workspace = true

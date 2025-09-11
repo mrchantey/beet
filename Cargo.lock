@@ -1288,7 +1288,6 @@ dependencies = [
  "beet_utils",
  "bevy",
  "console_error_panic_hook",
- "exponential-backoff",
  "extend",
  "fantoccini",
  "js-sys",
@@ -4187,15 +4186,6 @@ dependencies = [
  "futures-core",
  "nom",
  "pin-project-lite",
-]
-
-[[package]]
-name = "exponential-backoff"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "020662aa57307d8884be79fca464cce073745cfe6ac70805770972113ca6ee95"
-dependencies = [
- "fastrand",
 ]
 
 [[package]]
