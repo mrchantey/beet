@@ -4,6 +4,7 @@ use wasm_bindgen::JsCast;
 use web_sys::HtmlIFrameElement;
 
 #[ext]
+#[allow(async_fn_in_trait)]
 pub impl HtmlIFrameElement {
 	fn x_reload(&self) {
 		self.content_window().unwrap().location().reload().unwrap();

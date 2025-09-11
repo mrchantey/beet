@@ -6,106 +6,14 @@ use futures::future::BoxFuture;
 use send_wrapper::SendWrapper;
 use std::pin::Pin;
 
-/// A WebSocket message.
-///
-/// Mirrors common WS message types across platforms (e.g. web-sys and tungstenite)
-/// without leaking platform details into your code.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Message {
-	/// A UTF-8 text message.
-	Text(String),
-	/// A binary message.
-	Binary(Bytes),
-	/// A ping frame with an optional payload.
-	Ping(Bytes),
-	/// A pong frame with an optional payload.
-	Pong(Bytes),
-	/// A close frame with an optional code and reason.
-	Close(Option<CloseFrame>),
-}
-
-impl Message {
-	/// Create a text message.
-	pub fn text(text: impl Into<String>) -> Self { Message::Text(text.into()) }
-
-	/// Create a binary message.
-	pub fn binary(bytes: impl Into<Bytes>) -> Self {
-		Message::Binary(bytes.into())
-	}
-
-	/// Create a ping message.
-	pub fn ping(bytes: impl Into<Bytes>) -> Self { Message::Ping(bytes.into()) }
-
-	/// Create a pong message.
-	pub fn pong(bytes: impl Into<Bytes>) -> Self { Message::Pong(bytes.into()) }
-
-	/// Create a close message.
-	pub fn close(code: u16, reason: impl Into<String>) -> Self {
-		Message::Close(Some(CloseFrame {
-			code,
-			reason: reason.into(),
-		}))
-	}
-}
-
-impl From<&str> for Message {
-	fn from(value: &str) -> Self { Message::Text(value.to_owned()) }
-}
-impl From<String> for Message {
-	fn from(value: String) -> Self { Message::Text(value) }
-}
-impl From<Vec<u8>> for Message {
-	fn from(value: Vec<u8>) -> Self { Message::Binary(Bytes::from(value)) }
-}
-impl From<Bytes> for Message {
-	fn from(value: Bytes) -> Self { Message::Binary(value) }
-}
-
-/// A close frame describing why a socket was closed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CloseFrame {
-	/// Close code as per RFC6455.
-	pub code: u16,
-	/// Human-readable reason.
-	pub reason: String,
-}
-
-#[cfg(target_arch = "wasm32")]
-type DynMessageStream = dyn Stream<Item = Result<Message>>;
-/// crates like Axum/Tokio require Stream to be Send on native
-#[cfg(not(target_arch = "wasm32"))]
-type DynMessageStream = dyn Stream<Item = Result<Message>> + Send;
-
-/// Platform-agnostic writer trait for WebSocket sinks.
-///
-/// Platform-specific implementations live in their respective modules and are
-/// boxed into `Socket`.
-pub trait SocketWriter: 'static {
-	/// Send a message to the socket peer.
-	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
-	/// Close the socket with an optional close frame.
-	fn close_boxed(
-		&mut self,
-		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>>;
-}
-
-#[cfg(target_arch = "wasm32")]
-type DynSocketWriter = dyn SocketWriter;
-#[cfg(not(target_arch = "wasm32"))]
-type DynSocketWriter = dyn SocketWriter + Send;
-
-/// A cross-platform WebSocket that implements Stream of inbound [`Message`]s.
-///
-/// Construction is platform-specific (see `impl_web_sys.rs` and `impl_tungstenite.rs`),
-/// but once created this type provides a unified API for sending, receiving and closing.
-
+/// A cross-platform WebSocket that implements Stream of inbound [`Message`].
 pub struct Socket {
 	pub(crate) incoming: SendWrapper<Pin<Box<DynMessageStream>>>,
 	pub(crate) writer: SendWrapper<Box<DynSocketWriter>>,
 }
 
 impl Socket {
+	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
 	#[allow(unused_variables)]
 	pub async fn connect(
 		url: impl AsRef<str>,
@@ -184,6 +92,32 @@ impl Stream for Socket {
 	}
 }
 
+
+#[cfg(target_arch = "wasm32")]
+type DynMessageStream = dyn Stream<Item = Result<Message>>;
+/// crates like Axum/Tokio require Stream to be Send on native
+#[cfg(not(target_arch = "wasm32"))]
+type DynMessageStream = dyn Stream<Item = Result<Message>> + Send;
+
+/// Platform-agnostic writer trait for WebSocket sinks.
+///
+/// Platform-specific implementations live in their respective modules and are
+/// boxed into `Socket`.
+pub trait SocketWriter: 'static {
+	/// Send a message to the socket peer.
+	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
+	/// Close the socket with an optional close frame.
+	fn close_boxed(
+		&mut self,
+		close: Option<CloseFrame>,
+	) -> BoxFuture<'static, Result<()>>;
+}
+
+#[cfg(target_arch = "wasm32")]
+type DynSocketWriter = dyn SocketWriter;
+#[cfg(not(target_arch = "wasm32"))]
+type DynSocketWriter = dyn SocketWriter + Send;
+
 /// Read half returned by `Socket::split()`.
 pub struct SocketRead {
 	pub(crate) incoming: SendWrapper<Pin<Box<DynMessageStream>>>,
@@ -216,6 +150,72 @@ impl SocketWrite {
 		self.writer.close_boxed(close).await
 	}
 }
+
+
+/// A WebSocket message.
+///
+/// Mirrors common WS message types across platforms (e.g. web-sys and tungstenite)
+/// without leaking platform details into your code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Message {
+	/// A UTF-8 text message.
+	Text(String),
+	/// A binary message.
+	Binary(Bytes),
+	/// A ping frame with an optional payload.
+	Ping(Bytes),
+	/// A pong frame with an optional payload.
+	Pong(Bytes),
+	/// A close frame with an optional code and reason.
+	Close(Option<CloseFrame>),
+}
+
+impl Message {
+	/// Create a text message.
+	pub fn text(text: impl Into<String>) -> Self { Message::Text(text.into()) }
+
+	/// Create a binary message.
+	pub fn binary(bytes: impl Into<Bytes>) -> Self {
+		Message::Binary(bytes.into())
+	}
+
+	/// Create a ping message.
+	pub fn ping(bytes: impl Into<Bytes>) -> Self { Message::Ping(bytes.into()) }
+
+	/// Create a pong message.
+	pub fn pong(bytes: impl Into<Bytes>) -> Self { Message::Pong(bytes.into()) }
+
+	/// Create a close message.
+	pub fn close(code: u16, reason: impl Into<String>) -> Self {
+		Message::Close(Some(CloseFrame {
+			code,
+			reason: reason.into(),
+		}))
+	}
+}
+
+impl From<&str> for Message {
+	fn from(value: &str) -> Self { Message::Text(value.to_owned()) }
+}
+impl From<String> for Message {
+	fn from(value: String) -> Self { Message::Text(value) }
+}
+impl From<Vec<u8>> for Message {
+	fn from(value: Vec<u8>) -> Self { Message::Binary(Bytes::from(value)) }
+}
+impl From<Bytes> for Message {
+	fn from(value: Bytes) -> Self { Message::Binary(value) }
+}
+
+/// A close frame describing why a socket was closed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloseFrame {
+	/// Close code as per RFC6455.
+	pub code: u16,
+	/// Human-readable reason.
+	pub reason: String,
+}
+
 
 #[cfg(test)]
 mod tests {

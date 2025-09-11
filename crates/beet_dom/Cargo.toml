@@ -51,61 +51,11 @@ fantoccini = { version = "0.22", optional = true }
 tokio = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# web dependencies (WASM only)
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
-
-#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
-#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
-[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-workspace = true
-features = [
-	# File
-	"File",
-	"FileList",
-	# HTML
-	"Text",
-	"Comment",
-	"Node",
-	"NodeList",
-	'Document',
-	'Element',
-	'Window',
-	'HtmlAnchorElement',
-	'HtmlButtonElement',
-	'HtmlCanvasElement',
-	'HtmlDivElement',
-	'HtmlHeadElement',
-	"HtmlInputElement",
-	'HtmlIFrameElement',
-	'HtmlLinkElement',
-	'HtmlParagraphElement',
-	'HtmlScriptElement',
-	# Style
-	'MediaQueryList',
-	# Events
-	'MouseEvent',
-	'KeyboardEvent',
-	# JS
-	'console',
-	'Navigator',
-	'Performance',
-	# Url
-	'Url',
-	'History',
-	'Location',
-	'UrlSearchParams',
-	# Resize Observer
-	'ResizeObserver',
-	'ResizeObserverBoxOptions',
-	'ResizeObserverEntry',
-	'ResizeObserverOptions',
-	'ResizeObserverSize',
-	'DomRect',
-	'DomRectReadOnly',
-]
+web-sys.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

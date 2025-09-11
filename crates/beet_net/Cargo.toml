@@ -121,10 +121,6 @@ web-sys = { workspace = true, features = [
 	'ReadableStream',
 	'ReadableStreamDefaultReader',
 	'BinaryType',
-	'Blob',
-	'BlobEvent',
-	'BlobEventInit',
-	'BlobPropertyBag',
 	# localstorage
 	"Storage",
 	# sockets

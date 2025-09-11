@@ -1,3 +1,4 @@
+// TODO page member function
 #[allow(unused)]
 pub fn to_page(path: &str) {
 	#[cfg(target_arch = "wasm32")]

@@ -1,5 +1,3 @@
-use crate::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use extend::ext;
 use wasm_bindgen::JsCast;
@@ -8,23 +6,11 @@ use web_sys::*;
 
 
 #[ext]
+#[allow(async_fn_in_trait)]
 pub impl Document {
 	fn get() -> Document { window().unwrap().document().unwrap() }
 	fn x_head() -> HtmlHeadElement { Self::get().head().unwrap() }
 	fn x_body() -> HtmlElement { Self::get().body().unwrap() }
-
-	async fn x_await_load_by_id(id: &str) -> Result<()> {
-		HtmlEventListener::wait_with_target(
-			"load",
-			Self::get()
-				.get_element_by_id(id)
-				.or_err()?
-				.dyn_into()
-				.unwrap(),
-		)
-		.await;
-		Ok(())
-	}
 
 	fn x_append_child(node: &Node) {
 		Self::x_body().append_child(node).unwrap();

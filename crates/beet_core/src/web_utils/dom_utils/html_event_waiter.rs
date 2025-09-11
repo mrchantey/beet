@@ -114,7 +114,6 @@ pub fn timeout_reject(duration: Duration) -> Promise {
 #[cfg(target_arch = "wasm32")]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
 
 	#[sweet::test]
 	#[ignore = "requires dom"]
