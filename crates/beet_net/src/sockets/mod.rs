@@ -1,0 +1,6 @@
+mod socket;
+pub use socket::*;
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+pub(self) mod impl_tungstenite;
+#[cfg(target_arch = "wasm32")]
+pub(self) mod impl_web_sys;

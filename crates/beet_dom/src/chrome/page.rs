@@ -1,5 +1,5 @@
 use crate::chrome::net_backoff;
-use base64::Engine;
+use base64::prelude::*;
 use beet_core::bevybail;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -110,11 +110,10 @@ impl Page {
 			.await?;
 
 		if let Some(data) = response["result"]["data"].as_str() {
-			let pdf_bytes =
-				match base64::engine::general_purpose::STANDARD.decode(data) {
-					Ok(bytes) => bytes,
-					Err(e) => bevybail!("Base64 decode error: {}", e),
-				};
+			let pdf_bytes = match BASE64_STANDARD.decode(data) {
+				Ok(bytes) => bytes,
+				Err(e) => bevybail!("Base64 decode error: {}", e),
+			};
 			Ok(pdf_bytes)
 		} else {
 			bevybail!("No PDF data in response")
@@ -129,7 +128,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[sweet::test]
-	#[ignore = "requires Chrome DevTools"]
+	// #[ignore = "requires Chrome DevTools"]
 	async fn works() {
 		// let bytes = export_pdf("https://google.com").await.unwrap();
 		let devtools = ChromeDevTools::connect().await.unwrap();

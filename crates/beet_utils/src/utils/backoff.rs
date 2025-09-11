@@ -616,7 +616,7 @@ mod tests {
 		assert_eq!(it.next(), None);
 	}
 
-	#[cfg(feature = "tokio")]
+	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
 	#[tokio::test]
 	async fn stream_sleeps_and_yields_attempts() {
 		use futures::StreamExt;

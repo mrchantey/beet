@@ -4,11 +4,15 @@
 
 mod http_utils;
 mod object_storage;
+#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
+mod sockets;
 mod transport;
 
 pub mod prelude {
 	pub use crate::http_utils::*;
 	pub use crate::object_storage::*;
+	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
+	pub use crate::sockets::*;
 
 	// reexport common types
 	pub use http::StatusCode;
