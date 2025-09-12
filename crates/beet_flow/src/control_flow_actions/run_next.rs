@@ -79,6 +79,7 @@ fn run_next(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -87,7 +88,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 
-		let observed = observe_triggers::<OnResultAction>(app.world_mut());
+		let observed =
+			observer_ext::observe_triggers::<OnResultAction>(app.world_mut());
 		let world = app.world_mut();
 		let action1 = world.spawn(ReturnWith(RunResult::Success)).id();
 		let action2 = world

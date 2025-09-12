@@ -1592,6 +1592,7 @@ dependencies = [
  "anyhow",
  "beet_flow",
  "beet_spatial",
+ "beet_utils",
  "bevy",
  "sweet",
 ]

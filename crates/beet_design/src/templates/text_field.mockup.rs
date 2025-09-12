@@ -13,7 +13,7 @@ pub fn Inner() -> impl Bundle {
 
 	#[cfg(target_arch = "wasm32")]
 	effect(move || {
-		beet::prelude::log!("value: {}", value());
+		beet::prelude::cross_log!("value: {}", value());
 	});
 
 	rsx! {

@@ -207,9 +207,7 @@ impl BacktraceLocation {
 	/// 2. otherwise use [FsExt::workspace_root]
 	pub fn cwd_root() -> PathBuf {
 		#[cfg(not(target_arch = "wasm32"))]
-		return std::env::var("SWEET_ROOT")
-			.map(PathBuf::from)
-			.unwrap_or_else(|_| beet_utils::prelude::FsExt::workspace_root());
+		return beet_utils::prelude::workspace_root();
 		#[cfg(target_arch = "wasm32")]
 		return js_runtime::sweet_root()
 			.map(PathBuf::from)

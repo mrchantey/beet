@@ -84,7 +84,7 @@ impl PanicStore {
 		if !CURRENT_LISTENER.is_set() {
 			// nobody is listening, must be a real one
 			let payload = payload_to_string(info.payload());
-			beet_utils::log!(
+			beet_utils::cross_log!(
 				"Sweet Runner Panic:\nThis is an internal sweet panic, please file an issue\n{}\nend payload",
 				payload
 			);

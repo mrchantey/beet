@@ -33,9 +33,8 @@ pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 pub use beet_utils as utils;
-pub use beet_utils::elog;
-pub use beet_utils::log;
-pub use beet_utils::noop;
+pub use beet_utils::cross_log;
+pub use beet_utils::cross_log_error;
 pub mod prelude {
 	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;

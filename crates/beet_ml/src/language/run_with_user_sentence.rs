@@ -50,6 +50,7 @@ pub fn run_with_user_sentence<P: RunPayload>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -59,7 +60,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default())
 			.add_observer(run_with_user_sentence::<()>);
 		let world = app.world_mut();
-		let on_run = observe_triggers::<OnRun>(world);
+		let on_run = observer_ext::observe_triggers::<OnRun>(world);
 
 		let entity = world
 			.spawn((

@@ -49,6 +49,7 @@ fn nearest_sentence(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -65,7 +66,8 @@ mod test {
 			BeetFlowPlugin::default(),
 		))
 		.finish();
-		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
+		let on_run =
+			observer_ext::observe_trigger_names::<OnRun>(app.world_mut());
 
 		let handle =
 			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")

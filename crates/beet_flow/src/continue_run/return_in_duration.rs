@@ -72,6 +72,7 @@ pub(crate) fn return_in_duration<T: ResultPayload>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use std::time::Duration;
 	use sweet::prelude::*;
@@ -81,7 +82,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default()).insert_time();
 
-		let on_result = observe_triggers::<OnResult>(app.world_mut());
+		let on_result =
+			observer_ext::observe_triggers::<OnResult>(app.world_mut());
 
 		app.world_mut().spawn((
 			Running::default(),

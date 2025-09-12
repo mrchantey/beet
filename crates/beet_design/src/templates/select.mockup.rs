@@ -11,7 +11,7 @@ pub fn Inner() -> impl Bundle {
 	let (value, set_value) = signal("veggie".to_string());
 
 	effect(move || {
-		beet_utils::log!("value: {}", value());
+		beet_utils::cross_log!("value: {}", value());
 	});
 
 	rsx! {

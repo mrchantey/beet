@@ -97,6 +97,7 @@ fn step_environment<S: RlSessionTypes>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -104,7 +105,8 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		let on_result = observe_triggers::<OnResult>(app.world_mut());
+		let on_result =
+			observer_ext::observe_triggers::<OnResult>(app.world_mut());
 
 		app.add_plugins((
 			BeetFlowPlugin::default(),

@@ -23,7 +23,7 @@ pub impl<T, E: std::fmt::Display> Result<T, E> {
 		match self {
 			Ok(value) => value,
 			Err(err) => {
-				crate::log!("{err}");
+				eprintln!("{err}");
 				std::process::exit(1);
 			}
 		}

@@ -123,6 +123,7 @@ fn on_receive_score(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -134,8 +135,10 @@ mod test {
 
 		let on_run = collect_on_run(world);
 		let on_result = collect_on_result(world);
-		let on_request_score = observe_triggers::<OnRun<RequestScore>>(world);
-		let on_score = observe_triggers::<OnResultAction<ScoreValue>>(world);
+		let on_request_score =
+			observer_ext::observe_triggers::<OnRun<RequestScore>>(world);
+		let on_score =
+			observer_ext::observe_triggers::<OnResultAction<ScoreValue>>(world);
 
 		world
 			.spawn((Name::new("root"), HighestScore::default()))

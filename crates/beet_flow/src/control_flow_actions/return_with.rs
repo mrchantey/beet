@@ -37,6 +37,7 @@ fn return_with<T: ResultPayload>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -45,7 +46,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 
-		let observed = observe_triggers::<OnResultAction>(app.world_mut());
+		let observed =
+			observer_ext::observe_triggers::<OnResultAction>(app.world_mut());
 		let entity = app
 			.world_mut()
 			.spawn(ReturnWith(RunResult::Success))

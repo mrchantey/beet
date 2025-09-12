@@ -91,6 +91,7 @@ fn provide_score(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -139,7 +140,7 @@ mod test {
 		let world = app.world_mut();
 
 		let on_child_score =
-			observe_triggers::<OnChildResult<ScoreValue>>(world);
+			observer_ext::observe_triggers::<OnChildResult<ScoreValue>>(world);
 
 		world
 			.spawn(HighestScore::default())

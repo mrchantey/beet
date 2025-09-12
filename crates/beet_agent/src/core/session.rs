@@ -1,4 +1,4 @@
-use beet_core::bevyhow;
+use beet_utils::bevyhow;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;

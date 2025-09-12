@@ -78,7 +78,8 @@ pub impl<W: IntoWorld> W {
 	fn log_component_names(&self, entity: Entity) {
 		let names = self.component_names_related::<Children>(entity);
 		let str = names.iter_to_string_indented();
-		beet_utils::log!("Component names for {entity}: \n{str}");
+		println!("Component names for {entity}: \n{str}");
+		// bevy::log::info!("Component names for {entity}: \n{str}");
 	}
 
 	fn component_names_related<R: RelationshipTarget>(

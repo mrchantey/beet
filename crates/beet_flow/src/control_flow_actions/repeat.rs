@@ -86,6 +86,7 @@ fn repeat(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -94,7 +95,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let func = observe_triggers::<OnResultAction>(world);
+		let func = observer_ext::observe_triggers::<OnResultAction>(world);
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
@@ -117,7 +118,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let func = observe_triggers::<OnResultAction>(world);
+		let func = observer_ext::observe_triggers::<OnResultAction>(world);
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
@@ -139,7 +140,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let func = observe_triggers::<OnResultAction>(world);
+		let func = observer_ext::observe_triggers::<OnResultAction>(world);
 
 		world
 			.spawn((Sequence, Repeat::if_success()))

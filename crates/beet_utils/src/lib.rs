@@ -3,7 +3,6 @@
 	feature(fn_traits, unboxed_closures, exit_status_error)
 )]
 pub use utils::async_ext;
-pub use utils::log::*;
 pub use utils::time_ext;
 
 pub mod arena;
@@ -11,11 +10,15 @@ mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
+mod mini_utils;
 pub mod path_utils;
 #[cfg(feature = "tokens")]
 mod tokens_utils;
 pub mod utils;
 pub mod prelude {
+	pub use crate::cross_log;
+	pub use crate::cross_log_error;
+
 	pub use crate::abs_file;
 	pub use crate::arena::*;
 	pub use crate::bevy_utils::*;
@@ -25,8 +28,7 @@ pub mod prelude {
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
-	pub use crate::log;
-	pub use crate::log_kvp;
+	pub use crate::mini_utils::*;
 	pub use crate::path_utils::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;

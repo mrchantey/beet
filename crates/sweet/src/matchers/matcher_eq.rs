@@ -58,12 +58,11 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::utils::PipelineTarget;
 
 	#[test]
 	fn equality() {
 		true.xpect_eq(true);
-		true.xref().xpect_eq(true);
+		(&true).xpect_eq(true);
 
 		"foo".xpect_eq("foo");
 		"foo".to_string().xpect_eq("foo");

@@ -18,6 +18,7 @@ bevy_default = ["bevy/default"]
 [dependencies]
 beet_flow.workspace = true
 beet_spatial.workspace = true
+beet_utils.workspace = true
 bevy.workspace = true
 
 anyhow.workspace = true

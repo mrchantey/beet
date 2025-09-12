@@ -2,7 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use anyhow::Result;
-use beet_utils::time_ext::sleep_secs;
+use bevy::tasks::futures_lite::future::yield_now;
 #[cfg(target_arch = "wasm32")]
 use sweet::prelude::*;
 
@@ -34,16 +34,16 @@ async fn it_panics() { panic!("foo") }
 #[tokio::test]
 #[should_panic]
 async fn it_tokio_waits_then_panics() {
-	sleep_secs(1).await;
+	yield_now().await;
 	panic!("waddup")
 }
 #[sweet::test]
 // #[should_panic]
-async fn it_sleeps() { sleep_secs(1).await; }
+async fn it_sleeps() { yield_now().await; }
 
 #[sweet::test]
 #[should_panic]
 async fn it_sleeps_then_panics() {
-	sleep_secs(1).await;
+	yield_now().await;
 	panic!("waddup")
 }

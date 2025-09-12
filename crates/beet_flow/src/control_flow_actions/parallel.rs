@@ -64,6 +64,7 @@ fn on_next(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -73,8 +74,8 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_triggers::<OnResultAction>(world);
-		let on_run = observe_triggers::<OnRun>(world);
+		let on_result = observer_ext::observe_triggers::<OnResultAction>(world);
+		let on_run = observer_ext::observe_triggers::<OnRun>(world);
 
 		let action = world
 			.spawn((Name::new("root"), Parallel::default()))
@@ -95,8 +96,8 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_triggers::<OnResultAction>(world);
-		let on_run = observe_triggers::<OnRun>(world);
+		let on_result = observer_ext::observe_triggers::<OnResultAction>(world);
+		let on_run = observer_ext::observe_triggers::<OnRun>(world);
 
 		let action = world
 			.spawn((Name::new("root"), Parallel::default()))

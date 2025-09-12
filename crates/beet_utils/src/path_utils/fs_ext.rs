@@ -2,7 +2,6 @@ use crate::prelude::*;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 /// The workspace relative directory for this file,
 /// internally using the `file!()` macro.
@@ -93,39 +92,11 @@ impl FsExt {
 	/// ## Panics
 	/// - The current directory is not found
 	/// - Insufficient permissions to access the current directory
-	pub fn workspace_root() -> PathBuf {
-		if let Ok(root_str) = std::env::var("SWEET_ROOT") {
-			return PathBuf::from_str(&root_str).unwrap();
-		}
-
-		#[cfg(target_arch = "wasm32")]
-		{
-			return PathBuf::default();
-		}
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			use std::ffi::OsString;
-
-			let path = std::env::current_dir().unwrap();
-			let mut path_ancestors = path.as_path().ancestors();
-			while let Some(p) = path_ancestors.next() {
-				if ReadDir::files(p).unwrap_or_default().into_iter().any(|p| {
-					p.file_name() == Some(&OsString::from("Cargo.lock"))
-				}) {
-					return PathBuf::from(p);
-				}
-			}
-			// If no workspace root is found, fall back to the current directory
-			return path;
-		}
-	}
+	pub fn workspace_root() -> PathBuf { crate::prelude::workspace_root() }
 
 
 	/// Write a file, ensuring the path exists
-	pub fn write(
-		path: impl AsRef<Path>,
-		data: impl AsRef<[u8]>,
-	) -> FsResult {
+	pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)

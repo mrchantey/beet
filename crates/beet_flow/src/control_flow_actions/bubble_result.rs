@@ -42,6 +42,7 @@ fn bubble_result<T: ResultPayload>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -50,7 +51,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let on_result_action = observe_triggers::<OnResultAction>(world);
+		let on_result_action =
+			observer_ext::observe_triggers::<OnResultAction>(world);
 		let mut child = Entity::PLACEHOLDER;
 		let mut grandchild = Entity::PLACEHOLDER;
 

@@ -20,7 +20,7 @@ impl SweetCaseLogger {
 
 		let message = case.result.message();
 
-		beet_utils::log!("{status} {file}\t{name}{message}");
+		beet_utils::cross_log!("{status} {file}\t{name}{message}");
 	}
 
 	fn case_pretty_path(&self, desc: &TestDesc) -> String {

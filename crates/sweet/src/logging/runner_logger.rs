@@ -33,7 +33,7 @@ impl RunnerLogger {
 			clear();
 		}
 		if !config.quiet {
-			beet_utils::log!("\n{}\n\n{config}", Self::SWEET_AS)
+			beet_utils::cross_log!("\n{}\n\n{config}", Self::SWEET_AS)
 		}
 
 		Self {
@@ -56,7 +56,7 @@ impl RunnerLogger {
 		let result_count = ResultCount::from_case_results(&self.cases);
 
 		if !self.config.quiet {
-			beet_utils::log_val(&self.case_results(&result_count));
+			beet_utils::cross_log!("{}", self.case_results(&result_count));
 		}
 		self.on_results_printed();
 		if !self.config.watch && !result_count.succeeded() {
