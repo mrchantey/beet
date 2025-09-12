@@ -29,7 +29,7 @@ beet_ml = { workspace = true, features = [
 	"spatial",
 ], optional = true }
 beet_spatial = { workspace = true, features = [] }
-beet_utils = { workspace = true, features = ["rand"] }
+beet_core = { workspace = true, features = ["rand"] }
 
 
 serde.workspace = true

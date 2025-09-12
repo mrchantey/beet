@@ -1,4 +1,4 @@
-use beet_utils::utils::Tree;
+use crate::prelude::Tree;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;

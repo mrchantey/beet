@@ -1,4 +1,4 @@
-//! Cross-platform timer utility for beet_utils
+//! Cross-platform timer utility for beet_core
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;

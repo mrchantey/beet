@@ -1,4 +1,5 @@
 use beet_utils::prelude::*;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn;
@@ -15,11 +16,9 @@ pub fn impl_derive_to_tokens(
 		.into()
 }
 
-
-
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let ident = &input.ident;
-	let pound_token = pound_token();
+	let pound_token = syn::Token![#](Span::call_site());
 
 	// extract the to_tokens attribute if it exists
 	let constructor = input
@@ -214,7 +213,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		}));
 
 
-	quote! {
+	Ok(quote! {
 		impl #impl_generics #beet_core::prelude::TokenizeSelf for #ident #type_generics #where_clause {
 			fn self_tokens(&self, tokens: &mut #beet_core::exports::proc_macro2::TokenStream) {
 				use #beet_core::exports::quote;
@@ -223,8 +222,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 				#content
 			}
 		}
-	}
-	.xok()
+	})
 }
 
 

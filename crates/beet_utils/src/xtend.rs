@@ -14,7 +14,7 @@ where
 
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
-pub trait PipelineTarget: Sized {
+pub trait Xtend: Sized {
 	/// Similar to [`Iterator::map`] but for any type, not just iterators,
 	/// allowing for method chaining.
 	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
@@ -101,12 +101,12 @@ pub trait PipelineTarget: Sized {
 		format!("{}", self)
 	}
 }
-impl<T: Sized> PipelineTarget for T {}
+impl<T: Sized> Xtend for T {}
 
 
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
-pub trait PipelineTargetIter<T>: Sized + IntoIterator<Item = T> {
+pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 	/// Similar to [`IntoIterator::into_iter().map(func).collect()`]
 	fn xmap_each<O>(self, func: impl FnMut(T) -> O) -> Vec<O> {
 		self.into_iter().map(func).collect()
@@ -129,14 +129,14 @@ pub trait PipelineTargetIter<T>: Sized + IntoIterator<Item = T> {
 	}
 }
 
-impl<T: Sized, I: IntoIterator<Item = T>> PipelineTargetIter<T> for I {}
+impl<T: Sized, I: IntoIterator<Item = T>> XtendIter<T> for I {}
 
-pub trait PipelineTargetVec<T> {
+pub trait XtendVec<T> {
 	/// Similar to [`Vec::extend`] but returns [`Self`]
 	fn xtend<I: IntoIterator<Item = T>>(self, iter: I) -> Self;
 }
 
-impl<T, T2> PipelineTargetVec<T> for T2
+impl<T, T2> XtendVec<T> for T2
 where
 	T2: AsMut<Vec<T>>,
 {
@@ -146,12 +146,12 @@ where
 	}
 }
 
-pub trait PipelineTargetString {
+pub trait XtendString {
 	/// Similar to [`String::push_str`] but returns [`Self`]
 	fn xtend(self, item: impl AsRef<str>) -> Self;
 }
 
-impl PipelineTargetString for String {
+impl XtendString for String {
 	fn xtend(mut self, item: impl AsRef<str>) -> Self {
 		self.push_str(item.as_ref());
 		self

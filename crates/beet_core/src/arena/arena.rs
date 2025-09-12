@@ -216,7 +216,7 @@ mod tests {
 
 	impl Drop for Counter {
 		fn drop(&mut self) {
-			println!("Counter '{}' is being dropped", self.name);
+			// println!("Counter '{}' is being dropped", self.name);
 		}
 	}
 

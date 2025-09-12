@@ -30,7 +30,6 @@ tokens = ["beet_core/tokens"]
 beet_rsx_macros.workspace = true
 beet_core.workspace = true
 beet_dom.workspace = true
-beet_utils.workspace = true
 
 #💡 utils
 send_wrapper.workspace = true

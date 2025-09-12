@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::bevybail;
 use bevy::app::AppExit;
 
 #[extend::ext(name=AppExitExt)]

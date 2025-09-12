@@ -1,6 +1,4 @@
 use crate::prelude::*;
-// use beet_rsx::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::future::Future;
 use std::sync::Arc;
@@ -152,12 +150,11 @@ where
 
 #[cfg(test)]
 // currently must be Send
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
 mod test {
 	use std::time::Duration;
 
 	use crate::prelude::*;
-	use beet_utils::time_ext::sleep;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -167,7 +164,7 @@ mod test {
 		let entity = world
 			.spawn(AsyncAction::new(async |mut world, entity| {
 				// crosses async boundary
-				sleep(Duration::from_millis(1)).await;
+				time_ext::sleep(Duration::from_millis(1)).await;
 				world.entity_mut(entity).insert(Name::new("Hello"));
 				world
 			}))

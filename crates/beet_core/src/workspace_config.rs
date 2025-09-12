@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 use heck::ToKebabCase;
 use std::path::Path;

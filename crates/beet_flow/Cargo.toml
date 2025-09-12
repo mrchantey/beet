@@ -21,7 +21,6 @@ _doctest = []
 
 [dependencies]
 beet_flow_macros.workspace = true
-beet_utils.workspace = true
 beet_core.workspace = true
 
 bevy.workspace = true

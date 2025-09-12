@@ -1,17 +1,29 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![feature(exit_status_error)]
+#![cfg_attr(
+	feature = "nightly",
+	feature(fn_traits, unboxed_closures, exit_status_error)
+)]
+
+pub use beet_utils::*;
+pub use utils::async_ext;
+pub use utils::time_ext;
 
 pub mod actions;
+pub mod arena;
+mod bevy_utils;
+pub mod extensions;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub mod fs;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
+pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
 
 pub use beet_core_macros::*;
 
-mod bevy_utils;
 mod workspace_config;
 
 
@@ -20,20 +32,38 @@ pub mod prelude {
 	#[cfg(not(doctest))]
 	#[allow(unused)]
 	pub(crate) use crate as beet_core;
+
 	pub use crate::actions::*;
+	pub use crate::arena::*;
 	pub use crate::bevy_utils::*;
-	pub use crate::pkg_config;
+	pub use crate::extensions::*;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use crate::fs::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	pub use crate::utils::*;
+
+	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::web_utils::*;
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
+	pub use beet_utils::prelude::*;
 	pub use futures_lite::StreamExt;
+
+	pub use crate::abs_file;
+	pub use crate::bevybail;
+	pub use crate::bevyhow;
+	pub use crate::cross_log;
+	pub use crate::cross_log_error;
+	pub use crate::dir;
+	#[cfg(feature = "rand")]
+	pub use rand::Rng;
 }
 
 
 pub mod exports {
+	// original exports
 	pub use async_channel;
 	pub use futures_lite;
 	#[cfg(feature = "tokens")]
@@ -47,4 +77,21 @@ pub mod exports {
 	pub use syn;
 	#[cfg(feature = "serde")]
 	pub use toml;
+	pub use web_time;
+
+	// merged-in exports
+	pub use glob;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use notify;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use notify_debouncer_full;
+
+	#[cfg(target_arch = "wasm32")]
+	pub use js_sys;
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen;
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen_futures;
+	#[cfg(target_arch = "wasm32")]
+	pub use web_sys;
 }

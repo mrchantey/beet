@@ -27,7 +27,7 @@ sweet_macros.workspace = true
 #💡 misc
 anyhow.workspace = true
 extend.workspace = true
-web-time = "1"
+web-time.workspace = true
 
 #💡 logging
 log.workspace = true

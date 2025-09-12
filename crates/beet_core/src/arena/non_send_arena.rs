@@ -158,7 +158,7 @@ impl NonSendArenaMap {
 }
 
 const PANIC_MSG: &str = r#"
-Object does not exist in the NonSendArena. 
+Object does not exist in the NonSendArena.
 It may have been manually removed by another handle, or created in a different thread.
 "#;
 
@@ -286,7 +286,7 @@ mod tests {
 
 	impl Drop for NonSendCounter {
 		fn drop(&mut self) {
-			println!("NonSendCounter '{}' is being dropped", self.name);
+			// println!("NonSendCounter '{}' is being dropped", self.name);
 		}
 	}
 

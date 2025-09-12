@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -26,7 +26,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		.iter()
 		.filter_map(|attr| {
 			if attr.path().is_ident("sendit") {
-				let pound_token = pound_token();
+				let pound_token = syn::Token![#](Span::call_site());
 				let attrs = attr.parse_args::<TokenStream>().unwrap();
 				// let tokens = &list.tokens;
 				Some(quote!(#pound_token [#attrs]))
@@ -73,6 +73,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_utils::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
 

@@ -26,8 +26,9 @@ use std::str::FromStr;
 ///
 /// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Hash, bevy::reflect::Reflect,
+)]
 pub struct WsPathBuf(
 	// TODO upstream Pathbuf Reflect
 	PathBuf,
@@ -83,7 +84,7 @@ impl WsPathBuf {
 		let path = FsExt::workspace_root().join(self).clean();
 		AbsPathBuf::new(path)
 			.map_err(|err| {
-				bevyhow!("Failed to convert WsPathBuf to AbsPathBuf: {}", err)
+				format!("Failed to convert WsPathBuf to AbsPathBuf: {err}")
 			})
 			.unwrap()
 	}

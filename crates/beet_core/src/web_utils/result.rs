@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::error::BevyError;
 use extend::ext;
 use wasm_bindgen::JsValue;

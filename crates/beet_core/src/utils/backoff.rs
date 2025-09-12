@@ -3,8 +3,8 @@
 // MIT/APACHE
 // - added stream
 //
+use crate::prelude::*;
 use std::time::Duration;
-
 
 impl Default for Backoff {
 	fn default() -> Self {
@@ -36,7 +36,7 @@ impl Default for Backoff {
 /// Synchronous:
 ///
 /// ```no_run
-/// use beet_utils::utils::Backoff;
+/// use beet_core::utils::Backoff;
 /// use std::time::Duration;
 ///
 /// # fn main() -> Result<(), std::io::Error> {
@@ -73,7 +73,7 @@ impl Backoff {
 	/// With an explicit max duration:
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(3, Duration::from_millis(100), Duration::from_secs(10));
@@ -85,7 +85,7 @@ impl Backoff {
 	/// With no max duration, defaults to Duration::MAX (many many years)
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(5, Duration::from_millis(50), None);
@@ -114,7 +114,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
@@ -127,7 +127,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
@@ -142,7 +142,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
@@ -155,7 +155,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
@@ -170,7 +170,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.max_attempts(), 3);
@@ -182,7 +182,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_max_attempts(5);
@@ -197,7 +197,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.jitter(), 0.3);
@@ -215,7 +215,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_jitter(0.3);  // default value
@@ -237,7 +237,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.factor(), 2);
@@ -249,7 +249,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_factor(3);
@@ -299,7 +299,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```no_run
-	/// # use beet_utils::utils::Backoff;
+	/// # use beet_core::utils::Backoff;
 	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(3, Duration::from_millis(100), Duration::from_secs(10));
@@ -323,9 +323,8 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```no_run
-	/// # #[cfg(feature = "tokio")]
 	/// # async fn demo() {
-	/// # use beet_utils::utils::Backoff;
+	/// # use beet_core::utils::Backoff;
 	/// # use futures::StreamExt;
 	///
 	/// let backoff = Backoff::default();
@@ -340,6 +339,8 @@ impl Backoff {
 	pub fn stream(&self) -> BackoffStream { BackoffStream::new(self.clone()) }
 	/// Retry a synchronous operation using this backoff.
 	///
+	/// (synchronous sleep is unsupported on wasm, see [`Self::retry_async`])
+	///
 	/// The closure is called for each attempt with a `BackoffFrame`, and should return
 	/// `Ok(T)` on success or `Err(E)` to trigger another attempt (until the final attempt).
 	/// Between attempts this method sleeps according to the backoff policy.
@@ -347,7 +348,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use beet_utils::utils::Backoff;
+	/// use beet_core::utils::Backoff;
 	/// use std::time::Duration;
 	///
 	/// # fn main() -> Result<(), ()> {
@@ -358,6 +359,7 @@ impl Backoff {
 	/// })?;
 	/// # Ok(()) }
 	/// ```
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn retry<T, E, F>(&self, mut op: F) -> Result<T, E>
 	where
 		F: FnMut(BackoffFrame) -> Result<T, E>,
@@ -383,7 +385,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use beet_utils::utils::Backoff;
+	/// use beet_core::utils::Backoff;
 	/// use std::time::Duration;
 	///
 	/// # async fn demo() -> Result<(), ()> {
@@ -399,7 +401,6 @@ impl Backoff {
 		F: FnMut(BackoffFrame) -> Fut,
 		Fut: core::future::Future<Output = Result<T, E>>,
 	{
-		use futures::StreamExt;
 		let mut stream = self.stream();
 		while let Some(frame) = stream.next().await {
 			match op(frame).await {
@@ -420,7 +421,7 @@ impl Backoff {
 /// # Examples
 ///
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// # use std::time::Duration;
 ///
 /// let backoff = Backoff::default();
@@ -445,7 +446,7 @@ impl<'b> IntoIterator for &'b Backoff {
 /// # Examples
 ///
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// # use std::time::Duration;
 ///
 /// let backoff = Backoff::default();
@@ -696,7 +697,9 @@ mod tests {
 		// Exhausted
 		assert_eq!(it.next(), None);
 	}
+
 	#[test]
+	#[cfg(not(target_arch = "wasm32"))]
 	fn retry_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -722,8 +725,7 @@ mod tests {
 		assert!(counter.load(Ordering::SeqCst) >= 3);
 	}
 
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-	#[tokio::test]
+	#[sweet::test]
 	async fn retry_async_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -739,7 +741,7 @@ mod tests {
 			backoff.set_jitter(0.0);
 		}
 
-		let start = std::time::Instant::now();
+		let start = web_time::Instant::now();
 		let result = backoff
 			.retry_async({
 				let counter = counter.clone();
@@ -793,11 +795,8 @@ mod tests {
 		assert_eq!(it.next(), None);
 	}
 
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-	#[tokio::test]
+	#[sweet::test]
 	async fn stream_sleeps_and_yields_attempts() {
-		use futures::StreamExt;
-
 		#[allow(unused_mut)]
 		let mut backoff = Backoff::new(
 			3,
@@ -811,7 +810,7 @@ mod tests {
 		}
 
 		let mut stream = backoff.stream();
-		let start = std::time::Instant::now();
+		let start = web_time::Instant::now();
 		let mut items = Vec::new();
 
 		while let Some(frame) = stream.next().await {

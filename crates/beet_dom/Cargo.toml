@@ -15,7 +15,7 @@ publish = true
 [features]
 default = ["serde", "nightly"]
 client = []
-nightly = ["beet_utils/nightly"]
+nightly = ["beet_core/nightly"]
 tokens = ["beet_core/tokens"]
 bevy_text = ["bevy/bevy_text"]
 tokio = ["dep:tokio"]
@@ -31,7 +31,6 @@ chrome_dev_tools = ["tokio","beet_net/tungstenite"]
 webdriver = ["dep:fantoccini"]
 
 [dependencies]
-beet_utils.workspace = true
 beet_core.workspace = true
 beet_net.workspace = true
 

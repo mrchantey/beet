@@ -16,7 +16,7 @@ publish = true
 default = ["serde", "reqwest"]
 # for conditional compilation in hooks
 client = []
-tokio = ["dep:tokio","beet_utils/tokio"]
+tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 axum = ["dep:axum"]
 aws = [
@@ -46,7 +46,6 @@ rustls-tls = [
 ]
 
 [dependencies]
-beet_utils = { workspace = true }
 beet_core.workspace = true
 
 bevy.workspace = true

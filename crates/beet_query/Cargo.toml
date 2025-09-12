@@ -20,7 +20,6 @@ libsql = ["dep:libsql"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-beet_utils.workspace = true
 beet_core.workspace = true
 beet_net.workspace = true
 

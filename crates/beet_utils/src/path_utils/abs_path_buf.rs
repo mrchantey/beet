@@ -2,8 +2,7 @@ use super::FsError;
 use super::FsExt;
 use super::FsResult;
 use super::PathExt;
-use crate::prelude::WsPathBuf;
-use crate::utils::PipelineTarget;
+use crate::prelude::*;
 use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
@@ -32,11 +31,12 @@ macro_rules! abs_file {
 /// Naturally serializing absolute paths is problematic for several reasons:
 /// - moving the serialized path between machines will break
 /// - often an `AbsPathBuf` is used for workspace config files, and workspace
-/// 	paths are more intuitive in that context.  
+/// 	paths are more intuitive in that context.
 /// For these reasons the path is serialized and deserialized relative to the workspace root,
 /// using [`FsExt::workspace_root`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, bevy::reflect::Reflect,
+)]
 pub struct AbsPathBuf(pub PathBuf);
 
 impl Default for AbsPathBuf {

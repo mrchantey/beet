@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 use js_sys::Array;
 use js_sys::Promise;
@@ -84,7 +84,6 @@ fn timeout_reject(duration: Duration) -> Promise {
 #[cfg(target_arch = "wasm32")]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::utils::time_ext;
 	use std::time::Duration;
 	use sweet::prelude::*;
 

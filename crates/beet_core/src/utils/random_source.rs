@@ -13,7 +13,7 @@ use rand_chacha::ChaCha8Rng;
 /// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
 /// ```rust
 /// # use bevy::prelude::*;
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// # use rand::Rng;
 ///
 /// // defaults to from entropy

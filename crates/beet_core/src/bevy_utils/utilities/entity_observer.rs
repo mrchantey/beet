@@ -59,7 +59,6 @@ impl BundleEffect for EntityObserver {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

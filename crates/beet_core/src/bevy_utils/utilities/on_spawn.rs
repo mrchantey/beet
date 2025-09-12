@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use beet_core_macros::ImplBundle;
-use beet_utils::prelude::*;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;

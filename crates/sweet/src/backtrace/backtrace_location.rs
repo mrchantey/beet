@@ -247,7 +247,7 @@ SWEET_ROOT = { value = "", relative = true }
 	let file = js_runtime::read_file(&path.to_string_lossy().to_string())
 		.ok_or_else(|| bail(&js_runtime::cwd()))?;
 	#[cfg(not(target_arch = "wasm32"))]
-	let file = std::fs::read_to_string(path).map_err(|_| {
+	let file = beet_utils::prelude::ReadFile::to_string(path).map_err(|_| {
 		bail(
 			&std::env::current_dir()
 				.unwrap_or_default()

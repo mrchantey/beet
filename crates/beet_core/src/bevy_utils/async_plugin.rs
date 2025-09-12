@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use async_channel;
-use beet_utils::time_ext;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
@@ -377,10 +376,10 @@ impl AsyncEntity {
 }
 
 #[cfg(test)]
+#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 mod tests {
 	use super::*;
 	use crate::prelude::AppExitExt;
-	use beet_utils::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
 

@@ -1,5 +1,5 @@
 use super::performance_now;
-use beet_utils::utils::time_ext;
+use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 

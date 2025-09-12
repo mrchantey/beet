@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::entity::Entity;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;

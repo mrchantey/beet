@@ -87,16 +87,16 @@ impl FsWatcher {
 	///
 	/// ## Example
 	/// ```rust no_run
+	/// # use bevy::prelude::*;
 	/// # use beet_utils::prelude::*;
-	/// # async fn foo()->anyhow::Result {
+	/// # async fn foo() -> Result {
 	///
 	/// let mut rx = FsWatcher::default().watch()?;
 	/// while let Some(events) = rx.recv().await? {
 	/// 	println!("Received events: {:?}", events);
 	/// }
 	///
-	/// # Ok(())
-	/// # }
+	/// # Ok(()) }
 	/// ```
 	pub fn watch(&self) -> Result<WatchEventReceiver> {
 		self.assert_path_exists()?;

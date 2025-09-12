@@ -147,8 +147,7 @@ impl FsExt {
 #[cfg(test)]
 impl FsExt {
 	pub fn test_dir() -> PathBuf {
-		Self::workspace_root()
-			.join(Path::new("crates/beet_utils/src/fs/test_dir"))
+		Self::workspace_root().join(Path::new("tests/test_dir"))
 	}
 }
 
