@@ -1,65 +1,91 @@
-use crate::chrome::net_backoff;
+use super::DEFAULT_PORT;
+use crate::chrome::ChromeDevTools;
 use base64::prelude::*;
 use beet_core::bevybail;
+use beet_net::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-use futures::SinkExt;
-use futures::StreamExt;
 use serde_json::Value;
 use serde_json::json;
-use tokio::net::TcpStream;
-use tokio_tungstenite::MaybeTlsStream;
-use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::Message;
 
-type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-
-pub struct Page {
-	ws: Socket,
-	next_id: usize,
+pub struct ChromePage {
+	/// url that this page is currently visiting
+	url: String,
+	socket: Socket,
+	// each socket message is assigned an id, to be matched with the received message
+	next_msg_id: usize,
 }
 
+const DEFAULT_URL: &str = "about:blank";
+impl ChromePage {
+	pub async fn connect() -> Result<Self> {
+		let url = Url::parse(&format!("http://127.0.0.1:{DEFAULT_PORT}"))?;
+		Self::connect_with_url(&url).await
+	}
 
-impl Page {
-	pub fn new(ws: Socket) -> Self { Self { ws, next_id: 0 } }
+	pub async fn connect_with_url(dev_tools_url: &Url) -> Result<Self> {
+		let socket_url =
+			ChromeDevTools::socket_url(dev_tools_url, "page").await?;
+		let socket = Socket::connect(socket_url).await?;
+
+		let this = Self::new(socket, DEFAULT_URL);
+		// this.visit(DEFAULT_URL).await?;
+		Ok(this)
+	}
+
+	pub fn new(socket: Socket, url: impl AsRef<str>) -> Self {
+		Self {
+			url: url.as_ref().to_string(),
+			socket,
+			next_msg_id: 0,
+		}
+	}
 
 	fn next_id(&mut self) -> usize {
-		let id = self.next_id;
-		self.next_id += 1;
+		let id = self.next_msg_id;
+		self.next_msg_id += 1;
 		id
 	}
+
+	pub async fn visit(&mut self, url: impl AsRef<str>) -> Result<&mut Self> {
+		let url = url.as_ref();
+		self.send(json!({
+			"method": "Page.navigate",
+			"params": { "url": url }
+		}))
+		.await?;
+		self.url = url.to_string();
+		Ok(self)
+	}
+
 
 	/// send a message with the id inserted, awaiting a matching response
 	async fn send(&mut self, mut body: Value) -> Result<Value> {
 		let id = self.next_id();
 		body.set_field("id", Value::Number(id.into()))?;
-		self.ws.send(Message::Text(body.to_string().into())).await?;
+		self.socket
+			.send(Message::Text(body.to_string().into()))
+			.await?;
 		self.await_response(id).await
 	}
 
 	async fn send_with_backoff(&mut self, body: Value) -> Result<Value> {
-		for duration in net_backoff() {
-			match (self.send(body.clone()).await, duration) {
-				(Ok(value), _) => return Ok(value),
-				(Err(_), Some(duration)) => {
-					println!(
-						"Backoff Error, retrying in {}ms",
-						duration.as_millis()
-					);
-					time_ext::sleep(duration).await;
-				}
-				(Err(err), None) => {
-					bevybail!("failed to connect to devtools: {}", err)
+		while let Some(frame) = Backoff::default().stream().next().await {
+			match self.send(body.clone()).await {
+				Ok(val) => return Ok(val),
+				Err(err) if frame.is_final() => return Err(err),
+				_ => {
+					// discard error on retry
 				}
 			}
 		}
-		unreachable!()
+		unreachable!("returned error on final")
 	}
 
 	/// await a text response with the corresponding id, discarding
 	/// all other messages
 	async fn await_response(&mut self, id: usize) -> Result<Value> {
-		while let Some(msg) = self.ws.next().await {
+		while let Some(msg) = self.socket.next().await {
 			match msg {
 				Ok(Message::Text(text)) => {
 					let response = serde_json::from_str::<Value>(&text)?;
@@ -80,15 +106,6 @@ impl Page {
 			}
 		}
 		bevybail!("WebSocket connection closed before matching id returned")
-	}
-
-	pub async fn visit(&mut self, url: impl AsRef<str>) -> Result<()> {
-		self.send(json!({
-			"method": "Page.navigate",
-			"params": { "url": url.as_ref() }
-		}))
-		.await?;
-		Ok(())
 	}
 
 	pub async fn export_pdf(&mut self) -> Result<Vec<u8>> {
@@ -131,8 +148,10 @@ mod test {
 	// #[ignore = "requires Chrome DevTools"]
 	async fn works() {
 		// let bytes = export_pdf("https://google.com").await.unwrap();
-		let devtools = ChromeDevTools::connect().await.unwrap();
-		let bytes = devtools
+		let _devtools = ChromeDevTools::spawn().await.unwrap();
+		let bytes = ChromePage::connect()
+			.await
+			.unwrap()
 			.visit("https://google.com")
 			// .visit("https://beetstack.dev")
 			.await

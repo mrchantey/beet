@@ -1,76 +1,61 @@
-//! Copied from
-//! https://github.com/yoshuawuyts/exponential-backoff
-//! MIT/APACHE
-//! - added stream
-//!
-//!
-//! An exponential backoff generator with jitter. Serves as a building block to
-//! implement custom retry functions.
-//!
-//! # Why?
-//! When an network requests times out, often the best way to solve it is to try
-//! again. But trying again straight away might at best cause some network overhead,
-//! and at worst a full fledged DDOS. So we have to be responsible about it.
-//!
-//! A good explanation of retry strategies can be found on the [Stripe
-//! blog](https://stripe.com/blog/idempotency).
-//!
-//! # Usage
-//! Here we try and read a file from disk, and try again if it fails. A more
-//! realistic scenario would probably to perform an HTTP request, but the approach
-//! should be similar.
-//!
-//! ```rust
-//! # fn retry() -> std::io::Result<()> {
-//! use beet_utils::prelude::*;
-//! use std::{fs, thread, time::Duration};
-//!
-//! let attempts = 3;
-//! let min = Duration::from_millis(100);
-//! let max = Duration::from_secs(10);
-//!
-//! for duration in Backoff::new(attempts, min, max) {
-//!     match fs::read_to_string("README.md") {
-//!         Ok(s) => {
-//!             println!("{}", s);
-//!             break;
-//!         }
-//!         Err(err) => match duration {
-//!             Some(duration) => thread::sleep(duration),
-//!             None => return Err(err),
-//!         }
-//!     }
-//! }
-//! # Ok(()) }
-//! ```
-//! Async retry with a stream
-//!
-//! This yields immediately for the first attempt, then sleeps between subsequent attempts
-//! using the backoff policy.
-//!
-//! ```no_run
-//! use beet_utils::utils::Backoff;
-//! use futures::StreamExt;
-//!
-//! async fn try_operation() -> Result<(), ()> {
-//!     // your fallible async work here
-//!     Ok(())
-//! }
-//!
-//! # async fn example() {
-//! let mut stream = Backoff::default().stream();
-//! while let Some((attempt, _duration)) = stream.next().await {
-//!     if try_operation().await.is_ok() {
-//!         break;
-//!     }
-//!     // The stream will sleep according to the backoff policy before yielding the next attempt.
-//!     let _ = attempt; // 1-based attempt count
-//! }
-//! # }
-//! ```
+// Copied from
+// https://github.com/yoshuawuyts/exponential-backoff
+// MIT/APACHE
+// - added stream
+//
 use std::time::Duration;
 
-/// Exponential backoff type.
+
+impl Default for Backoff {
+	fn default() -> Self {
+		Self {
+			max_attempts: 3,
+			min: Duration::from_millis(100),
+			max: Duration::from_secs(10),
+			factor: 2,
+			#[cfg(feature = "rand")]
+			jitter: 0.3,
+		}
+	}
+}
+
+/// An exponential backoff generator with jitter. Serves as a building block to
+/// implement custom retry functions.
+///
+/// # Why?
+/// When an network requests times out, often the best way to solve it is to try
+/// again. But trying again straight away might at best cause some network overhead,
+/// and at worst a full fledged DDOS. So we have to be responsible about it.
+///
+/// A good explanation of retry strategies can be found on the [Stripe
+/// blog](https://stripe.com/blog/idempotency).
+///
+/// # Usage
+/// Primary usage is via `Backoff::retry` and `Backoff::retry_async`.
+///
+/// Synchronous:
+///
+/// ```no_run
+/// use beet_utils::utils::Backoff;
+/// use std::time::Duration;
+///
+/// # fn main() -> Result<(), std::io::Error> {
+/// let contents = Backoff::default().retry(|frame| {
+///     match std::fs::read_to_string("README.md") {
+///         Ok(s) => Ok(s),
+///         Err(e) => {
+///             // Returning Err will cause retry according to the backoff policy.
+///             // `frame.next_attempt` holds the sleep duration before the next try,
+///             // or None if this was the final attempt.
+///             Err(e)
+///         }
+///     }
+/// })?;
+/// println!("{}", contents);
+/// # Ok(()) }
+/// ```
+///
+/// If you need lower-level control, you can also use [`Self::iter()`] or [`Self::stream()`].
 #[derive(Debug, Clone)]
 pub struct Backoff {
 	max_attempts: u32,
@@ -88,8 +73,8 @@ impl Backoff {
 	/// With an explicit max duration:
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(3, Duration::from_millis(100), Duration::from_secs(10));
 	/// assert_eq!(backoff.max_attempts(), 3);
@@ -97,11 +82,11 @@ impl Backoff {
 	/// assert_eq!(backoff.max(), &Duration::from_secs(10));
 	/// ```
 	///
-	/// With no max duration (sets it to 584,942,417,355 years):
+	/// With no max duration, defaults to Duration::MAX (many many years)
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(5, Duration::from_millis(50), None);
 	/// # assert_eq!(backoff.max_attempts(), 5);
@@ -129,8 +114,8 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.min(), &Duration::from_millis(100));
@@ -142,8 +127,8 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_min(Duration::from_millis(50));
@@ -157,8 +142,8 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.max(), &Duration::from_secs(10));
@@ -170,8 +155,8 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
-	/// use std::time::Duration;
+	/// # use beet_utils::prelude::*;
+	/// # use std::time::Duration;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_max(Duration::from_secs(30));
@@ -185,7 +170,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.max_attempts(), 3);
@@ -197,7 +182,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_max_attempts(5);
@@ -212,7 +197,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.jitter(), 0.3);
@@ -230,7 +215,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_jitter(0.3);  // default value
@@ -252,7 +237,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// assert_eq!(backoff.factor(), 2);
@@ -264,7 +249,7 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```rust
-	/// use beet_utils::prelude::*;
+	/// # use beet_utils::prelude::*;
 	///
 	/// let mut backoff = Backoff::default();
 	/// backoff.set_factor(3);
@@ -278,21 +263,120 @@ impl Backoff {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use beet_utils::utils::Backoff;
-	/// use std::time::Duration;
+	/// # use beet_utils::utils::Backoff;
+	/// # use std::time::Duration;
 	///
 	/// let backoff = Backoff::new(3, Duration::from_millis(100), Duration::from_secs(10));
 	/// let mut count = 0;
-	/// for duration in backoff.iter() {
-	///     // duration is Some(d) for attempts which, on failure, will back off before the next attempt,
-	///     // and None for the final attempt (no further sleep).
-	///     let _ = duration;
+	/// for frame in backoff.iter() {
+	///     // frame.next_attempt is Some(d) for attempts which, on failure, will back off before the next attempt,
+	///     // and None for the final attempt (no further sleep). frame.attempt_index is zero-based.
+	///     let _ = frame;
 	///     count += 1;
 	/// }
 	/// assert_eq!(count, 3);
 	/// ```
 	#[inline]
 	pub fn iter(&self) -> BackoffIter { BackoffIter::new(self.clone()) }
+	/// Create a Stream that yields `BackoffFrame` per attempt.
+	///
+	/// The stream yields the first attempt immediately (without sleeping). For subsequent
+	/// attempts it sleeps according to the backoff policy before yielding. `BackoffFrame::next_attempt`
+	/// is the backoff duration for the following attempt (`None` for the last attempt).
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// # #[cfg(feature = "tokio")]
+	/// # async fn demo() {
+	/// # use beet_utils::utils::Backoff;
+	/// # use futures::StreamExt;
+	///
+	/// let backoff = Backoff::default();
+	/// let mut stream = backoff.stream();
+	///
+	/// while let Some(_frame) = stream.next().await {
+	///     // Perform your operation for this attempt.
+	///     // `frame.next_attempt` is the backoff that will be applied if this attempt fails.
+	/// }
+	/// # }
+	/// ```
+	pub fn stream(&self) -> BackoffStream { BackoffStream::new(self.clone()) }
+	/// Retry a synchronous operation using this backoff.
+	///
+	/// The closure is called for each attempt with a `BackoffFrame`, and should return
+	/// `Ok(T)` on success or `Err(E)` to trigger another attempt (until the final attempt).
+	/// Between attempts this method sleeps according to the backoff policy.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use beet_utils::utils::Backoff;
+	/// use std::time::Duration;
+	///
+	/// # fn main() -> Result<(), ()> {
+	/// let backoff = Backoff::new(3, Duration::from_millis(10), Duration::from_millis(100));
+	/// let _value = backoff.retry(|_frame| -> Result<&'static str, ()> {
+	///     // do work...
+	///     Err(())
+	/// })?;
+	/// # Ok(()) }
+	/// ```
+	pub fn retry<T, E, F>(&self, mut op: F) -> Result<T, E>
+	where
+		F: FnMut(BackoffFrame) -> Result<T, E>,
+	{
+		for frame in self.iter() {
+			match op(frame) {
+				Ok(v) => return Ok(v),
+				Err(err) => match frame.next_attempt {
+					Some(d) => std::thread::sleep(d),
+					None => return Err(err),
+				},
+			}
+		}
+		unreachable!("Backoff::iter must yield at least one frame")
+	}
+
+	/// Retry an asynchronous operation using this backoff.
+	///
+	/// The closure is called for each attempt with a `BackoffFrame`, and should return
+	/// a Future resolving to `Ok(T)` on success or `Err(E)` to trigger another attempt.
+	/// The backoff sleeps between attempts using the underlying stream.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use beet_utils::utils::Backoff;
+	/// use std::time::Duration;
+	///
+	/// # async fn demo() -> Result<(), ()> {
+	/// let backoff = Backoff::new(3, Duration::from_millis(10), Duration::from_millis(100));
+	/// let _ = backoff.retry_async(|_frame| async {
+	///     Err::<(), ()>(())
+	/// }).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn retry_async<T, E, Fut, F>(&self, mut op: F) -> Result<T, E>
+	where
+		F: FnMut(BackoffFrame) -> Fut,
+		Fut: core::future::Future<Output = Result<T, E>>,
+	{
+		use futures::StreamExt;
+		let mut stream = self.stream();
+		while let Some(frame) = stream.next().await {
+			match op(frame).await {
+				Ok(v) => return Ok(v),
+				Err(err) => {
+					if frame.is_final() {
+						return Err(err);
+					}
+				}
+			}
+		}
+		unreachable!("Backoff::stream must yield at least one frame")
+	}
 }
 
 /// Implements the `IntoIterator` trait for borrowed `Backoff` instances.
@@ -300,8 +384,8 @@ impl Backoff {
 /// # Examples
 ///
 /// ```rust
-/// use beet_utils::prelude::*;
-/// use std::time::Duration;
+/// # use beet_utils::prelude::*;
+/// # use std::time::Duration;
 ///
 /// let backoff = Backoff::default();
 /// let mut count = 0;
@@ -314,7 +398,7 @@ impl Backoff {
 /// }
 /// ```
 impl<'b> IntoIterator for &'b Backoff {
-	type Item = Option<Duration>;
+	type Item = BackoffFrame;
 	type IntoIter = BackoffIter;
 
 	fn into_iter(self) -> Self::IntoIter { Self::IntoIter::new(self.clone()) }
@@ -325,8 +409,8 @@ impl<'b> IntoIterator for &'b Backoff {
 /// # Examples
 ///
 /// ```rust
-/// use beet_utils::prelude::*;
-/// use std::time::Duration;
+/// # use beet_utils::prelude::*;
+/// # use std::time::Duration;
 ///
 /// let backoff = Backoff::default();
 /// let mut count = 0;
@@ -339,40 +423,12 @@ impl<'b> IntoIterator for &'b Backoff {
 /// }
 /// ```
 impl IntoIterator for Backoff {
-	type Item = Option<Duration>;
+	type Item = BackoffFrame;
 	type IntoIter = BackoffIter;
 
 	fn into_iter(self) -> Self::IntoIter { Self::IntoIter::new(self) }
 }
 
-/// Implements the `Default` trait for `Backoff`.
-///
-/// # Examples
-///
-/// ```rust
-/// use beet_utils::prelude::*;
-/// use std::time::Duration;
-///
-/// let backoff = Backoff::default();
-/// assert_eq!(backoff.max_attempts(), 3);
-/// assert_eq!(backoff.min(), &Duration::from_millis(100));
-/// assert_eq!(backoff.max(), &Duration::from_secs(10));
-/// #[cfg(feature = "rand")]
-/// assert_eq!(backoff.jitter(), 0.3);
-/// assert_eq!(backoff.factor(), 2);
-/// ```
-impl Default for Backoff {
-	fn default() -> Self {
-		Self {
-			max_attempts: 3,
-			min: Duration::from_millis(100),
-			max: Duration::from_secs(10),
-			factor: 2,
-			#[cfg(feature = "rand")]
-			jitter: 0.3,
-		}
-	}
-}
 use std::iter;
 /// An exponential backoff iterator.
 #[derive(Debug, Clone)]
@@ -395,7 +451,7 @@ impl BackoffIter {
 }
 
 impl iter::Iterator for BackoffIter {
-	type Item = Option<Duration>;
+	type Item = BackoffFrame;
 
 	#[inline]
 	fn next(&mut self) -> Option<Self::Item> {
@@ -404,13 +460,22 @@ impl iter::Iterator for BackoffIter {
 		// the last attempt.
 		if self.attempts == self.inner.max_attempts {
 			return None;
-		} else if self.attempts == self.inner.max_attempts - 1 {
+		}
+
+		// Zero-based attempt index for this yield.
+		let attempt_index = self.attempts;
+
+		// If this is the last attempt, yield with no further sleep.
+		if attempt_index == self.inner.max_attempts - 1 {
 			self.attempts = self.attempts.saturating_add(1);
-			return Some(None);
+			return Some(BackoffFrame {
+				attempt_index,
+				next_attempt: None,
+			});
 		}
 
 		// Create exponential duration.
-		let exponent = self.inner.factor.saturating_pow(self.attempts);
+		let exponent = self.inner.factor.saturating_pow(attempt_index);
 		let mut duration = self.inner.min.saturating_mul(exponent);
 
 		// Increment the attempts counter.
@@ -441,27 +506,35 @@ impl iter::Iterator for BackoffIter {
 		// Make sure it doesn't exceed upper / lower bounds.
 		duration = duration.clamp(self.inner.min, self.inner.max);
 
-		Some(Some(duration))
+		Some(BackoffFrame {
+			attempt_index,
+			next_attempt: Some(duration),
+		})
 	}
 }
 
-/// A Stream that yields per attempt and sleeps between attempts according to Backoff.
-///
-/// The item is `(attempt_index, Option<Duration>)`:
-/// - `attempt_index` starts at `1`.
-/// - `Option<Duration>` is the backoff duration associated with this attempt as produced by the iterator:
-///   - `Some(duration)` for attempts that, on failure, will back off before the next attempt,
-///   - `None` for the final attempt (no further sleep).
-///
+/// Frame yielded by BackoffStream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackoffFrame {
+	/// 0-based attempt count for this yield.
+	pub attempt_index: u32,
+	/// Backoff duration that will be awaited before the next attempt, or None for the final attempt.
+	pub next_attempt: Option<Duration>,
+}
+
+impl BackoffFrame {
+	/// Returns true if this is the final attempt.
+	pub fn is_final(&self) -> bool { self.next_attempt.is_none() }
+}
+
+/// A Stream that yields a [`BackoffFrame`] per attempt and sleeps between attempts according to Backoff.
 /// Behavior:
 /// - First attempt is yielded immediately (no pre-sleep).
 /// - Between subsequent attempts the stream sleeps using `time_ext::sleep(duration).await`.
 pub struct BackoffStream {
 	iter: BackoffIter,
-	// Duration for the attempt to be yielded next (as produced by BackoffIter).
-	current: Option<Option<Duration>>,
-	// 1-based attempt counter.
-	attempt: u32,
+	// Frame for the attempt to be yielded next (as produced by BackoffIter).
+	current: Option<BackoffFrame>,
 	sleeper: Option<
 		std::pin::Pin<Box<dyn core::future::Future<Output = ()> + 'static>>,
 	>,
@@ -474,42 +547,13 @@ impl BackoffStream {
 		Self {
 			iter,
 			current,
-			attempt: 0,
 			sleeper: None,
 		}
 	}
 }
 
-impl Backoff {
-	/// Create a Stream that yields `(attempt_index, Option<Duration>)` per attempt.
-	///
-	/// The stream yields the first attempt immediately (without sleeping). For subsequent
-	/// attempts it sleeps according to the backoff policy before yielding. The `Option<Duration>`
-	/// corresponds to the iterator's value for that attempt (`None` for the last attempt).
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// # #[cfg(feature = "tokio")]
-	/// # async fn demo() {
-	/// use beet_utils::utils::Backoff;
-	/// use futures::StreamExt;
-	///
-	/// let backoff = Backoff::default();
-	/// let mut stream = backoff.stream();
-	///
-	/// while let Some((attempt, duration)) = stream.next().await {
-	///     // Perform your operation for this attempt.
-	///     // `duration` is the backoff that will be applied if this attempt fails.
-	///     let _ = (attempt, duration);
-	/// }
-	/// # }
-	/// ```
-	pub fn stream(&self) -> BackoffStream { BackoffStream::new(self.clone()) }
-}
-
 impl futures::Stream for BackoffStream {
-	type Item = (u32, Option<Duration>);
+	type Item = BackoffFrame;
 
 	fn poll_next(
 		mut self: std::pin::Pin<&mut Self>,
@@ -530,14 +574,12 @@ impl futures::Stream for BackoffStream {
 		// Yield the next attempt if we have one.
 		match self.current.take() {
 			None => std::task::Poll::Ready(None),
-			Some(duration) => {
-				// Increment attempt count and schedule the next sleep if needed.
-				self.attempt = self.attempt.saturating_add(1);
-				if let Some(d) = duration {
+			Some(frame) => {
+				if let Some(d) = frame.next_attempt {
 					// Schedule sleep before the next attempt is yielded.
 					self.sleeper = Some(Box::pin(crate::time_ext::sleep(d)));
 				}
-				std::task::Poll::Ready(Some((self.attempt, duration)))
+				std::task::Poll::Ready(Some(frame))
 			}
 		}
 	}
@@ -557,10 +599,16 @@ mod tests {
 		);
 		let mut it = backoff.iter();
 
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(100))));
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(200))));
+		let f0 = it.next().unwrap();
+		assert_eq!(f0.attempt_index, 0);
+		assert_eq!(f0.next_attempt, Some(Duration::from_millis(100)));
+		let f1 = it.next().unwrap();
+		assert_eq!(f1.attempt_index, 1);
+		assert_eq!(f1.next_attempt, Some(Duration::from_millis(200)));
 		// Final attempt yields None to signal "last try, no sleep"
-		assert_eq!(it.next(), Some(None));
+		let f2 = it.next().unwrap();
+		assert_eq!(f2.attempt_index, 2);
+		assert_eq!(f2.next_attempt, None);
 		// Then the iterator is exhausted
 		assert_eq!(it.next(), None);
 	}
@@ -576,17 +624,93 @@ mod tests {
 		let mut it = backoff.iter();
 
 		// 1st: 500ms
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(500))));
+		let f0 = it.next().unwrap();
+		assert_eq!(f0.attempt_index, 0);
+		assert_eq!(f0.next_attempt, Some(Duration::from_millis(500)));
 		// 2nd: 1500ms -> clamped to 900ms
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(900))));
+		let f1 = it.next().unwrap();
+		assert_eq!(f1.attempt_index, 1);
+		assert_eq!(f1.next_attempt, Some(Duration::from_millis(900)));
 		// 3rd: would be bigger, still clamped
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(900))));
+		let f2 = it.next().unwrap();
+		assert_eq!(f2.attempt_index, 2);
+		assert_eq!(f2.next_attempt, Some(Duration::from_millis(900)));
 		// 4th: still clamped
-		assert_eq!(it.next(), Some(Some(Duration::from_millis(900))));
+		let f3 = it.next().unwrap();
+		assert_eq!(f3.attempt_index, 3);
+		assert_eq!(f3.next_attempt, Some(Duration::from_millis(900)));
 		// 5th: final attempt, no sleep
-		assert_eq!(it.next(), Some(None));
+		let f4 = it.next().unwrap();
+		assert_eq!(f4.attempt_index, 4);
+		assert_eq!(f4.next_attempt, None);
 		// Exhausted
 		assert_eq!(it.next(), None);
+	}
+	#[test]
+	fn retry_succeeds_after_failures() {
+		use std::sync::atomic::AtomicU32;
+		use std::sync::atomic::Ordering;
+
+		let counter = AtomicU32::new(0);
+		#[allow(unused_mut)]
+		let mut backoff = Backoff::new(
+			3,
+			Duration::from_millis(1),
+			Duration::from_millis(10),
+		);
+		#[cfg(feature = "rand")]
+		{
+			backoff.set_jitter(0.0);
+		}
+
+		let res: Result<u32, ()> = backoff.retry(|_frame| {
+			let c = counter.fetch_add(1, Ordering::SeqCst);
+			if c >= 2 { Ok(c) } else { Err(()) }
+		});
+
+		assert_eq!(res.unwrap(), 2);
+		assert!(counter.load(Ordering::SeqCst) >= 3);
+	}
+
+	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[tokio::test]
+	async fn retry_async_succeeds_after_failures() {
+		use std::sync::atomic::AtomicU32;
+		use std::sync::atomic::Ordering;
+		let counter = std::sync::Arc::new(AtomicU32::new(0));
+		#[allow(unused_mut)]
+		let mut backoff = Backoff::new(
+			3,
+			Duration::from_millis(5),
+			Duration::from_millis(100),
+		);
+		#[cfg(feature = "rand")]
+		{
+			backoff.set_jitter(0.0);
+		}
+
+		let start = std::time::Instant::now();
+		let result = backoff
+			.retry_async({
+				let counter = counter.clone();
+				move |_frame| {
+					let c = counter.fetch_add(1, Ordering::SeqCst);
+					async move {
+						if c >= 2 {
+							Ok::<u32, ()>(c)
+						} else {
+							Err::<u32, ()>(())
+						}
+					}
+				}
+			})
+			.await;
+
+		assert_eq!(result.unwrap(), 2);
+		// With factor=2 and no jitter, before success on attempt 2 (0-based),
+		// total sleep time is 5ms + 10ms = 15ms.
+		let elapsed = start.elapsed();
+		assert!(elapsed >= Duration::from_millis(15));
 	}
 
 	#[cfg(feature = "rand")]
@@ -599,20 +723,23 @@ mod tests {
 		);
 		let mut it = backoff.iter();
 
-		let d1 = it.next().unwrap().unwrap();
+		let f0 = it.next().unwrap();
+		let d1 = f0.next_attempt.unwrap();
 		// jitter ~ +/- 30% (implementation yields up to ~29% due to integer math)
 		assert!(
 			d1 >= Duration::from_millis(70) && d1 <= Duration::from_millis(130)
 		);
 
-		let d2 = it.next().unwrap().unwrap();
+		let f1 = it.next().unwrap();
+		let d2 = f1.next_attempt.unwrap();
 		assert!(
 			d2 >= Duration::from_millis(140)
 				&& d2 <= Duration::from_millis(260)
 		);
 
 		// Final attempt: None means no sleep
-		assert_eq!(it.next(), Some(None));
+		let f2 = it.next().unwrap();
+		assert_eq!(f2.next_attempt, None);
 		assert_eq!(it.next(), None);
 	}
 
@@ -637,16 +764,25 @@ mod tests {
 		let start = std::time::Instant::now();
 		let mut items = Vec::new();
 
-		while let Some((attempt, duration)) = stream.next().await {
+		while let Some(frame) = stream.next().await {
 			println!("NEXT");
-			items.push((attempt, duration));
+			items.push(frame);
 		}
 
-		// We should get exactly max_attempts yields, starting at attempt=1.
+		// We should get exactly max_attempts yields, starting at attempt=0.
 		assert_eq!(items.len(), 3);
-		assert_eq!(items[0], (1, Some(Duration::from_millis(5))));
-		assert_eq!(items[1], (2, Some(Duration::from_millis(10))));
-		assert_eq!(items[2], (3, None));
+		assert_eq!(items[0], BackoffFrame {
+			attempt_index: 0,
+			next_attempt: Some(Duration::from_millis(5))
+		});
+		assert_eq!(items[1], BackoffFrame {
+			attempt_index: 1,
+			next_attempt: Some(Duration::from_millis(10))
+		});
+		assert_eq!(items[2], BackoffFrame {
+			attempt_index: 2,
+			next_attempt: None
+		});
 
 		// With factor=2 and no jitter, total sleep time is 5ms + 10ms = 15ms (last attempt does not sleep).
 		let elapsed = start.elapsed();
