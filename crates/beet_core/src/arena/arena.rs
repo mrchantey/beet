@@ -191,6 +191,7 @@ impl<T: 'static> ArenaHandle<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sweet::prelude::*;
 
 	// Example Send type for demonstration
 	#[derive(Debug, Clone)]
@@ -239,31 +240,31 @@ mod tests {
 		let string_handle = arena.insert_impl("Hello, World!".to_string());
 		let number_handle = arena.insert_impl(123i32);
 
-		assert_eq!(arena.objects.lock().unwrap().len(), 3);
+		arena.objects.lock().unwrap().len().xpect_eq(3);
 
 		// Access stored objects using arena.with_ref()
 		arena.with_ref(&counter_handle, |counter| {
-			assert_eq!(counter.get_value(), 42);
-			assert_eq!(counter.get_name(), "test");
+			counter.get_value().xpect_eq(42);
+			counter.get_name().xpect_eq("test");
 		});
 
 		arena.with_ref(&string_handle, |string| {
-			assert_eq!(string, "Hello, World!");
+			string.as_str().xpect_eq("Hello, World!");
 		});
 
 		arena.with_ref(&number_handle, |number| {
-			assert_eq!(*number, 123);
+			(*number).xpect_eq(123);
 		});
 
 		// Mutate objects using arena.with_mut()
 		arena.with_mut(&counter_handle, |counter| {
 			counter.increment();
-			assert_eq!(counter.get_value(), 43);
+			counter.get_value().xpect_eq(43);
 		});
 
 		// Test cloned access for cloneable types
 		let cloned_counter = arena.get_cloned(&counter_handle);
-		assert_eq!(cloned_counter.get_value(), 43);
+		cloned_counter.get_value().xpect_eq(43);
 
 		// Manual cleanup using instance remove_impl
 		let _removed_counter =
@@ -273,7 +274,7 @@ mod tests {
 		let _removed_number =
 			arena.remove_impl(&number_handle).expect(PANIC_MSG);
 
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
 	#[test]
@@ -287,11 +288,11 @@ mod tests {
 
 		// Both handles should work (handle1 is still valid after copy)
 		arena.with_ref(&handle1, |counter| {
-			assert_eq!(counter.get_value(), 100);
+			counter.get_value().xpect_eq(100);
 		});
 
 		arena.with_ref(&handle2, |counter| {
-			assert_eq!(counter.get_value(), 100);
+			counter.get_value().xpect_eq(100);
 		});
 
 		// Modify through one handle
@@ -301,13 +302,13 @@ mod tests {
 
 		// See the change through the other handle
 		arena.with_ref(&handle2, |counter| {
-			assert_eq!(counter.get_value(), 101);
+			counter.get_value().xpect_eq(101);
 		});
 
 		// Remove using one handle (this consumes the stored object)
 		let removed = arena.remove_impl(&handle1).expect(PANIC_MSG);
-		assert_eq!(removed.get_value(), 101);
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		removed.get_value().xpect_eq(101);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
 	#[test]
@@ -320,7 +321,7 @@ mod tests {
 
 		// Manual remove should invalidate the entry in this local arena
 		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 
 		// handle1 should now panic when accessed
 		arena.with_ref(&handle1, |_| {});
@@ -336,7 +337,7 @@ mod tests {
 
 		// Manual remove should invalidate the entry in this local arena
 		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 
 		// handle1 should now panic when accessed mutably
 		arena.with_mut(&handle1, |_| {});
@@ -352,7 +353,7 @@ mod tests {
 
 		// Manual remove should invalidate the entry in this local arena
 		let _removed = arena.remove_impl(&handle2).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 
 		// handle1 should now panic when trying to remove again
 		let _removed2 = arena.remove_impl(&handle1).expect(PANIC_MSG);
@@ -366,22 +367,28 @@ mod tests {
 		let handle2 = arena.insert_impl(Counter::new("second".to_string(), 2));
 		let handle3 = arena.insert_impl("string".to_string());
 
-		assert_eq!(arena.objects.lock().unwrap().len(), 3);
+		arena.objects.lock().unwrap().len().xpect_eq(3);
 
 		// All handles should work independently
-		arena.with_ref(&handle1, |counter| assert_eq!(counter.get_value(), 1));
-		arena.with_ref(&handle2, |counter| assert_eq!(counter.get_value(), 2));
-		arena.with_ref(&handle3, |string| assert_eq!(string, "string"));
+		arena.with_ref(&handle1, |counter| {
+			counter.get_value().xpect_eq(1);
+		});
+		arena.with_ref(&handle2, |counter| {
+			counter.get_value().xpect_eq(2);
+		});
+		arena.with_ref(&handle3, |string| {
+			string.as_str().xpect_eq("string");
+		});
 
 		// Remove objects individually
 		let _removed1 = arena.remove_impl(&handle1).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 2);
+		arena.objects.lock().unwrap().len().xpect_eq(2);
 
 		let _removed2 = arena.remove_impl(&handle2).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 1);
+		arena.objects.lock().unwrap().len().xpect_eq(1);
 
 		let _removed3 = arena.remove_impl(&handle3).expect(PANIC_MSG);
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
+		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
 	#[test]
@@ -392,11 +399,11 @@ mod tests {
 		let _handle2 = arena.insert_impl(Counter::new("test2".to_string(), 2));
 		let _handle3 = arena.insert_impl("string".to_string());
 
-		assert_eq!(arena.objects.lock().unwrap().len(), 3);
+		arena.objects.lock().unwrap().len().xpect_eq(3);
 
 		// Clear all objects in the local arena
 		arena.objects.lock().unwrap().clear();
-		assert_eq!(arena.objects.lock().unwrap().len(), 0);
-		assert!(arena.objects.lock().unwrap().is_empty());
+		arena.objects.lock().unwrap().len().xpect_eq(0);
+		arena.objects.lock().unwrap().is_empty().xpect_true();
 	}
 }

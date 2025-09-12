@@ -262,6 +262,7 @@ mod tests {
 	use std::rc::Rc;
 
 	use super::*;
+	use sweet::prelude::*;
 	// Example non-Send type for demonstration
 	#[derive(Debug)]
 	struct NonSendCounter {
@@ -308,29 +309,29 @@ mod tests {
 				42,
 			));
 
-			assert_eq!(NonSendArena::len(), 1);
-			assert_eq!(handle1.ref_count(), 1);
+			NonSendArena::len().xpect_eq(1);
+			handle1.ref_count().xpect_eq(1);
 
 			// Clone the handle - should increase ref count
 			let handle2 = handle1.clone();
-			assert_eq!(handle1.ref_count(), 2);
+			handle1.ref_count().xpect_eq(2);
 
 			// Drop handle1 - ref count should decrease but object should remain
 			drop(handle1);
-			assert_eq!(handle2.ref_count(), 1);
-			assert_eq!(NonSendArena::len(), 1);
+			handle2.ref_count().xpect_eq(1);
+			NonSendArena::len().xpect_eq(1);
 
 			// Object should still be accessible through handle2
 			{
 				let counter = handle2.get();
-				assert_eq!(counter.get_value(), 42);
+				counter.get_value().xpect_eq(42);
 			}
 
 			// Drop handle2 - should automatically remove object from arena
 		}
 
 		// Object should now be gone
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
@@ -343,27 +344,27 @@ mod tests {
 			NonSendArena::insert(NonSendCounter::new("second".to_string(), 2));
 		let handle3 = NonSendArena::insert("string".to_string());
 
-		assert_eq!(NonSendArena::len(), 3);
+		NonSendArena::len().xpect_eq(3);
 
 		// Clone one handle
 		let handle1_clone = handle1.clone();
-		assert_eq!(handle1.ref_count(), 2);
+		handle1.ref_count().xpect_eq(2);
 
 		// Drop original handle1
 		drop(handle1);
-		assert_eq!(NonSendArena::len(), 3); // Should still be there due to clone
+		NonSendArena::len().xpect_eq(3); // Should still be there due to clone
 
 		// Drop handle2 - should remove that object
 		drop(handle2);
-		assert_eq!(NonSendArena::len(), 2);
+		NonSendArena::len().xpect_eq(2);
 
 		// Drop handle3 - should remove that object
 		drop(handle3);
-		assert_eq!(NonSendArena::len(), 1);
+		NonSendArena::len().xpect_eq(1);
 
 		// Drop the clone - should remove the last object
 		drop(handle1_clone);
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
@@ -374,18 +375,18 @@ mod tests {
 			NonSendArena::insert(NonSendCounter::new("test".to_string(), 42));
 		let _handle2 = handle1.clone();
 
-		assert_eq!(NonSendArena::len(), 1);
-		assert_eq!(handle1.ref_count(), 2);
+		NonSendArena::len().xpect_eq(1);
+		handle1.ref_count().xpect_eq(2);
 
 		// Manual remove should consume all handles and remove the object
 		let removed = handle1.remove();
-		assert_eq!(removed.get_name(), "test");
-		assert_eq!(NonSendArena::len(), 0);
+		removed.get_name().xpect_eq("test");
+		NonSendArena::len().xpect_eq(0);
 
 		// handle2 should now be invalid and panic when accessed
 		// We can't test this directly since it would panic the test
 		// but we can verify the object is gone from the arena
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
@@ -398,30 +399,30 @@ mod tests {
 		let string_handle = NonSendArena::insert("Hello, World!".to_string());
 		let number_handle = NonSendArena::insert(123i32);
 
-		assert_eq!(NonSendArena::len(), 3);
+		NonSendArena::len().xpect_eq(3);
 
 		// Access stored objects
 		{
 			let counter = counter_handle.get();
-			assert_eq!(counter.get_value(), 42);
-			assert_eq!(counter.get_name(), "test");
+			counter.get_value().xpect_eq(42);
+			counter.get_name().xpect_eq("test");
 		}
 
 		{
 			let string = string_handle.get();
-			assert_eq!(*string, "Hello, World!");
+			string.as_str().xpect_eq("Hello, World!");
 		}
 
 		{
 			let number = number_handle.get();
-			assert_eq!(*number, 123);
+			(*number).xpect_eq(123);
 		}
 
 		// Mutate objects
 		{
 			let counter = counter_handle.get();
 			counter.increment();
-			assert_eq!(counter.get_value(), 43);
+			counter.get_value().xpect_eq(43);
 		}
 
 		// Objects should be automatically cleaned up when handles are dropped
@@ -429,7 +430,7 @@ mod tests {
 		drop(string_handle);
 		drop(number_handle);
 
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
@@ -445,35 +446,35 @@ mod tests {
 				100,
 			));
 
-			assert_eq!(NonSendArena::len(), 1);
-			assert_eq!(handle.ref_count(), 1);
+			NonSendArena::len().xpect_eq(1);
+			handle.ref_count().xpect_eq(1);
 
 			// Forget the handle - should return a copy version that doesn't auto-cleanup
 			forgotten_handle = handle.forget();
 
 			// The object should still be in the arena after forgetting
-			assert_eq!(NonSendArena::len(), 1);
-			assert_eq!(forgotten_handle.ref_count(), 1);
+			NonSendArena::len().xpect_eq(1);
+			forgotten_handle.ref_count().xpect_eq(1);
 		}
 
 		// After the scope ends, the object should still be there because we forgot the handle
-		assert_eq!(NonSendArena::len(), 1);
-		assert_eq!(forgotten_handle.ref_count(), 1);
+		NonSendArena::len().xpect_eq(1);
+		forgotten_handle.ref_count().xpect_eq(1);
 
 		// The forgotten handle should still be able to access the object
 		{
 			let counter = forgotten_handle.get();
-			assert_eq!(counter.get_value(), 100);
-			assert_eq!(counter.get_name(), "forgotten");
+			counter.get_value().xpect_eq(100);
+			counter.get_name().xpect_eq("forgotten");
 		}
 
 		// Since the handle was forgotten, it won't auto-cleanup when dropped
 		drop(forgotten_handle);
-		assert_eq!(NonSendArena::len(), 1);
+		NonSendArena::len().xpect_eq(1);
 
 		// We need to manually clear to clean up the forgotten object
 		NonSendArena::clear();
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
@@ -487,7 +488,7 @@ mod tests {
 
 		// Manual remove should consume all handles and remove the object
 		let _removed = handle1.remove();
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 
 		// handle2 should now panic when accessed
 		let _counter = handle2.get();
@@ -504,7 +505,7 @@ mod tests {
 
 		// Manual remove should consume all handles and remove the object
 		let _removed = handle1.remove();
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 
 		// handle2 should now panic when accessed mutably
 		let _counter = handle2.get_mut();
@@ -521,7 +522,7 @@ mod tests {
 
 		// Manual remove should consume all handles and remove the object
 		let _removed = handle1.remove();
-		assert_eq!(NonSendArena::len(), 0);
+		NonSendArena::len().xpect_eq(0);
 
 		// handle2 should now panic when trying to remove again
 		let _removed2 = handle2.remove();

@@ -186,13 +186,14 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn signals() {
 		let (get, set) = signal(7);
-		assert_eq!(get.get(), 7);
+		get.get().xpect_eq(7);
 		set.set(10);
-		assert_eq!(get.get(), 10);
+		get.get().xpect_eq(10);
 	}
 	#[test]
 	fn effects() {
@@ -205,15 +206,15 @@ mod test {
 			*effect_called_clone.lock().unwrap() += 1;
 		});
 
-		assert_eq!(get.get(), 0);
-		assert_eq!(*effect_called.lock().unwrap(), 1);
+		get.get().xpect_eq(0);
+		(*effect_called.lock().unwrap()).xpect_eq(1);
 
 		set.set(1);
-		assert_eq!(get.get(), 1);
-		assert_eq!(*effect_called.lock().unwrap(), 2);
+		get.get().xpect_eq(1);
+		(*effect_called.lock().unwrap()).xpect_eq(2);
 
 		set.set(2);
-		assert_eq!(get.get(), 2);
-		assert_eq!(*effect_called.lock().unwrap(), 3);
+		get.get().xpect_eq(2);
+		(*effect_called.lock().unwrap()).xpect_eq(3);
 	}
 }

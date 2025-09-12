@@ -640,6 +640,7 @@ impl futures::Stream for BackoffStream {
 mod tests {
 	use super::*;
 	use std::time::Duration;
+	use sweet::prelude::*;
 
 	#[test]
 	fn iter_without_rand_deterministic() {
@@ -651,17 +652,17 @@ mod tests {
 		let mut it = backoff.iter();
 
 		let f0 = it.next().unwrap();
-		assert_eq!(f0.attempt_index, 0);
-		assert_eq!(f0.next_attempt, Some(Duration::from_millis(100)));
+		f0.attempt_index.xpect_eq(0);
+		f0.next_attempt.xpect_eq(Some(Duration::from_millis(100)));
 		let f1 = it.next().unwrap();
-		assert_eq!(f1.attempt_index, 1);
-		assert_eq!(f1.next_attempt, Some(Duration::from_millis(200)));
+		f1.attempt_index.xpect_eq(1);
+		f1.next_attempt.xpect_eq(Some(Duration::from_millis(200)));
 		// Final attempt yields None to signal "last try, no sleep"
 		let f2 = it.next().unwrap();
-		assert_eq!(f2.attempt_index, 2);
-		assert_eq!(f2.next_attempt, None);
+		f2.attempt_index.xpect_eq(2);
+		f2.next_attempt.xpect_none();
 		// Then the iterator is exhausted
-		assert_eq!(it.next(), None);
+		it.next().xpect_none();
 	}
 
 	#[test]
@@ -676,26 +677,26 @@ mod tests {
 
 		// 1st: 500ms
 		let f0 = it.next().unwrap();
-		assert_eq!(f0.attempt_index, 0);
-		assert_eq!(f0.next_attempt, Some(Duration::from_millis(500)));
+		f0.attempt_index.xpect_eq(0);
+		f0.next_attempt.xpect_eq(Some(Duration::from_millis(500)));
 		// 2nd: 1500ms -> clamped to 900ms
 		let f1 = it.next().unwrap();
-		assert_eq!(f1.attempt_index, 1);
-		assert_eq!(f1.next_attempt, Some(Duration::from_millis(900)));
+		f1.attempt_index.xpect_eq(1);
+		f1.next_attempt.xpect_eq(Some(Duration::from_millis(900)));
 		// 3rd: would be bigger, still clamped
 		let f2 = it.next().unwrap();
-		assert_eq!(f2.attempt_index, 2);
-		assert_eq!(f2.next_attempt, Some(Duration::from_millis(900)));
+		f2.attempt_index.xpect_eq(2);
+		f2.next_attempt.xpect_eq(Some(Duration::from_millis(900)));
 		// 4th: still clamped
 		let f3 = it.next().unwrap();
-		assert_eq!(f3.attempt_index, 3);
-		assert_eq!(f3.next_attempt, Some(Duration::from_millis(900)));
+		f3.attempt_index.xpect_eq(3);
+		f3.next_attempt.xpect_eq(Some(Duration::from_millis(900)));
 		// 5th: final attempt, no sleep
 		let f4 = it.next().unwrap();
-		assert_eq!(f4.attempt_index, 4);
-		assert_eq!(f4.next_attempt, None);
+		f4.attempt_index.xpect_eq(4);
+		f4.next_attempt.xpect_eq(None);
 		// Exhausted
-		assert_eq!(it.next(), None);
+		it.next().xpect_eq(None);
 	}
 
 	#[test]
@@ -721,11 +722,12 @@ mod tests {
 			if c >= 2 { Ok(c) } else { Err(()) }
 		});
 
-		assert_eq!(res.unwrap(), 2);
-		assert!(counter.load(Ordering::SeqCst) >= 3);
+		res.unwrap().xpect_eq(2);
+		(counter.load(Ordering::SeqCst) >= 3).xpect_true();
 	}
 
 	#[sweet::test]
+	#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 	async fn retry_async_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -758,11 +760,11 @@ mod tests {
 			})
 			.await;
 
-		assert_eq!(result.unwrap(), 2);
+		result.unwrap().xpect_eq(2);
 		// With factor=2 and no jitter, before success on attempt 2 (0-based),
 		// total sleep time is 5ms + 10ms = 15ms.
 		let elapsed = start.elapsed();
-		assert!(elapsed >= Duration::from_millis(15));
+		(elapsed >= Duration::from_millis(15)).xpect_true();
 	}
 
 	#[cfg(feature = "rand")]
@@ -778,24 +780,22 @@ mod tests {
 		let f0 = it.next().unwrap();
 		let d1 = f0.next_attempt.unwrap();
 		// jitter ~ +/- 30% (implementation yields up to ~29% due to integer math)
-		assert!(
-			d1 >= Duration::from_millis(70) && d1 <= Duration::from_millis(130)
-		);
+		(d1 >= Duration::from_millis(70) && d1 <= Duration::from_millis(130))
+			.xpect_true();
 
 		let f1 = it.next().unwrap();
 		let d2 = f1.next_attempt.unwrap();
-		assert!(
-			d2 >= Duration::from_millis(140)
-				&& d2 <= Duration::from_millis(260)
-		);
+		(d2 >= Duration::from_millis(140) && d2 <= Duration::from_millis(260))
+			.xpect_true();
 
 		// Final attempt: None means no sleep
 		let f2 = it.next().unwrap();
-		assert_eq!(f2.next_attempt, None);
-		assert_eq!(it.next(), None);
+		f2.next_attempt.xpect_eq(None);
+		it.next().xpect_eq(None);
 	}
 
 	#[sweet::test]
+	#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]
 		let mut backoff = Backoff::new(
@@ -819,22 +819,22 @@ mod tests {
 		}
 
 		// We should get exactly max_attempts yields, starting at attempt=0.
-		assert_eq!(items.len(), 3);
-		assert_eq!(items[0], BackoffFrame {
+		items.len().xpect_eq(3);
+		items[0].xpect_eq(BackoffFrame {
 			attempt_index: 0,
-			next_attempt: Some(Duration::from_millis(5))
+			next_attempt: Some(Duration::from_millis(5)),
 		});
-		assert_eq!(items[1], BackoffFrame {
+		items[1].xpect_eq(BackoffFrame {
 			attempt_index: 1,
-			next_attempt: Some(Duration::from_millis(10))
+			next_attempt: Some(Duration::from_millis(10)),
 		});
-		assert_eq!(items[2], BackoffFrame {
+		items[2].xpect_eq(BackoffFrame {
 			attempt_index: 2,
-			next_attempt: None
+			next_attempt: None,
 		});
 
 		// With factor=2 and no jitter, total sleep time is 5ms + 10ms = 15ms (last attempt does not sleep).
 		let elapsed = start.elapsed();
-		assert!(elapsed >= Duration::from_millis(15));
+		(elapsed >= Duration::from_millis(15)).xpect_true();
 	}
 }

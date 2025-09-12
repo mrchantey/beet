@@ -159,6 +159,7 @@ impl<T: fmt::Display> fmt::Display for Tree<T> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
@@ -169,25 +170,22 @@ mod test {
 				Tree::new("grandchild2"),
 			]),
 		]);
-		assert_eq!(
-			tree.to_string(),
-			"(root, [child1, (child2, [grandchild1, grandchild2])])"
-		);
-		assert_eq!(
-			tree.to_string_indented(),
+		tree.to_string()
+			.xpect_eq("(root, [child1, (child2, [grandchild1, grandchild2])])");
+		tree.to_string_indented().xpect_eq(
 			r#"root
   child1
   child2
     grandchild1
     grandchild2
-"#
+"#,
 		);
-		assert_eq!(tree.value, "root");
-		assert_eq!(tree.children.len(), 2);
-		assert_eq!(tree.children[0].value, "child1");
-		assert_eq!(tree.children[1].value, "child2");
-		assert_eq!(tree.children[1].children.len(), 2);
-		assert_eq!(tree.children[1].children[0].value, "grandchild1");
-		assert_eq!(tree.children[1].children[1].value, "grandchild2");
+		tree.value.xpect_eq("root");
+		tree.children.len().xpect_eq(2);
+		tree.children[0].value.xpect_eq("child1");
+		tree.children[1].value.xpect_eq("child2");
+		tree.children[1].children.len().xpect_eq(2);
+		tree.children[1].children[0].value.xpect_eq("grandchild1");
+		tree.children[1].children[1].value.xpect_eq("grandchild2");
 	}
 }

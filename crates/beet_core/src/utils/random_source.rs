@@ -114,19 +114,20 @@ impl RandomSource {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn seed() {
 		let mut source = RandomSource::from_seed(7);
 		let val = source.random_range(10..100);
-		assert_eq!(val, 22);
+		val.xpect_eq(22);
 	}
 
 	#[test]
 	fn entropy() {
 		let mut source = RandomSource::default();
 		let val = source.random_range(10..100);
-		assert!(val >= 10);
-		assert!(val < 100);
+		(val >= 10).xpect_true();
+		(val < 100).xpect_true();
 	}
 }

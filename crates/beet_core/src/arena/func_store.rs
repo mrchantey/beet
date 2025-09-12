@@ -214,6 +214,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn calls_and_records() {
@@ -222,9 +223,9 @@ mod test {
 		func_store.call(1);
 		func_store.call(2);
 
-		assert_eq!(func_store.called.len(), 2);
+		func_store.called.len().xpect_eq(2);
 		let outputs = func_store.called.get();
-		assert_eq!(outputs, vec![2, 3]);
+		outputs.xpect_eq(vec![2, 3]);
 	}
 
 	#[test]
@@ -235,7 +236,7 @@ mod test {
 		func_store.call(5);
 
 		let outputs = func_store.called.get();
-		assert_eq!(outputs, vec![4, 5]);
+		outputs.xpect_eq(vec![4, 5]);
 	}
 
 	#[test]
@@ -245,7 +246,7 @@ mod test {
 		func_store.call0();
 
 		let outputs = func_store.called.get();
-		assert_eq!(outputs, vec![5]);
+		outputs.xpect_eq(vec![5]);
 	}
 
 	#[test]
@@ -255,10 +256,10 @@ mod test {
 		let first = func_store.call_and_get(3);
 		let second = func_store.call_and_get(4);
 
-		assert_eq!(first, 6);
-		assert_eq!(second, 8);
+		first.xpect_eq(6);
+		second.xpect_eq(8);
 
 		let outputs = func_store.called.get();
-		assert_eq!(outputs, vec![6, 8]);
+		outputs.xpect_eq(vec![6, 8]);
 	}
 }

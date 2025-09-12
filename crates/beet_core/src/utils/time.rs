@@ -76,15 +76,13 @@ impl CrossInstant {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let now = CrossInstant::now();
 		std::thread::sleep(std::time::Duration::from_millis(100));
 		let elapsed = now.elapsed().as_secs_f64();
-		assert!(
-			elapsed >= 0.1 && elapsed < 0.2,
-			"Elapsed time was {elapsed}"
-		);
+		(elapsed >= 0.1 && elapsed < 0.2).xpect_true();
 	}
 }

@@ -132,6 +132,7 @@ impl<B: Bundle> Command for MaybeCommand<B> {
 mod tests {
 	use super::*;
 	use bevy::ecs::system::RunSystemOnce;
+	use sweet::prelude::*;
 
 	#[derive(Component)]
 	struct A;
@@ -153,8 +154,8 @@ mod tests {
 		// FIXME: this should not be needed!
 		world.flush();
 
-		assert!(world.get::<A>(entity).is_some());
-		assert!(world.get::<Maybe<A>>(entity).is_none());
+		world.get::<A>(entity).is_some().xpect_true();
+		world.get::<Maybe<A>>(entity).is_none().xpect_true();
 	}
 
 	#[test]
@@ -169,8 +170,8 @@ mod tests {
 		// FIXME: this should not be needed!
 		world.flush();
 
-		assert!(world.get::<A>(entity).is_none());
-		assert!(world.get::<Maybe<A>>(entity).is_none());
+		world.get::<A>(entity).is_none().xpect_true();
+		world.get::<Maybe<A>>(entity).is_none().xpect_true();
 	}
 
 	#[test]
@@ -188,8 +189,8 @@ mod tests {
 			.unwrap();
 
 		let entity_ref = world.get_entity(entity_with_component).unwrap();
-		assert!(entity_ref.contains::<A>());
-		assert!(!entity_ref.contains::<Maybe<A>>());
+		entity_ref.contains::<A>().xpect_true();
+		(!entity_ref.contains::<Maybe<A>>()).xpect_true();
 
 		let entity_without_component = world
 			.run_system_once(|mut commands: Commands| -> Entity {
@@ -202,7 +203,7 @@ mod tests {
 			.unwrap();
 
 		let entity_ref = world.get_entity(entity_without_component).unwrap();
-		assert!(!entity_ref.contains::<A>());
-		assert!(!entity_ref.contains::<Maybe<A>>());
+		(!entity_ref.contains::<A>()).xpect_true();
+		(!entity_ref.contains::<Maybe<A>>()).xpect_true();
 	}
 }

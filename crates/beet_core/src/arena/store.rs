@@ -234,29 +234,30 @@ impl<T: 'static> Store<Vec<T>> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let store = Store::new(0);
 
-		assert_eq!(store.get(), 0);
+		store.get().xpect_eq(0);
 		store.set(1);
-		assert_eq!(store.get(), 1);
+		store.get().xpect_eq(1);
 	}
 
 	#[test]
 	fn vec() {
 		let store = Store::<Vec<u32>>::default();
 
-		assert_eq!(store.len(), 0);
+		store.len().xpect_eq(0);
 		store.push(1);
-		assert_eq!(store.len(), 1);
+		store.len().xpect_eq(1);
 		store.push(2);
-		assert_eq!(store.len(), 2);
+		store.len().xpect_eq(2);
 		store.pop();
-		assert_eq!(store.len(), 1);
+		store.len().xpect_eq(1);
 		store.clear();
-		assert_eq!(store.len(), 0);
+		store.len().xpect_eq(0);
 	}
 
 	#[test]
@@ -264,8 +265,8 @@ mod test {
 		let store = Store::<Vec<u32>>::default();
 		store.push(10);
 		store.push(20);
-		assert_eq!(store.get_index(0), Some(10));
-		assert_eq!(store.get_index(1), Some(20));
-		assert_eq!(store.get_index(2), None);
+		store.get_index(0).xpect_eq(Some(10));
+		store.get_index(1).xpect_eq(Some(20));
+		store.get_index(2).xpect_none();
 	}
 }

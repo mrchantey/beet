@@ -167,95 +167,105 @@ pub impl Value {
 mod tests {
 	use super::*;
 	use serde_json::json;
+	use sweet::prelude::*;
+
 
 	#[test]
 	fn test_field_str_success() {
-		assert_eq!(
-			json!({"name": "Alice"}).field_str("name").unwrap(),
-			"Alice"
-		);
+		json!({"name": "Alice"})
+			.field_str("name")
+			.unwrap()
+			.xpect_eq("Alice");
 	}
 
 	#[test]
 	fn test_field_str_missing_field() {
-		assert!(
-			json!({"name": "Alice"})
-				.field_str("age")
-				.unwrap_err()
-				.to_string()
-				.contains("Expected field 'age' to be string, got 'null'")
-		);
+		json!({"name": "Alice"})
+			.field_str("age")
+			.unwrap_err()
+			.to_string()
+			.contains("Expected field 'age' to be string, got 'null'")
+			.xpect_true();
 	}
 
 	#[test]
 	fn test_field_str_wrong_type() {
-		assert!(
-			json!({"age": 30})
-				.field_str("age")
-				.unwrap_err()
-				.to_string()
-				.contains("Expected field 'age' to be string, got '30'")
-		);
+		json!({"age": 30})
+			.field_str("age")
+			.unwrap_err()
+			.to_string()
+			.contains("Expected field 'age' to be string, got '30'")
+			.xpect_true();
 	}
 
 	#[test]
 	fn test_field_i64_success() {
-		assert_eq!(json!({"age": 42}).field_i64("age").unwrap(), 42);
+		json!({"age": 42}).field_i64("age").unwrap().xpect_eq(42);
 	}
 
 	#[test]
 	fn test_field_i64_wrong_type() {
-		assert!(
-			json!({"age": "not a number"})
-				.field_i64("age")
-				.unwrap_err()
-				.to_string()
-				.contains("Expected field 'age' to be i64")
-		);
+		json!({"age": "not a number"})
+			.field_i64("age")
+			.unwrap_err()
+			.to_string()
+			.contains("Expected field 'age' to be i64")
+			.xpect_true();
 	}
 
 	#[test]
 	fn test_field_u64_success() {
-		assert_eq!(json!({"count": 123u64}).field_u64("count").unwrap(), 123);
+		json!({"count": 123u64})
+			.field_u64("count")
+			.unwrap()
+			.xpect_eq(123);
 	}
 
 	#[test]
 	fn test_field_f64_success() {
-		assert_eq!(json!({"score": 3.14}).field_f64("score").unwrap(), 3.14);
+		json!({"score": 3.14})
+			.field_f64("score")
+			.unwrap()
+			.xpect_eq(3.14);
 	}
 
 	#[test]
 	fn test_field_bool_success() {
-		assert_eq!(json!({"active": true}).field_bool("active").unwrap(), true);
+		json!({"active": true})
+			.field_bool("active")
+			.unwrap()
+			.xpect_eq(true);
 	}
 
 	#[test]
 	fn test_field_array_success() {
 		let value = json!({"items": [1, 2, 3]});
 		let arr = value.field_array("items").unwrap();
-		assert_eq!(arr.len(), 3);
+		arr.len().xpect_eq(3);
 	}
 
 	#[test]
 	fn test_field_object_success() {
 		let value = json!({"meta": {"foo": 1}});
 		let obj = value.field_object("meta").unwrap();
-		assert_eq!(obj.get("foo").unwrap(), &json!(1));
+		obj.get("foo").unwrap().clone().xpect_eq(json!(1));
 	}
 
 	#[test]
 	fn test_field_null_success() {
-		assert!(json!({"gone": null}).field_null("gone").is_ok());
+		json!({"gone": null})
+			.field_null("gone")
+			.is_ok()
+			.xpect_true();
 	}
 
 	#[test]
 	fn test_field_null_wrong_type() {
-		assert!(
-			json!({"gone": 1})
-				.field_null("gone")
-				.unwrap_err()
-				.to_string()
-				.contains("Expected field 'gone' to be null")
-		);
+		json!({"gone": 1})
+			.field_null("gone")
+			.unwrap_err()
+			.to_string()
+			.contains("Expected field 'gone' to be null")
+			.xpect_true();
 	}
 }

@@ -312,6 +312,7 @@ mod test {
 	use bevy::prelude::*;
 	use notify::EventKind;
 	use notify::event::CreateKind;
+	use sweet::prelude::*;
 	use tempfile::tempdir;
 
 	#[tokio::test]
@@ -329,8 +330,8 @@ mod test {
 		// does not hang
 		let ev = rx.recv().await?.unwrap();
 
-		assert_eq!(ev[0].kind, EventKind::Create(CreateKind::File));
-		assert_eq!(ev[0].path.as_ref(), file_path);
+		ev[0].kind.xpect_eq(EventKind::Create(CreateKind::File));
+		ev[0].path.as_ref().xpect_eq(file_path);
 
 		Ok(())
 	}

@@ -435,7 +435,7 @@ mod tests {
 							res.0
 						})
 						.await;
-					assert_eq!(next, 1);
+					next.xpect_eq(1);
 					time_ext::sleep(std::time::Duration::from_millis(2)).await;
 					let next = queue
 						.update_resource_then(|mut res: Mut<Count>| {
@@ -443,7 +443,7 @@ mod tests {
 							res.0
 						})
 						.await;
-					assert_eq!(next, 2);
+					next.xpect_eq(2);
 
 					future::yield_now().await;
 					queue.send_event(AppExit::Success);
