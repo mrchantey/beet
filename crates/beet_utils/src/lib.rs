@@ -37,9 +37,11 @@ pub mod prelude {
 	pub use rand::Rng;
 }
 pub mod exports {
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub use crate::fs::exports::*;
 	pub use glob;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use notify;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use notify_debouncer_full;
 	#[cfg(target_arch = "wasm32")]
 	pub use wasm_exports::*;
 	#[cfg(target_arch = "wasm32")]

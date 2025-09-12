@@ -1,5 +1,5 @@
 use super::FsWatcher;
-use crate::fs::terminal;
+use crate::prelude::terminal;
 use crate::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
