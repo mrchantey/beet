@@ -258,6 +258,42 @@ impl Backoff {
 	#[inline]
 	pub fn set_factor(&mut self, factor: u32) { self.factor = factor; }
 
+	/// Builder: set the maximum number of attempts.
+	#[inline]
+	pub fn with_max_attempts(mut self, max_attempts: u32) -> Self {
+		self.set_max_attempts(max_attempts);
+		self
+	}
+
+	/// Builder: set the minimum backoff duration.
+	#[inline]
+	pub fn with_min(mut self, min: Duration) -> Self {
+		self.set_min(min);
+		self
+	}
+
+	/// Builder: set the maximum backoff duration. Passing `None` sets it to `Duration::MAX`.
+	#[inline]
+	pub fn with_max(mut self, max: Duration) -> Self {
+		self.set_max(max);
+		self
+	}
+
+	/// Builder: set the jitter factor (0.0..=1.0).
+	#[cfg(feature = "rand")]
+	#[inline]
+	pub fn with_jitter(mut self, jitter: f32) -> Self {
+		self.set_jitter(jitter);
+		self
+	}
+
+	/// Builder: set the exponential growth factor.
+	#[inline]
+	pub fn with_factor(mut self, factor: u32) -> Self {
+		self.set_factor(factor);
+		self
+	}
+
 	/// Create an iterator.
 	///
 	/// # Examples
@@ -520,6 +556,20 @@ pub struct BackoffFrame {
 	pub attempt_index: u32,
 	/// Backoff duration that will be awaited before the next attempt, or None for the final attempt.
 	pub next_attempt: Option<Duration>,
+}
+
+impl std::fmt::Display for BackoffFrame {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self.next_attempt {
+			Some(d) => write!(
+				f,
+				"Attempt: {}, Next: {}ms",
+				self.attempt_index,
+				d.as_millis()
+			),
+			None => write!(f, "Attempt: {}, Next: None", self.attempt_index),
+		}
+	}
 }
 
 impl BackoffFrame {

@@ -2,7 +2,7 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 pub struct Page {
-	provider: Box<dyn PageProvider>,
+	// provider: Box<dyn PageProvider>,
 }
 
 

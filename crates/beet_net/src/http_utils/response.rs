@@ -258,7 +258,7 @@ impl Response {
 		http::Response::from_parts(self.parts, bytes).xok()
 	}
 
-	/// Convert the response into a result,
+	/// Convert a response that completed but may have returned a non-2xx status code into a result,
 	/// returning an error if the status code is not successful 2xx.
 	pub async fn into_result(self) -> Result<Self, HttpError> {
 		if self.parts.status.is_success() {
