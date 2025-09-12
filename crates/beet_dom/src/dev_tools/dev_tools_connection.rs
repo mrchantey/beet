@@ -30,7 +30,8 @@ impl DevToolsConnection {
 	/// Connect to chrome dev tools at the provided url
 	pub async fn connect_with_url(url: impl AsRef<str>) -> Result<Self> {
 		let url = url.as_ref();
-		let socket_url = DevToolsProcess::socket_url(url, "page").await?;
+		Self::await_up(url).await?;
+		let socket_url = Self::socket_url(url, "page").await?;
 		let socket = Socket::connect(socket_url).await?;
 
 		Ok(Self {
@@ -96,21 +97,11 @@ impl DevToolsConnection {
 		}
 		bevybail!("WebSocket connection closed before matching id returned")
 	}
-}
-
-pub struct DevToolsProcess {
-	url: Url,
-	process: Child,
-}
-
-impl DevToolsProcess {
-	pub async fn spawn() -> Result<Self> {
+	pub async fn spawn() -> Result<Child> {
 		Self::spawn_with_port(DEFAULT_DEVTOOLS_PORT).await
 	}
-	pub fn url(&self) -> &Url { &self.url }
 
-	pub async fn spawn_with_port(port: u16) -> Result<Self> {
-		let url = format!("http://127.0.0.1:{port}").as_str().try_into()?;
+	pub async fn spawn_with_port(port: u16) -> Result<Child> {
 		let cmd = vec![
 			"chromium".into(),
 			"--headless".into(),
@@ -120,18 +111,14 @@ impl DevToolsProcess {
 			// "--user-data-dir=$(mktemp -d)".into(),
 			format!("--remote-debugging-port={port}"),
 		];
-		let child = Command::new("nix-shell")
+		Command::new("nix-shell")
 			.arg("-p")
 			.arg("chromium")
 			.arg("--run")
 			.arg(format!(r#"bash -lc "{}""#, cmd.join(" ")))
 			.kill_on_drop(true)
-			.spawn()?;
-		Self {
-			url,
-			process: child,
-		}
-		.xok()
+			.spawn()?
+			.xok()
 	}
 	/// waits for the first Ok response from the dev tools url
 	pub async fn await_up(url: impl AsRef<str>) -> Result {
@@ -177,12 +164,8 @@ impl DevToolsProcess {
 			}
 		}
 	}
-
-	pub async fn kill(mut self) -> Result<()> {
-		self.process.kill().await?;
-		Ok(())
-	}
 }
+
 
 
 
@@ -193,10 +176,7 @@ mod test {
 	#[sweet::test]
 	// #[ignore = "requires Chrome DevTools"]
 	async fn works() {
-		let devtools = DevToolsProcess::spawn().await.unwrap();
-		let url = devtools.url();
-		let _ = DevToolsProcess::await_up(url).await.unwrap();
-
+		let mut devtools = DevToolsConnection::spawn().await.unwrap();
 		let _conn = DevToolsConnection::connect().await.unwrap();
 		devtools.kill().await.unwrap();
 	}

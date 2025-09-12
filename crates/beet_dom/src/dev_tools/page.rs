@@ -66,9 +66,7 @@ mod test {
 	#[sweet::test]
 	// #[ignore = "requires Chrome DevTools"]
 	async fn works() {
-		let devtools = DevToolsProcess::spawn().await.unwrap();
-		let url = devtools.url();
-		let _ = DevToolsProcess::await_up(url).await.unwrap();
+		let mut devtools = DevToolsConnection::spawn().await.unwrap();
 
 		// let bytes = export_pdf("https://google.com").await.unwrap();
 		// let _devtools = ChromeDevTools::spawn().await.unwrap();
