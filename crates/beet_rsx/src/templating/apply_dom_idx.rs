@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
@@ -132,8 +132,8 @@ pub(super) fn apply_client_island_dom_idx(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use beet_utils::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

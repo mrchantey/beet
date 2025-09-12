@@ -20,7 +20,7 @@ impl Request {
 #[cfg(test)]
 mod test_request {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	const HTTPBIN: &str = "https://httpbin.org";
@@ -150,7 +150,7 @@ mod test_request {
 #[cfg(test)]
 mod test_response {
 	use crate::prelude::*;
-	use beet_utils::utils::PipelineTarget;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

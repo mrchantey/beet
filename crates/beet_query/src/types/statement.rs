@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use sea_query::DeleteStatement;
 use sea_query::ForeignKeyCreateStatement;
 use sea_query::ForeignKeyDropStatement;

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::pkg_ext;
+use beet_core::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
@@ -20,7 +20,6 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 		quote! {
 			use bevy::prelude::*;
 			use beet_core::prelude::*;
-			use beet_utils::prelude::*;
 		}
 	} else {
 		quote! {

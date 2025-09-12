@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 
@@ -135,7 +135,7 @@ impl BucketProvider for FsBucketProvider {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

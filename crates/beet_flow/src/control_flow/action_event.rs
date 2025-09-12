@@ -1,6 +1,6 @@
 use crate::prelude::*;
 #[cfg(test)]
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 

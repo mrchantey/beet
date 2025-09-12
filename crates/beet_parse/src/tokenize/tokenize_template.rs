@@ -180,7 +180,7 @@ fn non_reserved_key(key: &str, span: Span) -> Ident {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;

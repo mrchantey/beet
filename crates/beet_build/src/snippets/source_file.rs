@@ -1,10 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_utils::exports::notify::EventKind;
-use beet_utils::exports::notify::event::CreateKind;
-use beet_utils::exports::notify::event::ModifyKind;
-use beet_utils::exports::notify::event::RemoveKind;
-use beet_utils::prelude::*;
+use beet_core::exports::notify::EventKind;
+use beet_core::exports::notify::event::CreateKind;
+use beet_core::exports::notify::event::ModifyKind;
+use beet_core::exports::notify::event::RemoveKind;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 use std::path::Path;

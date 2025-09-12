@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use sea_query::Expr;
 
 
@@ -114,7 +114,7 @@ impl Database {
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

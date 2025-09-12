@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use sea_query::Expr;
 use sea_query::InsertStatement;
 use sea_query::Query;

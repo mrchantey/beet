@@ -16,7 +16,7 @@ use std::fmt::Debug;
 /// ## Examples
 /// Basic usage:
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let number_store = Store::new(10u32);
 /// assert_eq!(number_store.get(), 10);
 /// number_store.set(11);
@@ -27,7 +27,7 @@ use std::fmt::Debug;
 ///
 /// Borrow without cloning:
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let text_store = Store::new(String::from("hello"));
 /// let length = text_store.with(|s| s.len());
 /// assert_eq!(length, 5);
@@ -45,7 +45,7 @@ impl<T: 'static + Send + Default> Default for Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let vec_store = Store::<Vec<u32>>::default();
 	/// assert!(vec_store.is_empty());
 	/// vec_store.remove();
@@ -60,7 +60,7 @@ impl<T: 'static + Send> Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let config_store = Store::new(42u64);
 	/// assert_eq!(config_store.get(), 42);
 	/// ```
@@ -72,7 +72,7 @@ impl<T: 'static + Send> Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let name_store = Store::new(String::from("beet"));
 	/// let cloned = name_store.get();
 	/// assert_eq!(cloned, "beet");
@@ -90,7 +90,7 @@ impl<T: 'static + Send> Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let flag_store = Store::new(false);
 	/// flag_store.set(true);
 	/// assert!(flag_store.get());
@@ -103,7 +103,7 @@ impl<T: 'static + Send> Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let numbers = Store::new(vec![1, 2, 3, 4]);
 	/// let sum = numbers.with(|v| v.iter().sum::<i32>());
 	/// assert_eq!(sum, 10);
@@ -129,7 +129,7 @@ impl<T: 'static + Send> Store<T> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let count = Store::new(1u32);
 	/// count.remove();
 	/// // Do not use `count` after this point.
@@ -150,7 +150,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let list = Store::<Vec<i32>>::default();
 	/// list.push(5);
 	/// assert_eq!(list.len(), 1);
@@ -161,7 +161,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let values = Store::<Vec<i32>>::default();
 	/// assert_eq!(values.pop(), None);
 	/// values.push(7);
@@ -173,7 +173,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let messages = Store::<Vec<&'static str>>::default();
 	/// messages.push("hi");
 	/// messages.clear();
@@ -185,7 +185,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let items = Store::<Vec<i32>>::default();
 	/// assert_eq!(items.len(), 0);
 	/// items.push(1);
@@ -198,7 +198,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let rows = Store::<Vec<u8>>::default();
 	/// assert!(rows.is_empty());
 	/// rows.push(1);
@@ -212,7 +212,7 @@ impl<T: 'static> Store<Vec<T>> {
 	///
 	/// ## Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let values = Store::<Vec<i32>>::default();
 	/// values.push(10);
 	/// values.push(20);

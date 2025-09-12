@@ -97,7 +97,7 @@ fn step_environment<S: RlSessionTypes>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::PathExt;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use syn::ItemMod;
 

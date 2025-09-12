@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::path::Path;
 use std::process::Command;

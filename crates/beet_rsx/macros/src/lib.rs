@@ -2,7 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
 use beet_parse::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use proc_macro::TokenStream;
 use syn::DeriveInput;
 use syn::ItemFn;

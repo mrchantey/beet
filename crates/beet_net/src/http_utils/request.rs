@@ -65,7 +65,7 @@ impl Request {
 		self,
 		body: &T,
 	) -> Result<Self, serde_json::Error> {
-		use beet_utils::utils::PipelineTarget;
+		use beet_core::prelude::*;
 
 		let body = serde_json::to_string(body)?;
 		self.with_body(body)

@@ -1,5 +1,5 @@
 use beet_net::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -13,7 +13,7 @@ static SERVER_URL: LazyLock<Mutex<Url>> = LazyLock::new(|| {
 	#[cfg(not(target_arch = "wasm32"))]
 	let path = "http://127.0.0.1:3000";
 	#[cfg(target_arch = "wasm32")]
-	let path = beet_utils::exports::web_sys::window()
+	let path = beet_core::exports::web_sys::window()
 		.and_then(|w| w.location().origin().ok())
 		.unwrap();
 	Mutex::new(Url::parse(&path).unwrap())

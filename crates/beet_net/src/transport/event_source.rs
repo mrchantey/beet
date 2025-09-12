@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use eventsource_stream::EventStream;
 use eventsource_stream::Eventsource;
@@ -16,7 +16,7 @@ impl Response {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::tasks::futures_lite::StreamExt;
 	use sweet::prelude::*;
 

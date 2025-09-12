@@ -1,7 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]

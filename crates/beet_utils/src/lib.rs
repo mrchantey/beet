@@ -5,7 +5,7 @@ mod glob_filter;
 mod path_utils;
 #[cfg(feature = "tokens")]
 pub mod pkg_ext;
-#[cfg(feature = "fs")]
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod terminal;
 mod workspace_root;
 mod xtend;
@@ -19,7 +19,7 @@ pub mod prelude {
 	pub use crate::path_utils::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::pkg_ext;
-	#[cfg(feature = "fs")]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::terminal;
 	pub use crate::workspace_root::*;
 	pub use crate::xtend::*;

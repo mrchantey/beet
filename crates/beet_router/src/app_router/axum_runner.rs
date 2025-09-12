@@ -4,7 +4,6 @@ use axum::routing::MethodFilter;
 #[allow(unused_imports)]
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
@@ -121,8 +120,6 @@ impl AxumRunner {
 fn get_reload(
 	html_dir: AbsPathBuf,
 ) -> (tower_livereload::LiveReloadLayer, JoinHandle<Result<()>>) {
-	use beet_utils::prelude::FsWatcher;
-
 	let livereload = tower_livereload::LiveReloadLayer::new();
 	let reload = livereload.reloader();
 

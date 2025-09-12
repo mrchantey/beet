@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use lambda_http::IntoResponse;
 use lambda_http::Request;

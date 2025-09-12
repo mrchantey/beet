@@ -41,7 +41,7 @@ pub mod prelude {
 			pub use beet_core::prelude::*;
 			pub use beet_net::prelude::*;
 			pub use beet_rsx::prelude::*;
-			pub use beet_utils::prelude::*;
+			use beet_core::prelude::*;
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;
 		}

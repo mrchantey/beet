@@ -66,7 +66,6 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
-	pub use crate::utils::prelude::*;
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
 	pub use bevy::prelude::*;
@@ -83,7 +82,6 @@ pub mod exports {
 	pub use crate::design::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::exports::*;
-	pub use crate::utils::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;
 	#[cfg(feature = "ml")]

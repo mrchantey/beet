@@ -50,7 +50,7 @@ pub fn run_with_user_sentence<P: RunPayload>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use fantoccini::Client;
 use fantoccini::ClientBuilder;
 use std::time::Duration;

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use fantoccini::Locator;
 use fantoccini::error;
 

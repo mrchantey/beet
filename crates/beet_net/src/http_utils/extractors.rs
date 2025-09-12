@@ -1,6 +1,6 @@
 use crate::prelude::*;
 #[allow(unused)]
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use http::HeaderMap;
 use http::StatusCode;

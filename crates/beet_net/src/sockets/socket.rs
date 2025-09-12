@@ -220,7 +220,7 @@ pub struct CloseFrame {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use futures::FutureExt;
 	use futures::StreamExt;
 	use futures::stream;

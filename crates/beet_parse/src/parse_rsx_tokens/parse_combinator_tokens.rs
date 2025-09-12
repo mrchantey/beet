@@ -3,7 +3,6 @@ use anyhow::Result;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_rsx_combinator::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::collections::HashSet;
 
@@ -289,7 +288,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use sweet::prelude::*;
 

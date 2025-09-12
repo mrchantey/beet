@@ -1,7 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_net::prelude::RoutePath;
-use beet_utils::prelude::PathExt;
-use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use std::path::PathBuf;
@@ -156,7 +155,7 @@ fn path_to_ident(path: &str) -> String {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use std::ops::Deref;

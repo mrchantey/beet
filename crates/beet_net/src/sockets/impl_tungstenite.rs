@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use futures::FutureExt;

@@ -72,7 +72,7 @@ pub(crate) fn return_in_duration<T: ResultPayload>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use std::time::Duration;
 	use sweet::prelude::*;

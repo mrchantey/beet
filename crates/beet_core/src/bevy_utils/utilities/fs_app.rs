@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::num::NonZeroU8;
 use std::ops::ControlFlow;

@@ -193,7 +193,7 @@ where
 
 
 // #[cfg(not(feature = "nightly"))]
-// impl<T, M> IntoBundle<(Self, T, M)> for beet_utils::prelude::Getter<T>
+// impl<T, M> IntoBundle<(Self, T, M)> for beet_core::prelude::Getter<T>
 // where
 // 	T: 'static + Send + Sync + IntoBundle<M>,
 // {
@@ -204,7 +204,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

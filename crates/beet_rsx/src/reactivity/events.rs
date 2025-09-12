@@ -192,7 +192,7 @@ mod wasm_utils {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

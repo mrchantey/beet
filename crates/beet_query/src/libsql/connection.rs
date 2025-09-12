@@ -1,7 +1,7 @@
 use crate::libsql::cached_statement::LibsqlStatementWrapper;
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use sea_query::SqliteQueryBuilder;
 
 #[cfg(feature = "libsql")]

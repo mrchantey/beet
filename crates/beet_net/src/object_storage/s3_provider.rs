@@ -6,7 +6,6 @@ use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 

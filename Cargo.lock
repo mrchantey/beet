@@ -1584,6 +1584,7 @@ name = "beet_sim"
 version = "0.0.7-dev.8"
 dependencies = [
  "anyhow",
+ "beet_core",
  "beet_flow",
  "beet_spatial",
  "bevy",

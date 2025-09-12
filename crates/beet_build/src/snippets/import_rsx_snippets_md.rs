@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use quote::ToTokens;
 
@@ -59,7 +58,7 @@ pub fn import_rsx_snippets_md(
 mod test {
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
-	use beet_utils::prelude::WsPathBuf;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -70,10 +69,7 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(
-				WsPathBuf::new(
-					"tests/test_site/test_docs/hello.md",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/test_docs/hello.md").into_abs(),
 			))
 			.id();
 
@@ -92,10 +88,8 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(
-				WsPathBuf::new(
-					"tests/test_site/test_docs/index.mdx",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/test_docs/index.mdx")
+					.into_abs(),
 			))
 			.id();
 

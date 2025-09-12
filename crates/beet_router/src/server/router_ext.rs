@@ -2,7 +2,7 @@ use axum::Router;
 use beet_net::exports::http;
 use beet_net::exports::http_body_util::BodyExt;
 use beet_net::prelude::*;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 use tower::ServiceExt;

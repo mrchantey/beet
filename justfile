@@ -188,11 +188,11 @@ test-beet-utils *args:
 test-utils *args:
 	cargo test -p beet_utils 							--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p sweet 									 													 								{{args}} -- {{test-threads}}
-	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
+	cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
-	cargo test -p sweet     --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 
 test-flow *args:
 	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}

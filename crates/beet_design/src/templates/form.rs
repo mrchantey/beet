@@ -17,9 +17,9 @@ pub fn Form(
 
 	#[cfg(target_arch = "wasm32")]
 	let onsubmit = move |ev: Trigger<OnSubmit>| {
-		use beet_utils::exports::js_sys;
-		use beet_utils::exports::wasm_bindgen::JsCast;
-		use beet_utils::exports::web_sys;
+		use beet_core::exports::js_sys;
+		use beet_core::exports::wasm_bindgen::JsCast;
+		use beet_core::exports::web_sys;
 
 		if !bubble_up {
 			ev.prevent_default();

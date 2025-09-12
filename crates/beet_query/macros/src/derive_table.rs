@@ -1,6 +1,5 @@
 use crate::table_field::TableField;
 use beet_core::prelude::*;
-use beet_utils::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2;
 use proc_macro2::TokenStream;

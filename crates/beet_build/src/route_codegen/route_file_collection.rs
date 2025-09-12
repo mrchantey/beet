@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -149,14 +148,9 @@ impl RouteFileCollection {
 	#[cfg(test)]
 	pub fn test_site() -> impl Bundle {
 		(
-			Self::new(
-				WsPathBuf::new("tests/test_site").into_abs(),
-			),
+			Self::new(WsPathBuf::new("tests/test_site").into_abs()),
 			CodegenFile::new(
-				WsPathBuf::new(
-					"tests/test_site/codegen/mod.rs",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/codegen/mod.rs").into_abs(),
 			)
 			.with_pkg_name("test_site"),
 		)
@@ -164,54 +158,39 @@ impl RouteFileCollection {
 	#[cfg(test)]
 	pub fn test_site_pages() -> impl Bundle {
 		(
-			Self::new(
-				WsPathBuf::new("tests/test_site/pages")
-					.into_abs(),
-			)
-			.with_filter(
-				GlobFilter::default()
-					.with_include("*.rs")
-					.with_exclude("*mod.rs"),
-			),
+			Self::new(WsPathBuf::new("tests/test_site/pages").into_abs())
+				.with_filter(
+					GlobFilter::default()
+						.with_include("*.rs")
+						.with_exclude("*mod.rs"),
+				),
 			CodegenFile::new(
-				WsPathBuf::new(
-					"tests/test_site/codegen/pages.rs",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/codegen/pages.rs").into_abs(),
 			)
 			.with_pkg_name("test_site"),
 			children![SourceFile::new(
-				WsPathBuf::new(
-					"tests/test_site/pages/docs/index.rs",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/pages/docs/index.rs",)
+					.into_abs(),
 			)],
 		)
 	}
 	#[cfg(test)]
 	pub fn test_site_docs() -> impl Bundle {
 		(
-			Self::new(
-				WsPathBuf::new("tests/test_site/test_docs")
-					.into_abs(),
-			)
-			.with_filter(
-				GlobFilter::default()
-					.with_include("*.md")
-					.with_include("*.mdx"),
-			),
+			Self::new(WsPathBuf::new("tests/test_site/test_docs").into_abs())
+				.with_filter(
+					GlobFilter::default()
+						.with_include("*.md")
+						.with_include("*.mdx"),
+				),
 			CodegenFile::new(
-				WsPathBuf::new(
-					"tests/test_site/codegen/test_docs.rs",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/codegen/test_docs.rs")
+					.into_abs(),
 			)
 			.with_pkg_name("test_site"),
 			children![SourceFile::new(
-				WsPathBuf::new(
-					"tests/test_site/test_docs/index.mdx",
-				)
-				.into_abs(),
+				WsPathBuf::new("tests/test_site/test_docs/index.mdx",)
+					.into_abs(),
 			)],
 		)
 	}
@@ -220,8 +199,7 @@ impl RouteFileCollection {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::GlobFilter;
-	use beet_utils::prelude::WsPathBuf;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -233,10 +211,7 @@ mod test {
 
 		collection
 			.passes_filter(
-				&WsPathBuf::new(
-					"tests/test_site/index.mockup.rs",
-				)
-				.into_abs(),
+				&WsPathBuf::new("tests/test_site/index.mockup.rs").into_abs(),
 			)
 			.xpect_true();
 		collection
@@ -244,8 +219,7 @@ mod test {
 			.xpect_false();
 		collection
 			.passes_filter(
-				&WsPathBuf::new("tests/test_site/index.rs")
-					.into_abs(),
+				&WsPathBuf::new("tests/test_site/index.rs").into_abs(),
 			)
 			.xpect_false();
 	}

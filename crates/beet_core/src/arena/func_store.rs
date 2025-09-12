@@ -19,7 +19,7 @@ use crate::prelude::*;
 /// Examples
 /// Basic usage:
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let adder = FuncStore::new(|n: u32| n + 1);
 /// adder.call(1);
 /// adder.call(2);
@@ -32,7 +32,7 @@ use crate::prelude::*;
 ///
 /// Call with default input using `call0`:
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let make_ten = FuncStore::new(|n: u32| n + 10);
 /// make_ten.call0(); // uses u32::default() == 0
 /// assert_eq!(make_ten.called.get(), vec![10]);
@@ -85,7 +85,7 @@ where
 	///
 	/// Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let fs = FuncStore::<u32, u32, _>::new(|n| n * 2);
 	/// fs.call(3);
 	/// assert_eq!(fs.called.get(), vec![6]);
@@ -105,7 +105,7 @@ where
 	///
 	/// Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let doubler = FuncStore::new(|n: u32| n * 2);
 	/// doubler.call(4);
 	/// assert_eq!(doubler.called.get(), vec![8]);
@@ -130,7 +130,7 @@ where
 	///
 	/// Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let make_five = FuncStore::new(|n: u32| n + 5);
 	/// make_five.call0(); // uses u32::default() == 0
 	/// assert_eq!(make_five.called.get(), vec![5]);
@@ -156,7 +156,7 @@ where
 	///
 	/// Examples
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let triple = FuncStore::new(|n: u32| n * 3);
 	/// let got = triple.call_and_get(3);
 	/// assert_eq!(got, 9);

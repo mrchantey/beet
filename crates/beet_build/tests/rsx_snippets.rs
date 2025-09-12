@@ -9,7 +9,6 @@ use beet_build::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use beet_rsx::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;

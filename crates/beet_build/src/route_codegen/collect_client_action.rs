@@ -225,7 +225,7 @@ impl ParseClientAction {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::utils::PipelineTarget;
+	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;

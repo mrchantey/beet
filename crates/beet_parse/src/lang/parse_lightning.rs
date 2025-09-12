@@ -1,5 +1,4 @@
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;

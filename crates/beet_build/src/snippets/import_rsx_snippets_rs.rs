@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use syn::visit::Visit;
 
@@ -73,8 +72,8 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_rsx::prelude::*;
-	use beet_utils::prelude::WsPathBuf;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -82,8 +81,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
-		let test_site_index =
-			WsPathBuf::new("tests/test_site/pages/index.rs");
+		let test_site_index = WsPathBuf::new("tests/test_site/pages/index.rs");
 		let entity = app
 			.world_mut()
 			.spawn(SourceFile::new(test_site_index.into_abs()))

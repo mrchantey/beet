@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
@@ -70,7 +70,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -230,8 +229,6 @@ mod test {
 
 	#[sweet::test]
 	async fn reactive_app() {
-		use beet_utils::time_ext;
-
 		let mut app = App::new();
 		app.add_plugins(SignalsPlugin);
 		app.set_runner(ReactiveApp::runner);

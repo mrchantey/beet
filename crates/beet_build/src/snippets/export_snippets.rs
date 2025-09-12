@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
@@ -64,9 +63,7 @@ fn collect_rsx_snippets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_dom::prelude::*;
-	use beet_utils::prelude::*;
-	// use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -77,8 +74,7 @@ mod test {
 			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 
-		let test_site_index =
-			WsPathBuf::new("tests/test_site/pages/index.rs");
+		let test_site_index = WsPathBuf::new("tests/test_site/pages/index.rs");
 
 		let snippet_path = WorkspaceConfig::default()
 			.rsx_snippet_path(&test_site_index, 7)

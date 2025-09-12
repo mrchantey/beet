@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
@@ -55,7 +55,7 @@ pub fn tokenize_bundle_with_errors(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_core::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
 

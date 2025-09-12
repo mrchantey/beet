@@ -1,7 +1,6 @@
 //! Types associated with the root node of a tree in beet.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_utils::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 

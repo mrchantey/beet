@@ -83,7 +83,7 @@ pub fn modify_route_file_tokens(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::dir;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
