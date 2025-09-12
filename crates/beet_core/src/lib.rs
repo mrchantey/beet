@@ -31,6 +31,7 @@ pub mod prelude {
 	pub use crate::web_utils::*;
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
+	pub use futures_lite::StreamExt;
 }
 
 

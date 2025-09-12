@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use crate::web_utils::HtmlEventListener;
+use crate::web_utils::document_ext;
 use js_sys::Array;
 use js_sys::Uint8Array;
 use wasm_bindgen::JsCast;
@@ -6,7 +7,6 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Blob;
 use web_sys::BlobPropertyBag;
-use web_sys::Document;
 use web_sys::File;
 use web_sys::HtmlInputElement;
 use web_sys::Url;
@@ -29,42 +29,54 @@ pub fn download_text(text: &str, filename: &str) -> Result<(), JsValue> {
 	download_blob(blob, filename)
 }
 
+/// Create a temporary object URL for `blob` and trigger a browser download with `filename`.
+///
+/// This function creates an `<a>` element, clicks it programmatically, and then
+/// revokes the object URL to avoid leaks.
 pub fn download_blob(blob: Blob, filename: &str) -> Result<(), JsValue> {
 	let url = Url::create_object_url_with_blob(&blob)?;
-	let anchor = Document::x_create_anchor();
+	let anchor = document_ext::create_anchor();
 	anchor.set_attribute("href", &url)?;
 	anchor.set_attribute("download", filename)?;
-	Document::x_append_child(&anchor);
+	document_ext::append_child(&anchor);
 	anchor.click();
 	anchor.remove();
 	Url::revoke_object_url(&url)?;
 	Ok(())
 }
 
+/// Open a native file picker and resolve with the selected File.
+///
+/// - `accept`: Optional accept string (e.g. "image/*,.png"). Defaults to "*".
+/// - Returns: The first selected `File`.
 pub async fn upload_file(accept: Option<&str>) -> Result<File, JsValue> {
-	let document = Document::get();
-	let el = document
+	let doc = document_ext::document();
+	let el = doc
 		.create_element("input")?
 		.dyn_into::<HtmlInputElement>()?;
 	el.set_type("file");
-	el.set_accept(&accept.unwrap_or("*"));
+	el.set_accept(accept.unwrap_or("*"));
 
-	document.body().unwrap().append_child(&el)?;
+	doc.body().unwrap().append_child(&el)?;
 	el.click();
-	document.body().unwrap().remove_child(&el)?;
-	HtmlEventWaiter::new_with_target("change", el.clone())
-		.wait()
-		.await?;
+
+	// Wait for the "change" event before detaching the input.
+	let mut changes = HtmlEventListener::<web_sys::Event>::new_with_target(
+		"change",
+		el.clone().unchecked_into::<web_sys::EventTarget>(),
+	);
+	changes.next_event().await;
+
+	doc.body().unwrap().remove_child(&el)?;
 
 	let file = el.files().ok_or("no files")?.get(0).ok_or("no file")?;
-
 	Ok(file)
 }
 
 pub async fn upload_text(accept: Option<&str>) -> Result<String, JsValue> {
 	let file = upload_file(accept).await?;
 	let text = JsFuture::from(file.text()).await?;
-	Ok(text.as_string().expect("blob.text() must be string"))
+	Ok(text.as_string().unwrap())
 }
 pub async fn upload_bytes(accept: Option<&str>) -> Result<Vec<u8>, JsValue> {
 	let file = upload_file(accept).await?;

@@ -59,7 +59,7 @@ clap = { workspace = true, optional = true }
 heck.workspace = true
 
 #💡 async
-futures-lite.workspace = true
+futures-lite = { workspace = true, features = ["race"] }
 async-channel.workspace = true
 
 # tokens dependencies

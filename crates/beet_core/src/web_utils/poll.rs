@@ -1,5 +1,5 @@
 use super::performance_now;
-use super::wait_for_millis;
+use beet_utils::utils::time_ext;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -19,7 +19,7 @@ pub async fn poll_ok_with_timeout<T>(
 				if performance_now() - start > timeout.as_millis() as f64 {
 					return Err(err);
 				}
-				wait_for_millis(10).await;
+				time_ext::sleep(Duration::from_millis(10)).await;
 			}
 		}
 	}
