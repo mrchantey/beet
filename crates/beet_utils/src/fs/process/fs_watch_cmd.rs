@@ -1,6 +1,7 @@
 use super::FsWatcher;
 use crate::fs::terminal;
-use anyhow::Result;
+use crate::prelude::*;
+use bevy::prelude::*;
 use clap::Parser;
 
 /// An [FsWatcher] that will run a command on change.
@@ -18,7 +19,7 @@ pub struct FsWatchCmd {
 impl FsWatchCmd {
 	/// Run the command once, then watch, printing the
 	/// mutated file each time.
-	pub async fn run_and_watch(&self) -> Result<()> {
+	pub async fn run_and_watch(&self) -> Result {
 		terminal::clear().unwrap();
 		println!("{:#?}", self);
 		self.try_run_cmd().ok();
@@ -34,7 +35,7 @@ impl FsWatchCmd {
 		Ok(())
 	}
 
-	fn try_run_cmd(&self) -> Result<()> {
+	fn try_run_cmd(&self) -> Result {
 		if let Some(cmd) = &self.cmd {
 			let cmd_vec = cmd.split_whitespace().collect::<Vec<_>>();
 			let status = std::process::Command::new(&cmd_vec[0])
@@ -42,11 +43,7 @@ impl FsWatchCmd {
 				.status()?;
 
 			if !status.success() {
-				return Err(anyhow::anyhow!(
-					"Command failed: {}\n{}",
-					cmd,
-					status
-				));
+				bevybail!("Command failed: {}\n{}", cmd, status);
 			}
 		}
 		Ok(())

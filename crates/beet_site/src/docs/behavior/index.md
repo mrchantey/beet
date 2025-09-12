@@ -1,6 +1,5 @@
 +++
 title = "Behavior"
-description= "Use bevy scenes to craft"
 +++
 
 Define behaviors using regular entities and relations with `beet_flow`:

@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::collections::VecDeque;
 use std::ops::ControlFlow;

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet::prelude::*;
 use clap::Parser;
 use std::fs;
@@ -39,13 +38,13 @@ pub struct TestWasm {
 
 
 impl TestWasm {
-	pub fn run(self) -> Result<()> {
+	pub fn run(self) -> Result {
 		self.run_wasm_bindgen()?;
 		self.init_deno()?;
 		self.run_deno()?;
 		Ok(())
 	}
-	fn run_wasm_bindgen(&self) -> Result<()> {
+	fn run_wasm_bindgen(&self) -> Result {
 		let output = Command::new("wasm-bindgen")
 			.arg("--out-dir")
 			.arg(sweet_target_dir())
@@ -71,7 +70,7 @@ impl TestWasm {
 	/// Move the deno file to the correct directory,
 	/// if this is the first time this will also ensure deno is installed
 	/// by running `deno --version`
-	fn init_deno(&self) -> Result<()> {
+	fn init_deno(&self) -> Result {
 		let deno_runner_path = deno_runner_path();
 		let deno_str = include_str!("./deno.ts");
 
@@ -90,7 +89,7 @@ impl TestWasm {
 				_ => false,
 			};
 		if !deno_installed {
-			anyhow::bail!(INSTALL_DENO);
+			bevybail!("{}", INSTALL_DENO);
 		}
 		println!("copying deno file to {}", deno_runner_path.display());
 
@@ -99,7 +98,7 @@ impl TestWasm {
 		Ok(())
 	}
 
-	fn run_deno(&self) -> Result<()> {
+	fn run_deno(&self) -> Result {
 		// args will look like this so skip 3
 		// sweet test-wasm binary-path *actual-args
 		// why doesnt it work with three?
@@ -117,7 +116,7 @@ impl TestWasm {
 }
 
 
-fn handle_process(_stderr_prefix: &str, child: Child) -> Result<()> {
+fn handle_process(_stderr_prefix: &str, child: Child) -> Result {
 	let output = child.wait_with_output()?;
 
 	let stdout = String::from_utf8_lossy(&output.stdout);
@@ -127,7 +126,7 @@ fn handle_process(_stderr_prefix: &str, child: Child) -> Result<()> {
 
 	if !output.status.success() {
 		let stderr = String::from_utf8_lossy(&output.stderr);
-		anyhow::bail!("{stderr}");
+		bevybail!("{stderr}");
 	}
 	Ok(())
 }

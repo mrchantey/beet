@@ -34,7 +34,6 @@ tokens = [
 ]
 [dependencies]
 extend.workspace = true
-anyhow.workspace = true
 glob.workspace = true
 thiserror.workspace = true
 clap.workspace = true

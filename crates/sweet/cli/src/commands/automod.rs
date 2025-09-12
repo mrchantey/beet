@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet::exports::notify::EventKind;
 use beet::exports::notify::event::ModifyKind;
 use beet::exports::notify::event::RenameMode;
@@ -37,7 +36,7 @@ enum DidMutate {
 
 
 impl AutoMod {
-	pub async fn run(mut self) -> Result<()> {
+	pub async fn run(mut self) -> Result {
 		self.watcher.assert_path_exists()?;
 		if !self.quiet {
 			println!(
@@ -308,7 +307,7 @@ impl ModFiles {
 		}
 		Ok(self.map.get_mut(path).unwrap())
 	}
-	pub fn write_all(&self) -> Result<()> {
+	pub fn write_all(&self) -> Result {
 		// TODO only perform write if hash changed
 		for (path, file) in &self.map {
 			let file = prettyplease::unparse(file);
@@ -335,7 +334,7 @@ impl<'a> FileMeta<'a> {
 	/// Returns either `lib.rs` or `mod.rs` for the given path's parent
 	fn new(event_path: &'a Path) -> Result<Self> {
 		let Some(parent) = event_path.parent() else {
-			anyhow::bail!("No parent found for path {}", event_path.display());
+			bevybail!("No parent found for path {}", event_path.display());
 		};
 		let is_lib_dir =
 			parent.file_name().map(|f| f == "src").unwrap_or(false);
@@ -348,10 +347,7 @@ impl<'a> FileMeta<'a> {
 			.file_stem()
 			.map(|s| s.to_string_lossy().to_string())
 		else {
-			anyhow::bail!(
-				"No file stem found for path {}",
-				event_path.display()
-			);
+			bevybail!("No file stem found for path {}", event_path.display());
 		};
 
 		let mod_ident =

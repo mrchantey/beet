@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
+use bevy::ecs::error::BevyError;
 use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
@@ -82,10 +83,7 @@ impl WsPathBuf {
 		let path = FsExt::workspace_root().join(self).clean();
 		AbsPathBuf::new(path)
 			.map_err(|err| {
-				anyhow::anyhow!(
-					"Failed to convert WsPathBuf to AbsPathBuf: {}",
-					err
-				)
+				bevyhow!("Failed to convert WsPathBuf to AbsPathBuf: {}", err)
 			})
 			.unwrap()
 	}
@@ -104,7 +102,7 @@ impl AsRef<Path> for WsPathBuf {
 	fn as_ref(&self) -> &Path { self.0.as_ref() }
 }
 impl FromStr for WsPathBuf {
-	type Err = anyhow::Error;
+	type Err = BevyError;
 	fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::new(s)) }
 }
 impl Into<WsPathBuf> for &str {

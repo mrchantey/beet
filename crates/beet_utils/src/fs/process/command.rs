@@ -1,4 +1,5 @@
-use anyhow::Result;
+use crate::prelude::*;
+use bevy::prelude::*;
 use std::process::Child;
 use std::process::Command;
 use std::process::Output;
@@ -29,20 +30,20 @@ impl CommandExt {
 	}
 
 	/// Turn an exit status into a Result
-	pub fn unwrap_status(mut cmd: Command) -> Result<()> {
+	pub fn unwrap_status(mut cmd: Command) -> Result {
 		let status = cmd.status()?;
 		if !status.success() {
-			Err(anyhow::anyhow!("Command failed: {:?}", status))?;
+			Err(bevyhow!("Command failed: {:?}", status))?;
 		}
 		Ok(())
 	}
 	/// Turn a non-empty output into a Result
-	pub fn unwrap_output_empty(mut cmd: Command) -> Result<()> {
+	pub fn unwrap_output_empty(mut cmd: Command) -> Result {
 		let output = cmd.output()?;
 		if output.stdout.is_empty() && output.stderr.is_empty() {
 			Ok(())
 		} else {
-			anyhow::bail!(
+			bevybail!(
 				"Expected empty output, received: \nStdout: {}\nStderr: {}",
 				String::from_utf8_lossy(&output.stdout),
 				String::from_utf8_lossy(&output.stderr)
@@ -60,7 +61,7 @@ impl CommandExt {
 		Ok(child)
 	}
 
-	pub fn spawn_command_blocking(args: &Vec<&str>) -> Result<()> {
+	pub fn spawn_command_blocking(args: &Vec<&str>) -> Result {
 		let _ = Self::get_command(args)
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit())
@@ -79,7 +80,7 @@ impl CommandExt {
 		cmd
 	}
 
-	pub fn spawn_command_with_shell_blocking(args: &Vec<&str>) -> Result<()> {
+	pub fn spawn_command_with_shell_blocking(args: &Vec<&str>) -> Result {
 		let _ = Self::get_command_with_shell(args)
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit())

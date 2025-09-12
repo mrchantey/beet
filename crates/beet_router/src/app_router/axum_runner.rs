@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use axum::routing;
 use axum::routing::MethodFilter;
+#[allow(unused_imports)]
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_utils::prelude::*;

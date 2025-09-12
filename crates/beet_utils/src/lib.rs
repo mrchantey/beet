@@ -5,7 +5,9 @@
 pub use utils::async_ext;
 pub use utils::log::*;
 pub use utils::time_ext;
+
 pub mod arena;
+mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
@@ -16,6 +18,9 @@ pub mod utils;
 pub mod prelude {
 	pub use crate::abs_file;
 	pub use crate::arena::*;
+	pub use crate::bevy_utils::*;
+	pub use crate::bevybail;
+	pub use crate::bevyhow;
 	pub use crate::dir;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

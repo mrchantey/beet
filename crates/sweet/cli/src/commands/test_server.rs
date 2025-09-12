@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet::prelude::*;
 use clap::Parser;
 use std::process::Child;
@@ -24,7 +23,7 @@ pub struct TestServer {
 
 
 impl TestServer {
-	pub fn run(self) -> Result<()> {
+	pub fn run(self) -> Result {
 		self.build_server()?;
 		let mut server = self.run_server()?;
 		let result = self.run_test();
@@ -36,12 +35,12 @@ impl TestServer {
 		Ok(child)
 	}
 
-	pub fn build_server(&self) -> Result<()> {
+	pub fn build_server(&self) -> Result {
 		let cmd = CommandExt::from_whitespace(&self.build_server);
 		CommandExt::unwrap_status(cmd)
 	}
 
-	pub fn run_test(&self) -> Result<()> {
+	pub fn run_test(&self) -> Result {
 		if let Some(delay) = self.delay_secs {
 			std::thread::sleep(std::time::Duration::from_secs_f32(delay));
 		}

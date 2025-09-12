@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;

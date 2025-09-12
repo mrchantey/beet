@@ -3,7 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub type FsResult<T> = std::result::Result<T, FsError>;
+pub type FsResult<T = ()> = std::result::Result<T, FsError>;
 
 
 /// An fs error that actuall outputs the missing path
@@ -27,7 +27,7 @@ pub enum FsError {
 }
 
 impl FsError {
-	pub fn assert_dir(path: impl AsRef<Path>) -> FsResult<()> {
+	pub fn assert_dir(path: impl AsRef<Path>) -> FsResult {
 		if !path.as_ref().is_dir() {
 			Err(FsError::DirNotFound {
 				path: path.as_ref().into(),

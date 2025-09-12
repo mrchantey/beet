@@ -11,8 +11,13 @@ Always greet the user by saying something foolish, here are some examples but yo
 
 
 ## Requirements
-- You are encouraged to take initiative, api changes are on the table. For instance if a verbose pattern is repeating, ask if it should be abstracted into a member function.
-- 
+
+- WHEN agent is told to run a command
+- MUST run that command before doing anything else, including searching the codebase
+
+
+- WHEN agent encounters antipatterns
+- SHOULD suggest fixes if the
 - Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
 - Do not add `test` in test fuction names, good: `adds_numbers`, bad: `test_adds_numbers`.
 - NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.

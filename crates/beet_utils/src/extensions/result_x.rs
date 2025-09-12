@@ -29,15 +29,3 @@ pub impl<T, E: std::fmt::Display> Result<T, E> {
 		}
 	}
 }
-
-
-// #[ext(name =ResultExtEDebug)]
-// pub impl<T, E: std::fmt::Debug> Result<T, E> {
-// 	/// Map a `Result<T,E:Debug>` to an [`anyhow::Result`].
-// 	fn anyhow(self) -> anyhow::Result<T> {
-// 		match self {
-// 			Ok(v) => Ok(v),
-// 			Err(e) => Err(anyhow::anyhow!("{:?}", e)),
-// 		}
-// 	}
-// }

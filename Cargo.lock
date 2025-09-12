@@ -1633,7 +1633,6 @@ dependencies = [
 name = "beet_utils"
 version = "0.0.7-dev.8"
 dependencies = [
- "anyhow",
  "beet_utils",
  "bevy",
  "clap",
@@ -9379,7 +9378,6 @@ dependencies = [
 name = "sweet-cli"
 version = "0.0.7-dev.8"
 dependencies = [
- "anyhow",
  "beet",
  "clap",
  "prettyplease",

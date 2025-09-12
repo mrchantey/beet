@@ -1,15 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#[cfg(not(target_arch = "wasm32"))]
 use beet_rsx::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
-use beet_utils::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
 use bevy::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
 use sweet::prelude::*;
 
-#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn rsx_combinator() {
 	let (get, set) = signal(String::new());

@@ -1,6 +1,6 @@
 use crate::prelude::NodeExpr;
-use beet_core::prelude::*;
 use beet_dom::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;

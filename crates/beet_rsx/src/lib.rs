@@ -13,6 +13,7 @@ pub mod wasm;
 #[rustfmt::skip]
 pub mod prelude {
 	pub use beet_rsx_macros::*;
+	pub use beet_utils::prelude::*;
 	pub use crate::apply_snippets::*;
 	pub use crate::reactivity::*;
 	pub use crate::templating::*;

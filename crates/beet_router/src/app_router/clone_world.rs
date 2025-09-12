@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::TypeRegistryArc;

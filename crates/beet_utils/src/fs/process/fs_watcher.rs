@@ -1,9 +1,12 @@
 use crate::prelude::*;
-use anyhow::Result;
+use bevy::prelude::*;
 use clap::Parser;
+use notify::EventKind;
+#[cfg(not(target_arch = "wasm32"))]
+use notify::INotifyWatcher;
+use notify::RecursiveMode;
 use notify::event::CreateKind;
 use notify::event::RemoveKind;
-use notify::*;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::Debouncer;
 use notify_debouncer_full::NoCache;
@@ -68,12 +71,12 @@ impl FsWatcher {
 
 	/// It is not valid to watch an empty path, it
 	/// will never be triggered!
-	pub fn assert_path_exists(&self) -> Result<()> {
+	pub fn assert_path_exists(&self) -> Result {
 		if self.cwd.exists() == false {
-			Err(anyhow::anyhow!(
+			bevybail!(
 				"Path does not exist: {}\nOnly existing paths can be watched",
 				self.cwd.display()
-			))
+			)
 		} else {
 			Ok(())
 		}
@@ -85,7 +88,7 @@ impl FsWatcher {
 	/// ## Example
 	/// ```rust no_run
 	/// # use beet_utils::prelude::*;
-	/// # async fn foo()->anyhow::Result<()> {
+	/// # async fn foo()->anyhow::Result {
 	///
 	/// let mut rx = FsWatcher::default().watch()?;
 	/// while let Some(events) = rx.recv().await? {
@@ -170,7 +173,7 @@ impl std::fmt::Display for WatchEvent {
 	}
 }
 
-pub type WatchEventResult = Result<WatchEventVec, Vec<Error>>;
+pub type WatchEventResult = Result<WatchEventVec, Vec<notify::Error>>;
 
 /// Wrapper for debounced events,
 /// queries are match
@@ -188,7 +191,7 @@ impl WatchEventVec {
 		let events = match events {
 			Ok(events) => events,
 			Err(errors) => {
-				anyhow::bail!("Watch event contains errors: {:?}", errors)
+				bevybail!("Watch event contains errors: {:?}", errors)
 			}
 		};
 
@@ -306,14 +309,14 @@ impl WatchEventVec {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_utils::prelude::FsExt;
+	use bevy::prelude::*;
 	use notify::EventKind;
 	use notify::event::CreateKind;
 	use tempfile::tempdir;
 
 	#[tokio::test]
-	async fn works() -> Result<()> {
+	async fn works() -> Result {
 		let tmp_dir = tempdir()?;
 		let mut rx = FsWatcher {
 			cwd: tmp_dir.path().to_path_buf(),

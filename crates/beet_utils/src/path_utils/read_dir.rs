@@ -181,7 +181,7 @@ impl ReadDir {
 		&self,
 		file_or_dir: impl AsRef<Path>,
 		paths: &mut Vec<PathBuf>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		let path = file_or_dir.as_ref();
 		if path.is_file() {
 			if self.files {
@@ -233,7 +233,7 @@ impl ReadDir {
 		&self,
 		file_or_dir: impl AsRef<Path>,
 		paths: &mut Vec<PathBuf>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		use tokio::fs;
 
 		let root = file_or_dir.as_ref().to_path_buf();

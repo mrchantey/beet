@@ -51,7 +51,7 @@ pub impl Value {
 			.ok_or_else(|| format!("Expected object, got {:?}", self).into())
 	}
 	/// checks for null with helpful error message
-	fn to_null(&self) -> Result<()> {
+	fn to_null(&self) -> Result {
 		self.is_null()
 			.then(|| ())
 			.ok_or_else(|| format!("Expected null, got {:?}", self).into())
@@ -152,7 +152,7 @@ pub impl Value {
 
 	/// Get a field as null, returning a helpful error message if it is
 	/// missing or of a different type.
-	fn field_null(&self, field_name: &str) -> Result<()> {
+	fn field_null(&self, field_name: &str) -> Result {
 		let field = &self[field_name];
 		field
 					.is_null()

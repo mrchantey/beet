@@ -132,7 +132,6 @@ mod test {
 	use beet_core::prelude::WorldMutExt;
 	use beet_dom::prelude::*;
 	use beet_rsx::prelude::*;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -236,9 +235,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BuildPlugin::default());
 
-		let index_path = WsPathBuf::new(
-			"tests/test_site/pages/docs/index.rs",
-		);
+		let index_path = WsPathBuf::new("tests/test_site/pages/docs/index.rs");
 		let mut query = app
 			.world_mut()
 			.query_filtered::<(), Changed<FileExprHash>>();

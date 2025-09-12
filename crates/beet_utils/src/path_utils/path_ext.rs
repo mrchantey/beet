@@ -27,7 +27,7 @@ impl PathExt {
 	}
 
 	/// Check if a path exists, returning an error if it does not.
-	pub fn assert_exists(path: impl AsRef<Path>) -> FsResult<()> {
+	pub fn assert_exists(path: impl AsRef<Path>) -> FsResult {
 		let path = path.as_ref();
 		if !path.exists() {
 			return Err(FsError::FileNotFound {

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet::prelude::*;
 use clap::Parser;
 
@@ -9,7 +8,7 @@ pub struct CargoTest {
 	cargo_runner: CargoCmdExtra,
 }
 impl CargoTest {
-	pub async fn run(mut self) -> Result<()> {
+	pub async fn run(mut self) -> Result {
 		self.cargo_runner.build_cmd.cmd = "test".to_string();
 		self.cargo_runner.run().await?;
 		Ok(())
@@ -23,7 +22,7 @@ pub struct CargoRun {
 	cargo_runner: CargoCmdExtra,
 }
 impl CargoRun {
-	pub async fn run(mut self) -> Result<()> {
+	pub async fn run(mut self) -> Result {
 		self.cargo_runner.build_cmd.cmd = "run".to_string();
 		self.cargo_runner.run().await?;
 		Ok(())
@@ -49,7 +48,7 @@ pub struct CargoCmdExtra {
 
 
 impl CargoCmdExtra {
-	pub async fn run(mut self) -> Result<()> {
+	pub async fn run(mut self) -> Result {
 		self.append_args();
 		self.run_binary()?;
 		if self.watch {
@@ -81,7 +80,7 @@ impl CargoCmdExtra {
 	// --exclude '{.git,target,html}/**' \
 	// --exclude '*/codegen/*' \
 
-	async fn watch(self) -> Result<()> {
+	async fn watch(self) -> Result {
 		let mut rx = FsWatcher {
 			filter: self.filter.clone(),
 			..Default::default()
@@ -101,7 +100,7 @@ impl CargoCmdExtra {
 	/// run the binary:
 	/// ## Errors
 	/// Errors if not in watch mode and the command fails
-	fn run_binary(&self) -> Result<()> {
+	fn run_binary(&self) -> Result {
 		if self.watch {
 			terminal::clear()?;
 			println!("\n🤘 sweet as 🤘\n");

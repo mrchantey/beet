@@ -34,7 +34,7 @@ impl FsExt {
 	pub fn copy_recursive(
 		source: impl AsRef<Path>,
 		destination: impl AsRef<Path>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		let source = source.as_ref();
 		let destination = destination.as_ref();
 
@@ -52,7 +52,7 @@ impl FsExt {
 	}
 
 	/// remove a directory and all its contents
-	pub fn remove(path: impl AsRef<Path>) -> FsResult<()> {
+	pub fn remove(path: impl AsRef<Path>) -> FsResult {
 		let path = path.as_ref();
 		fs::remove_dir_all(path).map_err(|err| FsError::io(path, err))?;
 		Ok(())
@@ -60,7 +60,7 @@ impl FsExt {
 
 	/// Async: remove a directory and all its contents
 	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult<()> {
+	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 		let path = path.as_ref();
 		tokio::fs::remove_dir_all(path)
 			.await
@@ -125,7 +125,7 @@ impl FsExt {
 	pub fn write(
 		path: impl AsRef<Path>,
 		data: impl AsRef<[u8]>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)
@@ -140,7 +140,7 @@ impl FsExt {
 	pub async fn write_async(
 		path: impl AsRef<Path>,
 		data: impl AsRef<[u8]>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		use tokio::fs;
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
@@ -159,7 +159,7 @@ impl FsExt {
 	pub fn write_if_diff(
 		path: impl AsRef<Path>,
 		data: impl AsRef<[u8]>,
-	) -> FsResult<()> {
+	) -> FsResult {
 		let path = path.as_ref();
 		match fs::read(path) {
 			Ok(existing_data) if existing_data == data.as_ref() => {

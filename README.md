@@ -72,7 +72,7 @@ world.spawn((
 
 ## Web
 
-Crates for building and deploying web apps.
+Crates for building and deploying web apps. At this stage it is only recommended to develop locally by cloning this repo. See [Contributing] (crates/beet_site/src/docs/contributing.md) for more details.
 
 
 ```rust

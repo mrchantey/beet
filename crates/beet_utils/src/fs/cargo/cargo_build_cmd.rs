@@ -1,4 +1,3 @@
-use anyhow::Result;
 use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;

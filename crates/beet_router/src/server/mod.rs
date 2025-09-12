@@ -121,7 +121,7 @@ impl Server {
 			}
 			#[cfg(not(feature = "rustls-tls"))]
 			{
-				beet_core::bevybail!(
+				bevybail!(
 					"secure mode is not enabled, please enable the 'rustls-tls' feature"
 				)
 			}

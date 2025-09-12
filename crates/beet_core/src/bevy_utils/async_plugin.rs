@@ -378,10 +378,9 @@ impl AsyncEntity {
 
 #[cfg(test)]
 mod tests {
-	use crate::prelude::AppExitExt;
-
 	use super::*;
-	use beet_utils::time_ext;
+	use crate::prelude::AppExitExt;
+	use beet_utils::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
 
@@ -461,8 +460,6 @@ mod tests {
 	}
 	#[sweet::test]
 	async fn results() {
-		use crate::bevybail;
-
 		let mut app = App::new();
 		app.init_resource::<Count>()
 			.add_plugins((MinimalPlugins, AsyncPlugin));
