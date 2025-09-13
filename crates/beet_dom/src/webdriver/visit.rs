@@ -11,26 +11,6 @@ pub enum RunTestsMode {
 	Headed,
 }
 
-pub const DEFAULT_WEBDRIVER_PORT: u16 = 4444;
-
-pub struct VisitOptions {
-	/// Sometimes webdriver takes a moment to start up,
-	/// we will retry until it is available
-	pub timeout: Duration,
-	pub headless: bool,
-	/// The port for the webdriver process
-	pub webdriver_port: u16,
-}
-impl Default for VisitOptions {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(5),
-			headless: true,
-			webdriver_port: DEFAULT_WEBDRIVER_PORT,
-		}
-	}
-}
-
 /// Serves the axum router on a port incremented from {DEFAULT_WEBDRIVER_PORT}
 /// so test routers can be served concurrently. The port is then used
 /// to prepend the provided path, so `/foo` becomes `http://127.0.0.1:4445/foo`
@@ -59,7 +39,7 @@ pub async fn serve_and_visit(
 /// - If the webdriver is not running
 /// - If the page cannot be reached
 pub async fn visit(url: &str) -> Page {
-	match visit_with_opts(url, VisitOptions::default()).await {
+	match visit_with_opts(url, ConnectOptions::default()).await {
 		Ok(page) => page,
 		Err(err) => {
 			eprintln!(
@@ -81,7 +61,7 @@ Please ensure the --e2e flag was passed to the test:
 /// ## Panics
 /// - If the webdriver is not running
 /// - If the page cannot be reached
-pub async fn visit_with_opts(url: &str, opts: VisitOptions) -> Result<Page> {
+pub async fn visit_with_opts(url: &str, opts: ConnectOptions) -> Result<Page> {
 	let client = async_ext::retry(
 		async || -> Result<Client> {
 			let headless_args = if opts.headless {

@@ -62,7 +62,9 @@ impl Socket {
 	}
 
 	/// Gracefully close the connection with an optional close frame.
-	pub async fn close(mut self, close: Option<CloseFrame>) -> Result<()> {
+	/// For convenience this does not take the socket, but it should
+	/// not be used afterward.
+	pub async fn close(&mut self, close: Option<CloseFrame>) -> Result<()> {
 		self.writer.close_boxed(close).await
 	}
 
@@ -296,7 +298,7 @@ mod tests {
 	async fn closing_records_reason() {
 		let incoming = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
-		let socket = Socket::new(incoming, Box::new(writer));
+		let mut socket = Socket::new(incoming, Box::new(writer));
 
 		let frame = CloseFrame {
 			code: 1000,

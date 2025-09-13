@@ -1,4 +1,4 @@
-mod dev_tools_connection;
-pub use dev_tools_connection::*;
+mod client;
+pub use client::*;
 mod page;
 pub use page::*;

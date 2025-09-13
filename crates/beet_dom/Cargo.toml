@@ -18,7 +18,7 @@ client = []
 nightly = ["beet_core/nightly"]
 tokens = ["beet_core/tokens"]
 bevy_text = ["bevy/bevy_text"]
-tokio = ["dep:tokio"]
+tokio = ["dep:tokio","beet_core/tokio"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 rustls-tls = ["fantoccini?/rustls-tls"]
 serde = [
@@ -28,7 +28,7 @@ serde = [
 	"beet_core/serde",
 ]
 chrome_dev_tools = ["tokio","beet_net/tungstenite"]
-webdriver = ["dep:fantoccini"]
+webdriver = ["tokio","dep:fantoccini"]
 
 [dependencies]
 beet_core.workspace = true
@@ -38,7 +38,8 @@ bevy.workspace = true
 
 extend.workspace = true
 send_wrapper.workspace = true
-tokio = { workspace = true, optional = true }
+bytes.workspace = true
+tokio = { workspace = true, optional = true,features=["process","fs"] }
 
 # serde
 serde = { workspace = true, optional = true }

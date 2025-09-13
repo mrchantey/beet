@@ -7,15 +7,15 @@ mod node;
 mod utils;
 
 #[cfg(all(feature = "chrome_dev_tools", not(target_arch = "wasm32")))]
-mod dev_tools;
-// #[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
-// mod webdriver;
+pub mod dev_tools;
+#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
+pub mod webdriver;
 
 pub mod prelude {
 	#[cfg(all(feature = "chrome_dev_tools", not(target_arch = "wasm32")))]
 	pub use crate::dev_tools::*;
-	// #[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
-	// pub use crate::webdriver::*;
+	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
+	pub use crate::webdriver::*;
 
 	pub use crate::dom::*;
 	pub use crate::node::*;

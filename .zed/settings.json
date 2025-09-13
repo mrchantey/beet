@@ -9,13 +9,14 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
-						"server",
-						"client",
-						"launch",
-						"lambda",
-						"chrome_dev_tools",
-						"css",
-						"aws"
+						// "server",
+						// "client",
+						// "launch",
+						// "lambda",
+						"webdriver"
+						// "chrome_dev_tools",
+						// "css",
+						// "aws"
 					]
 				}
 			}

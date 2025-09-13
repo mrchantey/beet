@@ -3,6 +3,8 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+
+// #[deprecated = "use web_time"]
 #[derive(Debug, Clone, Copy)]
 pub struct CrossInstant {
 	#[cfg(target_arch = "wasm32")]

@@ -1,63 +1,58 @@
-use crate::prelude::*;
+use crate::dom::PageProvider;
+use base64::prelude::*;
+use beet_core::bevybail;
+use beet_core::utils::SendBoxedFuture;
 use bevy::prelude::*;
-use fantoccini::Client;
 
 
-#[derive(Debug, Deref, DerefMut)]
-pub struct Page {
-	pub client: Client,
+
+
+pub struct WebdriverPage {
+	client: fantoccini::Client,
+}
+impl WebdriverPage {
+	pub fn new(client: fantoccini::Client) -> Self { Self { client } }
 }
 
-impl Page {
-	/// create a new page
-	pub fn new(client: Client) -> Self { Self { client } }
-	/// Await the closure of the page, this will be triggered
-	/// automatically when the page is dropped
-	pub async fn close(self) { self.client.close().await.unwrap(); }
-}
-
-
-impl AsRef<Page> for Page {
-	fn as_ref(&self) -> &Page { self }
-}
-
-impl<T: AsRef<Page>> Matcher<T> {
-	/// Assert that the page has the given URL.
-	/// Webdriver often appends a trailing slash so this will be removed if it is present
-	pub async fn to_have_url(&self, url: &str) {
-		let value = self.value.as_ref();
-		let mut received = value
-			.client
-			.current_url()
-			.await
-			.unwrap()
-			.as_str()
-			.to_string();
-		if received.ends_with('/') {
-			received.pop();
-		}
-		self.assert_correct_with_received(
-			received == url,
-			&format!("to be '{}'", url),
-			&received.as_str(),
-		);
+impl PageProvider for WebdriverPage {
+	fn visit(&self, url: &str) -> SendBoxedFuture<Result> {
+		let client = self.client.clone();
+		let url = url.to_string();
+		Box::pin(async move {
+			client.goto(&url).await?;
+			Ok(())
+		})
 	}
-}
 
 
 
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
+	fn export_pdf(&self) -> SendBoxedFuture<Result<bytes::Bytes>> {
+		let client = self.client.clone();
+		Box::pin(async move {
+			let response = client
+				.execute(
+					"return (async function() {
+						const pdf = await window.print();
+						return pdf;
+					})()",
+					vec![],
+				)
+				.await?;
 
-	#[crate::test]
-	async fn works() {
-		visit("https://example.com")
-			.await
-			.xpect_url("https://example.com")
-			.await
-			.xnot()
-			.xpect_url("https://foobar.com")
-			.await;
+			if let Some(data) = response.as_str() {
+				let pdf_bytes = match BASE64_STANDARD.decode(data) {
+					Ok(bytes) => bytes,
+					Err(e) => bevybail!("Base64 decode error: {}", e),
+				};
+				Ok(pdf_bytes.into())
+			} else {
+				bevybail!("No PDF data in response")
+			}
+		})
+	}
+
+	fn current_url(&self) -> SendBoxedFuture<Result<String>> {
+		let client = self.client.clone();
+		Box::pin(async move { Ok(client.current_url().await?.to_string()) })
 	}
 }
