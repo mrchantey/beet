@@ -52,7 +52,7 @@ impl Page {
 
 	/// Spawn a default (chromium) driver process, create a session,
 	/// navigate to `url` and return both process + page.
-	#[cfg(all(feature = "tokio", feature = "webdriver"))]
+	#[cfg(feature = "tokio")]
 	pub async fn visit(url: &str) -> Result<(ClientProcess, Self)> {
 		let process = ClientProcess::new()?;
 		let session = process.new_session().await?;
@@ -106,7 +106,7 @@ impl Page {
 	}
 
 	/// Get current page URL (string convenience wrapper).
-	pub async fn get_current_url(&self) -> Result<String> {
+	pub async fn current_url(&self) -> Result<String> {
 		self.evaluate("location.href")
 			.await?
 			.pointer("/result/result/value")
@@ -122,11 +122,10 @@ impl Page {
 		Err(bevyhow!("export_pdf not yet implemented"))
 	}
 
-	/// Query a single element. Currently returns a stub `Element`
-	/// (no object id tracking yet). Returns `Ok(None)` if not found.
-	///
-	/// Future: augment `Element` to store the BiDi remote object / handle
-	/// id, validate liveness, and lazily recover if discarded.
+	/// Query a single element. Returns `Ok(None)` if no match.
+	/// When an element is found we extract its BiDi remote handle
+	/// (handle/sharedId) so subsequent operations can target it
+	/// without re‑querying.
 	pub async fn query_selector(
 		&self,
 		selector: &str,
@@ -137,18 +136,28 @@ impl Page {
 			.pointer("/result/result/type")
 			.and_then(|v| v.as_str())
 			.unwrap_or("undefined");
-		if ty == "null" {
+		if ty == "null" || ty == "undefined" {
 			return Ok(None);
 		}
-		Ok(Some(Element {}))
+		if let Some(el) =
+			Element::from_bidi_response(&self.session, &self.context_id, &resp)
+		{
+			Ok(Some(el))
+		} else {
+			Err(bevyhow!(
+				"query_selector: element present but missing BiDi handle/sharedId"
+			))
+		}
 	}
 
 	pub async fn kill(self) -> Result<()> { self.session.kill().await }
 }
 
-#[cfg(all(test, feature = "tokio", feature = "webdriver"))]
+#[cfg(test)]
+#[cfg(feature = "tokio")]
 mod test {
-	use super::*;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -158,7 +167,7 @@ mod test {
 			.run_io_task(async move {
 				let (proc, page) =
 					Page::visit("https://example.com").await.unwrap();
-				page.get_current_url()
+				page.current_url()
 					.await
 					.unwrap()
 					.xpect_eq("https://example.com/");

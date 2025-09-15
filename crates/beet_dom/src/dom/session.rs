@@ -287,7 +287,8 @@ impl Session {
 	}
 }
 
-#[cfg(all(test, feature = "tokio", feature = "webdriver"))]
+#[cfg(test)]
+#[cfg(feature = "tokio")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
