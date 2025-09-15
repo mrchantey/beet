@@ -55,4 +55,16 @@ impl PageProvider for WebdriverPage {
 		let client = self.client.clone();
 		Box::pin(async move { Ok(client.current_url().await?.to_string()) })
 	}
+
+	fn eval_async(
+		&self,
+		_script: &str,
+		_args: Vec<serde_json::Value>,
+	) -> SendBoxedFuture<Result<serde_json::Value>> {
+		let _client = self.client.clone();
+		Box::pin(async move {
+			unimplemented!()
+			//Ok(client.execute_async(script, args))
+		})
+	}
 }

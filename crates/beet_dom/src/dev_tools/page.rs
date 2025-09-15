@@ -46,6 +46,8 @@ impl PageProvider for DevToolsPage {
 		})
 	}
 
+
+
 	fn export_pdf(&self) -> SendBoxedFuture<Result<Bytes>> {
 		// how to wait for full page load?
 		let client = self.client.clone();
@@ -74,6 +76,40 @@ impl PageProvider for DevToolsPage {
 				Ok(pdf_bytes.into())
 			} else {
 				bevybail!("No PDF data in response")
+			}
+		})
+	}
+
+	fn eval_async(
+		&self,
+		script: &str,
+		args: Vec<serde_json::Value>,
+	) -> SendBoxedFuture<Result<serde_json::Value>> {
+		let client = self.client.clone();
+		let func_args: Vec<serde_json::Value> =
+			args.into_iter().map(|a| json!({ "value": a })).collect();
+
+		let params = json!({
+			"method": "Runtime.callFunctionOn",
+			"params": {
+				"functionDeclaration": script,
+				"arguments": func_args,
+				"awaitPromise": true,
+				"returnByValue": true
+			}
+		});
+
+		Box::pin(async move {
+			let response = client.send(params).await?;
+
+			// Try to return the value returned by the function (when returned by value)
+			if response["result"]["result"].get("value").is_some() {
+				Ok(response["result"]["result"]["value"].clone())
+			} else if response["result"]["result"].is_object() {
+				// Fallback: return the whole result object
+				Ok(response["result"]["result"].clone())
+			} else {
+				bevybail!("No value in Runtime.callFunctionOn response")
 			}
 		})
 	}

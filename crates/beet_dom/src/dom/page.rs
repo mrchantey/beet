@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
+use serde_json::Value;
 
 pub struct Page {
 	provider: Box<dyn PageProvider>,
@@ -36,6 +37,13 @@ impl Page {
 pub trait PageProvider: 'static + Send + Sync {
 	fn visit(&self, url: &str) -> SendBoxedFuture<Result<()>>;
 	fn current_url(&self) -> SendBoxedFuture<Result<String>>;
+
+	/// Evaluate arbitary javascript, serializing the returned json script
+	fn eval_async(
+		&self,
+		script: &str,
+		args: Vec<Value>,
+	) -> SendBoxedFuture<Result<Value>>;
 
 	fn export_pdf(&self) -> SendBoxedFuture<Result<Bytes>>;
 }
