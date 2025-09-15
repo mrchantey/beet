@@ -1,8 +1,10 @@
 use crate::prelude::NonSendPlugin;
+use crate::time_ext;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
+use bevy::tasks::IoTaskPool;
 
 #[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]
@@ -60,6 +62,25 @@ pub impl App {
 		self.init();
 		self.update();
 		self.should_exit().unwrap_or(AppExit::Success)
+	}
+	/// run an io task to completion, polling at 10 millisecond intervals
+	async fn run_io_task<F, O>(&mut self, fut: F) -> O
+	where
+		F: Future<Output = O> + 'static,
+		O: 'static,
+	{
+		self.init_plugin(TaskPoolPlugin::default());
+		// spin up async task pool
+		self.run_once();
+		let task = IoTaskPool::get().spawn(fut);
+
+		while !task.is_finished() {
+			self.update();
+			time_ext::sleep_millis(10).await;
+		}
+		// only await task when its ready, app must update
+		// to poll futures
+		task.await
 	}
 
 	/// Call this on custom runners before update

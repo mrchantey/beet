@@ -11,7 +11,7 @@ impl Default for Backoff {
 		Self {
 			max_attempts: 3,
 			min: Duration::from_millis(100),
-			max: Duration::from_secs(10),
+			max: Duration::from_secs(4),
 			factor: 2,
 			#[cfg(feature = "rand")]
 			jitter: 0.3,

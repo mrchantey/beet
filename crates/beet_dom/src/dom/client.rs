@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
+use std::time::Duration;
 #[cfg(feature = "tokio")]
 use tokio::process::Child;
 #[cfg(feature = "tokio")]
@@ -138,7 +139,8 @@ impl Client {
 		};
 
 		let res = Backoff::default()
-			.with_max_attempts(20)
+			.with_max_attempts(10)
+			.with_max(Duration::from_secs(1))
 			.retry_async(async |_| {
 				Request::post(self.url("session"))
 					.with_json_body(&body)?
@@ -203,6 +205,7 @@ impl ClientProcess {
 		];
 		Command::new("nix-shell")
 			.args(&["-p", "chromium", "chromedriver", "--run", &run.join(" ")])
+			.kill_on_drop(true)
 			.spawn()?
 			.xok()
 	}
@@ -223,6 +226,7 @@ impl ClientProcess {
 
 		Command::new("nix-shell")
 			.args(&["-p", "firefox", "geckodriver", "--run", &run.join(" ")])
+			.kill_on_drop(true)
 			.spawn()?
 			.xok()
 	}

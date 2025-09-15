@@ -210,106 +210,95 @@ impl Session {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::app::TaskPoolPlugin;
-	use bevy::tasks::IoTaskPool;
+	use bevy::prelude::*;
 	use serde_json::json;
 	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
-		use bevy::app::App;
-		let mut app = App::new();
-		app.add_plugins(TaskPoolPlugin::default());
-		// spin up async task pool
-		app.run_once();
-		let client = Client::chromium();
-		let client = ClientProcess::new_with_opts(client.clone()).unwrap();
-		let session = client.new_session().await.unwrap();
+		App::default()
+			.run_io_task(async move {
+				let client = Client::chromium();
+				let client =
+					ClientProcess::new_with_opts(client.clone()).unwrap();
+				let session = client.new_session().await.unwrap();
+				// 1. Get browsing contexts
+				let tree = session
+					.command("browsingContext.getTree", json!({"maxDepth": 0}))
+					.await
+					.unwrap();
 
+				let contexts = tree["result"]["contexts"]
+					.as_array()
+					.expect("contexts array missing");
+				contexts.is_empty().xmap(|b| !b).xpect_true();
+				let context_id = contexts[0]["context"]
+					.as_str()
+					.expect("context id missing");
 
-		let task = IoTaskPool::get().spawn(async move {
-			// 1. Get browsing contexts
-			let tree = session
-				.command("browsingContext.getTree", json!({"maxDepth": 0}))
-				.await
-				.unwrap();
+				// 2. Navigate
+				session
+					.command(
+						"browsingContext.navigate",
+						json!({
+							"context": context_id,
+							"url": "https://example.com",
+							"wait": "complete"
+						}),
+					)
+					.await
+					.unwrap();
 
-			println!("command complete");
+				// 3. Evaluate heading text
+				session
+					.command(
+						"script.evaluate",
+						json!({
+							"expression": "document.querySelector('h1')?.textContent",
+							"target": { "context": context_id },
+							"awaitPromise": true,
+							"resultOwnership": "root"
+						}),
+					)
+					.await
+					.unwrap()["result"]["result"]["value"]
+					.as_str()
+					.unwrap()
+					.xpect_eq("Example Domain");
 
-			let contexts = tree["result"]["contexts"]
-				.as_array()
-				.expect("contexts array missing");
-			contexts.is_empty().xmap(|b| !b).xpect_true();
-			let context_id =
-				contexts[0]["context"].as_str().expect("context id missing");
+				// 4. Click anchor
+				session
+					.command(
+						"script.evaluate",
+						json!({
+							"expression": "document.querySelector('a')?.click(); 'clicked';",
+							"target": { "context": context_id },
+							"awaitPromise": true
+						}),
+					)
+					.await
+					.unwrap();
 
-			// 2. Navigate
-			session
-				.command(
-					"browsingContext.navigate",
-					json!({
-						"context": context_id,
-						"url": "https://example.com",
-						"wait": "complete"
-					}),
-				)
-				.await
-				.unwrap();
+				// 5. Query current URL (navigation may or may not change depending on driver timing)
+				session
+					.command(
+						"script.evaluate",
+						json!({
+							"expression": "location.href",
+							"target": { "context": context_id },
+							"awaitPromise": true
+						}),
+					)
+					.await
+					.unwrap()["result"]["result"]["value"]
+					.as_str()
+					.unwrap()
+					.xpect_eq("https://www.iana.org/help/example-domains");
 
-			// 3. Evaluate heading text
-			session
-				.command(
-					"script.evaluate",
-					json!({
-						"expression": "document.querySelector('h1')?.textContent",
-						"target": { "context": context_id },
-						"awaitPromise": true,
-						"resultOwnership": "root"
-					}),
-				)
-				.await
-				.unwrap()["result"]["result"]["value"]
-				.as_str()
-				.unwrap()
-				.xpect_eq("Example Domain");
-
-			// 4. Click anchor
-			session
-				.command(
-					"script.evaluate",
-					json!({
-						"expression": "document.querySelector('a')?.click(); 'clicked';",
-						"target": { "context": context_id },
-						"awaitPromise": true
-					}),
-				)
-				.await
-				.unwrap();
-
-			// 5. Query current URL (navigation may or may not change depending on driver timing)
-			session
-				.command(
-					"script.evaluate",
-					json!({
-						"expression": "location.href",
-						"target": { "context": context_id },
-						"awaitPromise": true
-					}),
-				)
-				.await
-				.unwrap()["result"]["result"]["value"]
-				.as_str()
-				.unwrap()
-				.xpect_eq("https://www.iana.org/help/example-domains");
-
-			// Cleanup
-			session.kill().await.unwrap();
-			client.kill().await.unwrap();
-		});
-
-		while !task.is_finished() {
-			app.run_once();
-			time_ext::sleep_millis(10).await;
-		}
+				// Cleanup
+				session.kill().await.unwrap();
+				client.kill().await.unwrap();
+			})
+			.await;
 	}
 }
