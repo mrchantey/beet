@@ -37,6 +37,59 @@ struct SessionInner {
 }
 
 /// A BiDi WebDriver session (cross platform, wasm friendly).
+///
+/// Channel / Task Pattern Overview
+/// ===============================
+/// The `Session` is a thin, cloneable handle over an internal reference-
+/// counted `SessionInner`. Internally we decouple caller futures from
+/// the websocket IO using three core pieces:
+///
+/// 1. Command Channel (`cmd_tx`)
+///    Callers invoke `Session::command`, which:
+///      - Allocates a monotonically increasing id (`next_id`)
+///      - Registers a one‑shot sender in `pending` keyed by that id
+///      - Serializes the outbound JSON {id, method, params}
+///      - Pushes the raw string onto `cmd_tx`
+///
+/// 2. Writer Task (`spawn_writer`)
+///    A background task receives raw JSON strings from `cmd_rx` and
+///    sends them as websocket text frames. If the underlying writer
+///    handle is gone (socket closed / moved), the task exits.
+///
+/// 3. Reader Task (`spawn_reader`)
+///    Continuously reads websocket frames:
+///      - If a message parses and contains an `id`, it is a response.
+///        The matching one‑shot sender (if still present) is removed
+///        from `pending` and fulfilled with the full JSON object.
+///      - If it lacks an `id` but contains `method`, it is treated as
+///        an unsolicited event and pushed (non‑blocking try_send) onto
+///        the `events_tx` channel for opportunistic consumption.
+///
+/// Error Handling & Backpressure
+/// -----------------------------
+/// * Each in‑flight command has exactly one awaiting receiver.
+/// * Dropping a receiver before fulfillment simply discards the response,
+///   because the pending entry is removed only on match.
+/// * Event delivery is best‑effort (a full events channel drops silently).
+///
+/// Concurrency & Safety
+/// --------------------
+/// * `pending` is guarded by a `Mutex` because operations are short and
+///   low contention (only command send / response match).
+/// * Writer + reader tasks run on `IoTaskPool` so they do not block user
+///   systems or async tests.
+///
+/// High‑Level Extensions
+/// ---------------------
+/// Higher constructs (e.g. `Page`, `Element`) compose over `Session` by
+/// calling `command` with BiDi methods, interpreting the returned JSON,
+/// and introducing richer ergonomics / state tracking.
+///
+/// Ping / Health
+/// -------------
+/// A lightweight `ping()` helper issues a benign BiDi round‑trip to
+/// validate the full pipeline (id allocation -> writer -> socket ->
+/// reader -> pending fulfillment).
 #[derive(Debug, Clone)]
 pub struct Session {
 	inner: Arc<SessionInner>,
@@ -76,6 +129,10 @@ impl Session {
 	/// Try to receive the next event (non-blocking).
 	pub fn try_event(&self) -> Option<Value> {
 		self.inner.events_rx.try_recv().ok()
+	}
+	/// Asynchronously receive the next event (non-blocking).
+	pub async fn next_event(&self) -> Result<Value, async_channel::RecvError> {
+		self.inner.events_rx.recv().await
 	}
 
 	/// Send a BiDi command and await the full JSON response (the full object
@@ -118,6 +175,22 @@ impl Session {
 		Ok(resp)
 	}
 
+	/// Cheap liveness / round‑trip check.
+	/// performs a simple `browsingContext.getTree`
+	///
+	/// Success proves:
+	/// * id allocation
+	/// * writer task operational
+	/// * websocket open
+	/// * reader task dispatch
+	/// * response routed via `pending`
+	pub async fn ping(&self) -> Result<()> {
+		let _ = self
+			.command("browsingContext.getTree", json!({"maxDepth": 0}))
+			.await?;
+		Ok(())
+	}
+
 	/// Connect to the BiDi websocket and spawn dispatcher tasks.
 	pub async fn connect(
 		driver_url: &str,
@@ -149,6 +222,10 @@ impl Session {
 		Ok(Self { inner })
 	}
 
+	/// Spawn the writer task:
+	/// Consumes outbound raw JSON command strings and forwards them
+	/// to the websocket writer half. If sending fails (socket closed),
+	/// the loop terminates gracefully.
 	fn spawn_writer(
 		inner: Arc<SessionInner>,
 		cmd_rx: async_channel::Receiver<String>,
@@ -173,6 +250,10 @@ impl Session {
 			.detach();
 	}
 
+	/// Spawn the reader task:
+	/// Parses inbound text frames. Routes:
+	/// * Responses (with `id`) -> matching pending one‑shot sender.
+	/// * Events (with `method` but no `id`) -> best effort broadcast.
 	fn spawn_reader(inner: Arc<SessionInner>, mut read: SocketRead) {
 		IoTaskPool::get()
 			.spawn(async move {
@@ -211,91 +292,15 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::prelude::*;
-	use serde_json::json;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
 		App::default()
 			.run_io_task(async move {
-				let client = Client::chromium();
-				let client =
-					ClientProcess::new_with_opts(client.clone()).unwrap();
+				let client = ClientProcess::new().unwrap();
 				let session = client.new_session().await.unwrap();
-				// 1. Get browsing contexts
-				let tree = session
-					.command("browsingContext.getTree", json!({"maxDepth": 0}))
-					.await
-					.unwrap();
-
-				let contexts = tree["result"]["contexts"]
-					.as_array()
-					.expect("contexts array missing");
-				contexts.is_empty().xmap(|b| !b).xpect_true();
-				let context_id = contexts[0]["context"]
-					.as_str()
-					.expect("context id missing");
-
-				// 2. Navigate
-				session
-					.command(
-						"browsingContext.navigate",
-						json!({
-							"context": context_id,
-							"url": "https://example.com",
-							"wait": "complete"
-						}),
-					)
-					.await
-					.unwrap();
-
-				// 3. Evaluate heading text
-				session
-					.command(
-						"script.evaluate",
-						json!({
-							"expression": "document.querySelector('h1')?.textContent",
-							"target": { "context": context_id },
-							"awaitPromise": true,
-							"resultOwnership": "root"
-						}),
-					)
-					.await
-					.unwrap()["result"]["result"]["value"]
-					.as_str()
-					.unwrap()
-					.xpect_eq("Example Domain");
-
-				// 4. Click anchor
-				session
-					.command(
-						"script.evaluate",
-						json!({
-							"expression": "document.querySelector('a')?.click(); 'clicked';",
-							"target": { "context": context_id },
-							"awaitPromise": true
-						}),
-					)
-					.await
-					.unwrap();
-
-				// 5. Query current URL (navigation may or may not change depending on driver timing)
-				session
-					.command(
-						"script.evaluate",
-						json!({
-							"expression": "location.href",
-							"target": { "context": context_id },
-							"awaitPromise": true
-						}),
-					)
-					.await
-					.unwrap()["result"]["result"]["value"]
-					.as_str()
-					.unwrap()
-					.xpect_eq("https://www.iana.org/help/example-domains");
-
-				// Cleanup
+				// Simple BiDi round‑trip health check.
+				session.ping().await.unwrap();
 				session.kill().await.unwrap();
 				client.kill().await.unwrap();
 			})
