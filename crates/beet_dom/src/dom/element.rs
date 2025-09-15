@@ -290,11 +290,18 @@ mod test {
 					.unwrap()
 					.xpect_eq("More information...");
 				anchor.click().await.unwrap();
-
-				page.current_url()
+				Backoff::default()
+					.with_max_attempts(10)
+					.retry_async(|_| async {
+						match page.current_url().await.unwrap().as_str() {
+							"https://www.iana.org/help/example-domains" => {
+								Ok(())
+							}
+							_ => Err(()),
+						}
+					})
 					.await
-					.unwrap()
-					.xpect_eq("https://www.iana.org/help/example-domains");
+					.unwrap();
 
 				page.kill().await.unwrap();
 				proc.kill().await.unwrap();

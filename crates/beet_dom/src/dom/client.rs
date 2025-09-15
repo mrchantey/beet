@@ -14,7 +14,7 @@ use tokio::process::Command;
 #[derive(Debug, Clone)]
 pub struct Client {
 	host: Cow<'static, str>,
-	provided: Provider,
+	provider: Provider,
 	driver_port: u16,
 	/// Port to serve bidi websockets on.
 	/// this is for geckodriver only, chromedriver uses
@@ -39,8 +39,8 @@ impl Default for Client {
 			driver_port: DEFAULT_WEBDRIVER_PORT,
 			websocket_port: DEFAULT_WEBDRIVER_SESSION_PORT,
 			host: "http://127.0.0.1".into(),
-			provided: default(),
-			log_level: LogLevel::Error,
+			provider: default(),
+			log_level: LogLevel::Warn,
 		}
 	}
 }
@@ -70,13 +70,13 @@ impl Default for NewSessionOptions {
 impl Client {
 	pub fn chromium() -> Self {
 		Self {
-			provided: Provider::Chromedriver,
+			provider: Provider::Chromedriver,
 			..default()
 		}
 	}
 	pub fn firefox() -> Self {
 		Self {
-			provided: Provider::Geckodriver,
+			provider: Provider::Geckodriver,
 			..default()
 		}
 	}
@@ -97,7 +97,7 @@ impl Client {
 		&self,
 		opts: NewSessionOptions,
 	) -> Result<Session> {
-		let browser_name = match self.provided {
+		let browser_name = match self.provider {
 			Provider::Chromedriver => "chrome",
 			Provider::Geckodriver => "firefox",
 		};
@@ -111,14 +111,17 @@ impl Client {
 			}
 		});
 
-		match self.provided {
+		match self.provider {
 			Provider::Chromedriver => {
-				let mut args = vec![format!(
-					"--remote-debugging-port={}",
-					self.websocket_port
-				)];
+				let mut args = vec![
+					// remote-debugging-port results in 'cannot connect to renderer'
+					"--remote-debugging-pipe".into(),
+					// "--disable-dev-shm-usage".into(),
+					// "--no-sandbox".into(),
+					// "--disable-software-rasterizer".into(),
+				];
 				if opts.headless {
-					args.push("--headless".to_string());
+					args.push("--headless=new".to_string());
 				}
 				if opts.disable_gpu {
 					args.push("--disable-gpu".to_string());
@@ -139,7 +142,7 @@ impl Client {
 		};
 
 		let res = Backoff::default()
-			.with_max_attempts(10)
+			.with_max_attempts(15)
 			.with_max(Duration::from_secs(1))
 			.retry_async(async |_| {
 				Request::post(self.url("session"))
@@ -179,7 +182,7 @@ impl std::ops::Deref for ClientProcess {
 impl ClientProcess {
 	pub fn new() -> Result<Self> { Self::new_with_opts(default()) }
 	pub fn new_with_opts(opts: Client) -> Result<Self> {
-		let process = match opts.provided {
+		let process = match opts.provider {
 			Provider::Chromedriver => Self::spawn_chromedriver(&opts),
 			Provider::Geckodriver => Self::spawn_geckodriver(&opts),
 		}?;
@@ -256,7 +259,7 @@ mod test {
 	// #[ignore = "smoketest"]
 	async fn chromium() {
 		let client = ClientProcess::new_with_opts(Client {
-			provided: Provider::Chromedriver,
+			provider: Provider::Chromedriver,
 			..default()
 		})
 		.unwrap();
