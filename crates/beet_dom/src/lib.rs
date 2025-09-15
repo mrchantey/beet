@@ -2,21 +2,14 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
 
+#[cfg(feature = "webdriver")]
 mod dom;
 mod node;
 mod utils;
 
-#[cfg(all(feature = "chrome_dev_tools", not(target_arch = "wasm32")))]
-pub mod dev_tools;
-#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
-pub mod webdriver;
-
 pub mod prelude {
-	#[cfg(all(feature = "chrome_dev_tools", not(target_arch = "wasm32")))]
-	pub use crate::dev_tools::*;
-	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
-	pub use crate::webdriver::*;
 
+	#[cfg(feature = "webdriver")]
 	pub use crate::dom::*;
 	pub use crate::node::*;
 	pub use crate::utils::*;

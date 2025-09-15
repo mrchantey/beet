@@ -48,6 +48,21 @@ impl Request {
 	pub fn post(path: impl AsRef<str>) -> Self {
 		Self::get(path).with_method(HttpMethod::Post)
 	}
+	pub fn put(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Put)
+	}
+	pub fn delete(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Delete)
+	}
+	pub fn patch(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Patch)
+	}
+	pub fn head(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Head)
+	}
+	pub fn options(path: impl AsRef<str>) -> Self {
+		Self::get(path).with_method(HttpMethod::Options)
+	}
 
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
 		self.parts.method = method.into();

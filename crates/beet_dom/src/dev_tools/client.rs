@@ -46,30 +46,7 @@ impl DevToolsClient {
 		Page::new(provider)
 	}
 
-	/// Connect using the shared ConnectOptions from `dom::mod.rs`.
-	/// This mirrors the webdriver client's connect flow: it may spawn the
-	/// browser process, waits for the endpoint to be available, then connects
-	/// the websocket to the page.
 
-	async fn spawn_chromium(opts: &ConnectOptions) -> Result<Child> {
-		let mut cmd = vec!["chromium"];
-		if opts.headless {
-			// keep the headless flag when requested
-			cmd.push("--disable-gpu");
-			cmd.push("--headless");
-		}
-		let port_arg = format!("--remote-debugging-port={}", opts.port);
-		cmd.push(&port_arg);
-
-		Command::new("nix-shell")
-			.arg("-p")
-			.arg("chromium")
-			.arg("--run")
-			.arg(format!(r#"bash -lc "{}""#, cmd.join(" ")))
-			.kill_on_drop(true)
-			.spawn()?
-			.xok()
-	}
 	/// waits for the first Ok response from the dev tools url
 	async fn await_up(url: impl AsRef<str>) -> Result {
 		let url = url.as_ref();

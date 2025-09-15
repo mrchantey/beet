@@ -12,6 +12,12 @@ pub struct Socket {
 	pub(crate) writer: SendWrapper<Box<DynSocketWriter>>,
 }
 
+impl std::fmt::Debug for Socket {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Socket").finish_non_exhaustive()
+	}
+}
+
 impl Socket {
 	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
 	#[allow(unused_variables)]
