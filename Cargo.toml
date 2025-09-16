@@ -155,9 +155,15 @@ console_log = { version = "1", features = ["color"] }
 #💡 async
 futures = "0.3"
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
-async-channel = { version = "2" }
+async-channel = "2"
+async-io = "2"
+async-executor = "1"
+async-task = "4"
+# todo replace with async channel
 flume = "0.11"
+# todo replace with bevy tasks
 rayon = "1"
+# todo replace with async-std
 tokio = { version = "1", features = [
 	"macros",
 	"sync",
@@ -165,7 +171,6 @@ tokio = { version = "1", features = [
 	"rt-multi-thread",
 	"time",
 ] }
-exponential-backoff = { version= "2" }
 
 #💡 macros
 

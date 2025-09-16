@@ -14,6 +14,7 @@ where
 	// tokio::task::spawn_local(fut).await.expect("Task panicked")
 }
 /// Cross platform spawn_local function
+// TODO deprecate for async-executor
 #[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
 pub fn spawn_local<F>(fut: F) -> tokio::task::JoinHandle<F::Output>
 where

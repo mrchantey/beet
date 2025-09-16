@@ -2,7 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
 use notify::EventKind;
-#[cfg(not(target_arch = "wasm32"))]
+// #[cfg(not(target_arch = "wasm32"))]
+pub use async_channel::Receiver;
+pub use async_channel::Sender;
 use notify::INotifyWatcher;
 use notify::RecursiveMode;
 use notify::event::CreateKind;
@@ -14,8 +16,6 @@ use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::time::Duration;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A file watcher with glob patterns. All matches against
 /// `include` and `exclude` patterns will be normalized to forward slashes
@@ -99,13 +99,13 @@ impl FsWatcher {
 	/// # Ok(()) }
 	/// ```
 	pub fn watch(&self) -> Result<WatchEventReceiver> {
-		self.assert_path_exists()?;
-		#[cfg(not(target_arch = "wasm32"))]
-		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		#[cfg(target_arch = "wasm32")]
 		panic!("File watching is not supported on wasm32");
+		self.assert_path_exists()?;
+		#[cfg(not(target_arch = "wasm32"))]
+		let (tx, rx) = async_channel::unbounded();
 		let mut debouncer = new_debouncer(self.debounce, None, move |ev| {
-			if let Err(err) = tx.send(ev) {
+			if let Err(err) = tx.try_send(ev) {
 				eprintln!("{:?}", err);
 			}
 		})?;
@@ -126,7 +126,7 @@ impl FsWatcher {
 // https://doc.rust-lang.org/std/async_iter/trait.AsyncIterator.html
 #[cfg(not(target_arch = "wasm32"))]
 pub struct WatchEventReceiver {
-	rx: UnboundedReceiver<DebounceEventResult>,
+	rx: Receiver<DebounceEventResult>,
 	filter: GlobFilter,
 	// keep reference to debouncer so it does not get dropped
 	_tx: Debouncer<INotifyWatcher, NoCache>,
@@ -135,7 +135,7 @@ pub struct WatchEventReceiver {
 #[cfg(not(target_arch = "wasm32"))]
 impl WatchEventReceiver {
 	pub async fn recv(&mut self) -> Result<Option<WatchEventVec>> {
-		while let Some(ev) = self.rx.recv().await {
+		while let Ok(ev) = self.rx.recv().await {
 			match WatchEventVec::new(ev)?
 				.apply_filter(|ev| self.filter.passes(&ev.path))
 			{
@@ -315,7 +315,7 @@ mod test {
 	use sweet::prelude::*;
 	use tempfile::tempdir;
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn works() -> Result {
 		let tmp_dir = tempdir()?;
 		let mut rx = FsWatcher {

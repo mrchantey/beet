@@ -10,9 +10,9 @@ pub async fn sleep_millis(millis: u64) {
 /// Cross platform sleep function
 #[allow(unused)]
 pub async fn sleep(duration: Duration) {
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(not(target_arch = "wasm32"))]
 	{
-		tokio::time::sleep(duration).await;
+		async_io::Timer::after(duration).await;
 	}
 	#[cfg(target_arch = "wasm32")]
 	{
@@ -32,6 +32,21 @@ pub async fn sleep(duration: Duration) {
 			.await
 			.expect("should await `setTimeout` OK");
 	}
-	#[cfg(not(any(feature = "tokio", target_arch = "wasm32")))]
-	panic!("enable beet/tokio feature for sleep on non wasm32 targets");
+	// #[cfg(not(any(feature = "tokio", target_arch = "wasm32")))]
+	// panic!("enable beet/tokio feature for sleep on non wasm32 targets");
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn works() {
+		let now = Instant::now();
+		time_ext::sleep(Duration::from_millis(100)).await;
+		now.elapsed().as_millis().xpect_greater_or_equal_to(100);
+	}
 }

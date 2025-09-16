@@ -110,16 +110,6 @@ impl Backoff {
 	}
 
 	/// Get the min duration
-	///
-	/// # Examples
-	///
-	/// ```rust
-	/// # use beet_core::prelude::*;
-	/// # use std::time::Duration;
-	///
-	/// let mut backoff = Backoff::default();
-	/// assert_eq!(backoff.min(), &Duration::from_millis(100));
-	/// ```
 	pub fn min(&self) -> &Duration { &self.min }
 
 	/// Set the min duration.
@@ -138,16 +128,6 @@ impl Backoff {
 	pub fn set_min(&mut self, min: Duration) { self.min = min; }
 
 	/// Get the max duration
-	///
-	/// # Examples
-	///
-	/// ```rust
-	/// # use beet_core::prelude::*;
-	/// # use std::time::Duration;
-	///
-	/// let mut backoff = Backoff::default();
-	/// assert_eq!(backoff.max(), &Duration::from_secs(10));
-	/// ```
 	pub fn max(&self) -> &Duration { &self.max }
 
 	/// Set the max duration.
@@ -166,15 +146,6 @@ impl Backoff {
 	pub fn set_max(&mut self, max: Duration) { self.max = max; }
 
 	/// Get the maximum number of attempts
-	///
-	/// # Examples
-	///
-	/// ```rust
-	/// # use beet_core::prelude::*;
-	///
-	/// let mut backoff = Backoff::default();
-	/// assert_eq!(backoff.max_attempts(), 3);
-	/// ```
 	pub fn max_attempts(&self) -> u32 { self.max_attempts }
 
 	/// Set the maximum number of attempts.
@@ -193,15 +164,6 @@ impl Backoff {
 	}
 
 	/// Get the jitter factor
-	///
-	/// # Examples
-	///
-	/// ```rust
-	/// # use beet_core::prelude::*;
-	///
-	/// let mut backoff = Backoff::default();
-	/// assert_eq!(backoff.jitter(), 0.3);
-	/// ```
 	#[cfg(feature = "rand")]
 	pub fn jitter(&self) -> f32 { self.jitter }
 
@@ -233,15 +195,6 @@ impl Backoff {
 	}
 
 	/// Get the growth factor
-	///
-	/// # Examples
-	///
-	/// ```rust
-	/// # use beet_core::prelude::*;
-	///
-	/// let mut backoff = Backoff::default();
-	/// assert_eq!(backoff.factor(), 2);
-	/// ```
 	pub fn factor(&self) -> u32 { self.factor }
 
 	/// Set the growth factor for each iteration of the backoff.

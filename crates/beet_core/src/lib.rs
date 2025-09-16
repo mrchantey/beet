@@ -50,6 +50,8 @@ pub mod prelude {
 	pub use beet_core_macros::*;
 	pub use beet_utils::prelude::*;
 	pub use futures_lite::StreamExt;
+	pub use web_time::Duration;
+	pub use web_time::Instant;
 
 	pub use crate::abs_file;
 	pub use crate::bevybail;

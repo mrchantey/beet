@@ -74,13 +74,20 @@ pub impl App {
 		self.run_once();
 		let task = IoTaskPool::get().spawn(fut);
 
-		while !task.is_finished() {
-			self.update();
-			time_ext::sleep_millis(10).await;
+		#[cfg(target_arch = "wasm32")]
+		todo!("task::is_finished not found in wasm???");
+
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			// is_finished not found in wasm???
+			while !task.is_finished() {
+				self.update();
+				time_ext::sleep_millis(10).await;
+			}
+			// only await task when its ready, app must update
+			// to poll futures
+			task.await
 		}
-		// only await task when its ready, app must update
-		// to poll futures
-		task.await
 	}
 
 	/// Call this on custom runners before update
