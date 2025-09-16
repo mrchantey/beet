@@ -57,10 +57,11 @@ web-sys = {workspace = true, features = [
 
 
 [dev-dependencies]
-tokio.workspace = true
 sweet.workspace = true
-beet_agent = {path = "", features = ["native-tls"]}
 
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
+beet_agent = {path = "", features = ["native-tls"]}
 
 
 [[test]]

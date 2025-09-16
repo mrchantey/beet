@@ -12,7 +12,9 @@ use web_sys::window;
 
 
 // TODO integrate with bevy app using async tasks
-pub async fn start_realtime(ephemeral_key: String) -> Result<(), JsValue> {
+pub(super) async fn connect_webrtc(
+	ephemeral_key: String,
+) -> Result<(), JsValue> {
 	// Get voice param from URL
 	let window = window().unwrap();
 
