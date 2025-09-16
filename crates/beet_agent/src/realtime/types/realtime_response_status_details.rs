@@ -1,4 +1,4 @@
-use crate::openai::realtime::types as models;
+use crate::realtime::types as models;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -1,3 +1,4 @@
+// TODO bevy 0.17 wasm gets .is_finished?
 #[cfg(not(target_arch = "wasm32"))]
 mod async_plugin;
 mod extensions;

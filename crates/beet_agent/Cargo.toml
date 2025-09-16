@@ -30,6 +30,32 @@ serde_json.workspace = true
 serde_with = "3.12"
 http.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+web-sys = {workspace = true, features = [
+# WebRtc
+'Window',
+'Navigator',
+'MediaDevices',
+'MediaStream',
+'MediaStreamConstraints',
+'RtcPeerConnection',
+'RtcDataChannel',
+'RtcDataChannelInit',
+'RtcSessionDescriptionInit',
+'RtcSdpType',
+'RtcTrackEvent',
+'HtmlAudioElement',
+'RtcRtpSender',
+'MediaStreamTrack',
+]}
+
+
+
 [dev-dependencies]
 tokio.workspace = true
 sweet.workspace = true

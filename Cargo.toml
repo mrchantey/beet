@@ -157,6 +157,7 @@ futures = "0.3"
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
 async-channel = "2"
 async-io = "2"
+async-fs = "2"
 async-executor = "1"
 async-task = "4"
 # todo replace with async channel

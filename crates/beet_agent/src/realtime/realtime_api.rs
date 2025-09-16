@@ -1,5 +1,5 @@
 use super::types::*;
-use crate::openai::*;
+use crate::realtime::*;
 use beet_net::prelude::*;
 
 /// REST API endpoint to generate ephemeral session tokens for use in client-side applications.
@@ -32,12 +32,12 @@ impl RealtimeApi {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::openai::realtime::*;
+	use crate::realtime::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
-		use crate::openai::realtime::types::RealtimeSessionCreateRequest;
+		use crate::realtime::types::RealtimeSessionCreateRequest;
 
 		RealtimeApi::create(RealtimeSessionCreateRequest {
 			voice: Some(Box::new(types::VoiceIdsShared::Ash)),
