@@ -1,8 +1,8 @@
-#[cfg(target_arch = "wasm32")]
-use crate::prelude::js_runtime;
 use ::test::TestDesc;
 use anyhow::Result;
 use backtrace::BacktraceFrame;
+#[cfg(target_arch = "wasm32")]
+use beet_utils::prelude::*;
 use colorize::*;
 use std::panic::PanicHookInfo;
 use std::path::Path;

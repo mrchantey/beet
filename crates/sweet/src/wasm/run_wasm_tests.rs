@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use flume::Sender;
 use test::TestDescAndFn;
 

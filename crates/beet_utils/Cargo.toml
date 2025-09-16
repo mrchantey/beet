@@ -14,7 +14,7 @@ keywords.workspace = true
 [features]
 tokens = ["dep:proc-macro2","dep:syn"]
 fs = ["dep:crossterm","dep:async-fs","dep:futures-lite"]
-serde = ["dep:serde"]
+serde = ["dep:serde","dep:serde_json"]
 
 [dependencies]
 glob.workspace = true
@@ -25,6 +25,7 @@ path-clean = "1"
 pathdiff = "0.2"
 
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 
 syn = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
@@ -35,9 +36,14 @@ futures-lite = { workspace = true, optional = true }
 crossterm = { version = "0.28", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
 web-sys = { workspace = true, features = ["Window", "console", "Performance"] }
 
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
+
 [dev-dependencies]
+# beet_utils = {path = "", features = }
 # abs_path serde roundtrip
 serde_json.workspace = true
-tokio.workspace = true

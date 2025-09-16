@@ -4,6 +4,8 @@
 //! where all types and macros are re-exported, and in `sweet`.
 mod cross_log;
 mod glob_filter;
+#[cfg(target_arch = "wasm32")]
+pub mod js_runtime;
 mod path_utils;
 #[cfg(feature = "tokens")]
 pub mod pkg_ext;
@@ -18,6 +20,8 @@ pub mod prelude {
 	pub use crate::cross_log_error;
 	pub use crate::dir;
 	pub use crate::glob_filter::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use crate::js_runtime;
 	pub use crate::path_utils::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::pkg_ext;

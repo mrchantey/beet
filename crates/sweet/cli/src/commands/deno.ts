@@ -19,13 +19,31 @@ globalThis.read_file = (path: string) => {
 };
 globalThis.sweet_root = () => Deno.env.get("SWEET_ROOT");
 
+// Expose single env var (maps undefined -> null for wasm-bindgen Option)
+globalThis.env_var = (key: string) => {
+	try {
+		return Deno.env.get(String(key)) ?? null;
+	} catch (_err) {
+		// If --allow-env not granted
+		return null;
+	}
+};
+
+// Expose all env vars as a JSON string (rust side will serde_json::from_str)
+globalThis.env_all_json = () => {
+	try {
+		return JSON.stringify(Deno.env.toObject());
+	} catch (_err) {
+		return "{}";
+	}
+};
+
 /// ⚠️ The runner will clear the console in watch mode
-const wasm = await init()
-	.catch((err: any) => {
-		// panicked!
-		console.error(err);
-		Deno.exit(1);
-	});
+const wasm = await init().catch((err: any) => {
+	// panicked!
+	console.error(err);
+	Deno.exit(1);
+});
 
 // if run_with_pending doesnt exist this file is being used
 // outside of the test runner, no worries i guess

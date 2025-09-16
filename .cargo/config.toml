@@ -4,7 +4,8 @@
 
 [target.wasm32-unknown-unknown]
 # this uses sweet for cargo run and cargo test
-runner = 'sweet test-wasm'
+# runner = 'sweet test-wasm'
+runner = 'cargo run -p sweet-cli -- test-wasm'
 rustflags = [
 	"--cfg",
 	"getrandom_backend=\"wasm_js\"",

@@ -1,6 +1,7 @@
 //! donation from the good folks at wasm-bindgen 🙏
 //! https://github.com/rustwasm/wasm-bindgen/blob/24f20ae9bc480c5ad0778fdb1481eb23461f0d82/crates/test/src/rt/mod.rs#L764
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use flume::Sender;
 use std::future::Future;
 use std::pin::Pin;
