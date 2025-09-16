@@ -376,7 +376,6 @@ impl AsyncEntity {
 }
 
 #[cfg(test)]
-#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 mod tests {
 	use super::*;
 	use crate::prelude::AppExitExt;

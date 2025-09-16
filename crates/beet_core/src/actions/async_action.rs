@@ -150,7 +150,7 @@ where
 
 #[cfg(test)]
 // currently must be Send
-#[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use std::time::Duration;
 

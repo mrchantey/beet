@@ -680,7 +680,6 @@ mod tests {
 	}
 
 	#[sweet::test]
-	#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 	async fn retry_async_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -748,7 +747,6 @@ mod tests {
 	}
 
 	#[sweet::test]
-	#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]
 		let mut backoff = Backoff::new(

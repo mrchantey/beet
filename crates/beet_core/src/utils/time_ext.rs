@@ -32,8 +32,6 @@ pub async fn sleep(duration: Duration) {
 			.await
 			.expect("should await `setTimeout` OK");
 	}
-	// #[cfg(not(any(feature = "tokio", target_arch = "wasm32")))]
-	// panic!("enable beet/tokio feature for sleep on non wasm32 targets");
 }
 
 

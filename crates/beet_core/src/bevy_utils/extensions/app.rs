@@ -1,10 +1,8 @@
 use crate::prelude::NonSendPlugin;
-use crate::time_ext;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use bevy::tasks::IoTaskPool;
 
 #[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]
@@ -64,30 +62,28 @@ pub impl App {
 		self.should_exit().unwrap_or(AppExit::Success)
 	}
 	/// run an io task to completion, polling at 10 millisecond intervals
+	#[cfg(not(target_arch = "wasm32"))]
+	// task::is_finished not found in wasm???
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static,
 		O: 'static,
 	{
+		use bevy::tasks::IoTaskPool;
+
 		self.init_plugin(TaskPoolPlugin::default());
 		// spin up async task pool
 		self.run_once();
+
 		let task = IoTaskPool::get().spawn(fut);
-
-		#[cfg(target_arch = "wasm32")]
-		todo!("task::is_finished not found in wasm???");
-
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			// is_finished not found in wasm???
-			while !task.is_finished() {
-				self.update();
-				time_ext::sleep_millis(10).await;
-			}
-			// only await task when its ready, app must update
-			// to poll futures
-			task.await
+		// is_finished not found in wasm???
+		while !task.is_finished() {
+			self.update();
+			crate::time_ext::sleep_millis(10).await;
 		}
+		// only await task when its ready, app must update
+		// to poll futures
+		task.await
 	}
 
 	/// Call this on custom runners before update

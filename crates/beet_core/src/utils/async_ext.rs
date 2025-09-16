@@ -11,7 +11,6 @@ where
 	F: Future<Output = ()> + 'static,
 {
 	wasm_bindgen_futures::spawn_local(fut)
-	// tokio::task::spawn_local(fut).await.expect("Task panicked")
 }
 /// Cross platform spawn_local function
 // TODO deprecate for async-executor

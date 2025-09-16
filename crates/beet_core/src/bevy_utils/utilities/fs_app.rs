@@ -41,9 +41,8 @@ impl Default for FsApp {
 }
 
 impl FsApp {
-	/// Update the app whenever a file is created, modified, or deleted.
-	// We dont use [`App::set_runner`] because its an async runner and
-	// we want to be able to call it from inside a tokio
+	/// An async runner that updates the app whenever a file is created, modified, or deleted.
+	// TODO use more generic async channels runner
 	pub fn runner(self) -> impl AsyncFnOnce(App) -> AppExit + 'static {
 		async |mut app| {
 			app.init();
