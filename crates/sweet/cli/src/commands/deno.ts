@@ -29,12 +29,12 @@ globalThis.env_var = (key: string) => {
 	}
 };
 
-// Expose all env vars as a JSON string (rust side will serde_json::from_str)
-globalThis.env_all_json = () => {
+// Expose all env vars as entries [[key, value], ...] to avoid serde on wasm side
+globalThis.env_all = () => {
 	try {
-		return JSON.stringify(Deno.env.toObject());
+		return Object.entries(Deno.env.toObject());
 	} catch (_err) {
-		return "{}";
+		return [];
 	}
 };
 
@@ -46,7 +46,8 @@ const wasm = await init().catch((err: any) => {
 });
 
 // if run_with_pending doesnt exist this file is being used
-// outside of the test runner, no worries i guess
+// outside of the test runner, no worries i guess, we still
+// ran the main(){}
 await wasm.run_with_pending?.().catch((err: any) => {
 	// panicked!
 	console.error(err);

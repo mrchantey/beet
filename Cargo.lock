@@ -1682,6 +1682,7 @@ dependencies = [
  "crossterm",
  "futures-lite",
  "glob",
+ "js-sys",
  "path-clean",
  "pathdiff",
  "proc-macro2",

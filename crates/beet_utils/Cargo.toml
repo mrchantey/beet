@@ -37,6 +37,7 @@ crossterm = { version = "0.28", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
+js-sys.workspace = true
 web-sys = { workspace = true, features = ["Window", "console", "Performance"] }
 
 

@@ -8,6 +8,7 @@ fn var() { env_ext::var("SWEET_ROOT").unwrap().xpect_ends_with("beet/"); }
 
 #[test]
 fn vars_filtered() {
+	// implicitly tests `vars()`
 	let filter = GlobFilter::default().with_include("SWEET_ROOT");
 	let vars = env_ext::vars_filtered(filter);
 	vars.len().xpect_eq(1);

@@ -35,7 +35,8 @@ fn sweet_root() {
 
 #[test]
 fn env_access() {
-	let json = js_runtime::env_all_json();
-	assert!(json.len() > 0);
-	js_runtime::env_var("SWEET_ROOT");
+	js_runtime::env_all().length().xpect_greater_or_equal_to(1);
+	js_runtime::env_var("SWEET_ROOT")
+		.unwrap()
+		.xpect_ends_with("beet/");
 }

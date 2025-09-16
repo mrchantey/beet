@@ -25,40 +25,38 @@ pub fn var(key: &str) -> Result<String, EnvError> {
 	}
 }
 
-/// Get all environment variables that match the given filter.
-pub fn vars_filtered(filter: GlobFilter) -> Vec<(String, String)> {
+
+/// Get all environment variables
+/// ## Panics
+/// In wasm this will panic if `js_runtime::env_all` returns a malformed array
+pub fn vars() -> Vec<(String, String)> {
 	#[cfg(not(target_arch = "wasm32"))]
 	{
-		return std::env::vars()
-			.filter(|(key, _)| filter.passes(key))
-			.collect();
+		return std::env::vars().collect();
 	}
-
-	#[cfg(all(target_arch = "wasm32", feature = "serde"))]
+	#[cfg(target_arch = "wasm32")]
 	{
-		use std::collections::HashMap;
-		use std::sync::OnceLock;
-		static ENV_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
-
-		fn all() -> &'static HashMap<String, String> {
-			ENV_CACHE.get_or_init(|| {
-				let json = js_runtime::env_all_json();
-				serde_json::from_str(&json).unwrap_or_default()
-			})
+		// Enumerate via JS 2D array: Object.entries(Deno.env.toObject())
+		use js_sys::Array;
+		let entries = js_runtime::env_all();
+		let mut out: Vec<(String, String)> = Vec::new();
+		let len = entries.length();
+		for i in 0..len {
+			let pair = Array::from(&entries.get(i));
+			let key = pair.get(0).as_string().unwrap();
+			let value = pair.get(1).as_string().unwrap();
+			out.push((key, value));
 		}
-
-		return all()
-			.iter()
-			.filter(|(k, _)| filter.passes(k))
-			.map(|(k, v)| (k.clone(), v.clone()))
-			.collect();
+		return out;
 	}
+}
 
-	// If on wasm without serde support, we can't list all envs; return empty.
-	#[cfg(all(target_arch = "wasm32", not(feature = "serde")))]
-	{
-		return Vec::new();
-	}
+/// Get all environment variables that match the given filter.
+pub fn vars_filtered(filter: GlobFilter) -> Vec<(String, String)> {
+	vars()
+		.into_iter()
+		.filter(|(key, _)| filter.passes(key))
+		.collect()
 }
 
 //upstream of sweet, see sweet/tests/env_ext for tests
