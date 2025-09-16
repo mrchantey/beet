@@ -41,7 +41,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories in a directory, not recursive
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn all_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			files: true,
@@ -62,7 +62,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all dirs in a directory, not recursive
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn dirs_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			dirs: true,
@@ -82,7 +82,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files in a directory, not recursive
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn files_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
 		Self {
 			files: true,
@@ -104,7 +104,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories recursively
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn all_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -129,7 +129,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all subdirectories recursively
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn dirs_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -153,7 +153,7 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files recursively
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn files_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
@@ -215,7 +215,7 @@ impl ReadDir {
 
 	/// Async version: Read dir with the provided options. if the root is a file, the
 	/// file will be returned.
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn read_async(
 		&self,
 		root: impl AsRef<Path>,
@@ -228,19 +228,19 @@ impl ReadDir {
 		Ok(paths)
 	}
 
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	async fn read_inner_async(
 		&self,
 		file_or_dir: impl AsRef<Path>,
 		paths: &mut Vec<PathBuf>,
 	) -> FsResult {
-		use tokio::fs;
-
 		let root = file_or_dir.as_ref().to_path_buf();
 		let mut stack = vec![root];
 
 		while let Some(path) = stack.pop() {
-			let metadata = fs::metadata(&path)
+			use futures_lite::StreamExt;
+
+			let metadata = async_fs::metadata(&path)
 				.await
 				.map_err(|e| FsError::io(&path, e))?;
 
@@ -251,21 +251,19 @@ impl ReadDir {
 				continue;
 			}
 
-			let mut read_dir = match fs::read_dir(&path).await {
+			let mut read_dir = match async_fs::read_dir(&path).await {
 				Ok(rd) => rd,
 				Err(e) => return Err(FsError::io(&path, e)),
 			};
 
-			while let Some(entry) =
-				read_dir
-					.next_entry()
-					.await
+			while let Some(entry) = read_dir.next().await {
+				let child = entry
 					.map_err(|err| FsError::ChildIo {
 						parent: path.clone().into(),
 						err,
-					})? {
-				let child = entry.path();
-				let child_metadata = fs::metadata(&child)
+					})?
+					.path();
+				let child_metadata = async_fs::metadata(&child)
 					.await
 					.map_err(|e| FsError::io(&child, e))?;
 
@@ -374,7 +372,7 @@ mod test {
 	}
 }
 
-#[cfg(all(test, feature = "tokio", not(target_arch = "wasm32")))]
+#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test_async {
 	use crate::prelude::*;
 	#[tokio::test]

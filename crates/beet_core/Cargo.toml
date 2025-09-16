@@ -27,7 +27,7 @@ nightly = []
 bevy = ["dep:bevy"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 serde = ["beet_utils/serde", "dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
-tokio = ["beet_utils/tokio", "dep:tokio"]
+tokio = ["dep:tokio"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 fs = [
@@ -36,7 +36,6 @@ fs = [
 	"dep:notify-debouncer-full",
 	"dep:ctrlc",
 	"dep:futures",
-	"tokio",
 ]
 tokens = [
 	"beet_utils/tokens",

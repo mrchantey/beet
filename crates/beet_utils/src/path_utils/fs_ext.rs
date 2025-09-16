@@ -58,10 +58,10 @@ impl FsExt {
 	}
 
 	/// Async: remove a directory and all its contents
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 		let path = path.as_ref();
-		tokio::fs::remove_dir_all(path)
+		async_fs::remove_dir_all(path)
 			.await
 			.map_err(|err| FsError::io(path, err))?;
 		Ok(())
@@ -107,19 +107,18 @@ impl FsExt {
 	}
 
 	/// Async version of write: Write a file, ensuring the path exists
-	#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn write_async(
 		path: impl AsRef<Path>,
 		data: impl AsRef<[u8]>,
 	) -> FsResult {
-		use tokio::fs;
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
-			fs::create_dir_all(parent)
+			async_fs::create_dir_all(parent)
 				.await
 				.map_err(|err| FsError::io(parent, err))?;
 		}
-		fs::write(path, data)
+		async_fs::write(path, data)
 			.await
 			.map_err(|err| FsError::io(path, err))?;
 		Ok(())

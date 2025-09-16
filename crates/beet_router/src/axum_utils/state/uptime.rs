@@ -46,6 +46,7 @@ mod test {
 	use axum::Router;
 	use axum::extract::State;
 	use axum::routing::get;
+	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
@@ -60,13 +61,11 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		use std::time::Duration;
-
 		let mut router = Router::new()
 			.route("/", get(uptime))
 			.with_state(Uptime::new());
 
-		tokio::time::sleep(Duration::from_millis(10)).await;
+		time_ext::sleep(Duration::from_millis(10)).await;
 		let time = router.oneshot_str("/").await.unwrap();
 		let time: u64 = time.parse().unwrap();
 		time.xpect_greater_or_equal_to(10);
