@@ -1,5 +1,7 @@
 //! This crate exists as an upstream dependency for utilities used by sweet,
-//! which is depended upon by all other crates
+//! which is depended upon by all other crates.
+//! It should not be depended upon or referred to anywhere except for `beet_core`
+//! where all types and macros are re-exported, and in `sweet`.
 mod cross_log;
 mod glob_filter;
 mod path_utils;

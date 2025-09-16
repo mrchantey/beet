@@ -36,13 +36,13 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.root.join(bucket_name);
-		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
+		Box::pin(async move { FsExt::exists_async(path).await?.xok() })
 	}
 
 	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
-			tokio::fs::create_dir_all(path).await?;
+			FsExt::create_dir_all_async(path).await?;
 			Ok(())
 		})
 	}
@@ -93,7 +93,7 @@ impl BucketProvider for FsBucketProvider {
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(bucket_name, path);
-		Box::pin(async move { tokio::fs::try_exists(path).await?.xok() })
+		Box::pin(async move { FsExt::exists_async(path).await?.xok() })
 	}
 
 	fn get(
@@ -116,10 +116,7 @@ impl BucketProvider for FsBucketProvider {
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<()>> {
 		let path = self.resolve_path(bucket_name, path);
-		Box::pin(async move {
-			tokio::fs::remove_file(path).await?;
-			Ok(())
-		})
+		Box::pin(async move { FsExt::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(

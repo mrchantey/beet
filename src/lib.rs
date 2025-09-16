@@ -22,6 +22,8 @@ pub use beet_ml as ml;
 pub use beet_parse as parse;
 // #[cfg(feature = "query")]
 // pub use beet_query as query;
+pub use beet_core::cross_log;
+pub use beet_core::cross_log_error;
 #[cfg(feature = "net")]
 pub use beet_net as net;
 #[cfg(feature = "router")]
@@ -32,9 +34,6 @@ pub use beet_rsx as rsx;
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
-pub use beet_utils as utils;
-pub use beet_utils::cross_log;
-pub use beet_utils::cross_log_error;
 pub mod prelude {
 	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;

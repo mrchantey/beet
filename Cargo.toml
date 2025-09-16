@@ -158,6 +158,7 @@ futures-lite = { version = "2", default-features = false, features = ["alloc"] }
 async-channel = "2"
 async-io = "2"
 async-fs = "2"
+async-lock = "3"
 async-executor = "1"
 async-task = "4"
 # todo replace with async channel
@@ -245,7 +246,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow", "nightly"]
 #💡 helper features
 launch = ["dom","net", "build"]
-server = ["serde","dom", "net", "router", "design"]
+server = ["serde","dom","fs", "net", "router", "design"]
 client = [
 	"rsx",
 	"design",
@@ -261,7 +262,7 @@ client = [
 #💡 fine-grained
 native-tls = ["beet_net?/native-tls", "beet_router?/native-tls"]
 rustls-tls = ["beet_net?/rustls-tls", "beet_router?/rustls-tls"]
-serde = ["beet_utils/serde", "beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
+serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 agent = ["dep:beet_agent"]
@@ -298,15 +299,13 @@ bevy_default = [
 	"beet_sim?/bevy_default",
 ]
 #💡 utils
-fs = ["beet_utils/fs", "beet_core/fs"]
+fs = ["beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
 # ui = ["beet_spatial?/ui"]
 # reflect = ["beet_flow/reflect"]
-
-# bevyhub = ["beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]

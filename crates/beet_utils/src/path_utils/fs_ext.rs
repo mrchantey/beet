@@ -57,14 +57,43 @@ impl FsExt {
 		Ok(())
 	}
 
-	/// Async: remove a directory and all its contents
+	/// Async: check if a file exists
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
+		let path = path.as_ref();
+		async_fs::create_dir_all(path)
+			.await
+			.map_err(|err| FsError::io(path, err))
+	}
+	/// Async: check if a file exists
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
+		let path = path.as_ref();
+		match async_fs::metadata(path).await {
+			Ok(_) => Ok(true),
+			Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+			Err(err) => Err(FsError::io(path, err)),
+		}
+	}
+	/// Async: remove a file or directory and all its contents
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 		let path = path.as_ref();
-		async_fs::remove_dir_all(path)
-			.await
-			.map_err(|err| FsError::io(path, err))?;
-		Ok(())
+		match async_fs::metadata(path).await {
+			Ok(meta) => {
+				if meta.is_dir() {
+					async_fs::remove_dir_all(path)
+						.await
+						.map_err(|err| FsError::io(path, err))?;
+				} else {
+					async_fs::remove_file(path)
+						.await
+						.map_err(|err| FsError::io(path, err))?;
+				}
+				Ok(())
+			}
+			Err(err) => Err(FsError::io(path, err)),
+		}
 	}
 
 

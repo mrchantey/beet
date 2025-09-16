@@ -13,10 +13,11 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "axum", "reload"]
+default = ["serde", "axum", "reload", "fs"]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
 client = []
+fs = ["beet_net/fs"]
 aws = ["beet_net/aws"]
 # wip: axum features behind this flag
 axum = [

@@ -13,9 +13,10 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "reqwest"]
+default = ["serde", "reqwest", "fs"]
 # for conditional compilation in hooks
 client = []
+fs = ["beet_core/fs"]
 tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 axum = ["dep:axum"]

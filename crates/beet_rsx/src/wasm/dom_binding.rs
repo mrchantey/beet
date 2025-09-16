@@ -232,7 +232,7 @@ pub(crate) fn bind_events(
 	find_attribute: FindAttribute,
 ) -> Result<()> {
 	for (el_entity, binding) in query.iter() {
-		// beet_utils::log!("binding event: {el_entity:?}");
+		// beet_core::cross_log!("binding event: {el_entity:?}");
 
 		let Some(element) = binding.dyn_ref::<web_sys::Element>() else {
 			bevybail!("DomNodeBinding with EventTarget is not an element")
@@ -301,7 +301,7 @@ pub(crate) fn update_fragments(
 	elements: Query<(Entity, &DomNodeBinding)>,
 ) -> Result {
 	for entity in query.iter() {
-		// beet_utils::log!("updating fragments..");
+		// beet_core::cross_log!("updating fragments..");
 		let (el_entity,el_binding) = parents.iter_ancestors(entity).find_map(|parent|{
 			elements.get(parent).ok()
 		}).ok_or_else(|| {
