@@ -1,5 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg(target_arch = "wasm32")]
 use beet_utils::prelude::*;
 use sweet::prelude::*;
 
