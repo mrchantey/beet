@@ -59,10 +59,6 @@ pub fn deploy_lambda(
 ) -> Result {
 	let binary_name = pkg_config.binary_name();
 
-	let html_dir = workspace_config
-		.html_dir
-		// .into_abs()
-		.to_string();
 	let snippets_dir = workspace_config
 		.snippets_dir()
 		// .into_abs()
@@ -72,8 +68,7 @@ pub fn deploy_lambda(
 	cmd.arg("lambda")
 		.arg("deploy")
 		.arg("--enable-function-url")
-		.arg("--include")
-		.arg(&html_dir)
+		// we dont include the html dir, thats uploaded to bucket
 		.arg("--include")
 		.arg(&snippets_dir)
 		.arg("--lambda-dir")
@@ -100,7 +95,7 @@ pub fn deploy_lambda(
 		cmd.arg("--region").arg(region);
 	};
 
-	let lambda_name = pkg_config.default_lambda_name();
+	let lambda_name = pkg_config.router_lambda_name();
 	cmd.arg(&lambda_name);
 
 	// Print the full command before executing
@@ -114,7 +109,7 @@ pub fn deploy_lambda(
 
 pub fn lambda_log(pkg_config: Res<PackageConfig>) -> Result {
 	let mut cmd = Command::new("aws");
-	let lambda_name = pkg_config.default_lambda_name();
+	let lambda_name = pkg_config.router_lambda_name();
 	println!("🌱 Watching Lambda logs {lambda_name}\n   {cmd:?}");
 	cmd.arg("logs")
 		.arg("tail")
@@ -134,7 +129,7 @@ pub fn sync_bucket(
 	ws_config: Res<WorkspaceConfig>,
 	pkg_config: Res<PackageConfig>,
 ) -> Result {
-	let bucket_name = pkg_config.default_bucket_name();
+	let bucket_name = pkg_config.html_bucket_name();
 
 	let src = &ws_config.html_dir.into_abs().to_string();
 	let dst = format!("s3://{bucket_name}");

@@ -3,6 +3,9 @@ use bevy::prelude::*;
 use std::process::Command;
 
 
+pub fn refresh_sst(pkg_config: Res<PackageConfig>) -> Result {
+	run_sst(&pkg_config, "refresh")
+}
 pub fn deploy_sst(pkg_config: Res<PackageConfig>) -> Result {
 	run_sst(&pkg_config, "deploy")
 }

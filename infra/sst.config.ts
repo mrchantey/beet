@@ -11,85 +11,92 @@ const domainName = "beetstack.dev";
 const prodStage = "prod";
 
 export default $config({
-  app(input) {
-    return {
-      name: appName,
-      removal: input?.stage === prodStage ? "retain" : "remove",
-      // protect: [prodStage].includes(input?.stage),
-      home: "aws",
-      providers: {
-        aws: {
-          region: "us-west-2",
-        },
-      },
-    };
-  },
-  run() {
-    const domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
+	app(input) {
+		return {
+			name: appName,
+			removal: input?.stage === prodStage ? "retain" : "remove",
+			// protect: [prodStage].includes(input?.stage),
+			home: "aws",
+			providers: {
+				aws: {
+					region: "us-west-2",
+				},
+			},
+		};
+	},
+	async run() {
+		// consistent resource naming
+		const resourceName = (descriptor: string) =>
+			`${appName}--${$app.stage}--${descriptor}`;
 
-    // consistent resource naming
-    const resourceName = (resourceType: string) =>
-      `${appName}-${resourceType}-${$app.stage}`;
+		const _assets_bucket = new sst.aws.Bucket(resourceName("assets"), {
+			access: "public",
+			versioning: true,
+			transform: {
+				bucket: (args: any) => {
+					args.bucket = resourceName("assets");
+				},
+			},
+		});
+		const _html_bucket = new sst.aws.Bucket(resourceName("html"), {
+			access: "public",
+			transform: {
+				bucket: (args) => {
+					args.bucket = resourceName("html");
+				},
+			},
+		});
 
-    // 1. create the s3 bucket for serving static html
-    const _bucket = new sst.aws.Bucket(resourceName("bucket"), {
-      name: resourceName("bucket"),
-      access: "public",
-      transform: {
-        bucket: (args: any) => {
-          args.bucket = resourceName("bucket");
-        },
-      },
-    });
+		// 2. create the api gateway
+		const domainPrefix = $app.stage === prodStage ? "" : `${$app.stage}.`;
+		const gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
+			domain: {
+				name: `${domainPrefix}${domainName}`,
+				dns: sst.cloudflare.dns(),
+			},
+			cors: true,
+			transform: {
+				api: (args) => {
+					args.name = resourceName("gateway");
+				},
+				stage: (args) => {
+					args.name = "$default";
+					args.autoDeploy = true;
+				},
+			},
+		});
+		// 3. create the lambda function
+		const func = new sst.aws.Function(resourceName("router"), {
+			// this name *must* match RunInfra::lambda_func_name
+			name: resourceName("router"),
+			// the rust runtime is not ready, we deploy ourselves
+			runtime: "rust",
+			// point to this dummy Cargo.toml
+			handler: "",
+			url: true,
+			timeout: "3 minutes",
+			// memory: "1024 MB"
+			permissions: [
+				{
+					actions: ["s3:*"],
+					resources: [
+						"*",
+						// bucket.arn,
+						// `${bucket.arn}/*`,
+					],
+				},
+				{
+					actions: [
+						"logs:CreateLogGroup",
+						"logs:CreateLogStream",
+						"logs:PutLogEvents",
+					],
+					resources: ["*"],
+				},
+			],
+		});
 
-    // 2. create the api gateway
-    const gateway = new sst.aws.ApiGatewayV2(resourceName("gateway"), {
-      domain: {
-        name: `${domainPrefix}${domainName}`,
-        dns: sst.cloudflare.dns(),
-      },
-      cors: true,
-      transform: {
-        stage: (args: any) => {
-          args.name = "$default";
-          args.autoDeploy = true;
-        },
-      },
-    });
-    // 3. create the lambda function
-    const func = new sst.aws.Function(resourceName("lambda"), {
-      // this name *must* match RunInfra::lambda_func_name
-      name: resourceName("lambda"),
-      // the rust runtime is not ready, we deploy ourselves
-      runtime: "rust",
-      // point to this dummy Cargo.toml
-      handler: "",
-      url: true,
-      timeout: "3 minutes",
-      // memory: "1024 MB"
-      permissions: [
-        {
-          actions: [
-            "s3:*",
-          ],
-          resources: [
-            "*",
-            // bucket.arn,
-            // `${bucket.arn}/*`,
-          ],
-        },
-        {
-          actions: [
-            "logs:CreateLogGroup",
-            "logs:CreateLogStream",
-            "logs:PutLogEvents",
-          ],
-          resources: ["*"],
-        },
-      ],
-    });
-
-    // 4. point the gateway's default route to the function
-    const _route = gateway.route("$default", func.arn);
-  },
+		// 4. point the gateway's default route to the function
+		const _route = gateway.route("$default", func.arn);
+	},
 });

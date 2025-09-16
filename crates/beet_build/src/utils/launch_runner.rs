@@ -209,8 +209,10 @@ pub enum BuildFlag {
 	ExportSsg,
 	/// Run the server
 	RunServer,
-	/// Run `sst deploy`, syncing local config with cloud infra
+	/// Run `sst deploy`, pushing sst.config.ts changes to cloud infrastructure
 	DeploySst,
+	/// Run `sst refresh`, pulling cloud state to local
+	RefreshSst,
 	/// Build the lambda function
 	CompileLambda,
 	/// Deploy the lambda function
@@ -239,6 +241,7 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::CompileClient => write!(f, "compile-client"),
 			BuildFlag::RunServer => write!(f, "run-server"),
 			BuildFlag::DeploySst => write!(f, "deploy-sst"),
+			BuildFlag::RefreshSst => write!(f, "refresh-sst"),
 			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
 			BuildFlag::DeployLambda => write!(f, "deploy-lambda"),
 			BuildFlag::WatchLambda => write!(f, "watch-lambda"),
@@ -260,6 +263,7 @@ impl FromStr for BuildFlag {
 			"compile-client" => Ok(BuildFlag::CompileClient),
 			"run-server" => Ok(BuildFlag::RunServer),
 			"deploy-sst" => Ok(BuildFlag::DeploySst),
+			"refresh-sst" => Ok(BuildFlag::RefreshSst),
 			"compile-lambda" => Ok(BuildFlag::CompileLambda),
 			"deploy-lambda" => Ok(BuildFlag::DeployLambda),
 			"watch-lambda" => Ok(BuildFlag::WatchLambda),

@@ -11,7 +11,7 @@ pub fn get() -> impl Bundle {
 				<h1>Beet</h1>
 				<p><b>"The Bevy Expansion Pack"</b></p>
 				<Card style:cascade class="hero">
-				<p>"Build applications that grow with Bevy ECS at every layer of the stack."
+				<p>"Fullstack Bevy with ECS at every layer of the stack."
 				<br/><br/>
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>
 				"Beet is under construction, if this project is of interest please come and say hi in the"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy/beet discord channel</a>.</p>
@@ -40,7 +40,7 @@ pub fn get() -> impl Bundle {
 				<p>"Pop open the dev tools to see your requests in flight!"</p>
 				<ServerCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/server-actions.rs"/>
-				<h2>"Very Bevy Agents"</h2>
+				<h2>"Very Bevy Control Flow"</h2>
 					<pre node:code lang="rust" src="../content/realtime-agents.rs"/>
 				</div>
 			</ContentLayout>

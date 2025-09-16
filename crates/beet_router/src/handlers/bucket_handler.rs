@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_net::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 
 /// Add this handler alongside a [`Bucket`] resource to serve files from the bucket.
@@ -21,9 +21,9 @@ pub fn bucket_file_handler() -> impl Bundle {
 
 // TODO precompressed variants, ie `index.html.br`
 async fn from_bucket(bucket: &Bucket, path: &RoutePath) -> Result<Response> {
-	debug!("serving from bucket: {}", path);
 	if let Some(_extension) = path.extension() {
 		if let Some(url) = bucket.public_url(&path).await? {
+			debug!("redirecting to bucket: {}", url);
 			Ok(Response::permanent_redirect(url))
 		} else {
 			// some buckets like fs bucket dont have a url so just serve the file directly
@@ -34,6 +34,7 @@ async fn from_bucket(bucket: &Bucket, path: &RoutePath) -> Result<Response> {
 				.xok()
 		}
 	} else {
+		debug!("loading from bucket: {}", path);
 		bucket
 			.get(&path.join("index.html"))
 			.await

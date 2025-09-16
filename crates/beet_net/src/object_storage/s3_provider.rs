@@ -12,8 +12,7 @@ use bytes::Bytes;
 
 pub fn s3_bucket() -> impl Bundle {
 	AsyncAction::new(async move |mut world, entity| {
-		let bucket_name =
-			world.resource::<PackageConfig>().default_bucket_name();
+		let bucket_name = world.resource::<PackageConfig>().html_bucket_name();
 		debug!("Connecting to S3 bucket: {bucket_name}");
 		let provider = S3Provider::create().await;
 		world

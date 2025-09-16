@@ -57,10 +57,17 @@ impl PackageConfig {
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
 	pub fn stage(&self) -> &str { &self.stage }
 
-	pub fn default_lambda_name(&self) -> String { self.resource_name("lambda") }
-	pub fn default_bucket_name(&self) -> String { self.resource_name("bucket") }
+	/// The aws resource name for the server lambda function
+	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
+	/// The aws resource name for the static html bucket
+	pub fn html_bucket_name(&self) -> String {
+		self.resource_name("html")
+	}
+	/// The aws resource name for the assets bucket
+	pub fn assets_bucket_name(&self) -> String { self.resource_name("assets") }
 
-	/// Returns a vec of environment variables
+	/// Returns a vec of environment variables to be propagated
+	/// from the parent process in compilation commands
 	#[rustfmt::skip]
 	pub fn envs(&self)->Vec<(String,String)>{
 		vec![
@@ -76,10 +83,10 @@ impl PackageConfig {
 	/// for example `lambda` becomes `my-site-lambda-dev`
 	/// this binary-resource-stage convention must match sst config
 	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
-	pub fn resource_name(&self, name: &str) -> String {
+	pub fn resource_name(&self, descriptor: &str) -> String {
 		let binary_name = self.binary_name.to_kebab_case();
 		let stage = self.stage.as_str();
-		format! {"{binary_name}-{name}-{stage}"}
+		format! {"{binary_name}--{stage}--{descriptor}"}
 	}
 }
 

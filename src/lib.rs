@@ -41,6 +41,8 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use crate::core::prelude::Interval;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
