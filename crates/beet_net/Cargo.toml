@@ -36,14 +36,14 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest"]
-tungstenite = ["tokio","dep:tokio-tungstenite"]
-native-tls = ["reqwest?/default", "tokio-tungstenite?/native-tls"]
+tungstenite = ["tokio","dep:async-tungstenite","dep:async-lock"]
+native-tls = ["reqwest?/default", "async-tungstenite?/tokio-native-tls"]
 rustls-tls = [
 	"reqwest?/rustls-tls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls",
-	"tokio-tungstenite?/rustls-tls-webpki-roots"
+	"async-tungstenite?/tokio-rustls-webpki-roots"
 ]
 
 [dependencies]
@@ -84,7 +84,8 @@ axum = { workspace = true, optional = true }
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",
 ] }
-tokio-tungstenite = { version = "0.27", optional = true }
+async-tungstenite = { version = "0.28", optional = true, default-features = false, features = ["tokio-runtime","futures-03-sink"] }
+async-lock = {workspace = true, optional = true }
 
 #💡 server
 tokio = { workspace = true, optional = true, default-features = true, features = ["process"] }

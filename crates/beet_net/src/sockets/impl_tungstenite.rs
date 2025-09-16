@@ -1,4 +1,10 @@
 use crate::prelude::*;
+use async_lock::Mutex;
+use async_tungstenite::tokio::connect_async;
+use async_tungstenite::tungstenite::Error as TungError;
+use async_tungstenite::tungstenite::Message as TungMessage;
+use async_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
+use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
@@ -6,18 +12,14 @@ use futures::FutureExt;
 use futures::SinkExt;
 use futures::StreamExt;
 use futures::future::BoxFuture;
+use std::borrow::Cow;
 use std::pin::Pin;
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Error as TungError;
-use tokio_tungstenite::tungstenite::Message as TungMessage;
-use tokio_tungstenite::tungstenite::Utf8Bytes;
-use tokio_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
-use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
+use std::sync::Arc;
 
 type DynTungSink =
 	dyn futures::Sink<TungMessage, Error = TungError> + Send + Unpin;
 
-/// Connect to a WebSocket endpoint using tokio-tungstenite and return a cross-platform `Socket`.
+/// Connect to a WebSocket endpoint using async-tungstenite and return a cross-platform `Socket`.
 ///
 /// This function:
 /// - Establishes a client connection to `url`
@@ -41,7 +43,7 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 	let sink_boxed: Pin<Box<DynTungSink>> = Box::pin(sink);
 
 	let writer = Box::new(TungWriter {
-		sink: std::sync::Arc::new(tokio::sync::Mutex::new(sink_boxed)),
+		sink: Arc::new(Mutex::new(sink_boxed)),
 	});
 
 	Ok(Socket::new(incoming, writer))
@@ -69,13 +71,13 @@ fn from_tung_msg(msg: TungMessage) -> Message {
 fn to_tung_msg(msg: Message) -> TungMessage {
 	match msg {
 		Message::Text(s) => TungMessage::Text(s.into()),
-		Message::Binary(b) => TungMessage::Binary(b),
-		Message::Ping(b) => TungMessage::Ping(b),
-		Message::Pong(b) => TungMessage::Pong(b),
+		Message::Binary(b) => TungMessage::Binary(b.to_vec()),
+		Message::Ping(b) => TungMessage::Ping(b.to_vec()),
+		Message::Pong(b) => TungMessage::Pong(b.to_vec()),
 		Message::Close(close) => {
 			TungMessage::Close(close.map(|cf| TungCloseFrame {
 				code: close_code_from_u16(cf.code),
-				reason: Utf8Bytes::from(cf.reason),
+				reason: Cow::Owned(cf.reason),
 			}))
 		}
 	}
@@ -107,7 +109,7 @@ fn close_code_to_u16(code: TungCloseCode) -> u16 {
 fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
 
 struct TungWriter {
-	sink: std::sync::Arc<tokio::sync::Mutex<Pin<Box<DynTungSink>>>>,
+	sink: Arc<Mutex<Pin<Box<DynTungSink>>>>,
 }
 
 impl SocketWriter for TungWriter {
@@ -135,7 +137,7 @@ impl SocketWriter for TungWriter {
 				Some(cf) => {
 					let frame = TungCloseFrame {
 						code: close_code_from_u16(cf.code),
-						reason: Utf8Bytes::from(cf.reason),
+						reason: Cow::Owned(cf.reason),
 					};
 					guard.send(TungMessage::Close(Some(frame))).await.map_err(
 						|e| bevyhow!("WebSocket close send failed: {}", e),
