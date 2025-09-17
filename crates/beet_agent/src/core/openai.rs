@@ -55,19 +55,24 @@ pub fn open_ai_provider() -> impl Bundle {
 }
 
 fn handle_openai_request(
-	trigger: Trigger<ContentChanged>,
+	trigger: Trigger<ContentBroadcast<ContentEnded>>,
 	query: Query<&OpenAiProvider>,
 	mut commands: Commands,
-	session_query: SessionQuery,
+	cx: SessionContext,
 ) -> Result {
+	let ContentBroadcast {
+		session,
+		owner: content_owner,
+		..
+	} = trigger.event().clone();
+
 	let member_ent = trigger.target();
-	if member_ent == trigger.owner {
-		// we dont react to our own changed content
-		println!("ignoring own content");
+	if member_ent == content_owner {
+		// println!("ignoring own content");
 		return Ok(());
 	}
-	let input = session_query
-		.content_changed(&trigger)
+	let input = cx
+		.collect_content_relative(session, member_ent)?
 		.into_iter()
 		.map(|item| {
 			let role = match item.role {
@@ -84,6 +89,7 @@ fn handle_openai_request(
 			}}
 		})
 		.collect::<Vec<_>>();
+	assert!(input.len() > 0, "cannot send request with no input");
 	let provider = query.get(member_ent)?;
 	let req = provider.completions_req(&input)?;
 
@@ -119,9 +125,8 @@ fn handle_openai_request(
 										);
 									} else {
 										let entity = queue
-											.spawn_then((
-												ContentOwner(member_ent),
-												TextContent::default(),
+											.spawn_then(text_content(
+												session, member_ent, "",
 											))
 											.await;
 										content_map.insert(index, entity);
@@ -139,15 +144,21 @@ fn handle_openai_request(
 									)
 								})?;
 							let new_text = body["delta"].to_str()?.to_string();
-							queue.entity(*entity).get_mut::<TextContent>(
-								move |mut content| {
-									content.push_str(&new_text);
-									println!("content: {}", **content)
-								},
-							);
+							queue
+								.entity(*entity)
+								.trigger(ContentTextDelta::new(new_text));
 						}
 						"response.output_text.done" => {}
-						"response.content_part.done" => {}
+						"response.content_part.done" => {
+							let index = body["content_index"].to_u64()?;
+							let entity =
+								content_map.get(&index).ok_or_else(|| {
+									bevyhow!(
+										"Missing entity for index: {index}"
+									)
+								})?;
+							queue.entity(*entity).trigger(ContentEnded);
+						}
 						"response.output_item.done" => {}
 						"response.completed" => {
 							let input_tokens =
@@ -198,14 +209,10 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
 
-		let user = 0;
-		let agent = 1;
-		SessionBuilder::new()
-			.member(user, ())
-			.member(agent, open_ai_provider())
-			.content(user, "whats 2 + 4")
-			.build(&mut app.world_mut().commands())
-			.unwrap();
+		let mut session = SessionBuilder::from_app(&mut app);
+		let user = session.add_member(User);
+		let _agent = session.add_member(open_ai_provider());
+		session.add_content(user, "what is 2 + 4?");
 
 		app.add_observer(
 			|ev: Trigger<ResponseComplete>,

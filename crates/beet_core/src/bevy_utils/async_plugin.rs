@@ -290,6 +290,13 @@ impl AsyncQueue {
 		});
 	}
 
+	pub fn run_system_cached<O, M, S>(&self, system: S)
+	where
+		O: 'static,
+		S: 'static + Send + IntoSystem<(), O, M>,
+	{
+		self.run_system_cached_with(system, ());
+	}
 	pub fn run_system_cached_with<I, O, M, S>(
 		&self,
 		system: S,

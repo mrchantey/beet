@@ -26,6 +26,7 @@ beet_net.workspace = true
 beet_core = { workspace = true, features = ["serde"] }
 serde.workspace = true
 base64.workspace = true
+async-lock.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"
 http.workspace = true

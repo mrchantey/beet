@@ -19,6 +19,7 @@ struct Cli {
 enum SubCommands {
 	Build(RunBuild),
 	New(RunNew),
+	Chat(Chat),
 	ExportPdf(ExportPdf),
 }
 
@@ -27,6 +28,7 @@ async fn main() -> Result {
 	match Cli::parse().command {
 		SubCommands::Build(cmd) => cmd.run().await,
 		SubCommands::New(cmd) => cmd.run().await,
+		SubCommands::Chat(cmd) => cmd.run().await,
 		SubCommands::ExportPdf(cmd) => cmd.run().await,
 	}
 }

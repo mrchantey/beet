@@ -1195,6 +1195,7 @@ name = "beet_agent"
 version = "0.0.7-dev.9"
 dependencies = [
  "anyhow",
+ "async-lock",
  "base64 0.22.1",
  "beet_agent",
  "beet_core",

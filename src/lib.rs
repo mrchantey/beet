@@ -36,6 +36,8 @@ pub use beet_sim as sim;
 pub use beet_spatial as spatial;
 pub mod prelude {
 	#[cfg(feature = "agent")]
+	pub use crate::agent::prelude::Session;
+	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
