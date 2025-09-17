@@ -1,6 +1,5 @@
 use beet::prelude::*;
 use clap::Parser;
-// use tokio::process::Command;
 
 // simple cargo generate for now
 #[derive(Parser)]

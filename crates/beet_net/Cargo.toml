@@ -16,7 +16,7 @@ publish = true
 default = ["serde", "reqwest", "fs"]
 # for conditional compilation in hooks
 client = []
-fs = ["beet_core/fs"]
+fs = ["beet_core/fs","dep:async-process"]
 tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 axum = ["dep:axum"]
@@ -77,6 +77,7 @@ eventsource-stream = "0.2.3"
 
 # async
 futures.workspace = true
+async-process = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = { workspace = true, optional = true }

@@ -1,4 +1,9 @@
+// using aws cli has no cargo dependencies
+#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
+mod aws_cli;
 mod bucket;
+#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
+pub use aws_cli::*;
 mod bucket_item;
 mod in_memory_provider;
 pub use bucket::*;
