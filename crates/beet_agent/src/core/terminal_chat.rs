@@ -5,17 +5,20 @@ use std::io::Write;
 
 
 
-pub struct TerminalChatPlugin;
+pub struct TerminalChatPlugin {
+	pub initial_prompt: String,
+}
 
 impl Plugin for TerminalChatPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(AgentPlugin)
-			.init_plugin(AsyncPlugin)
-			.add_systems(Startup, setup);
+		app.init_plugin(AgentPlugin).init_plugin(AsyncPlugin);
+		app.world_mut()
+			.run_system_cached_with(setup, self.initial_prompt.clone())
+			.unwrap();
 	}
 }
 
-fn setup(mut commands: Commands) {
+fn setup(initial_prompt: In<String>, mut commands: Commands) {
 	let mut session = SessionBuilder::new(commands.reborrow());
 	let session_ent = session.session();
 	session
@@ -26,9 +29,8 @@ fn setup(mut commands: Commands) {
 		.observe(print_content_ended);
 	let user = session.add_member(terminal_user());
 	let _agent = session.add_member(open_ai_provider());
-	let initial_prompt = "tell me story";
-	session.add_content(user, initial_prompt);
-	println!("User > {}", initial_prompt);
+	println!("User > {}\n", initial_prompt.0);
+	session.add_content(user, initial_prompt.0);
 }
 
 
@@ -37,21 +39,21 @@ fn terminal_user() -> impl Bundle {
 }
 
 fn on_content_added(
-	trigger: Trigger<ContentBroadcast<ContentAdded>>,
+	ev: Trigger<ContentBroadcast<ContentAdded>>,
 	users: Query<Entity, With<User>>,
 	agents: Query<Entity, With<Agent>>,
 	developers: Query<Entity, With<Developer>>,
 ) {
-	if users.contains(trigger.owner) {
+	if users.contains(ev.owner) {
 		// user text already printed
 		return;
 	}
 
-	let prefix = if users.contains(trigger.owner) {
+	let prefix = if users.contains(ev.owner) {
 		"User"
-	} else if agents.contains(trigger.owner) {
+	} else if agents.contains(ev.owner) {
 		"Agent"
-	} else if developers.contains(trigger.owner) {
+	} else if developers.contains(ev.owner) {
 		"Developer"
 	} else {
 		"Unknown"
@@ -59,19 +61,27 @@ fn on_content_added(
 	print!("{prefix} > ");
 }
 fn on_content_delta(
-	trigger: Trigger<ContentBroadcast<ContentTextDelta>>,
+	ev: Trigger<ContentBroadcast<ContentTextDelta>>,
 	users: Query<Entity, With<User>>,
 ) {
-	if users.contains(trigger.owner) {
+	if users.contains(ev.owner) {
 		// user text already printed
 		return;
 	}
-	let text = trigger.event().event.clone().0;
+	let text = ev.event().event.clone().0;
 	print!("{}", text);
 	let _ = std::io::stdout().flush();
 }
-fn print_content_ended(_: Trigger<ContentBroadcast<ContentEnded>>) {
-	print!("\n");
+fn print_content_ended(
+	ev: Trigger<ContentBroadcast<ContentEnded>>,
+	users: Query<Entity, With<User>>,
+) {
+	if users.contains(ev.owner) {
+		// user text already printed
+		return;
+	}
+
+	print!("\n\n");
 }
 
 fn user_input_on_content_end(
@@ -121,6 +131,7 @@ fn user_input_request(
 						.spawn_then(text_content(session, user_member, line))
 						.await;
 					queue.entity(entity).trigger(ContentEnded);
+					println!();
 				}
 				Err(err) => {
 					eprintln!("Error reading input: {}", err);
