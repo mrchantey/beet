@@ -3,7 +3,7 @@ use clap::Parser;
 
 /// Start a chat application
 #[derive(Debug, Clone, Parser)]
-pub struct Chat {
+pub struct AgentCmd {
 	/// Initial prompt to start the chat with
 	#[arg(
 		short = 'p',
@@ -11,18 +11,18 @@ pub struct Chat {
 		help = "Initial prompt to start the chat"
 	)]
 	pub initial_prompt: Option<String>,
-	/// Trailing positional arguments passed after `--`
+	/// Trailing positional arguments
 	#[arg(
-		value_name = "ARGS",
+		value_name = "PROMPT",
 		trailing_var_arg = true,
-		help = "Trailing arguments"
+		help = "Initial prompt to start the chat"
 	)]
 	pub trailing_args: Vec<String>,
 }
 
 
 
-impl Chat {
+impl AgentCmd {
 	pub async fn run(self) -> Result {
 		let mut app = App::new();
 
@@ -35,7 +35,7 @@ impl Chat {
 		};
 
 
-		app.add_plugins((MinimalPlugins, TerminalChatPlugin {
+		app.add_plugins((MinimalPlugins, TerminalAgentPlugin {
 			initial_prompt,
 		}));
 		app.run_async(AsyncChannel::runner_async)

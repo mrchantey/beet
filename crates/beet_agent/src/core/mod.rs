@@ -1,6 +1,6 @@
 mod openai;
 mod session;
-mod terminal_chat;
+mod terminal_agent;
 pub use openai::*;
 pub use session::*;
-pub use terminal_chat::*;
+pub use terminal_agent::*;

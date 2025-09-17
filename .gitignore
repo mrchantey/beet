@@ -10,6 +10,7 @@ dump.txt
 openapi.yaml
 openapitools.json
 rust_bindings
+prompt.md
 
 tests/assert.rs
 tests/expect.rs

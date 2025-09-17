@@ -5,11 +5,29 @@ use std::io::Write;
 
 
 
-pub struct TerminalChatPlugin {
+pub struct TerminalAgentPlugin {
 	pub initial_prompt: String,
 }
+impl TerminalAgentPlugin {
+	/// Exit after the first agent response
+	pub fn oneshot() -> impl Bundle {
+		Observer::new(
+			|ev: Trigger<ContentBroadcast<ContentEnded>>,
+			 agents: Query<(), With<Agent>>,
+			 mut exit: EventWriter<AppExit>| {
+				if agents.contains(ev.target()) {
+					exit.write(AppExit::Success);
+				}
+			},
+		)
+	}
+}
+pub enum TerminalAgentMode {
+	Oneshot { initial_prompt: String },
+}
 
-impl Plugin for TerminalChatPlugin {
+
+impl Plugin for TerminalAgentPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin(AgentPlugin).init_plugin(AsyncPlugin);
 		app.world_mut()
@@ -40,9 +58,9 @@ fn terminal_user() -> impl Bundle {
 
 fn on_content_added(
 	ev: Trigger<ContentBroadcast<ContentAdded>>,
-	users: Query<Entity, With<User>>,
-	agents: Query<Entity, With<Agent>>,
-	developers: Query<Entity, With<Developer>>,
+	users: Query<(), With<User>>,
+	agents: Query<(), With<Agent>>,
+	developers: Query<(), With<Developer>>,
 ) {
 	if users.contains(ev.owner) {
 		// user text already printed
@@ -62,7 +80,7 @@ fn on_content_added(
 }
 fn on_content_delta(
 	ev: Trigger<ContentBroadcast<ContentTextDelta>>,
-	users: Query<Entity, With<User>>,
+	users: Query<(), With<User>>,
 ) {
 	if users.contains(ev.owner) {
 		// user text already printed
@@ -74,7 +92,7 @@ fn on_content_delta(
 }
 fn print_content_ended(
 	ev: Trigger<ContentBroadcast<ContentEnded>>,
-	users: Query<Entity, With<User>>,
+	users: Query<(), With<User>>,
 ) {
 	if users.contains(ev.owner) {
 		// user text already printed

@@ -4,5 +4,5 @@ mod run_new;
 pub use export_pdf::*;
 pub use run_build::*;
 pub use run_new::*;
-mod chat;
-pub use chat::*;
+mod agent_cmd;
+pub use agent_cmd::*;
