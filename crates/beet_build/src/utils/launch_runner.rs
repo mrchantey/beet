@@ -16,17 +16,7 @@ pub struct LaunchRunner {
 	pub watch: bool,
 	#[command(subcommand)]
 	pub launch_cmd: Option<LaunchCmd>,
-	/// Only execute the provided build steps, options are:
-	/// - import-snippets
-	/// - export-snippets
-	/// - codegen
-	/// - compile-server
-	/// - compile-wasm
-	/// - export-ssg
-	/// - run-server
-	/// - deploy-sst
-	/// - compile-lambda
-	/// - deploy-lambda
+	/// Only execute the provided build steps
 	#[arg(long, value_delimiter = ',', value_parser = parse_flags)]
 	pub(crate) only: Vec<BuildFlag>,
 	#[clap(flatten)]

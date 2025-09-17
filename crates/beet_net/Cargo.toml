@@ -77,10 +77,10 @@ eventsource-stream = "0.2.3"
 
 # async
 futures.workspace = true
-async-process = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = { workspace = true, optional = true }
+async-process = { workspace = true, optional = true }
 # http (native)
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",

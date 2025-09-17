@@ -123,24 +123,3 @@ pub fn lambda_log(pkg_config: Res<PackageConfig>) -> Result {
 		.exit_ok()?
 		.xok()
 }
-
-
-pub fn sync_bucket(
-	ws_config: Res<WorkspaceConfig>,
-	pkg_config: Res<PackageConfig>,
-) -> Result {
-	let bucket_name = pkg_config.html_bucket_name();
-
-	let src = &ws_config.html_dir.into_abs().to_string();
-	let dst = format!("s3://{bucket_name}");
-
-	let mut cmd = Command::new("aws");
-	cmd.arg("s3")
-		.arg("sync")
-		.arg(&src)
-		.arg(&dst)
-		.arg("--delete")
-		.status()?
-		.exit_ok()?
-		.xok()
-}

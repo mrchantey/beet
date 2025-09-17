@@ -1,6 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 
+#[cfg(any(feature = "server", feature = "launch"))]
+pub mod infra;
+
 #[cfg(any(feature = "server", feature = "client"))]
 #[path = "codegen/client_actions.rs"]
 pub mod client_actions;
@@ -40,6 +43,8 @@ pub mod prelude {
 	pub use crate::codegen::pages::pages_routes;
 	#[cfg(any(feature = "server", feature = "client"))]
 	pub use crate::components::*;
+	#[cfg(any(feature = "server", feature = "launch"))]
+	pub use crate::infra::*;
 	#[cfg(feature = "launch")]
 	pub use crate::launch::*;
 	#[cfg(any(feature = "server", feature = "client"))]

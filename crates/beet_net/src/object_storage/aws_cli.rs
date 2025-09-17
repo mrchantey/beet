@@ -129,13 +129,6 @@ impl S3Filter {
 	}
 }
 
-/// Direction of the sync to drive URI validation in send().
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum S3Direction {
-	Push, // local -> s3
-	Pull, // s3 -> local
-}
-
 /// Builder for `aws s3 sync`, including CLI configuration, endpoints, and flags.
 ///
 /// This struct preserves the order of include/exclude rules, as the AWS CLI
@@ -161,7 +154,6 @@ pub struct S3Sync {
 	pub cli: AwsCli,
 	pub src: String,
 	pub dst: String,
-	dir: S3Direction,
 	// flags
 	pub delete: bool,
 	pub size_only: bool,
@@ -180,7 +172,6 @@ impl Default for S3Sync {
 			cli: default(),
 			src: String::new(),
 			dst: String::new(),
-			dir: S3Direction::Push,
 			delete: false,
 			size_only: false,
 			dry_run: false,
@@ -195,36 +186,66 @@ impl Default for S3Sync {
 }
 
 impl S3Sync {
-	/// Construct a push sync (local -> s3) from AbsPathBuf to S3 URI.
+	/// Sync a local directory to an S3 URI: `aws s3 sync <local_dir> s3://bucket/prefix`.
 	///
-	/// Local path must be absolute (AbsPathBuf ensures that). URI is validated during send.
-	pub fn push(
-		cli: AwsCli,
-		local_dir: AbsPathBuf,
-		s3_uri: impl AsRef<str>,
-	) -> Self {
+	/// ## Example
+	/// ```no_run
+	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result{
+	/// S3Sync::push(
+	/// 	AbsPathBuf::new_workspace_rel("assets").unwrap(),
+	/// 	"s3://my-bucket/subdir"
+	/// 	)
+	/// 	.delete(true)
+	/// 	.send()
+	/// 	.await?;
+	/// # Ok(()) }
+	/// ```
+	///
+	/// ## Panics
+	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
+	pub fn push(local_dir: AbsPathBuf, s3_uri: impl AsRef<str>) -> Self {
+		let s3_uri = s3_uri.as_ref();
+		if !is_s3_uri(&s3_uri) {
+			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
+		}
 		Self {
-			cli,
 			src: local_dir.to_string_lossy().to_string(),
-			dst: s3_uri.as_ref().to_string(),
-			dir: S3Direction::Push,
+			dst: s3_uri.to_string(),
 			..Default::default()
 		}
 	}
 
-	/// Construct a pull sync (s3 -> local) from S3 URI to AbsPathBuf.
+
+	/// Sync an S3 URI down to a local directory: `aws s3 sync s3://bucket/prefix <local_dir>`.
 	///
-	/// Local path must be absolute (AbsPathBuf ensures that). URI is validated during send.
-	pub fn pull(
-		cli: AwsCli,
-		s3_uri: impl AsRef<str>,
-		local_dir: AbsPathBuf,
-	) -> Self {
+	/// ## Example
+	/// ```no_run
+	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result{
+	/// S3Sync::pull(
+	/// 	"s3://my-bucket/subdir",
+	/// 	AbsPathBuf::new_workspace_rel("out").unwrap()
+	/// 	)
+	/// 	.delete(true)
+	/// 	.send()
+	/// 	.await?;
+	/// # Ok(()) }
+	/// ```
+	/// ## Panics
+	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
+	pub fn pull(s3_uri: impl AsRef<str>, local_dir: AbsPathBuf) -> Self {
+		let s3_uri = s3_uri.as_ref();
+		if !is_s3_uri(&s3_uri) {
+			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
+		}
 		Self {
-			cli,
-			src: s3_uri.as_ref().to_string(),
+			src: s3_uri.to_string(),
 			dst: local_dir.to_string_lossy().to_string(),
-			dir: S3Direction::Pull,
 			..Default::default()
 		}
 	}
@@ -233,18 +254,6 @@ impl S3Sync {
 	///
 	/// For push, validates that `dst` is an S3 URI. For pull, validates that `src` is an S3 URI.
 	pub async fn send(&self) -> Result {
-		match self.dir {
-			S3Direction::Push => {
-				if !is_s3_uri(&self.dst) {
-					bevybail!("expected S3 URI (s3://...), got: {}", self.dst);
-				}
-			}
-			S3Direction::Pull => {
-				if !is_s3_uri(&self.src) {
-					bevybail!("expected S3 URI (s3://...), got: {}", self.src);
-				}
-			}
-		}
 		let argv = self.cli.build_s3_sync_args(&self.src, &self.dst, self);
 		self.cli.run_argv(argv).await
 	}
@@ -435,10 +444,14 @@ mod test {
 	}
 
 	#[sweet::test]
+	#[should_panic]
 	async fn rejects_non_s3_uri() {
-		let local = AbsPathBuf::new("out").unwrap();
-		let sync = S3Sync::push(AwsCli::new(), local, "not-an-s3-uri");
-		let err = sync.send().await.unwrap_err();
-		err.to_string().contains("expected S3 URI").xpect_true();
+		S3Sync::push(AbsPathBuf::new("out").unwrap(), "not-an-s3-uri")
+			.send()
+			.await
+			.unwrap_err()
+			.to_string()
+			.contains("expected S3 URI")
+			.xpect_true();
 	}
 }

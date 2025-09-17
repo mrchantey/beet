@@ -105,7 +105,7 @@ impl Plugin for BuildPlugin {
 					compile_lambda
 						.run_if(BuildFlag::CompileLambda.should_run()),
 					deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
-					sync_bucket.run_if(BuildFlag::SyncBucket.should_run()),
+					push_html.run_if(BuildFlag::SyncBucket.should_run()),
 					lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),
