@@ -40,11 +40,11 @@ pub trait Xtend: Sized {
 		self
 	}
 	/// just print the value and return it, debug formatted
-	fn xprint_fmtdebug(self) -> Self
+	fn xprint_debug_formatted(self, prefix: impl AsRef<str>) -> Self
 	where
 		Self: std::fmt::Debug,
 	{
-		println!("{:#?}", self);
+		println!("{}: {:#?}", prefix.as_ref(), self);
 		self
 	}
 	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.

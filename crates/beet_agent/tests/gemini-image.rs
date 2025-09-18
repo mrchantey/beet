@@ -1,8 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use base64::prelude::*;
-use beet_net::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 #[sweet::test]
 async fn works() {
@@ -34,7 +34,7 @@ async fn works() {
 	FsExt::write("dump.txt", res.xfmt()).unwrap();
 
 
-	// Extract the base64 image string (response expected to contain a top-level "data" field)
+	// Extract the base64 image string
 	let b64 =
 		&res["candidates"][0]["content"]["parts"][1]["inlineData"]["data"]
 			.as_str()

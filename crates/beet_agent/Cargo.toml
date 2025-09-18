@@ -13,19 +13,24 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
+default = ["fs"]
 rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
+fs = ["beet_core/fs"]
 
 [dependencies]
+beet_net.workspace = true
+beet_core = { workspace = true, features = ["serde"] }
+
 # rig-core = { version = "0.18" }
 anyhow.workspace = true
+clap.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
 dotenv.workspace = true
-beet_net.workspace = true
-beet_core = { workspace = true, features = ["serde"] }
 serde.workspace = true
 base64.workspace = true
+mime_guess.workspace = true
 async-lock.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"

@@ -34,6 +34,7 @@ impl OpenAiProvider {
 		&self,
 		input: &Vec<serde_json::Value>,
 	) -> Result<Request> {
+		input.xprint_debug_formatted("content");
 		let url = format!("{OPENAI_API_BASE_URL}/responses");
 		Request::post(url)
 			.with_auth_bearer(&self.api_key)
@@ -80,9 +81,25 @@ fn handle_openai_request(
 				Role::Developer => "developer",
 				Role::Other => "user",
 			};
-			let content = match item.content {
-				Content::Text(content) => &content.0,
-			};
+
+			let content = item
+				.parts
+				.into_iter()
+				.map(|part| match part {
+					Content::Text(content) => json!({
+							"type":"input_text",
+							"text": content.0,
+					}),
+					Content::File(file) if file.is_image() => json!({
+						"type":"input_image",
+						"image_url": file.into_url(),
+					}),
+					Content::File(file) => json!({
+						"type":"input_file",
+						"file_url": file.into_url(),
+					}),
+				})
+				.collect::<Vec<_>>();
 			json! {{
 				"role": role,
 				"content": content
@@ -125,8 +142,10 @@ fn handle_openai_request(
 										);
 									} else {
 										let entity = queue
-											.spawn_then(text_content(
-												session, member_ent, "",
+											.spawn_then(content_bundle(
+												session,
+												member_ent,
+												TextContent::default(),
 											))
 											.await;
 										content_map.insert(index, entity);
@@ -198,36 +217,10 @@ fn handle_openai_request(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
-		dotenv::dotenv().ok();
-
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
-
-		let mut session = SessionBuilder::from_app(&mut app);
-		let user = session.add_member(User);
-		let _agent = session.add_member(open_ai_provider());
-		session.add_content(user, "what is 2 + 4?");
-
-		app.add_observer(
-			|ev: Trigger<ResponseComplete>,
-			 mut commands: Commands,
-			 text: Query<&TextContent>,
-			 query: Query<(&TokenUsage, &OwnedContent)>| {
-				let (_tokens, content) = query.get(ev.target()).unwrap();
-				text.get(content[0]).unwrap().0.xref().xpect_contains("6");
-				commands.send_event(AppExit::Success);
-			},
-		);
-
-		app.run_async(AsyncChannel::runner_async)
-			.await
-			.into_result()
-			.unwrap();
+		use crate::core::test::text_to_text;
+		text_to_text(open_ai_provider()).await;
 	}
 }

@@ -1,13 +1,35 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
+use clap::Parser;
 use std::io::Write;
 
-
-
+#[derive(Debug, Clone, Parser)]
 pub struct TerminalAgentPlugin {
-	pub initial_prompt: String,
+	/// Initial prompt to start the chat with
+	#[arg(
+		short = 'p',
+		long = "prompt",
+		help = "Initial prompt to start the chat"
+	)]
+	pub initial_prompt: Option<String>,
+	/// Trailing positional arguments
+	#[arg(
+		value_name = "PROMPT",
+		trailing_var_arg = true,
+		help = "Initial prompt to start the chat"
+	)]
+	pub trailing_args: Vec<String>,
+	/// Paths to files whose contents will be used as the initial prompt
+	#[arg(
+		short = 'f',
+		long = "file",
+		value_name = "FILE",
+		help = "Path to a file to read the initial prompt from (can be provided multiple times)"
+	)]
+	pub input_files: Vec<std::path::PathBuf>,
 }
+
 impl TerminalAgentPlugin {
 	/// Exit after the first agent response
 	pub fn oneshot() -> impl Bundle {
@@ -21,6 +43,63 @@ impl TerminalAgentPlugin {
 			},
 		)
 	}
+
+
+	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
+		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
+			prompt.clone()
+		} else if !self.trailing_args.is_empty() {
+			self.trailing_args.join(" ")
+		} else {
+			"Ask me a provocative question".to_string()
+		};
+
+		let paths = self
+			.input_files
+			.iter()
+			.map(|path| AbsPathBuf::new_workspace_rel(path).unwrap())
+			.collect::<Vec<_>>();
+
+		move |mut commands| {
+			let initial_prompt = initial_prompt.clone();
+			let paths = paths.clone();
+			commands.run_system_cached_with(
+				AsyncTask::spawn_with_queue_unwrap,
+				async move |queue| {
+					let paths = async_ext::try_join_all(paths.into_iter().map(
+						async |path| {
+							FileContent::new(path.to_string_lossy()).await
+						},
+					))
+					.await?;
+
+					queue.with(move |world| {
+						let commands = world.commands();
+						let mut session = SessionBuilder::new(commands);
+						let session_ent = session.session();
+						session
+							.commands()
+							.entity(session_ent)
+							.observe(on_content_added)
+							.observe(on_content_delta)
+							.observe(print_content_ended);
+						let user = session.add_member(terminal_user());
+						let _agent = session.add_member(open_ai_provider());
+						println!("User > {}\n", initial_prompt);
+						session.add_content(
+							user,
+							TextContent::new(initial_prompt),
+						);
+						for file in paths {
+							println!("User > {}\n", file);
+							session.add_content(user, file);
+						}
+					});
+					Ok(())
+				},
+			);
+		}
+	}
 }
 pub enum TerminalAgentMode {
 	Oneshot { initial_prompt: String },
@@ -29,26 +108,10 @@ pub enum TerminalAgentMode {
 
 impl Plugin for TerminalAgentPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(AgentPlugin).init_plugin(AsyncPlugin);
-		app.world_mut()
-			.run_system_cached_with(setup, self.initial_prompt.clone())
-			.unwrap();
+		app.init_plugin(AgentPlugin)
+			.init_plugin(AsyncPlugin)
+			.add_systems(Startup, self.into_system());
 	}
-}
-
-fn setup(initial_prompt: In<String>, mut commands: Commands) {
-	let mut session = SessionBuilder::new(commands.reborrow());
-	let session_ent = session.session();
-	session
-		.commands()
-		.entity(session_ent)
-		.observe(on_content_added)
-		.observe(on_content_delta)
-		.observe(print_content_ended);
-	let user = session.add_member(terminal_user());
-	let _agent = session.add_member(open_ai_provider());
-	println!("User > {}\n", initial_prompt.0);
-	session.add_content(user, initial_prompt.0);
 }
 
 
@@ -146,7 +209,11 @@ fn user_input_request(
 					// trim trailing newline and print the input
 					let line = input.trim_end().to_string();
 					let entity = queue
-						.spawn_then(text_content(session, user_member, line))
+						.spawn_then(content_bundle(
+							session,
+							user_member,
+							TextContent::new(line),
+						))
 						.await;
 					queue.entity(entity).trigger(ContentEnded);
 					println!();
