@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::relationship::Relationship;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
@@ -14,65 +13,51 @@ impl Plugin for AgentPlugin {
 	}
 }
 
-/// When any content changes, notify the session and all members who
+/// When any content changes, notify the session and all actors who
 /// do not own the content
 fn broadcast_content_event<E: Clone + Event>(
 	trigger: Trigger<E>,
-	content: Populated<(Entity, &ChildOf)>,
 	mut commands: Commands,
-	messages: Query<(&ChildOf, &MessageOwner)>,
-	sessions: Query<&SessionMembers>,
+	cx: SessionQuery,
 ) -> Result {
-	let (content, parent) = content.get(trigger.target())?;
-	let (session, owner) = messages.get(parent.parent())?;
-	let session = session.parent();
-	let owner = owner.get();
-	let to_notify = sessions
-		.iter_descendants_inclusive(session)
-		// .filter(|entity| *entity != owner)
-		.collect::<Vec<_>>();
+	let emitter = trigger.target();
+	let session = cx.session(emitter)?;
+	let actor = cx.actor(emitter)?;
+	let message = cx.message(emitter)?;
+	let targets = cx.actors(session)?.xpush(session);
 	commands.trigger_targets(
 		ContentBroadcast {
-			content,
-			owner,
+			message,
+			actor,
 			session,
 			event: trigger.event().clone(),
 		},
-		to_notify,
+		targets,
 	);
 
 	Ok(())
 }
 
-/// Point to the [`Session`] this member is a part of
-#[derive(Deref, Component)]
-#[relationship(relationship_target = SessionMembers)]
-pub struct SessionMemberOf(pub Entity);
-
-/// All user, agent and developer entities participating in
-/// this session.
-#[derive(Deref, Component)]
-#[relationship_target(relationship = SessionMemberOf)]
-#[require(Session)]
-pub struct SessionMembers(Vec<Entity>);
-
 #[derive(Default, Component)]
 pub struct Session;
 
-/// A content owner controlled by an AI agent, more than one agent may
-/// exist at a time
+/// Actor representing an AI agent, more than one agent may
+/// participate in a session at a time
 #[derive(Default, Component)]
-#[require(TokenUsage)]
+#[require(Actor, TokenUsage, Name = Name::new("Agent"))]
 pub struct Agent;
 
-/// A content owner controlled by a person using the program, more than
-/// one user may exist at a time
+/// Actor representing a human using the program, more than
+/// one user may participate in a session at a time.
 #[derive(Component)]
+#[require(Actor, Name = Name::new("User"))]
 pub struct User;
 
-/// Also known as the system role, this entity represents content
-/// owned by the developer, thats you :)
+/// Also known as the system actor, the messages and actions
+/// performed by this entity carry more weight.
+/// For example [`Developer`] instructions overrule [`User`] instructions
 #[derive(Component)]
+#[require(Actor, Name = Name::new("Developer"))]
 pub struct Developer;
 
 #[derive(Debug, Default, Component)]
@@ -87,51 +72,132 @@ pub enum ReasoningEffort {
 }
 
 
-/// Helper for getting and setting session context
+/// Helper for getting and setting session info
 #[derive(SystemParam)]
-pub struct SessionContext<'w, 's> {
+pub struct SessionQuery<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
-	messages: Query<'w, 's, (Entity, &'static MessageOwner)>,
+	parents: Query<'w, 's, &'static ChildOf>,
+	sessions: Query<'w, 's, Entity, With<Session>>,
+	actors: Query<
+		'w,
+		's,
+		(
+			Entity,
+			&'static Name,
+			Option<&'static User>,
+			Option<&'static Agent>,
+			Option<&'static Developer>,
+		),
+		With<Actor>,
+	>,
+	messages: Query<'w, 's, &'static Message>,
 	content: Query<
 		'w,
 		's,
 		(Option<&'static TextContent>, Option<&'static FileContent>),
 		Or<(With<TextContent>, With<FileContent>)>,
 	>,
-	developers: Query<'w, 's, &'static Developer>,
 }
 
-impl SessionContext<'_, '_> {
-	pub fn collect_content_relative(
-		&self,
-		session: Entity,
-		member: Entity,
-	) -> Result<Vec<Message<'_>>> {
+impl SessionQuery<'_, '_> {
+	/// Get the session for this entity
+	pub fn session(&self, entity: Entity) -> Result<Entity> {
+		self.parents
+			.iter_ancestors_inclusive(entity)
+			.find(|ent| self.sessions.get(*ent).is_ok())
+			.ok_or_else(|| bevyhow!("no session found for entity {entity:?}"))
+	}
+
+	/// Get the nearest message ancestor for this entity
+	pub fn message(&self, entity: Entity) -> Result<Entity> {
+		self.parents
+			.iter_ancestors_inclusive(entity)
+			.find(|ent| self.messages.get(*ent).is_ok())
+			.ok_or_else(|| bevyhow!("no message found for entity {entity:?}"))
+	}
+	/// Get the nearest actor ancestor for this entity
+	pub fn actor(&self, entity: Entity) -> Result<Entity> {
+		self.parents
+			.iter_ancestors_inclusive(entity)
+			.find(|ent| self.actors.get(*ent).is_ok())
+			.ok_or_else(|| bevyhow!("no actor found for entity {entity:?}"))
+	}
+	pub fn actors(&self, entity: Entity) -> Result<Vec<Entity>> {
+		let session = self.session(entity)?;
 		self.children
-			.iter_descendants_depth_first(session)
-			.filter_map(|entity| self.messages.get(entity).ok())
-			.map(|(entity, owner)| {
-				let role = if **owner == member {
-					Role::This
-				} else if self.developers.get(**owner).is_ok() {
-					Role::Developer
-				} else {
-					Role::Other
-				};
-				let mut parts = Vec::new();
-				self.get_parts(entity, &mut parts);
-				Message { parts, role }
-			})
+			.iter_direct_descendants(session)
+			.filter(|ent| self.actors.get(*ent).is_ok())
 			.collect::<Vec<_>>()
 			.xok()
 	}
 
+	pub fn collect_messages(
+		&self,
+		actor: Entity,
+	) -> Result<Vec<MessageView<'_>>> {
+		let session = self.session(actor)?;
+
+		let actors = self.children.iter_direct_descendants(session).filter_map(
+			|entity| {
+				let (entity, name, user, agent, developer) =
+					self.actors.get(entity).ok()?;
+				let role = if user.is_some() {
+					Some(ActorRole::User)
+				} else if agent.is_some() {
+					Some(ActorRole::Agent)
+				} else if developer.is_some() {
+					Some(ActorRole::Developer)
+				} else {
+					None
+				};
+				Some((entity, name, role))
+			},
+		);
+
+		let mut messages = actors
+			.flat_map(|(actor_ent, _name, role)| {
+				self.children
+					.iter_descendants_depth_first(actor_ent)
+					.filter_map(move |msg_ent| {
+						self.messages
+							.get(msg_ent)
+							.map(move |message| {
+								(actor_ent, role, msg_ent, message)
+							})
+							.ok()
+					})
+			})
+			.map(|(actor_ent, role, msg_ent, message)| {
+				let rel_role = if actor_ent == actor {
+					RelativeRole::This
+				} else if role == Some(ActorRole::Developer) {
+					RelativeRole::Developer
+				} else {
+					RelativeRole::Other
+				};
+				let mut parts = Vec::new();
+				self.get_content_recursive(msg_ent, &mut parts);
+				MessageView {
+					message,
+					content: parts,
+					role: rel_role,
+				}
+			})
+			.collect::<Vec<_>>();
+		messages.sort_by_key(|mv| mv.message.created);
+		messages.xok()
+	}
+
 	/// recursively get all content from this item
-	fn get_parts<'a>(&'a self, parent: Entity, content: &mut Vec<Content<'a>>) {
+	fn get_content_recursive<'a>(
+		&'a self,
+		parent: Entity,
+		content: &mut Vec<ContentView<'a>>,
+	) {
 		if let Ok(items) = self.content.get(parent) {
 			match items {
-				(Some(text), None) => content.push(Content::Text(text)),
-				(None, Some(file)) => content.push(Content::File(file)),
+				(Some(text), None) => content.push(ContentView::Text(text)),
+				(None, Some(file)) => content.push(ContentView::File(file)),
 				_ => unreachable!("content must be text or file"),
 			}
 		}
@@ -139,33 +205,56 @@ impl SessionContext<'_, '_> {
 		self.children
 			.iter_direct_descendants(parent)
 			.for_each(|entity| {
-				self.get_parts(entity, content);
+				self.get_content_recursive(entity, content);
 			});
 	}
 }
-pub enum Content<'a> {
+pub enum ContentView<'a> {
 	Text(&'a TextContent),
 	File(&'a FileContent),
 }
-
-pub struct Message<'a> {
-	pub role: Role,
-	pub parts: Vec<Content<'a>>,
+impl ContentView<'_> {
+	pub fn as_text(&self) -> Option<&TextContent> {
+		match self {
+			ContentView::Text(text) => Some(text),
+			_ => None,
+		}
+	}
+	pub fn as_file(&self) -> Option<&FileContent> {
+		match self {
+			ContentView::File(file) => Some(file),
+			_ => None,
+		}
+	}
 }
 
-/// A role relative to the member:
-/// -  If the member owns the content the role is [`Role::This`],
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActorRole {
+	User,
+	Developer,
+	Agent,
+}
+
+
+pub struct MessageView<'a> {
+	pub role: RelativeRole,
+	pub message: &'a Message,
+	pub content: Vec<ContentView<'a>>,
+}
+
+/// A role relative to the actor:
+/// -  If the actor owns the content the role is [`Role::This`],
 /// - otherwise if the owner has a [`Developer`] component the role is [`Role::Developer`].
 /// Any other case is [`Role::Other`] which may be a user or another agent
-#[derive(Debug, Clone)]
-pub enum Role {
-	/// The role is this member,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelativeRole {
+	/// The role is this actor,
 	This,
 	Developer,
 	Other,
 }
 
-impl Role {}
+impl RelativeRole {}
 
 /// Text emitted to stateless outputs like stdout or TTS
 #[derive(Event)]
@@ -189,10 +278,7 @@ pub(super) mod test {
 	async fn run_assertion(
 		agent: impl Bundle,
 		message: impl AsyncFnOnce(MessageBuilder),
-		assertion: impl 'static
-		+ Send
-		+ Sync
-		+ Fn(Vec<(Option<&TextContent>, Option<&FileContent>)>),
+		assertion: impl 'static + Send + Sync + Fn(Vec<ContentView>),
 	) {
 		dotenv::dotenv().ok();
 
@@ -200,26 +286,23 @@ pub(super) mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
 
 		let mut session = SessionBuilder::from_app(&mut app);
-		let mut user = session.add_member(User);
+		let mut user = session.add_actor(User);
 		message(user.create_message()).await;
-		session.add_member(agent).trigger(StartResponse);
+		session.add_actor(agent).trigger(StartResponse);
 
 		app.add_observer(
 			move |ev: Trigger<ResponseComplete>,
 			      mut commands: Commands,
-			      content: Query<
-				(Option<&TextContent>, Option<&FileContent>),
-				Or<(With<TextContent>, With<FileContent>)>,
-			>,
-			      children: Query<&Children>,
-			      query: Query<(&TokenUsage, &OwnedMessages)>| {
-				let (_tokens, messages) = query.get(ev.target()).unwrap();
-				let content = children
-					.get(messages[0])
+			      cx: SessionQuery| {
+				let actor = ev.target();
+				let content = cx
+					.collect_messages(actor)
 					.unwrap()
-					.iter()
-					.filter_map(|ent| content.get(ent).ok())
-					.collect::<Vec<_>>();
+					.into_iter()
+					.find(|msg| msg.role == RelativeRole::This)
+					.unwrap()
+					.content;
+
 				assertion(content);
 				// let text = text.get(content[0]).unwrap().0.xref();
 				// println!("Agent > {}\n", text);
@@ -240,7 +323,7 @@ pub(super) mod test {
 				msg.add_text("what is 2 + 4");
 			},
 			|content| {
-				content[0].0.unwrap().0.xref().xpect_contains("6");
+				content[0].as_text().unwrap().0.xref().xpect_contains("6");
 			},
 		)
 		.await;
@@ -257,7 +340,12 @@ pub(super) mod test {
 					.unwrap();
 			},
 			|content| {
-				content[0].0.unwrap().0.xref().xpect_contains("pineapple");
+				content[0]
+					.as_text()
+					.unwrap()
+					.0
+					.xref()
+					.xpect_contains("pineapple");
 			},
 		)
 		.await;
@@ -274,7 +362,7 @@ pub(super) mod test {
 			},
 			|content| {
 				content[0]
-					.0
+					.as_text()
 					.unwrap()
 					.0
 					.xref()
@@ -292,7 +380,7 @@ pub(super) mod test {
 			},
 			|content| {
 				use base64::prelude::*;
-				let file = content[0].1.unwrap();
+				let file = content[0].as_file().unwrap();
 				let FileData::Base64(b64) = &file.data else {
 					panic!("expected base64 image data");
 				};

@@ -66,36 +66,35 @@ impl OpenAiProvider {
 
 fn start_openai_response(
 	trigger: Trigger<StartResponse>,
-	query: Query<(&OpenAiProvider, &SessionMemberOf)>,
+	query: Query<&OpenAiProvider>,
 	mut commands: Commands,
-	cx: SessionContext,
+	cx: SessionQuery,
 ) -> Result {
-	let member_ent = trigger.target();
-	let (provider, session) = query.get(member_ent)?;
-	let session = **session;
+	let actor = trigger.target();
+	let provider = query.get(actor)?;
 	let input = cx
-		.collect_content_relative(session, member_ent)?
+		.collect_messages(actor)?
 		.into_iter()
 		.map(|item| {
 			let role = match item.role {
-				Role::This => "assistant",
-				Role::Developer => "developer",
-				Role::Other => "user",
+				RelativeRole::This => "assistant",
+				RelativeRole::Developer => "developer",
+				RelativeRole::Other => "user",
 			};
 
 			let content = item
-				.parts
+				.content
 				.into_iter()
 				.map(|part| match part {
-					Content::Text(content) => json!({
+					ContentView::Text(content) => json!({
 							"type":"input_text",
 							"text": content.0,
 					}),
-					Content::File(file) if file.is_image() => json!({
+					ContentView::File(file) if file.is_image() => json!({
 						"type":"input_image",
 						"image_url": file.into_url(),
 					}),
-					Content::File(file) => match &file.data {
+					ContentView::File(file) => match &file.data {
 						// only pdf file type supported
 						FileData::Utf8(utf8) => json!({
 							"type":"input_text",
@@ -122,9 +121,8 @@ fn start_openai_response(
 		.collect::<Vec<_>>();
 	assert!(input.len() > 0, "cannot send request with no input");
 	let req = provider.responses_req(&input)?;
-	let message_entity = commands
-		.spawn((ChildOf(session), MessageOwner(member_ent)))
-		.id();
+	let message_entity =
+		commands.spawn((Message::default(), ChildOf(actor))).id();
 
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
@@ -205,7 +203,7 @@ fn start_openai_response(
 								body["response"]["id"].to_str()?.to_string();
 
 							queue
-								.entity(member_ent)
+								.entity(actor)
 								.get_mut::<OpenAiProvider>(
 									move |mut provider| {
 										provider.prev_response_id = Some(id);

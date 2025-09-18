@@ -139,9 +139,12 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 
 impl<T: Sized, I: IntoIterator<Item = T>> XtendIter<T> for I {}
 
+
 pub trait XtendVec<T> {
 	/// Similar to [`Vec::extend`] but returns [`Self`]
 	fn xtend<I: IntoIterator<Item = T>>(self, iter: I) -> Self;
+	/// Similar to [`Vec::push`] but returns [`Self`]
+	fn xpush(self, item: T) -> Self;
 }
 
 impl<T, T2> XtendVec<T> for T2
@@ -150,6 +153,11 @@ where
 {
 	fn xtend<I: IntoIterator<Item = T>>(mut self, iter: I) -> Self {
 		self.as_mut().extend(iter);
+		self
+	}
+
+	fn xpush(mut self, item: T) -> Self {
+		self.as_mut().push(item);
 		self
 	}
 }

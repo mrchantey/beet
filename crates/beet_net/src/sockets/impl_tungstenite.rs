@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::prelude::sockets::*;
 use async_lock::Mutex;
 use async_tungstenite::tokio::connect_async;
 use async_tungstenite::tungstenite::Error as TungError;

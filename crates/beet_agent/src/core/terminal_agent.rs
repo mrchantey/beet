@@ -83,7 +83,7 @@ impl TerminalAgentPlugin {
 							.observe(on_content_added)
 							.observe(on_content_delta)
 							.observe(print_content_ended);
-						let mut user = session.add_member(terminal_user());
+						let mut user = session.add_actor(terminal_user());
 						let mut user_msg = user.create_message();
 						println!("User > {}\n", initial_prompt);
 						user_msg.add_text(initial_prompt);
@@ -92,7 +92,7 @@ impl TerminalAgentPlugin {
 							user_msg.add_content(file);
 						}
 						session
-							.add_member(OpenAiProvider::from_env())
+							.add_actor(OpenAiProvider::from_env())
 							.trigger(StartResponse);
 					});
 					Ok(())
@@ -125,16 +125,16 @@ fn on_content_added(
 	agents: Query<(), With<Agent>>,
 	developers: Query<(), With<Developer>>,
 ) {
-	if users.contains(ev.owner) {
+	if users.contains(ev.actor) {
 		// user text already printed
 		return;
 	}
 
-	let prefix = if users.contains(ev.owner) {
+	let prefix = if users.contains(ev.actor) {
 		"User"
-	} else if agents.contains(ev.owner) {
+	} else if agents.contains(ev.actor) {
 		"Agent"
-	} else if developers.contains(ev.owner) {
+	} else if developers.contains(ev.actor) {
 		"Developer"
 	} else {
 		"Unknown"
@@ -145,7 +145,7 @@ fn on_content_delta(
 	ev: Trigger<ContentBroadcast<ContentTextDelta>>,
 	users: Query<(), With<User>>,
 ) {
-	if users.contains(ev.owner) {
+	if users.contains(ev.actor) {
 		// user text already printed
 		return;
 	}
@@ -157,7 +157,7 @@ fn print_content_ended(
 	ev: Trigger<ContentBroadcast<ContentEnded>>,
 	users: Query<(), With<User>>,
 ) {
-	if users.contains(ev.owner) {
+	if users.contains(ev.actor) {
 		// user text already printed
 		return;
 	}
@@ -169,26 +169,16 @@ fn user_input_on_content_end(
 	trigger: Trigger<ContentBroadcast<ContentEnded>>,
 	commands: Commands,
 ) -> Result {
-	let ContentBroadcast {
-		session,
-		owner: content_owner,
-		..
-	} = trigger.event().clone();
-
-	let member_ent = trigger.target();
-	if member_ent == content_owner {
+	let actor = trigger.target();
+	if actor == trigger.actor {
 		// println!("ignoring own content");
 		return Ok(());
 	}
-	user_input_request(commands, session, member_ent);
+	user_input_request(commands, actor);
 	Ok(())
 }
 
-fn user_input_request(
-	mut commands: Commands,
-	session: Entity,
-	user_member: Entity,
-) {
+fn user_input_request(mut commands: Commands, actor: Entity) {
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {
@@ -200,9 +190,8 @@ fn user_input_request(
 			print!("User > ");
 			input.clear();
 			let _ = io::stdout().flush();
-			let message = queue
-				.spawn_then((ChildOf(session), MessageOwner(user_member)))
-				.await;
+			let message =
+				queue.spawn_then((ChildOf(actor), Message::default())).await;
 
 			match stdin.read_line(&mut input) {
 				Ok(0) => {

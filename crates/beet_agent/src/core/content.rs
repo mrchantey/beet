@@ -1,32 +1,40 @@
-use std::path::PathBuf;
 use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
+use std::path::PathBuf;
 
 
-/// Point to the owner of this content.
-#[derive(Deref, Component)]
-#[relationship(relationship_target = OwnedMessages)]
-pub struct MessageOwner(pub Entity);
+/// A session actor, owns messages and reacts to others
+#[derive(Debug, Default, Clone, Component)]
+#[require(Name)]
+pub struct Actor;
 
-/// List of content owned by the developer, user, or agent.
-/// This is non-linked so the owner may be removed but the content
-/// remains, ie somebody leaving a chat session.
-#[derive(Debug, Deref, Component)]
-#[relationship_target(relationship = MessageOwner)]
-pub struct OwnedMessages(Vec<Entity>);
+/// Marker component indicating the root entity for an actor's message.
+/// Messages must be (possibly nested) descendents of an [`Actor`], and may
+/// contain Content either in its entity its descendents.
+#[derive(Debug, Clone, Component)]
+pub struct Message {
+	pub created: Instant,
+}
 
+impl Default for Message {
+	fn default() -> Self {
+		Self {
+			created: Instant::now(),
+		}
+	}
+}
 
-/// Event notifying session members of a content change
+/// Event notifying session actors of a content change
 // TODO bevy 0.17 shouldnt need this, we have original entity
 #[derive(Debug, Clone, Event)]
 pub struct ContentBroadcast<E> {
-	pub content: Entity,
+	pub message: Entity,
 	pub session: Entity,
-	pub owner: Entity,
+	pub actor: Entity,
 	pub event: E,
 }
 
