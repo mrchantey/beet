@@ -92,7 +92,7 @@ impl TerminalAgentPlugin {
 							user_msg.add_content(file);
 						}
 						session
-							.add_member(open_ai_provider())
+							.add_member(OpenAiProvider::from_env())
 							.trigger(StartResponse);
 					});
 					Ok(())

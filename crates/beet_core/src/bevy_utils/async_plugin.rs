@@ -3,6 +3,7 @@ use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::ecs::component::Mutable;
+use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
@@ -37,6 +38,16 @@ fn poll_async_tasks(
 	while let Ok(mut queue) = channel.rx.try_recv() {
 		commands.append(&mut queue);
 	}
+}
+
+// TODO use this instead of AsyncTask
+#[derive(SystemParam)]
+pub struct AsyncCommands<'w, 's> {
+	pub commands: Commands<'w, 's>,
+	pub channel: Res<'w, AsyncChannel>,
+}
+impl AsyncCommands<'_, '_> {
+	pub fn run() {}
 }
 
 /// Task containing futures communicating with the world via channels

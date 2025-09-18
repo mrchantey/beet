@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use bevy::ecs::component::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde_json::json;
@@ -10,12 +12,21 @@ const GPT_5_MINI: &str = "gpt-5-mini";
 
 #[derive(Component)]
 #[require(Agent)]
+#[component(on_add=on_add)]
 pub struct OpenAiProvider {
 	api_key: String,
 	/// Model used for chat completions, defaults to [`GPT_5_MINI`]
 	completion_model: String,
 	/// The id of the previous response
 	prev_response_id: Option<String>,
+	tools: serde_json::Value,
+}
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(EntityObserver::new(start_openai_response));
 }
 
 impl OpenAiProvider {
@@ -27,13 +38,17 @@ impl OpenAiProvider {
 			api_key: std::env::var("OPENAI_API_KEY").unwrap(),
 			completion_model: GPT_5_MINI.into(),
 			prev_response_id: None,
+			tools: json!([]),
 		}
 	}
+	pub fn with_image_gen(mut self) -> Self {
+		self.tools = json!([{
+			"type": "image_generation",
+		}]);
+		self
+	}
 
-	fn completions_req(
-		&self,
-		input: &Vec<serde_json::Value>,
-	) -> Result<Request> {
+	fn responses_req(&self, input: &Vec<serde_json::Value>) -> Result<Request> {
 		// input.xprint_debug_formatted("content");
 		let url = format!("{OPENAI_API_BASE_URL}/responses");
 		Request::post(url)
@@ -42,17 +57,11 @@ impl OpenAiProvider {
 				"model": self.completion_model,
 				"stream": true,
 				"input": input,
+				"tools": self.tools,
 				"previous_response_id": self.prev_response_id
 			}})?
 			.xok()
 	}
-}
-
-pub fn open_ai_provider() -> impl Bundle {
-	(
-		OpenAiProvider::from_env(),
-		EntityObserver::new(start_openai_response),
-	)
 }
 
 fn start_openai_response(
@@ -112,7 +121,7 @@ fn start_openai_response(
 		})
 		.collect::<Vec<_>>();
 	assert!(input.len() > 0, "cannot send request with no input");
-	let req = provider.completions_req(&input)?;
+	let req = provider.responses_req(&input)?;
 	let message_entity = commands
 		.spawn((ChildOf(session), MessageOwner(member_ent)))
 		.id();
@@ -223,10 +232,24 @@ fn start_openai_response(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	#[sweet::test]
+	async fn text_to_text() {
+		super::super::test::text_to_text(OpenAiProvider::from_env()).await;
+	}
 
 	#[sweet::test]
-	async fn works() {
-		use crate::core::test::text_to_text;
-		text_to_text(open_ai_provider()).await;
+	async fn textfile_to_text() {
+		super::super::test::textfile_to_text(OpenAiProvider::from_env()).await;
+	}
+	#[sweet::test]
+	async fn image_to_text() {
+		super::super::test::image_to_text(OpenAiProvider::from_env()).await;
+	}
+	#[sweet::test]
+	async fn text_to_image() {
+		super::super::test::text_to_image(
+			OpenAiProvider::from_env().with_image_gen(),
+		)
+		.await;
 	}
 }

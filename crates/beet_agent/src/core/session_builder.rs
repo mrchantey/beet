@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
@@ -76,6 +78,14 @@ impl<'w, 's> MessageBuilder<'w, 's> {
 	pub fn add_text(&mut self, text: impl AsRef<str>) -> &mut Self {
 		self.add_content(TextContent::new(text))
 	}
+	pub async fn add_workspace_file(
+		&mut self,
+		path: impl AsRef<Path>,
+	) -> Result<&mut Self> {
+		self.add_file(AbsPathBuf::new_workspace_rel(path).unwrap().to_string())
+			.await
+	}
+
 	pub async fn add_file(
 		&mut self,
 		path: impl AsRef<str>,

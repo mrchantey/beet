@@ -185,41 +185,44 @@ pub(super) mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	pub async fn text_to_text(agent: impl Bundle) {
+
+	async fn run_assertion(
+		agent: impl Bundle,
+		message: impl AsyncFnOnce(MessageBuilder),
+		assertion: impl 'static
+		+ Send
+		+ Sync
+		+ Fn(Vec<(Option<&TextContent>, Option<&FileContent>)>),
+	) {
 		dotenv::dotenv().ok();
 
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
 
 		let mut session = SessionBuilder::from_app(&mut app);
-		session
-			.add_member(User)
-			.create_message()
-			.add_text("what is 2 + 4?");
+		let mut user = session.add_member(User);
+		message(user.create_message()).await;
 		session.add_member(agent).trigger(StartResponse);
-		// .add_text("what is the secret message")
-		// .add_file(
-		// 	AbsPathBuf::new_workspace_rel(
-		// 		"assets/tests/agents/secret-message.txt",
-		// 	)
-		// 	.unwrap()
-		// 	.to_string(),
-		// )
-		// .await
-		// .unwrap();
 
 		app.add_observer(
-			|ev: Trigger<ResponseComplete>,
-			 // ev: Trigger<ContentEnded>,
-			 mut commands: Commands,
-			 text: Query<&TextContent>,
-			 children: Query<&Children>,
-			 query: Query<(&TokenUsage, &OwnedMessages)>| {
+			move |ev: Trigger<ResponseComplete>,
+			      mut commands: Commands,
+			      content: Query<
+				(Option<&TextContent>, Option<&FileContent>),
+				Or<(With<TextContent>, With<FileContent>)>,
+			>,
+			      children: Query<&Children>,
+			      query: Query<(&TokenUsage, &OwnedMessages)>| {
 				let (_tokens, messages) = query.get(ev.target()).unwrap();
-				let content = children.get(messages[0]).unwrap();
-				let text = text.get(content[0]).unwrap().0.xref();
+				let content = children
+					.get(messages[0])
+					.unwrap()
+					.iter()
+					.filter_map(|ent| content.get(ent).ok())
+					.collect::<Vec<_>>();
+				assertion(content);
+				// let text = text.get(content[0]).unwrap().0.xref();
 				// println!("Agent > {}\n", text);
-				text.xpect_contains("6");
 				commands.send_event(AppExit::Success);
 			},
 		);
@@ -228,5 +231,79 @@ pub(super) mod test {
 			.await
 			.into_result()
 			.unwrap();
+	}
+
+	pub async fn text_to_text(agent: impl Bundle) {
+		run_assertion(
+			agent,
+			async |mut msg| {
+				msg.add_text("what is 2 + 4");
+			},
+			|content| {
+				content[0].0.unwrap().0.xref().xpect_contains("6");
+			},
+		)
+		.await;
+	}
+	pub async fn textfile_to_text(agent: impl Bundle) {
+		run_assertion(
+			agent,
+			async |mut msg| {
+				msg.add_text("what is the secret message")
+					.add_workspace_file(
+						"assets/tests/agents/secret-message.txt",
+					)
+					.await
+					.unwrap();
+			},
+			|content| {
+				content[0].0.unwrap().0.xref().xpect_contains("pineapple");
+			},
+		)
+		.await;
+	}
+
+	pub async fn image_to_text(agent: impl Bundle) {
+		run_assertion(
+			agent,
+			async |mut msg| {
+				msg.add_text("what does the text in the image say.")
+					.add_workspace_file("assets/tests/agents/secret-image.png")
+					.await
+					.unwrap();
+			},
+			|content| {
+				content[0]
+					.0
+					.unwrap()
+					.0
+					.xref()
+					.to_lowercase()
+					.xpect_contains("bevy");
+			},
+		)
+		.await;
+	}
+	pub async fn text_to_image(agent: impl Bundle) {
+		run_assertion(
+			agent,
+			async |mut msg| {
+				msg.add_text("create an image of a duck");
+			},
+			|content| {
+				use base64::prelude::*;
+				let file = content[0].1.unwrap();
+				let FileData::Base64(b64) = &file.data else {
+					panic!("expected base64 image data");
+				};
+				let bytes = BASE64_STANDARD.decode(b64).unwrap();
+				FsExt::write(
+					AbsPathBuf::new_workspace_rel(".cache/file.png").unwrap(),
+					bytes,
+				)
+				.unwrap();
+			},
+		)
+		.await;
 	}
 }

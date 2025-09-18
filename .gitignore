@@ -7,6 +7,7 @@ target
 .cache
 .vscode/settings.json
 dump.txt
+dump.json
 openapi.yaml
 openapitools.json
 rust_bindings

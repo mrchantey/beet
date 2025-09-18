@@ -1,10 +1,10 @@
+use std::path::PathBuf;
 use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
-use std::path::PathBuf;
 
 
 /// Point to the owner of this content.
