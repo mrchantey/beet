@@ -3,13 +3,13 @@
 
 // TODO wasm with bevy 0.17
 #[cfg(not(target_arch = "wasm32"))]
-mod core;
+mod session;
 pub mod realtime;
 
 
 pub mod prelude {
 
 	#[cfg(not(target_arch = "wasm32"))]
-	pub use crate::core::*;
+	pub use crate::session::*;
 	pub use crate::realtime;
 }
