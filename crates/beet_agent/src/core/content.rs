@@ -4,31 +4,25 @@ use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
+use std::path::PathBuf;
 
-pub fn content_bundle(
-	session: Entity,
-	owner: Entity,
-	content: impl Bundle,
-) -> impl Bundle {
-	(ChildOf(session), ContentOwner(owner), content)
-}
 
 /// Point to the owner of this content.
 #[derive(Deref, Component)]
-#[relationship(relationship_target = OwnedContent)]
-pub struct ContentOwner(pub Entity);
+#[relationship(relationship_target = OwnedMessages)]
+pub struct MessageOwner(pub Entity);
 
 /// List of content owned by the developer, user, or agent.
 /// This is non-linked so the owner may be removed but the content
 /// remains, ie somebody leaving a chat session.
-#[derive(Deref, Component)]
-#[relationship_target(relationship = ContentOwner)]
-pub struct OwnedContent(Vec<Entity>);
+#[derive(Debug, Deref, Component)]
+#[relationship_target(relationship = MessageOwner)]
+pub struct OwnedMessages(Vec<Entity>);
 
 
-/// Event notifying session members the content has ended
+/// Event notifying session members of a content change
 // TODO bevy 0.17 shouldnt need this, we have original entity
-#[derive(Clone, Event)]
+#[derive(Debug, Clone, Event)]
 pub struct ContentBroadcast<E> {
 	pub content: Entity,
 	pub session: Entity,
@@ -58,21 +52,55 @@ impl ContentTextDelta {
 #[derive(Clone, Event)]
 pub struct ContentEnded;
 
-#[derive(Event)]
-pub struct ResponseComplete;
-
 
 #[derive(Debug, Clone, Component)]
 #[component(on_add=on_add_content)]
 pub struct FileContent {
 	/// The mime type of the data, for example `image/png` or `text/plain`
 	pub mime_type: String,
+	/// The file path, primarily used for extracting the file name
+	pub filename: PathBuf,
 	/// The data encoded as a base64 string
 	pub data: FileData,
 }
 
+impl FileContent {
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub async fn new(path: impl AsRef<str>) -> Result<Self> {
+		let path = path.as_ref();
+		let mime_type = mime_guess::from_path(path)
+			.first_or_octet_stream()
+			.essence_str()
+			.to_string();
+		let filename = PathBuf::from(path);
+		let data = FileData::new(path, &mime_type).await?;
+		Ok(Self {
+			mime_type,
+			data,
+			filename,
+		})
+	}
+
+	pub fn is_image(&self) -> bool { self.mime_type.starts_with("image/") }
+
+	/// Returns the file url, or creates a base64 data url
+	pub fn into_url(&self) -> String {
+		match &self.data {
+			FileData::Base64(base_64) => {
+				format!("data:{};base64,{}", self.mime_type, base_64)
+			}
+			FileData::Utf8(utf8) => {
+				format!("data:{};charset=utf-8,{}", self.mime_type, utf8)
+			}
+			FileData::Uri(uri) => uri.clone(),
+		}
+	}
+}
+
+
 #[derive(Debug, Clone)]
 pub enum FileData {
+	Utf8(String),
 	Base64(String),
 	Uri(String),
 }
@@ -80,26 +108,27 @@ impl FileData {
 	pub fn new_uri(uri: impl AsRef<str>) -> Self {
 		Self::Uri(uri.as_ref().to_string())
 	}
-	pub fn new_from_bytes(data: impl AsRef<[u8]>) -> Self {
-		let base_64 = BASE64_STANDARD.encode(data.as_ref());
-		Self::Base64(base_64)
-	}
 
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub async fn new(path: impl AsRef<str>) -> Result<Self> {
+	pub async fn new(path: impl AsRef<str>, mime_type: &str) -> Result<Self> {
 		let path = path.as_ref();
 		// If it's a url or already a data: url, keep as Uri
 		if is_uri(path) {
-			Ok(Self::new_uri(path))
+			Self::new_uri(path)
+		} else if mime_type.starts_with("text/") {
+			let bytes = ReadFile::to_bytes_async(path).await?;
+			let utf8 = String::from_utf8(bytes)?;
+			Self::Utf8(utf8)
 		} else {
-			ReadFile::to_bytes_async(path)
-				.await?
-				.xmap(Self::new_from_bytes)
-				.xok()
+			let bytes = ReadFile::to_bytes_async(path).await?;
+			let base_64 = BASE64_STANDARD.encode(bytes);
+			Self::Base64(base_64)
 		}
+		.xok()
 	}
 	pub async fn get(&self) -> Result<Vec<u8>> {
 		match self {
+			FileData::Utf8(utf8) => Ok(utf8.as_bytes().to_vec()),
 			FileData::Base64(b64) => {
 				let bytes = BASE64_STANDARD.decode(b64)?;
 				Ok(bytes)
@@ -140,7 +169,7 @@ impl FileData {
 
 impl std::fmt::Display for FileContent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{} ({})", self.mime_type, self.data)
+		write!(f, "{} ({})", self.filename.display(), self.data)
 	}
 }
 
@@ -149,6 +178,10 @@ impl std::fmt::Display for FileData {
 		match self {
 			FileData::Base64(b64) => {
 				write!(f, "base64:{}", &b64[..16.min(b64.len())])
+			}
+			FileData::Utf8(utf8) => {
+				let snippet = if utf8.len() > 16 { &utf8[..16] } else { &utf8 };
+				write!(f, "utf8:{}", snippet.escape_debug())
 			}
 			FileData::Uri(uri) => write!(f, "uri:{}", uri),
 		}
@@ -163,30 +196,6 @@ fn is_uri(path: &str) -> bool {
 }
 
 
-impl FileContent {
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub async fn new(path: impl AsRef<str>) -> Result<Self> {
-		let path = path.as_ref();
-		let mime_type = mime_guess::from_path(path)
-			.first_or_octet_stream()
-			.essence_str()
-			.to_string();
-		let data = FileData::new(path).await?;
-		Ok(Self { mime_type, data })
-	}
-
-	pub fn is_image(&self) -> bool { self.mime_type.starts_with("image/") }
-
-	/// Returns the file url, or creates a base64 data url
-	pub fn into_url(&self) -> String {
-		match &self.data {
-			FileData::Base64(base_64) => {
-				format!("data:{};base64,{}", self.mime_type, base_64)
-			}
-			FileData::Uri(uri) => uri.clone(),
-		}
-	}
-}
 
 fn on_add_content(mut world: DeferredWorld, cx: HookContext) {
 	let mut commands = world.commands();

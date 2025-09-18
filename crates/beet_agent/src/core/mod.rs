@@ -1,8 +1,10 @@
 mod content;
 mod openai;
 mod session;
+mod session_builder;
 mod terminal_agent;
 pub use content::*;
 pub use openai::*;
 pub use session::*;
+pub use session_builder::*;
 pub use terminal_agent::*;

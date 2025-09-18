@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
-use beet_core::prelude::OnSpawn;
-use beet_core::prelude::Xtend;
+use beet_core::prelude::*;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -20,12 +18,14 @@ impl Plugin for AgentPlugin {
 /// do not own the content
 fn broadcast_content_event<E: Clone + Event>(
 	trigger: Trigger<E>,
-	content: Populated<(Entity, &ChildOf, &ContentOwner)>,
+	content: Populated<(Entity, &ChildOf)>,
 	mut commands: Commands,
+	messages: Query<(&ChildOf, &MessageOwner)>,
 	sessions: Query<&SessionMembers>,
 ) -> Result {
-	let (content, parent, owner) = content.get(trigger.target())?;
-	let session = parent.parent();
+	let (content, parent) = content.get(trigger.target())?;
+	let (session, owner) = messages.get(parent.parent())?;
+	let session = session.parent();
 	let owner = owner.get();
 	let to_notify = sessions
 		.iter_descendants_inclusive(session)
@@ -59,58 +59,6 @@ pub struct SessionMembers(Vec<Entity>);
 #[derive(Default, Component)]
 pub struct Session;
 
-/// Helper for building sessions, using user defined ids to match members with content.
-pub struct SessionBuilder<'w, 's> {
-	session: Entity,
-	commands: Commands<'w, 's>,
-}
-impl<'w, 's> SessionBuilder<'w, 's> {
-	pub fn session(&self) -> Entity { self.session }
-	pub fn commands(&mut self) -> &mut Commands<'w, 's> { &mut self.commands }
-	pub fn from_app(app: &'w mut App) -> Self
-	where
-		'w: 's,
-	{
-		Self::new(app.world_mut().commands())
-	}
-	pub fn new(mut commands: Commands<'w, 's>) -> Self {
-		let session = commands.spawn(Session).id();
-		Self { session, commands }
-	}
-	pub fn add_member(&mut self, bundle: impl Bundle) -> Entity {
-		self.commands
-			.spawn((bundle, SessionMemberOf(self.session)))
-			.id()
-	}
-	// pub fn add_message(
-	// 	&mut self,
-	// 	owner: Entity,
-	// 	content: impl Bundle,
-	// ) -> &mut Self {
-	// 	self.commands.spawn((
-	// 		content_bundle(self.session, owner, content),
-	// 		OnSpawn::new(|entity| {
-	// 			entity.trigger(ContentEnded);
-	// 		}),
-	// 	));
-	// 	self
-	// }
-	pub fn add_content(
-		&mut self,
-		owner: Entity,
-		content: impl Bundle,
-	) -> &mut Self {
-		self.commands.spawn((
-			content_bundle(self.session, owner, content),
-			OnSpawn::new(|entity| {
-				entity.trigger(ContentEnded);
-			}),
-		));
-		self
-	}
-}
-
-
 /// A content owner controlled by an AI agent, more than one agent may
 /// exist at a time
 #[derive(Default, Component)]
@@ -143,7 +91,7 @@ pub enum ReasoningEffort {
 #[derive(SystemParam)]
 pub struct SessionContext<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
-	messages: Query<'w, 's, (Entity, &'static ContentOwner)>,
+	messages: Query<'w, 's, (Entity, &'static MessageOwner)>,
 	content: Query<
 		'w,
 		's,
@@ -219,33 +167,16 @@ pub enum Role {
 
 impl Role {}
 
-/// An id used by a Content Provider to associate this entity and
-/// its children with a particular response.
-pub struct ResponseId {
-	pub id: String,
-}
-
-/// The provider id for a particular piece of content, for example
-/// the OpenAi `response.message.id` which may be streamed.
-pub struct ContentId {
-	pub id: String,
-}
-
-
 /// Text emitted to stateless outputs like stdout or TTS
 #[derive(Event)]
 pub struct TextDelta(pub String);
 
+/// Indicate it is 'your turn'
+#[derive(Event)]
+pub struct StartResponse;
 
-// #[cfg(test)]
-// mod test {
-// 	use crate::prelude::*;
-// 	use sweet::prelude::*;
-
-
-
-// }
-
+#[derive(Event)]
+pub struct ResponseComplete;
 
 #[cfg(test)]
 pub(super) mod test {
@@ -261,17 +192,34 @@ pub(super) mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
 
 		let mut session = SessionBuilder::from_app(&mut app);
-		let user = session.add_member(User);
-		let _agent = session.add_member(agent);
-		session.add_content(user, TextContent::new("what is 2 + 4?"));
+		session
+			.add_member(User)
+			.create_message()
+			.add_text("what is 2 + 4?");
+		session.add_member(agent).trigger(StartResponse);
+		// .add_text("what is the secret message")
+		// .add_file(
+		// 	AbsPathBuf::new_workspace_rel(
+		// 		"assets/tests/agents/secret-message.txt",
+		// 	)
+		// 	.unwrap()
+		// 	.to_string(),
+		// )
+		// .await
+		// .unwrap();
 
 		app.add_observer(
 			|ev: Trigger<ResponseComplete>,
+			 // ev: Trigger<ContentEnded>,
 			 mut commands: Commands,
 			 text: Query<&TextContent>,
-			 query: Query<(&TokenUsage, &OwnedContent)>| {
-				let (_tokens, content) = query.get(ev.target()).unwrap();
-				text.get(content[0]).unwrap().0.xref().xpect_contains("6");
+			 children: Query<&Children>,
+			 query: Query<(&TokenUsage, &OwnedMessages)>| {
+				let (_tokens, messages) = query.get(ev.target()).unwrap();
+				let content = children.get(messages[0]).unwrap();
+				let text = text.get(content[0]).unwrap().0.xref();
+				// println!("Agent > {}\n", text);
+				text.xpect_contains("6");
 				commands.send_event(AppExit::Success);
 			},
 		);

@@ -66,7 +66,7 @@ impl TerminalAgentPlugin {
 			commands.run_system_cached_with(
 				AsyncTask::spawn_with_queue_unwrap,
 				async move |queue| {
-					let paths = async_ext::try_join_all(paths.into_iter().map(
+					let files = async_ext::try_join_all(paths.into_iter().map(
 						async |path| {
 							FileContent::new(path.to_string_lossy()).await
 						},
@@ -83,17 +83,17 @@ impl TerminalAgentPlugin {
 							.observe(on_content_added)
 							.observe(on_content_delta)
 							.observe(print_content_ended);
-						let user = session.add_member(terminal_user());
-						let _agent = session.add_member(open_ai_provider());
+						let mut user = session.add_member(terminal_user());
+						let mut user_msg = user.create_message();
 						println!("User > {}\n", initial_prompt);
-						session.add_content(
-							user,
-							TextContent::new(initial_prompt),
-						);
-						for file in paths {
+						user_msg.add_text(initial_prompt);
+						for file in files {
 							println!("User > {}\n", file);
-							session.add_content(user, file);
+							user_msg.add_content(file);
 						}
+						session
+							.add_member(open_ai_provider())
+							.trigger(StartResponse);
 					});
 					Ok(())
 				},
@@ -190,7 +190,7 @@ fn user_input_request(
 	user_member: Entity,
 ) {
 	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue,
+		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {
 			use std::io;
 			use std::io::Write;
@@ -200,6 +200,10 @@ fn user_input_request(
 			print!("User > ");
 			input.clear();
 			let _ = io::stdout().flush();
+			let message = queue
+				.spawn_then((ChildOf(session), MessageOwner(user_member)))
+				.await;
+
 			match stdin.read_line(&mut input) {
 				Ok(0) => {
 					// EOF reached
@@ -209,11 +213,7 @@ fn user_input_request(
 					// trim trailing newline and print the input
 					let line = input.trim_end().to_string();
 					let entity = queue
-						.spawn_then(content_bundle(
-							session,
-							user_member,
-							TextContent::new(line),
-						))
+						.spawn_then((ChildOf(message), TextContent::new(line)))
 						.await;
 					queue.entity(entity).trigger(ContentEnded);
 					println!();
@@ -222,7 +222,7 @@ fn user_input_request(
 					eprintln!("Error reading input: {}", err);
 				}
 			}
-			// Ok(())
+			Ok(())
 		},
 	);
 }

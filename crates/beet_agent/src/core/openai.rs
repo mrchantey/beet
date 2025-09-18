@@ -34,7 +34,7 @@ impl OpenAiProvider {
 		&self,
 		input: &Vec<serde_json::Value>,
 	) -> Result<Request> {
-		input.xprint_debug_formatted("content");
+		// input.xprint_debug_formatted("content");
 		let url = format!("{OPENAI_API_BASE_URL}/responses");
 		Request::post(url)
 			.with_auth_bearer(&self.api_key)
@@ -51,27 +51,19 @@ impl OpenAiProvider {
 pub fn open_ai_provider() -> impl Bundle {
 	(
 		OpenAiProvider::from_env(),
-		EntityObserver::new(handle_openai_request),
+		EntityObserver::new(start_openai_response),
 	)
 }
 
-fn handle_openai_request(
-	trigger: Trigger<ContentBroadcast<ContentEnded>>,
-	query: Query<&OpenAiProvider>,
+fn start_openai_response(
+	trigger: Trigger<StartResponse>,
+	query: Query<(&OpenAiProvider, &SessionMemberOf)>,
 	mut commands: Commands,
 	cx: SessionContext,
 ) -> Result {
-	let ContentBroadcast {
-		session,
-		owner: content_owner,
-		..
-	} = trigger.event().clone();
-
 	let member_ent = trigger.target();
-	if member_ent == content_owner {
-		// println!("ignoring own content");
-		return Ok(());
-	}
+	let (provider, session) = query.get(member_ent)?;
+	let session = **session;
 	let input = cx
 		.collect_content_relative(session, member_ent)?
 		.into_iter()
@@ -94,10 +86,23 @@ fn handle_openai_request(
 						"type":"input_image",
 						"image_url": file.into_url(),
 					}),
-					Content::File(file) => json!({
-						"type":"input_file",
-						"file_url": file.into_url(),
-					}),
+					Content::File(file) => match &file.data {
+						// only pdf file type supported
+						FileData::Utf8(utf8) => json!({
+							"type":"input_text",
+							"text": format!("<file src={}>{}</file>", file.filename.to_string_lossy(), utf8),
+						}),
+						FileData::Uri(uri) => json!({
+							"type":"input_file",
+							"filename": file.filename.to_string_lossy(),
+							"file_url": uri,
+						}),
+						FileData::Base64(_) => json!({
+							"type":"input_file",
+							"filename": file.filename.to_string_lossy(),
+							"file_data": file.into_url(),
+						}),
+					},
 				})
 				.collect::<Vec<_>>();
 			json! {{
@@ -107,8 +112,10 @@ fn handle_openai_request(
 		})
 		.collect::<Vec<_>>();
 	assert!(input.len() > 0, "cannot send request with no input");
-	let provider = query.get(member_ent)?;
 	let req = provider.completions_req(&input)?;
+	let message_entity = commands
+		.spawn((ChildOf(session), MessageOwner(member_ent)))
+		.id();
 
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
@@ -123,7 +130,7 @@ fn handle_openai_request(
 				if let Ok(body) =
 					serde_json::from_str::<serde_json::Value>(&ev.data)
 				{
-					// println!("event: {body:#?}");
+					// body.xref().xprint_debug_formatted("response");
 					// https://platform.openai.com/docs/api-reference/responses_streaming/response
 					match body.field_str("type")? {
 						"response.created" => {
@@ -142,9 +149,8 @@ fn handle_openai_request(
 										);
 									} else {
 										let entity = queue
-											.spawn_then(content_bundle(
-												session,
-												member_ent,
+											.spawn_then((
+												ChildOf(message_entity),
 												TextContent::default(),
 											))
 											.await;
