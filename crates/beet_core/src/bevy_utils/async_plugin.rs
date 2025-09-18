@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use async_channel;
+use async_channel::Receiver;
+use async_channel::Sender;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
@@ -162,9 +164,9 @@ impl AsyncTask {
 #[derive(Resource)]
 pub struct AsyncChannel {
 	/// the sender for the async channel
-	tx: async_channel::Sender<CommandQueue>,
+	tx: Sender<CommandQueue>,
 	/// the receiver for the async channel, not accesible
-	rx: async_channel::Receiver<CommandQueue>,
+	rx: Receiver<CommandQueue>,
 }
 
 impl Default for AsyncChannel {
@@ -176,7 +178,7 @@ impl Default for AsyncChannel {
 
 impl AsyncChannel {
 	/// Get the sender of the channel
-	pub fn tx(&self) -> async_channel::Sender<CommandQueue> { self.tx.clone() }
+	pub fn tx(&self) -> Sender<CommandQueue> { self.tx.clone() }
 	pub fn queue(&self) -> AsyncQueue {
 		AsyncQueue {
 			tx: self.tx.clone(),
@@ -232,11 +234,11 @@ impl AsyncChannel {
 /// A portable channel for sending a [`CommandQueue`] to the world
 #[derive(Clone)]
 pub struct AsyncQueue {
-	tx: async_channel::Sender<CommandQueue>,
+	tx: Sender<CommandQueue>,
 }
 
 impl AsyncQueue {
-	pub fn new(tx: async_channel::Sender<CommandQueue>) -> Self { Self { tx } }
+	pub fn new(tx: Sender<CommandQueue>) -> Self { Self { tx } }
 
 	pub fn entity(&self, entity: Entity) -> AsyncEntity {
 		AsyncEntity {

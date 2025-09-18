@@ -24,19 +24,27 @@ pub trait Xtend: Sized {
 		self
 	}
 	/// just print the value and return it
-	fn xdebug(self) -> Self
+	fn xprint(self) -> Self
+	where
+		Self: std::fmt::Display,
+	{
+		println!("{}", self);
+		self
+	}
+	/// just print the value and return it, debug
+	fn xprint_debug(self) -> Self
 	where
 		Self: std::fmt::Debug,
 	{
 		println!("{:?}", self);
 		self
 	}
-	/// just print the value and return it
-	fn xdisplay(self) -> Self
+	/// just print the value and return it, debug formatted
+	fn xprint_fmtdebug(self) -> Self
 	where
-		Self: std::fmt::Display,
+		Self: std::fmt::Debug,
 	{
-		println!("{}", self);
+		println!("{:#?}", self);
 		self
 	}
 	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.

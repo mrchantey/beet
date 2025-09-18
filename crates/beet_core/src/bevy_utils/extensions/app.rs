@@ -46,14 +46,15 @@ pub impl App {
 		self
 	}
 
-	/// Convenience method for running with `app.run_async`
-	/// in the case that we are already in an async runtime
+	/// Like [`App::run()`] but for async runners, this will also
+	/// `std::mem::take` the app so it should not be used after.
 	async fn run_async(
-		self,
+		&mut self,
 		runner: impl AsyncFnOnce(App) -> AppExit + 'static,
 	) -> AppExit {
 		// let app = std::mem::take(self);
-		runner(self).await
+		let this = std::mem::take(self);
+		runner(this).await
 	}
 
 	fn run_once(&mut self) -> AppExit {

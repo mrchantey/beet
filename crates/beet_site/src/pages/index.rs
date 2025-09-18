@@ -37,7 +37,7 @@ pub fn get() -> impl Bundle {
 					<ClientCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/web-ui.rs"/>
 				<h2>"Very Bevy Server Actions"</h2>
-				<p>"Pop open the dev tools to see your requests in flight!"</p>
+				<p>"See your requests in the network tab"</p>
 				<ServerCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/server-actions.rs"/>
 				<h2>"Very Bevy Control Flow"</h2>

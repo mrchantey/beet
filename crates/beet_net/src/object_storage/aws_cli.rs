@@ -251,8 +251,6 @@ impl S3Sync {
 	}
 
 	/// Execute the configured sync.
-	///
-	/// For push, validates that `dst` is an S3 URI. For pull, validates that `src` is an S3 URI.
 	pub async fn send(&self) -> Result {
 		let argv = self.cli.build_s3_sync_args(&self.src, &self.dst, self);
 		self.cli.run_argv(argv).await

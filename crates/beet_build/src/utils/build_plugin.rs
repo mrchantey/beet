@@ -83,14 +83,16 @@ impl Plugin for BuildPlugin {
 			.add_systems(
 				BuildSequence,
 				(
-					parse_file_watch_events,
-					reparent_route_collection_source_files,
-					import_rsx_snippets_rs,
-					import_rsx_snippets_md,
-					ParseRsxTokens.run(),
-					update_file_expr_hash,
-					RouteCodegen.run(),
-					// .run_if(BuildFlag::Codegen.should_run()),
+					(
+						parse_file_watch_events,
+						reparent_route_collection_source_files,
+						import_rsx_snippets_rs,
+						import_rsx_snippets_md,
+						ParseRsxTokens.run(),
+						update_file_expr_hash,
+						RouteCodegen.run(), // .run_if(BuildFlag::Codegen.should_run()),
+					)
+						.chain(),
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
 					export_codegen.run_if(BuildFlag::Codegen.should_run()),
@@ -100,12 +102,20 @@ impl Plugin for BuildPlugin {
 					compile_client
 						.run_if(BuildFlag::CompileClient.should_run()),
 					run_server.run_if(BuildFlag::RunServer.should_run()),
-					refresh_sst.run_if(BuildFlag::RefreshSst.should_run()),
-					deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
+					(
+						refresh_sst.run_if(BuildFlag::RefreshSst.should_run()),
+						deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
+					)
+						.chain(),
 					compile_lambda
 						.run_if(BuildFlag::CompileLambda.should_run()),
 					deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
-					push_html.run_if(BuildFlag::SyncBucket.should_run()),
+					(
+						push_html.run_if(BuildFlag::PushHtml.should_run()),
+						push_assets.run_if(BuildFlag::PushAssets.should_run()),
+						pull_assets.run_if(BuildFlag::PullAssets.should_run()),
+					)
+						.chain(),
 					lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),

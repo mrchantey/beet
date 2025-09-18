@@ -134,6 +134,7 @@ send_wrapper = "0.6"
 rapidhash = "1"
 web-time = "1"
 tempfile = "3"
+mime_guess = "2"
 chrono = "0.4"
 # old rand until https://github.com/bevyengine/bevy/pull/18047
 # also when you update it remove all the RandomSource.0 in beet too please

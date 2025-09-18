@@ -129,7 +129,7 @@ impl LaunchCmd {
 				BuildFlag::CompileServer,
 				BuildFlag::CompileClient,
 				BuildFlag::ExportSsg,
-				BuildFlag::SyncBucket,
+				BuildFlag::PushHtml,
 			],
 			Self::Deploy => vec![
 				// BuildFlag::DeploySst,
@@ -209,8 +209,12 @@ pub enum BuildFlag {
 	DeployLambda,
 	/// Watch the lambda function logs
 	WatchLambda,
-	/// Sync the s3 bucket
-	SyncBucket,
+	/// Push from the html dir to s3 bucket
+	PushHtml,
+	/// Push assets dir to s3 bucket
+	PushAssets,
+	/// Pull from s3 bucket to assets dir
+	PullAssets,
 }
 
 impl BuildFlag {
@@ -235,7 +239,9 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
 			BuildFlag::DeployLambda => write!(f, "deploy-lambda"),
 			BuildFlag::WatchLambda => write!(f, "watch-lambda"),
-			BuildFlag::SyncBucket => write!(f, "sync-bucket"),
+			BuildFlag::PushHtml => write!(f, "push-html"),
+			BuildFlag::PushAssets => write!(f, "push-assets"),
+			BuildFlag::PullAssets => write!(f, "pull-assets"),
 		}
 	}
 }
@@ -257,7 +263,9 @@ impl FromStr for BuildFlag {
 			"compile-lambda" => Ok(BuildFlag::CompileLambda),
 			"deploy-lambda" => Ok(BuildFlag::DeployLambda),
 			"watch-lambda" => Ok(BuildFlag::WatchLambda),
-			"sync-bucket" => Ok(BuildFlag::SyncBucket),
+			"push-html" => Ok(BuildFlag::PushHtml),
+			"push-assets" => Ok(BuildFlag::PushAssets),
+			"pull-assets" => Ok(BuildFlag::PullAssets),
 			_ => Err(format!("Unknown flag: {}", s)),
 		}
 	}

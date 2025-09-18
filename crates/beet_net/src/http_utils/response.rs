@@ -244,6 +244,7 @@ impl Response {
 		let bytes = self.body.into_bytes().await?;
 		String::from_utf8(bytes.to_vec())?.xok()
 	}
+	pub async fn bytes(self) -> Result<Bytes> { self.body.into_bytes().await }
 
 	#[cfg(feature = "serde")]
 	pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
