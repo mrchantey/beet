@@ -57,11 +57,11 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 	let save_path = AbsPathBuf::new_workspace_rel(file_name)?;
 
 	if std::env::args().any(|arg| arg == "--snap") {
-		FsExt::write(&save_path, received)?;
+		fs_ext::write(&save_path, received)?;
 		println!("Snapshot saved: {}", desc.name);
 		Ok(None)
 	} else {
-		let expected = ReadFile::to_string(&save_path).map_err(|_| {
+		let expected = fs_ext::read_to_string(&save_path).map_err(|_| {
 
 			anyhow::anyhow!(
 				"

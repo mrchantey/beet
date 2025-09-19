@@ -16,7 +16,7 @@ impl SweetCaseLogger {
 		let status = case.result.status_prefix();
 
 		let file = self.case_pretty_path(&case.desc);
-		let name = TestDescExt::short_name(&case.desc).bold();
+		let name = test_desc_ext::short_name(&case.desc).bold();
 
 		let message = case.result.message();
 

@@ -325,7 +325,7 @@ mod test {
 		.watch()?;
 
 		let file_path = tmp_dir.path().join("foo.txt");
-		FsExt::write(&file_path, "hello")?;
+		fs_ext::write(&file_path, "hello")?;
 
 		// does not hang
 		let ev = rx.recv().await?.unwrap();

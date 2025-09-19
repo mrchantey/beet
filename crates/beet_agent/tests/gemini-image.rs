@@ -31,7 +31,7 @@ async fn works() {
 		.await
 		.unwrap();
 
-	FsExt::write("dump.txt", res.xfmt()).unwrap();
+	fs_ext::write("dump.txt", res.xfmt()).unwrap();
 
 
 	// Extract the base64 image string
@@ -45,5 +45,5 @@ async fn works() {
 
 	let path = AbsPathBuf::new_workspace_rel(".cache/image.png").unwrap();
 
-	FsExt::write(path, bytes).unwrap();
+	fs_ext::write(path, bytes).unwrap();
 }

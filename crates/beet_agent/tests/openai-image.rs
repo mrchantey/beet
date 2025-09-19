@@ -36,5 +36,5 @@ async fn works() {
 
 	let path = AbsPathBuf::new_workspace_rel(".cache/otter.png").unwrap();
 
-	FsExt::write(path, bytes).unwrap();
+	fs_ext::write(path, bytes).unwrap();
 }

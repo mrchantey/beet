@@ -36,13 +36,13 @@ impl BucketProvider for FsBucketProvider {
 		bucket_name: &str,
 	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.root.join(bucket_name);
-		Box::pin(async move { FsExt::exists_async(path).await?.xok() })
+		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
 	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
-			FsExt::create_dir_all_async(path).await?;
+			fs_ext::create_dir_all_async(path).await?;
 			Ok(())
 		})
 	}
@@ -50,7 +50,7 @@ impl BucketProvider for FsBucketProvider {
 	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
 		let path = self.root.join(bucket_name);
 		Box::pin(async move {
-			FsExt::remove_async(path).await?;
+			fs_ext::remove_async(path).await?;
 			Ok(())
 		})
 	}
@@ -63,7 +63,7 @@ impl BucketProvider for FsBucketProvider {
 	) -> SendBoxedFuture<Result<()>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			FsExt::write_async(path, body).await?;
+			fs_ext::write_async(path, body).await?;
 			Ok(())
 		})
 	}
@@ -93,7 +93,7 @@ impl BucketProvider for FsBucketProvider {
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(bucket_name, path);
-		Box::pin(async move { FsExt::exists_async(path).await?.xok() })
+		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
 	fn get(
@@ -103,7 +103,7 @@ impl BucketProvider for FsBucketProvider {
 	) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(bucket_name, path);
 		Box::pin(async move {
-			ReadFile::to_bytes_async(&path)
+			fs_ext::read_async(&path)
 				.await
 				.map_err(|_| HttpError::not_found())?
 				.xmap(Bytes::from)
@@ -116,7 +116,7 @@ impl BucketProvider for FsBucketProvider {
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<()>> {
 		let path = self.resolve_path(bucket_name, path);
-		Box::pin(async move { FsExt::remove_async(path).await?.xok() })
+		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(

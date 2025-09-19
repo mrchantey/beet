@@ -20,7 +20,7 @@ pub fn import_rsx_snippets_md(
 		{
 			trace!("markdown source file changed: {}", path.display());
 
-			let file = ReadFile::to_string(path)?;
+			let file = fs_ext::read_to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			let mut snippet = commands.spawn((

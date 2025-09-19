@@ -246,7 +246,7 @@ pub(super) mod test {
 					panic!("expected base64 image data");
 				};
 				let bytes = BASE64_STANDARD.decode(b64).unwrap();
-				FsExt::write(
+				fs_ext::write(
 					AbsPathBuf::new_workspace_rel(".cache/file.png").unwrap(),
 					bytes,
 				)

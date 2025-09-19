@@ -56,12 +56,11 @@ impl WsPathBuf {
 	/// the path and then stripping the workspace root.
 	/// ## Panics
 	///
-	/// Panics if [`FsExt::workspace_root`] fails.
+	/// Panics if [`fs_ext::workspace_root`] fails.
 	pub fn new_cwd_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		use crate::prelude::PathExt;
-		let path = PathExt::absolute(path)?;
+		let path = path_ext::absolute(path)?;
 		// TODO use pathdiff instead?
-		let path = PathExt::strip_prefix(&path, &FsExt::workspace_root())?;
+		let path = path_ext::strip_prefix(&path, &fs_ext::workspace_root())?;
 		Ok(Self::new(path))
 	}
 
@@ -81,7 +80,7 @@ impl WsPathBuf {
 	/// # Panics
 	/// Panics if the workspace root or cwd cannot be determined.
 	pub fn into_abs(&self) -> AbsPathBuf {
-		let path = FsExt::workspace_root().join(self).clean();
+		let path = fs_ext::workspace_root().join(self).clean();
 		AbsPathBuf::new(path)
 			.map_err(|err| {
 				format!("Failed to convert WsPathBuf to AbsPathBuf: {err}")

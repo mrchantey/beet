@@ -159,7 +159,7 @@ impl CodegenFile {
 		let output_str = prettyplease::unparse(&output_tokens);
 		trace!("Exporting codegen file:\n{}", self.output.to_string_lossy());
 
-		FsExt::write_if_diff(&self.output, &output_str)?;
+		fs_ext::write_if_diff(&self.output, &output_str)?;
 		Ok(())
 	}
 

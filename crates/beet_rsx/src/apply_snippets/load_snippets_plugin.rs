@@ -20,7 +20,7 @@ impl Plugin for LoadSnippetsPlugin {
 pub fn load_all_file_snippets(world: &mut World) -> Result {
 	let config = world.resource::<WorkspaceConfig>();
 	let file = config.snippets_dir().into_abs().join("snippets.ron");
-	if let Ok(file) = ReadFile::to_string(file) {
+	if let Ok(file) = fs_ext::read_to_string(file) {
 		world.load_scene(file)?;
 	}
 	Ok(())
@@ -36,7 +36,7 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	// TODO store this in a resource for hooking up with fine-grained loading
 	let mut snippet_entity_map = Default::default();
 	for file in files {
-		let file = ReadFile::to_string(file)?;
+		let file = fs_ext::read_to_string(file)?;
 		{
 			world.load_scene_with(file, &mut snippet_entity_map)?;
 		}

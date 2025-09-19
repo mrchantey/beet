@@ -22,7 +22,7 @@ pub fn import_rsx_snippets_rs(
 		{
 			trace!("rust source file changed: {}", path.display());
 
-			let file = ReadFile::to_string(path)?;
+			let file = fs_ext::read_to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
 				source_file: entity,

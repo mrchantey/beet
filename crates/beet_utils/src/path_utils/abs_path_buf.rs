@@ -1,7 +1,7 @@
 use super::FsError;
-use super::FsExt;
+use super::fs_ext;
 use super::FsResult;
-use super::PathExt;
+use super::path_ext;
 use crate::prelude::*;
 use path_clean::PathClean;
 use std::path::Path;
@@ -33,7 +33,7 @@ macro_rules! abs_file {
 /// - often an `AbsPathBuf` is used for workspace config files, and workspace
 /// 	paths are more intuitive in that context.
 /// For these reasons the path is serialized and deserialized relative to the workspace root,
-/// using [`FsExt::workspace_root`].
+/// using [`fs_ext::workspace_root`].
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, bevy::reflect::Reflect,
 )]
@@ -71,7 +71,7 @@ impl AbsPathBuf {
 	/// ```
 	pub fn new(path: impl AsRef<Path>) -> FsResult<Self> {
 		let path = path.as_ref();
-		let path = PathExt::absolute(path)?;
+		let path = path_ext::absolute(path)?;
 		let path = path.clean();
 		Ok(Self(path))
 	}
@@ -109,7 +109,7 @@ impl AbsPathBuf {
 	/// let path = AbsPathBuf::new_workspace_rel(file!());
 	/// ```
 	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		let path = FsExt::workspace_root().join(path);
+		let path = fs_ext::workspace_root().join(path);
 		Self::new(path)
 	}
 
@@ -138,7 +138,7 @@ impl AbsPathBuf {
 
 	pub fn into_ws_path(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
-		let path = PathExt::strip_prefix(&self.0, &FsExt::workspace_root())?;
+		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())?;
 		Ok(WsPathBuf::new(path))
 	}
 }
@@ -175,7 +175,7 @@ impl serde::Serialize for AbsPathBuf {
 		S: serde::Serializer,
 	{
 		// Get workspace root
-		let workspace_root = FsExt::workspace_root();
+		let workspace_root = fs_ext::workspace_root();
 
 		// Make path relative to workspace root
 		let rel_path = pathdiff::diff_paths(&self.0, &workspace_root)
@@ -200,7 +200,7 @@ impl<'de> serde::Deserialize<'de> for AbsPathBuf {
 		let rel_path = PathBuf::deserialize(deserializer)?;
 
 		// Join with workspace root
-		let abs_path = FsExt::workspace_root().join(rel_path);
+		let abs_path = fs_ext::workspace_root().join(rel_path);
 
 		// Return as AbsPathBuf
 		let abs_path = AbsPathBuf::new(abs_path).map_err(|err| {

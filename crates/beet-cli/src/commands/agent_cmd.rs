@@ -5,7 +5,7 @@ use clap::Parser;
 #[derive(Debug, Clone, Parser)]
 pub struct AgentCmd {
 	#[clap(flatten)]
-	plugin: TerminalAgentPlugin,
+	plugin: CliAgentPlugin,
 }
 
 

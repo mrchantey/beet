@@ -21,7 +21,7 @@ impl ExportPdf {
 		// let devtools = ChromeDevTools::connect().await?;
 		// let bytes = devtools.visit(&self.input).await?.export_pdf().await?;
 		// let output = self.output.unwrap_or("output.pdf".into());
-		// FsExt::write_async(output, bytes).await?;
+		// fs_ext::write_async(output, bytes).await?;
 		// Ok(())
 	}
 }

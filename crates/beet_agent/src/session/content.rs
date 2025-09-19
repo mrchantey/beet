@@ -182,11 +182,11 @@ impl FileData {
 		if is_uri(path) {
 			Self::new_uri(path)
 		} else if mime_type.starts_with("text/") {
-			let bytes = ReadFile::to_bytes_async(path).await?;
+			let bytes = fs_ext::read_async(path).await?;
 			let utf8 = String::from_utf8(bytes)?;
 			Self::Utf8(utf8)
 		} else {
-			let bytes = ReadFile::to_bytes_async(path).await?;
+			let bytes = fs_ext::read_async(path).await?;
 			let base_64 = BASE64_STANDARD.encode(bytes);
 			Self::Base64(base_64)
 		}
@@ -224,7 +224,7 @@ impl FileData {
 				} else {
 					// assume workspace relative file path
 					AbsPathBuf::new_workspace_rel(uri)?
-						.xmap(ReadFile::to_bytes_async)
+						.xmap(fs_ext::read_async)
 						.await?
 						.xok()
 				}

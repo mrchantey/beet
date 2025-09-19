@@ -44,7 +44,7 @@ pub fn export_server_ssg(
 ) -> Result {
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
-	PathExt::assert_exists(&exe_path)?;
+	path_ext::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
 		.envs(pkg_config.envs())
 		.arg("--export-static")
@@ -85,7 +85,7 @@ pub(crate) fn run_server(
 	}
 	// run once to export static
 	let exe_path = cmd.exe_path(manifest.package_name());
-	PathExt::assert_exists(&exe_path)?;
+	path_ext::assert_exists(&exe_path)?;
 	let child = Command::new(&exe_path)
 		.envs(pkg_config.envs())
 		.xtap(|cmd| {

@@ -25,7 +25,7 @@ pub fn collect_runnable_tests(
 					.expect("channel was dropped");
 				None
 			} else {
-				Some(TestDescAndFnExt::clone(test))
+				Some(test_desc_and_fn_ext::clone(test))
 			}
 		})
 		.collect::<Vec<_>>();
@@ -62,7 +62,7 @@ pub trait TestRunner {
 	// 		let suite = suites
 	// 			.entry(test.desc.source_file)
 	// 			.or_insert_with(|| TestSuite::new(test.desc.source_file));
-	// 		suite.tests.push(TestDescAndFnExt::clone(test));
+	// 		suite.tests.push(test_desc_and_fn_ext::clone(test));
 	// 	}
 }
 

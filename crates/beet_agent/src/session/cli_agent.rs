@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
-pub struct TerminalAgentPlugin {
+pub struct CliAgentPlugin {
 	/// Initial prompt to start the chat with
 	#[arg(
 		short = 'p',
@@ -19,7 +19,7 @@ pub struct TerminalAgentPlugin {
 		trailing_var_arg = true,
 		help = "Initial prompt to start the chat"
 	)]
-	pub trailing_args: Vec<String>,
+	pub initial_prompt_trailing: Vec<String>,
 	/// Paths to files whose contents will be used as the initial prompt
 	#[arg(
 		short = 'f',
@@ -31,7 +31,7 @@ pub struct TerminalAgentPlugin {
 	#[arg(long = "generate-images", help = "Add the image generation tool")]
 	pub generate_images: bool,
 	#[clap(flatten)]
-	pub config: TerminalAgentConfig,
+	pub config: CliAgentConfig,
 }
 
 
@@ -45,7 +45,7 @@ macro_rules! print_flush {
 
 
 #[derive(Debug, Clone, Parser, Resource)]
-pub struct TerminalAgentConfig {
+pub struct CliAgentConfig {
 	#[arg(
 		long,
 		help = "Run in oneshot mode, exiting after the first message received"
@@ -55,7 +55,7 @@ pub struct TerminalAgentConfig {
 	out_dir: Option<std::path::PathBuf>,
 }
 
-impl Plugin for TerminalAgentPlugin {
+impl Plugin for CliAgentPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin(AgentPlugin)
 			.init_plugin(AsyncPlugin)
@@ -71,12 +71,12 @@ impl Plugin for TerminalAgentPlugin {
 	}
 }
 
-impl TerminalAgentPlugin {
+impl CliAgentPlugin {
 	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
 		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
 			Some(prompt.clone())
-		} else if !self.trailing_args.is_empty() {
-			Some(self.trailing_args.join(" "))
+		} else if !self.initial_prompt_trailing.is_empty() {
+			Some(self.initial_prompt_trailing.join(" "))
 		} else {
 			None
 		};
@@ -187,7 +187,7 @@ fn file_inserted(
 	ev: Trigger<OnInsert, FileContent>,
 	mut cache: Local<HashMap<String, AbsPathBuf>>,
 	cx: SessionParams,
-	config: Res<TerminalAgentConfig>,
+	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
 	mut commands: Commands,
 ) -> Result {
@@ -213,7 +213,7 @@ fn file_inserted(
 			AsyncTask::spawn_with_queue_unwrap,
 			async move |_| {
 				let data = file.data.get().await?;
-				FsExt::write_async(filename, data).await?;
+				fs_ext::write_async(filename, data).await?;
 				Ok(())
 			},
 		);
@@ -235,7 +235,7 @@ fn message_ended(
 fn route_message_requests(
 	ev: Trigger<OnAdd, MessageComplete>,
 	cx: SessionParams,
-	config: Res<TerminalAgentConfig>,
+	config: Res<CliAgentConfig>,
 	mut commands: Commands,
 	users: Query<Entity, With<User>>,
 	agents: Query<Entity, With<Agent>>,

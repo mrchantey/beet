@@ -17,7 +17,7 @@ impl<H: Hasher> HashNonSnippetRust<'_, H> {
 	pub fn hash(&mut self, file: &SourceFile) -> Result<()> {
 		match file.extension() {
 			Some(ex) if ex == "rs" => {
-				let file_content = ReadFile::to_string(file)?;
+				let file_content = fs_ext::read_to_string(file)?;
 				let parsed_file =
 					syn::parse_file(&file_content).map_err(|err| {
 						anyhow::anyhow!(

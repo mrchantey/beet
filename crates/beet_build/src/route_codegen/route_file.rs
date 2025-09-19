@@ -102,12 +102,12 @@ pub(super) fn create_route_files(
 		};
 
 		// no existing route file found, create a new one
-		let mod_path = PathExt::create_relative(&codegen.output_dir()?, &file)?;
-		let route_path = PathExt::create_relative(&collection.src, &file)?
+		let mod_path = path_ext::create_relative(&codegen.output_dir()?, &file)?;
+		let route_path = path_ext::create_relative(&collection.src, &file)?
 			.xmap(RoutePath::from_file_path)?;
 
 		let source_file_collection_rel =
-			PathExt::create_relative(&collection.src, &file)?;
+			path_ext::create_relative(&collection.src, &file)?;
 
 		debug!("Creating new RouteSourceFile: {}", file.path());
 

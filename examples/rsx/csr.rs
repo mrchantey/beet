@@ -49,7 +49,7 @@ fn main() {
 </body>
 </html>
 "#;
-	FsExt::write("target/examples/csr/index.html", html).unwrap();
+	fs_ext::write("target/examples/csr/index.html", html).unwrap();
 }
 
 #[template]

@@ -21,7 +21,7 @@ pub fn parse_route_file_rs(
 				.extension()
 				.map_or(false, |ext| ext == "rs")
 		}) {
-		let file_str = ReadFile::to_string(&source_file)?;
+		let file_str = fs_ext::read_to_string(&source_file)?;
 
 		// collect all public functions, including handlers and
 		// possibly their meta functions

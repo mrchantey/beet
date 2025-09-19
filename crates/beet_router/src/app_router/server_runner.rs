@@ -96,7 +96,7 @@ impl ServerRunner {
 
 		for (path, html) in html {
 			trace!("Exporting html to {}", path);
-			FsExt::write(path, &html)?;
+			fs_ext::write(path, &html)?;
 		}
 		Ok(())
 	}

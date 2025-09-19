@@ -11,7 +11,7 @@ use serde::Serialize;
 use std::path::Path;
 
 use sweet::prelude::ReadDir;
-use sweet::prelude::ReadFile;
+use sweet::prelude::fs_ext;
 
 use super::ContentSource;
 use super::ContentSourceKey;
@@ -162,7 +162,7 @@ impl<'a, E: BeetEmbedModel> IndexRepository<'a, E> {
 			.par_bridge()
 			// .into_par_iter()
 			.map(|path| {
-				let content = ReadFile::to_string(&path)?;
+				let content = fs_ext::read_to_string(&path)?;
 				let documents =
 					source.split_text.split_to_documents(path, &content);
 				Ok(documents)

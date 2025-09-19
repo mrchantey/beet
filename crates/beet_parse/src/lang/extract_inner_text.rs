@@ -7,7 +7,7 @@ use bevy::prelude::*;
 /// and replaced with a [`FileInnerText`] component containing the file contents.
 ///
 /// ## Relative Paths
-/// Relative paths are defined by [`PathExt::is_relative_url`],
+/// Relative paths are defined by [`path_ext::is_relative_url`],
 /// any path not starting with `/`, `http://`, `https://` etc is considered relative.
 ///
 /// In The [`Build`] phase each [`FileInnerText`] is manually loaded via `fs` and
@@ -19,7 +19,7 @@ pub fn extract_inner_text_file(
 ) {
 	for entity in query.iter() {
 		if let Some((attr_entity, Some(value))) = attributes.find(entity, "src")
-			&& PathExt::is_relative_url(&value.0)
+			&& path_ext::is_relative_url(&value.0)
 		{
 			// TODO allow absolute paths?
 			commands

@@ -69,7 +69,7 @@ impl AutoMod {
 						if !self.quiet {
 							println!(
 								"AutoMod: {action} {}",
-								PathExt::relative(&path)
+								path_ext::relative(&path)
 									.unwrap_or(&path)
 									.display(),
 							);
@@ -301,7 +301,7 @@ impl ModFiles {
 		let path = path.as_ref();
 		if !self.map.contains_key(path) {
 			// if it doesnt exist create an empty file
-			let file = ReadFile::to_string(path).unwrap_or_default();
+			let file = fs_ext::read_to_string(path).unwrap_or_default();
 			let file = syn::parse_file(&file)?;
 			self.map.insert(path.to_path_buf(), file);
 		}
@@ -311,10 +311,10 @@ impl ModFiles {
 		// TODO only perform write if hash changed
 		for (path, file) in &self.map {
 			let file = prettyplease::unparse(file);
-			FsExt::write(path, &file)?;
+			fs_ext::write(path, &file)?;
 			println!(
 				"AutoMod: write  {}",
-				PathExt::relative(path).unwrap_or(path).display()
+				path_ext::relative(path).unwrap_or(path).display()
 			);
 		}
 		Ok(())
@@ -372,10 +372,10 @@ mod test {
 	fn insert_works() {
 		fn insert(ws_path: impl AsRef<Path>) -> Result<String> {
 			let abs =
-				AbsPathBuf::new(FsExt::workspace_root().join(ws_path.as_ref()))
+				AbsPathBuf::new(fs_ext::workspace_root().join(ws_path.as_ref()))
 					.unwrap();
 			let file_meta = FileMeta::new(abs.as_ref())?;
-			let file = ReadFile::to_string(&file_meta.parent_mod)?;
+			let file = fs_ext::read_to_string(&file_meta.parent_mod)?;
 			let mut file = syn::parse_file(&file)?;
 			AutoMod::insert_mod(&mut file, file_meta)?;
 			let file = prettyplease::unparse(&file);
@@ -395,10 +395,10 @@ mod test {
 	fn remove_works() {
 		fn remove(ws_path: impl AsRef<Path>) -> Result<String> {
 			let abs =
-				AbsPathBuf::new(FsExt::workspace_root().join(ws_path.as_ref()))
+				AbsPathBuf::new(fs_ext::workspace_root().join(ws_path.as_ref()))
 					.unwrap();
 			let file_meta = FileMeta::new(abs.as_ref())?;
-			let file = ReadFile::to_string(&file_meta.parent_mod)?;
+			let file = fs_ext::read_to_string(&file_meta.parent_mod)?;
 			let mut file = syn::parse_file(&file)?;
 			AutoMod::remove_mod(&mut file, file_meta)?;
 			let file = prettyplease::unparse(&file);

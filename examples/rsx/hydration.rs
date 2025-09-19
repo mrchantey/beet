@@ -35,7 +35,7 @@ fn main() {
 			}
 		</style>
 	});
-	FsExt::write("target/examples/hydration/index.html", html).unwrap();
+	fs_ext::write("target/examples/hydration/index.html", html).unwrap();
 }
 
 // then build the wasm module, this app must register the `ClientIslandRoot<Counter>`

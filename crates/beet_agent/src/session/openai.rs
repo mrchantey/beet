@@ -166,7 +166,7 @@ fn openai_message_request(
 					continue;
 				};
 				dump.push(body.clone());
-				FsExt::write_async(
+				fs_ext::write_async(
 					AbsPathBuf::new_workspace_rel("dump.json").unwrap(),
 					serde_json::to_string_pretty(&dump).unwrap(),
 				)

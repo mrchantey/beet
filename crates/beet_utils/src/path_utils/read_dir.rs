@@ -333,7 +333,7 @@ mod test {
 	#[test]
 	fn fails() {
 		let err_str = ReadDir::default()
-			.read(FsExt::test_dir().join("foo"))
+			.read(fs_ext::test_dir().join("foo"))
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
@@ -342,31 +342,31 @@ mod test {
 
 	#[test]
 	fn dirs() {
-		let err_str = ReadDir::dirs(FsExt::test_dir().join("foo"))
+		let err_str = ReadDir::dirs(fs_ext::test_dir().join("foo"))
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
 		assert!(err_str.contains("test_dir/foo"));
-		assert_eq!(ReadDir::dirs(FsExt::test_dir()).unwrap().len(), 2);
+		assert_eq!(ReadDir::dirs(fs_ext::test_dir()).unwrap().len(), 2);
 	}
 
 	#[test]
 	fn read_dir_recursive() {
 		assert_eq!(
-			ReadDir::dirs_recursive(FsExt::test_dir()).unwrap().len(),
+			ReadDir::dirs_recursive(fs_ext::test_dir()).unwrap().len(),
 			2
 		);
 	}
 
 	#[test]
 	fn files() {
-		assert_eq!(ReadDir::files(FsExt::test_dir()).unwrap().len(), 3);
+		assert_eq!(ReadDir::files(fs_ext::test_dir()).unwrap().len(), 3);
 	}
 
 	#[test]
 	fn files_recursive() {
 		assert_eq!(
-			ReadDir::files_recursive(FsExt::test_dir()).unwrap().len(),
+			ReadDir::files_recursive(fs_ext::test_dir()).unwrap().len(),
 			5
 		);
 	}
@@ -378,7 +378,7 @@ mod test_async {
 	#[tokio::test]
 	async fn fails() {
 		let err_str = ReadDir::default()
-			.read_async(FsExt::test_dir().join("foo"))
+			.read_async(fs_ext::test_dir().join("foo"))
 			.await
 			.unwrap_err()
 			.to_string()
@@ -388,14 +388,14 @@ mod test_async {
 
 	#[tokio::test]
 	async fn dirs() {
-		let err_str = ReadDir::dirs_async(FsExt::test_dir().join("foo"))
+		let err_str = ReadDir::dirs_async(fs_ext::test_dir().join("foo"))
 			.await
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
 		assert!(err_str.contains("test_dir/foo"));
 		assert_eq!(
-			ReadDir::dirs_async(FsExt::test_dir()).await.unwrap().len(),
+			ReadDir::dirs_async(fs_ext::test_dir()).await.unwrap().len(),
 			2
 		);
 	}
@@ -403,7 +403,7 @@ mod test_async {
 	#[tokio::test]
 	async fn read_dir_recursive() {
 		assert_eq!(
-			ReadDir::dirs_recursive_async(FsExt::test_dir())
+			ReadDir::dirs_recursive_async(fs_ext::test_dir())
 				.await
 				.unwrap()
 				.len(),
@@ -414,7 +414,7 @@ mod test_async {
 	#[tokio::test]
 	async fn files() {
 		assert_eq!(
-			ReadDir::files_async(FsExt::test_dir()).await.unwrap().len(),
+			ReadDir::files_async(fs_ext::test_dir()).await.unwrap().len(),
 			3
 		);
 	}
@@ -422,7 +422,7 @@ mod test_async {
 	#[tokio::test]
 	async fn files_recursive() {
 		assert_eq!(
-			ReadDir::files_recursive_async(FsExt::test_dir())
+			ReadDir::files_recursive_async(fs_ext::test_dir())
 				.await
 				.unwrap()
 				.len(),

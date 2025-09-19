@@ -40,7 +40,7 @@ impl<'a> Mddoc<'a> {
 	async fn build_json(&self) -> Result<()> {
 		let target_path = self.source.target_path();
 		// another commit may have some extra files lying around
-		FsExt::remove(&target_path.join("doc")).ok();
+		fs_ext::remove(&target_path.join("doc")).ok();
 
 		let mut cmd = tokio::process::Command::new("cargo");
 		cmd.arg("doc")
@@ -69,7 +69,7 @@ impl<'a> Mddoc<'a> {
 	}
 
 	fn build_mddoc(&self, json_path: &Path) -> Result<()> {
-		let file = ReadFile::to_string(&json_path)?;
+		let file = fs_ext::read_to_string(&json_path)?;
 		let data: Crate = serde_json::from_str(&file)?;
 
 		let markdown = rustdoc_json_to_markdown(data);
@@ -93,7 +93,7 @@ impl<'a> Mddoc<'a> {
 			.join(file_stem)
 			.with_extension("md");
 
-		FsExt::write(&md_path, &markdown)?;
+		fs_ext::write(&md_path, &markdown)?;
 
 		tracing::trace!("Wrote markdown to {}", md_path.display());
 		Ok(())

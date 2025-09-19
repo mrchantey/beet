@@ -204,7 +204,7 @@ impl BacktraceLocation {
 	/// - for `cargo test` this is the workspace root
 	/// - for `cargo test - my_pkg` this uses $SWEET_ROOT to resolve package root
 	/// 1. Prefix the path with $SWEET_ROOT if it exists,
-	/// 2. otherwise use [FsExt::workspace_root]
+	/// 2. otherwise use [fs_ext::workspace_root]
 	pub fn cwd_root() -> PathBuf {
 		#[cfg(not(target_arch = "wasm32"))]
 		return beet_utils::prelude::workspace_root();
@@ -247,7 +247,7 @@ SWEET_ROOT = { value = "", relative = true }
 	let file = js_runtime::read_file(&path.to_string_lossy().to_string())
 		.ok_or_else(|| bail(&js_runtime::cwd()))?;
 	#[cfg(not(target_arch = "wasm32"))]
-	let file = beet_utils::prelude::ReadFile::to_string(path).map_err(|_| {
+	let file = beet_utils::prelude::fs_ext::read_to_string(path).map_err(|_| {
 		bail(
 			&std::env::current_dir()
 				.unwrap_or_default()

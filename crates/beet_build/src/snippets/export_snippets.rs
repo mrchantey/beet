@@ -19,7 +19,7 @@ pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 			.join("snippets.ron")
 			.into_abs();
 		tracing::info!("Writing one big snippet scene to {}", path.display());
-		FsExt::write_if_diff(path, &scene)?;
+		fs_ext::write_if_diff(path, &scene)?;
 	}
 
 	// currently disabled until full roundtrip is stablized
@@ -33,7 +33,7 @@ pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 
 		let scene = world.build_scene_with(scene);
 		tracing::trace!("Writing rsx snippet to {}", path.display());
-		FsExt::write_if_diff(path, &scene)?;
+		fs_ext::write_if_diff(path, &scene)?;
 	}
 
 	Ok(())
@@ -85,11 +85,11 @@ mod test {
 			.spawn(SourceFile::new(test_site_index.into_abs()))
 			.id();
 
-		FsExt::remove(&snippet_path).ok();
+		fs_ext::remove(&snippet_path).ok();
 
 		app.update();
 
-		let saved = ReadFile::to_string(snippet_path).unwrap();
+		let saved = fs_ext::read_to_string(snippet_path).unwrap();
 		// non-empty scene file
 		saved.len().xpect_greater_than(1000);
 	}
@@ -109,11 +109,11 @@ mod test {
 		// 	.spawn((HtmlDocument, rsx! {<style>div{color:blue;}</style>}))
 		// 	.id();
 
-		FsExt::remove(&path).ok();
+		fs_ext::remove(&path).ok();
 
 		app.update();
 
-		let saved = ReadFile::to_string(path).unwrap();
+		let saved = fs_ext::read_to_string(path).unwrap();
 		// non-empty scene file
 		saved.len().xpect_greater_than(200);
 		#[cfg(feature = "css")]

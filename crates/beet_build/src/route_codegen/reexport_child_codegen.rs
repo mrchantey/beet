@@ -47,7 +47,7 @@ pub fn reexport_child_codegen(
 			}
 
 			let relative_path =
-				PathExt::create_relative(codegen.output_dir()?, &child_path)?;
+				path_ext::create_relative(codegen.output_dir()?, &child_path)?;
 			let relative_path = relative_path.to_string_lossy();
 			let name = quote::format_ident!("{child_name}");
 			codegen.add_item::<ItemMod>(syn::parse_quote! {

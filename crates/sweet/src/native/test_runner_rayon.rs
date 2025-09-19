@@ -71,7 +71,7 @@ impl TestRunner for TestRunnerRayon {
 							desc_cell.get_or(|| Default::default());
 						tls_desc_cell.set(Some(test.desc.clone()));
 
-						let func = TestDescAndFnExt::func(&test);
+						let func = test_desc_and_fn_ext::func(&test);
 						let result =
 							SweetTestCollector::with_scope(&test.desc, || {
 								std::panic::catch_unwind(func)
