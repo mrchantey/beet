@@ -25,7 +25,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(EntityObserver::new(start_openai_response));
+		.insert(EntityObserver::new(openai_message_request));
 }
 
 impl OpenAiProvider {
@@ -57,17 +57,17 @@ impl OpenAiProvider {
 				"stream": true,
 				"input": input,
 				"tools": self.tools,
-				"previous_response_id": self.prev_response_id
+				// "previous_response_id": self.prev_response_id
 			}})?
 			.xok()
 	}
 }
 
-fn start_openai_response(
-	trigger: Trigger<StartResponse>,
+fn openai_message_request(
+	trigger: Trigger<MessageRequest>,
 	query: Query<&OpenAiProvider>,
 	mut commands: Commands,
-	cx: SessionQuery,
+	cx: SessionParams,
 ) -> Result {
 	let actor = trigger.target();
 	let provider = query.get(actor)?;
@@ -81,31 +81,36 @@ fn start_openai_response(
 				RelativeRole::Other => "user",
 			};
 
+			let content_type_prefix = match item.role {
+				RelativeRole::This => "output",
+				_ => "input",
+			};
+
 			let content = item
 				.content
 				.into_iter()
 				.map(|part| match part {
 					ContentView::Text(content) => json!({
-							"type":"input_text",
+						"type": format!("{content_type_prefix}_text"),
 							"text": content.0,
 					}),
 					ContentView::File(file) if file.is_image() => json!({
-						"type":"input_image",
+						"type":format!("{content_type_prefix}_image"),
 						"image_url": file.into_url(),
 					}),
 					ContentView::File(file) => match &file.data {
 						// only pdf file type supported
 						FileData::Utf8(utf8) => json!({
-							"type":"input_text",
+							"type":format!("{content_type_prefix}_text"),
 							"text": format!("<file src={}>{}</file>", file.filename.to_string_lossy(), utf8),
 						}),
 						FileData::Uri(uri) => json!({
-							"type":"input_file",
+							"type":format!("{content_type_prefix}_file"),
 							"filename": file.filename.to_string_lossy(),
 							"file_url": uri,
 						}),
 						FileData::Base64(_) => json!({
-							"type":"input_file",
+							"type":format!("{content_type_prefix}_file"),
 							"filename": file.filename.to_string_lossy(),
 							"file_data": file.into_url(),
 						}),
@@ -228,7 +233,6 @@ fn start_openai_response(
 									.to_u64()?;
 							let id =
 								body["response"]["id"].to_str()?.to_string();
-							spawner.finish_message().await?;
 							queue
 								.entity(actor)
 								.with(move |mut entity| {
@@ -240,9 +244,9 @@ fn start_openai_response(
 										entity.get_mut::<TokenUsage>().unwrap();
 									tokens.input_tokens += input_tokens;
 									tokens.output_tokens += output_tokens;
-									entity.trigger(ResponseComplete);
 								})
 								.await;
+							spawner.finish_message().await?;
 						}
 						"error" => {
 							let message = body["error"]["message"].to_str()?;

@@ -101,7 +101,7 @@ impl<'w, 's> MessageBuilder<'w, 's> {
 		self.commands.spawn((
 			ChildOf(self.message),
 			content,
-			ContentComplete::default(),
+			ContentEnded::default(),
 		));
 		self
 	}

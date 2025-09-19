@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
-use std::io::Write;
 
 #[derive(Debug, Clone, Parser)]
 pub struct TerminalAgentPlugin {
@@ -30,6 +29,29 @@ pub struct TerminalAgentPlugin {
 	pub input_files: Vec<std::path::PathBuf>,
 }
 
+
+macro_rules! print_flush {
+ ($($arg:tt)*) => {{
+  use std::io::{self, Write};
+  print!($($arg)*);
+  let _ = io::stdout().flush();
+ }};
+}
+
+impl Plugin for TerminalAgentPlugin {
+	fn build(&self, app: &mut App) {
+		app.init_plugin(AgentPlugin)
+			.init_plugin(AsyncPlugin)
+			.add_systems(Startup, self.into_system())
+			.add_observer(text_added)
+			.add_observer(text_delta)
+			.add_observer(reasoning_added)
+			.add_observer(reasoning_ended)
+			.add_observer(message_ended)
+			.add_observer(route_message_requests);
+	}
+}
+
 impl TerminalAgentPlugin {
 	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
 		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
@@ -37,7 +59,8 @@ impl TerminalAgentPlugin {
 		} else if !self.trailing_args.is_empty() {
 			self.trailing_args.join(" ")
 		} else {
-			"Ask me a provocative question".to_string()
+			"Ask me a provocative question about my past. not about secrets"
+				.to_string()
 		};
 
 		let paths = self
@@ -62,13 +85,7 @@ impl TerminalAgentPlugin {
 					queue.with(move |world| {
 						let commands = world.commands();
 						let mut session = SessionBuilder::new(commands);
-						let session_ent = session.session();
-						session
-							.commands()
-							.entity(session_ent)
-							.observe(on_content_added)
-							.observe(on_content_delta)
-							.observe(print_content_ended);
+
 						let mut user = session.add_actor(terminal_user());
 						let mut user_msg = user.create_message();
 						println!("User > {}\n", initial_prompt);
@@ -79,7 +96,7 @@ impl TerminalAgentPlugin {
 						}
 						session
 							.add_actor(OpenAiProvider::from_env())
-							.trigger(StartResponse);
+							.trigger(MessageRequest);
 					});
 					Ok(())
 				},
@@ -92,79 +109,86 @@ pub enum TerminalAgentMode {
 }
 
 
-impl Plugin for TerminalAgentPlugin {
-	fn build(&self, app: &mut App) {
-		app.init_plugin(AgentPlugin)
-			.init_plugin(AsyncPlugin)
-			.add_systems(Startup, self.into_system());
-	}
-}
-
 
 fn terminal_user() -> impl Bundle {
-	(User, EntityObserver::new(user_input_on_content_end))
+	(User, EntityObserver::new(user_message_request))
 }
 
-fn on_content_added(
-	ev: Trigger<ContentBroadcast<MessageStart>>,
-	users: Query<(), With<User>>,
-	agents: Query<(), With<Agent>>,
-	developers: Query<(), With<Developer>>,
-) {
-	if users.contains(ev.actor) {
-		// user text already printed
-		return;
+fn text_added(ev: Trigger<OnAdd, TextContent>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.target())?;
+	if actor.role != ActorRole::User {
+		print_flush!("{} > ", actor.role);
 	}
-
-	let prefix = if users.contains(ev.actor) {
-		"User"
-	} else if agents.contains(ev.actor) {
-		"Agent"
-	} else if developers.contains(ev.actor) {
-		"Developer"
-	} else {
-		"Unknown"
-	};
-	print!("{prefix} > ");
+	Ok(())
 }
-fn on_content_delta(
-	ev: Trigger<ContentBroadcast<TextDelta>>,
-	users: Query<(), With<User>>,
-) {
-	if users.contains(ev.actor) {
-		// user text already printed
-		return;
+fn text_delta(ev: Trigger<TextDelta>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.target())?;
+	if actor.role != ActorRole::User {
+		print_flush!("{}", ev.event().0);
 	}
-	let text = ev.event().event.clone().0;
-	print!("{}", text);
-	let _ = std::io::stdout().flush();
-}
-fn print_content_ended(
-	ev: Trigger<OnAdd, ContentComplete>,
-	users: Query<(), With<User>>,
-) {
-	// if users.contains(ev.actor) {
-	// 	// user text already printed
-	// 	return;
-	// }
-
-	print!("\n\n");
-}
-
-fn user_input_on_content_end(
-	trigger: Trigger<ContentBroadcast<ResponseComplete>>,
-	commands: Commands,
-) -> Result {
-	let actor = trigger.target();
-	if actor == trigger.actor {
-		// println!("ignoring own content");
-		return Ok(());
-	}
-	user_input_request(commands, actor);
 	Ok(())
 }
 
-fn user_input_request(mut commands: Commands, actor: Entity) {
+fn reasoning_added(
+	ev: Trigger<OnAdd, ReasoningContent>,
+	cx: SessionParams,
+) -> Result {
+	let actor = cx.actor(ev.target())?;
+	print_flush!("{} > reasoning...", actor.role);
+
+	Ok(())
+}
+
+fn reasoning_ended(
+	ev: Trigger<OnAdd, ContentEnded>,
+	query: Query<(), With<ReasoningContent>>,
+) -> Result {
+	if query.contains(ev.target()) {
+		print_flush!(" done\n\n");
+	}
+	Ok(())
+}
+
+
+
+fn message_ended(
+	ev: Trigger<OnAdd, MessageComplete>,
+	cx: SessionParams,
+) -> Result {
+	let actor = cx.actor(ev.target())?;
+	if actor.role != ActorRole::User {
+		print_flush!("\n\n");
+	}
+	Ok(())
+}
+
+fn route_message_requests(
+	ev: Trigger<OnAdd, MessageComplete>,
+	cx: SessionParams,
+	mut commands: Commands,
+	users: Query<Entity, With<User>>,
+	agents: Query<Entity, With<Agent>>,
+) -> Result {
+	let actor = cx.actor(ev.target())?;
+	match actor.role {
+		ActorRole::User => {
+			commands.entity(agents.single()?).trigger(MessageRequest);
+		}
+		ActorRole::Agent => {
+			commands.entity(users.single()?).trigger(MessageRequest);
+		}
+		_ => {}
+	}
+
+	Ok(())
+}
+
+fn user_message_request(
+	ev: Trigger<MessageRequest>,
+	mut commands: Commands,
+	cx: SessionParams,
+) -> Result {
+	let actor = cx.actor(ev.target())?.entity;
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {
@@ -173,7 +197,7 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 
 			let stdin = io::stdin();
 			let mut input = String::new();
-			print!("User > ");
+			print_flush!("User > ");
 			input.clear();
 			let _ = io::stdout().flush();
 
@@ -188,11 +212,14 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 					// trim trailing newline and print the input
 					let line = input.trim_end().to_string();
 					let id = 0;
-					spawner.add(
-						id,
-						(TextContent::new(line), ContentComplete::default()),
-					);
-
+					spawner
+						.add(
+							id,
+							(TextContent::new(line), ContentEnded::default()),
+						)
+						.await?
+						.finish_message()
+						.await?;
 					println!();
 				}
 				Err(err) => {
@@ -202,4 +229,5 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 			Ok(())
 		},
 	);
+	Ok(())
 }

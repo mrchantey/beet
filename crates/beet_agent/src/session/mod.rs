@@ -1,9 +1,11 @@
+mod actor;
 mod content;
 mod message;
 mod openai;
 mod session;
 mod session_builder;
 mod terminal_agent;
+pub use actor::*;
 pub use content::*;
 pub use message::*;
 pub use openai::*;

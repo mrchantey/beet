@@ -6,89 +6,20 @@ use bevy::prelude::*;
 pub struct AgentPlugin;
 
 impl Plugin for AgentPlugin {
-	fn build(&self, app: &mut App) {
-		app.add_observer(broadcast_content_event::<MessageStart>)
-			.add_observer(broadcast_content_event::<TextDelta>);
-	}
-}
-
-/// When any content changes, notify the session and all actors who
-/// do not own the content
-fn broadcast_content_event<E: Clone + Event>(
-	trigger: Trigger<E>,
-	mut commands: Commands,
-	cx: SessionQuery,
-) -> Result {
-	let emitter = trigger.target();
-	let session = cx.session(emitter)?;
-	let actor = cx.actor(emitter)?;
-	let message = cx.message(emitter)?;
-	let targets = cx.actors(session)?.xpush(session);
-	commands.trigger_targets(
-		ContentBroadcast {
-			message,
-			actor,
-			session,
-			event: trigger.event().clone(),
-		},
-		targets,
-	);
-
-	Ok(())
+	fn build(&self, _: &mut App) {}
 }
 
 #[derive(Default, Component)]
 pub struct Session;
 
-/// Actor representing an AI agent, more than one agent may
-/// participate in a session at a time
-#[derive(Default, Component)]
-#[require(Actor, TokenUsage, Name = Name::new("Agent"))]
-pub struct Agent;
-
-/// Actor representing a human using the program, more than
-/// one user may participate in a session at a time.
-#[derive(Component)]
-#[require(Actor, Name = Name::new("User"))]
-pub struct User;
-
-/// Also known as the system actor, the messages and actions
-/// performed by this entity carry more weight.
-/// For example [`Developer`] instructions overrule [`User`] instructions
-#[derive(Component)]
-#[require(Actor, Name = Name::new("Developer"))]
-pub struct Developer;
-
-#[derive(Debug, Default, Component)]
-pub struct TokenUsage {
-	pub input_tokens: u64,
-	pub output_tokens: u64,
-}
-
-pub enum ReasoningEffort {
-	Min,
-	Max,
-}
-
 
 /// Helper for getting and setting session info
 #[derive(SystemParam)]
-pub struct SessionQuery<'w, 's> {
+pub struct SessionParams<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	parents: Query<'w, 's, &'static ChildOf>,
 	sessions: Query<'w, 's, Entity, With<Session>>,
-	actors: Query<
-		'w,
-		's,
-		(
-			Entity,
-			&'static Name,
-			Option<&'static User>,
-			Option<&'static Agent>,
-			Option<&'static Developer>,
-		),
-		With<Actor>,
-	>,
+	actors: Query<'w, 's, (Entity, &'static Name, &'static ActorRole)>,
 	messages: Query<'w, 's, &'static Message>,
 	content: Query<
 		'w,
@@ -98,7 +29,7 @@ pub struct SessionQuery<'w, 's> {
 	>,
 }
 
-impl SessionQuery<'_, '_> {
+impl SessionParams<'_, '_> {
 	/// Get the session for this entity
 	pub fn session(&self, entity: Entity) -> Result<Entity> {
 		self.parents
@@ -115,10 +46,10 @@ impl SessionQuery<'_, '_> {
 			.ok_or_else(|| bevyhow!("no message found for entity {entity:?}"))
 	}
 	/// Get the nearest actor ancestor for this entity
-	pub fn actor(&self, entity: Entity) -> Result<Entity> {
+	pub fn actor<'a>(&'a self, entity: Entity) -> Result<ActorView<'a>> {
 		self.parents
 			.iter_ancestors_inclusive(entity)
-			.find(|ent| self.actors.get(*ent).is_ok())
+			.find_map(|ent| self.actors.get(ent).map(ActorView::new).ok())
 			.ok_or_else(|| bevyhow!("no actor found for entity {entity:?}"))
 	}
 	pub fn actors(&self, entity: Entity) -> Result<Vec<Entity>> {
@@ -137,31 +68,18 @@ impl SessionQuery<'_, '_> {
 		let session = self.session(actor)?;
 
 		let actors = self.children.iter_direct_descendants(session).filter_map(
-			|entity| {
-				let (entity, name, user, agent, developer) =
-					self.actors.get(entity).ok()?;
-				let role = if user.is_some() {
-					Some(ActorRole::User)
-				} else if agent.is_some() {
-					Some(ActorRole::Agent)
-				} else if developer.is_some() {
-					Some(ActorRole::Developer)
-				} else {
-					None
-				};
-				Some((entity, name, role))
-			},
+			|entity| self.actors.get(entity).ok().map(ActorView::new),
 		);
 
 		let mut messages = actors
-			.flat_map(|(actor_ent, _name, role)| {
+			.flat_map(|actor| {
 				self.children
-					.iter_descendants_depth_first(actor_ent)
+					.iter_descendants_depth_first(actor.entity)
 					.filter_map(move |msg_ent| {
 						self.messages
 							.get(msg_ent)
 							.map(move |message| {
-								(actor_ent, role, msg_ent, message)
+								(actor.entity, actor.role, msg_ent, message)
 							})
 							.ok()
 					})
@@ -169,7 +87,7 @@ impl SessionQuery<'_, '_> {
 			.map(|(actor_ent, role, msg_ent, message)| {
 				let rel_role = if actor_ent == actor {
 					RelativeRole::This
-				} else if role == Some(ActorRole::Developer) {
+				} else if role == ActorRole::Developer {
 					RelativeRole::Developer
 				} else {
 					RelativeRole::Other
@@ -208,38 +126,7 @@ impl SessionQuery<'_, '_> {
 			});
 	}
 }
-pub enum ContentView<'a> {
-	Text(&'a TextContent),
-	File(&'a FileContent),
-}
-impl ContentView<'_> {
-	pub fn as_text(&self) -> Option<&TextContent> {
-		match self {
-			ContentView::Text(text) => Some(text),
-			_ => None,
-		}
-	}
-	pub fn as_file(&self) -> Option<&FileContent> {
-		match self {
-			ContentView::File(file) => Some(file),
-			_ => None,
-		}
-	}
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActorRole {
-	User,
-	Developer,
-	Agent,
-}
-
-
-pub struct MessageView<'a> {
-	pub role: RelativeRole,
-	pub message: &'a Message,
-	pub content: Vec<ContentView<'a>>,
-}
 
 /// A role relative to the actor:
 /// -  If the actor owns the content the role is [`Role::This`],
@@ -257,10 +144,7 @@ impl RelativeRole {}
 
 /// Indicate it is 'your turn'
 #[derive(Event)]
-pub struct StartResponse;
-
-#[derive(Event)]
-pub struct ResponseComplete;
+pub struct MessageRequest;
 
 #[cfg(test)]
 pub(super) mod test {
@@ -283,15 +167,16 @@ pub(super) mod test {
 		let mut session = SessionBuilder::from_app(&mut app);
 		let mut user = session.add_actor(User);
 		message(user.create_message()).await;
-		session.add_actor(agent).trigger(StartResponse);
+		session.add_actor(agent).trigger(MessageRequest);
 
 		app.add_observer(
-			move |ev: Trigger<ResponseComplete>,
+			move |ev: Trigger<OnAdd, MessageComplete>,
 			      mut commands: Commands,
-			      cx: SessionQuery| {
-				let actor = ev.target();
+			      cx: SessionParams|
+			      -> Result {
+				let actor = cx.actor(ev.target())?;
 				let content = cx
-					.collect_messages(actor)
+					.collect_messages(actor.entity)
 					.unwrap()
 					.into_iter()
 					.find(|msg| msg.role == RelativeRole::This)
@@ -302,6 +187,7 @@ pub(super) mod test {
 				// let text = text.get(content[0]).unwrap().0.xref();
 				// println!("Agent > {}\n", text);
 				commands.send_event(AppExit::Success);
+				Ok(())
 			},
 		);
 

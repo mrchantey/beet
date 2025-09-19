@@ -6,10 +6,13 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 
-/// A session actor, owns messages and reacts to others
-#[derive(Debug, Default, Clone, Component)]
-#[require(Name)]
-pub struct Actor;
+
+pub struct MessageView<'a> {
+	pub role: RelativeRole,
+	pub message: &'a Message,
+	pub content: Vec<ContentView<'a>>,
+}
+
 
 /// Marker component indicating the root entity for an actor's message.
 /// Messages must be (possibly nested) descendents of an [`Actor`], and may
@@ -104,7 +107,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 	pub async fn finish_content(&mut self, key: T) -> Result<&mut Self> {
 		self.queue
 			.entity(self.get_entity(&key)?)
-			.insert(ContentComplete::default())
+			.insert(ContentEnded::default())
 			.await;
 		self.finished_content.push(key);
 		Ok(self)
@@ -120,7 +123,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		self.queue
 			.with_then(move |world| {
 				for entity in unfinished {
-					world.entity_mut(entity).insert(ContentComplete::default());
+					world.entity_mut(entity).insert(ContentEnded::default());
 				}
 				world.entity_mut(message).insert(MessageComplete);
 			})
@@ -128,21 +131,3 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		Ok(())
 	}
 }
-
-
-/// Event notifying session actors of a content change
-// TODO bevy 0.17 shouldnt need this, we have original entity
-#[derive(Debug, Clone, Event)]
-pub struct ContentBroadcast<E> {
-	pub message: Entity,
-	pub session: Entity,
-	pub actor: Entity,
-	pub event: E,
-}
-
-
-
-/// Emitted on a piece of content like a TextContent to indicate it has started.
-/// This event does not contain text.
-#[derive(Clone, Event)]
-pub struct MessageStart;

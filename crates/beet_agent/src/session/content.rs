@@ -7,6 +7,24 @@ use bevy::prelude::*;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
+pub enum ContentView<'a> {
+	Text(&'a TextContent),
+	File(&'a FileContent),
+}
+impl ContentView<'_> {
+	pub fn as_text(&self) -> Option<&TextContent> {
+		match self {
+			ContentView::Text(text) => Some(text),
+			_ => None,
+		}
+	}
+	pub fn as_file(&self) -> Option<&FileContent> {
+		match self {
+			ContentView::File(file) => Some(file),
+			_ => None,
+		}
+	}
+}
 
 /// Marker component indicating the root entity for an actor's message.
 /// Messages must be (possibly nested) descendents of an [`Actor`], and may
@@ -26,7 +44,7 @@ impl Default for Timestamp {
 /// Added to a [`Content`] when it is finished, and no more content
 /// will be added to it.
 #[derive(Debug, Default, Clone, Copy, Component)]
-pub struct ContentComplete {
+pub struct ContentEnded {
 	pub completed: Timestamp,
 }
 
