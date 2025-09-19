@@ -1,6 +1,7 @@
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_net::sockets::*;
 use bevy::prelude::*;
 use bevy::tasks::IoTaskPool;
 use serde_json::Value;

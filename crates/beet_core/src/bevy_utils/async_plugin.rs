@@ -387,7 +387,7 @@ impl AsyncEntity {
 		self
 	}
 
-	pub fn trigger<E: Event>(&self, event: E) -> &Self {
+	pub async fn trigger<E: Event>(&self, event: E) -> &Self {
 		self.with(|mut entity| {
 			entity.trigger(event);
 		});

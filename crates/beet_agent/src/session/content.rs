@@ -3,7 +3,10 @@ use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 
@@ -27,6 +30,59 @@ impl Default for Message {
 		}
 	}
 }
+
+pub struct ContentBuilder<T: Hash> {
+	pub queue: AsyncQueue,
+	pub message: Entity,
+	pub map: HashMap<T, Entity>,
+}
+impl<T: Hash + Eq + Debug> ContentBuilder<T> {
+	pub fn new(queue: AsyncQueue, message: Entity) -> Self {
+		Self {
+			queue,
+			message,
+			map: HashMap::default(),
+		}
+	}
+	pub async fn add(&mut self, key: T, content: impl Bundle) -> Result<()> {
+		if self.map.contains_key(&key) {
+			bevybail!("Duplicate output index: {key:?}");
+		} else {
+			let entity = self
+				.queue
+				.spawn_then((ChildOf(self.message), content))
+				.await;
+			self.map.insert(key, entity);
+		}
+		Ok(())
+	}
+
+	pub async fn update_text(
+		&mut self,
+		key: &T,
+		text: impl AsRef<str>,
+	) -> Result<()> {
+		let entity = self
+			.map
+			.get(key)
+			.ok_or_else(|| bevyhow!("Missing entity for index: {key:?}"))?;
+		self.queue
+			.entity(*entity)
+			.trigger(ContentTextDelta::new(text))
+			.await;
+		Ok(())
+	}
+
+	pub async fn finish(&mut self, key: &T) -> Result {
+		let entity = self
+			.map
+			.get(key)
+			.ok_or_else(|| bevyhow!("Missing entity for index: {key:?}"))?;
+		self.queue.entity(*entity).trigger(ContentEnded).await;
+		Ok(())
+	}
+}
+
 
 /// Event notifying session actors of a content change
 // TODO bevy 0.17 shouldnt need this, we have original entity

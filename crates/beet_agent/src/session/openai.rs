@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use serde_json::json;
 
@@ -130,13 +129,24 @@ fn start_openai_response(
 			let mut stream = req.send().await?.event_source().await?;
 
 			// map of content_index to entity
-			let mut content_map = HashMap::new();
+			let mut content_map =
+				ContentBuilder::new(queue.clone(), message_entity);
+
+			let mut dump = Vec::new();
 
 			while let Some(ev) = stream.next().await {
 				let ev = ev?;
 				if let Ok(body) =
 					serde_json::from_str::<serde_json::Value>(&ev.data)
 				{
+					dump.push(body.clone());
+					FsExt::write_async(
+						AbsPathBuf::new_workspace_rel("dump.json").unwrap(),
+						serde_json::to_string_pretty(&dump).unwrap(),
+					)
+					.await
+					.unwrap();
+
 					// body.xref().xprint_debug_formatted("response");
 					// https://platform.openai.com/docs/api-reference/responses_streaming/response
 					match body.field_str("type")? {
@@ -148,48 +158,31 @@ fn start_openai_response(
 						"response.content_part.added" => {
 							match body["part"]["type"].to_str()? {
 								"output_text" => {
-									let index =
-										body["content_index"].to_u64()?;
-									if content_map.contains_key(&index) {
-										bevybail!(
-											"Duplicate output index: {index}"
-										);
-									} else {
-										let entity = queue
-											.spawn_then((
-												ChildOf(message_entity),
-												TextContent::default(),
-											))
-											.await;
-										content_map.insert(index, entity);
-									}
+									let key = body["content_index"].to_u64()?;
+									content_map
+										.add(key, TextContent::default())
+										.await?;
 								}
-								_ => {}
+								"reasoning" => {
+									//
+								}
+								other => {
+									eprintln!(
+										"unhandled content type: {}",
+										other
+									)
+								}
 							}
 						}
 						"response.output_text.delta" => {
 							let index = body["content_index"].to_u64()?;
-							let entity =
-								content_map.get(&index).ok_or_else(|| {
-									bevyhow!(
-										"Missing entity for index: {index}"
-									)
-								})?;
 							let new_text = body["delta"].to_str()?.to_string();
-							queue
-								.entity(*entity)
-								.trigger(ContentTextDelta::new(new_text));
+							content_map.update_text(&index, new_text).await?;
 						}
 						"response.output_text.done" => {}
 						"response.content_part.done" => {
 							let index = body["content_index"].to_u64()?;
-							let entity =
-								content_map.get(&index).ok_or_else(|| {
-									bevyhow!(
-										"Missing entity for index: {index}"
-									)
-								})?;
-							queue.entity(*entity).trigger(ContentEnded);
+							content_map.finish(&index).await?;
 						}
 						"response.output_item.done" => {}
 						"response.completed" => {
@@ -213,7 +206,8 @@ fn start_openai_response(
 									tokens.input_tokens += input_tokens;
 									tokens.output_tokens += output_tokens;
 								})
-								.trigger(ResponseComplete);
+								.trigger(ResponseComplete)
+								.await;
 						}
 						_ => {}
 					}

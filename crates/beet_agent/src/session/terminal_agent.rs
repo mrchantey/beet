@@ -204,7 +204,7 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 					let entity = queue
 						.spawn_then((ChildOf(message), TextContent::new(line)))
 						.await;
-					queue.entity(entity).trigger(ContentEnded);
+					queue.entity(entity).trigger(ContentEnded).await;
 					println!();
 				}
 				Err(err) => {
