@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 
-
+#[derive(Debug, Clone)]
 pub struct ActorView<'a> {
 	pub entity: Entity,
 	pub name: &'a Name,

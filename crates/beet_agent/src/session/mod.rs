@@ -1,5 +1,6 @@
 mod actor;
 mod content;
+mod gemini;
 mod message;
 mod openai;
 mod session;
@@ -8,6 +9,7 @@ mod terminal_agent;
 mod tools;
 pub use actor::*;
 pub use content::*;
+// pub use gemini::*;
 pub use message::*;
 pub use openai::*;
 pub use session::*;

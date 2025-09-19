@@ -120,7 +120,7 @@ impl TerminalAgentPlugin {
 						if users_turn {
 							user.trigger(MessageRequest);
 						}
-						let mut provider = OpenAiProvider::from_env();
+						let mut provider = OpenAiAgent::from_env();
 						if generate_images {
 							provider =
 								provider.with_tool(GenerateImage::default());

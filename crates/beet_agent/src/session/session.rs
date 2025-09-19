@@ -76,29 +76,20 @@ impl SessionParams<'_, '_> {
 				self.children
 					.iter_descendants_depth_first(actor.entity)
 					.filter_map(move |msg_ent| {
+						let actor = actor.clone();
 						self.messages
 							.get(msg_ent)
 							.map(move |message| {
-								(actor.entity, actor.role, msg_ent, message)
+								let mut parts = Vec::new();
+								self.get_content_recursive(msg_ent, &mut parts);
+								MessageView {
+									actor: actor.clone(),
+									message,
+									content: parts,
+								}
 							})
 							.ok()
 					})
-			})
-			.map(|(actor_ent, role, msg_ent, message)| {
-				let rel_role = if actor_ent == actor {
-					RelativeRole::This
-				} else if role == ActorRole::Developer {
-					RelativeRole::Developer
-				} else {
-					RelativeRole::Other
-				};
-				let mut parts = Vec::new();
-				self.get_content_recursive(msg_ent, &mut parts);
-				MessageView {
-					message,
-					content: parts,
-					role: rel_role,
-				}
 			})
 			.collect::<Vec<_>>();
 		messages.sort_by_key(|mv| mv.message.created);
@@ -126,25 +117,6 @@ impl SessionParams<'_, '_> {
 			});
 	}
 }
-
-
-/// A role relative to the actor:
-/// -  If the actor owns the content the role is [`Role::This`],
-/// - otherwise if the owner has a [`Developer`] component the role is [`Role::Developer`].
-/// Any other case is [`Role::Other`] which may be a user or another agent
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RelativeRole {
-	/// The role is this actor,
-	This,
-	Developer,
-	Other,
-}
-
-impl RelativeRole {}
-
-/// Indicate it is 'your turn'
-#[derive(Event)]
-pub struct MessageRequest;
 
 #[cfg(test)]
 pub(super) mod test {
@@ -175,11 +147,14 @@ pub(super) mod test {
 			      cx: SessionParams|
 			      -> Result {
 				let actor = cx.actor(ev.target())?;
+				if actor.role != ActorRole::Agent {
+					return Ok(());
+				};
 				let content = cx
 					.collect_messages(actor.entity)
 					.unwrap()
 					.into_iter()
-					.find(|msg| msg.role == RelativeRole::This)
+					.find(|msg| msg.actor.entity == actor.entity)
 					.unwrap()
 					.content;
 

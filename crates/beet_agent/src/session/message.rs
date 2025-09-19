@@ -8,10 +8,29 @@ use std::hash::Hash;
 
 
 pub struct MessageView<'a> {
-	pub role: RelativeRole,
+	pub actor: ActorView<'a>,
 	pub message: &'a Message,
 	pub content: Vec<ContentView<'a>>,
 }
+
+/// A role relative to the actor:
+/// -  If the actor owns the content the role is [`Role::This`],
+/// - otherwise if the owner has a [`Developer`] component the role is [`Role::Developer`].
+/// Any other case is [`Role::Other`] which may be a user or another agent
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelativeRole {
+	/// The role is this actor,
+	This,
+	Developer,
+	Other,
+}
+
+impl RelativeRole {}
+
+/// Indicate it is 'your turn'
+#[derive(Event)]
+pub struct MessageRequest;
+
 
 
 /// Marker component indicating the root entity for an actor's message.

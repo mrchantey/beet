@@ -7,13 +7,13 @@ use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-const OPENAI_API_BASE_URL: &str = "https://api.openai.com/v1";
+const BASE_URL: &str = "https://api.openai.com/v1";
 const GPT_5_MINI: &str = "gpt-5-mini";
 
 #[derive(Component)]
 #[require(Agent)]
 #[component(on_add=on_add)]
-pub struct OpenAiProvider {
+pub struct OpenAiAgent {
 	api_key: String,
 	/// Model used for chat completions, defaults to [`GPT_5_MINI`]
 	completion_model: String,
@@ -29,7 +29,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.insert(EntityObserver::new(openai_message_request));
 }
 
-impl OpenAiProvider {
+impl OpenAiAgent {
 	/// Create a new OpenAI client from environment variables.
 	/// ## Panics
 	/// If the OPENAI_API_KEY environment variable is not set.
@@ -67,7 +67,7 @@ impl OpenAiProvider {
 
 	fn responses_req(&self, input: &Vec<serde_json::Value>) -> Result<Request> {
 		// input.xprint_debug_formatted("content");
-		let url = format!("{OPENAI_API_BASE_URL}/responses");
+		let url = format!("{BASE_URL}/responses");
 		Request::post(url)
 			.with_auth_bearer(&self.api_key)
 			.with_json_body(&json! {{
@@ -75,7 +75,7 @@ impl OpenAiProvider {
 				"stream": true,
 				"input": input,
 				"tools": self.tools,
-				// "previous_response_id": self.prev_response_id
+				"previous_response_id": self.prev_response_id
 			}})?
 			.xok()
 	}
@@ -83,7 +83,7 @@ impl OpenAiProvider {
 
 fn openai_message_request(
 	trigger: Trigger<MessageRequest>,
-	query: Query<&OpenAiProvider>,
+	query: Query<&OpenAiAgent>,
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {
@@ -93,15 +93,16 @@ fn openai_message_request(
 		.collect_messages(actor)?
 		.into_iter()
 		.map(|item| {
-			let role = match item.role {
-				RelativeRole::This => "assistant",
-				RelativeRole::Developer => "developer",
-				RelativeRole::Other => "user",
+			let is_self = item.actor.entity == actor;
+			let role = if is_self {
+				"assistant"
+			} else {
+				"user"
 			};
 
-			let content_type_prefix = match item.role {
-				RelativeRole::This => "output",
-				_ => "input",
+			let content_type_prefix = if is_self {
+				"output"}else{
+				"input"
 			};
 
 			let content = item
@@ -255,7 +256,7 @@ fn openai_message_request(
 								.entity(actor)
 								.with(move |mut entity| {
 									entity
-										.get_mut::<OpenAiProvider>()
+										.get_mut::<OpenAiAgent>()
 										.unwrap()
 										.prev_response_id = Some(id);
 									let mut tokens =
@@ -292,25 +293,25 @@ mod test {
 
 	#[sweet::test]
 	async fn text_to_text() {
-		super::super::test::text_to_text(OpenAiProvider::from_env()).await;
+		super::super::test::text_to_text(OpenAiAgent::from_env()).await;
 	}
 
 	#[sweet::test]
 	async fn textfile_to_text() {
-		super::super::test::textfile_to_text(OpenAiProvider::from_env()).await;
+		super::super::test::textfile_to_text(OpenAiAgent::from_env()).await;
 	}
 	#[sweet::test]
 	async fn image_to_text() {
-		super::super::test::image_to_text(OpenAiProvider::from_env()).await;
+		super::super::test::image_to_text(OpenAiAgent::from_env()).await;
 	}
 	#[sweet::test]
 	async fn text_to_image() {
-		super::super::test::text_to_image(
-			OpenAiProvider::from_env().with_tool(GenerateImage {
+		super::super::test::text_to_image(OpenAiAgent::from_env().with_tool(
+			GenerateImage {
 				quality: ImageQuality::Low,
 				..default()
-			}),
-		)
+			},
+		))
 		.await;
 	}
 }
