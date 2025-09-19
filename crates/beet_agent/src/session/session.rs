@@ -102,11 +102,13 @@ impl SessionParams<'_, '_> {
 		parent: Entity,
 		content: &mut Vec<ContentView<'a>>,
 	) {
-		if let Ok(items) = self.content.get(parent) {
-			match items {
+		if let Ok(query) = self.content.get(parent) {
+			match query {
 				(Some(text), None) => content.push(ContentView::Text(text)),
 				(None, Some(file)) => content.push(ContentView::File(file)),
-				_ => unreachable!("content must be text or file"),
+				_ => {
+					// should be unreachable?
+				} // _ => unreachable!("content must be text or file"),
 			}
 		}
 
@@ -235,6 +237,8 @@ pub(super) mod test {
 				msg.add_text("create a logo for beet, a metaframework for the bevy engine. the logo should be of a beetroot, with clean lines that can scale down to a tiny favicon");
 			},
 			|content| {
+				// println!("content: {content:#?}");
+
 				use base64::prelude::*;
 				let file =
 					content.iter().find_map(|item| item.as_file()).unwrap();

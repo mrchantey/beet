@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
+#[derive(Debug, Clone)]
 pub enum ContentView<'a> {
 	Text(&'a TextContent),
 	File(&'a FileContent),
@@ -53,7 +54,7 @@ pub struct ContentEnded {
 pub struct ReasoningContent;
 
 
-#[derive(Default, Deref, DerefMut, Component)]
+#[derive(Debug, Default, Deref, DerefMut, Component)]
 #[require(Content)]
 #[component(on_add=handle_text_delta)]
 pub struct TextContent(pub String);

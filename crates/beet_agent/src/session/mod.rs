@@ -9,7 +9,7 @@ mod terminal_agent;
 mod tools;
 pub use actor::*;
 pub use content::*;
-// pub use gemini::*;
+pub use gemini::*;
 pub use message::*;
 pub use openai::*;
 pub use session::*;

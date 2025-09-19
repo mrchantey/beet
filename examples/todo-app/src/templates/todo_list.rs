@@ -9,8 +9,8 @@ use beet::prelude::*;
 pub fn TodoList() -> impl Bundle {
 	let (get_items, set_items) = signal::<Vec<TodoItem>>(vec![TodoItem {
 		description: "party".into(),
-		created: CrossInstant::now(),
-		due: CrossInstant::now(),
+		created: Instant::now(),
+		due: Instant::now(),
 	}]);
 
 	let items_table = move || {
@@ -48,8 +48,8 @@ pub fn TodoList() -> impl Bundle {
 #[derive(Clone)]
 struct TodoItem {
 	description: String,
-	created: CrossInstant,
-	due: CrossInstant,
+	created: Instant,
+	due: Instant,
 }
 
 
@@ -83,8 +83,8 @@ fn NewItem(
 	let add_item = Arc::new(move || {
 		create(TodoItem {
 			description: description(),
-			created: CrossInstant::now(),
-			due: CrossInstant::now(),
+			created: Instant::now(),
+			due: Instant::now(),
 		});
 		set_description(String::new());
 	});

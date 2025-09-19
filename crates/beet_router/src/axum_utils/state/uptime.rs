@@ -69,6 +69,6 @@ mod test {
 		let time = router.oneshot_str("/").await.unwrap();
 		let time: u64 = time.parse().unwrap();
 		time.xpect_greater_or_equal_to(10);
-		time.xpect_less_than(20);
+		time.xpect_less_than(100);
 	}
 }

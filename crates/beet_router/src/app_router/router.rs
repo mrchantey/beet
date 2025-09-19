@@ -159,7 +159,7 @@ impl Router {
 		// TODO proper pooling, this creates new app each time
 		let mut world = self.construct_world().await;
 
-		let start_time = CrossInstant::now();
+		let start_time = Instant::now();
 
 		let route_parts = route_path_queue(&request.parts.uri.path());
 		let method = request.method();

@@ -120,11 +120,16 @@ impl TerminalAgentPlugin {
 						if users_turn {
 							user.trigger(MessageRequest);
 						}
-						let mut provider = OpenAiAgent::from_env();
+						let mut provider = GeminiAgent::from_env();
 						if generate_images {
 							provider =
-								provider.with_tool(GenerateImage::default());
+								provider.with_model(GEMINI_2_5_FLASH_IMAGE);
 						}
+						// let mut provider = OpenAiAgent::from_env();
+						// if generate_images {
+						// 	provider =
+						// 		provider.with_tool(GenerateImage::default());
+						// }
 						let mut agent = session.add_actor(provider);
 						if !users_turn {
 							agent.trigger(MessageRequest);

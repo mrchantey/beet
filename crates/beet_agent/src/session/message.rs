@@ -93,11 +93,37 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		Ok(self)
 	}
 
+	/// Inserts the bundle, creating the entity if it doesnt exist
+	pub async fn insert(
+		&mut self,
+		key: T,
+		bundle: impl Bundle,
+	) -> Result<&mut Self> {
+		if let Ok(entity) = self.get_entity(&key) {
+			self.queue.entity(entity).insert(bundle).await;
+		} else {
+			self.add(key, bundle).await?;
+		}
+		Ok(self)
+	}
+
 	fn get_entity(&self, key: &T) -> Result<Entity> {
 		self.content_map
 			.get(key)
 			.copied()
 			.ok_or_else(|| bevyhow!("Missing entity for index: {key:?}"))
+	}
+
+	pub async fn add_or_delta(
+		&mut self,
+		key: T,
+		text: impl AsRef<str>,
+	) -> Result<&mut Self> {
+		if self.content_map.contains_key(&key) {
+			self.text_delta(key, text).await
+		} else {
+			self.add(key, TextContent::new(text)).await
+		}
 	}
 
 	pub async fn text_delta(
@@ -108,17 +134,6 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		self.queue
 			.entity(self.get_entity(&key)?)
 			.trigger(TextDelta::new(text))
-			.await;
-		Ok(self)
-	}
-	pub async fn insert(
-		&mut self,
-		key: T,
-		bundle: impl Bundle,
-	) -> Result<&mut Self> {
-		self.queue
-			.entity(self.get_entity(&key)?)
-			.insert(bundle)
 			.await;
 		Ok(self)
 	}
@@ -138,6 +153,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 			.filter(|(k, _)| !self.finished_content.contains(k))
 			.map(|(_, v)| *v)
 			.collect::<Vec<_>>();
+
 		let message = self.message;
 		self.queue
 			.with_then(move |world| {
