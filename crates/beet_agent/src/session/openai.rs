@@ -120,17 +120,14 @@ fn start_openai_response(
 		.collect::<Vec<_>>();
 	assert!(input.len() > 0, "cannot send request with no input");
 	let req = provider.responses_req(&input)?;
-	let message_entity =
-		commands.spawn((Message::default(), ChildOf(actor))).id();
 
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {
-			let mut stream = req.send().await?.event_source().await?;
+			let mut spawner =
+				MessageSpawner::spawn(queue.clone(), actor).await?;
 
-			// map of content_index to entity
-			let mut content_map =
-				ContentBuilder::new(queue.clone(), message_entity);
+			let mut stream = req.send().await?.event_source().await?;
 
 			let mut dump = Vec::new();
 
@@ -154,37 +151,74 @@ fn start_openai_response(
 							// let id = body["response"]["id"].to_str()?;
 						}
 						"response.in_progress" => {}
-						"response.output_item.added" => {}
-						"response.content_part.added" => {
-							match body["part"]["type"].to_str()? {
-								"output_text" => {
-									let key = body["content_index"].to_u64()?;
-									content_map
-										.add(key, TextContent::default())
+						"response.output_item.added" => {
+							let id = body["item"]["id"].to_str()?.to_string();
+							match body["item"]["type"].to_str()? {
+								"reasoning" => {
+									spawner
+										.add(id, ReasoningContent::default())
 										.await?;
 								}
-								"reasoning" => {
-									//
+								"message" => {
+									spawner
+										.add(id, TextContent::default())
+										.await?;
 								}
-								other => {
+								"image_generation_call" => {
+									// we dont actually insert the file yet
+									spawner.add(id, Content::default()).await?;
+								}
+								_ => {
 									eprintln!(
-										"unhandled content type: {}",
-										other
-									)
+										"unhandled item type: {}",
+										body["item"]["type"].to_str()?
+									);
 								}
 							}
 						}
+						"response.content_part.added" => {
+							// see output_item.added
+						}
 						"response.output_text.delta" => {
-							let index = body["content_index"].to_u64()?;
+							let id = body["item_id"].to_str()?.to_string();
+
 							let new_text = body["delta"].to_str()?.to_string();
-							content_map.update_text(&index, new_text).await?;
+							spawner.text_delta(id, new_text).await?;
 						}
-						"response.output_text.done" => {}
+						"response.image_generation_call.in_progress"
+						| "response.image_generation_call.generating"
+						| "response.image_generation_call.completed" => {}
+						"response.image_generation_call.partial_image" => {
+							let id = body["item_id"].to_str()?;
+							let ext = body["output_format"].to_str()?;
+							let b64 = body["partial_image_b64"].to_str()?;
+							let content = FileContent::new_b64(id, ext, b64);
+							spawner.insert(id.to_string(), content).await?;
+						}
+						"response.output_text.done" => {
+							// see output_item.done
+						}
 						"response.content_part.done" => {
-							let index = body["content_index"].to_u64()?;
-							content_map.finish(&index).await?;
+							// see output_item.done
 						}
-						"response.output_item.done" => {}
+						"response.output_item.done" => {
+							let id = body["item"]["id"].to_str()?.to_string();
+							match body["item"]["type"].to_str()? {
+								"image_generation_call" => {
+									let ext = body["item"]["output_format"]
+										.to_str()?;
+									let b64 =
+										body["item"]["result"].to_str()?;
+									let content =
+										FileContent::new_b64(&id, ext, b64);
+									spawner
+										.insert(id.to_string(), content)
+										.await?;
+								}
+								_ => {}
+							}
+							spawner.finish_content(id).await?;
+						}
 						"response.completed" => {
 							let input_tokens =
 								body["response"]["usage"]["input_tokens"]
@@ -194,24 +228,32 @@ fn start_openai_response(
 									.to_u64()?;
 							let id =
 								body["response"]["id"].to_str()?.to_string();
-
+							spawner.finish_message().await?;
 							queue
 								.entity(actor)
-								.get_mut::<OpenAiProvider>(
-									move |mut provider| {
-										provider.prev_response_id = Some(id);
-									},
-								)
-								.get_mut::<TokenUsage>(move |mut tokens| {
+								.with(move |mut entity| {
+									entity
+										.get_mut::<OpenAiProvider>()
+										.unwrap()
+										.prev_response_id = Some(id);
+									let mut tokens =
+										entity.get_mut::<TokenUsage>().unwrap();
 									tokens.input_tokens += input_tokens;
 									tokens.output_tokens += output_tokens;
+									entity.trigger(ResponseComplete);
 								})
-								.trigger(ResponseComplete)
 								.await;
 						}
-						_ => {}
+						"error" => {
+							let message = body["error"]["message"].to_str()?;
+							bevybail!("OpenAI API error: {message}");
+						}
+						other => {
+							eprintln!(
+								"unhandled event type: {other}\n{body:#?}"
+							);
+						}
 					}
-					// return Ok(());
 				};
 			}
 			Ok(())

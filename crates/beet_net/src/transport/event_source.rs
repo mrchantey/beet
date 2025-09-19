@@ -12,7 +12,6 @@ impl Response {
 	}
 }
 
-#[cfg(feature = "native-tls")]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -20,8 +19,8 @@ mod test {
 	use bevy::tasks::futures_lite::StreamExt;
 	use sweet::prelude::*;
 
-
 	#[sweet::test]
+	#[ignore = "hits network"]
 	async fn works() {
 		let mut ev = Request::get("https://sse.dev/test")
 			.send()
@@ -40,8 +39,5 @@ mod test {
 				count += 1;
 			}
 		}
-
-		// .xmap(|res| res.status())
-		// .xpect_eq(200);
 	}
 }

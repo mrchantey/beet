@@ -369,29 +369,42 @@ pub struct AsyncEntity {
 }
 
 impl AsyncEntity {
-	pub fn with(&self, func: impl 'static + Send + FnOnce(EntityWorldMut)) {
+	pub async fn with(
+		&self,
+		func: impl 'static + Send + FnOnce(EntityWorldMut),
+	) -> &Self {
 		let entity = self.entity;
-		self.queue.with(move |world: &mut World| {
-			let entity = world.entity_mut(entity);
-			func(entity);
-		});
+		self.queue
+			.with_then(move |world: &mut World| {
+				let entity = world.entity_mut(entity);
+				func(entity);
+			})
+			.await;
+		self
 	}
-	pub fn get_mut<T: Component<Mutability = Mutable>>(
+	pub async fn get_mut<T: Component<Mutability = Mutable>>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<T>),
 	) -> &Self {
 		self.with(|mut entity| {
 			let comp = entity.get_mut().unwrap();
 			func(comp);
-		});
-		self
+		})
+		.await
+	}
+
+	pub async fn insert<B: Bundle>(&self, component: B) -> &Self {
+		self.with(|mut entity| {
+			entity.insert(component);
+		})
+		.await
 	}
 
 	pub async fn trigger<E: Event>(&self, event: E) -> &Self {
 		self.with(|mut entity| {
 			entity.trigger(event);
-		});
-		self
+		})
+		.await
 	}
 }
 

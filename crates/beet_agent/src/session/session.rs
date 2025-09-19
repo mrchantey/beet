@@ -7,9 +7,8 @@ pub struct AgentPlugin;
 
 impl Plugin for AgentPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_observer(broadcast_content_event::<ContentAdded>)
-			.add_observer(broadcast_content_event::<ContentTextDelta>)
-			.add_observer(broadcast_content_event::<ContentEnded>);
+		app.add_observer(broadcast_content_event::<MessageStart>)
+			.add_observer(broadcast_content_event::<TextDelta>);
 	}
 }
 
@@ -256,10 +255,6 @@ pub enum RelativeRole {
 
 impl RelativeRole {}
 
-/// Text emitted to stateless outputs like stdout or TTS
-#[derive(Event)]
-pub struct TextDelta(pub String);
-
 /// Indicate it is 'your turn'
 #[derive(Event)]
 pub struct StartResponse;
@@ -376,11 +371,12 @@ pub(super) mod test {
 		run_assertion(
 			agent,
 			async |mut msg| {
-				msg.add_text("create an image of a duck");
+				msg.add_text("create a logo for beet, a metaframework for the bevy engine. the logo should be of a beetroot, with clean lines that can scale down to a tiny favicon");
 			},
 			|content| {
 				use base64::prelude::*;
-				let file = content[0].as_file().unwrap();
+				let file =
+					content.iter().find_map(|item| item.as_file()).unwrap();
 				let FileData::Base64(b64) = &file.data else {
 					panic!("expected base64 image data");
 				};

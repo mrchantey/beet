@@ -3,122 +3,88 @@ use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::path::PathBuf;
 
-
-/// A session actor, owns messages and reacts to others
-#[derive(Debug, Default, Clone, Component)]
-#[require(Name)]
-pub struct Actor;
 
 /// Marker component indicating the root entity for an actor's message.
 /// Messages must be (possibly nested) descendents of an [`Actor`], and may
 /// contain Content either in its entity its descendents.
-#[derive(Debug, Clone, Component)]
-pub struct Message {
-	pub created: Instant,
+#[derive(Debug, Default, Clone, Copy, Component)]
+pub struct Content {
+	pub created: Timestamp,
 }
 
-impl Default for Message {
-	fn default() -> Self {
-		Self {
-			created: Instant::now(),
-		}
+#[derive(Debug, Clone, Copy, Deref)]
+pub struct Timestamp(Instant);
+
+impl Default for Timestamp {
+	fn default() -> Self { Self(Instant::now()) }
+}
+
+/// Added to a [`Content`] when it is finished, and no more content
+/// will be added to it.
+#[derive(Debug, Default, Clone, Copy, Component)]
+pub struct ContentComplete {
+	pub completed: Timestamp,
+}
+
+#[derive(Default, Component)]
+#[require(Content)]
+pub struct ReasoningContent;
+
+
+#[derive(Default, Deref, DerefMut, Component)]
+#[require(Content)]
+#[component(on_add=handle_text_delta)]
+pub struct TextContent(pub String);
+
+impl TextContent {
+	pub fn new(text: impl AsRef<str>) -> Self {
+		TextContent(text.as_ref().to_string())
 	}
 }
 
-pub struct ContentBuilder<T: Hash> {
-	pub queue: AsyncQueue,
-	pub message: Entity,
-	pub map: HashMap<T, Entity>,
-}
-impl<T: Hash + Eq + Debug> ContentBuilder<T> {
-	pub fn new(queue: AsyncQueue, message: Entity) -> Self {
-		Self {
-			queue,
-			message,
-			map: HashMap::default(),
-		}
-	}
-	pub async fn add(&mut self, key: T, content: impl Bundle) -> Result<()> {
-		if self.map.contains_key(&key) {
-			bevybail!("Duplicate output index: {key:?}");
-		} else {
-			let entity = self
-				.queue
-				.spawn_then((ChildOf(self.message), content))
-				.await;
-			self.map.insert(key, entity);
-		}
-		Ok(())
-	}
-
-	pub async fn update_text(
-		&mut self,
-		key: &T,
-		text: impl AsRef<str>,
-	) -> Result<()> {
-		let entity = self
-			.map
-			.get(key)
-			.ok_or_else(|| bevyhow!("Missing entity for index: {key:?}"))?;
-		self.queue
-			.entity(*entity)
-			.trigger(ContentTextDelta::new(text))
-			.await;
-		Ok(())
-	}
-
-	pub async fn finish(&mut self, key: &T) -> Result {
-		let entity = self
-			.map
-			.get(key)
-			.ok_or_else(|| bevyhow!("Missing entity for index: {key:?}"))?;
-		self.queue.entity(*entity).trigger(ContentEnded).await;
-		Ok(())
-	}
-}
-
-
-/// Event notifying session actors of a content change
-// TODO bevy 0.17 shouldnt need this, we have original entity
-#[derive(Debug, Clone, Event)]
-pub struct ContentBroadcast<E> {
-	pub message: Entity,
-	pub session: Entity,
-	pub actor: Entity,
-	pub event: E,
-}
-
-
-
-/// Emitted on a piece of content like a TextContent to indicate it has started.
-/// This event does not contain text.
-#[derive(Clone, Event)]
-pub struct ContentAdded;
 /// Emitted on a piece of content like a TextContent to indicate a new piece of text
 /// was added.
 #[derive(Clone, Event)]
-pub struct ContentTextDelta(pub String);
+pub struct TextDelta(pub String);
 
 
-impl ContentTextDelta {
+impl TextDelta {
 	pub fn new(text: impl AsRef<str>) -> Self {
 		Self(text.as_ref().to_string())
 	}
 }
-/// Emitted on a piece of content like a TextContent to indicate it has finished
-/// streaming.
-#[derive(Clone, Event)]
-pub struct ContentEnded;
+
+fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
+	let initial_text = world
+		.entity(cx.entity)
+		.get::<TextContent>()
+		.unwrap()
+		.0
+		.clone();
+	let mut commands = world.commands();
+	let mut entity = commands.entity(cx.entity);
+
+	if !initial_text.is_empty() {
+		entity.trigger(TextDelta::new(initial_text));
+	}
+	entity.insert(EntityObserver::new(
+		|delta: Trigger<TextDelta>,
+		 mut text_content: Query<&mut TextContent>|
+		 -> Result {
+			text_content.get_mut(delta.target())?.0.push_str(&delta.0);
+			Ok(())
+		},
+	));
+}
+
 
 
 #[derive(Debug, Clone, Component)]
-#[component(on_add=on_add_content)]
+#[require(Content)]
 pub struct FileContent {
 	/// The mime type of the data, for example `image/png` or `text/plain`
 	pub mime_type: String,
@@ -143,6 +109,19 @@ impl FileContent {
 			data,
 			filename,
 		})
+	}
+
+	pub fn new_b64(file_stem: &str, ext: &str, b64: &str) -> Self {
+		let mime_type = mime_guess::from_ext(ext)
+			.first_or_octet_stream()
+			.essence_str()
+			.to_string();
+		let filename = format!("{}.{}", file_stem, ext).into();
+		Self {
+			mime_type,
+			filename,
+			data: FileData::Base64(b64.to_string()),
+		}
 	}
 
 	pub fn is_image(&self) -> bool { self.mime_type.starts_with("image/") }
@@ -257,46 +236,4 @@ fn is_uri(path: &str) -> bool {
 	path_lower.starts_with("http://")
 		|| path_lower.starts_with("https://")
 		|| path_lower.starts_with("data:")
-}
-
-
-
-fn on_add_content(mut world: DeferredWorld, cx: HookContext) {
-	let mut commands = world.commands();
-	let mut entity = commands.entity(cx.entity);
-	entity.trigger(ContentAdded);
-}
-
-
-#[derive(Default, Deref, DerefMut, Component)]
-#[component(on_add=on_add_text)]
-pub struct TextContent(pub String);
-
-fn on_add_text(mut world: DeferredWorld, cx: HookContext) {
-	let initial_text = world
-		.entity(cx.entity)
-		.get::<TextContent>()
-		.unwrap()
-		.0
-		.clone();
-	let mut commands = world.commands();
-	let mut entity = commands.entity(cx.entity);
-
-	entity.trigger(ContentAdded);
-	if !initial_text.is_empty() {
-		entity.trigger(ContentTextDelta::new(initial_text));
-	}
-	entity.insert(EntityObserver::new(
-		|delta: Trigger<ContentTextDelta>,
-		 mut text_content: Query<&mut TextContent>|
-		 -> Result {
-			text_content.get_mut(delta.target())?.0.push_str(&delta.0);
-			Ok(())
-		},
-	));
-}
-impl TextContent {
-	pub fn new(text: impl AsRef<str>) -> Self {
-		TextContent(text.as_ref().to_string())
-	}
 }

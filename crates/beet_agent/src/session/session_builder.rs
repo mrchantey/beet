@@ -101,9 +101,7 @@ impl<'w, 's> MessageBuilder<'w, 's> {
 		self.commands.spawn((
 			ChildOf(self.message),
 			content,
-			OnSpawn::new(|entity| {
-				entity.trigger(ContentEnded);
-			}),
+			ContentComplete::default(),
 		));
 		self
 	}

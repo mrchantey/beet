@@ -31,20 +31,6 @@ pub struct TerminalAgentPlugin {
 }
 
 impl TerminalAgentPlugin {
-	/// Exit after the first agent response
-	pub fn oneshot() -> impl Bundle {
-		Observer::new(
-			|ev: Trigger<ContentBroadcast<ContentEnded>>,
-			 agents: Query<(), With<Agent>>,
-			 mut exit: EventWriter<AppExit>| {
-				if agents.contains(ev.target()) {
-					exit.write(AppExit::Success);
-				}
-			},
-		)
-	}
-
-
 	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
 		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
 			prompt.clone()
@@ -120,7 +106,7 @@ fn terminal_user() -> impl Bundle {
 }
 
 fn on_content_added(
-	ev: Trigger<ContentBroadcast<ContentAdded>>,
+	ev: Trigger<ContentBroadcast<MessageStart>>,
 	users: Query<(), With<User>>,
 	agents: Query<(), With<Agent>>,
 	developers: Query<(), With<Developer>>,
@@ -142,7 +128,7 @@ fn on_content_added(
 	print!("{prefix} > ");
 }
 fn on_content_delta(
-	ev: Trigger<ContentBroadcast<ContentTextDelta>>,
+	ev: Trigger<ContentBroadcast<TextDelta>>,
 	users: Query<(), With<User>>,
 ) {
 	if users.contains(ev.actor) {
@@ -154,19 +140,19 @@ fn on_content_delta(
 	let _ = std::io::stdout().flush();
 }
 fn print_content_ended(
-	ev: Trigger<ContentBroadcast<ContentEnded>>,
+	ev: Trigger<OnAdd, ContentComplete>,
 	users: Query<(), With<User>>,
 ) {
-	if users.contains(ev.actor) {
-		// user text already printed
-		return;
-	}
+	// if users.contains(ev.actor) {
+	// 	// user text already printed
+	// 	return;
+	// }
 
 	print!("\n\n");
 }
 
 fn user_input_on_content_end(
-	trigger: Trigger<ContentBroadcast<ContentEnded>>,
+	trigger: Trigger<ContentBroadcast<ResponseComplete>>,
 	commands: Commands,
 ) -> Result {
 	let actor = trigger.target();
@@ -190,9 +176,9 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 			print!("User > ");
 			input.clear();
 			let _ = io::stdout().flush();
-			let message =
-				queue.spawn_then((ChildOf(actor), Message::default())).await;
 
+			let mut spawner =
+				MessageSpawner::spawn(queue.clone(), actor).await?;
 			match stdin.read_line(&mut input) {
 				Ok(0) => {
 					// EOF reached
@@ -201,10 +187,12 @@ fn user_input_request(mut commands: Commands, actor: Entity) {
 				Ok(_) => {
 					// trim trailing newline and print the input
 					let line = input.trim_end().to_string();
-					let entity = queue
-						.spawn_then((ChildOf(message), TextContent::new(line)))
-						.await;
-					queue.entity(entity).trigger(ContentEnded).await;
+					let id = 0;
+					spawner.add(
+						id,
+						(TextContent::new(line), ContentComplete::default()),
+					);
+
 					println!();
 				}
 				Err(err) => {
