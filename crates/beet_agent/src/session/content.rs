@@ -142,6 +142,10 @@ impl FileContent {
 		}
 	}
 
+	pub fn extension(&self) -> &str {
+		self.filename.extension().unwrap().to_str().unwrap()
+	}
+
 	pub fn is_image(&self) -> bool { self.mime_type.starts_with("image/") }
 
 	/// Returns the file url, or creates a base64 data url

@@ -4,6 +4,7 @@ use beet_net::prelude::*;
 use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
+use serde_json::Value;
 use serde_json::json;
 
 const OPENAI_API_BASE_URL: &str = "https://api.openai.com/v1";
@@ -18,7 +19,7 @@ pub struct OpenAiProvider {
 	completion_model: String,
 	/// The id of the previous response
 	prev_response_id: Option<String>,
-	tools: serde_json::Value,
+	tools: Vec<Value>,
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -37,13 +38,30 @@ impl OpenAiProvider {
 			api_key: std::env::var("OPENAI_API_KEY").unwrap(),
 			completion_model: GPT_5_MINI.into(),
 			prev_response_id: None,
-			tools: json!([]),
+			tools: Vec::new(),
 		}
 	}
-	pub fn with_image_gen(mut self) -> Self {
-		self.tools = json!([{
-			"type": "image_generation",
-		}]);
+	pub fn with_tool(mut self, tool: impl Into<CommonTool>) -> Self {
+		let tool = tool.into();
+		let json = match tool {
+			CommonTool::GenerateImage(GenerateImage {
+				background,
+				quality,
+				size,
+				partial_images,
+			}) => {
+				json!({
+					"type": "image_generation",
+					"size": size
+						.map(|size| size.to_string())
+						.unwrap_or_else(|| "auto".to_string()),
+					"background": background.to_string().to_lowercase(),
+					"quality": quality.to_string().to_lowercase(),
+					"partial_images": partial_images,
+				})
+			}
+		};
+		self.tools.push(json);
 		self
 	}
 
@@ -270,6 +288,8 @@ fn openai_message_request(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use bevy::prelude::*;
+
 	#[sweet::test]
 	async fn text_to_text() {
 		super::super::test::text_to_text(OpenAiProvider::from_env()).await;
@@ -286,7 +306,10 @@ mod test {
 	#[sweet::test]
 	async fn text_to_image() {
 		super::super::test::text_to_image(
-			OpenAiProvider::from_env().with_image_gen(),
+			OpenAiProvider::from_env().with_tool(GenerateImage {
+				quality: ImageQuality::Low,
+				..default()
+			}),
 		)
 		.await;
 	}

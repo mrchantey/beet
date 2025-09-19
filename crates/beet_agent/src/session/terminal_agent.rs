@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use clap::Parser;
 
@@ -27,6 +28,10 @@ pub struct TerminalAgentPlugin {
 		help = "Path to a file to read the initial prompt from (can be provided multiple times)"
 	)]
 	pub input_files: Vec<std::path::PathBuf>,
+	#[arg(long = "generate-images", help = "Add the image generation tool")]
+	pub generate_images: bool,
+	#[clap(flatten)]
+	pub config: TerminalAgentConfig,
 }
 
 
@@ -38,16 +43,30 @@ macro_rules! print_flush {
  }};
 }
 
+
+#[derive(Debug, Clone, Parser, Resource)]
+pub struct TerminalAgentConfig {
+	#[arg(
+		long,
+		help = "Run in oneshot mode, exiting after the first message received"
+	)]
+	oneshot: bool,
+	#[arg(short, long, help = "Directory to write received files to")]
+	out_dir: Option<std::path::PathBuf>,
+}
+
 impl Plugin for TerminalAgentPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin(AgentPlugin)
 			.init_plugin(AsyncPlugin)
+			.insert_resource(self.config.clone())
 			.add_systems(Startup, self.into_system())
 			.add_observer(text_added)
 			.add_observer(text_delta)
 			.add_observer(reasoning_added)
 			.add_observer(reasoning_ended)
 			.add_observer(message_ended)
+			.add_observer(file_inserted)
 			.add_observer(route_message_requests);
 	}
 }
@@ -55,12 +74,11 @@ impl Plugin for TerminalAgentPlugin {
 impl TerminalAgentPlugin {
 	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
 		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
-			prompt.clone()
+			Some(prompt.clone())
 		} else if !self.trailing_args.is_empty() {
-			self.trailing_args.join(" ")
+			Some(self.trailing_args.join(" "))
 		} else {
-			"Ask me a provocative question about my past. not about secrets"
-				.to_string()
+			None
 		};
 
 		let paths = self
@@ -68,6 +86,7 @@ impl TerminalAgentPlugin {
 			.iter()
 			.map(|path| AbsPathBuf::new_workspace_rel(path).unwrap())
 			.collect::<Vec<_>>();
+		let generate_images = self.generate_images;
 
 		move |mut commands| {
 			let initial_prompt = initial_prompt.clone();
@@ -88,24 +107,34 @@ impl TerminalAgentPlugin {
 
 						let mut user = session.add_actor(terminal_user());
 						let mut user_msg = user.create_message();
-						println!("User > {}\n", initial_prompt);
-						user_msg.add_text(initial_prompt);
+						if let Some(initial_prompt) = &initial_prompt {
+							println!("User > {}\n", initial_prompt);
+							user_msg.add_text(initial_prompt);
+						}
+						let users_turn =
+							initial_prompt.is_none() && files.is_empty();
 						for file in files {
 							println!("User > {}\n", file);
 							user_msg.add_content(file);
 						}
-						session
-							.add_actor(OpenAiProvider::from_env())
-							.trigger(MessageRequest);
+						if users_turn {
+							user.trigger(MessageRequest);
+						}
+						let mut provider = OpenAiProvider::from_env();
+						if generate_images {
+							provider =
+								provider.with_tool(GenerateImage::default());
+						}
+						let mut agent = session.add_actor(provider);
+						if !users_turn {
+							agent.trigger(MessageRequest);
+						}
 					});
 					Ok(())
 				},
 			);
 		}
 	}
-}
-pub enum TerminalAgentMode {
-	Oneshot { initial_prompt: String },
 }
 
 
@@ -149,7 +178,43 @@ fn reasoning_ended(
 	Ok(())
 }
 
-
+fn file_inserted(
+	ev: Trigger<OnInsert, FileContent>,
+	mut cache: Local<HashMap<String, AbsPathBuf>>,
+	cx: SessionParams,
+	config: Res<TerminalAgentConfig>,
+	query: Query<&FileContent>,
+	mut commands: Commands,
+) -> Result {
+	let file = query.get(ev.target())?;
+	let actor = cx.actor(ev.target())?;
+	if actor.role != ActorRole::User {
+		print_flush!("{} > file: {}", actor.role, file);
+		let cache_len = cache.len();
+		let filename = cache
+			.entry(file.filename.to_string_lossy().to_string())
+			.or_insert_with(|| {
+				let base = config.out_dir.clone().unwrap_or_default();
+				let base = base.display();
+				AbsPathBuf::new_workspace_rel(format!(
+					"{base}/file{cache_len}.{}",
+					file.extension()
+				))
+				.unwrap()
+			})
+			.clone();
+		let file = file.clone();
+		commands.run_system_cached_with(
+			AsyncTask::spawn_with_queue_unwrap,
+			async move |_| {
+				let data = file.data.get().await?;
+				FsExt::write_async(filename, data).await?;
+				Ok(())
+			},
+		);
+	}
+	Ok(())
+}
 
 fn message_ended(
 	ev: Trigger<OnAdd, MessageComplete>,
@@ -165,6 +230,7 @@ fn message_ended(
 fn route_message_requests(
 	ev: Trigger<OnAdd, MessageComplete>,
 	cx: SessionParams,
+	config: Res<TerminalAgentConfig>,
 	mut commands: Commands,
 	users: Query<Entity, With<User>>,
 	agents: Query<Entity, With<Agent>>,
@@ -173,6 +239,9 @@ fn route_message_requests(
 	match actor.role {
 		ActorRole::User => {
 			commands.entity(agents.single()?).trigger(MessageRequest);
+		}
+		ActorRole::Agent if config.oneshot => {
+			commands.send_event(AppExit::Success);
 		}
 		ActorRole::Agent => {
 			commands.entity(users.single()?).trigger(MessageRequest);

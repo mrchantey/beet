@@ -3,16 +3,8 @@
 # ```rust
 # cargo binstall just
 # just --list
-# just test-ci
+# just test-all
 # ```
-#
-# ## Note To Devs
-#
-# Command runners are great for individual projects
-# but as a metaframework these are all signs of painpoints in the workflow
-# For now this is useful, but if you feel like making a change here, consider instead
-# adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
-#
 #
 set dotenv-load
 
@@ -235,6 +227,13 @@ test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- 	--watch {{args}}
 test-rsx-macro *args:
 	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
+
+
+test-agent:
+	just cli agent 											\
+	--oneshot --generate-images					\
+	-f=assets/tests/agents/prompt.txt		\
+	--out-dir=assets/tests/agents/out
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer
