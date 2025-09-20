@@ -2,4 +2,4 @@
 title= "Docs"
 +++
 
-Is Beet Docs
+is beet docs :)

@@ -55,7 +55,6 @@ pub(super) async fn connect_webrtc(
 	// {
 	// 	let dc = dc.clone();
 	// 	let mut is_initialized = false;
-	// 	let onmessage = Closure::<dyn FnMut(_)>::new(move |e: MessageEvent| {
 	// 		// let data = e.data();
 	// 		// let realtime_event: serde_json::Value =
 	// 		// 	serde_wasm_bindgen::from_value(data).unwrap_or_default();

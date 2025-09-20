@@ -35,9 +35,11 @@ pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 pub mod prelude {
-	#[cfg(feature = "agent")]
+	// #[cfg(feature = "agent")]
+	#[cfg(all(feature = "agent", not(target_arch = "wasm32")))]
 	pub use crate::agent::prelude::MessageView;
-	#[cfg(feature = "agent")]
+	// #[cfg(feature = "agent")]
+	#[cfg(all(feature = "agent", not(target_arch = "wasm32")))]
 	pub use crate::agent::prelude::Session;
 	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;

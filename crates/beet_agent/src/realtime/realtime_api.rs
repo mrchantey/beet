@@ -32,11 +32,11 @@ impl RealtimeApi {
 	/// Connect to the realtime api client side
 	// TODO bevy integration
 	#[cfg(target_arch = "wasm32")]
-	pub fn connect_webrtc(ephemeral_key: String) -> Result<()> {
-		async_ext::spawn_local(async move {
-			connect_webrtc(ephemeral_key).await.unwrap()
-		});
-		Ok(())
+	pub async fn connect_webrtc(ephemeral_key: String) -> Result<()> {
+		// async_ext::spawn_local(async move {
+		connect_webrtc(ephemeral_key).await.map_jserr()
+		// });
+		// Ok(())
 	}
 }
 

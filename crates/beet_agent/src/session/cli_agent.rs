@@ -151,7 +151,7 @@ fn terminal_user() -> impl Bundle {
 fn text_added(ev: Trigger<OnAdd, TextContent>, cx: SessionParams) -> Result {
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
-		print_flush!("{} > ", actor.role);
+		print_flush!("\n{} > ", actor.role);
 	}
 	Ok(())
 }
@@ -168,7 +168,7 @@ fn reasoning_added(
 	cx: SessionParams,
 ) -> Result {
 	let actor = cx.actor(ev.target())?;
-	print_flush!("{} > reasoning...", actor.role);
+	print_flush!("{} > 🤔", actor.role);
 
 	Ok(())
 }
@@ -178,7 +178,7 @@ fn reasoning_ended(
 	query: Query<(), With<ReasoningContent>>,
 ) -> Result {
 	if query.contains(ev.target()) {
-		print_flush!(" done\n\n");
+		print_flush!(" 💡\n");
 	}
 	Ok(())
 }
@@ -194,7 +194,6 @@ fn file_inserted(
 	let file = query.get(ev.target())?;
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
-		print_flush!("{} > file: {}", actor.role, file);
 		let cache_len = cache.len();
 		let filename = cache
 			.entry(file.filename.to_string_lossy().to_string())
@@ -208,6 +207,7 @@ fn file_inserted(
 				.unwrap()
 			})
 			.clone();
+		print_flush!("\n{} > file: {}", actor.role, filename);
 		let file = file.clone();
 		commands.run_system_cached_with(
 			AsyncTask::spawn_with_queue_unwrap,
@@ -227,7 +227,7 @@ fn message_ended(
 ) -> Result {
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
-		print_flush!("\n\n");
+		print_flush!("\n");
 	}
 	Ok(())
 }
