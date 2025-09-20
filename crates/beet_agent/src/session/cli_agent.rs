@@ -6,29 +6,17 @@ use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
 pub struct CliAgentPlugin {
-	/// Initial prompt to start the chat with
-	#[arg(
-		short = 'p',
-		long = "prompt",
-		help = "Initial prompt to start the chat"
-	)]
+	/// Initial prompt to start the chat
+	#[arg(short = 'p', long = "prompt")]
 	pub initial_prompt: Option<String>,
-	/// Trailing positional arguments
-	#[arg(
-		value_name = "PROMPT",
-		trailing_var_arg = true,
-		help = "Initial prompt to start the chat"
-	)]
+	/// Initial prompt to start the chat
+	#[arg(value_name = "PROMPT", trailing_var_arg = true)]
 	pub initial_prompt_trailing: Vec<String>,
-	/// Paths to files whose contents will be used as the initial prompt
-	#[arg(
-		short = 'f',
-		long = "file",
-		value_name = "FILE",
-		help = "Path to a file to read the initial prompt from (can be provided multiple times)"
-	)]
+	/// Paths to files to be included in the initial prompt
+	#[arg(short = 'f', long = "file", value_name = "FILE")]
 	pub input_files: Vec<std::path::PathBuf>,
-	#[arg(long = "generate-images", help = "Add the image generation tool")]
+	/// Add the image generation tool
+	#[arg(long = "image")]
 	pub generate_images: bool,
 	#[clap(flatten)]
 	pub config: CliAgentConfig,

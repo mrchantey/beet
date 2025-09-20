@@ -1,6 +1,6 @@
 use super::FsError;
-use super::fs_ext;
 use super::FsResult;
+use super::fs_ext;
 use super::path_ext;
 use crate::prelude::*;
 use path_clean::PathClean;
@@ -77,9 +77,10 @@ impl AbsPathBuf {
 	}
 
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be an absolute path.
+	/// be an absolute path. This uses [`path_ext::join_relative`] so
+	/// any leading `/` will be discarded.
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path).clean();
+		let path = path_ext::join_relative(&self.0, path);
 		Self(path)
 	}
 
@@ -109,8 +110,7 @@ impl AbsPathBuf {
 	/// let path = AbsPathBuf::new_workspace_rel(file!());
 	/// ```
 	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		let path = fs_ext::workspace_root().join(path);
-		Self::new(path)
+		Self::new(fs_ext::workspace_root()).map(|abs| abs.join(path))
 	}
 
 	/// Create a new [`AbsPathBuf`] from a path relative to `CARGO_MANIFEST_DIR`,
@@ -246,6 +246,14 @@ mod test {
 	fn workspace_rel() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
+		assert_eq!(buf, abs_file!());
+		let workspace_rel = buf.into_ws_path().unwrap();
+		assert_eq!(workspace_rel.to_string_lossy(), file);
+	}
+	#[test]
+	fn workspace_rel_leading_slash() {
+		let file = file!();
+		let buf = AbsPathBuf::new_workspace_rel(format!("/{file}")).unwrap();
 		assert_eq!(buf, abs_file!());
 		let workspace_rel = buf.into_ws_path().unwrap();
 		assert_eq!(workspace_rel.to_string_lossy(), file);

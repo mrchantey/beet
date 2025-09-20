@@ -231,7 +231,7 @@ test-rsx-macro *args:
 
 test-agent:
 	just cli agent 											\
-	--oneshot --generate-images					\
+	--oneshot --image										\
 	-f=assets/tests/agents/prompt.txt		\
 	--out-dir=assets/tests/agents/out
 

@@ -14,6 +14,14 @@ pub fn relative(path: &impl AsRef<Path>) -> FsResult<&Path> {
 	path_ext::strip_prefix(path, &cwd)
 }
 
+
+pub fn join_relative(base: impl AsRef<Path>, rel: impl AsRef<Path>) -> PathBuf {
+	let base = base.as_ref();
+	let rel = rel.as_ref();
+	let rel = rel.strip_prefix("/").unwrap_or(rel);
+	base.join(rel)
+}
+
 /// Strip prefix
 pub fn strip_prefix<'a>(
 	path: &'a impl AsRef<Path>,
@@ -164,6 +172,19 @@ mod test {
 			PathBuf::from("../Cargo.toml")
 		);
 	}
+
+	#[test]
+	fn join_relative() {
+		assert_eq!(
+			path_ext::join_relative("foo/bar", "baz/style.css"),
+			PathBuf::from("foo/bar/baz/style.css")
+		);
+		assert_eq!(
+			path_ext::join_relative("foo/bar", "/baz/style.css"),
+			PathBuf::from("foo/bar/baz/style.css")
+		);
+	}
+
 	#[test]
 	fn is_relative() {
 		assert_eq!(path_ext::is_relative_url("style.css"), true);

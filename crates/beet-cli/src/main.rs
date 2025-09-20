@@ -7,7 +7,7 @@ use clap::Subcommand;
 
 /// 🌱 Beet CLI 🌱
 ///
-/// Various commands for testing and serving files.
+/// Welcome to the beet cli!
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
