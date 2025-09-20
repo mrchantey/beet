@@ -26,7 +26,14 @@ impl Plugin for RouterAppPlugin {
 			.init_resource::<HtmlConstants>()
 			.add_systems(
 				PostStartup,
-				(default_handlers, html_bucket, insert_route_tree).chain(),
+				(
+					default_handlers,
+					// assets must be placed in tree before html
+					assets_bucket,
+					html_bucket,
+					insert_route_tree,
+				)
+					.chain(),
 			);
 	}
 }

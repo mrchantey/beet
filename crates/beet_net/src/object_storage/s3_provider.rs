@@ -9,10 +9,6 @@ use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
 
-
-// pub async fn s3_fs_selector(fs_path: AbsPathBuf) {}
-
-
 pub fn s3_bucket() -> impl Bundle {
 	AsyncAction::new(async move |mut world, entity| {
 		let bucket_name = world.resource::<PackageConfig>().html_bucket_name();

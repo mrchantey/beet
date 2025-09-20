@@ -42,47 +42,49 @@ pub fn default_handlers(
 		));
 	Ok(())
 }
-
-pub fn html_bucket(
-	ws_config: Res<WorkspaceConfig>,
-	pkg_config: Res<PackageConfig>,
+pub fn assets_bucket(
+	ws_config: When<Res<WorkspaceConfig>>,
+	pkg_config: When<Res<PackageConfig>>,
 	query: Query<Entity, With<RouterRoot>>,
 	mut commands: Commands,
 ) -> Result {
 	let root = query.single()?;
-	let html_dir = ws_config.html_dir.into_abs();
-	#[allow(unused)]
-	let html_bucket = pkg_config.html_bucket_name();
-	let spawn_bucket = AsyncAction::new(async move |mut world, entity| {
-		let access = world.resource::<PackageConfig>().service_access;
-		let bucket = match access {
-			ServiceAccess::Local => {
-				debug!("HTML: Connecting to filesystem: {html_dir}");
-				Bucket::new(FsBucketProvider::new(html_dir.clone()), "")
-			}
-			#[cfg(not(feature = "aws"))]
-			ServiceAccess::Remote => {
-				warn!(
-					"AWS feature not enabled, falling back to local filesystem for HTML bucket."
-				);
-				Bucket::new(FsBucketProvider::new(html_dir.clone()), "")
-			}
-			#[cfg(feature = "aws")]
-			ServiceAccess::Remote => {
-				debug!("HTML: Connecting to S3: {html_bucket}");
-				let provider = S3Provider::create().await;
-				Bucket::new(provider, html_bucket)
-			}
-		};
-		world.entity_mut(entity).insert(bucket);
-		world
-	});
-
+	let fs_dir = ws_config.assets_dir.into_abs();
+	let bucket_name = pkg_config.assets_bucket_name();
 	commands.spawn((
 		ChildOf(root),
-		spawn_bucket,
+		PathFilter::new("assets"),
+		AsyncAction::new(async move |mut world, entity| {
+			let access = world.resource::<PackageConfig>().service_access;
+			let bucket = s3_fs_selector(&fs_dir, &bucket_name, access).await;
+			world.entity_mut(entity).insert(bucket);
+			world
+		}),
+		bucket_file_handler(Some(RoutePath::new("assets"))),
+	));
+
+	Ok(())
+}
+
+pub fn html_bucket(
+	ws_config: When<Res<WorkspaceConfig>>,
+	pkg_config: When<Res<PackageConfig>>,
+	query: Query<Entity, With<RouterRoot>>,
+	mut commands: Commands,
+) -> Result {
+	let root = query.single()?;
+	let fs_dir = ws_config.html_dir.into_abs();
+	let bucket_name = pkg_config.html_bucket_name();
+	commands.spawn((
+		ChildOf(root),
+		AsyncAction::new(async move |mut world, entity| {
+			let access = world.resource::<PackageConfig>().service_access;
+			let bucket = s3_fs_selector(&fs_dir, &bucket_name, access).await;
+			world.entity_mut(entity).insert(bucket);
+			world
+		}),
 		HandlerConditions::fallback(),
-		bucket_file_handler(),
+		bucket_file_handler(None),
 	));
 
 	Ok(())

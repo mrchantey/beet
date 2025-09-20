@@ -189,6 +189,8 @@ pub struct WorkspaceConfig {
 	pub snippets_dir: WsPathBuf,
 	/// Location of the html directory, defaults to 'target/client'
 	pub html_dir: WsPathBuf,
+	/// Location of the assets directory, defaults to 'assets'
+	pub assets_dir: WsPathBuf,
 	/// Directory for temp static files like client islands.
 	pub client_islands_path: WsPathBuf,
 }
@@ -212,6 +214,7 @@ impl Default for WorkspaceConfig {
 			},
 			snippets_dir: WsPathBuf::new("target/snippets"),
 			html_dir: WsPathBuf::new("target/client"),
+			assets_dir: WsPathBuf::new("assets"),
 			client_islands_path: WsPathBuf::new("target/client_islands.ron"),
 		}
 	}

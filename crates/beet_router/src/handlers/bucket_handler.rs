@@ -7,10 +7,20 @@ use bevy::prelude::*;
 /// Serves static files from the provided bucket
 /// 1. If the requested path has an extension, create a permanent redirect to the public URL
 /// 2. If the requested path does not have an extension, append `/index.html` and serve the file as HTML.
-pub fn bucket_file_handler() -> impl Bundle {
+///
+/// If `remove_prefix` is supplied this handler **must** have a matching `PathFilter` or be nested appropriately
+pub fn bucket_file_handler(remove_prefix: Option<RoutePath>) -> impl Bundle {
 	(RouteHandler::layer_async(async move |mut world, entity| {
 		let path = world.remove_resource::<Request>().unwrap();
-		let path: RoutePath = path.into();
+		let mut path: RoutePath = path.into();
+		if let Some(prefix) = &remove_prefix {
+			if let Ok(stripped) = path.strip_prefix(prefix) {
+				path = RoutePath::new(stripped);
+			} else {
+				// this is not allowed
+				error!("prefix {prefix} not found in {path}");
+			}
+		}
 		let entity = world.entity(entity);
 		let bucket = entity.get::<Bucket>().unwrap();
 		let response = from_bucket(bucket, &path).await.into_response();
@@ -113,10 +123,28 @@ mod test {
 			(
 				HandlerConditions::fallback(),
 				bucket.clone(),
-				super::bucket_file_handler(),
+				super::bucket_file_handler(None),
 			)
 		})
 		.oneshot_str("/")
+		.await
+		.unwrap()
+		.xpect_str("<div>fallback</div>");
+	}
+	#[sweet::test]
+	async fn remove_prefix() {
+		let bucket = Bucket::new_test().await;
+		let path = RoutePath::from("bar/index.html");
+		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
+		Router::new_bundle(move || {
+			(
+				PathFilter::new("foo"),
+				HandlerConditions::fallback(),
+				bucket.clone(),
+				super::bucket_file_handler(Some(RoutePath::new("foo"))),
+			)
+		})
+		.oneshot_str("/foo/bar")
 		.await
 		.unwrap()
 		.xpect_str("<div>fallback</div>");

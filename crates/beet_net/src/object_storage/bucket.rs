@@ -208,6 +208,37 @@ pub trait BucketProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
+
+/// Manages the selection of either a filesystem or s3
+/// bucket depending on [`ServiceAccess`] and feature flags
+#[allow(unused_variables)]
+pub async fn s3_fs_selector(
+	fs_path: &AbsPathBuf,
+	bucket_name: &str,
+	access: ServiceAccess,
+) -> Bucket {
+	match access {
+		ServiceAccess::Local => {
+			debug!("Bucket Selector - FS: {fs_path}");
+			Bucket::new(FsBucketProvider::new(fs_path.clone()), "")
+		}
+		#[cfg(not(feature = "aws"))]
+		ServiceAccess::Remote => {
+			debug!("Bucket Seelctor - FS (no aws feature): {fs_path}");
+			Bucket::new(FsBucketProvider::new(fs_path.clone()), "")
+		}
+		#[cfg(feature = "aws")]
+		ServiceAccess::Remote => {
+			debug!("Bucket Selector - S3: {bucket_name}");
+			let provider = S3Provider::create().await;
+			Bucket::new(provider, bucket_name)
+		}
+	}
+}
+
+
+
+
 #[cfg(test)]
 pub mod bucket_test {
 	use crate::prelude::*;
