@@ -3,6 +3,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use heck::ToKebabCase;
 use std::path::Path;
+use std::str::FromStr;
 
 
 /// Override settings typically set via environment variables like `BEET_STAGE`.
@@ -48,6 +49,40 @@ pub struct PackageConfig {
 	/// The infrastructure stage for this build,
 	/// defaults to `dev` in debug builds and `prod` in release builds
 	pub stage: String,
+	/// How services should be accessed
+	pub service_access: ServiceAccess,
+}
+
+/// Options for how services should be accessed, for instance
+/// a bucket that should use the local file system during development
+/// but an s3 bucket when deployed.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Reflect)]
+pub enum ServiceAccess {
+	/// Services should be accessed via filesystem and local servers
+	Local,
+	/// Services should be accessed via remote cloud services
+	Remote,
+}
+impl FromStr for ServiceAccess {
+	type Err = String;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s.to_lowercase().as_str() {
+			"local" => Ok(ServiceAccess::Local),
+			"remote" => Ok(ServiceAccess::Remote),
+			other => Err(format!(
+				"Invalid service access: {other}, expected 'local' or 'remote'"
+			)),
+		}
+	}
+}
+impl std::fmt::Display for ServiceAccess {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let s = match self {
+			ServiceAccess::Local => "local",
+			ServiceAccess::Remote => "remote",
+		};
+		write!(f, "{s}")
+	}
 }
 
 impl PackageConfig {
@@ -60,9 +95,7 @@ impl PackageConfig {
 	/// The aws resource name for the server lambda function
 	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
 	/// The aws resource name for the static html bucket
-	pub fn html_bucket_name(&self) -> String {
-		self.resource_name("html")
-	}
+	pub fn html_bucket_name(&self) -> String { self.resource_name("html") }
 	/// The aws resource name for the assets bucket
 	pub fn assets_bucket_name(&self) -> String { self.resource_name("assets") }
 
@@ -75,6 +108,7 @@ impl PackageConfig {
 			// ("BEET_VERSION".to_string(),self.version().to_string()),
 			// ("BEET_DESCRIPTION".to_string(),self.description().to_string()),
 			("BEET_STAGE".to_string(),self.stage().to_string()),
+			("BEET_SERVICE_ACCESS".to_string(),self.service_access.to_string()),
 		]
 	}
 
@@ -131,6 +165,9 @@ macro_rules! pkg_config {
 			repository: option_env!("CARGO_PKG_REPOSITORY")
 				.map(|s| s.to_string()),
 			stage: option_env!("BEET_STAGE").unwrap_or("dev").to_string(),
+			service_access: option_env!("BEET_SERVICE_ACCESS")
+				.map(|s| s.parse().unwrap_or(ServiceAccess::Local))
+				.unwrap_or(ServiceAccess::Local),
 		}
 	};
 }

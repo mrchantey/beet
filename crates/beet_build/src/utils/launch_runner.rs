@@ -132,6 +132,7 @@ impl LaunchCmd {
 				BuildFlag::PushHtml,
 			],
 			Self::Deploy => vec![
+				BuildFlag::ServiceAccessRemote,
 				// BuildFlag::DeploySst,
 				]
 				.xtend(Self::Static.into_flags())
@@ -215,6 +216,9 @@ pub enum BuildFlag {
 	PushAssets,
 	/// Pull from s3 bucket to assets dir
 	PullAssets,
+	/// Services should be accessed via live endpoints instead
+	/// of locally, see [`ServiceAccess`]
+	ServiceAccessRemote,
 }
 
 impl BuildFlag {
@@ -242,6 +246,9 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::PushHtml => write!(f, "push-html"),
 			BuildFlag::PushAssets => write!(f, "push-assets"),
 			BuildFlag::PullAssets => write!(f, "pull-assets"),
+			BuildFlag::ServiceAccessRemote => {
+				write!(f, "service-access-remote")
+			}
 		}
 	}
 }
@@ -266,6 +273,7 @@ impl FromStr for BuildFlag {
 			"push-html" => Ok(BuildFlag::PushHtml),
 			"push-assets" => Ok(BuildFlag::PushAssets),
 			"pull-assets" => Ok(BuildFlag::PullAssets),
+			"service-access-remote" => Ok(BuildFlag::ServiceAccessRemote),
 			_ => Err(format!("Unknown flag: {}", s)),
 		}
 	}

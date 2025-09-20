@@ -208,9 +208,6 @@ pub trait BucketProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
-
-
-
 #[cfg(test)]
 pub mod bucket_test {
 	use crate::prelude::*;

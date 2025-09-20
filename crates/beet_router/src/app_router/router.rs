@@ -25,8 +25,8 @@ impl Plugin for RouterAppPlugin {
 			.init_resource::<DynSegmentMap>()
 			.init_resource::<HtmlConstants>()
 			.add_systems(
-				Startup,
-				(default_handlers, insert_route_tree).chain(),
+				PostStartup,
+				(default_handlers, html_bucket, insert_route_tree).chain(),
 			);
 	}
 }

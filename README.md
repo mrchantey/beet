@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>The Bevy Expansion Pack</strong>
+    <strong>A Very Bevy Metaframework</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is a very bevy metaframework, bringing bevy patterns *and* principles (thats where the 'very' comes in) to the rest of the stack.
+Beet brings bevy patterns *and* principles (thats where the 'very' comes in) to the entire application stack.
 
 Thats right fam, we're going full-stack bevy. Its early days so your mileage may vary depending on your application:
 

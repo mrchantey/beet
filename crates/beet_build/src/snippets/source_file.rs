@@ -1,9 +1,9 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::exports::notify::EventKind;
 use beet_core::exports::notify::event::CreateKind;
 use beet_core::exports::notify::event::ModifyKind;
 use beet_core::exports::notify::event::RemoveKind;
+use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 use std::path::Path;
@@ -33,6 +33,8 @@ impl AsRef<Path> for SourceFile {
 ///
 /// These files are initially loaded as children of the [`SourceFileRoot`],
 /// but may be moved to a [`RouteFileCollection`] if the path matches.
+//  we could alternatively use import_route_file_collection to only load
+// source files used by file based routes
 #[cfg_attr(test, allow(dead_code))]
 pub fn load_workspace_source_files(
 	mut commands: Commands,

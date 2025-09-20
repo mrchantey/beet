@@ -75,7 +75,7 @@ impl TestWasm {
 		let deno_str = include_str!("./deno.ts");
 
 		// return if the deno file already exists
-		if fs_ext::exists(&deno_runner_path) {
+		if fs_ext::exists(&deno_runner_path)? {
 			let runner_hash = fs_ext::hash_file(&deno_runner_path)?;
 			let deno_hash = fs_ext::hash_string(deno_str);
 			if runner_hash == deno_hash {

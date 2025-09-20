@@ -12,6 +12,8 @@
 - Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
 - Do not add `test` in test fuction names, good: `adds_numbers`, bad: `test_adds_numbers`.
 - NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.
+- aim to leave code better than you found it, add missing documentation, edit ambiguous language and clean up antipatterns.
+- documentation should always be as short and concise as possible.
 - Do not create non-doc examples without being explictly asked to do so.
 - Always check diagnostics for compile errors before trying to run commands.
 - Implement trait bounds in the order from lowest to highest level, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Component + Reflect..`

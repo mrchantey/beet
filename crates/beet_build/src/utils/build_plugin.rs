@@ -38,6 +38,16 @@ pub struct BuildPlugin;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct BuildSequence;
 
+/// ensure at least one FileExprHash is present to trigger
+/// listeners at least once
+fn init_file_expr_hash(mut commands: Commands) {
+	commands.spawn((Name::new("empty FileExprHash"), FileExprHash::default()));
+}
+
+fn set_remote_service_access(mut config: ResMut<PackageConfig>) {
+	config.service_access = ServiceAccess::Remote;
+}
+
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
@@ -47,16 +57,9 @@ impl Plugin for BuildPlugin {
 		app.add_systems(
 			Startup,
 			(
-				|mut commands: Commands| {
-					// ensure at least one FileExprHash is present to trigger
-					// listeners at least once
-					commands.spawn((
-						Name::new("empty FileExprHash"),
-						FileExprHash::default(),
-					));
-				},
-				// alternatively use import_route_file_collection to only load
-				// source files used by file based routes
+				init_file_expr_hash,
+				set_remote_service_access
+					.run_if(BuildFlag::ServiceAccessRemote.should_run()),
 				load_workspace_source_files
 					.run_if(BuildFlag::ImportSnippets.should_run()),
 			),

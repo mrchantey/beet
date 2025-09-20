@@ -48,55 +48,79 @@ pub fn copy_recursive(
 	Ok(())
 }
 
+
+pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
+	let path = path.as_ref();
+	match fs::exists(path) {
+		Ok(val) => Ok(val),
+		Err(err) => Err(FsError::io(path, err)),
+	}
+}
+
+pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::exists(path)
+	}
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		let path = path.as_ref();
+		match async_fs::metadata(path).await {
+			Ok(_) => Ok(true),
+			Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+			Err(err) => Err(FsError::io(path, err)),
+		}
+	}
+}
+pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
+	let path = path.as_ref();
+	fs::create_dir_all(path).map_err(|err| FsError::io(path, err))
+}
+
+pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::create_dir_all(path)
+	}
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		let path = path.as_ref();
+		async_fs::create_dir_all(path)
+			.await
+			.map_err(|err| FsError::io(path, err))
+	}
+}
+
 /// remove a directory and all its contents
 pub fn remove(path: impl AsRef<Path>) -> FsResult {
 	let path = path.as_ref();
 	fs::remove_dir_all(path).map_err(|err| FsError::io(path, err))?;
 	Ok(())
 }
-pub fn exists(path: impl AsRef<Path>) -> bool {
-	match fs::exists(path) {
-		Ok(true) => true,
-		_ => false,
-	}
-}
 
-/// Async: check if a file exists
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
-	let path = path.as_ref();
-	async_fs::create_dir_all(path)
-		.await
-		.map_err(|err| FsError::io(path, err))
-}
-/// Async: check if a file exists
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
-	let path = path.as_ref();
-	match async_fs::metadata(path).await {
-		Ok(_) => Ok(true),
-		Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
-		Err(err) => Err(FsError::io(path, err)),
-	}
-}
-/// Async: remove a file or directory and all its contents
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
-	let path = path.as_ref();
-	match async_fs::metadata(path).await {
-		Ok(meta) => {
-			if meta.is_dir() {
-				async_fs::remove_dir_all(path)
-					.await
-					.map_err(|err| FsError::io(path, err))?;
-			} else {
-				async_fs::remove_file(path)
-					.await
-					.map_err(|err| FsError::io(path, err))?;
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::remove(path)
+	}
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		let path = path.as_ref();
+		match async_fs::metadata(path).await {
+			Ok(meta) => {
+				if meta.is_dir() {
+					async_fs::remove_dir_all(path)
+						.await
+						.map_err(|err| FsError::io(path, err))?;
+				} else {
+					async_fs::remove_file(path)
+						.await
+						.map_err(|err| FsError::io(path, err))?;
+				}
+				Ok(())
 			}
-			Ok(())
+			Err(err) => Err(FsError::io(path, err)),
 		}
-		Err(err) => Err(FsError::io(path, err)),
 	}
 }
 
@@ -110,24 +134,36 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 /// - Insufficient permissions to access the current directory
 pub fn workspace_root() -> PathBuf { crate::prelude::workspace_root() }
 
-pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
-	std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e))
-}
 pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	std::fs::read(&path).map_err(|e| FsError::io(path, e))
 }
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
-	async_fs::read_to_string(&path)
-		.await
-		.map_err(|e| FsError::io(path, e))
+pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::read(path)
+	}
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		async_fs::read(&path)
+			.await
+			.map_err(|e| FsError::io(path, e))
+	}
 }
 
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
-	async_fs::read(&path)
-		.await
-		.map_err(|e| FsError::io(path, e))
+pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
+	std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e))
+}
+pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::read_to_string(path)
+	}
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		async_fs::read_to_string(&path)
+			.await
+			.map_err(|e| FsError::io(path, e))
+	}
 }
 
 
@@ -159,22 +195,29 @@ pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 	Ok(())
 }
 
-/// Async version of write: Write a file, ensuring the path exists
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+/// Async version of write: Write a file, ensuring the path exists.
+/// Falls back to `fs_ex::write` without the feature flag
 pub async fn write_async(
 	path: impl AsRef<Path>,
 	data: impl AsRef<[u8]>,
 ) -> FsResult {
-	let path = path.as_ref();
-	if let Some(parent) = path.parent() {
-		async_fs::create_dir_all(parent)
-			.await
-			.map_err(|err| FsError::io(parent, err))?;
+	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	{
+		fs_ext::write(path, data)
 	}
-	async_fs::write(path, data)
-		.await
-		.map_err(|err| FsError::io(path, err))?;
-	Ok(())
+	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	{
+		let path = path.as_ref();
+		if let Some(parent) = path.parent() {
+			async_fs::create_dir_all(parent)
+				.await
+				.map_err(|err| FsError::io(parent, err))?;
+		}
+		async_fs::write(path, data)
+			.await
+			.map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
 }
 
 /// Write a file only if the data is different from the existing file,

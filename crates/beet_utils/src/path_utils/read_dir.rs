@@ -41,15 +41,21 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories in a directory, not recursive
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn all_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
-		Self {
-			files: true,
-			dirs: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::all(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				files: true,
+				dirs: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 	/// Get all dirs in a directory, not recursive
@@ -62,14 +68,20 @@ impl ReadDir {
 	}
 
 	/// Async: Get all dirs in a directory, not recursive
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn dirs_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
-		Self {
-			dirs: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::dirs(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				dirs: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 	/// Get all files in a directory, not recursive
@@ -82,14 +94,20 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files in a directory, not recursive
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn files_async(root: impl AsRef<Path>) -> FsResult<Vec<PathBuf>> {
-		Self {
-			files: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::files(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				files: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 	/// Get all files and directories recursively
@@ -104,18 +122,24 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files and directories recursively
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn all_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
-		Self {
-			dirs: true,
-			files: true,
-			recursive: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::all_recursive(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				dirs: true,
+				files: true,
+				recursive: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 	/// Get all subdirectories recursively
@@ -129,17 +153,23 @@ impl ReadDir {
 	}
 
 	/// Async: Get all subdirectories recursively
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn dirs_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
-		Self {
-			dirs: true,
-			recursive: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::dirs_recursive(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				dirs: true,
+				recursive: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 	/// Get all files recursively
@@ -153,17 +183,23 @@ impl ReadDir {
 	}
 
 	/// Async: Get all files recursively
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn files_recursive_async(
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
-		Self {
-			files: true,
-			recursive: true,
-			..Default::default()
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			Self::files_recursive(root)
 		}
-		.read_async(root)
-		.await
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			Self {
+				files: true,
+				recursive: true,
+				..Default::default()
+			}
+			.read_async(root)
+			.await
+		}
 	}
 
 
@@ -215,17 +251,23 @@ impl ReadDir {
 
 	/// Async version: Read dir with the provided options. if the root is a file, the
 	/// file will be returned.
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn read_async(
 		&self,
 		root: impl AsRef<Path>,
 	) -> FsResult<Vec<PathBuf>> {
-		let mut paths = Vec::new();
-		if self.root {
-			paths.push(root.as_ref().to_path_buf());
+		#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+		{
+			self.read(root)
 		}
-		self.read_inner_async(root, &mut paths).await?;
-		Ok(paths)
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			let mut paths = Vec::new();
+			if self.root {
+				paths.push(root.as_ref().to_path_buf());
+			}
+			self.read_inner_async(root, &mut paths).await?;
+			Ok(paths)
+		}
 	}
 
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -414,7 +456,10 @@ mod test_async {
 	#[tokio::test]
 	async fn files() {
 		assert_eq!(
-			ReadDir::files_async(fs_ext::test_dir()).await.unwrap().len(),
+			ReadDir::files_async(fs_ext::test_dir())
+				.await
+				.unwrap()
+				.len(),
 			3
 		);
 	}
