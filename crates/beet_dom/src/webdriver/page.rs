@@ -1,12 +1,9 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
 use serde_json::Value;
 use serde_json::json;
 
-use super::Client;
-use super::ClientProcess;
-use super::Element;
-use super::Session;
 
 /// High level ergonomic wrapper over a BiDi `Session` bound to a single
 /// top-level browsing context (page / tab).
@@ -25,8 +22,8 @@ use super::Session;
 ///
 #[derive(Debug, Clone)]
 pub struct Page {
-	session: Session,
-	context_id: String,
+	pub(super) session: Session,
+	pub(super) context_id: String,
 }
 
 impl Page {
@@ -85,7 +82,10 @@ impl Page {
 					"wait": "complete"
 				}),
 			)
-			.await?;
+			.await
+			.map_err(|err| {
+				bevyhow!("navigate to {url} failed, is it a valid url?\n {err}")
+			})?;
 		Ok(())
 	}
 
@@ -116,9 +116,6 @@ impl Page {
 			.xok()
 	}
 
-	pub async fn export_pdf(&self) -> Result<Vec<u8>> {
-		Err(bevyhow!("export_pdf not yet implemented"))
-	}
 
 	/// Query a single element. Returns `Ok(None)` if no match.
 	/// When an element is found we extract its BiDi remote handle

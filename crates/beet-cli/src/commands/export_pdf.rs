@@ -5,6 +5,9 @@ use clap::Parser;
 #[derive(Debug, Clone, Parser)]
 pub struct ExportPdf {
 	/// Input url (positional)
+	/// Disable margins
+	#[clap(long = "no-margin")]
+	pub no_margin: bool,
 	pub input: String,
 	/// Output file (-o, --output)
 	#[clap(short = 'o', long = "output",
@@ -13,16 +16,21 @@ pub struct ExportPdf {
 	pub output: std::path::PathBuf,
 }
 
-
-
 impl ExportPdf {
 	#[allow(unused)]
 	pub async fn run(self) -> Result {
-		todo!("chrome devtools protocol");
-		// let devtools = ChromeDevTools::connect().await?;
-		// let bytes = devtools.visit(&self.input).await?.export_pdf().await?;
-		// let output = self.output.unwrap_or("output.pdf".into());
-		// fs_ext::write_async(output, bytes).await?;
-		// Ok(())
+		App::default()
+			.run_io_task(async move {
+				let mut opts = PdfOptions::default();
+				if self.no_margin {
+					opts.margin = PdfMargin::none();
+				}
+
+				let (proc, page) = Page::visit(&self.input).await?;
+				let bytes = page.export_pdf_with_options(&opts).await?;
+				fs_ext::write_async(self.output, bytes).await?;
+				Ok(())
+			})
+			.await
 	}
 }
