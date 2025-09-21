@@ -6,10 +6,11 @@ use clap::Parser;
 pub struct ExportPdf {
 	/// Input url (positional)
 	pub input: String,
-
 	/// Output file (-o, --output)
-	#[clap(short = 'o', long = "output", value_parser = clap::value_parser!(std::path::PathBuf))]
-	pub output: Option<std::path::PathBuf>,
+	#[clap(short = 'o', long = "output",
+	default_value = "file.pdf",
+	 value_parser = clap::value_parser!(std::path::PathBuf))]
+	pub output: std::path::PathBuf,
 }
 
 

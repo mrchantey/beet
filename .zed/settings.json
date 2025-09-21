@@ -13,8 +13,7 @@
 						// "client",
 						// "launch",
 						// "lambda",
-						// "webdriver"
-						// "chrome_dev_tools",
+						"webdriver",
 						// "css",
 						"aws"
 					]

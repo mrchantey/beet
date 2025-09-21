@@ -3,14 +3,14 @@
 #![allow(async_fn_in_trait)]
 
 #[cfg(feature = "webdriver")]
-mod dom;
+mod webdriver;
 mod node;
 mod utils;
 
 pub mod prelude {
 
 	#[cfg(feature = "webdriver")]
-	pub use crate::dom::*;
+	pub use crate::webdriver::*;
 	pub use crate::node::*;
 	pub use crate::utils::*;
 
