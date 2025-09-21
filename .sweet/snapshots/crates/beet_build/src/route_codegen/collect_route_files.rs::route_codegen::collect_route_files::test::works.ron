@@ -8,9 +8,9 @@ use crate as test_site;
 pub mod _index;
 #[cfg(feature = "server")]
 pub fn test_docs_routes() -> impl Bundle {
-    children![
-        (CacheStrategy::Static, PathFilter { segments : RouteSegments::_from_raw(vec![],
-        true) }, HttpMethod::Get, bundle_endpoint(_index::get),
-        HandlerConditions::is_ssr())
-    ]
+    related! {
+        Children[(CacheStrategy::Static, PathFilter { segments :
+        RouteSegments::_from_raw(vec![], true) }, HttpMethod::Get,
+        bundle_endpoint(_index::get), HandlerConditions::is_ssr())]
+    }
 }

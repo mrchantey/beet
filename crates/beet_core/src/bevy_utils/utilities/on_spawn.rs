@@ -7,7 +7,8 @@ use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
 use bevy::prelude::*;
 
-/// Type helper for [`SpawnWith`]
+/// Type helper for [`SpawnWith`], useful for spawning any number of related entities
+/// like children.
 pub fn spawn_with<T: RelationshipTarget, F>(
 	func: F,
 ) -> SpawnRelatedBundle<T::Relationship, SpawnWith<F>>

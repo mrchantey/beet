@@ -2,8 +2,6 @@ use crate::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use quote::quote;
-use syn::Ident;
 
 /// If the entity has this [`RelationshipTarget`], then map each
 /// child with `map_child` and return a `related!` [`TokenStream`]
@@ -25,8 +23,7 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 		.into_iter()
 		.map(|child| map_child(world, child))
 		.collect::<Result<Vec<_>>>()?;
-	let ident = type_path_to_ident::<T>()?;
-	items.push(unbounded_related(&ident, related));
+	items.push(unbounded_related::<T>(related)?);
 	Ok(())
 }
 
@@ -52,28 +49,10 @@ where
 			let children =
 				children.iter().map(map_child).collect::<Result<Vec<_>>>()?;
 			if !children.is_empty() {
-				let ident = type_path_to_ident::<T>()?;
-				items.push(quote! { related!{#ident [#(#children),*]} });
+				items.push(unbounded_related::<T>(children)?);
 			}
 		};
 
 		Ok(())
 	}
-}
-
-fn type_path_to_ident<T: TypePath>() -> Result<Ident> {
-	let ident = T::type_ident().ok_or_else(|| {
-		anyhow::anyhow!(
-			"Failed to get type identifier for component: {}",
-			std::any::type_name::<T>()
-		)
-	})?;
-	let ident: Ident = syn::parse_str(ident).map_err(|_| {
-		anyhow::anyhow!(
-			"Failed to parse type identifier for component: {}",
-			std::any::type_name::<T>()
-		)
-	})?;
-
-	Ok(ident)
 }

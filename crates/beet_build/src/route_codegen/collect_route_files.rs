@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_parse::prelude::unbounded_related;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -104,11 +105,12 @@ pub fn collect_route_files(
 
 		let collection_name = codegen_file.name();
 		let collection_ident = quote::format_ident!("{collection_name}_routes");
+		let bundle = unbounded_related::<Children>(children)?;
 
 		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
 			#[cfg(feature = "server")]
 			pub fn #collection_ident() -> impl Bundle {
-				children![#(#children),*]
+				#bundle
 			}
 		});
 	}

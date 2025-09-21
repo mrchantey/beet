@@ -10,9 +10,16 @@ use syn::Ident;
 /// bundle impl limit
 const BOUNDED_MAX: usize = 12;
 
+pub fn unbounded_related<T: TypePath>(
+	related: Vec<TokenStream>,
+) -> Result<TokenStream> {
+	let ident = type_path_to_ident::<T>()?;
+	unbounded_related_ident(&ident, related).xok()
+}
+
 /// Uses `related!` if the number of related items can be represented as a tuple,
 /// otherwise use [`spawn_with`]
-pub fn unbounded_related(
+pub fn unbounded_related_ident(
 	ident: &Ident,
 	related: Vec<TokenStream>,
 ) -> TokenStream {
@@ -58,4 +65,21 @@ pub(super) fn maybe_spanned_attr_key(
 		(Some(key), None) => Some((key.to_string(), Span::call_site())),
 		_ => None,
 	}
+}
+
+fn type_path_to_ident<T: TypePath>() -> Result<Ident> {
+	let ident = T::type_ident().ok_or_else(|| {
+		anyhow::anyhow!(
+			"Failed to get type identifier for component: {}",
+			std::any::type_name::<T>()
+		)
+	})?;
+	let ident: Ident = syn::parse_str(ident).map_err(|_| {
+		anyhow::anyhow!(
+			"Failed to parse type identifier for component: {}",
+			std::any::type_name::<T>()
+		)
+	})?;
+
+	Ok(ident)
 }
