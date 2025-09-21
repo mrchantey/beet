@@ -28,7 +28,7 @@ impl Plugin for RouterAppPlugin {
 				PostStartup,
 				(
 					default_handlers,
-					// assets must be placed in tree before html
+					// assets must run first to be placed in tree before html
 					assets_bucket,
 					html_bucket,
 					insert_route_tree,

@@ -129,6 +129,7 @@ impl LaunchCmd {
 				BuildFlag::CompileServer,
 				BuildFlag::CompileClient,
 				BuildFlag::ExportSsg,
+				BuildFlag::PushAssets,
 				BuildFlag::PushHtml,
 			],
 			Self::Deploy => vec![

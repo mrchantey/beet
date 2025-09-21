@@ -16,16 +16,21 @@ keywords.workspace = true
 name = "beet"
 path = "src/main.rs"
 
+[features]
+default = ["qrcode"]
+qrcode = ["dep:qrcode","dep:image"]
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet = { workspace = true, features = [
 "native-tls", "build", "fs", "server", "webdriver","agent"] }
-anyhow.workspace = true
 ron.workspace = true
 clap.workspace = true
 tokio = { workspace = true, features = ["process"] }
 rapidhash.workspace = true
 bevy.workspace = true
 heck.workspace = true
+qrcode = {version = "0.14", optional = true }
+image = {version = "0.25", optional = true }
 
 #💡 Automod
 syn.workspace = true

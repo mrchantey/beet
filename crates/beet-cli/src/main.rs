@@ -21,6 +21,8 @@ enum SubCommands {
 	New(RunNew),
 	Agent(AgentCmd),
 	ExportPdf(ExportPdf),
+	#[cfg(feature = "qrcode")]
+	Qrcode(QrCodeCmd),
 }
 
 #[tokio::main]
@@ -30,5 +32,7 @@ async fn main() -> Result {
 		SubCommands::New(cmd) => cmd.run().await,
 		SubCommands::Agent(cmd) => cmd.run().await,
 		SubCommands::ExportPdf(cmd) => cmd.run().await,
+		#[cfg(feature = "qrcode")]
+		SubCommands::Qrcode(cmd) => cmd.run().await,
 	}
 }
