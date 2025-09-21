@@ -11,6 +11,7 @@ openapi.yaml
 openapitools.json
 rust_bindings
 prompt.md
+file.pdf
 
 tests/assert.rs
 tests/expect.rs

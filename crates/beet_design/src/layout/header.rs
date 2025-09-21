@@ -7,7 +7,7 @@ pub fn Header(
 	config: Res<PackageConfig>,
 ) -> impl Bundle {
 	rsx! {
-		<header>
+		<header class="bt-u-print-hidden">
 			<a class="app-bar-title button-like" href={home_route}>
 				// <Logo/>
 				{config.title.clone()}

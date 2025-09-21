@@ -1,4 +1,14 @@
-/* 
-utility classes
+@media print {
+	/*
+	h2 {
+		break-before: page;
+	}*/
 
-*/
+	.bt-u-print-hidden {
+		display: none !important;
+	}
+
+	.bt-u-page-break {
+		break-after: page;
+	}
+}

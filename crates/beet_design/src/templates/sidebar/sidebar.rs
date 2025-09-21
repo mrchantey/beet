@@ -18,7 +18,7 @@ pub struct SidebarInfo {
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	rsx! {
-		<nav id="sidebar" aria-hidden="false">
+		<nav id="sidebar" class="bt-u-print-hidden" aria-hidden="false">
 		{nodes.into_iter().map(|node|
 			rsx!{<SidebarItem root node=node/>}).collect::<Vec<_>>()
 		}

@@ -26,7 +26,7 @@ pub fn Footer(config: Res<PackageConfig>) -> impl Bundle {
 	// <!-- <a href="/terms-of-service">Terms</a> -->
 
 	rsx! {
-		<footer id="page-footer">
+		<footer id="page-footer" class="bt-u-print-hidden">
 			<span>{footer_text}</span>
 			<slot/>
 			<span>{build_text}</span>

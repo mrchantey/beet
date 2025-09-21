@@ -149,6 +149,7 @@ impl Page {
 						"width": options.page_size.width,
 						"height": options.page_size.height
 					},
+					// "pageRanges": ["1-"],  // Ensure we capture all pages
 					"scale": options.scale,
 					"shrinkToFit": options.shrink_to_fit
 				}),
