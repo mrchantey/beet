@@ -9,6 +9,13 @@ video {
 	align-self: center;
 }
 
+
+
+
+.bt-u-print-only {
+	display: none;
+}
+
 @media print {
 	/*
 	h2 {
@@ -18,7 +25,9 @@ video {
 	.bt-u-print-hidden {
 		display: none !important;
 	}
-
+	.bt-u-print-only {
+		display: block;
+	}
 	.bt-u-page-break {
 		break-after: page;
 	}
