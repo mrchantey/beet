@@ -20,6 +20,8 @@ pub struct PdfOptions {
 	pub scale: f64,
 	/// Whether to shrink content to fit page.
 	pub shrink_to_fit: bool,
+	/// Specific page ranges to include (e.g., ["1-3", "5"]).
+	pub page_ranges: Vec<String>,
 }
 
 
@@ -31,6 +33,7 @@ impl Default for PdfOptions {
 			orientation: PdfOrientation::Portrait,
 			page_size: PdfPageSize::a4(),
 			scale: 1.0,
+			page_ranges: Vec::new(),
 			shrink_to_fit: true,
 		}
 	}
@@ -149,7 +152,7 @@ impl Page {
 						"width": options.page_size.width,
 						"height": options.page_size.height
 					},
-					// "pageRanges": ["1-"],  // Ensure we capture all pages
+					"pageRanges": options.page_ranges,
 					"scale": options.scale,
 					"shrinkToFit": options.shrink_to_fit
 				}),
@@ -216,6 +219,7 @@ mod test {
 					page_size: PdfPageSize::letter(),
 					scale: 0.8,
 					shrink_to_fit: false,
+					page_ranges: vec!["1".to_string()],
 				};
 
 				let pdf_bytes =

@@ -49,10 +49,16 @@ pub struct CodegenFile {
 }
 
 fn default_imports() -> Vec<Unspan<Item>> {
-	vec![Unspan::new(&syn::parse_quote!(
-		#[allow(unused_imports)]
-		use beet::prelude::*;
-	))]
+	vec![
+		Unspan::new(&syn::parse_quote!(
+			#[allow(unused_imports)]
+			use beet::prelude::*;
+		)),
+		Unspan::new(&syn::parse_quote!(
+			#[allow(unused_imports)]
+			use crate::prelude::*;
+		)),
+	]
 }
 
 impl Default for CodegenFile {
