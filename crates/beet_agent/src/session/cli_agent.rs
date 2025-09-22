@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use clap::Parser;
 
@@ -34,13 +33,47 @@ macro_rules! print_flush {
 
 #[derive(Debug, Clone, Parser, Resource)]
 pub struct CliAgentConfig {
-	#[arg(
-		long,
-		help = "Run in oneshot mode, exiting after the first message received"
-	)]
+	/// Run in oneshot mode, exiting after the first message received
+	#[arg(long)]
 	oneshot: bool,
-	#[arg(short, long, help = "Directory to write received files to")]
-	out_dir: Option<std::path::PathBuf>,
+	/// Path without extension to write output images and text to
+	#[arg(short, long)]
+	out_file: Option<std::path::PathBuf>,
+	/// Overwrite existing files instead of creating new ones
+	#[arg(short = 'd', long)]
+	overwrite: bool,
+}
+
+impl CliAgentConfig {
+	pub fn oneshot(&self) -> bool { self.oneshot }
+
+	pub fn next_available_filename(
+		&self,
+		extension: &str,
+	) -> Result<AbsPathBuf> {
+		let mut filename =
+			self.out_file.clone().unwrap_or_else(|| "file".into());
+		filename.set_extension(extension);
+		let file_stem = filename
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("file")
+			.to_string();
+		let mut path = AbsPathBuf::new_workspace_rel(filename)?;
+		if self.overwrite {
+			path.xok()
+		} else {
+			let mut suffix = 0;
+			while path.exists() {
+				suffix += 1;
+				path.set_file_name(format!(
+					"{}-{}.{}",
+					file_stem, suffix, extension
+				));
+			}
+			path.xok()
+		}
+	}
 }
 
 impl Plugin for CliAgentPlugin {
@@ -173,7 +206,6 @@ fn reasoning_ended(
 
 fn file_inserted(
 	ev: Trigger<OnInsert, FileContent>,
-	mut cache: Local<HashMap<String, AbsPathBuf>>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
@@ -182,19 +214,7 @@ fn file_inserted(
 	let file = query.get(ev.target())?;
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
-		let cache_len = cache.len();
-		let filename = cache
-			.entry(file.filename.to_string_lossy().to_string())
-			.or_insert_with(|| {
-				let base = config.out_dir.clone().unwrap_or_default();
-				let base = base.display();
-				AbsPathBuf::new_workspace_rel(format!(
-					"{base}/file{cache_len}.{}",
-					file.extension()
-				))
-				.unwrap()
-			})
-			.clone();
+		let filename = config.next_available_filename(file.extension())?;
 		print_flush!("\n{} > file: {}", actor.role, filename);
 		let file = file.clone();
 		commands.run_system_cached_with(
