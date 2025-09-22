@@ -8,10 +8,12 @@ pub fn Header(
 ) -> impl Bundle {
 	rsx! {
 		<header class="bt-u-print-hidden">
+			<slot name="heading">
 			<a class="app-bar-title button-like" href={home_route}>
 				// <Logo/>
 				{config.title.clone()}
 			</a>
+			</slot>
 			<slot />
 			<nav>
 				<slot name="nav"/>
@@ -28,14 +30,13 @@ pub fn Header(
 			border-bottom: 1px solid var(--color-outline-variant);
 		}
 
-		.app-bar-title {
-			font-size: 2rem;
-			font-weight: 900;
-			background-image: linear-gradient(90deg, var(--bt-color-primary) 45%, var(--bt-color-secondary) 65%);
-			color: transparent !important;
-			background-clip: text;
-			display: flex;
-			align-items: center;
+		a.app-bar-title {
+			text-decoration: none;
+			cursor: pointer;
+			color: var(--bt-color-primary);
+			outline: none;
+			font-weight: 700;
+			font-size: 1.6rem;
 		}
 
 		nav {

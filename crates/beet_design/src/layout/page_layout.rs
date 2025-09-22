@@ -9,6 +9,7 @@ pub fn PageLayout() -> impl Bundle {
 		<div class="page">
 			<Header>
 				<slot name="header" slot="default" />
+				// <slot name="heading" slot="heading" />
 				<slot name="header-nav" slot="nav" />
 			</Header>
 			<slot/>

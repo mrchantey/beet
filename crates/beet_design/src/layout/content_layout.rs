@@ -7,6 +7,7 @@ pub fn ContentLayout() -> impl Bundle {
 			<PageLayout>
 			<slot name="head" slot="head" />
 			<slot name="header" slot="header" />
+			// <slot name="heading" slot="heading" />
 			<slot name="header-nav" slot="header-nav" />
 			<slot name="footer" slot="footer" />
 			<main>
