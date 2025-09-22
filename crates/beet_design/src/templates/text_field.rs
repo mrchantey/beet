@@ -57,11 +57,14 @@ pub fn TextArea(
 		variant.class_suffix()
 	));
 
+	// apply the initial value as well as setting the attribute,
+	// required for before-wasm visibility
+	let value = attrs.input_attrs.value.as_ref().map(|v| v.get());
 	rsx! {
 		<div class="bt-c-input__container">
 			<slot />
 			<textarea {attrs}>
-				<slot name="textarea" />
+				{value}
 			</textarea>
 		</div>
 		<style src="./input.css" />

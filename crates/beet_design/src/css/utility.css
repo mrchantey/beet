@@ -1,3 +1,14 @@
+.bt-u-main {
+	display: flex;
+	flex-direction: column;
+}
+
+.bt-u-main iframe,
+img,
+video {
+	align-self: center;
+}
+
 @media print {
 	/*
 	h2 {

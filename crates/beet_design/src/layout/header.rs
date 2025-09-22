@@ -30,7 +30,9 @@ pub fn Header(
 			border-bottom: 1px solid var(--color-outline-variant);
 		}
 
-		a.app-bar-title {
+		a.app-bar-title,
+		a.app-bar-title:visited
+	 {
 			text-decoration: none;
 			cursor: pointer;
 			color: var(--bt-color-primary);

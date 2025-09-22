@@ -10,7 +10,7 @@ pub fn ContentLayout() -> impl Bundle {
 			// <slot name="heading" slot="heading" />
 			<slot name="header-nav" slot="header-nav" />
 			<slot name="footer" slot="footer" />
-			<main>
+			<main class="bt-u-main">
 				<slot />
 			</main>
 			</PageLayout>
@@ -21,7 +21,7 @@ pub fn ContentLayout() -> impl Bundle {
 					padding: 1.em var(--bt-content-padding-width) 1.em var(--bt-content-padding-width);
 				}
 				main img {
-					max-width: 100%;
+					object-fit:contain;
 				}
 			</style>
 	}

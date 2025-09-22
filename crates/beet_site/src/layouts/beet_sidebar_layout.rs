@@ -29,7 +29,7 @@ pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
 		<BeetHeaderLinks slot="header-nav"/>
 		<div class="container">
 			<Sidebar nodes=sidebar_nodes />
-			<main>
+			<main class="bt-u-main">
 				<slot/>
 			</main>
 		</div>
@@ -48,7 +48,7 @@ pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
 			/* padding: 0 10em 0 2em; */
 			/* padding: 0 calc(var(--content-padding-width) - var(--sidebar-width)) 0 0; */
 		}
-		</style>	
+		</style>
 	}
 	.xok()
 }
