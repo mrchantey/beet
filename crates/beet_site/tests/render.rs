@@ -7,20 +7,25 @@ use sweet::prelude::*;
 #[sweet::test]
 // #[ignore = "changes too often"]
 async fn docs() {
-	// let text = Router::new_bundle(routes_bundle)
+	// let res = Router::new_bundle(routes_bundle)
 	// 	.oneshot("/docs")
 	// 	.await
-	// 	.text()
-	// 	.await
+	// 	// .text()
+	// 	// .await
 	// 	.unwrap();
-	// println!("text: {text}");
+	// println!("res: {res:?}");
 	// empty without snippets.ron?
 
 	Router::new_bundle(routes_bundle)
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
 		.oneshot("/docs")
 		.await
+		.into_result()
+		.await
+		.unwrap()
 		.text()
 		.await
 		.unwrap()
-		.xpect_contains("Docs");
+		.xpect_contains("docs");
 }

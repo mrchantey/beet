@@ -85,6 +85,13 @@ impl Router {
 		self
 	}
 
+	pub fn with_resource(mut self, res: impl Clone + Resource) -> Self {
+		self.add_plugin(move |app: &mut App| {
+			app.insert_resource(res.clone());
+		});
+		self
+	}
+
 	/// Creates a new [`Plugin`] which will first add the [`Self::plugin`]
 	/// and then the new plugin.
 	pub fn add_plugin(&mut self, new_plugin: impl ClonePlugin) {
@@ -268,6 +275,7 @@ impl Router {
 					continue;
 				}
 			}
+
 
 			// Party time: actually run the handler
 			if let Some(handler) =

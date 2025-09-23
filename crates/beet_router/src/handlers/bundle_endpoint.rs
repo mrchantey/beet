@@ -142,9 +142,7 @@ mod test {
 				}
 			})
 		})
-		.with_plugin(|app: &mut App| {
-			app.insert_resource(RenderMode::Ssr);
-		})
+		.with_resource(RenderMode::Ssr)
 		.oneshot_str("/")
 		.await
 		.unwrap()
@@ -170,9 +168,7 @@ mod test {
 				}),
 			]
 		})
-		.with_plugin(|app: &mut App| {
-			app.insert_resource(RenderMode::Ssr);
-		})
+		.with_resource(RenderMode::Ssr)
 		.oneshot_str("/")
 		.await
 		.unwrap()
