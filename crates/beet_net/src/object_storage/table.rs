@@ -11,27 +11,19 @@ use uuid::Uuid;
 ///
 /// # Example
 /// ```
-/// use serde::{Serialize, Deserialize};
-///
-/// #[derive(Serialize, Deserialize, Clone)]
-/// struct User {
-///     name: String,
-///     email: String,
-/// }
-///
+/// # use bevy::prelude::*;
+/// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let table = temp_table::<String>();
+/// let table = temp_table::<TableItem<String>>();
 /// table.bucket_try_create().await?;
 ///
-/// let user = User {
-///     name: "Alice".into(),
-///     email: "alice@example.com".into(),
-/// };
+/// let item = TableItem::new("Hello, world!".to_string());
+/// let id = item.id();
 ///
 /// // Insert and retrieve typed objects
-/// table.insert(&RoutePath::from("/alice"), user.clone()).await?;
-/// let retrieved = table.get(&RoutePath::from("/alice")).await?;
-/// assert_eq!(user.name, retrieved.name);
+/// table.push(item.clone()).await?;
+/// let retrieved = table.get(id).await?;
+/// assert_eq!(item.data, retrieved.data);
 /// # Ok(())
 /// # }
 /// ```
@@ -57,7 +49,9 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// let table = temp_table::<String>();
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// let table = temp_table::<TableItem<String>>();
 	/// ```
 	pub fn new(
 		provider: impl TableProvider<T>,
@@ -73,8 +67,10 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// let table = temp_table::<String>();
-	/// assert_eq!(table.name(), "users");
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// let table = temp_table::<TableItem<String>>();
+	/// assert_eq!(table.name(), "temp");
 	/// ```
 	pub fn name(&self) -> &str { &self.name }
 
@@ -109,10 +105,12 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// let user = User::default();
-	/// table.insert(&RoutePath::from("/user1"), user).await?;
+	/// let table = temp_table::<TableItem<String>>();
+	/// let item = TableItem::new("test data".to_string());
+	/// table.push(item).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -124,10 +122,12 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// let user = User::default();
-	/// table.try_insert(&RoutePath::from("/user1"), user).await?;
+	/// let table = temp_table::<TableItem<String>>();
+	/// let item = TableItem::new("test data".to_string());
+	/// table.try_push(item).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -147,9 +147,13 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// let exists = table.exists(&RoutePath::from("/user1")).await?;
+	/// let table = temp_table::<TableItem<String>>();
+	/// let item = TableItem::new("test".to_string());
+	/// let id = item.id();
+	/// let exists = table.exists(id).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -162,8 +166,10 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
+	/// let table = temp_table::<TableItem<String>>();
 	/// let paths = table.list().await?;
 	/// # Ok(())
 	/// # }
@@ -176,9 +182,13 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// let user = table.get(&RoutePath::from("/user1")).await?;
+	/// let table = temp_table::<TableItem<String>>();
+	/// let item = TableItem::new("test".to_string());
+	/// let id = item.id();
+	/// let retrieved = table.get(id).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -193,11 +203,13 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
+	/// let table = temp_table::<TableItem<String>>();
 	/// let items = table.get_all().await?;
-	/// for (path, user) in items {
-	///     println!("User at {}: {}", path, user.name);
+	/// for (path, item) in items {
+	///     println!("Item at {}: {}", path, item.data);
 	/// }
 	/// # Ok(())
 	/// # }
@@ -228,9 +240,13 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// table.remove(&RoutePath::from("/user1")).await?;
+	/// let table = temp_table::<TableItem<String>>();
+	/// let item = TableItem::new("test".to_string());
+	/// let id = item.id();
+	/// table.remove(id).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -246,9 +262,12 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let table = temp_table::<String>();
-	/// if let Some(url) = table.public_url(&RoutePath::from("/user1")).await? {
+	/// let table = temp_table::<TableItem<String>>();
+	/// let path = RoutePath::from("/some-uuid");
+	/// if let Some(url) = table.public_url(&path).await? {
 	///     println!("Public URL: {}", url);
 	/// }
 	/// # Ok(())
@@ -315,25 +334,8 @@ impl<T> TableItem<T> {
 ///
 /// This trait extends [`BucketProvider`] with type-safe operations for storing
 /// and retrieving serializable objects. Implementors only need to provide
-/// [`box_clone_table`], as the default implementations handle serialization.
-///
-/// # Example
-/// ```
-/// use serde::{Serialize, Deserialize};
-///
-/// #[derive(Serialize, Deserialize, Clone)]
-/// struct Config {
-///     api_key: String,
-/// }
-///
-/// struct MyProvider;
-///
-/// impl TableProvider<Config> for MyProvider {
-///     fn box_clone_table(&self) -> Box<dyn TableProvider<Config>> {
-///         Box::new(Self)
-///     }
-/// }
-/// ```
+/// [`box_clone_table`], as the default implementations just use the [`BucketProvider`] api
+/// to store the data as json.
 pub trait TableProvider<T: TableData>:
 	BucketProvider + 'static + Send + Sync
 {
