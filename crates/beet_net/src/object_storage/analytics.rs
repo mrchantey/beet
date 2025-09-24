@@ -5,13 +5,18 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+pub fn analytics_plugin(app: &mut App) {
+	app.add_systems(PostStartup, spawn_analytics_event_store)
+		.add_observer(handle_analytics_events);
+}
+
 
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct AnalyticsEventStore {
 	pub store: TableStore<AnalyticsEvent>,
 }
 /// Spawn the analytics event store resource, using the
-pub fn spawn_analytics_event_store(
+fn spawn_analytics_event_store(
 	mut commands: Commands,
 	ws_config: When<Res<WorkspaceConfig>>,
 	pkg_config: When<Res<PackageConfig>>,
@@ -30,7 +35,7 @@ pub fn spawn_analytics_event_store(
 
 
 /// A listener for [`AnalyticsEvent`] triggers, pushing them to the [`AnalyticsEventStore`] resource
-pub fn handle_analytics_events(
+fn handle_analytics_events(
 	trigger: Trigger<AnalyticsEvent>,
 	store: ResMut<AnalyticsEventStore>,
 	mut commands: Commands,

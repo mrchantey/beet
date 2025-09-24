@@ -19,28 +19,31 @@ pub struct RouterAppPlugin;
 
 impl Plugin for RouterAppPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ApplyDirectivesPlugin)
-			.init_resource::<WorkspaceConfig>()
-			.init_resource::<RenderMode>()
-			.init_resource::<DynSegmentMap>()
-			.init_resource::<HtmlConstants>()
-			.add_systems(
-				PostStartup,
-				(
-					#[cfg(not(target_arch = "wasm32"))]
-					analytics_handler,
-					app_info,
-					bundle_to_html_fallback,
-					// until wasm async task
-					#[cfg(not(target_arch = "wasm32"))]
-					spawn_analytics_event_store,
-					// assets must run first to be placed in tree before html
-					assets_bucket,
-					html_bucket,
-					insert_route_tree,
-				)
-					.chain(),
-			);
+		app.add_plugins((
+			ApplyDirectivesPlugin,
+			#[cfg(not(target_arch = "wasm32"))]
+			analytics_plugin,
+		))
+		.init_resource::<WorkspaceConfig>()
+		.init_resource::<RenderMode>()
+		.init_resource::<DynSegmentMap>()
+		.init_resource::<HtmlConstants>()
+		.add_systems(
+			PostStartup,
+			(
+				#[cfg(not(target_arch = "wasm32"))]
+				analytics_handler,
+				app_info,
+				bundle_to_html_fallback,
+				// until wasm async task
+				#[cfg(not(target_arch = "wasm32"))]
+				// assets must run first to be placed in tree before html
+				assets_bucket,
+				html_bucket,
+				insert_route_tree,
+			)
+				.chain(),
+		);
 		// until wasm async task
 		#[cfg(not(target_arch = "wasm32"))]
 		{

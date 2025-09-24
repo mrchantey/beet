@@ -26,7 +26,7 @@ class BeetAnalytics {
 		// Timezone and date info
 		this.data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		this.data.timezoneOffset = new Date().getTimezoneOffset();
-		this.data.sessionCreated = performance.now();
+		this.data.sessionCreated = Date.now();
 
 		// Hardware info (when available)
 		this.data.hardwareConcurrency = navigator.hardwareConcurrency || "unknown";
@@ -65,20 +65,14 @@ class BeetAnalytics {
 
 	// Generate a session ID (not personally identifiable)
 	generateSessionId() {
-		return (
-			"sess_" +
-			performance.now() +
-			"_" +
-			Math.random().toString(36).substr(2, 9)
-		);
+		return "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 	}
 
 	// Track page interactions
 	trackPageView() {
 		this.sendEvent("page_view", {
-			url: window.location.href,
-			title: document.title,
-			referrer: document.referrer || "direct",
+			"window.location.href": window.location.href,
+			documentTitle: document.title,
 		});
 	}
 
@@ -128,7 +122,7 @@ class BeetAnalytics {
 			event_type,
 			event_data,
 			session_data: this.data,
-			client_timestamp: performance.now(),
+			client_timestamp: Date.now(),
 		};
 
 		// Use beacon API for better reliability

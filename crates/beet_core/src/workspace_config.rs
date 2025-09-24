@@ -196,7 +196,7 @@ pub struct WorkspaceConfig {
 	pub html_dir: WsPathBuf,
 	/// Location of the assets directory, defaults to 'assets'
 	pub assets_dir: WsPathBuf,
-	/// Location of the analytics test directory, defaults to '.beet/analytics'
+	/// Location of the analytics test directory, defaults to 'target/analytics'
 	pub analytics_dir: WsPathBuf,
 	/// Directory for temp static files like client islands.
 	pub client_islands_path: WsPathBuf,
@@ -222,7 +222,7 @@ impl Default for WorkspaceConfig {
 			snippets_dir: WsPathBuf::new("target/snippets"),
 			html_dir: WsPathBuf::new("target/client"),
 			assets_dir: WsPathBuf::new("assets"),
-			analytics_dir: WsPathBuf::new(".beet/analytics"),
+			analytics_dir: WsPathBuf::new("target/analytics"),
 			client_islands_path: WsPathBuf::new("target/client_islands.ron"),
 		}
 	}
