@@ -27,6 +27,7 @@ impl Plugin for RouterAppPlugin {
 			.add_systems(
 				PostStartup,
 				(
+					analytics,
 					app_info,
 					bundle_to_html_fallback,
 					// until wasm async task
@@ -201,6 +202,7 @@ impl Router {
 			.handle_request_recursive(world, method, route_parts, root)
 			.await;
 
+		AsyncChannel::flush_async_tasks(&mut world).await;
 		let response = world
 			.remove_resource::<Response>()
 			.unwrap_or_else(|| Response::not_found());

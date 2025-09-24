@@ -137,6 +137,8 @@ impl BucketProvider for FsBucketProvider {
 
 
 #[cfg(test)]
+// TODO js_runtime fs support
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

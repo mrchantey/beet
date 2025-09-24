@@ -3,13 +3,29 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
+use serde_json::Value;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn analytics(
+	mut commands: Commands,
+	query: Query<Entity, With<RouterRoot>>,
+) -> Result {
+	let root = query.single()?;
+	commands.entity(root).with_child((
+		PathFilter::new("/analytics"),
+		action_endpoint(
+			HttpMethod::Post,
+			|In(input): In<Value>, mut commands: Commands| -> Result<()> {
+				let ev = AnalyticsEvent::parse(input)?;
+				commands.trigger(ev);
+				Ok(())
+			},
+		),
+	));
+	Ok(())
+}
 
 
-
-
-
-
-/// insert the default handlers
 pub fn app_info(
 	mut commands: Commands,
 	query: Query<Entity, With<RouterRoot>>,

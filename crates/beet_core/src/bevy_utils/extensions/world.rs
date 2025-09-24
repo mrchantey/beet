@@ -1,5 +1,6 @@
 use crate::prelude::Tree;
 use bevy::ecs::component::ComponentInfo;
+use bevy::ecs::event::EventCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
@@ -24,8 +25,31 @@ impl IntoWorld for App {
 	fn into_world(&self) -> &World { self.world() }
 	fn into_world_mut(&mut self) -> &mut World { self.world_mut() }
 }
+#[ext(name=WorldExt)]
+pub impl World {
+	/// The world equivelent of [`App::update`]
+	fn update(&mut self) { self.run_schedule(Main); }
+	/// The world equivelent of [`App::should_exit`]
+	fn should_exit(&self) -> Option<AppExit> {
+		let mut reader = EventCursor::default();
 
-#[ext(name=WorldMutExt)]
+		let events = self.get_resource::<Events<AppExit>>()?;
+		let mut events = reader.read(events);
+
+		if events.len() != 0 {
+			return Some(
+				events
+					.find(|exit| exit.is_error())
+					.cloned()
+					.unwrap_or(AppExit::Success),
+			);
+		}
+
+		None
+	}
+}
+
+#[ext(name=IntoWorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
 	fn component_names(&self, entity: Entity) -> Vec<String> {
