@@ -46,20 +46,44 @@ pub fn handle_analytics_events(
 	);
 }
 
-/// An event to be recorded, usually representing a user interaction on the site
+/// An event to be recorded, usually representing a user interaction on the site.
+///
 #[derive(Debug, Clone, Serialize, Deserialize, Event)]
 pub struct AnalyticsEvent {
 	pub id: Uuid,
 	/// The performance.now() timestamp from the client when the event was recorded
 	pub client_timestamp: u64,
 	pub event_type: String,
+	#[serde(flatten)]
 	pub event_data: Value,
+	#[serde(flatten)]
 	pub session_data: Value,
 }
 
 
 impl AnalyticsEvent {
 	pub fn parse(payload: Value) -> Result<Self> {
+		// these fields are serde flattened, ensure they wont overwrite primary key
+		if !payload["event_data"]["id"].is_null() {
+			bevybail!("event_data.id field is not allowed");
+		}
+		if !payload["session_data"]["id"].is_null() {
+			bevybail!("session_data.id field is not allowed");
+		}
+
+		let event_obj = payload["event_data"].as_object();
+		let session_obj = payload["session_data"].as_object();
+		if let (Some(event_map), Some(session_map)) = (event_obj, session_obj) {
+			for key in event_map.keys() {
+				if session_map.contains_key(key) {
+					bevybail!(
+						"conflicting field '{}' in event_data and session_data",
+						key
+					);
+				}
+			}
+		}
+
 		Self {
 			id: Uuid::now_v7(),
 			client_timestamp: payload["client_timestamp"].as_u64().unwrap_or(0),
@@ -74,31 +98,9 @@ impl AnalyticsEvent {
 	}
 }
 
-impl TableData for AnalyticsEvent {
+impl TableRow for AnalyticsEvent {
 	fn id(&self) -> Uuid { self.id }
 }
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum BasicEventPayload {
-	Visit {
-		/// The route path that was visited
-		path: RoutePath,
-	},
-	Click {
-		/// Application specific event identifier in a [`RoutePath`] form, ie
-		/// `/user/profile/edit`
-		event: RoutePath,
-	},
-	ClientError {
-		id: String,
-		message: String,
-	},
-	Other(Value),
-}
-
-
 
 #[cfg(test)]
 mod test {
@@ -110,9 +112,8 @@ mod test {
 	fn event() -> Value {
 		json! ({
 			"client_timestamp": 123456,
-			"event_type": "client-error",
+			"event_type": "client_error",
 			"event_data": {
-				"id": "foo",
 				"message": "bar"
 			},
 			"session_data": {
@@ -123,6 +124,22 @@ mod test {
 
 
 	#[test]
+	fn not_allowed() {
+		AnalyticsEvent::parse(json!({
+			"event_data": { "id": "foo" }
+		}))
+		.xpect_err();
+		AnalyticsEvent::parse(json!({
+			"session_data": { "id": "foo" }
+		}))
+		.xpect_err();
+		AnalyticsEvent::parse(json!({
+			"event_data": { "foo": "bar" },
+			"session_data": { "foo": "bar" }
+		}))
+		.xpect_err();
+	}
+	#[test]
 	fn works() {
 		let ev = AnalyticsEvent::parse(event()).unwrap();
 		let json = serde_json::to_value(&ev).unwrap();
@@ -130,10 +147,7 @@ mod test {
 		json["event_type"]
 			.as_str()
 			.unwrap()
-			.xpect_eq("client-error");
-		json["event_data"]["message"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("bar");
+			.xpect_eq("client_error");
+		json["message"].as_str().unwrap().xpect_eq("bar");
 	}
 }

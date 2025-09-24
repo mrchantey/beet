@@ -26,7 +26,7 @@ class BeetAnalytics {
 		// Timezone and date info
 		this.data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		this.data.timezoneOffset = new Date().getTimezoneOffset();
-		this.data.timestamp = new Date().toISOString();
+		this.data.sessionCreated = performance.now();
 
 		// Hardware info (when available)
 		this.data.hardwareConcurrency = navigator.hardwareConcurrency || "unknown";
@@ -65,7 +65,12 @@ class BeetAnalytics {
 
 	// Generate a session ID (not personally identifiable)
 	generateSessionId() {
-		return "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+		return (
+			"sess_" +
+			performance.now() +
+			"_" +
+			Math.random().toString(36).substr(2, 9)
+		);
 	}
 
 	// Track page interactions
@@ -74,7 +79,6 @@ class BeetAnalytics {
 			url: window.location.href,
 			title: document.title,
 			referrer: document.referrer || "direct",
-			timestamp: new Date().toISOString(),
 		});
 	}
 
@@ -82,9 +86,8 @@ class BeetAnalytics {
 		this.sendEvent("click", {
 			tagName: element.tagName,
 			className: element.className,
-			id: element.id,
+			elementId: element.id,
 			text: element.textContent?.substring(0, 128), // Limit text length
-			timestamp: new Date().toISOString(),
 			...customData,
 		});
 	}
@@ -115,7 +118,6 @@ class BeetAnalytics {
 				filename: event.filename,
 				line: event.lineno,
 				column: event.colno,
-				timestamp: new Date().toISOString(),
 			});
 		});
 	}
@@ -142,7 +144,6 @@ class BeetAnalytics {
 			}).catch((err) => console.warn("Analytics send failed:", err));
 		}
 	}
-
 }
 
 // Initialize analytics

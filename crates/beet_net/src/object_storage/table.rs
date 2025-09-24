@@ -29,14 +29,14 @@ use uuid::Uuid;
 /// # }
 /// ```
 #[derive(Component)]
-pub struct TableStore<T: TableData> {
+pub struct TableStore<T: TableRow> {
 	/// The resource name of the table bucket
 	name: String,
 	/// The provider that handles table operations (S3, filesystem, memory, etc)
 	provider: Box<dyn TableProvider<T>>,
 }
 
-impl<T: TableData> Clone for TableStore<T> {
+impl<T: TableRow> Clone for TableStore<T> {
 	fn clone(&self) -> Self {
 		Self {
 			name: self.name.clone(),
@@ -45,7 +45,7 @@ impl<T: TableData> Clone for TableStore<T> {
 	}
 }
 
-impl<T: TableData> TableStore<T> {
+impl<T: TableRow> TableStore<T> {
 	/// Create a new table store with the given provider and name
 	///
 	/// # Example
@@ -295,7 +295,7 @@ impl<T: TableData> TableStore<T> {
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - [`'static`] - For type safety across async boundaries
-pub trait TableData: TableContent {
+pub trait TableRow: TableContent {
 	/// Unique identifier for the object, used as the primary key in the table
 	fn id(&self) -> Uuid;
 	/// Decodes uuid timestamp as time since unix epoch
@@ -318,10 +318,6 @@ impl<T> TableContent for T where
 }
 
 
-impl<T: TableContent> TableData for TableItem<T> {
-	fn id(&self) -> Uuid { self.id }
-}
-
 /// Helper type implemementing [`TableData`]. Note some services
 /// like dynamodb do not allow indexing nested values, so if thats required
 /// a standalone impl [`TableData`] type should be used.
@@ -343,6 +339,10 @@ impl<T> TableItem<T> {
 		}
 	}
 }
+impl<T: TableContent> TableRow for TableItem<T> {
+	fn id(&self) -> Uuid { self.id }
+}
+
 
 /// Storage provider for typed table operations
 ///
@@ -350,7 +350,7 @@ impl<T> TableItem<T> {
 /// and retrieving serializable objects. Implementors only need to provide
 /// [`box_clone_table`], as the default implementations just use the [`BucketProvider`] api
 /// to store the data as json.
-pub trait TableProvider<T: TableData>:
+pub trait TableProvider<T: TableRow>:
 	BucketProvider + 'static + Send + Sync
 {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
@@ -387,13 +387,13 @@ pub trait TableProvider<T: TableData>:
 }
 
 /// Create temporary in-memory bucket for testing
-pub fn temp_table<T: TableData>() -> TableStore<T> {
+pub fn temp_table<T: TableRow>() -> TableStore<T> {
 	TableStore::new(InMemoryProvider::new(), "temp")
 }
 
 /// Select filesystem or DynamoDb TableProvider based on [`ServiceAccess`] and feature flags
 #[allow(unused_variables)]
-pub async fn dynamo_fs_selector<T: TableData>(
+pub async fn dynamo_fs_selector<T: TableRow>(
 	fs_path: &AbsPathBuf,
 	table_name: &str,
 	access: ServiceAccess,

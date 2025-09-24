@@ -31,7 +31,7 @@ impl LocalStorageProvider {
 	}
 }
 
-impl<T: Table> TableProvider<T> for LocalStorageProvider {
+impl<T: TableRow> TableProvider<T> for LocalStorageProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

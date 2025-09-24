@@ -5,6 +5,7 @@
 //
 use crate::prelude::*;
 
+use std::pin::Pin;
 use std::time::Duration;
 
 impl Default for Backoff {
@@ -543,11 +544,10 @@ pub struct BackoffStream {
 	iter: BackoffIter,
 	// Frame for the attempt to be yielded next (as produced by BackoffIter).
 	current: Option<BackoffFrame>,
-	sleeper: Option<
-		std::pin::Pin<
-			Box<dyn core::future::Future<Output = ()> + Send + 'static>,
-		>,
-	>,
+	#[cfg(target_arch = "wasm32")]
+	sleeper: Option<Pin<Box<dyn Future<Output = ()> + 'static>>>,
+	#[cfg(not(target_arch = "wasm32"))]
+	sleeper: Option<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
 }
 
 impl BackoffStream {

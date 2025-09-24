@@ -1,9 +1,11 @@
-// using aws cli has no cargo dependencies
+// until wasm asynctask
+#[cfg(not(target_arch = "wasm32"))]
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 mod bucket;
 mod table;
+#[cfg(not(target_arch = "wasm32"))]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;

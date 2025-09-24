@@ -252,6 +252,7 @@ clear-artifacts:
 # massive purge
 clear-all:
 	just clear-artifacts
+	just clear-rust-analyzer
 	cargo clean
 	rm -rf $CARGO_TARGET_DIR
 

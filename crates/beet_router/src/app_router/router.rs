@@ -14,7 +14,7 @@ use std::ops::ControlFlow;
 pub struct RouterRoot;
 
 
-/// Plugin added to the [`AppPool`] app for each handler
+/// Plugin added to the [`AppPool`] app for each handler, not the app for the server itsself.
 pub struct RouterAppPlugin;
 
 impl Plugin for RouterAppPlugin {
@@ -27,7 +27,11 @@ impl Plugin for RouterAppPlugin {
 			.add_systems(
 				PostStartup,
 				(
-					default_handlers,
+					app_info,
+					bundle_to_html_fallback,
+					// until wasm async task
+					#[cfg(not(target_arch = "wasm32"))]
+					spawn_analytics_event_store,
 					// assets must run first to be placed in tree before html
 					assets_bucket,
 					html_bucket,
@@ -35,6 +39,11 @@ impl Plugin for RouterAppPlugin {
 				)
 					.chain(),
 			);
+		// until wasm async task
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			app.init_plugin(AsyncPlugin);
+		}
 	}
 }
 
@@ -55,6 +64,7 @@ impl Router {
 	pub fn new(plugin: impl ClonePlugin) -> Self {
 		let plugin = ClonePluginContainer::new(plugin);
 		Self::new_no_defaults(move |app: &mut App| {
+			app.add_plugins(MinimalPlugins);
 			plugin.add_to_app(app);
 			app.init_plugin(RouterAppPlugin);
 			#[cfg(not(test))]

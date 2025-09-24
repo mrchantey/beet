@@ -4,42 +4,50 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
 
+
+
+
+
+
 /// insert the default handlers
-pub fn default_handlers(
+pub fn app_info(
 	mut commands: Commands,
 	query: Query<Entity, With<RouterRoot>>,
 ) -> Result {
 	let root = query.single()?;
-	commands
-		.entity(root)
-		.with_child((
-			PathFilter::new("/app-info"),
-			CacheStrategy::Static,
-			HttpMethod::Get,
-			HandlerConditions::is_ssr(),
-			bundle_endpoint(|config: Res<PackageConfig>| {
-				let PackageConfig {
-					title,
-					description,
-					version,
-					stage,
-					..
-				} = config.clone();
-				rsx! {
-					<main>
-						<h1>App Info</h1>
-						<p>Title: {title}</p>
-						<p>Description: {description}</p>
-						<p>Version: {version}</p>
-						<p>Stage: {stage}</p>
-					</main>
-				}
-			}),
-		))
-		.with_child((
-			HandlerConditions::no_response(),
-			bundle_to_html_handler(),
-		));
+	commands.entity(root).with_child((
+		PathFilter::new("/app-info"),
+		bundle_endpoint(|config: Res<PackageConfig>| {
+			let PackageConfig {
+				title,
+				description,
+				version,
+				stage,
+				..
+			} = config.clone();
+			rsx! {
+				<main>
+					<h1>App Info</h1>
+					<p>Title: {title}</p>
+					<p>Description: {description}</p>
+					<p>Version: {version}</p>
+					<p>Stage: {stage}</p>
+				</main>
+			}
+		}),
+	));
+	Ok(())
+}
+
+pub fn bundle_to_html_fallback(
+	mut commands: Commands,
+	query: Query<Entity, With<RouterRoot>>,
+) -> Result {
+	let root = query.single()?;
+	commands.entity(root).with_child((
+		HandlerConditions::no_response(),
+		bundle_to_html_handler(),
+	));
 	Ok(())
 }
 pub fn assets_bucket(
