@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use std::time::SystemTime;
 use uuid::Uuid;
 
 
@@ -294,15 +295,31 @@ impl<T: TableData> TableStore<T> {
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - [`'static`] - For type safety across async boundaries
-pub trait TableData: 'static + Clone + Serialize + DeserializeOwned {
+pub trait TableData: TableContent {
+	/// Unique identifier for the object, used as the primary key in the table
 	fn id(&self) -> Uuid;
-	fn set_id(&mut self, id: Uuid);
+	/// Decodes uuid timestamp as time since unix epoch
+	/// ## Panics
+	/// Panics if uuid is not v1,v6 or v7
+	fn timestamp(&self) -> Duration {
+		let timestamp = self.id().get_timestamp().unwrap();
+		let (secs, nanos) = timestamp.to_unix();
+		Duration::new(secs, nanos)
+	}
 }
-impl<T: 'static + Clone + Serialize + DeserializeOwned> TableData
-	for TableItem<T>
+/// Helper blanket trait constraining types which may be included in a table
+pub trait TableContent:
+	'static + Send + Sync + Clone + Serialize + DeserializeOwned
 {
+}
+impl<T> TableContent for T where
+	T: 'static + Send + Sync + Clone + Serialize + DeserializeOwned
+{
+}
+
+
+impl<T: TableContent> TableData for TableItem<T> {
 	fn id(&self) -> Uuid { self.id }
-	fn set_id(&mut self, id: Uuid) { self.id = id; }
 }
 
 /// Helper type implemementing [`TableData`]. Note some services
@@ -313,18 +330,15 @@ pub struct TableItem<T> {
 	/// A uuid v7 used as the primary key
 	pub id: Uuid,
 	/// Duration since Unix epoch
-	pub created: Duration,
+	pub created: SystemTime,
 	pub data: T,
 }
 
 impl<T> TableItem<T> {
 	pub fn new(data: T) -> Self {
-		let now = std::time::SystemTime::now()
-			.duration_since(std::time::UNIX_EPOCH)
-			.unwrap();
 		Self {
-			id: uuid::Uuid::now_v7(),
-			created: now,
+			id: Uuid::now_v7(),
+			created: SystemTime::now(),
 			data,
 		}
 	}
@@ -377,6 +391,31 @@ pub fn temp_table<T: TableData>() -> TableStore<T> {
 	TableStore::new(InMemoryProvider::new(), "temp")
 }
 
+/// Select filesystem or DynamoDb TableProvider based on [`ServiceAccess`] and feature flags
+#[allow(unused_variables)]
+pub async fn dynamo_fs_selector<T: TableData>(
+	fs_path: &AbsPathBuf,
+	table_name: &str,
+	access: ServiceAccess,
+) -> TableStore<T> {
+	match access {
+		ServiceAccess::Local => {
+			debug!("Table Selector - FS: {fs_path}");
+			TableStore::new(FsBucketProvider::new(fs_path.clone()), "")
+		}
+		#[cfg(not(feature = "aws"))]
+		ServiceAccess::Remote => {
+			debug!("Table Selector - FS (no aws feature): {fs_path}");
+			TableStore::new(FsBucketProvider::new(fs_path.clone()), "")
+		}
+		#[cfg(feature = "aws")]
+		ServiceAccess::Remote => {
+			debug!("Table Selector - Dynamo: {table_name}");
+			let provider = S3Provider::create().await;
+			TableStore::new(provider, table_name)
+		}
+	}
+}
 
 #[cfg(test)]
 pub mod table_test {

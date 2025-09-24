@@ -1,8 +1,10 @@
 // using aws cli has no cargo dependencies
+mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 mod bucket;
 mod table;
+pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
 pub use table::*;

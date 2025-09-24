@@ -60,6 +60,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 send_wrapper.workspace = true
 uuid = {workspace = true, features = ["v7"]}
+async-lock.workspace = true
 
 # serde
 clap = { workspace = true, optional = true }

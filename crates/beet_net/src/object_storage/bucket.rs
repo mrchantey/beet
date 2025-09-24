@@ -360,7 +360,7 @@ pub async fn s3_fs_selector(
 		}
 		#[cfg(not(feature = "aws"))]
 		ServiceAccess::Remote => {
-			debug!("Bucket Seelctor - FS (no aws feature): {fs_path}");
+			debug!("Bucket Selector - FS (no aws feature): {fs_path}");
 			Bucket::new(FsBucketProvider::new(fs_path.clone()), "")
 		}
 		#[cfg(feature = "aws")]

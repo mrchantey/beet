@@ -1,10 +1,10 @@
 use crate::prelude::*;
+use async_lock::RwLock;
 use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bytes::Bytes;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 
 impl Bucket {
@@ -19,7 +19,7 @@ impl Bucket {
 
 
 /// A bucket provider using a simple nested hashmap
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Deref, DerefMut)]
 pub struct InMemoryProvider(
 	pub Arc<RwLock<HashMap<String, HashMap<RoutePath, Bytes>>>>,
 );
@@ -43,22 +43,32 @@ impl BucketProvider for InMemoryProvider {
 		&self,
 		bucket_name: &str,
 	) -> SendBoxedFuture<Result<bool>> {
-		let exists = self.0.read().unwrap().contains_key(bucket_name);
-		Box::pin(async move { Ok(exists) })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		Box::pin(
+			async move { this.read().await.contains_key(&bucket_name).xok() },
+		)
 	}
 
 	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		self.0
-			.write()
-			.unwrap()
-			.entry(bucket_name.to_string())
-			.or_insert_with(HashMap::new);
-		Box::pin(async { Ok(()) })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		Box::pin(async move {
+			this.write()
+				.await
+				.entry(bucket_name)
+				.or_insert_with(HashMap::new);
+			Ok(())
+		})
 	}
 
 	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		self.0.write().unwrap().remove(bucket_name);
-		Box::pin(async move { Ok(()) })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		Box::pin(async move {
+			this.write().await.remove(&bucket_name);
+			Ok(())
+		})
 	}
 
 	fn insert(
@@ -67,14 +77,17 @@ impl BucketProvider for InMemoryProvider {
 		path: &RoutePath,
 		body: Bytes,
 	) -> SendBoxedFuture<Result<()>> {
-		let mut buckets = self.0.write().unwrap();
-		buckets
-			.entry(bucket_name.to_string())
-			.or_insert_with(HashMap::new)
-			.xmap(|bucket| {
-				bucket.insert(path.clone(), body);
-			});
-		Box::pin(async move { Ok(()) })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		let path = path.clone();
+		Box::pin(async move {
+			this.write()
+				.await
+				.entry(bucket_name)
+				.or_insert_with(HashMap::new)
+				.insert(path, body);
+			Ok(())
+		})
 	}
 
 	fn exists(
@@ -82,26 +95,31 @@ impl BucketProvider for InMemoryProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<bool>> {
-		let mut buckets = self.0.write().unwrap();
-		let result = buckets
-			.get_mut(bucket_name)
-			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-			.map(|bucket| bucket.contains_key(path));
-
-		Box::pin(async move { result })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		let path = path.clone();
+		Box::pin(async move {
+			this.write()
+				.await
+				.get(&bucket_name)
+				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+				.map(|bucket| bucket.contains_key(&path))
+		})
 	}
 
 	fn list(
 		&self,
 		bucket_name: &str,
 	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
-		let mut buckets = self.0.write().unwrap();
-		let result = buckets
-			.get_mut(bucket_name)
-			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-			.map(|bucket| bucket.keys().cloned().collect());
-
-		Box::pin(async move { result })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		Box::pin(async move {
+			this.write()
+				.await
+				.get(&bucket_name)
+				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+				.map(|bucket| bucket.keys().cloned().collect())
+		})
 	}
 
 	fn get(
@@ -109,19 +127,22 @@ impl BucketProvider for InMemoryProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<Bytes>> {
-		let mut buckets = self.0.write().unwrap();
-		let result = buckets
-			.get_mut(bucket_name)
-			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-			.map(|bucket| {
-				bucket
-					.get(path)
-					.cloned()
-					.ok_or_else(|| bevyhow!("Object not found: {path}"))
-			})
-			.flatten();
-
-		Box::pin(async move { result })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		let path = path.clone();
+		Box::pin(async move {
+			this.write()
+				.await
+				.get(&bucket_name)
+				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+				.map(|bucket| {
+					bucket
+						.get(&path)
+						.cloned()
+						.ok_or_else(|| bevyhow!("Object not found: {path}"))
+				})
+				.flatten()
+		})
 	}
 
 	fn remove(
@@ -129,18 +150,21 @@ impl BucketProvider for InMemoryProvider {
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<()>> {
-		let mut buckets = self.0.write().unwrap();
-		let result = buckets
-			.get_mut(bucket_name)
-			.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-			.and_then(|bucket| {
-				bucket
-					.remove(path)
-					.map(|_| ())
-					.ok_or_else(|| bevyhow!("Object not found: {path}"))
-			});
-
-		Box::pin(async move { result })
+		let this = self.clone();
+		let bucket_name = bucket_name.to_string();
+		let path = path.clone();
+		Box::pin(async move {
+			this.write()
+				.await
+				.get_mut(&bucket_name)
+				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
+				.and_then(|bucket| {
+					bucket
+						.remove(&path)
+						.map(|_| ())
+						.ok_or_else(|| bevyhow!("Object not found: {path}"))
+				})
+		})
 	}
 
 	fn public_url(
