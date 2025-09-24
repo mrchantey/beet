@@ -12,7 +12,7 @@ use std::path::PathBuf;
 ///
 /// ```txt
 /// https://example.com/foo/bar.txt
-/// 									 ^^^^^^^^^^^^
+///                    ^^^^^^^^^^^^
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

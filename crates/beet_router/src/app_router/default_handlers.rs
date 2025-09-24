@@ -67,18 +67,18 @@ pub fn assets_bucket(
 }
 
 pub fn html_bucket(
+	mut commands: Commands,
 	ws_config: When<Res<WorkspaceConfig>>,
 	pkg_config: When<Res<PackageConfig>>,
 	query: Query<Entity, With<RouterRoot>>,
-	mut commands: Commands,
 ) -> Result {
 	let root = query.single()?;
 	let fs_dir = ws_config.html_dir.into_abs();
 	let bucket_name = pkg_config.html_bucket_name();
+	let access = pkg_config.service_access;
 	commands.spawn((
 		ChildOf(root),
 		AsyncAction::new(async move |mut world, entity| {
-			let access = world.resource::<PackageConfig>().service_access;
 			let bucket = s3_fs_selector(&fs_dir, &bucket_name, access).await;
 			world.entity_mut(entity).insert(bucket);
 			world

@@ -411,7 +411,7 @@ pub async fn dynamo_fs_selector<T: TableData>(
 		#[cfg(feature = "aws")]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - Dynamo: {table_name}");
-			let provider = S3Provider::create().await;
+			let provider = DynamoDbProvider::create().await;
 			TableStore::new(provider, table_name)
 		}
 	}

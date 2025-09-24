@@ -92,12 +92,17 @@ impl PackageConfig {
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
 	pub fn stage(&self) -> &str { &self.stage }
 
-	/// The aws resource name for the server lambda function
+	/// The cloud resource name for the server lambda function
 	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
-	/// The aws resource name for the static html bucket
+	/// The cloud resource name for the static html bucket
 	pub fn html_bucket_name(&self) -> String { self.resource_name("html") }
-	/// The aws resource name for the assets bucket
+	/// The cloud resource name for the assets bucket
 	pub fn assets_bucket_name(&self) -> String { self.resource_name("assets") }
+	/// The cloud resource name for the analytics store
+	pub fn analytics_bucket_name(&self) -> String {
+		self.resource_name("analytics")
+	}
+
 
 	/// Returns a vec of environment variables to be propagated
 	/// from the parent process in compilation commands
@@ -191,6 +196,8 @@ pub struct WorkspaceConfig {
 	pub html_dir: WsPathBuf,
 	/// Location of the assets directory, defaults to 'assets'
 	pub assets_dir: WsPathBuf,
+	/// Location of the analytics test directory, defaults to '.beet/analytics'
+	pub analytics_dir: WsPathBuf,
 	/// Directory for temp static files like client islands.
 	pub client_islands_path: WsPathBuf,
 }
@@ -215,6 +222,7 @@ impl Default for WorkspaceConfig {
 			snippets_dir: WsPathBuf::new("target/snippets"),
 			html_dir: WsPathBuf::new("target/client"),
 			assets_dir: WsPathBuf::new("assets"),
+			analytics_dir: WsPathBuf::new(".beet/analytics"),
 			client_islands_path: WsPathBuf::new("target/client_islands.ron"),
 		}
 	}

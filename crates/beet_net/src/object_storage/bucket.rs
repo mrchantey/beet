@@ -45,7 +45,7 @@ impl Bucket {
 	pub fn name(&self) -> &str { &self.name }
 
 
-	/// Create bucket (may take 10+ seconds for cloud providers)
+	/// Create bucket (may take 10+ seconds for some services like dynamodb)
 	///
 	/// # Example
 	/// ```

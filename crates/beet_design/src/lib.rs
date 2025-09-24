@@ -9,6 +9,7 @@ pub mod html_elements;
 /// Collection of layout components
 pub mod layout;
 pub mod macros;
+pub mod scripts;
 pub mod templates;
 /// Structs for use as context in components
 pub mod types;
@@ -29,6 +30,7 @@ pub mod prelude {
 	pub use crate::macros::*;
 	#[cfg(feature = "mockups")]
 	pub use crate::mockups::*;
+	pub use crate::scripts::*;
 	pub use crate::templates::*;
 	pub use crate::types::*;
 	// pub(crate) use beet_rsx::prelude::*;
@@ -41,7 +43,6 @@ pub mod prelude {
 			pub use beet_core::prelude::*;
 			pub use beet_net::prelude::*;
 			pub use beet_rsx::prelude::*;
-			use beet_core::prelude::*;
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;
 		}
