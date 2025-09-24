@@ -197,46 +197,59 @@ impl AsyncChannel {
 	}
 
 	/// Uses the [`AsyncChannel::rx`] as a signal to run updates,
-	/// this means that the rx in poll_async_tasks should always be empty
-	/// Note:
-	///
-	/// The async runner has an agressive poll, updating the app every 100us.
-	/// For realtime apps use the regular runner.
+	/// this means that the rx in poll_async_tasks should be empty during updates
+	/// Any triggered [`AppExit`] will cause an exit after the current flush completes.
 	pub async fn runner_async(mut app: App) -> AppExit {
 		app.init();
-		let mut task_query = app.world_mut().query::<&mut AsyncTask>();
 		let rx = app.world().resource::<AsyncChannel>().rx.clone();
+
 		loop {
-			// println!("updating..");
-			app.update();
+			// 1. flush async tasks
+			Self::flush_async_tasks(app.world_mut()).await;
+			// 2. exit if instructed
 			if let Some(exit) = app.should_exit() {
 				return exit;
 			}
-			// flush rx
-			while let Ok(mut queue) = rx.try_recv() {
-				app.world_mut().commands().append(&mut queue);
-			}
-
-			if task_query.query(app.world_mut()).is_empty() {
-				// no current tasks, wait for the next command queue
-
-				// println!("awaiting rx");
-				// otherwise await the next rx then loop
-				match rx.recv().await {
-					Ok(mut queue) => {
-						// println!("received queue");
-						app.world_mut().commands().append(&mut queue);
-					}
-					Err(err) => {
-						eprintln!("AsyncChannel error: {}", err);
-						return AppExit::from_code(1);
-					}
+			// 3. await next async task
+			match rx.recv().await {
+				Ok(mut queue) => {
+					app.world_mut().commands().append(&mut queue);
 				}
-			} else {
-				// tasks are in flight, rest for a bit
+				Err(err) => {
+					eprintln!(
+						"Async channel closed: {}\nwas the resource removed?",
+						err
+					);
+					return AppExit::from_code(1);
+				}
+			}
+		}
+	}
+	/// Run an exponential backoff until all tasks have completed.
+	/// - The world will update at least once
+	/// - any triggered [`AppExit`] is ignored
+	pub async fn flush_async_tasks(world: &mut World) {
+		let mut task_query = world.query::<&mut AsyncTask>();
+		let rx = world.resource::<AsyncChannel>().rx.clone();
+		loop {
+			let mut backoff = Backoff::new(
+				u32::MAX,
+				Duration::from_micros(10),
+				Some(Duration::from_millis(500)),
+			)
+			.stream();
 
-				// TODO: exponential backoff 10us to 10ms
-				time_ext::sleep(std::time::Duration::from_micros(100)).await;
+			while let Some(_) = backoff.next().await {
+				// 1. update
+				world.update();
+				// 2. flush rx
+				while let Ok(mut queue) = rx.try_recv() {
+					world.commands().append(&mut queue);
+				}
+				// 3. exit if no remaining tasks
+				if task_query.query(world).is_empty() {
+					return;
+				}
 			}
 		}
 	}
@@ -468,7 +481,7 @@ mod tests {
 						})
 						.await;
 					next.xpect_eq(1);
-					time_ext::sleep(std::time::Duration::from_millis(2)).await;
+					time_ext::sleep(Duration::from_millis(2)).await;
 					let next = queue
 						.update_resource_then(|mut res: Mut<Count>| {
 							res.0 += 1;
@@ -478,13 +491,13 @@ mod tests {
 					next.xpect_eq(2);
 
 					future::yield_now().await;
-					queue.send_event(AppExit::Success);
 					queue.resource::<Count>().await.0
 				},
 			)
 			.unwrap();
+
 		// must update app first or future will hang
-		app.run_async(AsyncChannel::runner_async).await;
+		AsyncChannel::flush_async_tasks(app.world_mut()).await;
 
 		// future completed
 		fut.await.xpect_eq(2);
@@ -498,7 +511,7 @@ mod tests {
 			.run_system_cached_with(
 				AsyncTask::spawn_with_queue_unwrap,
 				async |_| {
-					time_ext::sleep(std::time::Duration::from_millis(2)).await;
+					time_ext::sleep(Duration::from_millis(2)).await;
 					// future::yield_now().await;
 					bevybail!("intentional error")
 				},

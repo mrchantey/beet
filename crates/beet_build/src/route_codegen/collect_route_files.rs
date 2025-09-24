@@ -121,7 +121,7 @@ pub fn collect_route_files(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::WorldMutExt;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;

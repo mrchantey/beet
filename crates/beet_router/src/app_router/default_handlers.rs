@@ -3,10 +3,11 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn analytics(
+pub fn analytics_handler(
 	mut commands: Commands,
 	query: Query<Entity, With<RouterRoot>>,
 ) -> Result {

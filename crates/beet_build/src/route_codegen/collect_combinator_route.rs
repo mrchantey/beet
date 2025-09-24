@@ -68,7 +68,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::WorldMutExt;
+	use beet_core::prelude::*;
 	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;

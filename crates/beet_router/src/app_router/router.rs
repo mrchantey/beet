@@ -27,7 +27,8 @@ impl Plugin for RouterAppPlugin {
 			.add_systems(
 				PostStartup,
 				(
-					analytics,
+					#[cfg(not(target_arch = "wasm32"))]
+					analytics_handler,
 					app_info,
 					bundle_to_html_fallback,
 					// until wasm async task
@@ -202,6 +203,7 @@ impl Router {
 			.handle_request_recursive(world, method, route_parts, root)
 			.await;
 
+		#[cfg(not(target_arch = "wasm32"))]
 		AsyncChannel::flush_async_tasks(&mut world).await;
 		let response = world
 			.remove_resource::<Response>()
