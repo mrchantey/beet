@@ -2,16 +2,13 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 
-/// Cross-service storage bucket representation
+/// Cross-service storage bucket for S3, filesystem, memory, or other providers
 #[derive(Component)]
 pub struct Bucket {
-	/// The resource name of the bucket.
+	/// Bucket name
 	name: String,
-	/// The provider that handles the bucket operations.
-	/// This may be S3, a local filesystem, or any other storage provider.
+	/// Provider that handles bucket operations (S3, filesystem, memory, etc.)
 	provider: Box<dyn BucketProvider>,
 }
 impl Clone for Bucket {
@@ -31,42 +28,91 @@ impl Bucket {
 		}
 	}
 
-	/// Create a [`BucketItem`] for interactively working with a bucket item
+	/// Create a [`BucketItem`] for working with a specific path
+	///
+	/// # Example
+	/// ```
+	/// let bucket = temp_bucket();
+	/// let item = bucket.item(RoutePath::from("/my-file.txt"));
+	/// ```
 	pub fn item(&self, path: RoutePath) -> BucketItem {
 		BucketItem::new(self.clone(), path)
 	}
 
-	/// Get the name of the bucket, ie `my-bucket`
+	/// Get bucket name
 	pub fn name(&self) -> &str { &self.name }
 
 
-	/// Create the bucket
+	/// Create bucket (may take 10+ seconds for cloud providers)
 	///
-	/// Note: This operation is intended to only return once the bucket
-	/// is ready, in cases like DynamoDb this usually takes over 10 seconds.
-	/// ## Errors
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_create().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	///
-	/// Errors if the bucket already exists
+	/// # Errors
+	/// Fails if bucket already exists
 	pub async fn bucket_create(&self) -> Result {
 		self.provider.bucket_create(&self.name).await
 	}
 
-	/// Check if the bucket exists, creating it if necessary
+	/// Ensure bucket exists, creating if needed
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_try_create().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn bucket_try_create(&self) -> Result {
 		self.provider.bucket_try_create(&self.name).await
 	}
 
-	/// Check if the bucket exists
+	/// Check if bucket exists
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let exists = bucket.bucket_exists().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn bucket_exists(&self) -> Result<bool> {
 		self.provider.bucket_exists(&self.name).await
 	}
-	/// Remove the bucket:
-	/// ## Errors
-	/// Errors if the bucket does not exist
+	/// Remove bucket
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_remove().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// # Errors
+	/// Fails if bucket doesn't exist
 	pub async fn bucket_remove(&self) -> Result {
 		self.provider.bucket_remove(&self.name).await
 	}
-	/// Insert an object into the bucket
+	/// Insert object into bucket
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn insert(
 		&self,
 		path: &RoutePath,
@@ -75,7 +121,16 @@ impl Bucket {
 		self.provider.insert(&self.name, path, body.into()).await
 	}
 
-	/// Try to insert the object, returning an error if it already exists
+	/// Insert object, failing if it already exists
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.try_insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn try_insert(
 		&self,
 		path: &RoutePath,
@@ -88,25 +143,59 @@ impl Bucket {
 		}
 	}
 
-	/// Check if the object exists
+	/// Check if object exists
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let exists = bucket.exists(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
 		self.provider.exists(&self.name, path).await
 	}
-	/// List all objects in this bucket
+	/// List all objects in bucket
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let paths = bucket.list().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn list(&self) -> Result<Vec<RoutePath>> {
 		self.provider.list(&self.name).await
 	}
-	/// Get the data for the object at the specified path
+	/// Get object data
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let data = bucket.get(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn get(&self, path: &RoutePath) -> Result<Bytes> {
 		self.provider.get(&self.name, path).await
 	}
 
-	/// Get the data for all items in this bucket
+	/// Get all objects and their data
 	///
-	/// ## Caution
-	/// This is potentially a very expensive operation and should
-	/// only be used in special circumstances, prefer [`Self::list`]
-	/// and [`Self::get`] in most circumstances.
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let all_data = bucket.get_all().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// # Caution
+	/// Expensive operation - prefer [`Self::list`] + [`Self::get`]
 	pub async fn get_all(&self) -> Result<Vec<(RoutePath, Bytes)>> {
 		self.list()
 			.await?
@@ -119,35 +208,51 @@ impl Bucket {
 			.await
 	}
 
-	/// Remove an object from the bucket
+	/// Remove object from bucket
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.remove(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn remove(&self, path: &RoutePath) -> Result {
 		self.provider.remove(&self.name, path).await
 	}
 
-	/// Get the public URL for the object at the specified path, if applicable
+	/// Get public URL for object (if supported by provider)
+	///
+	/// # Example
+	/// ```
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let url = bucket.public_url(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
 		self.provider.public_url(&self.name, path).await
 	}
-	/// Get the region of this buckets [`BucketProvider`]
+	/// Get provider region
 	pub async fn region(&self) -> Option<String> { self.provider.region() }
 }
 
 pub trait BucketProvider: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
 
-	/// Get the region of the provider
+	/// Get provider region
 	fn region(&self) -> Option<String>;
-	/// Check if the bucket exists
+	/// Check if bucket exists
 	fn bucket_exists(&self, bucket_name: &str)
 	-> SendBoxedFuture<Result<bool>>;
-	/// Create the bucket
+	/// Create bucket
 	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result>;
-	/// Remove the bucket
-	/// ## Caution
-	/// This operation is potentially very destructive, use with care!
+	/// Remove bucket (destructive operation!)
 	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result>;
 
-	/// Ensure the bucket exists, creating it if necessary
+	/// Ensure bucket exists, creating if needed
 	fn bucket_try_create(&self, bucket_name: &str) -> SendBoxedFuture<Result> {
 		let exists_fut = self.bucket_exists(bucket_name);
 		let create_fut = self.bucket_create(bucket_name);
@@ -159,39 +264,39 @@ pub trait BucketProvider: 'static + Send + Sync {
 			}
 		})
 	}
-	/// Insert an object into the bucket
+	/// Insert object into bucket
 	fn insert(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
 		body: Bytes,
 	) -> SendBoxedFuture<Result>;
-	/// List all items in the bucket
+	/// List all objects in bucket
 	fn list(
 		&self,
 		bucket_name: &str,
 	) -> SendBoxedFuture<Result<Vec<RoutePath>>>;
-	/// Get an object from the bucket
+	/// Get object from bucket
 	fn get(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<Bytes>>;
-	/// Check if an object exists in the bucket
+	/// Check if object exists in bucket
 	fn exists(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<bool>>;
-	/// Delete an object from the bucket
+	/// Remove object from bucket
 	fn remove(
 		&self,
 		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result>;
-	/// Get the public URL of an object in the bucket. For example:
-	/// - fs `file:///data/buckets/my-bucket/key`
-	/// - s3 `https://my-bucket.s3.us-west-2.amazonaws.com/key`
+	/// Get public URL of object
+	/// - fs: `file:///data/buckets/my-bucket/key`
+	/// - s3: `https://my-bucket.s3.us-west-2.amazonaws.com/key`
 	fn public_url(
 		&self,
 		bucket_name: &str,
@@ -199,9 +304,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
-/// Create a new bucket with a platform dependent provider
+/// Create temporary in-memory bucket for testing
+pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryProvider::new(), "temp") }
+/// Create local bucket with platform-specific provider
 /// - wasm: [`LocalStorageProvider`]
-/// - native: [`FsBucketProvider`] with root: `.cache/buckets`
+/// - native: [`FsBucketProvider`] at `.cache/buckets`
 pub fn local_bucket(name: impl Into<String>) -> Bucket {
 	#[cfg(target_arch = "wasm32")]
 	return Bucket::new(LocalStorageProvider::new(), name);
@@ -213,8 +320,7 @@ pub fn local_bucket(name: impl Into<String>) -> Bucket {
 		name,
 	);
 }
-/// Manages the selection of either a filesystem or s3
-/// bucket depending on [`ServiceAccess`] and feature flags
+/// Select filesystem or S3 bucket based on [`ServiceAccess`] and feature flags
 #[allow(unused_variables)]
 pub async fn s3_fs_selector(
 	fs_path: &AbsPathBuf,
@@ -240,41 +346,6 @@ pub async fn s3_fs_selector(
 	}
 }
 
-pub trait Table: Serialize + DeserializeOwned {}
-impl<T> Table for T where T: Serialize + DeserializeOwned {}
-
-
-pub trait TableProvider<T: Serialize + DeserializeOwned>:
-	BucketProvider
-{
-	fn set_typed(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-		body: &T,
-	) -> SendBoxedFuture<Result> {
-		match serde_json::to_vec(body) {
-			Ok(vec) => self.insert(bucket_name, path, vec.into()),
-			Err(e) => {
-				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
-			}
-		}
-	}
-	fn get_typed(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<T>> {
-		let fut = self.get(bucket_name, path);
-		Box::pin(async move {
-			let bytes = fut.await?;
-			match serde_json::from_slice(&bytes) {
-				Ok(val) => Ok(val),
-				Err(e) => bevybail!("Failed to deserialize: {}", e),
-			}
-		})
-	}
-}
 
 
 #[cfg(test)]

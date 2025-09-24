@@ -291,7 +291,11 @@ impl BucketProvider for DynamoDbProvider {
 
 
 impl<T: Table> TableProvider<T> for DynamoDbProvider {
-	fn set_typed(
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+
+	fn insert_typed(
 		&self,
 		table_name: &str,
 		path: &RoutePath,
@@ -340,9 +344,13 @@ mod test {
 	use super::*;
 
 	#[tokio::test]
-	// #[ignore = "this is a wip"]
-	async fn works() {
+	async fn bucket() {
 		let provider = DynamoDbProvider::create().await;
 		bucket_test::run(provider).await;
+	}
+	#[tokio::test]
+	async fn table() {
+		let provider = DynamoDbProvider::create().await;
+		table_test::run(provider).await;
 	}
 }

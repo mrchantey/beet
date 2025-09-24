@@ -2,8 +2,10 @@
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 mod bucket;
+mod table;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
+pub use table::*;
 mod bucket_item;
 mod in_memory_provider;
 pub use bucket::*;
