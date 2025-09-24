@@ -12,7 +12,7 @@ pub fn BucketList(
 	let (on_change, reload_items) = signal(());
 	let route_prefix = getter(route_prefix.trim_end_matches("/").to_string());
 	let (err, set_err) = signal::<Option<String>>(None);
-	let bucket = getter(Bucket::new_local(bucket_name));
+	let bucket = getter(local_bucket(bucket_name));
 
 	#[cfg(feature = "client")]
 	effect(move || {

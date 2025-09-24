@@ -2,6 +2,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use bytes::Bytes;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// Cross-service storage bucket representation
 #[derive(Component)]
@@ -28,25 +30,6 @@ impl Bucket {
 			provider: Box::new(provider),
 		}
 	}
-	/// Create a new bucket with a platform dependent provider
-	/// - wasm: [`LocalStorageProvider`]
-	/// - native: [`FsBucketProvider`] with root: `.cache/buckets`
-	pub fn new_local(name: impl Into<String>) -> Self {
-		#[cfg(target_arch = "wasm32")]
-		return Self::new(LocalStorageProvider::new(), name);
-		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-		return Self::new(
-			FsBucketProvider::new(
-				AbsPathBuf::new_workspace_rel(".cache/buckets").unwrap(),
-			),
-			name,
-		);
-		#[cfg(not(any(target_arch = "wasm32", feature = "fs")))]
-		panic!(
-			"Failed to create bucket {}, Bucket::new_local requires either the wasm32 target or the \"fs\" feature to be enabled.",
-			name.into()
-		);
-	}
 
 	/// Create a [`BucketItem`] for interactively working with a bucket item
 	pub fn item(&self, path: RoutePath) -> BucketItem {
@@ -58,6 +41,9 @@ impl Bucket {
 
 
 	/// Create the bucket if it does not exist
+	///
+	/// Note: This operation is intended to only return once the bucket
+	/// is ready, in cases like DynamoDb this usually takes over 10 seconds.
 	pub async fn bucket_create(&self) -> Result {
 		self.provider.bucket_create(&self.name).await
 	}
@@ -208,7 +194,20 @@ pub trait BucketProvider: 'static + Send + Sync {
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
-
+/// Create a new bucket with a platform dependent provider
+/// - wasm: [`LocalStorageProvider`]
+/// - native: [`FsBucketProvider`] with root: `.cache/buckets`
+pub fn local_bucket(name: impl Into<String>) -> Bucket {
+	#[cfg(target_arch = "wasm32")]
+	return Bucket::new(LocalStorageProvider::new(), name);
+	#[cfg(not(target_arch = "wasm32"))]
+	return Bucket::new(
+		FsBucketProvider::new(
+			AbsPathBuf::new_workspace_rel(".cache/buckets").unwrap(),
+		),
+		name,
+	);
+}
 /// Manages the selection of either a filesystem or s3
 /// bucket depending on [`ServiceAccess`] and feature flags
 #[allow(unused_variables)]
@@ -236,7 +235,41 @@ pub async fn s3_fs_selector(
 	}
 }
 
+pub trait Table: Serialize + DeserializeOwned {}
+impl<T> Table for T where T: Serialize + DeserializeOwned {}
 
+
+pub trait TableProvider<T: Serialize + DeserializeOwned>:
+	BucketProvider
+{
+	fn set_typed(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+		body: &T,
+	) -> SendBoxedFuture<Result> {
+		match serde_json::to_vec(body) {
+			Ok(vec) => self.insert(bucket_name, path, vec.into()),
+			Err(e) => {
+				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
+			}
+		}
+	}
+	fn get_typed(
+		&self,
+		bucket_name: &str,
+		path: &RoutePath,
+	) -> SendBoxedFuture<Result<T>> {
+		let fut = self.get(bucket_name, path);
+		Box::pin(async move {
+			let bytes = fut.await?;
+			match serde_json::from_slice(&bytes) {
+				Ok(val) => Ok(val),
+				Err(e) => bevybail!("Failed to deserialize: {}", e),
+			}
+		})
+	}
+}
 
 
 #[cfg(test)]

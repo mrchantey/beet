@@ -1549,6 +1549,7 @@ dependencies = [
  "reqwest",
  "send_wrapper",
  "serde",
+ "serde_dynamo",
  "serde_json",
  "serde_urlencoded",
  "sweet",
@@ -1593,7 +1594,7 @@ name = "beet_query"
 version = "0.0.7-dev.16"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_core",
  "beet_net",
  "beet_query_macros",
@@ -9197,6 +9198,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "serde_dynamo"
+version = "4.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e36c1b1792cfd9de29eb373ee6a4b74650369c096f55db7198ceb7b8921d1f7f"
+dependencies = [
+ "aws-sdk-dynamodb",
+ "base64 0.21.7",
+ "serde",
 ]
 
 [[package]]

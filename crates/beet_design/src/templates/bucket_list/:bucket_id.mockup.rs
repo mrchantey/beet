@@ -17,7 +17,7 @@ pub fn Inner(bucket_id: RoutePath) -> impl Bundle {
 		set_data,
 		get_err,
 		..
-	} = Bucket::new_local("buckets-demo").item(bucket_id);
+	} = local_bucket("buckets-demo").item(bucket_id);
 
 	let all_items = "/docs/design/templates/bucket_list";
 	// let all_items = routes::docs::interactivity::buckets::index();
