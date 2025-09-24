@@ -58,6 +58,7 @@ thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 send_wrapper.workspace = true
+uuid = {workspace = true, features = ["v7"]}
 
 # serde
 clap = { workspace = true, optional = true }

@@ -31,7 +31,9 @@ impl Bucket {
 	/// Create a [`BucketItem`] for working with a specific path
 	///
 	/// # Example
-	/// ```
+	/// ```no_run
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// let bucket = temp_bucket();
 	/// let item = bucket.item(RoutePath::from("/my-file.txt"));
 	/// ```
@@ -47,6 +49,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.bucket_create().await?;
@@ -64,6 +68,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.bucket_try_create().await?;
@@ -78,6 +84,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let exists = bucket.bucket_exists().await?;
@@ -91,6 +99,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.bucket_remove().await?;
@@ -107,6 +117,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.insert(&RoutePath::from("/file.txt"), "content").await?;
@@ -125,6 +137,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.try_insert(&RoutePath::from("/file.txt"), "content").await?;
@@ -147,6 +161,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let exists = bucket.exists(&RoutePath::from("/file.txt")).await?;
@@ -160,6 +176,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let paths = bucket.list().await?;
@@ -173,6 +191,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let data = bucket.get(&RoutePath::from("/file.txt")).await?;
@@ -187,6 +207,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let all_data = bucket.get_all().await?;
@@ -212,6 +234,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// bucket.remove(&RoutePath::from("/file.txt")).await?;
@@ -226,6 +250,8 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
 	/// let url = bucket.public_url(&RoutePath::from("/file.txt")).await?;

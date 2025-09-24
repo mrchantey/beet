@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 /// }
 ///
 /// # async fn run() -> Result<()> {
-/// let table = TableStore::<User>::new(temp_provider(), "users");
+/// let table = temp_table::<String>();
 /// table.bucket_try_create().await?;
 ///
 /// let user = User {
@@ -34,14 +34,14 @@ use serde::de::DeserializeOwned;
 /// # }
 /// ```
 #[derive(Component)]
-pub struct TableStore<T: Table> {
+pub struct TableStore<T: TableData> {
 	/// The resource name of the table bucket
 	name: String,
 	/// The provider that handles table operations (S3, filesystem, memory, etc)
 	provider: Box<dyn TableProvider<T>>,
 }
 
-impl<T: Table> Clone for TableStore<T> {
+impl<T: TableData> Clone for TableStore<T> {
 	fn clone(&self) -> Self {
 		Self {
 			name: self.name.clone(),
@@ -50,12 +50,12 @@ impl<T: Table> Clone for TableStore<T> {
 	}
 }
 
-impl<T: Table> TableStore<T> {
+impl<T: TableData> TableStore<T> {
 	/// Create a new table store with the given provider and name
 	///
 	/// # Example
 	/// ```
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// ```
 	pub fn new(
 		provider: impl TableProvider<T>,
@@ -71,7 +71,7 @@ impl<T: Table> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// assert_eq!(table.name(), "users");
 	/// ```
 	pub fn name(&self) -> &str { &self.name }
@@ -108,7 +108,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let user = User::default();
 	/// table.insert(&RoutePath::from("/user1"), user).await?;
 	/// # Ok(())
@@ -123,7 +123,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let user = User::default();
 	/// table.try_insert(&RoutePath::from("/user1"), user).await?;
 	/// # Ok(())
@@ -145,7 +145,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let exists = table.exists(&RoutePath::from("/user1")).await?;
 	/// # Ok(())
 	/// # }
@@ -159,7 +159,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let paths = table.list().await?;
 	/// # Ok(())
 	/// # }
@@ -173,7 +173,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let user = table.get(&RoutePath::from("/user1")).await?;
 	/// # Ok(())
 	/// # }
@@ -190,7 +190,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// let items = table.get_all().await?;
 	/// for (path, user) in items {
 	///     println!("User at {}: {}", path, user.name);
@@ -218,7 +218,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// table.remove(&RoutePath::from("/user1")).await?;
 	/// # Ok(())
 	/// # }
@@ -235,7 +235,7 @@ impl<T: Table> TableStore<T> {
 	/// # Example
 	/// ```
 	/// # async fn run() -> Result<()> {
-	/// let table = TableStore::<User>::new(temp_provider(), "users");
+	/// let table = temp_table::<String>();
 	/// if let Some(url) = table.public_url(&RoutePath::from("/user1")).await? {
 	///     println!("Public URL: {}", url);
 	/// }
@@ -263,9 +263,31 @@ impl<T: Table> TableStore<T> {
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - [`'static`] - For type safety across async boundaries
-pub trait Table: Serialize + DeserializeOwned + Clone + 'static {}
-impl<T> Table for T where T: Serialize + DeserializeOwned + Clone + 'static {}
+pub trait TableData: Serialize + DeserializeOwned + Clone + 'static {}
+impl<T> TableData for T where T: Serialize + DeserializeOwned + Clone + 'static {}
 
+
+pub struct TableItem<T> {
+	/// A uuid v7 used as the primary key
+	pub id: String,
+	/// Timestamp in milliseconds since Unix epoch
+	pub created: u64,
+	pub data: T,
+}
+
+impl<T> TableItem<T> {
+	pub fn new(data: T) -> Self {
+		let now = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_millis() as u64;
+		Self {
+			id: uuid::Uuid::now_v7().to_string(),
+			created: now,
+			data,
+		}
+	}
+}
 
 /// Storage provider for typed table operations
 ///
@@ -290,7 +312,7 @@ impl<T> Table for T where T: Serialize + DeserializeOwned + Clone + 'static {}
 ///     }
 /// }
 /// ```
-pub trait TableProvider<T: Table>:
+pub trait TableProvider<T: TableData>:
 	BucketProvider + 'static + Send + Sync
 {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
@@ -324,6 +346,12 @@ pub trait TableProvider<T: Table>:
 		})
 	}
 }
+
+/// Create temporary in-memory bucket for testing
+pub fn temp_table<T: TableData>() -> TableStore<T> {
+	TableStore::new(InMemoryProvider::new(), "temp")
+}
+
 
 #[cfg(test)]
 pub mod table_test {

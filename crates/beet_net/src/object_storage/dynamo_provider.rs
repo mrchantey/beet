@@ -290,7 +290,7 @@ impl BucketProvider for DynamoDbProvider {
 }
 
 
-impl<T: Table> TableProvider<T> for DynamoDbProvider {
+impl<T: TableData> TableProvider<T> for DynamoDbProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

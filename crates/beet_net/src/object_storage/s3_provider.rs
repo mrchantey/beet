@@ -24,6 +24,11 @@ pub fn s3_bucket() -> impl Bundle {
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
 
+impl<T: TableData> TableProvider<T> for S3Provider {
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+}
 
 impl S3Provider {
 	/// Create a new S3 client with the default region: `us-west-2`

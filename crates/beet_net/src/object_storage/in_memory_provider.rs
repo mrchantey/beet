@@ -28,6 +28,12 @@ impl InMemoryProvider {
 	pub fn new() -> Self { Self::default() }
 }
 
+impl<T: TableData> TableProvider<T> for InMemoryProvider {
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+}
+
 impl BucketProvider for InMemoryProvider {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 

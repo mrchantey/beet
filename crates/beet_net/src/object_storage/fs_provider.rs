@@ -26,6 +26,13 @@ impl FsBucketProvider {
 	}
 }
 
+impl<T: TableData> TableProvider<T> for FsBucketProvider {
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+}
+
+
 impl BucketProvider for FsBucketProvider {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 

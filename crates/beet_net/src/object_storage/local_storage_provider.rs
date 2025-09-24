@@ -31,6 +31,12 @@ impl LocalStorageProvider {
 	}
 }
 
+impl<T: Table> TableProvider<T> for LocalStorageProvider {
+	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
+		Box::new(self.clone())
+	}
+}
+
 impl BucketProvider for LocalStorageProvider {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
