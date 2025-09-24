@@ -7,56 +7,62 @@ class BeetAnalytics {
 
 	collectBasicInfo() {
 		// Browser and OS information
-		this.data.userAgent = navigator.userAgent;
-		this.data.platform = navigator.platform;
-		this.data.language = navigator.language;
-		this.data.languages = navigator.languages || [navigator.language];
-		this.data.cookieEnabled = navigator.cookieEnabled;
-		this.data.onLine = navigator.onLine;
+		this.data["navigator.userAgent"] = navigator.userAgent;
+		this.data["navigator.platform"] = navigator.platform;
+		this.data["navigator.language"] = navigator.language;
+		this.data["navigator.languages"] = navigator.languages || [
+			navigator.language,
+		];
+		this.data["navigator.cookieEnabled"] = navigator.cookieEnabled;
+		this.data["navigator.onLine"] = navigator.onLine;
 
 		// Screen and display info
-		this.data.screenWidth = screen.width;
-		this.data.screenHeight = screen.height;
-		this.data.screenColorDepth = screen.colorDepth;
-		this.data.screenPixelDepth = screen.pixelDepth;
-		this.data.viewportWidth = window.innerWidth;
-		this.data.viewportHeight = window.innerHeight;
-		this.data.devicePixelRatio = window.devicePixelRatio || 1;
+		this.data["screen.width"] = screen.width;
+		this.data["screen.height"] = screen.height;
+		this.data["screen.colorDepth"] = screen.colorDepth;
+		this.data["screen.pixelDepth"] = screen.pixelDepth;
+		this.data["window.innerWidth"] = window.innerWidth;
+		this.data["window.innerHeight"] = window.innerHeight;
+		this.data["window.devicePixelRatio"] = window.devicePixelRatio || 1;
 
 		// Timezone and date info
-		this.data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-		this.data.timezoneOffset = new Date().getTimezoneOffset();
-		this.data.sessionCreated = Date.now();
+		this.data["intl.timezone"] =
+			Intl.DateTimeFormat().resolvedOptions().timeZone;
+		this.data["date.timezoneOffset"] = new Date().getTimezoneOffset();
+		this.data["session.created"] = Date.now();
 
 		// Hardware info (when available)
-		this.data.hardwareConcurrency = navigator.hardwareConcurrency || "unknown";
-		this.data.maxTouchPoints = navigator.maxTouchPoints || 0;
+		this.data["navigator.hardwareConcurrency"] =
+			navigator.hardwareConcurrency || "unknown";
+		this.data["navigator.maxTouchPoints"] = navigator.maxTouchPoints || 0;
 
 		// Memory info (Chrome only)
 		if ("memory" in performance) {
-			this.data.memoryLimit = performance.memory.jsHeapSizeLimit;
-			this.data.memoryUsed = performance.memory.usedJSHeapSize;
+			this.data["performance.memory.limit"] =
+				performance.memory.jsHeapSizeLimit;
+			this.data["performance.memory.used"] = performance.memory.usedJSHeapSize;
 		}
 
 		// Connection info (when available)
 		if ("connection" in navigator) {
 			const conn = navigator.connection;
-			this.data.connectionType = conn.effectiveType;
-			this.data.downlink = conn.downlink;
-			this.data.rtt = conn.rtt;
+			this.data["connection.effectiveType"] = conn.effectiveType;
+			this.data["connection.downlink"] = conn.downlink;
+			this.data["connection.rtt"] = conn.rtt;
 		}
 
 		// Page and session info
-		this.data.url = window.location.href;
-		this.data.referrer = document.referrer || "direct";
-		this.data.title = document.title;
-		this.data.sessionId = this.generateSessionId();
+		this.data["window.location.href"] = window.location.href;
+		this.data["document.referrer"] = document.referrer || "direct";
+		this.data["document.title"] = document.title;
+		this.data["session.id"] = this.generateSessionId();
 
 		// Performance timing
 		if ("performance" in window && "timing" in performance) {
 			const timing = performance.timing;
-			this.data.pageLoadTime = timing.loadEventEnd - timing.navigationStart;
-			this.data.domContentLoaded =
+			this.data["performance.pageLoadTime"] =
+				timing.loadEventEnd - timing.navigationStart;
+			this.data["performance.domContentLoaded"] =
 				timing.domContentLoadedEventEnd - timing.navigationStart;
 		}
 
@@ -72,16 +78,16 @@ class BeetAnalytics {
 	trackPageView() {
 		this.sendEvent("page_view", {
 			"window.location.href": window.location.href,
-			documentTitle: document.title,
+			"document.title": document.title,
 		});
 	}
 
 	trackClick(element, customData = {}) {
 		this.sendEvent("click", {
-			tagName: element.tagName,
-			className: element.className,
-			elementId: element.id,
-			text: element.textContent?.substring(0, 128), // Limit text length
+			"element.tagName": element.tagName,
+			"element.className": element.className,
+			"element.id": element.id,
+			"element.text": element.textContent?.substring(0, 128), // Limit text length
 			...customData,
 		});
 	}
@@ -100,7 +106,7 @@ class BeetAnalytics {
 
 		// Send max scroll on page unload
 		window.addEventListener("beforeunload", () => {
-			this.sendEvent("scroll_depth", { maxScrollPercent: maxScroll });
+			this.sendEvent("scroll_depth", { "scroll.maxPercent": maxScroll });
 		});
 	}
 
@@ -108,10 +114,10 @@ class BeetAnalytics {
 	trackErrors() {
 		window.addEventListener("error", (event) => {
 			this.sendEvent("javascript_error", {
-				message: event.message,
-				filename: event.filename,
-				line: event.lineno,
-				column: event.colno,
+				"error.message": event.message,
+				"error.filename": event.filename,
+				"error.line": event.lineno,
+				"error.column": event.colno,
 			});
 		});
 	}
@@ -119,10 +125,10 @@ class BeetAnalytics {
 	// Send data to your analytics endpoint
 	sendEvent(event_type, event_data = {}) {
 		const payload = {
-			event_type,
-			event_data,
-			session_data: this.data,
-			client_timestamp: Date.now(),
+			"event.type": event_type,
+			"event.data": event_data,
+			"session.data": this.data,
+			"client.timestamp": Date.now(),
 		};
 
 		// Use beacon API for better reliability
