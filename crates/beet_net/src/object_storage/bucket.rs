@@ -40,10 +40,13 @@ impl Bucket {
 	pub fn name(&self) -> &str { &self.name }
 
 
-	/// Create the bucket if it does not exist
+	/// Create the bucket
 	///
 	/// Note: This operation is intended to only return once the bucket
 	/// is ready, in cases like DynamoDb this usually takes over 10 seconds.
+	/// ## Errors
+	///
+	/// Errors if the bucket already exists
 	pub async fn bucket_create(&self) -> Result {
 		self.provider.bucket_create(&self.name).await
 	}
@@ -57,7 +60,9 @@ impl Bucket {
 	pub async fn bucket_exists(&self) -> Result<bool> {
 		self.provider.bucket_exists(&self.name).await
 	}
-	/// Remove the bucket
+	/// Remove the bucket:
+	/// ## Errors
+	/// Errors if the bucket does not exist
 	pub async fn bucket_remove(&self) -> Result {
 		self.provider.bucket_remove(&self.name).await
 	}
@@ -278,7 +283,7 @@ pub mod bucket_test {
 	use sweet::prelude::*;
 
 	pub async fn run(provider: impl BucketProvider) {
-		let bucket = Bucket::new(provider, "beet-test-bucket-849302");
+		let bucket = Bucket::new(provider, "beet-test-bucket");
 		let path = RoutePath::from("/test_path");
 		let body = bytes::Bytes::from("test_body");
 		bucket.bucket_remove().await.ok();

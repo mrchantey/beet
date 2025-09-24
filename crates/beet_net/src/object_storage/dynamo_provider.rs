@@ -3,8 +3,7 @@ use aws_config::Region;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::error::SdkError;
-use aws_sdk_dynamodb::operation::create_table::CreateTableError;
-use aws_sdk_dynamodb::operation::describe_table::DescribeTableError;
+use aws_sdk_dynamodb::operation;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::types::TableStatus;
 use beet_core::prelude::*;
@@ -50,7 +49,7 @@ impl DynamoDbProvider {
 			Err(SdkError::ServiceError(service_err))
 				if matches!(
 					service_err.err(),
-					DescribeTableError::ResourceNotFoundException(_)
+					operation::describe_table::DescribeTableError::ResourceNotFoundException(_)
 				) =>
 			{
 				Ok(None)
@@ -146,22 +145,25 @@ impl BucketProvider for DynamoDbProvider {
 					this.await_table_create(&table_name).await?;
 					Ok(())
 				}
-				Err(SdkError::ServiceError(service_err))
-					if let CreateTableError::ResourceInUseException(_) =
-						service_err.err() =>
-				{
-					// already exists
-					Ok(())
-				}
+				// Err(SdkError::ServiceError(service_err))
+				// 	if let CreateTableError::ResourceInUseException(_) =
+				// 		service_err.err() =>
+				// {
+				// 	// already exists
+				// 	Ok(())
+				// }
 				Err(err) => bevybail!("Failed to create table: {:?}", err),
 			}
 		})
 	}
 
 	fn bucket_remove(&self, table_name: &str) -> SendBoxedFuture<Result<()>> {
-		let fut = self.delete_table().table_name(table_name).send();
+		let delete_fut = self.delete_table().table_name(table_name).send();
+		let this = self.clone();
+		let table_name = table_name.to_string();
 		Box::pin(async move {
-			fut.await?;
+			delete_fut.await?;
+			this.await_table_remove(&table_name).await?;
 			Ok(())
 		})
 	}
@@ -267,9 +269,13 @@ impl BucketProvider for DynamoDbProvider {
 			.delete_item()
 			.table_name(table_name)
 			.key("id", self.resolve_key(path))
+			.return_values(aws_sdk_dynamodb::types::ReturnValue::AllOld)
 			.send();
 		Box::pin(async move {
-			fut.await?;
+			let result = fut.await?;
+			if result.attributes.is_none() {
+				bevybail!("Item not found");
+			}
 			Ok(())
 		})
 	}
@@ -337,25 +343,6 @@ mod test {
 	// #[ignore = "this is a wip"]
 	async fn works() {
 		let provider = DynamoDbProvider::create().await;
-		let bucket = Bucket::new(provider.clone(), "beet_test");
-		bucket.bucket_create().await.unwrap();
-		let mut stream = Backoff::default().with_max_attempts(20).stream();
-		while let Some(next) = stream.next().await {
-			println!("Waiting for table create... {next:?}");
-			if bucket.bucket_exists().await.unwrap() {
-				break;
-			}
-		}
-		let mut stream = Backoff::default().with_max_attempts(20).stream();
-
-		bucket.bucket_remove().await.unwrap();
-		while let Some(next) = stream.next().await {
-			println!("Waiting for table remove... {next:?}");
-			if !bucket.bucket_exists().await.unwrap() {
-				break;
-			}
-		}
-		// dynamo tables take time to be active awkward to test
-		// bucket_test::run(provider).await;
+		bucket_test::run(provider).await;
 	}
 }

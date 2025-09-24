@@ -4,6 +4,7 @@
 // - added stream
 //
 use crate::prelude::*;
+
 use std::time::Duration;
 
 impl Default for Backoff {
@@ -425,7 +426,7 @@ use std::iter;
 pub struct BackoffIter {
 	inner: Backoff,
 	#[cfg(feature = "rand")]
-	rng: rand::rngs::ThreadRng,
+	rng: rand::rngs::StdRng,
 	attempts: u32,
 }
 
@@ -434,7 +435,10 @@ impl BackoffIter {
 		Self {
 			attempts: 0,
 			#[cfg(feature = "rand")]
-			rng: rand::thread_rng(),
+			rng: {
+				use rand::SeedableRng;
+				rand::rngs::StdRng::from_entropy()
+			},
 			inner,
 		}
 	}
@@ -540,7 +544,9 @@ pub struct BackoffStream {
 	// Frame for the attempt to be yielded next (as produced by BackoffIter).
 	current: Option<BackoffFrame>,
 	sleeper: Option<
-		std::pin::Pin<Box<dyn core::future::Future<Output = ()> + 'static>>,
+		std::pin::Pin<
+			Box<dyn core::future::Future<Output = ()> + Send + 'static>,
+		>,
 	>,
 }
 
