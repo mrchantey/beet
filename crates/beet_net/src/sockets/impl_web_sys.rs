@@ -129,6 +129,20 @@ struct WasmSocketWriter {
 	_on_open: Option<Closure<dyn FnMut(Event)>>,
 }
 
+impl WasmSocketWriter {
+	/// Clear all event handlers to prevent callbacks after drop
+	fn remove_listeners(&self) {
+		self.ws.set_onmessage(None);
+		self.ws.set_onerror(None);
+		self.ws.set_onclose(None);
+		self.ws.set_onopen(None);
+	}
+}
+
+impl Drop for WasmSocketWriter {
+	fn drop(&mut self) { self.remove_listeners() }
+}
+
 impl SocketWriter for WasmSocketWriter {
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
 		let res = match msg {
@@ -159,6 +173,8 @@ impl SocketWriter for WasmSocketWriter {
 				.map_jserr(),
 			None => self.ws.close().map_jserr(),
 		};
+		// if not yet dropped maybe user wants to listen for an ack,
+		// so dont remove_listeners
 		ready(res).boxed()
 	}
 }

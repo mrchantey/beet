@@ -201,28 +201,18 @@ impl AsyncChannel {
 	/// Any triggered [`AppExit`] will cause an exit after the current flush completes.
 	pub async fn runner_async(mut app: App) -> AppExit {
 		app.init();
-		let rx = app.world().resource::<AsyncChannel>().rx.clone();
 
+		// this is an outer loop that will run when there are no
+		// in-flight async tasks. We'll just do a 100ms update loop
 		loop {
-			// 1. flush async tasks
+			// 1. flush async tasks (also runs update)
 			Self::flush_async_tasks(app.world_mut()).await;
 			// 2. exit if instructed
 			if let Some(exit) = app.should_exit() {
 				return exit;
 			}
-			// 3. await next async task
-			match rx.recv().await {
-				Ok(mut queue) => {
-					app.world_mut().commands().append(&mut queue);
-				}
-				Err(err) => {
-					eprintln!(
-						"Async channel closed: {}\nwas the resource removed?",
-						err
-					);
-					return AppExit::from_code(1);
-				}
-			}
+			// 3. delay next update
+			time_ext::sleep_millis(100).await;
 		}
 	}
 	/// Run an exponential backoff until all tasks have completed.
