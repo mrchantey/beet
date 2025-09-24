@@ -1,8 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::*;
+use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use uuid::Uuid;
 
 
 /// Type-safe storage table for serializable objects
@@ -114,8 +116,8 @@ impl<T: TableData> TableStore<T> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn insert(&self, path: &RoutePath, body: T) -> Result {
-		self.provider.insert_typed(&self.name, path, &body).await
+	pub async fn push(&self, body: T) -> Result {
+		self.provider.insert_row(&self.name, body).await
 	}
 
 	/// Insert typed object, failing if it already exists
@@ -132,11 +134,12 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Errors
 	/// Returns error if object already exists at path
-	pub async fn try_insert(&self, path: &RoutePath, body: T) -> Result {
-		if self.exists(path).await? {
-			bevybail!("Object already exists: {}", path)
+	pub async fn try_push(&self, body: T) -> Result {
+		let id = body.id();
+		if self.exists(body.id()).await? {
+			bevybail!("Row already exists: {}", id)
 		} else {
-			self.insert(path, body).await
+			self.push(body).await
 		}
 	}
 
@@ -150,8 +153,9 @@ impl<T: TableData> TableStore<T> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
-		BucketProvider::exists(self.provider.as_ref(), &self.name, path).await
+	pub async fn exists(&self, id: Uuid) -> Result<bool> {
+		let path = RoutePath::new(id.to_string());
+		BucketProvider::exists(self.provider.as_ref(), &self.name, &path).await
 	}
 
 	/// List all object paths in table
@@ -181,8 +185,8 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Errors
 	/// Returns error if object doesn't exist or fails to deserialize
-	pub async fn get(&self, path: &RoutePath) -> Result<T> {
-		self.provider.get_typed(&self.name, path).await
+	pub async fn get(&self, id: Uuid) -> Result<T> {
+		self.provider.get_row(&self.name, id).await
 	}
 
 	/// Get all objects and their typed data
@@ -206,7 +210,14 @@ impl<T: TableData> TableStore<T> {
 			.await?
 			.into_iter()
 			.map(async |path| {
-				let data = self.get(&path).await?;
+				let id = path
+					.to_string()
+					.trim_start_matches('/')
+					.parse::<Uuid>()
+					.map_err(|e| {
+						bevyhow!("Invalid UUID in path {}: {}", path, e)
+					})?;
+				let data = self.get(id).await?;
 				Ok::<_, BevyError>((path, data))
 			})
 			.xmap(async_ext::try_join_all)
@@ -226,8 +237,9 @@ impl<T: TableData> TableStore<T> {
 	///
 	/// # Errors
 	/// Returns error if object doesn't exist
-	pub async fn remove(&self, path: &RoutePath) -> Result {
-		BucketProvider::remove(self.provider.as_ref(), &self.name, path).await
+	pub async fn remove(&self, id: Uuid) -> Result {
+		let path = RoutePath::new(id.to_string());
+		BucketProvider::remove(self.provider.as_ref(), &self.name, &path).await
 	}
 
 	/// Get public URL for object (if supported by provider)
@@ -263,15 +275,26 @@ impl<T: TableData> TableStore<T> {
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - [`'static`] - For type safety across async boundaries
-pub trait TableData: Serialize + DeserializeOwned + Clone + 'static {}
-impl<T> TableData for T where T: Serialize + DeserializeOwned + Clone + 'static {}
+pub trait TableData: 'static + Clone + Serialize + DeserializeOwned {
+	fn id(&self) -> Uuid;
+	fn set_id(&mut self, id: Uuid);
+}
+impl<T: 'static + Clone + Serialize + DeserializeOwned> TableData
+	for TableItem<T>
+{
+	fn id(&self) -> Uuid { self.id }
+	fn set_id(&mut self, id: Uuid) { self.id = id; }
+}
 
-
+/// Helper type implemementing [`TableData`]. Note some services
+/// like dynamodb do not allow indexing nested values, so if thats required
+/// a standalone impl [`TableData`] type should be used.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TableItem<T> {
 	/// A uuid v7 used as the primary key
-	pub id: String,
-	/// Timestamp in milliseconds since Unix epoch
-	pub created: u64,
+	pub id: Uuid,
+	/// Duration since Unix epoch
+	pub created: Duration,
 	pub data: T,
 }
 
@@ -279,10 +302,9 @@ impl<T> TableItem<T> {
 	pub fn new(data: T) -> Self {
 		let now = std::time::SystemTime::now()
 			.duration_since(std::time::UNIX_EPOCH)
-			.unwrap()
-			.as_millis() as u64;
+			.unwrap();
 		Self {
-			id: uuid::Uuid::now_v7().to_string(),
+			id: uuid::Uuid::now_v7(),
 			created: now,
 			data,
 		}
@@ -316,27 +338,28 @@ pub trait TableProvider<T: TableData>:
 	BucketProvider + 'static + Send + Sync
 {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
-	fn insert_typed(
+	fn insert_row(
 		&self,
 		bucket_name: &str,
-		path: &RoutePath,
-		body: &T,
+		body: T,
 	) -> SendBoxedFuture<Result> {
-		match serde_json::to_vec(body) {
+		let path = RoutePath::new(body.id().to_string());
+		match serde_json::to_vec(&body) {
 			Ok(vec) => {
-				BucketProvider::insert(self, bucket_name, path, vec.into())
+				BucketProvider::insert(self, bucket_name, &path, vec.into())
 			}
 			Err(e) => {
 				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
 			}
 		}
 	}
-	fn get_typed(
+	fn get_row(
 		&self,
 		bucket_name: &str,
-		path: &RoutePath,
+		id: Uuid,
 	) -> SendBoxedFuture<Result<T>> {
-		let fut = BucketProvider::get(self, bucket_name, path);
+		let path = RoutePath::new(id.to_string());
+		let fut = BucketProvider::get(self, bucket_name, &path);
 		Box::pin(async move {
 			let bytes = fut.await?;
 			match serde_json::from_slice(&bytes) {
@@ -360,36 +383,37 @@ pub mod table_test {
 	use serde::Serialize;
 	use sweet::prelude::*;
 
-	#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 	pub struct MyObject {
 		some_key: String,
 		some_vec: Vec<MyObject>,
 	}
 
-	pub async fn run(provider: impl TableProvider<MyObject>) {
+	pub async fn run(provider: impl TableProvider<TableItem<MyObject>>) {
 		let table = TableStore::new(provider, "beet-test-table");
-		let path = RoutePath::from("/test_path");
-		let body = MyObject {
+		let body = TableItem::new(MyObject {
 			some_key: "some_value".into(),
 			some_vec: vec![MyObject {
 				some_key: "nested".into(),
 				some_vec: vec![],
 			}],
-		};
+		});
+		let id = body.id();
+		let path = RoutePath::new(id.to_string());
 		table.bucket_remove().await.ok();
 		table.bucket_exists().await.unwrap().xpect_false();
 		table.bucket_try_create().await.unwrap();
-		table.exists(&path).await.unwrap().xpect_false();
-		table.remove(&path).await.xpect_err();
-		table.insert(&path, body.clone()).await.unwrap();
+		table.exists(id).await.unwrap().xpect_false();
+		table.remove(id).await.xpect_err();
+		table.push(body.clone()).await.unwrap();
 		table.bucket_exists().await.unwrap().xpect_true();
-		table.exists(&path).await.unwrap().xpect_true();
+		table.exists(id).await.unwrap().xpect_true();
 		table.list().await.unwrap().xpect_eq(vec![path.clone()]);
-		table.get(&path).await.unwrap().xpect_eq(body.clone());
-		table.get(&path).await.unwrap().xpect_eq(body);
+		table.get(id).await.unwrap().xpect_eq(body.clone());
+		table.get(id).await.unwrap().xpect_eq(body);
 
-		table.remove(&path).await.unwrap();
-		table.get(&path).await.xpect_err();
+		table.remove(id).await.unwrap();
+		table.get(id).await.xpect_err();
 
 		table.bucket_remove().await.unwrap();
 		table.bucket_exists().await.unwrap().xpect_false();

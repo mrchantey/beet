@@ -19,6 +19,7 @@ pub mod prelude {
 	pub use http::StatusCode;
 	pub use http::header;
 	pub use url::Url;
+	pub use uuid::Uuid;
 
 	pub use bevy::tasks::futures_lite::StreamExt;
 }

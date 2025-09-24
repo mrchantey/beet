@@ -21,7 +21,7 @@ tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 axum = ["dep:axum"]
 aws = [
-	"tokio",
+	"serde",
 	"dep:crc-fast",
 	"dep:aws-sdk-s3",
 	"dep:serde_dynamo",
@@ -34,6 +34,7 @@ serde = [
 	"dep:serde_urlencoded",
 	"dep:clap",
 	"dep:base64",
+	"uuid/serde",
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest"]

@@ -295,12 +295,7 @@ impl<T: TableData> TableProvider<T> for DynamoDbProvider {
 		Box::new(self.clone())
 	}
 
-	fn insert_typed(
-		&self,
-		table_name: &str,
-		path: &RoutePath,
-		body: &T,
-	) -> SendBoxedFuture<Result> {
+	fn insert_row(&self, table_name: &str, body: T) -> SendBoxedFuture<Result> {
 		let Ok(item) = serde_dynamo::to_item(body) else {
 			return Box::pin(async move {
 				bevybail!("Failed to serialize item for dynamo");
@@ -310,7 +305,6 @@ impl<T: TableData> TableProvider<T> for DynamoDbProvider {
 			.put_item()
 			.table_name(table_name)
 			.set_item(Some(item))
-			.item("id", self.resolve_key(path))
 			.send();
 		Box::pin(async move {
 			fut.await?;
@@ -318,15 +312,15 @@ impl<T: TableData> TableProvider<T> for DynamoDbProvider {
 		})
 	}
 
-	fn get_typed(
+	fn get_row(
 		&self,
 		table_name: &str,
-		path: &RoutePath,
+		id: Uuid,
 	) -> SendBoxedFuture<Result<T>> {
 		let fut = self
 			.get_item()
 			.table_name(table_name)
-			.key("id", self.resolve_key(path))
+			.key("id", AttributeValue::S(id.to_string()))
 			.send();
 		Box::pin(async move {
 			let out = fut.await?;
@@ -343,12 +337,12 @@ impl<T: TableData> TableProvider<T> for DynamoDbProvider {
 mod test {
 	use super::*;
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn bucket() {
 		let provider = DynamoDbProvider::create().await;
 		bucket_test::run(provider).await;
 	}
-	#[tokio::test]
+	#[sweet::test]
 	async fn table() {
 		let provider = DynamoDbProvider::create().await;
 		table_test::run(provider).await;
