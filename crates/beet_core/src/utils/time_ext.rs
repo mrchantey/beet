@@ -1,10 +1,22 @@
 use std::time::Duration;
+use std::time::SystemTime;
 
+
+pub fn now_millis() -> u128 {
+	SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap()
+		.as_millis()
+}
 
 pub async fn sleep_secs(secs: u64) { sleep(Duration::from_secs(secs)).await; }
 
 pub async fn sleep_millis(millis: u64) {
 	sleep(Duration::from_millis(millis)).await;
+}
+
+pub async fn sleep_micros(micros: u64) {
+	sleep(Duration::from_micros(micros)).await;
 }
 
 /// Cross platform sleep function

@@ -237,9 +237,7 @@ fn openai_message_request(
 								let b64 = body["item"]["result"].to_str()?;
 								let content =
 									FileContent::new_b64(&id, ext, b64);
-								spawner
-									.insert(id.to_string(), content)
-									.await?;
+								spawner.insert(id.to_string(), content).await?;
 							}
 							_ => {}
 						}
@@ -304,6 +302,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn text_to_image() {
+		println!("testing text_to_image, this may take over a minute");
 		super::super::test::text_to_image(OpenAiAgent::from_env().with_tool(
 			GenerateImage {
 				quality: ImageQuality::Low,

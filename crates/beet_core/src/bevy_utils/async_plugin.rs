@@ -212,35 +212,32 @@ impl AsyncChannel {
 				return exit;
 			}
 			// 3. delay next update
+			// println!("no async tasks in flight, sleeping..");
 			time_ext::sleep_millis(100).await;
 		}
 	}
-	/// Run an exponential backoff until all tasks have completed.
+	/// Run an loop at regular updates until all tasks have completed.
 	/// - The world will update at least once
 	/// - any triggered [`AppExit`] is ignored
 	pub async fn flush_async_tasks(world: &mut World) {
 		let mut task_query = world.query::<&mut AsyncTask>();
 		let rx = world.resource::<AsyncChannel>().rx.clone();
+		// tried an exponential backoff here, made streaming responses
+		// ie from agents extremely slow, i guess reqwest etc requires regular polling
+		// to receive bytes?
 		loop {
-			let mut backoff = Backoff::new(
-				u32::MAX,
-				Duration::from_micros(10),
-				Some(Duration::from_millis(500)),
-			)
-			.stream();
-
-			while let Some(_) = backoff.next().await {
-				// 1. update
-				world.update();
-				// 2. flush rx
-				while let Ok(mut queue) = rx.try_recv() {
-					world.commands().append(&mut queue);
-				}
-				// 3. exit if no remaining tasks
-				if task_query.query(world).is_empty() {
-					return;
-				}
+			// 1. update
+			world.update();
+			// 2. flush rx
+			while let Ok(mut queue) = rx.try_recv() {
+				world.commands().append(&mut queue);
 			}
+			time_ext::sleep_micros(10).await;
+			// 3. exit if no remaining tasks
+			if task_query.query(world).is_empty() {
+				return;
+			}
+			// }
 		}
 	}
 }

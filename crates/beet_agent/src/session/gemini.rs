@@ -162,6 +162,7 @@ fn gemini_message_request(
 					eprintln!("failed to parse event data as json: {:?}", ev);
 					continue;
 				};
+				// println!("Gemini event: {body:#?}");
 
 				dump.push(body.clone());
 				fs_ext::write_async(

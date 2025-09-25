@@ -50,14 +50,37 @@ impl OnSpawnBoxed {
 	) -> Self {
 		Self(Box::new(func))
 	}
+	/// Insert this bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {
 		Self::new(move |entity| {
 			entity.insert(bundle);
 		})
 	}
+	/// Insert the bundle if it is `Some`
+	pub fn insert_option(bundle: Option<impl Bundle>) -> Self {
+		Self::new(move |entity| {
+			if let Some(bundle) = bundle {
+				entity.insert(bundle);
+			}
+		})
+	}
+
 	pub fn insert_resource(resource: impl Resource) -> Self {
 		Self::new(move |entity| {
 			entity.world_scope(move |world| world.insert_resource(resource));
+		})
+	}
+
+	pub fn trigger(ev: impl Event) -> Self {
+		Self::new(move |entity| {
+			entity.trigger(ev);
+		})
+	}
+	pub fn trigger_option(ev: Option<impl Event>) -> Self {
+		Self::new(move |entity| {
+			if let Some(ev) = ev {
+				entity.trigger(ev);
+			}
 		})
 	}
 }

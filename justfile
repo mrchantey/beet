@@ -74,8 +74,8 @@ run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
 
-chat:
-	sweet run -w --example chat
+chat *args:
+	sweet run -w --example chat --features=native-tls,agent -- {{args}}
 
 run-csr:
 	cargo run --example csr --features=client

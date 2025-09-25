@@ -263,8 +263,16 @@ client = [
 ]
 
 #💡 fine-grained
-native-tls = ["beet_net?/native-tls", "beet_router?/native-tls"]
-rustls-tls = ["beet_net?/rustls-tls", "beet_router?/rustls-tls"]
+native-tls = [
+	"beet_agent?/native-tls",
+	"beet_net?/native-tls",
+	"beet_router?/native-tls"
+]
+rustls-tls = [
+	"beet_agent?/rustls-tls",
+	"beet_net?/rustls-tls",
+	"beet_router?/rustls-tls"
+]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
@@ -302,7 +310,7 @@ bevy_default = [
 	"beet_sim?/bevy_default",
 ]
 #💡 utils
-fs = ["beet_core/fs","beet_net?/fs","beet_router?/fs"]
+fs = ["beet_agent?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 
 # animation = ["beet_spatial?/animation"]
@@ -354,6 +362,7 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 sweet.workspace = true
 serde.workspace = true
 anyhow.workspace = true
+clap.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = "", features = ["fs"] }
@@ -368,6 +377,14 @@ web-sys.workspace = true
 # js-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
+
+
+# 💡 Examples - agent
+[[example]]
+name = "chat"
+path = "examples/agent/chat.rs"
+required-features = ["agent","native-tls"]
+
 
 # 💡 Examples - dom
 [[example]]

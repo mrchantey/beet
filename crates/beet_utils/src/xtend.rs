@@ -137,6 +137,17 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 	}
 }
 
+#[extend::ext(name=XtendBool)]
+pub impl bool {
+	/// Runs the function if `self` is true
+	fn xmap_true<O>(&self, func: impl FnOnce() -> O) -> Option<O> {
+		if *self { Some(func()) } else { None }
+	}
+	/// Runs the function if `self` is false
+	fn xmap_false<O>(&self, func: impl FnOnce() -> O) -> Option<O> {
+		if !*self { Some(func()) } else { None }
+	}
+}
 impl<T: Sized, I: IntoIterator<Item = T>> XtendIter<T> for I {}
 
 

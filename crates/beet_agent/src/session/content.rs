@@ -114,6 +114,7 @@ pub struct FileContent {
 }
 
 impl FileContent {
+	/// Create new file content, either from a file path or url
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn new(path: impl AsRef<str>) -> Result<Self> {
 		let path = path.as_ref();
@@ -174,7 +175,7 @@ impl FileData {
 	pub fn new_uri(uri: impl AsRef<str>) -> Self {
 		Self::Uri(uri.as_ref().to_string())
 	}
-
+	/// Create new file data, either from a file path or url
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn new(path: impl AsRef<str>, mime_type: &str) -> Result<Self> {
 		let path = path.as_ref();

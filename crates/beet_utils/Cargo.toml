@@ -20,6 +20,7 @@ serde = ["dep:serde","dep:serde_json"]
 glob.workspace = true
 clap.workspace = true
 bevy.workspace = true
+extend.workspace = true
 thiserror.workspace = true
 path-clean = "1"
 pathdiff = "0.2"

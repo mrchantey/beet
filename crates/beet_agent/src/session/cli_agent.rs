@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 use clap::Parser;
 
@@ -21,7 +22,15 @@ pub struct CliAgentPlugin {
 	pub config: CliAgentConfig,
 }
 
+impl CliAgentPlugin {
+	pub fn initial_message(&self) -> bool {
+		self.initial_prompt.is_some()
+			|| !self.initial_prompt_trailing.is_empty()
+			|| !self.input_files.is_empty()
+	}
+}
 
+/// Print the text then immediately flush stdout
 macro_rules! print_flush {
  ($($arg:tt)*) => {{
   use std::io::{self, Write};
@@ -102,6 +111,8 @@ impl CliAgentPlugin {
 			None
 		};
 
+		let initial_message = self.initial_message();
+
 		let paths = self
 			.input_files
 			.iter()
@@ -123,38 +134,48 @@ impl CliAgentPlugin {
 					.await?;
 
 					queue.with(move |world| {
-						let commands = world.commands();
-						let mut session = SessionBuilder::new(commands);
-
-						let mut user = session.add_actor(terminal_user());
-						let mut user_msg = user.create_message();
-						if let Some(initial_prompt) = &initial_prompt {
-							println!("User > {}\n", initial_prompt);
-							user_msg.add_text(initial_prompt);
-						}
-						let users_turn =
-							initial_prompt.is_none() && files.is_empty();
-						for file in files {
-							println!("User > {}\n", file);
-							user_msg.add_content(file);
-						}
-						if users_turn {
-							user.trigger(MessageRequest);
-						}
-						let mut provider = GeminiAgent::from_env();
-						if generate_images {
-							provider =
-								provider.with_model(GEMINI_2_5_FLASH_IMAGE);
-						}
-						// let mut provider = OpenAiAgent::from_env();
-						// if generate_images {
-						// 	provider =
-						// 		provider.with_tool(GenerateImage::default());
-						// }
-						let mut agent = session.add_actor(provider);
-						if !users_turn {
-							agent.trigger(MessageRequest);
-						}
+						#[rustfmt::skip]
+						world.spawn((
+							Session::default(),
+							children![
+								// Actor 1: User
+								(
+									terminal_user(),
+									OnSpawnBoxed::trigger_option(initial_message.xmap_false(||{
+										MessageRequest
+									})),
+									children![
+										// Initial User Message
+										(
+											Message::default(),
+											children![
+												OnSpawnBoxed::insert_option(
+													initial_prompt.map(|prompt| {
+														println!("User > {}\n", prompt);
+														session_ext::text(prompt)
+													})),
+												Children::spawn(SpawnIter(files.into_iter().map(|file|{
+													println!("User > {}\n", file);
+													(file, ContentEnded::default())
+												})))
+											]
+										)]
+								),
+							// Actor 2: Agent
+							(
+								{
+									let mut provider = GeminiAgent::from_env();
+									if generate_images {
+										provider =
+											provider.with_model(GEMINI_2_5_FLASH_IMAGE);
+									}
+									provider
+								},
+								OnSpawnBoxed::trigger_option(initial_message.xmap_true(||{
+									MessageRequest
+								})),
+							)
+						]));
 					});
 					Ok(())
 				},
@@ -279,7 +300,7 @@ fn user_message_request(
 
 			let stdin = io::stdin();
 			let mut input = String::new();
-			print_flush!("User > ");
+			print_flush!("\nUser > ");
 			input.clear();
 			let _ = io::stdout().flush();
 
