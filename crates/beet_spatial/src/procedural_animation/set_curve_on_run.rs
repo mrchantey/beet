@@ -1,6 +1,7 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
+use bevy::prelude::Interval;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
