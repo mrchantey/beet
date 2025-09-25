@@ -51,6 +51,25 @@ impl ContentVec {
 			)),
 		))
 	}
+
+	pub fn first_text(&self) -> Option<&TextContent> {
+		self.0.iter().find_map(|c| {
+			if let ContentEnum::Text(t) = c {
+				Some(t)
+			} else {
+				None
+			}
+		})
+	}
+	pub fn first_file(&self) -> Option<&FileContent> {
+		self.0.iter().find_map(|c| {
+			if let ContentEnum::File(f) = c {
+				Some(f)
+			} else {
+				None
+			}
+		})
+	}
 }
 
 

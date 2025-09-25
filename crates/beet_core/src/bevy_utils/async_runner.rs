@@ -44,6 +44,7 @@ impl AsyncRunner {
 		// ie from agents extremely slow, i guess reqwest etc requires regular polling
 		// to receive bytes?
 		loop {
+			// println!("loopin");
 			// 1. update
 			world.update();
 

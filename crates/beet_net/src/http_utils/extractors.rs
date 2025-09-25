@@ -88,6 +88,7 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 	}
 }
 
+#[derive(Deref, DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Json<T>(pub T);
 

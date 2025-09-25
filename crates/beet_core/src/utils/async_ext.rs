@@ -1,6 +1,11 @@
 pub use futures::future::try_join_all;
 use std::pin::Pin;
 
+
+pub fn block_on<F: Future>(fut: F) -> F::Output {
+	futures::executor::block_on(fut)
+}
+
 /// A 'static + Send, making it suitable for use-cases like tokio::spawn
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 
