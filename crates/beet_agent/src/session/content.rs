@@ -2,8 +2,11 @@ use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
 use bevy::ecs::component::HookContext;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
@@ -12,6 +15,114 @@ pub enum ContentView<'a> {
 	Text(&'a TextContent),
 	File(&'a FileContent),
 }
+
+/// Portable version of [`Content`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ContentEnum {
+	Text(TextContent),
+	File(FileContent),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentVec(pub Vec<ContentEnum>);
+
+impl ContentVec {
+	pub fn new() -> Self { Self(Vec::new()) }
+
+	pub fn into_bundle(self) -> impl Bundle {
+		let mut texts: Vec<TextContent> = Vec::new();
+		let mut files: Vec<FileContent> = Vec::new();
+		for content in self.0.into_iter() {
+			match content {
+				ContentEnum::Text(t) => texts.push(t),
+				ContentEnum::File(f) => files.push(f),
+			}
+		}
+		Children::spawn((
+			SpawnIter(
+				texts
+					.into_iter()
+					.map(|content| (content, ContentEnded::default())),
+			),
+			(SpawnIter(
+				files
+					.into_iter()
+					.map(|content| (content, ContentEnded::default())),
+			)),
+		))
+	}
+}
+
+
+pub trait IntoContentEnum {
+	fn into_content_enum(self) -> ContentEnum;
+}
+impl<'a> IntoContentEnum for &'a str {
+	fn into_content_enum(self) -> ContentEnum {
+		ContentEnum::Text(TextContent::new(self))
+	}
+}
+
+impl IntoContentEnum for TextContent {
+	fn into_content_enum(self) -> ContentEnum { ContentEnum::Text(self) }
+}
+impl IntoContentEnum for FileContent {
+	fn into_content_enum(self) -> ContentEnum { ContentEnum::File(self) }
+}
+
+pub trait IntoContentVec<M> {
+	fn into_content_vec(self) -> ContentVec;
+}
+impl IntoContentVec<Self> for ContentVec {
+	fn into_content_vec(self) -> ContentVec { self }
+}
+
+impl<T> IntoContentVec<Self> for T
+where
+	T: IntoContentEnum,
+{
+	fn into_content_vec(self) -> ContentVec {
+		ContentVec(vec![self.into_content_enum()])
+	}
+}
+impl<T> IntoContentVec<Self> for Vec<T>
+where
+	T: IntoContentEnum,
+{
+	fn into_content_vec(self) -> ContentVec {
+		ContentVec(
+			self.into_iter()
+				.map(|item| item.into_content_enum())
+				.collect(),
+		)
+	}
+}
+impl<T1, T2> IntoContentVec<Self> for (T1, T2)
+where
+	T1: IntoContentEnum,
+	T2: IntoContentEnum,
+{
+	fn into_content_vec(self) -> ContentVec {
+		ContentVec(vec![self.0.into_content_enum(), self.1.into_content_enum()])
+	}
+}
+impl<T1, T2, M1, M2> IntoContentVec<(Self, M1, M2)> for (T1, T2)
+where
+	T1: IntoContentVec<M1>,
+	T2: IntoContentVec<M2>,
+{
+	fn into_content_vec(self) -> ContentVec {
+		ContentVec(
+			self.0
+				.into_content_vec()
+				.0
+				.into_iter()
+				.chain(self.1.into_content_vec().0)
+				.collect(),
+		)
+	}
+}
+
 impl ContentView<'_> {
 	pub fn as_text(&self) -> Option<&TextContent> {
 		match self {
@@ -54,7 +165,9 @@ pub struct ContentEnded {
 pub struct ReasoningContent;
 
 
-#[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Default, Clone, Deref, DerefMut, Serialize, Deserialize, Component,
+)]
 #[require(Content)]
 #[component(on_add=handle_text_delta)]
 pub struct TextContent(pub String);
@@ -108,7 +221,7 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 
 
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
 #[require(Content)]
 pub struct FileContent {
 	/// The mime type of the data, for example `image/png` or `text/plain`
@@ -171,7 +284,7 @@ impl FileContent {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FileData {
 	Utf8(String),
 	Base64(String),

@@ -141,7 +141,7 @@ pub(super) mod test {
 
 		#[rustfmt::skip]
 		app.world_mut().spawn(session_ext::user_message_session(agent,
-			session_ext::message(text,files)
+			session_ext::message((text, files))
 		));
 
 		app.add_observer(

@@ -16,7 +16,6 @@
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::spawn::SpawnIter;
 use bevy::prelude::*;
 use std::path::Path;
 
@@ -33,18 +32,8 @@ pub async fn file(path: impl AsRef<str>) -> Result<FileContent> {
 pub fn text(text: impl AsRef<str>) -> TextContent { TextContent::new(text) }
 
 /// Create a [`Message`] with the given text and file content as children
-pub fn message(text: &str, files: Vec<FileContent>) -> impl Bundle {
-	(
-		Message::default(),
-		Children::spawn((
-			Spawn((session_ext::text(text), ContentEnded::default())),
-			SpawnIter(
-				files
-					.into_iter()
-					.map(|file| (file, ContentEnded::default())),
-			),
-		)),
-	)
+pub fn message<M>(content: impl IntoContentVec<M>) -> impl Bundle {
+	(Message::default(), content.into_content_vec().into_bundle())
 }
 
 /// Create a session, inserting the `agent` and `user_message`,
@@ -71,9 +60,7 @@ pub fn user_message_session(agent:impl Bundle, user_message:impl Bundle)->impl B
 /// emitted file
 /// ## Panics
 /// Panics if no Agent entity is found
-pub async fn run_and_collect_file(
-	session: impl Bundle,
-) -> (Vec<TextContent>, Vec<FileContent>) {
+pub async fn run_and_collect_file(session: impl Bundle) -> Vec<ContentEnum> {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AgentPlugin));
 	app.world_mut().spawn(session);
@@ -91,19 +78,19 @@ pub fn collect_output(
 	children: Query<&Children>,
 	text: Query<&TextContent>,
 	files: Query<&FileContent>,
-) -> (Vec<TextContent>, Vec<FileContent>) {
+) -> Vec<ContentEnum> {
 	let agent = agents.single().expect("No agent found in world");
 
-	let mut texts: Vec<TextContent> = Vec::new();
-	let mut file_contents: Vec<FileContent> = Vec::new();
-
-	for entity in children.iter_descendants(agent) {
-		if let Ok(t) = text.get(entity) {
-			texts.push(t.clone());
-		}
-		if let Ok(f) = files.get(entity) {
-			file_contents.push(f.clone());
-		}
-	}
-	(texts, file_contents)
+	children
+		.iter_descendants_depth_first(agent)
+		.filter_map(|entity| {
+			if let Some(text) = text.get(entity).ok() {
+				Some(ContentEnum::Text(text.clone()))
+			} else if let Some(file) = files.get(entity).ok() {
+				Some(ContentEnum::File(file.clone()))
+			} else {
+				None
+			}
+		})
+		.collect()
 }
