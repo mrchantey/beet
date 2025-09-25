@@ -54,7 +54,7 @@ pub struct ContentEnded {
 pub struct ReasoningContent;
 
 
-#[derive(Debug, Default, Deref, DerefMut, Component)]
+#[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
 #[require(Content)]
 #[component(on_add=handle_text_delta)]
 pub struct TextContent(pub String);

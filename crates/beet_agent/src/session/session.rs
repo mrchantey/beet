@@ -6,7 +6,7 @@ use bevy::prelude::*;
 pub struct AgentPlugin;
 
 impl Plugin for AgentPlugin {
-	fn build(&self, _: &mut App) {}
+	fn build(&self, app: &mut App) { app.init_plugin(AsyncPlugin); }
 }
 
 #[derive(Default, Component)]
@@ -128,32 +128,20 @@ pub(super) mod test {
 	use sweet::prelude::*;
 
 
-	async fn run_assertion<B: Bundle>(
+	async fn run_assertion(
 		agent: impl Bundle,
-		message: impl AsyncFnOnce() -> B,
+		text: &str,
+		files: Vec<FileContent>,
 		assertion: impl 'static + Send + Sync + Fn(Vec<ContentView>),
 	) {
 		dotenv::dotenv().ok();
 
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin, AgentPlugin));
+		app.add_plugins((MinimalPlugins, AgentPlugin));
 
 		#[rustfmt::skip]
-		app.world_mut().spawn((
-			Session::default(),
-			children![
-				(
-					User,
-					children![(
-						Message::default(),
-						message().await
-					)]
-				),
-				(
-					agent,
-					OnSpawnBoxed::trigger(MessageRequest)
-				)
-			]
+		app.world_mut().spawn(session_ext::user_message_session(agent,
+			session_ext::message(text,files)
 		));
 
 		app.add_observer(
@@ -188,28 +176,22 @@ pub(super) mod test {
 	}
 
 	pub async fn text_to_text(agent: impl Bundle) {
-		run_assertion(
-			agent,
-			async || children![session_ext::text("what is 2 + 4")],
-			|content| {
-				content[0].as_text().unwrap().0.xref().xpect_contains("6");
-			},
-		)
+		run_assertion(agent, "what is 2 + 4", Vec::new(), |content| {
+			content[0].as_text().unwrap().0.xref().xpect_contains("6");
+		})
 		.await;
 	}
 	pub async fn textfile_to_text(agent: impl Bundle) {
+		let file = session_ext::workspace_file(
+			"assets/tests/agents/secret-message.txt",
+		)
+		.await
+		.unwrap();
+
 		run_assertion(
 			agent,
-			async || {
-				children![
-					session_ext::text("what is the secret message"),
-					session_ext::workspace_file(
-						"assets/tests/agents/secret-message.txt",
-					)
-					.await
-					.unwrap(),
-				]
-			},
+			"what is the secret message",
+			vec![file],
 			|content| {
 				content[0]
 					.as_text()
@@ -223,18 +205,15 @@ pub(super) mod test {
 	}
 
 	pub async fn image_to_text(agent: impl Bundle) {
+		let file =
+			session_ext::workspace_file("assets/tests/agents/secret-image.png")
+				.await
+				.unwrap();
+
 		run_assertion(
 			agent,
-			async || {
-				children![
-					session_ext::text("what does the text in the image say."),
-					session_ext::workspace_file(
-						"assets/tests/agents/secret-image.png",
-					)
-					.await
-					.unwrap(),
-				]
-			},
+			"what does the text in the image say",
+			vec![file],
 			|content| {
 				content[0]
 					.as_text()
@@ -250,11 +229,8 @@ pub(super) mod test {
 	pub async fn text_to_image(agent: impl Bundle) {
 		run_assertion(
 			agent,
-			async || {
-				children![session_ext::text(
-					"create a logo for beet, a metaframework for the bevy engine. the logo should be of a beetroot, with clean lines that can scale down to a tiny favicon"
-				)]
-			},
+			"create a logo for beet, a metaframework for the bevy engine. the logo should be of a beetroot, with clean lines that can scale down to a tiny favicon",
+			Vec::new(),
 			|content| {
 				use base64::prelude::*;
 				let file =
