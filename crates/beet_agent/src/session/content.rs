@@ -65,6 +65,12 @@ impl TextContent {
 	}
 }
 
+impl std::fmt::Display for TextContent {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
 /// Emitted on a piece of content like a TextContent to indicate a new piece of text
 /// was added.
 #[derive(Clone, Event)]

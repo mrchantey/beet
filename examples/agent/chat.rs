@@ -1,3 +1,5 @@
+//! This example demonstrates a cli chat workflow,
+//! see [`CliAgentPlugin`] for more options.
 use beet::prelude::*;
 use clap::Parser;
 

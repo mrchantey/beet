@@ -74,8 +74,6 @@ run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
 
-chat *args:
-	sweet run -w --example chat --features=native-tls,agent -- {{args}}
 
 run-csr:
 	cargo run --example csr --features=client
@@ -234,6 +232,14 @@ test-agent:
 	--oneshot --image										\
 	-f=assets/tests/agents/prompt.txt		\
 	--out-dir=assets/tests/agents/out
+
+
+example-chat *args:
+	sweet run -w --example chat 	--features=native-tls,agent -- {{args}}
+
+example-image *args:
+	sweet run -w --example image 	--features=native-tls,agent -- {{args}}
+
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer

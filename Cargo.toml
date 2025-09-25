@@ -384,6 +384,10 @@ web-sys.workspace = true
 name = "chat"
 path = "examples/agent/chat.rs"
 required-features = ["agent","native-tls"]
+[[example]]
+name = "image"
+path = "examples/agent/image.rs"
+required-features = ["agent","native-tls"]
 
 
 # 💡 Examples - dom
