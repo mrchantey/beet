@@ -1,13 +1,20 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
+/// The plugin added to the router app
 pub fn server_plugin(app: &mut App) {
-	app.insert_resource(Router::new_bundle(routes_bundle));
+	app.insert_resource(Router::new(server_routes_plugin));
 }
 
+/// The plugin added to individual handler apps, not the router app
+pub fn server_routes_plugin(app: &mut App) {
+	app.add_plugins(AgentPlugin)
+		.world_mut()
+		.spawn(routes_bundle());
+}
 
 pub fn routes_bundle() -> impl Bundle {
-	children![
+	(RouterRoot, children![
 		pages_routes(),
 		docs_routes(),
 		blog_routes(),
@@ -15,5 +22,5 @@ pub fn routes_bundle() -> impl Bundle {
 		beet_design::mockups::mockups_routes(),
 		(PathFilter::new("docs"), article_layout_middleware()),
 		(PathFilter::new("blog"), article_layout_middleware()),
-	]
+	])
 }

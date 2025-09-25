@@ -65,7 +65,7 @@ pub async fn run_and_collect_file(session: impl Bundle) -> Vec<ContentEnum> {
 	app.add_plugins((MinimalPlugins, AgentPlugin));
 	app.world_mut().spawn(session);
 
-	AsyncChannel::flush_async_tasks(app.world_mut()).await;
+	AsyncRunner::flush_async_tasks(app.world_mut()).await;
 
 	app.world_mut().run_system_cached(collect_output).unwrap()
 }

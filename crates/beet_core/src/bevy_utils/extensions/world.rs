@@ -187,7 +187,15 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&self) -> String {
-		self.build_scene_with(DynamicScene::from_world(self.into_world()))
+		let world = self.into_world();
+		let dyn_scene = DynamicSceneBuilder::from_world(world)
+			.deny_resource::<Time<Real>>()
+			.extract_entities(world.iter_entities().map(|entity| entity.id()))
+			.extract_resources()
+			.build();
+
+
+		self.build_scene_with(dyn_scene)
 	}
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene_with(&self, scene: DynamicScene) -> String {
@@ -234,5 +242,25 @@ pub impl<W: IntoWorld> W {
 		scene.write_to_world(world, entity_map)?;
 
 		Ok(())
+	}
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "bevy_scene")]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn serializes() {
+		use bevy::MinimalPlugins;
+
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins);
+		app.init();
+		app.update();
+		app.world_mut().build_scene().xpect_contains("Time");
 	}
 }

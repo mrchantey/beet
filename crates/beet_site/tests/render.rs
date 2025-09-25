@@ -16,7 +16,7 @@ async fn docs() {
 	// println!("res: {res:?}");
 	// empty without snippets.ron?
 
-	Router::new_bundle(routes_bundle)
+	Router::new(server_routes_plugin)
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.oneshot("/docs")

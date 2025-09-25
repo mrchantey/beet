@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
@@ -177,7 +176,7 @@ pub struct AsyncChannel {
 	/// the sender for the async channel
 	tx: Sender<CommandQueue>,
 	/// the receiver for the async channel, not accesible
-	rx: Receiver<CommandQueue>,
+	pub(super) rx: Receiver<CommandQueue>,
 }
 
 impl Default for AsyncChannel {
@@ -193,51 +192,6 @@ impl AsyncChannel {
 	pub fn queue(&self) -> AsyncQueue {
 		AsyncQueue {
 			tx: self.tx.clone(),
-		}
-	}
-
-	/// Uses the [`AsyncChannel::rx`] as a signal to run updates,
-	/// this means that the rx in poll_async_tasks should be empty during updates
-	/// Any triggered [`AppExit`] will cause an exit after the current flush completes.
-	pub async fn runner_async(mut app: App) -> AppExit {
-		app.init();
-
-		// this is an outer loop that will run when there are no
-		// in-flight async tasks. We'll just do a 100ms update loop
-		loop {
-			// 1. flush async tasks (also runs update)
-			Self::flush_async_tasks(app.world_mut()).await;
-			// 2. exit if instructed
-			if let Some(exit) = app.should_exit() {
-				return exit;
-			}
-			// 3. delay next update
-			// println!("no async tasks in flight, sleeping..");
-			time_ext::sleep_millis(100).await;
-		}
-	}
-	/// Run an loop at regular updates until all tasks have completed.
-	/// - The world will update at least once
-	/// - any triggered [`AppExit`] is ignored
-	pub async fn flush_async_tasks(world: &mut World) {
-		let mut task_query = world.query::<&mut AsyncTask>();
-		let rx = world.resource::<AsyncChannel>().rx.clone();
-		// tried an exponential backoff here, made streaming responses
-		// ie from agents extremely slow, i guess reqwest etc requires regular polling
-		// to receive bytes?
-		loop {
-			// 1. update
-			world.update();
-			// 2. flush rx
-			while let Ok(mut queue) = rx.try_recv() {
-				world.commands().append(&mut queue);
-			}
-			time_ext::sleep_micros(10).await;
-			// 3. exit if no remaining tasks
-			if task_query.query(world).is_empty() {
-				return;
-			}
-			// }
 		}
 	}
 }
@@ -300,6 +254,14 @@ impl AsyncQueue {
 	pub fn send_event<E: Event>(&self, event: E) {
 		self.with(move |world| {
 			world.send_event(event);
+		});
+	}
+	pub fn send_event_batch<E: Event>(
+		&self,
+		event: impl 'static + Send + IntoIterator<Item = E>,
+	) {
+		self.with(move |world| {
+			world.send_event_batch(event);
 		});
 	}
 
@@ -410,8 +372,8 @@ impl AsyncEntity {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use crate::prelude::AppExitExt;
+	use crate::prelude::*;
+	use bevy::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
 
@@ -484,7 +446,7 @@ mod tests {
 			.unwrap();
 
 		// must update app first or future will hang
-		AsyncChannel::flush_async_tasks(app.world_mut()).await;
+		AsyncRunner::flush_async_tasks(app.world_mut()).await;
 
 		// future completed
 		fut.await.xpect_eq(2);
@@ -504,9 +466,6 @@ mod tests {
 				},
 			)
 			.unwrap();
-		app.run_async(AsyncChannel::runner_async)
-			.await
-			.into_result()
-			.xpect_err();
+		app.run_async().await.into_result().xpect_err();
 	}
 }

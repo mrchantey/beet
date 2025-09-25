@@ -12,7 +12,6 @@ use axum::routing::get;
 use beet_core::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
-use std::path::PathBuf;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tower_http::cors::CorsLayer;
@@ -26,7 +25,7 @@ use tower_livereload::LiveReloadLayer;
 pub struct Server {
 	/// Directory to serve
 	#[arg(default_value = ".")]
-	pub dir: PathBuf,
+	pub dir: AbsPathBuf,
 	/// Specify port
 	#[arg(long, default_value = "3000")]
 	pub port: String,
@@ -63,7 +62,7 @@ impl Default for Server {
 }
 
 impl Server {
-	pub fn with_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+	pub fn with_dir(mut self, dir: AbsPathBuf) -> Self {
 		self.dir = dir.into();
 		self
 	}

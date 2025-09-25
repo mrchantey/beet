@@ -14,7 +14,6 @@ use notify_debouncer_full::Debouncer;
 use notify_debouncer_full::NoCache;
 use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
-use std::path::PathBuf;
 use std::time::Duration;
 
 /// A file watcher with glob patterns. All matches against
@@ -24,11 +23,11 @@ use std::time::Duration;
 /// 	starts it will error
 /// - If the directory is removed while watching, the
 /// 	watcher will silently stop listening
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Resource)]
 pub struct FsWatcher {
 	/// the path to watch
 	#[arg(long, default_value = "./")]
-	pub cwd: PathBuf,
+	pub cwd: AbsPathBuf,
 	#[command(flatten)]
 	pub filter: GlobFilter,
 	/// debounce time in milliseconds
@@ -52,7 +51,7 @@ impl Default for FsWatcher {
 
 impl FsWatcher {
 	/// Sets the cwd for the watcher.
-	pub fn with_cwd(mut self, cwd: PathBuf) -> Self {
+	pub fn with_cwd(mut self, cwd: AbsPathBuf) -> Self {
 		self.cwd = cwd;
 		self
 	}
@@ -319,7 +318,7 @@ mod test {
 	async fn works() -> Result {
 		let tmp_dir = tempdir()?;
 		let mut rx = FsWatcher {
-			cwd: tmp_dir.path().to_path_buf(),
+			cwd: AbsPathBuf::new(tmp_dir.path().to_path_buf()).unwrap(),
 			..Default::default()
 		}
 		.watch()?;

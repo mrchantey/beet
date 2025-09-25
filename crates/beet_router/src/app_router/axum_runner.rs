@@ -125,7 +125,7 @@ fn get_reload(
 
 	let reload_handle = tokio::spawn(async move {
 		let mut rx = FsWatcher {
-			cwd: html_dir.to_path_buf(),
+			cwd: html_dir,
 			// debounce: std::time::Duration::from_millis(100),
 			// no filter because any change in the html dir should trigger a reload
 			..Default::default()

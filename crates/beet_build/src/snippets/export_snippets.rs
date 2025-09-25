@@ -3,8 +3,10 @@ use beet_dom::prelude::*;
 use bevy::prelude::*;
 
 
-pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
-	let snippets = world.run_system_cached(collect_rsx_snippets)?;
+pub fn export_snippets(world: &mut World) -> Result {
+	let snippets = world
+		.run_system_cached(collect_rsx_snippets)
+		.unwrap_or_default();
 	if snippets.is_empty() {
 		return Ok(());
 	}
@@ -43,7 +45,7 @@ pub fn export_snippets(world: &mut World) -> bevy::prelude::Result {
 /// and all entities that are part of the snippet.
 fn collect_rsx_snippets(
 	config: Res<WorkspaceConfig>,
-	query: Query<(Entity, &SnippetRoot), Changed<StaticRoot>>,
+	query: Populated<(Entity, &SnippetRoot), Changed<StaticRoot>>,
 	children: Query<&Children>,
 ) -> Vec<(AbsPathBuf, Vec<Entity>)> {
 	debug!("{} rsx snippets changed", query.iter().count());

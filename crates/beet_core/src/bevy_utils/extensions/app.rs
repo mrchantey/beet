@@ -46,17 +46,6 @@ pub impl App {
 		self
 	}
 
-	/// Like [`App::run()`] but for async runners, this will also
-	/// `std::mem::take` the app so it should not be used after.
-	async fn run_async(
-		&mut self,
-		runner: impl AsyncFnOnce(App) -> AppExit + 'static,
-	) -> AppExit {
-		// let app = std::mem::take(self);
-		let this = std::mem::take(self);
-		runner(this).await
-	}
-
 	fn run_once(&mut self) -> AppExit {
 		self.init();
 		self.update();

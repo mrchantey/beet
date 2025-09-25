@@ -207,7 +207,7 @@ impl Router {
 			.await;
 
 		#[cfg(not(target_arch = "wasm32"))]
-		AsyncChannel::flush_async_tasks(&mut world).await;
+		AsyncRunner::flush_async_tasks(&mut world).await;
 		let response = world
 			.remove_resource::<Response>()
 			.unwrap_or_else(|| Response::not_found());

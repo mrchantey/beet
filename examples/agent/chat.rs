@@ -18,7 +18,7 @@ pub async fn main() {
 
 	App::new()
 		.add_plugins((MinimalPlugins, plugin))
-		.run_async(AsyncChannel::runner_async)
+		.run_async()
 		.await
 		.into_result()
 		.unwrap();

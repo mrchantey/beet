@@ -14,7 +14,7 @@ impl AgentCmd {
 	pub async fn run(self) -> Result {
 		App::new()
 			.add_plugins((MinimalPlugins, self.plugin))
-			.run_async(AsyncChannel::runner_async)
+			.run_async()
 			.await
 			.into_result()
 	}

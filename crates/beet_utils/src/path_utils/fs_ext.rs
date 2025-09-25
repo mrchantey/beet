@@ -167,6 +167,8 @@ pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 }
 
 
+
+
 pub fn hash_file(path: impl AsRef<Path>) -> FsResult<u64> {
 	let bytes = fs_ext::read(path)?;
 	let hash = fs_ext::hash_bytes(&bytes);

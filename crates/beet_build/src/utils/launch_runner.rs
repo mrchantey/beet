@@ -70,16 +70,14 @@ impl LaunchRunner {
 		let cwd = config.root_dir.into_abs();
 		let filter = config.filter.clone();
 
-		app.run_async(
-			FsApp {
-				watcher: FsWatcher {
-					cwd: cwd.0,
-					filter,
-					debounce: Duration::from_millis(100),
-				},
-			}
-			.runner(),
-		)
+		app.add_plugins((MinimalPlugins, FsWatcherPlugin {
+			watcher: FsWatcher {
+				cwd,
+				filter,
+				debounce: Duration::from_millis(100),
+			},
+		}))
+		.run_async()
 		.await
 	}
 }

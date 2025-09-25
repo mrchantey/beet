@@ -169,7 +169,7 @@ pub(super) mod test {
 			},
 		);
 
-		app.run_async(AsyncChannel::runner_async)
+		app.run_async()
 			.await
 			.into_result()
 			.unwrap();
