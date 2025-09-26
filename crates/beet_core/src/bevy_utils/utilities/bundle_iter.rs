@@ -1,6 +1,5 @@
 use crate::prelude::OnSpawn;
-use beet_core_macros::ImplBundle;
-use bevy::ecs::bundle::BundleEffect;
+use beet_core_macros::BundleEffect;
 use bevy::ecs::relationship::Relationship;
 use bevy::prelude::*;
 use std::marker::PhantomData;
@@ -44,7 +43,7 @@ bundle effect race conditions, try reordering the effects")
 }
 
 /// Like [`SpawnIter`] but for bundles, calling [`EntityWorldMut::insert`].
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct BundleIter<T, B>
 where
 	T: 'static + Send + Sync + Iterator<Item = B>,
@@ -66,20 +65,12 @@ where
 			_phantom: PhantomData,
 		}
 	}
-}
-
-impl<T, B> BundleEffect for BundleIter<T, B>
-where
-	T: 'static + Send + Sync + Iterator<Item = B>,
-	B: Bundle,
-{
-	fn apply(self, entity: &mut EntityWorldMut) {
+	fn effect(self, entity: &mut EntityWorldMut) {
 		for bundle in self.value {
 			entity.insert(bundle);
 		}
 	}
 }
-
 
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ pub struct FsWatcherPlugin {
 impl Plugin for FsWatcherPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin(AsyncPlugin)
-			.add_event::<WatchEvent>()
+			.add_message::<WatchEvent>()
 			.insert_resource(self.watcher.clone())
 			.add_systems(PreStartup, watch_file_changes);
 	}
@@ -39,7 +39,7 @@ fn watch_file_changes(watcher: Res<FsWatcher>, mut commands: Commands) {
 				if ev.has_mutate() {
 					let mutated =
 						ev.take().into_iter().filter(|ev| ev.mutated());
-					queue.send_event_batch(mutated);
+					queue.write_message_batch(mutated);
 				}
 			}
 
@@ -85,14 +85,14 @@ mod test {
 		}))
 		.add_systems(
 			Update,
-			(move |mut reader: EventReader<WatchEvent>,
+			(move |mut reader: MessageReader<WatchEvent>,
 			       mut commands: Commands| {
 				for ev in reader.read() {
 					touched.push(ev.path.clone());
 				}
-				commands.send_event(AppExit::Success);
+				commands.write_message(AppExit::Success);
 			})
-			.run_if(common_conditions::on_event::<WatchEvent>),
+			.run_if(common_conditions::on_message::<WatchEvent>),
 		);
 
 		app.init();

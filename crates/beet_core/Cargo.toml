@@ -22,9 +22,8 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["serde", "bevy", "nightly"]
+default = ["serde", "nightly"]
 nightly = []
-bevy = ["dep:bevy"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 serde = ["beet_utils/serde", "dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 tokio = ["dep:tokio"]
@@ -51,7 +50,7 @@ tokens = [
 [dependencies]
 beet_utils.workspace = true
 beet_core_macros.workspace = true
-bevy = { workspace = true, optional = true }
+bevy.workspace = true
 
 tracing.workspace = true
 rapidhash.workspace = true

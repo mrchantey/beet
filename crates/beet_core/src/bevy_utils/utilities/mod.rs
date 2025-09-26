@@ -1,5 +1,5 @@
 mod app_pool;
-mod bundle_iter;
+// mod bundle_iter;
 mod common_systems;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_watcher_plugin;
@@ -8,7 +8,7 @@ mod id_counter;
 mod on_spawn;
 mod pretty_tracing;
 pub use app_pool::*;
-pub use bundle_iter::*;
+// pub use bundle_iter::*;
 pub use common_systems::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_watcher_plugin::*;

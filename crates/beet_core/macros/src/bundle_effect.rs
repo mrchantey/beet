@@ -1,3 +1,4 @@
+use beet_utils::prelude::Xtend;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn;
@@ -6,7 +7,9 @@ use syn::parse_macro_input;
 
 
 
-pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn bundle_effect(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	parse(input)
 		.unwrap_or_else(|err| err.into_compile_error())
@@ -14,6 +17,19 @@ pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
+	let effect_name = input
+		.attrs
+		.iter()
+		.find_map(|attr| {
+			if attr.path().is_ident("effect") {
+				attr.parse_args::<TokenStream>().unwrap().xsome()
+			} else {
+				None
+			}
+		})
+		.unwrap_or_else(|| quote! {Self::effect});
+
+
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 	let input_ident = &input.ident;
@@ -22,14 +38,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		impl #impl_generics bevy::ecs::bundle::DynamicBundle for #input_ident #type_generics #where_clause {
 			type Effect = Self;
 
-			fn get_components(
-				self,
-				_func: &mut impl FnMut(
-					bevy::ecs::component::StorageType,
-					bevy::ptr::OwningPtr<'_>,
-				),
-			) -> Self::Effect {
-				self
+	   unsafe fn get_components(ptr: bevy::ptr::MovingPtr<'_, Self>, _func: &mut impl FnMut(bevy::ecs::component::StorageType, bevy::ptr::OwningPtr<'_>)){
+				 // Forget the pointer so that the value is available in `apply_effect`.
+					std::mem::forget(ptr);
+				}
+		 unsafe fn apply_effect(mut ptr: bevy::ptr::MovingPtr<'_, std::mem::MaybeUninit<Self>>, entity: &mut EntityWorldMut){
+				let effect = unsafe { ptr.assume_init() }.read();
+				// let effect = unsafe { &mut *ptr.as_mut_ptr() };
+				#effect_name(effect, entity);
 			}
 		}
 
@@ -46,11 +62,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			) {
 			}
 
-			fn register_required_components(
-				_components: &mut bevy::ecs::component::ComponentsRegistrator,
-				_required_components: &mut bevy::ecs::component::RequiredComponents,
-			) {
-			}
 		}
 	})
 }

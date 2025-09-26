@@ -1,4 +1,3 @@
-#[cfg(feature = "bevy")]
 use bevy::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
@@ -30,7 +29,7 @@ use rand_chacha::ChaCha8Rng;
 /// }
 /// ```
 ///https://bevyengine.org/examples/math/random-sampling/
-#[cfg_attr(feature = "bevy", derive(Deref, DerefMut, Resource))]
+#[derive(Deref, DerefMut, Resource)]
 pub struct RandomSource(pub ChaCha8Rng);
 
 impl RandomSource {

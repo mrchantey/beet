@@ -1,10 +1,11 @@
 use crate::prelude::Tree;
 use bevy::ecs::component::ComponentInfo;
-use bevy::ecs::event::EventCursor;
+use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use extend::ext;
+use std::marker::PhantomData;
 /// system version
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
 	world.log_component_names(*entity);
@@ -12,7 +13,7 @@ pub fn log_component_names(entity: In<Entity>, world: &mut World) {
 
 
 /// common trait for 'App' and 'World'
-trait IntoWorld {
+pub trait IntoWorld {
 	#[allow(unused)]
 	fn into_world(&self) -> &World;
 	fn into_world_mut(&mut self) -> &mut World;
@@ -31,9 +32,9 @@ pub impl World {
 	fn update(&mut self) { self.run_schedule(Main); }
 	/// The world equivelent of [`App::should_exit`]
 	fn should_exit(&self) -> Option<AppExit> {
-		let mut reader = EventCursor::default();
+		let mut reader = MessageCursor::default();
 
-		let events = self.get_resource::<Events<AppExit>>()?;
+		let events = self.get_resource::<Messages<AppExit>>()?;
 		let mut events = reader.read(events);
 
 		if events.len() != 0 {
@@ -46,6 +47,36 @@ pub impl World {
 		}
 
 		None
+	}
+}
+
+
+pub struct QueryOnce<D: QueryData, F: QueryFilter = ()> {
+	items: Vec<D::Item<'static, 'static>>,
+	_phantom: PhantomData<F>,
+}
+
+impl<D: QueryData, F: QueryFilter> std::ops::Deref for QueryOnce<D, F> {
+	type Target = Vec<D::Item<'static, 'static>>;
+	fn deref(&self) -> &Self::Target { &self.items }
+}
+
+impl<D: QueryData, F: QueryFilter> std::ops::DerefMut for QueryOnce<D, F> {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.items }
+}
+
+impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
+	pub fn new<T: IntoWorld>(world: &mut T) -> Self {
+		let world = world.into_world_mut();
+		let mut query = world.query_filtered::<D, F>();
+		let items = query.iter_mut(world).collect::<Vec<_>>();
+		// SAFETY: We're extending the lifetime to 'static because we own the data
+		// The query items are collected into owned data structures
+		let items = unsafe { std::mem::transmute(items) };
+		Self {
+			items,
+			_phantom: PhantomData,
+		}
 	}
 }
 
@@ -154,22 +185,22 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
 	/// used for one-off queries, otherwise [`World::query`] should be preferred.
-	fn query_once<'a, D: QueryData>(&'a mut self) -> Vec<D::Item<'a>> {
-		let world = self.into_world_mut();
-		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
+	fn query_once<D: QueryData>(&mut self) -> QueryOnce<D, ()> {
+		QueryOnce::new(self)
 	}
 
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
 	/// used for one-off queries, otherwise [`World::query_filtered`] should be preferred.
-	fn query_filtered_once<'a, D: QueryData, F: QueryFilter>(
-		&'a mut self,
-	) -> Vec<D::Item<'a>> {
+	fn query_filtered_once<D: QueryData, F: QueryFilter>(
+		&mut self,
+	) -> QueryOnce<D, F> {
+		QueryOnce::new(self)
+	}
+
+	fn all_entities(&mut self) -> Vec<Entity> {
 		let world = self.into_world_mut();
-		world
-			.query_filtered::<D, F>()
-			.iter_mut(world)
-			.collect::<Vec<_>>()
+		world.query::<Entity>().iter(world).collect()
 	}
 
 	/// Shorthand for removing all components of a given type.
@@ -186,11 +217,12 @@ pub impl<W: IntoWorld> W {
 
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
-	fn build_scene(&self) -> String {
+	fn build_scene(&mut self) -> String {
+		let all_entities = self.all_entities();
 		let world = self.into_world();
 		let dyn_scene = DynamicSceneBuilder::from_world(world)
 			.deny_resource::<Time<Real>>()
-			.extract_entities(world.iter_entities().map(|entity| entity.id()))
+			.extract_entities(all_entities.into_iter())
 			.extract_resources()
 			.build();
 

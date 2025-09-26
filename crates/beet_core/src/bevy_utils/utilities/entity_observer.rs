@@ -1,5 +1,4 @@
-use beet_core_macros::ImplBundle;
-use bevy::ecs::bundle::BundleEffect;
+use beet_core_macros::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
@@ -20,7 +19,7 @@ use bevy::prelude::*;
 /// );
 ///
 /// ```
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct EntityObserver {
 	/// The observer to spawn.
 	observer: Observer,
@@ -43,10 +42,7 @@ impl EntityObserver {
 		self.target = Some(target);
 		self
 	}
-}
-
-impl BundleEffect for EntityObserver {
-	fn apply(self, entity: &mut EntityWorldMut) {
+	fn effect(self, entity: &mut EntityWorldMut) {
 		// If no target is specified, use the entity this bundle is applied to.
 		let target = self.target.unwrap_or_else(|| entity.id());
 		entity.world_scope(|world| {
@@ -54,7 +50,6 @@ impl BundleEffect for EntityObserver {
 		});
 	}
 }
-
 
 #[cfg(test)]
 mod test {
@@ -64,16 +59,15 @@ mod test {
 
 	#[test]
 	fn works() {
-		#[derive(Event)]
 		struct Foo(u32);
 
 		let store = Store::default();
 		let mut world = World::new();
 		world
-			.spawn(EntityObserver::new(move |ev: Trigger<Foo>| {
-				store.set(ev.event().0)
+			.spawn(EntityObserver::new(move |ev: On<EntityTrigger<Foo>>| {
+				store.set(ev.event().payload.0)
 			}))
-			.trigger(Foo(3));
+			.entity_trigger(Foo(3));
 
 		store.get().xpect_eq(3);
 	}

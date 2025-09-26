@@ -151,8 +151,7 @@ impl WatchEventReceiver {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy", derive(bevy::prelude::Event))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Message)]
 pub struct WatchEvent {
 	pub kind: EventKind,
 	pub path: AbsPathBuf,

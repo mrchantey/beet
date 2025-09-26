@@ -172,7 +172,7 @@ mod test {
 			)],
 		]));
 		world
-			.run_system_cached(ChildProcessSequence::system)
+			.run_system_cached::<Result, _, _>(ChildProcessSequence::system)
 			.unwrap()
 			.unwrap();
 	}
@@ -189,7 +189,7 @@ mod test {
 			),
 		]));
 		world
-			.run_system_cached(ChildProcessSequence::system)
+			.run_system_cached::<Result, _, _>(ChildProcessSequence::system)
 			.unwrap()
 			.unwrap();
 	}

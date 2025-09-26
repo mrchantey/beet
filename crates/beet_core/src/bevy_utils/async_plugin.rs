@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
@@ -162,7 +163,7 @@ impl AsyncTask {
 			In(async move {
 				if let Err(err) = fut.await {
 					eprintln!("Async task failed: {}", err);
-					queue.send_event(AppExit::from_code(1));
+					queue.write_message(AppExit::from_code(1));
 				}
 			}),
 			commands,
@@ -246,22 +247,22 @@ impl AsyncQueue {
 		self.with_then(move |world| world.resource::<R>().clone())
 	}
 
-	pub fn trigger<E: Event>(&self, event: E) {
+	pub fn trigger<'a, E: Event<Trigger<'a>: Default>>(&self, event: E) {
 		self.with(move |world| {
 			world.trigger(event);
 		});
 	}
-	pub fn send_event<E: Event>(&self, event: E) {
+	pub fn write_message<E: Message>(&self, event: E) {
 		self.with(move |world| {
-			world.send_event(event);
+			world.write_message(event);
 		});
 	}
-	pub fn send_event_batch<E: Event>(
+	pub fn write_message_batch<E: Message>(
 		&self,
 		event: impl 'static + Send + IntoIterator<Item = E>,
 	) {
 		self.with(move |world| {
-			world.send_event_batch(event);
+			world.write_message_batch(event);
 		});
 	}
 
@@ -362,9 +363,12 @@ impl AsyncEntity {
 		.await
 	}
 
-	pub async fn trigger<E: Event>(&self, event: E) -> &Self {
+	pub async fn trigger<'a, E: EntityEvent<Trigger<'a>: Default>>(
+		&self,
+		event: E,
+	) -> &Self {
 		self.with(|mut entity| {
-			entity.trigger(event);
+			entity.entity_trigger(event);
 		})
 		.await
 	}

@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use beet_core_macros::ImplBundle;
-use bevy::ecs::bundle::BundleEffect;
+use beet_core_macros::BundleEffect;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -20,7 +19,7 @@ where
 
 
 /// A [`BundleEffect`] that runs a function when the entity is spawned.
-#[derive(Clone, ImplBundle)]
+#[derive(Clone, BundleEffect)]
 pub struct OnSpawn<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
 	pub F,
 );
@@ -28,17 +27,12 @@ pub struct OnSpawn<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
 impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawn<F> {
 	/// Create a new [`OnSpawn`] effect.
 	pub fn new(func: F) -> Self { Self(func) }
-}
 
-impl<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)> BundleEffect
-	for OnSpawn<F>
-{
-	fn apply(self, entity: &mut EntityWorldMut) { self.0(entity); }
+	fn effect(self, entity: &mut EntityWorldMut) { self.0(entity); }
 }
-
 
 /// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct OnSpawnBoxed(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
@@ -71,22 +65,19 @@ impl OnSpawnBoxed {
 		})
 	}
 
-	pub fn trigger(ev: impl Event) -> Self {
+	pub fn trigger<T: IntoEntityTrigger>(ev: T) -> Self {
 		Self::new(move |entity| {
-			entity.trigger(ev);
+			entity.entity_trigger(ev);
 		})
 	}
-	pub fn trigger_option(ev: Option<impl Event>) -> Self {
+	pub fn trigger_option<T: IntoEntityTrigger>(ev: Option<T>) -> Self {
 		Self::new(move |entity| {
 			if let Some(ev) = ev {
-				entity.trigger(ev);
+				entity.entity_trigger(ev);
 			}
 		})
 	}
-}
-
-impl BundleEffect for OnSpawnBoxed {
-	fn apply(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
+	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
 
 
@@ -180,7 +171,7 @@ impl OnSpawnDeferred {
 }
 
 /// A [`Clone`] version of [`OnSpawnBoxed`]
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
 impl OnSpawnClone {
@@ -196,11 +187,9 @@ impl OnSpawnClone {
 			entity.insert(func.clone()());
 		})
 	}
+	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
 
-impl BundleEffect for OnSpawnClone {
-	fn apply(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
-}
 
 impl Clone for OnSpawnClone {
 	fn clone(&self) -> Self { Self(self.0.box_clone()) }
@@ -221,9 +210,6 @@ where
 
 #[cfg(test)]
 mod test {
-	use std::sync::Arc;
-	use std::sync::Mutex;
-
 	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -232,57 +218,44 @@ mod test {
 	fn dfs() {
 		let mut world = World::new();
 
-		let numbers: Arc<Mutex<Vec<u32>>> = Arc::new(Mutex::new(Vec::new()));
-
-		let numbers1 = numbers.clone();
-		let numbers2 = numbers.clone();
-		let numbers3 = numbers.clone();
+		let numbers = Store::default();
 
 		world.spawn((
 			OnSpawn::new(move |entity_world_mut| {
-				numbers1.lock().unwrap().push(1);
+				numbers.push(1);
 				entity_world_mut.insert(OnSpawn::new(move |_| {
-					numbers2.lock().unwrap().push(2);
+					numbers.push(2);
 				}));
 			}),
 			OnSpawn::new(move |_| {
-				numbers3.lock().unwrap().push(3);
+				numbers.push(3);
 			}),
 		));
 
-		numbers
-			.lock()
-			.unwrap()
-			.as_slice()
-			.xpect_eq([1, 2, 3].as_slice());
+		numbers.get().xpect_eq(&[1, 2, 3]);
 	}
 	#[test]
 	fn on_spawn_deferred() {
 		let mut world = World::new();
 
-		let numbers: Arc<Mutex<Vec<u32>>> = Arc::new(Mutex::new(Vec::new()));
-
-		let numbers1 = numbers.clone();
-		let numbers2 = numbers.clone();
-		let numbers3 = numbers.clone();
-
+		let numbers = Store::default();
 		world.spawn((
 			OnSpawnDeferred::new(move |entity_world_mut| {
-				numbers1.lock().unwrap().push(1);
+				numbers.push(1);
 				entity_world_mut.insert(OnSpawn::new(move |_| {
-					numbers2.lock().unwrap().push(2);
+					numbers.push(2);
 				}));
 				Ok(())
 			}),
 			children![OnSpawnDeferred::new(move |_| {
-				numbers3.lock().unwrap().push(3);
+				numbers.push(3);
 				Ok(())
 			}),],
 		));
 
-		(&*numbers.lock().unwrap()).xpect_eq(&[] as &[u32]);
+		numbers.get().xpect_eq(&[] as &[u32]);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 
-		(&*numbers.lock().unwrap()).xpect_eq(&[1, 2, 3]);
+		numbers.get().xpect_eq(&[3, 1, 2]);
 	}
 }

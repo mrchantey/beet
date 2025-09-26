@@ -1,6 +1,8 @@
+mod entity_world_mut;
 mod schedule;
 mod system;
 mod world;
+pub use self::entity_world_mut::*;
 pub use self::schedule::*;
 // pub use system::*;
 pub use world::*;

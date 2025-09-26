@@ -1,4 +1,3 @@
-use bevy::ecs::archetype::Archetype;
 use bevy::ecs::component::Tick;
 use bevy::ecs::system::ReadOnlySystemParam;
 use bevy::ecs::system::SystemMeta;
@@ -50,16 +49,19 @@ unsafe impl<T: SystemParam> SystemParam for When<T> {
 
 	type Item<'world, 'state> = When<T::Item<'world, 'state>>;
 
-	fn init_state(
-		world: &mut World,
+	fn init_state(world: &mut World) -> Self::State { T::init_state(world) }
+	fn init_access(
+		state: &Self::State,
 		system_meta: &mut SystemMeta,
-	) -> Self::State {
-		T::init_state(world, system_meta)
+		component_access_set: &mut bevy::ecs::query::FilteredAccessSet,
+		world: &mut World,
+	) {
+		T::init_access(state, system_meta, component_access_set, world);
 	}
 
 	#[inline]
 	unsafe fn validate_param(
-		state: &Self::State,
+		state: &mut Self::State,
 		system_meta: &SystemMeta,
 		world: UnsafeWorldCell,
 	) -> Result<(), SystemParamValidationError> {
@@ -79,15 +81,6 @@ unsafe impl<T: SystemParam> SystemParam for When<T> {
 		change_tick: Tick,
 	) -> Self::Item<'world, 'state> {
 		When(unsafe { T::get_param(state, system_meta, world, change_tick) })
-	}
-
-	unsafe fn new_archetype(
-		state: &mut Self::State,
-		archetype: &Archetype,
-		system_meta: &mut SystemMeta,
-	) {
-		// SAFETY: The caller ensures that `archetype` is from the World the state was initialized from in `init_state`.
-		unsafe { T::new_archetype(state, archetype, system_meta) };
 	}
 
 	fn apply(

@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-mod impl_bundle;
+mod bundle_effect;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -74,7 +74,9 @@ pub fn derive_sendit(
 ///		fn apply(self, entity: &mut EntityWorldMut) { entity.insert(Bar); }
 ///	}
 /// ```
-#[proc_macro_derive(ImplBundle)]
-pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	impl_bundle::impl_bundle(input).into()
+#[proc_macro_derive(BundleEffect)]
+pub fn bundle_effect(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	bundle_effect::bundle_effect(input).into()
 }

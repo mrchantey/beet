@@ -1,10 +1,10 @@
 //! Until Option imlemented for bundle
 //! https://github.com/bevyengine/bevy/issues/2157
 //! https://github.com/Leafwing-Studios/i-cant-believe-its-not-bsn/blob/main/src/maybe.rs
-use bevy::ecs::component::ComponentHooks;
-use bevy::ecs::component::HookContext;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
+use bevy::ecs::lifecycle::ComponentHook;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::system::Command;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
@@ -64,9 +64,7 @@ impl<B: Bundle> Component for Maybe<B> {
 	/// This is a sparse set component as it's only ever added and removed, never iterated over.
 	const STORAGE_TYPE: StorageType = StorageType::SparseSet;
 
-	fn register_component_hooks(hooks: &mut ComponentHooks) {
-		hooks.on_add(maybe_hook::<B>);
-	}
+	fn on_add() -> Option<ComponentHook> { Some(maybe_hook::<B>) }
 }
 
 impl<B: Bundle> Maybe<B> {
