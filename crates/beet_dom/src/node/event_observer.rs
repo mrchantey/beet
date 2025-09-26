@@ -6,7 +6,7 @@ use bevy::prelude::*;
 
 /// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver)
 /// which will also insert an [`EventTarget`]
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct EventHandler<E: 'static + Send + Sync + Event> {
 	observer: Observer,
 	_phantom: std::marker::PhantomData<E>,

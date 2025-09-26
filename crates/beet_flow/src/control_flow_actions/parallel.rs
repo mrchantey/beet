@@ -26,7 +26,7 @@ use bevy::prelude::*;
 pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) {
@@ -42,7 +42,7 @@ fn on_start(
 
 
 fn on_next(
-	ev: Trigger<OnChildResult>,
+	ev: On<OnChildResult>,
 	commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) {

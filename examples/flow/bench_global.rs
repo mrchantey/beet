@@ -6,11 +6,11 @@ use sweet::prelude::EntityWorldMutwExt;
 #[derive(Default, Component)]
 struct TriggerCount(i32);
 
-fn foobar(_trigger: Trigger<OnRunAction>) {
+fn foobar(_trigger: On<OnRunAction>) {
 	println!("foobar");
 }
 
-fn trigger_count(trigger: Trigger<OnRun>, mut query: Query<&mut TriggerCount>) {
+fn trigger_count(trigger: On<OnRun>, mut query: Query<&mut TriggerCount>) {
 	query.get_mut(trigger.action).unwrap().as_mut().0 += 1;
 }
 

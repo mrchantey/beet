@@ -33,7 +33,7 @@ impl<P: RunPayload> RunWithUserSentence<P> {
 }
 
 pub fn run_with_user_sentence<P: RunPayload>(
-	ev: Trigger<OnUserMessage>,
+	ev: On<OnUserMessage>,
 	mut commands: Commands,
 	mut query: Query<(Entity, &RunWithUserSentence<P>, &mut Sentence)>,
 ) {

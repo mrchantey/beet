@@ -73,7 +73,7 @@ impl<T: ResultPayload> ObserverEvent for OnResult<T> {
 #[cfg(test)]
 pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	let store = Store::default();
-	world.add_observer(move |ev: Trigger<OnRunAction>, query: Query<&Name>| {
+	world.add_observer(move |ev: On<OnRunAction>, query: Query<&Name>| {
 		let action = ev.resolve_action();
 		let name = if let Ok(name) = query.get(action) {
 			name.to_string()
@@ -90,7 +90,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, RunResult)>> {
 	let store = Store::default();
 	world.add_observer(
-		move |ev: Trigger<OnResultAction>, query: Query<&Name>| {
+		move |ev: On<OnResultAction>, query: Query<&Name>| {
 			let action = ev.resolve_action();
 			let name = if let Ok(name) = query.get(action) {
 				name.to_string()

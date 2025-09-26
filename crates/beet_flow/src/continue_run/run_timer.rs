@@ -19,7 +19,7 @@ pub struct RunTimer {
 }
 
 pub(crate) fn reset_run_time_started(
-	ev: Trigger<OnAdd, Running>,
+	ev: On<OnAdd, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
 	// println!("reset_run_time_started");
@@ -29,7 +29,7 @@ pub(crate) fn reset_run_time_started(
 		.ok();
 }
 pub(crate) fn reset_run_timer_stopped(
-	ev: Trigger<OnRemove, Running>,
+	ev: On<OnRemove, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
 	// println!("reset_run_time_stopped");

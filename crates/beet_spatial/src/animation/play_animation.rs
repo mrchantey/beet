@@ -57,7 +57,7 @@ impl PlayAnimation {
 
 /// Play animations for behaviors that run after the agent loads
 fn play_animation_on_run(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
 	query: Query<&PlayAnimation>,

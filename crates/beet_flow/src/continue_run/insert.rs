@@ -57,7 +57,7 @@ impl<E: ObserverEvent, B: Bundle + Clone + Default> Default for Insert<E, B> {
 }
 
 fn insert<E: ObserverEvent, B: Bundle + Clone>(
-	ev: Trigger<E>,
+	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&Insert<E, B>>,
 ) {

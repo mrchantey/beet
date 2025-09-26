@@ -145,7 +145,7 @@ pub(super) mod test {
 		));
 
 		app.add_observer(
-			move |ev: Trigger<OnAdd, MessageComplete>,
+			move |ev: On<OnAdd, MessageComplete>,
 			      mut commands: Commands,
 			      cx: SessionParams|
 			      -> Result {
@@ -164,15 +164,12 @@ pub(super) mod test {
 				assertion(content);
 				// let text = text.get(content[0]).unwrap().0.xref();
 				// println!("Agent > {}\n", text);
-				commands.send_event(AppExit::Success);
+				commands.write_message(AppExit::Success);
 				Ok(())
 			},
 		);
 
-		app.run_async()
-			.await
-			.into_result()
-			.unwrap();
+		app.run_async().await.into_result().unwrap();
 	}
 
 	pub async fn text_to_text(agent: impl Bundle) {

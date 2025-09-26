@@ -6,7 +6,7 @@ use beet::prelude::*;
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
-	let onclick = move |_: Trigger<OnClick>| {
+	let onclick = move |_: On<OnClick>| {
 		async_ext::spawn_local(async move {
 			let value = actions::add(get(), 1)
 				.await

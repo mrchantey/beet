@@ -25,7 +25,7 @@ impl CameraDistance {
 
 
 pub fn camera_distance(
-	mut resize: EventReader<WindowResized>,
+	mut resize: MessageReader<WindowResized>,
 	main_window: Single<&Window, With<PrimaryWindow>>,
 	camera_added: Query<
 		(),

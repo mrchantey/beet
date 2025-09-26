@@ -20,7 +20,7 @@ pub struct LogNameOnRun;
 
 
 /// Logs the [`Name`] of the entity when it runs.
-fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&Name>) {
+fn log_name_on_run(trigger: On<OnRun>, query: Query<&Name>) {
 	if let Ok(name) = query.get(trigger.action) {
 		log::info!("Running: {name}");
 	}

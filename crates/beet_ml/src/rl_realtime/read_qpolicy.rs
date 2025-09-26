@@ -24,7 +24,7 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 }
 
 fn read_q_policy<P: QPolicy + Asset>(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,

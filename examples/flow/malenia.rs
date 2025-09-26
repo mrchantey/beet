@@ -82,7 +82,7 @@ fn run_app() {
 				));
 		})
 		// actions can be declared inline if they have no parameters
-		// .observe(|_: Trigger<OnRunAction>| {
+		// .observe(|_: On<OnRunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
 		.trigger(OnRun::local());
@@ -98,7 +98,7 @@ struct AttackPlayer {
 }
 
 fn attack_player(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	attacks: Query<(&AttackPlayer, &Name)>,
 	mut query: Query<(&mut Health, &Name)>,
 	mut random_source: ResMut<RandomSource>,
@@ -133,7 +133,7 @@ fn attack_player(
 
 fn health_handler(
 	query: Populated<(&Health, &Name), Changed<Health>>,
-	mut exit: EventWriter<AppExit>,
+	mut exit: MessageWriter<AppExit>,
 ) {
 	for (health, name) in query.iter() {
 		if health.0 > 0. {
@@ -178,7 +178,7 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<OnRun<RequestScore>>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
@@ -200,7 +200,7 @@ fn provide_random_score(
 struct TryHealSelf;
 
 fn try_heal_self(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	mut query: Query<(&mut Health, &mut HealingPotions)>,
 ) {

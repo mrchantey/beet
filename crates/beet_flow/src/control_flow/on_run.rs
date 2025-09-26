@@ -185,7 +185,7 @@ impl OnRun<()> {
 /// The nature of this routing techique allows [`OnRunAction`] to be called
 /// on any entity, ie a different entity to the [`OnRunAction::action`].
 pub(crate) fn propagate_on_run<T: RunPayload>(
-	ev: Trigger<OnRunAction<T>>,
+	ev: On<OnRunAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 ) {
@@ -242,7 +242,7 @@ mod test {
 	struct TriggerCount(i32);
 
 	fn trigger_count(
-		trigger: Trigger<OnRun>,
+		trigger: On<OnRun>,
 		mut query: Query<&mut TriggerCount>,
 	) {
 		query.get_mut(trigger.action).unwrap().as_mut().0 += 1;

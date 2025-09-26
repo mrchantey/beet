@@ -34,7 +34,7 @@ pub fn main() {
 }
 
 #[rustfmt::skip]
-fn setup(mut ev: EventWriter<OnLogMessage>) {
+fn setup(mut ev: MessageWriter<OnLogMessage>) {
 	ev.write(OnLogMessage::new("Foxie: woof woof! I can fetch the following items:",OnLogMessage::GAME_COLOR).and_log());
 	ev.write(OnLogMessage::new("       - Red healing potion",OnLogMessage::GAME_COLOR).and_log());
 	ev.write(OnLogMessage::new("       - Gold coin",OnLogMessage::GAME_COLOR).and_log());
@@ -74,10 +74,10 @@ pub fn fetch_npc(
 			},
 		))
 		.observe(
-			|ev: Trigger<OnInsert, SteerTarget>,
+			|ev: On<OnInsert, SteerTarget>,
 			 steer_targets: Query<&SteerTarget>,
 			 sentences: Query<&Sentence>,
-			 mut log: EventWriter<OnLogMessage>| {
+			 mut log: MessageWriter<OnLogMessage>| {
 				if let Ok(SteerTarget::Entity(steer_target)) =
 					steer_targets.get(ev.target())
 				{

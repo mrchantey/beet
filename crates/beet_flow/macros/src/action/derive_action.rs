@@ -48,7 +48,7 @@ fn impl_component(
 			const STORAGE_TYPE: bevy::ecs::component::StorageType = #storage;
 			// wrong as of 0.16
 			fn register_component_hooks(
-				hooks: &mut bevy::ecs::component::ComponentHooks,
+				hooks: &mut bevy::ecs::lifecycle::ComponentHooks,
 			) {
 				hooks.on_add(|mut world, node, cid| {
 					#beet_flow_path::prelude::ActionObservers::on_add(&mut world, node, cid, |world, action| {

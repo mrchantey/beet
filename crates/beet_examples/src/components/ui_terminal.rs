@@ -51,7 +51,7 @@ fn font() -> TextFont {
 }
 
 fn log_on_message(
-	mut ev: EventReader<OnLogMessage>,
+	mut ev: MessageReader<OnLogMessage>,
 	mut commands: Commands,
 	terminal: Single<Entity, With<OutputContainer>>,
 ) {
@@ -89,7 +89,7 @@ const INPUT_HEIGHT_PX: f32 = 50.;
 
 fn resize_output(
 	window: Single<&Window>,
-	mut resize_reader: EventReader<WindowResized>,
+	mut resize_reader: MessageReader<WindowResized>,
 	mut containers: Populated<&mut Node, With<OutputContainer>>,
 ) {
 	if resize_reader.read().count() > 0 {
@@ -159,7 +159,7 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 
 fn parse_text_input(
 	mut commands: Commands,
-	mut evr_char: When<EventReader<KeyboardInput>>,
+	mut evr_char: When<MessageReader<KeyboardInput>>,
 	keys: When<Res<ButtonInput<KeyCode>>>,
 	mut query: Query<&mut TextSpan, With<InputContainer>>,
 ) {

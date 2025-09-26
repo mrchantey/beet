@@ -200,7 +200,7 @@ pub struct NoBubble;
 /// Propagate the [`OnResultAction`] event to all [`ActionObservers`],
 /// and call [`OnChildResult`] on the [`ChildOf`] if it exists.
 pub(super) fn propagate_on_result<T: ResultPayload>(
-	ev: Trigger<OnResultAction<T>>,
+	ev: On<OnResultAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 	should_bubble: Query<(), Without<NoBubble>>,

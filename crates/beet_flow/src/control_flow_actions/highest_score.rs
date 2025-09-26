@@ -85,7 +85,7 @@ impl ResultPayload for ScoreValue {
 pub struct HighestScore(HashMap<Entity, ScoreValue>);
 
 fn on_start(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) {
@@ -101,7 +101,7 @@ fn on_start(
 }
 
 fn on_receive_score(
-	ev: Trigger<OnChildResult<ScoreValue>>,
+	ev: On<OnChildResult<ScoreValue>>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) {

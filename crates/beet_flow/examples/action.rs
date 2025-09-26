@@ -7,7 +7,7 @@ use sweet::prelude::*;
 #[derive(Component)]
 struct LogOnRun(pub String);
 
-fn log_on_run(trigger: Trigger<OnRun>, query: Populated<&LogOnRun>) {
+fn log_on_run(trigger: On<OnRun>, query: Populated<&LogOnRun>) {
 	let name = query.get(trigger.action).unwrap();
 	println!("log_name_on_run: {}", name.0);
 }

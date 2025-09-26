@@ -42,7 +42,7 @@ impl<F: Component> Default for SentenceSteerTarget<F> {
 }
 
 fn sentence_steer_target<F: Component>(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	query: Query<(&HandleWrapper<Bert>, &SentenceSteerTarget<F>)>,
 	sentences: Query<&Sentence>,

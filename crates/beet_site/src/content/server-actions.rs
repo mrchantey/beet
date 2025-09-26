@@ -8,7 +8,7 @@ pub async fn get(input: JsonQuery<(i32, i32)>) -> Json<i32> {
 pub fn ServerCounter(initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
-	let onclick = move |_: Trigger<OnClick>| {
+	let onclick = move |_: On<OnClick>| {
 			spawn_local(async move {
 				set(actions::add(get(), 1).await.unwrap());
 			});

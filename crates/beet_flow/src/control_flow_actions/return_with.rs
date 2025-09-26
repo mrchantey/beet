@@ -22,7 +22,7 @@ use bevy::prelude::*;
 pub struct ReturnWith<T: ResultPayload>(pub T);
 
 fn return_with<T: ResultPayload>(
-	ev: Trigger<OnRun<T::Run>>,
+	ev: On<OnRun<T::Run>>,
 	mut commands: Commands,
 	action: Query<&ReturnWith<T>>,
 ) {

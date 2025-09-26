@@ -93,16 +93,16 @@ mod test {
 			expr.to_token_stream().to_string()
 		}
 		// leaves typed
-		parse(quote! { |_: Trigger<WeirdType>| {} })
-			.xpect_eq(quote! { {|_: Trigger<WeirdType>| {}} }.to_string());
+		parse(quote! { |_: On<WeirdType>| {} })
+			.xpect_eq(quote! { {|_: On<WeirdType>| {}} }.to_string());
 		// inserts inferred
 		parse(quote! { |foo| {} })
-			.xpect_eq(quote! { {|foo: Trigger<OnClick>| {}} }.to_string());
+			.xpect_eq(quote! { {|foo: On<OnClick>| {}} }.to_string());
 		// inserts discard for empty
 		parse(quote! { {|| {}} })
-			.xpect_eq(quote! { {|_: Trigger<OnClick>| {}} }.to_string());
+			.xpect_eq(quote! { {|_: On<OnClick>| {}} }.to_string());
 		// handles blocks
 		parse(quote! { {|| {}} })
-			.xpect_eq(quote! { {|_: Trigger<OnClick>| {}} }.to_string());
+			.xpect_eq(quote! { {|_: On<OnClick>| {}} }.to_string());
 	}
 }

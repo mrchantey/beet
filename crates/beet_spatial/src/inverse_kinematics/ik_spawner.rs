@@ -25,7 +25,7 @@ pub fn ik_spawner_plugin(app: &mut App) {
 }
 
 fn ik_spawner(
-	trigger: Trigger<SceneInstanceReady>,
+	trigger: On<SceneInstanceReady>,
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,

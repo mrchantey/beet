@@ -55,7 +55,7 @@ impl<A: Asset, P> RunOnAssetReady<A, P> {
 }
 
 fn run_on_asset_ready<A: Asset, P: RunPayload>(
-	mut asset_events: EventReader<AssetEvent<A>>,
+	mut asset_events: MessageReader<AssetEvent<A>>,
 	mut commands: Commands,
 	query: Query<(Entity, &RunOnAssetReady<A, P>)>,
 ) {

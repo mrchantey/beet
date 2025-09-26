@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::ecs::component::HookContext;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
@@ -17,7 +17,7 @@ use bevy::prelude::*;
 #[require(RunTimer,Remove<OnResult,Running>)]
 pub struct ContinueRun;
 
-fn insert_running(ev: Trigger<OnRun>, mut commands: Commands) {
+fn insert_running(ev: On<OnRun>, mut commands: Commands) {
 	commands.entity(ev.action).insert(Running::new(ev.origin));
 }
 

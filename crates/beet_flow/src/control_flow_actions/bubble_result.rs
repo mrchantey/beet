@@ -33,7 +33,7 @@ impl Default for BubbleResult {
 }
 
 fn bubble_result<T: ResultPayload>(
-	ev: Trigger<OnChildResult<T>>,
+	ev: On<OnChildResult<T>>,
 	commands: Commands,
 ) {
 	ev.trigger_bubble(commands);

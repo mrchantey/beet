@@ -24,7 +24,7 @@ impl LogOnRun {
 	}
 }
 
-fn log_on_run(ev: Trigger<OnRun>, query: Query<&LogOnRun>) {
+fn log_on_run(ev: On<OnRun>, query: Query<&LogOnRun>) {
 	let action = query
 		.get(ev.action)
 		.expect(&expect_action::to_have_action(&ev));

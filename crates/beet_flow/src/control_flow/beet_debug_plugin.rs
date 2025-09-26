@@ -67,7 +67,7 @@ impl BeetDebugPlugin {
 	/// ```rust
 	///	# use bevy::prelude::*;
 	///	# use beet_flow::prelude::*;
-	/// fn my_log_func(_ev: EventReader<OnLogMessage>) {
+	/// fn my_log_func(_ev: MessageReader<OnLogMessage>) {
 	///
 	/// }
 	/// App::new()
@@ -93,7 +93,7 @@ impl Plugin for BeetDebugPlugin {
 			.add_observer(log_user_message)
 			.add_observer(log_on_run)
 			.add_observer(log_on_run_result)
-			.add_event::<OnLogMessage>()
+			.add_message::<OnLogMessage>()
 			.add_systems(
 				Update,
 				// (
@@ -124,7 +124,7 @@ impl Plugin for BeetDebugPlugin {
 }
 
 /// A helper event for logging messages.
-/// This must use the [`EventReader`] pattern instead of observers
+/// This must use the [`MessageReader`] pattern instead of observers
 /// because the 'stack' nature of observers results in a reverse order.
 #[derive(Debug, Event)]
 pub struct OnLogMessage {
@@ -196,8 +196,8 @@ impl OnUserMessage {
 }
 
 fn log_user_message(
-	trigger: Trigger<OnUserMessage>,
-	mut out: EventWriter<OnLogMessage>,
+	trigger: On<OnUserMessage>,
+	mut out: MessageWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new(
@@ -229,17 +229,17 @@ pub struct DebugRunning;
 pub struct DebugToStdOut;
 
 
-// fn log_to_stdout(mut read: EventReader<OnLogMessage>) {
+// fn log_to_stdout(mut read: MessageReader<OnLogMessage>) {
 // 	for msg in read.read() {
 // 		println!("{}", msg.0);
 // 	}
 // }
 
 fn log_on_run(
-	ev: Trigger<OnRunAction>,
+	ev: On<OnRunAction>,
 	query: Query<&Name>,
 	_m: When<Res<DebugOnRun>>,
-	mut out: EventWriter<OnLogMessage>,
+	mut out: MessageWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
@@ -256,9 +256,9 @@ fn log_on_run(
 
 
 fn log_on_run_result(
-	ev: Trigger<OnResultAction>,
+	ev: On<OnResultAction>,
 	query: Query<&Name>,
-	mut out: EventWriter<OnLogMessage>,
+	mut out: MessageWriter<OnLogMessage>,
 	_m: When<Res<DebugOnResult>>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
@@ -275,7 +275,7 @@ fn log_on_run_result(
 }
 
 fn log_running(
-	mut out: EventWriter<OnLogMessage>,
+	mut out: MessageWriter<OnLogMessage>,
 	query: Populated<(Entity, Option<&Name>), With<Running>>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {

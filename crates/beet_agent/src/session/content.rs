@@ -1,7 +1,7 @@
 use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
-use bevy::ecs::component::HookContext;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
@@ -229,7 +229,7 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 		entity.trigger(TextDelta::new(initial_text));
 	}
 	entity.insert(EntityObserver::new(
-		|delta: Trigger<TextDelta>,
+		|delta: On<TextDelta>,
 		 mut text_content: Query<&mut TextContent>|
 		 -> Result {
 			text_content.get_mut(delta.target())?.0.push_str(&delta.0);

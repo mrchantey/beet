@@ -190,14 +190,14 @@ fn terminal_user() -> impl Bundle {
 	(User, EntityObserver::new(user_message_request))
 }
 
-fn text_added(ev: Trigger<OnAdd, TextContent>, cx: SessionParams) -> Result {
+fn text_added(ev: On<OnAdd, TextContent>, cx: SessionParams) -> Result {
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n{} > ", actor.role);
 	}
 	Ok(())
 }
-fn text_delta(ev: Trigger<TextDelta>, cx: SessionParams) -> Result {
+fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("{}", ev.event().0);
@@ -206,7 +206,7 @@ fn text_delta(ev: Trigger<TextDelta>, cx: SessionParams) -> Result {
 }
 
 fn reasoning_added(
-	ev: Trigger<OnAdd, ReasoningContent>,
+	ev: On<OnAdd, ReasoningContent>,
 	cx: SessionParams,
 ) -> Result {
 	let actor = cx.actor(ev.target())?;
@@ -216,7 +216,7 @@ fn reasoning_added(
 }
 
 fn reasoning_ended(
-	ev: Trigger<OnAdd, ContentEnded>,
+	ev: On<OnAdd, ContentEnded>,
 	query: Query<(), With<ReasoningContent>>,
 ) -> Result {
 	if query.contains(ev.target()) {
@@ -226,7 +226,7 @@ fn reasoning_ended(
 }
 
 fn file_inserted(
-	ev: Trigger<OnInsert, FileContent>,
+	ev: On<OnInsert, FileContent>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
@@ -251,7 +251,7 @@ fn file_inserted(
 }
 
 fn message_ended(
-	ev: Trigger<OnAdd, MessageComplete>,
+	ev: On<OnAdd, MessageComplete>,
 	cx: SessionParams,
 ) -> Result {
 	let actor = cx.actor(ev.target())?;
@@ -262,7 +262,7 @@ fn message_ended(
 }
 
 fn route_message_requests(
-	ev: Trigger<OnAdd, MessageComplete>,
+	ev: On<OnAdd, MessageComplete>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	mut commands: Commands,
@@ -275,7 +275,7 @@ fn route_message_requests(
 			commands.entity(agents.single()?).trigger(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
-			commands.send_event(AppExit::Success);
+			commands.write_message(AppExit::Success);
 		}
 		ActorRole::Agent => {
 			commands.entity(users.single()?).trigger(MessageRequest);
@@ -287,7 +287,7 @@ fn route_message_requests(
 }
 
 fn user_message_request(
-	ev: Trigger<MessageRequest>,
+	ev: On<MessageRequest>,
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {

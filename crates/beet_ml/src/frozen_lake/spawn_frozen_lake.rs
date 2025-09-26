@@ -12,7 +12,7 @@ pub mod frozen_lake_assets {
 }
 
 // pub fn spawn_frozen_lake_session(
-// 	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
+// 	mut events: MessageReader<StartSession<FrozenLakeEpParams>>,
 // 	mut commands: Commands,
 // ) {
 // 	for event in events.read() {
@@ -31,7 +31,7 @@ pub mod frozen_lake_assets {
 
 
 pub fn spawn_frozen_lake_episode(
-	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+	mut events: MessageReader<StartEpisode<FrozenLakeEpParams>>,
 	mut rng: ResMut<RandomSource>,
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,

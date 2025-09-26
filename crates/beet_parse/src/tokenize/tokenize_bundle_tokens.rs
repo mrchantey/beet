@@ -79,7 +79,7 @@ mod test {
 			party_time=true
 			some_key={bar}
 			onmousemove="some_js_func"
-			onclick={|_: Trigger<OnClick>| {}}
+			onclick={|_: On<OnClick>| {}}
 		/>})
 		.xpect_snapshot();
 	}
@@ -102,7 +102,7 @@ mod test {
 				hidden
 				class=true
 				onmousemove="some_js_func"
-				onclick={|_: Trigger<OnClick>| {}}
+				onclick={|_: On<OnClick>| {}}
 			/>
 		"#,
 		)

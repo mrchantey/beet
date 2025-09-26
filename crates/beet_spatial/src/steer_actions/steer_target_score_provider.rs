@@ -27,7 +27,7 @@ impl Default for SteerTargetScoreProvider {
 }
 
 fn provide_score(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<OnRun<RequestScore>>,
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,

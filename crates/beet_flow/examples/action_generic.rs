@@ -7,7 +7,7 @@ use bevy::prelude::*;
 pub struct ConstResponse<T: ResultPayload>(pub T);
 
 fn const_response<T: ResultPayload>(
-	req: Trigger<OnRun<T::Run>>,
+	req: On<OnRun<T::Run>>,
 	mut commands: Commands,
 	action: Query<&ConstResponse<T>>,
 ) {

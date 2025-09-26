@@ -49,7 +49,7 @@ fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 		#[allow(non_snake_case)]
 		fn #on_add_ident #impl_generics(
 			mut world: bevy::ecs::world::DeferredWorld,
-			cx: bevy::ecs::component::HookContext,
+			cx: bevy::ecs::lifecycle::HookContext,
 		) #where_clause {
 		  #beet_flow_path::prelude::ActionObservers::on_add(&mut world, cx,
 			  |world, observer_entity| {

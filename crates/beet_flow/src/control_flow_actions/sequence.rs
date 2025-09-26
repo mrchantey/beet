@@ -24,7 +24,7 @@ use bevy::prelude::*;
 pub struct Sequence;
 
 fn on_start(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	query: Query<&Children>,
 ) {
@@ -39,7 +39,7 @@ fn on_start(
 }
 
 fn on_next(
-	ev: Trigger<OnChildResult>,
+	ev: On<OnChildResult>,
 	commands: Commands,
 	query: Query<&Children>,
 ) {

@@ -65,7 +65,7 @@ impl Plugin for BuildPlugin {
 			),
 		);
 
-		app.add_event::<WatchEvent>()
+		app.add_message::<WatchEvent>()
 			.init_plugin(ParseRsxTokensPlugin)
 			// .init_plugin(ApplyDirectivesPlugin)
 			.init_plugin(RouteCodegenPlugin)

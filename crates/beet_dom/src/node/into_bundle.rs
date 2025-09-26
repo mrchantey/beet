@@ -249,6 +249,6 @@ mod test {
 		fn is_bundle<M>(_: impl IntoBundle<M>) {}
 		#[derive(Event)]
 		struct Foo;
-		is_bundle(|_: Trigger<Foo>| {});
+		is_bundle(|_: On<Foo>| {});
 	}
 }

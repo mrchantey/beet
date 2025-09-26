@@ -38,9 +38,9 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut rng: ResMut<RandomSource>,
-	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
+	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
 	mut agents: Query<(

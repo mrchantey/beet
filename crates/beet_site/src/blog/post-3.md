@@ -44,7 +44,7 @@ No traits, no enums, no macros.
 
 ```rust
 fn handle_input(
-  trigger: Trigger<UserInput>,
+  trigger: On<UserInput>,
   query: Query<&OllamaProvider>,
   mut commands: Commands,
 ) -> Result {

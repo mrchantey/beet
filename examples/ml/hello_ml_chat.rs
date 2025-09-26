@@ -27,7 +27,7 @@ pub fn main() {
 fn setup(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
-	mut ev: EventWriter<OnLogMessage>,
+	mut ev: MessageWriter<OnLogMessage>,
 ) {
 	ev.write(
 		OnLogMessage::new("Agent: I can heal or attack, what should i do?",

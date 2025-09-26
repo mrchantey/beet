@@ -47,7 +47,7 @@ impl<E: ObserverEvent, B: Bundle> Remove<E, B> {
 }
 
 fn remove<E: ObserverEvent, B: Bundle>(
-	ev: Trigger<E>,
+	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&Remove<E, B>>,
 ) {

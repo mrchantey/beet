@@ -15,7 +15,7 @@ impl NearestSentence {
 }
 
 fn nearest_sentence(
-	ev: Trigger<OnRun>,
+	ev: On<OnRun>,
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,

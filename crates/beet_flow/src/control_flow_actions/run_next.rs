@@ -61,7 +61,7 @@ impl RunNext {
 
 
 fn run_next(
-	ev: Trigger<OnResult>,
+	ev: On<OnResult>,
 	mut commands: Commands,
 	query: Query<&RunNext>,
 ) {

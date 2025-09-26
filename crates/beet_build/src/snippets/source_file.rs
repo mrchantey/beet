@@ -76,7 +76,7 @@ pub struct WatchedFiles(Vec<Entity>);
 /// including marking as [`Changed`] on modification.
 pub fn parse_file_watch_events(
 	mut commands: Commands,
-	mut events: EventReader<WatchEvent>,
+	mut events: MessageReader<WatchEvent>,
 	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,

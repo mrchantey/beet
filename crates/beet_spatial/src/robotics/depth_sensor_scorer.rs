@@ -40,7 +40,7 @@ impl DepthSensorScorer {
 }
 
 fn depth_sensor_scorer(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<OnRun<RequestScore>>,
 	mut commands: Commands,
 	sensors: Query<&DepthValue, Changed<DepthValue>>,
 	query: Query<&DepthSensorScorer>,
