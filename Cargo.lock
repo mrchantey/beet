@@ -1803,6 +1803,7 @@ dependencies = [
  "path-clean",
  "pathdiff",
  "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
  "syn 2.0.104",

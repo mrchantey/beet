@@ -85,7 +85,7 @@ impl FsWatcher {
 	///
 	/// ## Example
 	/// ```rust no_run
-	/// # 	/// # use beet_core::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # async fn foo() -> Result {
 	///
 	/// let mut rx = FsWatcher::default().watch()?;
@@ -305,7 +305,7 @@ impl WatchEventVec {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-		use notify::EventKind;
+	use notify::EventKind;
 	use notify::event::CreateKind;
 	use sweet::prelude::*;
 	use tempfile::tempdir;

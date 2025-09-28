@@ -1,6 +1,7 @@
 //! Until Option imlemented for bundle
 //! https://github.com/bevyengine/bevy/issues/2157
 //! https://github.com/Leafwing-Studios/i-cant-believe-its-not-bsn/blob/main/src/maybe.rs
+use crate::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::ecs::lifecycle::ComponentHook;
@@ -8,7 +9,6 @@ use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::system::Command;
 use bevy::ecs::world::DeferredWorld;
 use core::marker::PhantomData;
-use crate::prelude::*;
 
 /// A component that when added to an entity, will be removed from the entity and replaced with its contents if [`Some`].
 ///
@@ -19,8 +19,7 @@ use crate::prelude::*;
 /// # Example
 ///
 /// ```rust
-/// /// use bevy::ecs::system::RunSystemOnce;
-/// use beet_core::prelude::Maybe;
+/// use beet_core::prelude::*;
 ///
 /// #[derive(Component)]
 /// struct A;
@@ -32,7 +31,7 @@ use crate::prelude::*;
 ///
 /// let mut world = World::new();
 ///
-/// let entity_with_component = world.run_system_once(|mut commands: Commands| -> Entity {
+/// let entity_with_component = world.run_system_cached(|mut commands: Commands| -> Entity {
 ///     commands
 ///         .spawn(TestBundle {
 ///             maybe_a: Maybe::new(A),
@@ -43,7 +42,7 @@ use crate::prelude::*;
 /// assert!(entity_ref.contains::<A>());
 /// assert!(!entity_ref.contains::<Maybe<A>>());
 ///
-/// let entity_without_component = world.run_system_once(|mut commands: Commands| -> Entity {
+/// let entity_without_component = world.run_system_cached(|mut commands: Commands| -> Entity {
 ///     commands
 ///         .spawn(TestBundle {
 ///             maybe_a: Maybe::NONE,
