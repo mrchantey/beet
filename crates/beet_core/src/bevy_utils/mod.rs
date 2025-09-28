@@ -7,9 +7,9 @@ mod async_runner;
 pub use async_plugin::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use async_runner::*;
-mod auto_entity_trigger;
+mod event_target_trigger;
 mod non_send_marker;
-pub use auto_entity_trigger::*;
+pub use event_target_trigger::*;
 pub use non_send_marker::*;
 mod bevyhow;
 pub use bevyhow::*;

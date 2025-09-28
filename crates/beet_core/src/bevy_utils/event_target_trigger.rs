@@ -4,8 +4,8 @@ use bevy::ecs::event::Trigger;
 use bevy::ecs::event::trigger_entity_internal;
 use bevy::ecs::observer::CachedObservers;
 use bevy::ecs::observer::TriggerContext;
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::traversal::Traversal;
-use bevy::ecs::world::DeferredWorld;
 use std::fmt;
 use std::marker::PhantomData;
 
@@ -13,8 +13,8 @@ use std::marker::PhantomData;
 /// An [`EntityEvent`] [`Trigger`] that behaves like [`PropagateEntityTrigger`], but
 /// stores the `event_target` for ergonomics.
 ///
-/// If `AUTO_PROPAGATE` is `true`, [`AutoEntityTrigger::propagate`] will default to `true`.
-pub struct AutoEntityTrigger<
+/// If `AUTO_PROPAGATE` is `true`, [`EventTargetTrigger::propagate`] will default to `true`.
+pub struct EventTargetTrigger<
 	const AUTO_PROPAGATE: bool,
 	E: Event,
 	T: Traversal<E>,
@@ -32,9 +32,9 @@ pub struct AutoEntityTrigger<
 }
 
 impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
-	AutoEntityTrigger<AUTO_PROPAGATE, E, T>
+	EventTargetTrigger<AUTO_PROPAGATE, E, T>
 {
-	/// Create a new [`AutoEntityTrigger`] for the given target entity.
+	/// Create a new [`EventTargetTrigger`] for the given target entity.
 	pub fn new(event_target: Entity) -> Self {
 		Self {
 			event_target,
@@ -64,10 +64,11 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 
 
 impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>> fmt::Debug
-	for AutoEntityTrigger<AUTO_PROPAGATE, E, T>
+	for EventTargetTrigger<AUTO_PROPAGATE, E, T>
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct("AutoEntityTrigger")
+		f.debug_struct("EventTargetTrigger")
+			.field("event_target", &self.event_target)
 			.field("original_event_target", &self.original_event_target)
 			.field("propagate", &self.propagate)
 			.field("_marker", &self._marker)
@@ -79,7 +80,7 @@ unsafe impl<
 	const AUTO_PROPAGATE: bool,
 	E: for<'a> Event<Trigger<'a> = Self>,
 	T: Traversal<E>,
-> Trigger<E> for AutoEntityTrigger<AUTO_PROPAGATE, E, T>
+> Trigger<E> for EventTargetTrigger<AUTO_PROPAGATE, E, T>
 {
 	unsafe fn trigger(
 		&mut self,
@@ -140,34 +141,46 @@ unsafe impl<
 }
 
 
-#[extend::ext(name=CommandsAutoEntityTriggerExt)]
+#[extend::ext(name=CommandsEventTargetTriggerExt)]
 pub impl EntityCommands<'_> {
 	fn auto_trigger<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Send + Sync + Traversal<E>,
 	>(
 		&mut self,
 		mut ev: E,
 	) -> &mut Self {
 		let caller = MaybeLocation::caller();
-		let mut trigger =
-			AutoEntityTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
+		let mut trigger = EventTargetTrigger::new(self.id());
 		self.queue(move |mut world_scope: EntityWorldMut| {
 			world_scope.auto_trigger_ref(&mut ev, &mut trigger, caller);
+		});
+		self
+	}
+	/// An [`EntityCommand`] that creates an [`Observer`](crate::observer::Observer)
+	/// watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
+	/// targets this entity.
+	#[track_caller]
+	fn observe_any<E: Event, B: Bundle, M>(
+		&mut self,
+		observer: impl IntoObserverSystem<E, B, M>,
+	) -> &mut Self {
+		self.queue(move |mut entity: EntityWorldMut| {
+			entity.observe_any(observer);
 		});
 		self
 	}
 }
 
 
-#[extend::ext(name=EntityWorldMutAutoEntityTriggerExt)]
+#[extend::ext(name=EntityWorldMutEventTargetTriggerExt)]
 pub impl EntityWorldMut<'_> {
 	fn auto_trigger<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Traversal<E>,
 	>(
 		&mut self,
@@ -175,14 +188,14 @@ pub impl EntityWorldMut<'_> {
 	) -> &mut Self {
 		let caller = MaybeLocation::caller();
 		let mut trigger =
-			AutoEntityTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
+			EventTargetTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
 		self.auto_trigger_ref(&mut ev, &mut trigger, caller);
 		self
 	}
 	fn auto_trigger_ref<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Traversal<E>,
 	>(
 		&mut self,
@@ -200,15 +213,49 @@ pub impl EntityWorldMut<'_> {
 		});
 		self
 	}
+	/// Creates an [`Observer`] watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
+	/// targets this entity.
+	///
+	/// # Panics
+	///
+	/// If the entity has been despawned while this `EntityWorldMut` is still alive.
+	///
+	/// Panics if the given system is an exclusive system.
+	fn observe_any<E: Event, B: Bundle, M>(
+		&mut self,
+		observer: impl IntoObserverSystem<E, B, M>,
+	) -> &mut Self {
+		// self.assert_not_despawned();
+		let bundle = Observer::new(observer).with_entity(self.id());
+		self.world_scope(move |world| {
+			world.spawn(bundle);
+		});
+		self
+	}
 }
 
+pub fn prevent_auto_propagate<
+	const AUTO_PROPAGATE: bool,
+	E: for<'a> Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
+	T: 'static + Traversal<E>,
+>(
+	mut world: DeferredWorld,
+	cx: HookContext,
+) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(move |mut ev: On<E>| {
+			ev.trigger_mut().set_propagate(false);
+		});
+}
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
-	#[derive(AutoEntityEvent)]
+	#[derive(EntityTargetEvent)]
 	struct MyEvent;
 
 	#[test]

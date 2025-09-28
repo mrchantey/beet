@@ -43,7 +43,10 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
+	pub use bevy::ecs::lifecycle::HookContext;
+	pub use bevy::ecs::world::DeferredWorld;
 	pub use bevy::prelude::*;
+
 
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]

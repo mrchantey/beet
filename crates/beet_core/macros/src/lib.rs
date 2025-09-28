@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-mod auto_entity_event;
+mod entity_target_event;
 mod bundle_effect;
 mod sendit;
 mod to_tokens;
@@ -83,7 +83,7 @@ pub fn bundle_effect(
 }
 
 /// Cheat sheet for derive syntax,
-/// see full explanation on `AutoEntityEvent` trait docs.
+/// see full explanation on `EntityTargetEvent` trait docs.
 ///
 /// ```ignore
 /// /// Enable propagation using the given Traversal implementation
@@ -92,9 +92,9 @@ pub fn bundle_effect(
 /// #[entity_event(auto_propagate)]
 /// struct MyEvent;
 /// ```
-#[proc_macro_derive(AutoEntityEvent, attributes(entity_event))]
+#[proc_macro_derive(EntityTargetEvent, attributes(entity_event))]
 pub fn auto_entity_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	auto_entity_event::auto_entity_event(input).into()
+	entity_target_event::auto_entity_event(input).into()
 }

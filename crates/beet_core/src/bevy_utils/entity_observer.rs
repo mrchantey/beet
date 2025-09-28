@@ -56,7 +56,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		#[derive(AutoEntityEvent)]
+		#[derive(EntityTargetEvent)]
 		struct Foo(u32);
 
 		let store = Store::default();

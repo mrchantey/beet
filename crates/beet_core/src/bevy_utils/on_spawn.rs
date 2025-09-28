@@ -68,7 +68,7 @@ impl OnSpawnBoxed {
 	pub fn trigger<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Traversal<E>,
 	>(
 		ev: E,
@@ -80,7 +80,7 @@ impl OnSpawnBoxed {
 	pub fn trigger_option<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Traversal<E>,
 	>(
 		ev: Option<E>,
