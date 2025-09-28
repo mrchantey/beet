@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 
 /// Cross-service storage bucket for S3, filesystem, memory, or other providers

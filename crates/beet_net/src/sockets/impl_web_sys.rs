@@ -1,6 +1,5 @@
 use crate::prelude::sockets::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 use futures::channel::mpsc;
 use futures::channel::oneshot;

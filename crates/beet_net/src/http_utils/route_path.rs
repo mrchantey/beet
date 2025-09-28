@@ -255,11 +255,16 @@ impl std::fmt::Display for RoutePathTree {
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
 	#[test]
 	fn children_are_sorted() {
-		let ent1 = Entity::from_raw(1);
-		let ent2 = Entity::from_raw(2);
-		let ent3 = Entity::from_raw(3);
+		let mut world = World::new();
+		let ent1 = world.spawn_empty().id();
+		let ent2 = world.spawn_empty().id();
+		let ent3 = world.spawn_empty().id();
 		let paths = vec![
 			(ent1, RoutePath::new("/zeta")),
 			(ent2, RoutePath::new("/alpha")),
@@ -270,9 +275,6 @@ mod test {
 			tree.children.iter().map(|c| c.route.to_string()).collect();
 		child_names.xpect_eq(vec!["/alpha", "/beta", "/zeta"]);
 	}
-	use crate::prelude::*;
-	use bevy::prelude::Entity;
-	use sweet::prelude::*;
 
 	#[test]
 	fn route_path() {
@@ -307,11 +309,12 @@ mod test {
 
 	#[test]
 	fn route_path_tree_from_paths() {
+		let mut world = World::new();
 		// Dummy entity values for testing
-		let ent1 = Entity::from_raw(1);
-		let ent2 = Entity::from_raw(2);
-		let ent3 = Entity::from_raw(3);
-		let ent4 = Entity::from_raw(4);
+		let ent1 = world.spawn_empty().id();
+		let ent2 = world.spawn_empty().id();
+		let ent3 = world.spawn_empty().id();
+		let ent4 = world.spawn_empty().id();
 		let paths = vec![
 			(ent1, RoutePath::new("/foo/bar")),
 			(ent2, RoutePath::new("/foo/baz")),
