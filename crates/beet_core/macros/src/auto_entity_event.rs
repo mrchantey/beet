@@ -1,3 +1,4 @@
+use beet_utils::prelude::AttributeGroup;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn;
@@ -20,12 +21,20 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		input.generics.split_for_impl();
 	let input_ident = &input.ident;
 
+	let attrs = AttributeGroup::parse(&input.attrs, "entity_event")?;
+
+	let auto_propagate = attrs.contains("auto_propagate");
+	// let default_propagate = syn::parse_quote!(&'static ChildOf);
+	// let propagate = attrs.get_value("propagate").unwrap_or(&default_propagate);
+	// #propagate
+
+
 	Ok(quote! {
 		impl #impl_generics Event for #input_ident #type_generics #where_clause {
 			type Trigger<'a> = AutoEntityTrigger<
-				false,
+				#auto_propagate,
 				Self,
-				&'static ChildOf,
+				&'static ChildOf
 			>;
 		}
 	})

@@ -140,8 +140,29 @@ unsafe impl<
 }
 
 
+#[extend::ext(name=CommandsAutoEntityTriggerExt)]
+pub impl EntityCommands<'_> {
+	fn auto_trigger<
+		'a,
+		const AUTO_PROPAGATE: bool,
+		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		T: 'static + Send + Sync + Traversal<E>,
+	>(
+		&mut self,
+		mut ev: E,
+	) -> &mut Self {
+		let caller = MaybeLocation::caller();
+		let mut trigger =
+			AutoEntityTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
+		self.queue(move |mut world_scope: EntityWorldMut| {
+			world_scope.auto_trigger_ref(&mut ev, &mut trigger, caller);
+		});
+		self
+	}
+}
 
-#[extend::ext(name=EntityWorldMutExt)]
+
+#[extend::ext(name=EntityWorldMutAutoEntityTriggerExt)]
 pub impl EntityWorldMut<'_> {
 	fn auto_trigger<
 		'a,

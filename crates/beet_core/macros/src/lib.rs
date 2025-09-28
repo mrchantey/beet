@@ -82,8 +82,17 @@ pub fn bundle_effect(
 	bundle_effect::bundle_effect(input).into()
 }
 
-
-#[proc_macro_derive(AutoEntityEvent)]
+/// Cheat sheet for derive syntax,
+/// see full explanation on `AutoEntityEvent` trait docs.
+///
+/// ```ignore
+/// /// Enable propagation using the given Traversal implementation
+/// #[entity_event(propagate = &'static ChildOf)]
+/// /// Always propagate
+/// #[entity_event(auto_propagate)]
+/// struct MyEvent;
+/// ```
+#[proc_macro_derive(AutoEntityEvent, attributes(entity_event))]
 pub fn auto_entity_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
