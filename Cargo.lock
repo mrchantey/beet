@@ -1354,7 +1354,6 @@ dependencies = [
 name = "beet_core"
 version = "0.0.7-dev.17"
 dependencies = [
- "anyhow",
  "async-channel",
  "async-executor",
  "async-io",

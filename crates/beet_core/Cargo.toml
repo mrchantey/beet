@@ -84,7 +84,6 @@ rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
 
 ## utils
-anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 glob.workspace = true

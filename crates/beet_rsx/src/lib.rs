@@ -20,6 +20,4 @@ pub mod prelude {
 	pub use crate::wasm::*;
 }
 
-pub mod exports {
-	pub use anyhow;
-}
+pub mod exports {}
