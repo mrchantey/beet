@@ -3,14 +3,12 @@
 mod async_plugin;
 #[cfg(not(target_arch = "wasm32"))]
 mod async_runner;
-mod auto_entity_event;
 #[cfg(not(target_arch = "wasm32"))]
 pub use async_plugin::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use async_runner::*;
 mod auto_entity_trigger;
 mod non_send_marker;
-pub use auto_entity_event::*;
 pub use auto_entity_trigger::*;
 pub use non_send_marker::*;
 mod bevyhow;
