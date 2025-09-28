@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use crate::prelude::*;
 
 
 
@@ -7,7 +7,6 @@ use bevy::prelude::*;
 /// ## Example
 ///
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 ///
 /// fn my_system(mut counter: Local<IdCounter>) {

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -155,8 +154,7 @@ mod test {
 	use std::time::Duration;
 
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

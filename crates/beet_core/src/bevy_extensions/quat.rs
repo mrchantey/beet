@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use extend::ext;
+use crate::prelude::*;
 
 #[ext]
 pub impl Quat {
@@ -51,8 +51,7 @@ pub impl Quat {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[test]
 	fn works() {

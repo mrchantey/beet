@@ -1,7 +1,7 @@
-use bevy::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::RwLock;
+use crate::prelude::*;
 
 
 /// In some cases like router it is prefereable to have a single app instance
@@ -14,8 +14,7 @@ use std::sync::RwLock;
 ///
 /// ```rust
 /// # use beet_core::prelude::*;
-/// # use bevy::prelude::*;
-///
+/// # ///
 /// #[derive(Resource)]
 /// struct Foo(u32);
 ///

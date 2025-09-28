@@ -1,7 +1,6 @@
 use super::FsWatcher;
 use crate::prelude::terminal;
 use crate::prelude::*;
-use bevy::prelude::*;
 use clap::Parser;
 
 /// An [FsWatcher] that will run a command on change.

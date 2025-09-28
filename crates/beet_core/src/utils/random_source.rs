@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
 use rand::distributions::DistIter;
@@ -7,11 +6,13 @@ use rand::distributions::uniform::SampleRange;
 use rand::distributions::uniform::SampleUniform;
 use rand::prelude::Distribution;
 use rand_chacha::ChaCha8Rng;
+use crate::prelude::*;
+
+
 /// A simple random source, by default retrieved from entropy.
 ///
 /// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
 /// ```rust
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use rand::Rng;
 ///

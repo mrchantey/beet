@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use crate::prelude::*;
 
 
 /// A dummy type that is [`!Send`](Send), to force systems to run on the main thread.
@@ -13,8 +13,7 @@ pub type TempNonSendMarker<'w> = Option<NonSend<'w, ()>>;
 // ///
 // /// ## Example
 // /// ```rust
-// /// # use bevy::prelude::*;
-// /// # use beet_core::prelude::*;
+// /// # // /// # use beet_core::prelude::*;
 // ///
 // /// fn my_system(
 // /// 	_: TempNonSendMarker,

@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use extend::ext;
+use crate::prelude::*;
 
 #[ext]
 pub impl Vec3 {
@@ -102,8 +102,7 @@ pub impl Vec3 {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[test]
 	pub fn works() {

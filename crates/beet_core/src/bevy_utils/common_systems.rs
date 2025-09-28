@@ -1,7 +1,6 @@
-use crate::prelude::When;
 use bevy::app::AppExit;
 use bevy::diagnostic::FrameCount;
-use bevy::prelude::*;
+use crate::prelude::*;
 
 pub fn exit_in_frames(
 	count: u32,

@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
+mod auto_entity_event;
 mod bundle_effect;
 mod sendit;
 mod to_tokens;
@@ -79,4 +80,12 @@ pub fn bundle_effect(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	bundle_effect::bundle_effect(input).into()
+}
+
+
+#[proc_macro_derive(AutoEntityEvent)]
+pub fn auto_entity_event(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	auto_entity_event::auto_entity_event(input).into()
 }

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use extend::ext;
 
 #[ext]

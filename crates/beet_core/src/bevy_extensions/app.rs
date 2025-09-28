@@ -1,8 +1,8 @@
-use crate::prelude::NonSendPlugin;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::prelude::*;
+use crate::prelude::*;
+
 
 #[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]

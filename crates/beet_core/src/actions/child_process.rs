@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use std::fmt::Display;
 use std::process::Child;
 use std::process::Command;
@@ -137,8 +136,7 @@ impl ChildProcess {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	// use sweet::prelude::*;
+		// use sweet::prelude::*;
 
 	#[test]
 	fn works() {

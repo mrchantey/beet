@@ -5,7 +5,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::ecs::system::SystemParamValidationError;
 use bevy::ecs::world::DeferredWorld;
 use bevy::ecs::world::unsafe_world_cell::UnsafeWorldCell;
-use bevy::prelude::*;
+use crate::prelude::*;
 
 
 /// A [`SystemParam`] that wraps another parameter and causes its system to skip instead of failing when the parameter is invalid.
@@ -13,7 +13,6 @@ use bevy::prelude::*;
 /// # Example
 ///
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// # #[derive(Resource)]
 /// # struct SomeResource;
@@ -106,8 +105,7 @@ unsafe impl<T: ReadOnlySystemParam> ReadOnlySystemParam for When<T> {}
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-
+	
 	#[derive(Default, Resource)]
 	struct Foo;
 

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 
 pub fn observe_triggers<E: Event + Clone + Send + 'static>(
 	world: &mut World,

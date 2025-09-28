@@ -1,9 +1,8 @@
-use crate::prelude::Tree;
+use crate::prelude::*;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
-use bevy::prelude::*;
 use extend::ext;
 use std::marker::PhantomData;
 /// system version
@@ -282,7 +281,6 @@ pub impl<W: IntoWorld> W {
 #[cfg(feature = "bevy_scene")]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

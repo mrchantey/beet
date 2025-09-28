@@ -54,6 +54,7 @@ members = [
 
 	## 💡 Flow
 	"crates/beet_examples",
+	"crates/beet_flow2",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
@@ -89,6 +90,7 @@ beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.7-dev.17" 
 beet_core = { path = "crates/beet_core", version = "0.0.7-dev.17" }
 
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.17" }
+beet_flow2 = { path = "crates/beet_flow2", version = "0.0.7-dev.17" }
 beet_flow = { path = "crates/beet_flow", version = "0.0.7-dev.17" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.7-dev.17" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.7-dev.17" }
@@ -115,6 +117,7 @@ beet = { path = "", version = "0.0.7-dev.17" }
 bevy = { version = "0.17.0-rc.2", default-features = false, features = [
 	# bevy = { version = "0.16", default-features = false, features = [
 	"std", # std for reflect PathBuf
+	"debug",
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines,
 	# instead we should par_iter inside systems

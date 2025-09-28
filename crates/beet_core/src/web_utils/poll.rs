@@ -1,6 +1,5 @@
 use super::performance_now;
 use crate::prelude::*;
-use bevy::prelude::*;
 use std::time::Duration;
 
 pub async fn poll_ok<T>(f: impl FnMut() -> Result<T>) -> Result<T> {

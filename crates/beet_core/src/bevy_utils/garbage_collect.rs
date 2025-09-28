@@ -1,6 +1,6 @@
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
+use crate::prelude::*;
 
 
 /// Added to a 'watched' entity, despawning it
@@ -24,8 +24,7 @@ fn on_remove(mut world: DeferredWorld, cx: HookContext) {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[test]
 	fn works() {

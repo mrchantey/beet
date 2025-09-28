@@ -1490,6 +1490,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_flow2"
+version = "0.0.7-dev.17"
+dependencies = [
+ "beet_core",
+ "beet_flow2",
+ "bevy",
+ "extend",
+ "log",
+ "serde",
+ "sweet",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "beet_flow_macros"
 version = "0.0.7-dev.17"
 dependencies = [

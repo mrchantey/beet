@@ -1,7 +1,7 @@
-use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
+use crate::prelude::*;
 
 /// Verbatim clone of cargo build/run args
 #[derive(Debug, Clone, Parser, Resource)]

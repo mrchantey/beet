@@ -4,7 +4,7 @@ use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
-use bevy::prelude::*;
+use bevy::ecs::traversal::Traversal;
 
 /// Type helper for [`SpawnWith`], useful for spawning any number of related entities
 /// like children.
@@ -65,15 +65,29 @@ impl OnSpawnBoxed {
 		})
 	}
 
-	pub fn trigger<T: IntoEntityTrigger>(ev: T) -> Self {
+	pub fn trigger<
+		'a,
+		const AUTO_PROPAGATE: bool,
+		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		T: 'static + Traversal<E>,
+	>(
+		ev: E,
+	) -> Self {
 		Self::new(move |entity| {
-			entity.entity_trigger(ev);
+			entity.auto_trigger(ev);
 		})
 	}
-	pub fn trigger_option<T: IntoEntityTrigger>(ev: Option<T>) -> Self {
+	pub fn trigger_option<
+		'a,
+		const AUTO_PROPAGATE: bool,
+		E: Event<Trigger<'a> = AutoEntityTrigger<AUTO_PROPAGATE, E, T>>,
+		T: 'static + Traversal<E>,
+	>(
+		ev: Option<E>,
+	) -> Self {
 		Self::new(move |entity| {
 			if let Some(ev) = ev {
-				entity.entity_trigger(ev);
+				entity.auto_trigger(ev);
 			}
 		})
 	}
@@ -211,7 +225,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

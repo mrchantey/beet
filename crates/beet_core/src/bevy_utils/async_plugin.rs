@@ -5,7 +5,6 @@ use async_channel::Sender;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
-use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use bevy::tasks::Task;
 use std::future::Future;
@@ -363,21 +362,20 @@ impl AsyncEntity {
 		.await
 	}
 
-	pub async fn trigger<'a, E: EntityEvent<Trigger<'a>: Default>>(
-		&self,
-		event: E,
-	) -> &Self {
-		self.with(|mut entity| {
-			entity.entity_trigger(event);
-		})
-		.await
-	}
+	// pub async fn trigger<'a, E: EntityEvent<Trigger<'a>: Default>>(
+	// 	&self,
+	// 	event: E,
+	// ) -> &Self {
+	// 	self.with(|mut entity| {
+	// 		entity.auto_trigger(event);
+	// 	})
+	// 	.await
+	// }
 }
 
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
 

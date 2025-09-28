@@ -5,12 +5,12 @@
 	feature(fn_traits, unboxed_closures, exit_status_error)
 )]
 
-pub use beet_utils::*;
 pub use utils::async_ext;
 pub use utils::time_ext;
 
 pub mod actions;
 pub mod arena;
+mod bevy_extensions;
 mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -18,6 +18,7 @@ pub mod fs;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 pub mod utils;
+pub use beet_utils::*;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
@@ -32,9 +33,9 @@ pub mod prelude {
 	#[cfg(not(doctest))]
 	#[allow(unused)]
 	pub(crate) use crate as beet_core;
-
 	pub use crate::actions::*;
 	pub use crate::arena::*;
+	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -42,6 +43,7 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
+	pub use bevy::prelude::*;
 
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]

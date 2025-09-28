@@ -1,6 +1,5 @@
-use beet_core_macros::BundleEffect;
+use crate::prelude::*;
 use bevy::ecs::system::IntoObserverSystem;
-use bevy::prelude::*;
 
 /// Spawn an observer for the target entity, or `Self` if no target is specified.
 ///
@@ -9,8 +8,7 @@ use bevy::prelude::*;
 /// This example will spawn an observer for the entity this bundle is applied to.
 /// ```
 /// # use beet_core::prelude::*;
-/// # use bevy::prelude::*;
-///
+/// # ///
 /// #[derive(Event)]
 /// struct Foo;
 ///
@@ -54,20 +52,20 @@ impl EntityObserver {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
+		#[derive(AutoEntityEvent)]
 		struct Foo(u32);
 
 		let store = Store::default();
 		let mut world = World::new();
 		world
-			.spawn(EntityObserver::new(move |ev: On<EntityTrigger<Foo>>| {
-				store.set(ev.event().payload.0)
+			.spawn(EntityObserver::new(move |ev: On<Foo>| {
+				store.set(ev.event().0)
 			}))
-			.entity_trigger(Foo(3));
+			.auto_trigger(Foo(3));
 
 		store.get().xpect_eq(3);
 	}

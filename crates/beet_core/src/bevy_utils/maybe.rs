@@ -7,8 +7,8 @@ use bevy::ecs::lifecycle::ComponentHook;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::system::Command;
 use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use core::marker::PhantomData;
+use crate::prelude::*;
 
 /// A component that when added to an entity, will be removed from the entity and replaced with its contents if [`Some`].
 ///
@@ -19,8 +19,7 @@ use core::marker::PhantomData;
 /// # Example
 ///
 /// ```rust
-/// use bevy::prelude::*;
-/// use bevy::ecs::system::RunSystemOnce;
+/// /// use bevy::ecs::system::RunSystemOnce;
 /// use beet_core::prelude::Maybe;
 ///
 /// #[derive(Component)]

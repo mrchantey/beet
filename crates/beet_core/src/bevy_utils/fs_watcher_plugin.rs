@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use std::time::Duration;
 
 
@@ -8,7 +7,6 @@ use std::time::Duration;
 /// ## Example
 ///
 /// ```rust no_run
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// # async fn run(){
 /// App::new()

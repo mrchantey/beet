@@ -1,7 +1,6 @@
 use crate::prelude::OnSpawn;
 use beet_core_macros::BundleEffect;
 use bevy::ecs::relationship::Relationship;
-use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// Add to a temporary entity spawned as a child of another entity.
@@ -76,8 +75,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[test]
 	fn works() {
