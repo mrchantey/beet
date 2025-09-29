@@ -8,10 +8,6 @@ pub struct HtmlFragment;
 
 impl HtmlFragment {
 	/// returns the HTML string representation of a given [`Bundle`].
-	/// There are several transformations involved in the process,
-	/// for example resolving slots, so we reuse a [`TemplateApp`]
-	/// and run a full update cycle.
-	/// The app disables loading snippets.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();

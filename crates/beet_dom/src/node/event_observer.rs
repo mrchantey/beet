@@ -21,7 +21,11 @@ impl<E: 'static + Send + Sync + Event> EventHandler<E> {
 		}
 	}
 	fn effect(self, entity: &mut EntityWorldMut) {
-		entity.insert((EventTarget, self.observer.with_entity(entity.id())));
+		entity.insert(EventTarget);
+		let observer = self.observer.with_entity(entity.id());
+		entity.world_scope(move |world| {
+			world.spawn(observer);
+		});
 	}
 }
 

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 
 impl Bucket {
-	/// create a new [`FsBucketProvider`] in target/test_buckets
+	/// create a new [`InMemoryProvider`]
 	pub async fn new_test() -> Self {
 		let provider = InMemoryProvider::new();
 		let bucket = Self::new(provider, "test-bucket");
