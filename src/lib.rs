@@ -46,6 +46,7 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
+	pub use crate::core::prelude::Message;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;

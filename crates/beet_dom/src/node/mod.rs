@@ -36,6 +36,8 @@ pub use html_constants::*;
 /// This plugin is not unique, so can be added in multiple places.
 pub struct NodeTypesPlugin;
 
+use beet_core::prelude::*;
+
 // a group of all groups of components
 pub type RsxComponents = (
 	RootComponents,
@@ -50,6 +52,9 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 	fn is_unique(&self) -> bool { false }
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
+			// bevy 0.17 doesnt register parent/child by default
+			.register_type::<Children>()
+			.register_type::<ChildOf>()
 			// a blanket tuple, recursively registers all
 			.register_type::<RsxComponents>()
 			.register_type::<AttributeOf>()

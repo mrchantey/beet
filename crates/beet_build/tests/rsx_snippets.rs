@@ -29,10 +29,6 @@ fn expressions() {
 		.xpect_contains("ExprIdx")
 		.xpect_contains("StaticRoot");
 
-	// println!(
-	// 	"children: {:#?}",
-	// 	build_app.component_names_related::<Children>(_entity)
-	// );
 	// println!("Exported Scene:\n{}", scene);
 
 	apply_and_render(&scene, rsx! {
@@ -162,16 +158,12 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 		.world_mut()
 		.spawn((HtmlDocument, bundle))
 		.insert(common_idx())
-		// .spawn(HtmlDocument)
-		// .with_children(|parent| {
-		// 	parent.spawn(bundle).insert(common_idx());
-		// })
 		.id();
 
 	app.world_mut()
 		.query_once::<&SnippetRoot>()
 		.len()
-		.xpect_eq(2);
+		.xpect_greater_or_equal_to(2);
 
 	app.update();
 

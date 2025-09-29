@@ -16,7 +16,9 @@ pub struct ApplySnippets;
 impl Plugin for ApplySnippetsPlugin {
 	#[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app.init_plugin(schedule_order_plugin).add_systems(
+		app.try_set_error_handler(bevy::ecs::error::panic)
+			.init_plugin(schedule_order_plugin)
+			.add_systems(
 			ApplySnippets,
 			(
 				apply_static_and_flush,
@@ -132,7 +134,7 @@ fn apply_static_rsx(
 
 	// queue system to resolve template locations after clone
 	commands.run_system_cached_with(
-		apply_template_locations,
+		apply_template_locations.pipe(maybe_panic),
 		(snippet_root.clone(), instance_root, instance_expr_map),
 	);
 	Ok(())
@@ -224,6 +226,14 @@ pub(super) fn flush_on_spawn_deferred_recursive(
 	}
 	Ok(())
 }
+
+
+fn maybe_panic(result: In<Result>) {
+	if let Err(err) = result.0 {
+		panic!("apply_rsx_snippets: {err}");
+	}
+}
+
 
 /// Add this system for [`OnSpawnDeferred`] behavior.
 /// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
