@@ -145,7 +145,7 @@ pub(super) mod test {
 		));
 
 		app.add_observer(
-			move |ev: On<OnAdd, MessageComplete>,
+			move |ev: On<Add, MessageComplete>,
 			      mut commands: Commands,
 			      cx: SessionParams|
 			      -> Result {

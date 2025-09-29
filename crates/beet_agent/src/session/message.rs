@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -28,7 +27,7 @@ pub enum RelativeRole {
 impl RelativeRole {}
 
 /// Indicate it is 'your turn'
-#[derive(Event)]
+#[derive(EntityTargetEvent)]
 pub struct MessageRequest;
 
 

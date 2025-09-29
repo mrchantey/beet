@@ -23,7 +23,7 @@ where
 {
 	let handler = match method.has_body() {
 		// ie `POST`, `PUT`, etc
-		true => RouteHandler::endpoint(
+		true => RouteHandler::endpoint::<_, _, _, Out, _>(
 			move |val: In<Json<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {
@@ -33,7 +33,7 @@ where
 			},
 		),
 		// ie `GET`, `DELETE`, etc
-		false => RouteHandler::endpoint(
+		false => RouteHandler::endpoint::<_, _, _, Out, _>(
 			move |val: In<JsonQueryParams<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {

@@ -234,6 +234,7 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
+
 pub fn prevent_auto_propagate<
 	const AUTO_PROPAGATE: bool,
 	E: for<'a> Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,

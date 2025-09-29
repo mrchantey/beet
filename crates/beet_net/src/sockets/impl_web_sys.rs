@@ -1,3 +1,4 @@
+use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use beet_core::prelude::*;
 use bytes::Bytes;

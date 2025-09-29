@@ -46,8 +46,6 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use crate::core::prelude::Interval;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
@@ -73,11 +71,6 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
-	/// hack to fix bevy macros
-	pub use bevy::ecs as bevy_ecs;
-	pub use bevy::prelude::*;
-	/// hack to fix bevy macros
-	pub use bevy::reflect as bevy_reflect;
 	// beet workflows make heavy use of `RunSystemOnce` to run systems
 	pub use bevy::ecs::system::RunSystemOnce;
 }

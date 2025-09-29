@@ -190,8 +190,8 @@ fn terminal_user() -> impl Bundle {
 	(User, EntityObserver::new(user_message_request))
 }
 
-fn text_added(ev: On<OnAdd, TextContent>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n{} > ", actor.role);
 	}
@@ -205,10 +205,7 @@ fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
 	Ok(())
 }
 
-fn reasoning_added(
-	ev: On<OnAdd, ReasoningContent>,
-	cx: SessionParams,
-) -> Result {
+fn reasoning_added(ev: On<Add, ReasoningContent>, cx: SessionParams) -> Result {
 	let actor = cx.actor(ev.target())?;
 	print_flush!("{} > 🤔", actor.role);
 
@@ -216,7 +213,7 @@ fn reasoning_added(
 }
 
 fn reasoning_ended(
-	ev: On<OnAdd, ContentEnded>,
+	ev: On<Add, ContentEnded>,
 	query: Query<(), With<ReasoningContent>>,
 ) -> Result {
 	if query.contains(ev.target()) {
@@ -250,10 +247,7 @@ fn file_inserted(
 	Ok(())
 }
 
-fn message_ended(
-	ev: On<OnAdd, MessageComplete>,
-	cx: SessionParams,
-) -> Result {
+fn message_ended(ev: On<Add, MessageComplete>, cx: SessionParams) -> Result {
 	let actor = cx.actor(ev.target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n");
@@ -262,7 +256,7 @@ fn message_ended(
 }
 
 fn route_message_requests(
-	ev: On<OnAdd, MessageComplete>,
+	ev: On<Add, MessageComplete>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	mut commands: Commands,

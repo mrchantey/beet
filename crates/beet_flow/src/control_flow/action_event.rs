@@ -20,7 +20,7 @@ pub(crate) trait ActionEvent {
 }
 /// Common functions for [ActionEvent] triggers.
 #[extend::ext(name=ActionEventTriggerExt)]
-pub impl<'w, T: ActionEvent> Trigger<'w, T> {
+pub impl<'w, 't, T: ActionEvent> On<'w, 't, T> {
 	/// Get the action entity, or the entity that triggered the action.
 	/// Its assumed that if the action is [Entity::PLACEHOLDER] this event
 	/// was called with ::local() and the action entity is the trigger entity.
@@ -89,16 +89,14 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 #[cfg(test)]
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, RunResult)>> {
 	let store = Store::default();
-	world.add_observer(
-		move |ev: On<OnResultAction>, query: Query<&Name>| {
-			let action = ev.resolve_action();
-			let name = if let Ok(name) = query.get(action) {
-				name.to_string()
-			} else {
-				"".to_string()
-			};
-			store.push((name, ev.payload.clone()));
-		},
-	);
+	world.add_observer(move |ev: On<OnResultAction>, query: Query<&Name>| {
+		let action = ev.resolve_action();
+		let name = if let Ok(name) = query.get(action) {
+			name.to_string()
+		} else {
+			"".to_string()
+		};
+		store.push((name, ev.payload.clone()));
+	});
 	store
 }

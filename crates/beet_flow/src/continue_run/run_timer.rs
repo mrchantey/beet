@@ -19,22 +19,22 @@ pub struct RunTimer {
 }
 
 pub(crate) fn reset_run_time_started(
-	ev: On<OnAdd, Running>,
+	ev: On<Add, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
 	// println!("reset_run_time_started");
 	query
-		.get_mut(ev.target())
+		.get_mut(ev.event().event_target())
 		.map(|mut timer| timer.last_started.reset())
 		.ok();
 }
 pub(crate) fn reset_run_timer_stopped(
-	ev: On<OnRemove, Running>,
+	ev: On<Remove, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
 	// println!("reset_run_time_stopped");
 	query
-		.get_mut(ev.target())
+		.get_mut(ev.event().event_target())
 		.map(|mut timer| timer.last_stopped.reset())
 		.ok();
 }

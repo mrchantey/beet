@@ -5,8 +5,6 @@ use beet_core::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use beet_rsx::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
-use bevy::prelude::*;
-#[cfg(not(target_arch = "wasm32"))]
 use sweet::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -26,7 +24,7 @@ fn reactivity() {
 	world.run_schedule(ApplySnippets);
 	world
 		.entity_mut(button)
-		.trigger(OnClick(MockEvent::new("foo")));
+		.auto_trigger(OnClick(MockEvent::new("foo")));
 	get().xpect_eq("foo");
 }
 
