@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::types::ArticleMeta;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use heck::ToTitleCase;
 use serde::Deserialize;
 use serde::Serialize;

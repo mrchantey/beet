@@ -80,8 +80,6 @@ pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::exports::*;
-	#[cfg(feature = "rsx")]
-	pub use crate::rsx::exports::*;
 	#[cfg(feature = "examples")]
 	pub use beet_examples::exports::*;
 	#[cfg(feature = "ml")]
