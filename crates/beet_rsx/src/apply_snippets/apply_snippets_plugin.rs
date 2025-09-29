@@ -50,13 +50,6 @@ fn apply_static_and_flush(world: &mut World) -> Result {
 	Ok(())
 }
 
-fn maybe_panic(result: In<Result>) {
-	if let Err(err) = result.0 {
-		panic!("apply_rsx_snippets: {err}");
-	}
-}
-
-
 fn apply_static_rsx(
 	In(instance_root): In<Entity>,
 	mut commands: Commands,
@@ -139,7 +132,7 @@ fn apply_static_rsx(
 
 	// queue system to resolve template locations after clone
 	commands.run_system_cached_with(
-		apply_template_locations.pipe(maybe_panic),
+		apply_template_locations,
 		(snippet_root.clone(), instance_root, instance_expr_map),
 	);
 	Ok(())

@@ -167,6 +167,12 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 		// 	parent.spawn(bundle).insert(common_idx());
 		// })
 		.id();
+
+	app.world_mut()
+		.query_once::<&SnippetRoot>()
+		.len()
+		.xpect_eq(2);
+
 	app.update();
 
 	app.world_mut()
