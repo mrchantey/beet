@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
-use bevy::prelude::*;
 use quote::ToTokens;
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert
@@ -59,7 +58,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

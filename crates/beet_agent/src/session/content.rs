@@ -1,10 +1,7 @@
 use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
-use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::spawn::SpawnIter;
-use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -205,7 +202,7 @@ impl std::fmt::Display for TextContent {
 
 /// Emitted on a piece of content like a TextContent to indicate a new piece of text
 /// was added.
-#[derive(Clone, Event)]
+#[derive(Clone, EntityTargetEvent)]
 pub struct TextDelta(pub String);
 
 
@@ -226,13 +223,16 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 	let mut entity = commands.entity(cx.entity);
 
 	if !initial_text.is_empty() {
-		entity.trigger(TextDelta::new(initial_text));
+		entity.auto_trigger(TextDelta::new(initial_text));
 	}
 	entity.insert(EntityObserver::new(
-		|delta: On<TextDelta>,
+		|ev: On<TextDelta>,
 		 mut text_content: Query<&mut TextContent>|
 		 -> Result {
-			text_content.get_mut(delta.target())?.0.push_str(&delta.0);
+			text_content
+				.get_mut(ev.trigger().event_target())?
+				.0
+				.push_str(&ev.0);
 			Ok(())
 		},
 	));

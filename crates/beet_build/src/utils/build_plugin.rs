@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::prelude::*;
 use cargo_manifest::Manifest;
 
 
@@ -50,7 +49,8 @@ fn set_remote_service_access(mut config: ResMut<PackageConfig>) {
 
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
-		app.set_error_handler(bevy::ecs::error::panic).add_systems(
+		app.try_set_error_handler(bevy::ecs::error::panic);
+		app.add_systems(
 			Startup,
 			(
 				init_file_expr_hash,
@@ -60,7 +60,6 @@ impl Plugin for BuildPlugin {
 					.run_if(BuildFlag::ImportSnippets.should_run()),
 			),
 		);
-
 		app.add_message::<WatchEvent>()
 			.init_plugin(ParseRsxTokensPlugin)
 			// .init_plugin(ApplyDirectivesPlugin)

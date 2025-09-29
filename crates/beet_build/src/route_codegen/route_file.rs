@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::RoutePath;
-use bevy::prelude::*;
 use proc_macro2::Span;
 use std::path::PathBuf;
 use syn::Attribute;
@@ -156,7 +155,6 @@ fn path_to_ident(path: &str) -> String {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use quote::ToTokens;
 	use std::ops::Deref;
 	use std::path::PathBuf;

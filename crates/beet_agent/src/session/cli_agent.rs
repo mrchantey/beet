@@ -1,7 +1,7 @@
+use crate::prelude::Message;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
-use bevy::prelude::*;
 use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
@@ -198,7 +198,7 @@ fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
 	Ok(())
 }
 fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+	let actor = cx.actor(ev.trigger().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("{}", ev.event().0);
 	}
@@ -206,7 +206,7 @@ fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
 }
 
 fn reasoning_added(ev: On<Add, ReasoningContent>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	print_flush!("{} > 🤔", actor.role);
 
 	Ok(())
@@ -216,21 +216,21 @@ fn reasoning_ended(
 	ev: On<Add, ContentEnded>,
 	query: Query<(), With<ReasoningContent>>,
 ) -> Result {
-	if query.contains(ev.target()) {
+	if query.contains(ev.event().event_target()) {
 		print_flush!(" 💡\n");
 	}
 	Ok(())
 }
 
 fn file_inserted(
-	ev: On<OnInsert, FileContent>,
+	ev: On<Insert, FileContent>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
 	mut commands: Commands,
 ) -> Result {
-	let file = query.get(ev.target())?;
-	let actor = cx.actor(ev.target())?;
+	let file = query.get(ev.event().event_target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		let filename = config.next_available_filename(file.extension())?;
 		print_flush!("\n{} > file: {}", actor.role, filename);
@@ -248,7 +248,7 @@ fn file_inserted(
 }
 
 fn message_ended(ev: On<Add, MessageComplete>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n");
 	}
@@ -263,16 +263,20 @@ fn route_message_requests(
 	users: Query<Entity, With<User>>,
 	agents: Query<Entity, With<Agent>>,
 ) -> Result {
-	let actor = cx.actor(ev.target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	match actor.role {
 		ActorRole::User => {
-			commands.entity(agents.single()?).trigger(MessageRequest);
+			commands
+				.entity(agents.single()?)
+				.auto_trigger(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
 			commands.write_message(AppExit::Success);
 		}
 		ActorRole::Agent => {
-			commands.entity(users.single()?).trigger(MessageRequest);
+			commands
+				.entity(users.single()?)
+				.auto_trigger(MessageRequest);
 		}
 		_ => {}
 	}
@@ -285,7 +289,7 @@ fn user_message_request(
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = cx.actor(ev.target())?.entity;
+	let actor = cx.actor(ev.trigger().event_target())?.entity;
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {

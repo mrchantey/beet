@@ -50,6 +50,7 @@ pub mod prelude {
 	pub use bevy::ecs::lifecycle::HookContext;
 	pub use bevy::ecs::schedule::ScheduleLabel;
 	pub use bevy::ecs::system::SystemParam;
+	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;

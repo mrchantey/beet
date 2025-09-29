@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
@@ -83,12 +82,12 @@ impl OpenAiAgent {
 }
 
 fn openai_message_request(
-	trigger: On<MessageRequest>,
+	ev: On<MessageRequest>,
 	query: Query<&OpenAiAgent>,
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = trigger.target();
+	let actor = ev.trigger().event_target();
 	let provider = query.get(actor)?;
 	let input = cx
 		.collect_messages(actor)?

@@ -79,6 +79,29 @@ impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
 	}
 }
 
+impl<D: QueryData, F: QueryFilter> IntoIterator for QueryOnce<D, F> {
+	type Item = D::Item<'static, 'static>;
+	type IntoIter = std::vec::IntoIter<Self::Item>;
+
+	fn into_iter(self) -> Self::IntoIter { self.items.into_iter() }
+}
+
+impl<'a, D: QueryData, F: QueryFilter> IntoIterator for &'a QueryOnce<D, F> {
+	type Item = &'a D::Item<'static, 'static>;
+	type IntoIter = std::slice::Iter<'a, D::Item<'static, 'static>>;
+
+	fn into_iter(self) -> Self::IntoIter { self.items.iter() }
+}
+
+impl<'a, D: QueryData, F: QueryFilter> IntoIterator
+	for &'a mut QueryOnce<D, F>
+{
+	type Item = &'a mut D::Item<'static, 'static>;
+	type IntoIter = std::slice::IterMut<'a, D::Item<'static, 'static>>;
+
+	fn into_iter(self) -> Self::IntoIter { self.items.iter_mut() }
+}
+
 #[ext(name=IntoWorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {

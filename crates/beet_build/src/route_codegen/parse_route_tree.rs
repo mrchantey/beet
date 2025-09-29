@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -197,7 +196,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;

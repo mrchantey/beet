@@ -16,7 +16,7 @@
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
+use crate::prelude::Message;
 use std::path::Path;
 
 pub async fn workspace_file(path: impl AsRef<Path>) -> Result<FileContent> {

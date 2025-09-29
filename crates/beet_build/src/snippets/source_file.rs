@@ -5,7 +5,6 @@ use beet_core::exports::notify::event::ModifyKind;
 use beet_core::exports::notify::event::RemoveKind;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
-use bevy::prelude::*;
 use std::path::Path;
 
 /// Adde to an entity used to represent an file included

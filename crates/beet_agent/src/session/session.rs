@@ -1,7 +1,7 @@
+use crate::prelude::Message;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::*;
 
 pub struct AgentPlugin;
 
@@ -124,7 +124,6 @@ impl SessionParams<'_, '_> {
 pub(super) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -149,7 +148,7 @@ pub(super) mod test {
 			      mut commands: Commands,
 			      cx: SessionParams|
 			      -> Result {
-				let actor = cx.actor(ev.target())?;
+				let actor = cx.actor(ev.event().event_target())?;
 				if actor.role != ActorRole::Agent {
 					return Ok(());
 				};

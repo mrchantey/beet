@@ -1,6 +1,5 @@
-use beet_dom::prelude::*;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use bevy::tasks::futures_lite;
 
 pub fn push_assets(

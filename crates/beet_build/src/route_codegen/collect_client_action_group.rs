@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use proc_macro2::Span;
 use syn::Item;
 
@@ -138,7 +138,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;

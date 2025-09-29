@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
-use crate::prelude::*;
 
 
 #[extend::ext(name=BeetCoreAppExt)]
@@ -15,6 +15,16 @@ pub impl App {
 		self
 	}
 
+
+	fn try_set_error_handler(
+		&mut self,
+		handler: bevy::ecs::error::ErrorHandler,
+	) -> &mut Self {
+		if self.get_error_handler().is_none() {
+			self.set_error_handler(handler);
+		}
+		self
+	}
 
 
 	/// Register this schedule in the main schedule order after the specified schedule

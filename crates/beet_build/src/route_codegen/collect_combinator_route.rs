@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::tokenize_bundle;
-use bevy::prelude::*;
 use syn::ItemFn;
 
 
@@ -69,7 +68,6 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 

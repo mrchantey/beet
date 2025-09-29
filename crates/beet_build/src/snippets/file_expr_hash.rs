@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
-use bevy::prelude::*;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
 use std::hash::Hash;
@@ -132,7 +131,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
 	use beet_rsx::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	// TODO this is a hack, macro should include it

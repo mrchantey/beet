@@ -1,10 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::ecs::lifecycle::HookContext;
-use bevy::ecs::system::SystemParam;
-use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;

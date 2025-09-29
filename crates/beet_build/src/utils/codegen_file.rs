@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use heck::ToSnakeCase;
 use serde::Deserialize;
 use serde::Serialize;

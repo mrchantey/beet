@@ -66,7 +66,7 @@ macro_rules! define_events {
 					$(
 						$event => {
 							let ev = ev.unchecked_into::<$ty>();
-							commands.trigger($struct(SendWrapper::new(ev)));
+							commands.auto_trigger($struct(SendWrapper::new(ev)));
 						}
 					)*
 					_ => panic!("Unknown event: {event_name}"),

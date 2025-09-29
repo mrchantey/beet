@@ -25,7 +25,7 @@ pub(crate) fn schedule_order_plugin(app: &mut App) {
 
 impl Plugin for ApplyDirectivesPlugin {
 	fn build(&self, app: &mut App) {
-		app.set_error_handler(bevy::ecs::error::panic);
+		app.try_set_error_handler(bevy::ecs::error::panic);
 		#[cfg(target_arch = "wasm32")]
 		{
 			#[cfg(not(test))]

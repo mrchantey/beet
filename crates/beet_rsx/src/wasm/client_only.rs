@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 pub(crate) fn mount_client_only(
 	query: Populated<
