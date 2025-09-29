@@ -1,7 +1,7 @@
 use crate::prelude::NodeExpr;
 use crate::tokenize::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;

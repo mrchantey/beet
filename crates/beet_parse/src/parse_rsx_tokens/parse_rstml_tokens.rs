@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
@@ -432,7 +431,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;

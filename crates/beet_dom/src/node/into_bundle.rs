@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
-use bevy::prelude::*;
 
 /// Very inclusive version of [`Bundle`], allowing primitives to be wrapped
 /// in a [`TextNode`] and entities to be reparented.

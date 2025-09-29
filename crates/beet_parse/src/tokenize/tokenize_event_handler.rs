@@ -50,7 +50,7 @@ pub fn tokenize_event_handler(
 	Ok(())
 }
 /// if the tokens are a closure or a block where the last statement is a closure,
-/// insert the matching [`Trigger`] type.
+/// insert the matching [`On`] type.
 /// ie `<div onclick=|_|{ do_stuff() }/>` doesnt specify a type.
 fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 	match closure.inputs.first_mut() {
@@ -62,14 +62,14 @@ fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 				let pat_clone = pat.clone();
 				// insert type
 				*first_param =
-					Pat::Type(parse_quote! {#pat_clone:Trigger<#ident>});
+					Pat::Type(parse_quote! {#pat_clone:On<#ident>});
 			}
 		},
 		None => {
 			// If no parameters, add one with discard name
 			closure
 				.inputs
-				.push(Pat::Type(parse_quote!(_:Trigger<#ident>)));
+				.push(Pat::Type(parse_quote!(_:On<#ident>)));
 		}
 	};
 }

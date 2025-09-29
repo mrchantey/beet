@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 pub fn apply_reactive_text_nodes(

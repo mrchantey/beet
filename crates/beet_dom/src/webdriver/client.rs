@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;

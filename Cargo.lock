@@ -1234,7 +1234,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1267,7 +1267,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "beet",
  "bevy",
@@ -1287,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "beet_agent"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "async-lock",
@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -1398,7 +1398,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_utils",
@@ -1411,7 +1411,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1431,7 +1431,7 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "base64 0.22.1",
  "beet_core",
@@ -1453,7 +1453,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1474,7 +1474,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1490,7 +1490,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow2"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "beet_core",
  "beet_flow2",
@@ -1504,7 +1504,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "extend",
@@ -1517,7 +1517,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1550,7 +1550,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "async-lock",
  "async-process",
@@ -1594,7 +1594,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1620,10 +1620,10 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.13.1",
  "beet_core",
  "beet_net",
  "beet_query_macros",
@@ -1641,7 +1641,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "axum 0.8.4",
  "axum-extra",
@@ -1690,9 +1690,8 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_dom",
  "beet_rsx",
@@ -1721,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1731,9 +1730,8 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_parse",
  "proc-macro2",
@@ -1745,7 +1743,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1757,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet",
@@ -1770,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1789,7 +1787,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "async-fs",
  "bevy",
@@ -10011,7 +10009,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "beet",
  "clap",
@@ -10026,7 +10024,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.7-dev.17"
+version = "0.0.7-dev.0"
 dependencies = [
  "anyhow",
  "proc-macro2",

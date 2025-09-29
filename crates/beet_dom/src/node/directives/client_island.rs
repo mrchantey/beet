@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
+use bevy::ecs::lifecycle::ComponentHook;
 use bevy::prelude::*;
 use bevy::reflect::Reflectable;
 
@@ -76,7 +77,7 @@ where
 	type Mutability = Immutable;
 
 	// self register for the scene
-	fn on_add() -> Option<bevy::ecs::component::ComponentHook> {
+	fn on_add() -> Option<ComponentHook> {
 		Some(|mut world, cx| {
 			let entity = cx.entity;
 			world.commands().queue(move |world: &mut World| {

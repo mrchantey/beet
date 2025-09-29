@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemId;
-use bevy::prelude::*;
 use std::sync::Arc;
 
 /// Mark an entity as requiring a [`DomBinding`], often added to nodes
@@ -205,7 +204,6 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 

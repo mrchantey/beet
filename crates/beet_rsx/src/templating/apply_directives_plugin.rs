@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::prelude::*;
 
 #[derive(Default)]
 pub struct ApplyDirectivesPlugin;
@@ -26,9 +25,7 @@ pub(crate) fn schedule_order_plugin(app: &mut App) {
 
 impl Plugin for ApplyDirectivesPlugin {
 	fn build(&self, app: &mut App) {
-		bevy::ecs::error::GLOBAL_ERROR_HANDLER
-			.set(bevy::ecs::error::panic)
-			.ok();
+		app.set_error_handler(bevy::ecs::error::panic);
 		#[cfg(target_arch = "wasm32")]
 		{
 			#[cfg(not(test))]

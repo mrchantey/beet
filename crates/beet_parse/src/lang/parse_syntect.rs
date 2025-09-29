@@ -1,6 +1,6 @@
-use crate::prelude::NodeExpr;
+use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::html::ClassStyle;
@@ -238,7 +238,7 @@ mod test {
 				InnerText("fn foobar() -> String\n{}".to_string()),
 			))
 			.id();
-		world.run_system_cached(parse_syntect).unwrap().unwrap();
+		world.run_system_cached::<(), _, _>(parse_syntect).unwrap();
 
 		world
 			.entity(entity)

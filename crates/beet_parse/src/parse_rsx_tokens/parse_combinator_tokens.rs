@@ -3,7 +3,6 @@ use anyhow::Result;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_rsx_combinator::prelude::*;
-use bevy::prelude::*;
 use std::collections::HashSet;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree, which can then

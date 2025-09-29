@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::LazyLock;

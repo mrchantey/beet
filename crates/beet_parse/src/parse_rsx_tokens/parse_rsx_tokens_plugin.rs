@@ -4,7 +4,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
 /// A sequence for parsing raw rstml token streams and combinator strings into

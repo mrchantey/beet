@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*

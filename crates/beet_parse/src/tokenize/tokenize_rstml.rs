@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
 /// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].

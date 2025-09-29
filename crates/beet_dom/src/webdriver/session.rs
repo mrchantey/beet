@@ -1,8 +1,8 @@
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_net::sockets::Message;
 use beet_net::sockets::*;
-use bevy::prelude::*;
 use bevy::tasks::IoTaskPool;
 use serde_json::Value;
 use serde_json::json;
@@ -293,7 +293,6 @@ impl Session {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

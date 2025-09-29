@@ -2,10 +2,6 @@ use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::ecs::system::SystemParam;
-use bevy::platform::collections::HashMap;
-use bevy::platform::collections::HashSet;
-use bevy::prelude::*;
 
 /// Apply an [`AttributeKey`] with corresponding [`StyleId`] to elements with one
 ///

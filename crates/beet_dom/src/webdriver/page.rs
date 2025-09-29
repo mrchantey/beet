@@ -153,7 +153,6 @@ impl Page {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

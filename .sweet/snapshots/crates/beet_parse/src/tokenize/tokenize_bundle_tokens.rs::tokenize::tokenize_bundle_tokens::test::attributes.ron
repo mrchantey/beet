@@ -26,8 +26,8 @@
             TextNode(String::from("some_js_func")),
             NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
             (AttributeKey(String::from("onclick")),
-            NodeExpr(SendWrapper::new(syn::parse_quote!({ | _ : On < OnClick > |
-            {} }))))] })]
+            NodeExpr(SendWrapper::new(syn::parse_quote!({ | _ : On < OnClick > | {}
+            }))))] })]
         },
     )
 }

@@ -33,7 +33,6 @@ beet_dom.workspace = true
 
 #💡 utils
 send_wrapper.workspace = true
-anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 strum.workspace = true

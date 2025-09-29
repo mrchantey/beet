@@ -43,10 +43,15 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
+	// as a metaframework we're a superset of bevy,
+	// also more opinionated about kitchen sink prelude inclusions
 	pub use bevy::ecs::lifecycle::HookContext;
+	pub use bevy::ecs::schedule::ScheduleLabel;
+	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::world::DeferredWorld;
+	pub use bevy::platform::collections::HashMap;
+	pub use bevy::platform::collections::HashSet;
 	pub use bevy::prelude::*;
-
 
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]

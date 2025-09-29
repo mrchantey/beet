@@ -50,11 +50,7 @@ fn set_remote_service_access(mut config: ResMut<PackageConfig>) {
 
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
-		bevy::ecs::error::GLOBAL_ERROR_HANDLER
-			.set(bevy::ecs::error::panic)
-			.ok();
-
-		app.add_systems(
+		app.set_error_handler(bevy::ecs::error::panic).add_systems(
 			Startup,
 			(
 				init_file_expr_hash,

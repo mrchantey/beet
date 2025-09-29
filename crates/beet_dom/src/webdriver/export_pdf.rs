@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use serde_json::json;
 
 
@@ -175,7 +174,6 @@ impl Page {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

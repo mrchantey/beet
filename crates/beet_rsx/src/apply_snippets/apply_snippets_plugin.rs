@@ -1,11 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::ecs::schedule::ScheduleLabel;
-use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
-
 
 pub struct ApplySnippetsPlugin;
 
@@ -42,8 +37,11 @@ fn apply_static_and_flush(world: &mut World) -> Result {
 	while let Some(entity) = query.iter(world).next() {
 		// println!("Applying static rsx for {entity}");
 		world.entity_mut(entity).insert(ResolvedRoot);
-		world.run_system_cached_with(apply_static_rsx, entity)??;
-		world.run_system_cached_with(
+		world.run_system_cached_with::<_, Result, _, _>(
+			apply_static_rsx,
+			entity,
+		)??;
+		world.run_system_cached_with::<_, Result, _, _>(
 			flush_on_spawn_deferred_recursive,
 			entity,
 		)??;
@@ -52,7 +50,7 @@ fn apply_static_and_flush(world: &mut World) -> Result {
 	Ok(())
 }
 
-fn maybe_panic(result: In<Result<()>>) {
+fn maybe_panic(result: In<Result>) {
 	if let Err(err) = result.0 {
 		panic!("apply_rsx_snippets: {err}");
 	}
@@ -123,7 +121,7 @@ fn apply_static_rsx(
 	// apply the snippet tree
 	commands
 		.entity(static_root)
-		.clone_with(instance_root, |builder| {
+		.clone_with_opt_out(instance_root, |builder| {
 			builder
 				.deny::<(SnippetRoot, StaticRoot)>()
 				.linked_cloning(true)
@@ -267,7 +265,7 @@ mod test {
 		world.run_schedule(ApplySnippets);
 
 		world
-			.run_system_once(crate::apply_snippets::apply_slots)
+			.run_system_once::<_, Result, _>(crate::apply_snippets::apply_slots)
 			.ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)
@@ -547,7 +545,10 @@ mod test {
 			))
 			.id();
 		world
-			.run_system_cached_with(flush_on_spawn_deferred_recursive, entity)
+			.run_system_cached_with::<_, Result, _, _>(
+				flush_on_spawn_deferred_recursive,
+				entity,
+			)
 			.unwrap()
 			.unwrap();
 		val().xpect_eq(vec![0, 1, 2, 3, 4]);
@@ -559,7 +560,7 @@ mod test {
 
 		world.run_schedule(ApplySnippets);
 		world
-			.run_system_once(crate::apply_snippets::apply_slots)
+			.run_system_once::<_, Result, _>(crate::apply_snippets::apply_slots)
 			.ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)

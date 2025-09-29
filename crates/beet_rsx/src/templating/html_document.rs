@@ -1,7 +1,6 @@
 use super::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// Added to the *top-level* [`InstanceRoot`], and useful for getting the document root,

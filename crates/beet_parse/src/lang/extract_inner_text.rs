@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// Any file with a relative `src` attribute will have its contents extracted
@@ -94,7 +94,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
