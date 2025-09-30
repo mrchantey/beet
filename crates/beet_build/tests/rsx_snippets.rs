@@ -110,7 +110,7 @@ fn nested_template() {
 			rsx! {
 				<span>"value: "{initial}</span>
 			},
-			OnSpawn::new(|entity| {
+			OnSpawnTyped::new(|entity| {
 				entity.insert(common_idx_nested());
 			}),
 		)

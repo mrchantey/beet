@@ -140,7 +140,7 @@ mod test {
 	}
 
 	fn replace_hash() -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			entity.insert(LangSnippetHash::new(0));
 		})
 	}

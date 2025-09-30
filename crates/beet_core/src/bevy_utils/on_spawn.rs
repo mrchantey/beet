@@ -18,27 +18,14 @@ where
 }
 
 
-/// A [`BundleEffect`] that runs a function when the entity is spawned.
-#[derive(Clone, BundleEffect)]
-pub struct OnSpawn<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
-	pub F,
-);
-
-impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawn<F> {
-	/// Create a new [`OnSpawn`] effect.
-	pub fn new(func: F) -> Self { Self(func) }
-
-	fn effect(self, entity: &mut EntityWorldMut) { self.0(entity); }
-}
-
 /// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
 #[derive(BundleEffect)]
-pub struct OnSpawnBoxed(
+pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
-impl OnSpawnBoxed {
-	/// Create a new [`OnSpawnBoxed`] effect.
+impl OnSpawn {
+	/// Create a new [`OnSpawn`] effect.
 	pub fn new(
 		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
 	) -> Self {
@@ -94,6 +81,19 @@ impl OnSpawnBoxed {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
 
+
+/// A [`BundleEffect`] that runs a function when the entity is spawned.
+#[derive(Clone, BundleEffect)]
+pub struct OnSpawnTyped<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
+	pub F,
+);
+
+impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawnTyped<F> {
+	/// Create a new [`OnSpawn`] effect.
+	pub fn new(func: F) -> Self { Self(func) }
+
+	fn effect(self, entity: &mut EntityWorldMut) { self.0(entity); }
+}
 
 #[derive(Component)]
 pub struct OnSpawnDeferred(
@@ -184,7 +184,7 @@ impl OnSpawnDeferred {
 	}
 }
 
-/// A [`Clone`] version of [`OnSpawnBoxed`]
+/// A [`Clone`] version of [`OnSpawn`]
 #[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
@@ -234,13 +234,13 @@ mod test {
 		let numbers = Store::default();
 
 		world.spawn((
-			OnSpawn::new(move |entity_world_mut| {
+			OnSpawnTyped::new(move |entity_world_mut| {
 				numbers.push(1);
-				entity_world_mut.insert(OnSpawn::new(move |_| {
+				entity_world_mut.insert(OnSpawnTyped::new(move |_| {
 					numbers.push(2);
 				}));
 			}),
-			OnSpawn::new(move |_| {
+			OnSpawnTyped::new(move |_| {
 				numbers.push(3);
 			}),
 		));
@@ -255,7 +255,7 @@ mod test {
 		world.spawn((
 			OnSpawnDeferred::new(move |entity_world_mut| {
 				numbers.push(1);
-				entity_world_mut.insert(OnSpawn::new(move |_| {
+				entity_world_mut.insert(OnSpawnTyped::new(move |_| {
 					numbers.push(2);
 				}));
 				Ok(())

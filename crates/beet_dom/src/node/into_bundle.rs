@@ -30,7 +30,7 @@ pub impl<T, M> T
 where
 	T: IntoBundle<M>,
 {
-	/// Converts the bundle to be inserted via [`OnSpawnBoxed`], allowing branches
+	/// Converts the bundle to be inserted via [`OnSpawn`], allowing branches
 	/// to return the same type.
 	///
 	/// ## Example
@@ -44,9 +44,9 @@ where
 	/// 	Name::new("foo").any_bundle()
 	/// };
 	///```
-	fn any_bundle(self) -> OnSpawnBoxed {
+	fn any_bundle(self) -> OnSpawn {
 		let bundle = self.into_bundle();
-		OnSpawnBoxed::new(move |entity| {
+		OnSpawn::new(move |entity| {
 			entity.insert(bundle);
 		})
 	}
@@ -85,7 +85,7 @@ where
 	fn into_bundle(self) -> impl Bundle {
 		match self {
 			Some(item) => item.any_bundle(),
-			None => OnSpawnBoxed::new(|_| {}),
+			None => OnSpawn::new(|_| {}),
 		}
 	}
 }
@@ -114,7 +114,7 @@ where
 /// which becomes the parent of the entity passed in.
 impl IntoBundle<Self> for Entity {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |spawned_entity| {
+		OnSpawnTyped::new(move |spawned_entity| {
 			spawned_entity.insert(FragmentNode);
 			let id = spawned_entity.id();
 			spawned_entity.world_scope(|world| {

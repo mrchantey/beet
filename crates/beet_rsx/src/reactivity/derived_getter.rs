@@ -9,13 +9,13 @@ use beet_dom::prelude::*;
 #[derive(Clone)]
 pub struct DerivedGetter<T: 'static> {
 	get_value: CloneFunc<(), T>,
-	get_bundle: CloneFunc<(), OnSpawnBoxed>,
+	get_bundle: CloneFunc<(), OnSpawn>,
 }
 
 impl<T: 'static> DerivedGetter<T> {
 	pub fn new(
 		get_value: impl CloneFuncTrait<(), T>,
-		get_bundle: impl CloneFuncTrait<(), OnSpawnBoxed>,
+		get_bundle: impl CloneFuncTrait<(), OnSpawn>,
 	) -> Self {
 		DerivedGetter {
 			get_value: CloneFunc::new(get_value),
@@ -66,7 +66,7 @@ where
 		let val2 = val.clone();
 		DerivedGetter::new(
 			move |_| val.clone(),
-			move |_| OnSpawnBoxed::insert(val2.clone().into_bundle()),
+			move |_| OnSpawn::insert(val2.clone().into_bundle()),
 		)
 	}
 }
@@ -81,7 +81,7 @@ where
 
 		DerivedGetter::new(
 			move |_| (self.clone())(),
-			move |_| OnSpawnBoxed::insert((self2.clone()).into_bundle()),
+			move |_| OnSpawn::insert((self2.clone()).into_bundle()),
 		)
 	}
 }

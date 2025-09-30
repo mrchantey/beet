@@ -141,7 +141,7 @@ impl CliAgentPlugin {
 								// Actor 1: User
 								(
 									terminal_user(),
-									OnSpawnBoxed::trigger_option(initial_message.xmap_false(||{
+									OnSpawn::trigger_option(initial_message.xmap_false(||{
 										MessageRequest
 									})),
 									children![
@@ -149,7 +149,7 @@ impl CliAgentPlugin {
 										(
 											Message::default(),
 											children![
-												OnSpawnBoxed::insert_option(
+												OnSpawn::insert_option(
 													initial_prompt.map(|prompt| {
 														println!("User > {}\n", prompt);
 														session_ext::text(prompt)
@@ -171,7 +171,7 @@ impl CliAgentPlugin {
 									}
 									provider
 								},
-								OnSpawnBoxed::trigger_option(initial_message.xmap_true(||{
+								OnSpawn::trigger_option(initial_message.xmap_true(||{
 									MessageRequest
 								})),
 							)

@@ -103,7 +103,7 @@ where
 	Out: 'static + Send + Sync + Clone + Primitive<M>,
 {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			let id = entity.id();
 			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
@@ -158,7 +158,7 @@ where
 	Out: 'static + Send + Sync + BundleLike<M1, M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			let id = entity.id();
 			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
