@@ -31,7 +31,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 	Ok(quote! {
 		impl #impl_generics Event for #input_ident #type_generics #where_clause {
-			type Trigger<'a> = EventTargetTrigger<
+			type Trigger<'a> = EntityTargetTrigger<
 				#auto_propagate,
 				Self,
 				&'static ChildOf

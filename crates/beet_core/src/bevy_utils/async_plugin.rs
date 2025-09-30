@@ -365,7 +365,7 @@ impl AsyncEntity {
 	pub async fn trigger<
 		'a,
 		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
+		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 		T: 'static + Traversal<E>,
 	>(
 		&self,
