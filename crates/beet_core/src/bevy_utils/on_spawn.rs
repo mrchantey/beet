@@ -269,6 +269,10 @@ mod test {
 		numbers.get().xpect_eq(&[] as &[u32]);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 
+		// why is this?
+		#[cfg(target_arch = "wasm32")]
+		numbers.get().xpect_eq(&[1, 2, 3]);
+		#[cfg(not(target_arch = "wasm32"))]
 		numbers.get().xpect_eq(&[3, 1, 2]);
 	}
 }

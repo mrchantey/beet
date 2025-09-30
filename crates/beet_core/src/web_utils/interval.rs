@@ -165,7 +165,7 @@ mod tests {
 	async fn yields_timestamps() {
 		doc::clear_body();
 
-		let mut interval = Interval::new(10);
+		let mut interval = IntervalStream::new(10);
 
 		let a = interval.next_tick().await.unwrap();
 		let b = interval.next_tick().await.unwrap();

@@ -11,7 +11,6 @@ mod events;
 /// Include the kitchen sink for beet_flow.
 pub mod prelude {
 	pub use crate::events::*;
-	pub use beet_flow_macros::*;
 }
 /// doctest reexports and utilities
 #[cfg(feature = "_doctest")]

@@ -69,57 +69,55 @@ mod test {
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
+	#[action(run_parent, receive_result)]
+	#[derive(Component)]
+	struct Parent;
 
-	fn setup(done: Store<bool>) -> impl Bundle {
-		let visited = Store::default();
-		(
-			// 1. send Run down to child
-			EntityObserver::new(
-				move |ev: On<Run>,
-				      mut commands: Commands,
-				      children: Query<&Children>| {
-					if visited.get() {
-						return;
-					}
-					visited.set(true);
-					let child =
-						children.get(ev.trigger().event_target()).unwrap()[0];
-					commands.entity(child).trigger_target(RUN);
-					// println!("parent");
-				},
-			),
-			children![
-				// 2. Child receives Run, then sends End back up
-				(
-					EntityObserver::new(
-						|ev: On<Run>, mut commands: Commands| {
-							commands
-								.entity(ev.trigger().event_target())
-								.trigger_target(SUCCESS);
-							// println!("child")
-						}
-					),
-					// PREVENT_END_PROPAGATE
-				)
-			],
-			// 3. Parent received End, all done!
-			EntityObserver::new(
-				move |ev: On<End>, children: Query<&Children>| {
-					ev.event().xpect_eq(SUCCESS);
-					let child =
-						children.get(ev.trigger().event_target()).unwrap()[0];
-					ev.trigger().original_event_target().xpect_eq(child);
-					done.set(true);
-				},
-			),
-		)
+	fn run_parent(
+		ev: On<Run>,
+		mut commands: Commands,
+		children: Query<&Children>,
+	) {
+		let child = children.get(ev.trigger().event_target()).unwrap()[0];
+		commands.entity(child).trigger_target(RUN);
+	}
+
+	fn receive_result(
+		ev: On<End>,
+		mut commands: Commands,
+		children: Query<&Children>,
+	) {
+		ev.event().xpect_eq(SUCCESS);
+		let child = children.get(ev.trigger().event_target()).unwrap()[0];
+		ev.trigger().original_event_target().xpect_eq(child);
+		commands.write_message(AppExit::Success);
+	}
+
+	#[action(succeed)]
+	#[derive(Component)]
+	// #[require(PreventEndPropagate)]
+	struct Child;
+
+	fn succeed(ev: On<Run>, mut commands: Commands) {
+		commands
+			.entity(ev.trigger().event_target())
+			.trigger_target(SUCCESS);
 	}
 
 	#[test]
 	fn works() {
-		let done = Store::default();
 		let mut world = World::new();
-		world.spawn(setup(done)).trigger_target(RUN);
-		done.get().xpect_true();
+		world.insert_resource(Messages::<AppExit>::default());
+		world.spawn((Parent, children![Child])).trigger_target(RUN);
+		world.should_exit().xpect_eq(Some(AppExit::Success));
+	}
+	#[test]
+	fn prevent_propagate() {
+		let mut world = World::new();
+		world.insert_resource(Messages::<AppExit>::default());
+		world
+			.spawn((Parent, children![(Child, PREVENT_END_PROPAGATE)]))
+			.trigger_target(RUN);
+		world.should_exit().xpect_none();
 	}
 }
