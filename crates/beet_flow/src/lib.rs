@@ -6,11 +6,15 @@
 #[allow(unused, reason = "docs")]
 use crate::prelude::*;
 
+mod actions;
 mod events;
+mod types;
 
 /// Include the kitchen sink for beet_flow.
 pub mod prelude {
+	pub use crate::actions::*;
 	pub use crate::events::*;
+	pub use crate::types::*;
 }
 /// doctest reexports and utilities
 #[cfg(feature = "_doctest")]
