@@ -84,7 +84,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					Name::new("Behavior"),
 					Emoji::new("1F5FA"), //🗺️
 					orbital_child(3, total_children),
-					RunOnSpawn::default(),
+					TriggerOnSpawn::default(),
 					// RunOnChange::<StatValue>::default()
 					// 	.with_source(vec![stress, self_control]),
 					HighestScore::default(),
@@ -129,7 +129,7 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 				Name::new("Seek Agent"),
 				Emoji::new("1F5FA"), //🗺️
 				orbital_child(0, 2),
-				RunOnSpawn::default(),
+				TriggerOnSpawn::default(),
 				Seek::default(),
 				FindSteerTarget::new("Agent", f32::MAX),
 			));

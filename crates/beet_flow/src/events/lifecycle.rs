@@ -70,11 +70,11 @@ mod test {
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
-	#[action(run_parent, receive_result)]
+	#[action(run_child, exit_on_result)]
 	#[derive(Component)]
 	struct Parent;
 
-	fn run_parent(
+	fn run_child(
 		ev: On<Run>,
 		mut commands: Commands,
 		children: Query<&Children>,
@@ -83,7 +83,7 @@ mod test {
 		commands.entity(child).trigger_target(RUN);
 	}
 
-	fn receive_result(
+	fn exit_on_result(
 		ev: On<End>,
 		mut commands: Commands,
 		children: Query<&Children>,

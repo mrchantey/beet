@@ -10,24 +10,8 @@ mod actions;
 mod events;
 mod types;
 
-/// Include the kitchen sink for beet_flow.
 pub mod prelude {
 	pub use crate::actions::*;
 	pub use crate::events::*;
 	pub use crate::types::*;
-}
-/// doctest reexports and utilities
-#[cfg(feature = "_doctest")]
-pub mod doctest {}
-
-
-/// All plugins required for a beet_flow application.
-/// The primary role that this plugin plays is as a kind of
-/// observer router, ensuring the OnRun and OnResult events are propagated
-/// correctly.
-/// - [control_flow::control_flow_plugin]
-/// - [continue_run::continue_run_plugin]
-#[derive(Default)]
-pub struct BeetFlowPlugin {
-	// lifecycle_plugin: lifecycle::LifecyclePlugin,
 }
