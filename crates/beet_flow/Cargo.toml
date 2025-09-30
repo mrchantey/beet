@@ -4,7 +4,8 @@ version.workspace = true
 edition.workspace = true
 description = "An ECS control flow library"
 documentation.workspace = true
-readme = "README.md"
+# readme = "README.md"
+readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
@@ -26,7 +27,6 @@ beet_core.workspace = true
 bevy.workspace = true
 log.workspace = true
 extend.workspace = true
-anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 

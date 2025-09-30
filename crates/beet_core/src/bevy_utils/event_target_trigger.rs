@@ -211,6 +211,7 @@ pub impl EntityWorldMut<'_> {
 					.trigger_raw(event_key, ev, trigger, caller);
 			}
 		});
+		self.world_scope(|world| world.flush());
 		self
 	}
 	/// Creates an [`Observer`] watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]

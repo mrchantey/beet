@@ -54,7 +54,6 @@ members = [
 
 	## 💡 Flow
 	"crates/beet_examples",
-	"crates/beet_flow2",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
@@ -89,9 +88,8 @@ sweet = { path = "crates/sweet", version = "0.4.2-rc.1" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.7-dev.0" }
 beet_core = { path = "crates/beet_core", version = "0.0.7-dev.0" }
 
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.0" }
-beet_flow2 = { path = "crates/beet_flow2", version = "0.0.7-dev.0" }
 beet_flow = { path = "crates/beet_flow", version = "0.0.7-dev.0" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.7-dev.0" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.7-dev.0" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.7-dev.0" }
 beet_sim = { path = "crates/beet_sim", version = "0.0.7-dev.0" }

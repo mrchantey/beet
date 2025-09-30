@@ -1,11 +1,10 @@
 [package]
-name = "beet_flow2"
+name = "beet_flow_old"
 version.workspace = true
 edition.workspace = true
 description = "An ECS control flow library"
 documentation.workspace = true
-# readme = "README.md"
-readme.workspace = true
+readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
@@ -21,15 +20,16 @@ reflect = ["dep:serde", "bevy/serialize"]
 _doctest = []
 
 [dependencies]
-# beet_flow_macros.workspace = true
+beet_flow_macros.workspace = true
 beet_core.workspace = true
 
 bevy.workspace = true
 log.workspace = true
 extend.workspace = true
+anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_flow2 = { path = "", features = ["_doctest"] }
+beet_flow = { path = "", features = ["_doctest"] }
 sweet.workspace = true

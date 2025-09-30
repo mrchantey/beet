@@ -1,5 +1,6 @@
 use crate::utils::CrateManifest;
 use crate::utils::punctuated_args;
+use beet_core::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
@@ -10,9 +11,11 @@ pub fn impl_action_attr(
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let item = parse_macro_input!(item as DeriveInput);
+	// let result = parse(attr.into(), item);
 	let result = parse(attr.into(), item);
 	result.unwrap_or_else(|err| err.into_compile_error()).into()
 }
+
 fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 	assert_derive_component(&item)?;
 	let (impl_generics, type_generics, where_clause) =
