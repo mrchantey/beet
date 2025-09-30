@@ -65,7 +65,7 @@ mod test {
 			.spawn(EntityObserver::new(move |ev: On<Foo>| {
 				store.set(ev.event().0)
 			}))
-			.auto_trigger(Foo(3));
+			.trigger_target(Foo(3));
 
 		store.get().xpect_eq(3);
 	}

@@ -1,4 +1,5 @@
 //! inspired by [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Expr;
 use syn::ExprLit;
@@ -9,6 +10,9 @@ use syn::Result;
 use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+
 
 /// [`AttributeItem`] collection parsed from Syn attributes.
 /// These cannot be ref types because they are parsed.
@@ -31,6 +35,17 @@ impl AttributeGroup {
 			.collect();
 		Ok(Self { attributes })
 	}
+
+	/// Parse 'foo,bar,bazz' into a vec of expressions
+	pub fn parse_punctated(tokens: TokenStream) -> Result<Vec<Expr>> {
+		let args = Punctuated::<Expr, Token![,]>::parse_terminated
+			.parse2(tokens)?
+			.into_iter()
+			.collect::<Vec<_>>();
+		Ok(args)
+	}
+
+
 	/// ## Errors
 	/// if any of the attributes does not match a provided key
 	pub fn validate_allowed_keys(&self, keys: &[&str]) -> Result<&Self> {

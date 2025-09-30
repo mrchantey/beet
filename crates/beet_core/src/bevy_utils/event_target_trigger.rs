@@ -143,7 +143,7 @@ unsafe impl<
 
 #[extend::ext(name=CommandsEventTargetTriggerExt)]
 pub impl EntityCommands<'_> {
-	fn auto_trigger<
+	fn trigger_target<
 		'a,
 		const AUTO_PROPAGATE: bool,
 		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
@@ -155,7 +155,7 @@ pub impl EntityCommands<'_> {
 		let caller = MaybeLocation::caller();
 		let mut trigger = EventTargetTrigger::new(self.id());
 		self.queue(move |mut world_scope: EntityWorldMut| {
-			world_scope.auto_trigger_ref(&mut ev, &mut trigger, caller);
+			world_scope.trigger_target_ref(&mut ev, &mut trigger, caller);
 		});
 		self
 	}
@@ -177,7 +177,7 @@ pub impl EntityCommands<'_> {
 
 #[extend::ext(name=EntityWorldMutEventTargetTriggerExt)]
 pub impl EntityWorldMut<'_> {
-	fn auto_trigger<
+	fn trigger_target<
 		'a,
 		const AUTO_PROPAGATE: bool,
 		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
@@ -189,10 +189,10 @@ pub impl EntityWorldMut<'_> {
 		let caller = MaybeLocation::caller();
 		let mut trigger =
 			EventTargetTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
-		self.auto_trigger_ref(&mut ev, &mut trigger, caller);
+		self.trigger_target_ref(&mut ev, &mut trigger, caller);
 		self
 	}
-	fn auto_trigger_ref<
+	fn trigger_target_ref<
 		'a,
 		const AUTO_PROPAGATE: bool,
 		E: Event<Trigger<'a> = EventTargetTrigger<AUTO_PROPAGATE, E, T>>,
@@ -278,7 +278,7 @@ mod test {
 					},
 				),
 			))
-			.auto_trigger(MyEvent);
+			.trigger_target(MyEvent);
 		called.get().xpect_eq(true);
 	}
 }

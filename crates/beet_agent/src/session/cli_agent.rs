@@ -268,7 +268,7 @@ fn route_message_requests(
 		ActorRole::User => {
 			commands
 				.entity(agents.single()?)
-				.auto_trigger(MessageRequest);
+				.trigger_target(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
 			commands.write_message(AppExit::Success);
@@ -276,7 +276,7 @@ fn route_message_requests(
 		ActorRole::Agent => {
 			commands
 				.entity(users.single()?)
-				.auto_trigger(MessageRequest);
+				.trigger_target(MessageRequest);
 		}
 		_ => {}
 	}

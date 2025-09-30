@@ -1478,26 +1478,12 @@ version = "0.0.7-dev.0"
 dependencies = [
  "beet_core",
  "beet_flow",
- "beet_flow_macros",
  "bevy",
  "extend",
  "log",
  "serde",
  "sweet",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "beet_flow_macros"
-version = "0.0.7-dev.0"
-dependencies = [
- "beet_core",
- "extend",
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "syn 2.0.104",
- "toml_edit 0.22.27",
 ]
 
 [[package]]

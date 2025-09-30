@@ -84,7 +84,7 @@ mod test {
 					visited.set(true);
 					let child =
 						children.get(ev.trigger().event_target()).unwrap()[0];
-					commands.entity(child).auto_trigger(RUN);
+					commands.entity(child).trigger_target(RUN);
 					// println!("parent");
 				},
 			),
@@ -95,7 +95,7 @@ mod test {
 						|ev: On<Run>, mut commands: Commands| {
 							commands
 								.entity(ev.trigger().event_target())
-								.auto_trigger(SUCCESS);
+								.trigger_target(SUCCESS);
 							// println!("child")
 						}
 					),
@@ -119,8 +119,7 @@ mod test {
 	fn works() {
 		let done = Store::default();
 		let mut world = World::new();
-		world.spawn(setup(done)).auto_trigger(RUN);
-		world.flush();
+		world.spawn(setup(done)).trigger_target(RUN);
 		done.get().xpect_true();
 	}
 }

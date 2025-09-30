@@ -74,7 +74,7 @@ impl OnSpawnBoxed {
 		ev: E,
 	) -> Self {
 		Self::new(move |entity| {
-			entity.auto_trigger(ev);
+			entity.trigger_target(ev);
 		})
 	}
 	pub fn trigger_option<
@@ -87,7 +87,7 @@ impl OnSpawnBoxed {
 	) -> Self {
 		Self::new(move |entity| {
 			if let Some(ev) = ev {
-				entity.auto_trigger(ev);
+				entity.trigger_target(ev);
 			}
 		})
 	}

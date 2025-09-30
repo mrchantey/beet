@@ -1,8 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-mod entity_target_event;
+mod action;
 mod bundle_effect;
+mod entity_target_event;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -79,7 +80,7 @@ pub fn derive_sendit(
 pub fn bundle_effect(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	bundle_effect::bundle_effect(input).into()
+	bundle_effect::impl_bundle_effect(input).into()
 }
 
 /// Cheat sheet for derive syntax,
@@ -96,5 +97,31 @@ pub fn bundle_effect(
 pub fn auto_entity_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	entity_target_event::auto_entity_event(input).into()
+	entity_target_event::impl_entity_target_event(input).into()
+}
+
+
+
+
+
+/// Convenience helper to directly add observers to this entity.
+/// This macro must be placed above `#[derive(Component)]` as it
+/// sets the `on_add` hook.
+/// ## Example
+/// ```rust ignore
+/// #[action(log_on_run)]
+/// #[derive(Component)]
+/// struct LogOnRun(pub String);
+///
+/// fn log_on_run(trigger: On<Run>, query: Populated<&LogOnRun>) {
+/// 	let name = query.get(trigger.target()).unwrap();
+/// 	println!("log_name_on_run: {}", name.0);
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn action(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	action::impl_action(attr, item)
 }

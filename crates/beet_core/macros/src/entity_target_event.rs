@@ -7,7 +7,7 @@ use syn::parse_macro_input;
 
 
 
-pub fn auto_entity_event(
+pub fn impl_entity_target_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);

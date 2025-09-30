@@ -18,6 +18,6 @@ fn rsx_combinator() {
 	world.run_schedule(ApplySnippets);
 	world
 		.entity_mut(button)
-		.auto_trigger(OnClick(MockEvent::new("foo")));
+		.trigger_target(OnClick(MockEvent::new("foo")));
 	get().xpect_eq("foo");
 }

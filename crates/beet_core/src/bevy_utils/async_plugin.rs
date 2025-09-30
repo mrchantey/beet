@@ -372,7 +372,7 @@ impl AsyncEntity {
 		event: E,
 	) -> &Self {
 		self.with(|mut entity| {
-			entity.auto_trigger(event);
+			entity.trigger_target(event);
 		})
 		.await
 	}

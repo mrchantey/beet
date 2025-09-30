@@ -223,7 +223,7 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 	let mut entity = commands.entity(cx.entity);
 
 	if !initial_text.is_empty() {
-		entity.auto_trigger(TextDelta::new(initial_text));
+		entity.trigger_target(TextDelta::new(initial_text));
 	}
 	entity.insert(EntityObserver::new(
 		|ev: On<TextDelta>,

@@ -1,12 +1,11 @@
-use crate::utils::CrateManifest;
-use crate::utils::punctuated_args;
-use beet_core::prelude::*;
+use beet_utils::prelude::AttributeGroup;
+use beet_utils::prelude::pkg_ext;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 
-pub fn impl_action_attr(
+pub fn impl_action(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -21,46 +20,36 @@ fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		item.generics.split_for_impl();
 
-	let beet_flow_path = CrateManifest::get_path_direct("beet_flow");
-
 	let ident_str = &item.ident.to_string();
 
-
-
+	// ie OnAddMyComponent
 	let on_add_ident = syn::Ident::new(
 		&format!("OnAdd{}", ident_str),
 		proc_macro2::Span::call_site(),
 	);
 
-	let turbofish = if item.generics.params.is_empty() {
+	let turbofish_type_generics = if item.generics.params.is_empty() {
 		quote!()
 	} else {
 		quote!(::#type_generics)
 	};
 
 	item.attrs
-	.push(syn::parse_quote!(#[component(on_add=#on_add_ident #turbofish, on_remove = #beet_flow_path::prelude::ActionObservers::on_remove)]));
-	item.attrs.push(
-		syn::parse_quote!(#[require(#beet_flow_path::prelude::ActionObservers)]),
-	);
+	.push(syn::parse_quote!(#[component(on_add=#on_add_ident #turbofish_type_generics)]));
 
-	let observers = punctuated_args(attr)?.into_iter().map(|observer| {
-		quote! {cmd.observe(#observer);}
-	});
+	let observers = AttributeGroup::parse_punctated(attr)?;
+	let beet_path = pkg_ext::internal_or_beet("beet_core");
 
 	Ok(quote! {
 		#[allow(non_snake_case)]
 		fn #on_add_ident #impl_generics(
-			mut world: bevy::ecs::world::DeferredWorld,
-			cx: bevy::ecs::lifecycle::HookContext,
+			mut world: #beet_path::prelude::DeferredWorld,
+			cx: #beet_path::prelude::HookContext,
 		) #where_clause {
-		  #beet_flow_path::prelude::ActionObservers::on_add(&mut world, cx,
-			  |world, observer_entity| {
-					let mut commands = world.commands();
-				  let mut cmd = commands.entity(observer_entity);
-					#(#observers)*
-			  },
-		  );
+			world
+				.commands()
+				.entity(cx.entity)
+			  #(.observe_any(#observers))*;
 		}
 		#item
 	})
@@ -89,4 +78,42 @@ struct MyAction;
 		));
 	}
 	Ok(())
+}
+
+#[cfg(test)]
+mod test {
+	use super::parse;
+	use quote::quote;
+	use sweet::prelude::*;
+	use syn::DeriveInput;
+
+	#[test]
+	fn works() {
+		let input: DeriveInput = syn::parse_quote! {
+			#[derive(Component)]
+			struct Foo;
+		};
+		parse(
+			// equivelent to [action(bar,baz)]
+			quote!(bar, bazz),
+			input,
+		)
+		.unwrap()
+		.xpect_snapshot();
+	}
+	#[test]
+	fn generics() {
+		let input: DeriveInput = syn::parse_quote! {
+			#[derive(Component)]
+			struct Foo<T>;
+		};
+
+		parse(
+			// equivelent to [action(bar,baz::<T>)]
+			quote!(bar, bazz::<T>),
+			input,
+		)
+		.unwrap()
+		.xpect_snapshot();
+	}
 }
