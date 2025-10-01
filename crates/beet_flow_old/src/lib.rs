@@ -31,7 +31,7 @@ pub mod prelude {
 #[cfg(feature = "_doctest")]
 pub mod doctest {
 	pub use crate::prelude::*;
-	pub use bevy::prelude::*;
+	pub use beet_core::prelude::*;
 	/// for docs, create a world with BeetFlowPlugin
 	/// ```
 	/// use beet_flow::doctest::*;
@@ -68,31 +68,4 @@ impl PluginGroup for BeetFlowPlugin {
 			.add(continue_run::continue_run_plugin)
 			.build()
 	}
-}
-
-
-/// Actions can take many forms, these tags help categorize them.
-/// The convention is to add these in a list just after the description
-/// of the action, and before the example:
-/// ```
-/// # use beet_flow::doctest::*;
-/// /// ## Tags
-/// /// - [LongRunning](ActionTag::LongRunning)
-/// /// - [MutateOrigin](ActionTag::MutateOrigin)
-/// struct MyAction;
-/// ```
-pub enum ActionTag {
-	/// Actions concerned with control flow, usually
-	/// triggering [OnRun] and [OnResult] events.
-	ControlFlow,
-	/// Actions that use the [Running] component to run
-	/// over multiple frames.
-	LongRunning,
-	/// This action makes global changes to the world.
-	MutateWorld,
-	/// This action makes changes to the [`origin`](OnRun::origin] entity.
-	MutateOrigin,
-	/// This action is concerned with providing output to the user or
-	/// receiving input.
-	InputOutput,
 }

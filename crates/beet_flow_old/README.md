@@ -16,7 +16,7 @@ A demonstration of a Sequence control flow common in behavior trees
 
 Using `BeetDebugPlugin` will log the name of each action as it is triggered.
 ```rust
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
 let mut app = App::new();

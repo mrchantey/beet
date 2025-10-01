@@ -61,7 +61,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::EntityWorldMutEntityTargetTriggerExt;
 	use beet_core::prelude::IntoWorldMutExt;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	fn setup() -> World {

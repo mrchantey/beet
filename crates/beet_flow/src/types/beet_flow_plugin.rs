@@ -58,3 +58,61 @@ pub fn run_plugin<
 	// app.add_observer(propagate_on_result::<Result>);
 	app.add_observer(interrupt_on_end::<T, E>);
 }
+
+
+/// Actions can take many forms, these tags help categorize them.
+/// The convention is to add these in a list just after the description
+/// of the action, and before the example:
+/// ```
+/// # use beet_flow::prelude::*;
+/// /// ## Tags
+/// /// - [LongRunning](ActionTag::LongRunning)
+/// /// - [MutateOrigin](ActionTag::MutateOrigin)
+/// struct MyAction;
+/// ```
+pub enum ActionTag {
+	/// Actions concerned with control flow, usually
+	/// triggering [OnRun] and [OnResult] events.
+	ControlFlow,
+	/// Actions that use the [Running] component to run
+	/// over multiple frames.
+	LongRunning,
+	/// This action makes global changes to the world.
+	MutateWorld,
+	/// This action makes changes to the [`origin`](OnRun::origin] entity.
+	MutateOrigin,
+	/// This action is concerned with providing output to the user or
+	/// receiving input.
+	InputOutput,
+}
+
+
+/// test helper to collect all [`Run`] calls, storing their [`Name`] or "Unknown" if missing
+#[cfg(test)]
+pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
+	let store = Store::default();
+	world.add_observer(move |ev: On<Run>, query: Query<&Name>| {
+		let name = if let Ok(name) = query.get(ev.target()) {
+			name.to_string()
+		} else {
+			"Unknown".to_string()
+		};
+		store.push(name);
+	});
+	store
+}
+
+/// Collect all [OnResultAction] with a [Name]
+#[cfg(test)]
+pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, End)>> {
+	let store = Store::default();
+	world.add_observer(move |ev: On<End>, query: Query<&Name>| {
+		let name = if let Ok(name) = query.get(ev.target()) {
+			name.to_string()
+		} else {
+			"Unknown".to_string()
+		};
+		store.push((name, ev.event().clone()));
+	});
+	store
+}

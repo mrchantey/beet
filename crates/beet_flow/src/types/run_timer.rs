@@ -52,7 +52,7 @@ pub(crate) fn reset_run_timer_stopped(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

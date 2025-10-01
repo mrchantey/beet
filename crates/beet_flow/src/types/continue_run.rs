@@ -19,7 +19,7 @@ pub struct ContinueRun;
 /// ## Example
 /// This is the `Translate` action found in `beet_spatial`.
 /// ```
-///	# use bevy::prelude::*;
+///	# use beet_core::prelude::*;
 ///	# use beet_flow::prelude::*;
 ///
 /// #[derive(Component)]

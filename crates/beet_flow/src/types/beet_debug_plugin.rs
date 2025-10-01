@@ -63,7 +63,7 @@ impl BeetDebugPlugin {
 	}
 	/// Exclude all, add each manually and handle stdout
 	/// ```rust
-	///	# use bevy::prelude::*;
+	///	# use beet_core::prelude::*;
 	///	# use beet_flow::prelude::*;
 	/// fn my_log_func(_ev: MessageReader<OnLogMessage>) {
 	///

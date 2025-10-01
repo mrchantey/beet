@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A tree where each node is an [`Entity`].
@@ -34,7 +34,7 @@ impl EntityTree {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

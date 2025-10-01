@@ -1,6 +1,6 @@
 // use beet_flow::action_observers;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 #[action(const_response::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
