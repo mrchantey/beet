@@ -3,27 +3,24 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-pub fn run_on_spawn() -> TriggerOnSpawn<'static, false, Run, &'static ChildOf> {
-	default()
-}
-
-/// Sometimes its useful to run an action by spawning an entity,
-/// for example if you want to run on the next frame to avoid
-/// infinite loops or await updated world state.
-/// The [`RunOnSpawn`] component will be removed immediately
-/// and the [`OnRunAction`] will be triggered.
+/// A scene-serializable technique for triggering an event on the entity
+/// this component is attached to. On spawn this component is immediately
+/// removed and replaced with an `OnSpawnDeferred` command to be executed on
+/// the next `OnSpawnDeferred::flush`. This indirection allows this component to be
+/// inserted before any listeners, and only trigger after they have been inserted.
+///
 /// ## Example
 /// ```
-/// # use beet_flow::doctest::*;
+/// # use beet_flow::prelude::*;
 /// # let mut world = world();
-/// world.spawn(RunOnSpawn::default());
+/// world.spawn((TriggerDeferred::run(), EndOnRun::success()));
+/// world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 /// ```
 /// ## Notes
 /// This component is SparsSet as it is frequently added and removed.
 #[derive(Debug, Clone, Component)]
 #[component(storage = "SparseSet",on_add=on_add::<'a,AUTO_PROPAGATE,E,T>)]
-pub struct TriggerOnSpawn<
+pub struct TriggerDeferred<
 	'a,
 	const AUTO_PROPAGATE: bool,
 	E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
@@ -38,17 +35,22 @@ impl<
 	const AUTO_PROPAGATE: bool,
 	E: Default + Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 	T: 'static + Send + Sync + Traversal<E>,
-> Default for TriggerOnSpawn<'a, AUTO_PROPAGATE, E, T>
+> Default for TriggerDeferred<'a, AUTO_PROPAGATE, E, T>
 {
 	fn default() -> Self { Self::new(E::default()) }
 }
+
+impl TriggerDeferred<'static, false, Run, &'static ChildOf> {
+	pub fn run() -> Self { default() }
+}
+
 
 impl<
 	'a,
 	const AUTO_PROPAGATE: bool,
 	E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 	T: 'static + Send + Sync + Traversal<E>,
-> TriggerOnSpawn<'a, AUTO_PROPAGATE, E, T>
+> TriggerDeferred<'a, AUTO_PROPAGATE, E, T>
 {
 	/// Create a new [`TriggerOnSpawn`] with the provided event
 	pub fn new(ev: E) -> Self {
@@ -74,9 +76,11 @@ fn on_add<
 	world.commands().queue(move |world: &mut World| {
 		let ev = world
 			.entity_mut(entity)
-			.take::<TriggerOnSpawn<'a, AUTO_PROPAGATE, E, T>>()
-			.expect("TriggerOnSpawn: component missing");
-		world.entity_mut(entity).trigger_target(ev.event);
+			.take::<TriggerDeferred<'a, AUTO_PROPAGATE, E, T>>()
+			.expect("TriggerDeferred: component missing");
+		world
+			.entity_mut(entity)
+			.insert(OnSpawnDeferred::trigger(ev.event));
 	});
 }
 
@@ -91,9 +95,10 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 		let observers = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn((EndOnRun::success(), run_on_spawn()));
+		world.spawn((TriggerDeferred::run(), EndOnRun::success()));
+		observers.len().xpect_eq(0);
+		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);
 		observers.get_index(0).unwrap().xpect_eq(SUCCESS);
-		// app.world_mut().flush();
 	}
 }
