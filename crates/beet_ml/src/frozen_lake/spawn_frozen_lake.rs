@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::time::Duration;
 use sweet::prelude::*;
 

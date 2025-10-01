@@ -33,7 +33,7 @@ impl AssetLoader for BertLoader {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	// possibly flaky tests here, getting occasional 403 on tokenizer.json

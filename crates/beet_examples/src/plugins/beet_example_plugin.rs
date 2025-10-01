@@ -2,7 +2,7 @@ use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::log::LogPlugin;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use sweet::prelude::*;
 
 

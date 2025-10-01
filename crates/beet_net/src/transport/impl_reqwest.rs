@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use reqwest::Client;
 use reqwest::RequestBuilder;
 use std::sync::LazyLock;

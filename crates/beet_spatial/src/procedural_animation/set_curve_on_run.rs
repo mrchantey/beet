@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::Interval;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 
@@ -43,7 +43,7 @@ impl Default for SetCurveOnRun {
 impl SetCurveOnRun {}
 
 fn set_curve_on_run(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	transforms: Query<&Transform>,
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,

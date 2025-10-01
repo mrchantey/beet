@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::f32::consts::TAU;
 
 
@@ -67,7 +67,7 @@ pub(crate) fn hover(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 
@@ -51,7 +51,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

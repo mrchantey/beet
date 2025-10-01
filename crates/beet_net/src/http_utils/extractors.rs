@@ -279,7 +279,7 @@ impl HttpExt {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use bytes::Bytes;
 	use sweet::prelude::*;
 

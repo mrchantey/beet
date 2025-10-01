@@ -1,5 +1,5 @@
 use crate::prelude::SidebarInfo;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 

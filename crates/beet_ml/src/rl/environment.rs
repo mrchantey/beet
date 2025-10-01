@@ -1,5 +1,5 @@
 use bevy::ecs::component::Mutable;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hash;
 use sweet::prelude::*;

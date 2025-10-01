@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Random walk that uses a pair of circles
 /// to create somewhat cohesive movement, see [wander_impulse]
@@ -92,7 +92,7 @@ pub(crate) fn wander(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

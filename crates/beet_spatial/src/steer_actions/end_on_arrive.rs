@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// Succeeds when the agent arrives at the [`SteerTarget`].

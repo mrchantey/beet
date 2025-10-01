@@ -22,6 +22,6 @@ fn main() {
 	// assert_eq!(app.world().get::<TriggerCount>(entity).unwrap().0, 1);
 }
 
-fn increment(trigger: On<OnRun>, mut query: Query<&mut TriggerCount>) {
+fn increment(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
 	query.get_mut(trigger.target()).unwrap().as_mut().0 += 1;
 }

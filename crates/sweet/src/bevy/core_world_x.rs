@@ -22,7 +22,10 @@ pub impl World {
 	}
 
 	// TODO deprecated, bevy 0.16 fixes this
-	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(&mut self, event: E) -> &mut Self {
+	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&mut self,
+		event: E,
+	) -> &mut Self {
 		self.flush();
 		self.trigger(event);
 		self.flush();

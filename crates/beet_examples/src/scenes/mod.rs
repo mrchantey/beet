@@ -3,7 +3,7 @@ pub mod ml;
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::pbr::CascadeShadowConfigBuilder;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::f32::consts::PI;
 
 

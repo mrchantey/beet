@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A unique identifier for a stat,

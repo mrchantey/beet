@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::reflect::DynamicStruct;
 
 
@@ -59,7 +59,7 @@ pub fn Form(
 
 #[cfg(test)]
 mod test {
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::reflect::DynamicStruct;
 	use sweet::prelude::*;
 

@@ -160,7 +160,7 @@ impl RouteHandler {
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

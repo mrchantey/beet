@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreFlow`]
@@ -15,7 +15,7 @@ impl NearestSentence {
 }
 
 fn nearest_sentence(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
@@ -50,7 +50,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

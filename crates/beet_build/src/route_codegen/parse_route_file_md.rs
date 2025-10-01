@@ -68,7 +68,7 @@ pub fn parse_route_file_md(
 mod test {
 	use super::super::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

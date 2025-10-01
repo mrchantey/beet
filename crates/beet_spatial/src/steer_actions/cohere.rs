@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 /// Encourages boids to move towards the average position of their neighbors, keeping the flock together.

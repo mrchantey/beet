@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 use std::f32::consts::FRAC_PI_4;
 use std::f32::consts::PI;

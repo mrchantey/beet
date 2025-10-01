@@ -1,7 +1,5 @@
 use crate::prelude::*;
-#[cfg(feature = "tokens")]
-use beet_core::prelude::ToTokens;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use http::Uri;
 use http::uri::InvalidUri;
 use std::path::Path;
@@ -256,7 +254,7 @@ impl std::fmt::Display for RoutePathTree {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

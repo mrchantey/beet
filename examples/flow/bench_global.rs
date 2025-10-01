@@ -10,7 +10,7 @@ fn foobar(_trigger: On<OnRunAction>) {
 	println!("foobar");
 }
 
-fn trigger_count(trigger: On<OnRun>, mut query: Query<&mut TriggerCount>) {
+fn trigger_count(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
 	query.get_mut(trigger.action).unwrap().as_mut().0 += 1;
 }
 

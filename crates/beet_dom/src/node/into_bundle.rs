@@ -35,7 +35,7 @@ where
 	///
 	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_dom::prelude::*;
 	///
 	/// let bundle = if true {
@@ -241,7 +241,7 @@ impl IntoBundle<Self> for isize {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

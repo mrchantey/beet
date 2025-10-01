@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::time::Duration;
 
 /// Play a procedural animation with a provided [`SerdeCurve`] for
@@ -81,7 +81,7 @@ pub(crate) fn play_procedural_animation(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

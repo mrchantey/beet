@@ -133,7 +133,7 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 	use tokio::net::TcpListener;
 	use tokio::task::JoinHandle;

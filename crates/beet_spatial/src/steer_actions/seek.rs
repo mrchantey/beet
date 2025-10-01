@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 /// ## Tags
@@ -106,7 +106,7 @@ pub(crate) fn seek(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

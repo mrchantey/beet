@@ -1,5 +1,5 @@
 use super::StatValue;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::ops::Range;
 
 

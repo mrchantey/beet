@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Finds the [`Sentence`] with the highest similarity to the agent's,
 /// then set it as the agent's [`SteerTarget`].
@@ -42,7 +42,7 @@ impl<F: Component> Default for SentenceSteerTarget<F> {
 }
 
 fn sentence_steer_target<F: Component>(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
 	query: Query<(&HandleWrapper<Bert>, &SentenceSteerTarget<F>)>,
 	sentences: Query<&Sentence>,
@@ -87,7 +87,7 @@ fn sentence_steer_target<F: Component>(
 // 	use crate::prelude::*;
 // 	use beet_flow::prelude::*;
 // 	use beet_spatial::steer::SteerTarget;
-// 	use bevy::prelude::*;
+// 	use beet_core::prelude::*;
 // 	use sweet::prelude::*;
 
 // 	#[test]

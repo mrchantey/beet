@@ -2,7 +2,7 @@ use super::*;
 use beet_flow::prelude::*;
 use bevy::asset::LoadState;
 // use bevy::asset::LoadState;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Inserts the given component when a matching asset event is received.
 /// This requires the entity to have a Handle<T>.

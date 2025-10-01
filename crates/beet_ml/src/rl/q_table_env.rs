@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 // /// A number generator for determining.
 // rng: StdRng,
 // /// Whether there is a 2/3 chance the agent moves left or right of the intended direction.

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::scene::SceneInstanceReady;
 use std::f32::consts::FRAC_PI_2;
 

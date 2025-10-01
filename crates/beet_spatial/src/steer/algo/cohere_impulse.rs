@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Calculate a cohesion impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#exercise-515).
@@ -36,7 +36,7 @@ pub fn cohere_impulse<'a, T>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

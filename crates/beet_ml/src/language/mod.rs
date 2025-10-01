@@ -6,7 +6,7 @@ mod run_with_user_sentence;
 pub use self::run_with_user_sentence::*;
 
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::borrow::Cow;
 
 #[derive(Default)]

@@ -1,5 +1,5 @@
 use beet_flow::prelude::RunTimer;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::time::Duration;
 
 /// Sometimes we want a fixed duration and others a

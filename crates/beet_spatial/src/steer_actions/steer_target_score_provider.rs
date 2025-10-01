@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`],
 /// This scorer is binary, if the distance is within the min and max radius, the score is 1,

@@ -1,5 +1,5 @@
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -170,7 +170,7 @@ pub fn handle_episode_end<T: EpisodeParams>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	fn start_ep(

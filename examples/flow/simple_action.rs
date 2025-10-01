@@ -6,7 +6,7 @@ use sweet::prelude::EntityWorldMutwExt;
 #[derive(Component)]
 struct LogOnRun(pub String);
 
-fn log_on_run(ev: On<OnRun>, query: Query<&LogOnRun>) {
+fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) {
 	let name = query
 		// ensure that we use ev.action, wich is the 'action entity'
 		// ev.target() is the 'action observer'

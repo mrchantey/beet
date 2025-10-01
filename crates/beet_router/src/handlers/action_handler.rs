@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 
@@ -82,7 +82,7 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

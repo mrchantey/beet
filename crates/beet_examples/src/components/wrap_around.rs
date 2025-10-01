@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use sweet::prelude::When;
 
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;

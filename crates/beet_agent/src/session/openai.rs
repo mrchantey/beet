@@ -284,7 +284,7 @@ fn openai_message_request(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	async fn text_to_text() {

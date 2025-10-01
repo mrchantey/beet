@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::ecs::lifecycle::ComponentHook;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::reflect::Reflectable;
 
 /// A [`SceneFilter`] used to constrain the components serialized to the client scene,

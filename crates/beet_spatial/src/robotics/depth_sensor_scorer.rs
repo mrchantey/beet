@@ -1,6 +1,6 @@
 use super::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Sets the [`Score`] based on the [`DepthValue`], usually
 /// updated by a sensor.

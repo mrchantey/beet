@@ -2,7 +2,7 @@ use bevy::ecs::component::ComponentCloneBehavior;
 use bevy::ecs::component::ComponentDescriptor;
 use bevy::ecs::component::StorageType;
 use bevy::ecs::world::FilteredEntityMut;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::alloc::Layout;
 
 fn main() {

@@ -41,7 +41,7 @@ pub mod prelude {
 pub mod doctest {
 	pub use crate::prelude::*;
 	pub use beet_flow::prelude::*;
-	pub use bevy::prelude::*;
+	pub use beet_core::prelude::*;
 	/// for docs, create a world with BeetFlowPlugin
 	/// ```
 	/// use beet_spatial::doctest::*;
@@ -57,7 +57,7 @@ pub mod doctest {
 }
 use crate::prelude::*;
 use bevy::app::PluginGroupBuilder;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Plugins used for most beet apps.
 #[derive(Default, Clone)]

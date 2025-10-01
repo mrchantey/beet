@@ -1,6 +1,6 @@
 #[allow(unused)]
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 #[derive(Component)]
 pub struct Reward(pub f32);

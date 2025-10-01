@@ -219,7 +219,7 @@ fn script(content: impl Into<String>) -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

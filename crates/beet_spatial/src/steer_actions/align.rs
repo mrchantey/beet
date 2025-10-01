@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 /// Steers boids towards the average heading of their neighbors, promoting synchronized movement.

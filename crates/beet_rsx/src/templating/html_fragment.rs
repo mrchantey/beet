@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Utilities for rendering HTML fragments.
 pub struct HtmlFragment;
@@ -145,7 +145,7 @@ impl HtmlBuilder<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

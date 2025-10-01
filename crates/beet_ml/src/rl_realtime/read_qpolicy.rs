@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 
@@ -24,7 +24,7 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 }
 
 fn read_q_policy<P: QPolicy + Asset>(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,

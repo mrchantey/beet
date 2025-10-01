@@ -1,5 +1,5 @@
 use crate::prelude::NodeExpr;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use std::ops::DerefMut;

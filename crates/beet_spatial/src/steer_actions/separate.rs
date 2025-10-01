@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 /// Ensures that boids avoid crowding neighbors by maintaining a minimum distance from each other.

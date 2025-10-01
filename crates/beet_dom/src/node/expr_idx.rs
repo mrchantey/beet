@@ -1,6 +1,6 @@
 #[cfg(feature = "tokens")]
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// The index in which an expression appears in a template macro, assigned
 /// in the order of the visitor that spawned it, ie rstml or rsx combinator.

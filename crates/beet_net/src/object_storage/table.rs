@@ -11,7 +11,7 @@ use uuid::Uuid;
 ///
 /// # Example
 /// ```
-/// # use bevy::prelude::*;
+/// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
 /// let table = temp_table::<TableItem<String>>();
@@ -49,7 +49,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let table = temp_table::<TableItem<String>>();
 	/// ```
@@ -67,7 +67,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let table = temp_table::<TableItem<String>>();
 	/// assert_eq!(table.name(), "temp");
@@ -105,7 +105,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -122,7 +122,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -147,7 +147,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -166,7 +166,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -182,7 +182,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -203,7 +203,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -240,7 +240,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
@@ -262,7 +262,7 @@ impl<T: TableRow> TableStore<T> {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();

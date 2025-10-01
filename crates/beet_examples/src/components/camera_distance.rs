@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy::window::WindowResized;
 

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 //// Added to children of Collectables and Zones for consideration in [`FindStatSteerTarget`]
 #[derive(Default, Component, Reflect)]

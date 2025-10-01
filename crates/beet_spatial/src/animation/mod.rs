@@ -9,7 +9,7 @@ mod play_animation;
 pub use self::play_animation::*;
 pub use self::run_on_animation_ready::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A plugin containing systems required for animation actions:

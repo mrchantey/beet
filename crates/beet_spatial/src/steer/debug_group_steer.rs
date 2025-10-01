@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::input::common_conditions::input_toggle_active;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 

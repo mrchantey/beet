@@ -2,7 +2,7 @@
 use crate::prelude::*;
 use anyhow::Error as E;
 use anyhow::Result;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use candle_core::Tensor;
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::BertModel;

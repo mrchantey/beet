@@ -6,7 +6,7 @@ These algorithms are from the book "The Nature of Code" by Daniel Shiffman
 [Craig Reynolds - References](https://www.red3d.com/cwr/steer/)
 */
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Calculate a seek impulse
 /// as described [here](https://www.youtube.com/watch?v=p1Ws1ZhG36g&list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=585s)
@@ -91,7 +91,7 @@ pub fn evade_impulse(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

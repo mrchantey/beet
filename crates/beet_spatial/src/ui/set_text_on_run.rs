@@ -1,5 +1,5 @@
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -27,7 +27,7 @@ impl<F: Component> SetTextOnRun<F> {
 }
 
 fn set_text_on_run<F: Component>(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	query: Query<&SetTextOnRun<F>, Added<Running>>,
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,

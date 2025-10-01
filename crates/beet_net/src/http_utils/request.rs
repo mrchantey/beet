@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bytes::Bytes;
 use http::Uri;
 use http::header::IntoHeaderName;

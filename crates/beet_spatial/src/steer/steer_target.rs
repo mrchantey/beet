@@ -2,7 +2,7 @@ use anyhow::Result;
 use beet_flow::prelude::*;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// Description of a target used by steering behaviors.

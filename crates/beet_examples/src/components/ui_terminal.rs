@@ -3,7 +3,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::Node;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
 use sweet::prelude::When;

@@ -1,6 +1,6 @@
 use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::time::Duration;
 use sweet::prelude::*;
 
@@ -57,7 +57,7 @@ impl PlayAnimation {
 
 /// Play animations for behaviors that run after the agent loads
 fn play_animation_on_run(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
 	query: Query<&PlayAnimation>,

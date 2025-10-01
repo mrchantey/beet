@@ -1,5 +1,5 @@
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use sweet::prelude::*;
 
 /// Once an [`AnimationPlayer`] is loaded,

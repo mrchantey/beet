@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// The distance at which an agent should begin to slow down, defaults to `0.5`
 #[derive(

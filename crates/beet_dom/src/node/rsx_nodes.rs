@@ -1,6 +1,6 @@
 #[cfg(feature = "tokens")]
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
 pub type RsxNodes = (

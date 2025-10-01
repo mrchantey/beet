@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Applies constant translation to [`Running::origin`],
 /// multiplied by [`Time::delta_secs`]
@@ -49,7 +49,7 @@ pub(crate) fn translate(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

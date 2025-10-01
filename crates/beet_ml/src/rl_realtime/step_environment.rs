@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::marker::PhantomData;
 use sweet::prelude::RandomSource;
 
@@ -38,7 +38,7 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
@@ -98,7 +98,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

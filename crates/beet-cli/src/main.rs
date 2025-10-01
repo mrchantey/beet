@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_cli::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
 

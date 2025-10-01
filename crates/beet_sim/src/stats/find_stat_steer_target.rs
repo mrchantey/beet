@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
 #[action(find_steer_target)]
@@ -19,7 +19,7 @@ impl FindStatSteerTarget {}
 // TODO this shouldnt run every frame?
 
 fn find_steer_target(
-	ev: On<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
 	transforms: Query<&Transform>,
 	targets: Query<(&StatId, &StatValue, &ChildOf), With<StatProvider>>,

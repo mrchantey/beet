@@ -7,7 +7,7 @@ use beet_dom::prelude::*;
 /// ## Example
 /// ```
 /// # use beet_rsx::prelude::*;
-/// # use bevy::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 ///
 /// #[template]
@@ -169,7 +169,7 @@ fn collect_slot_children(
 mod test {
 	use crate::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[template]
