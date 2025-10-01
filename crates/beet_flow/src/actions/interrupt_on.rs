@@ -30,11 +30,8 @@ pub(crate) fn interrupt_on_run<T: 'static + Send + Sync>(
 
 /// Removes [`Running`] from the entity when [`End`] is triggered.
 /// Also removes [`Running`] from children unless they have a [`NoInterrupt`].
-pub(crate) fn interrupt_on_end<
-	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
->(
-	ev: On<End<T, E>>,
+pub(crate) fn interrupt_on_end<T: 'static + Send + Sync>(
+	ev: On<End<T>>,
 	mut commands: Commands,
 	children: Query<&Children>,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
@@ -91,7 +88,7 @@ mod test {
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
-			.trigger_target(SUCCESS);
+			.trigger_target(End::success());
 
 		// removes from parent and first child
 		world.query_once::<&Running>().len().xpect_eq(1);
@@ -99,7 +96,9 @@ mod test {
 	#[test]
 	fn interrupt_on_end_with_no_interrupt() {
 		let mut world = setup();
-		world.spawn((NoInterrupt, Running)).trigger_target(SUCCESS);
+		world
+			.spawn((NoInterrupt, Running))
+			.trigger_target(End::success());
 		// leaves parent
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}

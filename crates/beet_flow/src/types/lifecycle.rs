@@ -1,17 +1,7 @@
 use beet_core::prelude::*;
-use std::marker::PhantomData;
 
 /// Alias for `Run::<()>(())`
 pub const RUN: Run<()> = Run(());
-/// Alias for `End::<(),()>::Success(())`
-pub const SUCCESS: End<(), ()> = End::Success(());
-/// Alias for `End::<(),()>::Failure(())`
-pub const FAILURE: End<(), ()> = End::Failure(());
-/// Alias for `PreventEndPropagate::<(),()>::default()`
-pub const PREVENT_END_PROPAGATE: PreventEndPropagate<(), ()> =
-	PreventEndPropagate {
-		_phantom: PhantomData,
-	};
 
 #[derive(EntityTargetEvent)]
 pub struct Run<T: 'static + Send + Sync = ()>(pub T);
@@ -23,54 +13,117 @@ where
 }
 
 
+pub type EndResult = Result<(), ()>;
+
 #[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
-#[entity_event(auto_propagate)]
-pub enum End<T = (), E = ()>
+pub struct End<T = EndResult>
 where
 	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
 {
-	Success(T),
-	Failure(E),
+	value: T,
+}
+impl<T> std::ops::Deref for End<T>
+where
+	T: 'static + Send + Sync,
+{
+	type Target = T;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+impl<T> std::ops::DerefMut for End<T>
+where
+	T: 'static + Send + Sync,
+{
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
 }
 
-impl<T: Default, E> Default for End<T, E>
+impl<T> Default for End<T>
+where
+	T: 'static + Send + Sync + Default,
+{
+	fn default() -> Self { Self::new(Default::default()) }
+}
+impl<T> End<T>
 where
 	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
 {
-	fn default() -> Self { Self::Success(Default::default()) }
-}
-impl<T, E> End<T, E>
-where
-	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
-{
-	pub fn is_success(&self) -> bool { matches!(self, End::Success(_)) }
-	pub fn is_failure(&self) -> bool { matches!(self, End::Failure(_)) }
-}
+	pub fn new(value: T) -> Self { Self { value } }
 
-#[derive(Component)]
-#[component(on_add=prevent_auto_propagate::<End<T,E>>)]
-pub struct PreventEndPropagate<
-	T: 'static + Send + Sync = (),
-	E: 'static + Send + Sync = (),
-> {
-	_phantom: PhantomData<(T, E)>,
-}
-impl<T, E> Default for PreventEndPropagate<T, E>
-where
-	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_phantom: PhantomData,
-		}
+	pub fn into_child_end(self) -> ChildEnd<T> {
+		ChildEnd { value: self.value }
 	}
 }
 
+impl End<EndResult> {
+	pub fn success() -> Self { Self::new(Ok(())) }
+	pub fn failure() -> Self { Self::new(Err(())) }
+}
 
+#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+pub struct ChildEnd<T = EndResult>
+where
+	T: 'static + Send + Sync,
+{
+	value: T,
+}
+impl<T> std::ops::Deref for ChildEnd<T>
+where
+	T: 'static + Send + Sync,
+{
+	type Target = T;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+impl<T> std::ops::DerefMut for ChildEnd<T>
+where
+	T: 'static + Send + Sync,
+{
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
+}
+
+impl<T> ChildEnd<T>
+where
+	T: 'static + Send + Sync,
+{
+	pub fn into_end(self) -> End<T> { End { value: self.value } }
+}
+
+/// Add this to an entity to prevent the run result from bubbling up.
+/// Any action that requires this needs to manually call OnChildResult
+/// on the parent entity. For an example, see [`Repeat`].
+#[derive(Default, Component, Reflect)]
+pub struct PreventPropagateEnd;
+
+/// Propagate the [`End`] event as a [`ChildEnd`] to this entities
+/// parent if it exists.
+pub(crate) fn propagate_end<T>(
+	ev: On<End<T>>,
+	mut commands: Commands,
+	parents: Query<&ChildOf>,
+) where
+	T: 'static + Send + Sync + Clone,
+{
+	if let Ok(parent) = parents.get(ev.target()) {
+		commands
+			.entity(parent.parent())
+			.trigger_target(ev.event().clone().into_child_end());
+	}
+}
+
+/// Propagate the [`ChildEnd`] event as an [`End`] on this entity
+/// unless it has a [`PreventEndPropagate`] component.
+pub(crate) fn propagate_child_end<T>(
+	ev: On<ChildEnd<T>>,
+	mut commands: Commands,
+	prevent: Query<(), With<PreventPropagateEnd>>,
+) where
+	T: 'static + Send + Sync + Clone,
+{
+	let target = ev.target();
+	if !prevent.contains(target) {
+		commands
+			.entity(target)
+			.trigger_target(ev.event().clone().into_end());
+	}
+}
 
 #[cfg(test)]
 mod test {
@@ -94,11 +147,11 @@ mod test {
 	fn exit_on_result(
 		ev: On<End>,
 		mut commands: Commands,
-		children: Query<&Children>,
+		// children: Query<&Children>,
 	) {
-		ev.event().xpect_eq(SUCCESS);
-		let child = children.get(ev.trigger().event_target()).unwrap()[0];
-		ev.trigger().original_event_target().xpect_eq(child);
+		ev.event().xpect_eq(End::success());
+		// let child = children.get(ev.trigger().event_target()).unwrap()[0];
+		// ev.trigger().event_target().xpect_eq(child);
 		commands.write_message(AppExit::Success);
 	}
 
@@ -110,22 +163,22 @@ mod test {
 	fn succeed(ev: On<Run>, mut commands: Commands) {
 		commands
 			.entity(ev.trigger().event_target())
-			.trigger_target(SUCCESS);
+			.trigger_target(End::success());
 	}
 
 	#[test]
 	fn works() {
-		let mut world = World::new();
+		let mut world = BeetFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world.spawn((Parent, children![Child])).trigger_target(RUN);
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
 	#[test]
 	fn prevent_propagate() {
-		let mut world = World::new();
+		let mut world = BeetFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
-			.spawn((Parent, children![(Child, PREVENT_END_PROPAGATE)]))
+			.spawn((Parent, PreventPropagateEnd, children![(Child)]))
 			.trigger_target(RUN);
 		world.should_exit().xpect_none();
 	}

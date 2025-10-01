@@ -16,24 +16,20 @@ use beet_core::prelude::*;
 /// 	.spawn(EndOnRun::success())
 /// 	.trigger_target(RUN);
 /// ```
-#[action(end_on_run::<R,T, E>)]
+#[action(end_on_run::<R,E>)]
 #[derive(Debug, Component, PartialEq, Eq)]
 pub struct EndOnRun<
 	R: 'static + Send + Sync = (),
-	T: 'static + Send + Sync + Clone = (),
-	E: 'static + Send + Sync + Clone = (),
+	E: 'static + Send + Sync + Clone = EndResult,
 > {
-	event: End<T, E>,
+	event: End<E>,
 	phantom: std::marker::PhantomData<R>,
 }
 
-impl<
-	R: 'static + Send + Sync,
-	T: 'static + Send + Sync + Clone,
-	E: 'static + Send + Sync + Clone,
-> EndOnRun<R, T, E>
+impl<R: 'static + Send + Sync, E: 'static + Send + Sync + Clone>
+	EndOnRun<R, E>
 {
-	pub fn new(event: End<T, E>) -> Self {
+	pub fn new(event: End<E>) -> Self {
 		Self {
 			event,
 			phantom: default(),
@@ -42,20 +38,16 @@ impl<
 }
 
 
-impl EndOnRun<(), (), ()> {
+impl EndOnRun<(), EndResult> {
 	/// Create a new [`EndOnRun`] with [`End::Success`]
-	pub fn success() -> Self { Self::new(SUCCESS) }
-	pub fn failure() -> Self { Self::new(FAILURE) }
+	pub fn success() -> Self { Self::new(End::success()) }
+	pub fn failure() -> Self { Self::new(End::failure()) }
 }
 
-fn end_on_run<
-	R: 'static + Send + Sync,
-	T: 'static + Send + Sync + Clone,
-	E: 'static + Send + Sync + Clone,
->(
+fn end_on_run<R: 'static + Send + Sync, E: 'static + Send + Sync + Clone>(
 	ev: On<Run<R>>,
 	mut commands: Commands,
-	action: Query<&EndOnRun<T>>,
+	action: Query<&EndOnRun<R, E>>,
 ) -> Result {
 	let entity = ev.trigger().event_target();
 	let action = action.get(entity)?;
@@ -77,6 +69,6 @@ mod test {
 		world.spawn(EndOnRun::success()).trigger_target(RUN);
 
 		observed.len().xpect_eq(1);
-		observed.get_index(0).unwrap().xpect_eq(SUCCESS);
+		observed.get_index(0).unwrap().xpect_eq(End::success());
 	}
 }

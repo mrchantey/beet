@@ -64,7 +64,7 @@ mod test {
 		world.get::<Running>(entity).xpect_none();
 		world.entity_mut(entity).trigger_target(RUN);
 		world.get::<Running>(entity).xpect_some();
-		world.entity_mut(entity).trigger_target(SUCCESS);
+		world.entity_mut(entity).trigger_target(End::success());
 		world.get::<Running>(entity).xpect_none();
 	}
 }

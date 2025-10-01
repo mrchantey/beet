@@ -6,7 +6,7 @@ pub struct BeetFlowPlugin;
 
 impl Plugin for BeetFlowPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(run_plugin::<(), (), ()>)
+		app.add_plugins(run_plugin::<(), EndResult>)
 			.configure_sets(Update, PreTickSet)
 			.configure_sets(Update, TickSet.after(PreTickSet))
 			.configure_sets(Update, PostTickSet.after(TickSet))
@@ -20,7 +20,7 @@ impl Plugin for BeetFlowPlugin {
 			(
 				tick_run_timers,
 				// return_in_duration must be after tick_run_timers
-				end_in_duration::<(), ()>,
+				end_in_duration::<EndResult>,
 			)
 				.chain()
 				.in_set(TickSet),
@@ -48,15 +48,15 @@ pub struct PostTickSet;
 /// ensuring events are properly propagated and interrupted.
 pub fn run_plugin<
 	R: 'static + Send + Sync,
-	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
+	E: 'static + Send + Sync + Clone,
 >(
 	app: &mut App,
 ) {
 	// app.add_observer(propagate_on_run::<Run>);
 	app.add_observer(interrupt_on_run::<R>);
-	// app.add_observer(propagate_on_result::<Result>);
-	app.add_observer(interrupt_on_end::<T, E>);
+	app.add_observer(interrupt_on_end::<E>);
+	app.add_observer(propagate_end::<E>);
+	app.add_observer(propagate_child_end::<E>);
 }
 
 
