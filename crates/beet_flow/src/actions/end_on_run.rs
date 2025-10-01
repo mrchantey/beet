@@ -1,20 +1,20 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Immediately return a provided value when [`OnRun`] is called,
+/// Immediately return a provided value when [`Run`] is called,
 /// regardless of the world state.
-/// As an analogy this is similar to a `const` variable, although
+/// This is conceptually similar to a `const` variable, although
 /// it technically can be changed by some external system.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Example
-/// returns `RunResult::Success` when triggered.
+/// returns `SUCCESS` when triggered.
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
-/// world
-/// 	.spawn(EndOnRun(RunResult::Success))
-/// 	.trigger(OnRun::local());
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// World::new()
+/// 	.spawn(EndOnRun::success())
+/// 	.trigger_target(RUN);
 /// ```
 #[action(end_on_run::<R,T, E>)]
 #[derive(Debug, Component, PartialEq, Eq)]

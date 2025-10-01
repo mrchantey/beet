@@ -14,4 +14,7 @@ pub mod prelude {
 	pub use crate::actions::*;
 	pub use crate::events::*;
 	pub use crate::types::*;
+
+	#[cfg(doc)]
+	pub use beet_core::prelude::*;
 }
