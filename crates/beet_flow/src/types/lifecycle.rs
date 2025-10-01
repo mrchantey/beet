@@ -43,7 +43,7 @@ where
 }
 
 #[derive(Component)]
-#[component(on_add=prevent_auto_propagate::<true,End<T,E>,&'static ChildOf>)]
+#[component(on_add=prevent_auto_propagate::<End<T,E>>)]
 pub struct PreventEndPropagate<
 	T: 'static + Send + Sync = (),
 	E: 'static + Send + Sync = (),

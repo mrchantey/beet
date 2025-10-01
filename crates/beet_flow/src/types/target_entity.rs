@@ -16,18 +16,12 @@ pub enum TargetEntity {
 
 impl TargetEntity {
 	/// Get the target entity for the given trigger.
-	pub fn get_target<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		&self,
-		trigger: &EntityTargetTrigger<AUTO_PROPAGATE, E, T>,
-	) -> Entity {
+	pub fn get_target<E: EntityTargetEvent>(&self, ev: &On<E>) -> Entity {
 		match self {
-			TargetEntity::Target => trigger.event_target(),
-			TargetEntity::OriginalTarget => trigger.original_event_target(),
+			TargetEntity::Target => E::event_target(ev.trigger()),
+			TargetEntity::OriginalTarget => {
+				E::original_event_target(ev.trigger())
+			}
 			TargetEntity::Other(entity) => *entity,
 		}
 	}

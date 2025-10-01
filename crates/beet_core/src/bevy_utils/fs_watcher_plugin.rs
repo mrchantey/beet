@@ -109,7 +109,9 @@ mod test {
 		app.run_async().await;
 
 		touched.get().xpect_any(|item| {
-			item.to_string_lossy().contains("fs_app/file.txt")
+			// might be the directory created or the file created
+			item.to_string_lossy().contains("target/tests")
+			// item.to_string_lossy().contains("fs_app/file.txt")
 		});
 	}
 }

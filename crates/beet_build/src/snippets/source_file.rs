@@ -100,6 +100,9 @@ pub fn parse_file_watch_events(
 					SourceFile::new(ev.path.clone()),
 				));
 			}
+			EventKind::Create(CreateKind::Folder) => {
+				// noop
+			}
 			// emitted for both the from and to renames so
 			// assume if no matches, its the To event
 			EventKind::Modify(ModifyKind::Name(_)) => {

@@ -1,4 +1,12 @@
+mod interrupt_on;
+pub use interrupt_on::*;
 mod trigger_deferred;
 pub use trigger_deferred::*;
 mod end_on_run;
 pub use end_on_run::*;
+mod end_in_duration;
+pub use end_in_duration::*;
+mod insert_on;
+pub use insert_on::*;
+mod remove_on;
+pub use remove_on::*;

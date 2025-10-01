@@ -236,11 +236,7 @@ pub impl EntityWorldMut<'_> {
 }
 
 
-pub fn prevent_auto_propagate<
-	const AUTO_PROPAGATE: bool,
-	E: for<'a> Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-	T: 'static + Traversal<E>,
->(
+pub fn prevent_auto_propagate<E: EntityTargetEvent>(
 	mut world: DeferredWorld,
 	cx: HookContext,
 ) {
@@ -248,8 +244,51 @@ pub fn prevent_auto_propagate<
 		.commands()
 		.entity(cx.entity)
 		.observe_any(move |mut ev: On<E>| {
-			ev.trigger_mut().set_propagate(false);
+			E::set_auto_propagate(ev.trigger_mut(), false);
 		});
+}
+
+
+pub trait OnEntityTargetEvent {
+	fn target(&self) -> Entity;
+	fn original_target(&self) -> Entity;
+}
+
+impl<'w, 't, E> OnEntityTargetEvent for On<'w, 't, E, ()>
+where
+	E: EntityTargetEvent,
+{
+	fn target(&self) -> Entity { E::event_target(self.trigger()) }
+	fn original_target(&self) -> Entity {
+		E::original_event_target(self.trigger())
+	}
+}
+
+pub trait EntityTargetEvent: Event {
+	fn event_target(trigger: &Self::Trigger<'_>) -> Entity;
+	fn original_event_target(trigger: &Self::Trigger<'_>) -> Entity;
+	fn set_auto_propagate(
+		trigger: &mut Self::Trigger<'_>,
+		auto_propagate: bool,
+	);
+}
+impl<const AUTO_PROPAGATE: bool, E, T> EntityTargetEvent for E
+where
+	for<'a> E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
+	T: Traversal<E>,
+{
+	fn event_target(trigger: &Self::Trigger<'_>) -> Entity {
+		trigger.event_target()
+	}
+	fn original_event_target(trigger: &Self::Trigger<'_>) -> Entity {
+		trigger.original_event_target()
+	}
+	fn set_auto_propagate(
+		trigger: &mut Self::Trigger<'_>,
+		auto_propagate: bool,
+	) {
+		trigger.set_propagate(auto_propagate);
+	}
 }
 
 #[cfg(test)]

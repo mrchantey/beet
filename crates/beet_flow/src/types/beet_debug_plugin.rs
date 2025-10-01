@@ -1,8 +1,6 @@
-use super::PostTickSet;
 use crate::prelude::*;
-use beet_core::prelude::When;
+use beet_core::prelude::*;
 use bevy::color::palettes::tailwind;
-use bevy::prelude::*;
 use std::borrow::Cow;
 
 
@@ -13,12 +11,12 @@ use std::borrow::Cow;
 /// will print to stdout if [`Self::log_to_stdout`] is true.
 #[derive(Debug, Clone)]
 pub struct BeetDebugPlugin {
-	/// Log whenever [OnRunAction] is triggered.
-	pub log_on_run: bool,
-	/// Log whenever [Running] entities are updated.
+	/// Log whenever [`Run`] is triggered.
+	pub log_run: bool,
+	/// Log whenever [`Running`] entities are updated.
 	pub log_running: bool,
-	/// Log whenever [OnResultAction] is triggered.
-	pub log_on_result: bool,
+	/// Log whenever [`End`] is triggered.
+	pub log_end: bool,
 	/// Log all messages to stdout
 	pub log_to_stdout: bool,
 }
@@ -32,8 +30,8 @@ impl BeetDebugPlugin {
 	/// - [`log_to_stdout`](Self::log_to_stdout)
 	pub fn with_run() -> Self {
 		Self {
-			log_on_run: true,
-			log_on_result: false,
+			log_run: true,
+			log_end: false,
 			log_running: false,
 			log_to_stdout: true,
 		}
@@ -44,8 +42,8 @@ impl BeetDebugPlugin {
 	/// - [`log_to_stdout`](Self::log_to_stdout)
 	pub fn with_result() -> Self {
 		Self {
-			log_on_run: true,
-			log_on_result: true,
+			log_run: true,
+			log_end: true,
 			log_running: false,
 			log_to_stdout: true,
 		}
@@ -57,9 +55,9 @@ impl BeetDebugPlugin {
 	/// - [`log_to_stdout`](Self::log_to_stdout)
 	pub fn with_all() -> Self {
 		Self {
-			log_on_run: true,
+			log_run: true,
 			log_running: true,
-			log_on_result: true,
+			log_end: true,
 			log_to_stdout: true,
 		}
 	}
@@ -77,9 +75,9 @@ impl BeetDebugPlugin {
 	/// ```
 	pub fn with_none() -> Self {
 		Self {
-			log_on_run: false,
+			log_run: false,
 			log_running: false,
-			log_on_result: false,
+			log_end: false,
 			log_to_stdout: false,
 		}
 	}
@@ -105,11 +103,11 @@ impl Plugin for BeetDebugPlugin {
 				// .chain()
 			);
 
-		if self.log_on_run {
+		if self.log_run {
 			app.init_resource::<DebugOnRun>();
 		}
 
-		if self.log_on_result {
+		if self.log_end {
 			app.init_resource::<DebugOnResult>();
 		}
 
@@ -126,7 +124,7 @@ impl Plugin for BeetDebugPlugin {
 /// A helper event for logging messages.
 /// This must use the [`MessageReader`] pattern instead of observers
 /// because the 'stack' nature of observers results in a reverse order.
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct OnLogMessage {
 	/// The message to log
 	pub msg: Cow<'static, str>,
@@ -236,14 +234,14 @@ pub struct DebugToStdOut;
 // }
 
 fn log_on_run(
-	ev: On<OnRunAction>,
+	ev: On<Run>,
 	query: Query<&Name>,
 	_m: When<Res<DebugOnRun>>,
 	mut out: MessageWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.resolve_action(),
+		ev.target(),
 		&query,
 		"OnRun",
 		OnLogMessage::FLOW_COLOR,
@@ -256,16 +254,16 @@ fn log_on_run(
 
 
 fn log_on_run_result(
-	ev: On<OnResultAction>,
+	ev: On<End>,
 	query: Query<&Name>,
 	mut out: MessageWriter<OnLogMessage>,
 	_m: When<Res<DebugOnResult>>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.resolve_action(),
+		ev.target(),
 		&query,
-		&format!("{:?}", &ev.payload),
+		&format!("{:?}", &ev.event()),
 		OnLogMessage::FLOW_COLOR,
 	);
 	if stdout.is_some() {

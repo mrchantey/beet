@@ -1,25 +1,24 @@
 use crate::prelude::*;
-use bevy::prelude::*;
-use std::marker::PhantomData;
+use beet_core::prelude::*;
 
 
 
 /// This action will insert the provided bundle when the specified action is triggered.
-/// It is designed to work for both [`OnRun`] and [`OnResult`] events.
-/// This action also has a corresponding [`Remove`] action.
+/// It is designed to work for both [`Run`] and [`End`] events.
+/// This action also has a corresponding [`RemoveOn`] action.
 /// ## Example
 /// Inserts the `Running` bundle when the `OnRun` event is triggered.
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
-/// world
-///		.spawn(Insert::<OnRun, Running>::default())
-///		.trigger(OnRun::local());
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// World::new()
+///		.spawn(InsertOn::<Run, Running>::default())
+///		.trigger(RUN);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct Insert<E: ObserverEvent, B: Bundle + Clone> {
+pub struct InsertOn<E: EntityTargetEvent, B: Bundle + Clone> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
 	/// The target entity to insert the bundle into.
@@ -27,7 +26,7 @@ pub struct Insert<E: ObserverEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
-impl<E: ObserverEvent, B: Bundle + Clone> Insert<E, B> {
+impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {
 		Self {
@@ -46,43 +45,43 @@ impl<E: ObserverEvent, B: Bundle + Clone> Insert<E, B> {
 	}
 }
 
-impl<E: ObserverEvent, B: Bundle + Clone + Default> Default for Insert<E, B> {
+impl<E: EntityTargetEvent, B: Bundle + Clone + Default> Default
+	for InsertOn<E, B>
+{
 	fn default() -> Self {
 		Self {
-			bundle: B::default(),
-			phantom: PhantomData,
-			target_entity: TargetEntity::default(),
+			bundle: default(),
+			phantom: default(),
+			target_entity: default(),
 		}
 	}
 }
 
-fn insert<E: ObserverEvent, B: Bundle + Clone>(
+fn insert<E: EntityTargetEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
-	query: Query<&Insert<E, B>>,
-) {
-	let action = query
-		.get(ev.action())
-		.expect(&expect_action::to_have_action(&ev));
-	let target = action.target_entity.get_target(&*ev);
+	query: Query<&InsertOn<E, B>>,
+) -> Result {
+	let action = query.get(ev.target())?;
+	let target = action.target_entity.get_target(&ev);
 	commands.entity(target).insert(action.bundle.clone());
+	Ok(())
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn on_run() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn(Insert::<OnRun, Running>::default())
-			.flush_trigger(OnRun::local())
+			.spawn(InsertOn::<Run, Running>::default())
+			.trigger_target(RUN)
 			.id();
 		world.get::<Running>(entity).xpect_some();
 	}
@@ -93,11 +92,8 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((
-				Insert::<OnResult, Running>::default(),
-				ReturnWith(RunResult::Success),
-			))
-			.flush_trigger(OnRun::local())
+			.spawn((InsertOn::<End, Running>::default(), EndOnRun::success()))
+			.trigger_target(RUN)
 			.id();
 		world.get::<Running>(entity).xpect_some();
 	}

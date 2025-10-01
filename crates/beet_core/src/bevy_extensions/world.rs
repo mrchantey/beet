@@ -163,7 +163,6 @@ pub impl<W: IntoWorld> W {
 		&self,
 		entity: Entity,
 	) -> Tree<Vec<String>> {
-		let world = self.into_world();
 
 		fn recurse<'a, R: RelationshipTarget>(
 			world: &'a World,
@@ -197,9 +196,7 @@ pub impl<W: IntoWorld> W {
 				.unwrap_or_default();
 			Tree::new_with_children(value, children)
 		}
-
-		let mut visited = std::collections::HashSet::new();
-		recurse::<R>(world, entity, &mut visited)
+		recurse::<R>(self.into_world(), entity, &mut default())
 	}
 
 

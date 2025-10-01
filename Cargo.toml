@@ -109,17 +109,14 @@ beet_agent = { path = "crates/beet_agent", version = "0.0.7-dev.0" }
 beet = { path = "", version = "0.0.7-dev.0" }
 
 #💡 local
-## git for IntoPipeSystem: Clone
-bevy = { version = "0.17.0-rc.2", default-features = false, features = [
-	# bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.17.0", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
 	# for most oneshot apps multi-threaded coldstart is much slower than
-	# any potential performance gain, even more prominent for linear pipelines,
-	# instead we should par_iter inside systems
+	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
 	# "track_location",
-	# 0.17.0-rc.2 required for wasm to compile
+	# 0.17.0 required for wasm to compile
 	"reflect_auto_register_static",
 	"bevy_log",
 	"bevy_color",

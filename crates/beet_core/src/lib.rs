@@ -43,6 +43,7 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
+	pub use std::marker::PhantomData;
 	// as a metaframework we're a superset of bevy,
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
@@ -57,6 +58,7 @@ pub mod prelude {
 	pub use bevy::prelude::*;
 	/// hack to fix bevy macros
 	pub use bevy::reflect as bevy_reflect;
+	pub use bevy::time::Stopwatch;
 
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]

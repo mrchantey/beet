@@ -5,7 +5,7 @@
 //! to simply log the error and continue.
 #[allow(unused, reason = "docs")]
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::fmt::Debug;
 
 /// The action, ie [`OnRun::action`] could not be found.

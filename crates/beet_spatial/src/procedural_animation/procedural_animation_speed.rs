@@ -31,6 +31,6 @@ impl ProceduralAnimationSpeed {
 			Self::Duration(duration) => duration.as_secs_f32(),
 			Self::MetersPerSecond(mps) => total_len_meters / mps,
 		};
-		run_timer.last_started.elapsed().as_secs_f32() / duration_secs
+		run_timer.last_run.elapsed().as_secs_f32() / duration_secs
 	}
 }

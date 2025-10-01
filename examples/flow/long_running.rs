@@ -34,7 +34,7 @@ fn main() {
 					Name::new("Long Running"),
 					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
-					ReturnInDuration::new(
+					EndInDuration::new(
 						RunResult::Success,
 						Duration::from_secs(5),
 					),
@@ -54,7 +54,7 @@ fn main() {
 							// patrol the left flank for a bit
 							Name::new("Patrol Left"),
 							Patrol::default(),
-							ReturnInDuration::new(
+							EndInDuration::new(
 								RunResult::Success,
 								Duration::from_secs(1),
 							),
@@ -63,7 +63,7 @@ fn main() {
 							// patrol the right flank for a bit
 							Name::new("Patrol Right"),
 							Patrol::default(),
-							ReturnInDuration::new(
+							EndInDuration::new(
 								RunResult::Success,
 								Duration::from_secs(1),
 							),
