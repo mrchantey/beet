@@ -41,6 +41,14 @@ where
 {
 	fn default() -> Self { Self::Success(Default::default()) }
 }
+impl<T, E> End<T, E>
+where
+	T: 'static + Send + Sync,
+	E: 'static + Send + Sync,
+{
+	pub fn is_success(&self) -> bool { matches!(self, End::Success(_)) }
+	pub fn is_failure(&self) -> bool { matches!(self, End::Failure(_)) }
+}
 
 #[derive(Component)]
 #[component(on_add=prevent_auto_propagate::<End<T,E>>)]

@@ -13,14 +13,18 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_flow::doctest::*;
 /// # let mut world = world();
-///	world.spawn(Sequence)
-///		.with_child(ReturnWith(RunResult::Success))
-///		.with_child(ReturnWith(RunResult::Success))
-///		.trigger(OnRun::local());
+///	world.spawn((
+/// 	Sequence,
+/// 	children![
+/// 		EndOnRun::success(),
+/// 		EndOnRun::success(),
+///    ]))
+///		.trigger_target(RUN);
 /// ```
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(PreventEndPropagate)]
 pub struct Sequence;
 
 fn on_start(ev: On<Run>, mut commands: Commands, query: Query<&Children>)->Result {
@@ -35,8 +39,8 @@ fn on_start(ev: On<Run>, mut commands: Commands, query: Query<&Children>)->Resul
 	Ok(())
 }
 
-fn on_next(ev: On<OnChildResult>, commands: Commands, query: Query<&Children>) {
-	if ev.payload == RunResult::Failure {
+fn on_next(ev: On<End>, commands: Commands, query: Query<&Children>) {
+	if ev.is_success() {
 		ev.trigger_bubble(commands);
 		return;
 	}
