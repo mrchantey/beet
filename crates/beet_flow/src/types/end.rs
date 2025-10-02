@@ -12,13 +12,13 @@ pub const SUCCESS: EndResult<(), ()> = EndResult::Success(());
 pub const FAILURE: EndResult<(), ()> = EndResult::Failure(());
 
 
-impl<T, E> IntoEntityEvent for EndResult<T, E>
+impl<T, E> EventPayload for EndResult<T, E>
 where
 	T: 'static + Send + Sync,
 	E: 'static + Send + Sync,
 {
 	type Event = End<EndResult<T, E>>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
+	fn into_event(self, entity: Entity) -> Self::Event {
 		End::new(entity, self)
 	}
 }
@@ -76,22 +76,6 @@ where
 }
 
 impl End<EndResult> {}
-
-
-// #[derive(Debug, Default, Clone)]
-// pub struct IntoEnd<T = EndResult>(T);
-// impl<T> IntoEnd<T> {
-// 	pub fn new(value: T) -> Self { Self(value) }
-// }
-// impl IntoEnd<EndResult> {}
-
-// impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
-// 	type Event = End<T>;
-// 	fn into_entity_event(self, entity: Entity) -> Self::Event {
-// 		End::new(entity, self.0)
-// 	}
-// }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
 pub struct ChildEnd<T = EndResult>
@@ -196,7 +180,7 @@ mod test {
 		children: Query<&Children>,
 	) {
 		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_entity(RUN);
+		commands.entity(child).trigger_payload(RUN);
 	}
 
 	fn exit_on_result(
@@ -216,7 +200,7 @@ mod test {
 	struct Child;
 
 	fn succeed(ev: On<Run>, mut commands: Commands) {
-		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	}
 
 	#[test]
@@ -225,7 +209,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, children![Child]))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
@@ -235,7 +219,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, PREVENT_PROPAGATE_END, children![(Child)]))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 		world.should_exit().xpect_none();
 	}

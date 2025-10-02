@@ -22,7 +22,7 @@ use beet_core::prelude::*;
 /// 		EndOnRun(SUCCESS),
 /// 		RunNext::new(action)
 /// 	))
-/// 	.trigger_entity(RUN);
+/// 	.trigger_payload(RUN);
 /// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -72,7 +72,7 @@ fn run_next(
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_entity(RUN);
+	commands.entity(run_next.action).trigger_payload(RUN);
 	Ok(())
 }
 
@@ -98,7 +98,7 @@ mod test {
 				RunNext::new(action1),
 				EndOnRun(SUCCESS),
 			))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 
 		on_run

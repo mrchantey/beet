@@ -62,7 +62,7 @@ mod test {
 	#[test]
 	fn interrupt_on_run() {
 		let mut world = BeetFlowPlugin::world();
-		world.spawn(children![Running]).trigger_entity(RUN).flush();
+		world.spawn(children![Running]).trigger_payload(RUN).flush();
 		world.query_once::<&Running>().len().xpect_eq(0);
 	}
 	#[test]
@@ -70,7 +70,7 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn(children![(NoInterrupt, Running)])
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}
@@ -81,7 +81,7 @@ mod test {
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
-			.trigger_entity(SUCCESS)
+			.trigger_payload(SUCCESS)
 			.flush();
 
 		// removes from parent and first child
@@ -92,7 +92,7 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn((NoInterrupt, Running))
-			.trigger_entity(SUCCESS)
+			.trigger_payload(SUCCESS)
 			.flush();
 		// leaves parent
 		world.query_once::<&Running>().len().xpect_eq(1);

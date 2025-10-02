@@ -40,9 +40,9 @@ impl ScoreValue {
 	pub fn new(score: f32) -> Self { Self(score) }
 }
 
-impl IntoEntityEvent for ScoreValue {
+impl EventPayload for ScoreValue {
 	type Event = End<ScoreValue>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
+	fn into_event(self, entity: Entity) -> Self::Event {
 		End::new(entity, self)
 	}
 }
@@ -55,9 +55,9 @@ impl IntoEntityEvent for ScoreValue {
 )]
 pub struct RequestScore;
 
-impl IntoEntityEvent for RequestScore {
+impl EventPayload for RequestScore {
 	type Event = Run<RequestScore>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
+	fn into_event(self, entity: Entity) -> Self::Event {
 		Run::new(entity, self)
 	}
 }
@@ -92,7 +92,7 @@ impl EndPayload for ScoreValue {
 ///			EndOnRun(ScoreValue::PASS),
 ///			EndOnRun(SUCCESS),
 ///		))
-///		.trigger_entity(RUN);
+///		.trigger_payload(RUN);
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
@@ -110,7 +110,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands.entity(child).trigger_entity(RequestScore);
+		commands.entity(child).trigger_payload(RequestScore);
 	}
 	Ok(())
 }
@@ -129,7 +129,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		commands.entity(*highest).trigger_entity(RUN);
+		commands.entity(*highest).trigger_payload(RUN);
 	}
 	Ok(())
 }
@@ -163,7 +163,7 @@ mod test {
 				EndOnRun(ScoreValue::PASS),
 				EndOnRun(SUCCESS),
 			))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 		on_request_score.len().xpect_eq(2);
 		on_score.len().xpect_eq(4);

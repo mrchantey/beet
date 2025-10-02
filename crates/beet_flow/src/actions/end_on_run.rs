@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 /// 	.spawn(EndOnRun(SUCCESS))
-/// 	.trigger_entity(RUN);
+/// 	.trigger_payload(RUN);
 /// ```
 #[action(end_on_run::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -29,7 +29,7 @@ fn end_on_run<T: EndPayload + Clone>(
 ) -> Result {
 	let entity = ev.event_target();
 	let action = action.get(entity)?;
-	commands.entity(entity).trigger_entity(action.0.clone());
+	commands.entity(entity).trigger_payload(action.0.clone());
 	Ok(())
 }
 
@@ -44,7 +44,7 @@ mod test {
 		let mut world = World::new();
 
 		let observed = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn(EndOnRun(SUCCESS)).trigger_entity(RUN).flush();
+		world.spawn(EndOnRun(SUCCESS)).trigger_payload(RUN).flush();
 
 		observed.len().xpect_eq(1);
 		observed.get_index(0).unwrap().value().xpect_eq(SUCCESS);

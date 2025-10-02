@@ -57,6 +57,6 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	commands.entity(target).trigger_entity(next_score);
+	commands.entity(target).trigger_payload(next_score);
 	Ok(())
 }

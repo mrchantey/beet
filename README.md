@@ -61,7 +61,7 @@ world
 			),
 		],
 	))
-	.trigger_entity(RUN)
+	.trigger_payload(RUN)
 	.flush();
 ```
 

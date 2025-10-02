@@ -30,7 +30,7 @@ pub impl<T: Debug> Vec<T> {
 	///
 	/// ```
 	/// # use sweet::prelude::*;
-	/// vec![].xpect_empty();
+	/// Vec::<u32>::new().xpect_empty();
 	/// ```
 	///
 	/// ## Panics

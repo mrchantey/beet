@@ -3,23 +3,26 @@ use bevy::ecs::change_detection::MaybeLocation;
 use crate::prelude::*;
 
 
-
-pub trait IntoEntityEvent
+/// A type that, given a target [`Entity`] can be converted
+/// into an [`EntityEvent`].
+/// This is useful for non-default events that cannot
+/// be created via `From::Entity`
+pub trait EventPayload
 where
 	Self: 'static + Send + Sync,
 	for<'t> Self::Event: EntityEvent<Trigger<'t>: Default>,
 {
 	type Event;
-	fn into_entity_event(self, entity: Entity) -> Self::Event;
+	fn into_event(self, entity: Entity) -> Self::Event;
 }
-impl<T> IntoEntityEvent for T
+impl<T> EventPayload for T
 where
 	T: FnOnce(Entity) -> Self,
 	Self: 'static + Send + Sync,
 	for<'t> Self: EntityEvent<Trigger<'t>: Default>,
 {
 	type Event = Self;
-	fn into_entity_event(self, entity: Entity) -> Self::Event { (self)(entity) }
+	fn into_event(self, entity: Entity) -> Self::Event { (self)(entity) }
 }
 
 
@@ -39,11 +42,11 @@ impl<T: From<Entity>> Clone for EntityEventFunc<T> {
 }
 
 
-#[extend::ext(name=CommandsIntoEntityEventExt)]
+#[extend::ext(name=EntityCommandsEventPayloadExt)]
 pub impl EntityCommands<'_> {
-	fn trigger_entity<T: IntoEntityEvent>(&mut self, ev: T) -> &mut Self {
+	fn trigger_payload<T: EventPayload>(&mut self, ev: T) -> &mut Self {
 		let caller = MaybeLocation::caller();
-		let mut event = ev.into_entity_event(self.id());
+		let mut event = ev.into_event(self.id());
 		self.queue(move |mut entity: EntityWorldMut| {
 			entity.world_scope(|world| {
 				world.trigger_ref_with_caller_pub(
@@ -58,11 +61,11 @@ pub impl EntityCommands<'_> {
 	}
 }
 
-#[extend::ext(name=EntityWorldMutIntoEntityEventExt)]
+#[extend::ext(name=EntityWorldMutEventPayloadExt)]
 pub impl EntityWorldMut<'_> {
-	fn trigger_entity<T: IntoEntityEvent>(&mut self, ev: T) -> &mut Self {
+	fn trigger_payload<T: EventPayload>(&mut self, ev: T) -> &mut Self {
 		let caller = MaybeLocation::caller();
-		let mut event = ev.into_entity_event(self.id());
+		let mut event = ev.into_event(self.id());
 		self.world_scope(|world| {
 			world.trigger_ref_with_caller_pub(
 				&mut event,

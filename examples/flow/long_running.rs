@@ -76,7 +76,7 @@ fn main() {
 				},
 			);
 		})
-		.trigger_entity(RUN);
+		.trigger_payload(RUN);
 
 	app.run();
 }

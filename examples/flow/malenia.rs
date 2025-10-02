@@ -85,7 +85,7 @@ fn run_app() {
 		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
-		.trigger_entity(RUN);
+		.trigger_payload(RUN);
 	app.run();
 }
 
@@ -190,7 +190,7 @@ fn provide_random_score(
 	let rnd: f32 = random_source.random();
 	commands
 		.entity(ev.event_target())
-		.trigger_entity(ScoreValue(
+		.trigger_payload(ScoreValue(
 			rnd * score_provider.scalar + score_provider.offset,
 		));
 }
@@ -211,10 +211,10 @@ fn try_heal_self(
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	} else {
 		// we couldnt do anything so action was a failure
-		commands.entity(ev.event_target()).trigger_entity(FAILURE);
+		commands.entity(ev.event_target()).trigger_payload(FAILURE);
 	}
 	Ok(())
 }

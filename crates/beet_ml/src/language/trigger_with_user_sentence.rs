@@ -28,7 +28,7 @@ impl<P> TriggerWithUserSentence<P> {
 	pub fn new(payload: P) -> Self { Self { payload } }
 }
 
-pub fn trigger_with_user_sentence<P: IntoEntityEvent + Clone>(
+pub fn trigger_with_user_sentence<P: EventPayload + Clone>(
 	ev: On<UserMessage>,
 	mut commands: Commands,
 	mut query: Query<(Entity, &TriggerWithUserSentence<P>, &mut Sentence)>,
@@ -37,7 +37,7 @@ pub fn trigger_with_user_sentence<P: IntoEntityEvent + Clone>(
 		sentence.0 = (**ev).clone().into();
 		commands
 			.entity(action)
-			.trigger_entity(run_with_user_sentence.payload.clone());
+			.trigger_payload(run_with_user_sentence.payload.clone());
 	}
 }
 

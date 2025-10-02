@@ -36,10 +36,10 @@ pub(crate) fn end_on_arrive(
 			if transform.translation().distance_squared(target)
 				<= end_on_arrive.radius.powi(2)
 			{
-				commands.entity(action).trigger_entity(SUCCESS);
+				commands.entity(action).trigger_payload(SUCCESS);
 			}
 		} else {
-			commands.entity(action).trigger_entity(FAILURE);
+			commands.entity(action).trigger_payload(FAILURE);
 		}
 	}
 	Ok(())

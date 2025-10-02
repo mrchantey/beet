@@ -154,7 +154,7 @@ mod test {
 				StatScoreProvider::default(),
 				StatValueGoal::Low,
 			))
-			.trigger_entity(RUN).flush();
+			.trigger_payload(RUN).flush();
 
 		on_child_score.len().xpect_eq(2);
 	}

@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 ///		.spawn(LogOnRun::new("Running..."))
-///		.trigger_entity(RUN);
+///		.trigger_payload(RUN);
 /// ```
 #[action(log_on_run)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]

@@ -139,9 +139,9 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	pub fn trigger(ev: impl IntoEntityEvent) -> Self {
+	pub fn trigger(ev: impl EventPayload) -> Self {
 		Self::new(move |entity| {
-			entity.trigger(move |e| ev.into_entity_event(e));
+			entity.trigger(move |e| ev.into_event(e));
 			Ok(())
 		})
 	}

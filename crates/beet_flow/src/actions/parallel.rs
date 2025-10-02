@@ -20,7 +20,7 @@ use bevy::platform::collections::HashSet;
 /// 		EndOnRun(SUCCESS),
 /// 		EndOnRun(SUCCESS),
 /// 	]))
-/// 	.trigger_entity(RUN)
+/// 	.trigger_payload(RUN)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -38,12 +38,12 @@ fn on_start(
 	action.clear();
 
 	if children.is_empty() {
-		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 		return Ok(());
 	}
 
 	for child in children.iter() {
-		commands.entity(child).trigger_entity(RUN);
+		commands.entity(child).trigger_payload(RUN);
 	}
 	Ok(())
 }
@@ -90,7 +90,7 @@ mod test {
 				(Name::new("child1"), EndOnRun(SUCCESS)),
 				(Name::new("child2"), EndOnRun(FAILURE)),
 			]))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -117,7 +117,7 @@ mod test {
 				(Name::new("child1"), EndOnRun(SUCCESS)),
 				(Name::new("child2"), EndOnRun(SUCCESS)),
 			]))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 
 		on_run.get().xpect_eq(vec![

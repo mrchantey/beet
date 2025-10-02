@@ -41,6 +41,6 @@ fn read_q_policy<P: QPolicy + Asset>(
 	let (state, mut action) = agents.get_mut(ev.event_target())?;
 
 	*action = policy.greedy_policy(state).0;
-	commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+	commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	Ok(())
 }

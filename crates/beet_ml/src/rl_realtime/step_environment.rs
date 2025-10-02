@@ -80,7 +80,7 @@ where
 	// 	action,
 	// 	outcome.reward
 	// );
-	commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+	commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -127,7 +127,7 @@ mod test {
 				},
 				StepEnvironment::<FrozenLakeQTableSession>::new(0),
 			))
-			.trigger_entity(RUN)
+			.trigger_payload(RUN)
 			.flush();
 
 

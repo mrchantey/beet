@@ -25,5 +25,5 @@ fn main() {
 				)
 			]
 		))
-		.trigger_entity(RUN).flush();
+		.trigger_payload(RUN).flush();
 }

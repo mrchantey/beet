@@ -44,7 +44,7 @@ impl<P> TriggerOnAnimationEnd<P> {
 	}
 }
 
-pub(crate) fn trigger_on_animation_end<P: IntoEntityEvent + Clone>(
+pub(crate) fn trigger_on_animation_end<P: EventPayload + Clone>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
@@ -97,7 +97,7 @@ pub(crate) fn trigger_on_animation_end<P: IntoEntityEvent + Clone>(
 			println!("Animation ended!");
 			commands
 				.entity(action)
-				.trigger_entity(on_end.payload.clone());
+				.trigger_payload(on_end.payload.clone());
 		}
 	}
 }

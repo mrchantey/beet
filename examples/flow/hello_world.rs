@@ -21,5 +21,5 @@ fn main() {
 			Name::new("child2"),
 			EndOnRun(SUCCESS),
 		))
-		.trigger_entity(RUN).flush();
+		.trigger_payload(RUN).flush();
 }

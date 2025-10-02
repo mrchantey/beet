@@ -68,7 +68,7 @@ pub(crate) fn play_procedural_animation(
 		agents.get_mut(action)?.translation = target_pos;
 
 		if t >= 1.0 {
-			commands.entity(action).trigger_entity(SUCCESS);
+			commands.entity(action).trigger_payload(SUCCESS);
 		}
 	}
 	Ok(())

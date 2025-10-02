@@ -21,7 +21,7 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.trigger_entity(RUN)
+		.trigger_payload(RUN)
 		.flush();
 	println!("done!");
 }

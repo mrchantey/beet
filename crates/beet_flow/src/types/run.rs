@@ -26,9 +26,9 @@ pub struct RequestEndResult;
 
 pub const RUN: RequestEndResult = RequestEndResult;
 
-impl IntoEntityEvent for RequestEndResult {
+impl EventPayload for RequestEndResult {
 	type Event = Run<RequestEndResult>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
+	fn into_event(self, entity: Entity) -> Self::Event {
 		Run::new(entity, self)
 	}
 }
@@ -40,10 +40,10 @@ impl RunPayload for RequestEndResult {
 impl EndPayload for EndResult {
 	type Run = RequestEndResult;
 }
-pub trait RunPayload: 'static + Send + Sync + IntoEntityEvent {
+pub trait RunPayload: 'static + Send + Sync + EventPayload {
 	type End: EndPayload<Run = Self>;
 }
 
-pub trait EndPayload: 'static + Send + Sync + IntoEntityEvent {
+pub trait EndPayload: 'static + Send + Sync + EventPayload {
 	type Run: RunPayload<End = Self>;
 }

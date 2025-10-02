@@ -44,7 +44,7 @@ impl EndInDuration<EndResult> {
 	pub fn failure(duration: Duration) -> Self { Self::new(FAILURE, duration) }
 }
 
-pub(crate) fn end_in_duration<T: IntoEntityEvent + Clone>(
+pub(crate) fn end_in_duration<T: EventPayload + Clone>(
 	mut commands: Commands,
 	mut query: Populated<
 		(Entity, &RunTimer, &mut EndInDuration<T>),
@@ -53,7 +53,7 @@ pub(crate) fn end_in_duration<T: IntoEntityEvent + Clone>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_run.elapsed() >= action.duration {
-			commands.entity(entity).trigger_entity(action.event.clone());
+			commands.entity(entity).trigger_payload(action.event.clone());
 		}
 	}
 }

@@ -34,7 +34,7 @@ impl TriggerOnAnimationReady<RequestEndResult> {
 /// The associated system for [`TriggerOnAnimationReady`].
 /// The defaullt [`Run`] is added in the [`AnimationFlowPlugin`],
 /// any other payload types must be added manually.
-pub fn trigger_on_animation_ready<P: IntoEntityEvent + Clone>(
+pub fn trigger_on_animation_ready<P: EventPayload + Clone>(
 	mut commands: Commands,
 	scene_roots: Query<Entity, With<SceneRoot>>,
 	parents: Query<&ChildOf>,
@@ -51,7 +51,7 @@ pub fn trigger_on_animation_ready<P: IntoEntityEvent + Clone>(
 				if let Ok((action, trigger)) = actions.get(child) {
 					commands
 						.entity(action)
-						.trigger_entity(trigger.payload.clone());
+						.trigger_payload(trigger.payload.clone());
 				}
 			}
 		}
