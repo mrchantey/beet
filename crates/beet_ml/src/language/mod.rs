@@ -2,11 +2,11 @@
 mod bert;
 #[cfg(feature = "candle")]
 pub use self::bert::*;
-mod run_with_user_sentence;
-pub use self::run_with_user_sentence::*;
+mod trigger_with_user_sentence;
+pub use self::trigger_with_user_sentence::*;
 
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::borrow::Cow;
 
 #[derive(Default)]
@@ -15,7 +15,7 @@ pub struct LanguagePlugin;
 impl Plugin for LanguagePlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<Sentence>()
-			.add_observer(run_with_user_sentence::<()>);
+			.add_observer(trigger_with_user_sentence::<RequestEndResult>);
 
 		#[cfg(feature = "candle")]
 		app.init_asset::<Bert>().init_asset_loader::<BertLoader>();

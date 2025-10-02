@@ -8,24 +8,24 @@ pub trait EpisodeParams: Debug + Clone + Reflect {
 	fn num_episodes(&self) -> u32;
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct StartEpisode<T: EpisodeParams> {
 	pub session: Entity,
 	pub episode: u32,
 	pub params: T,
 }
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct StartSession<T: EpisodeParams> {
 	pub session: Entity,
 	pub params: T,
 }
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct EndSession<T: EpisodeParams> {
 	pub session: Entity,
 	pub params: T,
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct EndEpisode<T: EpisodeParams> {
 	pub session: Entity,
 	phantom: PhantomData<T>,

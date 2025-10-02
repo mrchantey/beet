@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;

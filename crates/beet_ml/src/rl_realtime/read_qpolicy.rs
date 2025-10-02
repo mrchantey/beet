@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
 
@@ -27,22 +27,20 @@ fn read_q_policy<P: QPolicy + Asset>(
 	ev: On<Run>,
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
-	mut agents: Query<(&P::State, &mut P::Action)>,
+	mut agents: AgentQuery<(&P::State, &mut P::Action)>,
 	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
-) {
-	let (_, handle) = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let (_, handle) = query.get(ev.event_target())?;
+	let policy = assets.get(&**handle).ok_or_else(|| {
+		bevyhow!(
+			"QPolicy asset not loaded for entity {:?}",
+			ev.event_target()
+		)
+	})?;
 
-	let policy = assets
-		.get(&**handle)
-		.expect(&expect_action::to_have_asset(&ev));
-
-	let (state, mut action) = agents
-		.get_mut(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
-
+	let (state, mut action) = agents.get_mut(ev.event_target())?;
 
 	*action = policy.greedy_policy(state).0;
-	ev.trigger_result(&mut commands, RunResult::Success);
+	commands.entity(ev.event_target()).trigger_entity(SUCCESS);
+	Ok(())
 }

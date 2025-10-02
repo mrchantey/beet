@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 
 
@@ -14,34 +14,30 @@ use beet_core::prelude::*;
 /// [`run_with_user_sentence`] manually.
 #[derive(Debug, Component)]
 #[require(Sentence)]
-pub struct RunWithUserSentence<P: RunPayload = ()> {
+pub struct TriggerWithUserSentence<P = RequestEndResult> {
 	/// The action to trigger.
-	pub trigger: OnRunAction<P>,
+	pub payload: P,
 }
 
-impl Default for RunWithUserSentence<()> {
-	fn default() -> Self {
-		Self {
-			trigger: OnRunAction::default(),
-		}
-	}
+impl Default for TriggerWithUserSentence {
+	fn default() -> Self { Self { payload: default() } }
 }
 
-impl<P: RunPayload> RunWithUserSentence<P> {
+impl<P> TriggerWithUserSentence<P> {
 	/// Create a new [`RunWithUserSentence`] with the given [`OnRunAction`].
-	pub fn new(trigger: OnRunAction<P>) -> Self { Self { trigger } }
+	pub fn new(payload: P) -> Self { Self { payload } }
 }
 
-pub fn run_with_user_sentence<P: RunPayload>(
-	ev: On<OnUserMessage>,
+pub fn trigger_with_user_sentence<P: IntoEntityEvent + Clone>(
+	ev: On<UserMessage>,
 	mut commands: Commands,
-	mut query: Query<(Entity, &RunWithUserSentence<P>, &mut Sentence)>,
+	mut query: Query<(Entity, &TriggerWithUserSentence<P>, &mut Sentence)>,
 ) {
 	for (action, run_with_user_sentence, mut sentence) in query.iter_mut() {
 		sentence.0 = (**ev).clone().into();
 		commands
 			.entity(action)
-			.trigger(run_with_user_sentence.trigger.clone());
+			.trigger_entity(run_with_user_sentence.payload.clone());
 	}
 }
 
@@ -49,28 +45,24 @@ pub fn run_with_user_sentence<P: RunPayload>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_core::prelude::*;
-	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default())
-			.add_observer(run_with_user_sentence::<()>);
+			.add_observer(trigger_with_user_sentence::<RequestEndResult>);
 		let world = app.world_mut();
-		let on_run = observer_ext::observe_triggers::<OnRun>(world);
+		let on_run = observer_ext::observe_triggers::<Run>(world);
 
 		let entity = world
-			.spawn((
-				RunWithUserSentence::default(),
-				ReturnWith(RunResult::Success),
-			))
+			.spawn((TriggerWithUserSentence::default(), EndOnRun::success()))
 			.id();
 		world.flush();
 
-		world.flush_trigger(OnUserMessage::new("pizza"));
+		world.flush_trigger(UserMessage::new("pizza"));
 
 		on_run.len().xpect_eq(1);
 		world

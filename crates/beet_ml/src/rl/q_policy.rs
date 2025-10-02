@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 pub trait QPolicy: 'static + Send + Sync {
 	type State: StateSpace;

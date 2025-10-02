@@ -173,7 +173,7 @@ fn parse_text_input(
 		for mut text in query.iter_mut() {
 			match &ev.logical_key {
 				Key::Enter => {
-					commands.trigger(OnUserMessage(text.0.clone()));
+					commands.trigger(UserMessage(text.0.clone()));
 					text.clear();
 				}
 				Key::Backspace => {

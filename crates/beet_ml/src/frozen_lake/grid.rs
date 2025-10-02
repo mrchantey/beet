@@ -1,12 +1,11 @@
 use super::frozen_lake_map::FrozenLakeMap;
-use crate::prelude::ActionSpace;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumCount;
 use strum::EnumIter;
 use strum::VariantArray;
-use sweet::prelude::*;
 
 #[derive(
 	Debug,

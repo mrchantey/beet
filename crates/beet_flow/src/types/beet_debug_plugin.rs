@@ -186,15 +186,15 @@ impl OnLogMessage {
 /// An event triggered to represent user input, useful for
 /// retrieving user text input.
 #[derive(Debug, Default, Clone, Deref, DerefMut, Event, Reflect)]
-pub struct OnUserMessage(pub String);
+pub struct UserMessage(pub String);
 
-impl OnUserMessage {
+impl UserMessage {
 	/// Create a new user message.
 	pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
 }
 
 fn log_user_message(
-	trigger: On<OnUserMessage>,
+	trigger: On<UserMessage>,
 	mut out: MessageWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
