@@ -48,9 +48,9 @@ impl<M> Separate<M> {
 pub(crate) fn separate<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(Entity, &Running, &Separate<M>)>,
+	query: Query<(Entity, &Separate<M>), With<Running>>,
 ) -> Result {
-	for (action, running, separate) in query.iter() {
+	for (action, separate) in query.iter() {
 		let (entity, transform, mut impulse, max_speed) =
 			agents.get_mut(action)?;
 

@@ -33,10 +33,10 @@ impl Translate {
 }
 pub(crate) fn translate(
 	time: When<Res<Time>>,
-	action: Populated<(Entity, &Running, &Translate)>,
+	action: Populated<(Entity, &Translate), With<Running>>,
 	mut agents: AgentQuery<&mut Transform>,
 ) -> Result {
-	for (action, running, translate) in action.iter() {
+	for (action, translate) in action.iter() {
 		agents.get_mut(action)?.translation +=
 			translate.translation * time.delta_secs();
 	}

@@ -71,9 +71,9 @@ impl Wander {
 pub(crate) fn wander(
 	mut rng: ResMut<RandomSource>,
 	mut agents: AgentQuery<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
-	mut query: Query<(Entity, &Running, &mut Wander), With<Wander>>,
+	mut query: Query<(Entity, &mut Wander), With<Running>>,
 ) -> Result {
-	for (action, running, mut wander) in query.iter_mut() {
+	for (action, mut wander) in query.iter_mut() {
 		let (transform, velocity, max_speed, mut impulse) =
 			agents.get_mut(action)?;
 		**impulse += *wander_impulse(

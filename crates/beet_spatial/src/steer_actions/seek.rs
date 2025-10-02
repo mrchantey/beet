@@ -50,9 +50,9 @@ pub(crate) fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(Entity, &Running, &Seek)>,
+	query: Query<(Entity, &Seek), With<Running>>,
 ) -> Result {
-	for (action, running, seek) in query.iter() {
+	for (action, seek) in query.iter() {
 		let (
 			agent_entity,
 			transform,
@@ -77,19 +77,11 @@ pub(crate) fn seek(
 			}
 			(OnTargetNotFound::Fail, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				running.trigger_result(
-					&mut commands,
-					action,
-					RunResult::Failure,
-				);
+				commands.entity(action).trigger_entity(FAILURE);
 			}
 			(OnTargetNotFound::Succeed, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				running.trigger_result(
-					&mut commands,
-					action,
-					RunResult::Success,
-				);
+				commands.entity(action).trigger_entity(SUCCESS);
 			}
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {

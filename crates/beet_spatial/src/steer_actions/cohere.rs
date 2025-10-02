@@ -48,9 +48,9 @@ impl<M> Cohere<M> {
 pub(crate) fn cohere<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(Entity, &Running, &Cohere<M>)>,
+	query: Query<(Entity, &Cohere<M>), With<Running>>,
 ) -> Result {
-	for (action, running, cohere) in query.iter() {
+	for (action, cohere) in query.iter() {
 		let (entity, transform, mut impulse, max_speed) =
 			agents.get_mut(action)?;
 

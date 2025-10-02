@@ -50,11 +50,11 @@ pub(crate) fn return_on_animation_end<P: ResultPayload>(
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
 	clips: When<Res<Assets<AnimationClip>>>,
-	mut query: Populated<(Entity, &Running, &ReturnOnAnimationEnd<P>)>,
+	mut query: Populated<(Entity, &ReturnOnAnimationEnd<P>), With<Running>>,
 ) {
-	for (action, running, return_on_end) in query.iter_mut() {
+	for (action, return_on_end) in query.iter_mut() {
 		let Some(target) = children
-			.iter_descendants_inclusive(running.origin)
+			.iter_descendants_inclusive(action)
 			.find(|entity| animators.contains(*entity))
 		else {
 			continue;
@@ -91,11 +91,9 @@ pub(crate) fn return_on_animation_end<P: ResultPayload>(
 			remaining_time < return_on_end.transition_duration.as_secs_f32();
 
 		if nearly_finished {
-			running.trigger_result(
-				&mut commands,
-				action,
-				return_on_end.payload.clone(),
-			);
+			commands
+				.entity(action)
+				.trigger_entity(return_on_end.payload.clone());
 		}
 	}
 }

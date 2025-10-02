@@ -28,22 +28,18 @@ pub(crate) fn end_on_arrive(
 	mut commands: Commands,
 	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
 	transforms: Query<&GlobalTransform>,
-	mut query: Query<(Entity, &Running, &EndOnArrive), With<Running>>,
+	mut query: Query<(Entity, &EndOnArrive), With<Running>>,
 ) -> Result {
-	for (action, running, end_on_arrive) in query.iter_mut() {
+	for (action, end_on_arrive) in query.iter_mut() {
 		let (transform, target) = agents.get(action)?;
 		if let Ok(target) = target.get_position(&transforms) {
 			if transform.translation().distance_squared(target)
 				<= end_on_arrive.radius.powi(2)
 			{
-				running.trigger_result(
-					&mut commands,
-					action,
-					RunResult::Success,
-				);
+				commands.entity(action).trigger_entity(SUCCESS);
 			}
 		} else {
-			running.trigger_result(&mut commands, action, RunResult::Failure);
+			commands.entity(action).trigger_entity(FAILURE);
 		}
 	}
 	Ok(())

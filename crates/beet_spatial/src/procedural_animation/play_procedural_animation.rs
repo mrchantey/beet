@@ -51,9 +51,9 @@ impl PlayProceduralAnimation {
 pub(crate) fn play_procedural_animation(
 	mut commands: Commands,
 	mut agents: AgentQuery<&mut Transform>,
-	query: Query<(Entity, &PlayProceduralAnimation, &Running, &RunTimer)>,
+	query: Query<(Entity, &PlayProceduralAnimation, &RunTimer), With<Running>>,
 ) -> Result {
-	for (action, play_procedural, running, run_timer) in query.iter() {
+	for (action, play_procedural, run_timer) in query.iter() {
 		// run_timer.last_started.
 		let total_len_meters = play_procedural.curve.total_len();
 		let t = play_procedural
@@ -68,7 +68,7 @@ pub(crate) fn play_procedural_animation(
 		agents.get_mut(action)?.translation = target_pos;
 
 		if t >= 1.0 {
-			running.trigger_result(&mut commands, action, RunResult::Success);
+			commands.entity(action).trigger_entity(SUCCESS);
 		}
 	}
 	Ok(())

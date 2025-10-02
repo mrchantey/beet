@@ -34,11 +34,11 @@ impl<M: 'static + Send + Sync> Plugin for DebugGroupSteerPlugin<M> {
 fn debug_group_steer<M: 'static + Send + Sync>(
 	mut gizmos: Gizmos,
 	transforms: AgentQuery<&Transform>,
-	separate: Query<(Entity, &Running, &Separate<M>)>,
-	align: Query<(Entity, &Running, &Align<M>)>,
-	cohere: Query<(Entity, &Running, &Cohere<M>)>,
+	separate: Query<(Entity, &Separate<M>), With<Running>>,
+	align: Query<(Entity, &Align<M>), With<Running>>,
+	cohere: Query<(Entity, &Cohere<M>), With<Running>>,
 ) -> Result {
-	for (action, running, params) in separate.iter() {
+	for (action, params) in separate.iter() {
 		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
@@ -48,7 +48,7 @@ fn debug_group_steer<M: 'static + Send + Sync>(
 		}
 	}
 
-	for (action, running, params) in align.iter() {
+	for (action, params) in align.iter() {
 		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
@@ -58,7 +58,7 @@ fn debug_group_steer<M: 'static + Send + Sync>(
 		}
 	}
 
-	for (action, running, params) in cohere.iter() {
+	for (action, params) in cohere.iter() {
 		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),

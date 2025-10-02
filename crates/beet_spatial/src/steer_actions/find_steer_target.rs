@@ -40,9 +40,9 @@ pub(crate) fn find_steer_target(
 	mut commands: Commands,
 	agents: AgentQuery<&Transform>,
 	names: Query<(Entity, &Transform, &Name)>,
-	query: Query<(Entity, &Running, &FindSteerTarget)>,
+	query: Query<(Entity, &FindSteerTarget), With<Running>>,
 ) -> Result {
-	for (action, running, find_target) in query.iter() {
+	for (action, find_target) in query.iter() {
 		if let Ok(agent_transform) = agents.get(action) {
 			let mut closest_dist = f32::MAX;
 			let mut closest_target = None;

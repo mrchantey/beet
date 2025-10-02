@@ -48,9 +48,9 @@ impl<M> Align<M> {
 pub(crate) fn align<M: Component>(
 	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
 	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse)>,
-	query: Query<(Entity, &Running, &Align<M>)>,
+	query: Query<(Entity, &Align<M>), With<Running>>,
 ) -> Result {
-	for (action, running, align) in query.iter() {
+	for (action, align) in query.iter() {
 		let (entity, transform, mut impulse) = agents.get_mut(action)?;
 		**impulse +=
 			*align_impulse(entity, transform.translation, align, boids.iter());
