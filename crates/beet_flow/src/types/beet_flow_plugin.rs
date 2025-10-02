@@ -20,7 +20,7 @@ impl Plugin for BeetFlowPlugin {
 			(
 				tick_run_timers,
 				// return_in_duration must be after tick_run_timers
-				end_in_duration::<EndResult>,
+				end_in_duration::<IntoEnd>,
 			)
 				.chain()
 				.in_set(TickSet),
@@ -92,7 +92,7 @@ pub enum ActionTag {
 pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<Run>, query: Query<&Name>| {
-		let name = if let Ok(name) = query.get(ev.target()) {
+		let name = if let Ok(name) = query.get(ev.event_target()) {
 			name.to_string()
 		} else {
 			"Unknown".to_string()
@@ -107,7 +107,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, End)>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<End>, query: Query<&Name>| {
-		let name = if let Ok(name) = query.get(ev.target()) {
+		let name = if let Ok(name) = query.get(ev.event_target()) {
 			name.to_string()
 		} else {
 			"Unknown".to_string()

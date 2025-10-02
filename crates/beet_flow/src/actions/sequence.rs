@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(PreventEndPropagate)]
+#[require(PreventPropagateEnd)]
 pub struct Sequence;
 
 fn on_start(ev: On<Run>, mut commands: Commands, query: Query<&Children>)->Result {
@@ -39,14 +39,15 @@ fn on_start(ev: On<Run>, mut commands: Commands, query: Query<&Children>)->Resul
 	Ok(())
 }
 
-fn on_next(ev: On<End>, commands: Commands, query: Query<&Children>) {
-	if ev.is_success() {
-		ev.trigger_bubble(commands);
-		return;
+fn on_next(ev: On<ChildEnd>,mut commands: Commands, query: Query<&Children>)->Result {
+	// sequence bubbles first successful child end
+let target = ev.target();
+	if ev.is_ok() {
+		commands.entity(target).trigger_target(ev.into_end());
+		return Ok(());
 	}
 	let children = query
-		.get(ev.parent)
-		.expect(&expect_action::to_have_children(&ev));
+		.get(target)?;
 	let index = children
 		.iter()
 		.position(|x| x == ev.child)
@@ -56,6 +57,7 @@ fn on_next(ev: On<End>, commands: Commands, query: Query<&Children>) {
 	} else {
 		ev.trigger_run(commands, children[index + 1], ());
 	}
+	Ok(())
 }
 
 #[cfg(test)]

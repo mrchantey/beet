@@ -19,69 +19,40 @@ use beet_core::prelude::*;
 /// ```
 /// ## Notes
 /// This component is SparsSet as it is frequently added and removed.
-#[derive(Debug, Clone, Component)]
-#[component(storage = "SparseSet",on_add=on_add::<'a,AUTO_PROPAGATE,E,T>)]
-pub struct TriggerDeferred<
-	'a,
-	const AUTO_PROPAGATE: bool,
-	E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-	T: 'static + Send + Sync + Traversal<E>,
-> {
-	event: E,
-	phantom: std::marker::PhantomData<&'a T>,
+#[derive(Clone, Component)]
+#[component(storage = "SparseSet",on_add=on_add::<T>)]
+pub struct TriggerDeferred<T: IntoEntityEvent> {
+	event: T,
 }
 
-impl<
-	'a,
-	const AUTO_PROPAGATE: bool,
-	E: Default + Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-	T: 'static + Send + Sync + Traversal<E>,
-> Default for TriggerDeferred<'a, AUTO_PROPAGATE, E, T>
+impl<T> Default for TriggerDeferred<T>
+where
+	T: IntoEntityEvent + Default,
 {
-	fn default() -> Self { Self::new(E::default()) }
+	fn default() -> Self { Self::new(default()) }
 }
 
-impl TriggerDeferred<'static, false, Run, &'static ChildOf> {
+impl TriggerDeferred<IntoRun> {
 	pub fn run() -> Self { default() }
 }
 
 
-impl<
-	'a,
-	const AUTO_PROPAGATE: bool,
-	E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-	T: 'static + Send + Sync + Traversal<E>,
-> TriggerDeferred<'a, AUTO_PROPAGATE, E, T>
-{
+impl<T: IntoEntityEvent> TriggerDeferred<T> {
 	/// Create a new [`TriggerOnSpawn`] with the provided event
-	pub fn new(ev: E) -> Self {
-		Self {
-			event: ev,
-			phantom: default(),
-		}
-	}
+	pub fn new(event: T) -> Self { Self { event } }
 }
 
-fn on_add<
-	'a,
-	const AUTO_PROPAGATE: bool,
-	E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-	T: 'static + Send + Sync + Traversal<E>,
->(
-	mut world: DeferredWorld,
-	cx: HookContext,
-) where
-	'a: 'static,
-{
+fn on_add<T: IntoEntityEvent>(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
-	world.commands().queue(move |world: &mut World| {
+	world.commands().queue(move |world: &mut World| -> Result {
 		let ev = world
 			.entity_mut(entity)
-			.take::<TriggerDeferred<'a, AUTO_PROPAGATE, E, T>>()
-			.expect("TriggerDeferred: component missing");
+			.take::<TriggerDeferred<T>>()
+			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
 		world
 			.entity_mut(entity)
 			.insert(OnSpawnDeferred::trigger(ev.event));
+		Ok(())
 	});
 }
 
@@ -100,6 +71,6 @@ mod test {
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);
-		observers.get_index(0).unwrap().xpect_eq(End::success());
+		observers.get_index(0).unwrap().value().xpect_ok();
 	}
 }

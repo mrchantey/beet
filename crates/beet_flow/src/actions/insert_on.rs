@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct InsertOn<E: EntityTargetEvent, B: Bundle + Clone> {
+pub struct InsertOn<E: EntityEvent, B: Bundle + Clone> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
 	/// The target entity to insert the bundle into.
@@ -26,7 +26,7 @@ pub struct InsertOn<E: EntityTargetEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
-impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
+impl<E: EntityEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {
 		Self {
@@ -45,9 +45,7 @@ impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
 	}
 }
 
-impl<E: EntityTargetEvent, B: Bundle + Clone + Default> Default
-	for InsertOn<E, B>
-{
+impl<E: EntityEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
 	fn default() -> Self {
 		Self {
 			bundle: default(),
@@ -57,12 +55,12 @@ impl<E: EntityTargetEvent, B: Bundle + Clone + Default> Default
 	}
 }
 
-fn insert<E: EntityTargetEvent, B: Bundle + Clone>(
+fn insert<E: EntityEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
 ) -> Result {
-	let action = query.get(ev.target())?;
+	let action = query.get(ev.event_target())?;
 	let target = action.target_entity.get_target(&ev);
 	commands.entity(target).insert(action.bundle.clone());
 	Ok(())
@@ -81,7 +79,8 @@ mod test {
 
 		let entity = world
 			.spawn(InsertOn::<Run, Running>::default())
-			.trigger_target(RUN)
+			.trigger_entity(RUN)
+			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
 	}
@@ -93,7 +92,8 @@ mod test {
 
 		let entity = world
 			.spawn((InsertOn::<End, Running>::default(), EndOnRun::success()))
-			.trigger_target(RUN)
+			.trigger_entity(RUN)
+			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
 	}

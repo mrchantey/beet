@@ -18,7 +18,7 @@ pub(crate) fn interrupt_on_run<T: 'static + Send + Sync>(
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 	children: Populated<&Children>,
 ) {
-	let action = ev.target();
+	let action = ev.event_target();
 	for child in children
 		.iter_descendants(action)
 		.filter(|child| should_remove.contains(*child))
@@ -36,7 +36,7 @@ pub(crate) fn interrupt_on_end<T: 'static + Send + Sync>(
 	children: Query<&Children>,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
-	let action = ev.target();
+	let action = ev.event_target();
 	// 1. always remove from this entity
 	if should_remove.contains(action) {
 		commands.entity(action).remove::<Running>();
@@ -56,49 +56,44 @@ pub(crate) fn interrupt_on_end<T: 'static + Send + Sync>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::EntityWorldMutEntityTargetTriggerExt;
-	use beet_core::prelude::IntoWorldMutExt;
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
-	fn setup() -> World {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		std::mem::take(app.world_mut())
-	}
-
 	#[test]
 	fn interrupt_on_run() {
-		let mut world = setup();
-		world.spawn(children![Running]).trigger_target(RUN);
+		let mut world = BeetFlowPlugin::world();
+		world.spawn(children![Running]).trigger_entity(RUN).flush();
 		world.query_once::<&Running>().len().xpect_eq(0);
 	}
 	#[test]
 	fn no_interrupt_on_run() {
-		let mut world = setup();
+		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn(children![(NoInterrupt, Running)])
-			.trigger_target(RUN);
+			.trigger_entity(RUN)
+			.flush();
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}
 
 	#[test]
 	fn interrupt_on_end() {
-		let mut world = setup();
+		let mut world = BeetFlowPlugin::world();
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
-			.trigger_target(End::success());
+			.trigger_entity(End::SUCCESS)
+			.flush();
 
 		// removes from parent and first child
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}
 	#[test]
 	fn interrupt_on_end_with_no_interrupt() {
-		let mut world = setup();
+		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn((NoInterrupt, Running))
-			.trigger_target(End::success());
+			.trigger_entity(End::SUCCESS)
+			.flush();
 		// leaves parent
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}

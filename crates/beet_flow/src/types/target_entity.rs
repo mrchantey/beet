@@ -8,20 +8,20 @@ pub enum TargetEntity {
 	/// Use the `trigger::event_target`
 	#[default]
 	Target,
-	/// Use the `trigger::original_event_target`
-	OriginalTarget,
+	// /// Use the `trigger::original_event_target`
+	// OriginalTarget,
 	/// Specify some other entity to target
 	Other(Entity),
 }
 
 impl TargetEntity {
 	/// Get the target entity for the given trigger.
-	pub fn get_target<E: EntityTargetEvent>(&self, ev: &On<E>) -> Entity {
+	pub fn get_target<E: EntityEvent>(&self, ev: &On<E>) -> Entity {
 		match self {
-			TargetEntity::Target => E::event_target(ev.trigger()),
-			TargetEntity::OriginalTarget => {
-				E::original_event_target(ev.trigger())
-			}
+			TargetEntity::Target => ev.event_target(),
+			// TargetEntity::OriginalTarget => {
+			// 	E::original_event_target(ev.trigger())
+			// }
 			TargetEntity::Other(entity) => *entity,
 		}
 	}

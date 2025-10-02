@@ -18,18 +18,21 @@ use beet_core::prelude::*;
 /// ```
 #[action(end_on_run::<R,E>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct EndOnRun<
-	R: 'static + Send + Sync = (),
-	E: 'static + Send + Sync + Clone = EndResult,
-> {
-	event: End<E>,
+pub struct EndOnRun<R = (), E = IntoEnd>
+where
+	R: 'static + Send + Sync,
+	E: IntoEntityEvent + Clone,
+{
+	event: E,
 	phantom: std::marker::PhantomData<R>,
 }
 
-impl<R: 'static + Send + Sync, E: 'static + Send + Sync + Clone>
-	EndOnRun<R, E>
+impl<R, E> EndOnRun<R, E>
+where
+	R: 'static + Send + Sync,
+	E: IntoEntityEvent + Clone,
 {
-	pub fn new(event: End<E>) -> Self {
+	pub fn new(event: E) -> Self {
 		Self {
 			event,
 			phantom: default(),
@@ -37,21 +40,24 @@ impl<R: 'static + Send + Sync, E: 'static + Send + Sync + Clone>
 	}
 }
 
-
-impl EndOnRun<(), EndResult> {
+impl EndOnRun<(), IntoEnd> {
 	/// Create a new [`EndOnRun`] with [`End::Success`]
-	pub fn success() -> Self { Self::new(End::success()) }
-	pub fn failure() -> Self { Self::new(End::failure()) }
+	pub fn success() -> Self { Self::new(IntoEnd::success()) }
+	pub fn failure() -> Self { Self::new(IntoEnd::failure()) }
 }
 
-fn end_on_run<R: 'static + Send + Sync, E: 'static + Send + Sync + Clone>(
+fn end_on_run<R, E>(
 	ev: On<Run<R>>,
 	mut commands: Commands,
 	action: Query<&EndOnRun<R, E>>,
-) -> Result {
-	let entity = ev.trigger().event_target();
+) -> Result
+where
+	R: 'static + Send + Sync,
+	E: IntoEntityEvent + Clone,
+{
+	let entity = ev.event_target();
 	let action = action.get(entity)?;
-	commands.entity(entity).trigger_target(action.event.clone());
+	commands.entity(entity).trigger_entity(action.event.clone());
 	Ok(())
 }
 
@@ -66,9 +72,9 @@ mod test {
 		let mut world = World::new();
 
 		let observed = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn(EndOnRun::success()).trigger_target(RUN);
+		world.spawn(EndOnRun::success()).trigger_entity(RUN).flush();
 
 		observed.len().xpect_eq(1);
-		observed.get_index(0).unwrap().xpect_eq(End::success());
+		observed.get_index(0).unwrap().value().xpect_ok();
 	}
 }

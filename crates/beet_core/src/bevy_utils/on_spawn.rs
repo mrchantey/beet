@@ -139,16 +139,9 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	pub fn trigger<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Traversal<E>,
-	>(
-		ev: E,
-	) -> Self {
+	pub fn trigger(ev: impl IntoEntityEvent) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_target(ev);
+			entity.trigger(move |e| ev.into_entity_event(e));
 			Ok(())
 		})
 	}

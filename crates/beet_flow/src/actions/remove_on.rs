@@ -22,13 +22,13 @@ use std::marker::PhantomData;
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct RemoveOn<E: EntityTargetEvent, B: Bundle> {
+pub struct RemoveOn<E: EntityEvent, B: Bundle> {
 	/// The target entity to remove the bundle from.
 	pub target_entity: TargetEntity,
 	phantom: PhantomData<(E, B)>,
 }
 
-impl<E: EntityTargetEvent, B: Bundle> Default for RemoveOn<E, B> {
+impl<E: EntityEvent, B: Bundle> Default for RemoveOn<E, B> {
 	fn default() -> Self {
 		Self {
 			phantom: default(),
@@ -37,7 +37,7 @@ impl<E: EntityTargetEvent, B: Bundle> Default for RemoveOn<E, B> {
 	}
 }
 
-impl<E: EntityTargetEvent, B: Bundle> RemoveOn<E, B> {
+impl<E: EntityEvent, B: Bundle> RemoveOn<E, B> {
 	/// Specify the target entity for this action.
 	pub fn new_with_target(target_entity: TargetEntity) -> Self {
 		Self {
@@ -47,12 +47,12 @@ impl<E: EntityTargetEvent, B: Bundle> RemoveOn<E, B> {
 	}
 }
 
-fn remove<E: EntityTargetEvent, B: Bundle>(
+fn remove<E: EntityEvent, B: Bundle>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&RemoveOn<E, B>>,
 ) -> Result {
-	let action = query.get(ev.target())?;
+	let action = query.get(ev.event_target())?;
 	let target = action.target_entity.get_target(&ev);
 	commands.entity(target).remove::<B>();
 	Ok(())
@@ -72,7 +72,8 @@ mod test {
 
 		let entity = world
 			.spawn((Running::default(), RemoveOn::<Run, Running>::default()))
-			.trigger_target(RUN)
+			.trigger_entity(RUN)
+			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();
 	}
@@ -88,7 +89,8 @@ mod test {
 				RemoveOn::<End, Running>::default(),
 				EndOnRun::success(),
 			))
-			.trigger_target(RUN)
+			.trigger_entity(RUN)
+			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();
 	}

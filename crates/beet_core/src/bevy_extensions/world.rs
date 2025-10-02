@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
@@ -163,7 +164,6 @@ pub impl<W: IntoWorld> W {
 		&self,
 		entity: Entity,
 	) -> Tree<Vec<String>> {
-
 		fn recurse<'a, R: RelationshipTarget>(
 			world: &'a World,
 			entity: Entity,
@@ -293,6 +293,23 @@ pub impl<W: IntoWorld> W {
 		scene.write_to_world(world, entity_map)?;
 
 		Ok(())
+	}
+
+
+	/// copied from world.trigger_ref_with_caller
+	fn trigger_ref_with_caller_pub<'a, E: Event>(
+		&mut self,
+		event: &mut E,
+		trigger: &mut E::Trigger<'a>,
+		caller: MaybeLocation,
+	) {
+		let world = self.into_world_mut();
+		let event_key = world.register_event_key::<E>();
+		// SAFETY: event_key was just registered and matches `event`
+		unsafe {
+			DeferredWorld::from(world)
+				.trigger_raw(event_key, event, trigger, caller);
+		}
 	}
 }
 
