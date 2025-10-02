@@ -6,15 +6,18 @@ pub struct BeetFlowPlugin;
 
 impl Plugin for BeetFlowPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(run_plugin::<(), EndResult>)
-			.configure_sets(Update, PreTickSet)
-			.configure_sets(Update, TickSet.after(PreTickSet))
-			.configure_sets(Update, PostTickSet.after(TickSet))
-			.add_systems(
-				Update,
-				// flush any triggers spawned by TriggerDeferred
-				OnSpawnDeferred::flush.in_set(PreTickSet),
-			);
+		app.add_plugins((
+			run_plugin::<(), EndResult>,
+			run_plugin::<RequestScore, ScoreValue>,
+		))
+		.configure_sets(Update, PreTickSet)
+		.configure_sets(Update, TickSet.after(PreTickSet))
+		.configure_sets(Update, PostTickSet.after(TickSet))
+		.add_systems(
+			Update,
+			// flush any triggers spawned by TriggerDeferred
+			OnSpawnDeferred::flush.in_set(PreTickSet),
+		);
 		app.add_systems(
 			Update,
 			(

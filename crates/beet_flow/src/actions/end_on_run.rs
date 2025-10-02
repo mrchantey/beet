@@ -75,6 +75,6 @@ mod test {
 		world.spawn(EndOnRun::success()).trigger_entity(RUN).flush();
 
 		observed.len().xpect_eq(1);
-		observed.get_index(0).unwrap().value().xpect_ok();
+		observed.get_index(0).unwrap().value().xpect_eq(SUCCESS);
 	}
 }

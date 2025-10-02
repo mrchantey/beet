@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 
-#[derive(EntityEvent)]
+#[derive(Debug, Clone, EntityEvent)]
 pub struct Run<T = ()> {
 	#[event_target]
 	target: Entity,

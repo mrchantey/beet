@@ -71,6 +71,6 @@ mod test {
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);
-		observers.get_index(0).unwrap().value().xpect_ok();
+		observers.get_index(0).unwrap().value().xpect_eq(SUCCESS);
 	}
 }

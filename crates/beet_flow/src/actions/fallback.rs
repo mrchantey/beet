@@ -52,7 +52,7 @@ fn on_next(
 	let target = ev.event_target();
 	let child = ev.child();
 	// if any success, propagate the success
-	if ev.is_ok() {
+	if ev.is_success() {
 		commands.trigger(ev.event().clone().into_end());
 		return Ok(());
 	}
@@ -98,9 +98,9 @@ mod test {
 			"child2".to_string(),
 		]);
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), Err(())),
-			("child2".to_string(), Ok(())),
-			("root".to_string(), Ok(())),
+			("child1".to_string(), FAILURE),
+			("child2".to_string(), SUCCESS),
+			("root".to_string(), SUCCESS),
 		]);
 	}
 }

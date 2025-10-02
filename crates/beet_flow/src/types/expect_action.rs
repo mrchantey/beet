@@ -29,8 +29,8 @@ pub fn to_have_child(ev: impl Debug, child: Entity) -> BevyError {
 }
 /// This event is missing a [`Children`] component,
 /// or it is empty.
-pub fn to_have_children(ev: impl Debug) -> String {
-	format!("Action entity has no children: {:#?}", ev)
+pub fn to_have_children(ev: impl Debug) -> BevyError {
+	bevyhow!("Action entity has no children: {:#?}", ev)
 }
 
 /// Error for for when an action expected an asset handle

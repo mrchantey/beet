@@ -3,7 +3,19 @@ use beet_core::prelude::*;
 
 
 /// The most common End payload, a [`Result<(),()>`] used to indicate run status
-pub type EndResult = Result<(), ()>;
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
+pub enum EndResult<T = (), E = ()> {
+	Success(T),
+	Failure(E),
+}
+pub const SUCCESS: EndResult<(), ()> = EndResult::Success(());
+pub const FAILURE: EndResult<(), ()> = EndResult::Failure(());
+
+impl<T, E> EndResult<T, E> {
+	pub fn is_success(&self) -> bool { matches!(self, EndResult::Success(_)) }
+	pub fn is_failure(&self) -> bool { matches!(self, EndResult::Failure(_)) }
+}
+impl EndResult<(), ()> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
 pub struct End<T = EndResult> {
@@ -59,8 +71,8 @@ impl<T> IntoEnd<T> {
 	pub fn new(value: T) -> Self { Self(value) }
 }
 impl IntoEnd<EndResult> {
-	pub fn success() -> Self { Self(Ok(())) }
-	pub fn failure() -> Self { Self(Err(())) }
+	pub fn success() -> Self { Self(SUCCESS) }
+	pub fn failure() -> Self { Self(FAILURE) }
 }
 
 impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
@@ -103,6 +115,7 @@ where
 {
 	pub fn target(&self) -> Entity { self.target }
 	pub fn child(&self) -> Entity { self.child }
+	pub fn value(&self) -> &T { &self.value }
 	/// Convert a [`ChildEnd`] to an [`End`] by discarding
 	/// the `child` field and transfering the `target`
 	pub fn into_end(self) -> End<T> {
@@ -113,11 +126,20 @@ where
 	}
 }
 
+pub const PREVENT_PROPAGATE_END: PreventPropagateEnd = PreventPropagateEnd {
+	phantom: PhantomData,
+};
+
 /// This component prevents a [`ChildEnd`] from automatically triggering
 /// an [`End`] with the same data, a requirement whenever you want to manually
 /// handle propagation, for instance in a [`Sequence`], [`HighestScore`] etc.
-#[derive(Default, Component, Reflect)]
-pub struct PreventPropagateEnd;
+#[derive(Component, Reflect)]
+pub struct PreventPropagateEnd<T = EndResult> {
+	phantom: PhantomData<T>,
+}
+impl<T> Default for PreventPropagateEnd<T> {
+	fn default() -> Self { Self { phantom: default() } }
+}
 
 /// Propagate the [`End`] event as a [`ChildEnd`] to this entities
 /// parent if it exists.
@@ -172,7 +194,7 @@ mod test {
 		mut commands: Commands,
 		// children: Query<&Children>,
 	) {
-		ev.event().value.xpect_ok();
+		ev.event().value.is_success().xpect_true();
 		// let child = children.get(ev.trigger().event_target()).unwrap()[0];
 		// ev.trigger().event_target().xpect_eq(child);
 		commands.write_message(AppExit::Success);
@@ -204,7 +226,7 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
-			.spawn((Parent, PreventPropagateEnd, children![(Child)]))
+			.spawn((Parent, PREVENT_PROPAGATE_END, children![(Child)]))
 			.trigger_entity(RUN)
 			.flush();
 		world.should_exit().xpect_none();

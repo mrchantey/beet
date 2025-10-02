@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy::platform::collections::HashMap;
 use beet_core::prelude::*;
+use bevy::platform::collections::HashMap;
 use std::cmp::Ordering;
 
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
@@ -47,12 +47,6 @@ impl ScoreValue {
 )]
 pub struct RequestScore;
 
-impl RunPayload for RequestScore {
-	type Result = ScoreValue;
-}
-impl ResultPayload for ScoreValue {
-	type Run = RequestScore;
-}
 /// Aka `UtilitySelector`, Runs the child with the highest score.
 /// This action uses the principles of Utility AI.
 /// The mechanisim for requesting and returning a score is the same
@@ -80,7 +74,7 @@ impl ResultPayload for ScoreValue {
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(BubbleResult)]
+#[require(PreventPropagateEnd<ScoreValue>)]
 // TODO sparseset instead of hashmap
 pub struct HighestScore(HashMap<Entity, ScoreValue>);
 
@@ -88,73 +82,74 @@ fn on_start(
 	ev: On<Run>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
-) {
-	let (mut action, children) = query
-		.get_mut(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
-
+) -> Result {
+	let (mut action, children) = query.get_mut(ev.event_target())?;
 	action.clear();
 
 	for child in children.iter() {
-		commands.trigger(OnRunAction::new(child, ev.origin, RequestScore));
+		commands
+			.entity(child)
+			.trigger_entity(IntoRun::new(RequestScore));
 	}
+	Ok(())
 }
 
 fn on_receive_score(
-	ev: On<OnChildResult<ScoreValue>>,
+	ev: On<ChildEnd<ScoreValue>>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
-) {
-	let (mut action, children) = query
-		.get_mut(ev.parent)
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let (mut action, children) = query.get_mut(ev.event_target())?;
+	action.insert(ev.child(), ev.value().clone());
 
-	action.insert(ev.child, ev.payload);
-
+	// all children have reported their score, run the highest scoring child
 	if action.len() == children.iter().len() {
 		let (highest, _) = action
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
-			.expect(&expect_action::to_have_children(&ev));
-		commands.entity(*highest).trigger(OnRun::local());
+			.ok_or_else(|| expect_action::to_have_children(&ev))?;
+		commands.entity(*highest).trigger_entity(RUN);
 	}
+	Ok(())
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		let world = app.world_mut();
+		let mut world = BeetFlowPlugin::world();
 
-		let on_run = collect_on_run(world);
-		let on_result = collect_on_result(world);
+		let on_run = collect_on_run(&mut world);
+		let on_result = collect_on_result(&mut world);
 		let on_request_score =
-			observer_ext::observe_triggers::<OnRun<RequestScore>>(world);
+			observer_ext::observe_triggers::<Run<RequestScore>>(&mut world);
 		let on_score =
-			observer_ext::observe_triggers::<OnResultAction<ScoreValue>>(world);
+			observer_ext::observe_triggers::<End<ScoreValue>>(&mut world);
 
 		world
 			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
-				ReturnWith(ScoreValue::NEUTRAL),
-				ReturnWith(RunResult::Success),
+				EndOnRun::<RequestScore, IntoEnd<ScoreValue>>::new(
+					IntoEnd::new(ScoreValue::NEUTRAL),
+				),
+				EndOnRun::success(),
 			))
 			.with_child((
 				Name::new("child2"),
-				ReturnWith(ScoreValue::PASS),
-				ReturnWith(RunResult::Success),
+				EndOnRun::<RequestScore, IntoEnd<ScoreValue>>::new(
+					IntoEnd::new(ScoreValue::PASS),
+				),
+				EndOnRun::success(),
 			))
-			.flush_trigger(OnRun::local());
-		on_request_score.len().xpect_eq(4);
-		on_score.len().xpect_eq(2);
+			.trigger_entity(RUN)
+			.flush();
+		on_request_score.len().xpect_eq(2);
+		on_score.len().xpect_eq(4);
 
 		#[rustfmt::skip]
 		on_run.get().xpect_eq(vec![
@@ -162,8 +157,8 @@ mod test {
 			"child2".to_string()
 		]);
 		on_result.get().xpect_eq(vec![
-			("child2".to_string(), RunResult::Success),
-			("root".to_string(), RunResult::Success),
+			("child2".to_string(), SUCCESS),
+			("root".to_string(), SUCCESS),
 		]);
 	}
 }
