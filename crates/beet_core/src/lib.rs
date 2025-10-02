@@ -46,6 +46,8 @@ pub mod prelude {
 	pub use std::marker::PhantomData;
 	// as a metaframework we're a superset of bevy,
 	// and more opinionated about kitchen sink prelude inclusions
+	#[cfg(feature = "bevy_default")]
+	pub use bevy::animation::AnimationEvent;
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
 	pub use bevy::ecs::entity::MapEntities;

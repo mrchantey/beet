@@ -53,8 +53,6 @@ pub fn beet_example_plugin(app: &mut App) {
 		// DefaultReplicatePlugin,
 	))
 	.init_resource::<RandomSource>()
-	.register_type::<GlobalTransform>()
-	.register_type::<Transform>()
 	.register_type::<Collectable>();
 }
 

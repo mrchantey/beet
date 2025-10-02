@@ -123,3 +123,75 @@ fn play_animation_on_run(
 // 		}
 // 	}
 // }
+
+
+
+
+#[cfg(test)]
+mod test {
+	use beet_core::prelude::*;
+	use sweet::prelude::*;
+
+	#[derive(Clone, AnimationEvent)]
+	struct MyEvent(u32);
+
+	#[test]
+	fn animation_basics() {
+		fn setup(
+			mut commands: Commands,
+			mut animations: ResMut<Assets<AnimationClip>>,
+			mut graphs: ResMut<Assets<AnimationGraph>>,
+		) {
+			let mut animation = AnimationClip::default();
+			// animation.set_duration(2.0);
+
+			animation.add_event(0.0, MyEvent(0));
+			animation.add_event(1.0, MyEvent(1));
+			animation.add_event(2.0, MyEvent(2));
+			animation.add_event(3.0, MyEvent(3));
+			let (graph, animation_index) =
+				AnimationGraph::from_clip(animations.add(animation));
+			let mut player = AnimationPlayer::default();
+			player.play(animation_index).repeat();
+
+			commands.spawn((AnimationGraphHandle(graphs.add(graph)), player));
+		}
+
+		let store = Store::<Vec<u32>>::default();
+		let mut app = App::new();
+		app.add_plugins((
+			AssetPlugin::default(),
+			AnimationPlugin,
+		))
+		.insert_time()
+		.add_systems(Startup, setup)
+		.add_observer(move |foo: On<MyEvent>| {
+			store.push(foo.0);
+		})
+		.run_once();
+		store.get().xpect_empty();
+		app.update();
+		store.get().xpect_empty();
+		app.update_with_millis(1);
+		store.get().xpect_eq(vec![0]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1, 2]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1, 2, 3, 0]);
+	}
+	
+	#[test]
+	fn works(){
+		let store = Store::<Vec<u32>>::default();
+
+		let mut app = App::new();
+		app.add_plugins((
+			// MinimalPlugins,
+			AssetPlugin::default(),
+			AnimationPlugin,
+		));
+		
+	}
+}

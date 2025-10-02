@@ -51,27 +51,29 @@ pub(crate) fn trigger_on_animation_end<P: IntoEntityEvent + Clone>(
 	clips: When<Res<Assets<AnimationClip>>>,
 	mut query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running>>,
 ) {
-	for (action, return_on_end) in query.iter_mut() {
+	for (action, on_end) in query.iter_mut() {
+		println!("1");
 		let Some(target) = children
 			.iter_descendants_inclusive(action)
 			.find(|entity| animators.contains(*entity))
 		else {
 			continue;
 		};
+		println!("2");
 		// safe unwrap, just checked
 		let player = animators.get(target).unwrap();
 
-		let Some(clip) = clips.get(&return_on_end.handle) else {
+		let Some(clip) = clips.get(&on_end.handle) else {
 			continue;
 		};
 
-		let Some(active_animation) =
-			player.animation(return_on_end.animation_index)
+		let Some(active_animation) = player.animation(on_end.animation_index)
 		else {
 			continue;
 		};
 
 
+		println!("3");
 		let remaining_time = match active_animation.repeat_mode() {
 			RepeatAnimation::Never => {
 				clip.duration() - active_animation.seek_time()
@@ -86,13 +88,16 @@ pub(crate) fn trigger_on_animation_end<P: IntoEntityEvent + Clone>(
 			RepeatAnimation::Forever => f32::INFINITY,
 		};
 
-		let nearly_finished =
-			remaining_time < return_on_end.transition_duration.as_secs_f32();
+		let duration = on_end.transition_duration.as_secs_f32();
 
+		let nearly_finished = remaining_time < duration;
+
+		println!("remaining time: {:.1}/{:.1}", remaining_time, duration);
 		if nearly_finished {
+			println!("Animation ended!");
 			commands
 				.entity(action)
-				.trigger_entity(return_on_end.payload.clone());
+				.trigger_entity(on_end.payload.clone());
 		}
 	}
 }
