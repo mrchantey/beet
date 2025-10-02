@@ -26,5 +26,5 @@ fn main() {
 				ReturnWith(ScoreValue(0.6)),
 			));
 		})
-		.flush_trigger(OnRun::local());
+		.trigger_entity(RUN).flush();
 }

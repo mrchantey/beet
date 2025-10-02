@@ -23,5 +23,5 @@ fn main() {
 			Name::new("child2"),
 			ReturnWith(RunResult::Success),
 		))
-		.flush_trigger(OnRun::local());
+		.trigger_entity(RUN).flush();
 }

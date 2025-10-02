@@ -85,7 +85,7 @@ fn run_app() {
 		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
-		.trigger(OnRun::local());
+		.trigger_entity(RUN);
 	app.run();
 }
 

@@ -84,7 +84,7 @@ mod test {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));
 				parent.spawn((Name::new("kill"), Sentence::new("kill")));
 			})
-			.flush_trigger(OnRun::local());
+			.trigger_entity(RUN).flush();
 
 
 		on_run.len().xpect_eq(2);

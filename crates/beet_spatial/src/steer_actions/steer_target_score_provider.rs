@@ -47,6 +47,8 @@ fn provide_score(
 	} else {
 		0.
 	};
-	ev.trigger_result(&mut commands, ScoreValue::new(score));
+	commands
+		.entity(ev.event_target())
+		.trigger_entity(ScoreValue::new(score));
 	Ok(())
 }

@@ -58,7 +58,7 @@ world.spawn((
     Name::new("World"),
     ReturnWith(RunResult::Success),
   ))
-  .trigger(OnRun::local());
+  .trigger_entity(RUN);
 ```
 
 

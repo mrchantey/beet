@@ -11,13 +11,15 @@ use std::f32::consts::TAU;
 /// ## Example
 /// Hovers up and down every two seconds, at a height of 0.1 meters.
 /// ```
-/// # use beet_spatial::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_spatial::prelude::*;
+/// # let mut world = World::new();
 ///	world.spawn((
 /// 	Transform::default(),
 ///		Hover::new(2.,0.1),
 ///		))
-///		.trigger(OnRun::local());
+///		.trigger_entity(RUN);
 /// ```
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]

@@ -1742,7 +1742,6 @@ version = "0.0.7-dev.0"
 dependencies = [
  "beet_core",
  "beet_flow",
- "beet_spatial",
  "bevy",
  "extend",
  "log",

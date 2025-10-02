@@ -22,5 +22,5 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.flush_trigger(OnRun::local());
+		.trigger_entity(RUN).flush();
 }

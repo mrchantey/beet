@@ -14,8 +14,6 @@ categories = { workspace = true }
 [features]
 # bevyhub = []
 bevy_default = ["bevy/default"]
-# revisit when we get construct
-_doctest = []
 
 [dependencies]
 beet_flow = { workspace = true }
@@ -35,5 +33,4 @@ strum_macros.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
-beet_spatial = { path = "", features = ["_doctest"] }
 sweet.workspace = true

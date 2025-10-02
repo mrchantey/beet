@@ -23,7 +23,7 @@ fn main() {
 		let entity = app
 			.world_mut()
 			.spawn(TriggerCount::default())
-			.flush_trigger(OnRun::local())
+			.trigger_entity(RUN).flush()
 			.id();
 		assert_eq!(app.world().get::<TriggerCount>(entity).unwrap().0, 1);
 	}

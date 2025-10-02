@@ -27,7 +27,7 @@ fn main() {
 		Name::new("some action to perform"),
 		ReturnWith(RunResult::Success),
 	))
-	.trigger(OnRun::local());
+	.trigger_entity(RUN);
 	app.update();
 	app.update();
 	println!("done, subsequent updates will have no effect");

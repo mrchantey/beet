@@ -35,29 +35,9 @@ pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::ui::*;
 }
-/// doctest reexports and utilities
-#[cfg(feature = "_doctest")]
-#[allow(ambiguous_glob_reexports)]
-pub mod doctest {
-	pub use crate::prelude::*;
-	pub use beet_flow::prelude::*;
-	pub use beet_core::prelude::*;
-	/// for docs, create a world with BeetFlowPlugin
-	/// ```
-	/// use beet_spatial::doctest::*;
-	/// let world = world();
-	/// ```
-	#[cfg(feature = "_doctest")]
-	pub fn world() -> World {
-		let mut app = App::new();
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins));
-		let world = std::mem::take(app.world_mut());
-		world
-	}
-}
 use crate::prelude::*;
-use bevy::app::PluginGroupBuilder;
 use beet_core::prelude::*;
+use bevy::app::PluginGroupBuilder;
 
 /// Plugins used for most beet apps.
 #[derive(Default, Clone)]

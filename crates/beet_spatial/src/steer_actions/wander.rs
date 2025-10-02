@@ -112,10 +112,7 @@ mod test {
 				SteerBundle::default(),
 			))
 			.with_children(|parent| {
-				parent.spawn((
-					Running::new(parent.target_entity()),
-					Wander::default(),
-				));
+				parent.spawn((Running, Wander::default()));
 			})
 			.id();
 

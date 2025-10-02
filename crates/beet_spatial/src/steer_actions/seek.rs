@@ -103,7 +103,6 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-
 		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
@@ -116,7 +115,7 @@ mod test {
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 				Seek::default(),
 			))
-			.flush_trigger(OnRun::local())
+			.trigger_entity(RUN)
 			.id();
 
 		app.update_with_secs(1);

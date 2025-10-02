@@ -133,7 +133,7 @@ mod test {
 				},
 				StepEnvironment::<FrozenLakeQTableSession>::new(0),
 			))
-			.flush_trigger(OnRun::local());
+			.trigger_entity(RUN).flush();
 
 
 		app.world_mut().insert_resource(rng);

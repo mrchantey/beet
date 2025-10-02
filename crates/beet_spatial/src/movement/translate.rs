@@ -10,13 +10,15 @@ use beet_flow::prelude::*;
 /// ## Example
 /// Translates to the right at 1 unit per second.
 /// ```
-/// # use beet_spatial::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_spatial::prelude::*;
+/// # let mut world = World::new();
 ///	world.spawn((
 /// 	Transform::default(),
 ///		Translate::new(Vec3::new(1.0, 0., 0.)),
 ///		))
-///		.trigger(OnRun::local());
+///		.trigger_entity(RUN);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -65,7 +67,8 @@ mod test {
 				Transform::default(),
 				Translate::new(Vec3::new(1.0, 0., 0.)),
 			))
-			.flush_trigger(OnRun::local())
+			.trigger_entity(RUN)
+			.flush()
 			.id();
 
 		app.update_with_secs(1);

@@ -76,7 +76,7 @@ fn main() {
 				},
 			);
 		})
-		.trigger(OnRun::local());
+		.trigger_entity(RUN);
 
 	app.run();
 }

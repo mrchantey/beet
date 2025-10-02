@@ -30,5 +30,5 @@ fn main() {
 		// here RunOnRunResult can be swapped out with a control flow action
 		// that decides which state to go to next
 		RunNext::new(transition),
-	)).flush_trigger(OnRun::local());
+	)).trigger_entity(RUN).flush();
 }

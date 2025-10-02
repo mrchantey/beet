@@ -81,6 +81,6 @@ pub fn spawn_frozen_lake_episode(
 						));
 					});
 			})
-			.trigger(OnRun::local());
+			.trigger_entity(RUN);
 	}
 }
