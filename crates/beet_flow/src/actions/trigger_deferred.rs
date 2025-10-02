@@ -32,7 +32,7 @@ where
 	fn default() -> Self { Self::new(default()) }
 }
 
-impl TriggerDeferred<IntoRun> {
+impl TriggerDeferred<RequestEndResult> {
 	pub fn run() -> Self { default() }
 }
 

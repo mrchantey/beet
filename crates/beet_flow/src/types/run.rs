@@ -1,7 +1,7 @@
 use beet_core::prelude::*;
 
 #[derive(Debug, Clone, EntityEvent)]
-pub struct Run<T = ()> {
+pub struct Run<T = RequestEndResult> {
 	#[event_target]
 	target: Entity,
 	value: T,
@@ -18,17 +18,16 @@ impl<T> Run<T> {
 	pub fn value(&self) -> &T { &self.value }
 }
 
-pub const RUN: IntoRun<()> = IntoRun(());
+#[derive(
+	Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect,
+)]
+pub struct RequestEndResult;
 
-#[derive(Debug, Default, Clone)]
-pub struct IntoRun<T = ()>(T);
-impl<T> IntoRun<T> {
-	pub fn new(value: T) -> Self { Self(value) }
-}
+pub const RUN: RequestEndResult = RequestEndResult;
 
-impl<T: 'static + Send + Sync> IntoEntityEvent for IntoRun<T> {
-	type Event = Run<T>;
+impl IntoEntityEvent for RequestEndResult {
+	type Event = Run<RequestEndResult>;
 	fn into_entity_event(self, entity: Entity) -> Self::Event {
-		Run::new(entity, self.0)
+		Run::new(entity, self)
 	}
 }

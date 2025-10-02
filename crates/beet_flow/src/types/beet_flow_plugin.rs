@@ -7,7 +7,7 @@ pub struct BeetFlowPlugin;
 impl Plugin for BeetFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
-			run_plugin::<(), EndResult>,
+			run_plugin::<RequestEndResult, EndResult>,
 			run_plugin::<RequestScore, ScoreValue>,
 		))
 		.configure_sets(Update, PreTickSet)

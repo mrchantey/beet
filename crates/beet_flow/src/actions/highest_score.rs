@@ -55,6 +55,14 @@ impl IntoEntityEvent for ScoreValue {
 )]
 pub struct RequestScore;
 
+impl IntoEntityEvent for RequestScore {
+	type Event = Run<RequestScore>;
+	fn into_entity_event(self, entity: Entity) -> Self::Event {
+		Run::new(entity, self)
+	}
+}
+
+
 /// Aka `UtilitySelector`, Runs the child with the highest score.
 /// This action uses the principles of Utility AI.
 /// The mechanisim for requesting and returning a score is the same
@@ -96,9 +104,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands
-			.entity(child)
-			.trigger_entity(IntoRun::new(RequestScore));
+		commands.entity(child).trigger_entity(RequestScore);
 	}
 	Ok(())
 }

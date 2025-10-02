@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 /// ```
 #[action(end_on_run::<R,E>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct EndOnRun<R = (), E = EndResult>
+pub struct EndOnRun<R = RequestEndResult, E = EndResult>
 where
 	R: 'static + Send + Sync,
 	E: IntoEntityEvent + Clone,
@@ -40,7 +40,7 @@ where
 	}
 }
 
-impl EndOnRun<(), EndResult> {
+impl EndOnRun<RequestEndResult, EndResult> {
 	/// Create a new [`EndOnRun`] with [`End::Success`]
 	pub fn success() -> Self { Self::new(SUCCESS) }
 	pub fn failure() -> Self { Self::new(FAILURE) }
