@@ -54,7 +54,7 @@ fn setup(
 			parent
 				.spawn((
 					Name::new("Behavior"),
-					RunOnAnimationReady::default(),
+					TriggerOnAnimationReady::run(),
 					Sequence::default(),
 					Repeat::default(),
 				))
@@ -62,24 +62,16 @@ fn setup(
 					Name::new("Idle"),
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
-					ReturnOnAnimationEnd::new(
-						idle_clip,
-						idle_index,
-						RunResult::Success,
-					)
-					.with_transition_duration(transition_duration),
+					TriggerOnAnimationEnd::new(idle_clip, idle_index, SUCCESS)
+						.with_transition_duration(transition_duration),
 				))
 				.with_child((
 					Name::new("Walking"),
 					PlayAnimation::new(walk_index)
 						.repeat(RepeatAnimation::Count(8))
 						.with_transition_duration(transition_duration),
-					ReturnOnAnimationEnd::new(
-						walk_clip,
-						walk_index,
-						RunResult::Success,
-					)
-					.with_transition_duration(transition_duration),
+					TriggerOnAnimationEnd::new(walk_clip, walk_index, SUCCESS)
+						.with_transition_duration(transition_duration),
 				));
 		});
 }

@@ -12,13 +12,11 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-# bevyhub = []
 bevy_default = ["bevy/default"]
 
 [dependencies]
 beet_flow = { workspace = true }
 beet_core = { workspace = true, features = ["rand"] }
-# bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true
 

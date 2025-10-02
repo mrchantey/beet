@@ -18,7 +18,7 @@ impl<
 {
 	type Asset = QTable<State, Action>;
 	type Settings = ();
-	type Error = anyhow::Error;
+	type Error = BevyError;
 
 	fn load(
 		&self,

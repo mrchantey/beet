@@ -10,7 +10,7 @@ pub struct BertLoader;
 impl AssetLoader for BertLoader {
 	type Asset = Bert;
 	type Settings = ();
-	type Error = anyhow::Error;
+	type Error = BevyError;
 
 	fn load(
 		&self,

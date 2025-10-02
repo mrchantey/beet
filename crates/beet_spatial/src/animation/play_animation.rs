@@ -2,7 +2,6 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
 use std::time::Duration;
-use sweet::prelude::*;
 
 
 pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =

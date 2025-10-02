@@ -26,7 +26,6 @@ _test_lightningcss = ["dep:beet_parse", "beet_parse/css"]
 
 [dependencies]
 bevy.workspace = true
-anyhow.workspace = true
 beet_rsx.workspace = true
 beet_core.workspace = true
 beet_dom.workspace = true

@@ -3,13 +3,12 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
 use std::time::Duration;
-use sweet::prelude::*;
 
 /// Returns with the provided payload when the specified animation
 /// is almost finished.
 #[derive(Debug, Clone, Component)]
 #[require(ContinueRun)]
-pub struct ReturnOnAnimationEnd<P> {
+pub struct TriggerOnAnimationEnd<P> {
 	/// The result payload to return when the animation ends.
 	pub payload: P,
 	/// The animation clip to check for end.
@@ -23,7 +22,7 @@ pub struct ReturnOnAnimationEnd<P> {
 }
 
 
-impl<P: ResultPayload> ReturnOnAnimationEnd<P> {
+impl<P: ResultPayload> TriggerOnAnimationEnd<P> {
 	/// Create a new [`TriggerOnAnimationEnd`] action.
 	pub fn new(
 		handle: Handle<AnimationClip>,
@@ -50,7 +49,7 @@ pub(crate) fn return_on_animation_end<P: ResultPayload>(
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
 	clips: When<Res<Assets<AnimationClip>>>,
-	mut query: Populated<(Entity, &ReturnOnAnimationEnd<P>), With<Running>>,
+	mut query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running>>,
 ) {
 	for (action, return_on_end) in query.iter_mut() {
 		let Some(target) = children

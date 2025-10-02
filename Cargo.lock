@@ -1289,7 +1289,6 @@ dependencies = [
 name = "beet_agent"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "async-lock",
  "base64 0.22.1",
  "beet_agent",
@@ -1317,7 +1316,6 @@ dependencies = [
 name = "beet_build"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_dom",
  "beet_net",
@@ -1400,7 +1398,6 @@ dependencies = [
 name = "beet_core_macros"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_utils",
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -1413,7 +1410,6 @@ dependencies = [
 name = "beet_design"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_dom",
  "beet_net",
@@ -1489,7 +1485,6 @@ dependencies = [
 name = "beet_ml"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_spatial",
@@ -1566,7 +1561,6 @@ dependencies = [
 name = "beet_parse"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_dom",
  "beet_rsx_combinator",

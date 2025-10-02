@@ -23,8 +23,6 @@ pub mod prelude {
 	pub use crate::animation::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::asset_actions::*;
-	// todo wait for construct
-	// pub use crate::bevyhub::*;
 	pub use crate::extensions::*;
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;

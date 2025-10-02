@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet_core::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;

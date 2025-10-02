@@ -1,6 +1,4 @@
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
-use sweet::prelude::*;
 
 /// Once an [`AnimationPlayer`] is loaded,
 /// add the additional components needed to play animations.

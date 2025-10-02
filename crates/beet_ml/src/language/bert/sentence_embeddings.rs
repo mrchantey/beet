@@ -1,4 +1,3 @@
-use anyhow::Result;
 use candle_core::Tensor;
 use std::borrow::Cow;
 

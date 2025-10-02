@@ -134,7 +134,7 @@ pub fn fetch_npc(
 				))
 				.with_child((
 					Name::new("Idle"),
-					RunOnAnimationReady::default(),
+					TriggerOnAnimationReady::run(),
 					Remove::<OnRun, Velocity>::new_with_target(
 						TargetEntity::Origin,
 					),

@@ -1,5 +1,5 @@
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use sweet::prelude::HierarchyQueryExtExt;
 
 ///
@@ -13,33 +13,33 @@ use sweet::prelude::HierarchyQueryExtExt;
 /// The [`AnimationPlayer`] api is a bit awkward to work with:
 /// 1. Listen for an [`AnimationPlayer`] to be added.
 /// 2. Find the parent [`SceneRoot`].
-/// 3. Find all children with a [`RunOnAnimationReady`] component.
+/// 3. Find all children with a [`TriggerOnAnimationReady`] component.
 /// 4. Trigger the action on those children with the [`SceneRoot`] as
 /// 	the [`OnRun::origin`].
 ///
 #[derive(Component)]
-pub struct RunOnAnimationReady<P> {
+pub struct TriggerOnAnimationReady<P> {
 	/// The action to trigger.
 	pub payload: P,
 }
 
-impl Default for RunOnAnimationReady<()> {
-	fn default() -> Self {
+impl TriggerOnAnimationReady<RequestEndResult> {
+	pub fn run() -> Self {
 		Self {
 			payload: Default::default(),
 		}
 	}
 }
 
-/// The associated system for [`RunOnAnimationReady`].
+/// The associated system for [`TriggerOnAnimationReady`].
 /// The defaullt [`OnRun<()>`] is added in the [`AnimationPlugin`],
 /// any other payload types must be added manually.
-pub fn run_on_animation_ready<P: RunPayload>(
+pub fn run_on_animation_ready<P: IntoEntityEvent + Clone>(
 	mut commands: Commands,
 	scene_roots: Query<Entity, With<SceneRoot>>,
 	parents: Query<&ChildOf>,
 	children: Query<&Children>,
-	actions: Query<&RunOnAnimationReady<P>>,
+	actions: Query<&TriggerOnAnimationReady<P>>,
 	players: Populated<Entity, Added<AnimationPlayer>>,
 ) {
 	for entity in players.iter() {
@@ -47,11 +47,9 @@ pub fn run_on_animation_ready<P: RunPayload>(
 			if let Ok(scene_root) = scene_roots.get(parent) {
 				for child in children.iter_descendants_inclusive(parent) {
 					if let Ok(action) = actions.get(child) {
-						commands.trigger(OnRunAction::new(
-							child,
-							scene_root,
-							action.payload.clone(),
-						));
+						commands
+							.entity(action)
+							.trigger_entity(action.payload.clone());
 					}
 				}
 			}

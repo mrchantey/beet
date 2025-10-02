@@ -1,4 +1,3 @@
-use anyhow::Result;
 use bevy::asset::LoadState;
 use beet_core::prelude::*;
 
@@ -26,10 +25,10 @@ pub fn block_on_asset_load<'a, A: Asset>(
 		{
 			LoadState::Loaded => return Ok(handle),
 			LoadState::Failed(err) => {
-				anyhow::bail!("Asset load failed {:?}\n{}", path, err);
+				bevybail!("Asset load failed {:?}\n{}", path, err);
 			}
 			LoadState::NotLoaded => {
-				anyhow::bail!("Asset not loaded {:?}", path);
+				bevybail!("Asset not loaded {:?}", path);
 			}
 			LoadState::Loading => {
 				// wait patiently 😴
@@ -37,7 +36,7 @@ pub fn block_on_asset_load<'a, A: Asset>(
 		}
 		app.update();
 		if now.elapsed().as_secs() > 10 {
-			anyhow::bail!("Timeout: block_on_asset_load");
+			bevybail!("Timeout: block_on_asset_load");
 		}
 	}
 }

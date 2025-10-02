@@ -32,7 +32,6 @@ beet_spatial = { workspace = true, optional = true }
 
 futures.workspace = true
 thiserror.workspace = true
-anyhow.workspace = true
 log.workspace = true
 ron.workspace = true
 serde.workspace = true

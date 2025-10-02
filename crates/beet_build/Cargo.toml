@@ -43,7 +43,6 @@ beet_router = { workspace = true, features = ["tokens"] }
 #💡 Utils
 thiserror.workspace = true
 tracing.workspace = true
-anyhow.workspace = true
 rapidhash.workspace = true
 futures.workspace = true
 heck.workspace = true

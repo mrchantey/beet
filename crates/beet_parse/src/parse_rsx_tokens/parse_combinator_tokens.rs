@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_rsx_combinator::prelude::*;
@@ -57,9 +56,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		mut self,
 		root: Entity,
 		rsx: &CombinatorTokens,
-	) -> Result<()> {
+	) -> Result {
 		let children = CombinatorParser::parse(&rsx).map_err(|e| {
-			anyhow::anyhow!("Failed to parse Combinator RSX: {}", e.to_string())
+			bevyhow!("Failed to parse Combinator RSX: {}", e.to_string())
 		})?;
 
 		let children = self.rsx_children("fragment", children)?;

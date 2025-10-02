@@ -45,7 +45,6 @@ anyhow.workspace = true
 sweet.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
-anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

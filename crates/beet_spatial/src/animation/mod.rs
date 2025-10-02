@@ -1,15 +1,15 @@
 //! Contains the animation systems and components.
 //! See [`AnimationPlugin`] for more information.
 mod init_animators;
-mod run_on_animation_ready;
+mod trigger_on_animation_ready;
 use self::init_animators::*;
 mod return_on_animation_end;
 pub use self::return_on_animation_end::*;
 mod play_animation;
 pub use self::play_animation::*;
-pub use self::run_on_animation_ready::*;
-use beet_flow::prelude::*;
+pub use self::trigger_on_animation_ready::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 
 /// A plugin containing systems required for animation actions:

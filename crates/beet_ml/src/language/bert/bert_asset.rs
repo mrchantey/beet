@@ -103,12 +103,12 @@ impl Bert {
 		// );
 
 		let model_config = model_config
-			.map_err(|e| anyhow::anyhow!("config fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("config fetch error: {:?}", e))?
 			.to_vec();
 		let model_config: Config = serde_json::from_slice(&model_config)?;
 
 		let weights = weights
-			.map_err(|e| anyhow::anyhow!("weights fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("weights fetch error: {:?}", e))?
 			.to_vec();
 		let device = &candle_core::Device::Cpu;
 		let vb = VarBuilder::from_buffered_safetensors(
@@ -120,10 +120,10 @@ impl Bert {
 
 
 		let tokenizer = tokenizer
-			.map_err(|e| anyhow::anyhow!("tokenizer fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("tokenizer fetch error: {:?}", e))?
 			.to_vec();
 		let tokenizer = Tokenizer::from_bytes(&tokenizer)
-			.map_err(|m| anyhow::anyhow!(m.to_string()))?;
+			.map_err(|m| bevyhow!(m.to_string()))?;
 
 
 		let model = BertModel::load(vb, &model_config)?;
