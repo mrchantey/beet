@@ -299,6 +299,7 @@ bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_scene",
+	"beet_core/multi_threaded",
 	"beet_dom/bevy_scene",
 	"beet_dom/bevy_text",
 	"beet_examples?/bevy_default",

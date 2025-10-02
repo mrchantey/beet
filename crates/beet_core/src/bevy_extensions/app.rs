@@ -64,8 +64,6 @@ pub impl App {
 		self.should_exit().unwrap_or(AppExit::Success)
 	}
 	/// run an io task to completion, polling at 10 millisecond intervals
-	#[cfg(not(target_arch = "wasm32"))]
-	// task::is_finished not found in wasm???
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static + MaybeSend,
@@ -78,7 +76,6 @@ pub impl App {
 		self.run_once();
 
 		let task = IoTaskPool::get().spawn(fut);
-		// is_finished not found in wasm???
 		while !task.is_finished() {
 			self.update();
 			crate::time_ext::sleep_millis(10).await;

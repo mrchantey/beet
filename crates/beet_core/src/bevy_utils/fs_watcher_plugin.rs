@@ -65,6 +65,7 @@ impl Default for FsWatcherPlugin {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "multi_threaded"))]
 mod test {
 	use super::*;
 	use bevy::ecs::schedule::common_conditions;

@@ -10,21 +10,21 @@ use bevy::tasks::Task;
 use std::future::Future;
 use std::pin::Pin;
 
-#[cfg(feature = "multi_threaded")]
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
 pub trait MaybeSend: Send {}
-#[cfg(not(feature = "multi_threaded"))]
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
 pub trait MaybeSend {}
-#[cfg(feature = "multi_threaded")]
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
 impl<T> MaybeSend for T where T: Send {}
-#[cfg(not(feature = "multi_threaded"))]
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
 impl<T> MaybeSend for T {}
-#[cfg(feature = "multi_threaded")]
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
 pub trait MaybeSync: Sync {}
-#[cfg(not(feature = "multi_threaded"))]
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
 pub trait MaybeSync {}
-#[cfg(feature = "multi_threaded")]
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
 impl<T> MaybeSync for T where T: Sync {}
-#[cfg(not(feature = "multi_threaded"))]
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
 impl<T> MaybeSync for T {}
 
 

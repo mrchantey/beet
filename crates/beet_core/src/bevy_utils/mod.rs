@@ -1,11 +1,6 @@
-// TODO bevy 0.17 wasm gets .is_finished?
-#[cfg(not(target_arch = "wasm32"))]
 mod async_plugin;
-#[cfg(not(target_arch = "wasm32"))]
 mod async_runner;
-#[cfg(not(target_arch = "wasm32"))]
 pub use async_plugin::*;
-#[cfg(not(target_arch = "wasm32"))]
 pub use async_runner::*;
 mod entity_target_trigger;
 mod non_send_marker;
