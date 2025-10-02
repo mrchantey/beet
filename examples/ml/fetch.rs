@@ -115,7 +115,7 @@ pub fn fetch_npc(
 							TargetEntity::Other(parent.target_entity()),
 						),
 						HandleWrapper(bert),
-						ReturnWith(RunResult::Success),
+						EndOnRun(SUCCESS),
 					));
 				})
 				.with_child((

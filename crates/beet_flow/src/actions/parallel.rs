@@ -17,8 +17,8 @@ use bevy::platform::collections::HashSet;
 /// world.spawn((
 /// 	Parallel::default(),
 /// 	children![
-/// 		EndOnRun::success(),
-/// 		EndOnRun::success(),
+/// 		EndOnRun(SUCCESS),
+/// 		EndOnRun(SUCCESS),
 /// 	]))
 /// 	.trigger_entity(RUN)
 /// 	.flush();
@@ -87,8 +87,8 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Parallel::default(), children![
-				(Name::new("child1"), EndOnRun::success()),
-				(Name::new("child2"), EndOnRun::failure()),
+				(Name::new("child1"), EndOnRun(SUCCESS)),
+				(Name::new("child2"), EndOnRun(FAILURE)),
 			]))
 			.trigger_entity(RUN)
 			.flush();
@@ -114,8 +114,8 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Parallel::default(), children![
-				(Name::new("child1"), EndOnRun::success()),
-				(Name::new("child2"), EndOnRun::success()),
+				(Name::new("child1"), EndOnRun(SUCCESS)),
+				(Name::new("child2"), EndOnRun(SUCCESS)),
 			]))
 			.trigger_entity(RUN)
 			.flush();

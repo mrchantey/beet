@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(Debug, Clone, EntityEvent)]
@@ -30,4 +31,19 @@ impl IntoEntityEvent for RequestEndResult {
 	fn into_entity_event(self, entity: Entity) -> Self::Event {
 		Run::new(entity, self)
 	}
+}
+
+
+impl RunPayload for RequestEndResult {
+	type End = EndResult;
+}
+impl EndPayload for EndResult {
+	type Run = RequestEndResult;
+}
+pub trait RunPayload: 'static + Send + Sync + IntoEntityEvent {
+	type End: EndPayload<Run = Self>;
+}
+
+pub trait EndPayload: 'static + Send + Sync + IntoEntityEvent {
+	type Run: RunPayload<End = Self>;
 }

@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
-/// world.spawn((TriggerDeferred::run(), EndOnRun::success()));
+/// world.spawn((TriggerDeferred::run(), EndOnRun(SUCCESS)));
 /// world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 /// ```
 /// ## Notes
@@ -67,7 +67,7 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 		let observers = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn((TriggerDeferred::run(), EndOnRun::success()));
+		world.spawn((TriggerDeferred::run(), EndOnRun(SUCCESS)));
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);

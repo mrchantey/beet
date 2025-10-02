@@ -62,6 +62,12 @@ impl IntoEntityEvent for RequestScore {
 	}
 }
 
+impl RunPayload for RequestScore {
+	type End = ScoreValue;
+}
+impl EndPayload for ScoreValue {
+	type Run = RequestScore;
+}
 
 /// Aka `UtilitySelector`, Runs the child with the highest score.
 /// This action uses the principles of Utility AI.
@@ -80,11 +86,11 @@ impl IntoEntityEvent for RequestScore {
 ///		.spawn(HighestScore::default())
 ///		.with_child((
 ///			EndOnRun::<RequestScore, _>::new(ScoreValue::NEUTRAL),
-///			EndOnRun::success(),
+///			EndOnRun(SUCCESS),
 ///		))
 ///		.with_child((
 ///			EndOnRun::<RequestScore, _>::new(ScoreValue::PASS),
-///			EndOnRun::success(),
+///			EndOnRun(SUCCESS),
 ///		))
 ///		.trigger_entity(RUN);
 /// ```
@@ -149,13 +155,13 @@ mod test {
 			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
-				EndOnRun::<RequestScore, _>::new(ScoreValue::NEUTRAL),
-				EndOnRun::success(),
+				EndOnRun(ScoreValue::NEUTRAL),
+				EndOnRun(SUCCESS),
 			))
 			.with_child((
 				Name::new("child2"),
-				EndOnRun::<RequestScore, _>::new(ScoreValue::PASS),
-				EndOnRun::success(),
+				EndOnRun(ScoreValue::PASS),
+				EndOnRun(SUCCESS),
 			))
 			.trigger_entity(RUN)
 			.flush();

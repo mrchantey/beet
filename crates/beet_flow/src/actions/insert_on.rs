@@ -91,7 +91,7 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((InsertOn::<End, Running>::default(), EndOnRun::success()))
+			.spawn((InsertOn::<End, Running>::default(), EndOnRun(SUCCESS)))
 			.trigger_entity(RUN)
 			.flush()
 			.id();

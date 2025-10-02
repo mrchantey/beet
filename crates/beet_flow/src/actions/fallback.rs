@@ -17,8 +17,8 @@ use beet_core::prelude::*;
 ///	world.spawn((
 /// 	Fallback,
 /// 	children![
-/// 		EndOnRun::failure(),
-/// 		EndOnRun::success(),
+/// 		EndOnRun(FAILURE),
+/// 		EndOnRun(SUCCESS),
 ///    ]))
 ///		.trigger_entity(RUN)
 /// 	.flush();
@@ -85,8 +85,8 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Fallback, children![
-				(Name::new("child1"), EndOnRun::failure()),
-				(Name::new("child2"), EndOnRun::success()),
+				(Name::new("child1"), EndOnRun(FAILURE)),
+				(Name::new("child2"), EndOnRun(SUCCESS)),
 			]))
 			.trigger_entity(RUN)
 			.flush();

@@ -25,7 +25,7 @@ fn main() {
 		// this action would be the thing you want to do n times
 		// it will only run twice
 		Name::new("some action to perform"),
-		ReturnWith(RunResult::Success),
+		EndOnRun(SUCCESS),
 	))
 	.trigger_entity(RUN);
 	app.update();

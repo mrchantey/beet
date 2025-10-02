@@ -1,6 +1,5 @@
 use beet::prelude::*;
 // flush_trigger utils
-use sweet::prelude::EntityWorldMutwExt;
 
 #[action(log_on_run)]
 #[derive(Component)]
@@ -22,5 +21,7 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.trigger_entity(RUN).flush();
+		.trigger_entity(RUN)
+		.flush();
+	println!("done!");
 }

@@ -66,19 +66,19 @@ fn run_app() {
 						max_damage: 15.0,
 						max_recoil: 30.0,
 					},
-					ReturnWith(RunResult::Success),
+					EndOnRun(SUCCESS),
 				))
 				.with_child((
 					// pretty much doomed if she decides to use this
 					// so lets give it a low score. This is a 5% chance because the alternative
 					// is a random value between 0 and 1
 					Name::new("Scarlet Aeonia"),
-					ReturnWith(ScoreValue(0.05)),
+					EndOnRun::new(ScoreValue(0.05)),
 					AttackPlayer {
 						max_damage: 10_000.0,
 						max_recoil: 10.0,
 					},
-					ReturnWith(RunResult::Success),
+					EndOnRun(SUCCESS),
 				));
 		})
 		// actions can be declared inline if they have no parameters

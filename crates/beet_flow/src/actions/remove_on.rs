@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 /// World::new()
 ///		.spawn((
 /// 		Running,
-/// 		EndOnRun::success(),
+/// 		EndOnRun(SUCCESS),
 /// 		RemoveOn::<End, Running>::default()
 /// 	))
 ///		.trigger_entity(RUN);
@@ -87,7 +87,7 @@ mod test {
 			.spawn((
 				Running::default(),
 				RemoveOn::<End, Running>::default(),
-				EndOnRun::success(),
+				EndOnRun(SUCCESS),
 			))
 			.trigger_entity(RUN)
 			.flush()

@@ -21,8 +21,8 @@ pub fn hello_world(mut commands: Commands) {
 			Sequence::default(),
 		))
 		.with_children(|parent| {
-			parent.spawn((Name::new("Hello"), ReturnWith(RunResult::Success)));
-			parent.spawn((Name::new("World"), ReturnWith(RunResult::Success)));
+			parent.spawn((Name::new("Hello"), EndOnRun(SUCCESS)));
+			parent.spawn((Name::new("World"), EndOnRun(SUCCESS)));
 		});
 }
 

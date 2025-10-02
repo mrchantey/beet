@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
-use beet_core::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
 #[action(find_steer_target)]
@@ -24,7 +24,7 @@ fn find_steer_target(
 	transforms: Query<&Transform>,
 	targets: Query<(&StatId, &StatValue, &ChildOf), With<StatProvider>>,
 	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,
-) {
+) -> Result {
 	let (_action, goal_id, value_goal) = query
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
@@ -70,4 +70,5 @@ fn find_steer_target(
 			.entity(ev.origin)
 			.insert(SteerTarget::Entity(closest_target));
 	}
+	Ok(())
 }

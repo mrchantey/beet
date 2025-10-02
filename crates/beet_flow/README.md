@@ -31,11 +31,11 @@ app.world_mut()
 		children![
 			(
 				Name::new("Hello"),
-				EndOnRun::success(),
+				EndOnRun(SUCCESS),
 			),
 			(
 				Name::new("World"),
-				EndOnRun::success(),
+				EndOnRun(SUCCESS),
 			),
 		],
 	))

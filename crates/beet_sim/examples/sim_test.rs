@@ -93,7 +93,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
-						ReturnWith(ScoreValue::NEUTRAL),
+						EndOnRun::new(ScoreValue::NEUTRAL),
 					));
 					parent.spawn((
 						Name::new("Desire Low Stress"),

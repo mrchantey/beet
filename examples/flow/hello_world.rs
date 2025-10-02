@@ -17,11 +17,11 @@ fn main() {
 		))
 		.with_child((
 			Name::new("child1"),
-			ReturnWith(RunResult::Success),
+			EndOnRun(SUCCESS),
 		))
 		.with_child((
 			Name::new("child2"),
-			ReturnWith(RunResult::Success),
+			EndOnRun(SUCCESS),
 		))
 		.trigger_entity(RUN).flush();
 }

@@ -15,11 +15,11 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// let action = world
-/// 	.spawn(EndOnRun::success())
+/// 	.spawn(EndOnRun(SUCCESS))
 /// 	.id();
 /// world
 /// 	.spawn((
-/// 		EndOnRun::success(),
+/// 		EndOnRun(SUCCESS),
 /// 		RunNext::new(action)
 /// 	))
 /// 	.trigger_entity(RUN);
@@ -90,13 +90,13 @@ mod test {
 		let on_run = collect_on_run(&mut world);
 
 		let action1 = world
-			.spawn((Name::new("action1"), EndOnRun::success()))
+			.spawn((Name::new("action1"), EndOnRun(SUCCESS)))
 			.id();
 		world
 			.spawn((
 				Name::new("action2"),
 				RunNext::new(action1),
-				EndOnRun::success(),
+				EndOnRun(SUCCESS),
 			))
 			.trigger_entity(RUN)
 			.flush();

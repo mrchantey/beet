@@ -13,51 +13,25 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
-/// 	.spawn(EndOnRun::success())
+/// 	.spawn(EndOnRun(SUCCESS))
 /// 	.trigger_entity(RUN);
 /// ```
-#[action(end_on_run::<R,E>)]
+#[action(end_on_run::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct EndOnRun<R = RequestEndResult, E = EndResult>
-where
-	R: 'static + Send + Sync,
-	E: IntoEntityEvent + Clone,
-{
-	event: E,
-	phantom: std::marker::PhantomData<R>,
+pub struct EndOnRun<T: EndPayload + Clone = EndResult>(pub T);
+
+impl<T: EndPayload + Clone> EndOnRun<T> {
+	pub fn new(event: T) -> Self { Self(event) }
 }
 
-impl<R, E> EndOnRun<R, E>
-where
-	R: 'static + Send + Sync,
-	E: IntoEntityEvent + Clone,
-{
-	pub fn new(event: E) -> Self {
-		Self {
-			event,
-			phantom: default(),
-		}
-	}
-}
-
-impl EndOnRun<RequestEndResult, EndResult> {
-	/// Create a new [`EndOnRun`] with [`End::Success`]
-	pub fn success() -> Self { Self::new(SUCCESS) }
-	pub fn failure() -> Self { Self::new(FAILURE) }
-}
-
-fn end_on_run<R, E>(
-	ev: On<Run<R>>,
+fn end_on_run<T: EndPayload + Clone>(
+	ev: On<Run<T::Run>>,
 	mut commands: Commands,
-	action: Query<&EndOnRun<R, E>>,
-) -> Result
-where
-	R: 'static + Send + Sync,
-	E: IntoEntityEvent + Clone,
-{
+	action: Query<&EndOnRun<T>>,
+) -> Result {
 	let entity = ev.event_target();
 	let action = action.get(entity)?;
-	commands.entity(entity).trigger_entity(action.event.clone());
+	commands.entity(entity).trigger_entity(action.0.clone());
 	Ok(())
 }
 
@@ -72,7 +46,7 @@ mod test {
 		let mut world = World::new();
 
 		let observed = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn(EndOnRun::success()).trigger_entity(RUN).flush();
+		world.spawn(EndOnRun(SUCCESS)).trigger_entity(RUN).flush();
 
 		observed.len().xpect_eq(1);
 		observed.get_index(0).unwrap().value().xpect_eq(SUCCESS);
