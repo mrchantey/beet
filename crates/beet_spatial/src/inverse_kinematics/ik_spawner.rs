@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use bevy::scene::SceneInstanceReady;
 use std::f32::consts::FRAC_PI_2;
 
@@ -32,7 +32,7 @@ fn ik_spawner(
 	query: Populated<(Entity, &Transform, &Children, &TargetEntity)>,
 ) {
 	let Ok((scene_root_entity, transform, scene_root_children, target_entity)) =
-		query.get(trigger.target())
+		query.get(trigger.event_target())
 	else {
 		return;
 	};

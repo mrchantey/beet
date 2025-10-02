@@ -12,7 +12,7 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-bevy_default = ["bevy/default"]
+bevy_default = ["bevy/default","beet_core/multi_threaded"]
 
 [dependencies]
 beet_flow = { workspace = true }

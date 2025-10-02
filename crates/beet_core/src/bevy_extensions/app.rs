@@ -1,5 +1,3 @@
-#[cfg(not(target_arch = "wasm32"))]
-use crate::bevy_utils::MaybeSend;
 use crate::prelude::*;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;

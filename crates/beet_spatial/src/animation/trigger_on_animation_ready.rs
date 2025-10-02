@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use sweet::prelude::HierarchyQueryExtExt;
 
 ///
 /// Attach as a descendent of a parent with a [`SceneRoot`] and it will
@@ -24,6 +23,7 @@ pub struct TriggerOnAnimationReady<P> {
 }
 
 impl TriggerOnAnimationReady<RequestEndResult> {
+	/// Create a new [`TriggerOnAnimationReady`] with a `RequestEndResult` payload.
 	pub fn run() -> Self {
 		Self {
 			payload: Default::default(),
@@ -34,23 +34,24 @@ impl TriggerOnAnimationReady<RequestEndResult> {
 /// The associated system for [`TriggerOnAnimationReady`].
 /// The defaullt [`OnRun<()>`] is added in the [`AnimationPlugin`],
 /// any other payload types must be added manually.
-pub fn run_on_animation_ready<P: IntoEntityEvent + Clone>(
+pub fn trigger_on_animation_ready<P: IntoEntityEvent + Clone>(
 	mut commands: Commands,
 	scene_roots: Query<Entity, With<SceneRoot>>,
 	parents: Query<&ChildOf>,
 	children: Query<&Children>,
-	actions: Query<&TriggerOnAnimationReady<P>>,
+	actions: Query<(Entity, &TriggerOnAnimationReady<P>)>,
 	players: Populated<Entity, Added<AnimationPlayer>>,
 ) {
 	for entity in players.iter() {
-		for parent in parents.iter_ancestors_inclusive(entity) {
-			if let Ok(scene_root) = scene_roots.get(parent) {
-				for child in children.iter_descendants_inclusive(parent) {
-					if let Ok(action) = actions.get(child) {
-						commands
-							.entity(action)
-							.trigger_entity(action.payload.clone());
-					}
+		for root in parents
+			.iter_ancestors_inclusive(entity)
+			.filter_map(|entity| scene_roots.get(entity).ok())
+		{
+			for child in children.iter_descendants_inclusive(root) {
+				if let Ok((action, trigger)) = actions.get(child) {
+					commands
+						.entity(action)
+						.trigger_entity(trigger.payload.clone());
 				}
 			}
 		}

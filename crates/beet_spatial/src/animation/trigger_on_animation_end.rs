@@ -22,7 +22,7 @@ pub struct TriggerOnAnimationEnd<P> {
 }
 
 
-impl<P: ResultPayload> TriggerOnAnimationEnd<P> {
+impl<P> TriggerOnAnimationEnd<P> {
 	/// Create a new [`TriggerOnAnimationEnd`] action.
 	pub fn new(
 		handle: Handle<AnimationClip>,
@@ -44,7 +44,7 @@ impl<P: ResultPayload> TriggerOnAnimationEnd<P> {
 	}
 }
 
-pub(crate) fn return_on_animation_end<P: ResultPayload>(
+pub(crate) fn trigger_on_animation_end<P: IntoEntityEvent + Clone>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,

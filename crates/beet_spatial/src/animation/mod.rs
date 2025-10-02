@@ -3,8 +3,8 @@
 mod init_animators;
 mod trigger_on_animation_ready;
 use self::init_animators::*;
-mod return_on_animation_end;
-pub use self::return_on_animation_end::*;
+mod trigger_on_animation_end;
+pub use self::trigger_on_animation_end::*;
 mod play_animation;
 pub use self::play_animation::*;
 pub use self::trigger_on_animation_ready::*;
@@ -25,13 +25,17 @@ impl Plugin for AnimationPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,
-			(init_animators, run_on_animation_ready::<()>).chain(),
+			(
+				init_animators,
+				trigger_on_animation_ready::<RequestEndResult>,
+			)
+				.chain(),
 		)
 		.add_systems(
 			Update,
 			(
 				// play_animation_on_load,
-				return_on_animation_end::<RunResult>,
+				trigger_on_animation_end::<EndResult>,
 			)
 				.in_set(TickSet),
 		);

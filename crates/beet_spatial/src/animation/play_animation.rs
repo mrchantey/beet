@@ -60,13 +60,15 @@ fn play_animation_on_run(
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
 	query: Query<&PlayAnimation>,
+	agents: AgentQuery,
 ) {
 	let play_animation = query
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
+	let agent = agents.entity(ev.event_target());
 
 	let target = children
-		.iter_descendants_inclusive(ev.origin)
+		.iter_descendants_inclusive(agent)
 		.find(|entity| animators.contains(*entity))
 		.expect(&expect_action::to_have_origin(&ev));
 	// safe unwrap, just checked

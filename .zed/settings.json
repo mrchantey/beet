@@ -16,7 +16,7 @@
 						// "lambda",
 						"webdriver",
 						// "css",
-						// "bevy_default",
+						"bevy_default",
 						"aws"
 					]
 				}
