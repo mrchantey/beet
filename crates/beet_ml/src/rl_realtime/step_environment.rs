@@ -58,7 +58,7 @@ fn step_environment<S: RlSessionTypes>(
 	S::Env: Component,
 {
 	let mut step = query
-		.get_mut(ev.action)
+		.get_mut(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	let (state, mut action, mut env, params, session_entity) = agents
 		.get_mut(ev.origin)

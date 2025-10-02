@@ -27,14 +27,14 @@ impl Default for SteerTargetScoreProvider {
 }
 
 fn provide_score(
-	ev: On<OnRun<RequestScore>>,
+	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
 	query: Query<&SteerTargetScoreProvider>,
 ) {
 	let action = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	let (transform, target) = agents
 		.get(ev.origin)

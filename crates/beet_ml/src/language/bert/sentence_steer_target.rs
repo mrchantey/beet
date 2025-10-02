@@ -52,7 +52,7 @@ fn sentence_steer_target<F: Component>(
 	mut berts: ResMut<Assets<Bert>>,
 ) {
 	let (handle, sentence_steer_target) = query
-		.get(ev.action())
+		.get(ev.event_target()())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let target_entity = sentence_steer_target.target_entity.get_target(&*ev);

@@ -82,7 +82,7 @@ fn run_app() {
 				));
 		})
 		// actions can be declared inline if they have no parameters
-		// .observe(|_: On<OnRunAction>| {
+		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
 		.trigger(OnRun::local());
@@ -104,7 +104,7 @@ fn attack_player(
 	mut random_source: ResMut<RandomSource>,
 ) {
 	let (attack, attack_name) = attacks
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	println!("🔪  \tMalenia attacks with {}", attack_name);
 
@@ -178,13 +178,13 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: On<OnRun<RequestScore>>,
+	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
 ) {
 	let score_provider = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let rnd: f32 = random_source.random();

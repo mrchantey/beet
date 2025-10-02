@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::f32::consts::TAU;
 
 
@@ -46,7 +46,6 @@ impl Hover {
 }
 
 pub(crate) fn hover(
-	mut _commands: Commands,
 	time: When<Res<Time>>,
 	actions: Populated<(&Running, &Hover)>,
 	mut transforms: Query<&mut Transform>,
@@ -66,8 +65,8 @@ pub(crate) fn hover(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 

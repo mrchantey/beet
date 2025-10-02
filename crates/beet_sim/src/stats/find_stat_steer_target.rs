@@ -26,7 +26,7 @@ fn find_steer_target(
 	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,
 ) {
 	let (_action, goal_id, value_goal) = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let agent_transform = transforms

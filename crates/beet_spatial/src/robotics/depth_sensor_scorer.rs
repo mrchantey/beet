@@ -1,6 +1,6 @@
 use super::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Sets the [`Score`] based on the [`DepthValue`], usually
 /// updated by a sensor.
@@ -40,17 +40,13 @@ impl DepthSensorScorer {
 }
 
 fn depth_sensor_scorer(
-	ev: On<OnRun<RequestScore>>,
+	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
 	sensors: Query<&DepthValue, Changed<DepthValue>>,
 	query: Query<&DepthSensorScorer>,
-) {
-	let scorer = query
-		.get(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
-	let depth = sensors
-		.get(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+) -> Result {
+	let scorer = query.get(ev.event_target())?;
+	let depth = sensors.get(ev.origin)?;
 	let next_score = if let Some(depth) = **depth {
 		if depth < scorer.threshold_dist {
 			scorer.close_score
@@ -61,4 +57,5 @@ fn depth_sensor_scorer(
 		scorer.far_score
 	};
 	ev.trigger_result(&mut commands, next_score);
+	Ok(())
 }

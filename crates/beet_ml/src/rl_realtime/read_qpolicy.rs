@@ -31,7 +31,7 @@ fn read_q_policy<P: QPolicy + Asset>(
 	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
 ) {
 	let (_, handle) = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let policy = assets

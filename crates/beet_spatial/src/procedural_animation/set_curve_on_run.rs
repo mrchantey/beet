@@ -49,7 +49,7 @@ fn set_curve_on_run(
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
 ) {
 	let (action, mut anim) = query
-		.get_mut(ev.action)
+		.get_mut(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let transform = transforms

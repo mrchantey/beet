@@ -59,7 +59,7 @@ impl StatScoreProvider {
 
 
 fn provide_score(
-	ev: On<OnRun<RequestScore>>,
+	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
 	stat_map: Res<StatMap>,
 	children: Query<&Children>,
@@ -67,7 +67,7 @@ fn provide_score(
 	query: Query<(&StatScoreProvider, &StatId, &StatValueGoal)>,
 ) {
 	let (score_provider, stat_id, target_value) = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let value = StatValue::find_by_id(ev.origin, children, stats, *stat_id)

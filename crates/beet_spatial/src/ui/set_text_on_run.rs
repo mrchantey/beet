@@ -33,7 +33,7 @@ fn set_text_on_run<F: Component>(
 	mut text_spans: Query<&mut TextSpan, With<F>>,
 ) {
 	let set_text_on_run = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	for mut text in texts.iter_mut() {
 		**text = set_text_on_run.value.to_string();

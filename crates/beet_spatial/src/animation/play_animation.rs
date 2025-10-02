@@ -63,7 +63,7 @@ fn play_animation_on_run(
 	query: Query<&PlayAnimation>,
 ) {
 	let play_animation = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let target = children
