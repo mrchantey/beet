@@ -25,7 +25,6 @@ beet_core = { workspace = true, features = ["rand"] }
 bevy.workspace = true
 
 extend.workspace = true
-anyhow.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 serde.workspace = true

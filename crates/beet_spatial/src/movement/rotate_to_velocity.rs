@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_core::prelude::*;
 use std::f32::consts::PI;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space

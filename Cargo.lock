@@ -1740,7 +1740,6 @@ dependencies = [
 name = "beet_spatial"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_spatial",

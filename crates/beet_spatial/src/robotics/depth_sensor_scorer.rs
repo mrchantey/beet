@@ -42,11 +42,12 @@ impl DepthSensorScorer {
 fn depth_sensor_scorer(
 	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
-	sensors: Query<&DepthValue, Changed<DepthValue>>,
 	query: Query<&DepthSensorScorer>,
+	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,
 ) -> Result {
-	let scorer = query.get(ev.event_target())?;
-	let depth = sensors.get(ev.origin)?;
+	let target = ev.event_target();
+	let scorer = query.get(target)?;
+	let depth = sensors.get(target)?;
 	let next_score = if let Some(depth) = **depth {
 		if depth < scorer.threshold_dist {
 			scorer.close_score
@@ -56,6 +57,6 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	ev.trigger_result(&mut commands, next_score);
+	commands.entity(target).trigger_entity(next_score);
 	Ok(())
 }

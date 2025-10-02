@@ -15,7 +15,6 @@ use crate::prelude::*;
 pub use algo::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_core::prelude::*;
 pub use steer_target::*;
 
 type M = GroupSteerAgent;

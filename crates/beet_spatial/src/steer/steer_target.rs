@@ -1,7 +1,3 @@
-use anyhow::Result;
-use beet_flow::prelude::*;
-use bevy::ecs::entity::MapEntities;
-use bevy::ecs::reflect::ReflectMapEntities;
 use beet_core::prelude::*;
 
 
@@ -33,7 +29,7 @@ impl SteerTarget {
 				if let Ok(transform) = query.get(*entity) {
 					Ok(transform.translation())
 				} else {
-					anyhow::bail!("transform not found for entity {entity:?}")
+					bevybail!("transform not found for entity {entity:?}")
 				}
 			}
 		}

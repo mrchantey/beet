@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
 /// Steers boids towards the average heading of their neighbors, promoting synchronized movement.
@@ -47,12 +47,12 @@ impl<M> Align<M> {
 
 pub(crate) fn align<M: Component>(
 	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
-	mut agents: Query<(Entity, &Transform, &mut Impulse)>,
-	query: Query<(&Running, &Align<M>)>,
+	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse)>,
+	query: Query<(Entity, &Running, &Align<M>)>,
 ) {
-	for (running, align) in query.iter() {
+	for (action, running, align) in query.iter() {
 		let (entity, transform, mut impulse) = agents
-			.get_mut(running.origin)
+			.get_mut(action)
 			.expect(&expect_action::to_have_origin(&running));
 		**impulse +=
 			*align_impulse(entity, transform.translation, align, boids.iter());

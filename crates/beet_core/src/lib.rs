@@ -48,13 +48,17 @@ pub mod prelude {
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
+	pub use bevy::ecs::entity::MapEntities;
 	pub use bevy::ecs::lifecycle::HookContext;
+	pub use bevy::ecs::reflect::ReflectMapEntities;
+	pub use bevy::ecs::relationship::Relationship;
 	pub use bevy::ecs::schedule::ScheduleLabel;
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
+
 	pub use bevy::prelude::*;
 	/// hack to fix bevy macros
 	pub use bevy::reflect as bevy_reflect;

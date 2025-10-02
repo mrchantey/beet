@@ -47,14 +47,15 @@ impl Hover {
 
 pub(crate) fn hover(
 	time: When<Res<Time>>,
-	actions: Populated<(&Running, &Hover)>,
+	actions: Populated<(Entity, &Running, &Hover)>,
 	mut transforms: Query<&mut Transform>,
+	agents: AgentQuery,
 ) {
-	for (running, hover) in actions.iter() {
+	for (entity, running, hover) in actions.iter() {
 		let elapsed = time.elapsed_secs();
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
 		transforms
-			.get_mut(running.origin)
+			.get_mut(agents.get(entity))
 			.expect(&expect_action::to_have_origin(&running))
 			.translation
 			.y = y;
@@ -80,7 +81,7 @@ mod test {
 		let agent = app
 			.world_mut()
 			.spawn((Transform::default(), Hover::default()))
-			.flush_trigger(OnRun::local())
+			.trigger_entity(RUN)
 			.id();
 
 		// the 'top' of a sine wave is a quarter of 1 hz

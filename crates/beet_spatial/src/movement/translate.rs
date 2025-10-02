@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Applies constant translation to [`Running::origin`],
 /// multiplied by [`Time::delta_secs`]
@@ -33,12 +33,13 @@ impl Translate {
 }
 pub(crate) fn translate(
 	time: When<Res<Time>>,
-	action: Populated<(&Running, &Translate)>,
+	action: Populated<(Entity, &Running, &Translate)>,
 	mut transforms: Query<&mut Transform>,
+	agents: AgentQuery,
 ) {
-	for (running, translate) in action.iter() {
+	for (entity, running, translate) in action.iter() {
 		transforms
-			.get_mut(running.origin)
+			.get_mut(agents.get(entity))
 			.expect(&expect_action::to_have_origin(&running))
 			.translation += translate.translation * time.delta_secs();
 	}
@@ -48,8 +49,8 @@ pub(crate) fn translate(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 
