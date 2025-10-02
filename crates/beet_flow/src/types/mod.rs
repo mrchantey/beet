@@ -5,6 +5,7 @@ mod continue_run;
 pub use continue_run::*;
 mod end;
 pub use end::*;
+pub mod expect_action;
 mod run;
 pub use run::*;
 mod beet_flow_plugin;

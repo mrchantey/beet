@@ -104,7 +104,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 
 /// Collect all [OnResultAction] with a [Name]
 #[cfg(test)]
-pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, End)>> {
+pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, EndResult)>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<End>, query: Query<&Name>| {
 		let name = if let Ok(name) = query.get(ev.event_target()) {
@@ -112,7 +112,7 @@ pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, End)>> {
 		} else {
 			"Unknown".to_string()
 		};
-		store.push((name, ev.event().clone()));
+		store.push((name, ev.event().value().clone()));
 	});
 	store
 }

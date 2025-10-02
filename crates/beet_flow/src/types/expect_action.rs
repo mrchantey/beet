@@ -20,10 +20,11 @@ pub fn to_have_origin(ev: impl Debug) -> String {
 /// This event is missing a child entity, either because
 /// it doesnt have a [`Children`] component or the child
 /// was not found in the [`Children`] component.
-pub fn to_have_child(ev: impl Debug, child: Entity) -> String {
-	format!(
+pub fn to_have_child(ev: impl Debug, child: Entity) -> BevyError {
+	bevyhow!(
 		"The child {:?} does not belong to the action {:#?}",
-		child, ev
+		child,
+		ev
 	)
 }
 /// This event is missing a [`Children`] component,

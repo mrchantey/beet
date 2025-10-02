@@ -112,7 +112,7 @@ where
 	T: 'static + Send + Sync,
 {
 	pub fn target(&self) -> Entity { self.target }
-	pub fn child(&self) -> Entity { self.target }
+	pub fn child(&self) -> Entity { self.child }
 	/// Convert a [`ChildEnd`] to an [`End`] by discarding
 	/// the `child` field and transfering the `target`
 	pub fn into_end(self) -> End<T> {
