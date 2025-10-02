@@ -10,6 +10,24 @@ use bevy::tasks::Task;
 use std::future::Future;
 use std::pin::Pin;
 
+#[cfg(feature = "multi_threaded")]
+pub trait MaybeSend: Send {}
+#[cfg(not(feature = "multi_threaded"))]
+pub trait MaybeSend {}
+#[cfg(feature = "multi_threaded")]
+impl<T> MaybeSend for T where T: Send {}
+#[cfg(not(feature = "multi_threaded"))]
+impl<T> MaybeSend for T {}
+#[cfg(feature = "multi_threaded")]
+pub trait MaybeSync: Sync {}
+#[cfg(not(feature = "multi_threaded"))]
+pub trait MaybeSync {}
+#[cfg(feature = "multi_threaded")]
+impl<T> MaybeSync for T where T: Sync {}
+#[cfg(not(feature = "multi_threaded"))]
+impl<T> MaybeSync for T {}
+
+
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.
 pub struct AsyncPlugin;
@@ -58,7 +76,7 @@ impl AsyncTask {
 	pub fn spawn<Fut, Out>(In(fut): In<Fut>, mut commands: Commands)
 	where
 		// no send requirement for std AsyncComputeTaskPool
-		Fut: 'static + Future<Output = Out>,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
 	{
 		let task = AsyncComputeTaskPool::get().spawn(async move {
 			let _ = fut.await;
@@ -80,7 +98,7 @@ impl AsyncTask {
 		channel: Res<AsyncChannel>,
 	) where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Out>,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
 		Out: 'static,
 	{
 		let fut = func(channel.queue());
@@ -100,8 +118,8 @@ impl AsyncTask {
 	) -> Pin<Box<dyn Future<Output = Out>>>
 	where
 		// no send requirement for std AsyncComputeTaskPool
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
+		Out: 'static + MaybeSend,
 	{
 		// channel for the final output
 		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
@@ -140,8 +158,8 @@ impl AsyncTask {
 	) -> Pin<Box<dyn Future<Output = Out>>>
 	where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
+		Out: 'static + MaybeSend,
 	{
 		let fut = func(channel.queue());
 		Self::spawn_then(In(fut), commands)
@@ -152,7 +170,7 @@ impl AsyncTask {
 		channel: Res<AsyncChannel>,
 	) where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Result>,
+		Fut: 'static + Future<Output = Result> + MaybeSend,
 	{
 		let queue = channel.queue();
 		let fut = func(queue.clone());

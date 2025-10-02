@@ -1,3 +1,5 @@
+#[cfg(not(target_arch = "wasm32"))]
+use crate::bevy_utils::MaybeSend;
 use crate::prelude::*;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
@@ -66,8 +68,8 @@ pub impl App {
 	// task::is_finished not found in wasm???
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
-		F: Future<Output = O> + 'static,
-		O: 'static,
+		F: Future<Output = O> + 'static + MaybeSend,
+		O: 'static + MaybeSend,
 	{
 		use bevy::tasks::IoTaskPool;
 
