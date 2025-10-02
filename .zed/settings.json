@@ -18,8 +18,8 @@
 						// "css",
 						"bevy_default",
 						"ml",
-						"cuda"
-						// "aws"
+						"cuda",
+						"rand"
 					]
 				}
 			}

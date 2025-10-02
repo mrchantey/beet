@@ -14,18 +14,20 @@ fn main() {
 		Sequence,
 		// will repeat while the sequence returns [RunResult::Success]
 		Repeat::if_success(),
-	))
-	.with_child((
-		Name::new("fails on third run"),
-		// this action behaves as a 'while predicate', it will succeed twice
-		// then fail the third time.
-		SucceedTimes::new(2),
-	))
-	.with_child((
-		// this action would be the thing you want to do n times
-		// it will only run twice
-		Name::new("some action to perform"),
-		EndOnRun(SUCCESS),
+		children![
+			(
+				Name::new("fails on third run"),
+				// this action behaves as a 'while predicate', it will succeed twice
+				// then fail the third time.
+				SucceedTimes::new(2),
+			),
+			(
+				// this action would be the thing you want to do n times
+				// it will only run twice
+				Name::new("some action to perform"),
+				EndOnRun(SUCCESS),
+			)
+		],
 	))
 	.trigger_entity(RUN);
 	app.update();

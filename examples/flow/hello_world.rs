@@ -1,7 +1,5 @@
 //! A basic behavior tree sequence example
 use beet::prelude::*;
-// flush_trigger test utils
-use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]
 fn main() {
@@ -12,7 +10,7 @@ fn main() {
 		))
 		.world_mut()
 		.spawn((
-			Name::new("root"), 
+			Name::new("root"),
 			Sequence
 		))
 		.with_child((

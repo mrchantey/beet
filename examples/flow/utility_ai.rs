@@ -14,16 +14,16 @@ fn main() {
 		.spawn((
 			Name::new("ScoreFlow will select the highest score"),
 			HighestScore::default(),
+			children![
+				(
+					Name::new("this child does not run"),
+					EndOnRun(ScoreValue(0.4)),
+				),
+				(
+					Name::new("this child runs"),
+					EndOnRun(ScoreValue(0.6)),
+				)
+			]
 		))
-		.with_children(|parent| {
-			parent.spawn((
-				Name::new("this child does not run"),
-				EndOnRun(ScoreValue(0.4)),
-			));
-			parent.spawn((
-				Name::new("this child runs"),
-				EndOnRun(ScoreValue(0.6)),
-			));
-		})
 		.trigger_entity(RUN).flush();
 }

@@ -188,10 +188,11 @@ fn provide_random_score(
 		.expect(&expect_action::to_have_action(&ev));
 
 	let rnd: f32 = random_source.random();
-	ev.trigger_result(
-		&mut commands,
-		ScoreValue(rnd * score_provider.scalar + score_provider.offset),
-	);
+	commands
+		.entity(ev.event_target())
+		.trigger_entity(ScoreValue(
+			rnd * score_provider.scalar + score_provider.offset,
+		));
 }
 
 
@@ -202,29 +203,28 @@ struct TryHealSelf;
 fn try_heal_self(
 	ev: On<Run>,
 	mut commands: Commands,
-	mut query: Query<(&mut Health, &mut HealingPotions)>,
-) {
-	let (mut health, mut potions) = query
-		.get_mut(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+	mut query: AgentQuery<(&mut Health, &mut HealingPotions)>,
+) -> Result {
+	let (mut health, mut potions) = query.get_mut(ev.event_target())?;
 
 	if health.0 < 50.0 && potions.0 > 0 {
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		ev.trigger_result(&mut commands, RunResult::Success);
+		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
 	} else {
-		// we didnt do anything so action was a failure
-		ev.trigger_result(&mut commands, RunResult::Failure);
+		// we couldnt do anything so action was a failure
+		commands.entity(ev.event_target()).trigger_entity(FAILURE);
 	}
+	Ok(())
 }
 
 const INTRO: &str = r#"
-			I dreamt for so long.
-			My flesh was dull gold...and my blood, rotted.
-			Corpse after corpse, left in my wake...
-			As I awaited... his return.
-			... Heed my words.
-			I am Malenia. Blade of Miquella.
-			And I have never known defeat.
+        I dreamt for so long.
+        My flesh was dull gold...and my blood, rotted.
+        Corpse after corpse, left in my wake...
+        As I awaited... his return.
+        ... Heed my words.
+        I am Malenia. Blade of Miquella.
+        And I have never known defeat.
 "#;

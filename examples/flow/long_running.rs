@@ -35,7 +35,7 @@ fn main() {
 					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
 					EndInDuration::new(
-						RunResult::Success,
+						SUCCESS,
 						Duration::from_secs(5),
 					),
 				))
@@ -55,7 +55,7 @@ fn main() {
 							Name::new("Patrol Left"),
 							Patrol::default(),
 							EndInDuration::new(
-								RunResult::Success,
+								SUCCESS,
 								Duration::from_secs(1),
 							),
 						))
@@ -64,7 +64,7 @@ fn main() {
 							Name::new("Patrol Right"),
 							Patrol::default(),
 							EndInDuration::new(
-								RunResult::Success,
+								SUCCESS,
 								Duration::from_secs(1),
 							),
 						));
