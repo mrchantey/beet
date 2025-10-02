@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 
 /// Succeeds when the agent arrives at the [`SteerTarget`].
@@ -26,14 +26,12 @@ impl EndOnArrive {
 
 pub(crate) fn end_on_arrive(
 	mut commands: Commands,
-	agents: Query<(&GlobalTransform, &SteerTarget)>,
+	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
 	transforms: Query<&GlobalTransform>,
 	mut query: Query<(Entity, &Running, &EndOnArrive), With<Running>>,
-) {
+) -> Result {
 	for (action, running, end_on_arrive) in query.iter_mut() {
-		let (transform, target) = agents
-			.get(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+		let (transform, target) = agents.get(action)?;
 		if let Ok(target) = target.get_position(&transforms) {
 			if transform.translation().distance_squared(target)
 				<= end_on_arrive.radius.powi(2)
@@ -48,4 +46,5 @@ pub(crate) fn end_on_arrive(
 			running.trigger_result(&mut commands, action, RunResult::Failure);
 		}
 	}
+	Ok(())
 }

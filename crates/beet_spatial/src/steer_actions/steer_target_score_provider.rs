@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`],
 /// This scorer is binary, if the distance is within the min and max radius, the score is 1,
@@ -30,15 +30,11 @@ fn provide_score(
 	ev: On<Run<RequestScore>>,
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
-	agents: Query<(&GlobalTransform, &SteerTarget)>,
+	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
 	query: Query<&SteerTargetScoreProvider>,
-) {
-	let action = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
-	let (transform, target) = agents
-		.get(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+) -> Result {
+	let action = query.get(ev.event_target())?;
+	let (transform, target) = agents.get(ev.event_target())?;
 	let score = if let Ok(target) = target.get_position(&transforms) {
 		let dist = transform.translation().distance_squared(target);
 		if dist >= action.min_radius.powi(2)
@@ -52,4 +48,5 @@ fn provide_score(
 		0.
 	};
 	ev.trigger_result(&mut commands, ScoreValue::new(score));
+	Ok(())
 }

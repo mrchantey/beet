@@ -49,12 +49,11 @@ pub(crate) fn align<M: Component>(
 	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
 	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse)>,
 	query: Query<(Entity, &Running, &Align<M>)>,
-) {
+) -> Result {
 	for (action, running, align) in query.iter() {
-		let (entity, transform, mut impulse) = agents
-			.get_mut(action)
-			.expect(&expect_action::to_have_origin(&running));
+		let (entity, transform, mut impulse) = agents.get_mut(action)?;
 		**impulse +=
 			*align_impulse(entity, transform.translation, align, boids.iter());
 	}
+	Ok(())
 }

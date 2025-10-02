@@ -48,18 +48,14 @@ impl Hover {
 pub(crate) fn hover(
 	time: When<Res<Time>>,
 	actions: Populated<(Entity, &Running, &Hover)>,
-	mut transforms: Query<&mut Transform>,
-	agents: AgentQuery,
-) {
-	for (entity, running, hover) in actions.iter() {
+	mut agents: AgentQuery<&mut Transform>,
+) -> Result {
+	for (action, running, hover) in actions.iter() {
 		let elapsed = time.elapsed_secs();
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
-		transforms
-			.get_mut(agents.get(entity))
-			.expect(&expect_action::to_have_origin(&running))
-			.translation
-			.y = y;
+		agents.get_mut(action)?.translation.y = y;
 	}
+	Ok(())
 }
 
 

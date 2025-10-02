@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
 /// ## Tags
@@ -38,12 +38,12 @@ impl FindSteerTarget {
 
 pub(crate) fn find_steer_target(
 	mut commands: Commands,
-	agents: Query<&Transform>,
+	agents: AgentQuery<&Transform>,
 	names: Query<(Entity, &Transform, &Name)>,
-	query: Query<(&Running, &FindSteerTarget)>,
-) {
-	for (running, find_target) in query.iter() {
-		if let Ok(agent_transform) = agents.get(running.origin) {
+	query: Query<(Entity, &Running, &FindSteerTarget)>,
+) -> Result {
+	for (action, running, find_target) in query.iter() {
+		if let Ok(agent_transform) = agents.get(action) {
 			let mut closest_dist = f32::MAX;
 			let mut closest_target = None;
 
@@ -62,10 +62,9 @@ pub(crate) fn find_steer_target(
 			}
 
 			if let Some(winner) = closest_target {
-				commands
-					.entity(running.origin)
-					.insert(SteerTarget::Entity(winner));
+				commands.entity(action).insert(SteerTarget::Entity(winner));
 			}
 		}
 	}
+	Ok(())
 }

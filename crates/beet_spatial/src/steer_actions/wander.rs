@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_core::prelude::*;
 
 /// Random walk that uses a pair of circles
 /// to create somewhat cohesive movement, see [wander_impulse]
@@ -71,13 +70,12 @@ impl Wander {
 
 pub(crate) fn wander(
 	mut rng: ResMut<RandomSource>,
-	mut agents: Query<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
-	mut query: Query<(&Running, &mut Wander), With<Wander>>,
-) {
-	for (running, mut wander) in query.iter_mut() {
-		let (transform, velocity, max_speed, mut impulse) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+	mut agents: AgentQuery<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
+	mut query: Query<(Entity, &Running, &mut Wander), With<Wander>>,
+) -> Result {
+	for (action, running, mut wander) in query.iter_mut() {
+		let (transform, velocity, max_speed, mut impulse) =
+			agents.get_mut(action)?;
 		**impulse += *wander_impulse(
 			&transform.translation,
 			&velocity,
@@ -86,13 +84,14 @@ pub(crate) fn wander(
 			&mut rng.0,
 		);
 	}
+	Ok(())
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

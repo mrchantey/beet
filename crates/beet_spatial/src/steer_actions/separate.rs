@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
 /// Ensures that boids avoid crowding neighbors by maintaining a minimum distance from each other.
@@ -47,13 +47,12 @@ impl<M> Separate<M> {
 
 pub(crate) fn separate<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
-	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&Running, &Separate<M>)>,
-) {
-	for (running, separate) in query.iter() {
-		let (entity, transform, mut impulse, max_speed) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
+	query: Query<(Entity, &Running, &Separate<M>)>,
+) -> Result {
+	for (action, running, separate) in query.iter() {
+		let (entity, transform, mut impulse, max_speed) =
+			agents.get_mut(action)?;
 
 		**impulse += *separate_impulse(
 			entity,
@@ -63,4 +62,5 @@ pub(crate) fn separate<M: Component>(
 			boids.iter(),
 		);
 	}
+	Ok(())
 }

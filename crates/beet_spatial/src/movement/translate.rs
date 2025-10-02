@@ -34,15 +34,13 @@ impl Translate {
 pub(crate) fn translate(
 	time: When<Res<Time>>,
 	action: Populated<(Entity, &Running, &Translate)>,
-	mut transforms: Query<&mut Transform>,
-	agents: AgentQuery,
-) {
-	for (entity, running, translate) in action.iter() {
-		transforms
-			.get_mut(agents.get(entity))
-			.expect(&expect_action::to_have_origin(&running))
-			.translation += translate.translation * time.delta_secs();
+	mut agents: AgentQuery<&mut Transform>,
+) -> Result {
+	for (action, running, translate) in action.iter() {
+		agents.get_mut(action)?.translation +=
+			translate.translation * time.delta_secs();
 	}
+	Ok(())
 }
 
 

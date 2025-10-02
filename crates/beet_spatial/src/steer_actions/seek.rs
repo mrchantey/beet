@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 /// ## Tags
@@ -41,7 +41,7 @@ pub enum OnTargetNotFound {
 pub(crate) fn seek(
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
-	mut agents: Query<(
+	mut agents: AgentQuery<(
 		Entity,
 		&GlobalTransform,
 		&Velocity,
@@ -51,7 +51,7 @@ pub(crate) fn seek(
 		Option<&ArriveRadius>,
 	)>,
 	query: Query<(Entity, &Running, &Seek)>,
-) {
+) -> Result {
 	for (action, running, seek) in query.iter() {
 		let (
 			agent_entity,
@@ -61,9 +61,7 @@ pub(crate) fn seek(
 			max_speed,
 			mut impulse,
 			arrive_radius,
-		) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+		) = agents.get_mut(action)?;
 		match (&seek.on_not_found, steer_target.get_position(&transforms)) {
 			(_, Ok(target_position)) => {
 				*impulse = seek_impulse(
@@ -99,14 +97,15 @@ pub(crate) fn seek(
 			}
 		}
 	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
