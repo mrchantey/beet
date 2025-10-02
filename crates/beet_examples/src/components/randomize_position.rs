@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use sweet::prelude::*;
 
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]

@@ -117,7 +117,8 @@ bevy = { version = "0.17.0", default-features = false, features = [
 	# "multi_threaded",
 	# "track_location",
 	# 0.17.0 required for wasm to compile
-	"reflect_auto_register_static",
+	# "reflect_auto_register_static",
+	"reflect_auto_register",
 	"bevy_log",
 	"bevy_color",
 ] }
@@ -298,8 +299,7 @@ build = ["parse", "dep:beet_build"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
-	"beet_core/bevy_scene",
-	"beet_core/multi_threaded",
+	"beet_core/bevy_default",
 	"beet_dom/bevy_scene",
 	"beet_dom/bevy_text",
 	"beet_examples?/bevy_default",
@@ -355,10 +355,11 @@ uuid = { workspace = true, features = ["rng-getrandom"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = "", features = ["flow"] }
+beet = { path = "", features = ["flow","examples"] }
 # beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
+bevy = { workspace = true, features = ["reflect_auto_register"] }
 sweet.workspace = true
 serde.workspace = true
 anyhow.workspace = true

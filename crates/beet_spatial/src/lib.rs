@@ -52,7 +52,7 @@ impl PluginGroup for BeetSpatialPlugins {
 		/*-*/;
 
 		#[cfg(feature = "bevy_default")]
-		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
+		(builder = builder.add(crate::prelude::AnimationFlowPlugin::default()));
 		builder
 	}
 }

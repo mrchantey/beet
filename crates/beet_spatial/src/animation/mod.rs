@@ -1,5 +1,5 @@
 //! Contains the animation systems and components.
-//! See [`AnimationPlugin`] for more information.
+//! See [`AnimationFlowPlugin`] for more information.
 mod init_animators;
 mod trigger_on_animation_ready;
 use self::init_animators::*;
@@ -19,9 +19,9 @@ use beet_flow::prelude::*;
 /// that will append the [`AnimationTransitions`] ( and [`AnimationGraphHandle`] if found in parents)
 /// components to all entities with an [`AnimationPlayer`] component.
 #[derive(Default)]
-pub struct AnimationPlugin;
+pub struct AnimationFlowPlugin;
 
-impl Plugin for AnimationPlugin {
+impl Plugin for AnimationFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,

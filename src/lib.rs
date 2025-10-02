@@ -81,16 +81,14 @@ pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::exports::*;
-	#[cfg(feature = "examples")]
-	pub use beet_examples::exports::*;
+	// #[cfg(feature = "examples")]
+	// pub use beet_examples::exports::*;
 	#[cfg(feature = "ml")]
 	pub use beet_ml::exports::*;
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "sim")]
 	pub use beet_sim::exports::*;
-	#[cfg(feature = "spatial")]
-	pub use beet_spatial::exports::*;
 	pub use bevy;
 }
 #[cfg(test)]

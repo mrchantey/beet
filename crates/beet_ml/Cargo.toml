@@ -24,7 +24,7 @@ candle = [
 	"dep:tokenizers",
 ]
 spatial = ["dep:beet_spatial"]
-bevy_default = ["bevy/default","beet_core/multi_threaded"]
+bevy_default = ["bevy/default","beet_core/bevy_default"]
 
 [dependencies]
 beet_flow.workspace = true

@@ -54,7 +54,9 @@ fn sentence_steer_target<F: Component>(
 ) -> Result {
 	let (handle, sentence_steer_target) = query.get(ev.event_target())?;
 
-	let target_entity = sentence_steer_target.target_entity.get_target(&ev);
+	let target_entity = sentence_steer_target
+		.target_entity
+		.select_target(&ev, &agents);
 
 	let target_sentence = sentences.get(target_entity)?;
 

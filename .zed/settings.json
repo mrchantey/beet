@@ -17,6 +17,8 @@
 						// "webdriver",
 						// "css",
 						"bevy_default",
+						"spatial",
+						"examples",
 						"ml",
 						"cuda",
 						"rand"

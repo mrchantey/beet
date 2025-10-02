@@ -1,9 +1,8 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::log::LogPlugin;
-use beet_core::prelude::*;
-use sweet::prelude::*;
 
 
 /// A minimal app with flow and spatial
@@ -54,6 +53,8 @@ pub fn beet_example_plugin(app: &mut App) {
 		// DefaultReplicatePlugin,
 	))
 	.init_resource::<RandomSource>()
+	.register_type::<GlobalTransform>()
+	.register_type::<Transform>()
 	.register_type::<Collectable>();
 }
 

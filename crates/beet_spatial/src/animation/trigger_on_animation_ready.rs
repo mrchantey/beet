@@ -5,7 +5,7 @@ use beet_flow::prelude::*;
 /// Attach as a descendent of a parent with a [`SceneRoot`] and it will
 /// run when the [`AnimationPlayer`] is ready.
 ///
-/// The system is added for [`OnRun<()>`] in the [`AnimationPlugin`],
+/// The system is added for [`Run`] in the [`AnimationFlowPlugin`],
 /// any other payload types must be added manually.
 ///
 /// ## How it works
@@ -32,7 +32,7 @@ impl TriggerOnAnimationReady<RequestEndResult> {
 }
 
 /// The associated system for [`TriggerOnAnimationReady`].
-/// The defaullt [`OnRun<()>`] is added in the [`AnimationPlugin`],
+/// The defaullt [`Run`] is added in the [`AnimationFlowPlugin`],
 /// any other payload types must be added manually.
 pub fn trigger_on_animation_ready<P: IntoEntityEvent + Clone>(
 	mut commands: Commands,

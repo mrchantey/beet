@@ -1,12 +1,10 @@
 use crate::beet::prelude::*;
+use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
-use bevy::prelude::Node;
-use beet_core::prelude::*;
-use bevy::ui::UiSystem;
+use bevy::ui::UiSystems;
 use bevy::window::WindowResized;
-use sweet::prelude::When;
 
 /// A plugin for rendering a terminal-like UI
 #[derive(Clone)]
@@ -20,7 +18,7 @@ impl Plugin for UiTerminalPlugin {
 			.add_systems(
 				PostUpdate,
 				(init_output,resize_output,remove_excessive_lines)
-					.before(UiSystem::Layout),
+					.before(UiSystems::Layout),
 			)
 			.register_type::<OutputContainer>()
 			.register_type::<InputContainer>()
