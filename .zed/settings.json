@@ -14,10 +14,12 @@
 						// "client",
 						// "launch",
 						// "lambda",
-						"webdriver",
+						// "webdriver",
 						// "css",
 						"bevy_default",
-						"aws"
+						"ml",
+						"cuda"
+						// "aws"
 					]
 				}
 			}

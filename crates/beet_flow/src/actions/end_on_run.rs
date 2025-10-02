@@ -20,9 +20,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Component, PartialEq, Eq)]
 pub struct EndOnRun<T: EndPayload + Clone = EndResult>(pub T);
 
-impl<T: EndPayload + Clone> EndOnRun<T> {
-	pub fn new(event: T) -> Self { Self(event) }
-}
+impl<T: EndPayload + Clone> EndOnRun<T> {}
 
 fn end_on_run<T: EndPayload + Clone>(
 	ev: On<Run<T::Run>>,

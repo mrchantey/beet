@@ -73,7 +73,7 @@ fn run_app() {
 					// so lets give it a low score. This is a 5% chance because the alternative
 					// is a random value between 0 and 1
 					Name::new("Scarlet Aeonia"),
-					EndOnRun::new(ScoreValue(0.05)),
+					EndOnRun(ScoreValue(0.05)),
 					AttackPlayer {
 						max_damage: 10_000.0,
 						max_recoil: 10.0,

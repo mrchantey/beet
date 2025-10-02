@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 /// this is useful for a State Machine pattern, but be aware that
 /// in terms of control flow this is essentially a [`goto`](https://xkcd.com/292/) statement.
 ///
-/// The `origin` will be preserved in calling the next OnRun.
+/// The `origin` will be preserved in calling the next `Run`.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Example

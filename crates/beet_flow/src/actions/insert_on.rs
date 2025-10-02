@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// It is designed to work for both [`Run`] and [`End`] events.
 /// This action also has a corresponding [`RemoveOn`] action.
 /// ## Example
-/// Inserts the `Running` bundle when the `OnRun` event is triggered.
+/// Inserts the `Running` bundle when the `Run` event is triggered.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;

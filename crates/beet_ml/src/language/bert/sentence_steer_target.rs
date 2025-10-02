@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
-use beet_core::prelude::*;
 
 /// Finds the [`Sentence`] with the highest similarity to the agent's,
 /// then set it as the agent's [`SteerTarget`].
@@ -50,16 +50,13 @@ fn sentence_steer_target<F: Component>(
 	// it to be similar to sentence_scorer
 	items: Query<Entity, (With<Sentence>, With<F>)>,
 	mut berts: ResMut<Assets<Bert>>,
-) {
-	let (handle, sentence_steer_target) = query
-		.get(ev.event_target()())
-		.expect(&expect_action::to_have_action(&ev));
+	agents: AgentQuery,
+) -> Result {
+	let (handle, sentence_steer_target) = query.get(ev.event_target())?;
 
-	let target_entity = sentence_steer_target.target_entity.get_target(&*ev);
+	let target_entity = sentence_steer_target.target_entity.get_target(&ev);
 
-	let target_sentence = sentences
-		.get(target_entity)
-		.expect(&expect_action::to_have_other(&ev));
+	let target_sentence = sentences.get(target_entity)?;
 
 	let bert = berts
 		.get_mut(handle)
@@ -75,11 +72,12 @@ fn sentence_steer_target<F: Component>(
 	) {
 		Ok(entity) => {
 			commands
-				.entity(ev.origin())
+				.entity(agents.entity(ev.event_target()))
 				.insert(SteerTarget::Entity(entity));
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
 	}
+	Ok(())
 }
 
 // #[cfg(test)]

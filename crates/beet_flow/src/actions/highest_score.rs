@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
 /// // create a passing score value
-/// world.spawn(EndOnRun::<RequestScore, _>::new(ScoreValue(1.)));
+/// world.spawn(EndOnRun(ScoreValue(1.)));
 /// ```
 #[derive(
 	Debug,
@@ -85,11 +85,11 @@ impl EndPayload for ScoreValue {
 /// world
 ///		.spawn(HighestScore::default())
 ///		.with_child((
-///			EndOnRun::<RequestScore, _>::new(ScoreValue::NEUTRAL),
+///			EndOnRun(ScoreValue::NEUTRAL),
 ///			EndOnRun(SUCCESS),
 ///		))
 ///		.with_child((
-///			EndOnRun::<RequestScore, _>::new(ScoreValue::PASS),
+///			EndOnRun(ScoreValue::PASS),
 ///			EndOnRun(SUCCESS),
 ///		))
 ///		.trigger_entity(RUN);
