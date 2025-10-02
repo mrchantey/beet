@@ -6,6 +6,7 @@ use beet_core::prelude::*;
 /// - [InputOutput](ActionTag::InputOutput)
 /// ## Example
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world

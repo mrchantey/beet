@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 /// 	.spawn(EndOnRun::success())
-/// 	.trigger_target(RUN);
+/// 	.trigger_entity(RUN);
 /// ```
 #[action(end_on_run::<R,E>)]
 #[derive(Debug, Component, PartialEq, Eq)]

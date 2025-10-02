@@ -13,17 +13,19 @@ Beet Flow is an ECS control flow library built with [Bevy Observers][bevy-observ
 A demonstration of a Sequence control flow common in behavior trees.
 
 ```rust
-use beet::prelude::*;
+use beet_flow::prelude::*;
+use beet_core::prelude::*;
 
-App::new()
-	.add_plugins((
-		// manages action lifecycles
-		BeetFlowPlugin::default(),
-		// this will log the name of each action as it is triggered.
-		BeetDebugPlugin::default()
-	))
-	.world_mut()
-  .spawn((
+let mut app = App::new();
+app.add_plugins((
+	// manages action lifecycles
+	BeetFlowPlugin::default(),
+	// this will log the name of each action as it is triggered.
+	BeetDebugPlugin::default()
+));
+
+app.world_mut()
+	.spawn((
 		Name::new("My Behavior"),
 		Sequence,
 		children![
@@ -34,10 +36,11 @@ App::new()
 			(
 				Name::new("World"),
 				EndOnRun::success(),
-			)
-		]
-  ))
-	.trigger_target(RUN);
+			),
+		],
+	))
+	.trigger_entity(RUN)
+	.flush();
 ```
 
 [bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#

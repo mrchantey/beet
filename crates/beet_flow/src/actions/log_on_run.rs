@@ -7,6 +7,7 @@ use std::borrow::Cow;
 /// - [InputOutput](ActionTag::InputOutput)
 /// # Example
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world

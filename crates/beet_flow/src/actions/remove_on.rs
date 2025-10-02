@@ -17,7 +17,7 @@ use std::marker::PhantomData;
 /// 		EndOnRun::success(),
 /// 		RemoveOn::<End, Running>::default()
 /// 	))
-///		.trigger(RUN);
+///		.trigger_entity(RUN);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]

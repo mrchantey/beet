@@ -6,10 +6,11 @@ use std::cmp::Ordering;
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
 ///	## Example
 /// ```rust
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// let mut world = World::new();
 /// // create a passing score value
-/// world.spawn(ReturnWith(ScoreValue(1.)));
+/// world.spawn(EndOnRun::<RequestScore, _>::new(ScoreValue(1.)));
 /// ```
 #[derive(
 	Debug,
@@ -64,19 +65,20 @@ pub struct RequestScore;
 ///
 /// ## Example
 /// ```rust
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// let mut world = World::new();
 /// world
 ///		.spawn(HighestScore::default())
 ///		.with_child((
-///			ReturnWith(ScoreValue::NEUTRAL),
-///			ReturnWith(RunResult::Success),
+///			EndOnRun::<RequestScore, _>::new(ScoreValue::NEUTRAL),
+///			EndOnRun::success(),
 ///		))
 ///		.with_child((
-///			ReturnWith(ScoreValue::PASS),
-///			ReturnWith(RunResult::Success),
+///			EndOnRun::<RequestScore, _>::new(ScoreValue::PASS),
+///			EndOnRun::success(),
 ///		))
-///		.trigger(OnRun::local());
+///		.trigger_entity(RUN);
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]

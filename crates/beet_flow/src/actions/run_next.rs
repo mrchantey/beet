@@ -11,6 +11,7 @@ use beet_core::prelude::*;
 /// ## Example
 /// Triggering the second action will run the first `action`.
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// let action = world

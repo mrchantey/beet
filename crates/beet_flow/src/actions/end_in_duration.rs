@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = world();
+/// let mut world = World::new();
 /// world.spawn((
 ///		Running::default(),
 ///		EndInDuration::success(Duration::from_secs(2)),

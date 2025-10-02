@@ -28,14 +28,13 @@ pub struct ContinueRun;
 ///
 /// fn translate(
 /// 	time: Res<Time>,
-/// 	action: Query<(&Running, &Translate)>,
+/// 	action: Query<(Entity, &Running, &Translate)>,
 /// 	mut transforms: Query<&mut Transform>,
 /// ){
-/// 	for (running, translate) in action.iter(){
-/// 		let mut transform = transforms
-/// 			.get_mut(running.origin)
-/// 			.expect(&expect_action::to_have_origin(&running));
-/// 		transform.translation += translate.0 * time.delta_secs();
+/// 	for (entity, _running, translate) in action.iter(){
+/// 		if let Ok(mut transform) = transforms.get_mut(entity) {
+/// 			transform.translation += translate.0 * time.delta_secs();
+/// 		}
 /// 	}
 /// }
 /// ```
@@ -64,10 +63,7 @@ mod test {
 		world.get::<Running>(entity).xpect_none();
 		world.entity_mut(entity).trigger_entity(RUN).flush();
 		world.get::<Running>(entity).xpect_some();
-		world
-			.entity_mut(entity)
-			.trigger_entity(SUCCESS)
-			.flush();
+		world.entity_mut(entity).trigger_entity(SUCCESS).flush();
 		world.get::<Running>(entity).xpect_none();
 	}
 }

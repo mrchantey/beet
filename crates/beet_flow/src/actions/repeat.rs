@@ -12,6 +12,7 @@ use beet_core::prelude::*;
 /// ## Example
 /// Repeat the action twice, then bubble up the failure
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world

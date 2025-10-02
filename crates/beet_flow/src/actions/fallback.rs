@@ -11,6 +11,7 @@ use beet_core::prelude::*;
 /// ## Example
 /// Runs the first child, then the second child if first fails.
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 ///	world.spawn((
@@ -37,9 +38,7 @@ fn on_start(
 	if let Some(first_child) = children.iter().next() {
 		commands.entity(first_child).trigger_entity(RUN);
 	} else {
-		commands
-			.entity(ev.event_target())
-			.trigger_entity(FAILURE);
+		commands.entity(ev.event_target()).trigger_entity(FAILURE);
 	}
 	Ok(())
 }

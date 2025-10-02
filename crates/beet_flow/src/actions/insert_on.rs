@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 ///		.spawn(InsertOn::<Run, Running>::default())
-///		.trigger(RUN);
+///		.trigger_entity(RUN);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]

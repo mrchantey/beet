@@ -11,6 +11,7 @@ use bevy::platform::collections::HashSet;
 /// ## Example
 /// Run two children in parallel
 /// ```
+/// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world.spawn((
@@ -37,9 +38,7 @@ fn on_start(
 	action.clear();
 
 	if children.is_empty() {
-		commands
-			.entity(ev.event_target())
-			.trigger_entity(SUCCESS);
+		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
 		return Ok(());
 	}
 
