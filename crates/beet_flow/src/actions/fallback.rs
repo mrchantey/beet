@@ -5,64 +5,71 @@ use beet_core::prelude::*;
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Logic
-/// - If a child succeeds it succeed.
+/// - If a child succeeds it will succeed.
 /// - If a child fails it will run the next child.
-/// - If there are no more children to run it will succeed.
+/// - If there are no more children to run it will fail.
 /// ## Example
-/// This example will run the first child, then the second child.
+/// Runs the first child, then the second child if first fails.
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
-/// world
-///		.spawn(Fallback)
-///		.with_child(ReturnWith(RunResult::Failure))
-///		.with_child(ReturnWith(RunResult::Success))
-///		.trigger(OnRun::local());
+/// # use beet_flow::prelude::*;
+/// # let mut world = BeetFlowPlugin::world();
+///	world.spawn((
+/// 	Fallback,
+/// 	children![
+/// 		EndOnRun::failure(),
+/// 		EndOnRun::success(),
+///    ]))
+///		.trigger_entity(RUN)
+/// 	.flush();
 /// ```
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(PreventPropagateEnd)]
 pub struct Fallback;
 
 fn on_start(
 	ev: On<Run>,
 	mut commands: Commands,
 	query: Query<&Children>,
-) {
-	let children = query
-		.get(ev.action)
-		.expect(&expect_action::to_have_children(&ev));
+) -> Result {
+	let children = query.get(ev.event_target())?;
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_next(&mut commands, first_child);
+		commands.entity(first_child).trigger_entity(RUN);
 	} else {
-		ev.trigger_result(&mut commands, RunResult::Success);
+		commands
+			.entity(ev.event_target())
+			.trigger_entity(IntoEnd::failure());
 	}
+	Ok(())
 }
 
 fn on_next(
-	ev: On<OnChildResult>,
-	commands: Commands,
+	ev: On<ChildEnd>,
+	mut commands: Commands,
 	query: Query<&Children>,
-) {
-	if ev.payload == RunResult::Success {
-		ev.trigger_bubble(commands);
-		return;
+) -> Result {
+	let target = ev.event_target();
+	let child = ev.child();
+	// if any success, propagate the success
+	if ev.is_ok() {
+		commands.trigger(ev.event().clone().into_end());
+		return Ok(());
 	}
-	let children = query
-		.get(ev.parent)
-		.expect(&expect_action::to_have_children(&ev));
-
+	let children = query.get(target)?;
 	let index = children
 		.iter()
-		.position(|x| x == ev.child)
-		.expect(&expect_action::to_have_child(&ev, ev.child));
+		.position(|x| x == child)
+		.ok_or_else(|| expect_action::to_have_child(&ev, child))?;
 	if index == children.len() - 1 {
-		ev.trigger_bubble(commands);
+		// all done, propagate the failure
+		commands.trigger(ev.event().clone().into_end());
 	} else {
-		ev.trigger_run(commands, children[index + 1], ());
+		// run next
+		commands.entity(children[index + 1]).trigger_entity(RUN);
 	}
+	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
@@ -72,19 +79,18 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		let world = app.world_mut();
+		let mut world = BeetFlowPlugin::world();
 
-		let on_run = collect_on_run(world);
-		let on_result = collect_on_result(world);
+		let on_result = collect_on_result(&mut world);
+		let on_run = collect_on_run(&mut world);
 
 		world
-			.spawn((Name::new("root"), Fallback))
-			.with_child((Name::new("child1"), ReturnWith(RunResult::Failure)))
-			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
-			.flush_trigger(OnRun::local());
-
+			.spawn((Name::new("root"), Fallback, children![
+				(Name::new("child1"), EndOnRun::failure()),
+				(Name::new("child2"), EndOnRun::success()),
+			]))
+			.trigger_entity(RUN)
+			.flush();
 
 		on_run.get().xpect_eq(vec![
 			"root".to_string(),
@@ -92,9 +98,9 @@ mod test {
 			"child2".to_string(),
 		]);
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), RunResult::Failure),
-			("child2".to_string(), RunResult::Success),
-			("root".to_string(), RunResult::Success),
+			("child1".to_string(), Err(())),
+			("child2".to_string(), Ok(())),
+			("root".to_string(), Ok(())),
 		]);
 	}
 }

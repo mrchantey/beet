@@ -12,8 +12,6 @@ pub struct End<T = EndResult> {
 	value: T,
 }
 
-
-
 impl<T> std::ops::Deref for End<T>
 where
 	T: 'static + Send + Sync,
