@@ -28,23 +28,6 @@ where
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct IntoEnd<T = EndResult>(T);
-impl<T> IntoEnd<T> {
-	pub fn new(value: T) -> Self { Self(value) }
-}
-impl IntoEnd<EndResult> {
-	pub fn success() -> Self { Self(Ok(())) }
-	pub fn failure() -> Self { Self(Err(())) }
-}
-
-impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
-	type Event = End<T>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self.0)
-	}
-}
-
 impl<T> From<Entity> for End<T>
 where
 	T: 'static + Send + Sync + Default,
@@ -69,17 +52,26 @@ where
 	}
 }
 
-impl End<EndResult> {
-	pub const SUCCESS: IntoEnd<EndResult> = IntoEnd(Ok(()));
-	pub const FAILURE: IntoEnd<EndResult> = IntoEnd(Err(()));
+impl End<EndResult> {}
 
-	pub fn success() -> fn(Entity) -> Self {
-		|target: Entity| Self::new(target, Ok(()))
-	}
-	pub fn failure() -> fn(Entity) -> Self {
-		|target: Entity| Self::new(target, Err(()))
+
+#[derive(Debug, Default, Clone)]
+pub struct IntoEnd<T = EndResult>(T);
+impl<T> IntoEnd<T> {
+	pub fn new(value: T) -> Self { Self(value) }
+}
+impl IntoEnd<EndResult> {
+	pub fn success() -> Self { Self(Ok(())) }
+	pub fn failure() -> Self { Self(Err(())) }
+}
+
+impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
+	type Event = End<T>;
+	fn into_entity_event(self, entity: Entity) -> Self::Event {
+		End::new(entity, self.0)
 	}
 }
+
 
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
 pub struct ChildEnd<T = EndResult>
@@ -196,7 +188,7 @@ mod test {
 	fn succeed(ev: On<Run>, mut commands: Commands) {
 		commands
 			.entity(ev.event_target())
-			.trigger_entity(End::SUCCESS);
+			.trigger_entity(IntoEnd::success());
 	}
 
 	#[test]
