@@ -1477,7 +1477,6 @@ name = "beet_flow"
 version = "0.0.7-dev.0"
 dependencies = [
  "beet_core",
- "beet_flow",
  "bevy",
  "extend",
  "log",

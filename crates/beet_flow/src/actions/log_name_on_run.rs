@@ -6,11 +6,11 @@ use beet_core::prelude::*;
 /// - [InputOutput](ActionTag::InputOutput)
 /// ## Example
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # let mut world = BeetFlowPlugin::world();
 /// world
 ///		.spawn((Name::new("root"), LogNameOnRun))
-///		.trigger(OnRun::local());
+///		.trigger_entity(RUN);
 /// ```
 #[action(log_name_on_run)]
 #[derive(Default, Component, Reflect)]
@@ -18,31 +18,26 @@ use beet_core::prelude::*;
 #[require(Name)]
 pub struct LogNameOnRun;
 
-
 /// Logs the [`Name`] of the entity when it runs.
-fn log_name_on_run(trigger: On<Run>, query: Query<&Name>) {
-	if let Ok(name) = query.get(trigger.action) {
+fn log_name_on_run(ev: On<Run>, query: Query<&Name>) -> Result {
+	if let Ok(name) = query.get(ev.event_target()) {
 		log::info!("Running: {name}");
 	}
+	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	/// run with `--nocapture` to check output
 	#[test]
-	fn action() -> Result<()> {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		app.world_mut()
+	fn action() {
+		let mut world = BeetFlowPlugin::world();
+		world
 			.spawn((Name::new("root"), LogNameOnRun))
-			.flush_trigger(OnRun::local());
-
-		Ok(())
+			.trigger_entity(RUN)
+			.flush();
 	}
 }

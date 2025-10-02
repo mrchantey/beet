@@ -7,11 +7,11 @@ use std::borrow::Cow;
 /// - [InputOutput](ActionTag::InputOutput)
 /// # Example
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # let mut world = BeetFlowPlugin::world();
 /// world
 ///		.spawn(LogOnRun::new("Running..."))
-///		.trigger(OnRun::local());
+///		.trigger_entity(RUN);
 /// ```
 #[action(log_on_run)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -24,9 +24,10 @@ impl LogOnRun {
 	}
 }
 
-fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) {
+fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) -> Result {
 	let action = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	log::info!("{}", action.0);
+	Ok(())
 }

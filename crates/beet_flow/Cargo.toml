@@ -13,11 +13,8 @@ categories.workspace = true
 
 
 [features]
-bevy_default = ["bevy/default"]
+bevy_default = ["bevy/bevy_asset"]
 reflect = ["dep:serde", "bevy/serialize"]
-# for doctest helpers
-# https://github.com/rust-lang/rust/issues/67295
-_doctest = []
 
 [dependencies]
 beet_core.workspace = true
@@ -29,5 +26,4 @@ thiserror.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_flow = { path = "", features = ["_doctest"] }
 sweet.workspace = true

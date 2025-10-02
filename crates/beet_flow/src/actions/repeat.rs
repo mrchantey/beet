@@ -1,13 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
-
-/// Reattaches the [`RunOnSpawn`] component whenever [`OnResult`] is called.
+/// Reattaches the [`RunOnSpawn`] component whenever [`End`] is called.
 /// Using [`RunOnSpawn`] means this does **not** directly trigger observers, which avoids infinite loops.
 ///
-/// Note that [`RepeatFlow`] requires [`NoBubble`] so results must be bubbled up manually
+/// Note that [`Repeat`] requires [`PreventPropagateEnd`] so results must be bubbled up manually
 /// if the [`Self::if_result_matches`] option is unused.
 ///
 /// ## Tags
@@ -15,32 +12,32 @@ use beet_core::prelude::*;
 /// ## Example
 /// Repeat the action twice, then bubble up the failure
 /// ```
-/// # use beet_flow::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # let mut world = BeetFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
-/// .trigger(OnRun::local());
+/// .trigger_entity(RUN);
 /// ```
 #[action(repeat)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(NoBubble)]
+#[require(PreventPropagateEnd)]
 pub struct Repeat {
 	/// Optional predicate to only repeat if the result matches.
-	pub if_result_matches: Option<RunResult>,
+	pub if_result_matches: Option<EndResult>,
 }
 
 impl Repeat {
-	/// Repeats the action if the result is [`RunResult::Success`].
+	/// Repeats the action if the result is [`EndResult::Success`].
 	pub fn if_success() -> Self {
 		Self {
-			if_result_matches: Some(RunResult::Success),
+			if_result_matches: Some(SUCCESS),
 		}
 	}
-	/// Repeats the action if the result is [`RunResult::Failure`].
+	/// Repeats the action if the result is [`EndResult::Failure`].
 	pub fn if_failure() -> Self {
 		Self {
-			if_result_matches: Some(RunResult::Failure),
+			if_result_matches: Some(FAILURE),
 		}
 	}
 }
@@ -55,107 +52,97 @@ impl Default for Repeat {
 
 fn repeat(
 	ev: On<End>,
-	parents: Query<&ChildOf>,
-	action_observers: Query<&ActionObservers>,
 	query: Query<&Repeat>,
 	mut commands: Commands,
-) {
-	let repeat = query
-		.get(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let repeat = query.get(ev.event_target())?;
 	if let Some(check) = &repeat.if_result_matches {
-		if &ev.payload != check {
-			// repeat is completed, call OnResult
-			OnChildResult::try_trigger(
-				commands,
-				parents,
-				action_observers,
-				ev.action,
-				ev.origin,
-				ev.payload.clone(),
-			);
-			return;
+		if **ev != *check {
+			// repeat is completed, propagate the result
+			commands
+				.trigger(ev.event().clone().into_child_end(ev.event_target()));
+			return Ok(());
 		}
 	}
 	// otherwise run again on the next tick
-	let action = OnRunAction::new(ev.action, ev.origin, ());
-	commands.entity(ev.action).insert(RunOnSpawn::new(action));
+	commands
+		.entity(ev.event_target())
+		.insert(TriggerDeferred::new(RUN));
+	Ok(())
 }
-
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn repeat_always() {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		let world = app.world_mut();
-		let func = observer_ext::observe_triggers::<OnResultAction>(world);
+		let mut world = BeetFlowPlugin::world();
+		let on_result = collect_on_result(&mut world);
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
-			.flush_trigger(OnRun::local());
+			.trigger_entity(RUN)
+			.flush();
 
-		func.len().xpect_eq(1);
-		app.update();
-		func.len().xpect_eq(2);
-		app.update();
-		func.len().xpect_eq(3);
-		app.update();
-		// // even though child failed, it keeps repeating
-		func.len().xpect_eq(4);
-		app.update();
-		func.len().xpect_eq(5);
+		on_result.get().len().xpect_eq(1);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(2);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(3);
+		world.run_schedule(Update);
+		// even though child failed, it keeps repeating
+		on_result.get().len().xpect_eq(4);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(5);
 	}
 
 	#[test]
 	fn repeat_if() {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		let world = app.world_mut();
-		let func = observer_ext::observe_triggers::<OnResultAction>(world);
+		let mut world = BeetFlowPlugin::world();
+		let on_result = collect_on_result(&mut world);
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
-			.flush_trigger(OnRun::local());
+			.trigger_entity(RUN)
+			.flush();
 
-		func.len().xpect_eq(1);
-		app.update();
-		func.len().xpect_eq(2);
-		app.update();
-		func.len().xpect_eq(3);
-		app.update();
+		on_result.get().len().xpect_eq(1);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(2);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(3);
+		world.run_schedule(Update);
 		// it stopped repeating
-		func.len().xpect_eq(3);
-		app.update();
-		func.len().xpect_eq(3);
+		on_result.get().len().xpect_eq(3);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(3);
 	}
+
 	#[test]
 	fn repeat_child() {
-		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
-		let world = app.world_mut();
-		let func = observer_ext::observe_triggers::<OnResultAction>(world);
+		let mut world = BeetFlowPlugin::world();
+		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn((Sequence, Repeat::if_success()))
-			.with_child(SucceedTimes::new(2))
-			.flush_trigger(OnRun::local());
+			.spawn((Sequence, children![(
+				Repeat::if_success(),
+				SucceedTimes::new(2)
+			)]))
+			.trigger_entity(RUN)
+			.flush();
 
-		func.len().xpect_eq(2);
-		app.update();
-		func.len().xpect_eq(4);
-		app.update();
-		func.len().xpect_eq(6);
-		app.update();
-		func.len().xpect_eq(6);
-		app.update();
+		on_result.get().len().xpect_eq(2);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(4);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(6);
+		world.run_schedule(Update);
+		on_result.get().len().xpect_eq(6);
+		world.run_schedule(Update);
 		// last one, it stopped repeating
-		func.len().xpect_eq(6);
+		on_result.get().len().xpect_eq(6);
 	}
 }
