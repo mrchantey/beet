@@ -11,6 +11,19 @@ pub enum EndResult<T = (), E = ()> {
 pub const SUCCESS: EndResult<(), ()> = EndResult::Success(());
 pub const FAILURE: EndResult<(), ()> = EndResult::Failure(());
 
+
+impl<T, E> IntoEntityEvent for EndResult<T, E>
+where
+	T: 'static + Send + Sync,
+	E: 'static + Send + Sync,
+{
+	type Event = End<EndResult<T, E>>;
+	fn into_entity_event(self, entity: Entity) -> Self::Event {
+		End::new(entity, self)
+	}
+}
+
+
 impl<T, E> EndResult<T, E> {
 	pub fn is_success(&self) -> bool { matches!(self, EndResult::Success(_)) }
 	pub fn is_failure(&self) -> bool { matches!(self, EndResult::Failure(_)) }
@@ -65,22 +78,19 @@ where
 impl End<EndResult> {}
 
 
-#[derive(Debug, Default, Clone)]
-pub struct IntoEnd<T = EndResult>(T);
-impl<T> IntoEnd<T> {
-	pub fn new(value: T) -> Self { Self(value) }
-}
-impl IntoEnd<EndResult> {
-	pub fn success() -> Self { Self(SUCCESS) }
-	pub fn failure() -> Self { Self(FAILURE) }
-}
+// #[derive(Debug, Default, Clone)]
+// pub struct IntoEnd<T = EndResult>(T);
+// impl<T> IntoEnd<T> {
+// 	pub fn new(value: T) -> Self { Self(value) }
+// }
+// impl IntoEnd<EndResult> {}
 
-impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
-	type Event = End<T>;
-	fn into_entity_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self.0)
-	}
-}
+// impl<T: 'static + Send + Sync> IntoEntityEvent for IntoEnd<T> {
+// 	type Event = End<T>;
+// 	fn into_entity_event(self, entity: Entity) -> Self::Event {
+// 		End::new(entity, self.0)
+// 	}
+// }
 
 
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
@@ -206,9 +216,7 @@ mod test {
 	struct Child;
 
 	fn succeed(ev: On<Run>, mut commands: Commands) {
-		commands
-			.entity(ev.event_target())
-			.trigger_entity(IntoEnd::success());
+		commands.entity(ev.event_target()).trigger_entity(SUCCESS);
 	}
 
 	#[test]

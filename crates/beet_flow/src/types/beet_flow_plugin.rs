@@ -23,7 +23,7 @@ impl Plugin for BeetFlowPlugin {
 			(
 				tick_run_timers,
 				// return_in_duration must be after tick_run_timers
-				end_in_duration::<IntoEnd>,
+				end_in_duration::<EndResult>,
 			)
 				.chain()
 				.in_set(TickSet),

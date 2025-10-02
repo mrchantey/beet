@@ -39,7 +39,7 @@ fn on_start(
 	if children.is_empty() {
 		commands
 			.entity(ev.event_target())
-			.trigger_entity(IntoEnd::success());
+			.trigger_entity(SUCCESS);
 		return Ok(());
 	}
 

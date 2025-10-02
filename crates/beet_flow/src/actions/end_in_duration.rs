@@ -39,13 +39,9 @@ impl<T> EndInDuration<T> {
 	}
 }
 
-impl EndInDuration<IntoEnd> {
-	pub fn success(duration: Duration) -> Self {
-		Self::new(IntoEnd::success(), duration)
-	}
-	pub fn failure(duration: Duration) -> Self {
-		Self::new(IntoEnd::failure(), duration)
-	}
+impl EndInDuration<EndResult> {
+	pub fn success(duration: Duration) -> Self { Self::new(SUCCESS, duration) }
+	pub fn failure(duration: Duration) -> Self { Self::new(FAILURE, duration) }
 }
 
 pub(crate) fn end_in_duration<T: IntoEntityEvent + Clone>(

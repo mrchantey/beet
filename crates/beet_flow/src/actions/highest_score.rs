@@ -39,6 +39,13 @@ impl ScoreValue {
 	pub fn new(score: f32) -> Self { Self(score) }
 }
 
+impl IntoEntityEvent for ScoreValue {
+	type Event = End<ScoreValue>;
+	fn into_entity_event(self, entity: Entity) -> Self::Event {
+		End::new(entity, self)
+	}
+}
+
 
 /// The payload for requesting a score,
 /// for usage see [`HighestScore`].
@@ -134,16 +141,12 @@ mod test {
 			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
-				EndOnRun::<RequestScore, IntoEnd<ScoreValue>>::new(
-					IntoEnd::new(ScoreValue::NEUTRAL),
-				),
+				EndOnRun::<RequestScore, _>::new(ScoreValue::NEUTRAL),
 				EndOnRun::success(),
 			))
 			.with_child((
 				Name::new("child2"),
-				EndOnRun::<RequestScore, IntoEnd<ScoreValue>>::new(
-					IntoEnd::new(ScoreValue::PASS),
-				),
+				EndOnRun::<RequestScore, _>::new(ScoreValue::PASS),
 				EndOnRun::success(),
 			))
 			.trigger_entity(RUN)

@@ -39,7 +39,7 @@ fn on_start(
 	} else {
 		commands
 			.entity(ev.event_target())
-			.trigger_entity(IntoEnd::failure());
+			.trigger_entity(FAILURE);
 	}
 	Ok(())
 }

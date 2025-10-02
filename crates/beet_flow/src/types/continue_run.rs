@@ -66,7 +66,7 @@ mod test {
 		world.get::<Running>(entity).xpect_some();
 		world
 			.entity_mut(entity)
-			.trigger_entity(IntoEnd::success())
+			.trigger_entity(SUCCESS)
 			.flush();
 		world.get::<Running>(entity).xpect_none();
 	}

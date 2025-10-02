@@ -81,7 +81,7 @@ mod test {
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
-			.trigger_entity(IntoEnd::success())
+			.trigger_entity(SUCCESS)
 			.flush();
 
 		// removes from parent and first child
@@ -92,7 +92,7 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn((NoInterrupt, Running))
-			.trigger_entity(IntoEnd::success())
+			.trigger_entity(SUCCESS)
 			.flush();
 		// leaves parent
 		world.query_once::<&Running>().len().xpect_eq(1);
