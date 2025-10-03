@@ -7,7 +7,7 @@ use std::fs::{
 use std::io::Write;
 use sweet::prelude::*;
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result {
 	let map = FrozenLakeMap::default_four_by_four();
 	let initial_state = map.agent_position();
 	let env = QTableEnv::new(map.transition_outcomes());

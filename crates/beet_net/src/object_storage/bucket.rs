@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 
 /// Cross-service storage bucket for S3, filesystem, memory, or other providers
@@ -32,7 +31,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```no_run
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let bucket = temp_bucket();
 	/// let item = bucket.item(RoutePath::from("/my-file.txt"));
@@ -49,7 +48,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -68,7 +67,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -84,7 +83,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -99,7 +98,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -117,7 +116,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -137,7 +136,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -161,7 +160,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -176,7 +175,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -191,7 +190,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -207,7 +206,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -234,7 +233,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
@@ -250,7 +249,7 @@ impl Bucket {
 	///
 	/// # Example
 	/// ```
-	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();

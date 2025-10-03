@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::f32::consts::TAU;
 use std::time::Duration;
 
@@ -26,23 +26,22 @@ impl Default for TranslateGrid {
 
 pub(crate) fn translate_grid(
 	mut commands: Commands,
-	mut agents: Query<(
+	mut agents: AgentQuery<(
 		&mut Transform,
 		&mut GridPos,
 		&GridDirection,
 		&GridToWorld,
 	)>,
-	query: Query<(Entity, &TranslateGrid, &Running, &RunTimer)>,
-) {
-	for (action, translate_grid, running, run_timer) in query.iter() {
-		let (mut transform, mut grid_pos, dir, grid_to_world) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+	query: Query<(Entity, &TranslateGrid, &RunTimer), With<Running>>,
+) -> Result {
+	for (action, translate_grid, run_timer) in query.iter() {
+		let (mut transform, mut grid_pos, dir, grid_to_world) =
+			agents.get_mut(action)?;
 		let from_world = grid_to_world.world_pos(**grid_pos);
 		let to_grid = grid_to_world.clamped_add(**grid_pos, (*dir).into());
 		let to_world = grid_to_world.world_pos(to_grid);
 
-		let t = run_timer.last_started.elapsed().as_secs_f32()
+		let t = run_timer.last_run.elapsed().as_secs_f32()
 			/ translate_grid.anim_duration.as_secs_f32();
 
 		let dir_vec: Vec3 = (*dir).into();
@@ -60,9 +59,10 @@ pub(crate) fn translate_grid(
 		} else {
 			transform.translation = to_world;
 			**grid_pos = to_grid;
-			running.trigger_result(&mut commands, action, RunResult::Success);
+			commands.entity(action).trigger_payload(SUCCESS);
 		}
 	}
+	Ok(())
 }
 
 fn bounce(t: f32, n: i32) -> f32 {

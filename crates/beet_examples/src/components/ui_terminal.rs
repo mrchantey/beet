@@ -1,12 +1,10 @@
 use crate::beet::prelude::*;
+use beet_core::prelude::*;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
-use bevy::prelude::Node;
-use bevy::prelude::*;
-use bevy::ui::UiSystem;
+use bevy::ui::UiSystems;
 use bevy::window::WindowResized;
-use sweet::prelude::When;
 
 /// A plugin for rendering a terminal-like UI
 #[derive(Clone)]
@@ -20,7 +18,7 @@ impl Plugin for UiTerminalPlugin {
 			.add_systems(
 				PostUpdate,
 				(init_output,resize_output,remove_excessive_lines)
-					.before(UiSystem::Layout),
+					.before(UiSystems::Layout),
 			)
 			.register_type::<OutputContainer>()
 			.register_type::<InputContainer>()
@@ -51,7 +49,7 @@ fn font() -> TextFont {
 }
 
 fn log_on_message(
-	mut ev: EventReader<OnLogMessage>,
+	mut ev: MessageReader<OnLogMessage>,
 	mut commands: Commands,
 	terminal: Single<Entity, With<OutputContainer>>,
 ) {
@@ -89,7 +87,7 @@ const INPUT_HEIGHT_PX: f32 = 50.;
 
 fn resize_output(
 	window: Single<&Window>,
-	mut resize_reader: EventReader<WindowResized>,
+	mut resize_reader: MessageReader<WindowResized>,
 	mut containers: Populated<&mut Node, With<OutputContainer>>,
 ) {
 	if resize_reader.read().count() > 0 {
@@ -159,7 +157,7 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 
 fn parse_text_input(
 	mut commands: Commands,
-	mut evr_char: When<EventReader<KeyboardInput>>,
+	mut evr_char: When<MessageReader<KeyboardInput>>,
 	keys: When<Res<ButtonInput<KeyCode>>>,
 	mut query: Query<&mut TextSpan, With<InputContainer>>,
 ) {
@@ -173,7 +171,7 @@ fn parse_text_input(
 		for mut text in query.iter_mut() {
 			match &ev.logical_key {
 				Key::Enter => {
-					commands.trigger(OnUserMessage(text.0.clone()));
+					commands.trigger(UserMessage(text.0.clone()));
 					text.clear();
 				}
 				Key::Backspace => {

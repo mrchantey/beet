@@ -1,12 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
-use bevy::prelude::*;
 
 /// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver)
 /// which will also insert an [`EventTarget`]
-#[derive(ImplBundle)]
+#[derive(BundleEffect)]
 pub struct EventHandler<E: 'static + Send + Sync + Event> {
 	observer: Observer,
 	_phantom: std::marker::PhantomData<E>,
@@ -22,11 +20,12 @@ impl<E: 'static + Send + Sync + Event> EventHandler<E> {
 			_phantom: std::marker::PhantomData,
 		}
 	}
-}
-
-impl<E: 'static + Send + Sync + Event> BundleEffect for EventHandler<E> {
-	fn apply(self, entity: &mut EntityWorldMut) {
-		entity.insert((EventTarget, self.observer.with_entity(entity.id())));
+	fn effect(self, entity: &mut EntityWorldMut) {
+		entity.insert(EventTarget);
+		let observer = self.observer.with_entity(entity.id());
+		entity.world_scope(move |world| {
+			world.spawn(observer);
+		});
 	}
 }
 

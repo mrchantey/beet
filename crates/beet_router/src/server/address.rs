@@ -1,6 +1,5 @@
 use beet_net::exports::http::Uri;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use std::fmt::Display;
 
 

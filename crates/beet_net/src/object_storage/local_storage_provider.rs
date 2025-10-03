@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 use js_sys::wasm_bindgen::JsCast;
 

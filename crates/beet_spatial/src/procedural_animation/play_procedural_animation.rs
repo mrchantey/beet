@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::time::Duration;
 
 /// Play a procedural animation with a provided [`SerdeCurve`] for
@@ -50,10 +50,10 @@ impl PlayProceduralAnimation {
 
 pub(crate) fn play_procedural_animation(
 	mut commands: Commands,
-	mut transforms: Query<&mut Transform>,
-	query: Query<(Entity, &PlayProceduralAnimation, &Running, &RunTimer)>,
-) {
-	for (action, play_procedural, running, run_timer) in query.iter() {
+	mut agents: AgentQuery<&mut Transform>,
+	query: Query<(Entity, &PlayProceduralAnimation, &RunTimer), With<Running>>,
+) -> Result {
+	for (action, play_procedural, run_timer) in query.iter() {
 		// run_timer.last_started.
 		let total_len_meters = play_procedural.curve.total_len();
 		let t = play_procedural
@@ -65,23 +65,21 @@ pub(crate) fn play_procedural_animation(
 		// 	target_pos = transform.transform_point(target_pos);
 		// }
 
-		transforms
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running))
-			.translation = target_pos;
+		agents.get_mut(action)?.translation = target_pos;
 
 		if t >= 1.0 {
-			running.trigger_result(&mut commands, action, RunResult::Success);
+			commands.entity(action).trigger_payload(SUCCESS);
 		}
 	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

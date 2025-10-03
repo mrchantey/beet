@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 
@@ -23,7 +23,7 @@ where
 {
 	let handler = match method.has_body() {
 		// ie `POST`, `PUT`, etc
-		true => RouteHandler::endpoint(
+		true => RouteHandler::endpoint::<_, _, _, Out, _>(
 			move |val: In<Json<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {
@@ -33,7 +33,7 @@ where
 			},
 		),
 		// ie `GET`, `DELETE`, etc
-		false => RouteHandler::endpoint(
+		false => RouteHandler::endpoint::<_, _, _, Out, _>(
 			move |val: In<JsonQueryParams<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {
@@ -82,7 +82,7 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

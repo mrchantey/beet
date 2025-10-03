@@ -1,32 +1,28 @@
-#![allow(dead_code)]
-use beet::prelude::*;
-use sweet::prelude::EntityWorldMutwExt;
+//! Adding and removing observers per entity per spawn can get expensive if done a lot,
+//! in that case its better to use global observers, this is a simple example.
 
-#[action(trigger_count)]
+use bevy::prelude::*;
+
+#[derive(EntityEvent)]
+struct Run(Entity);
+
 #[derive(Default, Component)]
 struct TriggerCount(i32);
 
-fn foobar(_trigger: Trigger<OnRunAction>) {
-	println!("foobar");
-}
-
-fn trigger_count(trigger: Trigger<OnRun>, mut query: Query<&mut TriggerCount>) {
-	query.get_mut(trigger.action).unwrap().as_mut().0 += 1;
+fn increment(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
+	query.get_mut(trigger.event_target()).unwrap().as_mut().0 += 1;
 }
 
 fn main() {
 	let mut app = App::new();
-	app.add_plugins(BeetFlowPlugin::default());
-
+	app.add_observer(increment);
 	let start = std::time::Instant::now();
 	for _ in 0..10_u64.pow(6) {
-		let entity = app
-			.world_mut()
-			.spawn(TriggerCount::default())
-			.flush_trigger(OnRun::local())
-			.id();
-		assert_eq!(app.world().get::<TriggerCount>(entity).unwrap().0, 1);
+		let entity = app.world_mut().spawn(TriggerCount::default()).id();
+		app.world_mut().flush();
+		app.world_mut().entity_mut(entity).trigger(Run);
+		app.world_mut().flush();
 	}
 	println!("Time: {}", start.elapsed().as_millis());
-	// 600ms
+	// 200ms
 }

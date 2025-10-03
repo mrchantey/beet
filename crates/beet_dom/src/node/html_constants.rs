@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::path::PathBuf;
 
 /// Constant values used in the HTML rendering process.

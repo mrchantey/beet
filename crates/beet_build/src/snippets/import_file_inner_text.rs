@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 
@@ -70,7 +69,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
 	use beet_rsx::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	// this file will be parsed, declare an fs src

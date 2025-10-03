@@ -1,5 +1,5 @@
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -27,18 +27,17 @@ impl<F: Component> SetTextOnRun<F> {
 }
 
 fn set_text_on_run<F: Component>(
-	ev: Trigger<OnRun>,
+	ev: On<Run>,
 	query: Query<&SetTextOnRun<F>, Added<Running>>,
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,
-) {
-	let set_text_on_run = query
-		.get(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let set_text_on_run = query.get(ev.event_target())?;
 	for mut text in texts.iter_mut() {
 		**text = set_text_on_run.value.to_string();
 	}
 	for mut text in text_spans.iter_mut() {
 		**text = set_text_on_run.value.to_string();
 	}
+	Ok(())
 }

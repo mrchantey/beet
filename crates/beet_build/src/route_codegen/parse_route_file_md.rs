@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 
 
 pub fn parse_route_file_md(
@@ -69,7 +68,7 @@ pub fn parse_route_file_md(
 mod test {
 	use super::super::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -79,15 +78,15 @@ mod test {
 		let collection =
 			world.spawn(RouteFileCollection::test_site_docs()).id();
 		world
-			.run_system_cached(create_route_files)
+			.run_system_cached::<Result, _, _>(create_route_files)
 			.unwrap()
 			.unwrap();
 		world
-			.run_system_cached(parse_route_file_md)
+			.run_system_cached::<Result, _, _>(parse_route_file_md)
 			.unwrap()
 			.unwrap();
 		world
-			.run_system_cached(parse_route_file_md)
+			.run_system_cached::<Result, _, _>(parse_route_file_md)
 			// bypass_change_detection
 			.xpect_err();
 		let file = world.entity(collection).get::<Children>().unwrap()[0];

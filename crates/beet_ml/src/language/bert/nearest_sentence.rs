@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreFlow`]
@@ -15,7 +15,7 @@ impl NearestSentence {
 }
 
 fn nearest_sentence(
-	ev: Trigger<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
@@ -28,7 +28,7 @@ fn nearest_sentence(
 	)>,
 ) {
 	let (_scorer, target_sentence, handle, children) = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	let bert = berts
 		.get_mut(handle)
@@ -39,7 +39,7 @@ fn nearest_sentence(
 		&sentences,
 	) {
 		Ok(entity) => {
-			ev.trigger_next(&mut commands, entity);
+			commands.entity(entity).trigger_payload(RUN);
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
 	}
@@ -48,9 +48,8 @@ fn nearest_sentence(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -67,7 +66,7 @@ mod test {
 		))
 		.finish();
 		let on_run =
-			observer_ext::observe_trigger_names::<OnRun>(app.world_mut());
+			observer_ext::observe_trigger_names::<Run>(app.world_mut());
 
 		let handle =
 			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")
@@ -84,7 +83,8 @@ mod test {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));
 				parent.spawn((Name::new("kill"), Sentence::new("kill")));
 			})
-			.flush_trigger(OnRun::local());
+			.trigger_payload(RUN)
+			.flush();
 
 
 		on_run.len().xpect_eq(2);

@@ -72,8 +72,10 @@ impl CargoCmdExtra {
 			.map(|p| ["beet_utils"].contains(&p.as_str()))
 			.unwrap_or(false);
 		if self.watch && self.build_cmd.lib && !is_upstream {
-			// watching
-			self.build_cmd.trailing_args.push("--watch".to_string());
+			// watching, only works if before any trailing args
+			self.build_cmd
+				.trailing_args
+				.insert(0, "--watch".to_string());
 		}
 	}
 	// 	--include '**/*.rs' \

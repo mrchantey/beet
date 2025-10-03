@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 /// ## Tags
@@ -41,7 +41,7 @@ pub enum OnTargetNotFound {
 pub(crate) fn seek(
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
-	mut agents: Query<(
+	mut agents: AgentQuery<(
 		Entity,
 		&GlobalTransform,
 		&Velocity,
@@ -50,9 +50,9 @@ pub(crate) fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(Entity, &Running, &Seek)>,
-) {
-	for (action, running, seek) in query.iter() {
+	query: Query<(Entity, &Seek), With<Running>>,
+) -> Result {
+	for (action, seek) in query.iter() {
 		let (
 			agent_entity,
 			transform,
@@ -61,9 +61,7 @@ pub(crate) fn seek(
 			max_speed,
 			mut impulse,
 			arrive_radius,
-		) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
+		) = agents.get_mut(action)?;
 		match (&seek.on_not_found, steer_target.get_position(&transforms)) {
 			(_, Ok(target_position)) => {
 				*impulse = seek_impulse(
@@ -79,19 +77,11 @@ pub(crate) fn seek(
 			}
 			(OnTargetNotFound::Fail, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				running.trigger_result(
-					&mut commands,
-					action,
-					RunResult::Failure,
-				);
+				commands.entity(action).trigger_payload(FAILURE);
 			}
 			(OnTargetNotFound::Succeed, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				running.trigger_result(
-					&mut commands,
-					action,
-					RunResult::Success,
-				);
+				commands.entity(action).trigger_payload(SUCCESS);
 			}
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {
@@ -99,20 +89,20 @@ pub(crate) fn seek(
 			}
 		}
 	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut app = App::new();
-
 		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
@@ -125,7 +115,7 @@ mod test {
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 				Seek::default(),
 			))
-			.flush_trigger(OnRun::local())
+			.trigger_payload(RUN)
 			.id();
 
 		app.update_with_secs(1);

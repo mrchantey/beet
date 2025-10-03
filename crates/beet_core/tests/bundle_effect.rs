@@ -3,22 +3,17 @@
 use beet_core::prelude::*;
 use sweet::prelude::*;
 
-
-use bevy::ecs::bundle::BundleEffect;
-use bevy::prelude::*;
-
 #[test]
 fn works() {
 	#[derive(Debug, Component)]
 	struct Bar;
 
-	#[derive(Default, ImplBundle)]
+	#[derive(Default, BundleEffect)]
 	struct Foo<T: 'static + Send + Sync> {
 		_phantom: std::marker::PhantomData<T>,
 	}
-
-	impl<T: 'static + Send + Sync> BundleEffect for Foo<T> {
-		fn apply(self, entity: &mut EntityWorldMut) { entity.insert(Bar); }
+	impl<T: 'static + Send + Sync> Foo<T> {
+		fn effect(self, entity: &mut EntityWorldMut) { entity.insert(Bar); }
 	}
 
 	let mut world = World::new();

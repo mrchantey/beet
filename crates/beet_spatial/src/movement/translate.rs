@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 
 /// Applies constant translation to [`Running::origin`],
 /// multiplied by [`Time::delta_secs`]
@@ -10,13 +10,15 @@ use bevy::prelude::*;
 /// ## Example
 /// Translates to the right at 1 unit per second.
 /// ```
-/// # use beet_spatial::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_spatial::prelude::*;
+/// # let mut world = World::new();
 ///	world.spawn((
 /// 	Transform::default(),
 ///		Translate::new(Vec3::new(1.0, 0., 0.)),
 ///		))
-///		.trigger(OnRun::local());
+///		.trigger_payload(RUN);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -33,23 +35,22 @@ impl Translate {
 }
 pub(crate) fn translate(
 	time: When<Res<Time>>,
-	action: Populated<(&Running, &Translate)>,
-	mut transforms: Query<&mut Transform>,
-) {
-	for (running, translate) in action.iter() {
-		transforms
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running))
-			.translation += translate.translation * time.delta_secs();
+	action: Populated<(Entity, &Translate), With<Running>>,
+	mut agents: AgentQuery<&mut Transform>,
+) -> Result {
+	for (action, translate) in action.iter() {
+		agents.get_mut(action)?.translation +=
+			translate.translation * time.delta_secs();
 	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -66,7 +67,8 @@ mod test {
 				Transform::default(),
 				Translate::new(Vec3::new(1.0, 0., 0.)),
 			))
-			.flush_trigger(OnRun::local())
+			.trigger_payload(RUN)
+			.flush()
 			.id();
 
 		app.update_with_secs(1);

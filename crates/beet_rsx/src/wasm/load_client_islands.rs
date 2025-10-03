@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// Load the client island scene from the html script if it exists,

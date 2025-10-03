@@ -120,7 +120,7 @@ fn design_mockups_collection() -> impl Bundle {
 		.set_imports(vec![
 			syn::parse_quote! {
 			#[allow(unused_imports)]
-			use bevy::prelude::*;},
+			use beet_core::prelude::*;},
 			syn::parse_quote! {
 			#[allow(unused_imports)]
 			use beet_rsx::prelude::*;},

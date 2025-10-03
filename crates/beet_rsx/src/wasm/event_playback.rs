@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
 use js_sys::Array;
 use js_sys::Reflect;
 use wasm_bindgen::JsCast;

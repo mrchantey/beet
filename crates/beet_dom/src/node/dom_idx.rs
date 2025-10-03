@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// A unique identifier for this node in a templating tree,
 /// used for dom binding and reconcilling client island locations.

@@ -6,7 +6,7 @@ use beet_rsx::prelude::*;
 use bevy::app::Plugins;
 use bevy::ecs::schedule::ScheduleConfigs;
 use bevy::ecs::system::ScheduleSystem;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;

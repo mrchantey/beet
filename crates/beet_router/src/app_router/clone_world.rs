@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::TypeRegistryArc;
 use std::sync::Arc;
@@ -79,7 +78,6 @@ fn clone_registry(registry: &TypeRegistry) -> TypeRegistry {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 

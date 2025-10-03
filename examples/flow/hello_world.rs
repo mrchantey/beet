@@ -1,27 +1,25 @@
 //! A basic behavior tree sequence example
 use beet::prelude::*;
-// flush_trigger test utils
-use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]
 fn main() {
 	App::new()
 		.add_plugins((
 			BeetFlowPlugin::default(),
-			BeetDebugPlugin::default()
+			DebugFlowPlugin::default()
 		))
 		.world_mut()
 		.spawn((
-			Name::new("root"), 
+			Name::new("root"),
 			Sequence
 		))
 		.with_child((
 			Name::new("child1"),
-			ReturnWith(RunResult::Success),
+			EndOnRun(SUCCESS),
 		))
 		.with_child((
 			Name::new("child2"),
-			ReturnWith(RunResult::Success),
+			EndOnRun(SUCCESS),
 		))
-		.flush_trigger(OnRun::local());
+		.trigger_payload(RUN).flush();
 }

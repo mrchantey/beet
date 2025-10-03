@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use beet_core::prelude::*;
 /// probably the best templating layout ever
 #[derive(Props)]

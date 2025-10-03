@@ -6,10 +6,10 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use beet_rsx::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
@@ -29,10 +29,6 @@ fn expressions() {
 		.xpect_contains("ExprIdx")
 		.xpect_contains("StaticRoot");
 
-	// println!(
-	// 	"children: {:#?}",
-	// 	build_app.component_names_related::<Children>(_entity)
-	// );
 	// println!("Exported Scene:\n{}", scene);
 
 	apply_and_render(&scene, rsx! {
@@ -114,7 +110,7 @@ fn nested_template() {
 			rsx! {
 				<span>"value: "{initial}</span>
 			},
-			OnSpawn::new(|entity| {
+			OnSpawnTyped::new(|entity| {
 				entity.insert(common_idx_nested());
 			}),
 		)
@@ -162,11 +158,13 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 		.world_mut()
 		.spawn((HtmlDocument, bundle))
 		.insert(common_idx())
-		// .spawn(HtmlDocument)
-		// .with_children(|parent| {
-		// 	parent.spawn(bundle).insert(common_idx());
-		// })
 		.id();
+
+	app.world_mut()
+		.query_once::<&SnippetRoot>()
+		.len()
+		.xpect_greater_or_equal_to(2);
+
 	app.update();
 
 	app.world_mut()

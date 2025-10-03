@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::Stream;
 use futures::future::BoxFuture;
@@ -228,7 +227,6 @@ pub struct CloseFrame {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_core::prelude::*;
 	use futures::FutureExt;
 	use futures::StreamExt;
 	use futures::stream;

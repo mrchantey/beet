@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::When;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// Implementation of position, velocity, force integration
@@ -63,7 +63,7 @@ pub fn integrate_force(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

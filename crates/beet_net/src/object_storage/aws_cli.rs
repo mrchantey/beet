@@ -15,7 +15,6 @@
 //! surface naturally as process errors.
 use async_process::Command;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use std::process::Stdio;
 
 /// A minimal AWS CLI driver with a few global settings (profile, region).
@@ -190,7 +189,6 @@ impl S3Sync {
 	///
 	/// ## Example
 	/// ```no_run
-	/// # use bevy::prelude::*;
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result{
@@ -223,7 +221,6 @@ impl S3Sync {
 	///
 	/// ## Example
 	/// ```no_run
-	/// # use bevy::prelude::*;
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result{

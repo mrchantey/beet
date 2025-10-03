@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use sweet::prelude::Rng;
+use beet_core::prelude::*;
+
 
 pub trait QTrainer: 'static + Send + Sync + QPolicy {
 	/// Immediately train an entire agent

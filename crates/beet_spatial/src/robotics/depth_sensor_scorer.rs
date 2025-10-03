@@ -1,6 +1,6 @@
 use super::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 
 /// Sets the [`Score`] based on the [`DepthValue`], usually
 /// updated by a sensor.
@@ -14,17 +14,17 @@ pub struct DepthSensorScorer {
 	/// `far_score` to `close_score`.
 	pub threshold_dist: f32,
 	/// The score to set when the depth is more than the threshold.
-	pub far_score: ScoreValue,
+	pub far_score: Score,
 	/// The score to set when the depth is less than the threshold.
-	pub close_score: ScoreValue,
+	pub close_score: Score,
 }
 
 impl Default for DepthSensorScorer {
 	fn default() -> Self {
 		Self {
 			threshold_dist: 0.5,
-			far_score: ScoreValue::FAIL,
-			close_score: ScoreValue::PASS,
+			far_score: Score::FAIL,
+			close_score: Score::PASS,
 		}
 	}
 }
@@ -40,17 +40,14 @@ impl DepthSensorScorer {
 }
 
 fn depth_sensor_scorer(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
-	sensors: Query<&DepthValue, Changed<DepthValue>>,
 	query: Query<&DepthSensorScorer>,
-) {
-	let scorer = query
-		.get(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
-	let depth = sensors
-		.get(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,
+) -> Result {
+	let target = ev.event_target();
+	let scorer = query.get(target)?;
+	let depth = sensors.get(target)?;
 	let next_score = if let Some(depth) = **depth {
 		if depth < scorer.threshold_dist {
 			scorer.close_score
@@ -60,5 +57,6 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	ev.trigger_result(&mut commands, next_score);
+	commands.entity(target).trigger_payload(next_score);
+	Ok(())
 }

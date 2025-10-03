@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// The default maximum depth for ultrasound sensors,

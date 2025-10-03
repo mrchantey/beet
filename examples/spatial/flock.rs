@@ -1,7 +1,5 @@
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
-use sweet::prelude::*;
 
 #[rustfmt::skip]
 pub fn main() {
@@ -11,8 +9,8 @@ pub fn main() {
 		.init_resource::<WrapAround>()
 		// .add_plugins(DebugGroupSteerPlugin::<GroupSteerAgent>::default())
 		.add_systems(Startup, (
-			scenes::camera_2d, 
-			scenes::space_scene, 
+			scenes::camera_2d,
+			scenes::space_scene,
 			setup
 		))
 		.run();
@@ -43,7 +41,7 @@ fn setup(
 			SteerBundle::default().scaled_dist(SCALE),
 			VelocityScalar(Vec3::new(1., 1., 0.)),
 			GroupSteerAgent,
-			RunOnSpawn::default(),
+			TriggerDeferred::run(),
 			Separate::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Align::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Cohere::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),

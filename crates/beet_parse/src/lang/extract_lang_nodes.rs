@@ -1,5 +1,5 @@
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// For elements with a `script`, `style` or `code` tag, and without an
@@ -38,8 +38,8 @@ pub fn extract_lang_nodes(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

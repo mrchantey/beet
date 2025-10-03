@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use http::StatusCode;
 use tracing::error;
 
@@ -44,7 +44,27 @@ impl HttpError {
 		Self::new(StatusCode::BAD_REQUEST, message)
 	}
 	pub fn internal_error(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
+		let message = message.into();
+		// we are about to lose the internal bevy message, so log it
+		// and return an opaque error
+		error!("Internal Error: {}", message);
+		#[cfg(debug_assertions)]
+		{
+			Self::new(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				format!(
+					"Internal Error: {}\n\nThis error will *not* be returned to the client in release builds.",
+					message
+				),
+			)
+		}
+		#[cfg(not(debug_assertions))]
+		{
+			Self::new(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				format!("Internal Error"),
+			)
+		}
 	}
 
 	/// Unwraps the `BevyError` into a `HttpError` if thats what it is,
@@ -56,20 +76,8 @@ impl HttpError {
 			// If the error is already an HttpError, return it directly
 			inner.clone()
 		} else {
-			// we are about to lose the internal bevy message, so log it
-			// and return an opaque error
-			error!("Internal Error: {}", error);
-			#[cfg(debug_assertions)]
-			{
-				HttpError::internal_error(format!(
-					"Internal Error: {}\n\nThis error will *not* be returned to the client in release builds.",
-					error
-				))
-			}
-			#[cfg(not(debug_assertions))]
-			{
-				HttpError::internal_error(format!("Internal Error"))
-			}
+			let error = error.to_string();
+			Self::internal_error(error)
 		}
 	}
 }
@@ -88,7 +96,9 @@ impl From<BevyError> for HttpError {
 	fn from(err: BevyError) -> HttpError { Self::from_opaque(err) }
 }
 impl From<RunSystemError> for HttpError {
-	fn from(err: RunSystemError) -> HttpError { Self::from_opaque(err) }
+	fn from(err: RunSystemError) -> HttpError {
+		Self::internal_error(err.to_string())
+	}
 }
 impl<In, Out> From<RegisteredSystemError<In, Out>> for HttpError
 where

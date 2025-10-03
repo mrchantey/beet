@@ -1,7 +1,7 @@
+use crate::prelude::Message;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
-use bevy::prelude::*;
 use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
@@ -141,7 +141,7 @@ impl CliAgentPlugin {
 								// Actor 1: User
 								(
 									terminal_user(),
-									OnSpawnBoxed::trigger_option(initial_message.xmap_false(||{
+									OnSpawn::trigger_option(initial_message.xmap_false(||{
 										MessageRequest
 									})),
 									children![
@@ -149,7 +149,7 @@ impl CliAgentPlugin {
 										(
 											Message::default(),
 											children![
-												OnSpawnBoxed::insert_option(
+												OnSpawn::insert_option(
 													initial_prompt.map(|prompt| {
 														println!("User > {}\n", prompt);
 														session_ext::text(prompt)
@@ -171,7 +171,7 @@ impl CliAgentPlugin {
 									}
 									provider
 								},
-								OnSpawnBoxed::trigger_option(initial_message.xmap_true(||{
+								OnSpawn::trigger_option(initial_message.xmap_true(||{
 									MessageRequest
 								})),
 							)
@@ -190,50 +190,47 @@ fn terminal_user() -> impl Bundle {
 	(User, EntityObserver::new(user_message_request))
 }
 
-fn text_added(ev: Trigger<OnAdd, TextContent>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n{} > ", actor.role);
 	}
 	Ok(())
 }
-fn text_delta(ev: Trigger<TextDelta>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.target())?;
+fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.trigger().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("{}", ev.event().0);
 	}
 	Ok(())
 }
 
-fn reasoning_added(
-	ev: Trigger<OnAdd, ReasoningContent>,
-	cx: SessionParams,
-) -> Result {
-	let actor = cx.actor(ev.target())?;
+fn reasoning_added(ev: On<Add, ReasoningContent>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.event().event_target())?;
 	print_flush!("{} > 🤔", actor.role);
 
 	Ok(())
 }
 
 fn reasoning_ended(
-	ev: Trigger<OnAdd, ContentEnded>,
+	ev: On<Add, ContentEnded>,
 	query: Query<(), With<ReasoningContent>>,
 ) -> Result {
-	if query.contains(ev.target()) {
+	if query.contains(ev.event().event_target()) {
 		print_flush!(" 💡\n");
 	}
 	Ok(())
 }
 
 fn file_inserted(
-	ev: Trigger<OnInsert, FileContent>,
+	ev: On<Insert, FileContent>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
 	mut commands: Commands,
 ) -> Result {
-	let file = query.get(ev.target())?;
-	let actor = cx.actor(ev.target())?;
+	let file = query.get(ev.event().event_target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		let filename = config.next_available_filename(file.extension())?;
 		print_flush!("\n{} > file: {}", actor.role, filename);
@@ -250,11 +247,8 @@ fn file_inserted(
 	Ok(())
 }
 
-fn message_ended(
-	ev: Trigger<OnAdd, MessageComplete>,
-	cx: SessionParams,
-) -> Result {
-	let actor = cx.actor(ev.target())?;
+fn message_ended(ev: On<Add, MessageComplete>, cx: SessionParams) -> Result {
+	let actor = cx.actor(ev.event().event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n");
 	}
@@ -262,23 +256,27 @@ fn message_ended(
 }
 
 fn route_message_requests(
-	ev: Trigger<OnAdd, MessageComplete>,
+	ev: On<Add, MessageComplete>,
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	mut commands: Commands,
 	users: Query<Entity, With<User>>,
 	agents: Query<Entity, With<Agent>>,
 ) -> Result {
-	let actor = cx.actor(ev.target())?;
+	let actor = cx.actor(ev.event().event_target())?;
 	match actor.role {
 		ActorRole::User => {
-			commands.entity(agents.single()?).trigger(MessageRequest);
+			commands
+				.entity(agents.single()?)
+				.trigger_target(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
-			commands.send_event(AppExit::Success);
+			commands.write_message(AppExit::Success);
 		}
 		ActorRole::Agent => {
-			commands.entity(users.single()?).trigger(MessageRequest);
+			commands
+				.entity(users.single()?)
+				.trigger_target(MessageRequest);
 		}
 		_ => {}
 	}
@@ -287,11 +285,11 @@ fn route_message_requests(
 }
 
 fn user_message_request(
-	ev: Trigger<MessageRequest>,
+	ev: On<MessageRequest>,
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = cx.actor(ev.target())?.entity;
+	let actor = cx.actor(ev.trigger().event_target())?.entity;
 	commands.run_system_cached_with(
 		AsyncTask::spawn_with_queue_unwrap,
 		async move |queue| {

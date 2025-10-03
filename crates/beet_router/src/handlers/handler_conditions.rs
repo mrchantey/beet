@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_net::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use std::sync::Arc;
 
 
@@ -114,7 +113,7 @@ impl HandlerConditions {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[rustfmt::skip]

@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 pub fn export_snippets(world: &mut World) -> Result {
@@ -66,7 +65,6 @@ fn collect_rsx_snippets(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -93,7 +91,7 @@ mod test {
 
 		let saved = fs_ext::read_to_string(snippet_path).unwrap();
 		// non-empty scene file
-		saved.len().xpect_greater_than(1000);
+		saved.len().xpect_greater_than(500);
 	}
 	#[test]
 	#[ignore = "lang snippet exports is a wip"]

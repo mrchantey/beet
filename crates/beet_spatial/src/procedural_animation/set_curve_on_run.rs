@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::Interval;
-use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 
@@ -43,18 +42,14 @@ impl Default for SetCurveOnRun {
 impl SetCurveOnRun {}
 
 fn set_curve_on_run(
-	ev: Trigger<OnRun>,
-	transforms: Query<&Transform>,
+	ev: On<Run>,
+	transforms: AgentQuery<&Transform>,
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
-) {
-	let (action, mut anim) = query
-		.get_mut(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let (action, mut anim) = query.get_mut(ev.event_target())?;
 
-	let transform = transforms
-		.get(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+	let transform = transforms.get(ev.event_target())?;
 
 	anim.curve = match action {
 		SetCurveOnRun::EaseRangeDir2 { func, range } => {
@@ -91,5 +86,6 @@ fn set_curve_on_run(
 				.unwrap()
 				.into()
 		}
-	}
+	};
+	Ok(())
 }

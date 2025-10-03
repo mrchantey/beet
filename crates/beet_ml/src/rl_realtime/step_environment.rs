@@ -1,8 +1,7 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::marker::PhantomData;
-use sweet::prelude::RandomSource;
 
 #[action(step_environment::<S>)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -38,12 +37,12 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	ev: Trigger<OnRun>,
+	ev: On<Run>,
 	mut rng: ResMut<RandomSource>,
-	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
+	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
-	mut agents: Query<(
+	mut agents: AgentQuery<(
 		&S::State,
 		&mut S::Action,
 		&mut S::Env,
@@ -51,21 +50,17 @@ fn step_environment<S: RlSessionTypes>(
 		&SessionEntity,
 	)>,
 	mut query: Query<&mut StepEnvironment<S>>,
-) where
+) -> Result
+where
 	S::State: Component,
 	S::Action: Component,
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	let mut step = query
-		.get_mut(ev.action)
-		.expect(&expect_action::to_have_action(&ev));
-	let (state, mut action, mut env, params, session_entity) = agents
-		.get_mut(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
-	let mut table = sessions
-		.get_mut(**session_entity)
-		.expect(&expect_action::to_have_other(&ev));
+	let mut step = query.get_mut(ev.event_target())?;
+	let (state, mut action, mut env, params, session_entity) =
+		agents.get_mut(ev.event_target())?;
+	let mut table = sessions.get_mut(**session_entity)?;
 
 	let outcome = env.step(&state, &action);
 	// we ignore the state of the outcome, allow simulation to determine
@@ -85,28 +80,27 @@ fn step_environment<S: RlSessionTypes>(
 	// 	action,
 	// 	outcome.reward
 	// );
-	ev.trigger_result(&mut commands, RunResult::Success);
+	commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
 		end_episode_events.write(EndEpisode::new(**session_entity));
 	}
+	Ok(())
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
+	use beet_flow::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut app = App::new();
 
-		let on_result =
-			observer_ext::observe_triggers::<OnResult>(app.world_mut());
+		let on_result = observer_ext::observe_triggers::<End>(app.world_mut());
 
 		app.add_plugins((
 			BeetFlowPlugin::default(),
@@ -133,7 +127,8 @@ mod test {
 				},
 				StepEnvironment::<FrozenLakeQTableSession>::new(0),
 			))
-			.flush_trigger(OnRun::local());
+			.trigger_payload(RUN)
+			.flush();
 
 
 		app.world_mut().insert_resource(rng);
@@ -149,6 +144,6 @@ mod test {
 			.next()
 			.xpect_eq(Some(&GridPos(UVec2::new(0, 0))));
 		let inner = table.values().next().unwrap();
-		inner.iter().next().unwrap().1.xpect_eq(&0.);
+		inner.iter().next().unwrap().1.xpect_eq(0.);
 	}
 }

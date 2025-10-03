@@ -3,8 +3,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use anyhow::Result;
 use bevy::tasks::futures_lite::future::yield_now;
-#[cfg(target_arch = "wasm32")]
-use sweet::prelude::*;
 
 #[test]
 #[ignore]

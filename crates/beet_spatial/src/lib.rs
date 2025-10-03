@@ -23,8 +23,6 @@ pub mod prelude {
 	pub use crate::animation::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::asset_actions::*;
-	// todo wait for construct
-	// pub use crate::bevyhub::*;
 	pub use crate::extensions::*;
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;
@@ -35,29 +33,9 @@ pub mod prelude {
 	#[cfg(feature = "bevy_default")]
 	pub use crate::ui::*;
 }
-/// doctest reexports and utilities
-#[cfg(feature = "_doctest")]
-#[allow(ambiguous_glob_reexports)]
-pub mod doctest {
-	pub use crate::prelude::*;
-	pub use beet_flow::prelude::*;
-	pub use bevy::prelude::*;
-	/// for docs, create a world with BeetFlowPlugin
-	/// ```
-	/// use beet_spatial::doctest::*;
-	/// let world = world();
-	/// ```
-	#[cfg(feature = "_doctest")]
-	pub fn world() -> World {
-		let mut app = App::new();
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins));
-		let world = std::mem::take(app.world_mut());
-		world
-	}
-}
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::app::PluginGroupBuilder;
-use bevy::prelude::*;
 
 /// Plugins used for most beet apps.
 #[derive(Default, Clone)]
@@ -74,7 +52,7 @@ impl PluginGroup for BeetSpatialPlugins {
 		/*-*/;
 
 		#[cfg(feature = "bevy_default")]
-		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
+		(builder = builder.add(crate::prelude::AnimationFlowPlugin::default()));
 		builder
 	}
 }

@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::HierarchyQueryExtExt;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use std::path::PathBuf;
 
 /// Helper for common route mapping
@@ -84,7 +83,6 @@ pub fn modify_route_file_tokens(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

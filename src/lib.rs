@@ -46,8 +46,7 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use crate::core::prelude::Interval;
+	pub use crate::core::prelude::Message;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
@@ -73,11 +72,6 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
-	/// hack to fix bevy macros
-	pub use bevy::ecs as bevy_ecs;
-	pub use bevy::prelude::*;
-	/// hack to fix bevy macros
-	pub use bevy::reflect as bevy_reflect;
 	// beet workflows make heavy use of `RunSystemOnce` to run systems
 	pub use bevy::ecs::system::RunSystemOnce;
 }
@@ -87,18 +81,10 @@ pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::exports::*;
-	#[cfg(feature = "rsx")]
-	pub use crate::rsx::exports::*;
-	#[cfg(feature = "examples")]
-	pub use beet_examples::exports::*;
-	#[cfg(feature = "ml")]
-	pub use beet_ml::exports::*;
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "sim")]
 	pub use beet_sim::exports::*;
-	#[cfg(feature = "spatial")]
-	pub use beet_spatial::exports::*;
 	pub use bevy;
 }
 #[cfg(test)]

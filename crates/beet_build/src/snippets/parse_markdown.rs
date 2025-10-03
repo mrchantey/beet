@@ -1,4 +1,4 @@
-use anyhow::Result;
+use beet_core::prelude::*;
 use pulldown_cmark::CowStr;
 use pulldown_cmark::Event;
 use pulldown_cmark::MetadataBlockKind;
@@ -63,7 +63,7 @@ impl ParseMarkdown {
 			}
 			// minus indicates yaml, ie foo: "bar"
 			Some((_frontmatter, MetadataBlockKind::YamlStyle)) => {
-				anyhow::bail!(
+				bevybail!(
 					"yaml frontmatter is not yet supported, please use +++ toml +++ frontmatter"
 				);
 				// let frontmatter = Self::yaml_frontmatter_to_ron(&frontmatter)?;
@@ -124,13 +124,13 @@ impl ParseMarkdown {
 				let key = split
 					.next()
 					.ok_or_else(|| {
-						anyhow::anyhow!("frontmatter line has no key: {line}")
+						bevyhow!("frontmatter line has no key: {line}")
 					})?
 					.trim();
 				let value = split
 					.next()
 					.ok_or_else(|| {
-						anyhow::anyhow!("frontmatter line has no value: {line}")
+						bevyhow!("frontmatter line has no value: {line}")
 					})?
 					.trim();
 				Ok(format!("{}: {}", key, value))

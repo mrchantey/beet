@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -36,7 +35,7 @@ fn spawn_analytics_event_store(
 
 /// A listener for [`AnalyticsEvent`] triggers, pushing them to the [`AnalyticsEventStore`] resource
 fn handle_analytics_events(
-	trigger: Trigger<AnalyticsEvent>,
+	trigger: On<AnalyticsEvent>,
 	store: ResMut<AnalyticsEventStore>,
 	mut commands: Commands,
 ) {

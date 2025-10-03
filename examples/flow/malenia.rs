@@ -66,26 +66,26 @@ fn run_app() {
 						max_damage: 15.0,
 						max_recoil: 30.0,
 					},
-					ReturnWith(RunResult::Success),
+					EndOnRun(SUCCESS),
 				))
 				.with_child((
 					// pretty much doomed if she decides to use this
 					// so lets give it a low score. This is a 5% chance because the alternative
 					// is a random value between 0 and 1
 					Name::new("Scarlet Aeonia"),
-					ReturnWith(ScoreValue(0.05)),
+					EndOnRun(Score(0.05)),
 					AttackPlayer {
 						max_damage: 10_000.0,
 						max_recoil: 10.0,
 					},
-					ReturnWith(RunResult::Success),
+					EndOnRun(SUCCESS),
 				));
 		})
 		// actions can be declared inline if they have no parameters
-		// .observe(|_: Trigger<OnRunAction>| {
+		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
-		.trigger(OnRun::local());
+		.trigger_payload(RUN);
 	app.run();
 }
 
@@ -98,13 +98,13 @@ struct AttackPlayer {
 }
 
 fn attack_player(
-	ev: Trigger<OnRun>,
+	ev: On<Run>,
 	attacks: Query<(&AttackPlayer, &Name)>,
 	mut query: Query<(&mut Health, &Name)>,
 	mut random_source: ResMut<RandomSource>,
 ) {
 	let (attack, attack_name) = attacks
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	println!("🔪  \tMalenia attacks with {}", attack_name);
 
@@ -133,7 +133,7 @@ fn attack_player(
 
 fn health_handler(
 	query: Populated<(&Health, &Name), Changed<Health>>,
-	mut exit: EventWriter<AppExit>,
+	mut exit: MessageWriter<AppExit>,
 ) {
 	for (health, name) in query.iter() {
 		if health.0 > 0. {
@@ -178,20 +178,21 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
 ) {
 	let score_provider = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let rnd: f32 = random_source.random();
-	ev.trigger_result(
-		&mut commands,
-		ScoreValue(rnd * score_provider.scalar + score_provider.offset),
-	);
+	commands
+		.entity(ev.event_target())
+		.trigger_payload(Score(
+			rnd * score_provider.scalar + score_provider.offset,
+		));
 }
 
 
@@ -200,31 +201,30 @@ fn provide_random_score(
 struct TryHealSelf;
 
 fn try_heal_self(
-	ev: Trigger<OnRun>,
+	ev: On<Run>,
 	mut commands: Commands,
-	mut query: Query<(&mut Health, &mut HealingPotions)>,
-) {
-	let (mut health, mut potions) = query
-		.get_mut(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+	mut query: AgentQuery<(&mut Health, &mut HealingPotions)>,
+) -> Result {
+	let (mut health, mut potions) = query.get_mut(ev.event_target())?;
 
 	if health.0 < 50.0 && potions.0 > 0 {
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		ev.trigger_result(&mut commands, RunResult::Success);
+		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
 	} else {
-		// we didnt do anything so action was a failure
-		ev.trigger_result(&mut commands, RunResult::Failure);
+		// we couldnt do anything so action was a failure
+		commands.entity(ev.event_target()).trigger_payload(FAILURE);
 	}
+	Ok(())
 }
 
 const INTRO: &str = r#"
-			I dreamt for so long.
-			My flesh was dull gold...and my blood, rotted.
-			Corpse after corpse, left in my wake...
-			As I awaited... his return.
-			... Heed my words.
-			I am Malenia. Blade of Miquella.
-			And I have never known defeat.
+        I dreamt for so long.
+        My flesh was dull gold...and my blood, rotted.
+        Corpse after corpse, left in my wake...
+        As I awaited... his return.
+        ... Heed my words.
+        I am Malenia. Blade of Miquella.
+        And I have never known defeat.
 "#;

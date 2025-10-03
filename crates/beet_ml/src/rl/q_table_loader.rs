@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
@@ -18,7 +19,7 @@ impl<
 {
 	type Asset = QTable<State, Action>;
 	type Settings = ();
-	type Error = anyhow::Error;
+	type Error = BevyError;
 
 	fn load(
 		&self,

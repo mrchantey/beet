@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::ecs::component::HookContext;
-use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
@@ -68,12 +65,12 @@ impl GeminiAgent {
 
 // https://ai.google.dev/api/generate-content#method:-models.streamgeneratecontent
 fn gemini_message_request(
-	trigger: Trigger<MessageRequest>,
+	ev: On<MessageRequest>,
 	query: Query<&GeminiAgent>,
 	mut commands: Commands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = trigger.target();
+	let actor = ev.trigger().event_target();
 	let provider = query.get(actor)?;
 
 	let contents = cx

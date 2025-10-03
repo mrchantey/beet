@@ -12,20 +12,15 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-# bevyhub = []
-bevy_default = ["bevy/default"]
-# revisit when we get construct
-_doctest = []
+bevy_default = ["bevy/default","beet_core/bevy_default"]
 
 [dependencies]
 beet_flow = { workspace = true }
 beet_core = { workspace = true, features = ["rand"] }
-# bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true
 
 extend.workspace = true
-anyhow.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 serde.workspace = true
@@ -36,5 +31,4 @@ strum_macros.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
-beet_spatial = { path = "", features = ["_doctest"] }
 sweet.workspace = true

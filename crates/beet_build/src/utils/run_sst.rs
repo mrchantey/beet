@@ -1,5 +1,4 @@
-use beet_dom::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::process::Command;
 
 

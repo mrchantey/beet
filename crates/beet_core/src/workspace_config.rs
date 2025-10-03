@@ -1,6 +1,5 @@
 // use crate::prelude::*;
 use crate::prelude::*;
-use bevy::prelude::*;
 use heck::ToKebabCase;
 use std::path::Path;
 use std::str::FromStr;
@@ -150,7 +149,6 @@ impl std::fmt::Display for PackageConfig {
 /// This saves boilerplate for various `env!` environment variables.
 /// ## Example
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.insert_resource(PackageConfig {

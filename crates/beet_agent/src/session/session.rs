@@ -1,7 +1,7 @@
+use crate::prelude::Message;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::*;
 
 pub struct AgentPlugin;
 
@@ -124,7 +124,6 @@ impl SessionParams<'_, '_> {
 pub(super) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -145,11 +144,11 @@ pub(super) mod test {
 		));
 
 		app.add_observer(
-			move |ev: Trigger<OnAdd, MessageComplete>,
+			move |ev: On<Add, MessageComplete>,
 			      mut commands: Commands,
 			      cx: SessionParams|
 			      -> Result {
-				let actor = cx.actor(ev.target())?;
+				let actor = cx.actor(ev.event().event_target())?;
 				if actor.role != ActorRole::Agent {
 					return Ok(());
 				};
@@ -164,15 +163,12 @@ pub(super) mod test {
 				assertion(content);
 				// let text = text.get(content[0]).unwrap().0.xref();
 				// println!("Agent > {}\n", text);
-				commands.send_event(AppExit::Success);
+				commands.write_message(AppExit::Success);
 				Ok(())
 			},
 		);
 
-		app.run_async()
-			.await
-			.into_result()
-			.unwrap();
+		app.run_async().await.into_result().unwrap();
 	}
 
 	pub async fn text_to_text(agent: impl Bundle) {

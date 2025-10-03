@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct RouteFileMethodTree {
@@ -87,7 +86,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 

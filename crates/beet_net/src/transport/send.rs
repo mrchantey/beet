@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 impl Request {
 	pub async fn send(self) -> Result<Response> {

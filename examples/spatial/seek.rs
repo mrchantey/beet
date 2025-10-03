@@ -1,14 +1,13 @@
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
 
 #[rustfmt::skip]
 pub fn main() {
 	App::new()
 		.add_plugins(running_beet_example_plugin)
 		.add_systems(Startup, (
-			scenes::camera_2d, 
-			scenes::space_scene, 
+			scenes::camera_2d,
+			scenes::space_scene,
 			setup
 		))
 		.run();
@@ -41,6 +40,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 		SteerBundle::default().scaled_dist(500.),
 		SteerTarget::Entity(target),
 		Seek::default(),
-		RunOnSpawn::default(),
+		TriggerDeferred::run(),
 	));
 }

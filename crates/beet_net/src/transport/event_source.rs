@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use eventsource_stream::EventStream;
 use eventsource_stream::Eventsource;
 

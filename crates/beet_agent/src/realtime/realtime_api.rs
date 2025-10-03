@@ -1,7 +1,6 @@
 use crate::realtime::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 
 /// REST API endpoint to generate ephemeral session tokens for use in client-side applications.
 pub struct RealtimeApi;

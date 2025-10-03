@@ -1,6 +1,6 @@
 use beet_core::prelude::When;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
@@ -11,13 +11,15 @@ use std::f32::consts::TAU;
 /// ## Example
 /// Hovers up and down every two seconds, at a height of 0.1 meters.
 /// ```
-/// # use beet_spatial::doctest::*;
-/// # let mut world = world();
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_spatial::prelude::*;
+/// # let mut world = World::new();
 ///	world.spawn((
 /// 	Transform::default(),
 ///		Hover::new(2.,0.1),
 ///		))
-///		.trigger(OnRun::local());
+///		.trigger_payload(RUN);
 /// ```
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -46,28 +48,24 @@ impl Hover {
 }
 
 pub(crate) fn hover(
-	mut _commands: Commands,
 	time: When<Res<Time>>,
-	actions: Populated<(&Running, &Hover)>,
-	mut transforms: Query<&mut Transform>,
-) {
-	for (running, hover) in actions.iter() {
+	actions: Populated<(Entity, &Hover), With<Running>>,
+	mut agents: AgentQuery<&mut Transform>,
+) -> Result {
+	for (action, hover) in actions.iter() {
 		let elapsed = time.elapsed_secs();
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
-		transforms
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running))
-			.translation
-			.y = y;
+		agents.get_mut(action)?.translation.y = y;
 	}
+	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -81,7 +79,7 @@ mod test {
 		let agent = app
 			.world_mut()
 			.spawn((Transform::default(), Hover::default()))
-			.flush_trigger(OnRun::local())
+			.trigger_payload(RUN)
 			.id();
 
 		// the 'top' of a sine wave is a quarter of 1 hz

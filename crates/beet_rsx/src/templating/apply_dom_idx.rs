@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// Some cases cant just use a `#[requires(RequiresDomIdx)]`,
@@ -135,7 +134,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

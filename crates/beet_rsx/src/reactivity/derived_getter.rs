@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// This type may be used to represent:
@@ -10,13 +9,13 @@ use bevy::prelude::*;
 #[derive(Clone)]
 pub struct DerivedGetter<T: 'static> {
 	get_value: CloneFunc<(), T>,
-	get_bundle: CloneFunc<(), OnSpawnBoxed>,
+	get_bundle: CloneFunc<(), OnSpawn>,
 }
 
 impl<T: 'static> DerivedGetter<T> {
 	pub fn new(
 		get_value: impl CloneFuncTrait<(), T>,
-		get_bundle: impl CloneFuncTrait<(), OnSpawnBoxed>,
+		get_bundle: impl CloneFuncTrait<(), OnSpawn>,
 	) -> Self {
 		DerivedGetter {
 			get_value: CloneFunc::new(get_value),
@@ -26,14 +25,14 @@ impl<T: 'static> DerivedGetter<T> {
 
 	/// Get the inner value, either by cloning the const
 	/// or calling the func
-	pub fn get(&self) -> T { (self.get_value)(()) }
+	pub fn get(&self) -> T { self.get_value.call_func(()) }
 }
 
 impl<T, M> IntoBundle<(Self, M)> for DerivedGetter<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,
 {
-	fn into_bundle(self) -> impl Bundle { (self.get_bundle)(()) }
+	fn into_bundle(self) -> impl Bundle { self.get_bundle.call_func(()) }
 }
 
 impl<T: 'static + Send + Clone + std::fmt::Debug> std::fmt::Debug
@@ -67,7 +66,7 @@ where
 		let val2 = val.clone();
 		DerivedGetter::new(
 			move |_| val.clone(),
-			move |_| OnSpawnBoxed::insert(val2.clone().into_bundle()),
+			move |_| OnSpawn::insert(val2.clone().into_bundle()),
 		)
 	}
 }
@@ -82,7 +81,7 @@ where
 
 		DerivedGetter::new(
 			move |_| (self.clone())(),
-			move |_| OnSpawnBoxed::insert((self2.clone()).into_bundle()),
+			move |_| OnSpawn::insert((self2.clone()).into_bundle()),
 		)
 	}
 }

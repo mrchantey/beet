@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use bevy::prelude::*;
 
 
 /// Load all file snippets from the `snippets` directory on [`Startup`].

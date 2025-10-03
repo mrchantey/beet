@@ -1,11 +1,13 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
-#![feature(test)]
+// #![feature(test)]
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 // implement FnMut for MockFunc
-#![feature(unboxed_closures)]
-#![cfg_attr(feature = "nightly", feature(fn_traits, backtrace_frames))]
+#![cfg_attr(
+	feature = "nightly",
+	feature(fn_traits, backtrace_frames, unboxed_closures, test)
+)]
 
 extern crate test;
 // the #[sweet::test] macro

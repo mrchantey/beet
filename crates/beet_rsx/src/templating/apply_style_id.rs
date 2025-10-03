@@ -2,10 +2,6 @@ use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::ecs::system::SystemParam;
-use bevy::platform::collections::HashMap;
-use bevy::platform::collections::HashSet;
-use bevy::prelude::*;
 
 /// Apply an [`AttributeKey`] with corresponding [`StyleId`] to elements with one
 ///
@@ -132,7 +128,7 @@ impl ApplyAttributes<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[template]
@@ -144,7 +140,7 @@ mod test {
 	}
 
 	fn replace_hash() -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			entity.insert(LangSnippetHash::new(0));
 		})
 	}

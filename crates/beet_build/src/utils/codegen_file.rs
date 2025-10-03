@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use anyhow::Result;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use heck::ToSnakeCase;
 use serde::Deserialize;
 use serde::Serialize;
@@ -133,7 +131,7 @@ impl CodegenFile {
 
 	pub fn output_dir(&self) -> Result<AbsPathBuf> {
 		self.output.parent().ok_or_else(|| {
-			anyhow::anyhow!("Output path must have a parent directory")
+			bevyhow!("Output path must have a parent directory")
 		})
 	}
 	pub fn clear_items(&mut self) { self.items.clear(); }

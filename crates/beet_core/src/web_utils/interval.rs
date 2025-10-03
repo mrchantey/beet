@@ -14,8 +14,7 @@
 //!
 //! Example (requires wasm/DOM):
 //! ```ignore
-//! use beet_core::web_utils::interval::Interval;
-//! use futures_lite::StreamExt;
+//! # use beet_core::prelude::*;
 //!
 //! let mut every_second = Interval::new(1000);
 //! let t1 = every_second.next().await.unwrap();
@@ -58,15 +57,15 @@ impl Drop for IntervalInner {
 ///
 /// Use `.next().await` to wait for ticks, or `next_tick()` if you don't want to
 /// bring in `StreamExt`.
-pub struct Interval {
+pub struct IntervalStream {
 	receiver: Receiver<f64>,
 	// Keep the callback alive and ensure cleanup on drop.
 	_inner: Rc<IntervalInner>,
 }
 
-impl Unpin for Interval {}
+impl Unpin for IntervalStream {}
 
-impl Interval {
+impl IntervalStream {
 	/// Start a repeating timer on the global `window` that yields a timestamp every `interval_ms`.
 	pub fn new(interval_ms: i32) -> Self {
 		let target: Window = window().unwrap();
@@ -117,7 +116,7 @@ impl Interval {
 	}
 }
 
-impl Stream for Interval {
+impl Stream for IntervalStream {
 	type Item = f64;
 
 	fn poll_next(
@@ -148,9 +147,8 @@ impl Stream for Interval {
 #[cfg(test)]
 #[cfg(target_arch = "wasm32")]
 mod tests {
-	use super::Interval;
+	use super::IntervalStream;
 	use crate::web_utils::document_ext as doc;
-
 	use sweet::prelude::*;
 
 	#[ignore = "requires dom"]
@@ -167,7 +165,7 @@ mod tests {
 	async fn yields_timestamps() {
 		doc::clear_body();
 
-		let mut interval = Interval::new(10);
+		let mut interval = IntervalStream::new(10);
 
 		let a = interval.next_tick().await.unwrap();
 		let b = interval.next_tick().await.unwrap();

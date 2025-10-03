@@ -8,8 +8,7 @@ pub use depth_sensor_scorer::*;
 mod dual_motor;
 pub use dual_motor::*;
 mod motor;
-use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 pub use motor::*;
 
 /// A plugin that registers all robotics components and bundles:

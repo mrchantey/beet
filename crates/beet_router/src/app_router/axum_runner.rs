@@ -4,7 +4,6 @@ use axum::routing::MethodFilter;
 #[allow(unused_imports)]
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
 

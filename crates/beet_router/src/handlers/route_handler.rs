@@ -1,8 +1,7 @@
 use beet_net::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::component::HookContext;
+use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -161,7 +160,7 @@ impl RouteHandler {
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 

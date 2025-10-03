@@ -1,5 +1,4 @@
-use bevy::prelude::*;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]

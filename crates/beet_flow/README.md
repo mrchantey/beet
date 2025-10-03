@@ -1,8 +1,6 @@
 # `beet_flow`
 
-Beet Flow is an ECS control flow library, built with [Bevy Observers][bevy-observers]. Being ECS first gives Beet a high level of flexibility and modularity.
-
-Currently implemented paradigms:
+Beet Flow is an ECS control flow library built with [Bevy Observers][bevy-observers]. The ECS architecture allows for a growing list of paradigms to be used interchangably:
 - [Behavior Trees](../../examples/flow/hello_world.rs)
 - [Long Running](../../examples/flow/long_running.rs)
 - [State Machines](../../examples/flow/state_machine.rs)
@@ -12,39 +10,37 @@ Currently implemented paradigms:
 
 ## Hello World
 
-A demonstration of a Sequence control flow common in behavior trees
+A demonstration of a Sequence control flow common in behavior trees.
 
-Using `BeetDebugPlugin` will log the name of each action as it is triggered.
 ```rust
-use bevy::prelude::*;
 use beet_flow::prelude::*;
+use beet_core::prelude::*;
 
 let mut app = App::new();
-app
-	.add_plugins((
-		BeetFlowPlugin::default(),
-		BeetDebugPlugin::default()
+app.add_plugins((
+	// manages action lifecycles
+	BeetFlowPlugin::default(),
+	// this will log the name of each action as it is triggered.
+	DebugFlowPlugin::default()
+));
+
+app.world_mut()
+	.spawn((
+		Name::new("My Behavior"),
+		Sequence,
+		children![
+			(
+				Name::new("Hello"),
+				EndOnRun(SUCCESS),
+			),
+			(
+				Name::new("World"),
+				EndOnRun(SUCCESS),
+			),
+		],
 	))
-	.world_mut()
-  .spawn((
-		Name::new("My Behavior"), 
-		Sequence
-	))
-		.with_child((
-			Name::new("Hello"),
-			ReturnWith(RunResult::Success),
-		))
-		.with_child((
-			Name::new("World"),
-			ReturnWith(RunResult::Success),
-		))
-		.trigger(OnRun::local());
-app.world_mut().flush();
+	.trigger_payload(RUN)
+	.flush();
 ```
 
 [bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
-
-
-## TODO
-
-- When we get [`OnMutate`](https://github.com/bevyengine/bevy/pull/14520) observers, they should probably replace most `OnInsert` observers we're using

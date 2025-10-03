@@ -1,7 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::platform::collections::HashSet;
-use bevy::prelude::*;
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
@@ -9,7 +7,7 @@ use bevy::prelude::*;
 /// ## Example
 /// ```
 /// # use beet_rsx::prelude::*;
-/// # use bevy::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 ///
 /// #[template]
@@ -81,12 +79,11 @@ pub fn apply_slots(
 				.iter()
 				.find(|(_, target)| target.name() == Some(named_slot.as_str()))
 			else {
-				return Err(anyhow::anyhow!(
+				bevybail!(
 					"Attempted to add a child to {node_tag} which has no '{named_slot}' slot target,
 					consider adding a <slot name=\"{named_slot}\"/> to {node_tag}."
 
-				)
-				.into());
+				);
 			};
 			used_targets.insert(*target);
 			commands.entity(*named_slot_ent).insert(ChildOf(*target));
@@ -95,11 +92,10 @@ pub fn apply_slots(
 		// 3.b Apply default slots
 		if !default_slots.is_empty() {
 			let Some((target, _)) = default_slot_target else {
-				return Err(anyhow::anyhow!(
+				bevybail!(
 					"Attempted to add a child to {node_tag} which has no default slot target,
 					consider adding a <slot/> to {node_tag}."
-				)
-				.into());
+				);
 			};
 			used_targets.insert(*target);
 			for slot in default_slots {
@@ -173,7 +169,7 @@ fn collect_slot_children(
 mod test {
 	use crate::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[template]

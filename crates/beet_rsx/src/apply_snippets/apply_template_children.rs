@@ -1,6 +1,6 @@
 use crate::prelude::HtmlDocument;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A node which is a descendant of a template root

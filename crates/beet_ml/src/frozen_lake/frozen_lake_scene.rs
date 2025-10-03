@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 pub fn spawn_frozen_lake_scene(
 	mut commands: Commands,

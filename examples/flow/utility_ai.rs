@@ -2,29 +2,28 @@
 //! see `malenia.rs` for custom score providers
 //!
 use beet::prelude::*;
-use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]
 fn main() {
 	App::new()
 		.add_plugins((
 			BeetFlowPlugin::default(),
-			BeetDebugPlugin::default()
+			DebugFlowPlugin::default()
 		))
 		.world_mut()
 		.spawn((
-			Name::new("ScoreFlow will select the highest score"), 
+			Name::new("ScoreFlow will select the highest score"),
 			HighestScore::default(),
+			children![
+				(
+					Name::new("this child does not run"),
+					EndOnRun(Score(0.4)),
+				),
+				(
+					Name::new("this child runs"),
+					EndOnRun(Score(0.6)),
+				)
+			]
 		))
-		.with_children(|parent| {
-			parent.spawn((
-				Name::new("this child does not run"),
-				ReturnWith(ScoreValue(0.4)),
-			));
-			parent.spawn((
-				Name::new("this child runs"),
-				ReturnWith(ScoreValue(0.6)),
-			));
-		})
-		.flush_trigger(OnRun::local());
+		.trigger_payload(RUN).flush();
 }

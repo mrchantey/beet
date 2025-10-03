@@ -2,7 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 // use beet_dom::prelude::*;
 use beet_rsx::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use sweet::prelude::*;
 
 

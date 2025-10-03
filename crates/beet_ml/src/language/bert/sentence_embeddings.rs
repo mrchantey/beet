@@ -1,7 +1,6 @@
-use anyhow::Result;
+use beet_core::prelude::*;
 use candle_core::Tensor;
 use std::borrow::Cow;
-
 
 /// Container for a list of sentences and their embeddings.
 /// This can be used to calculate the similarity between sentences.

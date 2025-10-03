@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
-use std::time::Duration;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 pub mod frozen_lake_assets {
 	pub const TILE: &str = "kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0";
@@ -12,7 +10,7 @@ pub mod frozen_lake_assets {
 }
 
 // pub fn spawn_frozen_lake_session(
-// 	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
+// 	mut events: MessageReader<StartSession<FrozenLakeEpParams>>,
 // 	mut commands: Commands,
 // ) {
 // 	for event in events.read() {
@@ -31,7 +29,7 @@ pub mod frozen_lake_assets {
 
 
 pub fn spawn_frozen_lake_episode(
-	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+	mut events: MessageReader<StartEpisode<FrozenLakeEpParams>>,
 	mut rng: ResMut<RandomSource>,
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
@@ -81,6 +79,6 @@ pub fn spawn_frozen_lake_episode(
 						));
 					});
 			})
-			.trigger(OnRun::local());
+			.trigger_payload(RUN);
 	}
 }

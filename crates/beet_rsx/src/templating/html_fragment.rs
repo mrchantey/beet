@@ -1,17 +1,13 @@
 use crate::prelude::*;
 use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Utilities for rendering HTML fragments.
 pub struct HtmlFragment;
 
 impl HtmlFragment {
 	/// returns the HTML string representation of a given [`Bundle`].
-	/// There are several transformations involved in the process,
-	/// for example resolving slots, so we reuse a [`TemplateApp`]
-	/// and run a full update cycle.
-	/// The app disables loading snippets.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();
@@ -149,7 +145,7 @@ impl HtmlBuilder<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

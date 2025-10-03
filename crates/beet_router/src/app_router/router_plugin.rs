@@ -4,7 +4,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 
 #[derive(Default)]
 pub struct RouterPlugin;

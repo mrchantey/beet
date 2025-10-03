@@ -3,7 +3,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use beet_rsx::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]

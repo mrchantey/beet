@@ -6,7 +6,7 @@ fn main() {
 	app.add_plugins((
 		MinimalPlugins,
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::default(),
+		DebugFlowPlugin::default(),
 	))
 	.world_mut()
 	.spawn((
@@ -14,20 +14,22 @@ fn main() {
 		Sequence,
 		// will repeat while the sequence returns [RunResult::Success]
 		Repeat::if_success(),
+		children![
+			(
+				Name::new("fails on third run"),
+				// this action behaves as a 'while predicate', it will succeed twice
+				// then fail the third time.
+				SucceedTimes::new(2),
+			),
+			(
+				// this action would be the thing you want to do n times
+				// it will only run twice
+				Name::new("some action to perform"),
+				EndOnRun(SUCCESS),
+			)
+		],
 	))
-	.with_child((
-		Name::new("fails on third run"),
-		// this action behaves as a 'while predicate', it will succeed twice
-		// then fail the third time.
-		SucceedTimes::new(2),
-	))
-	.with_child((
-		// this action would be the thing you want to do n times
-		// it will only run twice
-		Name::new("some action to perform"),
-		ReturnWith(RunResult::Success),
-	))
-	.trigger(OnRun::local());
+	.trigger_payload(RUN);
 	app.update();
 	app.update();
 	println!("done, subsequent updates will have no effect");

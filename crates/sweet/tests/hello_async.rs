@@ -2,8 +2,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use bevy::tasks::futures_lite::future::yield_now;
-#[cfg(target_arch = "wasm32")]
-use sweet::prelude::*;
 
 #[sweet::test]
 #[ignore = "it returns error"]

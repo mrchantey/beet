@@ -1,16 +1,15 @@
 use beet::prelude::*;
 // flush_trigger utils
-use sweet::prelude::EntityWorldMutwExt;
 
 #[action(log_on_run)]
 #[derive(Component)]
 struct LogOnRun(pub String);
 
-fn log_on_run(ev: Trigger<OnRun>, query: Query<&LogOnRun>) {
+fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) {
 	let name = query
-		// ensure that we use ev.action, wich is the 'action entity'
+		// ensure that we use ev.event_target(), wich is the 'action entity'
 		// ev.target() is the 'action observer'
-		.get(ev.action)
+		.get(ev.event_target())
 		// common pattern for getting an action,
 		// it should never be missing
 		.expect(&expect_action::to_have_action(&ev));
@@ -22,5 +21,7 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.flush_trigger(OnRun::local());
+		.trigger_payload(RUN)
+		.flush();
+	println!("done!");
 }

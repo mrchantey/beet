@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
@@ -10,7 +11,7 @@ pub struct BertLoader;
 impl AssetLoader for BertLoader {
 	type Asset = Bert;
 	type Settings = ();
-	type Error = anyhow::Error;
+	type Error = BevyError;
 
 	fn load(
 		&self,
@@ -33,7 +34,7 @@ impl AssetLoader for BertLoader {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	// possibly flaky tests here, getting occasional 403 on tokenizer.json

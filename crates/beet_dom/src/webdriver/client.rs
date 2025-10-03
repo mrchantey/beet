@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
@@ -244,7 +243,7 @@ impl ClientProcess {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	#[ignore = "smoketest"]

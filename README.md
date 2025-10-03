@@ -46,19 +46,23 @@ General patterns and tools for application development.
 Control flow crates for use in behavior paradigms like behavior trees, utility AI or agentic systems.
 
 ```rust
-world.spawn((
-    Name::new("My Behavior"),
-    Sequence
-  ))
-	.with_child((
-    Name::new("Hello"),
-    ReturnWith(RunResult::Success),
-  ))
-  .with_child((
-    Name::new("World"),
-    ReturnWith(RunResult::Success),
-  ))
-  .trigger(OnRun::local());
+world
+	.spawn((
+		Name::new("My Behavior"),
+		Sequence,
+		children![
+			(
+				Name::new("Hello"),
+				EndOnRun(SUCCESS),
+			),
+			(
+				Name::new("World"),
+				EndOnRun(SUCCESS),
+			),
+		],
+	))
+	.trigger_payload(RUN)
+	.flush();
 ```
 
 

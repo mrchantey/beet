@@ -1,5 +1,3 @@
-#[cfg(feature = "bevy")]
-use bevy::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
 use rand::distributions::DistIter;
@@ -8,11 +6,13 @@ use rand::distributions::uniform::SampleRange;
 use rand::distributions::uniform::SampleUniform;
 use rand::prelude::Distribution;
 use rand_chacha::ChaCha8Rng;
+use crate::prelude::*;
+
+
 /// A simple random source, by default retrieved from entropy.
 ///
 /// Enable the `bevy` feature to derive [Resource](bevy::prelude::Resource)
 /// ```rust
-/// # use bevy::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use rand::Rng;
 ///
@@ -30,7 +30,7 @@ use rand_chacha::ChaCha8Rng;
 /// }
 /// ```
 ///https://bevyengine.org/examples/math/random-sampling/
-#[cfg_attr(feature = "bevy", derive(Deref, DerefMut, Resource))]
+#[derive(Deref, DerefMut, Resource)]
 pub struct RandomSource(pub ChaCha8Rng);
 
 impl RandomSource {

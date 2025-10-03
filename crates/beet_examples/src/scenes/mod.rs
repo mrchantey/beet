@@ -2,8 +2,8 @@
 pub mod ml;
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use bevy::pbr::CascadeShadowConfigBuilder;
-use bevy::prelude::*;
+use beet_core::prelude::*;
+use bevy::light::CascadeShadowConfigBuilder;
 use std::f32::consts::PI;
 
 
@@ -14,16 +14,15 @@ pub fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
 
 
 pub fn hello_world(mut commands: Commands) {
-	commands
-		.spawn((
-			Name::new("Hello World Sequence"),
-			RunOnSpawn::default(),
-			Sequence::default(),
-		))
-		.with_children(|parent| {
-			parent.spawn((Name::new("Hello"), ReturnWith(RunResult::Success)));
-			parent.spawn((Name::new("World"), ReturnWith(RunResult::Success)));
-		});
+	commands.spawn((
+		Name::new("Hello World Sequence"),
+		TriggerDeferred::run(),
+		Sequence::default(),
+		children![
+			(Name::new("Hello"), EndOnRun(SUCCESS)),
+			(Name::new("World"), EndOnRun(SUCCESS))
+		],
+	));
 }
 
 

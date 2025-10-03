@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
@@ -260,7 +259,6 @@ impl Element {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

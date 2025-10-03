@@ -1,5 +1,5 @@
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::ParserOptions;
@@ -138,9 +138,10 @@ fn apply_recursive<'a>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
+
 
 	fn setup(bundle: impl Bundle) -> InnerText {
 		let mut app = App::new();

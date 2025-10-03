@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use js_sys::Array;
 use js_sys::Promise;
 use std::cell::RefCell;

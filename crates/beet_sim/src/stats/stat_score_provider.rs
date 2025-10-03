@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::ops::Range;
 
 #[action(provide_score)]
@@ -41,7 +41,7 @@ impl StatScoreProvider {
 		value: StatValue,
 		target_value: StatValueGoal,
 		range: Range<StatValue>,
-	) -> ScoreValue {
+	) -> Score {
 		let normal_value = value.normalize(range);
 
 		let curved_value =
@@ -50,27 +50,29 @@ impl StatScoreProvider {
 		match target_value {
 			// if the value is high and the desired direction is high,
 			// the score should be low
-			StatValueGoal::High => ScoreValue(1. - curved_value),
+			StatValueGoal::High => Score(1. - curved_value),
 			// vice versa
-			StatValueGoal::Low => ScoreValue(curved_value),
+			StatValueGoal::Low => Score(curved_value),
 		}
 	}
 }
 
 
 fn provide_score(
-	ev: Trigger<OnRun<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	stat_map: Res<StatMap>,
 	children: Query<&Children>,
 	stats: Query<(&StatId, &StatValue)>,
 	query: Query<(&StatScoreProvider, &StatId, &StatValueGoal)>,
+	agents: AgentQuery,
 ) {
+	let agent = agents.entity(ev.event_target());
 	let (score_provider, stat_id, target_value) = query
-		.get(ev.action)
+		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
-	let value = StatValue::find_by_id(ev.origin, children, stats, *stat_id)
+	let value = StatValue::find_by_id(agent, children, stats, *stat_id)
 		.expect(&expect_action::to_have_origin(&ev));
 
 	let descriptor = stat_map
@@ -82,7 +84,7 @@ fn provide_score(
 		descriptor.global_range.clone(),
 	);
 
-	ev.trigger_result(&mut commands, score);
+	commands.entity(ev.event_target()).trigger_payload(score);
 }
 
 
@@ -92,7 +94,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -140,7 +141,7 @@ mod test {
 		let world = app.world_mut();
 
 		let on_child_score =
-			observer_ext::observe_triggers::<OnChildResult<ScoreValue>>(world);
+			observer_ext::observe_triggers::<ChildEnd<Score>>(world);
 
 		world
 			.spawn(HighestScore::default())
@@ -154,7 +155,8 @@ mod test {
 				StatScoreProvider::default(),
 				StatValueGoal::Low,
 			))
-			.flush_trigger(OnRun::local());
+			.trigger_payload(RUN)
+			.flush();
 
 		on_child_score.len().xpect_eq(2);
 	}

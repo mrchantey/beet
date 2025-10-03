@@ -12,7 +12,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-tokens = ["dep:proc-macro2","dep:syn"]
+tokens = ["dep:proc-macro2","dep:syn","dep:quote"]
 fs = ["dep:crossterm","dep:async-fs","dep:futures-lite"]
 serde = ["dep:serde","dep:serde_json"]
 
@@ -29,6 +29,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
 syn = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -46,6 +47,6 @@ web-sys = { workspace = true, features = ["Window", "console", "Performance"] }
 tokio.workspace = true
 
 [dev-dependencies]
-# beet_utils = {path = "", features = }
+bevy = {workspace = true, features=["reflect_auto_register"]}
 # abs_path serde roundtrip
 serde_json.workspace = true

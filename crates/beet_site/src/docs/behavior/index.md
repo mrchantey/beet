@@ -11,11 +11,11 @@ world.spawn((
   children![
     (
       LogOnRun::("Hello"),
-      EndOnRun::failure(),
+      EndOnRun(FAILURE),
     ),
     (
       LogOnRun::("World"),
-      EndOnRun::success(),
+      EndOnRun(SUCCESS),
     )
   ]
 ));

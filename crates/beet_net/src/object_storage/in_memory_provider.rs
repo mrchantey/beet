@@ -2,13 +2,12 @@ use crate::prelude::*;
 use async_lock::RwLock;
 use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
 use bytes::Bytes;
 use std::sync::Arc;
 
 
 impl Bucket {
-	/// create a new [`FsBucketProvider`] in target/test_buckets
+	/// create a new [`InMemoryProvider`]
 	pub async fn new_test() -> Self {
 		let provider = InMemoryProvider::new();
 		let bucket = Self::new(provider, "test-bucket");

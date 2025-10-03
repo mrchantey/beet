@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;
@@ -20,7 +19,7 @@ impl<H: Hasher> HashNonSnippetRust<'_, H> {
 				let file_content = fs_ext::read_to_string(file)?;
 				let parsed_file =
 					syn::parse_file(&file_content).map_err(|err| {
-						anyhow::anyhow!(
+						bevyhow!(
 							"Failed to parse file: {}\n{}",
 							file.display(),
 							err

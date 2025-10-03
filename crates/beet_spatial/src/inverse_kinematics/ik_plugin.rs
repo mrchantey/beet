@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Add the update methods for IK.
 pub fn ik_plugin(app: &mut App) {

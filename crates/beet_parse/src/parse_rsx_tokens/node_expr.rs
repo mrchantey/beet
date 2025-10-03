@@ -4,7 +4,6 @@
 //! for example adding #[allow(unused_braces)] to block nodes
 //! and appending `.into_bundle()`
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use send_wrapper::SendWrapper;

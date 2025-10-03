@@ -16,7 +16,7 @@
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
+use crate::prelude::Message;
 use std::path::Path;
 
 pub async fn workspace_file(path: impl AsRef<Path>) -> Result<FileContent> {
@@ -49,7 +49,7 @@ pub fn user_message_session(agent:impl Bundle, user_message:impl Bundle)->impl B
 			),
 			(
 				agent,
-				OnSpawnBoxed::trigger(MessageRequest)
+				OnSpawn::trigger(MessageRequest)
 			)
 		]
 	)

@@ -10,7 +10,6 @@ use axum::http::Method;
 use axum::response::Response;
 use axum::routing::get;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use clap::Parser;
 use std::time::Duration;
 use tokio::task::JoinHandle;

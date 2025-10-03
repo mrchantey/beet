@@ -7,7 +7,6 @@ use aws_sdk_dynamodb::operation;
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::types::TableStatus;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 
 #[derive(Clone, Deref, DerefMut, Resource)]

@@ -1,5 +1,5 @@
 use beet_rsx::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A table

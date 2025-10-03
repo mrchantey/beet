@@ -18,7 +18,6 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 
 	let imports = if pkg_ext::is_internal() {
 		quote! {
-			use bevy::prelude::*;
 			use beet_core::prelude::*;
 		}
 	} else {
@@ -118,6 +117,12 @@ fn impl_template_bundle(
 		Default::default()
 	};
 
+	let maybe_generics = if returns_result {
+		quote!(::<_, Result<_>, _, _>)
+	} else {
+		Default::default()
+	};
+
 	Ok(quote! {
 
 	impl #impl_generics #ident #type_generics #where_clause {
@@ -133,7 +138,7 @@ fn impl_template_bundle(
 			OnSpawn::new(move |entity_world_mut: &mut EntityWorldMut| {
 				let id = entity_world_mut.id();
 				let bundle = entity_world_mut.world_scope(|world| {
-					world.run_system_cached_with(Self::system, (id,self)).map_err(|err|
+					world.run_system_cached_with #maybe_generics(Self::system, (id,self)).map_err(|err|
 						bevyhow!(#err_msg, err)
 					).unwrap_or_exit()
 				})#maybe_unwrap;

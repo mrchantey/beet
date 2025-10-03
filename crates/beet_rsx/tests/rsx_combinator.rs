@@ -2,8 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;
-
-use bevy::prelude::*;
 use sweet::prelude::*;
 
 #[test]
@@ -20,6 +18,6 @@ fn rsx_combinator() {
 	world.run_schedule(ApplySnippets);
 	world
 		.entity_mut(button)
-		.trigger(OnClick(MockEvent::new("foo")));
+		.trigger_target(OnClick(MockEvent::new("foo")));
 	get().xpect_eq("foo");
 }

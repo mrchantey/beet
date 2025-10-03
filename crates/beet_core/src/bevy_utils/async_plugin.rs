@@ -1,14 +1,32 @@
+use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
-use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use bevy::tasks::Task;
 use std::future::Future;
 use std::pin::Pin;
+
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+pub trait MaybeSend: Send {}
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+pub trait MaybeSend {}
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+impl<T> MaybeSend for T where T: Send {}
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+impl<T> MaybeSend for T {}
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+pub trait MaybeSync: Sync {}
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+pub trait MaybeSync {}
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+impl<T> MaybeSync for T where T: Sync {}
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+impl<T> MaybeSync for T {}
+
 
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.
@@ -58,7 +76,7 @@ impl AsyncTask {
 	pub fn spawn<Fut, Out>(In(fut): In<Fut>, mut commands: Commands)
 	where
 		// no send requirement for std AsyncComputeTaskPool
-		Fut: 'static + Future<Output = Out>,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
 	{
 		let task = AsyncComputeTaskPool::get().spawn(async move {
 			let _ = fut.await;
@@ -80,7 +98,7 @@ impl AsyncTask {
 		channel: Res<AsyncChannel>,
 	) where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Out>,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
 		Out: 'static,
 	{
 		let fut = func(channel.queue());
@@ -100,8 +118,8 @@ impl AsyncTask {
 	) -> Pin<Box<dyn Future<Output = Out>>>
 	where
 		// no send requirement for std AsyncComputeTaskPool
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
+		Out: 'static + MaybeSend,
 	{
 		// channel for the final output
 		let (tx_out, rx_out) = async_channel::bounded::<Out>(1);
@@ -140,8 +158,8 @@ impl AsyncTask {
 	) -> Pin<Box<dyn Future<Output = Out>>>
 	where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static,
+		Fut: 'static + Future<Output = Out> + MaybeSend,
+		Out: 'static + MaybeSend,
 	{
 		let fut = func(channel.queue());
 		Self::spawn_then(In(fut), commands)
@@ -152,7 +170,7 @@ impl AsyncTask {
 		channel: Res<AsyncChannel>,
 	) where
 		Func: 'static + FnOnce(AsyncQueue) -> Fut,
-		Fut: 'static + Future<Output = Result>,
+		Fut: 'static + Future<Output = Result> + MaybeSend,
 	{
 		let queue = channel.queue();
 		let fut = func(queue.clone());
@@ -162,7 +180,7 @@ impl AsyncTask {
 			In(async move {
 				if let Err(err) = fut.await {
 					eprintln!("Async task failed: {}", err);
-					queue.send_event(AppExit::from_code(1));
+					queue.write_message(AppExit::from_code(1));
 				}
 			}),
 			commands,
@@ -246,22 +264,22 @@ impl AsyncQueue {
 		self.with_then(move |world| world.resource::<R>().clone())
 	}
 
-	pub fn trigger<E: Event>(&self, event: E) {
+	pub fn trigger<'a, E: Event<Trigger<'a>: Default>>(&self, event: E) {
 		self.with(move |world| {
 			world.trigger(event);
 		});
 	}
-	pub fn send_event<E: Event>(&self, event: E) {
+	pub fn write_message<E: Message>(&self, event: E) {
 		self.with(move |world| {
-			world.send_event(event);
+			world.write_message(event);
 		});
 	}
-	pub fn send_event_batch<E: Event>(
+	pub fn write_message_batch<E: Message>(
 		&self,
 		event: impl 'static + Send + IntoIterator<Item = E>,
 	) {
 		self.with(move |world| {
-			world.send_event_batch(event);
+			world.write_message_batch(event);
 		});
 	}
 
@@ -362,9 +380,17 @@ impl AsyncEntity {
 		.await
 	}
 
-	pub async fn trigger<E: Event>(&self, event: E) -> &Self {
+	pub async fn trigger<
+		'a,
+		const AUTO_PROPAGATE: bool,
+		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
+		T: 'static + Traversal<E>,
+	>(
+		&self,
+		event: E,
+	) -> &Self {
 		self.with(|mut entity| {
-			entity.trigger(event);
+			entity.trigger_target(event);
 		})
 		.await
 	}
@@ -373,7 +399,6 @@ impl AsyncEntity {
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
 

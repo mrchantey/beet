@@ -2,13 +2,12 @@
 //! Like 'hello ml' but the user enters the prompt.
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
 
 #[rustfmt::skip]
 pub fn main() {
 	App::new()
 		.add_plugins((
-			running_beet_example_plugin, 
+			running_beet_example_plugin,
 			plugin_ml
 		))
 		.add_systems(
@@ -27,7 +26,7 @@ pub fn main() {
 fn setup(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
-	mut ev: EventWriter<OnLogMessage>,
+	mut ev: MessageWriter<OnLogMessage>,
 ) {
 	ev.write(
 		OnLogMessage::new("Agent: I can heal or attack, what should i do?",
@@ -40,14 +39,10 @@ fn setup(
 		.spawn((
 			Name::new("Hello ML"),
 			HandleWrapper(bert),
-			RunWithUserSentence::default(),
+			TriggerWithUserSentence::default(),
 			NearestSentence::new(),
-		))
-		.with_child((
-			Name::new("Heal Behavior"), 
-			Sentence::new("heal")
-		))
-		.with_child((
-			Name::new("Attack Behavior"), 
-			Sentence::new("attack")
+			children![
+				(Name::new("Heal Behavior"), Sentence::new("heal")),
+				(Name::new("Attack Behavior"), Sentence::new("attack")),
+			],
 		));}

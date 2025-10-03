@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use clap::Parser;
 use notify::EventKind;
 // #[cfg(not(target_arch = "wasm32"))]
@@ -86,7 +85,6 @@ impl FsWatcher {
 	///
 	/// ## Example
 	/// ```rust no_run
-	/// # use bevy::prelude::*;
 	/// # use beet_core::prelude::*;
 	/// # async fn foo() -> Result {
 	///
@@ -151,8 +149,7 @@ impl WatchEventReceiver {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy", derive(bevy::prelude::Event))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Message)]
 pub struct WatchEvent {
 	pub kind: EventKind,
 	pub path: AbsPathBuf,
@@ -308,7 +305,6 @@ impl WatchEventVec {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use notify::EventKind;
 	use notify::event::CreateKind;
 	use sweet::prelude::*;

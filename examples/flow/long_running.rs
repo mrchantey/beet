@@ -22,7 +22,7 @@ fn main() {
 	app.add_plugins((
 		MinimalPlugins,
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::with_result(),
+		DebugFlowPlugin::with_result(),
 	))
 	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
 
@@ -34,8 +34,8 @@ fn main() {
 					Name::new("Long Running"),
 					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
-					ReturnInDuration::new(
-						RunResult::Success,
+					EndInDuration::new(
+						SUCCESS,
 						Duration::from_secs(5),
 					),
 				))
@@ -54,8 +54,8 @@ fn main() {
 							// patrol the left flank for a bit
 							Name::new("Patrol Left"),
 							Patrol::default(),
-							ReturnInDuration::new(
-								RunResult::Success,
+							EndInDuration::new(
+								SUCCESS,
 								Duration::from_secs(1),
 							),
 						))
@@ -63,20 +63,20 @@ fn main() {
 							// patrol the right flank for a bit
 							Name::new("Patrol Right"),
 							Patrol::default(),
-							ReturnInDuration::new(
-								RunResult::Success,
+							EndInDuration::new(
+								SUCCESS,
 								Duration::from_secs(1),
 							),
 						));
 				});
 			parent.spawn(Name::new("After Long Running")).observe(
-				|_trigger: Trigger<OnRun>| {
+				|_trigger: On<Run>| {
 					println!("After Long Running triggered, exiting");
 					std::process::exit(0);
 				},
 			);
 		})
-		.trigger(OnRun::local());
+		.trigger_payload(RUN);
 
 	app.run();
 }

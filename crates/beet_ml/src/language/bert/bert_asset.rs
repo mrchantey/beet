@@ -1,8 +1,6 @@
 //https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
 use crate::prelude::*;
-use anyhow::Error as E;
-use anyhow::Result;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use candle_core::Tensor;
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::BertModel;
@@ -59,11 +57,10 @@ impl Bert {
 		// let tokenizer_url = config.model.tokenizer_url();
 
 		// let tokenizer_bytes = reqwest::get(tokenizer_url).await?.text().await?;
-		let tokenizer =
-			Tokenizer::from_file(tokenizer_filename).map_err(E::msg)?;
+		let tokenizer = Tokenizer::from_file(tokenizer_filename)?;
 
 		// let tokenizer =
-		// 	Tokenizer::from_str(&tokenizer_bytes).map_err(E::msg)?;
+		// 	Tokenizer::from_str(&tokenizer_bytes)?;
 
 		let vb = unsafe {
 			VarBuilder::from_mmaped_safetensors(
@@ -103,12 +100,12 @@ impl Bert {
 		// );
 
 		let model_config = model_config
-			.map_err(|e| anyhow::anyhow!("config fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("config fetch error: {:?}", e))?
 			.to_vec();
 		let model_config: Config = serde_json::from_slice(&model_config)?;
 
 		let weights = weights
-			.map_err(|e| anyhow::anyhow!("weights fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("weights fetch error: {:?}", e))?
 			.to_vec();
 		let device = &candle_core::Device::Cpu;
 		let vb = VarBuilder::from_buffered_safetensors(
@@ -120,10 +117,10 @@ impl Bert {
 
 
 		let tokenizer = tokenizer
-			.map_err(|e| anyhow::anyhow!("tokenizer fetch error: {:?}", e))?
+			.map_err(|e| bevyhow!("tokenizer fetch error: {:?}", e))?
 			.to_vec();
 		let tokenizer = Tokenizer::from_bytes(&tokenizer)
-			.map_err(|m| anyhow::anyhow!(m.to_string()))?;
+			.map_err(|m| bevyhow!(m.to_string()))?;
 
 
 		let model = BertModel::load(vb, &model_config)?;
@@ -151,10 +148,7 @@ impl Bert {
 			};
 			self.tokenizer.with_padding(Some(pp));
 		}
-		let tokens = self
-			.tokenizer
-			.encode_batch(options.clone(), true)
-			.map_err(E::msg)?;
+		let tokens = self.tokenizer.encode_batch(options.clone(), true)?;
 		let token_ids = tokens
 			.iter()
 			.map(|tokens| {
@@ -219,7 +213,7 @@ impl Bert {
 			.max_by(|a, b| {
 				a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
 			})
-			.ok_or_else(|| E::msg("No scores returned"))?
+			.ok_or_else(|| bevyhow!("No scores returned"))?
 			.0;
 
 		Ok(highest_index)
@@ -231,16 +225,9 @@ impl Bert {
 		prompt: &str,
 		iterations: usize,
 	) -> Result<Vec<Tensor>> {
-		let tokenizer = self
-			.tokenizer
-			.with_padding(None)
-			.with_truncation(None)
-			.map_err(E::msg)?;
-		let tokens = tokenizer
-			.encode(prompt, true)
-			.map_err(E::msg)?
-			.get_ids()
-			.to_vec();
+		let tokenizer =
+			self.tokenizer.with_padding(None).with_truncation(None)?;
+		let tokens = tokenizer.encode(prompt, true)?.get_ids().to_vec();
 		let token_ids =
 			Tensor::new(&tokens[..], &self.model.device)?.unsqueeze(0)?;
 		let token_type_ids = token_ids.zeros_like()?;

@@ -1,0 +1,10 @@
+#[allow(non_snake_case)]
+fn OnAddFoo(
+    mut world: beet_core::prelude::DeferredWorld,
+    cx: beet_core::prelude::HookContext,
+) {
+    world.commands().entity(cx.entity).observe(bar).observe(bazz);
+}
+#[derive(Component)]
+#[component(on_add = OnAddFoo)]
+struct Foo;

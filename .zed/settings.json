@@ -14,9 +14,15 @@
 						// "client",
 						// "launch",
 						// "lambda",
-						"webdriver",
+						// "webdriver",
 						// "css",
-						"aws"
+						"sim",
+						"bevy_default",
+						"spatial",
+						"examples",
+						"ml",
+						"cuda",
+						"rand"
 					]
 				}
 			}
@@ -30,9 +36,8 @@
 		"LICENSE-MIT.txt",
 		"**/node_modules",
 		// "**/target",
-		"**/.DS_Store",
-		"**/*.log",
-		"**/Cargo.lock",
+		// "**/*.log",
+		// "**/Cargo.lock",
 		"rustc-ice**"
 	]
 }

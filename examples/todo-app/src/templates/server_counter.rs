@@ -7,7 +7,7 @@ use beet::prelude::*;
 pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
-	let onclick = move |_: Trigger<OnClick>| {
+	let onclick = move |_: On<OnClick>| {
 		#[cfg(target_arch = "wasm32")]
 		{
 			let val = get();

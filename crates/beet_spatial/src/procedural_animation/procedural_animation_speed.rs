@@ -1,5 +1,5 @@
 use beet_flow::prelude::RunTimer;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::time::Duration;
 
 /// Sometimes we want a fixed duration and others a
@@ -31,6 +31,6 @@ impl ProceduralAnimationSpeed {
 			Self::Duration(duration) => duration.as_secs_f32(),
 			Self::MetersPerSecond(mps) => total_len_meters / mps,
 		};
-		run_timer.last_started.elapsed().as_secs_f32() / duration_secs
+		run_timer.last_run.elapsed().as_secs_f32() / duration_secs
 	}
 }

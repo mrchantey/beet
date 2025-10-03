@@ -5,7 +5,6 @@ use beet_core::exports::notify::event::ModifyKind;
 use beet_core::exports::notify::event::RemoveKind;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
-use bevy::prelude::*;
 use std::path::Path;
 
 /// Adde to an entity used to represent an file included
@@ -76,7 +75,7 @@ pub struct WatchedFiles(Vec<Entity>);
 /// including marking as [`Changed`] on modification.
 pub fn parse_file_watch_events(
 	mut commands: Commands,
-	mut events: EventReader<WatchEvent>,
+	mut events: MessageReader<WatchEvent>,
 	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
@@ -100,6 +99,9 @@ pub fn parse_file_watch_events(
 					ChildOf(root_entity.single()?),
 					SourceFile::new(ev.path.clone()),
 				));
+			}
+			EventKind::Create(CreateKind::Folder) => {
+				// noop
 			}
 			// emitted for both the from and to renames so
 			// assume if no matches, its the To event

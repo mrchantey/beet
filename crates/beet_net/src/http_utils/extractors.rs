@@ -1,7 +1,6 @@
 use crate::prelude::*;
 #[allow(unused)]
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use http::HeaderMap;
 use http::StatusCode;
 use http::request;
@@ -280,7 +279,7 @@ impl HttpExt {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use bytes::Bytes;
 	use sweet::prelude::*;
 

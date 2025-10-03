@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core_macros::ToTokens;
-use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use variadics_please::all_tuples;
 
@@ -83,8 +82,7 @@ impl<C> SpanOf<C> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
-	use sweet::prelude::*;
+		use sweet::prelude::*;
 
 	#[derive(Component, ToTokens)]
 	struct Foo;

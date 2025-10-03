@@ -1,5 +1,4 @@
-use bevy::prelude::*;
-
+use beet_core::prelude::*;
 #[cfg(target_arch = "wasm32")]
 pub use send_wrapper::SendWrapper;
 
@@ -41,10 +40,10 @@ macro_rules! define_events {
 	),* $(,)?) => {
 		$(
 			#[cfg(target_arch = "wasm32")]
-			#[derive(Event,Deref)]
+			#[derive(EntityTargetEvent, Deref)]
 			pub struct $struct(pub SendWrapper<$ty>);
 			#[cfg(not(target_arch = "wasm32"))]
-			#[derive(Event,Deref)]
+			#[derive(EntityTargetEvent, Deref)]
 			pub struct $struct(pub MockEvent);
 			#[cfg(target_arch = "wasm32")]
 			impl EventExt for $struct{
@@ -67,7 +66,7 @@ macro_rules! define_events {
 					$(
 						$event => {
 							let ev = ev.unchecked_into::<$ty>();
-							commands.trigger($struct(SendWrapper::new(ev)));
+							commands.trigger_target($struct(SendWrapper::new(ev)));
 						}
 					)*
 					_ => panic!("Unknown event: {event_name}"),
@@ -193,7 +192,6 @@ mod wasm_utils {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -212,7 +210,7 @@ mod test {
 			.entity_mut(ent)
 			// Thanks to From<MockEvent> for MouseEvent and Into<T> in BeetEvent::new,
 			// this mirrors how downstream tests construct events.
-			.trigger(OnClick(MockEvent::new("bar")));
+			.trigger_target(OnClick(MockEvent::new("bar")));
 		get().xpect_eq("bar");
 	}
 }

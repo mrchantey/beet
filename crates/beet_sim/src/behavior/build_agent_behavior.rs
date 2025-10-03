@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Build behavior for an agent, depending on its
 /// abilities and desires.

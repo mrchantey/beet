@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use syn::ItemMod;
 
 /// Add a `pub mod #name;` for any child [`CodegenFile`] of a [`CodegenFile`]

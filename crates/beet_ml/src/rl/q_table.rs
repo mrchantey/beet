@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 pub type QValue = f32;
@@ -78,6 +77,7 @@ impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates

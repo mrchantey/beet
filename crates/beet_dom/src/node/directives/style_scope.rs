@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::hash::Hash;
 
 /// Define on a component to indicate that template scoped styles

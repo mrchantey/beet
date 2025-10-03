@@ -41,7 +41,7 @@ mod translate_grid;
 pub use self::translate_grid::*;
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 pub struct FrozenLakePlugin;
 

@@ -1,11 +1,10 @@
-use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
+use crate::prelude::*;
 
 /// Verbatim clone of cargo build/run args
-#[derive(Debug, Clone, Parser)]
-#[cfg_attr(feature = "bevy", derive(bevy::prelude::Resource))]
+#[derive(Debug, Clone, Parser, Resource)]
 pub struct CargoBuildCmd {
 	/// The top level command to run: `build`, `run`, `test`, etc.
 	#[arg(long, default_value = "build")]
@@ -383,6 +382,7 @@ impl CargoBuildCmd {
 		let mut command = Command::new("cargo");
 		command.args(&args);
 
+		
 		command.status()?.exit_ok()?;
 		Ok(self)
 	}

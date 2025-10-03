@@ -24,6 +24,27 @@ pub impl<T: Debug> Vec<T> {
 
 		self
 	}
+	/// Performs an assertion ensuring the `Vec` is empty.
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet::prelude::*;
+	/// Vec::<u32>::new().xpect_empty();
+	/// ```
+	///
+	/// ## Panics
+	///
+	/// Panics if the `Vec` is not empty.
+	fn xpect_empty(&self) -> &Self {
+		if !self.is_empty() {
+			assert_ext::panic_expected_received_display_debug(
+				"To be empty",
+				self,
+			);
+		}
+		self
+	}
 }
 
 
@@ -36,4 +57,6 @@ mod test {
 	fn xpect_any_panics() { vec![false, false].xpect_any(|v| *v == true); }
 	#[test]
 	fn xpect_any() { vec![false, true].xpect_any(|v| *v == true); }
+	#[test]
+	fn xpect_empty() { Vec::<()>::default().xpect_empty(); }
 }

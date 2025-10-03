@@ -1,6 +1,5 @@
-use super::*;
-use crate::prelude::RlSessionTypes;
-use sweet::prelude::*;
+use crate::prelude::*;
+use beet_core::prelude::*;
 
 
 /// Used for training a QTable to completion with a provided [`Environment`].
@@ -125,8 +124,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use std::time::Duration;
-	use std::time::Instant;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// Encourages boids to move towards the average position of their neighbors, keeping the flock together.
@@ -47,14 +47,12 @@ impl<M> Cohere<M> {
 
 pub(crate) fn cohere<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
-	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&Running, &Cohere<M>)>,
-) {
-	for (running, cohere) in query.iter() {
-		let (entity, transform, mut impulse, max_speed) = agents
-			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
-
+	mut agents: AgentQuery<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
+	query: Query<(Entity, &Cohere<M>), With<Running>>,
+) -> Result {
+	for (action, cohere) in query.iter() {
+		let (entity, transform, mut impulse, max_speed) =
+			agents.get_mut(action)?;
 
 		**impulse += *cohere_impulse(
 			entity,
@@ -64,4 +62,5 @@ pub(crate) fn cohere<M: Component>(
 			boids.iter(),
 		);
 	}
+	Ok(())
 }

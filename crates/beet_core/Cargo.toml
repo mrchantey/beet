@@ -22,10 +22,11 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["serde", "bevy", "nightly"]
+default = ["serde"]
 nightly = []
-bevy = ["dep:bevy"]
+bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
+multi_threaded = ["bevy/multi_threaded"]
 serde = ["beet_utils/serde", "dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 tokio = ["dep:tokio"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
@@ -51,7 +52,7 @@ tokens = [
 [dependencies]
 beet_utils.workspace = true
 beet_core_macros.workspace = true
-bevy = { workspace = true, optional = true }
+bevy.workspace = true
 
 tracing.workspace = true
 rapidhash.workspace = true
@@ -85,7 +86,6 @@ rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
 
 ## utils
-anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 glob.workspace = true
@@ -165,7 +165,6 @@ web-sys = {workspace = true, features = [
 sweet.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
-
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

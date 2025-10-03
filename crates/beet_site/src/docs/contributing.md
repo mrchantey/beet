@@ -17,7 +17,7 @@ cargo install cargo-binstall
 # wasm builds
 rustup target add wasm32-unknown-unknown
 # we need exact bindgen versions
-cargo binstall --no-confirm wasm-bindgen-cli --version=0.2.100
+cargo binstall --no-confirm wasm-bindgen-cli --version=0.2.104
 # only required for deploying
 cargo binstall --no-confirm wasm-opt
 # install nix for dom testing

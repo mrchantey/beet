@@ -1,6 +1,5 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -69,13 +68,13 @@ pub(super) fn maybe_spanned_attr_key(
 
 fn type_path_to_ident<T: TypePath>() -> Result<Ident> {
 	let ident = T::type_ident().ok_or_else(|| {
-		anyhow::anyhow!(
+		bevyhow!(
 			"Failed to get type identifier for component: {}",
 			std::any::type_name::<T>()
 		)
 	})?;
 	let ident: Ident = syn::parse_str(ident).map_err(|_| {
-		anyhow::anyhow!(
+		bevyhow!(
 			"Failed to parse type identifier for component: {}",
 			std::any::type_name::<T>()
 		)

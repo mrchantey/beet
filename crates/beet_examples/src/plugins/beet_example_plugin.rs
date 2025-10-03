@@ -1,9 +1,8 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::log::LogPlugin;
-use bevy::prelude::*;
-use sweet::prelude::*;
 
 
 /// A minimal app with flow and spatial
@@ -45,7 +44,7 @@ pub fn beet_example_plugin(app: &mut App) {
 
 	app.add_plugins((
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::default(),
+		DebugFlowPlugin::default(),
 		BeetSpatialPlugins::default(),
 		plugin_2d,
 		plugin_3d,

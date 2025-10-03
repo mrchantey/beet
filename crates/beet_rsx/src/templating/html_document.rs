@@ -1,7 +1,6 @@
 use super::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::prelude::*;
 
 
 /// Added to the *top-level* [`InstanceRoot`], and useful for getting the document root,
@@ -220,7 +219,7 @@ fn script(content: impl Into<String>) -> impl Bundle {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

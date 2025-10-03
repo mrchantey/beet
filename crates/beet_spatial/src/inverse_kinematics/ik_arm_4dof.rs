@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::f32::consts::PI;
 use std::f32::consts::TAU;
 
@@ -135,7 +135,7 @@ impl IkArm4Dof {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use std::f32::consts::PI;
 
 	#[test]

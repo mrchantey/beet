@@ -2,7 +2,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::prelude::*;
 use syn::Ident;
 use syn::ItemFn;
 

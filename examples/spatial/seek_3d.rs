@@ -2,8 +2,6 @@
 //! that involves animation and steering.
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
-use std::time::Duration;
 
 pub fn main() {
 	App::new()
@@ -53,59 +51,49 @@ fn setup(
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
-	commands
-		.spawn((
-			Name::new("Foxie"),
-			Transform::from_scale(Vec3::splat(0.1)),
-			SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
-			graph_handle,
-			AnimationTransitions::new(),
-			RotateToVelocity3d::default(),
-			ForceBundle::default(),
-			SteerBundle {
-				max_force: MaxForce(0.05),
-				..default()
-			}
-			.scaled_dist(10.),
-			SteerTarget::Entity(target),
-		))
-		.with_children(|parent| {
-			parent
-				.spawn((
-					Name::new("Behavior"),
-					RunOnAnimationReady::default(),
-					Sequence::default(),
-					Repeat::default(),
-				))
-				.with_child((
+	commands.spawn((
+		Name::new("Foxie"),
+		Transform::from_scale(Vec3::splat(0.1)),
+		SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
+		graph_handle,
+		AnimationTransitions::new(),
+		RotateToVelocity3d::default(),
+		ForceBundle::default(),
+		SteerBundle {
+			max_force: MaxForce(0.05),
+			..default()
+		}
+		.scaled_dist(10.),
+		SteerTarget::Entity(target),
+		children![(
+			Name::new("Behavior"),
+			TriggerOnAnimationReady::run(),
+			Sequence::default(),
+			Repeat::default(),
+			children![
+				(
 					Name::new("Idle"),
-					Remove::<OnRun, Velocity>::new_with_target(
-						TargetEntity::Origin,
+					RemoveOn::<Run, Velocity>::new_with_target(
+						TargetEntity::Agent,
 					),
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
-					ReturnOnAnimationEnd::new(
-						idle_clip,
-						idle_index,
-						RunResult::Success,
-					)
-					.with_transition_duration(transition_duration),
-				))
-				.with_child((
+					TriggerOnAnimationEnd::new(idle_clip, idle_index, SUCCESS)
+						.with_transition_duration(transition_duration),
+				),
+				(
 					Name::new("Seek"),
 					Seek::default(),
-					Insert::<OnRun, _>::new_with_target(
+					InsertOn::<Run, _>::new_with_target(
 						Velocity::default(),
-						TargetEntity::Origin,
+						TargetEntity::Agent,
 					),
 					PlayAnimation::new(walk_index)
 						.repeat_forever()
 						.with_transition_duration(transition_duration),
 					EndOnArrive::new(6.),
-				));
-		});
-
-	// 	parent.spawn((
-	// 	));
-	// });
+				)
+			]
+		)],
+	));
 }

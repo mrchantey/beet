@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use bevy::reflect::DynamicStruct;
 
 
@@ -16,7 +16,7 @@ pub fn Form(
 	// let (entity, set_entity) = signal(Entity::PLACEHOLDER);
 
 	#[cfg(target_arch = "wasm32")]
-	let onsubmit = move |ev: Trigger<OnSubmit>| {
+	let onsubmit = move |ev: On<OnSubmit>| {
 		use beet_core::exports::js_sys;
 		use beet_core::exports::wasm_bindgen::JsCast;
 		use beet_core::exports::web_sys;
@@ -46,7 +46,7 @@ pub fn Form(
 		onsubmit_dyn(dyn_struct);
 	};
 	#[cfg(not(target_arch = "wasm32"))]
-	let onsubmit = |_: Trigger<OnSubmit>| {};
+	let onsubmit = |_: On<OnSubmit>| {};
 
 	rsx! {
 		<form {attrs} onsubmit=onsubmit>
@@ -59,7 +59,7 @@ pub fn Form(
 
 #[cfg(test)]
 mod test {
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::reflect::DynamicStruct;
 	use sweet::prelude::*;
 

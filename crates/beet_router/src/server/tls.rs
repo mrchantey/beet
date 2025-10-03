@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::http::Uri;
 use axum::response::Redirect;
 use axum_extra::extract::Host;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::net::SocketAddr;
 
 impl Server {

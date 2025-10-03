@@ -20,7 +20,7 @@
             .into_bundle())), (AttributeKey::new("onmousemove"),
             OnSpawnDeferred::insert("some_js_func".into_bundle())),
             (AttributeKey::new("onclick"), OnSpawnDeferred::insert_parent:: <
-            AttributeOf > (#[allow(unused_braces)] { | _ : Trigger < OnClick > | {
+            AttributeOf > (#[allow(unused_braces)] { | _ : On < OnClick > | {
             println!("clicked"); } } .into_bundle()), ExprIdx(1u32))]))]
         },
     )

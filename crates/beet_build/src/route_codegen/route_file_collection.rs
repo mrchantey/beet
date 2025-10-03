@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::platform::collections::HashMap;
-use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 

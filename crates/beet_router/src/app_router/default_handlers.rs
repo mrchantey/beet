@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
-use bevy::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
@@ -14,7 +13,7 @@ pub fn analytics_handler(
 	let root = query.single()?;
 	commands.entity(root).with_child((
 		PathFilter::new("/analytics"),
-		action_endpoint(
+		action_endpoint::<_, _, Result, _>(
 			HttpMethod::Post,
 			|In(input): In<Value>, mut commands: Commands| -> Result<()> {
 				let ev = AnalyticsEvent::parse(input)?;

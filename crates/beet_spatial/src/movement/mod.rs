@@ -11,7 +11,7 @@ pub use self::rotate_to_velocity::*;
 mod translate;
 pub use self::translate::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Add all systems and types for the base movement actions:
 /// - [`Translate`]

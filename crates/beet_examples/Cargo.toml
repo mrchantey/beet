@@ -15,6 +15,7 @@ categories.workspace = true
 # but we use it to ensure no bevy_default for workspace tests
 bevy_default = [
 	"bevy/default",
+	"beet_core/bevy_default",
 	"beet_flow/bevy_default",
 	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
@@ -45,7 +46,6 @@ anyhow.workspace = true
 sweet.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
-anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
-use bevy::prelude::*;
 
 /// Marker type indicating this entity was spawned via [`bundle_endpoint`].
 #[derive(Component)]
@@ -115,7 +114,7 @@ fn system(world: &mut World) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	fn some_endpoint(_: Query<()>) -> impl Bundle + use<> {

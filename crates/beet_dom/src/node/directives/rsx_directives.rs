@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
 pub type RsxDirectives = (SlotChild, SlotTarget);
@@ -94,7 +94,7 @@ pub fn extract_slot_targets(
 mod test {
 	use crate::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

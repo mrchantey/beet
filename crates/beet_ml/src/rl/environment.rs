@@ -1,8 +1,7 @@
+use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
-use bevy::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hash;
-use sweet::prelude::*;
 
 #[derive(Deref)]
 pub struct Readonly<T>(T);

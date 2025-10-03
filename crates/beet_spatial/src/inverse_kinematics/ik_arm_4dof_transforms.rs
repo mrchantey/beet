@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 
 /// A wrapper around the [`IkArm4Dof`] that will use the [`GlobalTransform`] pose of

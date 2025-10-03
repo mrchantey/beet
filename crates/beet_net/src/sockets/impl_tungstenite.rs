@@ -1,3 +1,4 @@
+use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use async_lock::Mutex;
 use async_tungstenite::tokio::connect_async;
@@ -6,7 +7,6 @@ use async_tungstenite::tungstenite::Message as TungMessage;
 use async_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
 use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 use futures::FutureExt;
 use futures::SinkExt;

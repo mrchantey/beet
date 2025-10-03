@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::input::common_conditions::input_toggle_active;
-use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
@@ -33,13 +33,13 @@ impl<M: 'static + Send + Sync> Plugin for DebugGroupSteerPlugin<M> {
 
 fn debug_group_steer<M: 'static + Send + Sync>(
 	mut gizmos: Gizmos,
-	transforms: Query<&Transform>,
-	separate: Query<(&Running, &Separate<M>)>,
-	align: Query<(&Running, &Align<M>)>,
-	cohere: Query<(&Running, &Cohere<M>)>,
-) {
-	for (running, params) in separate.iter() {
-		if let Ok(transform) = transforms.get(running.origin) {
+	transforms: AgentQuery<&Transform>,
+	separate: Query<(Entity, &Separate<M>), With<Running>>,
+	align: Query<(Entity, &Align<M>), With<Running>>,
+	cohere: Query<(Entity, &Cohere<M>), With<Running>>,
+) -> Result {
+	for (action, params) in separate.iter() {
+		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
@@ -48,8 +48,8 @@ fn debug_group_steer<M: 'static + Send + Sync>(
 		}
 	}
 
-	for (running, params) in align.iter() {
-		if let Ok(transform) = transforms.get(running.origin) {
+	for (action, params) in align.iter() {
+		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
@@ -58,8 +58,8 @@ fn debug_group_steer<M: 'static + Send + Sync>(
 		}
 	}
 
-	for (running, params) in cohere.iter() {
-		if let Ok(transform) = transforms.get(running.origin) {
+	for (action, params) in cohere.iter() {
+		if let Ok(transform) = transforms.get(action) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
@@ -67,4 +67,5 @@ fn debug_group_steer<M: 'static + Send + Sync>(
 			);
 		}
 	}
+	Ok(())
 }

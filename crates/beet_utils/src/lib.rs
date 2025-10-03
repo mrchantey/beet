@@ -7,10 +7,10 @@ mod glob_filter;
 #[cfg(target_arch = "wasm32")]
 pub mod js_runtime;
 mod path_utils;
-#[cfg(feature = "tokens")]
-pub mod pkg_ext;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod terminal;
+#[cfg(feature = "tokens")]
+mod tokens_utils;
 mod workspace_root;
 mod xtend;
 
@@ -23,10 +23,10 @@ pub mod prelude {
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::js_runtime;
 	pub use crate::path_utils::*;
-	#[cfg(feature = "tokens")]
-	pub use crate::pkg_ext;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::terminal;
+	#[cfg(feature = "tokens")]
+	pub use crate::tokens_utils::*;
 	pub use crate::workspace_root::*;
 	pub use crate::xtend::*;
 }

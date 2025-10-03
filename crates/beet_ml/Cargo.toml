@@ -13,8 +13,10 @@ categories.workspace = true
 
 [features]
 # default = ["cuda"]
-# requires cuda to be installed https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_local
-cuda = ["candle-transformers/cuda"]
+# requires cuda to be installed
+# arch linux: pacman -S cuda
+# other: https://developer.nvidia.com/cuda-downloads
+cuda = ["candle", "candle-transformers/cuda"]
 candle = [
 	"dep:candle-core",
 	"dep:candle-transformers",
@@ -22,7 +24,7 @@ candle = [
 	"dep:tokenizers",
 ]
 spatial = ["dep:beet_spatial"]
-bevy_default = ["bevy/default"]
+bevy_default = ["bevy/default","beet_core/bevy_default"]
 
 [dependencies]
 beet_flow.workspace = true
@@ -32,7 +34,6 @@ beet_spatial = { workspace = true, optional = true }
 
 futures.workspace = true
 thiserror.workspace = true
-anyhow.workspace = true
 log.workspace = true
 ron.workspace = true
 serde.workspace = true
@@ -41,10 +42,11 @@ strum.workspace = true
 strum_macros.workspace = true
 
 #💡 huggingface
-candle-core = { version = "0.8", optional = true }
-candle-transformers = { version = "0.8", optional = true }
-candle-nn = { version = "0.8", optional = true }
-tokenizers = { version = "0.19.1", optional = true, default-features = false, features = [
+# use git until candle supports cudarc 0.17 (for cuda 13.0)
+candle-core = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
+candle-transformers = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
+candle-nn = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
+tokenizers = { version = "0.22", optional = true, default-features = false, features = [
 	"unstable_wasm",
 ] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

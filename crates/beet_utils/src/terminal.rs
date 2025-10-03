@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use crossterm::*;
 use std::io::Write;
 use std::io::stdout;
@@ -14,7 +13,7 @@ pub fn reset_cursor() {
 	stdout.execute(cursor::MoveTo(0, 0)).unwrap();
 }
 
-pub fn clear() -> Result {
+pub fn clear() -> std::io::Result<()> {
 	let mut stdout = stdout();
 	stdout
 		.queue(terminal::Clear(terminal::ClearType::All))?

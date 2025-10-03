@@ -182,19 +182,19 @@ test-core *args:
 	cargo test -p beet_core_macros 				--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p beet_core 							--all-features 													 	{{args}} -- {{test-threads}}
 	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
+	cargo test -p beet_net						 	--features=tungstenite,native-tls  					{{args}} -- {{test-threads}}
+	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{args}} -- {{test-threads}}
 	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 
 test-flow *args:
-	cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--all-features 																						{{args}} -- {{test-threads}}
 	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
-	cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
+	cargo test -p beet_spatial																														{{args}} -- {{test-threads}}
 	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 
 test-rsx *args:
-	cargo test -p beet_net						 	--features=tungstenite,native-tls  									{{args}} -- {{test-threads}}
-	cargo test -p beet_net 	--lib 			--all-features --target wasm32-unknown-unknown			{{args}} -- {{test-threads}}
 	cargo test -p beet_dom						 	--features=tokens  																	{{args}} -- {{test-threads}}
 	cargo test -p beet_dom 	--lib 			--target wasm32-unknown-unknown											{{args}} -- {{test-threads}}
 	cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}

@@ -4,7 +4,7 @@ pub use self::insert_on_asset_event::*;
 mod reflected_asset_event;
 pub use self::reflected_asset_event::*;
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 
 /// Adds systems for a [`InsertOnAssetEvent`] action.
 pub fn insert_on_asset_event_plugin<T: Component + Clone, A: Asset>(

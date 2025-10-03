@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::prelude::*;
 use bytes::Bytes;
 
 
@@ -145,7 +144,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let dir = "target/test_buckets/test-bucket-001";
+		let dir = "target/tests/beet_net/test-bucket-001";
 		let provider =
 			FsBucketProvider::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
 		bucket_test::run(provider).await;

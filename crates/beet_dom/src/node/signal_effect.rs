@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemId;
-use bevy::prelude::*;
 use std::sync::Arc;
 
 /// Mark an entity as requiring a [`DomBinding`], often added to nodes
@@ -104,7 +103,7 @@ where
 	Out: 'static + Send + Sync + Clone + Primitive<M>,
 {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			let id = entity.id();
 			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
@@ -159,7 +158,7 @@ where
 	Out: 'static + Send + Sync + BundleLike<M1, M2>,
 {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
+		OnSpawnTyped::new(move |entity| {
 			let id = entity.id();
 			let this = self.clone();
 			let system_id = entity.world_scope(move |world| {
@@ -205,7 +204,6 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -255,7 +253,7 @@ mod test {
 		};
 
 		assert(&world, "bob");
-		set(Name::new("bill"));
+		set.set(Name::new("bill"));
 		assert(&world, "bob");
 		let system = world
 			.entity(entity)

@@ -1,5 +1,5 @@
 use beet_flow::prelude::*;
-use bevy::prelude::*;
+use beet_core::prelude::*;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -8,24 +8,24 @@ pub trait EpisodeParams: Debug + Clone + Reflect {
 	fn num_episodes(&self) -> u32;
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct StartEpisode<T: EpisodeParams> {
 	pub session: Entity,
 	pub episode: u32,
 	pub params: T,
 }
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct StartSession<T: EpisodeParams> {
 	pub session: Entity,
 	pub params: T,
 }
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct EndSession<T: EpisodeParams> {
 	pub session: Entity,
 	pub params: T,
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct EndEpisode<T: EpisodeParams> {
 	pub session: Entity,
 	phantom: PhantomData<T>,
@@ -54,10 +54,10 @@ impl<T: EpisodeParams> Plugin for RlSessionPlugin<T> {
 				handle_episode_end::<T>.in_set(PostTickSet),
 			),
 		)
-		.add_event::<StartSession<T>>()
-		.add_event::<EndSession<T>>()
-		.add_event::<StartEpisode<T>>()
-		.add_event::<EndEpisode<T>>();
+		.add_message::<StartSession<T>>()
+		.add_message::<EndSession<T>>()
+		.add_message::<StartEpisode<T>>()
+		.add_message::<EndEpisode<T>>();
 	}
 }
 
@@ -96,8 +96,8 @@ impl<T: EpisodeParams> RlSession<T> {
 }
 
 pub fn start_session<T: EpisodeParams>(
-	mut start_session: EventWriter<StartSession<T>>,
-	mut start_episode: EventWriter<StartEpisode<T>>,
+	mut start_session: MessageWriter<StartSession<T>>,
+	mut start_episode: MessageWriter<StartEpisode<T>>,
 	sessions: Query<(Entity, &mut RlSession<T>), Added<RlSession<T>>>,
 ) {
 	for (entity, session) in sessions.iter() {
@@ -115,9 +115,9 @@ pub fn start_session<T: EpisodeParams>(
 
 pub fn handle_episode_end<T: EpisodeParams>(
 	mut commands: Commands,
-	mut start_ep: EventWriter<StartEpisode<T>>,
-	mut end_ep: EventReader<EndEpisode<T>>,
-	mut end_session: EventWriter<EndSession<T>>,
+	mut start_ep: MessageWriter<StartEpisode<T>>,
+	mut end_ep: MessageReader<EndEpisode<T>>,
+	mut end_session: MessageWriter<EndSession<T>>,
 	mut despawn_on_episode_end: Query<
 		(Entity, &SessionEntity),
 		With<DespawnOnEpisodeEnd>,
@@ -170,12 +170,12 @@ pub fn handle_episode_end<T: EpisodeParams>(
 mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
-	use bevy::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	fn start_ep(
 		mut commands: Commands,
-		mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+		mut events: MessageReader<StartEpisode<FrozenLakeEpParams>>,
 	) {
 		for event in events.read() {
 			commands.spawn((SessionEntity(event.session), DespawnOnEpisodeEnd));
@@ -183,7 +183,7 @@ mod test {
 	}
 
 	fn end_ep(
-		mut events: EventWriter<EndEpisode<FrozenLakeEpParams>>,
+		mut events: MessageWriter<EndEpisode<FrozenLakeEpParams>>,
 		query: Query<&SessionEntity, Added<SessionEntity>>,
 	) {
 		for trainer in query.iter() {
