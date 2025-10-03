@@ -4,7 +4,8 @@ use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::query::QueryFilter;
 use bevy::ecs::query::ROQueryItem;
 
-/// Marker type to indicate this entity is the target of
+/// Many actions have a canonical entity they may refer to as the `agent`.
+/// For instance a behavior tree may use an npc entity with a `Health` component.
 #[derive(Debug, Copy, Clone, Reflect, Component)]
 pub struct Agent;
 
@@ -21,9 +22,9 @@ pub struct Actions(Vec<Entity>);
 
 
 /// A [`SystemParam`] used to get the agent for a particular action.
-/// the agent is defined as either:
-/// - The first [`Agent`] or [`ActionOf`] ancestor
-/// - The root ancestor
+/// This type optionally accepts a `QueryData` and `QueryFilter` for conveniently getting
+/// components of the agent.
+/// See [`AgentQuery::entity`] for how the entity is resolved.
 #[derive(SystemParam)]
 pub struct AgentQuery<'w, 's, D = (), F = ()>
 where
@@ -41,7 +42,10 @@ where
 	D: 'static + QueryData,
 	F: 'static + QueryFilter,
 {
-	/// Get the 'agent' entity for this action
+	/// Get the 'agent' entity for this action.
+	/// The agent is resolved in the following order:
+	/// - The first [`Agent`] or [`ActionOf`] in ancestors (inclusive)
+	/// - The root ancestor
 	pub fn entity(&self, entity: Entity) -> Entity {
 		// cache root to avoid double traversal
 		let mut root = Entity::PLACEHOLDER;

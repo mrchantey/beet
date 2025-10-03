@@ -253,7 +253,7 @@ mod test {
 		};
 
 		assert(&world, "bob");
-		set(Name::new("bill"));
+		set.set(Name::new("bill"));
 		assert(&world, "bob");
 		let system = world
 			.entity(entity)

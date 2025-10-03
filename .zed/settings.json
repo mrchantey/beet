@@ -36,9 +36,8 @@
 		"LICENSE-MIT.txt",
 		"**/node_modules",
 		// "**/target",
-		"**/.DS_Store",
-		"**/*.log",
-		"**/Cargo.lock",
+		// "**/*.log",
+		// "**/Cargo.lock",
 		"rustc-ice**"
 	]
 }

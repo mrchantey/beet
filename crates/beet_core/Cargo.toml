@@ -24,7 +24,7 @@ required-features = ["tokens"]
 [features]
 default = ["serde"]
 nightly = []
-bevy_default = ["bevy_scene","multi_threaded"]
+bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["beet_utils/serde", "dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
@@ -165,7 +165,6 @@ web-sys = {workspace = true, features = [
 sweet.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
-
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

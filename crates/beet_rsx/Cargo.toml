@@ -14,9 +14,10 @@ keywords.workspace = true
 
 
 [features]
-default = ["scene"]
+# removing nightly dependency is a wip
+default = ["scene","nightly"]
 # default = ["nightly", "bevy_default"]
-nightly = []
+nightly = ["beet_dom/nightly"]
 # client to match rsx macro conventions, for testing only
 client = []
 # adds css support for non-cli usage

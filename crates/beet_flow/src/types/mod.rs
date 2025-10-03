@@ -1,7 +1,7 @@
 //! General purpose types used by actions in beet_flow.
-mod beet_debug_plugin;
+mod debug_flow_plugin;
 mod outcome;
-pub use beet_debug_plugin::*;
+pub use debug_flow_plugin::*;
 mod continue_run;
 pub use continue_run::*;
 pub use outcome::*;

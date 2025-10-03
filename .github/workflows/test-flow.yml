@@ -54,7 +54,7 @@ jobs:
     - name: 🔨 Install cargo binstall
       uses: cargo-bins/cargo-binstall@main
     - name: 🔨 Install wasm bindgen cli
-      run: cargo binstall wasm-bindgen-cli --version 0.2.100    || true
+      run: cargo binstall wasm-bindgen-cli --version 0.2.104    || true
     - name: 🔨 Install sweet cli
       run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
     - name: 📋 Init repo

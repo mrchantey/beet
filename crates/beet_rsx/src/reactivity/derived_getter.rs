@@ -25,14 +25,14 @@ impl<T: 'static> DerivedGetter<T> {
 
 	/// Get the inner value, either by cloning the const
 	/// or calling the func
-	pub fn get(&self) -> T { (self.get_value)(()) }
+	pub fn get(&self) -> T { self.get_value.call_func(()) }
 }
 
 impl<T, M> IntoBundle<(Self, M)> for DerivedGetter<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,
 {
-	fn into_bundle(self) -> impl Bundle { (self.get_bundle)(()) }
+	fn into_bundle(self) -> impl Bundle { self.get_bundle.call_func(()) }
 }
 
 impl<T: 'static + Send + Clone + std::fmt::Debug> std::fmt::Debug

@@ -19,6 +19,8 @@ path = "src/main.rs"
 beet = { workspace = true, features = ["axum", "fs", "router"] }
 sweet.workspace = true
 rapidhash.workspace = true
+# auto_register_static rrequired for compilation, no idea why
+bevy = { workspace = true,features = ["reflect_auto_register_static"]}
 
 #💡 parsing
 proc-macro2.workspace = true

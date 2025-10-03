@@ -114,11 +114,13 @@ bevy = { version = "0.17.0", default-features = false, features = [
 	"debug",
 	"bevy_log",
 	"bevy_color",
+	# bevy reccommends to not do this in libraries but beet_core --all-features wont compile without it
+	# even if feature forced on, not sure why
+	"reflect_auto_register",
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
 	# "track_location",
-	# 0.17.0 required for wasm to compile
 ] }
 
 #💡 utility
@@ -357,8 +359,6 @@ beet = { path = "", features = ["flow","examples"] }
 # beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
-bevy = { workspace = true, features = ["reflect_auto_register_static"] }
-	# "reflect_auto_register"
 serde.workspace = true
 clap.workspace = true
 
