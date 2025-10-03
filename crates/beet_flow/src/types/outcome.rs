@@ -16,6 +16,9 @@ pub const SUCCESS: Outcome = Outcome::Success(());
 /// Type alias for the default [`End`] payload: [`Outcome::Failure(())`]
 pub const FAILURE: Outcome = Outcome::Failure(());
 
+impl RunPayload for GetOutcome {
+	type End = Outcome;
+}
 impl EventPayload for GetOutcome {
 	type Event = Run<GetOutcome>;
 	fn into_event(self, entity: Entity) -> Self::Event {
@@ -23,23 +26,15 @@ impl EventPayload for GetOutcome {
 	}
 }
 
-
-impl RunPayloaad for GetOutcome {
-	type End = Outcome;
-}
-impl EndPayload for Outcome {
-	type Run = GetOutcome;
-}
-
-
 /// The most common End payload, used to indicate run status
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub enum Outcome<T = (), E = ()> {
 	Success(T),
 	Failure(E),
 }
-
-
+impl EndPayload for Outcome {
+	type Run = GetOutcome;
+}
 impl<T, E> EventPayload for Outcome<T, E>
 where
 	T: 'static + Send + Sync,

@@ -9,6 +9,11 @@ pub trait EndPayload: EventPayload {
 	type Run: RunPayload<End = Self>;
 }
 
+/// An [`EntityEvent`] requesting this entity to trigger a corresponding
+/// [`End`] event.
+/// The event pair is defined as [`RunPayload::End`] and [`EndPayload::Run`]
+/// The default pair is [`GetOutcome`]/[`Outcome`] but the mechanism is general-purpose in nature,
+/// for instance it can als be used for a utility ai [`GetScore`]/[`Score`] pair.
 #[derive(Debug, Clone, EntityEvent)]
 pub struct Run<T = GetOutcome> {
 	#[event_target]

@@ -142,11 +142,11 @@ mod test {
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(4);
 		world.run_schedule(Update);
-		on_result.get().len().xpect_eq(6);
+		on_result.get().len().xpect_eq(7);
 		world.run_schedule(Update);
-		on_result.get().len().xpect_eq(6);
+		on_result.get().len().xpect_eq(7);
 		world.run_schedule(Update);
 		// last one, it stopped repeating
-		on_result.get().len().xpect_eq(6);
+		on_result.get().len().xpect_eq(7);
 	}
 }

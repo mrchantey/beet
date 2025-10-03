@@ -8,6 +8,17 @@ use beet_core::prelude::*;
 )]
 pub struct GetScore;
 
+impl RunPayload for GetScore {
+	type End = Score;
+}
+impl EventPayload for GetScore {
+	type Event = Run<GetScore>;
+	fn into_event(self, entity: Entity) -> Self::Event {
+		Run::new(entity, self)
+	}
+}
+
+
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
 ///	## Example
 /// ```rust
@@ -31,6 +42,17 @@ pub struct GetScore;
 )]
 pub struct Score(pub f32);
 
+impl EndPayload for Score {
+	type Run = GetScore;
+}
+
+impl EventPayload for Score {
+	type Event = End<Score>;
+	fn into_event(self, entity: Entity) -> Self::Event {
+		End::new(entity, self)
+	}
+}
+
 impl Score {
 	/// Its best practice to keep scores between 0 and 1,
 	/// so a passing score is 1
@@ -43,25 +65,4 @@ impl Score {
 	pub const FAIL: Self = Self(0.0);
 	/// Create a new instance of `Score` with the provided score.
 	pub fn new(score: f32) -> Self { Self(score) }
-}
-
-impl EventPayload for Score {
-	type Event = End<Score>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self)
-	}
-}
-
-impl EventPayload for GetScore {
-	type Event = Run<GetScore>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		Run::new(entity, self)
-	}
-}
-
-impl RunPayload for GetScore {
-	type End = Score;
-}
-impl EndPayload for Score {
-	type Run = GetScore;
 }
