@@ -1,9 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![cfg_attr(
-	feature = "nightly",
-	feature(fn_traits, unboxed_closures, exit_status_error)
-)]
+#![cfg_attr(feature = "nightly", feature(fn_traits, unboxed_closures))]
+// allow name collision until exit_ok stablized
+#![allow(unstable_name_collisions)]
 
 pub use utils::async_ext;
 pub use utils::time_ext;
@@ -26,7 +25,6 @@ pub mod web_utils;
 pub use beet_core_macros::*;
 
 mod workspace_config;
-
 
 pub mod prelude {
 	/// macro helper
@@ -83,7 +81,6 @@ pub mod prelude {
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;
 }
-
 
 pub mod exports {
 	// original exports

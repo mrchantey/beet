@@ -14,7 +14,7 @@ keywords.workspace = true
 
 
 [features]
-default = ["nightly", "scene"]
+default = ["scene"]
 # default = ["nightly", "bevy_default"]
 nightly = []
 # client to match rsx macro conventions, for testing only

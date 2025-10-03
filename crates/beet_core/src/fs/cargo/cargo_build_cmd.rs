@@ -382,6 +382,7 @@ impl CargoBuildCmd {
 		let mut command = Command::new("cargo");
 		command.args(&args);
 
+		
 		command.status()?.exit_ok()?;
 		Ok(self)
 	}

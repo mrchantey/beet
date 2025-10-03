@@ -1,6 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![feature(proc_macro_span)]
 mod action;
 mod bundle_effect;
 mod entity_target_event;
@@ -99,10 +98,6 @@ pub fn auto_entity_event(
 ) -> proc_macro::TokenStream {
 	entity_target_event::impl_entity_target_event(input).into()
 }
-
-
-
-
 
 /// Convenience helper to directly add observers to this entity.
 /// This macro must be placed above `#[derive(Component)]` as it

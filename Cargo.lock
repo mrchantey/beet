@@ -1237,7 +1237,6 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 name = "beet"
 version = "0.0.7-dev.0"
 dependencies = [
- "anyhow",
  "axum 0.8.4",
  "beet",
  "beet_agent",
@@ -1260,7 +1259,6 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom 0.3.3",
  "serde",
- "sweet",
  "tokio",
  "uuid",
  "web-sys",

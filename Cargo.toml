@@ -112,15 +112,13 @@ beet = { path = "", version = "0.0.7-dev.0" }
 bevy = { version = "0.17.0", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
+	"bevy_log",
+	"bevy_color",
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
 	# "track_location",
 	# 0.17.0 required for wasm to compile
-	# "reflect_auto_register_static",
-	"reflect_auto_register",
-	"bevy_log",
-	"bevy_color",
 ] }
 
 #💡 utility
@@ -245,7 +243,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["nightly"]
+# default = ["nightly"]
 #💡 helper features
 launch = ["dom","net", "build"]
 server = ["serde","dom","fs", "net", "router", "design"]
@@ -273,7 +271,7 @@ rustls-tls = [
 	"beet_router?/rustls-tls"
 ]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
-nightly = ["beet_core/nightly"]
+nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
 rand = ["beet_core/rand"]
 agent = ["dep:beet_agent"]
 dom = ["dep:beet_dom"]
@@ -359,10 +357,9 @@ beet = { path = "", features = ["flow","examples"] }
 # beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
-bevy = { workspace = true, features = ["reflect_auto_register"] }
-sweet.workspace = true
+bevy = { workspace = true, features = ["reflect_auto_register_static"] }
+	# "reflect_auto_register"
 serde.workspace = true
-anyhow.workspace = true
 clap.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

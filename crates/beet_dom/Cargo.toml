@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "nightly"]
+default = ["serde"]
 client = []
 nightly = ["beet_core/nightly"]
 tokens = ["beet_core/tokens"]

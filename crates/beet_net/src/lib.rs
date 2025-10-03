@@ -1,6 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![feature(if_let_guard)]
 
 mod http_utils;
 mod object_storage;
@@ -23,7 +22,6 @@ pub mod prelude {
 
 	pub use bevy::tasks::futures_lite::StreamExt;
 }
-
 
 pub mod exports {
 	pub use bevy::tasks::futures_lite;

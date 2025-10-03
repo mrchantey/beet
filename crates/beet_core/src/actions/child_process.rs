@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::process::Child;
 use std::process::Command;
 
-
 // TODO replace with beet_flow
 #[derive(Reflect, Component)]
 pub struct ChildProcessSequence {
@@ -13,7 +12,9 @@ pub struct ChildProcessSequence {
 }
 
 impl ChildProcessSequence {
-	pub fn new(kill_before_run: bool) -> Self { Self { kill_before_run } }
+	pub fn new(kill_before_run: bool) -> Self {
+		Self { kill_before_run }
+	}
 
 	pub fn system(
 		query: Query<(Entity, &ChildProcessSequence)>,
@@ -57,7 +58,6 @@ pub enum ExecProcessMode {
 	/// Spawn and hold onto a handle, ie spinning up a server
 	SpawnHandle,
 }
-
 
 impl ChildProcess {
 	pub fn new<S: AsRef<str>>(
@@ -130,45 +130,50 @@ impl ChildProcess {
 	}
 }
 
-
-
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-		// use sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut world = World::new();
-		world.spawn((ChildProcessSequence::new(false), children![
-			// no commands
-			ChildProcess::new::<String>(
-				vec![],
-				ExecProcessMode::Blocking,
-				true
-			),
-			// bad command
-			ChildProcess::new(
-				vec!["this_command_should_not_exist_12345"],
-				ExecProcessMode::Blocking,
-				true,
-			),
-			// one command
-			ChildProcess::new(vec!["echo"], ExecProcessMode::Blocking, false),
-			// sequence 1
-			ChildProcess::new(
-				vec!["echo", "howdy"],
-				ExecProcessMode::Blocking,
-				false,
-			),
-			// sequence 2
-			children![ChildProcess::new(
-				vec!["echo", "doody"],
-				ExecProcessMode::Blocking,
-				false,
-			)],
-		]));
+		world.spawn((
+			ChildProcessSequence::new(false),
+			children![
+				// no commands
+				ChildProcess::new::<String>(
+					vec![],
+					ExecProcessMode::Blocking,
+					true
+				),
+				// bad command
+				ChildProcess::new(
+					vec!["this_command_should_not_exist_12345"],
+					ExecProcessMode::Blocking,
+					true,
+				),
+				// one command
+				ChildProcess::new(
+					vec!["echo"],
+					ExecProcessMode::Blocking,
+					false
+				),
+				// sequence 1
+				ChildProcess::new(
+					vec!["echo", "howdy"],
+					ExecProcessMode::Blocking,
+					false,
+				),
+				// sequence 2
+				children![ChildProcess::new(
+					vec!["echo", "doody"],
+					ExecProcessMode::Blocking,
+					false,
+				)],
+			],
+		));
 		world
 			.run_system_cached::<Result, _, _>(ChildProcessSequence::system)
 			.unwrap()
@@ -179,13 +184,14 @@ mod test {
 	#[should_panic]
 	fn panics_on_invalid_command() {
 		let mut world = World::new();
-		world.spawn((ChildProcessSequence::new(false), children![
-			ChildProcess::new(
+		world.spawn((
+			ChildProcessSequence::new(false),
+			children![ChildProcess::new(
 				vec!["this_command_should_not_exist_12345"],
 				ExecProcessMode::Blocking,
 				false,
-			),
-		]));
+			),],
+		));
 		world
 			.run_system_cached::<Result, _, _>(ChildProcessSequence::system)
 			.unwrap()

@@ -4,12 +4,11 @@ mod value;
 pub use value::*;
 mod vec;
 pub use vec::*;
-pub mod duration;
-#[allow(unused_imports)]
+mod exit_status;
+pub use exit_status::*;
+mod duration;
 pub use self::duration::*;
-pub mod option;
-#[allow(unused_imports)]
+mod option;
 pub use self::option::*;
-pub mod result_x;
-#[allow(unused_imports)]
+mod result_x;
 pub use self::result_x::*;
