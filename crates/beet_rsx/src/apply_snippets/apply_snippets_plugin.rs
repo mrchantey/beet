@@ -260,15 +260,8 @@ mod test {
 	use bevy::ecs::system::RunSystemOnce;
 	use sweet::prelude::*;
 
-	fn world() -> World {
-		let mut app = App::new();
-		// app.add_plugins(ApplySnippetsPlugin);
-		std::mem::take(app.world_mut())
-	}
-
-
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
-		let mut world = world();
+		let mut world = World::new();
 		// convert an instance to a snippet with the same SnippetRoot
 		let _snippet = world
 			.spawn((SnippetRoot::default(), StaticRoot, rsx_snippet))
@@ -281,7 +274,7 @@ mod test {
 
 	#[test]
 	fn retains_parent() {
-		let mut world = world();
+		let mut world = World::new();
 		world
 			.spawn((SnippetRoot::default(), StaticRoot, rsx! { <span /> }))
 			.remove::<InstanceRoot>();
@@ -453,7 +446,7 @@ mod test {
 
 	#[test]
 	fn child_already_resolved() {
-		let mut world = world();
+		let mut world = World::new();
 		let child_idx =
 			SnippetRoot::new_file_line_col(file!(), line!(), column!());
 		let parent_idx =
@@ -557,7 +550,7 @@ mod test {
 	}
 
 	fn parse_instance(instance: impl Bundle) -> String {
-		let mut world = world();
+		let mut world = World::new();
 		let instance = world.spawn(instance).id();
 
 		world

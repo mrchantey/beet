@@ -1,6 +1,6 @@
 use crate::prelude::HtmlDocument;
-use beet_dom::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 
 
 /// A node which is a descendant of a template root
@@ -55,17 +55,14 @@ mod test {
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {
-		rsx! { <div>hello world!</div> }
+		rsx! { <div><slot/>hello world!</div> }
 	}
 
 
 	#[test]
 	fn works_no_children() {
-		let mut world = World::new();
-		let root = world.spawn(rsx! { <div /> }).id();
-		world.run_system_cached(apply_template_children).unwrap();
-		world
-			.entity(root)
+		World::new()
+			.spawn(rsx! { <div /> })
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
@@ -74,7 +71,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut world = World::new();
-		let root = world
+		world
 			.spawn(rsx! {
 				<div>
 					<MyTemplate>
@@ -83,12 +80,6 @@ mod test {
 					<MyTemplate/>
 				</div>
 			})
-			.id();
-		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
-		world.run_system_cached(apply_template_children).unwrap();
-
-		world
-			.entity(root)
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()

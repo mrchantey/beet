@@ -39,8 +39,7 @@ impl Plugin for ApplyDirectivesPlugin {
 			);
 		}
 
-		app.init_plugin(ApplySnippetsPlugin)
-			.init_plugin(schedule_order_plugin)
+		app.init_plugin(schedule_order_plugin)
 			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()

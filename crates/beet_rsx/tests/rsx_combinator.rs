@@ -8,14 +8,11 @@ use sweet::prelude::*;
 fn rsx_combinator() {
 	let (get, set) = signal(String::new());
 
-	let mut app = App::new();
-	app.add_plugins(ApplySnippetsPlugin);
-	let world = app.world_mut();
+	let mut world = World::new();
 	let button = world
 		.spawn(rsx_combinator! {"<button onclick={move|ev|set(ev.value())}>click me</button>"})
 		.get::<Children>()
 		.unwrap()[0];
-	world.run_schedule(ApplySnippets);
 	world
 		.entity_mut(button)
 		.trigger_target(OnClick(MockEvent::new("foo")));

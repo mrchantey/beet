@@ -198,14 +198,11 @@ mod test {
 	fn works() {
 		let (get, set) = signal(String::from("foo"));
 
-		let mut app = App::new();
-		app.add_plugins(ApplySnippetsPlugin);
-		let world = app.world_mut();
+		let mut world = World::new();
 		let ent = world
 			.spawn(rsx! { <button onclick=move |ev| set(ev.value())/> })
 			.get::<Children>()
 			.unwrap()[0];
-		world.run_schedule(ApplySnippets);
 		world
 			.entity_mut(ent)
 			// Thanks to From<MockEvent> for MouseEvent and Into<T> in BeetEvent::new,

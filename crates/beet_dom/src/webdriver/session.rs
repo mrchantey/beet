@@ -232,7 +232,7 @@ impl Session {
 		cmd_rx: async_channel::Receiver<String>,
 	) {
 		IoTaskPool::get()
-			.spawn(async move {
+			.spawn_local(async move {
 				while let Ok(raw) = cmd_rx.recv().await {
 					let send_result = {
 						let mut guard = inner.writer.lock().unwrap();

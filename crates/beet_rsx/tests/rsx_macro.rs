@@ -12,16 +12,13 @@ use sweet::prelude::*;
 fn reactivity() {
 	let (get, set) = signal(String::new());
 
-	let mut app = App::new();
-	app.add_plugins(ApplySnippetsPlugin);
-	let world = app.world_mut();
+	let mut world = World::new();
 	let button = world
 		.spawn(
 			rsx! { <button onclick=move |ev| set(ev.value())>click me</button> },
 		)
 		.get::<Children>()
 		.unwrap()[0];
-	world.run_schedule(ApplySnippets);
 	world
 		.entity_mut(button)
 		.trigger_target(OnClick(MockEvent::new("foo")));
@@ -45,14 +42,10 @@ fn inner_text() {
 fn r#ref() {
 	let (get, set) = signal(Entity::PLACEHOLDER);
 
-	let mut app = App::new();
-	app.add_plugins(ApplySnippetsPlugin);
-	let world = app.world_mut();
+	let mut world = World::new();
 	let div = world
 		.spawn(rsx! { <div ref=set /> })
 		.get::<Children>()
 		.unwrap()[0];
-	get().xpect_eq(Entity::PLACEHOLDER);
-	world.run_schedule(ApplySnippets);
 	get().xpect_eq(div);
 }
