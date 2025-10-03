@@ -46,34 +46,26 @@ impl<P> TriggerOnAnimationEnd<P> {
 
 pub(crate) fn trigger_on_animation_end<P: EventPayload + Clone>(
 	mut commands: Commands,
-	animators: Query<&AnimationPlayer>,
-	children: Query<&Children>,
 	clips: When<Res<Assets<AnimationClip>>>,
 	mut query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running>>,
-) {
+	agents: AgentQuery<&AnimationPlayer>,
+) -> Result {
 	for (action, on_end) in query.iter_mut() {
-		println!("1");
-		let Some(target) = children
-			.iter_descendants_inclusive(action)
-			.find(|entity| animators.contains(*entity))
-		else {
-			continue;
-		};
-		println!("2");
-		// safe unwrap, just checked
-		let player = animators.get(target).unwrap();
+		let player = agents.get_descendent(action)?;
 
-		let Some(clip) = clips.get(&on_end.handle) else {
-			continue;
-		};
+		let clip = clips
+			.get(&on_end.handle)
+			.ok_or_else(|| bevyhow!("clip not found"))?;
 
 		let Some(active_animation) = player.animation(on_end.animation_index)
 		else {
+			// animation not playing
+			warn!(
+				"animation is not playing, TriggerOnAnimationEnd will not be called"
+			);
 			continue;
 		};
 
-
-		println!("3");
 		let remaining_time = match active_animation.repeat_mode() {
 			RepeatAnimation::Never => {
 				clip.duration() - active_animation.seek_time()
@@ -92,12 +84,12 @@ pub(crate) fn trigger_on_animation_end<P: EventPayload + Clone>(
 
 		let nearly_finished = remaining_time < duration;
 
-		println!("remaining time: {:.1}/{:.1}", remaining_time, duration);
+		// println!("remaining time: {:.1}/{:.1}", remaining_time, duration);
 		if nearly_finished {
-			println!("Animation ended!");
 			commands
 				.entity(action)
 				.trigger_payload(on_end.payload.clone());
 		}
 	}
+	Ok(())
 }

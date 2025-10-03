@@ -31,6 +31,7 @@ where
 	F: 'static + QueryFilter,
 {
 	parents: Query<'w, 's, &'static ChildOf>,
+	children: Query<'w, 's, &'static Children>,
 	actions: Query<'w, 's, &'static ActionOf>,
 	agents: Query<'w, 's, &'static Agent>,
 	query: Query<'w, 's, D, F>,
@@ -59,6 +60,7 @@ where
 			.unwrap_or(root)
 	}
 
+	/// Get the query item for this `agent`
 	pub fn get(
 		&self,
 		entity: Entity,
@@ -67,11 +69,45 @@ where
 		self.query.get(agent)
 	}
 
+	/// Get the query item for this `agent`
 	pub fn get_mut(
 		&mut self,
 		entity: Entity,
 	) -> Result<D::Item<'_, 's>, QueryEntityError> {
 		let agent = self.entity(entity);
 		self.query.get_mut(agent)
+	}
+
+	/// Get the item for this `agent`
+	/// or its first matching child (BFS)
+	pub fn get_descendent(
+		&self,
+		entity: Entity,
+	) -> Result<ROQueryItem<'_, 's, D>> {
+		let agent = self.entity(entity);
+		self.children
+			.iter_descendants_inclusive(agent)
+			.find_map(|entity| self.query.get(entity).ok())
+			.ok_or_else(|| {
+				bevyhow!("No entity in agent descendents matches the query")
+			})
+	}
+
+	/// Get the query item for this `agent`
+	/// or its first matching child (BFS)
+	pub fn get_descendent_mut(
+		&mut self,
+		entity: Entity,
+	) -> Result<D::Item<'_, 's>> {
+		let agent = self.entity(entity);
+		self.children
+			.iter_descendants_inclusive(agent)
+			.find(|entity| self.query.contains(*entity))
+			.ok_or_else(|| {
+				bevyhow!("No entity in agent descendents matches the query")
+			})?
+			.xmap(|entity| self.query.get_mut(entity))
+			.unwrap()
+			.xok()
 	}
 }

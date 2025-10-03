@@ -22,7 +22,7 @@ pub struct TriggerOnAnimationReady<P> {
 	pub payload: P,
 }
 
-impl TriggerOnAnimationReady<RunPayload> {
+impl TriggerOnAnimationReady<GetOutcome> {
 	/// Create a new [`TriggerOnAnimationReady`] with a `DefaultRun` payload.
 	pub fn run() -> Self {
 		Self {

@@ -57,22 +57,12 @@ impl PlayAnimation {
 /// Play animations for behaviors that run after the agent loads
 fn play_animation_on_run(
 	ev: On<Run>,
-	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-	children: Query<&Children>,
 	query: Query<&PlayAnimation>,
-	agents: AgentQuery,
-) {
-	let play_animation = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
-	let agent = agents.entity(ev.event_target());
-
-	let target = children
-		.iter_descendants_inclusive(agent)
-		.find(|entity| animators.contains(*entity))
-		.expect(&expect_action::to_have_origin(&ev));
-	// safe unwrap, just checked
-	let (mut player, mut transitions) = animators.get_mut(target).unwrap();
+	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
+) -> Result {
+	let play_animation = query.get(ev.event_target())?;
+	let (mut player, mut transitions) =
+		agents.get_descendent_mut(ev.event_target())?;
 
 	if !player.is_playing_animation(play_animation.animation)
 		|| play_animation.trigger_if_playing
@@ -85,6 +75,7 @@ fn play_animation_on_run(
 			)
 			.set_repeat(play_animation.repeat);
 	}
+	Ok(())
 }
 
 // /// Play animations for animators that load after the behavior starts
@@ -124,51 +115,76 @@ fn play_animation_on_run(
 // 	}
 // }
 
+/// convenience system to create an [`AnimationPlayer`] from a clip
+#[cfg(test)]
+pub fn clip_to_player(
+	clip: In<AnimationClip>,
+	mut commands: Commands,
+	mut animations: ResMut<Assets<AnimationClip>>,
+	mut graphs: ResMut<Assets<AnimationGraph>>,
+) -> (Entity, AnimationNodeIndex) {
+	let (graph, animation_index) =
+		AnimationGraph::from_clip(animations.add(clip.0));
+	let player = AnimationPlayer::default();
+	// player.play(animation_index).repeat();
+
+	let player_entity = commands
+		.spawn((
+			AnimationGraphHandle(graphs.add(graph)),
+			player,
+			AnimationTransitions::new(),
+		))
+		.id();
+	(player_entity, animation_index)
+}
 
 
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
+	use bevy::animation::AnimationEvent;
 	use sweet::prelude::*;
 
 	#[derive(Clone, AnimationEvent)]
 	struct MyEvent(u32);
 
+	fn setup() -> (App, Store<Vec<u32>>, Entity, AnimationNodeIndex) {
+		let store = Store::default();
+		let mut app = App::new();
+		app.add_plugins((AssetPlugin::default(), AnimationPlugin))
+			.insert_time()
+			.add_observer(move |foo: On<MyEvent>| {
+				store.push(foo.0);
+			})
+			.run_once();
+
+		let mut clip = AnimationClip::default();
+		// animation.set_duration(2.0);
+
+		clip.add_event(0.0, MyEvent(0));
+		clip.add_event(1.0, MyEvent(1));
+		clip.add_event(2.0, MyEvent(2));
+		clip.add_event(3.0, MyEvent(3));
+		let (entity, index) = app
+			.world_mut()
+			.run_system_cached_with(clip_to_player, clip)
+			.unwrap();
+
+		(app, store, entity, index)
+	}
+
 	#[test]
 	fn animation_basics() {
-		fn setup(
-			mut commands: Commands,
-			mut animations: ResMut<Assets<AnimationClip>>,
-			mut graphs: ResMut<Assets<AnimationGraph>>,
-		) {
-			let mut animation = AnimationClip::default();
-			// animation.set_duration(2.0);
-
-			animation.add_event(0.0, MyEvent(0));
-			animation.add_event(1.0, MyEvent(1));
-			animation.add_event(2.0, MyEvent(2));
-			animation.add_event(3.0, MyEvent(3));
-			let (graph, animation_index) =
-				AnimationGraph::from_clip(animations.add(animation));
-			let mut player = AnimationPlayer::default();
-			player.play(animation_index).repeat();
-
-			commands.spawn((AnimationGraphHandle(graphs.add(graph)), player));
-		}
-
-		let store = Store::<Vec<u32>>::default();
-		let mut app = App::new();
-		app.add_plugins((
-			AssetPlugin::default(),
-			AnimationPlugin,
-		))
-		.insert_time()
-		.add_systems(Startup, setup)
-		.add_observer(move |foo: On<MyEvent>| {
-			store.push(foo.0);
-		})
-		.run_once();
+		let (mut app, store, entity, index) = setup();
+		app.world_mut()
+			.entity_mut(entity)
+			.get_mut::<AnimationPlayer>()
+			.unwrap()
+			.play(index)
+			.repeat();
 		store.get().xpect_empty();
 		app.update();
 		store.get().xpect_empty();
@@ -181,17 +197,24 @@ mod test {
 		app.update_with_secs(1);
 		store.get().xpect_eq(vec![0, 1, 2, 3, 0]);
 	}
-	
-	#[test]
-	fn works(){
-		let store = Store::<Vec<u32>>::default();
 
-		let mut app = App::new();
-		app.add_plugins((
-			// MinimalPlugins,
-			AssetPlugin::default(),
-			AnimationPlugin,
-		));
-		
+	#[test]
+	fn works() {
+		let (mut app, store, entity, index) = setup();
+
+		app.world_mut()
+			.spawn((ChildOf(entity), PlayAnimation::new(index)))
+			.trigger_payload(RUN);
+		store.get().xpect_empty();
+		app.update();
+		store.get().xpect_empty();
+		app.update_with_millis(1);
+		store.get().xpect_eq(vec![0]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1, 2]);
+		app.update_with_secs(1);
+		store.get().xpect_eq(vec![0, 1, 2, 3]);
 	}
 }
