@@ -14,7 +14,7 @@ pub fn tokenize_rstml(
 			InstanceRoot,
 			RstmlTokens::new(tokens),
 		),
-		tokenize_bundle,
+		tokenize_bundle_resolve_snippet,
 	)
 }
 

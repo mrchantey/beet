@@ -13,43 +13,58 @@ pub struct ApplySnippetsSet;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ApplySnippets;
 
-impl Plugin for ApplySnippetsPlugin {
-	#[rustfmt::skip]
-	fn build(&self, app: &mut App) {
-		app.try_set_error_handler(bevy::ecs::error::panic)
-			.init_plugin(schedule_order_plugin)
-			.add_systems(
-			ApplySnippets,
-			(
-				apply_static_and_flush,
-				apply_template_children,
-				apply_slots,
-			)
-				.chain().in_set(ApplySnippetsSet),
-		);
+impl ApplySnippets {
+	/// Create the `OnSpawn` which will immediately resolve the rsx snippet.
+	/// This is the entrypoint for the `rsx!` macro.
+	pub fn resolve(bundle: impl Bundle) -> OnSpawn {
+		OnSpawn::new(move |entity_ref| {
+			// hack to preserve a predefined SnippetRoot for tests
+			let root = entity_ref.get::<SnippetRoot>().cloned();
+			entity_ref.insert(bundle);
+			if let Some(root) = root {
+				entity_ref.insert(root);
+			}
+			if entity_ref.contains::<StaticRoot>() {
+				return;
+			}
+			let entity = entity_ref.id();
+			entity_ref.world_scope(|world| {
+				// world.log_component_names(entity);
+				// println!("Applying static rsx for {entity}");
+				world
+					.run_system_cached_with::<_, Result, _, _>(
+						apply_static_rsx,
+						entity,
+					)
+					// ignore skipped error
+					.unwrap_or(Ok(()))
+					.unwrap();
+				world
+					.run_system_cached_with::<_, Result, _, _>(
+						flush_on_spawn_deferred_recursive,
+						entity,
+					)
+					// ignore skipped error
+					.unwrap_or(Ok(()))
+					.unwrap();
+				world.run_system_cached(apply_template_children).ok();
+				world
+					.run_system_cached::<Result, _, _>(apply_slots)
+					// ignore skipped error
+					.unwrap_or(Ok(()))
+					.unwrap();
+			});
+		})
 	}
 }
 
-/// When a [`SnippetRoot`] is added to an entity,
-/// recusively apply each [`StaticRoot`]
-fn apply_static_and_flush(world: &mut World) -> Result {
-	let mut query = world
-		.query_filtered::<Entity, (With<InstanceRoot>, Without<ResolvedRoot>)>(
-		);
-	while let Some(entity) = query.iter(world).next() {
-		// println!("Applying static rsx for {entity}");
-		world.entity_mut(entity).insert(ResolvedRoot);
-		world.run_system_cached_with::<_, Result, _, _>(
-			apply_static_rsx,
-			entity,
-		)??;
-		world.run_system_cached_with::<_, Result, _, _>(
-			flush_on_spawn_deferred_recursive,
-			entity,
-		)??;
-	}
 
-	Ok(())
+
+impl Plugin for ApplySnippetsPlugin {
+	#[rustfmt::skip]
+	fn build(&self, _app: &mut App) {
+		todo!("deprecated");
+	}
 }
 
 fn apply_static_rsx(
@@ -204,7 +219,7 @@ Remaining idxs: {:?}
 }
 
 
-pub(super) fn flush_on_spawn_deferred_recursive(
+fn flush_on_spawn_deferred_recursive(
 	In(root): In<Entity>,
 	mut commands: Commands,
 	children: Query<&Children>,
@@ -247,7 +262,7 @@ mod test {
 
 	fn world() -> World {
 		let mut app = App::new();
-		app.add_plugins(ApplySnippetsPlugin);
+		// app.add_plugins(ApplySnippetsPlugin);
 		std::mem::take(app.world_mut())
 	}
 
@@ -256,20 +271,9 @@ mod test {
 		let mut world = world();
 		// convert an instance to a snippet with the same SnippetRoot
 		let _snippet = world
-			.spawn((StaticRoot, rsx_snippet))
-			.remove::<InstanceRoot>()
-			.insert(SnippetRoot::default())
-			.id();
-		let instance =
-			world.spawn(instance).insert(SnippetRoot::default()).id();
-
-		world.run_schedule(ApplySnippets);
-		// Safely runs multiple times
-		world.run_schedule(ApplySnippets);
-
-		world
-			.run_system_once::<_, Result, _>(crate::apply_snippets::apply_slots)
-			.ok(); // no matching entities ok
+			.spawn((SnippetRoot::default(), StaticRoot, rsx_snippet))
+			.remove::<InstanceRoot>();
+		let instance = world.spawn((SnippetRoot::default(), instance)).id();
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()
@@ -278,21 +282,15 @@ mod test {
 	#[test]
 	fn retains_parent() {
 		let mut world = world();
+		world
+			.spawn((SnippetRoot::default(), StaticRoot, rsx! { <span /> }))
+			.remove::<InstanceRoot>();
 
-		let child = world
-			.spawn(rsx! { <div /> })
-			.insert(SnippetRoot::default())
-			.id();
+		let child =
+			world.spawn((SnippetRoot::default(), rsx! { <div /> })).id();
 		let parent = world.spawn(rsx! { <main></main> }).id();
 		let main = world.entity(parent).get::<Children>().unwrap()[0];
 		world.entity_mut(main).add_child(child);
-
-		let _snippet = world
-			.spawn((rsx! { <span /> }, StaticRoot))
-			.remove::<InstanceRoot>()
-			.insert(SnippetRoot::default())
-			.id();
-		world.run_schedule(ApplySnippets);
 
 		world
 			.run_system_cached_with(render_fragment, parent)
@@ -461,44 +459,45 @@ mod test {
 		let parent_idx =
 			SnippetRoot::new_file_line_col(file!(), line!(), column!());
 
-		let child_instance =
-			rsx! { <div>pasta is <MyTemplate initial=3 /></div> };
-		let child_static =
-			rsx! { <div>pizza is <MyTemplate initial=4 /></div> };
 
-
-		let child = world.spawn(child_instance).insert(child_idx.clone()).id();
 		world
-			.spawn(child_static)
-			.remove::<InstanceRoot>()
-			.insert((StaticRoot, child_idx));
+			.spawn((
+				StaticRoot,
+				child_idx.clone(),
+				rsx! { <div>pizza is <MyTemplate initial=4 /></div> },
+			))
+			.remove::<InstanceRoot>();
 
-		world.run_schedule(ApplySnippets);
+		let child = world
+			.spawn((
+				child_idx,
+				rsx! { <div>pasta is <MyTemplate initial=3 /></div> },
+			))
+			.id();
+
 		world
 			.run_system_once_with(render_fragment, child)
 			.unwrap()
 			.xpect_eq("<div>pizza is 3</div>");
 
-		let parent_instance = rsx! {
-			<article>
-				<h1>all about pasta</h1>
-				{child}
-			</article>
-		};
-		let parent_static = rsx! {
-			<article>
-				<h1>all about pizza</h1>
-				{child}
-			</article>
-		};
-		let parent =
-			world.spawn(parent_instance).insert(parent_idx.clone()).id();
 		world
-			.spawn(parent_static)
+			.spawn((StaticRoot, parent_idx.clone(), rsx! {
+				<article>
+					<h1>all about pizza</h1>
+					{child}
+				</article>
+			}))
 			.remove::<InstanceRoot>()
-			.insert((StaticRoot, parent_idx));
+			.insert(());
+		let parent = world
+			.spawn((parent_idx, rsx! {
+				<article>
+					<h1>all about pasta</h1>
+					{child}
+				</article>
+			}))
+			.id();
 
-		world.run_schedule(ApplySnippets);
 		world
 			.run_system_once_with(render_fragment, parent)
 			.unwrap()
@@ -561,7 +560,6 @@ mod test {
 		let mut world = world();
 		let instance = world.spawn(instance).id();
 
-		world.run_schedule(ApplySnippets);
 		world
 			.run_system_once::<_, Result, _>(crate::apply_snippets::apply_slots)
 			.ok(); // no matching entities ok

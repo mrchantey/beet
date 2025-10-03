@@ -17,7 +17,7 @@ pub fn tokenize_combinator(
 			InstanceRoot,
 			CombinatorTokens::new(tokens),
 		),
-		tokenize_bundle,
+		tokenize_bundle_resolve_snippet,
 	)
 }
 

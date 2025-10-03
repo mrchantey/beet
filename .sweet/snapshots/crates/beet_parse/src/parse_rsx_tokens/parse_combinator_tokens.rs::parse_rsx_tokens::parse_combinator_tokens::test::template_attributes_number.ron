@@ -3,7 +3,7 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    (
+    ApplySnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new(
                 "crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs",
@@ -18,5 +18,5 @@
             OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< MyTemplate as Props >
             ::Builder::default().foo(20f64).build().into_bundle())).into_bundle()))]
         },
-    )
+    ))
 }

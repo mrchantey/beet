@@ -3,7 +3,7 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    (
+    ApplySnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new(
                 "crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs",
@@ -19,5 +19,5 @@
             (NodeTag(String::from("br")), ElementNode { self_closing : true }); bar }
             .into_bundle()), ExprIdx(0u32))]))]
         },
-    )
+    ))
 }
