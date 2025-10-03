@@ -27,7 +27,6 @@ where
 		match world.run_system_cached_with(handler.clone(), input) {
 			Ok(out) => {
 				world.spawn((HandlerBundle, out));
-				// world.run_schedule(ApplySnippets);
 			}
 			Err(err) => {
 				world.insert_resource(HttpError::from(err).into_response());
@@ -101,7 +100,6 @@ fn system(world: &mut World) -> Result {
 	} else {
 		return Ok(());
 	};
-	world.run_schedule(ApplySnippets);
 	world.run_schedule(ApplyDirectives);
 	let html = world.run_system_cached_with(render_fragment, entity)?;
 	world.insert_resource(Html(html).into_response());

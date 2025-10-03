@@ -179,7 +179,7 @@ mod test {
 	#[sweet::test]
 	async fn export_pdf_generates_valid_pdf() {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let (proc, page) =
 					Page::visit("https://example.com").await.unwrap();
 
@@ -201,7 +201,7 @@ mod test {
 	#[sweet::test]
 	async fn export_pdf_with_custom_options() {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let (proc, page) =
 					Page::visit("https://example.com").await.unwrap();
 

@@ -2,15 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
-pub struct ApplySnippetsPlugin;
-
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ApplySnippetsSet;
-
-
-/// This schedule recursively resolves each newly added [`InstanceRoot`]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ApplySnippets;
 
 impl ApplySnippets {
@@ -55,15 +46,6 @@ impl ApplySnippets {
 					.unwrap();
 			});
 		})
-	}
-}
-
-
-
-impl Plugin for ApplySnippetsPlugin {
-	#[rustfmt::skip]
-	fn build(&self, _app: &mut App) {
-		todo!("deprecated");
 	}
 }
 

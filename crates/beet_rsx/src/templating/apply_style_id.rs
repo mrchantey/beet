@@ -233,14 +233,15 @@ mod test {
 	#[test]
 	fn nested_template() {
 		#[template]
-		fn StyledTemplate() -> impl Bundle {
+		fn StyledTemplate(repeat: bool) -> impl Bundle {
 			rsx! {
 				<style {replace_hash()}/>
-				<div>
+				<div/>
+				{repeat.xmap_true(||rsx!{<StyledTemplate repeat=false/>})}
 			}
 		}
 
-		HtmlDocument::parse_bundle(rsx! { <StyledTemplate /> })
+		HtmlDocument::parse_bundle(rsx! { <StyledTemplate repeat=true /> })
 			.xpect_snapshot();
 	}
 

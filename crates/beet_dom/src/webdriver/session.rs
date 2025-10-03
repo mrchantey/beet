@@ -297,7 +297,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let client = ClientProcess::new().unwrap();
 				let session = client.new_session().await.unwrap();
 				// Simple BiDi round‑trip health check.

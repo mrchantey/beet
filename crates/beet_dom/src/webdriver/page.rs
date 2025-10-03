@@ -158,7 +158,7 @@ mod test {
 	#[sweet::test]
 	async fn visit_and_read_title() {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let (proc, page) =
 					Page::visit("https://example.com").await.unwrap();
 				page.current_url()
