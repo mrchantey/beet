@@ -73,7 +73,7 @@ fn run_app() {
 					// so lets give it a low score. This is a 5% chance because the alternative
 					// is a random value between 0 and 1
 					Name::new("Scarlet Aeonia"),
-					EndOnRun(ScoreValue(0.05)),
+					EndOnRun(Score(0.05)),
 					AttackPlayer {
 						max_damage: 10_000.0,
 						max_recoil: 10.0,
@@ -178,7 +178,7 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: On<Run<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
@@ -190,7 +190,7 @@ fn provide_random_score(
 	let rnd: f32 = random_source.random();
 	commands
 		.entity(ev.event_target())
-		.trigger_payload(ScoreValue(
+		.trigger_payload(Score(
 			rnd * score_provider.scalar + score_provider.offset,
 		));
 }

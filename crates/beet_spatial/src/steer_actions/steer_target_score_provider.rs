@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
-/// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`],
+/// Provides a [`Score`] based on distance to the [`SteerTarget`],
 /// This scorer is binary, if the distance is within the min and max radius, the score is 1,
 /// otherwise it is 0.
 /// ## Tags
@@ -27,7 +27,7 @@ impl Default for SteerTargetScoreProvider {
 }
 
 fn provide_score(
-	ev: On<Run<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
@@ -49,6 +49,6 @@ fn provide_score(
 	};
 	commands
 		.entity(ev.event_target())
-		.trigger_payload(ScoreValue::new(score));
+		.trigger_payload(Score::new(score));
 	Ok(())
 }

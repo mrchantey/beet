@@ -1,37 +1,35 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
-/// The most common End payload, a [`Result<(),()>`] used to indicate run status
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
-pub enum EndResult<T = (), E = ()> {
-	Success(T),
-	Failure(E),
+pub trait RunPayload: EventPayload {
+	type End: EndPayload<Run = Self>;
 }
-pub const SUCCESS: EndResult<(), ()> = EndResult::Success(());
-pub const FAILURE: EndResult<(), ()> = EndResult::Failure(());
 
+pub trait EndPayload: EventPayload {
+	type Run: RunPayload<End = Self>;
+}
 
-impl<T, E> EventPayload for EndResult<T, E>
+#[derive(Debug, Clone, EntityEvent)]
+pub struct Run<T = GetOutcome> {
+	#[event_target]
+	target: Entity,
+	value: T,
+}
+impl<T> From<Entity> for Run<T>
 where
-	T: 'static + Send + Sync,
-	E: 'static + Send + Sync,
+	T: Default,
 {
-	type Event = End<EndResult<T, E>>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self)
-	}
+	fn from(target: Entity) -> Self { Self::new(target, default()) }
+}
+impl<T> Run<T> {
+	pub fn new(target: Entity, value: T) -> Self { Self { target, value } }
+	pub fn target(&self) -> Entity { self.target }
+	pub fn value(&self) -> &T { &self.value }
 }
 
-
-impl<T, E> EndResult<T, E> {
-	pub fn is_success(&self) -> bool { matches!(self, EndResult::Success(_)) }
-	pub fn is_failure(&self) -> bool { matches!(self, EndResult::Failure(_)) }
-}
-impl EndResult<(), ()> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
-pub struct End<T = EndResult> {
+pub struct End<T = Outcome> {
 	#[event_target]
 	target: Entity,
 	value: T,
@@ -75,10 +73,8 @@ where
 	}
 }
 
-impl End<EndResult> {}
-
 #[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
-pub struct ChildEnd<T = EndResult>
+pub struct ChildEnd<T = Outcome>
 where
 	T: 'static + Send + Sync,
 {
@@ -128,7 +124,7 @@ pub const PREVENT_PROPAGATE_END: PreventPropagateEnd = PreventPropagateEnd {
 /// an [`End`] with the same data, a requirement whenever you want to manually
 /// handle propagation, for instance in a [`Sequence`], [`HighestScore`] etc.
 #[derive(Component, Reflect)]
-pub struct PreventPropagateEnd<T = EndResult> {
+pub struct PreventPropagateEnd<T = Outcome> {
 	phantom: PhantomData<T>,
 }
 impl<T> Default for PreventPropagateEnd<T> {

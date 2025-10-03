@@ -39,7 +39,7 @@ impl<T> EndInDuration<T> {
 	}
 }
 
-impl EndInDuration<EndResult> {
+impl EndInDuration<Outcome> {
 	pub fn success(duration: Duration) -> Self { Self::new(SUCCESS, duration) }
 	pub fn failure(duration: Duration) -> Self { Self::new(FAILURE, duration) }
 }

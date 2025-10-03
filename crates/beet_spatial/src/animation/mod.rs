@@ -27,7 +27,7 @@ impl Plugin for AnimationFlowPlugin {
 			Update,
 			(
 				init_animators,
-				trigger_on_animation_ready::<RequestEndResult>,
+				trigger_on_animation_ready::<RunPayload>,
 			)
 				.chain(),
 		)
@@ -35,7 +35,7 @@ impl Plugin for AnimationFlowPlugin {
 			Update,
 			(
 				// play_animation_on_load,
-				trigger_on_animation_end::<EndResult>,
+				trigger_on_animation_end::<Outcome>,
 			)
 				.in_set(TickSet),
 		);

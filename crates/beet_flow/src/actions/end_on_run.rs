@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 /// ```
 #[action(end_on_run::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct EndOnRun<T: EndPayload + Clone = EndResult>(pub T);
+pub struct EndOnRun<T: EndPayload + Clone = Outcome>(pub T);
 
 impl<T: EndPayload + Clone> EndOnRun<T> {}
 

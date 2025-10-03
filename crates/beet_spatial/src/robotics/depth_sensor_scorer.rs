@@ -14,17 +14,17 @@ pub struct DepthSensorScorer {
 	/// `far_score` to `close_score`.
 	pub threshold_dist: f32,
 	/// The score to set when the depth is more than the threshold.
-	pub far_score: ScoreValue,
+	pub far_score: Score,
 	/// The score to set when the depth is less than the threshold.
-	pub close_score: ScoreValue,
+	pub close_score: Score,
 }
 
 impl Default for DepthSensorScorer {
 	fn default() -> Self {
 		Self {
 			threshold_dist: 0.5,
-			far_score: ScoreValue::FAIL,
-			close_score: ScoreValue::PASS,
+			far_score: Score::FAIL,
+			close_score: Score::PASS,
 		}
 	}
 }
@@ -40,7 +40,7 @@ impl DepthSensorScorer {
 }
 
 fn depth_sensor_scorer(
-	ev: On<Run<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	query: Query<&DepthSensorScorer>,
 	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,

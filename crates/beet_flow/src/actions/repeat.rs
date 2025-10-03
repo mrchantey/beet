@@ -25,17 +25,17 @@ use beet_core::prelude::*;
 #[require(PreventPropagateEnd)]
 pub struct Repeat {
 	/// Optional predicate to only repeat if the result matches.
-	pub if_result_matches: Option<EndResult>,
+	pub if_result_matches: Option<Outcome>,
 }
 
 impl Repeat {
-	/// Repeats the action if the result is [`EndResult::Success`].
+	/// Repeats the action if the result is [`Outcome::Success`].
 	pub fn if_success() -> Self {
 		Self {
 			if_result_matches: Some(SUCCESS),
 		}
 	}
-	/// Repeats the action if the result is [`EndResult::Failure`].
+	/// Repeats the action if the result is [`Outcome::Failure`].
 	pub fn if_failure() -> Self {
 		Self {
 			if_result_matches: Some(FAILURE),

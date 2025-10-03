@@ -32,7 +32,7 @@ pub struct RunNext {
 	/// if set, this will only run next if the result matches this,
 	/// otherwise it will stop repeating and trigger End
 	/// on its parent.
-	pub if_result_matches: Option<EndResult>,
+	pub if_result_matches: Option<Outcome>,
 }
 
 impl RunNext {
@@ -43,14 +43,14 @@ impl RunNext {
 			if_result_matches: None,
 		}
 	}
-	/// Create a new RunNext action that only runs if the result is [`EndResult::Success`].
+	/// Create a new RunNext action that only runs if the result is [`Outcome::Success`].
 	pub fn if_success(action: Entity) -> Self {
 		Self {
 			action,
 			if_result_matches: Some(SUCCESS),
 		}
 	}
-	/// Create a new RunNext action that only runs if the result is [`EndResult::Failure`].
+	/// Create a new RunNext action that only runs if the result is [`Outcome::Failure`].
 	pub fn if_failure(action: Entity) -> Self {
 		Self {
 			action,

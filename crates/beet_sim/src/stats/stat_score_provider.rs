@@ -41,7 +41,7 @@ impl StatScoreProvider {
 		value: StatValue,
 		target_value: StatValueGoal,
 		range: Range<StatValue>,
-	) -> ScoreValue {
+	) -> Score {
 		let normal_value = value.normalize(range);
 
 		let curved_value =
@@ -50,16 +50,16 @@ impl StatScoreProvider {
 		match target_value {
 			// if the value is high and the desired direction is high,
 			// the score should be low
-			StatValueGoal::High => ScoreValue(1. - curved_value),
+			StatValueGoal::High => Score(1. - curved_value),
 			// vice versa
-			StatValueGoal::Low => ScoreValue(curved_value),
+			StatValueGoal::Low => Score(curved_value),
 		}
 	}
 }
 
 
 fn provide_score(
-	ev: On<Run<RequestScore>>,
+	ev: On<Run<GetScore>>,
 	mut commands: Commands,
 	stat_map: Res<StatMap>,
 	children: Query<&Children>,
@@ -140,7 +140,7 @@ mod test {
 		let world = app.world_mut();
 
 		let on_child_score =
-			observer_ext::observe_triggers::<OnChildResult<ScoreValue>>(world);
+			observer_ext::observe_triggers::<OnChildResult<Score>>(world);
 
 		world
 			.spawn(HighestScore::default())

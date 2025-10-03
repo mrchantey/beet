@@ -17,11 +17,11 @@ fn main() {
 			children![
 				(
 					Name::new("this child does not run"),
-					EndOnRun(ScoreValue(0.4)),
+					EndOnRun(Score(0.4)),
 				),
 				(
 					Name::new("this child runs"),
-					EndOnRun(ScoreValue(0.6)),
+					EndOnRun(Score(0.6)),
 				)
 			]
 		))

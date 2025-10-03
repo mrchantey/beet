@@ -3,72 +3,6 @@ use beet_core::prelude::*;
 use bevy::platform::collections::HashMap;
 use std::cmp::Ordering;
 
-/// Wrapper for an f32, representing a score. This should be between 0 and 1.
-///	## Example
-/// ```rust
-/// # use beet_core::prelude::*;
-/// # use beet_flow::prelude::*;
-/// let mut world = World::new();
-/// // create a passing score value
-/// world.spawn(EndOnRun(ScoreValue(1.)));
-/// ```
-#[derive(
-	Debug,
-	Default,
-	Copy,
-	Clone,
-	PartialEq,
-	PartialOrd,
-	Deref,
-	DerefMut,
-	Component,
-	Reflect,
-)]
-pub struct ScoreValue(pub f32);
-
-impl ScoreValue {
-	/// Its best practice to keep scores between 0 and 1,
-	/// so a passing score is 1
-	pub const PASS: Self = Self(1.0);
-	/// Its best practice to keep scores between 0 and 1,
-	/// so a neutral score is 0.5
-	pub const NEUTRAL: Self = Self(0.5);
-	/// Its best practice to keep scores between 0 and 1,
-	/// so a failing score is 0
-	pub const FAIL: Self = Self(0.0);
-	/// Create a new instance of `ScoreValue` with the provided score.
-	pub fn new(score: f32) -> Self { Self(score) }
-}
-
-impl EventPayload for ScoreValue {
-	type Event = End<ScoreValue>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self)
-	}
-}
-
-
-/// The payload for requesting a score,
-/// for usage see [`HighestScore`].
-#[derive(
-	Debug, Default, Copy, Clone, PartialEq, PartialOrd, Component, Reflect,
-)]
-pub struct RequestScore;
-
-impl EventPayload for RequestScore {
-	type Event = Run<RequestScore>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		Run::new(entity, self)
-	}
-}
-
-impl RunPayload for RequestScore {
-	type End = ScoreValue;
-}
-impl EndPayload for ScoreValue {
-	type Run = RequestScore;
-}
-
 /// Aka `UtilitySelector`, Runs the child with the highest score.
 /// This action uses the principles of Utility AI.
 /// The mechanisim for requesting and returning a score is the same
@@ -85,11 +19,11 @@ impl EndPayload for ScoreValue {
 /// world
 ///		.spawn(HighestScore::default())
 ///		.with_child((
-///			EndOnRun(ScoreValue::NEUTRAL),
+///			EndOnRun(Score::NEUTRAL),
 ///			EndOnRun(SUCCESS),
 ///		))
 ///		.with_child((
-///			EndOnRun(ScoreValue::PASS),
+///			EndOnRun(Score::PASS),
 ///			EndOnRun(SUCCESS),
 ///		))
 ///		.trigger_payload(RUN);
@@ -97,9 +31,9 @@ impl EndPayload for ScoreValue {
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(PreventPropagateEnd<ScoreValue>)]
+#[require(PreventPropagateEnd<Score>)]
 // TODO sparseset instead of hashmap
-pub struct HighestScore(HashMap<Entity, ScoreValue>);
+pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(
 	ev: On<Run>,
@@ -110,13 +44,13 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands.entity(child).trigger_payload(RequestScore);
+		commands.entity(child).trigger_payload(GetScore);
 	}
 	Ok(())
 }
 
 fn on_receive_score(
-	ev: On<ChildEnd<ScoreValue>>,
+	ev: On<ChildEnd<Score>>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
@@ -147,20 +81,20 @@ mod test {
 		let on_run = collect_on_run(&mut world);
 		let on_result = collect_on_result(&mut world);
 		let on_request_score =
-			observer_ext::observe_triggers::<Run<RequestScore>>(&mut world);
+			observer_ext::observe_triggers::<Run<GetScore>>(&mut world);
 		let on_score =
-			observer_ext::observe_triggers::<End<ScoreValue>>(&mut world);
+			observer_ext::observe_triggers::<End<Score>>(&mut world);
 
 		world
 			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
-				EndOnRun(ScoreValue::NEUTRAL),
+				EndOnRun(Score::NEUTRAL),
 				EndOnRun(SUCCESS),
 			))
 			.with_child((
 				Name::new("child2"),
-				EndOnRun(ScoreValue::PASS),
+				EndOnRun(Score::PASS),
 				EndOnRun(SUCCESS),
 			))
 			.trigger_payload(RUN)

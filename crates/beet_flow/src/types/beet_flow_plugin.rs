@@ -7,8 +7,8 @@ pub struct BeetFlowPlugin;
 impl Plugin for BeetFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
-			run_plugin::<RequestEndResult, EndResult>,
-			run_plugin::<RequestScore, ScoreValue>,
+			run_plugin::<GetOutcome, Outcome>,
+			run_plugin::<GetScore, Score>,
 		))
 		.configure_sets(Update, PreTickSet)
 		.configure_sets(Update, TickSet.after(PreTickSet))
@@ -23,7 +23,7 @@ impl Plugin for BeetFlowPlugin {
 			(
 				tick_run_timers,
 				// return_in_duration must be after tick_run_timers
-				end_in_duration::<EndResult>,
+				end_in_duration::<Outcome>,
 			)
 				.chain()
 				.in_set(TickSet),
@@ -107,7 +107,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 
 /// Collect all [OnResultAction] with a [Name]
 #[cfg(test)]
-pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, EndResult)>> {
+pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, Outcome)>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<End>, query: Query<&Name>| {
 		let name = if let Ok(name) = query.get(ev.event_target()) {

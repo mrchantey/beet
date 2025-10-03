@@ -15,7 +15,7 @@ pub struct LanguagePlugin;
 impl Plugin for LanguagePlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<Sentence>()
-			.add_observer(trigger_with_user_sentence::<RequestEndResult>);
+			.add_observer(trigger_with_user_sentence::<RunPayload>);
 
 		#[cfg(feature = "candle")]
 		app.init_asset::<Bert>().init_asset_loader::<BertLoader>();
