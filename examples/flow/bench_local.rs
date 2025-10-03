@@ -1,9 +1,14 @@
 use bevy::prelude::*;
 
-#[derive(Event)]
-struct OnRun;
+#[derive(EntityEvent)]
+struct Run(Entity);
+
 #[derive(Default, Component)]
 struct TriggerCount(i32);
+
+fn increment(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
+	query.get_mut(trigger.event_target()).unwrap().as_mut().0 += 1;
+}
 
 fn main() {
 	let mut app = App::new();
@@ -15,13 +20,9 @@ fn main() {
 			.observe(increment)
 			.id();
 		app.world_mut().flush();
-		app.world_mut().entity_mut(entity).trigger(OnRun);
+		app.world_mut().entity_mut(entity).trigger(Run);
+		app.world_mut().flush();
 	}
 	println!("Time: {}", start.elapsed().as_millis());
-	// 3000ms
-	// assert_eq!(app.world().get::<TriggerCount>(entity).unwrap().0, 1);
-}
-
-fn increment(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
-	query.get_mut(trigger.target()).unwrap().as_mut().0 += 1;
+	// 2200ms
 }

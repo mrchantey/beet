@@ -13,6 +13,9 @@ pub enum TargetEntity {
 	Target,
 	/// Use the [`AgentQuery::entity`]
 	Agent,
+	/// Use the [`ChildOf`] for the [`EntityEvent::event_target`],
+	/// defaulting back to [`TargetEntity::Target`] if none present
+	Parent,
 	/// Specify some other entity to target
 	Other(Entity),
 }
@@ -31,6 +34,12 @@ impl TargetEntity {
 		match self {
 			TargetEntity::Target => ev.event_target(),
 			TargetEntity::Agent => agents.entity(ev.event_target()),
+			TargetEntity::Parent => agents
+				.parents
+				.get(ev.event_target())
+				.ok()
+				.and_then(|parent| Some(parent.get()))
+				.unwrap_or(ev.event_target()),
 			TargetEntity::Other(entity) => *entity,
 		}
 	}

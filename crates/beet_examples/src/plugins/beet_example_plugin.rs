@@ -44,7 +44,7 @@ pub fn beet_example_plugin(app: &mut App) {
 
 	app.add_plugins((
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::default(),
+		DebugFlowPlugin::default(),
 		BeetSpatialPlugins::default(),
 		plugin_2d,
 		plugin_3d,

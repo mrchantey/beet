@@ -1,7 +1,6 @@
 use beet::examples::scenes;
 use beet::examples::scenes::ml::FROZEN_LAKE_SCENE_SCALE;
 use beet::prelude::*;
-use bevy::prelude::*;
 
 pub fn main() {
 	App::new()

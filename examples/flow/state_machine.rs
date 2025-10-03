@@ -7,7 +7,7 @@ use beet::prelude::*;
 fn main() {
 	let mut app = App::new();
   app
-		.add_plugins((BeetFlowPlugin::default(), BeetDebugPlugin::default()));
+		.add_plugins((BeetFlowPlugin::default(), DebugFlowPlugin::default()));
 	let world = app.world_mut();
 
 

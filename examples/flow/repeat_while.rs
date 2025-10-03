@@ -6,7 +6,7 @@ fn main() {
 	app.add_plugins((
 		MinimalPlugins,
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::default(),
+		DebugFlowPlugin::default(),
 	))
 	.world_mut()
 	.spawn((

@@ -1,7 +1,6 @@
 use beet::examples::scenes;
 use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
-use bevy::prelude::*;
 use std::time::Duration;
 
 pub fn main() {
@@ -42,36 +41,34 @@ fn setup(
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
-	commands
-		.spawn((
-			Name::new("Foxie"),
-			Transform::from_scale(Vec3::splat(0.1)),
-			SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
-			graph_handle,
-			// AnimationTransitions::default(),
-		))
-		.with_children(|parent| {
-			parent
-				.spawn((
-					Name::new("Behavior"),
-					TriggerOnAnimationReady::run(),
-					Sequence::default(),
-					Repeat::default(),
-				))
-				.with_child((
-					Name::new("Idle"),
+	commands.spawn((
+		Name::new("Foxie"),
+		Transform::from_scale(Vec3::splat(0.1)),
+		SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
+		graph_handle,
+		// AnimationTransitions::default(),
+		children![(
+			Name::new("Behavior"),
+			TriggerOnAnimationReady::run(),
+			Sequence::default(),
+			Repeat::default(),
+			children![
+				(
+					Name::new("Idle"), 
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
 					TriggerOnAnimationEnd::new(idle_clip, idle_index, SUCCESS)
-						.with_transition_duration(transition_duration),
-				))
-				.with_child((
+						.with_transition_duration(transition_duration)
+				),
+				(
 					Name::new("Walking"),
 					PlayAnimation::new(walk_index)
 						.repeat(RepeatAnimation::Count(8))
 						.with_transition_duration(transition_duration),
 					TriggerOnAnimationEnd::new(walk_clip, walk_index, SUCCESS)
-						.with_transition_duration(transition_duration),
-				));
-		});
+						.with_transition_duration(transition_duration)
+				)
+			]
+		)]
+	));
 }

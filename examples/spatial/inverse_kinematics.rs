@@ -1,7 +1,6 @@
 use beet::examples::scenes;
 use beet::prelude::*;
 use bevy::color::palettes::tailwind;
-use bevy::prelude::*;
 
 fn main() {
 	App::new()

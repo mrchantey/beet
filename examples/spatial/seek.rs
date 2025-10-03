@@ -1,6 +1,5 @@
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
 
 #[rustfmt::skip]
 pub fn main() {

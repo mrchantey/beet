@@ -21,7 +21,7 @@ app.add_plugins((
 	// manages action lifecycles
 	BeetFlowPlugin::default(),
 	// this will log the name of each action as it is triggered.
-	BeetDebugPlugin::default()
+	DebugFlowPlugin::default()
 ));
 
 app.world_mut()

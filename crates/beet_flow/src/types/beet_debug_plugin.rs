@@ -10,7 +10,7 @@ use std::borrow::Cow;
 /// It emits [OnLogMessage] events, and also
 /// will print to stdout if [`Self::log_to_stdout`] is true.
 #[derive(Debug, Clone)]
-pub struct BeetDebugPlugin {
+pub struct DebugFlowPlugin {
 	/// Log whenever [`Run`] is triggered.
 	pub log_run: bool,
 	/// Log whenever [`Running`] entities are updated.
@@ -20,11 +20,11 @@ pub struct BeetDebugPlugin {
 	/// Log all messages to stdout
 	pub log_to_stdout: bool,
 }
-impl Default for BeetDebugPlugin {
+impl Default for DebugFlowPlugin {
 	fn default() -> Self { Self::with_run() }
 }
 
-impl BeetDebugPlugin {
+impl DebugFlowPlugin {
 	/// Include:
 	/// - [`log_on_run`](Self::log_on_run)
 	/// - [`log_to_stdout`](Self::log_to_stdout)
@@ -69,7 +69,7 @@ impl BeetDebugPlugin {
 	///
 	/// }
 	/// App::new()
-	/// 	.add_plugins(BeetDebugPlugin::with_none())
+	/// 	.add_plugins(DebugFlowPlugin::with_none())
 	/// 	.add_systems(Update, my_log_func)
 	/// 	.init_resource::<DebugOnRun>();
 	/// ```
@@ -83,7 +83,7 @@ impl BeetDebugPlugin {
 	}
 }
 
-impl Plugin for BeetDebugPlugin {
+impl Plugin for DebugFlowPlugin {
 	fn build(&self, app: &mut App) {
 		// TODO when resolved: [Observers::run_if](https://github.com/bevyengine/bevy/issues/14195)
 		app

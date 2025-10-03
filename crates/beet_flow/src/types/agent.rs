@@ -30,11 +30,11 @@ where
 	D: 'static + QueryData,
 	F: 'static + QueryFilter,
 {
-	parents: Query<'w, 's, &'static ChildOf>,
-	children: Query<'w, 's, &'static Children>,
-	actions: Query<'w, 's, &'static ActionOf>,
-	agents: Query<'w, 's, &'static Agent>,
-	query: Query<'w, 's, D, F>,
+	pub parents: Query<'w, 's, &'static ChildOf>,
+	pub children: Query<'w, 's, &'static Children>,
+	pub actions: Query<'w, 's, &'static ActionOf>,
+	pub agents: Query<'w, 's, &'static Agent>,
+	pub query: Query<'w, 's, D, F>,
 }
 impl<'w, 's, D, F> AgentQuery<'w, 's, D, F>
 where

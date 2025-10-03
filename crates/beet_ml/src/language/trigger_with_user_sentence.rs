@@ -14,7 +14,7 @@ use beet_flow::prelude::*;
 /// [`run_with_user_sentence`] manually.
 #[derive(Debug, Component)]
 #[require(Sentence)]
-pub struct TriggerWithUserSentence<P = RunPayload> {
+pub struct TriggerWithUserSentence<P = GetOutcome> {
 	/// The action to trigger.
 	pub payload: P,
 }
@@ -53,7 +53,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default())
-			.add_observer(trigger_with_user_sentence::<RunPayload>);
+			.add_observer(trigger_with_user_sentence::<GetOutcome>);
 		let world = app.world_mut();
 		let on_run = observer_ext::observe_triggers::<Run>(world);
 

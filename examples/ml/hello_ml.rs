@@ -10,7 +10,6 @@
 //! Note that the [Name] components are for debugging only, its the
 //! [Sentence] components that are used for the actual behavior selection.
 use beet::prelude::*;
-use bevy::prelude::*;
 
 // #[rustfmt::skip]
 pub fn main() {
@@ -19,7 +18,7 @@ pub fn main() {
 			MinimalPlugins,
 			AssetPlugin::default(),
 			BeetFlowPlugin::default(),
-			BeetDebugPlugin::default(),
+			DebugFlowPlugin::default(),
 			RunOnAssetReadyPlugin::<Bert>::default(),
 			LanguagePlugin::default(),
 		))
@@ -37,13 +36,17 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 			RunOnAssetReady::<Bert>::new(bert),
 			NearestSentence::new(),
 			Sentence::new("please kill the baddies"),
-		))
-		.with_child((
-			Name::new("Heal Behavior"), 
-			Sentence::new("heal")
-		))
-		.with_child((
-			Name::new("Attack Behavior"), 
-			Sentence::new("attack")
+			children![
+				(
+					// this wont run
+					Name::new("Heal Behavior"),
+					Sentence::new("heal")
+				),
+				(
+					// this will run, closer sentence similarity
+					Name::new("Attack Behavior"),
+					Sentence::new("attack")
+				)
+			]
 		));
 }

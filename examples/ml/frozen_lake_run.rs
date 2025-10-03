@@ -1,10 +1,6 @@
 use beet::examples::scenes;
 use beet::examples::scenes::ml::FROZEN_LAKE_SCENE_SCALE;
 use beet::prelude::*;
-use bevy::prelude::*;
-use std::time::Duration;
-use sweet::prelude::RandomSource;
-
 
 pub fn main() {
 	App::new()
@@ -38,38 +34,29 @@ fn setup(
 	let qtable =
 		asset_server.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
 
-	commands
-		.spawn((
-			Name::new("Inference Agent"),
-			SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
-			Transform::from_translation(agent_pos).with_scale(object_scale),
-			grid_to_world.clone(),
-			agent_grid_pos,
-			GridDirection::sample(&mut rng.0),
-		))
-		.with_children(|parent| {
-			let origin = parent.target_entity();
-
-			parent
-				.spawn((
-					RunOnAssetReady::new_with_trigger(
-						qtable.clone(),
-						OnRunAction::new(Entity::PLACEHOLDER, origin, ()),
-					),
-					Sequence::default(),
-					Repeat::default(),
-					Name::new("Run Frozen Lake Agent"),
-				))
-				.with_children(|parent| {
-					parent.spawn((
-						Name::new("Get next action"),
-						HandleWrapper(qtable),
-						ReadQPolicy::<FrozenLakeQTable>::default(),
-					));
-					parent.spawn((
-						Name::new("Perform action"),
-						TranslateGrid::new(Duration::from_secs(1)),
-					));
-				});
-		});
+	commands.spawn((
+		Name::new("Inference Agent"),
+		SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
+		Transform::from_translation(agent_pos).with_scale(object_scale),
+		grid_to_world.clone(),
+		agent_grid_pos,
+		GridDirection::sample(&mut rng.0),
+		children![(
+			RunOnAssetReady::new(qtable.clone()),
+			Sequence::default(),
+			Repeat::default(),
+			Name::new("Run Frozen Lake Agent"),
+			children![
+				(
+					Name::new("Get next action"),
+					HandleWrapper(qtable),
+					ReadQPolicy::<FrozenLakeQTable>::default(),
+				),
+				(
+					Name::new("Perform action"),
+					TranslateGrid::new(Duration::from_secs(1)),
+				)
+			]
+		)],
+	));
 }

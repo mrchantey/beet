@@ -22,7 +22,7 @@ fn main() {
 	app.add_plugins((
 		MinimalPlugins,
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::with_result(),
+		DebugFlowPlugin::with_result(),
 	))
 	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
 

@@ -10,13 +10,12 @@
 //!
 use beet::examples::scenes;
 use beet::prelude::*;
-use bevy::prelude::*;
 
 #[rustfmt::skip]
 pub fn main() {
 	App::new()
 		.add_plugins((
-			running_beet_example_plugin, 
+			running_beet_example_plugin,
 			plugin_ml
 		))
 		.add_systems(
@@ -58,28 +57,26 @@ pub fn fetch_npc(
 		walk_clip: _,
 	} = Foxie::new(&asset_server, &mut anim_graphs);
 
-	commands
-		.spawn((
-			Name::new("Fox"),
-			Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
-			SceneRoot(foxie.clone()),
-			graph_handle,
-			AnimationTransitions::new(),
-			RotateToVelocity3d::default(),
-			ForceBundle::default(),
-			SteerBundle {
-				max_force: MaxForce(0.05),
-				max_speed: MaxSpeed(2.),
-				..default()
-			},
-		))
-		.observe(
-			|ev: On<OnInsert, SteerTarget>,
+	commands.spawn((
+		Name::new("Fox"),
+		Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
+		SceneRoot(foxie.clone()),
+		graph_handle,
+		AnimationTransitions::new(),
+		RotateToVelocity3d::default(),
+		ForceBundle::default(),
+		SteerBundle {
+			max_force: MaxForce(0.05),
+			max_speed: MaxSpeed(2.),
+			..default()
+		},
+		EntityObserver::new(
+			|ev: On<Insert, SteerTarget>,
 			 steer_targets: Query<&SteerTarget>,
 			 sentences: Query<&Sentence>,
 			 mut log: MessageWriter<OnLogMessage>| {
 				if let Ok(SteerTarget::Entity(steer_target)) =
-					steer_targets.get(ev.target())
+					steer_targets.get(ev.event_target())
 				{
 					if let Ok(sentence) = sentences.get(*steer_target) {
 						log.write(
@@ -95,30 +92,21 @@ pub fn fetch_npc(
 					}
 				}
 			},
-		)
-		.with_children(|parent| {
-			let origin = parent.target_entity();
-			parent
-				.spawn((
-					Name::new("Fetch Behavior"),
-					RunWithUserSentence::new(OnRunAction::new(
-						Entity::PLACEHOLDER,
-						origin,
-						(),
-					)),
-					Sequence::default(),
-				))
-				.with_children(|parent| {
-					parent.spawn((
-						Name::new("Apply Sentence Steer Target"),
-						SentenceSteerTarget::<Collectable>::new(
-							TargetEntity::Other(parent.target_entity()),
-						),
-						HandleWrapper(bert),
-						EndOnRun(SUCCESS),
-					));
-				})
-				.with_child((
+		),
+		children![(
+			Name::new("Fetch Behavior"),
+			TriggerWithUserSentence::default(),
+			Sequence::default(),
+			children![
+				(
+					Name::new("Apply Sentence Steer Target"),
+					SentenceSteerTarget::<Collectable>::new(
+						TargetEntity::Parent,
+					),
+					HandleWrapper(bert),
+					EndOnRun(SUCCESS),
+				),
+				(
 					Name::new("Fetch"),
 					SteerTargetScoreProvider {
 						min_radius: 1.,
@@ -126,21 +114,23 @@ pub fn fetch_npc(
 					},
 					Seek::default(),
 					PlayAnimation::new(walk_index).repeat_forever(),
-					Insert::<OnRun, _>::new_with_target(
+					InsertOn::<Run, _>::new_with_target(
 						Velocity::default(),
 						TargetEntity::Agent,
 					),
 					EndOnArrive::new(1.),
-				))
-				.with_child((
+				),
+				(
 					Name::new("Idle"),
 					TriggerOnAnimationReady::run(),
-					Remove::<OnRun, Velocity>::new_with_target(
+					RemoveOn::<Run, Velocity>::new_with_target(
 						TargetEntity::Agent,
 					),
 					PlayAnimation::new(idle_index).repeat_forever(),
-				));
-		});
+				)
+			]
+		)],
+	));
 }
 
 
@@ -159,56 +149,44 @@ pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 	// items
 	let scale = Vec3::splat(0.5);
-	commands
-		.spawn((
-			Name::new("Potion"),
-			Sentence::new("red healing potion"),
-			Collectable,
-			Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				Transform::from_xyz(0., 0., 0.).with_scale(scale),
-				SceneRoot(asset_server.load("kaykit/potion.glb#Scene0")),
-			));
-		});
-	commands
-		.spawn((
-			Name::new("Coin"),
-			Sentence::new("gold coin"),
-			Collectable,
-			Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				Transform::from_xyz(0., 0.2, 0.).with_scale(scale),
-				SceneRoot(asset_server.load("kaykit/coin.glb#Scene0")),
-			));
-		});
-	commands
-		.spawn((
-			Name::new("Sword"),
-			Sentence::new("silver sword"),
-			Collectable,
-			Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				Transform::from_xyz(0., 0.15, 0.).with_scale(scale),
-				SceneRoot(asset_server.load("kaykit/sword.glb#Scene0")),
-			));
-		});
-	commands
-		.spawn((
-			Name::new("Cheese"),
-			Sentence::new("tasty cheese"),
-			Collectable,
-			Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				Transform::from_xyz(0., 0., 0.).with_scale(scale),
-				SceneRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
-			));
-		});
+	commands.spawn((
+		Name::new("Potion"),
+		Sentence::new("red healing potion"),
+		Collectable,
+		Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
+		children![(
+			Transform::from_xyz(0., 0., 0.).with_scale(scale),
+			SceneRoot(asset_server.load("kaykit/potion.glb#Scene0")),
+		)],
+	));
+	commands.spawn((
+		Name::new("Coin"),
+		Sentence::new("gold coin"),
+		Collectable,
+		Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
+		children![(
+			Transform::from_xyz(0., 0.2, 0.).with_scale(scale),
+			SceneRoot(asset_server.load("kaykit/coin.glb#Scene0")),
+		)],
+	));
+	commands.spawn((
+		Name::new("Sword"),
+		Sentence::new("silver sword"),
+		Collectable,
+		Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
+		children![(
+			Transform::from_xyz(0., 0.15, 0.).with_scale(scale),
+			SceneRoot(asset_server.load("kaykit/sword.glb#Scene0")),
+		)],
+	));
+	commands.spawn((
+		Name::new("Cheese"),
+		Sentence::new("tasty cheese"),
+		Collectable,
+		Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
+		children![(
+			Transform::from_xyz(0., 0., 0.).with_scale(scale),
+			SceneRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
+		)],
+	));
 }
