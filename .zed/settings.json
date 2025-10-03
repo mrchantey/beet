@@ -16,6 +16,7 @@
 						// "lambda",
 						// "webdriver",
 						// "css",
+						"sim",
 						"bevy_default",
 						"spatial",
 						"examples",

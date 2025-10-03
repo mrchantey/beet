@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use std::ops::Range;
 
 #[action(provide_score)]
@@ -65,12 +65,14 @@ fn provide_score(
 	children: Query<&Children>,
 	stats: Query<(&StatId, &StatValue)>,
 	query: Query<(&StatScoreProvider, &StatId, &StatValueGoal)>,
+	agents: AgentQuery,
 ) {
+	let agent = agents.entity(ev.event_target());
 	let (score_provider, stat_id, target_value) = query
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 
-	let value = StatValue::find_by_id(ev.origin, children, stats, *stat_id)
+	let value = StatValue::find_by_id(agent, children, stats, *stat_id)
 		.expect(&expect_action::to_have_origin(&ev));
 
 	let descriptor = stat_map
@@ -82,7 +84,7 @@ fn provide_score(
 		descriptor.global_range.clone(),
 	);
 
-	ev.trigger_result(&mut commands, score);
+	commands.entity(ev.event_target()).trigger_payload(score);
 }
 
 
@@ -92,7 +94,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -140,7 +141,7 @@ mod test {
 		let world = app.world_mut();
 
 		let on_child_score =
-			observer_ext::observe_triggers::<OnChildResult<Score>>(world);
+			observer_ext::observe_triggers::<ChildEnd<Score>>(world);
 
 		world
 			.spawn(HighestScore::default())
@@ -154,7 +155,8 @@ mod test {
 				StatScoreProvider::default(),
 				StatValueGoal::Low,
 			))
-			.trigger_payload(RUN).flush();
+			.trigger_payload(RUN)
+			.flush();
 
 		on_child_score.len().xpect_eq(2);
 	}

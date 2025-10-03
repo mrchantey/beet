@@ -21,17 +21,15 @@ impl FindStatSteerTarget {}
 fn find_steer_target(
 	ev: On<Run>,
 	mut commands: Commands,
-	transforms: Query<&Transform>,
 	targets: Query<(&StatId, &StatValue, &ChildOf), With<StatProvider>>,
 	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,
+	agents: AgentQuery<&Transform>,
+	transforms: Query<&Transform>,
 ) -> Result {
-	let (_action, goal_id, value_goal) = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
+	let (_action, goal_id, value_goal) = query.get(ev.event_target())?;
 
-	let agent_transform = transforms
-		.get(ev.origin)
-		.expect(&expect_action::to_have_origin(&ev));
+	let agent = agents.entity(ev.event_target());
+	let agent_transform = agents.get(ev.event_target())?;
 
 	let mut best_score = f32::MAX;
 	let mut closest_target = None;
@@ -67,7 +65,7 @@ fn find_steer_target(
 
 	if let Some(closest_target) = closest_target {
 		commands
-			.entity(ev.origin)
+			.entity(agent)
 			.insert(SteerTarget::Entity(closest_target));
 	}
 	Ok(())
