@@ -47,6 +47,5 @@ web-sys = { workspace = true, features = ["Window", "console", "Performance"] }
 tokio.workspace = true
 
 [dev-dependencies]
-bevy = {workspace = true, features=["reflect_auto_register"]}
 # abs_path serde roundtrip
 serde_json.workspace = true

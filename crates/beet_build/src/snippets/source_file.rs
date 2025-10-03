@@ -56,8 +56,7 @@ pub fn load_workspace_source_files(
 pub struct NonCollectionSourceFiles;
 
 /// A [`SourceFile`] watched by another [`SourceFile`]
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
+#[derive(Deref, Component)]
 #[relationship(relationship_target = WatchedFiles)]
 // TODO many-many relations
 pub struct FileWatchedBy(pub Entity);
@@ -65,8 +64,7 @@ pub struct FileWatchedBy(pub Entity);
 
 /// A collection of [`SourceFile`] entities that this [`SourceFile`] is watching.
 /// If any child changes this should also change.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
+#[derive(Deref, Component)]
 #[relationship_target(relationship = FileWatchedBy, linked_spawn)]
 pub struct WatchedFiles(Vec<Entity>);
 
