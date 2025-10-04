@@ -186,16 +186,16 @@ fn terminal_user() -> impl Bundle {
 }
 
 fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.event().event_target())?;
+	let actor = cx.actor(ev.event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n{} > ", actor.role);
 	}
 	Ok(())
 }
 fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.trigger().event_target())?;
+	let actor = cx.actor(ev.event_target())?;
 	if actor.role != ActorRole::User {
-		print_flush!("{}", ev.event().0);
+		print_flush!("{}", ev.value);
 	}
 	Ok(())
 }

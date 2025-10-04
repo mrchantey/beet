@@ -327,7 +327,16 @@ impl AsyncEntity {
 		.await
 	}
 
-	pub async fn trigger<
+	pub async fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		&self,
+		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
+	) -> &Self {
+		self.with(move |mut entity| {
+			entity.trigger(ev);
+		})
+		.await
+	}
+	pub async fn trigger_target<
 		'a,
 		const AUTO_PROPAGATE: bool,
 		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
