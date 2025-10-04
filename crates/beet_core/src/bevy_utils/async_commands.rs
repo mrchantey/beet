@@ -69,7 +69,7 @@ fn poll_async_tasks(
 ///
 /// fn my_system(mut commands: AsyncCommands){
 /// 	commands.run(async |world|{
-///			world.insert_resource(MyResource(2));
+///			world.insert_resource(MyResource(2)).await;
 ///			let value = world.resource::<MyResource>().await.0;
 ///			assert_eq!(value, 2);
 /// 	});
