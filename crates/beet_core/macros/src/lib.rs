@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 mod action;
 mod bundle_effect;
-mod entity_target_event;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -80,23 +79,6 @@ pub fn bundle_effect(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	bundle_effect::impl_bundle_effect(input).into()
-}
-
-/// Cheat sheet for derive syntax,
-/// see full explanation on `EntityTargetEvent` trait docs.
-///
-/// ```ignore
-/// /// Enable propagation using the given Traversal implementation
-/// #[entity_event(propagate = &'static ChildOf)]
-/// /// Always propagate
-/// #[entity_event(auto_propagate)]
-/// struct MyEvent;
-/// ```
-#[proc_macro_derive(EntityTargetEvent, attributes(entity_event))]
-pub fn auto_entity_event(
-	input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	entity_target_event::impl_entity_target_event(input).into()
 }
 
 /// Convenience helper to directly add observers to this entity.

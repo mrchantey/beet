@@ -337,20 +337,6 @@ impl AsyncEntity {
 		})
 		.await
 	}
-	pub async fn trigger_target<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Traversal<E>,
-	>(
-		&self,
-		event: E,
-	) -> &Self {
-		self.with(|mut entity| {
-			entity.trigger_target(event);
-		})
-		.await
-	}
 	pub async fn trigger_payload<T: EventPayload>(&self, payload: T) -> &Self {
 		self.with(|mut entity| {
 			entity.trigger_payload(payload);

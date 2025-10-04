@@ -21,7 +21,7 @@ fn reactivity() {
 		.unwrap()[0];
 	world
 		.entity_mut(button)
-		.trigger_target(OnClick(MockEvent::new("foo")));
+		.trigger(OnClick::new(MockEvent::new("foo")));
 	get().xpect_eq("foo");
 }
 
