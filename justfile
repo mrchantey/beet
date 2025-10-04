@@ -14,7 +14,7 @@ export RUST_MIN_STACK := '1073741824'
 # min-stack := 'RUST_MIN_STACK=134217728'
 # min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'
-test-threads:= '--test-threads=8'
+test-threads:= '--test-threads=10'
 
 default:
 	just --list --unsorted

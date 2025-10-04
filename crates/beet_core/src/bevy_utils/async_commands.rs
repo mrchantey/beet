@@ -92,10 +92,10 @@ impl AsyncCommands<'_, '_> {
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		let queue = self.channel.world();
-		let queue2 = queue.clone();
+		let world = self.channel.world();
+		let world2 = world.clone();
 		let task = IoTaskPool::get()
-			.spawn(async move { func(queue).await.apply(queue2) });
+			.spawn(async move { func(world).await.apply(world2) });
 		self.commands.spawn(AsyncTask(task)).id()
 	}
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
@@ -105,10 +105,10 @@ impl AsyncCommands<'_, '_> {
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		let queue = self.channel.world();
-		let queue2 = queue.clone();
+		let world = self.channel.world();
+		let world2 = world.clone();
 		let task = IoTaskPool::get()
-			.spawn_local(async move { func(queue).await.apply(queue2) });
+			.spawn_local(async move { func(world).await.apply(world2) });
 		self.commands.spawn(AsyncTask(task)).id()
 	}
 }
