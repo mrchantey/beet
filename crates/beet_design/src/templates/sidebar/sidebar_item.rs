@@ -28,7 +28,7 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 	} else {
 		let children = children
 			.into_iter()
-			.map(|node| SidebarItem { node, root: false })
+			.map(|node| rsx! {<SidebarItem node=node root=false/>})
 			.collect::<Vec<_>>();
 
 		let item = if let Some(path) = path {

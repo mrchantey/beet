@@ -10,15 +10,16 @@ use beet_dom::prelude::*;
 pub struct TemplateChildOf(Entity);
 
 /// Added to the root of a template, pointing to all nodes which are
-/// descendants of the template root, excluding other templates.
+/// children of the template root, excluding other [`TemplateRoot`]s
+/// which have not yet been resolved to children by apply_slots.
 #[derive(Debug, Clone, Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship_target(relationship = TemplateChildOf, linked_spawn)]
 pub struct TemplateChildren(Vec<Entity>);
 
 
-/// Creates a [`TemplateNodes`] relation for each template root,
-/// pointing to every non-template node which is a descendant.
+/// Creates a [`TemplateChildren`] relation for each template root,
+/// pointing to every child which is a descendant.
 pub fn apply_template_children(
 	mut commands: Commands,
 	template_roots: Populated<
@@ -36,7 +37,6 @@ pub fn apply_template_children(
 		),
 	>,
 	children: Query<&Children>,
-	// node_tags: Query<&NodeTag>,
 ) {
 	for root in template_roots.iter() {
 		for child in children.iter_descendants(root) {
@@ -55,7 +55,7 @@ mod test {
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {
-		rsx! { <div><slot/>hello world!</div> }
+		rsx! { <div><div><slot/>hello world!</div></div> }
 	}
 
 
@@ -67,6 +67,24 @@ mod test {
 			.unwrap()
 			.len()
 			.xpect_eq(1);
+	}
+	#[test]
+	fn visits_nested_rsx() {
+		World::new()
+			.spawn(rsx! { <div>{rsx!{<div/>}}</div> })
+			.get::<TemplateChildren>()
+			.unwrap()
+			.len()
+			.xpect_eq(3); // div, BlockNode/SnippetRoot, div
+	}
+	#[test]
+	fn skips_resolved_template() {
+		World::new()
+			.spawn(rsx! { <div>{rsx!{<MyTemplate/>}}</div> })
+			.get::<TemplateChildren>()
+			.unwrap()
+			.len()
+			.xpect_eq(3); // div, BlockNode/SnippetRoot, MyTemplate
 	}
 	#[test]
 	fn works() {
