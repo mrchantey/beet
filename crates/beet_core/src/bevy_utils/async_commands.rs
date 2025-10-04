@@ -69,7 +69,7 @@ fn poll_async_tasks(
 ///
 /// fn my_system(mut commands: AsyncCommands){
 /// 	commands.run(async |world|{
-///			world.insert_resource(MyResource(2)).await;
+///			world.insert_resource(MyResource(2));
 ///			let value = world.resource::<MyResource>().await.0;
 ///			assert_eq!(value, 2);
 /// 	});
@@ -135,6 +135,7 @@ impl AsyncTaskOut for Result {
 #[derive(Component, Deref, DerefMut)]
 pub struct AsyncTask(Task<()>);
 
+/// Contains the channel used by async functions to send [`CommandQueue`]s
 #[derive(Resource)]
 pub struct AsyncChannel {
 	/// the sender for the async channel

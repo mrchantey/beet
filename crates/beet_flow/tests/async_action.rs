@@ -23,16 +23,8 @@ async fn works() {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, BeetFlowPlugin));
 	app.world_mut()
-		.spawn((
-			Sequence,
-			EntityObserver::new(|ev: On<End>, mut commands: Commands| {
-				ev.value().xpect_eq(FAILURE);
-				commands.write_message(AppExit::Success);
-				// todo!("exit on end");
-			}),
-			children![Foo, EndOnRun(FAILURE)],
-		))
+		.spawn((Sequence, ExitOnEnd, children![Foo, EndOnRun(FAILURE)]))
 		.trigger_payload(RUN);
 
-	app.run_async().await.xpect_eq(AppExit::Success);
+	app.run_async().await.xpect_eq(AppExit::error());
 }

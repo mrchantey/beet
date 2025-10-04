@@ -190,8 +190,6 @@ mod test {
 		// children: Query<&Children>,
 	) {
 		ev.event().value.is_success().xpect_true();
-		// let child = children.get(ev.trigger().event_target()).unwrap()[0];
-		// ev.trigger().event_target().xpect_eq(child);
 		commands.write_message(AppExit::Success);
 	}
 

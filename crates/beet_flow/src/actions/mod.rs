@@ -2,10 +2,12 @@
 //! If you think that a missing action should be built-in, please open an issue.
 mod interrupt_on;
 pub use interrupt_on::*;
+mod exit_on_end;
 mod trigger_deferred;
 pub use trigger_deferred::*;
 mod end_on_run;
 pub use end_on_run::*;
+pub use exit_on_end::*;
 mod end_in_duration;
 pub use end_in_duration::*;
 mod insert_on;
