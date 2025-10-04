@@ -33,7 +33,7 @@ pub fn Head(
 		<title>{title.clone()}</title>
 		<link rel="canonical" href={homepage.clone()}>
 		<meta name="viewport" content={scale} />
-		<link rel="icon" href="https://fav.farm/🌱"/>
+		// <link rel="icon" href="https://fav.farm/🌱"/>
 		<meta name="description" content={description.clone()}>
 		<meta name="version" content={version.clone()}>
 		// <link rel="alternate" type="application/rss+xml" title="Bevyhub Blog" href={Routes.rss} />
