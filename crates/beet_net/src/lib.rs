@@ -1,5 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(feature = "aws", feature(if_let_guard))]
+
 
 mod http_utils;
 mod object_storage;

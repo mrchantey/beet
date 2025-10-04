@@ -15,11 +15,11 @@ fn main() {
 		))
 		.with_child((
 			Name::new("child1"),
-			EndOnRun(SUCCESS),
+			EndWith(Outcome::Pass),
 		))
 		.with_child((
 			Name::new("child2"),
-			EndOnRun(SUCCESS),
+			EndWith(Outcome::Pass),
 		))
-		.trigger_payload(RUN).flush();
+		.trigger_payload(GetOutcome).flush();
 }

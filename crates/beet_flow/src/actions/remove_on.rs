@@ -14,10 +14,10 @@ use std::marker::PhantomData;
 /// World::new()
 ///		.spawn((
 /// 		Running,
-/// 		EndOnRun(SUCCESS),
+/// 		EndWith(Outcome::Pass),
 /// 		RemoveOn::<End, Running>::default()
 /// 	))
-///		.trigger_payload(RUN);
+///		.trigger_payload(GetOutcome);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -73,7 +73,7 @@ mod test {
 
 		let entity = world
 			.spawn((Running::default(), RemoveOn::<Run, Running>::default()))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();
@@ -88,9 +88,9 @@ mod test {
 			.spawn((
 				Running::default(),
 				RemoveOn::<End, Running>::default(),
-				EndOnRun(SUCCESS),
+				EndWith(Outcome::Pass),
 			))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();

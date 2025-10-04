@@ -19,8 +19,8 @@ pub fn hello_world(mut commands: Commands) {
 		TriggerDeferred::run(),
 		Sequence::default(),
 		children![
-			(Name::new("Hello"), EndOnRun(SUCCESS)),
-			(Name::new("World"), EndOnRun(SUCCESS))
+			(Name::new("Hello"), EndWith(Outcome::Pass)),
+			(Name::new("World"), EndWith(Outcome::Pass))
 		],
 	));
 }

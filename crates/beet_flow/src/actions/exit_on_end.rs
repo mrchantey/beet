@@ -8,8 +8,8 @@ pub struct ExitOnEnd;
 
 fn exit_on_end(ev: On<End>, mut commands: Commands) {
 	let exit = match ev.value() {
-		Outcome::Success => AppExit::Success,
-		Outcome::Failure => AppExit::error(),
+		Outcome::Pass => AppExit::Success,
+		Outcome::Fail => AppExit::error(),
 	};
 	commands.write_message(exit);
 }
@@ -25,8 +25,8 @@ mod test {
 		let mut world = World::new();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
-			.spawn((EndOnRun(SUCCESS), ExitOnEnd))
-			.trigger_payload(RUN)
+			.spawn((EndWith(Outcome::Pass), ExitOnEnd))
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		world.should_exit().unwrap().xpect_eq(AppExit::Success);

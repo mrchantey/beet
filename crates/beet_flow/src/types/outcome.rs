@@ -9,13 +9,6 @@ use beet_core::prelude::*;
 )]
 pub struct GetOutcome;
 
-/// Type alias for the default [`Run`] payload: [`GetOutcome`]
-pub const RUN: GetOutcome = GetOutcome;
-/// Type alias for the default [`End`] payload: [`Outcome::Success`]
-pub const SUCCESS: Outcome = Outcome::Success;
-/// Type alias for the default [`End`] payload: [`Outcome::Failure`]
-pub const FAILURE: Outcome = Outcome::Failure;
-
 impl RunPayload for GetOutcome {
 	type End = Outcome;
 }
@@ -26,11 +19,19 @@ impl EventPayload for GetOutcome {
 	}
 }
 
-/// The most common End payload, used to indicate run status
+/// The default [`End`] payload, used to indicate run status. [`Outcome`]
+/// is closer in spirit to [`ControlFlow`] than [`Result`], in that the
+/// [`Outcome::Fail`] status is frequently expected, and does not
+/// nessecarily indicate an error.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub enum Outcome {
-	Success,
-	Failure,
+	/// The action emitted a `Pass` outcome, which may mean it was able to
+	/// execute successfully or that a predicate passed.
+	Pass,
+	/// The action emitted a `Fail` outcome, this is not nessecarily an `Err`,
+	/// for example an `IsNearEnemy` action may emit `Outcome::Fail` to indicate
+	/// 'no i am not near an enemy'.
+	Fail,
 }
 impl EndPayload for Outcome {
 	type Run = GetOutcome;
@@ -44,6 +45,6 @@ impl EventPayload for Outcome {
 
 
 impl Outcome {
-	pub fn is_success(&self) -> bool { self == &Outcome::Success }
-	pub fn is_failure(&self) -> bool { self == &Outcome::Failure }
+	pub fn is_pass(&self) -> bool { self == &Outcome::Pass }
+	pub fn is_fail(&self) -> bool { self == &Outcome::Fail }
 }

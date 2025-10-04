@@ -25,11 +25,11 @@ fn main() {
 				// this action would be the thing you want to do n times
 				// it will only run twice
 				Name::new("some action to perform"),
-				EndOnRun(SUCCESS),
+				EndWith(Outcome::Pass),
 			)
 		],
 	))
-	.trigger_payload(RUN);
+	.trigger_payload(GetOutcome);
 	app.update();
 	app.update();
 	println!("done, subsequent updates will have no effect");

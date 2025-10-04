@@ -57,7 +57,7 @@ fn setup(
 					Name::new("Idle"), 
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(idle_clip, idle_index, SUCCESS)
+					TriggerOnAnimationEnd::new(idle_clip, idle_index, Outcome::Pass)
 						.with_transition_duration(transition_duration)
 				),
 				(
@@ -65,7 +65,7 @@ fn setup(
 					PlayAnimation::new(walk_index)
 						.repeat(RepeatAnimation::Count(8))
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(walk_clip, walk_index, SUCCESS)
+					TriggerOnAnimationEnd::new(walk_clip, walk_index, Outcome::Pass)
 						.with_transition_duration(transition_duration)
 				)
 			]

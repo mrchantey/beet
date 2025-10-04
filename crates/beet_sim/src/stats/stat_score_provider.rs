@@ -155,7 +155,7 @@ mod test {
 				StatScoreProvider::default(),
 				StatValueGoal::Low,
 			))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_child_score.len().xpect_eq(2);

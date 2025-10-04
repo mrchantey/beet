@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
-/// .trigger_payload(RUN);
+/// .trigger_payload(GetOutcome);
 /// ```
 #[action(repeat)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -29,16 +29,16 @@ pub struct Repeat {
 }
 
 impl Repeat {
-	/// Repeats the action if the result is [`Outcome::Success`].
+	/// Repeats the action if the result is [`Outcome::Pass`].
 	pub fn if_success() -> Self {
 		Self {
-			if_result_matches: Some(SUCCESS),
+			if_result_matches: Some(Outcome::Pass),
 		}
 	}
-	/// Repeats the action if the result is [`Outcome::Failure`].
+	/// Repeats the action if the result is [`Outcome::Fail`].
 	pub fn if_failure() -> Self {
 		Self {
-			if_result_matches: Some(FAILURE),
+			if_result_matches: Some(Outcome::Fail),
 		}
 	}
 }
@@ -71,7 +71,7 @@ fn repeat(
 	// otherwise run again on the next tick
 	commands
 		.entity(ev.event_target())
-		.insert(TriggerDeferred::new(RUN));
+		.insert(TriggerDeferred::new(GetOutcome));
 	Ok(())
 }
 
@@ -88,7 +88,7 @@ mod test {
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -110,7 +110,7 @@ mod test {
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -135,7 +135,7 @@ mod test {
 				Repeat::if_success(),
 				SucceedTimes::new(2)
 			)]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(2);

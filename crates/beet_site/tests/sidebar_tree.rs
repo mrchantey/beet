@@ -7,7 +7,7 @@ use sweet::prelude::*;
 #[sweet::test]
 async fn works() {
 	let mut app = App::new();
-	app.add_plugins((RouterAppPlugin, server_routes_plugin));
+	app.add_plugins((HandlerPlugin, server_routes_plugin));
 	app.init().update();
 	app.world_mut()
 		.run_system_cached_with(

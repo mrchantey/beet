@@ -13,21 +13,21 @@ fn main() {
 
 	let state2 = world.spawn((
 		Name::new("state2"),
-		EndOnRun(SUCCESS),
+		EndWith(Outcome::Pass),
 	)).id();
 
 	// transitions are just behaviors that always trigger the next behavior
 	let transition = world.spawn((
 		Name::new("transition"),
-		EndOnRun(SUCCESS),
+		EndWith(Outcome::Pass),
 		RunNext::new(state2),
 	)).id();
 
 	world.spawn((
 		Name::new("state1"),
-		EndOnRun(SUCCESS),
+		EndWith(Outcome::Pass),
 		// here RunOnRunResult can be swapped out with a control flow action
 		// that decides which state to go to next
 		RunNext::new(transition),
-	)).trigger_payload(RUN).flush();
+	)).trigger_payload(GetOutcome).flush();
 }

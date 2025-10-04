@@ -181,7 +181,7 @@ mod test {
 		children: Query<&Children>,
 	) {
 		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_payload(RUN);
+		commands.entity(child).trigger_payload(GetOutcome);
 	}
 
 	fn exit_on_result(
@@ -189,7 +189,7 @@ mod test {
 		mut commands: Commands,
 		// children: Query<&Children>,
 	) {
-		ev.event().value.is_success().xpect_true();
+		ev.event().value.is_pass().xpect_true();
 		commands.write_message(AppExit::Success);
 	}
 
@@ -199,7 +199,7 @@ mod test {
 	struct Child;
 
 	fn succeed(ev: On<Run>, mut commands: Commands) {
-		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
 	}
 
 	#[test]
@@ -208,7 +208,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, children![Child]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
@@ -218,7 +218,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, PREVENT_PROPAGATE_END, children![(Child)]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 		world.should_exit().xpect_none();
 	}

@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 ///		.spawn(InsertOn::<Run, Running>::default())
-///		.trigger_payload(RUN);
+///		.trigger_payload(GetOutcome);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -80,7 +80,7 @@ mod test {
 
 		let entity = world
 			.spawn(InsertOn::<Run, Running>::default())
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
@@ -92,8 +92,8 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((InsertOn::<End, Running>::default(), EndOnRun(SUCCESS)))
-			.trigger_payload(RUN)
+			.spawn((InsertOn::<End, Running>::default(), EndWith(Outcome::Pass)))
+			.trigger_payload(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();

@@ -66,26 +66,26 @@ fn run_app() {
 						max_damage: 15.0,
 						max_recoil: 30.0,
 					},
-					EndOnRun(SUCCESS),
+					EndWith(Outcome::Pass),
 				))
 				.with_child((
 					// pretty much doomed if she decides to use this
 					// so lets give it a low score. This is a 5% chance because the alternative
 					// is a random value between 0 and 1
 					Name::new("Scarlet Aeonia"),
-					EndOnRun(Score(0.05)),
+					EndWith(Score(0.05)),
 					AttackPlayer {
 						max_damage: 10_000.0,
 						max_recoil: 10.0,
 					},
-					EndOnRun(SUCCESS),
+					EndWith(Outcome::Pass),
 				));
 		})
 		// actions can be declared inline if they have no parameters
 		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
-		.trigger_payload(RUN);
+		.trigger_payload(GetOutcome);
 	app.run();
 }
 
@@ -211,10 +211,10 @@ fn try_heal_self(
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
 	} else {
 		// we couldnt do anything so action was a failure
-		commands.entity(ev.event_target()).trigger_payload(FAILURE);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Fail);
 	}
 	Ok(())
 }

@@ -1,22 +1,23 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
+use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
 
 
-/// Mark the root entity of the router, every router app must have exactly one
+/// Mark the root entity of the route tree, every handler app must have exactly one
 /// of these.
 #[derive(Component)]
 pub struct RouterRoot;
 
 
 /// Plugin added to the [`AppPool`] app for each handler, not the app for the server itsself.
-pub struct RouterAppPlugin;
+pub struct HandlerPlugin;
 
-impl Plugin for RouterAppPlugin {
+impl Plugin for HandlerPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
 			ApplyDirectivesPlugin,
@@ -27,6 +28,8 @@ impl Plugin for RouterAppPlugin {
 		.init_resource::<RenderMode>()
 		.init_resource::<DynSegmentMap>()
 		.init_resource::<HtmlConstants>()
+		.init_plugin(BeetFlowPlugin)
+		.init_plugin(AsyncPlugin)
 		.add_systems(
 			PostStartup,
 			(
@@ -43,11 +46,6 @@ impl Plugin for RouterAppPlugin {
 			)
 				.chain(),
 		);
-		// until wasm async task
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			app.init_plugin(AsyncPlugin);
-		}
 	}
 }
 
@@ -64,18 +62,18 @@ pub struct Router {
 
 
 impl Router {
-	/// Create a new [`Router`] with the given plugin and the [`RouterAppPlugin`].
+	/// Create a new [`Router`] with the given plugin and the [`HandlerPlugin`].
 	pub fn new(plugin: impl ClonePlugin) -> Self {
 		let plugin = ClonePluginContainer::new(plugin);
 		Self::new_no_defaults(move |app: &mut App| {
 			app.add_plugins(MinimalPlugins);
 			plugin.add_to_app(app);
-			app.init_plugin(RouterAppPlugin);
+			app.init_plugin(HandlerPlugin);
 			#[cfg(not(test))]
 			app.add_plugins(LoadSnippetsPlugin);
 		})
 	}
-	/// Create a new [`Router`] with the given plugin, without the [`RouterAppPlugin`].
+	/// Create a new [`Router`] with the given plugin, without the [`HandlerPlugin`].
 	pub fn new_no_defaults(plugin: impl ClonePlugin) -> Self {
 		Self {
 			plugin: ClonePluginContainer(plugin.box_clone()),
@@ -84,6 +82,8 @@ impl Router {
 	}
 	/// Convenience method to create a new [`Router`] with a bundle of routes,
 	/// adding the [`RouterRoot`] component.
+	/// 
+	/// This must be a `Fn` because a new app will be created for each thread.
 	pub fn new_bundle<B>(
 		func: impl 'static + Send + Sync + Clone + FnOnce() -> B,
 	) -> Self
@@ -165,7 +165,7 @@ impl Router {
 			.len();
 		if num_roots != 1 {
 			bevybail!(
-				"Router apps must have exactly one `RouterRoot`, found {num_roots}",
+				"Handler apps must have exactly one `RouterRoot`, found {num_roots}",
 			);
 		}
 		Ok(())

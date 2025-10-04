@@ -7,11 +7,11 @@ fn SayHello(name: String) -> impl Bundle {
 		children![
 			(
 				Name::new("Hello"),
-				EndOnRun(SUCCESS)
+				EndWith(Outcome::Pass)
 			),
 			(
 				Name::new(name),
-				EndOnRun(SUCCESS)
+				EndWith(Outcome::Pass)
 			)
 		]
 	)

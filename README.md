@@ -52,15 +52,15 @@ world
 		children![
 			(
 				Name::new("Hello"),
-				EndOnRun(SUCCESS),
+				EndWith(Outcome::Pass),
 			),
 			(
 				Name::new("World"),
-				EndOnRun(SUCCESS),
+				EndWith(Outcome::Pass),
 			),
 		],
 	))
-	.trigger_payload(RUN)
+	.trigger_payload(GetOutcome)
 	.flush();
 ```
 

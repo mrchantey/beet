@@ -49,6 +49,7 @@ rustls-tls = [
 beet_core.workspace = true
 beet_net.workspace = true
 beet_dom.workspace = true
+beet_flow.workspace = true
 beet_rsx.workspace = true
 
 bevy.workspace = true

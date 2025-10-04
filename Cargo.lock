@@ -1621,6 +1621,7 @@ dependencies = [
  "base64 0.22.1",
  "beet_core",
  "beet_dom",
+ "beet_flow",
  "beet_net",
  "beet_rsx",
  "bevy",

@@ -27,7 +27,7 @@ impl SuiteResult {
 	}
 
 	pub fn in_progress_str(&self) -> String {
-		let mut value = " RUNS ".black().bold().yellowb();
+		let mut value = " GetOutcomeS ".black().bold().yellowb();
 		value += " ";
 		value += self.pretty_path().as_str();
 		value

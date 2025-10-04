@@ -26,7 +26,7 @@ impl EventPayload for GetScore {
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
 /// // create a passing score value
-/// world.spawn(EndOnRun(Score(1.)));
+/// world.spawn(EndWith(Score(1.)));
 /// ```
 #[derive(
 	Debug,
