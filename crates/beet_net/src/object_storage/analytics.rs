@@ -16,20 +16,17 @@ pub struct AnalyticsEventStore {
 }
 /// Spawn the analytics event store resource, using the
 fn spawn_analytics_event_store(
-	mut commands: Commands,
+	mut commands: AsyncCommands,
 	ws_config: When<Res<WorkspaceConfig>>,
 	pkg_config: When<Res<PackageConfig>>,
 ) {
 	let fs_dir = ws_config.analytics_dir.into_abs();
 	let bucket_name = pkg_config.analytics_bucket_name();
 	let access = pkg_config.service_access;
-	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue,
-		async move |queue| {
-			let store = dynamo_fs_selector(&fs_dir, &bucket_name, access).await;
-			queue.insert_resource(AnalyticsEventStore { store });
-		},
-	);
+	commands.run(async move |queue| {
+		let store = dynamo_fs_selector(&fs_dir, &bucket_name, access).await;
+		queue.insert_resource(AnalyticsEventStore { store });
+	});
 }
 
 
@@ -37,17 +34,14 @@ fn spawn_analytics_event_store(
 fn handle_analytics_events(
 	trigger: On<AnalyticsEvent>,
 	store: ResMut<AnalyticsEventStore>,
-	mut commands: Commands,
+	mut commands: AsyncCommands,
 ) {
 	let store = store.clone();
 	let event = trigger.event().clone();
-	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue_unwrap,
-		async move |_| {
-			store.push(event).await?;
-			Ok(())
-		},
-	);
+	commands.run(async move |_| {
+		store.push(event).await?;
+		Ok(())
+	});
 }
 
 /// An event to be recorded, usually representing a user interaction on the site.
