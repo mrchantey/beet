@@ -26,8 +26,8 @@ pub enum RelativeRole {
 impl RelativeRole {}
 
 /// Indicate it is 'your turn'
-#[derive(EntityTargetEvent)]
-pub struct MessageRequest;
+#[derive(EntityEvent)]
+pub struct MessageRequest(pub Entity);
 
 
 

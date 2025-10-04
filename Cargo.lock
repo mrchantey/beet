@@ -1472,6 +1472,7 @@ dependencies = [
  "serde",
  "sweet",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

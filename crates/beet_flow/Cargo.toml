@@ -27,3 +27,4 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet.workspace = true
+tokio.workspace = true

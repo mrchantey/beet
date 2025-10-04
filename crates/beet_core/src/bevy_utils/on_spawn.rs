@@ -4,7 +4,6 @@ use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
-use bevy::ecs::traversal::Traversal;
 
 /// Type helper for [`SpawnWith`], useful for spawning any number of related entities
 /// like children.
@@ -52,29 +51,31 @@ impl OnSpawn {
 		})
 	}
 
-	pub fn trigger<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Traversal<E>,
-	>(
-		ev: E,
+	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
 	) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_target(ev);
+			entity.trigger(ev);
 		})
 	}
-	pub fn trigger_option<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Traversal<E>,
-	>(
-		ev: Option<E>,
+	pub fn trigger_option<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		ev: Option<impl 'static + Send + Sync + FnOnce(Entity) -> E>,
 	) -> Self {
 		Self::new(move |entity| {
 			if let Some(ev) = ev {
-				entity.trigger_target(ev);
+				entity.trigger(ev);
+			}
+		})
+	}
+	pub fn trigger_payload<T: EventPayload>(ev: T) -> Self {
+		Self::new(move |entity| {
+			entity.trigger_payload(ev);
+		})
+	}
+	pub fn trigger_payload_option<T: EventPayload>(ev: Option<T>) -> Self {
+		Self::new(move |entity| {
+			if let Some(ev) = ev {
+				entity.trigger_payload(ev);
 			}
 		})
 	}

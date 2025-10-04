@@ -87,7 +87,7 @@ fn openai_message_request(
 	mut commands: AsyncCommands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = ev.trigger().event_target();
+	let actor = ev.event_target();
 	let provider = query.get(actor)?;
 	let input = cx
 		.collect_messages(actor)?

@@ -251,6 +251,7 @@ impl AsyncWorld {
 			world.trigger(event);
 		});
 	}
+
 	pub fn write_message<E: Message>(&self, event: E) {
 		self.with(move |world| {
 			world.write_message(event);
@@ -337,6 +338,12 @@ impl AsyncEntity {
 	) -> &Self {
 		self.with(|mut entity| {
 			entity.trigger_target(event);
+		})
+		.await
+	}
+	pub async fn trigger_payload<T: EventPayload>(&self, payload: T) -> &Self {
+		self.with(|mut entity| {
+			entity.trigger_payload(payload);
 		})
 		.await
 	}

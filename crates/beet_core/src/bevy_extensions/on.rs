@@ -1,6 +1,5 @@
-use bevy::ecs::change_detection::MaybeLocation;
-
 use crate::prelude::*;
+use bevy::ecs::change_detection::MaybeLocation;
 
 
 /// A type that, given a target [`Entity`] can be converted
@@ -15,16 +14,6 @@ where
 	type Event;
 	fn into_event(self, entity: Entity) -> Self::Event;
 }
-impl<T> EventPayload for T
-where
-	T: FnOnce(Entity) -> Self,
-	Self: 'static + Send + Sync,
-	for<'t> Self: EntityEvent<Trigger<'t>: Default>,
-{
-	type Event = Self;
-	fn into_event(self, entity: Entity) -> Self::Event { (self)(entity) }
-}
-
 
 pub struct EntityEventFunc<T: From<Entity>> {
 	phantom: PhantomData<T>,

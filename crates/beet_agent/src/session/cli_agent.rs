@@ -258,17 +258,13 @@ fn route_message_requests(
 	let actor = cx.actor(ev.event().event_target())?;
 	match actor.role {
 		ActorRole::User => {
-			commands
-				.entity(agents.single()?)
-				.trigger_target(MessageRequest);
+			commands.entity(agents.single()?).trigger(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
 			commands.write_message(AppExit::Success);
 		}
 		ActorRole::Agent => {
-			commands
-				.entity(users.single()?)
-				.trigger_target(MessageRequest);
+			commands.entity(users.single()?).trigger(MessageRequest);
 		}
 		_ => {}
 	}
@@ -281,7 +277,7 @@ fn user_message_request(
 	mut commands: AsyncCommands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = cx.actor(ev.trigger().event_target())?.entity;
+	let actor = cx.actor(ev.event_target())?.entity;
 	commands.run(async move |queue| {
 		use std::io;
 		use std::io::Write;
