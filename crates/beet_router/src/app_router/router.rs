@@ -14,7 +14,7 @@ use std::ops::ControlFlow;
 pub struct RouterRoot;
 
 
-/// Plugin added to the [`AppPool`] app for each handler, not the app for the server itsself.
+/// Plugin added to the [`AppPool`] app for each handler, not the 'main app' for the actual server.
 pub struct HandlerPlugin;
 
 impl Plugin for HandlerPlugin {
