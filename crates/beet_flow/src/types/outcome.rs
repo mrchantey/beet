@@ -12,7 +12,7 @@ pub struct GetOutcome;
 impl RunPayload for GetOutcome {
 	type End = Outcome;
 }
-impl EventPayload for GetOutcome {
+impl ActionEvent for GetOutcome {
 	type Event = Run<GetOutcome>;
 	fn into_event(self, entity: Entity) -> Self::Event {
 		Run::new(entity, self)
@@ -36,7 +36,7 @@ pub enum Outcome {
 impl EndPayload for Outcome {
 	type Run = GetOutcome;
 }
-impl EventPayload for Outcome {
+impl ActionEvent for Outcome {
 	type Event = End<Outcome>;
 	fn into_event(self, entity: Entity) -> Self::Event {
 		End::new(entity, self)

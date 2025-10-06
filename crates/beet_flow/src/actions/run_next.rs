@@ -5,7 +5,6 @@ use beet_core::prelude::*;
 /// this is useful for a State Machine pattern, but be aware that
 /// in terms of control flow this is essentially a [`goto`](https://xkcd.com/292/) statement.
 ///
-/// The `origin` will be preserved in calling the next `Run`.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Example
@@ -22,7 +21,7 @@ use beet_core::prelude::*;
 /// 		EndWith(Outcome::Pass),
 /// 		RunNext::new(action)
 /// 	))
-/// 	.trigger_payload(GetOutcome);
+/// 	.trigger_action(GetOutcome);
 /// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -72,7 +71,7 @@ fn run_next(
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_payload(GetOutcome);
+	commands.entity(run_next.action).trigger_action(GetOutcome);
 	Ok(())
 }
 
@@ -98,7 +97,7 @@ mod test {
 				RunNext::new(action1),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_run

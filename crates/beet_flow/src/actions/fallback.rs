@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 /// 		EndWith(Outcome::Fail),
 /// 		EndWith(Outcome::Pass),
 ///    ]))
-///		.trigger_payload(GetOutcome)
+///		.trigger_action(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -36,9 +36,9 @@ fn on_start(
 ) -> Result {
 	let children = query.get(ev.event_target())?;
 	if let Some(first_child) = children.iter().next() {
-		commands.entity(first_child).trigger_payload(GetOutcome);
+		commands.entity(first_child).trigger_action(GetOutcome);
 	} else {
-		commands.entity(ev.event_target()).trigger_payload(Outcome::Fail);
+		commands.entity(ev.event_target()).trigger_action(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -65,7 +65,7 @@ fn on_next(
 		commands.trigger(ev.event().clone().into_end());
 	} else {
 		// run next
-		commands.entity(children[index + 1]).trigger_payload(GetOutcome);
+		commands.entity(children[index + 1]).trigger_action(GetOutcome);
 	}
 	Ok(())
 }
@@ -88,7 +88,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Fail)),
 				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![

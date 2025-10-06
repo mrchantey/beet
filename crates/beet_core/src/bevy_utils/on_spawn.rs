@@ -67,15 +67,15 @@ impl OnSpawn {
 			}
 		})
 	}
-	pub fn trigger_payload<T: EventPayload>(ev: T) -> Self {
+	pub fn trigger_action<T: ActionEvent>(ev: T) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_payload(ev);
+			entity.trigger_action(ev);
 		})
 	}
-	pub fn trigger_payload_option<T: EventPayload>(ev: Option<T>) -> Self {
+	pub fn trigger_action_option<T: ActionEvent>(ev: Option<T>) -> Self {
 		Self::new(move |entity| {
 			if let Some(ev) = ev {
-				entity.trigger_payload(ev);
+				entity.trigger_action(ev);
 			}
 		})
 	}
@@ -140,7 +140,7 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	pub fn trigger(ev: impl EventPayload) -> Self {
+	pub fn trigger(ev: impl ActionEvent) -> Self {
 		Self::new(move |entity| {
 			entity.trigger(move |e| ev.into_event(e));
 			Ok(())

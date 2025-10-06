@@ -337,9 +337,9 @@ impl AsyncEntity {
 		})
 		.await
 	}
-	pub async fn trigger_payload<T: EventPayload>(&self, payload: T) -> &Self {
+	pub async fn trigger_action<T: ActionEvent>(&self, payload: T) -> &Self {
 		self.with(|mut entity| {
-			entity.trigger_payload(payload);
+			entity.trigger_action(payload);
 		})
 		.await
 	}

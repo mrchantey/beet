@@ -11,7 +11,7 @@ pub struct GetScore;
 impl RunPayload for GetScore {
 	type End = Score;
 }
-impl EventPayload for GetScore {
+impl ActionEvent for GetScore {
 	type Event = Run<GetScore>;
 	fn into_event(self, entity: Entity) -> Self::Event {
 		Run::new(entity, self)
@@ -46,7 +46,7 @@ impl EndPayload for Score {
 	type Run = GetScore;
 }
 
-impl EventPayload for Score {
+impl ActionEvent for Score {
 	type Event = End<Score>;
 	fn into_event(self, entity: Entity) -> Self::Event {
 		End::new(entity, self)

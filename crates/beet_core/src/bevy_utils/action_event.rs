@@ -6,7 +6,7 @@ use bevy::ecs::change_detection::MaybeLocation;
 /// into an [`EntityEvent`].
 /// This is useful for non-default events that cannot
 /// be created via `From::Entity`
-pub trait EventPayload
+pub trait ActionEvent
 where
 	Self: 'static + Send + Sync,
 	for<'t> Self::Event: EntityEvent<Trigger<'t>: Default>,
@@ -33,7 +33,7 @@ impl<T: From<Entity>> Clone for EntityEventFunc<T> {
 
 #[extend::ext(name=EntityCommandsEventPayloadExt)]
 pub impl EntityCommands<'_> {
-	fn trigger_payload<T: EventPayload>(&mut self, ev: T) -> &mut Self {
+	fn trigger_action<T: ActionEvent>(&mut self, ev: T) -> &mut Self {
 		let caller = MaybeLocation::caller();
 		let mut event = ev.into_event(self.id());
 		self.queue(move |mut entity: EntityWorldMut| {
@@ -52,7 +52,7 @@ pub impl EntityCommands<'_> {
 
 #[extend::ext(name=EntityWorldMutEventPayloadExt)]
 pub impl EntityWorldMut<'_> {
-	fn trigger_payload<T: EventPayload>(&mut self, ev: T) -> &mut Self {
+	fn trigger_action<T: ActionEvent>(&mut self, ev: T) -> &mut Self {
 		let caller = MaybeLocation::caller();
 		let mut event = ev.into_event(self.id());
 		self.world_scope(|world| {

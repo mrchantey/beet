@@ -47,7 +47,7 @@ fn run_on_asset_ready<A: Asset>(
 						commands
 							.entity(entity)
 							.remove::<RunOnAssetReady<A>>()
-							.trigger_payload(GetOutcome);
+							.trigger_action(GetOutcome);
 					}
 				}
 			}

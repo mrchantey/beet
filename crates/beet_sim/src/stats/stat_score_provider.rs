@@ -84,7 +84,7 @@ fn provide_score(
 		descriptor.global_range.clone(),
 	);
 
-	commands.entity(ev.event_target()).trigger_payload(score);
+	commands.entity(ev.event_target()).trigger_action(score);
 }
 
 
@@ -155,7 +155,7 @@ mod test {
 				StatScoreProvider::default(),
 				StatValueGoal::Low,
 			))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_child_score.len().xpect_eq(2);

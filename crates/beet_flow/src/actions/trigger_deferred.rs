@@ -21,13 +21,13 @@ use beet_core::prelude::*;
 /// This component is SparsSet as it is frequently added and removed.
 #[derive(Clone, Component)]
 #[component(storage = "SparseSet",on_add=on_add::<T>)]
-pub struct TriggerDeferred<T: EventPayload> {
+pub struct TriggerDeferred<T: ActionEvent> {
 	event: T,
 }
 
 impl<T> Default for TriggerDeferred<T>
 where
-	T: EventPayload + Default,
+	T: ActionEvent + Default,
 {
 	fn default() -> Self { Self::new(default()) }
 }
@@ -37,12 +37,12 @@ impl TriggerDeferred<GetOutcome> {
 }
 
 
-impl<T: EventPayload> TriggerDeferred<T> {
+impl<T: ActionEvent> TriggerDeferred<T> {
 	/// Create a new [`TriggerOnSpawn`] with the provided event
 	pub fn new(event: T) -> Self { Self { event } }
 }
 
-fn on_add<T: EventPayload>(mut world: DeferredWorld, cx: HookContext) {
+fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	world.commands().queue(move |world: &mut World| -> Result {
 		let ev = world

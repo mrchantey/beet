@@ -204,7 +204,7 @@ mod test {
 
 		app.world_mut()
 			.spawn((ChildOf(entity), PlayAnimation::new(index)))
-			.trigger_payload(GetOutcome);
+			.trigger_action(GetOutcome);
 		store.get().xpect_empty();
 		app.update();
 		store.get().xpect_empty();

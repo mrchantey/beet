@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-pub trait RunPayload: EventPayload {
+pub trait RunPayload: ActionEvent {
 	type End: EndPayload<Run = Self>;
 }
 
-pub trait EndPayload: EventPayload {
+pub trait EndPayload: ActionEvent {
 	type Run: RunPayload<End = Self>;
 }
 
@@ -181,7 +181,7 @@ mod test {
 		children: Query<&Children>,
 	) {
 		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_payload(GetOutcome);
+		commands.entity(child).trigger_action(GetOutcome);
 	}
 
 	fn exit_on_result(
@@ -199,7 +199,7 @@ mod test {
 	struct Child;
 
 	fn succeed(ev: On<Run>, mut commands: Commands) {
-		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
+		commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
 	}
 
 	#[test]
@@ -208,7 +208,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, children![Child]))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
@@ -218,7 +218,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, PREVENT_PROPAGATE_END, children![(Child)]))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 		world.should_exit().xpect_none();
 	}
