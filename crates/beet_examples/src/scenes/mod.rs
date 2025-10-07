@@ -16,7 +16,7 @@ pub fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
 pub fn hello_world(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Hello World Sequence"),
-		TriggerDeferred::run(),
+		TriggerDeferred::get_outcome(),
 		Sequence::default(),
 		children![
 			(Name::new("Hello"), EndWith(Outcome::Pass)),

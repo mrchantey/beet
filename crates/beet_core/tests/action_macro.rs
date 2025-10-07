@@ -7,13 +7,8 @@ use sweet::prelude::*;
 #[derive(Resource)]
 struct Visited;
 
-#[derive(EntityEvent)]
-struct Run<T: 'static + Send + Sync> {
-	#[event_target]
-	target: Entity,
-	#[allow(unused)]
-	payload: T,
-}
+#[derive(ActionEvent)]
+struct Run<T: 'static + Send + Sync>(pub T);
 
 /// Demonstrates declaring generic and non-generic actions in macro
 #[test]
@@ -21,10 +16,7 @@ fn works() {
 	App::new()
 		.world_mut()
 		.spawn(Foo::<bool>(Default::default()))
-		.trigger(|target: Entity| Run {
-			target,
-			payload: true,
-		})
+		.trigger_action(Run(true))
 		.flush()
 		.world_scope(|world| {
 			world.get_resource::<Visited>().xpect_some();

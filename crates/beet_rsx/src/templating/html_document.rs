@@ -27,7 +27,7 @@ use beet_dom::prelude::*;
 /// to either pass a valid document structure or none at all.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(InstanceRoot)]
+#[require(InstanceRoot, BeetRoot)]
 pub struct HtmlDocument;
 
 impl HtmlDocument {

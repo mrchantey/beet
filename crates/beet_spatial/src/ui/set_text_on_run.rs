@@ -27,7 +27,7 @@ impl<F: Component> SetTextOnRun<F> {
 }
 
 fn set_text_on_run<F: Component>(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	query: Query<&SetTextOnRun<F>, Added<Running>>,
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,

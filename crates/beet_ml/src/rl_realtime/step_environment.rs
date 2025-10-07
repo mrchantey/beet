@@ -37,7 +37,7 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
@@ -80,7 +80,7 @@ where
 	// 	action,
 	// 	outcome.reward
 	// );
-	commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
+	commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -100,7 +100,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		let on_result = observer_ext::observe_triggers::<End>(app.world_mut());
+		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.add_plugins((
 			BeetFlowPlugin::default(),
@@ -127,7 +127,7 @@ mod test {
 				},
 				StepEnvironment::<FrozenLakeQTableSession>::new(0),
 			))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 

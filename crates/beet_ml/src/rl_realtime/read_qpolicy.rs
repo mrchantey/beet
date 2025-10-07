@@ -24,7 +24,7 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 }
 
 fn read_q_policy<P: QPolicy + Asset>(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: AgentQuery<(&P::State, &mut P::Action)>,
@@ -41,6 +41,6 @@ fn read_q_policy<P: QPolicy + Asset>(
 	let (state, mut action) = agents.get_mut(ev.event_target())?;
 
 	*action = policy.greedy_policy(state).0;
-	commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
+	commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
 	Ok(())
 }

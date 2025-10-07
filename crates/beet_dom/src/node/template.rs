@@ -27,11 +27,11 @@ impl TemplateOf {
 }
 
 /// Assigned to the 'container' entity of a template, pointing to the bundle
-/// spawned by the template.
+/// spawned by the template. This should always only be a single entity,
+/// which may have [`Children`]. We use this relation so that the parent-child
+/// relation can easily be traversed in `apply_template_children`.
 /// This relationship will be replaced with a parent-child relationship
 /// in apply_slots.
-/// Points to the entity that was spawned by this template. This should
-/// always only be a single entity, which may have [`Children`].
 // TODO 1:1 relationship
 #[derive(Component)]
 #[relationship_target(relationship = TemplateOf,linked_spawn)]

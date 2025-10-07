@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.spawn((
 ///		Running::default(),
-///		EndInDuration::success(Duration::from_secs(2)),
+///		EndInDuration::pass(Duration::from_secs(2)),
 ///	));
 ///
 /// ```
@@ -40,11 +40,17 @@ impl<T> EndInDuration<T> {
 }
 
 impl EndInDuration<Outcome> {
-	pub fn success(duration: Duration) -> Self { Self::new(Outcome::Pass, duration) }
-	pub fn failure(duration: Duration) -> Self { Self::new(Outcome::Fail, duration) }
+	/// Create a new [`EndInDuration`] with an [`Outcome::Pass`] and the specified duration.
+	pub fn pass(duration: Duration) -> Self {
+		Self::new(Outcome::Pass, duration)
+	}
+	/// Create a new [`EndInDuration`] with an [`Outcome::Fail`] and the specified duration.
+	pub fn fail(duration: Duration) -> Self {
+		Self::new(Outcome::Fail, duration)
+	}
 }
 
-pub(crate) fn end_in_duration<T: EventPayload + Clone>(
+pub(crate) fn end_in_duration<T: ActionEvent + Clone>(
 	mut commands: Commands,
 	mut query: Populated<
 		(Entity, &RunTimer, &mut EndInDuration<T>),
@@ -53,7 +59,7 @@ pub(crate) fn end_in_duration<T: EventPayload + Clone>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_run.elapsed() >= action.duration {
-			commands.entity(entity).trigger_payload(action.event.clone());
+			commands.entity(entity).trigger_action(action.event.clone());
 		}
 	}
 }
@@ -70,11 +76,12 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default()).insert_time();
 
-		let on_result = observer_ext::observe_triggers::<End>(app.world_mut());
+		let on_result =
+			observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.world_mut().spawn((
 			Running::default(),
-			EndInDuration::success(Duration::from_secs(2)),
+			EndInDuration::pass(Duration::from_secs(2)),
 		));
 
 		app.update_with_secs(1);

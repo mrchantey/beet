@@ -21,5 +21,5 @@ fn main() {
 			Name::new("child2"),
 			EndWith(Outcome::Pass),
 		))
-		.trigger_payload(GetOutcome).flush();
+		.trigger_action(GetOutcome).flush();
 }

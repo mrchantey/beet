@@ -14,35 +14,36 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
-/// world.spawn((TriggerDeferred::run(), EndWith(Outcome::Pass)));
+/// world.spawn((TriggerDeferred::get_outcome(), EndWith(Outcome::Pass)));
 /// world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 /// ```
 /// ## Notes
 /// This component is SparsSet as it is frequently added and removed.
 #[derive(Clone, Component)]
 #[component(storage = "SparseSet",on_add=on_add::<T>)]
-pub struct TriggerDeferred<T: EventPayload> {
+pub struct TriggerDeferred<T: ActionEvent> {
 	event: T,
 }
 
 impl<T> Default for TriggerDeferred<T>
 where
-	T: EventPayload + Default,
+	T: ActionEvent + Default,
 {
 	fn default() -> Self { Self::new(default()) }
 }
 
 impl TriggerDeferred<GetOutcome> {
-	pub fn run() -> Self { default() }
+	/// Create a new [`TriggerOnSpawn`] that triggers a [`GetOutcome`]
+	pub fn get_outcome() -> Self { default() }
 }
 
 
-impl<T: EventPayload> TriggerDeferred<T> {
+impl<T: ActionEvent> TriggerDeferred<T> {
 	/// Create a new [`TriggerOnSpawn`] with the provided event
 	pub fn new(event: T) -> Self { Self { event } }
 }
 
-fn on_add<T: EventPayload>(mut world: DeferredWorld, cx: HookContext) {
+fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	world.commands().queue(move |world: &mut World| -> Result {
 		let ev = world
@@ -51,7 +52,7 @@ fn on_add<T: EventPayload>(mut world: DeferredWorld, cx: HookContext) {
 			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
 		world
 			.entity_mut(entity)
-			.insert(OnSpawnDeferred::trigger(ev.event));
+			.insert(OnSpawnDeferred::trigger_action(ev.event));
 		Ok(())
 	});
 }
@@ -66,11 +67,11 @@ mod test {
 	#[test]
 	fn works() {
 		let mut world = World::new();
-		let observers = observer_ext::observe_triggers::<End>(&mut world);
-		world.spawn((TriggerDeferred::run(), EndWith(Outcome::Pass)));
+		let observers = observer_ext::observe_triggers::<Outcome>(&mut world);
+		world.spawn((TriggerDeferred::get_outcome(), EndWith(Outcome::Pass)));
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);
-		observers.get_index(0).unwrap().value().xpect_eq(Outcome::Pass);
+		observers.get_index(0).unwrap().xpect_eq(Outcome::Pass);
 	}
 }

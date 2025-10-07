@@ -1,95 +1,30 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-pub trait RunPayload: EventPayload {
-	type End: EndPayload<Run = Self>;
+
+/// Trait for specifying a 'Run' event, similar to a 'request' in a request-response pattern.
+pub trait RunEvent: ActionEvent {
+	/// The corresponding 'End' event type
+	type End: EndEvent<Run = Self>;
 }
 
-pub trait EndPayload: EventPayload {
-	type Run: RunPayload<End = Self>;
+/// Trait for specifying an 'End' event, similar to a 'response' in a request-response pattern.
+pub trait EndEvent: ActionEvent {
+	/// The corresponding 'Run' event type
+	type Run: RunEvent<End = Self>;
 }
 
-/// An [`EntityEvent`] requesting this entity to trigger a corresponding
-/// [`End`] event.
-/// The event pair is defined as [`RunPayload::End`] and [`EndPayload::Run`]
-/// The default pair is [`GetOutcome`]/[`Outcome`] but the mechanism is general-purpose in nature,
-/// for instance it can als be used for a utility ai [`GetScore`]/[`Score`] pair.
-#[derive(Debug, Clone, EntityEvent)]
-pub struct Run<T = GetOutcome> {
-	#[event_target]
-	target: Entity,
-	value: T,
-}
-impl<T> From<Entity> for Run<T>
-where
-	T: Default,
-{
-	fn from(target: Entity) -> Self { Self::new(target, default()) }
-}
-impl<T> Run<T> {
-	pub fn new(target: Entity, value: T) -> Self { Self { target, value } }
-	pub fn target(&self) -> Entity { self.target }
-	pub fn value(&self) -> &T { &self.value }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
-pub struct End<T = Outcome> {
-	#[event_target]
-	target: Entity,
-	value: T,
-}
-
-impl<T> std::ops::Deref for End<T>
+/// Event automatically triggered on the parent of an `event_target` when it triggers an [`End`].
+#[derive(Debug, Clone, PartialEq, Eq, ActionEvent)]
+pub struct ChildEnd<T>
 where
 	T: 'static + Send + Sync,
 {
-	type Target = T;
-	fn deref(&self) -> &Self::Target { &self.value }
-}
-impl<T> std::ops::DerefMut for End<T>
-where
-	T: 'static + Send + Sync,
-{
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
-}
-
-impl<T> From<Entity> for End<T>
-where
-	T: 'static + Send + Sync + Default,
-{
-	fn from(value: Entity) -> Self { Self::new(value, default()) }
-}
-
-impl<T> End<T>
-where
-	T: 'static + Send + Sync,
-{
-	pub fn new(target: Entity, value: T) -> Self { Self { target, value } }
-	pub fn target(&self) -> Entity { self.target }
-	pub fn value(&self) -> &T { &self.value }
-
-	pub fn into_child_end(self, target: Entity) -> ChildEnd<T> {
-		ChildEnd {
-			target,
-			child: self.target,
-			value: self.value,
-		}
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, EntityEvent)]
-pub struct ChildEnd<T = Outcome>
-where
-	T: 'static + Send + Sync,
-{
-	/// The parent that this event is being triggered on
-	#[event_target]
-	target: Entity,
 	/// The entity that triggered the [`End`]
 	child: Entity,
 	value: T,
 }
+
 impl<T> std::ops::Deref for ChildEnd<T>
 where
 	T: 'static + Send + Sync,
@@ -106,24 +41,40 @@ where
 
 impl<T> ChildEnd<T>
 where
-	T: 'static + Send + Sync,
+	T: 'static + Send + Sync + Clone + ActionEvent,
 {
-	pub fn target(&self) -> Entity { self.target }
+	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists.
+	pub fn trigger(mut commands: Commands, ev: &On<T>) {
+		let child = ev.event_target();
+		let value = ev.event().clone();
+
+		commands.queue(move |world: &mut World| {
+			if let Some(parent) = world.entity(child).get::<ChildOf>().clone() {
+				let parent = parent.parent();
+				world
+					.entity_mut(parent)
+					.trigger_action(ChildEnd { child, value });
+			}
+		})
+	}
+	/// Trigger [`T`] on this [`event_target`], essentially propagating a
+	/// [`ChildEnd<T>`] into a [`T`] event.
+	pub fn propagate(mut commands: Commands, ev: &On<Self>) {
+		let entity = ev.event_target();
+		commands
+			.entity(entity)
+			.trigger_action(ev.event().clone().inner());
+	}
+	/// Get the entity that originated the [`End`]
 	pub fn child(&self) -> Entity { self.child }
+	/// Get the [`End`] event that the child triggered
 	pub fn value(&self) -> &T { &self.value }
 	/// Convert a [`ChildEnd`] to an [`End`] by discarding
 	/// the `child` field and transfering the `target`
-	pub fn into_end(self) -> End<T> {
-		End {
-			value: self.value,
-			target: self.target,
-		}
-	}
+	pub fn inner(self) -> T { self.value }
 }
 
-pub const PREVENT_PROPAGATE_END: PreventPropagateEnd = PreventPropagateEnd {
-	phantom: PhantomData,
-};
+
 
 /// This component prevents a [`ChildEnd`] from automatically triggering
 /// an [`End`] with the same data, a requirement whenever you want to manually
@@ -138,16 +89,11 @@ impl<T> Default for PreventPropagateEnd<T> {
 
 /// Propagate the [`End`] event as a [`ChildEnd`] to this entities
 /// parent if it exists.
-pub(crate) fn propagate_end<T>(
-	ev: On<End<T>>,
-	mut commands: Commands,
-	parents: Query<&ChildOf>,
-) where
+pub(crate) fn propagate_end<T: ActionEvent>(ev: On<T>, commands: Commands)
+where
 	T: 'static + Send + Sync + Clone,
 {
-	if let Ok(parent) = parents.get(ev.event_target()) {
-		commands.trigger(ev.event().clone().into_child_end(parent.parent()));
-	}
+	ChildEnd::trigger(commands, &ev);
 }
 
 /// Propagate the [`ChildEnd`] event as an [`End`] on this entity
@@ -157,11 +103,13 @@ pub(crate) fn propagate_child_end<T>(
 	mut commands: Commands,
 	prevent: Query<(), With<PreventPropagateEnd>>,
 ) where
-	T: 'static + Send + Sync + Clone,
+	ChildEnd<T>: Clone + ActionEvent,
+	T: 'static + Send + Sync + Clone + ActionEvent,
 {
 	let target = ev.event_target();
 	if !prevent.contains(target) {
-		commands.trigger(ev.event().clone().into_end());
+		let ev2 = ev.clone().inner();
+		commands.entity(target).trigger_action(ev2);
 	}
 }
 
@@ -176,20 +124,20 @@ mod test {
 	struct Parent;
 
 	fn run_child(
-		ev: On<Run>,
+		ev: On<GetOutcome>,
 		mut commands: Commands,
 		children: Query<&Children>,
 	) {
 		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_payload(GetOutcome);
+		commands.entity(child).trigger_action(GetOutcome);
 	}
 
 	fn exit_on_result(
-		ev: On<End>,
+		ev: On<Outcome>,
 		mut commands: Commands,
 		// children: Query<&Children>,
 	) {
-		ev.event().value.is_pass().xpect_true();
+		ev.is_pass().xpect_true();
 		commands.write_message(AppExit::Success);
 	}
 
@@ -198,8 +146,10 @@ mod test {
 	// #[require(PreventPropagateEnd)]
 	struct Child;
 
-	fn succeed(ev: On<Run>, mut commands: Commands) {
-		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
+	fn succeed(ev: On<GetOutcome>, mut commands: Commands) {
+		commands
+			.entity(ev.event_target())
+			.trigger_action(Outcome::Pass);
 	}
 
 	#[test]
@@ -208,7 +158,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, children![Child]))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
@@ -217,8 +167,12 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
-			.spawn((Parent, PREVENT_PROPAGATE_END, children![(Child)]))
-			.trigger_payload(GetOutcome)
+			.spawn((
+				Parent,
+				PreventPropagateEnd::<Outcome>::default(),
+				children![(Child)],
+			))
+			.trigger_action(GetOutcome)
 			.flush();
 		world.should_exit().xpect_none();
 	}

@@ -5,16 +5,16 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 readme.workspace = true
-description = "Absolute base level utility crate"
+description = "Base level utilities for beet crates"
 documentation.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
 [features]
-tokens = ["dep:proc-macro2","dep:syn","dep:quote"]
-fs = ["dep:crossterm","dep:async-fs","dep:futures-lite"]
-serde = ["dep:serde","dep:serde_json"]
+tokens = ["dep:proc-macro2", "dep:syn", "dep:quote"]
+fs = ["dep:crossterm", "dep:async-fs", "dep:futures-lite"]
+serde = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 glob.workspace = true

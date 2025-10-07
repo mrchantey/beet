@@ -8,12 +8,12 @@ use bevy::ecs::query::QueryFilter;
 #[derive(Debug, Default, Clone, Component, Reflect, PartialEq, Eq, Hash)]
 #[reflect(Default, Component)]
 pub enum TargetEntity {
-	/// Use the [`EntityEvent::event_target`]
+	/// Use the [`ActionTrigger::event_target`]
 	#[default]
 	Target,
 	/// Use the [`AgentQuery::entity`]
 	Agent,
-	/// Use the [`ChildOf`] for the [`EntityEvent::event_target`],
+	/// Use the [`ChildOf`] for the [`ActionTrigger::event_target`],
 	/// defaulting back to [`TargetEntity::Target`] if none present
 	Parent,
 	/// Specify some other entity to target
@@ -22,7 +22,7 @@ pub enum TargetEntity {
 
 impl TargetEntity {
 	/// Get the target entity for the given trigger.
-	pub fn select_target<E: EntityEvent, D, F>(
+	pub fn select_target<E: ActionEvent, D, F>(
 		&self,
 		ev: &On<E>,
 		agents: &AgentQuery<D, F>,

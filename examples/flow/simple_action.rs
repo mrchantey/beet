@@ -5,7 +5,7 @@ use beet::prelude::*;
 #[derive(Component)]
 struct LogOnRun(pub String);
 
-fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) {
+fn log_on_run(ev: On<GetOutcome>, query: Query<&LogOnRun>) {
 	let name = query
 		// ensure that we use ev.event_target(), wich is the 'action entity'
 		// ev.target() is the 'action observer'
@@ -21,7 +21,7 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.trigger_payload(GetOutcome)
+		.trigger_action(GetOutcome)
 		.flush();
 	println!("done!");
 }

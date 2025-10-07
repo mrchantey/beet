@@ -3,10 +3,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
-/// Marker type indicating this entity was spawned via [`bundle_endpoint`].
-#[derive(Component)]
-pub struct HandlerBundle;
-
 
 /// A route handler returning a bundle, which is inserted into the world
 /// with a [`HandlerBundle`] component.

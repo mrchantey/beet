@@ -7,7 +7,7 @@ use crate::prelude::*;
 #[allow(unused_imports)]
 use crate as test_site;
 pub fn get() -> impl Bundle {
-    ApplySnippets::resolve((
+    ResolveSnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new("tests/test_site/test_docs/index.mdx"),
             start: LineCol { line: 1u32, col: 0u32 },

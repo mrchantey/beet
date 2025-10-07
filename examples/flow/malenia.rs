@@ -85,7 +85,7 @@ fn run_app() {
 		// .observe(|_: On<RunAction>| {
 		// 	println!("👩\tMalenia is thinking..");
 		// })
-		.trigger_payload(GetOutcome);
+		.trigger_action(GetOutcome);
 	app.run();
 }
 
@@ -98,7 +98,7 @@ struct AttackPlayer {
 }
 
 fn attack_player(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	attacks: Query<(&AttackPlayer, &Name)>,
 	mut query: Query<(&mut Health, &Name)>,
 	mut random_source: ResMut<RandomSource>,
@@ -178,7 +178,7 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: On<Run<GetScore>>,
+	ev: On<GetScore>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
@@ -190,7 +190,7 @@ fn provide_random_score(
 	let rnd: f32 = random_source.random();
 	commands
 		.entity(ev.event_target())
-		.trigger_payload(Score(
+		.trigger_action(Score(
 			rnd * score_provider.scalar + score_provider.offset,
 		));
 }
@@ -201,7 +201,7 @@ fn provide_random_score(
 struct TryHealSelf;
 
 fn try_heal_self(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: AgentQuery<(&mut Health, &mut HealingPotions)>,
 ) -> Result {
@@ -211,10 +211,10 @@ fn try_heal_self(
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
+		commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
 	} else {
 		// we couldnt do anything so action was a failure
-		commands.entity(ev.event_target()).trigger_payload(Outcome::Fail);
+		commands.entity(ev.event_target()).trigger_action(Outcome::Fail);
 	}
 	Ok(())
 }

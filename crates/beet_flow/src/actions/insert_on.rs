@@ -12,13 +12,13 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
-///		.spawn(InsertOn::<Run, Running>::default())
-///		.trigger_payload(GetOutcome);
+///		.spawn(InsertOn::<GetOutcome, Running>::default())
+///		.trigger_action(GetOutcome);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct InsertOn<E: EntityEvent, B: Bundle + Clone> {
+pub struct InsertOn<E: ActionEvent, B: Bundle + Clone> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
 	/// The target entity to insert the bundle into.
@@ -26,7 +26,7 @@ pub struct InsertOn<E: EntityEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
-impl<E: EntityEvent, B: Bundle + Clone> InsertOn<E, B> {
+impl<E: ActionEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {
 		Self {
@@ -45,7 +45,7 @@ impl<E: EntityEvent, B: Bundle + Clone> InsertOn<E, B> {
 	}
 }
 
-impl<E: EntityEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
+impl<E: ActionEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
 	fn default() -> Self {
 		Self {
 			bundle: default(),
@@ -55,7 +55,7 @@ impl<E: EntityEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
 	}
 }
 
-fn insert<E: EntityEvent, B: Bundle + Clone>(
+fn insert<E: ActionEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
@@ -79,8 +79,8 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn(InsertOn::<Run, Running>::default())
-			.trigger_payload(GetOutcome)
+			.spawn(InsertOn::<GetOutcome, Running>::default())
+			.trigger_action(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
@@ -92,8 +92,11 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((InsertOn::<End, Running>::default(), EndWith(Outcome::Pass)))
-			.trigger_payload(GetOutcome)
+			.spawn((
+				InsertOn::<Outcome, Running>::default(),
+				EndWith(Outcome::Pass),
+			))
+			.trigger_action(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();

@@ -51,6 +51,7 @@ pub mod prelude {
 	pub use bevy::ecs::reflect::ReflectMapEntities;
 	pub use bevy::ecs::relationship::Relationship;
 	pub use bevy::ecs::schedule::ScheduleLabel;
+	pub use bevy::ecs::system::RunSystemOnce;
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;

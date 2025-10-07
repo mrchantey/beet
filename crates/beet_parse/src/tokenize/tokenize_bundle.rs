@@ -5,14 +5,14 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 
-/// Calls [`tokenize_bundle`] then wraps in [`ApplySnippets::resolve`]
+/// Calls [`tokenize_bundle`] then wraps in [`ResolveSnippets::resolve`]
 pub fn tokenize_bundle_resolve_snippet(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
 	let bundle = tokenize_bundle(world, entity)?;
 	quote! {
-		ApplySnippets::resolve(#bundle)
+		ResolveSnippets::resolve(#bundle)
 	}
 	.xok()
 }

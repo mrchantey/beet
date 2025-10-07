@@ -28,7 +28,7 @@ impl<P> TriggerWithUserSentence<P> {
 	pub fn new(payload: P) -> Self { Self { payload } }
 }
 
-pub fn trigger_with_user_sentence<P: EventPayload + Clone>(
+pub fn trigger_with_user_sentence<P: ActionEvent + Clone>(
 	ev: On<UserMessage>,
 	mut commands: Commands,
 	mut query: Query<(Entity, &TriggerWithUserSentence<P>, &mut Sentence)>,
@@ -37,7 +37,7 @@ pub fn trigger_with_user_sentence<P: EventPayload + Clone>(
 		sentence.0 = (**ev).clone().into();
 		commands
 			.entity(action)
-			.trigger_payload(run_with_user_sentence.payload.clone());
+			.trigger_action(run_with_user_sentence.payload.clone());
 	}
 }
 
@@ -55,7 +55,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default())
 			.add_observer(trigger_with_user_sentence::<GetOutcome>);
 		let world = app.world_mut();
-		let on_run = observer_ext::observe_triggers::<Run>(world);
+		let on_run = observer_ext::observe_triggers::<GetOutcome>(world);
 
 		let entity = world
 			.spawn((TriggerWithUserSentence::default(), EndWith(Outcome::Pass)))

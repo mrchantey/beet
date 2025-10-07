@@ -1,23 +1,21 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Plugin adding lifecycle management for the core beet_flow systems.
 #[derive(Default)]
 pub struct BeetFlowPlugin;
 
 impl Plugin for BeetFlowPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((
-			run_plugin::<GetOutcome, Outcome>,
-			run_plugin::<GetScore, Score>,
-		))
-		.configure_sets(Update, PreTickSet)
-		.configure_sets(Update, TickSet.after(PreTickSet))
-		.configure_sets(Update, PostTickSet.after(TickSet))
-		.add_systems(
-			Update,
-			// flush any triggers spawned by TriggerDeferred
-			OnSpawnDeferred::flush.in_set(PreTickSet),
-		);
+		app.add_plugins((run_plugin::<GetOutcome>, run_plugin::<GetScore>))
+			.configure_sets(Update, PreTickSet)
+			.configure_sets(Update, TickSet.after(PreTickSet))
+			.configure_sets(Update, PostTickSet.after(TickSet))
+			.add_systems(
+				Update,
+				// flush any triggers spawned by TriggerDeferred
+				OnSpawnDeferred::flush.in_set(PreTickSet),
+			);
 		app.add_systems(
 			Update,
 			(
@@ -49,17 +47,15 @@ pub struct PostTickSet;
 
 /// This plugin should be registered for any [`RunPayload`] and [`ResultPayload`] pair,
 /// ensuring events are properly propagated and interrupted.
-pub fn run_plugin<
-	R: 'static + Send + Sync,
-	E: 'static + Send + Sync + Clone,
->(
-	app: &mut App,
-) {
-	// app.add_observer(propagate_on_run::<Run>);
-	app.add_observer(interrupt_on_run::<R>);
-	app.add_observer(interrupt_on_end::<E>);
-	app.add_observer(propagate_end::<E>);
-	app.add_observer(propagate_child_end::<E>);
+pub fn run_plugin<R: RunEvent>(app: &mut App)
+where
+	R::End: Clone,
+{
+	// app.add_observer(propagate_run::<Run>);
+	app.add_observer(interrupt_run::<R>);
+	app.add_observer(interrupt_end::<R::End>);
+	app.add_observer(propagate_end::<R::End>);
+	app.add_observer(propagate_child_end::<R::End>);
 }
 
 
@@ -94,7 +90,7 @@ pub enum ActionTag {
 #[cfg(test)]
 pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	let store = Store::default();
-	world.add_observer(move |ev: On<Run>, query: Query<&Name>| {
+	world.add_observer(move |ev: On<GetOutcome>, query: Query<&Name>| {
 		let name = if let Ok(name) = query.get(ev.event_target()) {
 			name.to_string()
 		} else {
@@ -109,13 +105,13 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 #[cfg(test)]
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, Outcome)>> {
 	let store = Store::default();
-	world.add_observer(move |ev: On<End>, query: Query<&Name>| {
+	world.add_observer(move |ev: On<Outcome>, query: Query<&Name>| {
 		let name = if let Ok(name) = query.get(ev.event_target()) {
 			name.to_string()
 		} else {
 			"Unknown".to_string()
 		};
-		store.push((name, ev.event().value().clone()));
+		store.push((name, ev.clone()));
 	});
 	store
 }

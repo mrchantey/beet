@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 ///		.spawn(LogOnRun::new("Running..."))
-///		.trigger_payload(GetOutcome);
+///		.trigger_action(GetOutcome);
 /// ```
 #[action(log_on_run)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -25,7 +25,7 @@ impl LogOnRun {
 	}
 }
 
-fn log_on_run(ev: On<Run>, query: Query<&LogOnRun>) -> Result {
+fn log_on_run(ev: On<GetOutcome>, query: Query<&LogOnRun>) -> Result {
 	let action = query
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));

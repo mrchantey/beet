@@ -42,7 +42,7 @@ impl Default for SetCurveOnRun {
 impl SetCurveOnRun {}
 
 fn set_curve_on_run(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	transforms: AgentQuery<&Transform>,
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,

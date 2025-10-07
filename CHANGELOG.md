@@ -9,13 +9,29 @@ Bevy had an [`Event Overhaul`] in 0.17 so naturally a lot has shifted around in 
 
 The introduction of global observers led to a mess of tracking the `origin` (now referred to as `agent`) through `OnRun`, `Running` and `OnResult` calls, leading to dreadfully complex triggering. Tracking the `origin` is now done through an `AgentQuery`, see its documentation for more details.
 
-### [`Outcome`] / [`GetOutcome`]
+###  [`GetOutcome`] / [`Outcome`]
 
-`OnRun` / `OnResult` has been refactored to better suit the direction of events in bevy, now with a `Foo` / `GetFoo` convention. Likewise we now have `Score` / `GetScore`.
+`OnRun` / `OnResult` has been refactored to better suit the direction of events in bevy, now with a request/response `Foo` / `GetFoo` convention. `GetOutcome` is longer to type than `Run` but clearly defines the relationship with `Outcome` and is much easier to grep in the codebase. Likewise we now have `GetScore` / `Score`.
 
 ### Removed: Global Observers
 
 I still think this pattern may be useful if you have >1000 entities frequently added and removed, although in that case something like a pool might be more effective. However the juice aint worth the squeeze for the 90% of other cases, removing this makes tha api a lot simpler to reason about. Also there is no reason for this pattern to be built in, just add a `Run` global observer.
+
+
+## `beet_net`
+
+- Added support for Sockets/SSE.
+- DynamoDB Integration
+- Basic analytics
+
+## `beet_rsx`
+- Print to pdf helpers
+- Template refactor, prep for bevy 0.18
+
+## `beet_dom`
+- Webdriver BiDi
+- Pdf exports
+
 
 # 0.0.6
 

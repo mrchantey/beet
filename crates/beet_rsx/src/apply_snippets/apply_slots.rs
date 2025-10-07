@@ -48,14 +48,33 @@ use beet_dom::prelude::*;
 /// 3. For each slot, apply to the slot target.
 /// 4. Move the [`TemplateRoot`] relation to a [`Children`].
 /// 5. Remove any fallback children from slot targets which are used.
+
+
 pub fn apply_slots(
 	mut commands: Commands,
+	roots: Populated<Entity, Added<BeetRoot>>,
+) -> Result {
+	for root in roots.iter() {
+		commands.run_system_cached_with(apply_slots_recursive, root);
+	}
+	Ok(())
+}
+
+pub fn apply_slots_recursive(
+	In(instance_root): In<Entity>,
+	mut commands: Commands,
 	children: Query<&Children>,
-	query: Populated<(Entity, &TemplateRoot, Option<&NodeTag>)>,
+	template_roots: Query<(Entity, &TemplateRoot, Option<&NodeTag>)>,
 	slot_targets: Query<(Entity, &SlotTarget)>,
 	slot_children: Query<(Entity, &SlotChild)>,
 ) -> Result {
-	for (node_entity, root, node_tag) in query.iter() {
+	// only visit the TemplateRoots below the current InstanceRoot
+	for (node_entity, root, node_tag) in
+		// query.iter()
+		children
+			.iter_descendants_inclusive(instance_root)
+			.filter_map(|entity| template_roots.get(entity).ok())
+	{
 		let node_tag = node_tag.map(|tag| tag.as_str()).unwrap_or("Unnamed");
 		let (named_slots, default_slots) =
 			collect_slot_children(node_entity, &children, &slot_children);
@@ -81,8 +100,10 @@ pub fn apply_slots(
 			else {
 				bevybail!(
 					"Attempted to add a child to {node_tag} which has no '{named_slot}' slot target,
-					consider adding a <slot name=\"{named_slot}\"/> to {node_tag}."
-
+					consider adding a <slot name=\"{named_slot}\"/> to {node_tag}.
+					available named targets: {}",
+					slot_targets.iter().filter_map(|(_,target)|target.name().clone())
+						.collect::<Vec<_>>().join(", ")
 				);
 			};
 			used_targets.insert(*target);
@@ -103,12 +124,7 @@ pub fn apply_slots(
 			}
 		}
 
-		// 4. move the template root to the children
-		commands
-			.entity(**root)
-			.remove::<TemplateOf>()
-			.insert(ChildOf(node_entity));
-		// 5. remove fallback children from used targets
+		// 4. remove fallback children from used targets
 		used_targets
 			.into_iter()
 			.filter_map(|e| children.get(e).ok())
@@ -117,6 +133,14 @@ pub fn apply_slots(
 					commands.entity(child).despawn();
 				}
 			});
+		// 5. move the template root to the children
+		commands
+			.entity(**root)
+			.remove::<TemplateOf>()
+			.insert(ChildOf(node_entity));
+		// 6. recurse into template root, it wasnt yet a
+		// ChildOf
+		commands.run_system_cached_with(apply_slots_recursive, **root);
 	}
 	Ok(())
 }
@@ -168,8 +192,8 @@ fn collect_slot_children(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_dom::prelude::*;
 	use beet_core::prelude::*;
+	use beet_dom::prelude::*;
 	use sweet::prelude::*;
 
 	#[template]
@@ -274,13 +298,21 @@ mod test {
 		fn Layout() -> impl Bundle {
 			rsx! {
 				<body>
-					<Header>
-						<slot name="header" slot="default" />
-					</Header>
+					<Middle>
+						<slot name="header" slot="header" />
+					</Middle>
 					<main>
 						<slot />
 					</main>
 				</body>
+			}
+		}
+		#[template]
+		fn Middle() -> impl Bundle {
+			rsx! {
+				<Header>
+					<slot name="header" slot="default" />
+				</Header>
 			}
 		}
 
@@ -292,6 +324,7 @@ mod test {
 				</header>
 			}
 		}
+
 
 		rsx! {
 			<Layout>

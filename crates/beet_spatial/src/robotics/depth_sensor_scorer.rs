@@ -40,7 +40,7 @@ impl DepthSensorScorer {
 }
 
 fn depth_sensor_scorer(
-	ev: On<Run<GetScore>>,
+	ev: On<GetScore>,
 	mut commands: Commands,
 	query: Query<&DepthSensorScorer>,
 	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,
@@ -57,6 +57,6 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	commands.entity(target).trigger_payload(next_score);
+	commands.entity(target).trigger_action(next_score);
 	Ok(())
 }

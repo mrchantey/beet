@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::component::Immutable;
 use bevy::ecs::component::StorageType;
 use bevy::ecs::lifecycle::ComponentHook;
-use beet_core::prelude::*;
 use bevy::reflect::Reflectable;
 
 /// A [`SceneFilter`] used to constrain the components serialized to the client scene,
@@ -39,7 +39,7 @@ impl ClientIslandRegistry {
 
 /// Added to any template with a client directive, ie [`ClientLoadDirective`],
 /// automatically registering the type for serialization in the client scene.
-/// This also adds a [`TemplateRoot`]
+/// This adds the template as a child of a [`(BeetRoot, TemplateRoot)`]
 #[derive(Debug, Clone, Reflect)]
 #[reflect(Component)]
 pub struct ClientIslandRoot<T, U = T>
@@ -97,9 +97,10 @@ where
 				let dynamic: Box<dyn PartialReflect> = this.value.to_dynamic();
 				let value =
 					<T as FromReflect>::from_reflect(&*dynamic).unwrap();
-				world
-					.entity_mut(entity)
-					.insert(TemplateRoot::spawn(Spawn(value.into_bundle())));
+				world.entity_mut(entity).insert((
+					BeetRoot,
+					TemplateRoot::spawn(Spawn(value.into_bundle())),
+				));
 			});
 		})
 	}

@@ -41,7 +41,7 @@ fn setup(
 			SteerBundle::default().scaled_dist(SCALE),
 			VelocityScalar(Vec3::new(1., 1., 0.)),
 			GroupSteerAgent,
-			TriggerDeferred::run(),
+			TriggerDeferred::get_outcome(),
 			Separate::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Align::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Cohere::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),

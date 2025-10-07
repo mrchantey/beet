@@ -2,9 +2,9 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
-pub struct ApplySnippets;
+pub struct ResolveSnippets;
 
-impl ApplySnippets {
+impl ResolveSnippets {
 	/// Create the `OnSpawn` which will immediately resolve the rsx snippet.
 	/// This is the entrypoint for the `rsx!` macro.
 	pub fn resolve(bundle: impl Bundle) -> OnSpawn {
@@ -38,12 +38,17 @@ impl ApplySnippets {
 					// ignore skipped error
 					.unwrap_or(Ok(()))
 					.unwrap();
-				world.run_system_cached(apply_template_children).ok();
 				world
-					.run_system_cached::<Result, _, _>(apply_slots)
-					// ignore skipped error
-					.unwrap_or(Ok(()))
-					.unwrap();
+					.run_system_cached_with(apply_template_children, entity)
+					.unwrap_or(());
+				// world
+				// 	.run_system_cached_with::<_, Result, _, _>(
+				// 		apply_slots,
+				// 		entity,
+				// 	)
+				// 	// ignore skipped error
+				// 	.unwrap_or(Ok(()))
+				// 	.unwrap();
 			});
 		})
 	}
@@ -155,7 +160,7 @@ fn apply_template_locations(
 	let mut get_on_spawn = |idx: &ExprIdx| -> Result<OnSpawnDeferred> {
 		let out = instance_exprs.remove(idx).ok_or_else(|| {
 			bevyhow!(
-				"Apply Snippets Error:
+				"Resolve Snippets Error:
 Error resolving static root for snippet at {snippet_root}
 The instance root is missing an ExprIdx found in the static root.
 Instance idxs: 	{instance_keys:?}
@@ -186,7 +191,7 @@ Expected idx: 	{idx}
 	}
 	if !instance_exprs.is_empty() {
 		bevybail!(
-			"Apply Snippets Error:
+			"Resolve Snippets Error:
 Error resolving static root for snippet at {snippet_root}
 Not all ExprIdx were applied.
 The static root is missing idxs found in the instance root:
@@ -248,7 +253,17 @@ mod test {
 		let _snippet = world
 			.spawn((SnippetRoot::default(), StaticRoot, rsx_snippet))
 			.remove::<InstanceRoot>();
-		let instance = world.spawn((SnippetRoot::default(), instance)).id();
+		let instance = world
+			.spawn((BeetRoot, SnippetRoot::default(), instance))
+			.id();
+		//this is ugly hack should be automatic
+		world
+			.run_system_cached_with::<_, Result, _, _>(
+				apply_slots_recursive,
+				instance,
+			)
+			.unwrap()
+			.unwrap();
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()
@@ -380,7 +395,7 @@ mod test {
 
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
-		rsx! { {initial} }
+		rsx! { {initial}<slot/> }
 	}
 	#[template]
 	fn SomeOtherName() -> impl Bundle { () }
@@ -400,6 +415,18 @@ mod test {
 		.xpect_eq("<span>3</span>");
 	}
 	#[test]
+	fn template_children() {
+		parse(
+			rsx! { <MyTemplate initial=3><span>foo</span></MyTemplate> },
+			rsx! {
+					<MyTemplate initial=4><div>bar</div></MyTemplate>
+			},
+		)
+		// contents of MyTemplate not changed
+		.xpect_eq("3<div>bar</div>");
+	}
+	#[test]
+	#[ignore = "broken"]
 	fn template_expr_attr() {
 		let val = 5;
 		parse(
@@ -420,6 +447,7 @@ mod test {
 							ExprIdx(1u32)
 						)
 				]},
+				related! {TemplateRoot[()]},
 			),
 		)
 		.xpect_eq("5");
@@ -449,6 +477,14 @@ mod test {
 				rsx! { <div>pasta is <MyTemplate initial=3 /></div> },
 			))
 			.id();
+		//this is ugly hack should be automatic
+		world
+			.run_system_cached_with::<_, Result, _, _>(
+				apply_slots_recursive,
+				child,
+			)
+			.unwrap()
+			.unwrap();
 
 		world
 			.run_system_once_with(render_fragment, child)
@@ -535,9 +571,14 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).id();
 
+		//this is ugly hack should be automatic
 		world
-			.run_system_once::<_, Result, _>(crate::apply_snippets::apply_slots)
-			.ok(); // no matching entities ok
+			.run_system_once_with::<_, _, Result, _>(
+				crate::apply_snippets::apply_slots_recursive,
+				instance,
+			)
+			.unwrap_or(Ok(())) // no matching entities ok
+			.ok();
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()

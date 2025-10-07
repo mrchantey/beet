@@ -39,7 +39,7 @@ app.world_mut()
 			),
 		],
 	))
-	.trigger_payload(GetOutcome)
+	.trigger_action(GetOutcome)
 	.flush();
 ```
 

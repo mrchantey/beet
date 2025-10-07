@@ -10,6 +10,9 @@ pub mod sockets;
 mod transport;
 
 pub mod prelude {
+
+	pub const ANALYTICS_JS: &str = include_str!("object_storage/analytics.js");
+
 	pub use crate::http_utils::*;
 	pub use crate::object_storage::*;
 	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]

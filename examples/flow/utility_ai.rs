@@ -25,5 +25,5 @@ fn main() {
 				)
 			]
 		))
-		.trigger_payload(GetOutcome).flush();
+		.trigger_action(GetOutcome).flush();
 }

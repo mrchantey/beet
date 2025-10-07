@@ -26,7 +26,7 @@ use std::cmp::Ordering;
 ///			EndWith(Score::PASS),
 ///			EndWith(Outcome::Pass),
 ///		))
-///		.trigger_payload(GetOutcome);
+///		.trigger_action(GetOutcome);
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
@@ -36,7 +36,7 @@ use std::cmp::Ordering;
 pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
@@ -44,7 +44,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands.entity(child).trigger_payload(GetScore);
+		commands.entity(child).trigger_action(GetScore);
 	}
 	Ok(())
 }
@@ -63,7 +63,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		commands.entity(*highest).trigger_payload(GetOutcome);
+		commands.entity(*highest).trigger_action(GetOutcome);
 	}
 	Ok(())
 }
@@ -81,9 +81,8 @@ mod test {
 		let on_run = collect_on_run(&mut world);
 		let on_result = collect_on_result(&mut world);
 		let on_request_score =
-			observer_ext::observe_triggers::<Run<GetScore>>(&mut world);
-		let on_score =
-			observer_ext::observe_triggers::<End<Score>>(&mut world);
+			observer_ext::observe_triggers::<GetScore>(&mut world);
+		let on_score = observer_ext::observe_triggers::<Score>(&mut world);
 
 		world
 			.spawn((Name::new("root"), HighestScore::default()))
@@ -97,7 +96,7 @@ mod test {
 				EndWith(Score::PASS),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 		on_request_score.len().xpect_eq(2);
 		on_score.len().xpect_eq(4);

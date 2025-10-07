@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
-/// .trigger_payload(GetOutcome);
+/// .trigger_action(GetOutcome);
 /// ```
 #[action(repeat)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -52,19 +52,15 @@ impl Default for Repeat {
 }
 
 fn repeat(
-	ev: On<End>,
+	ev: On<Outcome>,
 	query: Query<&Repeat>,
-	children: Query<&ChildOf>,
 	mut commands: Commands,
 ) -> Result {
 	let repeat = query.get(ev.event_target())?;
 	if let Some(check) = &repeat.if_result_matches {
-		if **ev != *check {
+		if *ev != *check {
 			// repeat is completed, propagate the result to the parent if it exists
-			if let Ok(parent) = children.get(ev.event_target()) {
-				commands
-					.trigger(ev.event().clone().into_child_end(parent.get()));
-			}
+			ChildEnd::trigger(commands, &ev);
 			return Ok(());
 		}
 	}
@@ -88,7 +84,7 @@ mod test {
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -110,7 +106,7 @@ mod test {
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -135,7 +131,7 @@ mod test {
 				Repeat::if_success(),
 				SucceedTimes::new(2)
 			)]))
-			.trigger_payload(GetOutcome)
+			.trigger_action(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(2);

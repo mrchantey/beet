@@ -2,7 +2,7 @@
 name = "beet_sim"
 version.workspace = true
 edition.workspace = true
-description = "Game AI simulation primitives."
+description = "Game AI simulation primitives built upon beet_flow"
 documentation.workspace = true
 readme = "README.md"
 homepage.workspace = true

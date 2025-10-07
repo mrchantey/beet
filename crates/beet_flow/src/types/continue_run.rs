@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// For usage see the [`Running`] component.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(RunTimer, InsertOn<Run, Running>, RemoveOn<End, Running>)]
+#[require(RunTimer, InsertOn<GetOutcome, Running>, RemoveOn<Outcome, Running>)]
 pub struct ContinueRun;
 
 /// A marker component added to an [ActionEntity] indicate this action is currently running.
@@ -61,9 +61,12 @@ mod test {
 		// adds
 		let entity = world.spawn(ContinueRun).id();
 		world.get::<Running>(entity).xpect_none();
-		world.entity_mut(entity).trigger_payload(GetOutcome).flush();
+		world.entity_mut(entity).trigger_action(GetOutcome).flush();
 		world.get::<Running>(entity).xpect_some();
-		world.entity_mut(entity).trigger_payload(Outcome::Pass).flush();
+		world
+			.entity_mut(entity)
+			.trigger_action(Outcome::Pass)
+			.flush();
 		world.get::<Running>(entity).xpect_none();
 	}
 }
