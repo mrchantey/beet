@@ -8,6 +8,10 @@ created="2025-10-07"
 
 Action time!
 
+<iframe width="941" height="538" src="https://www.youtube.com/embed/yI9tuBsrW1M" title="Full Moon Harvest #4 | Action Time" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+
+
 <br/>
 <br/>
 
@@ -20,7 +24,7 @@ The Bevy `0.17` release introduces event triggers, which I used as an opportunit
 
 ## Webdriver BiDi
 
-`beet_net` now has full cross-platform support for websockets, and we have an initial integration of Webdriver BiDi, the new standard set to replace Chrome DevTools Protocol. This will allow testing in an actual browser instead of just the html output (which has served pretty well so far!).
+`beet_net` now has full cross-platform support for websockets, and we have an initial integration of Webdriver BiDi, the new standard set to replace Chrome DevTools Protocol. This will allow testing in an actual browser instead of just the html output (which in fairness has served pretty well so far!).
 
 ## Analytics
 
@@ -33,3 +37,10 @@ Also partial initial support for DynamoDb which will likely be the place where t
 ## PDF Exports
 
 Preparing for a conference i didnt want to copy all my beetmash stuff into a word doc and do formatting all over again so instead worked on print-to-pdf utilities like page breaks, hidden-unless-printing etc.
+
+
+## Preparing for `bsn!`
+
+Its been super handy getting to see carts progress with bsn, this harvest I've made some changes to alighn the templating system with the direction of bsn and the native bevy templating system. Its too early to say how much ill be able to deprecate (100% would be a dream), but the closer I can get the model the more we'll be able to do.
+
+Thats about it for this harvest, all of these features put us in a steady position for having a lot of fun in the coming weeks.
