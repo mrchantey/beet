@@ -3,6 +3,10 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
 
+/// Marker type indicating this entity was spawned via [`bundle_endpoint`].
+#[derive(Component)]
+pub struct HandlerBundle;
+
 /// A node which is a descendant of a template root
 #[derive(Debug, Deref, Reflect, Component)]
 #[reflect(Component)]
@@ -21,26 +25,40 @@ pub struct TemplateChildren(Vec<Entity>);
 /// Creates a [`TemplateChildren`] relation for each template root,
 /// pointing to every child which is a descendant.
 pub fn apply_template_children(
+	In(entity): In<Entity>,
 	mut commands: Commands,
-	template_roots: Populated<
-		Entity,
-		(
-			Added<InstanceRoot>,
+	template_roots: Query<
+		(),
 			Or<(
 				// instance without parent is a root
 				Without<ChildOf>,
-				// documents are roots
+				// documents are roots, even if they have a parent
 				With<HtmlDocument>,
 				// templates are roots
 				With<TemplateOf>,
+				// handler bundles are roots
+				With<HandlerBundle>,
 			)>,
-		),
 	>,
 	children: Query<&Children>,
+	// these appear in Children if resolved by blocks instead of tags:
+	// - like this 		`rsx!{<div>{rsx!{<MyTemplate/>}}</div>}`
+	// - instead of 	`rsx!{<div><MyTemplate/></div>}`
+	template_nodes: Query<(), (With<TemplateNode>, Without<TemplateRoot>)>,
 ) {
-	for root in template_roots.iter() {
-		for child in children.iter_descendants(root) {
-			commands.entity(child).insert(TemplateChildOf(root));
+	if template_roots.contains(entity) {
+		let mut stack = vec![entity];
+		// recurse into all children, but stop if template_nodes.contains,
+		// 	 to children by apply_slots
+		while let Some(current) = stack.pop() {
+			if let Ok(children) = children.get(current) {
+				for child in children.iter() {
+					if !template_nodes.contains(child) {
+						commands.entity(child).insert(TemplateChildOf(entity));
+						stack.push(child);
+					}
+				}
+			}
 		}
 	}
 }
@@ -60,7 +78,7 @@ mod test {
 
 
 	#[test]
-	fn works_no_children() {
+	fn no_children() {
 		World::new()
 			.spawn(rsx! { <div /> })
 			.get::<TemplateChildren>()
@@ -78,16 +96,23 @@ mod test {
 			.xpect_eq(3); // div, BlockNode/SnippetRoot, div
 	}
 	#[test]
-	fn skips_resolved_template() {
-		World::new()
-			.spawn(rsx! { <div>{rsx!{<MyTemplate/>}}</div> })
+	fn skips_template_roots_simple() {
+		let mut world = World::new();
+		world
+			.spawn(rsx! {
+				<div>
+					<MyTemplate/>
+				</div>
+			})
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
-			.xpect_eq(3); // div, BlockNode/SnippetRoot, MyTemplate
+			.xpect_eq(2); // div, mytemplate
+
+		world.query_once::<&TemplateChildren>().len().xpect_eq(2);
 	}
 	#[test]
-	fn works() {
+	fn skips_template_roots_complex() {
 		let mut world = World::new();
 		world
 			.spawn(rsx! {
@@ -104,5 +129,17 @@ mod test {
 			.xpect_eq(4); // div, mytemplate, span, mytemplate
 
 		world.query_once::<&TemplateChildren>().len().xpect_eq(3);
+	}
+	#[test]
+	fn skips_resolved_template() {
+		let mut world = World::new();
+		world
+			.spawn(rsx! { <div>{rsx!{<MyTemplate/>}}</div> })
+			.get::<TemplateChildren>()
+			.unwrap()
+			.len()
+			.xpect_eq(2); // div, BlockNode, not MyTemplate inner
+
+		world.query_once::<&TemplateChildren>().len().xpect_eq(2);
 	}
 }

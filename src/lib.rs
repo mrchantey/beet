@@ -72,8 +72,6 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
-	// beet workflows make heavy use of `RunSystemOnce` to run systems
-	pub use bevy::ecs::system::RunSystemOnce;
 }
 pub mod exports {
 	#[cfg(feature = "build")]

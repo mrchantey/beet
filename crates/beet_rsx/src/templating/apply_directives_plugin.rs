@@ -29,15 +29,12 @@ impl Plugin for ApplyDirectivesPlugin {
 		{
 			#[cfg(not(test))]
 			console_error_panic_hook::set_once();
+			#[cfg(target_arch = "wasm32")]
 			app.add_systems(
 				Startup,
-				(
-					#[cfg(target_arch = "wasm32")]
-					load_client_islands.run_if(document_exists),
-				),
+				load_client_islands.run_if(document_exists),
 			);
 		}
-
 		app.init_plugin(schedule_order_plugin)
 			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
@@ -46,6 +43,7 @@ impl Plugin for ApplyDirectivesPlugin {
 			.add_systems(
 				ApplyDirectives,
 				(
+					apply_slots,
 					apply_lang_snippet_hashes,
 					apply_style_id,
 					deduplicate_lang_nodes,

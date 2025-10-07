@@ -1,8 +1,10 @@
+mod commands;
 mod plugin;
 mod schedule;
 mod system;
 mod world;
 pub use self::schedule::*;
+pub use commands::*;
 pub use plugin::*;
 pub use world::*;
 mod app;
