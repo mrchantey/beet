@@ -11,6 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
+publish = false
 
 [features]
 default = ["tokio"]

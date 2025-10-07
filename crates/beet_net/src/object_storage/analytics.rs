@@ -4,8 +4,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-pub const ANALYTICS_JS: &str = include_str!("analytics.js");
-
 pub fn analytics_plugin(app: &mut App) {
 	app.add_systems(PostStartup, spawn_analytics_event_store)
 		.add_observer(handle_analytics_events);
