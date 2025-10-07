@@ -100,14 +100,7 @@ mod test {
 
 	fn parse(app: &mut App, bundle: impl Bundle) -> Result<String> {
 		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
-		let reg = app.world().resource::<AppTypeRegistry>();
-		reg.read()
-			.get_type_info(
-				std::any::TypeId::of::<ClientIslandRoot<MyTemplate>>(),
-			)
-			// OnSpawnDeferred not triggered yet
-			.xpect_none();
-
+		
 		app.update();
 		let reg = app.world().resource::<AppTypeRegistry>();
 		reg.read()

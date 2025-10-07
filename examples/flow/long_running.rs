@@ -35,7 +35,7 @@ fn main() {
 					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
 					EndInDuration::new(
-						SUCCESS,
+						Outcome::Pass,
 						Duration::from_secs(5),
 					),
 				))
@@ -55,7 +55,7 @@ fn main() {
 							Name::new("Patrol Left"),
 							Patrol::default(),
 							EndInDuration::new(
-								SUCCESS,
+								Outcome::Pass,
 								Duration::from_secs(1),
 							),
 						))
@@ -64,7 +64,7 @@ fn main() {
 							Name::new("Patrol Right"),
 							Patrol::default(),
 							EndInDuration::new(
-								SUCCESS,
+								Outcome::Pass,
 								Duration::from_secs(1),
 							),
 						));
@@ -76,7 +76,7 @@ fn main() {
 				},
 			);
 		})
-		.trigger_payload(RUN);
+		.trigger_payload(GetOutcome);
 
 	app.run();
 }

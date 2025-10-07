@@ -10,20 +10,13 @@ pub struct SignalsPlugin;
 impl Plugin for SignalsPlugin {
 	// #[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app.init_plugin(ApplySnippetsPlugin)
-			.init_plugin(schedule_order_plugin)
+		app.init_plugin(schedule_order_plugin)
 			.init_resource::<DirtySignals>()
-			.add_systems(
-				ApplySnippets,
-				// signals may contain bundles containing OnSpawnDeferred,
-				// when snippets/directives are immediately applied we can move this
-				flush_signals.before(ApplySnippetsSet),
-			)
 			.add_systems(
 				PropagateSignals,
 				(
 					|| {},
-					// flush_signals,
+					flush_signals,
 					#[cfg(feature = "bevy_default")]
 					propagate_text_signals,
 					#[cfg(target_arch = "wasm32")]

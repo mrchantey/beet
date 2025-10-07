@@ -26,8 +26,8 @@ pub enum RelativeRole {
 impl RelativeRole {}
 
 /// Indicate it is 'your turn'
-#[derive(EntityTargetEvent)]
-pub struct MessageRequest;
+#[derive(EntityEvent)]
+pub struct MessageRequest(pub Entity);
 
 
 
@@ -55,19 +55,19 @@ pub struct MessageComplete;
 
 
 pub struct MessageSpawner<T: Hash> {
-	pub queue: AsyncQueue,
+	pub world: AsyncWorld,
 	pub message: Entity,
 	pub content_map: HashMap<T, Entity>,
 	pub finished_content: Vec<T>,
 }
 impl<T: Hash + Eq + Debug> MessageSpawner<T> {
-	pub async fn spawn(queue: AsyncQueue, actor: Entity) -> Result<Self> {
+	pub async fn spawn(world: AsyncWorld, actor: Entity) -> Result<Self> {
 		let message =
-			queue.spawn_then((Message::default(), ChildOf(actor))).await;
+			world.spawn_then((Message::default(), ChildOf(actor))).await;
 
 
 		Self {
-			queue,
+			world,
 			message,
 			content_map: HashMap::default(),
 			finished_content: Vec::new(),
@@ -83,7 +83,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 			bevybail!("Duplicate output index: {key:?}");
 		} else {
 			let entity = self
-				.queue
+				.world
 				.spawn_then((ChildOf(self.message), content))
 				.await;
 			self.content_map.insert(key, entity);
@@ -98,7 +98,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		bundle: impl Bundle,
 	) -> Result<&mut Self> {
 		if let Ok(entity) = self.get_entity(&key) {
-			self.queue.entity(entity).insert(bundle).await;
+			self.world.entity(entity).insert(bundle).await;
 		} else {
 			self.add(key, bundle).await?;
 		}
@@ -129,7 +129,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		key: T,
 		text: impl AsRef<str>,
 	) -> Result<&mut Self> {
-		self.queue
+		self.world
 			.entity(self.get_entity(&key)?)
 			.trigger(TextDelta::new(text))
 			.await;
@@ -137,7 +137,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 	}
 
 	pub async fn finish_content(&mut self, key: T) -> Result<&mut Self> {
-		self.queue
+		self.world
 			.entity(self.get_entity(&key)?)
 			.insert(ContentEnded::default())
 			.await;
@@ -153,7 +153,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 			.collect::<Vec<_>>();
 
 		let message = self.message;
-		self.queue
+		self.world
 			.with_then(move |world| {
 				for entity in unfinished {
 					world.entity_mut(entity).insert(ContentEnded::default());

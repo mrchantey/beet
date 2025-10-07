@@ -59,7 +59,7 @@ pub(crate) fn translate_grid(
 		} else {
 			transform.translation = to_world;
 			**grid_pos = to_grid;
-			commands.entity(action).trigger_payload(SUCCESS);
+			commands.entity(action).trigger_payload(Outcome::Pass);
 		}
 	}
 	Ok(())

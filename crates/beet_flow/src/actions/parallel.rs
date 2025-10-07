@@ -17,10 +17,10 @@ use bevy::platform::collections::HashSet;
 /// world.spawn((
 /// 	Parallel::default(),
 /// 	children![
-/// 		EndOnRun(SUCCESS),
-/// 		EndOnRun(SUCCESS),
+/// 		EndWith(Outcome::Pass),
+/// 		EndWith(Outcome::Pass),
 /// 	]))
-/// 	.trigger_payload(RUN)
+/// 	.trigger_payload(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -38,12 +38,12 @@ fn on_start(
 	action.clear();
 
 	if children.is_empty() {
-		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
 		return Ok(());
 	}
 
 	for child in children.iter() {
-		commands.entity(child).trigger_payload(RUN);
+		commands.entity(child).trigger_payload(GetOutcome);
 	}
 	Ok(())
 }
@@ -57,7 +57,7 @@ fn on_next(
 	let child = ev.child();
 
 	// if any error, just propagate the error
-	if ev.is_failure() {
+	if ev.is_fail() {
 		commands.trigger(ev.event().clone().into_end());
 		return Ok(());
 	}
@@ -87,10 +87,10 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Parallel::default(), children![
-				(Name::new("child1"), EndOnRun(SUCCESS)),
-				(Name::new("child2"), EndOnRun(FAILURE)),
+				(Name::new("child1"), EndWith(Outcome::Pass)),
+				(Name::new("child2"), EndWith(Outcome::Fail)),
 			]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -99,9 +99,9 @@ mod test {
 			"child2".to_string(),
 		]);
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), SUCCESS),
-			("child2".to_string(), FAILURE),
-			("root".to_string(), FAILURE),
+			("child1".to_string(), Outcome::Pass),
+			("child2".to_string(), Outcome::Fail),
+			("root".to_string(), Outcome::Fail),
 		]);
 	}
 
@@ -114,10 +114,10 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Parallel::default(), children![
-				(Name::new("child1"), EndOnRun(SUCCESS)),
-				(Name::new("child2"), EndOnRun(SUCCESS)),
+				(Name::new("child1"), EndWith(Outcome::Pass)),
+				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -126,9 +126,9 @@ mod test {
 			"child2".to_string(),
 		]);
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), SUCCESS),
-			("child2".to_string(), SUCCESS),
-			("root".to_string(), SUCCESS),
+			("child1".to_string(), Outcome::Pass),
+			("child2".to_string(), Outcome::Pass),
+			("root".to_string(), Outcome::Pass),
 		]);
 	}
 }

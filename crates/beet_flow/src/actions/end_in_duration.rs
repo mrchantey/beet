@@ -40,8 +40,8 @@ impl<T> EndInDuration<T> {
 }
 
 impl EndInDuration<Outcome> {
-	pub fn success(duration: Duration) -> Self { Self::new(SUCCESS, duration) }
-	pub fn failure(duration: Duration) -> Self { Self::new(FAILURE, duration) }
+	pub fn success(duration: Duration) -> Self { Self::new(Outcome::Pass, duration) }
+	pub fn failure(duration: Duration) -> Self { Self::new(Outcome::Fail, duration) }
 }
 
 pub(crate) fn end_in_duration<T: EventPayload + Clone>(

@@ -2,6 +2,21 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use proc_macro2::TokenStream;
+use quote::quote;
+
+
+/// Calls [`tokenize_bundle`] then wraps in [`ApplySnippets::resolve`]
+pub fn tokenize_bundle_resolve_snippet(
+	world: &World,
+	entity: Entity,
+) -> Result<TokenStream> {
+	let bundle = tokenize_bundle(world, entity)?;
+	quote! {
+		ApplySnippets::resolve(#bundle)
+	}
+	.xok()
+}
+
 
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
 /// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,

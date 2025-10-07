@@ -202,13 +202,22 @@ impl std::fmt::Display for TextContent {
 
 /// Emitted on a piece of content like a TextContent to indicate a new piece of text
 /// was added.
-#[derive(Clone, EntityTargetEvent)]
-pub struct TextDelta(pub String);
+#[derive(Clone, EntityEvent)]
+pub struct TextDelta {
+	entity: Entity,
+	pub value: String,
+}
 
 
 impl TextDelta {
-	pub fn new(text: impl AsRef<str>) -> Self {
-		Self(text.as_ref().to_string())
+	pub fn new(
+		text: impl AsRef<str>,
+	) -> impl 'static + Send + Sync + FnOnce(Entity) -> Self {
+		let text = text.as_ref().to_string();
+		move |entity| Self {
+			entity,
+			value: text,
+		}
 	}
 }
 
@@ -223,16 +232,16 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 	let mut entity = commands.entity(cx.entity);
 
 	if !initial_text.is_empty() {
-		entity.trigger_target(TextDelta::new(initial_text));
+		entity.trigger(TextDelta::new(initial_text));
 	}
 	entity.insert(EntityObserver::new(
 		|ev: On<TextDelta>,
 		 mut text_content: Query<&mut TextContent>|
 		 -> Result {
 			text_content
-				.get_mut(ev.trigger().event_target())?
+				.get_mut(ev.event_target())?
 				.0
-				.push_str(&ev.0);
+				.push_str(&ev.value);
 			Ok(())
 		},
 	));

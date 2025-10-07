@@ -15,14 +15,14 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// let action = world
-/// 	.spawn(EndOnRun(SUCCESS))
+/// 	.spawn(EndWith(Outcome::Pass))
 /// 	.id();
 /// world
 /// 	.spawn((
-/// 		EndOnRun(SUCCESS),
+/// 		EndWith(Outcome::Pass),
 /// 		RunNext::new(action)
 /// 	))
-/// 	.trigger_payload(RUN);
+/// 	.trigger_payload(GetOutcome);
 /// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -43,18 +43,18 @@ impl RunNext {
 			if_result_matches: None,
 		}
 	}
-	/// Create a new RunNext action that only runs if the result is [`Outcome::Success`].
+	/// Create a new RunNext action that only runs if the result is [`Outcome::Pass`].
 	pub fn if_success(action: Entity) -> Self {
 		Self {
 			action,
-			if_result_matches: Some(SUCCESS),
+			if_result_matches: Some(Outcome::Pass),
 		}
 	}
-	/// Create a new RunNext action that only runs if the result is [`Outcome::Failure`].
+	/// Create a new RunNext action that only runs if the result is [`Outcome::Fail`].
 	pub fn if_failure(action: Entity) -> Self {
 		Self {
 			action,
-			if_result_matches: Some(FAILURE),
+			if_result_matches: Some(Outcome::Fail),
 		}
 	}
 }
@@ -72,7 +72,7 @@ fn run_next(
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_payload(RUN);
+	commands.entity(run_next.action).trigger_payload(GetOutcome);
 	Ok(())
 }
 
@@ -90,23 +90,23 @@ mod test {
 		let on_run = collect_on_run(&mut world);
 
 		let action1 = world
-			.spawn((Name::new("action1"), EndOnRun(SUCCESS)))
+			.spawn((Name::new("action1"), EndWith(Outcome::Pass)))
 			.id();
 		world
 			.spawn((
 				Name::new("action2"),
 				RunNext::new(action1),
-				EndOnRun(SUCCESS),
+				EndWith(Outcome::Pass),
 			))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_run
 			.get()
 			.xpect_eq(vec!["action2".to_string(), "action1".to_string()]);
 		on_result.get().xpect_eq(vec![
-			("action2".to_string(), SUCCESS),
-			("action1".to_string(), SUCCESS),
+			("action2".to_string(), Outcome::Pass),
+			("action1".to_string(), Outcome::Pass),
 		]);
 	}
 }

@@ -19,14 +19,14 @@ use std::cmp::Ordering;
 /// world
 ///		.spawn(HighestScore::default())
 ///		.with_child((
-///			EndOnRun(Score::NEUTRAL),
-///			EndOnRun(SUCCESS),
+///			EndWith(Score::NEUTRAL),
+///			EndWith(Outcome::Pass),
 ///		))
 ///		.with_child((
-///			EndOnRun(Score::PASS),
-///			EndOnRun(SUCCESS),
+///			EndWith(Score::PASS),
+///			EndWith(Outcome::Pass),
 ///		))
-///		.trigger_payload(RUN);
+///		.trigger_payload(GetOutcome);
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
@@ -63,7 +63,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		commands.entity(*highest).trigger_payload(RUN);
+		commands.entity(*highest).trigger_payload(GetOutcome);
 	}
 	Ok(())
 }
@@ -89,15 +89,15 @@ mod test {
 			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
-				EndOnRun(Score::NEUTRAL),
-				EndOnRun(SUCCESS),
+				EndWith(Score::NEUTRAL),
+				EndWith(Outcome::Pass),
 			))
 			.with_child((
 				Name::new("child2"),
-				EndOnRun(Score::PASS),
-				EndOnRun(SUCCESS),
+				EndWith(Score::PASS),
+				EndWith(Outcome::Pass),
 			))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 		on_request_score.len().xpect_eq(2);
 		on_score.len().xpect_eq(4);
@@ -108,8 +108,8 @@ mod test {
 			"child2".to_string()
 		]);
 		on_result.get().xpect_eq(vec![
-			("child2".to_string(), SUCCESS),
-			("root".to_string(), SUCCESS),
+			("child2".to_string(), Outcome::Pass),
+			("root".to_string(), Outcome::Pass),
 		]);
 	}
 }

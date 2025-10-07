@@ -139,7 +139,7 @@ mod test {
 	#[test]
 	fn applies_ids() {
 		let mut app = App::new();
-		app.add_plugins((ApplySnippetsPlugin, SignalsPlugin));
+		app.add_plugins(SignalsPlugin);
 		let world = app.world_mut();
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);
@@ -151,7 +151,6 @@ mod test {
 			}))
 			.get::<Children>()
 			.unwrap()[0];
-		world.run_schedule(ApplySnippets);
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
 		world.get::<DomIdx>(div).unwrap().xpect_eq(DomIdx(0));

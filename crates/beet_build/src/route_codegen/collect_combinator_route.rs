@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use beet_parse::prelude::tokenize_bundle;
+use beet_parse::prelude::*;
 use syn::ItemFn;
 
 
@@ -43,7 +43,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			.entity_mut(static_root)
 			.remove::<StaticRoot>()
 			.insert(InstanceRoot);
-		let tokens = tokenize_bundle(world, static_root)?;
+		let tokens = tokenize_bundle_resolve_snippet(world, static_root)?;
 		world
 			.entity_mut(static_root)
 			.remove::<InstanceRoot>()

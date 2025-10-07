@@ -17,13 +17,13 @@ fn main() {
 			children![
 				(
 					Name::new("this child does not run"),
-					EndOnRun(Score(0.4)),
+					EndWith(Score(0.4)),
 				),
 				(
 					Name::new("this child runs"),
-					EndOnRun(Score(0.6)),
+					EndWith(Score(0.6)),
 				)
 			]
 		))
-		.trigger_payload(RUN).flush();
+		.trigger_payload(GetOutcome).flush();
 }

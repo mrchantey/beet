@@ -39,7 +39,7 @@ fn nearest_sentence(
 		&sentences,
 	) {
 		Ok(entity) => {
-			commands.entity(entity).trigger_payload(RUN);
+			commands.entity(entity).trigger_payload(GetOutcome);
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
 	}
@@ -83,7 +83,7 @@ mod test {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));
 				parent.spawn((Name::new("kill"), Sentence::new("kill")));
 			})
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 

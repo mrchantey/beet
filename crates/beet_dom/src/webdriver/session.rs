@@ -232,7 +232,7 @@ impl Session {
 		cmd_rx: async_channel::Receiver<String>,
 	) {
 		IoTaskPool::get()
-			.spawn(async move {
+			.spawn_local(async move {
 				while let Ok(raw) = cmd_rx.recv().await {
 					let send_result = {
 						let mut guard = inner.writer.lock().unwrap();
@@ -297,7 +297,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let client = ClientProcess::new().unwrap();
 				let session = client.new_session().await.unwrap();
 				// Simple BiDi round‑trip health check.

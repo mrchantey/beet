@@ -67,10 +67,10 @@ impl GeminiAgent {
 fn gemini_message_request(
 	ev: On<MessageRequest>,
 	query: Query<&GeminiAgent>,
-	mut commands: Commands,
+	mut commands: AsyncCommands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = ev.trigger().event_target();
+	let actor = ev.event_target();
 	let provider = query.get(actor)?;
 
 	let contents = cx
@@ -139,86 +139,76 @@ fn gemini_message_request(
 
 	let req = provider.stream_req(&contents)?;
 
-	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue_unwrap,
-		async move |queue| {
-			let mut spawner =
-				MessageSpawner::spawn(queue.clone(), actor).await?;
+	commands.run(async move |queue| {
+		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
 
-			let mut stream = req.send().await?.event_source().await?;
+		let mut stream = req.send().await?.event_source().await?;
 
-			let mut input_tokens: u64 = 0;
-			let mut output_tokens: u64 = 0;
-			let mut dump = Vec::new();
+		let mut input_tokens: u64 = 0;
+		let mut output_tokens: u64 = 0;
+		let mut dump = Vec::new();
 
-			while let Some(ev) = stream.next().await {
-				let ev = ev?;
-				let Ok(body) =
-					serde_json::from_str::<serde_json::Value>(&ev.data)
-				else {
-					eprintln!("failed to parse event data as json: {:?}", ev);
-					continue;
-				};
-				// println!("Gemini event: {body:#?}");
+		while let Some(ev) = stream.next().await {
+			let ev = ev?;
+			let Ok(body) = serde_json::from_str::<serde_json::Value>(&ev.data)
+			else {
+				eprintln!("failed to parse event data as json: {:?}", ev);
+				continue;
+			};
+			// println!("Gemini event: {body:#?}");
 
-				dump.push(body.clone());
-				fs_ext::write_async(
-					AbsPathBuf::new_workspace_rel("dump.json").unwrap(),
-					serde_json::to_string_pretty(&dump).unwrap(),
-				)
-				.await
-				.unwrap();
+			dump.push(body.clone());
+			fs_ext::write_async(
+				AbsPathBuf::new_workspace_rel("dump.json").unwrap(),
+				serde_json::to_string_pretty(&dump).unwrap(),
+			)
+			.await
+			.unwrap();
 
 
-				// Update token usage if present
-				if let Some(usage) = body["usageMetadata"].as_object() {
-					input_tokens = usage["promptTokenCount"].to_u64()?;
-					output_tokens = usage["candidatesTokenCount"].to_u64()?;
-				}
-
-				// Streamed candidates with parts
-				let candidates = body["candidates"].to_array()?;
-				if candidates.is_empty() {
-					bevybail!("Gemini Error: {}", body.to_string());
-				}
-				let cand = &candidates[0];
-				let parts = cand["content"]["parts"].to_array()?;
-				let text_content_id = 0;
-				let image_content_id = 1;
-				for part in parts.iter() {
-					if let Some(text) = part["text"].as_str() {
-						spawner.add_or_delta(text_content_id, text).await?;
-					} else if let Some(inline) = part["inlineData"].as_object()
-					{
-						let mime = inline["mimeType"].to_str()?;
-						let data = inline["data"].to_str()?;
-						let ext = mime.split('/').nth(1).unwrap();
-						let content =
-							FileContent::new_b64(&"foobar", ext, data);
-						spawner.insert(image_content_id, content).await?;
-					} else {
-						bevybail!(
-							"Unhandled Gemini part: {}",
-							part.to_string()
-						);
-					}
-				}
+			// Update token usage if present
+			if let Some(usage) = body["usageMetadata"].as_object() {
+				input_tokens = usage["promptTokenCount"].to_u64()?;
+				output_tokens = usage["candidatesTokenCount"].to_u64()?;
 			}
 
-			// Persist usage and finalize the message
-			queue
-				.entity(actor)
-				.with(move |mut entity| {
-					let mut tokens = entity.get_mut::<TokenUsage>().unwrap();
-					tokens.input_tokens += input_tokens;
-					tokens.output_tokens += output_tokens;
-				})
-				.await;
+			// Streamed candidates with parts
+			let candidates = body["candidates"].to_array()?;
+			if candidates.is_empty() {
+				bevybail!("Gemini Error: {}", body.to_string());
+			}
+			let cand = &candidates[0];
+			let parts = cand["content"]["parts"].to_array()?;
+			let text_content_id = 0;
+			let image_content_id = 1;
+			for part in parts.iter() {
+				if let Some(text) = part["text"].as_str() {
+					spawner.add_or_delta(text_content_id, text).await?;
+				} else if let Some(inline) = part["inlineData"].as_object() {
+					let mime = inline["mimeType"].to_str()?;
+					let data = inline["data"].to_str()?;
+					let ext = mime.split('/').nth(1).unwrap();
+					let content = FileContent::new_b64(&"foobar", ext, data);
+					spawner.insert(image_content_id, content).await?;
+				} else {
+					bevybail!("Unhandled Gemini part: {}", part.to_string());
+				}
+			}
+		}
 
-			spawner.finish_message().await?;
-			Ok(())
-		},
-	);
+		// Persist usage and finalize the message
+		queue
+			.entity(actor)
+			.with(move |mut entity| {
+				let mut tokens = entity.get_mut::<TokenUsage>().unwrap();
+				tokens.input_tokens += input_tokens;
+				tokens.output_tokens += output_tokens;
+			})
+			.await;
+
+		spawner.finish_message().await?;
+		Ok(())
+	});
 
 	Ok(())
 }

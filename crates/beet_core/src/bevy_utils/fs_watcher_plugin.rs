@@ -27,23 +27,19 @@ impl Plugin for FsWatcherPlugin {
 	}
 }
 
-fn watch_file_changes(watcher: Res<FsWatcher>, mut commands: Commands) {
+fn watch_file_changes(watcher: Res<FsWatcher>, mut commands: AsyncCommands) {
 	let watcher = watcher.clone();
-	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue_unwrap,
-		async move |queue| {
-			let mut rx = watcher.watch()?;
-			while let Some(ev) = rx.recv().await? {
-				if ev.has_mutate() {
-					let mutated =
-						ev.take().into_iter().filter(|ev| ev.mutated());
-					queue.write_message_batch(mutated);
-				}
+	commands.run(async move |queue| {
+		let mut rx = watcher.watch()?;
+		while let Some(ev) = rx.recv().await? {
+			if ev.has_mutate() {
+				let mutated = ev.take().into_iter().filter(|ev| ev.mutated());
+				queue.write_message_batch(mutated);
 			}
+		}
 
-			Ok(())
-		},
-	);
+		Ok(())
+	});
 }
 
 impl Default for FsWatcherPlugin {

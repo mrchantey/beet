@@ -106,14 +106,9 @@ fn nested_template() {
 
 	#[template]
 	fn NestedTemplate(initial: u32) -> impl Bundle {
-		(
-			rsx! {
-				<span>"value: "{initial}</span>
-			},
-			OnSpawnTyped::new(|entity| {
-				entity.insert(common_idx_nested());
-			}),
-		)
+		(common_idx_nested(), rsx! {
+			<span>"value: "{initial}</span>
+		})
 	}
 
 	apply_and_render(&scene, rsx! {
@@ -156,8 +151,7 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 
 	let root = app
 		.world_mut()
-		.spawn((HtmlDocument, bundle))
-		.insert(common_idx())
+		.spawn((HtmlDocument, common_idx(), bundle))
 		.id();
 
 	app.world_mut()

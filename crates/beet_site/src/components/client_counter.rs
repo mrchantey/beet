@@ -17,7 +17,9 @@ pub fn ClientCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 		div {
 			display: flex;
 			align-items: center;
+			flex-direction:column;
 			gap: 1.em;
+			padding:1.em 0.em;
 		}
 	</style>
 	}

@@ -104,7 +104,7 @@ pub fn fetch_npc(
 						TargetEntity::Parent,
 					),
 					HandleWrapper(bert),
-					EndOnRun(SUCCESS),
+					EndWith(Outcome::Pass),
 				),
 				(
 					Name::new("Fetch"),

@@ -114,7 +114,6 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		let text = app.world().entity(div).get::<Children>().unwrap()[0];
-		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(text)
@@ -148,7 +147,6 @@ mod test {
 			.get::<Children>()
 			.unwrap()[0];
 		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
-		app.world_mut().run_schedule(ApplySnippets);
 
 		app.world()
 			.entity(attr)

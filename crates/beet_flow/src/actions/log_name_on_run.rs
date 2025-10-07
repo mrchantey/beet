@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 ///		.spawn((Name::new("root"), LogNameOnRun))
-///		.trigger_payload(RUN);
+///		.trigger_payload(GetOutcome);
 /// ```
 #[action(log_name_on_run)]
 #[derive(Default, Component, Reflect)]
@@ -38,7 +38,7 @@ mod test {
 		let mut world = BeetFlowPlugin::world();
 		world
 			.spawn((Name::new("root"), LogNameOnRun))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 	}
 }

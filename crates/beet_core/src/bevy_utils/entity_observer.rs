@@ -56,16 +56,14 @@ mod test {
 
 	#[test]
 	fn works() {
-		#[derive(EntityTargetEvent)]
-		struct Foo(u32);
+		#[derive(EntityEvent)]
+		struct Foo(Entity);
 
 		let store = Store::default();
 		let mut world = World::new();
 		world
-			.spawn(EntityObserver::new(move |ev: On<Foo>| {
-				store.set(ev.event().0)
-			}))
-			.trigger_target(Foo(3));
+			.spawn(EntityObserver::new(move |_: On<Foo>| store.set(3)))
+			.trigger(Foo);
 
 		store.get().xpect_eq(3);
 	}

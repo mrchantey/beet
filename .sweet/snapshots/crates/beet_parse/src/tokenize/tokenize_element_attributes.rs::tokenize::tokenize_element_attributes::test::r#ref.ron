@@ -3,7 +3,7 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    (
+    ApplySnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new(
                 "crates/beet_parse/src/tokenize/tokenize_element_attributes.rs",
@@ -18,5 +18,5 @@
             OnSpawnDeferred::parent:: < AttributeOf > (move | entity | { span_ref
             .set(entity.id()); Ok(()) }), ExprIdx(0u32))]))]
         },
-    )
+    ))
 }

@@ -17,10 +17,10 @@ use beet_core::prelude::*;
 ///	world.spawn((
 /// 	Fallback,
 /// 	children![
-/// 		EndOnRun(FAILURE),
-/// 		EndOnRun(SUCCESS),
+/// 		EndWith(Outcome::Fail),
+/// 		EndWith(Outcome::Pass),
 ///    ]))
-///		.trigger_payload(RUN)
+///		.trigger_payload(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -36,9 +36,9 @@ fn on_start(
 ) -> Result {
 	let children = query.get(ev.event_target())?;
 	if let Some(first_child) = children.iter().next() {
-		commands.entity(first_child).trigger_payload(RUN);
+		commands.entity(first_child).trigger_payload(GetOutcome);
 	} else {
-		commands.entity(ev.event_target()).trigger_payload(FAILURE);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -51,7 +51,7 @@ fn on_next(
 	let target = ev.event_target();
 	let child = ev.child();
 	// if any success, propagate the success
-	if ev.is_success() {
+	if ev.is_pass() {
 		commands.trigger(ev.event().clone().into_end());
 		return Ok(());
 	}
@@ -65,7 +65,7 @@ fn on_next(
 		commands.trigger(ev.event().clone().into_end());
 	} else {
 		// run next
-		commands.entity(children[index + 1]).trigger_payload(RUN);
+		commands.entity(children[index + 1]).trigger_payload(GetOutcome);
 	}
 	Ok(())
 }
@@ -85,10 +85,10 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), Fallback, children![
-				(Name::new("child1"), EndOnRun(FAILURE)),
-				(Name::new("child2"), EndOnRun(SUCCESS)),
+				(Name::new("child1"), EndWith(Outcome::Fail)),
+				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_payload(RUN)
+			.trigger_payload(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -97,9 +97,9 @@ mod test {
 			"child2".to_string(),
 		]);
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), FAILURE),
-			("child2".to_string(), SUCCESS),
-			("root".to_string(), SUCCESS),
+			("child1".to_string(), Outcome::Fail),
+			("child2".to_string(), Outcome::Pass),
+			("root".to_string(), Outcome::Pass),
 		]);
 	}
 }

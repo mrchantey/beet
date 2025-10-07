@@ -7,7 +7,7 @@ use std::hash::Hasher;
 
 
 
-/// Insert a [`LangSnippetHash`]  script and style nodes.
+/// Insert a [`LangSnippetHash`] for script and style nodes.
 pub fn apply_lang_snippet_hashes(
 	mut commands: Commands,
 	query: Populated<

@@ -2,6 +2,8 @@ use crate::prelude::*;
 use bevy::app::MainScheduleOrder;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
+use bevy::tasks::IoTaskPool;
+use bevy::tasks::Task;
 
 
 #[extend::ext(name=BeetCoreAppExt)]
@@ -64,16 +66,24 @@ pub impl App {
 	/// run an io task to completion, polling at 10 millisecond intervals
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
-		F: Future<Output = O> + 'static + MaybeSend,
-		O: 'static + MaybeSend,
+		F: Future<Output = O> + 'static + Send,
+		O: 'static + Send,
 	{
-		use bevy::tasks::IoTaskPool;
-
+		self.await_io_task(IoTaskPool::get().spawn(fut)).await
+	}
+	/// run an io task to completion, polling at 10 millisecond intervals
+	async fn run_io_task_local<F, O>(&mut self, fut: F) -> O
+	where
+		F: Future<Output = O> + 'static,
+		O: 'static,
+	{
+		self.await_io_task(IoTaskPool::get().spawn_local(fut)).await
+	}
+	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
 		self.init_plugin(TaskPoolPlugin::default());
 		// spin up async task pool
 		self.run_once();
 
-		let task = IoTaskPool::get().spawn(fut);
 		while !task.is_finished() {
 			self.update();
 			crate::time_ext::sleep_millis(10).await;

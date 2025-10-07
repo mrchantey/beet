@@ -16,13 +16,13 @@
 						// "lambda",
 						// "webdriver",
 						// "css",
-						"sim",
-						"bevy_default",
-						"spatial",
-						"examples",
-						"ml",
-						"cuda",
-						"rand"
+						// "sim",
+						// "bevy_default",
+						// "spatial",
+						// "examples",
+						// "ml",
+						// "cuda",
+						// "rand"
 					]
 				}
 			}
@@ -30,6 +30,7 @@
 	},
 	"diagnostics": {},
 	"file_scan_exclusions": [
+		".sweet",
 		"**/.git",
 		".gitattributes",
 		"LICENSE-APACHE.txt",

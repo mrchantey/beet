@@ -1,3 +1,4 @@
+use beet_core::prelude::*;
 use beet_ml::prelude::*;
 
 #[tokio::main]

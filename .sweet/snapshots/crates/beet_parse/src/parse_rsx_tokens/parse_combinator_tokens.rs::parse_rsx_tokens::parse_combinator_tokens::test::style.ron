@@ -3,7 +3,7 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    (
+    ApplySnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new(
                 "crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs",
@@ -22,5 +22,5 @@
             StyleScope::Global, StyleElement,
             InnerText(String::from("body {\n  font-size: 1.4em;\n  font-family: system-ui, sans-serif;\n  background: #000;\n  color: #fff;\n}\n")))]
         },
-    )
+    ))
 }

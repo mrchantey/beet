@@ -38,9 +38,9 @@ fn succeed_times(
 
 	if action.times < action.max_times {
 		action.times += 1;
-		commands.entity(ev.event_target()).trigger_payload(SUCCESS);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Pass);
 	} else {
-		commands.entity(ev.event_target()).trigger_payload(FAILURE);
+		commands.entity(ev.event_target()).trigger_payload(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -58,28 +58,28 @@ mod test {
 
 		let entity = world.spawn(SucceedTimes::new(2)).id();
 
-		world.entity_mut(entity).trigger_payload(RUN).flush();
+		world.entity_mut(entity).trigger_payload(GetOutcome).flush();
 
 		on_result
 			.get()
-			.xpect_eq(vec![("Unknown".to_string(), SUCCESS)]);
-		world.entity_mut(entity).trigger_payload(RUN).flush();
+			.xpect_eq(vec![("Unknown".to_string(), Outcome::Pass)]);
+		world.entity_mut(entity).trigger_payload(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), SUCCESS),
-			("Unknown".to_string(), SUCCESS),
+			("Unknown".to_string(), Outcome::Pass),
+			("Unknown".to_string(), Outcome::Pass),
 		]);
-		world.entity_mut(entity).trigger_payload(RUN).flush();
+		world.entity_mut(entity).trigger_payload(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), SUCCESS),
-			("Unknown".to_string(), SUCCESS),
-			("Unknown".to_string(), FAILURE),
+			("Unknown".to_string(), Outcome::Pass),
+			("Unknown".to_string(), Outcome::Pass),
+			("Unknown".to_string(), Outcome::Fail),
 		]);
-		world.entity_mut(entity).trigger_payload(RUN).flush();
+		world.entity_mut(entity).trigger_payload(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), SUCCESS),
-			("Unknown".to_string(), SUCCESS),
-			("Unknown".to_string(), FAILURE),
-			("Unknown".to_string(), FAILURE),
+			("Unknown".to_string(), Outcome::Pass),
+			("Unknown".to_string(), Outcome::Pass),
+			("Unknown".to_string(), Outcome::Fail),
+			("Unknown".to_string(), Outcome::Fail),
 		]);
 	}
 }

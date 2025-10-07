@@ -102,7 +102,7 @@ impl Plugin for CliAgentPlugin {
 }
 
 impl CliAgentPlugin {
-	pub fn into_system(&self) -> impl 'static + Fn(Commands) {
+	pub fn into_system(&self) -> impl 'static + Fn(AsyncCommands) {
 		let initial_prompt = if let Some(prompt) = &self.initial_prompt {
 			Some(prompt.clone())
 		} else if !self.initial_prompt_trailing.is_empty() {
@@ -123,18 +123,14 @@ impl CliAgentPlugin {
 		move |mut commands| {
 			let initial_prompt = initial_prompt.clone();
 			let paths = paths.clone();
-			commands.run_system_cached_with(
-				AsyncTask::spawn_with_queue_unwrap,
-				async move |queue| {
-					let files = async_ext::try_join_all(paths.into_iter().map(
-						async |path| {
-							FileContent::new(path.to_string_lossy()).await
-						},
-					))
-					.await?;
+			commands.run(async move |queue| {
+				let files = async_ext::try_join_all(paths.into_iter().map(
+					async |path| FileContent::new(path.to_string_lossy()).await,
+				))
+				.await?;
 
-					queue.with(move |world| {
-						#[rustfmt::skip]
+				queue.with(move |world| {
+					#[rustfmt::skip]
 						world.spawn((
 							Session::default(),
 							children![
@@ -176,10 +172,9 @@ impl CliAgentPlugin {
 								})),
 							)
 						]));
-					});
-					Ok(())
-				},
-			);
+				});
+				Ok(())
+			});
 		}
 	}
 }
@@ -191,16 +186,16 @@ fn terminal_user() -> impl Bundle {
 }
 
 fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.event().event_target())?;
+	let actor = cx.actor(ev.event_target())?;
 	if actor.role != ActorRole::User {
 		print_flush!("\n{} > ", actor.role);
 	}
 	Ok(())
 }
 fn text_delta(ev: On<TextDelta>, cx: SessionParams) -> Result {
-	let actor = cx.actor(ev.trigger().event_target())?;
+	let actor = cx.actor(ev.event_target())?;
 	if actor.role != ActorRole::User {
-		print_flush!("{}", ev.event().0);
+		print_flush!("{}", ev.value);
 	}
 	Ok(())
 }
@@ -227,7 +222,7 @@ fn file_inserted(
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	query: Query<&FileContent>,
-	mut commands: Commands,
+	mut commands: AsyncCommands,
 ) -> Result {
 	let file = query.get(ev.event().event_target())?;
 	let actor = cx.actor(ev.event().event_target())?;
@@ -235,14 +230,11 @@ fn file_inserted(
 		let filename = config.next_available_filename(file.extension())?;
 		print_flush!("\n{} > file: {}", actor.role, filename);
 		let file = file.clone();
-		commands.run_system_cached_with(
-			AsyncTask::spawn_with_queue_unwrap,
-			async move |_| {
-				let data = file.data.get().await?;
-				fs_ext::write_async(filename, data).await?;
-				Ok(())
-			},
-		);
+		commands.run(async move |_| {
+			let data = file.data.get().await?;
+			fs_ext::write_async(filename, data).await?;
+			Ok(())
+		});
 	}
 	Ok(())
 }
@@ -266,17 +258,13 @@ fn route_message_requests(
 	let actor = cx.actor(ev.event().event_target())?;
 	match actor.role {
 		ActorRole::User => {
-			commands
-				.entity(agents.single()?)
-				.trigger_target(MessageRequest);
+			commands.entity(agents.single()?).trigger(MessageRequest);
 		}
 		ActorRole::Agent if config.oneshot => {
 			commands.write_message(AppExit::Success);
 		}
 		ActorRole::Agent => {
-			commands
-				.entity(users.single()?)
-				.trigger_target(MessageRequest);
+			commands.entity(users.single()?).trigger(MessageRequest);
 		}
 		_ => {}
 	}
@@ -286,49 +274,42 @@ fn route_message_requests(
 
 fn user_message_request(
 	ev: On<MessageRequest>,
-	mut commands: Commands,
+	mut commands: AsyncCommands,
 	cx: SessionParams,
 ) -> Result {
-	let actor = cx.actor(ev.trigger().event_target())?.entity;
-	commands.run_system_cached_with(
-		AsyncTask::spawn_with_queue_unwrap,
-		async move |queue| {
-			use std::io;
-			use std::io::Write;
+	let actor = cx.actor(ev.event_target())?.entity;
+	commands.run(async move |queue| {
+		use std::io;
+		use std::io::Write;
 
-			let stdin = io::stdin();
-			let mut input = String::new();
-			print_flush!("\nUser > ");
-			input.clear();
-			let _ = io::stdout().flush();
+		let stdin = io::stdin();
+		let mut input = String::new();
+		print_flush!("\nUser > ");
+		input.clear();
+		let _ = io::stdout().flush();
 
-			let mut spawner =
-				MessageSpawner::spawn(queue.clone(), actor).await?;
-			match stdin.read_line(&mut input) {
-				Ok(0) => {
-					// EOF reached
-					println!("EOF");
-				}
-				Ok(_) => {
-					// trim trailing newline and print the input
-					let line = input.trim_end().to_string();
-					let id = 0;
-					spawner
-						.add(
-							id,
-							(TextContent::new(line), ContentEnded::default()),
-						)
-						.await?
-						.finish_message()
-						.await?;
-					println!();
-				}
-				Err(err) => {
-					eprintln!("Error reading input: {}", err);
-				}
+		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
+		match stdin.read_line(&mut input) {
+			Ok(0) => {
+				// EOF reached
+				println!("EOF");
 			}
-			Ok(())
-		},
-	);
+			Ok(_) => {
+				// trim trailing newline and print the input
+				let line = input.trim_end().to_string();
+				let id = 0;
+				spawner
+					.add(id, (TextContent::new(line), ContentEnded::default()))
+					.await?
+					.finish_message()
+					.await?;
+				println!();
+			}
+			Err(err) => {
+				eprintln!("Error reading input: {}", err);
+			}
+		}
+		Ok(())
+	});
 	Ok(())
 }

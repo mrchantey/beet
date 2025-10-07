@@ -18,8 +18,7 @@ pub struct ApplyDirectives;
 
 
 pub(crate) fn schedule_order_plugin(app: &mut App) {
-	app.insert_schedule_before(Update, ApplySnippets)
-		.insert_schedule_after(ApplySnippets, ApplyDirectives)
+	app.insert_schedule_before(Update, ApplyDirectives)
 		.insert_schedule_after(ApplyDirectives, PropagateSignals);
 }
 
@@ -39,8 +38,7 @@ impl Plugin for ApplyDirectivesPlugin {
 			);
 		}
 
-		app.init_plugin(ApplySnippetsPlugin)
-			.init_plugin(schedule_order_plugin)
+		app.init_plugin(schedule_order_plugin)
 			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()

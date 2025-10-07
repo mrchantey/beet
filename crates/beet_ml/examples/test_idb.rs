@@ -5,7 +5,7 @@ fn main() {
 	let result = open_or_fetch_blocking(
 		"https://png.pngtree.com/png-clipart/20200225/original/pngtree-image-of-cute-radish-vector-or-color-illustration-png-image_5274337.jpg",
 	);
-	log::info!("SUCCESS {:?}", result);
+	log::info!("Success {:?}", result);
 }
 #[cfg(not(target_arch = "wasm32"))]
 

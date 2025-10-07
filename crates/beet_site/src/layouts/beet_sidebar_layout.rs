@@ -22,6 +22,7 @@ pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
 	rsx! {
 		<BeetContext>
 		<PageLayout>
+			<BeetHead slot="head"/>
 		// <slot name="head" slot="head" />
 		// <slot name="header" slot="header" />
 		// <slot name="header-nav" slot="header-nav" />

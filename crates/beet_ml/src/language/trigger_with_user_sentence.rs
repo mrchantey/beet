@@ -58,7 +58,7 @@ mod test {
 		let on_run = observer_ext::observe_triggers::<Run>(world);
 
 		let entity = world
-			.spawn((TriggerWithUserSentence::default(), EndOnRun(SUCCESS)))
+			.spawn((TriggerWithUserSentence::default(), EndWith(Outcome::Pass)))
 			.id();
 		world.flush();
 
