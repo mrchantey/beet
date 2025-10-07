@@ -51,7 +51,7 @@ fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
 		world
 			.entity_mut(entity)
-			.insert(OnSpawnDeferred::trigger(ev.event));
+			.insert(OnSpawnDeferred::trigger_action(ev.event));
 		Ok(())
 	});
 }
@@ -66,11 +66,11 @@ mod test {
 	#[test]
 	fn works() {
 		let mut world = World::new();
-		let observers = observer_ext::observe_triggers::<End>(&mut world);
+		let observers = observer_ext::observe_triggers::<Outcome>(&mut world);
 		world.spawn((TriggerDeferred::run(), EndWith(Outcome::Pass)));
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);
-		observers.get_index(0).unwrap().value().xpect_eq(Outcome::Pass);
+		observers.get_index(0).unwrap().xpect_eq(Outcome::Pass);
 	}
 }

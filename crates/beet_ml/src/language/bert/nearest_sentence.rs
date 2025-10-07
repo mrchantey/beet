@@ -15,7 +15,7 @@ impl NearestSentence {
 }
 
 fn nearest_sentence(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
@@ -66,7 +66,7 @@ mod test {
 		))
 		.finish();
 		let on_run =
-			observer_ext::observe_trigger_names::<Run>(app.world_mut());
+			observer_ext::observe_trigger_names::<GetOutcome>(app.world_mut());
 
 		let handle =
 			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")

@@ -70,7 +70,7 @@ fn main() {
 						));
 				});
 			parent.spawn(Name::new("After Long Running")).observe(
-				|_trigger: On<Run>| {
+				|_trigger: On<GetOutcome>| {
 					println!("After Long Running triggered, exiting");
 					std::process::exit(0);
 				},

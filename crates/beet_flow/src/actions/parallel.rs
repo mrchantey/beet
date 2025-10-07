@@ -30,7 +30,7 @@ use bevy::platform::collections::HashSet;
 pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
@@ -38,7 +38,9 @@ fn on_start(
 	action.clear();
 
 	if children.is_empty() {
-		commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
+		commands
+			.entity(ev.event_target())
+			.trigger_action(Outcome::Pass);
 		return Ok(());
 	}
 
@@ -49,8 +51,8 @@ fn on_start(
 }
 
 fn on_next(
-	ev: On<ChildEnd>,
-	mut commands: Commands,
+	ev: On<ChildEnd<Outcome>>,
+	commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
 	let target = ev.event_target();
@@ -58,7 +60,7 @@ fn on_next(
 
 	// if any error, just propagate the error
 	if ev.is_fail() {
-		commands.trigger(ev.event().clone().into_end());
+		ChildEnd::propagate(commands, &ev);
 		return Ok(());
 	}
 
@@ -67,7 +69,7 @@ fn on_next(
 
 	// if all children have completed successfully, succeed
 	if action.len() == children.len() {
-		commands.trigger(ev.event().clone().into_end());
+		ChildEnd::propagate(commands, &ev);
 	}
 	Ok(())
 }

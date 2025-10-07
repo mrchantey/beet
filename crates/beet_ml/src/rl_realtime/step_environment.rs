@@ -37,7 +37,7 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: MessageWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
@@ -100,7 +100,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		let on_result = observer_ext::observe_triggers::<End>(app.world_mut());
+		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.add_plugins((
 			BeetFlowPlugin::default(),

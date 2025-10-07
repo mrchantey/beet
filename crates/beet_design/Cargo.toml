@@ -11,6 +11,7 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 publish = true
+exclude = ["src/**/:*.rs"]
 
 # [[bin]]
 # name = "run-build"

@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 mod action;
+mod action_event;
 mod bundle_effect;
 mod sendit;
 mod to_tokens;
@@ -90,7 +91,7 @@ pub fn bundle_effect(
 /// #[derive(Component)]
 /// struct LogOnRun(pub String);
 ///
-/// fn log_on_run(trigger: On<Run>, query: Populated<&LogOnRun>) {
+/// fn log_on_run(trigger: On<GetOutcome>, query: Populated<&LogOnRun>) {
 /// 	let name = query.get(trigger.target()).unwrap();
 /// 	println!("log_name_on_run: {}", name.0);
 /// }
@@ -101,4 +102,19 @@ pub fn action(
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	action::impl_action(attr, item)
+}
+
+
+/// Macro for [`ActionEvent`]
+///
+/// ```ignore
+/// /// Enable propagation using the given Traversal implementation
+/// #[action_event(propagate = &'static ChildOf)]
+/// /// Always propagate
+/// #[action_event(auto_propagate)]
+/// struct MyEvent;
+/// ```
+#[proc_macro_derive(ActionEvent, attributes(action_event))]
+pub fn action_event(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	action_event::impl_action_event(input).into()
 }

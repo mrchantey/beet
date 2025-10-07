@@ -70,7 +70,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default()).insert_time();
 
-		let on_result = observer_ext::observe_triggers::<End>(app.world_mut());
+		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.world_mut().spawn((
 			Running::default(),

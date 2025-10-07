@@ -98,7 +98,7 @@ struct AttackPlayer {
 }
 
 fn attack_player(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	attacks: Query<(&AttackPlayer, &Name)>,
 	mut query: Query<(&mut Health, &Name)>,
 	mut random_source: ResMut<RandomSource>,
@@ -178,7 +178,7 @@ impl Default for RandomScoreProvider {
 
 
 fn provide_random_score(
-	ev: On<Run<GetScore>>,
+	ev: On<GetScore>,
 	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
@@ -201,7 +201,7 @@ fn provide_random_score(
 struct TryHealSelf;
 
 fn try_heal_self(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: AgentQuery<(&mut Health, &mut HealingPotions)>,
 ) -> Result {

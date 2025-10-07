@@ -73,7 +73,7 @@ fn setup(
 			children![
 				(
 					Name::new("Idle"),
-					RemoveOn::<Run, Velocity>::new_with_target(
+					RemoveOn::<GetOutcome, Velocity>::new_with_target(
 						TargetEntity::Agent,
 					),
 					PlayAnimation::new(idle_index)
@@ -84,7 +84,7 @@ fn setup(
 				(
 					Name::new("Seek"),
 					Seek::default(),
-					InsertOn::<Run, _>::new_with_target(
+					InsertOn::<GetOutcome, _>::new_with_target(
 						Velocity::default(),
 						TargetEntity::Agent,
 					),

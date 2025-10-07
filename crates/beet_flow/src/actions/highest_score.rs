@@ -36,7 +36,7 @@ use std::cmp::Ordering;
 pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
@@ -81,9 +81,8 @@ mod test {
 		let on_run = collect_on_run(&mut world);
 		let on_result = collect_on_result(&mut world);
 		let on_request_score =
-			observer_ext::observe_triggers::<Run<GetScore>>(&mut world);
-		let on_score =
-			observer_ext::observe_triggers::<End<Score>>(&mut world);
+			observer_ext::observe_triggers::<GetScore>(&mut world);
+		let on_score = observer_ext::observe_triggers::<Score>(&mut world);
 
 		world
 			.spawn((Name::new("root"), HighestScore::default()))

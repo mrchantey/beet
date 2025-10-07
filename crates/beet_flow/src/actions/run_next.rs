@@ -59,7 +59,7 @@ impl RunNext {
 }
 
 fn run_next(
-	ev: On<End>,
+	ev: On<Outcome>,
 	mut commands: Commands,
 	query: Query<&RunNext>,
 ) -> Result {
@@ -67,7 +67,7 @@ fn run_next(
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
 	if let Some(check) = &run_next.if_result_matches {
-		if **ev != *check {
+		if *ev != *check {
 			return Ok(());
 		}
 	}

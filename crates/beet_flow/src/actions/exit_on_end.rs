@@ -6,8 +6,8 @@ use beet_core::prelude::*;
 #[derive(Debug, Component)]
 pub struct ExitOnEnd;
 
-fn exit_on_end(ev: On<End>, mut commands: Commands) {
-	let exit = match ev.value() {
+fn exit_on_end(ev: On<Outcome>, mut commands: Commands) {
+	let exit = match ev.event() {
 		Outcome::Pass => AppExit::Success,
 		Outcome::Fail => AppExit::error(),
 	};

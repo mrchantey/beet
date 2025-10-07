@@ -12,8 +12,8 @@ pub struct NoInterrupt;
 /// removes [`Running`] from children when [`Run`] is called, unless they have a [`NoInterrupt`].
 /// Unlike [`interrupt_on_result`], this does not remove the `Running` component
 /// from the action entity, as it may have been *just added*.
-pub(crate) fn interrupt_on_run<T: 'static + Send + Sync>(
-	ev: On<Run<T>>,
+pub(crate) fn interrupt_run<T: RunEvent>(
+	ev: On<T>,
 	mut commands: Commands,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 	children: Populated<&Children>,
@@ -30,8 +30,8 @@ pub(crate) fn interrupt_on_run<T: 'static + Send + Sync>(
 
 /// Removes [`Running`] from the entity when [`End`] is triggered.
 /// Also removes [`Running`] from children unless they have a [`NoInterrupt`].
-pub(crate) fn interrupt_on_end<T: 'static + Send + Sync>(
-	ev: On<End<T>>,
+pub(crate) fn interrupt_end<T: EndEvent>(
+	ev: On<T>,
 	mut commands: Commands,
 	children: Query<&Children>,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
@@ -62,7 +62,10 @@ mod test {
 	#[test]
 	fn interrupt_on_run() {
 		let mut world = BeetFlowPlugin::world();
-		world.spawn(children![Running]).trigger_action(GetOutcome).flush();
+		world
+			.spawn(children![Running])
+			.trigger_action(GetOutcome)
+			.flush();
 		world.query_once::<&Running>().len().xpect_eq(0);
 	}
 	#[test]

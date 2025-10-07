@@ -49,7 +49,7 @@ fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 			world
 				.commands()
 				.entity(cx.entity)
-			  #(.observe(#observers))*;
+			  #(.observe_any(#observers))*;
 		}
 		#item
 	})

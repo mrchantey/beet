@@ -4,18 +4,20 @@ use beet_core::prelude::*;
 
 /// The payload for requesting a score, for example usage see [`HighestScore`].
 #[derive(
-	Debug, Default, Copy, Clone, PartialEq, PartialOrd, Component, Reflect,
+	Debug,
+	Default,
+	Copy,
+	Clone,
+	PartialEq,
+	PartialOrd,
+	Component,
+	Reflect,
+	ActionEvent,
 )]
 pub struct GetScore;
 
-impl RunPayload for GetScore {
+impl RunEvent for GetScore {
 	type End = Score;
-}
-impl ActionEvent for GetScore {
-	type Event = Run<GetScore>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		Run::new(entity, self)
-	}
 }
 
 
@@ -39,18 +41,12 @@ impl ActionEvent for GetScore {
 	DerefMut,
 	Component,
 	Reflect,
+	ActionEvent,
 )]
 pub struct Score(pub f32);
 
-impl EndPayload for Score {
+impl EndEvent for Score {
 	type Run = GetScore;
-}
-
-impl ActionEvent for Score {
-	type Event = End<Score>;
-	fn into_event(self, entity: Entity) -> Self::Event {
-		End::new(entity, self)
-	}
 }
 
 impl Score {

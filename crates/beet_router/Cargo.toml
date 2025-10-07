@@ -4,11 +4,11 @@ version.workspace = true
 edition.workspace = true
 description = "ECS router and server utilities"
 documentation.workspace = true
-readme = "README.md"
+readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["router"]
+keywords = ["bevy","server","router"]
 categories.workspace = true
 publish = true
 

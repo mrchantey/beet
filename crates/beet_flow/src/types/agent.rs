@@ -6,18 +6,21 @@ use bevy::ecs::query::ROQueryItem;
 
 /// Many actions have a canonical entity they may refer to as the `agent`.
 /// For instance a behavior tree may use an npc entity with a `Health` component.
-#[derive(Debug, Copy, Clone, Reflect, Component)]
+#[derive(Debug, Default, Copy, Clone, Reflect, Component)]
 pub struct Agent;
 
-
+/// Declare this action as belonging to the
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = Actions)]
 pub struct ActionOf(pub Entity);
 
+/// Added to agents, listing all actions which belong to it. Actions which are
+/// [`Children`].
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship_target(relationship = ActionOf, linked_spawn)]
+#[require(Agent)]
 pub struct Actions(Vec<Entity>);
 
 

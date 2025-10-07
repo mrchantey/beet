@@ -52,19 +52,15 @@ impl Default for Repeat {
 }
 
 fn repeat(
-	ev: On<End>,
+	ev: On<Outcome>,
 	query: Query<&Repeat>,
-	children: Query<&ChildOf>,
 	mut commands: Commands,
 ) -> Result {
 	let repeat = query.get(ev.event_target())?;
 	if let Some(check) = &repeat.if_result_matches {
-		if **ev != *check {
+		if *ev != *check {
 			// repeat is completed, propagate the result to the parent if it exists
-			if let Ok(parent) = children.get(ev.event_target()) {
-				commands
-					.trigger(ev.event().clone().into_child_end(parent.get()));
-			}
+			ChildEnd::trigger(commands, &ev);
 			return Ok(());
 		}
 	}

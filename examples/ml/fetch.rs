@@ -114,7 +114,7 @@ pub fn fetch_npc(
 					},
 					Seek::default(),
 					PlayAnimation::new(walk_index).repeat_forever(),
-					InsertOn::<Run, _>::new_with_target(
+					InsertOn::<GetOutcome, _>::new_with_target(
 						Velocity::default(),
 						TargetEntity::Agent,
 					),
@@ -123,7 +123,7 @@ pub fn fetch_npc(
 				(
 					Name::new("Idle"),
 					TriggerOnAnimationReady::run(),
-					RemoveOn::<Run, Velocity>::new_with_target(
+					RemoveOn::<GetOutcome, Velocity>::new_with_target(
 						TargetEntity::Agent,
 					),
 					PlayAnimation::new(idle_index).repeat_forever(),

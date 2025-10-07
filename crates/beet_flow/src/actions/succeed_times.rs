@@ -30,7 +30,7 @@ impl SucceedTimes {
 }
 
 fn succeed_times(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: Query<&mut SucceedTimes>,
 ) -> Result {

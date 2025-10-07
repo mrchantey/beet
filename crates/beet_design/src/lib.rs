@@ -1,7 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 // #![deny(missing_docs)]
-#![doc = include_str!("../README.md")]
 /// Color theme and utilities
 pub mod color;
 pub mod css;

@@ -19,7 +19,7 @@ impl FindStatSteerTarget {}
 // TODO this shouldnt run every frame?
 
 fn find_steer_target(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	targets: Query<(&StatId, &StatValue, &ChildOf), With<StatProvider>>,
 	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,

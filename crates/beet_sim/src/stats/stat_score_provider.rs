@@ -59,7 +59,7 @@ impl StatScoreProvider {
 
 
 fn provide_score(
-	ev: On<Run<GetScore>>,
+	ev: On<GetScore>,
 	mut commands: Commands,
 	stat_map: Res<StatMap>,
 	children: Query<&Children>,

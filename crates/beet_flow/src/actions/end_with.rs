@@ -18,12 +18,12 @@ use beet_core::prelude::*;
 /// ```
 #[action(end_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct EndWith<T: EndPayload + Clone = Outcome>(pub T);
+pub struct EndWith<T: EndEvent + Clone = Outcome>(pub T);
 
-impl<T: EndPayload + Clone> EndWith<T> {}
+impl<T: EndEvent + Clone> EndWith<T> {}
 
-fn end_with<T: EndPayload + Clone>(
-	ev: On<Run<T::Run>>,
+fn end_with<T: EndEvent + Clone>(
+	ev: On<T::Run>,
 	mut commands: Commands,
 	action: Query<&EndWith<T>>,
 ) -> Result {
@@ -43,17 +43,13 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-		let observed = observer_ext::observe_triggers::<End>(&mut world);
+		let observed = observer_ext::observe_triggers::<Outcome>(&mut world);
 		world
 			.spawn(EndWith(Outcome::Pass))
 			.trigger_action(GetOutcome)
 			.flush();
 
 		observed.len().xpect_eq(1);
-		observed
-			.get_index(0)
-			.unwrap()
-			.value()
-			.xpect_eq(Outcome::Pass);
+		observed.get_index(0).unwrap().xpect_eq(Outcome::Pass);
 	}
 }

@@ -15,20 +15,20 @@ use std::marker::PhantomData;
 ///		.spawn((
 /// 		Running,
 /// 		EndWith(Outcome::Pass),
-/// 		RemoveOn::<End, Running>::default()
+/// 		RemoveOn::<Outcome, Running>::default()
 /// 	))
 ///		.trigger_action(GetOutcome);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct RemoveOn<E: EntityEvent, B: Bundle> {
+pub struct RemoveOn<E: ActionEvent, B: Bundle> {
 	/// The target entity to remove the bundle from.
 	pub target_entity: TargetEntity,
 	phantom: PhantomData<(E, B)>,
 }
 
-impl<E: EntityEvent, B: Bundle> Default for RemoveOn<E, B> {
+impl<E: ActionEvent, B: Bundle> Default for RemoveOn<E, B> {
 	fn default() -> Self {
 		Self {
 			phantom: default(),
@@ -37,7 +37,7 @@ impl<E: EntityEvent, B: Bundle> Default for RemoveOn<E, B> {
 	}
 }
 
-impl<E: EntityEvent, B: Bundle> RemoveOn<E, B> {
+impl<E: ActionEvent, B: Bundle> RemoveOn<E, B> {
 	/// Specify the target entity for this action.
 	pub fn new_with_target(target_entity: TargetEntity) -> Self {
 		Self {
@@ -47,7 +47,7 @@ impl<E: EntityEvent, B: Bundle> RemoveOn<E, B> {
 	}
 }
 
-fn remove<E: EntityEvent, B: Bundle>(
+fn remove<E: ActionEvent, B: Bundle>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&RemoveOn<E, B>>,
@@ -72,7 +72,10 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((Running::default(), RemoveOn::<Run, Running>::default()))
+			.spawn((
+				Running::default(),
+				RemoveOn::<GetOutcome, Running>::default(),
+			))
 			.trigger_action(GetOutcome)
 			.flush()
 			.id();
@@ -87,7 +90,7 @@ mod test {
 		let entity = world
 			.spawn((
 				Running::default(),
-				RemoveOn::<End, Running>::default(),
+				RemoveOn::<Outcome, Running>::default(),
 				EndWith(Outcome::Pass),
 			))
 			.trigger_action(GetOutcome)

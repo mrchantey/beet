@@ -1,4 +1,8 @@
-// Basic Analytics Collection
+/**
+Basic Analytics Collection
+This uses a flat structure with dot notation keys for maximum compatibility with various key-value store backends.
+Some values may be arrays or objects but most are strings or numbers.
+**/
 class BeetAnalytics {
 	constructor() {
 		this.data = {};
@@ -58,12 +62,14 @@ class BeetAnalytics {
 		this.data["session.id"] = this.generateSessionId();
 
 		// Performance timing
-		if ("performance" in window && "timing" in performance) {
-			const timing = performance.timing;
-			this.data["performance.pageLoadTime"] =
-				timing.loadEventEnd - timing.navigationStart;
-			this.data["performance.domContentLoaded"] =
-				timing.domContentLoadedEventEnd - timing.navigationStart;
+		if (performance.getEntriesByType) {
+			const navTiming = performance.getEntriesByType("navigation")[0];
+			if (navTiming) {
+				this.data["performance.pageLoadTime"] =
+					navTiming.loadEventEnd - navTiming.startTime;
+				this.data["performance.domContentLoaded"] =
+					navTiming.domContentLoadedEventEnd - navTiming.startTime;
+			}
 		}
 
 		return this.data;
@@ -76,18 +82,22 @@ class BeetAnalytics {
 
 	// Track page interactions
 	trackPageView() {
-		this.sendEvent("page_view", {
-			"window.location.href": window.location.href,
-			"document.title": document.title,
-		});
+		this.sendEvent(
+			"page_view",
+			// these are duplicated but send anyway, may have changed
+			{
+				"event.window.location.href": window.location.href,
+				"event.document.title": document.title,
+			},
+		);
 	}
 
 	trackClick(element, customData = {}) {
 		this.sendEvent("click", {
-			"element.tagName": element.tagName,
-			"element.className": element.className,
-			"element.id": element.id,
-			"element.text": element.textContent?.substring(0, 128), // Limit text length
+			"event.element.tagName": element.tagName,
+			"event.element.className": element.className,
+			"event.element.id": element.id,
+			"event.element.text": element.textContent?.substring(0, 128), // Limit text length
 			...customData,
 		});
 	}
@@ -106,7 +116,7 @@ class BeetAnalytics {
 
 		// Send max scroll on page unload
 		window.addEventListener("beforeunload", () => {
-			this.sendEvent("scroll_depth", { "scroll.maxPercent": maxScroll });
+			this.sendEvent("scroll_depth", { "event.scroll.maxPercent": maxScroll });
 		});
 	}
 
@@ -114,22 +124,42 @@ class BeetAnalytics {
 	trackErrors() {
 		window.addEventListener("error", (event) => {
 			this.sendEvent("javascript_error", {
-				"error.message": event.message,
-				"error.filename": event.filename,
-				"error.line": event.lineno,
-				"error.column": event.colno,
+				"event.error.message": event.message,
+				"event.error.filename": event.filename,
+				"event.error.line": event.lineno,
+				"event.error.column": event.colno,
 			});
+		});
+	}
+
+	trackConsoleErrors() {
+		const originalConsoleError = console.error;
+		console.error = function (...args) {
+			this.sendEvent("console_error", {
+				"event.error.message": args.map((a) => String(a)).join(" "),
+			});
+			originalConsoleError.apply(console, args);
+		};
+	}
+
+	trackClicks() {
+		document.addEventListener("click", (e) => {
+			if (e.target.tagName === "BUTTON" || e.target.tagName === "A") {
+				self.trackClick(e.target);
+			}
 		});
 	}
 
 	// Send data to your analytics endpoint
 	sendEvent(event_type, event_data = {}) {
-		const payload = {
-			"event.type": event_type,
-			"event.data": event_data,
-			"session.data": this.data,
-			"client.timestamp": Date.now(),
-		};
+		const payload = Object.assign(
+			{
+				"event.type": event_type,
+				"event.client.timestamp": Date.now(),
+			},
+			this.data,
+			event_data,
+		);
 
 		// Use beacon API for better reliability
 		if ("sendBeacon" in navigator) {
@@ -148,23 +178,12 @@ class BeetAnalytics {
 
 // Initialize analytics
 const analytics = new BeetAnalytics();
-
-// Track page view
 analytics.trackPageView();
-
-// Track clicks on important elements
-document.addEventListener("click", (e) => {
-	if (e.target.tagName === "BUTTON" || e.target.tagName === "A") {
-		analytics.trackClick(e.target);
-	}
-});
-
-// Track scroll depth
+analytics.trackClicks();
 analytics.trackScroll();
-
-// Track JavaScript errors
 analytics.trackErrors();
+analytics.trackConsoleErrors();
 
 // Example usage for custom events
-// analytics.sendEvent('signup_attempt', { method: 'email' });
-// analytics.sendEvent('purchase', { value: 29.99, currency: 'USD' });
+// analytics.sendEvent('signup_attempt', { 'event.method': 'email' });
+// analytics.sendEvent('purchase', { 'event.value': 29.99, 'event.currency': 'USD' });

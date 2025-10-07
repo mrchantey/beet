@@ -234,7 +234,7 @@ pub struct DebugToStdOut;
 // }
 
 fn log_on_run(
-	ev: On<Run>,
+	ev: On<GetOutcome>,
 	query: Query<&Name>,
 	_m: When<Res<DebugOnRun>>,
 	mut out: MessageWriter<OnLogMessage>,
@@ -254,7 +254,7 @@ fn log_on_run(
 
 
 fn log_on_run_result(
-	ev: On<End>,
+	ev: On<Outcome>,
 	query: Query<&Name>,
 	mut out: MessageWriter<OnLogMessage>,
 	_m: When<Res<DebugOnResult>>,

@@ -9,6 +9,7 @@ use crate::prelude::*;
 mod actions;
 mod types;
 
+/// A prelude for beet_flow, re-exporting the most commonly used items.
 pub mod prelude {
 	pub use crate::actions::*;
 	pub use crate::types::*;
