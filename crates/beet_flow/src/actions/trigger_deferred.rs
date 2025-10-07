@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
-/// world.spawn((TriggerDeferred::run(), EndWith(Outcome::Pass)));
+/// world.spawn((TriggerDeferred::get_outcome(), EndWith(Outcome::Pass)));
 /// world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 /// ```
 /// ## Notes
@@ -33,7 +33,8 @@ where
 }
 
 impl TriggerDeferred<GetOutcome> {
-	pub fn run() -> Self { default() }
+	/// Create a new [`TriggerOnSpawn`] that triggers a [`GetOutcome`]
+	pub fn get_outcome() -> Self { default() }
 }
 
 
@@ -67,7 +68,7 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 		let observers = observer_ext::observe_triggers::<Outcome>(&mut world);
-		world.spawn((TriggerDeferred::run(), EndWith(Outcome::Pass)));
+		world.spawn((TriggerDeferred::get_outcome(), EndWith(Outcome::Pass)));
 		observers.len().xpect_eq(0);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 		observers.len().xpect_eq(1);

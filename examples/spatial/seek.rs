@@ -40,6 +40,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 		SteerBundle::default().scaled_dist(500.),
 		SteerTarget::Entity(target),
 		Seek::default(),
-		TriggerDeferred::run(),
+		TriggerDeferred::get_outcome(),
 	));
 }

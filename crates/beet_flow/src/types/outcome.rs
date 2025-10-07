@@ -25,7 +25,7 @@ impl RunEvent for GetOutcome {
 /// The returned value from a [`GetOutcome`] request, indicating run status.
 /// [`Outcome`] is closer in spirit to [`ControlFlow`] than [`Result`], in that the
 /// [`Outcome::Fail`] status is frequently expected, and does not
-/// nessecarily indicate an error.
+/// necessarily indicate an error.
 /// For example an `IsNearEnemy` action may emit `Outcome::Fail` to indicate
 /// 'I successfully checked and no i am not near an enemy'.
 /// For actual error handling the system/observer should output a [`Result`]
@@ -44,6 +44,8 @@ impl EndEvent for Outcome {
 }
 
 impl Outcome {
+	/// Returns `true` if the outcome is [`Outcome::Pass`]
 	pub fn is_pass(&self) -> bool { self == &Outcome::Pass }
+	/// Returns `true` if the outcome is [`Outcome::Fail`]
 	pub fn is_fail(&self) -> bool { self == &Outcome::Fail }
 }

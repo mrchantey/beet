@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Plugin adding lifecycle management for the core beet_flow systems.
 #[derive(Default)]
 pub struct BeetFlowPlugin;
 

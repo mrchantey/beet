@@ -34,10 +34,15 @@ where
 	D: 'static + QueryData,
 	F: 'static + QueryFilter,
 {
+	/// A [`ChildOf`] query
 	pub parents: Query<'w, 's, &'static ChildOf>,
+	/// A [`Children`] query
 	pub children: Query<'w, 's, &'static Children>,
+	/// A [`ActionOf`] query
 	pub actions: Query<'w, 's, &'static ActionOf>,
+	/// An [`Agent`] query
 	pub agents: Query<'w, 's, &'static Agent>,
+	/// A user defined query
 	pub query: Query<'w, 's, D, F>,
 }
 impl<'w, 's, D, F> AgentQuery<'w, 's, D, F>

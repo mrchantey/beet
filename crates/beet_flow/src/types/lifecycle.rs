@@ -1,14 +1,20 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+
+/// Trait for specifying a 'Run' event, similar to a 'request' in a request-response pattern.
 pub trait RunEvent: ActionEvent {
+	/// The corresponding 'End' event type
 	type End: EndEvent<Run = Self>;
 }
 
+/// Trait for specifying an 'End' event, similar to a 'response' in a request-response pattern.
 pub trait EndEvent: ActionEvent {
+	/// The corresponding 'Run' event type
 	type Run: RunEvent<End = Self>;
 }
 
+/// Event automatically triggered on the parent of an `event_target` when it triggers an [`End`].
 #[derive(Debug, Clone, PartialEq, Eq, ActionEvent)]
 pub struct ChildEnd<T>
 where
@@ -37,7 +43,6 @@ impl<T> ChildEnd<T>
 where
 	T: 'static + Send + Sync + Clone + ActionEvent,
 {
-	pub fn new(child: Entity, value: T) -> Self { Self { child, value } }
 	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists.
 	pub fn trigger(mut commands: Commands, ev: &On<T>) {
 		let child = ev.event_target();
@@ -60,8 +65,9 @@ where
 			.entity(entity)
 			.trigger_action(ev.event().clone().inner());
 	}
-
+	/// Get the entity that originated the [`End`]
 	pub fn child(&self) -> Entity { self.child }
+	/// Get the [`End`] event that the child triggered
 	pub fn value(&self) -> &T { &self.value }
 	/// Convert a [`ChildEnd`] to an [`End`] by discarding
 	/// the `child` field and transfering the `target`

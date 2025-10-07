@@ -84,7 +84,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					Name::new("Behavior"),
 					Emoji::new("1F5FA"), //🗺️
 					orbital_child(3, total_children),
-					TriggerDeferred::run(),
+					TriggerDeferred::get_outcome(),
 					// RunOnChange::<StatValue>::default()
 					// 	.with_source(vec![stress, self_control]),
 					HighestScore::default(),
