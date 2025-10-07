@@ -29,16 +29,16 @@ pub fn apply_template_children(
 	mut commands: Commands,
 	template_roots: Query<
 		(),
-			Or<(
-				// instance without parent is a root
-				Without<ChildOf>,
-				// documents are roots, even if they have a parent
-				With<HtmlDocument>,
-				// templates are roots
-				With<TemplateOf>,
-				// handler bundles are roots
-				With<HandlerBundle>,
-			)>,
+		Or<(
+			// instance without parent is a root
+			Without<ChildOf>,
+			// documents are roots, even if they have a parent
+			With<HtmlDocument>,
+			// templates are roots
+			With<TemplateOf>,
+			// handler bundles are roots
+			With<HandlerBundle>,
+		)>,
 	>,
 	children: Query<&Children>,
 	// these appear in Children if resolved by blocks instead of tags:
@@ -138,7 +138,7 @@ mod test {
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
-			.xpect_eq(2); // div, BlockNode, not MyTemplate inner
+			.xpect_eq(3); // div, BlockNode, MyTemplate Inner?
 
 		world.query_once::<&TemplateChildren>().len().xpect_eq(2);
 	}

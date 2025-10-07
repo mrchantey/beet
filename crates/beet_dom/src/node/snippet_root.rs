@@ -6,12 +6,25 @@ use bevy::ecs::system::SystemParam;
 /// Specify types for variadic functions like TokenizeComponent
 pub type RootComponents = (
 	SnippetRoot,
+	BeetRoot,
 	StaticRoot,
 	InstanceRoot,
 	ExprIdx,
 	DomIdx,
 	RequiresDomIdx,
 );
+
+
+/// Used to mark the root of a resolved tree:
+/// - a [`HtmlDocument`]
+/// - a [`ClientIslandRoot`]
+/// - when rendering a [`HtmlFragment`]
+/// The root needs to be explicitly marked so we can know the entrypoint of a resolved tree
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[reflect(Component)]
+pub struct BeetRoot;
 
 
 /// Placed at the root of each [`StaticRoot`] and [`InstanceRoot`], with a [`LineCol`] representing

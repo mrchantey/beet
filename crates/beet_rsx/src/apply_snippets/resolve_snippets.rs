@@ -253,7 +253,17 @@ mod test {
 		let _snippet = world
 			.spawn((SnippetRoot::default(), StaticRoot, rsx_snippet))
 			.remove::<InstanceRoot>();
-		let instance = world.spawn((SnippetRoot::default(), instance)).id();
+		let instance = world
+			.spawn((BeetRoot, SnippetRoot::default(), instance))
+			.id();
+		//this is ugly hack should be automatic
+		world
+			.run_system_cached_with::<_, Result, _, _>(
+				apply_slots_recursive,
+				instance,
+			)
+			.unwrap()
+			.unwrap();
 		world
 			.run_system_once_with(render_fragment, instance)
 			.unwrap()
@@ -467,6 +477,14 @@ mod test {
 				rsx! { <div>pasta is <MyTemplate initial=3 /></div> },
 			))
 			.id();
+		//this is ugly hack should be automatic
+		world
+			.run_system_cached_with::<_, Result, _, _>(
+				apply_slots_recursive,
+				child,
+			)
+			.unwrap()
+			.unwrap();
 
 		world
 			.run_system_once_with(render_fragment, child)
@@ -553,6 +571,7 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).id();
 
+		//this is ugly hack should be automatic
 		world
 			.run_system_once_with::<_, _, Result, _>(
 				crate::apply_snippets::apply_slots_recursive,

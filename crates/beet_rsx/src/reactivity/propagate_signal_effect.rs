@@ -184,7 +184,7 @@ mod test {
 		let (get, set) = signal("foo".to_string());
 		let template = app
 			.world_mut()
-			.spawn(rsx! { <Bar class=get /> })
+			.spawn((BeetRoot, rsx! { <Bar class=get /> }))
 			.get::<Children>()
 			.unwrap()[0];
 		app.update();

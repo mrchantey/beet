@@ -7,9 +7,7 @@ use beet::prelude::*;
 #[derive(Reflect)]
 pub fn ImageGenerator() -> impl Bundle {
 	let (image_url, set_image_url) = signal(None);
-	let (prompt, set_prompt) = signal(
-		"generate an image of a person called 'bevy' and a person called 'beet' partying".to_string()
-	);
+	let (prompt, set_prompt) = signal("TODO images".to_string());
 	let (response, set_response) = signal("".to_string());
 
 	let on_submit = move || {
@@ -37,7 +35,7 @@ pub fn ImageGenerator() -> impl Bundle {
 	};
 
 	rsx! {
-		<h1>Generate an image</h1>
+		<h1>Agent Images</h1>
 		<TextArea value=prompt onchange=move |e|set_prompt(e.value())/>
 		<Button onclick=move |_|on_submit()>Submit</Button>
 		<br/>

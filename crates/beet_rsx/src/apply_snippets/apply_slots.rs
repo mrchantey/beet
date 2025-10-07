@@ -52,20 +52,13 @@ use beet_dom::prelude::*;
 
 pub fn apply_slots(
 	mut commands: Commands,
-	roots: Populated<Entity, SlotsFilter>,
+	roots: Populated<Entity, Added<BeetRoot>>,
 ) -> Result {
 	for root in roots.iter() {
 		commands.run_system_cached_with(apply_slots_recursive, root);
 	}
 	Ok(())
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-type SlotsFilter = Added<crate::prelude::HtmlDocument>;
-// TODO this is super dodgy, only needed so that TemplateOf gets evaluated
-// for client load directives.
-#[cfg(target_arch = "wasm32")]
-type SlotsFilter = Added<ClientLoadDirective>;
 
 pub fn apply_slots_recursive(
 	In(instance_root): In<Entity>,
@@ -306,7 +299,7 @@ mod test {
 			rsx! {
 				<body>
 					<Middle>
-						<slot name="header" slot="default" />
+						<slot name="header" slot="header" />
 					</Middle>
 					<main>
 						<slot />

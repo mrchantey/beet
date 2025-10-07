@@ -1,18 +1,19 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use bevy::ecs::system::SystemParam;
-use beet_core::prelude::*;
 
 /// Utilities for rendering HTML fragments.
 pub struct HtmlFragment;
 
 impl HtmlFragment {
-	/// returns the HTML string representation of a given [`Bundle`].
+	/// returns the HTML string representation of a given [`Bundle`],
+	/// this inserts the bundle alongside a [`BeetRoot`] for slots etc to resolve
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// TODO bench caching and reusing the app
 		let mut app = App::new();
 		app.add_plugins(ApplyDirectivesPlugin);
-		let entity = app.world_mut().spawn(bundle).id();
+		let entity = app.world_mut().spawn((BeetRoot, bundle)).id();
 		app.update();
 		let html = app
 			.world_mut()

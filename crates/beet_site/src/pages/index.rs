@@ -10,7 +10,7 @@ pub fn get() -> impl Bundle {
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
 				<h1>Beet</h1>
-				<img style="width:10em" src="/assets/branding/logo.png"/>
+				// <img style="width:10em" src="/assets/branding/logo.png"/>
 				<p><b>"A Very Bevy Metaframework"</b></p>
 				<Card style:cascade class="hero">
 				<p>"Fullstack Bevy with ECS at every layer of the stack."
