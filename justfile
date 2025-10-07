@@ -274,7 +274,7 @@ expand crate test *args:
 patch:
 	cargo set-version --bump patch
 
-publish crate *args:
+publish *args:
 	cargo publish --workspace --allow-dirty --no-verify {{args}}
 
 watch *command:
