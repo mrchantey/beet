@@ -4,11 +4,6 @@ use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::query::QueryFilter;
 use bevy::ecs::query::ROQueryItem;
 
-/// Many actions have a canonical entity they may refer to as the `agent`.
-/// For instance a behavior tree may use an npc entity with a `Health` component.
-#[derive(Debug, Default, Copy, Clone, Reflect, Component)]
-pub struct Agent;
-
 /// Declare this action as belonging to the
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
@@ -20,8 +15,58 @@ pub struct ActionOf(pub Entity);
 #[derive(Deref, Reflect, Component)]
 #[reflect(Component)]
 #[relationship_target(relationship = ActionOf, linked_spawn)]
-#[require(Agent)]
 pub struct Actions(Vec<Entity>);
+
+/// Wrap an [`ActionEvent`] specifying the agent entity it should be performed on.
+/// This event type, paired with [`GlobalAgentQuery`], enables 'global control flow',
+/// where a single tree of observers can be reused for multiple agents.
+/// This is particularly useful for agents which are frequently spawned/despawned as it
+/// avoids creating a new tree for each entity.
+pub struct AgentEvent<E> {
+	pub agent: Entity,
+	pub event: E,
+}
+impl<E> AgentEvent<E> {
+	pub fn new(agent: Entity, event: E) -> Self { Self { agent, event } }
+}
+
+
+#[extend::ext(name=ActionEventAgentExt)]
+pub impl<E, T> E
+where
+	E: 'static
+		+ Send
+		+ Sync
+		+ for<'a> Event<Trigger<'a> = ActionTrigger<false, E, T>>,
+	T: 'static + Send + Sync + Traversal<E>,
+{
+	fn with_agent(self, agent: Entity) -> AgentEvent<E> {
+		AgentEvent::new(agent, self)
+	}
+}
+
+impl<E, T> IntoEntityTargetEvent<(T, Self)> for AgentEvent<E>
+where
+	E: 'static
+		+ Send
+		+ Sync
+		+ for<'a> Event<Trigger<'a> = ActionTrigger<false, E, T>>,
+	T: 'static + Send + Sync + Traversal<E>,
+{
+	type Event = E;
+	type Trigger = ActionTrigger<false, E, T>;
+
+	fn into_entity_target_event(
+		self,
+		entity: Entity,
+	) -> (Self::Event, Self::Trigger) {
+		(
+			self.event,
+			ActionTrigger::new(entity).with_agent(self.agent),
+		)
+	}
+}
+
 
 
 /// A [`SystemParam`] used to get the agent for a particular action.
@@ -40,8 +85,6 @@ where
 	pub children: Query<'w, 's, &'static Children>,
 	/// A [`ActionOf`] query
 	pub actions: Query<'w, 's, &'static ActionOf>,
-	/// An [`Agent`] query
-	pub agents: Query<'w, 's, &'static Agent>,
 	/// A user defined query
 	pub query: Query<'w, 's, D, F>,
 }
@@ -52,7 +95,7 @@ where
 {
 	/// Get the 'agent' entity for this action.
 	/// The agent is resolved in the following order:
-	/// - The first [`Agent`] or [`ActionOf`] in ancestors (inclusive)
+	/// - The first [`ActionOf`] in ancestors (inclusive)
 	/// - The root ancestor
 	pub fn entity(&self, entity: Entity) -> Entity {
 		// cache root to avoid double traversal
@@ -61,9 +104,7 @@ where
 			.iter_ancestors_inclusive(entity)
 			.find_map(|entity| {
 				root = entity;
-				if self.agents.get(entity).is_ok() {
-					Some(entity)
-				} else if let Ok(action_of) = self.actions.get(entity) {
+				if let Ok(action_of) = self.actions.get(entity) {
 					Some(action_of.get())
 				} else {
 					None
@@ -219,5 +260,66 @@ where
 			.xmap(|entity| self.query.get_mut(entity))
 			.unwrap()
 			.xok()
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[derive(ActionEvent)]
+	struct Run;
+
+	fn set_agent(store: Store<Entity>) -> impl Bundle {
+		EntityObserver::new(move |ev: On<Run>, agents: GlobalAgentQuery| {
+			store.set(agents.entity(&ev));
+		})
+	}
+
+
+	#[test]
+	fn agent_query_self() {
+		let mut world = World::new();
+		let store = Store::new(Entity::PLACEHOLDER);
+		let action = world.spawn(set_agent(store)).trigger_target(Run).flush();
+		store.get().xpect_eq(action);
+	}
+	#[test]
+	fn agent_query_root() {
+		let mut world = World::new();
+		let store = Store::new(Entity::PLACEHOLDER);
+		let root = world
+			.spawn(children![(set_agent(store), OnSpawn::trigger(Run))])
+			.flush();
+		store.get().xpect_eq(root);
+	}
+	#[test]
+	fn agent_query_action_of() {
+		let mut world = World::new();
+		let store = Store::new(Entity::PLACEHOLDER);
+		let agent = world.spawn_empty().id();
+		world
+			.spawn(children![(
+				ActionOf(agent),
+				set_agent(store),
+				OnSpawn::trigger(Run)
+			)])
+			.flush();
+		store.get().xpect_eq(agent);
+	}
+	#[test]
+	fn agent_query_global_agent() {
+		let mut world = World::new();
+		let store = Store::new(Entity::PLACEHOLDER);
+		let agent = world.spawn_empty().id();
+		world
+			.spawn(children![(
+				set_agent(store),
+				OnSpawn::trigger(Run.with_agent(agent))
+			)])
+			.flush();
+		store.get().xpect_eq(agent);
 	}
 }

@@ -69,41 +69,6 @@ where
 }
 
 
-/// Wrap an [`ActionEvent`] specifying the agent entity it should be performed on.
-/// This event type, paired with [`GlobalAgentQuery`], enables 'global control flow',
-/// where a single tree of observers can be reused for multiple agents.
-/// This is particularly useful for agents which are frequently spawned/despawned as it
-/// avoids creating a new tree for each entity.
-pub struct AgentEvent<E> {
-	pub agent: Entity,
-	pub event: E,
-}
-impl<E> AgentEvent<E> {
-	pub fn new(agent: Entity, event: E) -> Self { Self { agent, event } }
-}
-
-impl<E, T> IntoEntityTargetEvent<(T, Self)> for AgentEvent<E>
-where
-	E: 'static
-		+ Send
-		+ Sync
-		+ for<'a> Event<Trigger<'a> = ActionTrigger<false, E, T>>,
-	T: 'static + Send + Sync + Traversal<E>,
-{
-	type Event = E;
-	type Trigger = ActionTrigger<false, E, T>;
-
-	fn into_entity_target_event(
-		self,
-		entity: Entity,
-	) -> (Self::Event, Self::Trigger) {
-		(
-			self.event,
-			ActionTrigger::new(entity).with_agent(self.agent),
-		)
-	}
-}
-
 
 #[extend::ext(name=OnActionEventExt)]
 pub impl<'w, 't, T> On<'w, 't, T>
@@ -169,12 +134,12 @@ pub impl EntityWorldMut<'_> {
 		self
 	}
 
-	/// Call [`World::flush`]
-	fn flush(&mut self) -> &mut Self {
+	/// Call [`World::flush`] for an `&mut Self`
+	fn flush(&mut self) -> Entity {
 		self.world_scope(|world| {
 			world.flush();
 		});
-		self
+		self.id()
 	}
 	/// Creates an [`Observer`] watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
 	/// targets this entity.

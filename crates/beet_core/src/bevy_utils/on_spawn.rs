@@ -51,29 +51,12 @@ impl OnSpawn {
 		})
 	}
 
-	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
-		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> Self {
-		Self::new(move |entity| {
-			entity.trigger(ev);
-		})
-	}
-	pub fn trigger_option<'t, E: EntityEvent<Trigger<'t>: Default>>(
-		ev: Option<impl 'static + Send + Sync + FnOnce(Entity) -> E>,
-	) -> Self {
-		Self::new(move |entity| {
-			if let Some(ev) = ev {
-				entity.trigger(ev);
-			}
-		})
-	}
-
-	pub fn trigger_target<M>(event: impl IntoEntityTargetEvent<M>) -> Self {
+	pub fn trigger<M>(event: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
 			entity.trigger_target(event);
 		})
 	}
-	pub fn trigger_target_option<M>(
+	pub fn trigger_option<M>(
 		event: Option<impl IntoEntityTargetEvent<M>>,
 	) -> Self {
 		Self::new(move |entity| {
