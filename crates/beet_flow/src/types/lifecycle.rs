@@ -43,27 +43,30 @@ impl<T> ChildEnd<T>
 where
 	T: 'static + Send + Sync + Clone + ActionEvent,
 {
-	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists.
+	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists,
+	/// propagating the [`ActionTrigger::agent`]
 	pub fn trigger(mut commands: Commands, ev: &On<T>) {
 		let child = ev.event_target();
 		let value = ev.event().clone();
+		let agent = ev.trigger().agent();
 
 		commands.queue(move |world: &mut World| {
 			if let Some(parent) = world.entity(child).get::<ChildOf>().clone() {
 				let parent = parent.parent();
-				world
-					.entity_mut(parent)
-					.trigger_target(ChildEnd { child, value });
+				world.entity_mut(parent).trigger_target(
+					ChildEnd { child, value }.with_agent_opt(agent),
+				);
 			}
 		})
 	}
 	/// Trigger [`T`] on this [`event_target`], essentially propagating a
-	/// [`ChildEnd<T>`] into a [`T`] event.
+	/// [`ChildEnd<T>`] into a [`T`] event, also propagating the [`ActionTrigger::agent`]
 	pub fn propagate(mut commands: Commands, ev: &On<Self>) {
 		let entity = ev.event_target();
+		let agent = ev.trigger().agent();
 		commands
 			.entity(entity)
-			.trigger_target(ev.event().clone().inner());
+			.trigger_target(ev.event().clone().inner().with_agent_opt(agent));
 	}
 	/// Get the entity that originated the [`End`]
 	pub fn child(&self) -> Entity { self.child }

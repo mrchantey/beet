@@ -23,11 +23,13 @@ pub struct Actions(Vec<Entity>);
 /// This is particularly useful for agents which are frequently spawned/despawned as it
 /// avoids creating a new tree for each entity.
 pub struct AgentEvent<E> {
-	pub agent: Entity,
-	pub event: E,
+	agent: Option<Entity>,
+	event: E,
 }
 impl<E> AgentEvent<E> {
-	pub fn new(agent: Entity, event: E) -> Self { Self { agent, event } }
+	pub fn new(agent: Option<Entity>, event: E) -> Self {
+		Self { agent, event }
+	}
 }
 
 
@@ -41,6 +43,9 @@ where
 	T: 'static + Send + Sync + Traversal<E>,
 {
 	fn with_agent(self, agent: Entity) -> AgentEvent<E> {
+		AgentEvent::new(Some(agent), self)
+	}
+	fn with_agent_opt(self, agent: Option<Entity>) -> AgentEvent<E> {
 		AgentEvent::new(agent, self)
 	}
 }
@@ -283,7 +288,11 @@ mod test {
 	fn agent_query_self() {
 		let mut world = World::new();
 		let store = Store::new(Entity::PLACEHOLDER);
-		let action = world.spawn(set_agent(store)).trigger_target(Run).flush();
+		let action = world
+			.spawn(set_agent(store))
+			.trigger_target(Run)
+			.flush()
+			.id();
 		store.get().xpect_eq(action);
 	}
 	#[test]

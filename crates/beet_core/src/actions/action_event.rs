@@ -134,12 +134,12 @@ pub impl EntityWorldMut<'_> {
 		self
 	}
 
-	/// Call [`World::flush`] for an `&mut Self`
-	fn flush(&mut self) -> Entity {
+	/// Call [`World::flush`]
+	fn flush(&mut self) -> &mut Self {
 		self.world_scope(|world| {
 			world.flush();
 		});
-		self.id()
+		self
 	}
 	/// Creates an [`Observer`] watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
 	/// targets this entity.
@@ -197,8 +197,8 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 			_marker: PhantomData,
 		}
 	}
-	pub fn with_agent(mut self, agent: Entity) -> Self {
-		self.agent = Some(agent);
+	pub fn with_agent(mut self, agent: Option<Entity>) -> Self {
+		self.agent = agent;
 		self
 	}
 
