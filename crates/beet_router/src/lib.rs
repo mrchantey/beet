@@ -4,6 +4,7 @@
 mod app_router;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod axum_utils;
+mod flow_router;
 mod handlers;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
@@ -12,6 +13,7 @@ mod server;
 mod templates;
 
 pub mod prelude {
+	pub use crate::flow_router::*;
 	pub use crate::handlers::*;
 	pub use crate::templates::*;
 

@@ -18,7 +18,7 @@ type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
 /// will be returned.
-#[derive(Debug, Resource)]
+#[derive(Debug, Component, Resource)]
 pub struct Response {
 	pub parts: response::Parts,
 	pub body: Body,

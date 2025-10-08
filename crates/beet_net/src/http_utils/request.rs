@@ -9,7 +9,7 @@ use http::request;
 
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone, Component, Resource)]
 pub struct Request {
 	pub parts: request::Parts,
 

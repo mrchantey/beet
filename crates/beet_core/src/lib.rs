@@ -48,6 +48,8 @@ pub mod prelude {
 	pub use bevy::ecs as bevy_ecs;
 	pub use bevy::ecs::entity::MapEntities;
 	pub use bevy::ecs::lifecycle::HookContext;
+	pub use bevy::ecs::query::QueryData;
+	pub use bevy::ecs::query::QueryFilter;
 	pub use bevy::ecs::reflect::ReflectMapEntities;
 	pub use bevy::ecs::relationship::Relationship;
 	pub use bevy::ecs::schedule::ScheduleLabel;

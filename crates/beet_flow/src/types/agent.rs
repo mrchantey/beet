@@ -56,7 +56,7 @@ where
 	/// - The root ancestor
 	pub fn entity(&self, entity: Entity) -> Entity {
 		// cache root to avoid double traversal
-		let mut root = Entity::PLACEHOLDER;
+		let mut root = entity;
 		self.parents
 			.iter_ancestors_inclusive(entity)
 			.find_map(|entity| {
