@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use std::marker::PhantomData;
 
@@ -7,7 +6,7 @@ use std::marker::PhantomData;
 /// It is designed to work for both [`Run`] and [`End`] events.
 /// This action also has a corresponding [`InsertOn`] action.
 /// ## Example
-/// Removes the `Running` bundle when the `OnResult` event is triggered.
+/// Removes the `Running` bundle when the `Outcome` event is triggered.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -51,7 +50,7 @@ fn remove<E: ActionEvent, B: Bundle>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&RemoveOn<E, B>>,
-	agents: AgentQuery,
+	agents: GlobalAgentQuery,
 ) -> Result {
 	let action = query.get(ev.event_target())?;
 	let target = action.target_entity.select_target(&ev, &agents);

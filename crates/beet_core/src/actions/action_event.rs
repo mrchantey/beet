@@ -69,6 +69,42 @@ where
 }
 
 
+/// Wrap an [`ActionEvent`] specifying the agent entity it should be performed on.
+/// This event type, paired with [`GlobalAgentQuery`], enables 'global control flow',
+/// where a single tree of observers can be reused for multiple agents.
+/// This is particularly useful for agents which are frequently spawned/despawned as it
+/// avoids creating a new tree for each entity.
+pub struct AgentEvent<E> {
+	pub agent: Entity,
+	pub event: E,
+}
+impl<E> AgentEvent<E> {
+	pub fn new(agent: Entity, event: E) -> Self { Self { agent, event } }
+}
+
+impl<E, T> IntoEntityTargetEvent<(T, Self)> for AgentEvent<E>
+where
+	E: 'static
+		+ Send
+		+ Sync
+		+ for<'a> Event<Trigger<'a> = ActionTrigger<false, E, T>>,
+	T: 'static + Send + Sync + Traversal<E>,
+{
+	type Event = E;
+	type Trigger = ActionTrigger<false, E, T>;
+
+	fn into_entity_target_event(
+		self,
+		entity: Entity,
+	) -> (Self::Event, Self::Trigger) {
+		(
+			self.event,
+			ActionTrigger::new(entity).with_agent(self.agent),
+		)
+	}
+}
+
+
 #[extend::ext(name=OnActionEventExt)]
 pub impl<'w, 't, T> On<'w, 't, T>
 where
@@ -170,6 +206,7 @@ pub impl EntityWorldMut<'_> {
 /// If `AUTO_PROPAGATE` is `true`, [`ActionTrigger::propagate`] will default to `true`.
 pub struct ActionTrigger<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 {
+	pub agent: Option<Entity>,
 	/// The [`Entity`] the [`Event`] is currently triggered for.
 	pub event_target: Entity,
 	/// The original [`Entity`] the [`Event`] was _first_ triggered for.
@@ -191,8 +228,13 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 			event_target,
 			original_event_target: event_target,
 			propagate: AUTO_PROPAGATE,
+			agent: None,
 			_marker: PhantomData,
 		}
+	}
+	pub fn with_agent(mut self, agent: Entity) -> Self {
+		self.agent = Some(agent);
+		self
 	}
 
 	/// Get the current event target entity.
@@ -200,6 +242,11 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 
 	/// Get the original event target entity.
 	pub fn original_event_target(&self) -> Entity { self.original_event_target }
+
+	/// Get the agent entity, if it was specified on the trigger,
+	/// otherwise types like [`AgentQuery`] will infer the agent from the
+	/// `event_target` and its ancestors.
+	pub fn agent(&self) -> Option<Entity> { self.agent }
 
 	/// Whether or not to continue propagating using the `T` [`Traversal`]. If this is false,
 	/// The [`Traversal`] will stop on the current entity.
@@ -222,6 +269,7 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>> fmt::Debug
 			.field("event_target", &self.event_target)
 			.field("original_event_target", &self.original_event_target)
 			.field("propagate", &self.propagate)
+			.field("agent", &self.agent)
 			.field("_marker", &self._marker)
 			.finish()
 	}

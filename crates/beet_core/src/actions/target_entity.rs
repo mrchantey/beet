@@ -1,5 +1,4 @@
-use crate::types::AgentQuery;
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 
@@ -22,10 +21,10 @@ pub enum TargetEntity {
 
 impl TargetEntity {
 	/// Get the target entity for the given trigger.
-	pub fn select_target<E: ActionEvent, D, F>(
+	pub fn select_target<D, F>(
 		&self,
-		ev: &On<E>,
-		agents: &AgentQuery<D, F>,
+		ev: &On<impl ActionEvent>,
+		agents: &GlobalAgentQuery<D, F>,
 	) -> Entity
 	where
 		D: 'static + QueryData,
@@ -33,7 +32,7 @@ impl TargetEntity {
 	{
 		match self {
 			TargetEntity::Target => ev.event_target(),
-			TargetEntity::Agent => agents.entity(ev.event_target()),
+			TargetEntity::Agent => agents.entity(&ev),
 			TargetEntity::Parent => agents
 				.parents
 				.get(ev.event_target())

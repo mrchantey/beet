@@ -71,7 +71,7 @@ where
 /// ```
 pub enum ActionTag {
 	/// Actions concerned with control flow, usually
-	/// triggering [OnRun] and [OnResult] events.
+	/// triggering [GetOutcome] and [Outcome] events.
 	ControlFlow,
 	/// Actions that use the [Running] component to run
 	/// over multiple frames.
@@ -101,7 +101,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	store
 }
 
-/// Collect all [OnResultAction] with a [Name]
+/// Collect all [Outcome] with a [Name]
 #[cfg(test)]
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, Outcome)>> {
 	let store = Store::default();

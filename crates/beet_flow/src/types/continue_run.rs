@@ -3,8 +3,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
-/// This will add the [`Running`] component to the behavior when [`OnRun`] is triggered,
-/// and remove it when [`OnResult`] is triggered.
+/// This will add the [`Running`] component to the behavior when [`GetOutcome`] is triggered,
+/// and remove it when [`Outcome`] is triggered.
 ///
 /// This should be added as `#[require(ContinueRun)]` for any long running action,
 /// ie any action that has a [`With<Running>`] query filter.

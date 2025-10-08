@@ -26,23 +26,17 @@ fn nearest_sentence(
 		&HandleWrapper<Bert>,
 		&Children,
 	)>,
-) {
-	let (_scorer, target_sentence, handle, children) = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
-	let bert = berts
-		.get_mut(handle)
-		.expect(&expect_action::to_have_asset(&ev));
-	match bert.closest_sentence_entity(
+) -> Result {
+	let (_scorer, target_sentence, handle, children) =
+		query.get(ev.event_target())?;
+	let bert = berts.get_mut(handle)?;
+	let entity = bert.closest_sentence_entity(
 		target_sentence.0.clone(),
 		children.iter().map(|e| e.clone()),
 		&sentences,
-	) {
-		Ok(entity) => {
-			commands.entity(entity).trigger_target(GetOutcome);
-		}
-		Err(e) => log::error!("SentenceFlow: {}", e),
-	}
+	)?;
+	commands.entity(entity).trigger_target(GetOutcome);
+	Ok(())
 }
 
 #[cfg(test)]

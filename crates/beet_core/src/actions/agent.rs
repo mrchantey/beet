@@ -1,4 +1,4 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::query::QueryFilter;
@@ -112,6 +112,104 @@ where
 		entity: Entity,
 	) -> Result<D::Item<'_, 's>> {
 		let agent = self.entity(entity);
+		self.children
+			.iter_descendants_inclusive(agent)
+			.find(|entity| self.query.contains(*entity))
+			.ok_or_else(|| {
+				bevyhow!("No entity in agent descendents matches the query")
+			})?
+			.xmap(|entity| self.query.get_mut(entity))
+			.unwrap()
+			.xok()
+	}
+}
+
+
+/// A wrapper for [`AgentQuery`] that first checks the [`ActionTrigger::agent`] to resolve
+/// the agent entity. For more info see [`AgentEvent`]
+#[derive(SystemParam)]
+pub struct GlobalAgentQuery<'w, 's, D = (), F = ()>
+where
+	D: 'static + QueryData,
+	F: 'static + QueryFilter,
+{
+	agent_query: AgentQuery<'w, 's, D, F>,
+}
+impl<'w, 's, D, F> std::ops::Deref for GlobalAgentQuery<'w, 's, D, F>
+where
+	D: 'static + QueryData,
+	F: 'static + QueryFilter,
+{
+	type Target = AgentQuery<'w, 's, D, F>;
+	fn deref(&self) -> &Self::Target { &self.agent_query }
+}
+
+impl<'w, 's, D, F> std::ops::DerefMut for GlobalAgentQuery<'w, 's, D, F>
+where
+	D: 'static + QueryData,
+	F: 'static + QueryFilter,
+{
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.agent_query }
+}
+
+
+impl<'w, 's, D, F> GlobalAgentQuery<'w, 's, D, F>
+where
+	D: 'static + QueryData,
+	F: 'static + QueryFilter,
+{
+	/// Get the 'agent' entity for this action.
+	/// The agent is resolved in the following order:
+	/// - [`ActionTrigger::agent`]
+	/// - [`AgentQuery::entity`]
+	pub fn entity(&self, ev: &On<impl ActionEvent>) -> Entity {
+		if let Some(agent) = ev.trigger().agent() {
+			return agent;
+		} else {
+			self.agent_query.entity(ev.event_target())
+		}
+	}
+
+	/// Get the query item for this `agent`
+	pub fn get(
+		&self,
+		ev: &On<impl ActionEvent>,
+	) -> Result<ROQueryItem<'_, 's, D>, QueryEntityError> {
+		let agent = self.entity(ev);
+		self.query.get(agent)
+	}
+
+	/// Get the query item for this `agent`
+	pub fn get_mut(
+		&mut self,
+		ev: &On<impl ActionEvent>,
+	) -> Result<D::Item<'_, 's>, QueryEntityError> {
+		let agent = self.entity(ev);
+		self.query.get_mut(agent)
+	}
+
+	/// Get the item for this `agent`
+	/// or its first matching child (BFS)
+	pub fn get_descendent(
+		&self,
+		ev: &On<impl ActionEvent>,
+	) -> Result<ROQueryItem<'_, 's, D>> {
+		let agent = self.entity(ev);
+		self.children
+			.iter_descendants_inclusive(agent)
+			.find_map(|entity| self.query.get(entity).ok())
+			.ok_or_else(|| {
+				bevyhow!("No entity in agent descendents matches the query")
+			})
+	}
+
+	/// Get the query item for this `agent`
+	/// or its first matching child (BFS)
+	pub fn get_descendent_mut(
+		&mut self,
+		ev: &On<impl ActionEvent>,
+	) -> Result<D::Item<'_, 's>> {
+		let agent = self.entity(ev);
 		self.children
 			.iter_descendants_inclusive(agent)
 			.find(|entity| self.query.contains(*entity))

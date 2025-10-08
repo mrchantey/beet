@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 
@@ -59,7 +58,7 @@ fn insert<E: ActionEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
-	agents: AgentQuery,
+	agents: GlobalAgentQuery,
 ) -> Result {
 	let action = query.get(ev.event_target())?;
 	let target = action.target_entity.select_target(&ev, &agents);
