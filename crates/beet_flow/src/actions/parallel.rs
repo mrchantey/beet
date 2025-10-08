@@ -20,7 +20,7 @@ use bevy::platform::collections::HashSet;
 /// 		EndWith(Outcome::Pass),
 /// 		EndWith(Outcome::Pass),
 /// 	]))
-/// 	.trigger_action(GetOutcome)
+/// 	.trigger_target(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -40,12 +40,12 @@ fn on_start(
 	if children.is_empty() {
 		commands
 			.entity(ev.event_target())
-			.trigger_action(Outcome::Pass);
+			.trigger_target(Outcome::Pass);
 		return Ok(());
 	}
 
 	for child in children.iter() {
-		commands.entity(child).trigger_action(GetOutcome);
+		commands.entity(child).trigger_target(GetOutcome);
 	}
 	Ok(())
 }
@@ -92,7 +92,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Pass)),
 				(Name::new("child2"), EndWith(Outcome::Fail)),
 			]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -119,7 +119,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Pass)),
 				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![

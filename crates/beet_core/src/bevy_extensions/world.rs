@@ -297,6 +297,7 @@ pub impl<W: IntoWorld> W {
 
 
 	/// copied from world.trigger_ref_with_caller
+	#[track_caller]
 	fn trigger_ref_with_caller_pub<'a, E: Event>(
 		&mut self,
 		event: &mut E,

@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// # let mut world = BeetFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
-/// .trigger_action(GetOutcome);
+/// .trigger_target(GetOutcome);
 /// ```
 #[action(repeat)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -84,7 +84,7 @@ mod test {
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -106,7 +106,7 @@ mod test {
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -131,7 +131,7 @@ mod test {
 				Repeat::if_success(),
 				SucceedTimes::new(2)
 			)]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(2);

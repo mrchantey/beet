@@ -37,7 +37,7 @@ pub fn trigger_with_user_sentence<P: ActionEvent + Clone>(
 		sentence.0 = (**ev).clone().into();
 		commands
 			.entity(action)
-			.trigger_action(run_with_user_sentence.payload.clone());
+			.trigger_target(run_with_user_sentence.payload.clone());
 	}
 }
 

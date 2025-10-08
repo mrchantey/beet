@@ -20,7 +20,7 @@ impl EndExchange {
 	pub fn trigger(mut commands: Commands, ev: &On<RunExchange>) {
 		commands
 			.entity(ev.event_target())
-			.trigger_action(Self::new(ev.exchange));
+			.trigger_target(Self::new(ev.exchange));
 	}
 }
 
@@ -87,7 +87,7 @@ mod test {
 					Ok(())
 				},
 			)
-			.trigger_action(RunExchange::new(exchange))
+			.trigger_target(RunExchange::new(exchange))
 			.flush();
 
 		store.get().clone()

@@ -52,7 +52,7 @@ fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
 		world
 			.entity_mut(entity)
-			.insert(OnSpawnDeferred::trigger_action(ev.event));
+			.insert(OnSpawnDeferred::trigger_target(ev.event));
 		Ok(())
 	});
 }

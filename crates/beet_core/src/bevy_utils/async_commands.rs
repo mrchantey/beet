@@ -337,17 +337,12 @@ impl AsyncEntity {
 		})
 		.await
 	}
-	pub async fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
+	pub async fn trigger_target<M>(
 		&self,
-		event: E,
+		event: impl IntoEntityTargetEvent<M>,
 	) -> &Self {
 		self.with(|mut entity| {
-			entity.trigger_action(event);
+			entity.trigger_target(event);
 		})
 		.await
 	}

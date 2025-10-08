@@ -76,7 +76,7 @@ fn main() {
 				},
 			);
 		})
-		.trigger_action(GetOutcome);
+		.trigger_target(GetOutcome);
 
 	app.run();
 }

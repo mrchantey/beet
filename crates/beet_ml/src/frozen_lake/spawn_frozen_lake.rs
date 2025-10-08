@@ -79,6 +79,6 @@ pub fn spawn_frozen_lake_episode(
 						));
 					});
 			})
-			.trigger_action(GetOutcome);
+			.trigger_target(GetOutcome);
 	}
 }

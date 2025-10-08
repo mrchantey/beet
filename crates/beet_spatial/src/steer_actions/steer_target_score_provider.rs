@@ -49,6 +49,6 @@ fn provide_score(
 	};
 	commands
 		.entity(ev.event_target())
-		.trigger_action(Score::new(score));
+		.trigger_target(Score::new(score));
 	Ok(())
 }

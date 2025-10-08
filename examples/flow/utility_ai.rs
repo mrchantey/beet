@@ -25,5 +25,5 @@ fn main() {
 				)
 			]
 		))
-		.trigger_action(GetOutcome).flush();
+		.trigger_target(GetOutcome).flush();
 }

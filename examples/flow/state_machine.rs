@@ -29,5 +29,5 @@ fn main() {
 		// here RunOnRunResult can be swapped out with a control flow action
 		// that decides which state to go to next
 		RunNext::new(transition),
-	)).trigger_action(GetOutcome).flush();
+	)).trigger_target(GetOutcome).flush();
 }

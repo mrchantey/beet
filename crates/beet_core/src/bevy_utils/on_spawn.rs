@@ -68,29 +68,17 @@ impl OnSpawn {
 		})
 	}
 
-	pub fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		event: E,
-	) -> Self {
+	pub fn trigger_target<M>(event: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_action(event);
+			entity.trigger_target(event);
 		})
 	}
-	pub fn trigger_action_option<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		event: Option<E>,
+	pub fn trigger_target_option<M>(
+		event: Option<impl IntoEntityTargetEvent<M>>,
 	) -> Self {
 		Self::new(move |entity| {
 			if let Some(event) = event {
-				entity.trigger_action(event);
+				entity.trigger_target(event);
 			}
 		})
 	}
@@ -156,16 +144,9 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	pub fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		ev: E,
-	) -> Self {
+	pub fn trigger_target<M>(ev: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_action(ev);
+			entity.trigger_target(ev);
 			Ok(())
 		})
 	}

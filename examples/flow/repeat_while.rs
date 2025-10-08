@@ -29,7 +29,7 @@ fn main() {
 			)
 		],
 	))
-	.trigger_action(GetOutcome);
+	.trigger_target(GetOutcome);
 	app.update();
 	app.update();
 	println!("done, subsequent updates will have no effect");

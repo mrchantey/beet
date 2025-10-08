@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 ///		.spawn(InsertOn::<GetOutcome, Running>::default())
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -80,7 +80,7 @@ mod test {
 
 		let entity = world
 			.spawn(InsertOn::<GetOutcome, Running>::default())
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
@@ -96,7 +96,7 @@ mod test {
 				InsertOn::<Outcome, Running>::default(),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();

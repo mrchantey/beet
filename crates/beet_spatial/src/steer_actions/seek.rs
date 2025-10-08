@@ -77,11 +77,11 @@ pub(crate) fn seek(
 			}
 			(OnTargetNotFound::Fail, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_action(Outcome::Fail);
+				commands.entity(action).trigger_target(Outcome::Fail);
 			}
 			(OnTargetNotFound::Succeed, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_action(Outcome::Pass);
+				commands.entity(action).trigger_target(Outcome::Pass);
 			}
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {
@@ -115,7 +115,7 @@ mod test {
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 				Seek::default(),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.id();
 
 		app.update_with_secs(1);

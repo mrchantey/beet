@@ -61,11 +61,11 @@ mod test {
 		// adds
 		let entity = world.spawn(ContinueRun).id();
 		world.get::<Running>(entity).xpect_none();
-		world.entity_mut(entity).trigger_action(GetOutcome).flush();
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 		world.get::<Running>(entity).xpect_some();
 		world
 			.entity_mut(entity)
-			.trigger_action(Outcome::Pass)
+			.trigger_target(Outcome::Pass)
 			.flush();
 		world.get::<Running>(entity).xpect_none();
 	}

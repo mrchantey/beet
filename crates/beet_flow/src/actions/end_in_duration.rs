@@ -59,7 +59,7 @@ pub(crate) fn end_in_duration<T: ActionEvent + Clone>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_run.elapsed() >= action.duration {
-			commands.entity(entity).trigger_action(action.event.clone());
+			commands.entity(entity).trigger_target(action.event.clone());
 		}
 	}
 }

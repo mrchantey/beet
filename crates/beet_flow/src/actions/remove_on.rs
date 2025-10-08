@@ -17,7 +17,7 @@ use std::marker::PhantomData;
 /// 		EndWith(Outcome::Pass),
 /// 		RemoveOn::<Outcome, Running>::default()
 /// 	))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -76,7 +76,7 @@ mod test {
 				Running::default(),
 				RemoveOn::<GetOutcome, Running>::default(),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();
@@ -93,7 +93,7 @@ mod test {
 				RemoveOn::<Outcome, Running>::default(),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();

@@ -53,7 +53,7 @@ where
 				let parent = parent.parent();
 				world
 					.entity_mut(parent)
-					.trigger_action(ChildEnd { child, value });
+					.trigger_target(ChildEnd { child, value });
 			}
 		})
 	}
@@ -63,7 +63,7 @@ where
 		let entity = ev.event_target();
 		commands
 			.entity(entity)
-			.trigger_action(ev.event().clone().inner());
+			.trigger_target(ev.event().clone().inner());
 	}
 	/// Get the entity that originated the [`End`]
 	pub fn child(&self) -> Entity { self.child }
@@ -109,7 +109,7 @@ pub(crate) fn propagate_child_end<T>(
 	let target = ev.event_target();
 	if !prevent.contains(target) {
 		let ev2 = ev.clone().inner();
-		commands.entity(target).trigger_action(ev2);
+		commands.entity(target).trigger_target(ev2);
 	}
 }
 
@@ -129,7 +129,7 @@ mod test {
 		children: Query<&Children>,
 	) {
 		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_action(GetOutcome);
+		commands.entity(child).trigger_target(GetOutcome);
 	}
 
 	fn exit_on_result(
@@ -149,7 +149,7 @@ mod test {
 	fn succeed(ev: On<GetOutcome>, mut commands: Commands) {
 		commands
 			.entity(ev.event_target())
-			.trigger_action(Outcome::Pass);
+			.trigger_target(Outcome::Pass);
 	}
 
 	#[test]
@@ -158,7 +158,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, children![Child]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
@@ -172,7 +172,7 @@ mod test {
 				PreventPropagateEnd::<Outcome>::default(),
 				children![(Child)],
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		world.should_exit().xpect_none();
 	}

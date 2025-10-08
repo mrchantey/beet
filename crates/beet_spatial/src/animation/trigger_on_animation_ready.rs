@@ -51,7 +51,7 @@ pub fn trigger_on_animation_ready<P: ActionEvent + Clone>(
 				if let Ok((action, trigger)) = actions.get(child) {
 					commands
 						.entity(action)
-						.trigger_action(trigger.payload.clone());
+						.trigger_target(trigger.payload.clone());
 				}
 			}
 		}

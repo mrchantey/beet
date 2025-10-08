@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// 		EndWith(Outcome::Pass),
 /// 		RunNext::new(action)
 /// 	))
-/// 	.trigger_action(GetOutcome);
+/// 	.trigger_target(GetOutcome);
 /// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -71,7 +71,7 @@ fn run_next(
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_action(GetOutcome);
+	commands.entity(run_next.action).trigger_target(GetOutcome);
 	Ok(())
 }
 
@@ -97,7 +97,7 @@ mod test {
 				RunNext::new(action1),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run

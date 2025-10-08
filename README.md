@@ -60,7 +60,7 @@ world
 			),
 		],
 	))
-	.trigger_action(GetOutcome)
+	.trigger_target(GetOutcome)
 	.flush();
 ```
 

@@ -16,7 +16,7 @@ fn works() {
 	App::new()
 		.world_mut()
 		.spawn(Foo::<bool>(Default::default()))
-		.trigger_action(Run(true))
+		.trigger_target(Run(true))
 		.flush()
 		.world_scope(|world| {
 			world.get_resource::<Visited>().xpect_some();

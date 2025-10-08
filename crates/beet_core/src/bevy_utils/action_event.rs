@@ -19,6 +19,55 @@ impl<T> ActionEvent for T where
 {
 }
 
+pub trait IntoEntityTargetEvent<M>: 'static + Send + Sync {
+	type Event: for<'a> Event<Trigger<'a> = Self::Trigger>;
+	type Trigger: 'static + Send + Sync + Trigger<Self::Event>;
+
+	fn into_entity_target_event(
+		self,
+		entity: Entity,
+	) -> (Self::Event, Self::Trigger);
+}
+
+pub struct FnOnceIntoEntityTargetMarker;
+
+impl<F, E, T> IntoEntityTargetEvent<(E, T, FnOnceIntoEntityTargetMarker)> for F
+where
+	F: 'static + Send + Sync + FnOnce(Entity) -> E,
+	E: 'static + Send + Sync + for<'a> Event<Trigger<'a> = T>,
+	T: 'static + Send + Sync + Default + Trigger<E>,
+{
+	type Event = E;
+	type Trigger = T;
+
+	fn into_entity_target_event(
+		self,
+		entity: Entity,
+	) -> (Self::Event, Self::Trigger) {
+		(self(entity), default())
+	}
+}
+
+
+impl<E, T> IntoEntityTargetEvent<(T, Self)> for E
+where
+	E: 'static
+		+ Send
+		+ Sync
+		+ for<'a> Event<Trigger<'a> = ActionTrigger<false, E, T>>,
+	T: 'static + Send + Sync + Traversal<E>,
+{
+	type Event = E;
+	type Trigger = ActionTrigger<false, E, T>;
+
+	fn into_entity_target_event(
+		self,
+		entity: Entity,
+	) -> (Self::Event, Self::Trigger) {
+		(self, ActionTrigger::new(entity))
+	}
+}
+
 
 #[extend::ext(name=OnActionEventExt)]
 pub impl<'w, 't, T> On<'w, 't, T>
@@ -30,49 +79,24 @@ where
 		self.trigger().original_event_target()
 	}
 }
-#[extend::ext(name=WorldActionEventExt)]
-pub impl World {
-	fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		&mut self,
-		ev: &mut E,
-		trigger: &mut E::Trigger<'a>,
-		caller: MaybeLocation,
-	) -> &mut Self {
-		let event_key = self.register_event_key::<E>();
-		{
-			// SAFETY: event_key was just registered and matches `event`
-			unsafe {
-				DeferredWorld::from(&mut *self)
-					.trigger_raw(event_key, ev, trigger, caller);
-			}
-		}
-		self.flush();
-		self
-	}
-}
 
 
 #[extend::ext(name=EntityCommandsActionEventExt)]
 pub impl EntityCommands<'_> {
-	fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
+	#[track_caller]
+	fn trigger_target<M>(
 		&mut self,
-		mut ev: E,
+		ev: impl IntoEntityTargetEvent<M>,
 	) -> &mut Self {
+		let (mut ev, mut trigger) = ev.into_entity_target_event(self.id());
 		let caller = MaybeLocation::caller();
-		let mut trigger = ActionTrigger::new(self.id());
 		self.queue(move |mut entity: EntityWorldMut| {
 			entity.world_scope(move |world| {
-				world.trigger_action(&mut ev, &mut trigger, caller);
+				world.trigger_ref_with_caller_pub(
+					&mut ev,
+					&mut trigger,
+					caller,
+				);
 			});
 		});
 		self
@@ -96,19 +120,15 @@ pub impl EntityCommands<'_> {
 
 #[extend::ext(name=EntityWorldMutActionEventExt)]
 pub impl EntityWorldMut<'_> {
-	fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
+	#[track_caller]
+	fn trigger_target<M>(
 		&mut self,
-		mut ev: E,
+		ev: impl IntoEntityTargetEvent<M>,
 	) -> &mut Self {
+		let (mut ev, mut trigger) = ev.into_entity_target_event(self.id());
 		let caller = MaybeLocation::caller();
-		let mut trigger = ActionTrigger::<AUTO_PROPAGATE, E, T>::new(self.id());
 		self.world_scope(move |world| {
-			world.trigger_action(&mut ev, &mut trigger, caller);
+			world.trigger_ref_with_caller_pub(&mut ev, &mut trigger, caller);
 		});
 		self
 	}
@@ -291,7 +311,20 @@ mod test {
 			.observe_any(move |ev: On<MyEvent>| {
 				store.set(ev.0.clone());
 			})
-			.trigger_action(MyEvent("bing bong".to_string()));
+			.trigger_target(MyEvent("bing bong".to_string()));
+		store.get().xpect_eq("bing bong".to_string());
+	}
+	#[test]
+	fn tracks_caller() {
+		let store = Store::default();
+
+		let mut world = World::new();
+		world
+			.spawn_empty()
+			.observe_any(move |ev: On<MyEvent>| {
+				store.set(ev.0.clone());
+			})
+			.trigger_target(MyEvent("bing bong".to_string()));
 		store.get().xpect_eq("bing bong".to_string());
 	}
 }

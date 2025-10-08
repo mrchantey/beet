@@ -13,7 +13,7 @@ fn foo(run: On<GetOutcome>, mut cmd: AsyncCommands) {
 	let entity = run.event_target();
 	cmd.run(async move |world| {
 		time_ext::sleep(Duration::from_millis(20)).await;
-		world.entity(entity).trigger_action(Outcome::Pass).await;
+		world.entity(entity).trigger_target(Outcome::Pass).await;
 	});
 }
 
@@ -24,7 +24,7 @@ async fn works() {
 	app.add_plugins((MinimalPlugins, BeetFlowPlugin, AsyncPlugin));
 	app.world_mut()
 		.spawn((Sequence, ExitOnEnd, children![Foo, EndWith(Outcome::Fail)]))
-		.trigger_action(GetOutcome);
+		.trigger_target(GetOutcome);
 
 	app.run_async().await.xpect_eq(AppExit::error());
 }
