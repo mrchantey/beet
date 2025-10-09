@@ -6,20 +6,18 @@ use beet_rsx::prelude::*;
 
 /// A route handler returning a bundle, which is inserted into the world
 /// with a [`HandlerBundle`] component.
-pub fn bundle_endpoint<T, In, InErr, Out, Marker>(handler: T) -> impl Bundle
+pub fn bundle_endpoint<T, In, InM, Out, Marker>(handler: T) -> impl Bundle
 where
 	T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 	In: 'static + SystemInput,
-	for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
-	InErr: IntoResponse,
+	for<'a> In::Inner<'a>: FromRequest<InM>,
 	Out: 'static + Send + Sync + Bundle,
 {
 	let handler = move |world: &mut World| -> Result<(), Response> {
-		let input = world
+		let req = world
 			.remove_resource::<Request>()
-			.ok_or_else(|| no_request_err::<T>())?
-			.try_into()
-			.map_err(|err: InErr| err.into_response())?;
+			.ok_or_else(|| no_request_err::<T>())?;
+		let input = In::Inner::from_request_sync(req)?;
 		match world.run_system_cached_with(handler.clone(), input) {
 			Ok(out) => {
 				world.spawn((HandlerBundle, out));
@@ -107,8 +105,8 @@ fn system(world: &mut World) -> Result {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::prelude::*;
 	use beet_core::prelude::*;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
 	fn some_endpoint(_: Query<()>) -> impl Bundle + use<> {

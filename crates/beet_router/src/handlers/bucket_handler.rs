@@ -10,8 +10,8 @@ use beet_net::prelude::*;
 /// If `remove_prefix` is supplied this handler **must** have a matching `PathFilter` or be nested appropriately
 pub fn bucket_file_handler(remove_prefix: Option<RoutePath>) -> impl Bundle {
 	(RouteHandler::layer_async(async move |mut world, entity| {
-		let path = world.remove_resource::<Request>().unwrap();
-		let mut path: RoutePath = path.into();
+		let req = world.remove_resource::<Request>().unwrap();
+		let mut path = RoutePath::from_request_ref(&req).unwrap();
 		if let Some(prefix) = &remove_prefix {
 			if let Ok(stripped) = path.strip_prefix(prefix) {
 				path = RoutePath::new(stripped);

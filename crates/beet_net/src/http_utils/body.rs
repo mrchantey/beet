@@ -19,6 +19,19 @@ pub enum Body {
 	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
 }
 
+impl Default for Body {
+	fn default() -> Self { Body::Bytes(Bytes::new()) }
+}
+
+impl std::fmt::Debug for Body {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Body::Bytes(bytes) => write!(f, "Body::Bytes({:?})", bytes),
+			Body::Stream(_) => write!(f, "Body::Stream(...)"),
+		}
+	}
+}
+
 impl Stream for Body {
 	type Item = Result<Bytes>;
 
@@ -44,15 +57,6 @@ impl Into<Body> for Bytes {
 	fn into(self) -> Body { Body::Bytes(self) }
 }
 
-impl std::fmt::Debug for Body {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Body::Bytes(bytes) => write!(f, "Body::Bytes({:?})", bytes),
-			Body::Stream(_) => write!(f, "Body::Stream(...)"),
-		}
-	}
-}
-
 impl Body {
 	/// Any body with a content length greater than this will be parsed as a stream.
 	pub const MAX_BUFFER_SIZE: usize = 1 * 1024 * 1024; // 1 MB
@@ -67,6 +71,19 @@ impl Body {
 				}
 				Ok(buffer.freeze())
 			}
+		}
+	}
+
+	pub async fn into_string(self) -> Result<String> {
+		let bytes = self.into_bytes().await?;
+		String::from_utf8(bytes.to_vec())?.xok()
+	}
+
+	// temp antipattern while migrating beet_router
+	pub fn try_into_bytes(self) -> Option<Bytes> {
+		match self {
+			Body::Bytes(bytes) => Some(bytes),
+			Body::Stream(_) => None,
 		}
 	}
 

@@ -1,5 +1,5 @@
-use beet_net::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use std::future::Future;
@@ -52,20 +52,18 @@ impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`], these add
 	/// an [`ExactPath`] component which means the path must not contain
 	/// trailing segments to match this handler.
-	pub fn endpoint<T, In, InErr, Out, Marker>(handler: T) -> (Endpoint, Self)
+	pub fn endpoint<T, In, InM, Out, Marker>(handler: T) -> (Endpoint, Self)
 	where
 		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
 		Out: 'static + Send + Sync + IntoResponse,
 		In: 'static + SystemInput,
-		for<'a> In::Inner<'a>: TryFrom<Request, Error = InErr>,
-		InErr: IntoResponse,
+		for<'a> In::Inner<'a>: FromRequest<InM>,
 	{
 		let handler = move |world: &mut World| -> Result<Out, Response> {
-			let input = world
+			let req = world
 				.remove_resource::<Request>()
-				.ok_or_else(|| no_request_err::<T>())?
-				.try_into()
-				.map_err(|err: InErr| err.into_response())?;
+				.ok_or_else(|| no_request_err::<T>())?;
+			let input = In::Inner::from_request_sync(req)?;
 			let out = world
 				.run_system_cached_with(handler.clone(), input)
 				.map_err(|err| HttpError::from(err).into_response())?;
@@ -106,10 +104,9 @@ impl RouteHandler {
 
 	/// An async route handler with output inserted as a [`Response`].
 	/// This handler must return a tuple of [`(World, Out)`]
-	pub fn new_async<Handler, In, InErr, Fut, Out>(handler: Handler) -> Self
+	pub fn new_async<Handler, In, InM, Fut, Out>(handler: Handler) -> Self
 	where
-		In: TryFrom<Request, Error = InErr>,
-		InErr: IntoResponse,
+		In: FromRequest<InM>,
 		Handler:
 			'static + Send + Sync + Clone + FnOnce(World, In, Entity) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
@@ -128,8 +125,8 @@ impl RouteHandler {
 				else {
 					return world;
 				};
-				let Ok(input) = input.try_into().map_err(|err: InErr| {
-					world.insert_resource(err.into_response());
+				let Ok(input) = In::from_request_sync(input).map_err(|err| {
+					world.insert_resource(err);
 					Err::<(), ()>(())
 				}) else {
 					return world;
@@ -159,8 +156,8 @@ impl RouteHandler {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -196,7 +193,8 @@ mod test {
 					req.set_body("jimmy");
 				}),
 				RouteHandler::endpoint(|req: In<Request>| {
-					let body = req.body_str().unwrap_or_default();
+					let body = req.0.body.try_into_bytes().unwrap_or_default();
+					let body = std::str::from_utf8(&body).unwrap_or_default();
 					format!("hello {}", body)
 				}),
 			]

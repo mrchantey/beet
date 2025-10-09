@@ -144,6 +144,7 @@ web-sys = { workspace = true, features = [
 	'RequestMode',
 	'Response',
 	'ReadableStream',
+	'ReadableStreamDefaultController',
 	'ReadableStreamDefaultReader',
 	'BinaryType',
 	# localstorage

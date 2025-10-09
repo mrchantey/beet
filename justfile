@@ -292,7 +292,8 @@ search *args:
 
 # Run a command with the sweet cli without installing it
 sweet *args:
-	cargo run -p sweet-cli -- {{args}}
+	sweet {{args}}
+#cargo run -p sweet-cli -- {{args}}
 
 # Install the sweet cli
 install-sweet *args:

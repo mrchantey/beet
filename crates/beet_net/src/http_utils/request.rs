@@ -9,11 +9,11 @@ use http::request;
 
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
-#[derive(Debug, Clone, Component, Resource)]
+#[derive(Debug, Component, Resource)]
 pub struct Request {
 	pub parts: request::Parts,
 
-	pub body: Option<Bytes>,
+	pub body: Body,
 }
 
 impl Request {
@@ -25,11 +25,14 @@ impl Request {
 			.expect("Failed to create request parts")
 			.into_parts()
 			.0;
-		Self { parts, body: None }
+		Self {
+			parts,
+			body: default(),
+		}
 	}
 
 
-	pub fn from_parts(parts: request::Parts, body: Option<Bytes>) -> Self {
+	pub fn from_parts(parts: request::Parts, body: Body) -> Self {
 		Self { parts, body }
 	}
 
@@ -42,7 +45,7 @@ impl Request {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: None,
+			body: default(),
 		}
 	}
 	pub fn post(path: impl AsRef<str>) -> Self {
@@ -70,7 +73,16 @@ impl Request {
 	}
 
 	pub fn with_body(mut self, body: impl AsRef<[u8]>) -> Self {
-		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self.body = Bytes::copy_from_slice(body.as_ref()).into();
+		self
+	}
+
+	pub fn with_body_stream<S>(mut self, stream: S) -> Self
+	where
+		S: futures::Stream<Item = Result<Bytes>> + Send + 'static,
+	{
+		use send_wrapper::SendWrapper;
+		self.body = Body::Stream(SendWrapper::new(Box::pin(stream)));
 		self
 	}
 
@@ -89,7 +101,7 @@ impl Request {
 	}
 
 	pub fn set_body(&mut self, body: impl AsRef<[u8]>) -> &mut Self {
-		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self.body = Bytes::copy_from_slice(body.as_ref()).into();
 		self
 	}
 	pub fn with_header<K: IntoHeaderName>(
@@ -161,20 +173,14 @@ impl Request {
 		HttpMethod::from(self.parts.method.clone())
 	}
 
-	pub fn body_str(&self) -> Option<String> {
-		self.body
-			.as_ref()
-			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
-	}
-
 	pub fn from_http<T: Into<Bytes>>(request: http::Request<T>) -> Self {
 		let (parts, body) = request.into_parts();
-		let bytes = if HttpExt::has_body(&parts) {
-			Some(Bytes::from(body.into()))
+		let body = if HttpExt::has_body(&parts) {
+			Bytes::from(body.into()).into()
 		} else {
-			None
+			default()
 		};
-		Self { parts, body: bytes }
+		Self { parts, body }
 	}
 
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
@@ -184,7 +190,7 @@ impl Request {
 	) -> HttpResult<Self> {
 		use axum::extract::FromRequest;
 		let (parts, body) = request.into_parts();
-		let bytes = if HttpExt::has_body(&parts) {
+		let body = if HttpExt::has_body(&parts) {
 			let request =
 				axum::extract::Request::from_parts(parts.clone(), body);
 			let bytes =
@@ -194,13 +200,16 @@ impl Request {
 						err
 					))
 				})?;
-			Some(bytes)
+			bytes.into()
 		} else {
-			None
+			default()
 		};
-		Ok(Self { parts, body: bytes })
+		Ok(Self { parts, body })
 	}
-	pub fn into_http_request(self) -> http::Request<Bytes> { self.into() }
+	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {
+		let bytes = self.body.into_bytes().await?;
+		Ok(http::Request::from_parts(self.parts, bytes))
+	}
 }
 
 
@@ -215,7 +224,7 @@ impl From<RouteInfo> for Request {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: None,
+			body: default(),
 		}
 	}
 }
@@ -224,25 +233,22 @@ impl Into<()> for Request {
 	fn into(self) -> () {}
 }
 
-impl Into<http::Request<Bytes>> for Request {
-	fn into(self) -> http::Request<Bytes> {
-		http::Request::from_parts(
-			self.parts,
-			self.body.unwrap_or_else(Bytes::new),
-		)
-	}
-}
-
 
 impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
 }
 
-/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
+/// Types which consume a request, requiring its body which may be a stream
+#[allow(async_fn_in_trait)]
 pub trait FromRequest<M>: Sized {
-	fn from_request(request: Request) -> Result<Self, Response>;
+	async fn from_request(request: Request) -> Result<Self, Response>;
+	// temp while migrating beet_router
+	fn from_request_sync(request: Request) -> Result<Self, Response> {
+		futures::executor::block_on(Self::from_request(request))
+	}
 }
-/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
+
+/// Types which consume a request by reference, not requiring its body
 pub trait FromRequestRef<M>: Sized {
 	fn from_request_ref(request: &Request) -> Result<Self, Response>;
 }
@@ -252,7 +258,7 @@ where
 	T: TryFrom<Request, Error = E>,
 	E: IntoResponse,
 {
-	fn from_request(request: Request) -> Result<Self, Response> {
+	async fn from_request(request: Request) -> Result<Self, Response> {
 		request.try_into().map_err(|e: E| e.into_response())
 	}
 }
@@ -263,7 +269,7 @@ impl<T, M> FromRequest<(FromRequestRefMarker, M)> for T
 where
 	T: FromRequestRef<M>,
 {
-	fn from_request(request: Request) -> Result<Self, Response> {
+	async fn from_request(request: Request) -> Result<Self, Response> {
 		T::from_request_ref(&request)
 	}
 }

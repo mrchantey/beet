@@ -27,7 +27,9 @@ mod test {
 				 requests: Query<&Request>|
 				 -> Result {
 					let req = requests.get(ev.agent())?;
-					let status = if req.body.is_some() {
+					let status = if let Body::Bytes(bytes) = &req.body
+						&& !bytes.is_empty()
+					{
 						StatusCode::OK
 					} else {
 						StatusCode::BAD_REQUEST

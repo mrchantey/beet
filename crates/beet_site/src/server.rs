@@ -33,7 +33,8 @@ fn image_generator() -> impl Bundle {
 		PathFilter::new("generate_image"),
 		RouteHandler::layer_async(async |mut world, _entity| {
 			let request = world.remove_resource::<Request>().unwrap();
-			let content: Json<ContentVec> = request.try_into().unwrap();
+			let content =
+				Json::<ContentVec>::from_request(request).await.unwrap();
 			let agent =
 				GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE);
 

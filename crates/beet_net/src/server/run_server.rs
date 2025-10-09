@@ -8,6 +8,7 @@ use hyper::rt::Timer;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use pin_project::pin_project;
+use send_wrapper::SendWrapper;
 use std::convert::Infallible;
 use std::future::Future;
 use std::io;
@@ -95,14 +96,24 @@ pub(super) fn run_server(
 }
 
 async fn hyper_to_request(
-	req: hyper::Request<impl hyper::body::Body>,
+	req: hyper::Request<hyper::body::Incoming>,
 ) -> Request {
 	let (parts, body) = req.into_parts();
-	let body_bytes = match http_body_util::BodyExt::collect(body).await {
-		Ok(collected) => Some(collected.to_bytes()),
-		Err(_) => None,
-	};
-	Request::from_parts(parts, body_bytes)
+
+	// Convert hyper body into a stream
+	let stream = http_body_util::BodyStream::new(body);
+	let stream = Box::pin(stream.map(|result| match result {
+		Ok(frame) => match frame.into_data() {
+			Ok(data) => Ok(data),
+			Err(_) => Err(bevyhow!("Failed to convert frame to data")),
+		},
+		Err(err) => Err(bevyhow!("Body stream error: {:?}", err)),
+	}));
+
+	// Create body based on size
+	let body = Body::Stream(SendWrapper::new(stream));
+
+	Request::from_parts(parts, body)
 }
 
 async fn response_to_hyper(res: Response) -> hyper::Response<Full<Bytes>> {

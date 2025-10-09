@@ -97,20 +97,18 @@ impl<T> Json<T> {
 	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
 }
 
-#[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
-	for Json<T>
-{
-	type Error = HttpError;
 
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
-		let body = req
-			.body
-			.ok_or_else(|| HttpError::bad_request("no body in request"))?;
-		let json: T = serde_json::from_slice(&body).map_err(|err| {
+#[cfg(feature = "serde")]
+impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
+	async fn from_request(req: Request) -> Result<Self, Response> {
+		let body = req.body.into_bytes().await.map_err(|err| {
+			error!("Failed to read request body: {}", err);
+			HttpError::bad_request("Failed to read stream")
+		})?;
+		let json = serde_json::from_slice(&body).map_err(|err| {
 			HttpError::bad_request(format!("Failed to parse JSON: {}", err))
 		})?;
-		Ok(Json(json))
+		Ok(Self(json))
 	}
 }
 #[cfg(feature = "serde")]
@@ -156,16 +154,19 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	}
 }
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+impl<T: serde::de::DeserializeOwned> FromRequestRef<Self>
 	for JsonQueryParams<T>
 {
-	type Error = HttpError;
-
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
+	fn from_request_ref(req: &Request) -> Result<Self, Response> {
 		let query = req.parts.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
-		let value = Self::from_query_string(query)?;
+		let value = Self::from_query_string(query).map_err(|err| {
+			HttpError::bad_request(format!(
+				"Failed to parse query params: {}",
+				err
+			))
+		})?;
 		Ok(Self(value))
 	}
 }
