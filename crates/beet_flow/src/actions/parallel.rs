@@ -33,12 +33,12 @@ fn on_start(
 	mut commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.clear();
 
 	if children.is_empty() {
 		commands
-			.entity(ev.event_target())
+			.entity(ev.action())
 			.trigger_target(Outcome::Pass);
 		return Ok(());
 	}
@@ -53,7 +53,7 @@ fn on_next(
 	mut ev: On<ChildEnd<Outcome>>,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let child = ev.child();
 
 	// if any error, just propagate the error

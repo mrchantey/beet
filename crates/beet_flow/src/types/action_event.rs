@@ -31,7 +31,7 @@ pub impl<'w, 't, T> On<'w, 't, T>
 where
 	T: ActionEvent,
 {
-	fn event_target(&self) -> Entity { self.trigger().cx.action }
+	fn action(&self) -> Entity { self.trigger().cx.action }
 	fn agent(&self) -> Entity { self.trigger().cx.agent }
 	#[track_caller]
 	fn trigger_next(&mut self, event: impl ActionEvent) -> &mut Self {
@@ -54,7 +54,7 @@ where
 	T: Clone + ActionEvent,
 {
 	/// Trigger [`T`] on this [`event_target`], essentially propagating a
-	/// [`ChildEnd<T>`] into a [`T`] event, also propagating the [`ActionTrigger::agent`]
+	/// [`ChildEnd<T>`] into a [`T`] event, also propagating the [`ActionContext::agent`]
 	fn propagate_child(&mut self) -> &mut Self {
 		let ev = self
 			.event()

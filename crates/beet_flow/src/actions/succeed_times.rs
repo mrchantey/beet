@@ -33,7 +33,7 @@ fn succeed_times(
 	mut ev: On<GetOutcome>,
 	mut query: Query<&mut SucceedTimes>,
 ) -> Result {
-	let mut action = query.get_mut(ev.event_target())?;
+	let mut action = query.get_mut(ev.action())?;
 
 	if action.times < action.max_times {
 		action.times += 1;

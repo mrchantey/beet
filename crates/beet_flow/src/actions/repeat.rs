@@ -56,7 +56,7 @@ fn repeat(
 	query: Query<&Repeat>,
 	mut commands: Commands,
 ) -> Result {
-	let repeat = query.get(ev.event_target())?;
+	let repeat = query.get(ev.action())?;
 	if let Some(check) = &repeat.if_result_matches {
 		if *ev != *check {
 			// repeat is completed, propagate the result to the parent if it exists
@@ -66,7 +66,7 @@ fn repeat(
 	}
 	// otherwise run again on the next tick
 	commands
-		.entity(ev.event_target())
+		.entity(ev.action())
 		.insert(TriggerDeferred::new(GetOutcome));
 	Ok(())
 }

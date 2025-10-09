@@ -30,7 +30,7 @@ use beet_core::prelude::*;
 pub struct Fallback;
 
 fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
-	let children = query.get(ev.event_target())?;
+	let children = query.get(ev.action())?;
 	if let Some(first_child) = children.iter().next() {
 		ev.trigger_next_with(first_child, GetOutcome);
 	} else {
@@ -44,7 +44,7 @@ fn on_next(
 	mut commands: Commands,
 	query: Query<&Children>,
 ) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let child = ev.child();
 	// if any success, propagate the success
 	if ev.is_pass() {

@@ -30,7 +30,7 @@ use beet_core::prelude::*;
 pub struct Sequence;
 
 fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
-	let children = query.get(ev.event_target())?;
+	let children = query.get(ev.action())?;
 	if let Some(first_child) = children.iter().next() {
 		ev.trigger_next_with(first_child, GetOutcome);
 	} else {
@@ -40,7 +40,7 @@ fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
 }
 
 fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let child = ev.child();
 	// if any error, just propagate the error
 	if ev.is_fail() {

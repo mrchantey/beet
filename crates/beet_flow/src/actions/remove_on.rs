@@ -52,7 +52,7 @@ fn remove<E: ActionEvent, B: Bundle>(
 	mut commands: Commands,
 	query: Query<&RemoveOn<E, B>>,
 ) -> Result {
-	let action = query.get(ev.event_target())?;
+	let action = query.get(ev.action())?;
 	let target = action.target_entity.select_target(&ev);
 	commands.entity(target).remove::<B>();
 	Ok(())

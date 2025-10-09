@@ -47,9 +47,9 @@ fn set_curve_on_run(
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
 ) -> Result {
-	let (action, mut anim) = query.get_mut(ev.event_target())?;
+	let (action, mut anim) = query.get_mut(ev.action())?;
 
-	let transform = transforms.get(ev.event_target())?;
+	let transform = transforms.get(ev.action())?;
 
 	anim.curve = match action {
 		SetCurveOnRun::EaseRangeDir2 { func, range } => {

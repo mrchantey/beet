@@ -26,7 +26,7 @@ fn end_with<T: EndEvent + Clone>(
 	mut ev: On<T::Run>,
 	action: Query<&EndWith<T>>,
 ) -> Result {
-	let action = action.get(ev.event_target())?;
+	let action = action.get(ev.action())?;
 	ev.trigger_next(action.0.clone());
 	Ok(())
 }

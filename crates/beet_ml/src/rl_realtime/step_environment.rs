@@ -57,9 +57,9 @@ where
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	let mut step = query.get_mut(ev.event_target())?;
+	let mut step = query.get_mut(ev.action())?;
 	let (state, mut action, mut env, params, session_entity) =
-		agents.get_mut(ev.event_target())?;
+		agents.get_mut(ev.action())?;
 	let mut table = sessions.get_mut(**session_entity)?;
 
 	let outcome = env.step(&state, &action);
@@ -80,7 +80,7 @@ where
 	// 	action,
 	// 	outcome.reward
 	// );
-	commands.entity(ev.event_target()).trigger_target(Outcome::Pass);
+	commands.entity(ev.action()).trigger_target(Outcome::Pass);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {

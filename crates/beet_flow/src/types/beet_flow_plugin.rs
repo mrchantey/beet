@@ -91,7 +91,7 @@ pub enum ActionTag {
 pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<GetOutcome>, query: Query<&Name>| {
-		let name = if let Ok(name) = query.get(ev.event_target()) {
+		let name = if let Ok(name) = query.get(ev.action()) {
 			name.to_string()
 		} else {
 			"Unknown".to_string()
@@ -106,7 +106,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, Outcome)>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<Outcome>, query: Query<&Name>| {
-		let name = if let Ok(name) = query.get(ev.event_target()) {
+		let name = if let Ok(name) = query.get(ev.action()) {
 			name.to_string()
 		} else {
 			"Unknown".to_string()

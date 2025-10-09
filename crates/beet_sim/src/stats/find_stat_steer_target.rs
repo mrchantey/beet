@@ -26,10 +26,10 @@ fn find_steer_target(
 	agents: AgentQuery<&Transform>,
 	transforms: Query<&Transform>,
 ) -> Result {
-	let (_action, goal_id, value_goal) = query.get(ev.event_target())?;
+	let (_action, goal_id, value_goal) = query.get(ev.action())?;
 
-	let agent = agents.entity(ev.event_target());
-	let agent_transform = agents.get(ev.event_target())?;
+	let agent = agents.entity(ev.action());
+	let agent_transform = agents.get(ev.action())?;
 
 	let mut best_score = f32::MAX;
 	let mut closest_target = None;

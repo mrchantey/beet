@@ -28,7 +28,7 @@ fn nearest_sentence(
 	)>,
 ) -> Result {
 	let (_scorer, target_sentence, handle, children) =
-		query.get(ev.event_target())?;
+		query.get(ev.action())?;
 	let bert = berts
 		.get_mut(handle)
 		.expect(&expect_action::to_have_asset(&ev));

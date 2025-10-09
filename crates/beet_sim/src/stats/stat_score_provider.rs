@@ -67,9 +67,9 @@ fn provide_score(
 	query: Query<(&StatScoreProvider, &StatId, &StatValueGoal)>,
 	agents: AgentQuery,
 ) {
-	let agent = agents.entity(ev.event_target());
+	let agent = agents.entity(ev.action());
 	let (score_provider, stat_id, target_value) = query
-		.get(ev.event_target())
+		.get(ev.action())
 		.expect(&expect_action::to_have_action(&ev));
 
 	let value = StatValue::find_by_id(agent, children, stats, *stat_id)
@@ -84,7 +84,7 @@ fn provide_score(
 		descriptor.global_range.clone(),
 	);
 
-	commands.entity(ev.event_target()).trigger_target(score);
+	commands.entity(ev.action()).trigger_target(score);
 }
 
 

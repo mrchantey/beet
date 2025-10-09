@@ -46,7 +46,7 @@ where
 	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists,
 	/// propagating the [`ActionTrigger::agent`]
 	pub fn trigger(mut commands: Commands, ev: &On<T>) {
-		let child = ev.event_target();
+		let child = ev.action();
 		let value = ev.event().clone();
 		let agent = ev.agent();
 
@@ -99,7 +99,7 @@ pub(crate) fn propagate_child_end<T>(
 	ChildEnd<T>: Clone + ActionEvent,
 	T: 'static + Send + Sync + Clone + ActionEvent,
 {
-	let target = ev.event_target();
+	let target = ev.action();
 	if !prevent.contains(target) {
 		ev.propagate_child();
 	}
@@ -116,7 +116,7 @@ mod test {
 	struct Parent;
 
 	fn run_child(mut ev: On<GetOutcome>, children: Query<&Children>) {
-		let child = children.get(ev.event_target()).unwrap()[0];
+		let child = children.get(ev.action()).unwrap()[0];
 		ev.trigger_next_with(child, GetOutcome);
 	}
 
@@ -127,7 +127,7 @@ mod test {
 
 	fn succeed(ev: On<GetOutcome>, mut commands: Commands) {
 		commands
-			.entity(ev.event_target())
+			.entity(ev.action())
 			.trigger_target(Outcome::Pass);
 	}
 

@@ -38,7 +38,7 @@ fn on_start(
 	mut ev: On<GetOutcome>,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.clear();
 
 	for child in children.iter() {
@@ -51,7 +51,7 @@ fn on_receive_score(
 	mut ev: On<ChildEnd<Score>>,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.insert(ev.child(), ev.value().clone());
 
 	// all children have reported their score, run the highest scoring child

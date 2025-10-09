@@ -19,7 +19,7 @@ impl TargetEntity {
 	/// Get the target entity for the given trigger.
 	pub fn select_target(&self, ev: &On<impl ActionEvent>) -> Entity {
 		match self {
-			TargetEntity::Action => ev.event_target(),
+			TargetEntity::Action => ev.action(),
 			TargetEntity::Agent => ev.agent(),
 			TargetEntity::Other(entity) => *entity,
 		}

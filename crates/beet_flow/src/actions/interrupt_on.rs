@@ -18,7 +18,7 @@ pub(crate) fn interrupt_run<T: RunEvent>(
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 	children: Populated<&Children>,
 ) {
-	let action = ev.event_target();
+	let action = ev.action();
 	for child in children
 		.iter_descendants(action)
 		.filter(|child| should_remove.contains(*child))
@@ -36,7 +36,7 @@ pub(crate) fn interrupt_end<T: EndEvent>(
 	children: Query<&Children>,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
-	let action = ev.event_target();
+	let action = ev.action();
 	// 1. always remove from this entity
 	if should_remove.contains(action) {
 		commands.entity(action).remove::<Running>();

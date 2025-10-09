@@ -241,7 +241,7 @@ fn log_on_run(
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.event_target(),
+		ev.action(),
 		&query,
 		"OnRun",
 		OnLogMessage::FLOW_COLOR,
@@ -261,7 +261,7 @@ fn log_on_run_result(
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.event_target(),
+		ev.action(),
 		&query,
 		&format!("{:?}", &ev.event()),
 		OnLogMessage::FLOW_COLOR,

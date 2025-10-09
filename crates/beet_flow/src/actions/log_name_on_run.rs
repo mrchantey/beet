@@ -21,7 +21,7 @@ pub struct LogNameOnRun;
 
 /// Logs the [`Name`] of the entity when it runs.
 fn log_name_on_run(ev: On<GetOutcome>, query: Query<&Name>) -> Result {
-	if let Ok(name) = query.get(ev.event_target()) {
+	if let Ok(name) = query.get(ev.action()) {
 		info!("Running: {name}");
 	}
 	Ok(())

@@ -51,7 +51,7 @@ fn sentence_steer_target<F: Component>(
 	items: Query<Entity, (With<Sentence>, With<F>)>,
 	mut berts: ResMut<Assets<Bert>>,
 ) -> Result {
-	let (handle, sentence_steer_target) = query.get(ev.event_target())?;
+	let (handle, sentence_steer_target) = query.get(ev.action())?;
 
 	let target_entity = sentence_steer_target.target_entity.select_target(&ev);
 

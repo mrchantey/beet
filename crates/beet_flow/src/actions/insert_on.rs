@@ -60,7 +60,7 @@ fn insert<E: ActionEvent, B: Bundle + Clone>(
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
 ) -> Result {
-	let action = query.get(ev.event_target())?;
+	let action = query.get(ev.action())?;
 	let target = action.target_entity.select_target(&ev);
 	commands.entity(target).insert(action.bundle.clone());
 	Ok(())
