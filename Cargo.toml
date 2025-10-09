@@ -156,6 +156,7 @@ console_log = { version = "1", features = ["color"] }
 #💡 async
 futures = "0.3"
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
+pin-project = "1"
 async-channel = "2"
 async-executor = "1"
 async-fs = "2"

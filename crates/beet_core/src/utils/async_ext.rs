@@ -18,7 +18,7 @@ where
 	wasm_bindgen_futures::spawn_local(fut)
 }
 /// Cross platform spawn_local function
-// TODO deprecate for async-executor
+// TODO deprecate for async-executor or bevy tasks?
 #[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
 pub fn spawn_local<F>(fut: F) -> tokio::task::JoinHandle<F::Output>
 where

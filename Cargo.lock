@@ -1608,6 +1608,8 @@ dependencies = [
 name = "beet_router"
 version = "0.0.7"
 dependencies = [
+ "async-executor",
+ "async-io",
  "axum 0.8.6",
  "axum-extra",
  "axum-server",
@@ -1622,8 +1624,11 @@ dependencies = [
  "clap",
  "extend",
  "futures",
+ "http-body-util",
+ "hyper 1.7.0",
  "js-sys",
  "lambda_http",
+ "pin-project",
  "send_wrapper",
  "serde",
  "serde_json",

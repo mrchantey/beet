@@ -119,6 +119,8 @@ pub trait AsyncTaskOut: 'static + Send + Sync {
 impl AsyncTaskOut for () {
 	fn apply(self, _: AsyncWorld) {}
 }
+
+
 impl AsyncTaskOut for Result {
 	fn apply(self, world: AsyncWorld) {
 		match self {

@@ -123,8 +123,6 @@ impl ReactiveApp {
 			let _ = Self::try_update();
 		});
 		let func_js: js_sys::Function = func.unchecked_into();
-		if let Some(win) = web_sys::window() {
-			let _ = win.queue_microtask(&func_js);
-		}
+		let _ = web_sys::window().unwrap().queue_microtask(&func_js);
 	}
 }

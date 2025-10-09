@@ -76,6 +76,7 @@ where
 /// This type optionally accepts a `QueryData` and `QueryFilter` for conveniently getting
 /// components of the agent.
 /// See [`AgentQuery::entity`] for how the entity is resolved.
+// TODO Running should track ActionContext::agent
 #[derive(SystemParam)]
 pub struct AgentQuery<'w, 's, D = (), F = ()>
 where
@@ -100,6 +101,8 @@ where
 	/// The agent is resolved in the following order:
 	/// - The first [`ActionOf`] in ancestors (inclusive)
 	/// - The root ancestor
+	/// currently this does NOT track the ActionContext::agent
+	// TODO track ActionContext::agent
 	pub fn entity(&self, entity: Entity) -> Entity {
 		// cache root to avoid double traversal
 		let mut root = entity;
