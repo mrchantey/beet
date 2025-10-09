@@ -47,8 +47,8 @@ async fn hello_server(world: AsyncWorld, req: Request) -> Response {
     </style>
   </head>
   <body>
-    <h1>Greetings {name}!</h1>
     <pre>
+	    Greetings {name}!
       Uptime: {uptime:.2} seconds
       Request Count: {count}
     </pre>

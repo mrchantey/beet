@@ -26,7 +26,7 @@ mod test_request {
 	const HTTPBIN: &str = "https://httpbin.org";
 
 	#[sweet::test]
-	#[ignore = "flaky example.com"]
+	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
 			.send()
