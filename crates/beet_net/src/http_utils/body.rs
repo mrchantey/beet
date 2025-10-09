@@ -10,7 +10,7 @@ use std::pin::Pin;
 type DynBytesStream = dyn Stream<Item = Result<Bytes>>;
 /// crates like Axum require Stream to be Send
 #[cfg(not(target_arch = "wasm32"))]
-type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send;
+type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send + Sync;
 
 
 

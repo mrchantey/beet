@@ -79,7 +79,7 @@ impl Request {
 
 	pub fn with_body_stream<S>(mut self, stream: S) -> Self
 	where
-		S: futures::Stream<Item = Result<Bytes>> + Send + 'static,
+		S: 'static + Send + Sync + futures::Stream<Item = Result<Bytes>>,
 	{
 		use send_wrapper::SendWrapper;
 		self.body = Body::Stream(SendWrapper::new(Box::pin(stream)));

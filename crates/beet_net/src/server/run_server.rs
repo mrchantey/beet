@@ -2,7 +2,10 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::ready;
+use http_body_util::BodyExt;
 use http_body_util::Full;
+use http_body_util::StreamBody;
+use hyper::body::Frame;
 use hyper::rt::Sleep;
 use hyper::rt::Timer;
 use hyper::server::conn::http1;
@@ -95,6 +98,7 @@ pub(super) fn run_server(
 	});
 }
 
+
 async fn hyper_to_request(
 	req: hyper::Request<hyper::body::Incoming>,
 ) -> Request {
@@ -116,22 +120,35 @@ async fn hyper_to_request(
 	Request::from_parts(parts, body)
 }
 
-async fn response_to_hyper(res: Response) -> hyper::Response<Full<Bytes>> {
-	match res.into_http().await {
-		Ok(http_response) => {
-			let (parts, body) = http_response.into_parts();
-			hyper::Response::from_parts(parts, Full::new(body))
+async fn response_to_hyper(
+	res: Response,
+) -> hyper::Response<http_body_util::combinators::BoxBody<Bytes, std::io::Error>>
+{
+	let Response { parts, body } = res;
+
+	match body {
+		Body::Bytes(bytes) => {
+			let body = Full::new(bytes).map_err(|never| match never {}).boxed();
+			hyper::Response::from_parts(parts, body)
 		}
-		Err(_) => {
-			error!("Failed to convert Response to hyper");
-			let error_response = hyper::Response::builder()
-				.status(500)
-				.body(Full::new(Bytes::from("Internal Server Error")))
-				.unwrap();
-			error_response
+		Body::Stream(stream) => {
+			// Convert our stream to a stream of Frames
+			let frame_stream = stream.take().map(|result| {
+				result.map(Frame::data).map_err(|e| {
+					std::io::Error::new(
+						std::io::ErrorKind::Other,
+						e.to_string(),
+					)
+				})
+			});
+
+			let body = BodyExt::boxed(StreamBody::new(frame_stream));
+			hyper::Response::from_parts(parts, body)
 		}
 	}
 }
+
+
 
 // Wrapper to make async-io's TcpStream work with hyper's IO traits
 struct BevyIo<S> {
