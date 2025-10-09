@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::server::run_server;
 use beet_core::prelude::*;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -29,9 +30,41 @@ pub(super) type HandlerFn = Arc<
 	>,
 >;
 
+pub trait IntoHandlerFn<M> {
+	fn into_handler_fn(self) -> HandlerFn;
+}
+
+
+pub struct AsyncWorldRequestIntoHandlerFn;
+impl<Func, Fut, Out> IntoHandlerFn<(Out, AsyncWorldRequestIntoHandlerFn)>
+	for Func
+where
+	Func: 'static + Send + Sync + Clone + FnOnce(AsyncWorld, Request) -> Fut,
+	Fut: Send + Future<Output = Out>,
+	Out: IntoResponse,
+{
+	fn into_handler_fn(self) -> HandlerFn {
+		box_it(async move |world, req| self(world, req).await.into_response())
+	}
+}
+pub struct RequestIntoHandlerFn;
+impl<Func, Fut, Out> IntoHandlerFn<(Out, RequestIntoHandlerFn)> for Func
+where
+	Func: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
+	Fut: Send + Future<Output = Out>,
+	Out: IntoResponse,
+{
+	fn into_handler_fn(self) -> HandlerFn {
+		box_it(async move |_, req| self(req).await.into_response())
+	}
+}
+
+
 #[derive(Resource)]
 pub struct ServerSettings {
+	/// The port the server listens on
 	pub port: u16,
+	/// The function called by hyper for each request
 	pub handler: HandlerFn,
 }
 
@@ -40,15 +73,22 @@ impl ServerSettings {
 		format!("http://127.0.0.1:{DEFAULT_SERVER_PORT}")
 	}
 
-	pub fn with_handler<Func, Fut>(mut self, func: Func) -> Self
+	pub fn with_handler<F, M>(mut self, func: F) -> Self
 	where
-		Func:
-			'static + Send + Sync + Clone + FnOnce(AsyncWorld, Request) -> Fut,
-		Fut: Send + Future<Output = Response>,
+		F: IntoHandlerFn<M>,
 	{
-		self.handler = box_it(func);
+		self.set_handler(func);
 		self
 	}
+
+	pub fn set_handler<F, M>(&mut self, func: F) -> &mut Self
+	where
+		F: IntoHandlerFn<M>,
+	{
+		self.handler = func.into_handler_fn();
+		self
+	}
+
 	pub fn handler(&self) -> HandlerFn { self.handler.clone() }
 }
 

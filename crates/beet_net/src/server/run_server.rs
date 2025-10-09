@@ -274,7 +274,9 @@ mod test {
 			App::new()
 				.add_plugins((DefaultPlugins, ServerPlugin))
 				.insert_resource(ServerSettings::default().with_handler(
-					async move |_world, req| Response::ok().with_body(req.body),
+					async move |_world: AsyncWorld, req: Request| {
+						Response::ok().with_body(req.body)
+					},
 				))
 				.run();
 		});
@@ -303,7 +305,7 @@ mod test {
 			App::new()
 				.add_plugins((DefaultPlugins, ServerPlugin))
 				.insert_resource(ServerSettings::default().with_handler(
-					async move |_world, req| {
+					async move |req: Request| {
 						// Server adds 100ms delay per chunk
 						use futures::TryStreamExt;
 						let delayed_stream = req.body.into_stream().and_then(
