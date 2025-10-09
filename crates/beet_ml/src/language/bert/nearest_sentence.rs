@@ -29,7 +29,9 @@ fn nearest_sentence(
 ) -> Result {
 	let (_scorer, target_sentence, handle, children) =
 		query.get(ev.event_target())?;
-	let bert = berts.get_mut(handle)?;
+	let bert = berts
+		.get_mut(handle)
+		.expect(&expect_action::to_have_asset(&ev));
 	let entity = bert.closest_sentence_entity(
 		target_sentence.0.clone(),
 		children.iter().map(|e| e.clone()),

@@ -31,7 +31,6 @@ pub impl<'w, 't, T> On<'w, 't, T>
 where
 	T: ActionEvent,
 {
-	// TODO rename to action
 	fn event_target(&self) -> Entity { self.trigger().cx.action }
 	fn agent(&self) -> Entity { self.trigger().cx.agent }
 	#[track_caller]

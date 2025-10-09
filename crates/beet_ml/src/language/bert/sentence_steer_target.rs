@@ -50,13 +50,10 @@ fn sentence_steer_target<F: Component>(
 	// it to be similar to sentence_scorer
 	items: Query<Entity, (With<Sentence>, With<F>)>,
 	mut berts: ResMut<Assets<Bert>>,
-	agents: AgentQuery,
 ) -> Result {
 	let (handle, sentence_steer_target) = query.get(ev.event_target())?;
 
-	let target_entity = sentence_steer_target
-		.target_entity
-		.select_target(&ev, &agents);
+	let target_entity = sentence_steer_target.target_entity.select_target(&ev);
 
 	let target_sentence = sentences.get(target_entity)?;
 
@@ -74,7 +71,7 @@ fn sentence_steer_target<F: Component>(
 	) {
 		Ok(entity) => {
 			commands
-				.entity(agents.entity(ev.event_target()))
+				.entity(ev.agent())
 				.insert(SteerTarget::Entity(entity));
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
