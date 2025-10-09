@@ -1,5 +1,19 @@
+// use crate::prelude::*;
+// use beet_core::prelude::*;
+// use beet_net::prelude::*;
+
 pub struct Exchange;
 
+impl Exchange {
+	// pub async fn request(world: &mut World, req: Request) -> Result<Response> {
+	// 	let root = world
+	// 		.query_filtered::<Entity, With<RouterRoot>>()
+	// 		.single(world)?;
+
+
+	// 	Ok(())
+	// }
+}
 
 
 

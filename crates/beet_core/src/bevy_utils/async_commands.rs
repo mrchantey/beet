@@ -3,6 +3,7 @@ use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::ecs::component::Mutable;
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
 use bevy::tasks::IoTaskPool;
@@ -375,6 +376,24 @@ impl AsyncEntity {
 		})
 		.await
 	}
+
+	pub async fn observe<E: Event, B: Bundle, M>(
+		&self,
+		observer: impl IntoObserverSystem<E, B, M>,
+	) -> &Self {
+		self.with(|mut entity| {
+			entity.observe_any(observer);
+		})
+		.await;
+		self
+	}
+
+	pub async fn despawn(&self) {
+		self.with(move |entity| {
+			entity.despawn();
+		})
+		.await;
+	}
 }
 
 #[extend::ext(name=WorldAsyncCommandsExt)]
@@ -391,7 +410,6 @@ pub impl World {
 			.spawn(async move { func(world).await.apply(world2) });
 		self.spawn(AsyncTask(task))
 	}
-	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
 	fn run_async_local<Func, Fut, Out>(
 		&mut self,
 		func: Func,
@@ -406,6 +424,50 @@ pub impl World {
 		let task = IoTaskPool::get()
 			.spawn_local(async move { func(world).await.apply(world2) });
 		self.spawn(AsyncTask(task))
+	}
+	/// Spawn the async task, flush all async tasks and return the output
+	fn run_async_then<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> impl Future<Output = Out>
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: 'static + Send + Sync,
+	{
+		let world = self.resource::<AsyncChannel>().world();
+		let (send, recv) = async_channel::bounded(1);
+		let task = IoTaskPool::get().spawn(async move {
+			let out = func(world).await;
+			let _ = send.try_send(out);
+		});
+		self.spawn(AsyncTask(task));
+		async move {
+			AsyncRunner::flush_async_tasks(self).await;
+			recv.recv().await.unwrap()
+		}
+	}
+	/// Spawn the async local task, flush all async tasks and return the output
+	fn run_async_local_then<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> impl Future<Output = Out>
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
+	{
+		let world = self.resource::<AsyncChannel>().world();
+		let (send, recv) = async_channel::bounded(1);
+		let task = IoTaskPool::get().spawn_local(async move {
+			let out = func(world).await;
+			let _ = send.try_send(out);
+		});
+		self.spawn(AsyncTask(task));
+		async move {
+			AsyncRunner::flush_async_tasks(self).await;
+			recv.recv().await.unwrap()
+		}
 	}
 }
 
@@ -481,5 +543,15 @@ mod tests {
 			bevybail!("intentional error")
 		});
 		app.run_async().await.into_result().xpect_err();
+	}
+	#[sweet::test]
+	async fn run_async_then() {
+		let mut app = App::new();
+		app.init_resource::<Count>()
+			.add_plugins((MinimalPlugins, AsyncPlugin));
+		app.world_mut()
+			.run_async_then(async |_| 32)
+			.await
+			.xpect_eq(32);
 	}
 }

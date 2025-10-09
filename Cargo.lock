@@ -1612,6 +1612,7 @@ dependencies = [
 name = "beet_router"
 version = "0.0.7"
 dependencies = [
+ "async-channel",
  "axum 0.8.6",
  "axum-extra",
  "axum-server",

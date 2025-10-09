@@ -1,10 +1,12 @@
+use bevy::app::Plugins;
+
 use crate::prelude::*;
 
 
-#[extend::ext]
-pub impl<T> T
+#[extend::ext(name=PluginsExt)]
+pub impl<T, M> T
 where
-	T: Plugin,
+	T: Plugins<M>,
 {
 	/// Create a [`World`] with this plugin
 	fn into_world(self) -> World {
