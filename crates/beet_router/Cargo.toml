@@ -14,15 +14,10 @@ publish = true
 
 [features]
 default = ["serde", "axum", "reload", "fs","server"]
-server = ["dep:hyper",
-"dep:http-body-util",
-"dep:async-io",
-"dep:async-executor",
-"dep:pin-project"
-]
+server = ["beet_net/server"]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
-client = []
+client = ["beet_net/client"]
 fs = ["beet_net/fs"]
 aws = ["beet_net/aws"]
 # wip: axum features behind this flag
@@ -81,13 +76,6 @@ bytes.workspace = true
 futures.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-
-#💡 server
-hyper = { version = "1.7", optional = true }
-http-body-util = {workspace = true, optional = true }
-async-io = { workspace = true, optional = true }
-async-executor = { workspace = true, optional = true }
-pin-project = { workspace = true, optional = true }
 
 
 tokio = { workspace = true, optional = true, default-features = true }
