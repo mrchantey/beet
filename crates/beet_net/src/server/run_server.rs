@@ -255,3 +255,120 @@ impl BevySleep {
 		self.project().inner.as_mut().set_at(deadline);
 	}
 }
+
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use bytes::Bytes;
+	use std::time::Duration;
+	use std::time::Instant;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn stream_roundtrip() {
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((DefaultPlugins, ServerPlugin))
+				.insert_resource(ServerSettings::default().with_handler(
+					async move |_world, req| Response::ok().with_body(req.body),
+				))
+				.run();
+		});
+		Request::post(ServerSettings::default_local_url())
+			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
+				Ok(Bytes::from("foo")),
+				Ok(Bytes::from("bar")),
+				Ok(Bytes::from("bazz")),
+			]))
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_eq("foobarbazz");
+	}
+
+	// asserts stream behavior with timestamps and delays
+	#[sweet::test]
+	async fn stream_timestamp() {
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((DefaultPlugins, ServerPlugin))
+				.insert_resource(ServerSettings::default().with_handler(
+					async move |_world, req| {
+						// Server adds 100ms delay per chunk
+						use futures::TryStreamExt;
+						let delayed_stream = req.body.into_stream().and_then(
+							move |chunk| async move {
+								time_ext::sleep(Duration::from_millis(100))
+									.await;
+								Ok(chunk)
+							},
+						);
+						Response::ok().with_body(Body::stream(delayed_stream))
+					},
+				))
+				.run();
+		});
+
+		let start_time = Instant::now();
+
+		// Create timestamped stream that starts after request is sent
+		let timestamped_stream =
+			futures::stream::unfold(0usize, move |count| async move {
+				if count >= 3 {
+					return None;
+				}
+
+				// Wait 100ms between chunks (including initial delay)
+				time_ext::sleep(Duration::from_millis(100)).await;
+
+				let elapsed = start_time.elapsed().as_millis() as u64;
+				let timestamp_data = format!("{}:{}", count, elapsed);
+
+				Some((Ok(Bytes::from(timestamp_data)), count + 1))
+			});
+
+		let mut response_stream =
+			Request::post(ServerSettings::default_local_url())
+				.with_body_stream(timestamped_stream)
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.body;
+
+		let mut chunk_count = 0;
+		while let Some(chunk) = response_stream.next().await.unwrap() {
+			let chunk_str = String::from_utf8(chunk.to_vec()).unwrap();
+			let final_elapsed = start_time.elapsed().as_millis() as u64;
+
+			// Parse the timestamp from the chunk
+			let parts: Vec<&str> = chunk_str.split(':').collect();
+			let chunk_index: usize = parts[0].parse().unwrap();
+			let original_timestamp: u64 = parts[1].parse().unwrap();
+
+			// Expected delay: original timestamp + 100ms server delay per chunk
+			let expected_min_delay = original_timestamp + 100;
+
+			// Verify timing is within reasonable bounds (allowing some jitter)
+			final_elapsed.xpect_greater_or_equal_to(expected_min_delay);
+			final_elapsed.xpect_less_or_equal_to(expected_min_delay + 50);
+
+			chunk_index.xpect_eq(chunk_count);
+			chunk_count += 1;
+		}
+
+		chunk_count.xpect_eq(3);
+	}
+}

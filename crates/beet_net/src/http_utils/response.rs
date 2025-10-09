@@ -68,6 +68,11 @@ impl Response {
 		)
 	}
 
+	pub fn with_body(mut self, body: impl Into<Body>) -> Self {
+		self.body = body.into();
+		self
+	}
+
 	pub fn from_status_body(
 		status: StatusCode,
 		body: impl AsRef<[u8]>,

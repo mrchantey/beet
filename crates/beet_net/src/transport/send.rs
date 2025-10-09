@@ -112,10 +112,9 @@ mod test_request {
 	#[ignore = "flaky httpbin"]
 	async fn body_stream() {
 		use bytes::Bytes;
-		use futures::stream;
 
 		Request::post(format!("{HTTPBIN}/post"))
-			.with_body_stream(stream::iter(vec![
+			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
 				Ok(Bytes::from("chunk1")),
 				Ok(Bytes::from("chunk2")),
 				Ok(Bytes::from("chunk3")),

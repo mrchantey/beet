@@ -36,6 +36,10 @@ pub struct ServerSettings {
 }
 
 impl ServerSettings {
+	pub fn default_local_url() -> String {
+		format!("http://127.0.0.1:{DEFAULT_SERVER_PORT}")
+	}
+
 	pub fn with_handler<Func, Fut>(mut self, func: Func) -> Self
 	where
 		Func:

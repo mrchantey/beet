@@ -19,6 +19,14 @@ pub enum Body {
 	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
 }
 
+impl Body {
+	pub fn stream(
+		stream: impl 'static + Stream<Item = Result<Bytes>> + Send + Sync,
+	) -> Self {
+		Body::Stream(SendWrapper::new(Box::pin(stream)))
+	}
+}
+
 impl Default for Body {
 	fn default() -> Self { Body::Bytes(Bytes::new()) }
 }
@@ -53,9 +61,18 @@ impl Stream for Body {
 	}
 }
 
+
+impl Into<Body> for &[u8] {
+	fn into(self) -> Body { Body::Bytes(Bytes::from(self.to_vec())) }
+}
 impl Into<Body> for Bytes {
 	fn into(self) -> Body { Body::Bytes(self) }
 }
+impl Into<Body> for Vec<u8> {
+	fn into(self) -> Body { Body::Bytes(Bytes::from(self)) }
+}
+
+
 
 impl Body {
 	/// Any body with a content length greater than this will be parsed as a stream.
