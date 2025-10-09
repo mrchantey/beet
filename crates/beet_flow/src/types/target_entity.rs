@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 
@@ -32,7 +33,7 @@ impl TargetEntity {
 	{
 		match self {
 			TargetEntity::Target => ev.event_target(),
-			TargetEntity::Agent => agents.entity(&ev),
+			TargetEntity::Agent => ev.agent(),
 			TargetEntity::Parent => agents
 				.parents
 				.get(ev.event_target())

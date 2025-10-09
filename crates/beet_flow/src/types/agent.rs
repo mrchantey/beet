@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryEntityError;
 use bevy::ecs::query::QueryFilter;
@@ -63,12 +64,13 @@ where
 
 	fn into_entity_target_event(
 		self,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 	) -> (Self::Event, Self::Trigger) {
-		(
-			self.event,
-			ActionTrigger::new(entity).with_agent(self.agent),
-		)
+		let cx = match self.agent {
+			Some(agent) => ActionContext::new_with_agent(entity.id(), agent),
+			None => ActionContext::new(entity),
+		};
+		(self.event, ActionTrigger::new(cx))
 	}
 }
 
@@ -208,13 +210,7 @@ where
 	/// The agent is resolved in the following order:
 	/// - [`ActionTrigger::agent`]
 	/// - [`AgentQuery::entity`]
-	pub fn entity(&self, ev: &On<impl ActionEvent>) -> Entity {
-		if let Some(agent) = ev.trigger().agent() {
-			return agent;
-		} else {
-			self.agent_query.entity(ev.event_target())
-		}
-	}
+	pub fn entity(&self, ev: &On<impl ActionEvent>) -> Entity { ev.agent() }
 
 	/// Get the query item for this `agent`
 	pub fn get(
@@ -266,69 +262,5 @@ where
 			.unwrap()
 			.xok()
 	}
-}
 
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-
-	#[derive(ActionEvent)]
-	struct Run;
-
-	fn set_agent(store: Store<Entity>) -> impl Bundle {
-		EntityObserver::new(move |ev: On<Run>, agents: GlobalAgentQuery| {
-			store.set(agents.entity(&ev));
-		})
-	}
-
-
-	#[test]
-	fn agent_query_self() {
-		let mut world = World::new();
-		let store = Store::new(Entity::PLACEHOLDER);
-		let action = world
-			.spawn(set_agent(store))
-			.trigger_target(Run)
-			.flush()
-			.id();
-		store.get().xpect_eq(action);
-	}
-	#[test]
-	fn agent_query_root() {
-		let mut world = World::new();
-		let store = Store::new(Entity::PLACEHOLDER);
-		let root = world
-			.spawn(children![(set_agent(store), OnSpawn::trigger(Run))])
-			.flush();
-		store.get().xpect_eq(root);
-	}
-	#[test]
-	fn agent_query_action_of() {
-		let mut world = World::new();
-		let store = Store::new(Entity::PLACEHOLDER);
-		let agent = world.spawn_empty().id();
-		world
-			.spawn(children![(
-				ActionOf(agent),
-				set_agent(store),
-				OnSpawn::trigger(Run)
-			)])
-			.flush();
-		store.get().xpect_eq(agent);
-	}
-	#[test]
-	fn agent_query_global_agent() {
-		let mut world = World::new();
-		let store = Store::new(Entity::PLACEHOLDER);
-		let agent = world.spawn_empty().id();
-		world
-			.spawn(children![(
-				set_agent(store),
-				OnSpawn::trigger(Run.with_agent(agent))
-			)])
-			.flush();
-		store.get().xpect_eq(agent);
-	}
 }

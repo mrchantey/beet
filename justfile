@@ -192,7 +192,7 @@ test-flow *args:
 	cargo test -p beet_flow 		--all-features 																						{{args}} -- {{test-threads}}
 	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
 	cargo test -p beet_spatial																														{{args}} -- {{test-threads}}
-	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--lib 										--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 

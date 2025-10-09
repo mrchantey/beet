@@ -18,6 +18,7 @@ bevy_default = ["bevy/bevy_asset"]
 [dependencies]
 beet_core.workspace = true
 bevy.workspace = true
+extend.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

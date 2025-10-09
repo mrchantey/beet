@@ -58,11 +58,7 @@ impl RunNext {
 	}
 }
 
-fn run_next(
-	ev: On<Outcome>,
-	mut commands: Commands,
-	query: Query<&RunNext>,
-) -> Result {
+fn run_next(mut ev: On<Outcome>, query: Query<&RunNext>) -> Result {
 	let run_next = query
 		.get(ev.event_target())
 		.expect(&expect_action::to_have_action(&ev));
@@ -71,7 +67,7 @@ fn run_next(
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_target(GetOutcome);
+	ev.trigger_next_with(run_next.action, GetOutcome);
 	Ok(())
 }
 

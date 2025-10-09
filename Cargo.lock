@@ -1463,6 +1463,7 @@ version = "0.0.7"
 dependencies = [
  "beet_core",
  "bevy",
+ "extend",
  "sweet",
  "tokio",
 ]

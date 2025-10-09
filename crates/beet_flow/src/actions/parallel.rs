@@ -29,7 +29,7 @@ use beet_core::prelude::*;
 pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
-	ev: On<GetOutcome>,
+	mut ev: On<GetOutcome>,
 	mut commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
@@ -44,14 +44,13 @@ fn on_start(
 	}
 
 	for child in children.iter() {
-		commands.entity(child).trigger_target(GetOutcome);
+		ev.trigger_next_with(child, GetOutcome);
 	}
 	Ok(())
 }
 
 fn on_next(
-	ev: On<ChildEnd<Outcome>>,
-	commands: Commands,
+	mut ev: On<ChildEnd<Outcome>>,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
 	let target = ev.event_target();
@@ -59,7 +58,7 @@ fn on_next(
 
 	// if any error, just propagate the error
 	if ev.is_fail() {
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 		return Ok(());
 	}
 
@@ -68,7 +67,7 @@ fn on_next(
 
 	// if all children have completed successfully, succeed
 	if action.len() == children.len() {
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 	}
 	Ok(())
 }
