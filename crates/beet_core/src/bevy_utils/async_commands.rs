@@ -191,7 +191,10 @@ impl AsyncWorld {
 		let mut queue = CommandQueue::default();
 		queue.push(move |world: &mut World| {
 			let out = func(world);
-			out_tx.try_send(out).unwrap();
+			out_tx
+				.try_send(out)
+				// allow dropped, they didnt want the output
+				.ok();
 		});
 		self.tx.try_send(queue).unwrap();
 		async move { out_rx.recv().await.unwrap() }
@@ -289,6 +292,30 @@ impl AsyncWorld {
 		self.with(move |world| {
 			world.run_system_cached_with(system, input).ok();
 		});
+	}
+	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
+	pub fn run_async<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = Entity>
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: AsyncTaskOut,
+	{
+		self.with_then(move |world| world.run_async(func).id())
+	}
+	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
+	pub fn run_async_local<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> impl Future<Output = Entity>
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		self.with_then(move |world| world.run_async_local(func).id())
 	}
 }
 

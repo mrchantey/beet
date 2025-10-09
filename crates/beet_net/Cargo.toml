@@ -102,7 +102,7 @@ async-lock = {workspace = true, optional = true }
 #💡 server
 
 #💡 server
-hyper = { version = "1.7", optional = true }
+hyper = { version = "1.7", features = ["server"], optional = true }
 http-body-util = {workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
