@@ -19,7 +19,7 @@ struct MyParams {
 
 async fn hello_server(world: AsyncWorld, req: Request) -> Response {
 	let name =
-		if let Ok(params) = QueryParams::<MyParams>::from_request_ref(req) {
+		if let Ok(params) = QueryParams::<MyParams>::from_request_ref(&req) {
 			params.name.clone()
 		} else {
 			"User".to_string()

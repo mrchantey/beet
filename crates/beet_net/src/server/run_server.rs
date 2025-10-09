@@ -16,7 +16,7 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-
+/// A hyper/bevy server
 pub(super) fn run_server(
 	settings: Res<ServerSettings>,
 	mut async_commands: AsyncCommands,
@@ -140,7 +140,6 @@ where
 		cx: &mut Context<'_>,
 		mut buf: hyper::rt::ReadBufCursor<'_>,
 	) -> Poll<io::Result<()>> {
-		// Convert ReadBufCursor to &mut [u8] for futures::AsyncRead
 		let slice = unsafe {
 			std::slice::from_raw_parts_mut(
 				buf.as_mut().as_mut_ptr() as *mut u8,
@@ -181,7 +180,6 @@ where
 	}
 }
 
-// Timer implementation using bevy's async executor
 #[derive(Clone, Debug)]
 struct BevyTimer;
 
