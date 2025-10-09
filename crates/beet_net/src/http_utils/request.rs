@@ -242,6 +242,10 @@ impl From<&str> for Request {
 pub trait FromRequest<M>: Sized {
 	fn from_request(request: Request) -> Result<Self, Response>;
 }
+/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
+pub trait FromRequestRef<M>: Sized {
+	fn from_request_ref(request: &Request) -> Result<Self, Response>;
+}
 
 impl<T, E> FromRequest<E> for T
 where
@@ -253,6 +257,26 @@ where
 	}
 }
 
+pub struct FromRequestRefMarker;
+
+impl<T, M> FromRequest<(FromRequestRefMarker, M)> for T
+where
+	T: FromRequestRef<M>,
+{
+	fn from_request(request: Request) -> Result<Self, Response> {
+		T::from_request_ref(&request)
+	}
+}
+
+impl<T, E> FromRequestRef<E> for T
+where
+	T: for<'a> TryFrom<&'a Request, Error = E>,
+	E: IntoResponse,
+{
+	fn from_request_ref(request: &Request) -> Result<Self, Response> {
+		request.try_into().map_err(|e: E| e.into_response())
+	}
+}
 
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }

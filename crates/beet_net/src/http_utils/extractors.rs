@@ -170,6 +170,7 @@ impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
 	}
 }
 
+#[derive(Debug, Clone, Deref)]
 pub struct QueryParams<T>(pub T);
 
 #[cfg(feature = "serde")]
@@ -190,12 +191,12 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<&Request>
 	for QueryParams<T>
 {
 	type Error = HttpError;
 
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
+	fn try_from(req: &Request) -> std::result::Result<Self, Self::Error> {
 		let query = req.parts.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;

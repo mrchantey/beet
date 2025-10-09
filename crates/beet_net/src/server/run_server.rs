@@ -3,8 +3,6 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::ready;
 use http_body_util::Full;
-use hyper::Request;
-use hyper::Response;
 use hyper::rt::Sleep;
 use hyper::rt::Timer;
 use hyper::server::conn::http1;
@@ -19,26 +17,21 @@ use std::task::Context;
 use std::task::Poll;
 
 
-/// System that starts the HTTP server using bevy's async commands
 pub(super) fn run_server(
 	settings: Res<ServerSettings>,
 	mut async_commands: AsyncCommands,
 ) {
-	// let addr
 	let addr: SocketAddr = ([127, 0, 0, 1], settings.port).into();
+	let handler = settings.handler();
 
 	async_commands.run(async move |world| -> Result {
-		bevy::log::info!("Starting Bevy HTTP server application...");
-
-
-		// Bind to the port and listen for incoming TCP connections
+		let handler = handler.clone();
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
 
-		bevy::log::info!("Bevy HTTP server listening on http://{}", addr);
+		bevy::log::info!("Server listening on http://{}", addr);
 
 		loop {
-			// Accept incoming connections
 			let (tcp, addr) = listener
 				.accept()
 				.await
@@ -47,10 +40,28 @@ pub(super) fn run_server(
 			bevy::log::info!("New connection from: {}", addr);
 			let io = BevyIo::new(tcp);
 
-			let _entity_fut = world.run_async(async |world| {
+			let handler = handler.clone();
+			let _entity_fut = world.run_async(async move |world| {
 				let service = service_fn(move |req| {
-					let world = world.clone();					
-					handle_request(world, req)
+					let world = world.clone();
+					let handler = handler.clone();
+					async move {
+						let req = hyper_to_request(req).await;
+						bevy::log::info!(
+							"Request: {} {}",
+							req.method(),
+							req.parts.uri.path()
+						);
+						let res = handler(world.clone(), req).await;
+						let res = response_to_hyper(res).await;
+						bevy::log::info!("Response: {:?}", res.status());
+
+						// non-await
+						world.with_resource::<ServerStatus>(|mut status| {
+							status.increment_requests();
+						});
+						res.xok::<Infallible>()
+					}
 				});
 
 				if let Err(err) = http1::Builder::new()
@@ -61,8 +72,7 @@ pub(super) fn run_server(
 					.await
 				{
 					if err.is_timeout()
-						&& err.to_string()
-							== ("read header from client timeout")
+						&& err.xfmt_debug() == "hyper::Error(HeaderTimeout)"
 					{
 						bevy::log::trace!(
 							"Connection closed due to header timeout (normal behavior)"
@@ -84,24 +94,33 @@ pub(super) fn run_server(
 	});
 }
 
-/// HTTP request handler that uses bevy's async world to manage state
-async fn handle_request(
-	world: AsyncWorld,
-	req: Request<impl hyper::body::Body>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
-	bevy::log::info!("Request: {} {}", req.method(), req.uri().path());
-	// Increment request counter using async world
-	let count = world
-		.with_resource_then::<ServerStatus, _>(|mut status| {
-			status.increment_requests().num_requests()
-		})
-		.await;
-
-	let response_text = format!("Hello from Bevy! Request #{}", count);
-	Ok(Response::new(Full::new(Bytes::from(response_text))))
+async fn hyper_to_request(
+	req: hyper::Request<impl hyper::body::Body>,
+) -> Request {
+	let (parts, body) = req.into_parts();
+	let body_bytes = match http_body_util::BodyExt::collect(body).await {
+		Ok(collected) => Some(collected.to_bytes()),
+		Err(_) => None,
+	};
+	Request::from_parts(parts, body_bytes)
 }
 
-
+async fn response_to_hyper(res: Response) -> hyper::Response<Full<Bytes>> {
+	match res.into_http().await {
+		Ok(http_response) => {
+			let (parts, body) = http_response.into_parts();
+			hyper::Response::from_parts(parts, Full::new(body))
+		}
+		Err(_) => {
+			error!("Failed to convert Response to hyper");
+			let error_response = hyper::Response::builder()
+				.status(500)
+				.body(Full::new(Bytes::from("Internal Server Error")))
+				.unwrap();
+			error_response
+		}
+	}
+}
 
 // Wrapper to make async-io's TcpStream work with hyper's IO traits
 struct BevyIo<S> {
