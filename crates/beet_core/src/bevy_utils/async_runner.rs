@@ -13,9 +13,6 @@ pub impl App {
 
 
 impl AsyncRunner {
-	/// Uses the [`AsyncChannel::rx`] as a signal to run updates,
-	/// this means that the rx in poll_async_tasks should be empty during updates
-	/// Any triggered [`AppExit`] will cause an exit after the current flush completes.
 	pub async fn run(mut app: App) -> AppExit {
 		app.init_plugin(AsyncPlugin);
 		app.init();
@@ -34,35 +31,29 @@ impl AsyncRunner {
 			time_ext::sleep_millis(100).await;
 		}
 	}
+
 	/// Run an loop at regular updates until all tasks have completed or
-	/// an AppExit is triggered.
+	/// an AppExit is triggered. Note that some tasks like http/socket listeners
+	/// will never complete in which case this will never return.
 	pub async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
-		let mut task_query = world.query::<&mut AsyncTask>();
-		let rx = world.resource::<AsyncChannel>().rx.clone();
-		// tried an exponential backoff here, made streaming responses
-		// ie from agents extremely slow, i guess reqwest etc requires regular polling
-		// to receive bytes?
 		loop {
 			// println!("loopin");
 			// 1. update
 			world.update();
+			// println!(
+			// 	"CONTINUE async tasks in flight: {}",
+			// 	world.resource::<AsyncChannel>().task_count()
+			// );
 
-			// 2. flush rx
-			while let Ok(mut queue) = rx.try_recv() {
-				world.commands().append(&mut queue);
-			}
-
-			// 3. exit if AppExit
+			// 2. exit if AppExit
 			if let Some(exit) = world.should_exit() {
 				return Some(exit);
 			}
-
-			// 4. exit if no remaining tasks
-			if task_query.query(world).is_empty() {
+			// 3. exit if no remaining tasks
+			if world.resource::<AsyncChannel>().task_count() == 0 {
 				return None;
 			}
-
-			// 5. short delay
+			// 4. short delay
 			time_ext::sleep_millis(1).await;
 			// }
 		}

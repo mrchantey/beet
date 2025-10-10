@@ -2,12 +2,12 @@ use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
+use async_channel::TryRecvError;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
 use bevy::tasks::IoTaskPool;
-use bevy::tasks::Task;
 use std::future::Future;
 
 #[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
@@ -35,26 +35,67 @@ pub struct AsyncPlugin;
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<AsyncChannel>()
-			.add_systems(PreUpdate, poll_async_tasks);
+			.add_systems(PreUpdate, append_async_queues);
 	}
 }
-
-fn poll_async_tasks(
+/// Append all [`AsyncChannel::rx`]
+fn append_async_queues(
 	mut commands: Commands,
 	channel: Res<AsyncChannel>,
-	tasks: Query<(Entity, &AsyncTask)>,
 ) -> Result {
-	// 1. remove any completed tasks
-	for (entity, task) in tasks {
-		if task.0.is_finished() {
-			commands.entity(entity).despawn();
-		}
-	}
-	// 2. run all ready queues
 	while let Ok(mut queue) = channel.rx.try_recv() {
 		commands.append(&mut queue);
 	}
 	Ok(())
+}
+
+fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
+where
+	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Send + Future<Output = Out>,
+	Out: AsyncTaskOut,
+{
+	let world2 = world.clone();
+	let world3 = world.clone();
+	IoTaskPool::get()
+		.spawn(async move {
+			world3
+				.with_resource_then::<AsyncChannel, _>(|mut channel| {
+					channel.increment_tasks();
+				})
+				.await;
+			func(world).await.apply(world2);
+			world3
+				.with_resource_then::<AsyncChannel, _>(|mut channel| {
+					channel.decrement_tasks();
+				})
+				.await;
+		})
+		.detach();
+}
+fn spawn_async_task_local<Func, Fut, Out>(world: AsyncWorld, func: Func)
+where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: AsyncTaskOut,
+{
+	let world2 = world.clone();
+	let world3 = world.clone();
+	IoTaskPool::get()
+		.spawn_local(async move {
+			world3
+				.with_resource_then::<AsyncChannel, _>(|mut channel| {
+					channel.increment_tasks();
+				})
+				.await;
+			func(world).await.apply(world2);
+			world3
+				.with_resource_then::<AsyncChannel, _>(|mut channel| {
+					channel.decrement_tasks();
+				})
+				.await;
+		})
+		.detach();
 }
 
 /// Commands used to run async functions, passing in an [`AsyncWorld`] which
@@ -87,30 +128,22 @@ pub struct AsyncCommands<'w, 's> {
 
 impl AsyncCommands<'_, '_> {
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
-	pub fn run<Func, Fut, Out>(&mut self, func: Func) -> Entity
+	pub fn run<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		let world = self.channel.world();
-		let world2 = world.clone();
-		let task = IoTaskPool::get()
-			.spawn(async move { func(world).await.apply(world2) });
-		self.commands.spawn(AsyncTask(task)).id()
+		spawn_async_task(self.channel.world(), func);
 	}
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
-	pub fn run_local<Func, Fut, Out>(&mut self, func: Func) -> Entity
+	pub fn run_local<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		let world = self.channel.world();
-		let world2 = world.clone();
-		let task = IoTaskPool::get()
-			.spawn_local(async move { func(world).await.apply(world2) });
-		self.commands.spawn(AsyncTask(task)).id()
+		spawn_async_task_local(self.channel.world(), func);
 	}
 }
 
@@ -134,33 +167,44 @@ impl AsyncTaskOut for Result {
 	}
 }
 
-/// Task containing futures communicating with the world via channels
-#[derive(Component, Deref, DerefMut)]
-pub struct AsyncTask(Task<()>);
-
 /// Contains the channel used by async functions to send [`CommandQueue`]s
 #[derive(Resource)]
 pub struct AsyncChannel {
+	/// the number of tasks currently in flight
+	task_count: usize,
 	/// the sender for the async channel
 	tx: Sender<CommandQueue>,
 	/// the receiver for the async channel, not accesible
-	pub(super) rx: Receiver<CommandQueue>,
+	rx: Receiver<CommandQueue>,
 }
 
 impl Default for AsyncChannel {
 	fn default() -> Self {
 		let (tx, rx) = async_channel::unbounded();
-		Self { rx, tx }
+		Self {
+			rx,
+			tx,
+			task_count: 0,
+		}
 	}
 }
 
 impl AsyncChannel {
+	pub fn task_count(&self) -> usize { self.task_count }
 	/// Get the sender of the channel
 	pub fn tx(&self) -> Sender<CommandQueue> { self.tx.clone() }
 	pub fn world(&self) -> AsyncWorld {
 		AsyncWorld {
 			tx: self.tx.clone(),
 		}
+	}
+	fn increment_tasks(&mut self) -> &mut Self {
+		self.task_count += 1;
+		self
+	}
+	fn decrement_tasks(&mut self) -> &mut Self {
+		self.task_count = self.task_count.saturating_sub(1);
+		self
 	}
 }
 
@@ -294,29 +338,33 @@ impl AsyncWorld {
 			world.run_system_cached_with(system, input).ok();
 		});
 	}
-	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
+	/// Spawn an async task
 	pub fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> impl Future<Output = Entity>
+	) -> impl Future<Output = ()>
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		self.with_then(move |world| world.run_async(func).id())
+		self.with_then(move |world| {
+			world.run_async(func);
+		})
 	}
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
 	pub fn run_async_local<Func, Fut, Out>(
 		&mut self,
 		func: Func,
-	) -> impl Future<Output = Entity>
+	) -> impl Future<Output = ()>
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		self.with_then(move |world| world.run_async_local(func).id())
+		self.with_then(move |world| {
+			world.run_async_local(func);
+		})
 	}
 }
 
@@ -398,32 +446,23 @@ impl AsyncEntity {
 
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
-	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> EntityWorldMut<'_>
+	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		let world = self.resource::<AsyncChannel>().world();
-		let world2 = world.clone();
-		let task = IoTaskPool::get()
-			.spawn(async move { func(world).await.apply(world2) });
-		self.spawn(AsyncTask(task))
+		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		self
 	}
-	fn run_async_local<Func, Fut, Out>(
-		&mut self,
-		func: Func,
-	) -> EntityWorldMut<'_>
+	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		let world = self.resource::<AsyncChannel>().world();
-		let world2 = world.clone();
-		let task = IoTaskPool::get()
-			.spawn_local(async move { func(world).await.apply(world2) });
-		self.spawn(AsyncTask(task))
+		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		self
 	}
 	/// Spawn the async task, flush all async tasks and return the output
 	fn run_async_then<Func, Fut, Out>(
@@ -435,17 +474,16 @@ pub impl World {
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: 'static + Send + Sync,
 	{
-		let world = self.resource::<AsyncChannel>().world();
 		let (send, recv) = async_channel::bounded(1);
-		let task = IoTaskPool::get().spawn(async move {
-			let out = func(world).await;
-			let _ = send.try_send(out);
-		});
-		self.spawn(AsyncTask(task));
-		async move {
-			AsyncRunner::flush_async_tasks(self).await;
-			recv.recv().await.unwrap()
-		}
+		spawn_async_task_local(
+			self.resource::<AsyncChannel>().world(),
+			async move |world| {
+				let out = func(world).await;
+				// allowed to drop recv
+				send.try_send(out).ok();
+			},
+		);
+		poll_and_update(self, recv)
 	}
 	/// Spawn the async local task, flush all async tasks and return the output
 	fn run_async_local_then<Func, Fut, Out>(
@@ -457,19 +495,35 @@ pub impl World {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static,
 	{
-		let world = self.resource::<AsyncChannel>().world();
 		let (send, recv) = async_channel::bounded(1);
-		let task = IoTaskPool::get().spawn_local(async move {
-			let out = func(world).await;
-			let _ = send.try_send(out);
-		});
-		self.spawn(AsyncTask(task));
-		async move {
-			AsyncRunner::flush_async_tasks(self).await;
-			recv.recv().await.unwrap()
+		spawn_async_task_local(
+			self.resource::<AsyncChannel>().world(),
+			async move |world| {
+				let out = func(world).await;
+				// allowed to drop recv
+				send.try_send(out).ok();
+			},
+		);
+		poll_and_update(self, recv)
+	}
+}
+
+/// update the world in 1ms increments until recv has a value
+async fn poll_and_update<T>(world: &mut World, recv: Receiver<T>) -> T {
+	loop {
+		match recv.try_recv() {
+			Ok(out) => return out,
+			Err(TryRecvError::Empty) => {
+				world.update();
+				time_ext::sleep_millis(1).await;
+			}
+			Err(TryRecvError::Closed) => {
+				unreachable!("we control the send");
+			}
 		}
 	}
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -486,12 +540,14 @@ mod tests {
 		let mut app = App::new();
 		app.init_resource::<Count>()
 			.add_plugins((MinimalPlugins, AsyncPlugin));
-		app.world_mut().run_async_local(async |world| {
-			let next = 1;
-			future::yield_now().await;
-			world.with_resource::<Count>(move |mut count| count.0 += next);
-			future::yield_now().await;
-		});
+		app.world_mut()
+			.run_async_local_then(async |world| {
+				let next = 1;
+				future::yield_now().await;
+				world.with_resource::<Count>(move |mut count| count.0 += next);
+				future::yield_now().await;
+			})
+			.await;
 
 		// world not yet applied
 		app.world_mut().resource::<Count>().0.xpect_eq(0);
@@ -507,28 +563,27 @@ mod tests {
 		app.init_resource::<Count>()
 			.add_plugins((MinimalPlugins, AsyncPlugin));
 		// time_ext::sleep !send in wasm
-		app.world_mut().run_async_local(async |world| {
-			let next = world
-				.with_resource_then(|mut res: Mut<Count>| {
-					res.0 += 1;
-					res.0
-				})
-				.await;
-			next.xpect_eq(1);
-			time_ext::sleep(Duration::from_millis(2)).await;
-			let next = world
-				.with_resource_then(|mut res: Mut<Count>| {
-					res.0 += 1;
-					res.0
-				})
-				.await;
-			next.xpect_eq(2);
+		app.world_mut()
+			.run_async_local_then(async |world| {
+				let next = world
+					.with_resource_then(|mut res: Mut<Count>| {
+						res.0 += 1;
+						res.0
+					})
+					.await;
+				next.xpect_eq(1);
+				time_ext::sleep(Duration::from_millis(2)).await;
+				let next = world
+					.with_resource_then(|mut res: Mut<Count>| {
+						res.0 += 1;
+						res.0
+					})
+					.await;
+				next.xpect_eq(2);
 
-			future::yield_now().await;
-		});
-
-		// must update app first or future will hang
-		AsyncRunner::flush_async_tasks(app.world_mut()).await;
+				future::yield_now().await;
+			})
+			.await;
 
 		app.world_mut().resource::<Count>().0.xpect_eq(2);
 	}

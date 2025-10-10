@@ -98,7 +98,10 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world = (DefaultPlugins, FlowRouterPlugin).into_world();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, FlowRouterPlugin));
+		let world = app.world_mut();
+		// let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
 		world.spawn((RouterRoot, EndWith(Outcome::Pass)));
 		world.all_entities().len().xpect_eq(1);
 		world
