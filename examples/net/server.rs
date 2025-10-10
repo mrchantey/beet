@@ -26,8 +26,14 @@ struct MyParams {
 struct VisitCount(u32);
 
 async fn handler(entity: AsyncEntity, req: Request) -> Response {
-	if req.parts.uri.path() == "/favicon.ico" {
-		return Response::not_found();
+	let path = req.parts.uri.path();
+	// our diy router :)
+	if path != "/" {
+		return Response::from_status_body(
+			StatusCode::NOT_FOUND,
+			format!("Path not found: {}", path),
+			"text/plain",
+		);
 	}
 	let visit_count = entity
 		.get_mut::<VisitCount, _>(|mut count| {
@@ -50,9 +56,7 @@ async fn handler(entity: AsyncEntity, req: Request) -> Response {
 		.await;
 
 	let special_message = if visit_count % 7 == 0 {
-		format!(
-			"<p>🎉 Congratulations you are visitor number {visit_count}! 🎉</p>"
-		)
+		format!("<p>Congratulations you are visitor number {visit_count}!</p>")
 	} else {
 		default()
 	};

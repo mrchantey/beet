@@ -52,13 +52,10 @@ pub(super) fn start_server(
 					let start = Instant::now();
 					let world = world.clone();
 					let handler = handler.clone();
+					let method = req.method().clone();
+					let path = req.uri().path().to_string();
 					async move {
 						let req = hyper_to_request(req).await;
-						bevy::log::info!(
-							"Request: {} {}",
-							req.method(),
-							req.parts.uri.path()
-						);
 						let entity = world.entity(entity);
 						let res = handler(entity.clone(), req).await;
 						let res = response_to_hyper(res).await;
@@ -70,8 +67,16 @@ pub(super) fn start_server(
 							})
 							.await;
 						bevy::log::info!(
-							"Response\n duration: {}ms\nstatus: {}",
-							start.elapsed().as_millis(),
+							"
+Request Complete
+  path: {}
+  method: {}
+  duration: {}
+  status: {}
+							",
+							method,
+							path,
+							time_ext::pretty_print_duration(start.elapsed()),
 							res.status()
 						);
 						res.xok::<Infallible>()
