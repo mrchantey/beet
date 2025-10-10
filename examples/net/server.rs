@@ -10,29 +10,27 @@ fn main() {
 			LogPlugin::default(),
 			ServerPlugin,
 		))
-		.init_resource::<VisitCount>()
-		.add_systems(Startup,|mut commands|	{
-			commands.spawn(Server::default())
-				.with_handler(hello_server);
-		})
+		.add_systems(Startup, setup)
 		.run();
 }
-
+fn setup(mut commands: Commands) {
+	commands.spawn((Server::default().with_handler(handler), VisitCount(0)));
+}
 
 #[derive(Deserialize)]
 struct MyParams {
 	name: String,
 }
 
-#[derive(Default, Resource)]
+#[derive(Default, Component)]
 struct VisitCount(u32);
 
-async fn hello_server(world: AsyncWorld, req: Request) -> Response {
+async fn handler(entity: AsyncEntity, req: Request) -> Response {
 	if req.parts.uri.path() == "/favicon.ico" {
 		return Response::not_found();
 	}
-	let visit_count = world
-		.with_resource_then::<VisitCount, _>(|mut count| {
+	let visit_count = entity
+		.get_mut::<VisitCount, _>(|mut count| {
 			count.0 += 1;
 			count.0
 		})
@@ -46,9 +44,18 @@ async fn hello_server(world: AsyncWorld, req: Request) -> Response {
 			"User".to_string()
 		};
 
-	let uptime = world
+	let uptime = entity
+		.world()
 		.with_resource_then::<Time, _>(|time| time.elapsed_secs())
 		.await;
+
+	let special_message = if visit_count % 7 == 0 {
+		format!(
+			"<p>🎉 Congratulations you are visitor number {visit_count}! 🎉</p>"
+		)
+	} else {
+		default()
+	};
 
 	// the request count includes favicon get
 	let response_text = format!(
@@ -56,8 +63,10 @@ async fn hello_server(world: AsyncWorld, req: Request) -> Response {
 <!DOCTYPE html>
 <html>
   <head>
+    <title>Beet Server</title>
     <style>
       body {{
+      font-family: system-ui, sans-serif;
      	  background-color: black;
      	  color: white;
       }}
@@ -69,6 +78,7 @@ async fn hello_server(world: AsyncWorld, req: Request) -> Response {
   Visit Count: {visit_count}
   Uptime: {uptime:.2} seconds
     </pre>
+  {special_message}
   </body>
 </html>
 "#,

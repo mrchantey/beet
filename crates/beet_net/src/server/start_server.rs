@@ -65,7 +65,7 @@ pub(super) fn start_server(
 
 						// non-await
 						entity
-							.get_mut::<ServerStatus>(|mut status| {
+							.get_mut::<ServerStatus, _>(|mut status| {
 								status.increment_requests();
 							})
 							.await;

@@ -424,17 +424,18 @@ impl AsyncEntity {
 		.await
 	}
 
-
-	pub async fn get_mut<T: Component<Mutability = Mutable>>(
+	pub async fn get_mut<T: Component<Mutability = Mutable>, O>(
 		&self,
-		func: impl 'static + Send + FnOnce(Mut<T>),
-	) -> &Self {
+		func: impl 'static + Send + FnOnce(Mut<T>) -> O,
+	) -> O
+	where
+		O: 'static + Send + Sync,
+	{
 		self.with_then(|mut entity| {
 			let comp = entity.get_mut().unwrap();
-			func(comp);
+			func(comp)
 		})
-		.await;
-		self
+		.await
 	}
 
 	pub async fn insert<B: Bundle>(&self, component: B) -> &Self {
