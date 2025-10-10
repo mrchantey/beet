@@ -49,6 +49,7 @@ pub(super) fn start_server(
 			let handler = handler.clone();
 			let _entity_fut = world.run_async(async move |world| {
 				let service = service_fn(move |req| {
+					let start = Instant::now();
 					let world = world.clone();
 					let handler = handler.clone();
 					async move {
@@ -61,7 +62,6 @@ pub(super) fn start_server(
 						let entity = world.entity(entity);
 						let res = handler(entity.clone(), req).await;
 						let res = response_to_hyper(res).await;
-						bevy::log::info!("Response: {:?}", res.status());
 
 						// non-await
 						entity
@@ -69,6 +69,11 @@ pub(super) fn start_server(
 								status.increment_requests();
 							})
 							.await;
+						bevy::log::info!(
+							"Response\n duration: {}ms\nstatus: {}",
+							start.elapsed().as_millis(),
+							res.status()
+						);
 						res.xok::<Infallible>()
 					}
 				});

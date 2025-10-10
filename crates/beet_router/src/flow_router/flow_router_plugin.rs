@@ -42,7 +42,10 @@ async fn route_handler(
 	request: Request,
 ) -> Result<Response> {
 	let world = entity.world();
-	let exchange = world.spawn_then(request).await.id();
+	let exchange = world
+		.spawn_then((request, PathPartialMap::default()))
+		.await
+		.id();
 	let (send, recv) = async_channel::bounded(1);
 	let _ = entity
 		.observe(move |ev: On<Outcome>, mut commands: Commands| {

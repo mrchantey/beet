@@ -240,7 +240,7 @@ impl Router {
 		}) = stack.pop()
 		{
 			let mut dyn_map =
-				world.remove_resource::<DynSegmentMap>().unwrap_or_default();
+			world.remove_resource::<DynSegmentMap>().unwrap_or_default();
 
 			// Check 2: PathFilter
 			if let Some(filter) = world.entity(entity).get::<PathFilter>() {

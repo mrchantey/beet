@@ -8,8 +8,38 @@ use std::path::Path;
 
 /// A list of [`RouteSegment::Dynamic`] and [`RouteSegment::Wildcard`]
 /// values extracted during path matching.
+// TODO deprecate for PathPartialMap after beet_router refactor
 #[derive(Default, Clone, Resource, Deref, DerefMut, Reflect)]
 pub struct DynSegmentMap(HashMap<String, String>);
+
+
+/// A map stored on the agent of actions in the tree, storing which
+/// parts of the path are still yet to be consumed.
+/// This allows us to check for exact path matches.
+#[derive(Debug, Default, Deref, DerefMut, Component)]
+pub struct PathPartialMap(HashMap<Entity, PathPartial>);
+
+impl PathPartialMap {
+	pub fn insert_from_request(&mut self, entity: Entity, request: &Request) {
+		self.0.insert(entity, PathPartial {
+			path: route_path_queue(request.parts.uri.path()),
+			dyn_segments: default(),
+		});
+	}
+}
+
+
+#[derive(Debug, Default, Clone)]
+pub struct PathPartial {
+	path: VecDeque<String>,
+	dyn_segments: HashMap<String, String>,
+}
+
+impl PathPartial {
+	pub fn parse_filter(&mut self, filter: &PathFilter) -> ControlFlow<()> {
+		filter.matches(&mut self.dyn_segments, &mut self.path)
+	}
+}
 
 
 /// Endpoints will only run if there are no trailing path segments,
@@ -214,6 +244,18 @@ impl PathSegment {
 		dyn_map: &mut HashMap<String, String>,
 		path: &mut VecDeque<String>,
 	) -> ControlFlow<()> {
+		let mut insert = |key: String, value: String| {
+			if dyn_map.contains_key(&key) {
+				error!(
+					"Duplicate dynamic segment key: {}\nThis will result in unexpected behavior
+					Please check for overlapping routes",
+					key
+				);
+			}
+			dyn_map.insert(key, value);
+		};
+
+
 		match (self, path.pop_front()) {
 			// static match, continue with remaining path
 			(PathSegment::Static(val), Some(other)) if val == &other => {
@@ -221,7 +263,7 @@ impl PathSegment {
 			}
 			// dynamic will always match, continue with remaining path
 			(PathSegment::Dynamic(key), Some(value)) => {
-				dyn_map.insert(key.clone(), value);
+				insert(key.clone(), value);
 				ControlFlow::Continue(())
 			}
 			// wildcard consumes the rest of the path, continue with empty path
@@ -231,12 +273,12 @@ impl PathSegment {
 					value.push('/');
 					value.push_str(&next);
 				}
-				dyn_map.insert(key.clone(), value);
+				insert(key.clone(), value);
 				ControlFlow::Continue(())
 			}
 			// only a wildcard permits an empty path
 			(PathSegment::Wildcard(key), None) => {
-				dyn_map.insert(key.clone(), "".to_string());
+				insert(key.clone(), "".to_string());
 				ControlFlow::Continue(())
 			}
 			// break if empty path or no matching static
