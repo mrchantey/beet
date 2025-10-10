@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IntoObserverSystem;
 
-/// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver)
+/// A typed version of [`OnSpawn::obsserve`]
 /// which will also insert an [`EventTarget`]
 #[derive(BundleEffect)]
 pub struct EventHandler<E: 'static + Send + Sync + Event> {

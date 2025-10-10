@@ -70,7 +70,7 @@ pub fn fetch_npc(
 			max_speed: MaxSpeed(2.),
 			..default()
 		},
-		EntityObserver::new(
+		OnSpawn::observe(
 			|ev: On<Insert, SteerTarget>,
 			 steer_targets: Query<&SteerTarget>,
 			 sentences: Query<&Sentence>,

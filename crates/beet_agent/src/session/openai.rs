@@ -25,7 +25,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(EntityObserver::new(openai_message_request));
+		.insert(OnSpawn::observe(openai_message_request));
 }
 
 impl OpenAiAgent {

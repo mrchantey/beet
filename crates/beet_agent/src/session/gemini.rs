@@ -24,7 +24,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(EntityObserver::new(gemini_message_request));
+		.insert(OnSpawn::observe(gemini_message_request));
 }
 
 impl GeminiAgent {

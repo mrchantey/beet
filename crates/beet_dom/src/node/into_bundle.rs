@@ -74,7 +74,7 @@ where
 	T: IntoObserverSystem<E, B, M>,
 {
 	fn into_bundle(self) -> impl Bundle {
-		(EventTarget, EntityObserver::new(self))
+		(EventTarget, OnSpawn::observe(self))
 	}
 }
 

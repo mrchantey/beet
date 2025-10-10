@@ -234,7 +234,7 @@ fn handle_text_delta(mut world: DeferredWorld, cx: HookContext) {
 	if !initial_text.is_empty() {
 		entity.trigger(TextDelta::new(initial_text));
 	}
-	entity.insert(EntityObserver::new(
+	entity.insert(OnSpawn::observe(
 		|ev: On<TextDelta>,
 		 mut text_content: Query<&mut TextContent>|
 		 -> Result {

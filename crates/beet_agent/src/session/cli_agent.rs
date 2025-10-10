@@ -182,7 +182,7 @@ impl CliAgentPlugin {
 
 
 fn terminal_user() -> impl Bundle {
-	(User, EntityObserver::new(user_message_request))
+	(User, OnSpawn::observe(user_message_request))
 }
 
 fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {

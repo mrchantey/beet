@@ -82,7 +82,7 @@ impl Router {
 	}
 	/// Convenience method to create a new [`Router`] with a bundle of routes,
 	/// adding the [`RouterRoot`] component.
-	/// 
+	///
 	/// This must be a `Fn` because a new app will be created for each thread.
 	pub fn new_bundle<B>(
 		func: impl 'static + Send + Sync + Clone + FnOnce() -> B,
@@ -240,9 +240,9 @@ impl Router {
 		}) = stack.pop()
 		{
 			let mut dyn_map =
-			world.remove_resource::<DynSegmentMap>().unwrap_or_default();
+				world.remove_resource::<DynSegmentMap>().unwrap_or_default();
 
-			// Check 2: PathFilter
+			// Check 1: PathFilter
 			if let Some(filter) = world.entity(entity).get::<PathFilter>() {
 				match filter.matches(&mut dyn_map, &mut current_path) {
 					ControlFlow::Break(_) => {
@@ -266,7 +266,8 @@ impl Router {
 				}
 			}
 
-			// Check 3: Method and Path
+			// Check 2: Method and Path Predicate
+			// path must have no remaining parts
 			if !current_path.is_empty()
 				&& world.entity(entity).contains::<Endpoint>()
 			{
@@ -279,7 +280,7 @@ impl Router {
 				continue;
 			}
 
-			// Check 4: HandlerPredicates
+			// Check 3: Custom Predicates
 			if let Some(predicates) =
 				world.entity(entity).get::<HandlerConditions>().cloned()
 			{

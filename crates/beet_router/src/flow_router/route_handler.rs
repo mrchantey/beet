@@ -3,7 +3,7 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
 
-pub fn route_handler() -> impl Bundle {
+pub fn route_handler(path: PathFilter, method: HttpMethod) -> impl Bundle {
 	(OnSpawn::new(collect_route_segments), Sequence, children![])
 }
 
@@ -15,4 +15,9 @@ fn collect_route_segments(entity: &mut EntityWorldMut) {
 			.unwrap();
 		world.entity_mut(id).insert(segments);
 	});
+}
+
+
+pub fn path_filter_check() -> impl Bundle {
+	// OnSpawn::observe(||)
 }

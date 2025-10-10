@@ -4,6 +4,7 @@ use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
+use bevy::ecs::system::IntoObserverSystem;
 
 /// Type helper for [`SpawnWith`], useful for spawning any number of related entities
 /// like children.
@@ -65,6 +66,15 @@ impl OnSpawn {
 			}
 		})
 	}
+
+	pub fn observe<E: Event, B: Bundle, M>(
+		observer: impl 'static + Send + Sync + IntoObserverSystem<E, B, M>,
+	) -> Self {
+		Self::new(move |entity| {
+			entity.observe_any(observer);
+		})
+	}
+
 
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
@@ -269,5 +279,19 @@ mod test {
 		numbers.get().xpect_eq(&[1, 2, 3]);
 		#[cfg(not(target_arch = "wasm32"))]
 		numbers.get().xpect_eq(&[3, 1, 2]);
+	}
+
+	#[test]
+	fn observe() {
+		#[derive(EntityEvent)]
+		struct Foo(Entity);
+
+		let store = Store::default();
+		let mut world = World::new();
+		world
+			.spawn(OnSpawn::observe(move |_: On<Foo>| store.set(3)))
+			.trigger(Foo);
+
+		store.get().xpect_eq(3);
 	}
 }

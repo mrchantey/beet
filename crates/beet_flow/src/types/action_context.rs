@@ -117,7 +117,7 @@ mod test {
 	struct Run;
 
 	fn set_agent(store: Store<Entity>) -> impl Bundle {
-		EntityObserver::new(move |ev: On<Run>| {
+		OnSpawn::observe(move |ev: On<Run>| {
 			store.set(ev.agent());
 		})
 	}
