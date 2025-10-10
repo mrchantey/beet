@@ -65,6 +65,12 @@ impl Stream for Body {
 impl Into<Body> for &[u8] {
 	fn into(self) -> Body { Body::Bytes(Bytes::from(self.to_vec())) }
 }
+impl Into<Body> for &str {
+	fn into(self) -> Body { Body::Bytes(Bytes::from(self.as_bytes().to_vec())) }
+}
+impl Into<Body> for String {
+	fn into(self) -> Body { Body::Bytes(Bytes::from(self.as_bytes().to_vec())) }
+}
 impl Into<Body> for Bytes {
 	fn into(self) -> Body { Body::Bytes(self) }
 }

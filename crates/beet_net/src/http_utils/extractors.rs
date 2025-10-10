@@ -72,7 +72,7 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 		match self.result {
 			Ok(val) => {
 				let ok_body = serde_json::to_string(&val)?;
-				Response::ok_body(&ok_body, "application/json")
+				Response::ok_body(ok_body, "application/json")
 			}
 			Err(err) => {
 				let err_body = serde_json::to_string(&err)?;
@@ -118,7 +118,7 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	fn try_into(self) -> Result<Response, Self::Error> {
 		let json_str = serde_json::to_string(&self.0)?;
 		Ok(Response::ok_body(
-			&json_str,
+			json_str,
 			"application/json; charset=utf-8",
 		))
 	}
@@ -220,30 +220,30 @@ impl<'a> Into<Response> for &'a str {
 
 impl Into<Response> for String {
 	fn into(self) -> Response {
-		Response::ok_body(&self, "text/plain; charset=utf-8")
+		Response::ok_body(self, "text/plain; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Html {
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "text/html; charset=utf-8")
+		Response::ok_body(self.0, "text/html; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Css {
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "text/css; charset=utf-8")
+		Response::ok_body(self.0, "text/css; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Javascript {
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "application/javascript; charset=utf-8")
+		Response::ok_body(self.0, "application/javascript; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Png {
-	fn into(self) -> Response { Response::ok_body(&self.0, "image/png") }
+	fn into(self) -> Response { Response::ok_body(self.0, "image/png") }
 }
 
 

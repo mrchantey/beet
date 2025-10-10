@@ -9,7 +9,7 @@ mod handlers;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_utils;
 #[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-mod server;
+mod axum_server;
 mod templates;
 
 pub mod prelude {
@@ -23,7 +23,7 @@ pub mod prelude {
 	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 	pub use crate::lambda_utils::*;
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-	pub use crate::server::*;
+	pub use crate::axum_server::*;
 }
 
 

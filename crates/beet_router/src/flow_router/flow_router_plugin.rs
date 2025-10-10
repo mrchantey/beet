@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
@@ -12,11 +11,7 @@ impl Plugin for FlowRouterPlugin {
 		app.init_plugin(AsyncPlugin).init_plugin(BeetFlowPlugin);
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-		app.init_plugin(ServerPlugin)
-			.init_resource::<ServerSettings>()
-			.world_mut()
-			.resource_mut::<ServerSettings>()
-			.set_handler(route_handler);
+		app.init_plugin(ServerPlugin);
 	}
 }
 
@@ -25,36 +20,32 @@ impl Plugin for FlowRouterPlugin {
 pub impl World {
 	/// Handle a single request and return the response, awaiting
 	/// all async tasks to flush.
+	/// ## Panics
+	/// Panics if there is not exactly one `RouteServer` in the world.
 	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
+		let server = self
+			.query_filtered::<Entity, With<RouteServer>>()
+			.single(self)
+			.expect("Expected a single RouteServer");
+
+
 		self.run_async_then(async move |world| {
-			route_handler(world, req).await.into_response()
+			route_handler(world.entity(server), req)
+				.await
+				.into_response()
 		})
 	}
 }
 
 async fn route_handler(
-	world: AsyncWorld,
+	entity: AsyncEntity,
 	request: Request,
 ) -> Result<Response> {
-	let root = world
-		.with_then(|world| {
-			world
-				.query_filtered::<Entity, With<RouterRoot>>()
-				.single(world)
-		})
-		.await
-		.map_err(|e| {
-			HttpError::new(
-				StatusCode::INTERNAL_SERVER_ERROR,
-				format!("No RouterRoot found: {e}"),
-			)
-		})?;
-
-	let exchange = world.spawn_then(request).await;
+	let world = entity.world();
+	let exchange = world.spawn_then(request).await.id();
 	let (send, recv) = async_channel::bounded(1);
-	let _ = world
-		.entity(root)
-		.observe(move |ev: On<GetOutcome>, mut commands: Commands| {
+	let _ = entity
+		.observe(move |ev: On<Outcome>, mut commands: Commands| {
 			if ev.agent() == exchange {
 				let send = send.clone();
 				let observer = ev.observer();
@@ -68,10 +59,7 @@ async fn route_handler(
 				});
 			}
 		})
-		.await;
-
-	world
-		.entity(root)
+		.await
 		.trigger_target(GetOutcome.with_agent(exchange))
 		.await;
 
@@ -86,6 +74,11 @@ async fn route_handler(
 	res.xok()
 }
 
+#[derive(Component)]
+#[cfg_attr(all(not(target_arch = "wasm32"), feature = "server"),
+	require(Server = Server::default().with_handler(route_handler))
+)]
+pub struct RouteServer;
 
 
 #[cfg(test)]
@@ -102,7 +95,7 @@ mod test {
 		app.add_plugins((MinimalPlugins, FlowRouterPlugin));
 		let world = app.world_mut();
 		// let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
-		world.spawn((RouterRoot, EndWith(Outcome::Pass)));
+		world.spawn((RouteServer, EndWith(Outcome::Pass)));
 		world.all_entities().len().xpect_eq(1);
 		world
 			.oneshot(Request::get("/foo"))

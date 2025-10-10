@@ -21,7 +21,7 @@ enum Commands {
 	TestWasm(TestWasm),
 	Run(CargoRun),
 	Test(CargoTest),
-	Serve(Server),
+	Serve(AxumServer),
 	Watch(FsWatchCmd),
 	Mod(AutoMod),
 }

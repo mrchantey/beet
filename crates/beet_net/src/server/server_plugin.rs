@@ -1,21 +1,17 @@
 use crate::prelude::*;
-use crate::server::run_server;
 use beet_core::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU16;
+use std::sync::atomic::Ordering;
 
 
 
 pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {
-	fn build(&self, app: &mut App) {
-		app.init_plugin(AsyncPlugin)
-			.init_resource::<ServerSettings>()
-			.init_resource::<ServerStatus>()
-			.add_systems(Startup, run_server);
-	}
+	fn build(&self, app: &mut App) { app.init_plugin(AsyncPlugin); }
 }
 
 pub(super) type HandlerFn = Arc<
@@ -24,7 +20,7 @@ pub(super) type HandlerFn = Arc<
 			+ Send
 			+ Sync
 			+ Fn(
-				AsyncWorld,
+				AsyncEntity,
 				Request,
 			) -> Pin<Box<dyn Send + Future<Output = Response>>>,
 	>,
@@ -44,7 +40,21 @@ where
 	Out: IntoResponse,
 {
 	fn into_handler_fn(self) -> HandlerFn {
-		box_it(async move |world, req| self(world, req).await.into_response())
+		box_it(async move |entity, req| {
+			self(entity.world(), req).await.into_response()
+		})
+	}
+}
+pub struct AsyncEntityRequestIntoHandlerFn;
+impl<Func, Fut, Out> IntoHandlerFn<(Out, AsyncEntityRequestIntoHandlerFn)>
+	for Func
+where
+	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
+	Fut: Send + Future<Output = Out>,
+	Out: IntoResponse,
+{
+	fn into_handler_fn(self) -> HandlerFn {
+		box_it(async move |entity, req| self(entity, req).await.into_response())
 	}
 }
 pub struct RequestIntoHandlerFn;
@@ -59,18 +69,36 @@ where
 	}
 }
 
-
-#[derive(Resource)]
-pub struct ServerSettings {
+#[derive(Component)]
+#[component(on_add=on_add)]
+#[require(ServerStatus)]
+pub struct Server {
 	/// The port the server listens on
 	pub port: u16,
 	/// The function called by hyper for each request
 	pub handler: HandlerFn,
 }
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.run_system_cached_with(super::start_server, cx.entity);
+}
 
-impl ServerSettings {
-	pub fn default_local_url() -> String {
-		format!("http://127.0.0.1:{DEFAULT_SERVER_PORT}")
+
+impl Server {
+	/// Create a new Server with an incrementing port to avoid
+	/// collisions in tests
+	pub fn new_test() -> Self {
+		static PORT: AtomicU16 = AtomicU16::new(8340);
+		Self {
+			port: PORT.fetch_add(1, Ordering::SeqCst),
+			handler: box_it(hello_server),
+		}
+	}
+
+
+	pub fn local_url(&self) -> String {
+		format!("http://127.0.0.1:{}", self.port)
 	}
 
 	pub fn with_handler<F, M>(mut self, func: F) -> Self
@@ -92,7 +120,7 @@ impl ServerSettings {
 	pub fn handler(&self) -> HandlerFn { self.handler.clone() }
 }
 
-impl Default for ServerSettings {
+impl Default for Server {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,
@@ -103,7 +131,7 @@ impl Default for ServerSettings {
 
 fn box_it<Func, Fut>(func: Func) -> HandlerFn
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncWorld, Request) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
 	Fut: Send + Future<Output = Response>,
 {
 	Arc::new(Box::new(move |world, request| {
@@ -112,7 +140,7 @@ where
 	}))
 }
 
-#[derive(Default, Resource)]
+#[derive(Default, Component)]
 pub struct ServerStatus {
 	request_count: u128,
 }
@@ -125,17 +153,15 @@ impl ServerStatus {
 }
 
 /// HTTP request handler that uses bevy's async world to manage state
-async fn hello_server(world: AsyncWorld, req: Request) -> Response {
+async fn hello_server(entity: AsyncEntity, req: Request) -> Response {
 	bevy::log::info!("Request: {} {}", req.method(), req.parts.uri.path());
 
 	// Increment request counter using async world
-	let count = world
-		.with_resource_then::<ServerStatus, _>(|mut status| {
-			status.increment_requests().num_requests()
-		})
+	let count = entity
+		.get::<ServerStatus, _>(|status| status.num_requests())
 		.await;
 
-	let response_text = format!("Hello from Bevy! Request #{}", count);
+	let response_text = format!("greetings! Request #{}", count);
 
 	// Create our Response and convert it back to hyper response
 	Response::ok_body(response_text, "text/plain")

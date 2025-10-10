@@ -21,12 +21,14 @@ use std::task::Context;
 use std::task::Poll;
 
 /// A hyper/bevy server
-pub(super) fn run_server(
-	settings: Res<ServerSettings>,
+pub(super) fn start_server(
+	In(entity): In<Entity>,
+	query: Query<&Server>,
 	mut async_commands: AsyncCommands,
-) {
-	let addr: SocketAddr = ([127, 0, 0, 1], settings.port).into();
-	let handler = settings.handler();
+) -> Result {
+	let server = query.get(entity)?;
+	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
+	let handler = server.handler();
 
 	async_commands.run(async move |world| -> Result {
 		let handler = handler.clone();
@@ -56,14 +58,17 @@ pub(super) fn run_server(
 							req.method(),
 							req.parts.uri.path()
 						);
-						let res = handler(world.clone(), req).await;
+						let entity = world.entity(entity);
+						let res = handler(entity.clone(), req).await;
 						let res = response_to_hyper(res).await;
 						bevy::log::info!("Response: {:?}", res.status());
 
 						// non-await
-						world.with_resource::<ServerStatus>(|mut status| {
-							status.increment_requests();
-						});
+						entity
+							.get_mut::<ServerStatus>(|mut status| {
+								status.increment_requests();
+							})
+							.await;
 						res.xok::<Infallible>()
 					}
 				});
@@ -96,6 +101,7 @@ pub(super) fn run_server(
 			// 	.detach();
 		}
 	});
+	Ok(())
 }
 
 
@@ -270,17 +276,21 @@ mod test {
 
 	#[sweet::test]
 	async fn stream_roundtrip() {
+		let server = Server::new_test().with_handler(
+			async move |_world: AsyncWorld, req: Request| {
+				Response::ok().with_body(req.body)
+			},
+		);
+		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((DefaultPlugins, ServerPlugin))
-				.insert_resource(ServerSettings::default().with_handler(
-					async move |_world: AsyncWorld, req: Request| {
-						Response::ok().with_body(req.body)
-					},
-				))
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.xtap(|app| {
+					app.world_mut().spawn(server);
+				})
 				.run();
 		});
-		Request::post(ServerSettings::default_local_url())
+		Request::post(url)
 			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
 				Ok(Bytes::from("foo")),
 				Ok(Bytes::from("bar")),
@@ -301,23 +311,24 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[sweet::test]
 	async fn stream_timestamp() {
+		let server =
+			Server::new_test().with_handler(async move |req: Request| {
+				// Server adds 100ms delay per chunk
+				use futures::TryStreamExt;
+				let delayed_stream =
+					req.body.into_stream().and_then(move |chunk| async move {
+						time_ext::sleep(Duration::from_millis(100)).await;
+						Ok(chunk)
+					});
+				Response::ok().with_body(Body::stream(delayed_stream))
+			});
+		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((DefaultPlugins, ServerPlugin))
-				.insert_resource(ServerSettings::default().with_handler(
-					async move |req: Request| {
-						// Server adds 100ms delay per chunk
-						use futures::TryStreamExt;
-						let delayed_stream = req.body.into_stream().and_then(
-							move |chunk| async move {
-								time_ext::sleep(Duration::from_millis(100))
-									.await;
-								Ok(chunk)
-							},
-						);
-						Response::ok().with_body(Body::stream(delayed_stream))
-					},
-				))
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.xtap(|app| {
+					app.world_mut().spawn(server);
+				})
 				.run();
 		});
 
@@ -339,16 +350,15 @@ mod test {
 				Some((Ok(Bytes::from(timestamp_data)), count + 1))
 			});
 
-		let mut response_stream =
-			Request::post(ServerSettings::default_local_url())
-				.with_body_stream(timestamped_stream)
-				.send()
-				.await
-				.unwrap()
-				.into_result()
-				.await
-				.unwrap()
-				.body;
+		let mut response_stream = Request::post(url)
+			.with_body_stream(timestamped_stream)
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.unwrap()
+			.body;
 
 		let mut chunk_count = 0;
 		while let Some(chunk) = response_stream.next().await.unwrap() {

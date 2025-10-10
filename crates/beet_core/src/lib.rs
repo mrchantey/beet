@@ -59,6 +59,7 @@ pub mod prelude {
 	pub use bevy::ecs::world::DeferredWorld;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
+	pub use tracing::Level;
 
 	pub use bevy::prelude::*;
 	/// hack to fix bevy macros

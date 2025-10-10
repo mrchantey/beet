@@ -21,7 +21,7 @@ use tower_livereload::LiveReloadLayer;
 /// Serve static files with hot reloading
 #[derive(Debug, Clone, Parser)]
 #[command(name = "serve")]
-pub struct Server {
+pub struct AxumServer {
 	/// Directory to serve
 	#[arg(default_value = ".")]
 	pub dir: AbsPathBuf,
@@ -56,11 +56,11 @@ pub struct Server {
 	pub debounce: Duration,
 }
 
-impl Default for Server {
+impl Default for AxumServer {
 	fn default() -> Self { Self::parse_from(&[""]) }
 }
 
-impl Server {
+impl AxumServer {
 	pub fn with_dir(mut self, dir: AbsPathBuf) -> Self {
 		self.dir = dir.into();
 		self

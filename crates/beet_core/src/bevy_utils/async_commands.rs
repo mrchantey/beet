@@ -248,7 +248,7 @@ impl AsyncWorld {
 	pub fn entity(&self, entity: Entity) -> AsyncEntity {
 		AsyncEntity {
 			entity,
-			queue: self.clone(),
+			world: self.clone(),
 		}
 	}
 
@@ -260,8 +260,13 @@ impl AsyncWorld {
 	pub fn spawn_then<B: Bundle>(
 		&self,
 		bundle: B,
-	) -> impl Future<Output = Entity> {
-		self.with_then(move |world: &mut World| world.spawn(bundle).id())
+	) -> impl Future<Output = AsyncEntity> {
+		async move {
+			let entity = self
+				.with_then(move |world: &mut World| world.spawn(bundle).id())
+				.await;
+			self.entity(entity)
+		}
 	}
 
 	pub fn insert_resource<R: Resource>(&self, resource: R) {
@@ -368,68 +373,104 @@ impl AsyncWorld {
 	}
 }
 
-
+#[derive(Clone)]
 pub struct AsyncEntity {
 	entity: Entity,
-	queue: AsyncWorld,
+	world: AsyncWorld,
 }
 
 impl AsyncEntity {
-	pub async fn with(
+	pub fn id(&self) -> Entity { self.entity }
+	pub fn world(&self) -> AsyncWorld { self.world.clone() }
+
+	pub fn with(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut),
 	) -> &Self {
 		let entity = self.entity;
-		self.queue
-			.with_then(move |world: &mut World| {
-				let entity = world.entity_mut(entity);
-				func(entity);
-			})
-			.await;
+		self.world.with(move |world: &mut World| {
+			let entity = world.entity_mut(entity);
+			func(entity);
+		});
 		self
 	}
-	pub async fn get_mut<T: Component<Mutability = Mutable>>(
+	pub async fn with_then<O>(
 		&self,
-		func: impl 'static + Send + FnOnce(Mut<T>),
-	) -> &Self {
-		self.with(|mut entity| {
-			let comp = entity.get_mut().unwrap();
-			func(comp);
+		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
+	) -> O
+	where
+		O: 'static + Send + Sync,
+	{
+		let entity = self.entity;
+		self.world
+			.with_then(move |world: &mut World| {
+				let entity = world.entity_mut(entity);
+				func(entity)
+			})
+			.await
+	}
+
+	pub async fn get<T: Component, O>(
+		&self,
+		func: impl 'static + Send + FnOnce(&T) -> O,
+	) -> O
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with_then(|entity| {
+			let comp = entity.get().unwrap();
+			func(comp)
 		})
 		.await
 	}
 
+
+	pub async fn get_mut<T: Component<Mutability = Mutable>>(
+		&self,
+		func: impl 'static + Send + FnOnce(Mut<T>),
+	) -> &Self {
+		self.with_then(|mut entity| {
+			let comp = entity.get_mut().unwrap();
+			func(comp);
+		})
+		.await;
+		self
+	}
+
 	pub async fn insert<B: Bundle>(&self, component: B) -> &Self {
-		self.with(|mut entity| {
+		self.with_then(|mut entity| {
 			entity.insert(component);
 		})
-		.await
+		.await;
+		self
 	}
 
 	pub async fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
 	) -> &Self {
-		self.with(move |mut entity| {
+		self.with_then(move |mut entity| {
 			entity.trigger(ev);
 		})
-		.await
+		.await;
+		self
 	}
 	pub async fn trigger_target<M>(
 		&self,
 		event: impl IntoEntityTargetEvent<M>,
 	) -> &Self {
-		self.with(|mut entity| {
+		self.with_then(|mut entity| {
 			entity.trigger_target(event);
 		})
-		.await
+		.await;
+		self
 	}
 
 	pub async fn observe<E: Event, B: Bundle, M>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M>,
 	) -> &Self {
-		self.with(|mut entity| {
+		self.with_then(|mut entity| {
 			entity.observe_any(observer);
 		})
 		.await;
@@ -437,7 +478,7 @@ impl AsyncEntity {
 	}
 
 	pub async fn despawn(&self) {
-		self.with(move |entity| {
+		self.with_then(move |entity| {
 			entity.despawn();
 		})
 		.await;

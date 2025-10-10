@@ -9,7 +9,7 @@ use axum_extra::extract::Host;
 use beet_core::prelude::*;
 use std::net::SocketAddr;
 
-impl Server {
+impl AxumServer {
 	pub async fn serve_insecure(self, router: Router) -> Result<()> {
 		let listener =
 			tokio::net::TcpListener::bind(&self.address()?.to_socket_addr())

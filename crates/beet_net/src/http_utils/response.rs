@@ -135,7 +135,7 @@ impl Response {
 	}
 
 	/// Create a response with the given body and content type.
-	pub fn ok_body(body: impl AsRef<[u8]>, content_type: &str) -> Self {
+	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
 		Self {
 			parts: http::response::Builder::new()
 				.status(StatusCode::OK)
@@ -144,7 +144,7 @@ impl Response {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: Bytes::copy_from_slice(body.as_ref()).into(),
+			body: body.into(),
 		}
 	}
 
@@ -152,7 +152,7 @@ impl Response {
 	/// based on the file extension, defaulting to `application/octet-stream`
 	/// if the extension is not recognized.
 	pub fn ok_mime_guess(
-		body: impl AsRef<[u8]>,
+		body: impl Into<Body>,
 		path: impl AsRef<std::path::Path>,
 	) -> Self {
 		let mime_type = mime_guess::from_path(path).first_or_octet_stream();
@@ -255,7 +255,7 @@ impl Into<Response> for BevyError {
 
 impl IntoResponse for Bytes {
 	fn into_response(self) -> Response {
-		Response::ok_body(&self, "application/octet-stream")
+		Response::ok_body(self, "application/octet-stream")
 	}
 }
 impl IntoResponse for &[u8] {
