@@ -40,7 +40,8 @@ async fn handler(entity: AsyncEntity, req: Request) -> Response {
 			count.0 += 1;
 			count.0
 		})
-		.await;
+		.await
+		.unwrap();
 
 
 	let name =

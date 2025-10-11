@@ -35,10 +35,7 @@ pub fn endpoint_with_path(
 ) -> impl Bundle {
 	// path filter must be ancestor of endpoint
 	// so we nest the sequence
-	(Sequence, children![(Sequence, children![(
-		parse_path_filter(path),
-		endpoint(method, handler)
-	)])])
+	parse_path_filter(path, endpoint(method, handler))
 }
 
 
@@ -83,27 +80,39 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 
 /// Parses the [`RouteContext`] for this entity and applies the
 /// [`PathFilter`], popping from the [`RouteContext::path`]
-/// and inserting to the [`RouteContext::dyn_segments`]
-pub fn parse_path_filter(filter: PathFilter) -> impl Bundle {
+/// and inserting to the [`RouteContext::dyn_segments`].
+/// The child will only run if the path matches, extra segments
+/// are allowed.
+pub fn parse_path_filter(
+	filter: PathFilter,
+	child: impl Bundle,
+) -> impl Bundle {
 	(
 		filter,
 		OnSpawn::observe(
 			|mut ev: On<GetOutcome>,
 			 mut query: RouteQuery,
-			 actions: Query<&PathFilter>|
+			 actions: Query<&PathFilter>,
+			 children: Query<&Children>|
 			 -> Result {
 				let filter = actions.get(ev.action())?;
-				let outcome = query.with_cx(&mut ev, |cx| {
-					match cx.parse_filter(filter) {
-						Ok(_) => Outcome::Pass,
-						Err(_) => Outcome::Fail,
+				let outcome =
+					query.with_cx(&mut ev, |cx| cx.parse_filter(filter))?;
+				match outcome {
+					Ok(_) => {
+						let child = children.get(ev.action())?[0];
+						ev.trigger_next_with(child, GetOutcome);
 					}
-				})?;
+					Err(_) => {
+						ev.trigger_next(Outcome::Fail);
+					}
+				}
+
 				// println!("check_path_filter: {}", outcome);
-				ev.trigger_next(outcome);
 				Ok(())
 			},
 		),
+		children![child],
 	)
 }
 
