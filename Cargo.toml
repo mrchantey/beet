@@ -120,6 +120,7 @@ bevy = { version = "0.17.0", default-features = false, features = [
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
+	# doesnt seem accurate, lists despawn location as spawn location
 	# "track_location",
 ] }
 

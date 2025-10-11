@@ -13,7 +13,7 @@ impl Plugin for FlowRouterPlugin {
 			.init_plugin::<ControlFlowPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-		app.init_plugin::<ServerPlugin>();
+		app.init_plugin_with(ServerPlugin::default().without_server());
 	}
 }
 
@@ -29,7 +29,7 @@ pub impl World {
 			.single(self)
 			.expect("Expected a single RouteServer");
 		self.run_async_then(async move |world| {
-			route_handler(world.entity(entity), req)
+			flow_route_handler(world.entity(entity), req)
 				.await
 				.into_response()
 		})
@@ -41,54 +41,63 @@ pub impl EntityWorldMut<'_> {
 	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
 		let entity = self.id();
 		self.run_async_then(async move |world| {
-			route_handler(world.entity(entity), req)
+			flow_route_handler(world.entity(entity), req)
 				.await
 				.into_response()
 		})
 	}
 }
-
-async fn route_handler(
-	entity: AsyncEntity,
+/// This handler differs from the default route handler in that
+/// we use `beet_flow` primitives of GetOutcome / Outcome instead of
+/// `Insert, Request`.
+async fn flow_route_handler(
+	server_async: AsyncEntity,
 	request: Request,
-) -> Result<Response> {
-	let world = entity.world();
-	let exchange = world
-		.spawn_then((request, RouteContextMap::default()))
-		.await
-		.id();
+) -> Response {
+	let server = server_async.id();
 	let (send, recv) = async_channel::bounded(1);
-	let _ = entity
-		.observe(move |ev: On<Outcome>, mut commands: Commands| {
-			if ev.agent() == exchange {
-				let send = send.clone();
-				let observer = ev.observer();
-				commands.queue(move |world: &mut World| {
-					world.entity_mut(observer).despawn();
-					let res = world
-						.entity_mut(exchange)
-						.take::<Response>()
-						.unwrap_or_else(|| Response::not_found());
-					let _ = send.try_send(res);
-				});
-			}
+	server_async
+		.world()
+		.with_then(move |world| {
+			let exchange = world
+				.spawn((
+					ExchangeOf(server),
+					request,
+					RouteContextMap::default(),
+				))
+				.id();
+			world
+				.entity_mut(server)
+				.observe_any(move |ev: On<Outcome>, mut commands: Commands| {
+					// this observer
+					if ev.agent() == exchange {
+						let send = send.clone();
+						let observer = ev.observer();
+						commands.queue(move |world: &mut World| {
+							world.entity_mut(observer).despawn();
+							let res = world
+								.entity_mut(exchange)
+								.take::<Response>()
+								.unwrap_or_else(|| Response::not_found());
+							world.entity_mut(exchange).despawn();
+							send.try_send(res)
+								.expect("unreachable, we await recv");
+						});
+					}
+				})
+				.trigger_target(GetOutcome.with_agent(exchange));
 		})
-		.await
-		.trigger_target(GetOutcome.with_agent(exchange))
 		.await;
 
-
-	let res = recv.recv().await.map_err(|e| {
-		error!("Failed to receive response: {}", e);
-		HttpError::from_status(StatusCode::INTERNAL_SERVER_ERROR)
-	})?;
-	world.entity(exchange).despawn().await;
-	res.xok()
+	recv.recv().await.unwrap_or_else(|_| {
+		error!("Sender was dropped, was the world dropped?");
+		Response::from_status(StatusCode::INTERNAL_SERVER_ERROR)
+	})
 }
 
 #[derive(Component)]
 #[cfg_attr(all(not(target_arch = "wasm32"), feature = "server"),
-	require(Server = Server::default().with_handler(route_handler))
+	require(Server = Server::default().with_handler(flow_route_handler))
 )]
 pub struct RouteServer;
 
@@ -104,9 +113,9 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = FlowRouterPlugin::world();
-		world.spawn((RouteServer, EndWith(Outcome::Pass)));
-		world.all_entities().len().xpect_eq(1);
+		world.all_entities().len().xpect_eq(0);
 		world
+			.spawn((RouteServer, EndWith(Outcome::Pass)))
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
