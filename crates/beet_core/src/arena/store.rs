@@ -145,7 +145,10 @@ impl<T: 'static + Debug> Debug for Store<T> {
 }
 
 
-impl<T: 'static> Store<Vec<T>> {
+impl<T: 'static + Send> Store<Vec<T>> {
+	/// helper
+	pub fn new_vec() -> Self { Self::default() }
+
 	/// Appends `value` to the end of the inner `Vec<T>`.
 	///
 	/// ## Examples

@@ -26,13 +26,29 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(RequestParts(parts));
+		.insert(RequestMeta::new(parts));
 }
 
 /// Cloned from the [`Request`] when its added, allowing the [`Request`]
 /// to be consumed and for these parts to still be accessible.
-#[derive(Debug, Deref, Component)]
-pub struct RequestParts(request::Parts);
+/// This component should not be removed
+#[derive(Debug, Component)]
+pub struct RequestMeta {
+	parts: request::Parts,
+	started: Instant,
+}
+impl RequestMeta {
+	pub fn new(parts: request::Parts) -> Self {
+		Self {
+			parts,
+			started: Instant::now(),
+		}
+	}
+	pub fn method(&self) -> HttpMethod { self.parts.method.clone().into() }
+	pub fn path(&self) -> &str { self.parts.uri.path() }
+	pub fn started(&self) -> Instant { self.started }
+	pub fn parts(&self) -> &request::Parts { &self.parts }
+}
 
 
 impl Request {

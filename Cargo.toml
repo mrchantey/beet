@@ -363,6 +363,7 @@ beet = { path = "", features = ["flow"] }
 # bevy = { workspace = true, default_features = true }
 serde.workspace = true
 clap.workspace = true
+async-executor.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = "", features = ["fs"] }
@@ -395,6 +396,18 @@ required-features = ["agent","native-tls"]
 [[example]]
 name = "server"
 path = "examples/net/server.rs"
+required-features = ["server"]
+[[example]]
+name = "server_minimal"
+path = "examples/net/server_minimal.rs"
+required-features = ["server"]
+[[example]]
+name = "server_bench"
+path = "examples/net/server_bench.rs"
+required-features = ["server"]
+[[example]]
+name = "server_custom_handler"
+path = "examples/net/server_custom_handler.rs"
 required-features = ["server"]
 #
 # 💡 Examples - dom

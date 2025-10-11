@@ -122,6 +122,7 @@ where
 impl<I, O, F> FuncStore<I, O, F>
 where
 	I: Default,
+	O: 'static + Send,
 	F: Send + Fn(I) -> O,
 {
 	/// Calls the stored function with `I::default()` and pushes the output to `called`.
@@ -146,7 +147,7 @@ where
 
 impl<I, O, F> FuncStore<I, O, F>
 where
-	O: Clone,
+	O: 'static + Send + Clone,
 	F: Send + Fn(I) -> O,
 {
 	/// Calls the stored function with `input`, records the output, and returns it.

@@ -21,6 +21,9 @@ use std::task::Context;
 use std::task::Poll;
 
 /// A hyper/bevy server
+/// This bevy system contains unopinionated machinery for handling
+/// hyper requests.
+/// See [`Server::handler`] for customizing handlers
 pub(super) fn start_server(
 	In(entity): In<Entity>,
 	query: Query<&Server>,
@@ -35,7 +38,7 @@ pub(super) fn start_server(
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
 
-		bevy::log::info!("Server listening on http://{}", addr);
+		info!("Server listening on http://{}", addr);
 
 		loop {
 			let (tcp, addr) = listener
@@ -43,44 +46,19 @@ pub(super) fn start_server(
 				.await
 				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))
 				.unwrap();
-			bevy::log::info!("New connection from: {}", addr);
+			trace!("New connection from: {}", addr);
 			let io = BevyIo::new(tcp);
 
 			let handler = handler.clone();
 			let _entity_fut = world.run_async(async move |world| {
 				let service = service_fn(move |req| {
-					let start = Instant::now();
 					let world = world.clone();
 					let handler = handler.clone();
-					let method = req.method().clone();
-					let path = req.uri().path().to_string();
+
 					async move {
 						let req = hyper_to_request(req).await;
-						let entity = world.entity(entity);
-						let res = handler(entity.clone(), req).await;
+						let res = handler(world.entity(entity), req).await;
 						let res = response_to_hyper(res).await;
-
-						// non-await
-						entity
-							.get_mut::<ServerStatus, _>(|mut status| {
-								status.increment_requests();
-							})
-							.await
-							// ignore if stats doesnt exist
-							.ok();
-						bevy::log::info!(
-							"
-Request Complete
-  path: {}
-  method: {}
-  duration: {}
-  status: {}
-							",
-							method,
-							path,
-							time_ext::pretty_print_duration(start.elapsed()),
-							res.status()
-						);
 						res.xok::<Infallible>()
 					}
 				});
@@ -95,14 +73,11 @@ Request Complete
 					if err.is_timeout()
 						&& err.xfmt_debug() == "hyper::Error(HeaderTimeout)"
 					{
-						bevy::log::trace!(
+						trace!(
 							"Connection closed due to header timeout (normal behavior)"
 						);
 					} else {
-						bevy::log::error!(
-							"Error serving connection: {:?}",
-							err
-						);
+						error!("Error serving connection: {:?}", err);
 					}
 				}
 			});
@@ -287,6 +262,39 @@ mod test {
 	use sweet::prelude::*;
 
 	#[sweet::test]
+	async fn works() {
+		let server = Server::new_test().with_handler(
+			async move |world: AsyncWorld, req: Request| {
+				let time = world
+					.with_then(|world| {
+						world.query_once::<&ServerStatus>()[0].request_count()
+					})
+					.await;
+				assert!(time < 99999);
+				Response::ok().with_body(req.body)
+			},
+		);
+
+		let url = server.local_url();
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((
+					MinimalPlugins,
+					ServerPlugin::with_server(server),
+				))
+				.run();
+		});
+		for _ in 0..10 {
+			Request::post(&url)
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.xpect_ok();
+		}
+	}
+	#[sweet::test]
 	async fn stream_roundtrip() {
 		let server = Server::new_test().with_handler(
 			async move |_world: AsyncWorld, req: Request| {
@@ -296,10 +304,7 @@ mod test {
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin))
-				.xtap(|app| {
-					app.world_mut().spawn(server);
-				})
+				.add_plugins((MinimalPlugins, ServerPlugin::with_server(server)))
 				.run();
 		});
 		Request::post(url)
@@ -337,10 +342,7 @@ mod test {
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin))
-				.xtap(|app| {
-					app.world_mut().spawn(server);
-				})
+				.add_plugins((MinimalPlugins, ServerPlugin::with_server(server)))
 				.run();
 		});
 

@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
-	requests: Query<'w, 's, &'static RequestParts>,
+	requests: Query<'w, 's, &'static RequestMeta>,
 	agents: Query<'w, 's, &'static mut RouteContextMap>,
 	parents: Query<'w, 's, &'static ChildOf>,
 }
@@ -46,19 +46,14 @@ impl RouteQuery<'_, '_> {
 		}
 		// 3. create from request
 		let request = self.requests.get(ev.agent())?;
-		let cx = RouteContext::new(request.uri.path());
+		let cx = RouteContext::new(request.path());
 		cx_map.insert(ev.action(), cx);
 		let cx = cx_map.get_mut(&ev.action()).unwrap();
 		return Ok(func(cx));
 	}
 
 	pub fn method(&self, ev: &On<impl ActionEvent>) -> Result<HttpMethod> {
-		self.requests
-			.get(ev.agent())?
-			.method
-			.xref()
-			.xinto::<HttpMethod>()
-			.xok()
+		self.requests.get(ev.agent())?.method().xok()
 	}
 }
 

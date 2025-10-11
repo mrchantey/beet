@@ -1226,6 +1226,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 name = "beet"
 version = "0.0.7"
 dependencies = [
+ "async-executor",
  "axum 0.8.6",
  "beet",
  "beet_agent",
@@ -1505,6 +1506,7 @@ dependencies = [
 name = "beet_net"
 version = "0.0.7"
 dependencies = [
+ "async-channel",
  "async-executor",
  "async-io",
  "async-lock",

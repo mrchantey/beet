@@ -8,11 +8,46 @@ use std::sync::atomic::Ordering;
 
 
 
-#[derive(Default)]
-pub struct ServerPlugin;
+/// Plugin for running bevy servers.
+/// by default this plugin will spawn the default [`Server`] on [`Startup`]
+pub struct ServerPlugin {
+	/// Spawn the server on add
+	pub spawn_server: Option<Server>,
+}
+
+
+impl ServerPlugin {
+	/// Create a new ServerPlugin that does not spawn a server
+	pub fn without_server(mut self) -> Self {
+		self.spawn_server = None;
+		self
+	}
+	pub fn with_server(server: Server) -> Self {
+		Self {
+			spawn_server: Some(server),
+			..default()
+		}
+	}
+}
+impl Default for ServerPlugin {
+	fn default() -> Self {
+		Self {
+			spawn_server: Some(Server::default()),
+		}
+	}
+}
 
 impl Plugin for ServerPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin::<AsyncPlugin>(); }
+	fn build(&self, app: &mut App) {
+		app.init_plugin::<AsyncPlugin>().add_observer(exchange_meta);
+		if let Some(server) = &self.spawn_server {
+			let server = server.clone();
+			app.add_systems(Startup, move |mut commands: Commands| {
+				commands.spawn(server.clone());
+			});
+			// app.world_mut().spawn(server.clone());
+		}
+	}
 }
 
 pub(super) type HandlerFn = Arc<
@@ -70,7 +105,7 @@ where
 	}
 }
 
-#[derive(Component)]
+#[derive(Clone, Component)]
 #[component(on_add=on_add)]
 #[require(ServerStatus)]
 pub struct Server {
@@ -93,7 +128,7 @@ impl Server {
 		static PORT: AtomicU16 = AtomicU16::new(8340);
 		Self {
 			port: PORT.fetch_add(1, Ordering::SeqCst),
-			handler: box_it(hello_server),
+			..default()
 		}
 	}
 
@@ -125,7 +160,7 @@ impl Default for Server {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,
-			handler: box_it(hello_server),
+			handler: box_it(default_handler),
 		}
 	}
 }
@@ -146,25 +181,9 @@ pub struct ServerStatus {
 	request_count: u128,
 }
 impl ServerStatus {
-	pub fn num_requests(&self) -> u128 { self.request_count }
+	pub fn request_count(&self) -> u128 { self.request_count }
 	pub(super) fn increment_requests(&mut self) -> &mut Self {
 		self.request_count += 1;
 		self
 	}
-}
-
-/// HTTP request handler that uses bevy's async world to manage state
-async fn hello_server(entity: AsyncEntity, req: Request) -> Response {
-	bevy::log::info!("Request: {} {}", req.method(), req.parts.uri.path());
-
-	// Increment request counter using async world
-	let count = entity
-		.get::<ServerStatus, _>(|status| status.num_requests())
-		.await
-		.unwrap();
-
-	let response_text = format!("greetings! Request #{}", count);
-
-	// Create our Response and convert it back to hyper response
-	Response::ok_body(response_text, "text/plain")
 }

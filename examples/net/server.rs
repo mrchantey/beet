@@ -2,19 +2,16 @@ use beet::prelude::*;
 use bevy::log::LogPlugin;
 use serde::Deserialize;
 
-#[rustfmt::skip]
 fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			ServerPlugin,
+			ServerPlugin::default(),
 		))
-		.add_systems(Startup, setup)
+		.init_resource::<VisitCounter>()
+		.add_observer(handler)
 		.run();
-}
-fn setup(mut commands: Commands) {
-	commands.spawn((Server::default().with_handler(handler), VisitCount(0)));
 }
 
 #[derive(Deserialize)]
@@ -22,47 +19,48 @@ struct MyParams {
 	name: String,
 }
 
-#[derive(Default, Component)]
-struct VisitCount(u32);
+#[derive(Default, Resource)]
+struct VisitCounter(u32);
 
-async fn handler(entity: AsyncEntity, req: Request) -> Response {
-	let path = req.parts.uri.path();
+fn handler(
+	ev: On<Insert, Request>,
+	mut commands: Commands,
+	requests: Query<&Request>,
+	time: Res<Time>,
+	mut visit_counter: ResMut<VisitCounter>,
+) -> Result {
+	let request = requests.get(ev.event_target())?;
+	let path = request.parts.uri.path();
 	// our diy router :)
 	if path != "/" {
-		return Response::from_status_body(
-			StatusCode::NOT_FOUND,
-			format!("Path not found: {}", path),
-			"text/plain",
-		);
+		commands
+			.entity(ev.event_target())
+			.insert(Response::from_status_body(
+				StatusCode::NOT_FOUND,
+				format!("Path not found: {}", path),
+				"text/plain",
+			));
+		return Ok(());
 	}
-	let visit_count = entity
-		.get_mut::<VisitCount, _>(|mut count| {
-			count.0 += 1;
-			count.0
-		})
-		.await
-		.unwrap();
+	visit_counter.0 += 1;
+	let num_visits = visit_counter.0;
 
+	let name = if let Ok(params) =
+		QueryParams::<MyParams>::from_request_ref(&request)
+	{
+		params.name.clone()
+	} else {
+		"User".to_string()
+	};
 
-	let name =
-		if let Ok(params) = QueryParams::<MyParams>::from_request_ref(&req) {
-			params.name.clone()
-		} else {
-			"User".to_string()
-		};
+	let uptime = time.elapsed_secs();
 
-	let uptime = entity
-		.world()
-		.with_resource_then::<Time, _>(|time| time.elapsed_secs())
-		.await;
-
-	let special_message = if visit_count % 7 == 0 {
-		format!("<p>Congratulations you are visitor number {visit_count}!</p>")
+	let special_message = if num_visits % 7 == 0 {
+		format!("<p>Congratulations you are visitor number {num_visits}!</p>")
 	} else {
 		default()
 	};
 
-	// the request count includes favicon get
 	let response_text = format!(
 		r#"
 <!DOCTYPE html>
@@ -80,7 +78,7 @@ async fn handler(entity: AsyncEntity, req: Request) -> Response {
   <body>
     <pre>
   Greetings {name}!
-  Visit Count: {visit_count}
+  Visit Count: {num_visits}
   Uptime: {uptime:.2} seconds
     </pre>
   {special_message}
@@ -88,5 +86,8 @@ async fn handler(entity: AsyncEntity, req: Request) -> Response {
 </html>
 "#,
 	);
-	Response::ok_body(response_text, "text/html")
+	commands
+		.entity(ev.event_target())
+		.insert(Response::ok_body(response_text, "text/html"));
+	Ok(())
 }

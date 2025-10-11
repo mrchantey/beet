@@ -61,6 +61,7 @@ beet_core.workspace = true
 bevy.workspace = true
 
 # utils
+async-channel.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
@@ -85,7 +86,6 @@ url = "2"
 mime_guess.workspace = true
 html-escape = "0.2"
 eventsource-stream = "0.2.3"
-
 # async
 futures.workspace = true
 
