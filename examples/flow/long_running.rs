@@ -21,7 +21,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetFlowPlugin::default(),
+		ControlFlowPlugin::default(),
 		DebugFlowPlugin::with_result(),
 	))
 	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));

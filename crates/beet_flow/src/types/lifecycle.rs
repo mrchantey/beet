@@ -133,7 +133,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((Parent, ExitOnEnd, children![Child]))
@@ -143,7 +143,7 @@ mod test {
 	}
 	#[test]
 	fn prevent_propagate() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((

@@ -5,7 +5,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetFlowPlugin::default(),
+		ControlFlowPlugin::default(),
 		DebugFlowPlugin::default(),
 	))
 	.world_mut()

@@ -9,7 +9,7 @@ use std::borrow::Cow;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world
 ///		.spawn(LogOnRun::new("Running..."))
 ///		.trigger_target(GetOutcome);

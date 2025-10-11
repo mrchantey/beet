@@ -103,7 +103,7 @@ mod test {
 		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.add_plugins((
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.init_resource::<RandomSource>()

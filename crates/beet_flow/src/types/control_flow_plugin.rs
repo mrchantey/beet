@@ -3,9 +3,9 @@ use beet_core::prelude::*;
 
 /// Plugin adding lifecycle management for the core beet_flow systems.
 #[derive(Default)]
-pub struct BeetFlowPlugin;
+pub struct ControlFlowPlugin;
 
-impl Plugin for BeetFlowPlugin {
+impl Plugin for ControlFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((run_plugin::<GetOutcome>, run_plugin::<GetScore>))
 			.configure_sets(Update, PreTickSet)

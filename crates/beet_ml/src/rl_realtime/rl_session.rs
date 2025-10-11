@@ -198,7 +198,7 @@ mod test {
 
 		app.add_plugins((
 			MinimalPlugins,
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.add_systems(Update, (start_ep, end_ep).in_set(TickSet));

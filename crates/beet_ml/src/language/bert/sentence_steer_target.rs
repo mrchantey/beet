@@ -94,7 +94,7 @@ fn sentence_steer_target<F: Component>(
 // 		let mut app = App::new();
 // 		app.add_plugins((
 // 			MinimalPlugins,
-// 			BeetFlowPlugin::default(),
+// 			ControlFlowPlugin::default(),
 // 			workspace_asset_plugin(),
 // 			Language::default(),
 // 		))

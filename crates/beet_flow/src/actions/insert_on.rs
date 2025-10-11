@@ -87,7 +87,7 @@ mod test {
 	#[test]
 	fn on_result() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
+		app.add_plugins(ControlFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world

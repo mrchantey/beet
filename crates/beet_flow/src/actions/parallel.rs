@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world.spawn((
 /// 	Parallel::default(),
 /// 	children![
@@ -80,7 +80,7 @@ mod test {
 
 	#[test]
 	fn fails() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);
@@ -107,7 +107,7 @@ mod test {
 
 	#[test]
 	fn succeeds() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);

@@ -52,7 +52,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default())
+		app.add_plugins(ControlFlowPlugin::default())
 			.add_observer(trigger_with_user_sentence::<GetOutcome>);
 		let world = app.world_mut();
 		let on_run = observer_ext::observe_triggers::<GetOutcome>(world);

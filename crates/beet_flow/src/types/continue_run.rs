@@ -55,7 +55,7 @@ mod test {
 	#[test]
 	fn adds() {
 		let mut app = App::new();
-		// app.add_plugins(BeetFlowPlugin::default());
+		// app.add_plugins(ControlFlowPlugin::default());
 		let world = app.world_mut();
 
 		// adds

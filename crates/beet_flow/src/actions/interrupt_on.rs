@@ -61,7 +61,7 @@ mod test {
 
 	#[test]
 	fn interrupt_on_run() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn(children![Running])
 			.trigger_target(GetOutcome)
@@ -70,7 +70,7 @@ mod test {
 	}
 	#[test]
 	fn no_interrupt_on_run() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn(children![(NoInterrupt, Running)])
 			.trigger_target(GetOutcome)
@@ -80,7 +80,7 @@ mod test {
 
 	#[test]
 	fn interrupt_on_end() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
@@ -92,7 +92,7 @@ mod test {
 	}
 	#[test]
 	fn interrupt_on_end_with_no_interrupt() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn((NoInterrupt, Running))
 			.trigger_target(Outcome::Pass)

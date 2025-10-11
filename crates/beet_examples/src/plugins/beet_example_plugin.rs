@@ -43,7 +43,7 @@ pub fn beet_example_plugin(app: &mut App) {
 	assert_local_assets();
 
 	app.add_plugins((
-		BeetFlowPlugin::default(),
+		ControlFlowPlugin::default(),
 		DebugFlowPlugin::default(),
 		BeetSpatialPlugins::default(),
 		plugin_2d,

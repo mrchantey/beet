@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// let action = world
 /// 	.spawn(EndWith(Outcome::Pass))
 /// 	.id();
@@ -79,7 +79,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);

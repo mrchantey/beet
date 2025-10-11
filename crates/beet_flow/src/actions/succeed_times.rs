@@ -52,7 +52,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		let entity = world.spawn(SucceedTimes::new(2)).id();

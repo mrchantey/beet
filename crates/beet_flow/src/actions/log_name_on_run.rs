@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world
 ///		.spawn((Name::new("root"), LogNameOnRun))
 ///		.trigger_target(GetOutcome);
@@ -35,7 +35,7 @@ mod test {
 	/// run with `--nocapture` to check output
 	#[test]
 	fn action() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn((Name::new("root"), LogNameOnRun))
 			.trigger_target(GetOutcome)

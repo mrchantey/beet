@@ -32,7 +32,7 @@ fn run_app() {
 	println!("👩\tMalenia says: {INTRO}");
 
 	let mut app = App::new();
-	app.add_plugins((MinimalPlugins, BeetFlowPlugin::default()))
+	app.add_plugins((MinimalPlugins, ControlFlowPlugin::default()))
 		.add_systems(Update, health_handler)
 		.init_resource::<RandomSource>();
 

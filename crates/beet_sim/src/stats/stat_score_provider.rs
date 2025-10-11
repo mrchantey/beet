@@ -135,7 +135,7 @@ mod test {
 	fn action() {
 		let mut app = App::new();
 
-		app.add_plugins(BeetFlowPlugin::default())
+		app.add_plugins(ControlFlowPlugin::default())
 			.insert_resource(StatMap::default_with_test_stats());
 
 		let world = app.world_mut();

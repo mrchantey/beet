@@ -58,7 +58,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
+		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
 		let agent = app

@@ -6,11 +6,12 @@ use beet_net::prelude::*;
 
 /// Endpoints are actions that will only run if the method and path are an
 /// exact match.
+/// The method will also be added to the handler for easier querying.
 pub fn endpoint(method: HttpMethod, handler: impl Bundle) -> impl Bundle {
 	(Sequence, children![
 		check_exact_path(),
 		check_method(method),
-		handler
+		(method, handler)
 	])
 }
 
@@ -24,7 +25,7 @@ pub fn endpoint_with_path(
 	// path filter must be ancestor of endpoint
 	// so we nest the sequence
 	(Sequence, children![(Sequence, children![(
-		check_path_filter(path),
+		parse_path_filter(path),
 		endpoint(method, handler)
 	)])])
 }
@@ -33,7 +34,7 @@ pub fn endpoint_with_path(
 /// Parses the [`RouteContext`] for this entity and applies the
 /// [`PathFilter`], popping from the [`RouteContext::path`]
 /// and inserting to the [`RouteContext::dyn_segments`]
-pub fn check_path_filter(filter: PathFilter) -> impl Bundle {
+pub fn parse_path_filter(filter: PathFilter) -> impl Bundle {
 	(
 		filter,
 		OnSpawn::observe(
@@ -108,6 +109,17 @@ pub fn collect_route_segments() -> impl Bundle {
 
 
 pub fn respond_with(
+	response: impl 'static + Send + Sync + Clone + IntoResponse,
+) -> impl Bundle {
+	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
+		let response = response.clone().into_response();
+		commands.entity(ev.agent()).insert(response);
+		ev.trigger_next(Outcome::Pass);
+	})
+}
+
+
+pub fn handler<F>(
 	response: impl 'static + Send + Sync + Clone + IntoResponse,
 ) -> impl Bundle {
 	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {

@@ -58,7 +58,7 @@ mod test {
 			MinimalPlugins,
 			workspace_asset_plugin(),
 			LanguagePlugin::default(),
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 		))
 		.finish();
 		let on_run =

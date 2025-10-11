@@ -10,7 +10,7 @@ pub struct FlowRouterPlugin;
 impl Plugin for FlowRouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
-			.init_plugin::<BeetFlowPlugin>();
+			.init_plugin::<ControlFlowPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 		app.init_plugin::<ServerPlugin>();

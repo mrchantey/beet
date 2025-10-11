@@ -5,7 +5,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			DebugFlowPlugin::default()
 		))
 		.world_mut()

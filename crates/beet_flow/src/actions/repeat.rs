@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
 /// .trigger_target(GetOutcome);
@@ -79,7 +79,7 @@ mod test {
 
 	#[test]
 	fn repeat_always() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
@@ -101,7 +101,7 @@ mod test {
 
 	#[test]
 	fn repeat_if() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
@@ -123,7 +123,7 @@ mod test {
 
 	#[test]
 	fn repeat_child() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world

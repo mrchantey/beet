@@ -29,7 +29,7 @@ impl Plugin for HandlerPlugin {
 		.init_resource::<RenderMode>()
 		.init_resource::<DynSegmentMap>()
 		.init_resource::<HtmlConstants>()
-		.init_plugin::<BeetFlowPlugin>()
+		.init_plugin::<ControlFlowPlugin>()
 		.init_plugin::<AsyncPlugin>()
 		.add_systems(
 			PostStartup,

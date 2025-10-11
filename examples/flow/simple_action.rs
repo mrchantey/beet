@@ -18,7 +18,7 @@ fn log_on_run(ev: On<GetOutcome>, query: Query<&LogOnRun>) {
 
 fn main() {
 	App::new()
-		.add_plugins(BeetFlowPlugin::default())
+		.add_plugins(ControlFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
 		.trigger_target(GetOutcome)

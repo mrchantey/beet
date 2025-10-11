@@ -17,7 +17,7 @@ pub fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			AssetPlugin::default(),
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			DebugFlowPlugin::default(),
 			RunOnAssetReadyPlugin::<Bert>::default(),
 			LanguagePlugin::default(),
