@@ -153,7 +153,8 @@ test-all:
 	just test-core
 	just test-flow
 	just test-rsx
-	cargo test -p beet-cli --all-features -- {{test-threads}}
+	cargo test -p sweet-cli --all-features -- {{test-threads}}
+	cargo test -p beet-cli  --all-features -- {{test-threads}}
 
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
@@ -186,7 +187,6 @@ test-core *args:
 	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 	cargo test -p beet_net						 	--features=tungstenite,native-tls  					{{args}} -- {{test-threads}}
 	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{args}} -- {{test-threads}}
-	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 
 test-flow *args:
 	cargo test -p beet_flow 		--all-features 																						{{args}} -- {{test-threads}}

@@ -51,3 +51,13 @@ impl Outcome {
 	/// Returns `true` if the outcome is [`Outcome::Fail`]
 	pub fn is_fail(&self) -> bool { self == &Outcome::Fail }
 }
+
+
+impl std::fmt::Display for Outcome {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Outcome::Pass => write!(f, "Pass"),
+			Outcome::Fail => write!(f, "Fail"),
+		}
+	}
+}

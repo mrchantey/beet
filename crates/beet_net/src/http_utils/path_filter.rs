@@ -8,39 +8,9 @@ use std::path::Path;
 
 /// A list of [`RouteSegment::Dynamic`] and [`RouteSegment::Wildcard`]
 /// values extracted during path matching.
-// TODO deprecate for PathPartialMap after beet_router refactor
+// TODO deprecate for RouteContext after beet_router refactor
 #[derive(Default, Clone, Resource, Deref, DerefMut, Reflect)]
 pub struct DynSegmentMap(HashMap<String, String>);
-
-
-/// A map stored on the agent of actions in the tree, storing which
-/// parts of the path are still yet to be consumed.
-/// This allows us to check for exact path matches.
-#[derive(Debug, Default, Deref, DerefMut, Component)]
-pub struct PathPartialMap(HashMap<Entity, PathPartial>);
-
-impl PathPartialMap {
-	pub fn insert_from_request(&mut self, entity: Entity, request: &Request) {
-		self.0.insert(entity, PathPartial {
-			path: route_path_queue(request.parts.uri.path()),
-			dyn_segments: default(),
-		});
-	}
-}
-
-
-#[derive(Debug, Default, Clone)]
-pub struct PathPartial {
-	path: VecDeque<String>,
-	dyn_segments: HashMap<String, String>,
-}
-
-impl PathPartial {
-	pub fn parse_filter(&mut self, filter: &PathFilter) -> ControlFlow<()> {
-		filter.matches(&mut self.dyn_segments, &mut self.path)
-	}
-}
-
 
 /// Endpoints will only run if there are no trailing path segments,
 /// unlike middleware which may run for multiple child paths.

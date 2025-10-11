@@ -71,7 +71,7 @@ impl<T, E, B: Bundle, M> IntoBundle<(ObserverMarker, E, B, M)> for T
 where
 	E: Event,
 	B: Bundle,
-	T: IntoObserverSystem<E, B, M>,
+	T: 'static + Send + Sync + IntoObserverSystem<E, B, M>,
 {
 	fn into_bundle(self) -> impl Bundle {
 		(EventTarget, OnSpawn::observe(self))

@@ -132,6 +132,7 @@ dotenv = "0.15"
 send_wrapper = "0.6"
 rapidhash = "1"
 web-time = "1"
+itertools = "0.14"
 tempfile = "3"
 mime_guess = "2"
 uuid = {version = "1",features=["js"]}

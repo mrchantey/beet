@@ -18,7 +18,7 @@ fn main() {
 // #[rustfmt::skip]
 fn setup(mut commands: Commands) {
 	commands.insert_resource(Router::new_no_defaults(|app: &mut App| {
-		app.init_plugin(HandlerPlugin);
+		app.init_plugin::<HandlerPlugin>();
 		app.world_mut().spawn((RouterRoot, children![
 			// bundles are served as html documents
 			(PathFilter::new("/"), bundle_endpoint(|| rsx! {<Home/>})),

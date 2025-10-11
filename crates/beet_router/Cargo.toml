@@ -61,6 +61,7 @@ thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 send_wrapper.workspace = true
+http.workspace = true
 
 # serde
 clap = { workspace = true, optional = true }

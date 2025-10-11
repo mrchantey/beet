@@ -9,8 +9,15 @@ use bevy::tasks::Task;
 #[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]
 pub impl App {
-	/// Add a plugin to the app, if it hasn't been added yet.
-	fn init_plugin<T: Plugin>(&mut self, plugin: T) -> &mut Self {
+	/// Add the plugin to the app if it hasn't been added yet.
+	fn init_plugin<T: Plugin + Default>(&mut self) -> &mut Self {
+		if self.get_added_plugins::<T>().is_empty() {
+			self.add_plugins(T::default());
+		}
+		self
+	}
+	/// Adds the plugin to the app if it hasn't been added yet.
+	fn init_plugin_with<T: Plugin>(&mut self, plugin: T) -> &mut Self {
 		if self.get_added_plugins::<T>().is_empty() {
 			self.add_plugins(plugin);
 		}
@@ -80,7 +87,7 @@ pub impl App {
 		self.await_io_task(IoTaskPool::get().spawn_local(fut)).await
 	}
 	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
-		self.init_plugin(TaskPoolPlugin::default());
+		self.init_plugin::<TaskPoolPlugin>();
 		// spin up async task pool
 		self.run_once();
 

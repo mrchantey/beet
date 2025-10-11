@@ -323,8 +323,6 @@ mod test {
 
 	#[test]
 	fn serializes() {
-		use bevy::MinimalPlugins;
-
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.init();

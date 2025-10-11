@@ -87,6 +87,7 @@ pub mod prelude {
 }
 
 pub mod exports {
+	pub use itertools::Itertools;
 	// original exports
 	pub use async_channel;
 	pub use futures_lite;

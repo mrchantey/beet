@@ -8,7 +8,7 @@ impl Plugin for LoadSnippetsPlugin {
 	#[allow(unused)]
 	fn build(&self, app: &mut App) {
 		#[cfg(not(target_arch = "wasm32"))]
-		app.init_plugin(crate::prelude::ApplyDirectivesPlugin)
+		app.init_plugin::<crate::prelude::ApplyDirectivesPlugin>()
 			.add_systems(Startup, load_all_file_snippets);
 	}
 }

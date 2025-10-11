@@ -21,7 +21,7 @@ fn foo(run: On<GetOutcome>, mut cmd: AsyncCommands) {
 #[sweet::test]
 async fn works() {
 	let mut app = App::new();
-	app.add_plugins((MinimalPlugins, BeetFlowPlugin, AsyncPlugin));
+	app.add_plugins((BeetFlowPlugin, AsyncPlugin));
 	app.world_mut()
 		.spawn((Sequence, ExitOnEnd, children![Foo, EndWith(Outcome::Fail)]))
 		.trigger_target(GetOutcome);

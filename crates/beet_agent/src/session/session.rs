@@ -6,7 +6,7 @@ use bevy::ecs::system::SystemParam;
 pub struct AgentPlugin;
 
 impl Plugin for AgentPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin(AsyncPlugin); }
+	fn build(&self, app: &mut App) { app.init_plugin::<AsyncPlugin>(); }
 }
 
 #[derive(Default, Component)]
@@ -136,7 +136,7 @@ pub(super) mod test {
 		dotenv::dotenv().ok();
 
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AgentPlugin));
+		app.add_plugins(AgentPlugin);
 
 		#[rustfmt::skip]
 		app.world_mut().spawn(session_ext::user_message_session(agent,

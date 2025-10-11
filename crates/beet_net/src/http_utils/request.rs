@@ -10,11 +10,30 @@ use http::request;
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
 #[derive(Debug, Component, Resource)]
+#[component(on_add=on_add)]
 pub struct Request {
 	pub parts: request::Parts,
-
 	pub body: Body,
 }
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	let parts = world
+		.entity(cx.entity)
+		.get::<Request>()
+		.unwrap()
+		.parts
+		.clone();
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(RequestParts(parts));
+}
+
+/// Cloned from the [`Request`] when its added, allowing the [`Request`]
+/// to be consumed and for these parts to still be accessible.
+#[derive(Debug, Deref, Component)]
+pub struct RequestParts(request::Parts);
+
 
 impl Request {
 	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {

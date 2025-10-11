@@ -61,10 +61,9 @@ impl Plugin for BuildPlugin {
 			),
 		);
 		app.add_message::<WatchEvent>()
-			.init_plugin(ParseRsxTokensPlugin)
-			// .init_plugin(ApplyDirectivesPlugin)
-			.init_plugin(RouteCodegenPlugin)
-			.init_plugin(NodeTypesPlugin)
+			.init_plugin::<ParseRsxTokensPlugin>()
+			.init_plugin::<RouteCodegenPlugin>()
+			.init_plugin::<NodeTypesPlugin>()
 			.insert_schedule_before(Update, BuildSequence)
 			.insert_resource(CargoManifest::load().unwrap())
 			.init_resource::<BuildFlags>()

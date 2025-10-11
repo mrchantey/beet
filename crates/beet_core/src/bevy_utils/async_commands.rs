@@ -30,11 +30,15 @@ impl<T> MaybeSync for T {}
 
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.
+/// This plugin will init the [`TaskPoolPlugin`] if unintialized,
+/// so must be added after [`DefaultPlugins`] / [`MinimalPlugins`]
+#[derive(Default)]
 pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<AsyncChannel>()
+		app.init_plugin::<TaskPoolPlugin>()
+			.init_resource::<AsyncChannel>()
 			.add_systems(PreUpdate, append_async_queues);
 	}
 }
@@ -98,6 +102,60 @@ where
 		.detach();
 }
 
+/// Spawn the async task, flush all async tasks and return the output
+fn spawn_async_task_then<Func, Fut, Out>(
+	world: AsyncWorld,
+	update: impl FnMut(),
+	func: Func,
+) -> impl Future<Output = Out>
+where
+	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out> + Send,
+	Out: 'static + Send + Sync,
+{
+	let (send, recv) = async_channel::bounded(1);
+	spawn_async_task_local(world, async move |world| {
+		let out = func(world).await;
+		// allowed to drop recv
+		send.try_send(out).ok();
+	});
+	poll_and_update(update, recv)
+}
+/// Spawn the async local task, flush all async tasks and return the output
+fn spawn_async_task_local_then<Func, Fut, Out>(
+	world: AsyncWorld,
+	update: impl FnMut(),
+	func: Func,
+) -> impl Future<Output = Out>
+where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: 'static,
+{
+	let (send, recv) = async_channel::bounded(1);
+	spawn_async_task_local(world, async move |world| {
+		let out = func(world).await;
+		// allowed to drop recv
+		send.try_send(out).ok();
+	});
+	poll_and_update(update, recv)
+}
+
+/// update the world in 1ms increments until recv has a value
+async fn poll_and_update<T>(mut update: impl FnMut(), recv: Receiver<T>) -> T {
+	loop {
+		match recv.try_recv() {
+			Ok(out) => return out,
+			Err(TryRecvError::Empty) => {
+				update();
+				time_ext::sleep_millis(1).await;
+			}
+			Err(TryRecvError::Closed) => {
+				unreachable!("we control the send");
+			}
+		}
+	}
+}
 /// Commands used to run async functions, passing in an [`AsyncWorld`] which
 /// can be used to send and received values from the [`World`]
 ///
@@ -217,11 +275,16 @@ pub struct AsyncWorld {
 impl AsyncWorld {
 	pub fn new(tx: Sender<CommandQueue>) -> Self { Self { tx } }
 
+	fn send(&self, queue: CommandQueue) {
+		if let Err(err) = self.tx.try_send(queue) {
+			warn!("Failed to send command queue: {}", err);
+		}
+	}
 	/// Queues the command
 	pub fn with(&self, func: impl Command + FnOnce(&mut World)) {
 		let mut queue = CommandQueue::default();
 		queue.push(func);
-		self.tx.try_send(queue).unwrap();
+		self.send(queue);
 	}
 	/// Queues the command, creating another channel that will resolve when
 	/// the task is complete, returing its output
@@ -241,8 +304,13 @@ impl AsyncWorld {
 				// allow dropped, they didnt want the output
 				.ok();
 		});
-		self.tx.try_send(queue).unwrap();
-		async move { out_rx.recv().await.unwrap() }
+		self.send(queue);
+		async move {
+			out_rx
+				.recv()
+				.await
+				.expect("channel closed, was the world dropped?")
+		}
 	}
 
 	pub fn entity(&self, entity: Entity) -> AsyncEntity {
@@ -413,13 +481,16 @@ impl AsyncEntity {
 	pub async fn get<T: Component, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&T) -> O,
-	) -> O
+	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
 		self.with_then(|entity| {
-			let comp = entity.get().unwrap();
-			func(comp)
+			if let Some(comp) = entity.get() {
+				func(comp).xok()
+			} else {
+				bevybail!("Component not found")
+			}
 		})
 		.await
 	}
@@ -427,13 +498,16 @@ impl AsyncEntity {
 	pub async fn get_mut<T: Component<Mutability = Mutable>, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<T>) -> O,
-	) -> O
+	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
 		self.with_then(|mut entity| {
-			let comp = entity.get_mut().unwrap();
-			func(comp)
+			if let Some(comp) = entity.get_mut() {
+				func(comp).xok()
+			} else {
+				bevybail!("Component not found")
+			}
 		})
 		.await
 	}
@@ -516,16 +590,11 @@ pub impl World {
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: 'static + Send + Sync,
 	{
-		let (send, recv) = async_channel::bounded(1);
-		spawn_async_task_local(
+		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
-			async move |world| {
-				let out = func(world).await;
-				// allowed to drop recv
-				send.try_send(out).ok();
-			},
-		);
-		poll_and_update(self, recv)
+			|| self.update(),
+			func,
+		)
 	}
 	/// Spawn the async local task, flush all async tasks and return the output
 	fn run_async_local_then<Func, Fut, Out>(
@@ -537,38 +606,71 @@ pub impl World {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static,
 	{
-		let (send, recv) = async_channel::bounded(1);
-		spawn_async_task_local(
+		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
-			async move |world| {
-				let out = func(world).await;
-				// allowed to drop recv
-				send.try_send(out).ok();
-			},
-		);
-		poll_and_update(self, recv)
+			|| self.update(),
+			func,
+		)
+	}
+}
+#[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
+pub impl EntityWorldMut<'_> {
+	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: AsyncTaskOut,
+	{
+		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		self
+	}
+	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		self
+	}
+	/// Spawn the async task, flush all async tasks and return the output
+	fn run_async_then<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> impl Future<Output = Out>
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: 'static + Send + Sync,
+	{
+		spawn_async_task_then(
+			self.resource::<AsyncChannel>().world(),
+			|| self.world_scope(World::update),
+			func,
+		)
+	}
+	/// Spawn the async local task, flush all async tasks and return the output
+	fn run_async_local_then<Func, Fut, Out>(
+		&mut self,
+		func: Func,
+	) -> impl Future<Output = Out>
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static,
+	{
+		spawn_async_task_local_then(
+			self.resource::<AsyncChannel>().world(),
+			|| self.world_scope(World::update),
+			func,
+		)
 	}
 }
 
-/// update the world in 1ms increments until recv has a value
-async fn poll_and_update<T>(world: &mut World, recv: Receiver<T>) -> T {
-	loop {
-		match recv.try_recv() {
-			Ok(out) => return out,
-			Err(TryRecvError::Empty) => {
-				world.update();
-				time_ext::sleep_millis(1).await;
-			}
-			Err(TryRecvError::Closed) => {
-				unreachable!("we control the send");
-			}
-		}
-	}
-}
 
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use crate::prelude::*;
 	use bevy::tasks::futures_lite::future;
 	use sweet::prelude::*;
@@ -579,10 +681,9 @@ mod tests {
 
 	#[sweet::test]
 	async fn async_task() {
-		let mut app = App::new();
-		app.init_resource::<Count>()
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-		app.world_mut()
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Count>();
+		world
 			.run_async_local_then(async |world| {
 				let next = 1;
 				future::yield_now().await;
@@ -592,20 +693,19 @@ mod tests {
 			.await;
 
 		// world not yet applied
-		app.world_mut().resource::<Count>().0.xpect_eq(0);
+		world.resource::<Count>().0.xpect_eq(0);
 
-		AsyncRunner::flush_async_tasks(app.world_mut()).await;
+		AsyncRunner::flush_async_tasks(&mut world).await;
 
 		// world now applied
-		app.world_mut().resource::<Count>().0.xpect_eq(1);
+		world.resource::<Count>().0.xpect_eq(1);
 	}
 	#[sweet::test]
 	async fn async_queue() {
-		let mut app = App::new();
-		app.init_resource::<Count>()
-			.add_plugins((MinimalPlugins, AsyncPlugin));
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Count>();
 		// time_ext::sleep !send in wasm
-		app.world_mut()
+		world
 			.run_async_local_then(async |world| {
 				let next = world
 					.with_resource_then(|mut res: Mut<Count>| {
@@ -627,28 +727,31 @@ mod tests {
 			})
 			.await;
 
-		app.world_mut().resource::<Count>().0.xpect_eq(2);
+		world.resource::<Count>().0.xpect_eq(2);
 	}
 	#[sweet::test]
 	async fn results() {
+		// use bevy::ecs::error::DefaultErrorHandler;
 		let mut app = App::new();
-		app.init_resource::<Count>()
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-		app.set_error_handler(|_, _| {});
-		app.world_mut().run_async_local(async |_| {
+		app.add_plugins(AsyncPlugin);
+		// let mut world = (MinimalPlugins, AsyncPlugin).into_world();
+		let world = app.world_mut();
+		world.init_resource::<Count>();
+		// world.insert_resource(DefaultErrorHandler(bevy::ecs::error::ignore));
+		world.run_async_local(async |_| {
 			time_ext::sleep(Duration::from_millis(2)).await;
 			bevybail!("intentional error")
 		});
+
+		// AsyncRunner::flush_async_tasks(&mut world).await;
+
 		app.run_async().await.into_result().xpect_err();
 	}
+
 	#[sweet::test]
 	async fn run_async_then() {
-		let mut app = App::new();
-		app.init_resource::<Count>()
-			.add_plugins((MinimalPlugins, AsyncPlugin));
-		app.world_mut()
-			.run_async_then(async |_| 32)
-			.await
-			.xpect_eq(32);
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Count>();
+		world.run_async_then(async |_| 32).await.xpect_eq(32);
 	}
 }

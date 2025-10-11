@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
@@ -8,29 +9,39 @@ pub struct FlowRouterPlugin;
 
 impl Plugin for FlowRouterPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(AsyncPlugin).init_plugin(BeetFlowPlugin);
+		app.init_plugin::<AsyncPlugin>()
+			.init_plugin::<BeetFlowPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-		app.init_plugin(ServerPlugin);
+		app.init_plugin::<ServerPlugin>();
 	}
 }
 
 
 #[extend::ext(name=WorldRouterExt)]
 pub impl World {
-	/// Handle a single request and return the response, awaiting
-	/// all async tasks to flush.
+	/// Handle a single request and return the response
 	/// ## Panics
 	/// Panics if there is not exactly one `RouteServer` in the world.
 	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
-		let server = self
+		let entity = self
 			.query_filtered::<Entity, With<RouteServer>>()
 			.single(self)
 			.expect("Expected a single RouteServer");
-
-
 		self.run_async_then(async move |world| {
-			route_handler(world.entity(server), req)
+			route_handler(world.entity(entity), req)
+				.await
+				.into_response()
+		})
+	}
+}
+#[extend::ext(name=EntityWorldMutRouterExt)]
+pub impl EntityWorldMut<'_> {
+	/// Handle a single request and return the response
+	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
+		let entity = self.id();
+		self.run_async_then(async move |world| {
+			route_handler(world.entity(entity), req)
 				.await
 				.into_response()
 		})
@@ -43,7 +54,7 @@ async fn route_handler(
 ) -> Result<Response> {
 	let world = entity.world();
 	let exchange = world
-		.spawn_then((request, PathPartialMap::default()))
+		.spawn_then((request, RouteContextMap::default()))
 		.await
 		.id();
 	let (send, recv) = async_channel::bounded(1);
@@ -94,10 +105,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, FlowRouterPlugin));
-		let world = app.world_mut();
-		// let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
+		let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
 		world.spawn((RouteServer, EndWith(Outcome::Pass)));
 		world.all_entities().len().xpect_eq(1);
 		world
@@ -105,6 +113,7 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
+		// agent was cleaned up
 		world.all_entities().len().xpect_eq(1);
 	}
 }

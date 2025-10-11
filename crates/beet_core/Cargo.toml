@@ -55,6 +55,7 @@ beet_core_macros.workspace = true
 bevy.workspace = true
 
 tracing.workspace = true
+itertools.workspace = true
 rapidhash.workspace = true
 send_wrapper.workspace = true
 web-time.workspace = true

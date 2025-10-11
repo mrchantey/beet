@@ -8,10 +8,11 @@ use std::sync::atomic::Ordering;
 
 
 
+#[derive(Default)]
 pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin(AsyncPlugin); }
+	fn build(&self, app: &mut App) { app.init_plugin::<AsyncPlugin>(); }
 }
 
 pub(super) type HandlerFn = Arc<

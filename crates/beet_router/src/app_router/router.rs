@@ -15,6 +15,7 @@ pub struct RouterRoot;
 
 
 /// Plugin added to the [`AppPool`] app for each handler, not the 'main app' for the actual server.
+#[derive(Default)]
 pub struct HandlerPlugin;
 
 impl Plugin for HandlerPlugin {
@@ -28,8 +29,8 @@ impl Plugin for HandlerPlugin {
 		.init_resource::<RenderMode>()
 		.init_resource::<DynSegmentMap>()
 		.init_resource::<HtmlConstants>()
-		.init_plugin(BeetFlowPlugin)
-		.init_plugin(AsyncPlugin)
+		.init_plugin::<BeetFlowPlugin>()
+		.init_plugin::<AsyncPlugin>()
 		.add_systems(
 			PostStartup,
 			(
@@ -68,7 +69,7 @@ impl Router {
 		Self::new_no_defaults(move |app: &mut App| {
 			app.add_plugins(MinimalPlugins);
 			plugin.add_to_app(app);
-			app.init_plugin(HandlerPlugin);
+			app.init_plugin::<HandlerPlugin>();
 			#[cfg(not(test))]
 			app.add_plugins(LoadSnippetsPlugin);
 		})

@@ -10,7 +10,7 @@ pub struct SignalsPlugin;
 impl Plugin for SignalsPlugin {
 	// #[rustfmt::skip]
 	fn build(&self, app: &mut App) {
-		app.init_plugin(schedule_order_plugin)
+		app.init_plugin_with(schedule_order_plugin)
 			.init_resource::<DirtySignals>()
 			.add_systems(
 				PropagateSignals,

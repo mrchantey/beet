@@ -14,7 +14,7 @@ pub impl App {
 
 impl AsyncRunner {
 	pub async fn run(mut app: App) -> AppExit {
-		app.init_plugin(AsyncPlugin);
+		app.init_plugin::<AsyncPlugin>();
 		app.init();
 
 		// this is an outer loop that will run when there are no
