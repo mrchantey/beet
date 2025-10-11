@@ -364,6 +364,8 @@ beet = { path = "", features = ["flow"] }
 serde.workspace = true
 clap.workspace = true
 async-executor.workspace = true
+futures.workspace = true
+tokio.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = "", features = ["fs"] }

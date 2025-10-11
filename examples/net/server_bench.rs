@@ -1,15 +1,11 @@
-//! A minimal server example
+//! Roundtrip bench of server requests
 use beet::prelude::*;
-use bevy::log::LogPlugin;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	let _handle = std::thread::spawn(|| {
 		App::new()
-			.add_plugins((
-				MinimalPlugins,
-				LogPlugin::default(),
-				ServerPlugin::default(),
-			))
+			.add_plugins((MinimalPlugins, ServerPlugin::default()))
 			.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {
 				commands
 					.entity(ev.event_target())
@@ -18,29 +14,30 @@ fn main() {
 			.run();
 	});
 
+	time_ext::sleep_millis(10).await;
 	let start = std::time::Instant::now();
 
-	let num_requests = 1000;
-	let store = Store::new_vec();
+	// let num_requests = 1; //     700 us
+	// let num_requests = 10; //    850 us
+	// let num_requests = 100; //   5 ms
+	let num_requests = 1000; //     65 ms
 
-	async_executor::LocalExecutor::new().run(async {
-		let mut handles = Vec::new();
-		let futures = (0..num_requests).map(|_| async {
-			let start = Instant::now();
-			Request::get("http://127.0.0.1:8337").send().await.unwrap();
-			start.elapsed()
-		});
-		join_all(futures).await
+
+	let futures = (0..num_requests).map(|_| async {
+		let start = Instant::now();
+		Request::get("http://127.0.0.1:8337").send().await.unwrap();
+		start.elapsed()
 	});
+	let durations = futures::future::join_all(futures).await;
+	let avg = durations.iter().sum::<std::time::Duration>()
+		/ (durations.len() as u32);
 
-	let duration = start.elapsed();
-	let avg = store.get().iter().sum::<std::time::Duration>()
-		/ (store.get().len() as u32);
+	let total = start.elapsed();
 	println!(
 		"Complete:\n  requests: {}\n  avg: {}\n  total: {}",
 		num_requests,
 		time_ext::pretty_print_duration(avg),
-		time_ext::pretty_print_duration(duration)
+		time_ext::pretty_print_duration(total)
 	);
 
 	// let mut
