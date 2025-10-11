@@ -3,15 +3,26 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
+/// Signifies this position in the route graph is a canonical handler,
+/// and should be included in any kind of 'collect all endpoints' functionality.
+///
+/// Usually this is not added directly, instead via the [`endpoint`] constructor.
+/// Endpoints should only run if there are no trailing path segments,
+/// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component)]
+pub struct Endpoint;
+
 
 /// Endpoints are actions that will only run if the method and path are an
 /// exact match.
-/// The method will also be added to the handler for easier querying.
+/// - A [`RouteSegments`] will be added, collecting all parent [`PathFilter`]s
+/// - The method will also be added to the handler for easier querying.
 pub fn endpoint(method: HttpMethod, handler: impl Bundle) -> impl Bundle {
 	(Sequence, children![
 		check_exact_path(),
 		check_method(method),
-		(method, handler)
+		(Endpoint, collect_route_segments(), method, handler,)
 	])
 }
 
@@ -30,32 +41,6 @@ pub fn endpoint_with_path(
 	)])])
 }
 
-
-/// Parses the [`RouteContext`] for this entity and applies the
-/// [`PathFilter`], popping from the [`RouteContext::path`]
-/// and inserting to the [`RouteContext::dyn_segments`]
-pub fn parse_path_filter(filter: PathFilter) -> impl Bundle {
-	(
-		filter,
-		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
-			 mut query: RouteQuery,
-			 actions: Query<&PathFilter>|
-			 -> Result {
-				let filter = actions.get(ev.action())?;
-				let outcome = query.with_cx(&mut ev, |cx| {
-					match cx.parse_filter(filter) {
-						Ok(_) => Outcome::Pass,
-						Err(_) => Outcome::Fail,
-					}
-				})?;
-				// println!("check_path_filter: {}", outcome);
-				ev.trigger_next(outcome);
-				Ok(())
-			},
-		),
-	)
-}
 
 
 fn check_exact_path() -> impl Bundle {
@@ -95,18 +80,32 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 	)
 }
 
-pub fn collect_route_segments() -> impl Bundle {
-	OnSpawn::new(|entity| {
-		let id = entity.id();
-		entity.world_scope(move |world| {
-			let segments = world
-				.run_system_cached_with(RouteSegments::collect, id)
-				.unwrap();
-			world.entity_mut(id).insert(segments);
-		});
-	})
-}
 
+/// Parses the [`RouteContext`] for this entity and applies the
+/// [`PathFilter`], popping from the [`RouteContext::path`]
+/// and inserting to the [`RouteContext::dyn_segments`]
+pub fn parse_path_filter(filter: PathFilter) -> impl Bundle {
+	(
+		filter,
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 mut query: RouteQuery,
+			 actions: Query<&PathFilter>|
+			 -> Result {
+				let filter = actions.get(ev.action())?;
+				let outcome = query.with_cx(&mut ev, |cx| {
+					match cx.parse_filter(filter) {
+						Ok(_) => Outcome::Pass,
+						Err(_) => Outcome::Fail,
+					}
+				})?;
+				// println!("check_path_filter: {}", outcome);
+				ev.trigger_next(outcome);
+				Ok(())
+			},
+		),
+	)
+}
 
 pub fn respond_with(
 	response: impl 'static + Send + Sync + Clone + IntoResponse,
@@ -128,6 +127,7 @@ pub fn handler<F>(
 		ev.trigger_next(Outcome::Pass);
 	})
 }
+
 
 
 #[cfg(test)]
