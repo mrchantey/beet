@@ -14,7 +14,7 @@ where
 		app.add_plugins(self);
 		std::mem::take(app.world_mut())
 	}
-	/// Create a [`World`] with this plugins `Default`
+	/// Create a [`World`] with this plugin's `Default`
 	fn world() -> World
 	where
 		T: Default,

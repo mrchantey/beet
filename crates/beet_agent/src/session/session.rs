@@ -3,6 +3,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 
+#[derive(Default)]
 pub struct AgentPlugin;
 
 impl Plugin for AgentPlugin {

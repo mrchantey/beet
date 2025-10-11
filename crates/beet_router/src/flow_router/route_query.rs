@@ -75,7 +75,7 @@ mod test {
 
 	#[test]
 	fn cx_propagates() {
-		let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
+		let mut world = FlowRouterPlugin::world();
 		let agent = world
 			.spawn((Request::get("/foo"), RouteContextMap::default()))
 			.id();

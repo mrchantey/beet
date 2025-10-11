@@ -127,8 +127,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world =
-			(TaskPoolPlugin::default(), FlowRouterPlugin).into_world();
+		let mut world = FlowRouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
 			endpoint_with_path(

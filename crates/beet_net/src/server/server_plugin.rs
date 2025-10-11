@@ -160,7 +160,8 @@ async fn hello_server(entity: AsyncEntity, req: Request) -> Response {
 	// Increment request counter using async world
 	let count = entity
 		.get::<ServerStatus, _>(|status| status.num_requests())
-		.await;
+		.await
+		.unwrap();
 
 	let response_text = format!("greetings! Request #{}", count);
 

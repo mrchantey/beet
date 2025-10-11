@@ -65,7 +65,9 @@ pub(super) fn start_server(
 							.get_mut::<ServerStatus, _>(|mut status| {
 								status.increment_requests();
 							})
-							.await;
+							.await
+							// ignore if stats doesnt exist
+							.ok();
 						bevy::log::info!(
 							"
 Request Complete

@@ -4,7 +4,7 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
 
-
+#[derive(Default)]
 pub struct FlowRouterPlugin;
 
 impl Plugin for FlowRouterPlugin {
@@ -79,10 +79,8 @@ async fn route_handler(
 
 
 	let res = recv.recv().await.map_err(|e| {
-		HttpError::new(
-			StatusCode::INTERNAL_SERVER_ERROR,
-			format!("Failed to receive response: {e}"),
-		)
+		error!("Failed to receive response: {}", e);
+		HttpError::from_status(StatusCode::INTERNAL_SERVER_ERROR)
 	})?;
 	world.entity(exchange).despawn().await;
 	res.xok()
@@ -105,7 +103,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world = (MinimalPlugins, FlowRouterPlugin).into_world();
+		let mut world = FlowRouterPlugin::world();
 		world.spawn((RouteServer, EndWith(Outcome::Pass)));
 		world.all_entities().len().xpect_eq(1);
 		world
