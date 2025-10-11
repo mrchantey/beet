@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::ecs::system::SystemParam;
-use beet_core::prelude::*;
 
 
 #[derive(SystemParam)]
@@ -57,8 +57,8 @@ pub fn static_get_routes(endpoints: EndpointQuery) -> Vec<(Entity, RoutePath)> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
 
@@ -94,9 +94,9 @@ mod test {
     .map(|(_, segments)| segments.annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
-				RoutePath::new("/foo"),
 				RoutePath::new("/foo/*bar"),
-				RoutePath::new("/foo/:quax")
+				RoutePath::new("/foo/:quax"),
+				RoutePath::new("/foo"),
 		]);
 	}
 }

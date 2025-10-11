@@ -46,6 +46,7 @@ pub mod prelude {
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
+	pub use bevy::log::LogPlugin;
 	pub use bevy::ecs::entity::MapEntities;
 	pub use bevy::ecs::lifecycle::HookContext;
 	pub use bevy::ecs::query::QueryData;

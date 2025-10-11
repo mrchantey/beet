@@ -5,7 +5,7 @@ fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
-			bevy::log::LogPlugin::default(),
+			LogPlugin::default(),
 			ServerPlugin::default(),
 		))
 		.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {

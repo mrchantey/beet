@@ -69,6 +69,7 @@ impl PathFilter {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]
+// TODO remove component after beet_router refactor
 pub struct RouteSegments {
 	segments: Vec<PathSegment>,
 	is_static: bool,

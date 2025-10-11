@@ -216,15 +216,13 @@ fn run_app_default_plugins_benchmark(num_operations: usize) -> Duration {
 		let start_time = Instant::now();
 
 		let mut app = App::new();
-		app.add_plugins(
-			DefaultPlugins.build().disable::<bevy::log::LogPlugin>(),
-		)
-		.insert_resource(BenchmarkConfig {
-			entity_operations: 1,
-			current_count: 0,
-		})
-		.add_systems(Startup, setup_counter_system)
-		.add_systems(Update, increment_counter_system);
+		app.add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
+			.insert_resource(BenchmarkConfig {
+				entity_operations: 1,
+				current_count: 0,
+			})
+			.add_systems(Startup, setup_counter_system)
+			.add_systems(Update, increment_counter_system);
 
 		// Run the app once to do the single operation
 		app.update(); // startup

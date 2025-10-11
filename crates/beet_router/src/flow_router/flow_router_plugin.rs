@@ -63,28 +63,11 @@ async fn flow_route_handler(
 				.spawn((
 					ExchangeOf(server),
 					request,
-					RouteContextMap::default(),
+					ExchangeContext::new(send),
 				))
 				.id();
 			world
 				.entity_mut(server)
-				.observe_any(move |ev: On<Outcome>, mut commands: Commands| {
-					// this observer
-					if ev.agent() == exchange {
-						let send = send.clone();
-						let observer = ev.observer();
-						commands.queue(move |world: &mut World| {
-							world.entity_mut(observer).despawn();
-							let res = world
-								.entity_mut(exchange)
-								.take::<Response>()
-								.unwrap_or_else(|| Response::not_found());
-							world.entity_mut(exchange).despawn();
-							send.try_send(res)
-								.expect("unreachable, we await recv");
-						});
-					}
-				})
 				.trigger_target(GetOutcome.with_agent(exchange));
 		})
 		.await;
@@ -99,7 +82,34 @@ async fn flow_route_handler(
 #[cfg_attr(all(not(target_arch = "wasm32"), feature = "server"),
 	require(Server = Server::default().with_handler(flow_route_handler))
 )]
+#[component(on_add=on_add)]
 pub struct RouteServer;
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).observe_any(
+		move |ev: On<Outcome>, mut commands: Commands| {
+			let exchange = ev.agent();
+			// this observer
+			commands.queue(move |world: &mut World| -> Result {
+				let res = world
+					.entity_mut(exchange)
+					.take::<Response>()
+					.unwrap_or_else(|| Response::not_found());
+				let Some(cx) =
+					world.entity_mut(exchange).take::<ExchangeContext>()
+				else {
+					bevybail!("Expected ExchangeContext on exchange entity");
+				};
+				world.entity_mut(exchange).despawn();
+				cx.sender().try_send(res).map_err(|_| {
+					bevyhow!("Failed to send, was the receiver dropped?")
+				})?;
+				Ok(())
+			});
+		},
+	);
+}
+
 
 
 #[cfg(test)]
@@ -120,7 +130,7 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
-		// agent was cleaned up
+		// exchange entity was cleaned up
 		world.all_entities().len().xpect_eq(1);
 	}
 }

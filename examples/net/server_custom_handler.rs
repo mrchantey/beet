@@ -3,7 +3,6 @@
 //! This can be overridden by setting a custom handler,
 //! for a more detailed example of a custom handler see [`FlowRouterPlugin`]
 use beet::prelude::*;
-use bevy::log::LogPlugin;
 
 fn main() {
 	App::new()

@@ -11,8 +11,21 @@ use beet_net::prelude::*;
 /// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
+#[component(on_add = on_add)]
 pub struct Endpoint;
 
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	let entity = cx.entity;
+	world.commands().queue(move |world: &mut World| {
+		let route_segments = world
+			.run_system_cached_with(RouteSegments::collect, entity)
+			.unwrap();
+		world
+			.entity_mut(entity)
+			.insert(EndpointMeta::new(route_segments));
+	});
+}
 
 /// Endpoints are actions that will only run if the method and path are an
 /// exact match.
@@ -22,7 +35,7 @@ pub fn endpoint(method: HttpMethod, handler: impl Bundle) -> impl Bundle {
 	(Sequence, children![
 		check_exact_path(),
 		check_method(method),
-		(Endpoint, collect_route_segments(), method, handler,)
+		(Endpoint, method, handler,)
 	])
 }
 
@@ -127,11 +140,13 @@ pub fn respond_with(
 }
 
 
-pub fn handler<F>(
-	response: impl 'static + Send + Sync + Clone + IntoResponse,
-) -> impl Bundle {
+pub fn handler<F, O>(handler: F) -> impl Bundle
+where
+	F: 'static + Send + Sync + Clone + Fn() -> O,
+	O: IntoResponse,
+{
 	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
-		let response = response.clone().into_response();
+		let response = handler.clone()().into_response();
 		commands.entity(ev.agent()).insert(response);
 		ev.trigger_next(Outcome::Pass);
 	})

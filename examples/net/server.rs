@@ -1,5 +1,4 @@
 use beet::prelude::*;
-use bevy::log::LogPlugin;
 use serde::Deserialize;
 
 fn main() {

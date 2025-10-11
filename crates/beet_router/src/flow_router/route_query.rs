@@ -6,7 +6,7 @@ use beet_net::prelude::*;
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
 	requests: Query<'w, 's, &'static RequestMeta>,
-	agents: Query<'w, 's, &'static mut RouteContextMap>,
+	agents: Query<'w, 's, &'static mut ExchangeContext>,
 	parents: Query<'w, 's, &'static ChildOf>,
 }
 
@@ -30,7 +30,8 @@ impl RouteQuery<'_, '_> {
 		ev: &On<E>,
 		mut func: impl FnMut(&mut RouteContext) -> O,
 	) -> Result<O> {
-		let mut cx_map = self.agents.get_mut(ev.agent())?;
+		let mut cx = self.agents.get_mut(ev.agent())?;
+		let cx_map = cx.route_context_map_mut();
 		// 1. check if it exists
 		if let Some(cx) = cx_map.get_mut(&ev.action()) {
 			return Ok(func(cx));
@@ -69,10 +70,11 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn cx_propagates() {
+	fn route_cx_propagates() {
 		let mut world = FlowRouterPlugin::world();
+		let (send, _recv) = async_channel::bounded(1);
 		let agent = world
-			.spawn((Request::get("/foo"), RouteContextMap::default()))
+			.spawn((Request::get("/foo"), ExchangeContext::new(send)))
 			.id();
 		let store = Store::default();
 

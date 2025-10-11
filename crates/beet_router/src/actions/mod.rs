@@ -1,4 +1,4 @@
-mod collect_route_segments;
+mod endpoint_meta;
 mod endpoint;
-pub use collect_route_segments::*;
+pub use endpoint_meta::*;
 pub use endpoint::*;

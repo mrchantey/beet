@@ -400,19 +400,22 @@ required-features = ["agent","native-tls"]
 name = "server"
 path = "examples/net/server.rs"
 required-features = ["server"]
+
 [[example]]
 name = "server_minimal"
 path = "examples/net/server_minimal.rs"
 required-features = ["server"]
+
 [[example]]
 name = "server_bench"
 path = "examples/net/server_bench.rs"
 required-features = ["server"]
+
 [[example]]
 name = "server_custom_handler"
 path = "examples/net/server_custom_handler.rs"
 required-features = ["server"]
-#
+
 # 💡 Examples - dom
 [[example]]
 name = "csr"
@@ -428,6 +431,14 @@ required-features = ["server"]
 name = "hydration"
 path = "examples/rsx/hydration.rs"
 required-features = ["rsx"]
+
+# 💡 Examples - router
+
+[[example]]
+name = "router"
+path = "examples/router/router.rs"
+required-features = ["server"]
+
 
 # 💡 Examples - flow
 

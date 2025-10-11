@@ -2,7 +2,6 @@ use crate::beet::prelude::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::asset::AssetMetaCheck;
-use bevy::log::LogPlugin;
 
 
 /// A minimal app with flow and spatial
