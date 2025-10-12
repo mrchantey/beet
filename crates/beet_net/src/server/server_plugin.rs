@@ -66,7 +66,7 @@ impl Plugin for ServerPlugin {
 	}
 }
 
-pub(super) type HandlerFn = Arc<
+type HandlerFn = Arc<
 	Box<
 		dyn 'static
 			+ Send
@@ -78,48 +78,6 @@ pub(super) type HandlerFn = Arc<
 	>,
 >;
 
-pub trait IntoHandlerFn<M> {
-	fn into_handler_fn(self) -> HandlerFn;
-}
-
-
-pub struct AsyncWorldRequestIntoHandlerFn;
-impl<Func, Fut, Out> IntoHandlerFn<(Out, AsyncWorldRequestIntoHandlerFn)>
-	for Func
-where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncWorld, Request) -> Fut,
-	Fut: Send + Future<Output = Out>,
-	Out: IntoResponse,
-{
-	fn into_handler_fn(self) -> HandlerFn {
-		box_it(async move |entity, req| {
-			self(entity.world(), req).await.into_response()
-		})
-	}
-}
-pub struct AsyncEntityRequestIntoHandlerFn;
-impl<Func, Fut, Out> IntoHandlerFn<(Out, AsyncEntityRequestIntoHandlerFn)>
-	for Func
-where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
-	Fut: Send + Future<Output = Out>,
-	Out: IntoResponse,
-{
-	fn into_handler_fn(self) -> HandlerFn {
-		box_it(async move |entity, req| self(entity, req).await.into_response())
-	}
-}
-pub struct RequestIntoHandlerFn;
-impl<Func, Fut, Out> IntoHandlerFn<(Out, RequestIntoHandlerFn)> for Func
-where
-	Func: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
-	Fut: Send + Future<Output = Out>,
-	Out: IntoResponse,
-{
-	fn into_handler_fn(self) -> HandlerFn {
-		box_it(async move |_, req| self(req).await.into_response())
-	}
-}
 
 #[derive(Clone, Component)]
 #[component(on_add=on_add)]
@@ -153,19 +111,21 @@ impl Server {
 		format!("http://127.0.0.1:{}", self.port)
 	}
 
-	pub fn with_handler<F, M>(mut self, func: F) -> Self
+	pub fn with_handler<F, Fut>(mut self, func: F) -> Self
 	where
-		F: IntoHandlerFn<M>,
+		F: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
+		Fut: Send + Future<Output = Response>,
 	{
 		self.set_handler(func);
 		self
 	}
 
-	pub fn set_handler<F, M>(&mut self, func: F) -> &mut Self
+	pub fn set_handler<F, Fut>(&mut self, func: F) -> &mut Self
 	where
-		F: IntoHandlerFn<M>,
+		F: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
+		Fut: Send + Future<Output = Response>,
 	{
-		self.handler = func.into_handler_fn();
+		self.handler = box_it(func);
 		self
 	}
 

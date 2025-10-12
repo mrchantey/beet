@@ -1,11 +1,10 @@
-use std::str::FromStr;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use http::Uri;
 use http::header::IntoHeaderName;
 use http::request;
+use std::str::FromStr;
 
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
@@ -35,6 +34,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 #[derive(Debug, Component)]
 pub struct RequestMeta {
 	parts: request::Parts,
+	/// Note this is taken the moment the request is inserted. It does not account
+	/// for the approx 70us overhead created by using bevy at all.
 	started: Instant,
 }
 impl RequestMeta {
@@ -274,9 +275,10 @@ impl From<&str> for Request {
 }
 
 /// Types which consume a request, requiring its body which may be a stream
-#[allow(async_fn_in_trait)]
 pub trait FromRequest<M>: Sized {
-	async fn from_request(request: Request) -> Result<Self, Response>;
+	fn from_request(
+		request: Request,
+	) -> SendBoxedFuture<Result<Self, Response>>;
 	// temp while migrating beet_router
 	fn from_request_sync(request: Request) -> Result<Self, Response> {
 		futures::executor::block_on(Self::from_request(request))
@@ -287,14 +289,19 @@ pub trait FromRequest<M>: Sized {
 pub trait FromRequestRef<M>: Sized {
 	fn from_request_ref(request: &Request) -> Result<Self, Response>;
 }
+pub struct TryFromRequestMarker;
 
-impl<T, E> FromRequest<E> for T
+impl<T, E, M> FromRequest<(E, M, TryFromRequestMarker)> for T
 where
 	T: TryFrom<Request, Error = E>,
-	E: IntoResponse,
+	E: IntoResponse<M>,
 {
-	async fn from_request(request: Request) -> Result<Self, Response> {
-		request.try_into().map_err(|e: E| e.into_response())
+	fn from_request(
+		request: Request,
+	) -> SendBoxedFuture<Result<Self, Response>> {
+		Box::pin(
+			async move { request.try_into().map_err(|e: E| e.into_response()) },
+		)
 	}
 }
 
@@ -304,15 +311,17 @@ impl<T, M> FromRequest<(FromRequestRefMarker, M)> for T
 where
 	T: FromRequestRef<M>,
 {
-	async fn from_request(request: Request) -> Result<Self, Response> {
-		T::from_request_ref(&request)
+	fn from_request(
+		request: Request,
+	) -> SendBoxedFuture<Result<Self, Response>> {
+		Box::pin(async move { T::from_request_ref(&request) })
 	}
 }
 
-impl<T, E> FromRequestRef<E> for T
+impl<T, E, M> FromRequestRef<(E, M)> for T
 where
 	T: for<'a> TryFrom<&'a Request, Error = E>,
-	E: IntoResponse,
+	E: IntoResponse<M>,
 {
 	fn from_request_ref(request: &Request) -> Result<Self, Response> {
 		request.try_into().map_err(|e: E| e.into_response())

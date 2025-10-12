@@ -264,8 +264,9 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let server = Server::new_test().with_handler(
-			async move |world: AsyncWorld, req: Request| {
-				let time = world
+			async move |entity: AsyncEntity, req: Request| {
+				let time = entity
+					.world()
 					.with_then(|world| {
 						world.query_once::<&ServerStatus>()[0].request_count()
 					})
@@ -297,14 +298,17 @@ mod test {
 	#[sweet::test]
 	async fn stream_roundtrip() {
 		let server = Server::new_test().with_handler(
-			async move |_world: AsyncWorld, req: Request| {
+			async move |_: AsyncEntity, req: Request| {
 				Response::ok().with_body(req.body)
 			},
 		);
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin::with_server(server)))
+				.add_plugins((
+					MinimalPlugins,
+					ServerPlugin::with_server(server),
+				))
 				.run();
 		});
 		Request::post(url)
@@ -328,8 +332,8 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[sweet::test]
 	async fn stream_timestamp() {
-		let server =
-			Server::new_test().with_handler(async move |req: Request| {
+		let server = Server::new_test().with_handler(
+			async move |_: AsyncEntity, req: Request| {
 				// Server adds 100ms delay per chunk
 				use futures::TryStreamExt;
 				let delayed_stream =
@@ -338,11 +342,15 @@ mod test {
 						Ok(chunk)
 					});
 				Response::ok().with_body(Body::stream(delayed_stream))
-			});
+			},
+		);
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((MinimalPlugins, ServerPlugin::with_server(server)))
+				.add_plugins((
+					MinimalPlugins,
+					ServerPlugin::with_server(server),
+				))
 				.run();
 		});
 

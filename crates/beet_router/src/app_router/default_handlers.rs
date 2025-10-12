@@ -13,7 +13,7 @@ pub fn analytics_handler(
 	let root = query.single()?;
 	commands.entity(root).with_child((
 		PathFilter::new("/analytics"),
-		action_endpoint::<_, _, Result, _>(
+		action_endpoint::<_, _, Result, _, _>(
 			HttpMethod::Post,
 			|In(input): In<Value>, mut commands: Commands| -> Result<()> {
 				let ev = AnalyticsEvent::parse(input)?;

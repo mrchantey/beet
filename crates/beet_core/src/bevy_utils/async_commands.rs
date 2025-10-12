@@ -568,7 +568,7 @@ pub impl World {
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		spawn_async_task(self.resource::<AsyncChannel>().world(), func);
 		self
 	}
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self

@@ -100,15 +100,17 @@ impl<T> Json<T> {
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
-	async fn from_request(req: Request) -> Result<Self, Response> {
-		let body = req.body.into_bytes().await.map_err(|err| {
-			error!("Failed to read request body: {}", err);
-			HttpError::bad_request("Failed to read stream")
-		})?;
-		let json = serde_json::from_slice(&body).map_err(|err| {
-			HttpError::bad_request(format!("Failed to parse JSON: {}", err))
-		})?;
-		Ok(Self(json))
+	fn from_request(req: Request) -> SendBoxedFuture<Result<Self, Response>> {
+		Box::pin(async move {
+			let body = req.body.into_bytes().await.map_err(|err| {
+				error!("Failed to read request body: {}", err);
+				HttpError::bad_request("Failed to read stream")
+			})?;
+			let json = serde_json::from_slice(&body).map_err(|err| {
+				HttpError::bad_request(format!("Failed to parse JSON: {}", err))
+			})?;
+			Ok(Self(json))
+		})
 	}
 }
 #[cfg(feature = "serde")]

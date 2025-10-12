@@ -129,8 +129,8 @@ pub fn parse_path_filter(
 	)
 }
 
-pub fn respond_with(
-	response: impl 'static + Send + Sync + Clone + IntoResponse,
+pub fn respond_with<M>(
+	response: impl 'static + Send + Sync + Clone + IntoResponse<M>,
 ) -> impl Bundle {
 	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
 		let response = response.clone().into_response();
@@ -140,10 +140,10 @@ pub fn respond_with(
 }
 
 
-pub fn handler<F, O>(handler: F) -> impl Bundle
+pub fn handler<F, O, M>(handler: F) -> impl Bundle
 where
 	F: 'static + Send + Sync + Clone + Fn() -> O,
-	O: IntoResponse,
+	O: IntoResponse<M>,
 {
 	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
 		let response = handler.clone()().into_response();

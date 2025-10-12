@@ -53,10 +53,10 @@ impl RouteHandler {
 	/// A route handler with output inserted as a [`Response`], these add
 	/// an [`ExactPath`] component which means the path must not contain
 	/// trailing segments to match this handler.
-	pub fn endpoint<T, In, InM, Out, Marker>(handler: T) -> (Endpoint, Self)
+	pub fn endpoint<T, In, InM, Out, M1, M2>(handler: T) -> (Endpoint, Self)
 	where
-		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
-		Out: 'static + Send + Sync + IntoResponse,
+		T: 'static + Send + Sync + Clone + IntoSystem<In, Out, M1>,
+		Out: 'static + Send + Sync + IntoResponse<M2>,
 		In: 'static + SystemInput,
 		for<'a> In::Inner<'a>: FromRequest<InM>,
 	{
@@ -105,13 +105,13 @@ impl RouteHandler {
 
 	/// An async route handler with output inserted as a [`Response`].
 	/// This handler must return a tuple of [`(World, Out)`]
-	pub fn new_async<Handler, In, InM, Fut, Out>(handler: Handler) -> Self
+	pub fn new_async<Handler, In, M1, M2, Fut, Out>(handler: Handler) -> Self
 	where
-		In: FromRequest<InM>,
+		In: FromRequest<M1>,
 		Handler:
 			'static + Send + Sync + Clone + FnOnce(World, In, Entity) -> Fut,
 		Fut: 'static + Send + Future<Output = (World, Out)>,
-		Out: 'static + Send + Sync + IntoResponse,
+		Out: 'static + Send + Sync + IntoResponse<M2>,
 	{
 		Self::layer_async(move |mut world, entity| {
 			let func = handler.clone();

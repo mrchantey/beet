@@ -28,6 +28,13 @@ fn main() {
 						"text/html"
 					)),
 				),
+				// Benches a large amount of nested branches
+				// In practice this is quite a large tree,
+				// a well formed router should break much earlier.
+				// That said for a 200ms request this is unnoticable
+				//
+				// short path: 			30us
+				// 100 nested paths: 130us
 				parse_path_filter(
 					PathFilter::new("nested"),
 					endpoint(
@@ -46,7 +53,6 @@ fn main() {
 }
 
 
-// 100 parents
 #[rustfmt::skip]
 fn nested_sequence(inner: impl Bundle) -> impl Bundle {
 (Sequence, children![

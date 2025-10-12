@@ -253,12 +253,12 @@ impl Into<Response> for BevyError {
 // 	}
 // }
 
-impl IntoResponse for Bytes {
+impl IntoResponse<Self> for Bytes {
 	fn into_response(self) -> Response {
 		Response::ok_body(self, "application/octet-stream")
 	}
 }
-impl IntoResponse for &[u8] {
+impl IntoResponse<Self> for &[u8] {
 	fn into_response(self) -> Response {
 		Response::ok_body("dsds", "application/octet-stream")
 	}
@@ -274,11 +274,13 @@ impl From<http::Response<Body>> for Response {
 /// Allows for blanket implementation of `Into<Response>`,
 /// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
 /// and  Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
-pub trait IntoResponse {
+pub trait IntoResponse<M> {
 	fn into_response(self) -> Response;
 }
 
-impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
+impl<T: IntoResponse<M1>, M1, E: IntoResponse<M2>, M2>
+	IntoResponse<(Self, M1, M2)> for Result<T, E>
+{
 	fn into_response(self) -> Response {
 		match self {
 			Ok(t) => t.into_response(),
@@ -287,23 +289,24 @@ impl<T: IntoResponse, E: IntoResponse> IntoResponse for Result<T, E> {
 	}
 }
 
-impl IntoResponse for Infallible {
+impl IntoResponse<Self> for Infallible {
 	fn into_response(self) -> Response {
 		unreachable!("Infallible cannot be converted to a response");
 	}
 }
 
-impl IntoResponse for () {
+impl IntoResponse<Self> for () {
 	fn into_response(self) -> Response { Response::ok() }
 }
 
-impl IntoResponse for StatusCode {
+impl IntoResponse<Self> for StatusCode {
 	fn into_response(self) -> Response { Response::from_status(self) }
 }
 
-impl<T: TryInto<Response>> IntoResponse for T
+
+impl<T: TryInto<Response>, M1> IntoResponse<(Self, M1)> for T
 where
-	T::Error: IntoResponse,
+	T::Error: IntoResponse<M1>,
 {
 	fn into_response(self) -> Response {
 		match self.try_into() {
@@ -314,7 +317,7 @@ where
 }
 
 /// None = not found, matching http principles ie crud operations
-impl<T: IntoResponse> IntoResponse for Option<T> {
+impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
 	fn into_response(self) -> Response {
 		match self {
 			Some(t) => t.into_response(),

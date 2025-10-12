@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_net::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 
@@ -11,19 +11,19 @@ use std::future::Future;
 ///
 /// To support the [`JsonResult`] pattern, the handler must return a type that implements [`IntoResponse`],
 /// regular types can be mapped by using `my_action.pipe(Json::pipe)`.
-pub fn action_endpoint<T, Input, Out, Marker>(
+pub fn action_endpoint<T, Input, Out, M1, M2>(
 	method: HttpMethod,
 	handler: T,
 ) -> (HttpMethod, (Endpoint, RouteHandler))
 where
-	T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, Marker>,
+	T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, M1>,
 	Input: 'static + SystemInput,
 	for<'a> Input::Inner<'a>: DeserializeOwned,
-	Out: 'static + Send + Sync + IntoResponse,
+	Out: 'static + Send + Sync + IntoResponse<M2>,
 {
 	let handler = match method.has_body() {
 		// ie `POST`, `PUT`, etc
-		true => RouteHandler::endpoint::<_, _, _, Out, _>(
+		true => RouteHandler::endpoint::<_, _, _, Out, _, _>(
 			move |val: In<Json<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {
@@ -33,7 +33,7 @@ where
 			},
 		),
 		// ie `GET`, `DELETE`, etc
-		false => RouteHandler::endpoint::<_, _, _, Out, _>(
+		false => RouteHandler::endpoint::<_, _, _, Out, _, _>(
 			move |val: In<JsonQueryParams<Input::Inner<'_>>>,
 			      world: &mut World|
 			      -> Result<Out> {
@@ -45,14 +45,14 @@ where
 	};
 	(method, handler)
 }
-pub fn action_endpoint_async<T, Input, Fut, Out>(
+pub fn action_endpoint_async<T, Input, Fut, Out, M2>(
 	method: HttpMethod,
 	handler: T,
 ) -> (HttpMethod, RouteHandler)
 where
 	T: 'static + Send + Sync + Clone + Fn(In<Input>, World, Entity) -> Fut,
 	Input: 'static + Send + Sync + DeserializeOwned,
-	Out: 'static + Send + Sync + IntoResponse,
+	Out: 'static + Send + Sync + IntoResponse<M2>,
 	Fut: 'static + Send + Future<Output = (World, Out)>,
 {
 	let handler = match method.has_body() {
@@ -81,8 +81,8 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]
