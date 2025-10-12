@@ -97,17 +97,17 @@ impl Body {
 		}
 	}
 
-	pub async fn into_string(self) -> Result<String> {
-		let bytes = self.into_bytes().await?;
-		String::from_utf8(bytes.to_vec())?.xok()
-	}
-
 	// temp antipattern while migrating beet_router
 	pub fn try_into_bytes(self) -> Option<Bytes> {
 		match self {
 			Body::Bytes(bytes) => Some(bytes),
 			Body::Stream(_) => None,
 		}
+	}
+
+	pub async fn into_string(self) -> Result<String> {
+		let bytes = self.into_bytes().await?;
+		String::from_utf8(bytes.to_vec())?.xok()
 	}
 
 	pub async fn next(&mut self) -> Result<Option<Bytes>> {

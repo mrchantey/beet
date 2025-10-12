@@ -99,9 +99,7 @@
 //!   App No Plugins → Minimal:        2.1x increase
 //!   Minimal → Default Plugins:       2.2x increase
 
-use bevy::prelude::*;
-use std::time::Duration;
-use std::time::Instant;
+use beet_core::prelude::*;
 
 
 #[derive(Component)]

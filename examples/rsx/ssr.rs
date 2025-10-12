@@ -31,7 +31,9 @@ fn setup(mut commands: Commands) {
 				children![
 					RouteHandler::layer(modify_request),
 					bundle_endpoint(|req: In<Request>| {
-						let body = req.body_str().unwrap_or_default();
+						// let body = req.body_str().unwrap_or_default();
+						todo!();
+						let body = String::new();
 						rsx! {
 							<Style/>
 							<main>
