@@ -438,6 +438,10 @@ required-features = ["rsx"]
 name = "router"
 path = "examples/router/router.rs"
 required-features = ["server"]
+[[example]]
+name = "router_bench"
+path = "examples/router/router_bench.rs"
+required-features = ["server"]
 
 
 # 💡 Examples - flow

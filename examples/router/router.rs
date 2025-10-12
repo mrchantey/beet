@@ -1,4 +1,4 @@
-//! A minimal server example
+//! Example of using the beet router
 use beet::prelude::*;
 
 fn main() {
