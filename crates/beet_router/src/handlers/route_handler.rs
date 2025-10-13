@@ -72,7 +72,7 @@ impl RouteHandler {
 		};
 
 		(
-			Endpoint,
+			Endpoint::new(default()),
 			Self::layer(move |world: &mut World| {
 				let res = handler(world).into_response();
 				world.insert_resource(res);

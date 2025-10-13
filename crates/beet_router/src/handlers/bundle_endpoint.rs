@@ -30,7 +30,7 @@ where
 	};
 
 	(
-		Endpoint,
+		Endpoint::new(default()),
 		RouteHandler::layer(move |world: &mut World| {
 			if let Err(err) = handler(world) {
 				world.insert_resource(err);
@@ -49,7 +49,7 @@ where
 	Out: 'static + Send + Sync + Bundle,
 {
 	(
-		Endpoint,
+		Endpoint::new(default()),
 		RouteHandler::layer_async(move |world, _| {
 			let func = handler.clone();
 			async move {

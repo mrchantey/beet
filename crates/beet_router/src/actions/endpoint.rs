@@ -19,7 +19,12 @@ pub struct HtmlEndpoint;
 /// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct Endpoint;
+pub struct Endpoint {
+	/// A collection of the content of every [`PathFilter`] in this entity's
+	/// ancestors(inclusive)
+	route_segments: RouteSegments,
+}
+
 
 impl Endpoint {
 	pub fn get() -> EndpointBuilder {
@@ -34,6 +39,13 @@ impl Endpoint {
 	pub fn delete() -> EndpointBuilder {
 		EndpointBuilder::default().with_method(HttpMethod::Delete)
 	}
+	/// Call [`RouteSegments::collect`] on this entity, collecting
+	/// every parent [`PathFilter`]
+	pub(crate) fn new(route_segments: RouteSegments) -> Self {
+		Self { route_segments }
+	}
+
+	pub fn route_segments(&self) -> &RouteSegments { &self.route_segments }
 }
 /// High level helper for building a correct [`Endpoint`] structure.
 /// The flexibility of `beet_router` makes it challenging to build a correct
@@ -124,51 +136,43 @@ impl EndpointBuilder {
 				.entity_mut(current_entity)
 				.insert(Sequence)
 				.with_children(|spawner| {
+					// here we add the predicates as prior
+					// children in the behavior tree.
+					// Order is not important so long as the
+					// handler is last.
+
 					spawner.spawn(check_exact_path());
 					if let Some(method) = self.method {
 						spawner.spawn(check_method(method));
 					}
 
-					let mut endpoint_entity = spawner.spawn(Endpoint);
+					let mut handler_entity = spawner.spawn_empty();
 					if let Some(cache_strategy) = self.cache_strategy {
-						endpoint_entity.insert(cache_strategy);
+						handler_entity.insert(cache_strategy);
 					}
 					if let Some(html) = self.html {
-						endpoint_entity.insert(html);
+						handler_entity.insert(html);
 					}
 					if let Some(method) = self.method {
-						endpoint_entity.insert(method);
+						handler_entity.insert(method);
 					}
-					(self.insert)(&mut endpoint_entity);
-					let endpoint_entity_id = endpoint_entity.id();
+					(self.insert)(&mut handler_entity);
+					let handler_id = handler_entity.id();
 					let route_segments = spawner
 						.world_mut()
 						.run_system_cached_with(
 							RouteSegments::collect,
-							endpoint_entity_id,
+							handler_id,
 						)
 						.unwrap();
 					spawner
 						.world_mut()
-						.entity_mut(endpoint_entity_id)
-						.insert(EndpointMeta::new(route_segments));
+						.entity_mut(handler_id)
+						.insert(Endpoint::new(route_segments));
 				});
 		});
 	}
 }
-
-pub fn nested_endpoint(
-	method: HttpMethod,
-	handler: impl Bundle,
-) -> impl Bundle {
-	(Sequence, children![
-		check_exact_path(),
-		check_method(method),
-		(Endpoint, method, handler)
-	])
-}
-
-
 
 fn check_exact_path() -> impl Bundle {
 	OnSpawn::observe(
@@ -213,7 +217,7 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 /// and inserting to the [`RouteContext::dyn_segments`].
 /// The child will only run if the path matches, extra segments
 /// are allowed.
-pub fn parse_and_check_path_filter(
+fn parse_and_check_path_filter(
 	mut ev: On<GetOutcome>,
 	mut query: RouteQuery,
 	actions: Query<&PathFilter>,
@@ -235,36 +239,51 @@ pub fn parse_and_check_path_filter(
 	Ok(())
 }
 
-
-/// Metadata for an endpoint
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone)]
 pub struct EndpointMeta {
-	/// A collection of the content of every [`PathFilter`] in this entity's
-	/// ancestors(inclusive)
+	/// The entity this metadata is for
+	entity: Entity,
+	/// The segments for this endpoint
 	route_segments: RouteSegments,
+	/// The method to match, or None for any method.
+	method: Option<HttpMethod>,
+	/// The cache strategy for this endpoint, if any
+	cache_strategy: Option<CacheStrategy>,
+	/// Marks this endpoint as an HTML endpoint
+	html: Option<HtmlEndpoint>,
 }
 
 impl EndpointMeta {
-	/// Call [`RouteSegments::collect`] on this entity, collecting
-	/// every parent [`PathFilter`]
-	pub fn new(route_segments: RouteSegments) -> Self {
-		Self { route_segments }
-	}
-
-
+	pub fn entity(&self) -> Entity { self.entity }
 	pub fn route_segments(&self) -> &RouteSegments { &self.route_segments }
+	pub fn method(&self) -> Option<HttpMethod> { self.method }
+	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
+		self.cache_strategy
+	}
+	pub fn html(&self) -> Option<HtmlEndpoint> { self.html }
 
 
-	pub fn collect_all(
-		query: Query<(Entity, &EndpointMeta)>,
-	) -> Vec<(Entity, EndpointMeta)> {
+	pub fn collect(
+		query: Query<(
+			Entity,
+			&Endpoint,
+			Option<&HttpMethod>,
+			Option<&CacheStrategy>,
+			Option<&HtmlEndpoint>,
+		)>,
+	) -> Vec<Self> {
 		query
 			.iter()
-			.map(|(entity, segments)| (entity, segments.clone()))
+			.map(|(entity, endpoint, method, cache_strategy, html)| Self {
+				entity,
+				route_segments: endpoint.route_segments().clone(),
+				method: method.cloned(),
+				cache_strategy: cache_strategy.cloned(),
+				html: html.cloned(),
+			})
 			.collect::<Vec<_>>()
 	}
 }
-
 
 #[cfg(test)]
 mod test {
@@ -328,9 +347,9 @@ mod test {
 				),
 			],
 		));
-		world.run_system_cached(EndpointMeta::collect_all).unwrap()
+		world.run_system_cached(EndpointMeta::collect).unwrap()
     .into_iter()
-    .map(|(_, meta)| meta.route_segments().annotated_route_path())
+    .map(|meta| meta.route_segments().annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
 				RoutePath::new("/foo"),
