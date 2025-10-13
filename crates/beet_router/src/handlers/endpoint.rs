@@ -94,9 +94,9 @@ mod test {
     .map(|(_, segments)| segments.annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
+				RoutePath::new("/foo"),
 				RoutePath::new("/foo/*bar"),
 				RoutePath::new("/foo/:quax"),
-				RoutePath::new("/foo"),
 		]);
 	}
 }

@@ -10,11 +10,11 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((RouteServer, InfallibleSequence, children![
-				endpoint(HttpMethod::Get, || Response::ok_body(
+				Endpoint::get().with_handler(|| Response::ok_body(
 					"hello world",
 					"text/plain"
-				),),
-				endpoint_with_path("foo", HttpMethod::Get, || {
+				)),
+				Endpoint::get().with_path("foo").with_handler(|| {
 					Response::ok_body("hello foo", "text/plain")
 				},),
 			]));
