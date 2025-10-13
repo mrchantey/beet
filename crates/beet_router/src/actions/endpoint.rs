@@ -43,11 +43,21 @@ pub fn endpoint<M>(
 		(Endpoint, method, handler.into_endpoint())
 	])
 }
+pub fn nested_endpoint(
+	method: HttpMethod,
+	handler: impl Bundle,
+) -> impl Bundle {
+	(Sequence, children![
+		check_exact_path(),
+		check_method(method),
+		(Endpoint, method, handler)
+	])
+}
 
 
 /// An [`endpoint`] with a preceding path filter.
 pub fn endpoint_with_path<M>(
-	path: PathFilter,
+	path: impl AsRef<str>,
 	method: HttpMethod,
 	handler: impl IntoEndpoint<M>,
 ) -> impl Bundle {
@@ -102,11 +112,11 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 /// The child will only run if the path matches, extra segments
 /// are allowed.
 pub fn parse_path_filter(
-	filter: PathFilter,
+	filter: impl AsRef<str>,
 	child: impl Bundle,
 ) -> impl Bundle {
 	(
-		filter,
+		PathFilter::new(filter.as_ref()),
 		OnSpawn::observe(
 			|mut ev: On<GetOutcome>,
 			 mut query: RouteQuery,
@@ -135,12 +145,6 @@ pub fn parse_path_filter(
 }
 
 
-pub fn handler<Endpoint, M>(handler: impl IntoEndpoint<M>) -> impl Bundle {
-	handler.into_endpoint()
-}
-
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -153,11 +157,7 @@ mod test {
 		let mut world = FlowRouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
-			endpoint_with_path(
-				PathFilter::new("foo"),
-				HttpMethod::Post,
-				StatusCode::OK,
-			),
+			endpoint_with_path("foo", HttpMethod::Post, StatusCode::OK),
 		));
 
 		// method and path match

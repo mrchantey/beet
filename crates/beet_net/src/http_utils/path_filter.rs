@@ -27,6 +27,18 @@ pub struct PathFilter {
 	pub segments: RouteSegments,
 }
 
+impl Into<PathFilter> for &str {
+	fn into(self) -> PathFilter { PathFilter::new(self) }
+}
+impl Into<PathFilter> for String {
+	fn into(self) -> PathFilter { PathFilter::new(&self) }
+}
+impl Into<PathFilter> for &String {
+	fn into(self) -> PathFilter { PathFilter::new(self) }
+}
+impl Into<PathFilter> for &Path {
+	fn into(self) -> PathFilter { PathFilter::new(self) }
+}
 
 impl PathFilter {
 	/// Create a new `PathFilter` with the given path which is split into segments.

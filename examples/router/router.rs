@@ -10,15 +10,13 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((RouteServer, InfallibleSequence, children![
-				endpoint(
-					HttpMethod::Get,
-					handler(|| Response::ok_body("hello world", "text/plain")),
-				),
-				endpoint_with_path(
-					PathFilter::new("foo"),
-					HttpMethod::Get,
-					handler(|| Response::ok_body("hello foo", "text/plain")),
-				),
+				endpoint(HttpMethod::Get, || Response::ok_body(
+					"hello world",
+					"text/plain"
+				),),
+				endpoint_with_path("foo", HttpMethod::Get, || {
+					Response::ok_body("hello foo", "text/plain")
+				},),
 			]));
 		})
 		.run();
