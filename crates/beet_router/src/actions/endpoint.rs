@@ -27,6 +27,8 @@ pub struct Endpoint {
 
 
 impl Endpoint {
+	pub fn builder() -> EndpointBuilder { EndpointBuilder::default() }
+
 	pub fn get() -> EndpointBuilder {
 		EndpointBuilder::default().with_method(HttpMethod::Get)
 	}

@@ -16,7 +16,7 @@ pub struct DynSegmentMap(HashMap<String, String>);
 /// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
-/// Unlike [`RouteSegments`] this type contains *sections* of the full route path,
+/// Unlike [`Endpoint`] this type contains *sections* of the full route path,
 /// not nessecarily the entire path.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

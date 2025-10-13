@@ -46,7 +46,7 @@ pub struct RouteContext {
 	/// A hashmap of the dynamic and wildcard parts collected at this
 	/// point in the route path. For the route `foo/:bar/*bazz` and the
 	/// request `foo/bing/bong/boom?bang=boo` this map will contain:
-	/// ```
+	/// ```ignore
 	/// bar: bing
 	/// bazz: bong/boom
 	/// ```

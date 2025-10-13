@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_parse::prelude::unbounded_related;
+use beet_router::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse_quote;
