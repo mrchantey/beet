@@ -1,6 +1,8 @@
 mod exchange_context;
 mod route_query;
 pub use exchange_context::*;
+pub use path_filter::*;
 pub use route_query::*;
 mod flow_router_plugin;
+mod path_filter;
 pub use flow_router_plugin::*;

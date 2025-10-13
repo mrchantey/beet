@@ -9,6 +9,14 @@ pub fn block_on<F: Future>(fut: F) -> F::Output {
 /// A 'static + Send, making it suitable for use-cases like tokio::spawn
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 
+/// A BoxedFuture which is `Send` on non-wasm32 targets
+#[cfg(target_arch = "wasm32")]
+pub type MaybeSendBoxedFuture<T> = Pin<Box<dyn 'static + Future<Output = T>>>;
+/// A BoxedFuture which is `Send` on non-wasm32 targets
+#[cfg(not(target_arch = "wasm32"))]
+pub type MaybeSendBoxedFuture<T> =
+	Pin<Box<dyn 'static + Send + Future<Output = T>>>;
+
 /// Cross platform spawn_local function
 #[cfg(target_arch = "wasm32")]
 pub fn spawn_local<F>(fut: F)

@@ -124,10 +124,7 @@ impl EndpointBuilder {
 		let mut current_entity = entity.id();
 
 		if let Some(path_filter) = self.path {
-			entity.insert((
-				path_filter,
-				OnSpawn::observe(parse_and_check_path_filter),
-			));
+			entity.insert(path_filter);
 			current_entity = entity
 				.world_scope(|world| world.spawn(ChildOf(current_entity)).id());
 		}
@@ -209,34 +206,6 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 			},
 		),
 	)
-}
-
-
-/// Parses the [`RouteContext`] for this entity and applies the
-/// [`PathFilter`], popping from the [`RouteContext::path`]
-/// and inserting to the [`RouteContext::dyn_segments`].
-/// The child will only run if the path matches, extra segments
-/// are allowed.
-fn parse_and_check_path_filter(
-	mut ev: On<GetOutcome>,
-	mut query: RouteQuery,
-	actions: Query<&PathFilter>,
-	children: Query<&Children>,
-) -> Result {
-	let filter = actions.get(ev.action())?;
-	let outcome = query.with_cx(&mut ev, |cx| cx.parse_filter(filter))?;
-	match outcome {
-		Ok(_) => {
-			let child = children.get(ev.action())?[0];
-			ev.trigger_next_with(child, GetOutcome);
-		}
-		Err(_) => {
-			ev.trigger_next(Outcome::Fail);
-		}
-	}
-
-	// println!("check_path_filter: {}", outcome);
-	Ok(())
 }
 
 #[derive(Debug, Clone)]

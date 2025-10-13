@@ -100,7 +100,7 @@ impl<T> Json<T> {
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
-	fn from_request(req: Request) -> SendBoxedFuture<Result<Self, Response>> {
+	fn from_request(req: Request) -> MaybeSendBoxedFuture<Result<Self, Response>> {
 		Box::pin(async move {
 			let body = req.body.into_bytes().await.map_err(|err| {
 				error!("Failed to read request body: {}", err);

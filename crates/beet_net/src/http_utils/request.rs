@@ -274,7 +274,7 @@ impl From<&str> for Request {
 pub trait FromRequest<M>: Sized {
 	fn from_request(
 		request: Request,
-	) -> SendBoxedFuture<Result<Self, Response>>;
+	) -> MaybeSendBoxedFuture<Result<Self, Response>>;
 	// temp while migrating beet_router
 	fn from_request_sync(request: Request) -> Result<Self, Response> {
 		futures::executor::block_on(Self::from_request(request))
@@ -289,7 +289,7 @@ where
 {
 	fn from_request(
 		request: Request,
-	) -> SendBoxedFuture<Result<Self, Response>> {
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
 		Box::pin(
 			async move { request.try_into().map_err(|e: E| e.into_response()) },
 		)
@@ -318,7 +318,7 @@ where
 {
 	fn from_request(
 		request: Request,
-	) -> SendBoxedFuture<Result<Self, Response>> {
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
 		Box::pin(async move { T::from_request_ref(&request) })
 	}
 }

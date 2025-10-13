@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::platform::collections::HashMap;
+use beet_flow::prelude::*;
+use beet_net::prelude::*;
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::path::Path;
@@ -21,11 +22,48 @@ pub struct DynSegmentMap(HashMap<String, String>);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
+#[component(on_add=on_add)]
 pub struct PathFilter {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
 	pub segments: RouteSegments,
 }
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(OnSpawn::observe(parse_and_check_path_filter));
+}
+
+/// Parses the [`RouteContext`] for this entity and applies the
+/// [`PathFilter`], popping from the [`RouteContext::path`]
+/// and inserting to the [`RouteContext::dyn_segments`].
+/// The child will only run if the path matches, extra segments
+/// are allowed.
+fn parse_and_check_path_filter(
+	mut ev: On<GetOutcome>,
+	mut query: RouteQuery,
+	actions: Query<&PathFilter>,
+	children: Query<&Children>,
+) -> Result {
+	let filter = actions.get(ev.action())?;
+	let outcome = query.with_cx(&mut ev, |cx| cx.parse_filter(filter))?;
+	match outcome {
+		Ok(_) => {
+			let child = children.get(ev.action())?[0];
+			ev.trigger_next_with(child, GetOutcome);
+		}
+		Err(_) => {
+			ev.trigger_next(Outcome::Fail);
+		}
+	}
+
+	// println!("check_path_filter: {}", outcome);
+	Ok(())
+}
+
+
 
 impl Into<PathFilter> for &str {
 	fn into(self) -> PathFilter { PathFilter::new(self) }

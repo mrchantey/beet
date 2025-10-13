@@ -337,11 +337,13 @@ mod test {
 	use super::*;
 
 	#[sweet::test]
+	#[ignore = "takes ages"]
 	async fn bucket() {
 		let provider = DynamoDbProvider::create().await;
 		bucket_test::run(provider).await;
 	}
 	#[sweet::test]
+	#[ignore = "takes ages"]
 	async fn table() {
 		let provider = DynamoDbProvider::create().await;
 		table_test::run(provider).await;
