@@ -1,6 +1,8 @@
 mod bucket_endpoint;
 pub mod common_predicates;
+pub mod html_bundle;
 pub use bucket_endpoint::*;
+pub use html_bundle::*;
 mod endpoint;
 pub use endpoint::*;
 mod server_action;

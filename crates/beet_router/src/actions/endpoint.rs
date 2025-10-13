@@ -80,7 +80,8 @@ impl EndpointBuilder {
 		self.with_handler_bundle(handler.into_endpoint())
 	}
 	/// Create a new endpoint with the provided bundle, the bundle must be
-	/// a `GetOutcome` / `Outcome` action.
+	/// a `GetOutcome` / `Outcome` action, and usually inserts a response
+	/// or some type thats later converted to a response.
 	pub fn with_handler_bundle(mut self, endpoint: impl Bundle) -> Self {
 		self.insert = Box::new(move |entity| {
 			entity.insert(endpoint);

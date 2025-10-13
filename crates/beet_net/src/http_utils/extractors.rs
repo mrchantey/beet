@@ -5,14 +5,14 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::request;
 
-pub struct Html(pub String);
+pub struct Html<T>(pub T);
 pub struct Css(pub String);
 pub struct Javascript(pub String);
 pub struct Png(pub String);
 
 
-impl Into<Html> for String {
-	fn into(self) -> Html { Html(self) }
+impl Into<Html<Self>> for String {
+	fn into(self) -> Html<Self> { Html(self) }
 }
 impl Into<Css> for String {
 	fn into(self) -> Css { Css(self) }
@@ -100,7 +100,9 @@ impl<T> Json<T> {
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
-	fn from_request(req: Request) -> MaybeSendBoxedFuture<Result<Self, Response>> {
+	fn from_request(
+		req: Request,
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
 		Box::pin(async move {
 			let body = req.body.into_bytes().await.map_err(|err| {
 				error!("Failed to read request body: {}", err);
@@ -226,7 +228,10 @@ impl Into<Response> for String {
 	}
 }
 
-impl Into<Response> for Html {
+impl<T> Into<Response> for Html<T>
+where
+	T: Into<Body>,
+{
 	fn into(self) -> Response {
 		Response::ok_body(self.0, "text/html; charset=utf-8")
 	}

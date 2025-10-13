@@ -1,6 +1,38 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use beet_rsx::prelude::*;
+
+/// A blanket trait for both:
+/// - [`IntoResponse`] types inserted verbatim
+/// - [`Html<Bundle>`] types inserted as a child with [`HandlerBundle`]
+trait IntoResponseBundle<M> {
+	fn into_response_bundle(self) -> impl Bundle;
+}
+
+pub struct HtmlIntoResponseBundle;
+impl<B> IntoResponseBundle<HtmlIntoResponseBundle> for Html<B>
+where
+	B: Bundle,
+{
+	fn into_response_bundle(self) -> impl Bundle {
+		children![(HandlerBundle, self.0)]
+	}
+}
+
+pub struct ResponseIntoBundle;
+impl<R, M> IntoResponseBundle<(ResponseIntoBundle, M)> for R
+where
+	R: IntoResponse<M>,
+{
+	fn into_response_bundle(self) -> impl Bundle { self.into_response() }
+}
+
+struct TypeErasedResponseBundle(OnSpawn);
+impl IntoResponseBundle<Self> for TypeErasedResponseBundle {
+	fn into_response_bundle(self) -> impl Bundle { self.0 }
+}
+
 
 /// An `action` / `exchange` pair for a current visit.
 #[derive(Clone)]
@@ -35,13 +67,14 @@ impl VisitContext {
 pub trait IntoEndpoint<M> {
 	fn into_endpoint(self) -> impl Bundle;
 }
-
-fn into_endpoint_inner<Req, Res, Func, Fut, M1, M2>(func: Func) -> impl Bundle
+/// Run the provided func, then call `into_exchange_bundle` on the output,
+/// inserting it directly into the `exchange`.
+fn run_and_insert<Req, Res, Func, Fut, M1, M2>(func: Func) -> impl Bundle
 where
 	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
-	Res: IntoResponse<M2>,
+	Res: IntoResponseBundle<M2>,
 {
 	OnSpawn::observe(move |ev: On<GetOutcome>, mut commands: Commands| {
 		let func = func.clone();
@@ -61,8 +94,10 @@ where
 								};
 
 								let res = func(req, context).await;
-								let response = res.into_response();
-								world.entity(exchange).insert(response).await;
+								world
+									.entity(exchange)
+									.insert(res.into_response_bundle())
+									.await;
 								// only pass condition
 								world
 									.entity(action)
@@ -101,11 +136,11 @@ been taken by a previous route, please check for conficting endpoints.
 		});
 	})
 }
-
-pub struct ResponseIntoEndpoint;
-impl<T, M> IntoEndpoint<(ResponseIntoEndpoint, M)> for T
+/// A non-func type that can be converted directly into an exchange bundle.
+pub struct TypeIntoEndpoint;
+impl<T, M> IntoEndpoint<(TypeIntoEndpoint, M)> for T
 where
-	T: 'static + Send + Sync + Clone + IntoResponse<M>,
+	T: 'static + Send + Sync + Clone + IntoResponseBundle<M>,
 {
 	fn into_endpoint(self) -> impl Bundle {
 		// skip all the async shenannigans, just insert the response
@@ -113,7 +148,7 @@ where
 			move |mut ev: On<GetOutcome>, mut commands: Commands| {
 				commands
 					.entity(ev.agent())
-					.insert(self.clone().into_response());
+					.insert(self.clone().into_response_bundle());
 				ev.trigger_next(Outcome::Pass);
 			},
 		)
@@ -128,13 +163,18 @@ where
 	System: 'static + Send + Sync + Clone + IntoSystem<Req, Out, M1>,
 	Req: 'static + Send + SystemInput,
 	for<'a> Req::Inner<'a>: 'static + Send + Sync + FromRequest<M2>,
-	Out: 'static + Send + Sync + IntoResponse<M3>,
+	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
 {
 	fn into_endpoint(self) -> impl Bundle {
-		into_endpoint_inner(async move |req, cx| {
-			cx.run_system_cached_with(self.clone(), req)
-				.await
-				.map_err(HttpError::from)
+		run_and_insert(async move |req, cx| {
+			match cx.run_system_cached_with(self.clone(), req).await {
+				Ok(bundle) => TypeErasedResponseBundle(OnSpawn::insert(
+					bundle.into_response_bundle(),
+				)),
+				Err(bundle) => TypeErasedResponseBundle(OnSpawn::insert(
+					HttpError::from(bundle).into_response_bundle(),
+				)),
+			}
 		})
 	}
 }
@@ -147,9 +187,9 @@ where
 	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
-	Res: IntoResponse<M2>,
+	Res: IntoResponseBundle<M2>,
 {
-	fn into_endpoint(self) -> impl Bundle { into_endpoint_inner(self) }
+	fn into_endpoint(self) -> impl Bundle { run_and_insert(self) }
 }
 
 
@@ -159,6 +199,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
+	use beet_rsx::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
 	use sweet::prelude::*;
@@ -183,7 +224,6 @@ mod test {
 	async fn response() { assert(StatusCode::OK).await.xpect_eq(200); }
 
 
-
 	#[sweet::test]
 	async fn system() {
 		fn my_async_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::OK }
@@ -205,5 +245,12 @@ mod test {
 		assert(async |_: Json<Foo>, _: VisitContext| StatusCode::OK)
 			.await
 			.xpect_eq(200);
+	}
+
+
+	#[sweet::test]
+	async fn html() {
+		// just check compilation, see html_bundle for test
+		let _ = assert(|| Html(rsx! {<div>"hello world"</div>}));
 	}
 }
