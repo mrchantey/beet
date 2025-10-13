@@ -237,6 +237,32 @@ impl Response {
 	}
 }
 
+impl From<http::Response<Body>> for Response {
+	fn from(res: http::Response<Body>) -> Self {
+		let (parts, body) = res.into_parts();
+		Response { parts, body }
+	}
+}
+
+/// Allows for blanket implementation of `Into<Response>`,
+/// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
+/// and  Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
+pub trait IntoResponse<M> {
+	fn into_response(self) -> Response;
+}
+
+impl<T: IntoResponse<M1>, M1, E: IntoResponse<M2>, M2>
+	IntoResponse<(Self, M1, M2)> for Result<T, E>
+{
+	fn into_response(self) -> Response {
+		match self {
+			Ok(t) => t.into_response(),
+			Err(e) => e.into_response(),
+		}
+	}
+}
+
+
 
 impl Into<Response> for BevyError {
 	fn into(self) -> Response { HttpError::from_opaque(self).into() }
@@ -264,30 +290,6 @@ impl IntoResponse<Self> for &[u8] {
 	}
 }
 
-impl From<http::Response<Body>> for Response {
-	fn from(res: http::Response<Body>) -> Self {
-		let (parts, body) = res.into_parts();
-		Response { parts, body }
-	}
-}
-
-/// Allows for blanket implementation of `Into<Response>`,
-/// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
-/// and  Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
-pub trait IntoResponse<M> {
-	fn into_response(self) -> Response;
-}
-
-impl<T: IntoResponse<M1>, M1, E: IntoResponse<M2>, M2>
-	IntoResponse<(Self, M1, M2)> for Result<T, E>
-{
-	fn into_response(self) -> Response {
-		match self {
-			Ok(t) => t.into_response(),
-			Err(e) => e.into_response(),
-		}
-	}
-}
 
 impl IntoResponse<Self> for Infallible {
 	fn into_response(self) -> Response {

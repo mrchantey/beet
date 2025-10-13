@@ -52,7 +52,10 @@ pub fn exchange_meta(
 	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
 ) -> Result {
 	let entity = ev.event_target();
-	let (meta, response, exchange_of) = exchange.get(entity)?;
+	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
+		// ignore if no match, probably a test
+		return Ok(());
+	};
 	let status = response.status();
 	let duration = meta.started().elapsed();
 	let path = meta.path();

@@ -5,6 +5,7 @@ use async_channel::Sender;
 use async_channel::TryRecvError;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
 use bevy::tasks::IoTaskPool;
@@ -390,26 +391,29 @@ impl AsyncWorld {
 		});
 	}
 
-	pub fn run_system_cached<O, M, S>(&self, system: S)
+	pub async fn run_system_cached<O, M, S>(
+		&self,
+		system: S,
+	) -> Result<O, RegisteredSystemError<(), O>>
 	where
-		O: 'static,
+		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<(), O, M>,
 	{
-		self.run_system_cached_with(system, ());
+		self.run_system_cached_with(system, ()).await
 	}
-	pub fn run_system_cached_with<I, O, M, S>(
+	pub async fn run_system_cached_with<I, O, M, S>(
 		&self,
 		system: S,
 		input: I::Inner<'_>,
-	) where
+	) -> Result<O, RegisteredSystemError<I, O>>
+	where
 		I: SystemInput + 'static,
 		for<'a> I::Inner<'a>: 'static + Send + Sync,
-		O: 'static,
+		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
-		self.with(move |world| {
-			world.run_system_cached_with(system, input).ok();
-		});
+		self.with_then(move |world| world.run_system_cached_with(system, input))
+			.await
 	}
 	/// Spawn an async task
 	pub fn run_async<Func, Fut, Out>(

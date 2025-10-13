@@ -265,10 +265,6 @@ impl From<RouteInfo> for Request {
 	}
 }
 
-impl Into<()> for Request {
-	fn into(self) -> () {}
-}
-
 
 impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
@@ -283,11 +279,6 @@ pub trait FromRequest<M>: Sized {
 	fn from_request_sync(request: Request) -> Result<Self, Response> {
 		futures::executor::block_on(Self::from_request(request))
 	}
-}
-
-/// Types which consume a request by reference, not requiring its body
-pub trait FromRequestRef<M>: Sized {
-	fn from_request_ref(request: &Request) -> Result<Self, Response>;
 }
 pub struct TryFromRequestMarker;
 
@@ -304,6 +295,20 @@ where
 		)
 	}
 }
+
+/// Types which consume a request by reference, not requiring its body
+pub trait FromRequestRef<M>: Sized {
+	fn from_request_ref(request: &Request) -> Result<Self, Response>;
+}
+
+impl FromRequestRef<Self> for () {
+	fn from_request_ref(_request: &Request) -> Result<Self, Response> { Ok(()) }
+}
+
+// impl Into<()> for Request {
+// 	fn into(self) -> () {}
+// }
+
 
 pub struct FromRequestRefMarker;
 

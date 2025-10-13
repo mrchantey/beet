@@ -15,6 +15,8 @@ use beet_net::prelude::*;
 pub struct Endpoint;
 
 
+impl Endpoint {}
+
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	world.commands().queue(move |world: &mut World| {
@@ -31,20 +33,23 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 /// exact match.
 /// - A [`RouteSegments`] will be added, collecting all parent [`PathFilter`]s
 /// - The method will also be added to the handler for easier querying.
-pub fn endpoint(method: HttpMethod, handler: impl Bundle) -> impl Bundle {
+pub fn endpoint<M>(
+	method: HttpMethod,
+	handler: impl IntoEndpoint<M>,
+) -> impl Bundle {
 	(Sequence, children![
 		check_exact_path(),
 		check_method(method),
-		(Endpoint, method, handler,)
+		(Endpoint, method, handler.into_endpoint())
 	])
 }
 
 
 /// An [`endpoint`] with a preceding path filter.
-pub fn endpoint_with_path(
+pub fn endpoint_with_path<M>(
 	path: PathFilter,
 	method: HttpMethod,
-	handler: impl Bundle,
+	handler: impl IntoEndpoint<M>,
 ) -> impl Bundle {
 	// path filter must be ancestor of endpoint
 	// so we nest the sequence
@@ -129,27 +134,9 @@ pub fn parse_path_filter(
 	)
 }
 
-pub fn respond_with<M>(
-	response: impl 'static + Send + Sync + Clone + IntoResponse<M>,
-) -> impl Bundle {
-	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
-		let response = response.clone().into_response();
-		commands.entity(ev.agent()).insert(response);
-		ev.trigger_next(Outcome::Pass);
-	})
-}
 
-
-pub fn handler<F, O, M>(handler: F) -> impl Bundle
-where
-	F: 'static + Send + Sync + Clone + Fn() -> O,
-	O: IntoResponse<M>,
-{
-	OnSpawn::observe(move |mut ev: On<GetOutcome>, mut commands: Commands| {
-		let response = handler.clone()().into_response();
-		commands.entity(ev.agent()).insert(response);
-		ev.trigger_next(Outcome::Pass);
-	})
+pub fn handler<Endpoint, M>(handler: impl IntoEndpoint<M>) -> impl Bundle {
+	handler.into_endpoint()
 }
 
 
@@ -169,7 +156,7 @@ mod test {
 			endpoint_with_path(
 				PathFilter::new("foo"),
 				HttpMethod::Post,
-				respond_with(StatusCode::OK),
+				StatusCode::OK,
 			),
 		));
 
