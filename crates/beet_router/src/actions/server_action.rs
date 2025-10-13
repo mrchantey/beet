@@ -29,15 +29,14 @@ impl ServerAction {
 		for<'a> Input::Inner<'a>: 'static + Send + Sync + DeserializeOwned,
 		Out: 'static + Send + Sync + IntoResponse<M2>,
 	{
-		let builder = Endpoint::builder().with_method(method);
+		let builder = EndpointBuilder::default().with_method(method);
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
-				async move |entity: AsyncEntity,
-				            req: Json<Input::Inner<'_>>|
+				async move |req: Json<Input::Inner<'_>>,
+				            cx: VisitContext|
 				            -> Result<Out> {
-					let out = entity
-						.world()
+					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
 					Ok(out)
@@ -45,11 +44,10 @@ impl ServerAction {
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
-				async move |entity: AsyncEntity,
-				            req: JsonQueryParams<Input::Inner<'_>>|
+				async move |req: JsonQueryParams<Input::Inner<'_>>,
+				            cx: VisitContext|
 				            -> Result<Out> {
-					let out = entity
-						.world()
+					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
 					Ok(out)
@@ -63,26 +61,24 @@ impl ServerAction {
 		handler: T,
 	) -> EndpointBuilder
 	where
-		T: 'static + Send + Sync + Clone + Fn(In<Input>, AsyncEntity) -> Fut,
+		T: 'static + Send + Sync + Clone + Fn(Input, VisitContext) -> Fut,
 		Input: 'static + Send + Sync + DeserializeOwned,
 		Out: 'static + Send + Sync + IntoResponse<M2>,
 		Fut: 'static + Send + Future<Output = Out>,
 	{
-		let builder = Endpoint::builder().with_method(method);
+		let builder = EndpointBuilder::default().with_method(method);
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
-				async move |entity: AsyncEntity, req: Json<Input>| -> Out {
-					handler.clone()(In(req.0), entity).await
+				async move |req: Json<Input>, cx: VisitContext| -> Out {
+					handler.clone()(req.0, cx).await
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
-				async move |entity: AsyncEntity,
-				            req: JsonQueryParams<Input>|
-				            -> Out {
-					handler.clone()(In(req.0), entity).await
-				},
+				async move |req: JsonQueryParams<Input>,
+				            cx: VisitContext|
+				            -> Out { handler.clone()(req.0, cx).await },
 			),
 		}
 	}
@@ -156,10 +152,9 @@ mod test {
 		let mut world = FlowRouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
-			ServerAction::build_async(
-				HttpMethod::Get,
-				async |val: In<u32>, _| Json(val.0 + 2),
-			),
+			ServerAction::build_async(HttpMethod::Get, async |val: u32, _| {
+				Json(val + 2)
+			}),
 		));
 
 		//ok

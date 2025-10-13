@@ -516,6 +516,10 @@ impl AsyncEntity {
 		.await
 	}
 
+	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
+		self.get::<T, _>(|comp| comp.clone()).await
+	}
+
 	pub async fn insert<B: Bundle>(&self, component: B) -> &Self {
 		self.with_then(|mut entity| {
 			entity.insert(component);

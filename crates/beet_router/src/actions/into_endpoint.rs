@@ -2,6 +2,32 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
+/// An `action` / `exchange` pair for a current visit.
+#[derive(Clone)]
+pub struct VisitContext {
+	/// The current action this exchange is visiting
+	action: Entity,
+	/// The `agent` of the action, containing the [`Request`] and [`Response`]
+	exchange: Entity,
+	/// The world the action is running in
+	pub world: AsyncWorld,
+}
+
+impl std::ops::Deref for VisitContext {
+	type Target = AsyncWorld;
+	fn deref(&self) -> &Self::Target { &self.world }
+}
+
+impl VisitContext {
+	pub fn action_id(&self) -> Entity { self.action }
+	pub fn exchange_id(&self) -> Entity { self.exchange }
+	/// The action entity this endpoint currently running for
+	pub fn action(&self) -> AsyncEntity { self.world.entity(self.action) }
+	/// The exchange entity, containing the [`Request`] and [`Response`]
+	pub fn exchange(&self) -> AsyncEntity { self.world.entity(self.exchange) }
+	/// The world this endpoint is running in
+	pub fn world(&self) -> &AsyncWorld { &self.world }
+}
 
 /// Helper for defining methods accepting requests and returning responses.
 /// These are converted to `On<GetOutcome>` observers.
@@ -12,7 +38,7 @@ pub trait IntoEndpoint<M> {
 
 fn into_endpoint_inner<Req, Res, Func, Fut, M1, M2>(func: Func) -> impl Bundle
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Req) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponse<M2>,
@@ -28,8 +54,13 @@ where
 					world.run_async(async move |world: AsyncWorld| {
 						match Req::from_request(req).await {
 							Ok(req) => {
-								let res =
-									func(world.entity(exchange), req).await;
+								let context = VisitContext {
+									action,
+									exchange,
+									world: world.clone(),
+								};
+
+								let res = func(req, context).await;
 								let response = res.into_response();
 								world.entity(exchange).insert(response).await;
 								// only pass condition
@@ -100,10 +131,8 @@ where
 	Out: 'static + Send + Sync + IntoResponse<M3>,
 {
 	fn into_endpoint(self) -> impl Bundle {
-		into_endpoint_inner(async move |entity, req| {
-			entity
-				.world()
-				.run_system_cached_with(self.clone(), req)
+		into_endpoint_inner(async move |req, cx| {
+			cx.run_system_cached_with(self.clone(), req)
 				.await
 				.map_err(HttpError::from)
 		})
@@ -115,7 +144,7 @@ pub struct AsyncSystemIntoEndpoint;
 impl<Func, Fut, Req, Res, M1, M2>
 	IntoEndpoint<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Req) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponse<M2>,
@@ -167,13 +196,13 @@ mod test {
 	#[sweet::test]
 	async fn async_system() {
 		async fn my_async_system(
-			_entity: AsyncEntity,
 			_req: Json<Foo>,
+			_cx: VisitContext,
 		) -> StatusCode {
 			StatusCode::OK
 		}
 		assert(my_async_system).await.xpect_eq(200);
-		assert(async |_: AsyncEntity, _: Json<Foo>| StatusCode::OK)
+		assert(async |_: Json<Foo>, _: VisitContext| StatusCode::OK)
 			.await
 			.xpect_eq(200);
 	}

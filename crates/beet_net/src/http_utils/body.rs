@@ -96,11 +96,15 @@ impl Body {
 			}
 		}
 	}
-
+	pub async fn into_string(self) -> Result<String> {
+		let bytes = self.into_bytes().await?;
+		String::from_utf8(bytes.to_vec())?.xok()
+	}
+	#[cfg(feature = "serde")]
 	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		let json = serde_json::from_slice(&bytes)?;
-		Ok(json)
+		serde_json::from_slice::<T>(&bytes)
+			.map_err(|e| bevyhow!("Failed to deserialize body\n {}", e))
 	}
 
 	// temp antipattern while migrating beet_router
@@ -111,10 +115,7 @@ impl Body {
 		}
 	}
 
-	pub async fn into_string(self) -> Result<String> {
-		let bytes = self.into_bytes().await?;
-		String::from_utf8(bytes.to_vec())?.xok()
-	}
+
 
 	pub async fn next(&mut self) -> Result<Option<Bytes>> {
 		match self {

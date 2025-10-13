@@ -159,18 +159,11 @@ impl Response {
 		Self::ok_body(body, mime_type.as_ref())
 	}
 
-	pub async fn text(self) -> Result<String> {
-		let bytes = self.body.into_bytes().await?;
-		String::from_utf8(bytes.to_vec())?.xok()
-	}
 	pub async fn bytes(self) -> Result<Bytes> { self.body.into_bytes().await }
-
+	pub async fn text(self) -> Result<String> { self.body.into_string().await }
 	#[cfg(feature = "serde")]
 	pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
-		let body = self.body.into_bytes().await?;
-		serde_json::from_slice::<T>(&body).map_err(|e| {
-			bevyhow!("Failed to deserialize response body\n {}", e)
-		})
+		self.body.into_json().await
 	}
 
 	pub async fn into_http(self) -> Result<http::Response<Bytes>> {

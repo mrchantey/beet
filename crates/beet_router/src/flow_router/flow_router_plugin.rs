@@ -39,12 +39,38 @@ pub impl World {
 pub impl EntityWorldMut<'_> {
 	/// Handle a single request and return the response
 	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
+		self.oneshot_bundle(req)
+	}
+	/// Handle a single request bundle and return the response
+	fn oneshot_bundle(
+		&mut self,
+		bundle: impl Bundle,
+	) -> impl Future<Output = Response> {
 		let entity = self.id();
 		self.run_async_then(async move |world| {
-			flow_route_handler(world.entity(entity), req)
+			flow_route_handler(world.entity(entity), bundle)
 				.await
 				.into_response()
 		})
+	}
+
+	#[cfg(test)]
+	/// Convenience method for testing, unwraps a 200 response string
+	fn oneshot_str(
+		&mut self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = String> {
+		let req = req.into();
+		async {
+			self.oneshot(req)
+				.await
+				.into_result()
+				.await
+				.unwrap()
+				.text()
+				.await
+				.expect("Expected text body")
+		}
 	}
 }
 /// This handler differs from the default route handler in that
@@ -52,7 +78,7 @@ pub impl EntityWorldMut<'_> {
 /// `Insert, Request`.
 async fn flow_route_handler(
 	server_async: AsyncEntity,
-	request: Request,
+	request: impl Bundle,
 ) -> Response {
 	let server = server_async.id();
 	let (send, recv) = async_channel::bounded(1);
@@ -85,6 +111,8 @@ async fn flow_route_handler(
 #[component(on_add=on_add)]
 pub struct RouteServer;
 
+// On<Outcome> we need to pass the `exchange` [`Response`] to the
+// [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(
 		move |ev: On<Outcome>, mut commands: Commands| {

@@ -27,8 +27,6 @@ pub struct Endpoint {
 
 
 impl Endpoint {
-	pub fn builder() -> EndpointBuilder { EndpointBuilder::default() }
-
 	pub fn get() -> EndpointBuilder {
 		EndpointBuilder::default().with_method(HttpMethod::Get)
 	}
@@ -64,6 +62,8 @@ pub struct EndpointBuilder {
 	cache_strategy: Option<CacheStrategy>,
 	/// Marks this endpoint as an HTML endpoint
 	html: Option<HtmlEndpoint>,
+	/// Whether to match the path exactly, defaults to true.
+	exact_path: bool,
 }
 
 impl Default for EndpointBuilder {
@@ -76,6 +76,7 @@ impl Default for EndpointBuilder {
 			method: Some(HttpMethod::Get),
 			cache_strategy: None,
 			html: None,
+			exact_path: true,
 		}
 	}
 }
@@ -120,6 +121,12 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Sets [`Self::exact_path`] to false
+	pub fn with_trailing_path(mut self) -> Self {
+		self.exact_path = false;
+		self
+	}
+
 	fn effect(self, entity: &mut EntityWorldMut) {
 		// the entity to eventually call [`Self::insert`] on, this will
 		// be some nested entity depending on the builder configuration
@@ -139,8 +146,9 @@ impl EndpointBuilder {
 					// children in the behavior tree.
 					// Order is not important so long as the
 					// handler is last.
-
-					spawner.spawn(check_exact_path());
+					if self.exact_path {
+						spawner.spawn(check_exact_path());
+					}
 					if let Some(method) = self.method {
 						spawner.spawn(check_method(method));
 					}
@@ -262,6 +270,16 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn simple() {
+		FlowRouterPlugin::world()
+			.spawn((RouteServer, Endpoint::get()))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
 
 	#[sweet::test]
 	async fn works() {
