@@ -363,6 +363,7 @@ beet = { path = "", features = ["flow"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 serde.workspace = true
+serde_json.workspace = true
 clap.workspace = true
 async-executor.workspace = true
 futures.workspace = true
@@ -437,7 +438,7 @@ required-features = ["rsx"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
-required-features = ["server"]
+required-features = ["server", "native-tls"]
 [[example]]
 name = "router_bench"
 path = "examples/router/router_bench.rs"

@@ -78,7 +78,7 @@ mod test {
 		FlowRouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::fallback(),
-				Endpoint::get()
+				EndpointBuilder::get()
 			]))
 			.oneshot(Request::get("/"))
 			.await
@@ -88,9 +88,9 @@ mod test {
 		// request already consumed
 		FlowRouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
-				Endpoint::get().with_handler(StatusCode::IM_A_TEAPOT),
+				EndpointBuilder::get().with_handler(StatusCode::IM_A_TEAPOT),
 				common_predicates::fallback(),
-				Endpoint::get(),
+				EndpointBuilder::get(),
 			]))
 			.oneshot(Request::get("/"))
 			.await
@@ -104,7 +104,7 @@ mod test {
 			.xtap(|world| world.insert_resource(RenderMode::Ssr))
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::is_ssr(),
-				Endpoint::get()
+				EndpointBuilder::get()
 			]))
 			.oneshot(Request::get("/"))
 			.await
@@ -115,7 +115,7 @@ mod test {
 			.xtap(|world| world.insert_resource(RenderMode::Ssg))
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::is_ssr(),
-				Endpoint::get(),
+				EndpointBuilder::get(),
 			]))
 			.oneshot(Request::get("/"))
 			.await
@@ -131,7 +131,7 @@ mod test {
 		FlowRouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::contains_handler_bundle(),
-				Endpoint::get()
+				EndpointBuilder::get()
 			]))
 			.oneshot_bundle((Request::get("/"), children![HandlerBundle]))
 			.await
@@ -142,7 +142,7 @@ mod test {
 		FlowRouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::contains_handler_bundle(),
-				Endpoint::get(),
+				EndpointBuilder::get(),
 			]))
 			.oneshot(Request::get("/"))
 			.await

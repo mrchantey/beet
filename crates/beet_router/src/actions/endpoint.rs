@@ -27,18 +27,6 @@ pub struct Endpoint {
 
 
 impl Endpoint {
-	pub fn get() -> EndpointBuilder {
-		EndpointBuilder::default().with_method(HttpMethod::Get)
-	}
-	pub fn post() -> EndpointBuilder {
-		EndpointBuilder::default().with_method(HttpMethod::Post)
-	}
-	pub fn put() -> EndpointBuilder {
-		EndpointBuilder::default().with_method(HttpMethod::Put)
-	}
-	pub fn delete() -> EndpointBuilder {
-		EndpointBuilder::default().with_method(HttpMethod::Delete)
-	}
 	/// Call [`RouteSegments::collect`] on this entity, collecting
 	/// every parent [`PathFilter`]
 	pub(crate) fn new(route_segments: RouteSegments) -> Self {
@@ -82,16 +70,18 @@ impl Default for EndpointBuilder {
 }
 
 impl EndpointBuilder {
+	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
+	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
 	/// Create a new endpoint with the provided handler
 	pub fn with_handler<M>(
 		self,
 		handler: impl 'static + Send + Sync + IntoEndpoint<M>,
 	) -> Self {
-		self.with_bundle(handler.into_endpoint())
+		self.with_handler_bundle(handler.into_endpoint())
 	}
 	/// Create a new endpoint with the provided bundle, the bundle must be
 	/// a `GetOutcome` / `Outcome` action.
-	pub fn with_bundle(mut self, endpoint: impl Bundle) -> Self {
+	pub fn with_handler_bundle(mut self, endpoint: impl Bundle) -> Self {
 		self.insert = Box::new(move |entity| {
 			entity.insert(endpoint);
 		});
@@ -274,7 +264,7 @@ mod test {
 	#[sweet::test]
 	async fn simple() {
 		FlowRouterPlugin::world()
-			.spawn((RouteServer, Endpoint::get()))
+			.spawn((RouteServer, EndpointBuilder::get()))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
@@ -284,8 +274,8 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = FlowRouterPlugin::world();
-		let mut entity =
-			world.spawn((RouteServer, Endpoint::post().with_path("foo")));
+		let mut entity = world
+			.spawn((RouteServer, EndpointBuilder::post().with_path("foo")));
 
 		// method and path match
 		entity
@@ -318,12 +308,12 @@ mod test {
 		let mut world = World::new();
 		world.spawn((
 			PathFilter::new("foo"),
-			Endpoint::get(),
+			EndpointBuilder::get(),
 			children![
 				children![
 					(
 						PathFilter::new("*bar"),
-						Endpoint::get()
+						EndpointBuilder::get()
 					),
 					PathFilter::new("bazz")
 				],
@@ -332,7 +322,7 @@ mod test {
 				),
 				(
 					PathFilter::new(":quax"),
-					Endpoint::get()
+					EndpointBuilder::get()
 				),
 			],
 		));

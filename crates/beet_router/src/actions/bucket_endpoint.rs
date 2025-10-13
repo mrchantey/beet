@@ -21,7 +21,7 @@ impl BucketEndpoint {
 	) -> impl Bundle {
 		EndpointBuilder::default()
 			.with_trailing_path()
-			.with_bundle((
+			.with_handler_bundle((
 				bucket,
 				async move |mut path: RoutePath,
 				            cx: VisitContext|

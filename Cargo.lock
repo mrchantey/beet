@@ -1250,6 +1250,7 @@ dependencies = [
  "futures",
  "getrandom 0.3.3",
  "serde",
+ "serde_json",
  "tokio",
  "uuid",
  "web-sys",
