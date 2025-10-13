@@ -4,6 +4,8 @@ use beet_net::prelude::*;
 /// Metadata for an endpoint
 #[derive(Debug, Clone, Component)]
 pub struct EndpointMeta {
+	/// A collection of the content of every [`PathFilter`] in this entity's
+	/// ancestors(inclusive)
 	route_segments: RouteSegments,
 }
 

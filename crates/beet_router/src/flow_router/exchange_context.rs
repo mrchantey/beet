@@ -5,7 +5,8 @@ use std::collections::VecDeque;
 use std::ops::ControlFlow;
 
 
-
+/// Added to each exchange entity, tracking the [`RouteContext`] for visited
+/// actions and storing the [`Sender<Response>`]
 #[derive(Debug, Component)]
 pub struct ExchangeContext {
 	/// A map stored on the agent of actions in the tree, storing which
