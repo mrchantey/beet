@@ -129,7 +129,6 @@ impl Request {
 		body: &T,
 	) -> Result<Self, serde_json::Error> {
 		use beet_core::prelude::*;
-
 		let body = serde_json::to_string(body)?;
 		self.with_body(body)
 			.with_content_type("application/json")

@@ -97,6 +97,12 @@ impl Body {
 		}
 	}
 
+	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
+		let bytes = self.into_bytes().await?;
+		let json = serde_json::from_slice(&bytes)?;
+		Ok(json)
+	}
+
 	// temp antipattern while migrating beet_router
 	pub fn try_into_bytes(self) -> Option<Bytes> {
 		match self {
