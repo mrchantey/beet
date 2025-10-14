@@ -20,7 +20,7 @@ async fn main() {
 					Response::ok_body("hello foo", "text/plain")
 				},),
 				EndpointBuilder::get().with_path("doggo").with_handler(
-					async |_: (), _: VisitContext| -> Result<Response> {
+					async |_: (), _: EndpointContext| -> Result<Response> {
 						let res = Request::get(
 							"https://dog.ceo/api/breeds/image/random",
 						)

@@ -34,7 +34,7 @@ impl ServerAction {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
 				async move |req: Json<Input::Inner<'_>>,
-				            cx: VisitContext|
+				            cx: EndpointContext|
 				            -> Result<Out> {
 					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
@@ -45,7 +45,7 @@ impl ServerAction {
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input::Inner<'_>>,
-				            cx: VisitContext|
+				            cx: EndpointContext|
 				            -> Result<Out> {
 					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
@@ -61,7 +61,7 @@ impl ServerAction {
 		handler: T,
 	) -> EndpointBuilder
 	where
-		T: 'static + Send + Sync + Clone + Fn(Input, VisitContext) -> Fut,
+		T: 'static + Send + Sync + Clone + Fn(Input, EndpointContext) -> Fut,
 		Input: 'static + Send + Sync + DeserializeOwned,
 		Out: 'static + Send + Sync + IntoResponse<M2>,
 		Fut: 'static + Send + Future<Output = Out>,
@@ -70,14 +70,14 @@ impl ServerAction {
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
-				async move |req: Json<Input>, cx: VisitContext| -> Out {
+				async move |req: Json<Input>, cx: EndpointContext| -> Out {
 					handler.clone()(req.0, cx).await
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input>,
-				            cx: VisitContext|
+				            cx: EndpointContext|
 				            -> Out { handler.clone()(req.0, cx).await },
 			),
 		}

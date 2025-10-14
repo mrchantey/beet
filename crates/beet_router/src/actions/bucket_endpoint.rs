@@ -24,7 +24,7 @@ impl BucketEndpoint {
 			.with_handler_bundle((
 				bucket,
 				async move |mut path: RoutePath,
-				            cx: VisitContext|
+				            cx: EndpointContext|
 				            -> Result<Response> {
 					if let Some(prefix) = &remove_prefix {
 						if let Ok(stripped) = path.strip_prefix(prefix) {

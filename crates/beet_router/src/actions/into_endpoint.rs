@@ -36,7 +36,7 @@ impl IntoResponseBundle<Self> for TypeErasedResponseBundle {
 
 /// An `action` / `exchange` pair for a current visit.
 #[derive(Clone)]
-pub struct VisitContext {
+pub struct EndpointContext {
 	/// The current action this exchange is visiting
 	action: Entity,
 	/// The `agent` of the action, containing the [`Request`] and [`Response`]
@@ -45,12 +45,12 @@ pub struct VisitContext {
 	pub world: AsyncWorld,
 }
 
-impl std::ops::Deref for VisitContext {
+impl std::ops::Deref for EndpointContext {
 	type Target = AsyncWorld;
 	fn deref(&self) -> &Self::Target { &self.world }
 }
 
-impl VisitContext {
+impl EndpointContext {
 	pub fn action_id(&self) -> Entity { self.action }
 	pub fn exchange_id(&self) -> Entity { self.exchange }
 	/// The action entity this endpoint currently running for
@@ -71,7 +71,7 @@ pub trait IntoEndpoint<M> {
 /// inserting it directly into the `exchange`.
 fn run_and_insert<Req, Res, Func, Fut, M1, M2>(func: Func) -> impl Bundle
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(Req, EndpointContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponseBundle<M2>,
@@ -87,7 +87,7 @@ where
 					world.run_async(async move |world: AsyncWorld| {
 						match Req::from_request(req).await {
 							Ok(req) => {
-								let context = VisitContext {
+								let context = EndpointContext {
 									action,
 									exchange,
 									world: world.clone(),
@@ -184,7 +184,7 @@ pub struct AsyncSystemIntoEndpoint;
 impl<Func, Fut, Req, Res, M1, M2>
 	IntoEndpoint<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(Req, VisitContext) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(Req, EndpointContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponseBundle<M2>,
@@ -237,12 +237,12 @@ mod test {
 	async fn async_system() {
 		async fn my_async_system(
 			_req: Json<Foo>,
-			_cx: VisitContext,
+			_cx: EndpointContext,
 		) -> StatusCode {
 			StatusCode::OK
 		}
 		assert(my_async_system).await.xpect_eq(200);
-		assert(async |_: Json<Foo>, _: VisitContext| StatusCode::OK)
+		assert(async |_: Json<Foo>, _: EndpointContext| StatusCode::OK)
 			.await
 			.xpect_eq(200);
 	}
