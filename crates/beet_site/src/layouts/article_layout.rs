@@ -8,7 +8,7 @@ pub fn article_layout_middleware() -> impl Bundle {
 		HandlerConditions::contains_handler_bundle(),
 		RouteHandler::layer(|world: &mut World| {
 			let entity = world
-				.query_filtered::<Entity, With<HandlerBundle>>()
+				.query_filtered::<Entity, With<HtmlBundle>>()
 				.single(world)
 				.unwrap(/*checked in handler conditions*/);
 

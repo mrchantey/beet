@@ -5,7 +5,7 @@ use beet_rsx::prelude::*;
 
 
 /// A route handler returning a bundle, which is inserted into the world
-/// with a [`HandlerBundle`] component.
+/// with a [`HtmlBundle`] component.
 pub fn bundle_endpoint<T, In, InM, Out, Marker>(handler: T) -> impl Bundle
 where
 	T: 'static + Send + Sync + Clone + IntoSystem<In, Out, Marker>,
@@ -20,7 +20,7 @@ where
 		let input = In::Inner::from_request_sync(req)?;
 		match world.run_system_cached_with(handler.clone(), input) {
 			Ok(out) => {
-				world.spawn((HandlerBundle, out));
+				world.spawn((HtmlBundle, out));
 			}
 			Err(err) => {
 				world.insert_resource(HttpError::from(err).into_response());
@@ -41,7 +41,7 @@ where
 
 
 /// An async route handler returning a bundle, which is inserted into the world
-/// with a [`HandlerBundle`] component.
+/// with a [`HtmlBundle`] component.
 pub fn bundle_endpoint_async<Handler, Fut, Out>(handler: Handler) -> impl Bundle
 where
 	Handler: 'static + Send + Sync + Clone + FnOnce(World) -> Fut,
@@ -54,7 +54,7 @@ where
 			let func = handler.clone();
 			async move {
 				let (mut world, out) = func(world).await;
-				world.spawn((HandlerBundle, out));
+				world.spawn((HtmlBundle, out));
 				world
 			}
 		}),
@@ -65,7 +65,7 @@ where
 /// A system for converting bundles into HTML responses, automatically
 /// run by the router if no [`Response`] is set.
 /// - First checks for a [`HtmlDocument`] and renders that one,
-/// - otherwise searches for a [`HandlerBundle`].
+/// - otherwise searches for a [`HtmlBundle`].
 pub fn bundle_to_html_handler() -> impl Bundle {
 	RouteHandler::layer(system.pipe(insert_response_if_error))
 }
@@ -85,7 +85,7 @@ fn system(world: &mut World) -> Result {
 	{
 		entity
 	} else if let Some(&entity) = world
-		.query_filtered_once::<Entity, With<HandlerBundle>>()
+		.query_filtered_once::<Entity, With<HtmlBundle>>()
 		.iter()
 		.next()
 	{
@@ -152,7 +152,7 @@ mod test {
 				}),
 				RouteHandler::layer(|world: &mut World| {
 					let entity = world
-						.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+						.query_filtered_once::<Entity, With<HtmlBundle>>()[0];
 					world.spawn((HtmlDocument, rsx! {
 						"middleware!" {entity}
 					}));

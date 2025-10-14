@@ -52,7 +52,7 @@ fn setup(mut commands: Commands) {
 // modifies the request body to "jimmy"
 fn modify_request(mut req: ResMut<Request>) { req.set_body("jimmy"); }
 fn modify_response(world: &mut World) {
-	let entity = world.query_filtered_once::<Entity, With<HandlerBundle>>()[0];
+	let entity = world.query_filtered_once::<Entity, With<HtmlBundle>>()[0];
 
 	world.spawn((HtmlDocument, rsx! {
 		<Style/>

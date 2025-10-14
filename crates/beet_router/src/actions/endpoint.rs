@@ -72,6 +72,7 @@ impl Default for EndpointBuilder {
 impl EndpointBuilder {
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
+	pub fn any_method() -> Self { Self::default().with_any_method() }
 	/// Create a new endpoint with the provided handler
 	pub fn with_handler<M>(
 		self,

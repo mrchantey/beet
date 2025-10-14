@@ -28,6 +28,11 @@ impl IntoWorld for App {
 }
 #[ext(name=WorldExt)]
 pub impl World {
+	fn with_resource<T: Resource>(&mut self, resource: T) -> &mut Self {
+		self.insert_resource(resource);
+		self
+	}
+
 	/// The world equivelent of [`App::update`]
 	fn update(&mut self) { self.run_schedule(Main); }
 	/// The world equivelent of [`App::should_exit`]

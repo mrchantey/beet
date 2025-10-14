@@ -33,7 +33,7 @@ impl HandlerConditions {
 	}
 
 	pub fn contains_handler_bundle() -> Self {
-		Self::default().system(|query: Query<(), With<HandlerBundle>>| {
+		Self::default().system(|query: Query<(), With<HtmlBundle>>| {
 			query.iter().next().is_some()
 		})
 	}

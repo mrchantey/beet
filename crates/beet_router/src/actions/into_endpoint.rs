@@ -5,7 +5,7 @@ use beet_rsx::prelude::*;
 
 /// A blanket trait for both:
 /// - [`IntoResponse`] types inserted verbatim
-/// - [`Html<Bundle>`] types inserted as a child with [`HandlerBundle`]
+/// - [`Html<Bundle>`] types inserted as a child with [`HtmlBundle`]
 trait IntoResponseBundle<M> {
 	fn into_response_bundle(self) -> impl Bundle;
 }
@@ -16,7 +16,7 @@ where
 	B: Bundle,
 {
 	fn into_response_bundle(self) -> impl Bundle {
-		children![(HandlerBundle, self.0)]
+		children![(HtmlBundle, self.0)]
 	}
 }
 

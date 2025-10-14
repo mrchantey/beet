@@ -7,7 +7,7 @@ use beet_rsx::prelude::*;
 /// Used on fallback handlers, ie 404 page.
 /// Passes only if the `exchange` has a [`Request`] but no [`Response`].
 /// The no request check indicates the [`Request`] was not consumed by a handler
-/// and replaced by a partial response pattern like [`HandlerBundle`].
+/// and replaced by a partial response pattern like [`HtmlBundle`].
 pub fn fallback() -> impl Bundle {
 	OnSpawn::observe(
 		|mut ev: On<GetOutcome>,
@@ -33,12 +33,12 @@ pub fn no_response() -> impl Bundle {
 	)
 }
 
-/// Passes only if the `exchange` has a child with a [`HandlerBundle`]
+/// Passes only if the `exchange` has a child with a [`HtmlBundle`]
 pub fn contains_handler_bundle() -> impl Bundle {
 	OnSpawn::observe(
 		|mut ev: On<GetOutcome>,
 		 children: Query<&Children>,
-		 handler_bundles: Query<(), With<HandlerBundle>>| {
+		 handler_bundles: Query<(), With<HtmlBundle>>| {
 			match children
 				.iter_direct_descendants(ev.agent())
 				.any(|child| handler_bundles.contains(child))
@@ -125,7 +125,7 @@ mod test {
 
 	#[sweet::test]
 	async fn contains_handler_bundle() {
-		use beet_rsx::prelude::HandlerBundle;
+		use beet_rsx::prelude::HtmlBundle;
 		// request no response
 
 		FlowRouterPlugin::world()
@@ -133,7 +133,7 @@ mod test {
 				common_predicates::contains_handler_bundle(),
 				EndpointBuilder::get()
 			]))
-			.oneshot_bundle((Request::get("/"), children![HandlerBundle]))
+			.oneshot_bundle((Request::get("/"), children![HtmlBundle]))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
