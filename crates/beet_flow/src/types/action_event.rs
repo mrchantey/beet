@@ -54,7 +54,7 @@ where
 	T: Clone + ActionEvent,
 {
 	/// Trigger [`T`] on this [`event_target`], essentially propagating a
-	/// [`ChildEnd<T>`] into a [`T`] event, also propagating the [`ActionContext::agent`]
+	/// [`ChildEnd<T>`] into a [`T`] event while tracking the [`ActionContext::agent`]
 	fn propagate_child(&mut self) -> &mut Self {
 		let ev = self
 			.event()

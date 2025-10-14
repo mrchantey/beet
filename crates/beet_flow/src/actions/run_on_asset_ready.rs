@@ -23,6 +23,7 @@ impl<A: Asset> Plugin for RunOnAssetReadyPlugin<A> {
 /// ## Warning
 /// The [`RunOnAssetReadyPlugin`] must be registered with matching
 /// generic parameters for this action to work.
+// TODO refactor to ready_on_asset_load
 #[derive(Debug, Component)]
 pub struct RunOnAssetReady<A: Asset> {
 	/// The handle of the asset to wait for.
