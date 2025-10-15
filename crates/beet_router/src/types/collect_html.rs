@@ -39,3 +39,47 @@ pub async fn collect_html(
 	}
 	results.xok()
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
+	use beet_net::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn children() {
+		let mut world = RouterPlugin::world();
+		world.spawn((RouteServer, InfallibleSequence, children![
+			EndpointBuilder::get()
+				.with_path("foo")
+				.with_handler(|| "foo")
+				.with_cache_strategy(CacheStrategy::Static)
+				.as_html(),
+			EndpointBuilder::get()
+				.with_path("bar")
+				.with_handler(|| "bar")
+				.with_cache_strategy(CacheStrategy::Static)
+				.as_html(),
+			// non-static
+			EndpointBuilder::get()
+				.with_path("bazz")
+				.with_handler(|| "bazz")
+				.as_html(),
+			// non-html
+			EndpointBuilder::get()
+				.with_path("boo")
+				.with_handler(|| "boo")
+				.with_cache_strategy(CacheStrategy::Static),
+		]));
+		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
+
+		collect_html(&mut world).await.unwrap().xpect_eq(vec![
+			(ws_path.join("foo/index.html"), "foo".to_string()),
+			(ws_path.join("bar/index.html"), "bar".to_string()),
+		]);
+	}
+}
