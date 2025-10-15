@@ -72,10 +72,12 @@ pub fn assets_bucket() -> impl Bundle {
 			})
 			.await
 			.await;
-		entity.insert(
-			BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
-				.with_path("assets"),
-		);
+		entity
+			.insert(
+				BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
+					.with_path("assets"),
+			)
+			.await;
 	})
 }
 /// Bucket for handling html, usually added as a fallback
@@ -95,7 +97,7 @@ pub fn html_bucket() -> impl Bundle {
 			})
 			.await
 			.await;
-		entity.insert(BucketEndpoint::new(bucket, None));
+		entity.insert(BucketEndpoint::new(bucket, None)).await;
 	})
 }
 

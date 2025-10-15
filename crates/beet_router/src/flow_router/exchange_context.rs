@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use async_channel::Sender;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use std::collections::VecDeque;

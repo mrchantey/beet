@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
@@ -12,7 +13,10 @@ impl Plugin for FlowRouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<ApplyDirectivesPlugin>()
-			.init_plugin::<ControlFlowPlugin>();
+			.init_plugin::<ControlFlowPlugin>()
+			.init_resource::<WorkspaceConfig>()
+			.init_resource::<RenderMode>()
+			.init_resource::<HtmlConstants>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 		app.init_plugin_with(ServerPlugin::default().without_server());

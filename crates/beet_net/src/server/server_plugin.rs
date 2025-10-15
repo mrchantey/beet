@@ -88,10 +88,16 @@ pub struct Server {
 	/// The function called by hyper for each request
 	pub handler: HandlerFn,
 }
+#[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	world
 		.commands()
-		.run_system_cached_with(super::start_server, cx.entity);
+		.run_system_cached_with(super::start_hyper_server, cx.entity);
+	#[cfg(not(all(feature = "server", not(target_arch = "wasm32"))))]
+	panic!(
+		"The ServerPlugin can only be used on non-wasm32 targets with the `server` feature enabled"
+	);
 }
 
 

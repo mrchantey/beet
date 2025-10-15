@@ -56,7 +56,7 @@ fn append_async_queues(
 fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + Send + Future<Output = Out>,
+	Fut: 'static + MaybeSend + Future<Output = Out>,
 	Out: AsyncTaskOut,
 {
 	let world2 = world.clone();
@@ -110,7 +110,7 @@ fn spawn_async_task_then<Func, Fut, Out>(
 ) -> impl Future<Output = Out>
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + Future<Output = Out> + Send,
+	Fut: 'static + MaybeSend + Future<Output = Out>,
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded(1);
@@ -558,7 +558,7 @@ pub impl World {
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
 		spawn_async_task(self.resource::<AsyncChannel>().world(), func);
@@ -580,7 +580,7 @@ pub impl World {
 	) -> impl Future<Output = Out>
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync,
 	{
 		spawn_async_task_then(

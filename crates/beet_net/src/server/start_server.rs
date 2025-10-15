@@ -24,7 +24,7 @@ use std::task::Poll;
 /// This bevy system contains unopinionated machinery for handling
 /// hyper requests.
 /// See [`Server::handler`] for customizing handlers
-pub(super) fn start_server(
+pub(super) fn start_hyper_server(
 	In(entity): In<Entity>,
 	query: Query<&Server>,
 	mut async_commands: AsyncCommands,
