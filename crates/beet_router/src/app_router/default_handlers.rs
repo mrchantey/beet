@@ -80,7 +80,7 @@ pub fn assets_bucket(
 		PathFilter::new("assets"),
 		AsyncAction::new(async move |mut world, entity| {
 			let access = world.resource::<PackageConfig>().service_access;
-			let bucket = s3_fs_selector(&fs_dir, &bucket_name, access).await;
+			let bucket = s3_fs_selector(fs_dir, &bucket_name, access).await;
 			world.entity_mut(entity).insert(bucket);
 			world
 		}),
@@ -103,7 +103,7 @@ pub fn html_bucket(
 	commands.spawn((
 		ChildOf(root),
 		AsyncAction::new(async move |mut world, entity| {
-			let bucket = s3_fs_selector(&fs_dir, &bucket_name, access).await;
+			let bucket = s3_fs_selector(fs_dir, &bucket_name, access).await;
 			world.entity_mut(entity).insert(bucket);
 			world
 		}),

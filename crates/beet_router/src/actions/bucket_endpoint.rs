@@ -18,7 +18,7 @@ impl BucketEndpoint {
 	pub fn new(
 		bucket: Bucket,
 		remove_prefix: Option<RoutePath>,
-	) -> impl Bundle {
+	) -> EndpointBuilder {
 		EndpointBuilder::default()
 			.with_trailing_path()
 			.with_handler_bundle((

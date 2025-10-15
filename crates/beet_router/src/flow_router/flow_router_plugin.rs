@@ -107,13 +107,12 @@ async fn flow_route_handler(
 }
 
 
-/// The root of a server, adding this will 
+/// The root of a server
 #[derive(Clone, Component)]
 #[cfg_attr(all(not(target_arch = "wasm32"), feature = "server"),
 	require(Server = Server::default().with_handler(flow_route_handler))
 )]
 #[component(on_add=on_add)]
-#[require(PreventPropagateEnd)]
 pub struct RouteServer;
 
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
