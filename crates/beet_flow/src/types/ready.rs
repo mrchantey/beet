@@ -1,3 +1,4 @@
+use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 
 /// Event triggered to indicate that an entity is preparing to become ready.
@@ -51,5 +52,56 @@ impl ReadyAction {
 				},
 			),
 		)
+	}
+}
+
+
+#[extend::ext(name=EntityWorldMutReadyExt)]
+pub impl EntityWorldMut<'_> {
+	/// Triggers [`GetReady`] for this entity and completes
+	/// when the entity triggers [`Ready`].
+	fn await_ready(&mut self) -> impl Future<Output = &mut Self> {
+		let (send, recv) = async_channel::bounded(1);
+		self.observe(move |_: On<Ready>| {
+			send.try_send(()).ok();
+		})
+		.trigger(GetReady)
+		.flush();
+		async move {
+			AsyncRunner::poll_and_update(
+				|| {
+					self.world_scope(|world| {
+						world.update();
+					})
+				},
+				recv,
+			)
+			.await;
+			self
+		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn await_ready() {
+		let store = Store::default();
+
+		let mut world = AsyncPlugin::world();
+		world
+			.spawn((ReadyAction::new(async move |_| {
+				store.set(true);
+			}),))
+			.await_ready()
+			.await;
+		store.get().xpect_eq(true);
+
+		AsyncRunner::flush_async_tasks(&mut world).await;
 	}
 }

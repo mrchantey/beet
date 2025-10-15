@@ -26,6 +26,19 @@ pub struct InsertOn<E: ActionEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
+impl<E: ActionEvent> InsertOn<E, OnSpawnClone> {
+	pub fn new_func<B: Bundle>(
+		bundle: impl 'static + Send + Sync + Clone + FnOnce() -> B,
+	) -> Self {
+		Self {
+			bundle: OnSpawnClone::new(move |entity| {
+				entity.insert(bundle.clone()());
+			}),
+			phantom: PhantomData,
+			target_entity: TargetEntity::default(),
+		}
+	}
+}
 impl<E: ActionEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {

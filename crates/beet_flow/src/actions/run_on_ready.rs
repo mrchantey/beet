@@ -1,10 +1,21 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Triggers [`GetOutcome`] when a [`Ready`] event is received.
+#[action(run_on_ready)]
+#[derive(Debug, Default, Component)]
+pub struct RunOnReady;
+fn run_on_ready(ev: On<Ready>, mut commands: Commands) {
+	if ev.event_target() == ev.trigger().original_event_target {
+		commands
+			.entity(ev.event_target())
+			.trigger_target(GetOutcome);
+	}
+}
 
 #[action(request_child_ready, handle_child_ready)]
 #[derive(Debug, Default, Component)]
-pub struct RunOnReady {
+pub struct ReadyOnChildrenReady {
 	/// The number of [`ReadyAction`] descendants that have
 	/// triggered [`Ready`].
 	pub num_ready: u32,
@@ -18,7 +29,7 @@ pub struct RunOnReady {
 fn request_child_ready(
 	ev: On<GetReady>,
 	mut commands: Commands,
-	mut action: Query<&mut RunOnReady>,
+	mut action: Query<&mut ReadyOnChildrenReady>,
 	children: Query<&Children>,
 	ready_actions: Query<Entity, With<ReadyAction>>,
 ) -> Result {
@@ -44,7 +55,7 @@ fn request_child_ready(
 fn handle_child_ready(
 	ev: On<Ready>,
 	mut commands: Commands,
-	mut action: Query<&mut RunOnReady>,
+	mut action: Query<&mut ReadyOnChildrenReady>,
 ) -> Result {
 	// only handle bubbled up events
 	if ev.event_target() == ev.trigger().original_event_target {
@@ -54,12 +65,8 @@ fn handle_child_ready(
 	let mut action = action.get_mut(ev.event_target())?;
 	action.num_ready += 1;
 	if action.num_ready == action.num_actions {
-		commands
-			.entity(ev.event_target())
-			.trigger(Ready)
-			.trigger_target(GetOutcome);
+		commands.entity(ev.event_target()).trigger(Ready);
 	}
-
 	Ok(())
 }
 
@@ -76,7 +83,7 @@ mod test {
 		let store = Store::default();
 		let mut world = World::new();
 		world
-			.spawn((RunOnReady::default(), children![()]))
+			.spawn((ReadyOnChildrenReady::default(), children![()]))
 			.observe(move |_: On<Ready>| {
 				store.set(true);
 			})
@@ -91,7 +98,7 @@ mod test {
 		let store = Store::default();
 		let mut world = AsyncPlugin::world();
 		world
-			.spawn((RunOnReady::default(), children![
+			.spawn((RunOnReady, ReadyOnChildrenReady::default(), children![
 				ReadyAction::new(async |_| {
 					beet_core::exports::futures_lite::future::yield_now().await;
 				}),

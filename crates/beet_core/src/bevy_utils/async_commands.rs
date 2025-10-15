@@ -2,7 +2,6 @@ use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
-use async_channel::TryRecvError;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
@@ -120,7 +119,7 @@ where
 		// allowed to drop recv
 		send.try_send(out).ok();
 	});
-	poll_and_update(update, recv)
+	AsyncRunner::poll_and_update(update, recv)
 }
 /// Spawn the async local task, flush all async tasks and return the output
 fn spawn_async_task_local_then<Func, Fut, Out>(
@@ -139,24 +138,10 @@ where
 		// allowed to drop recv
 		send.try_send(out).ok();
 	});
-	poll_and_update(update, recv)
+	AsyncRunner::poll_and_update(update, recv)
 }
 
-/// update the world in 1ms increments until recv has a value
-async fn poll_and_update<T>(mut update: impl FnMut(), recv: Receiver<T>) -> T {
-	loop {
-		match recv.try_recv() {
-			Ok(out) => return out,
-			Err(TryRecvError::Empty) => {
-				update();
-				time_ext::sleep_millis(1).await;
-			}
-			Err(TryRecvError::Closed) => {
-				unreachable!("we control the send");
-			}
-		}
-	}
-}
+
 /// Commands used to run async functions, passing in an [`AsyncWorld`] which
 /// can be used to send and received values from the [`World`]
 ///

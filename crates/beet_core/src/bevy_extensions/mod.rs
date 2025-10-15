@@ -1,10 +1,12 @@
 mod commands;
+mod entity;
 mod plugin;
 mod schedule;
 mod system;
 mod world;
 pub use self::schedule::*;
 pub use commands::*;
+pub use entity::*;
 pub use plugin::*;
 pub use world::*;
 mod app;

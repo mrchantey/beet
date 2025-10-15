@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use async_channel::Receiver;
+use async_channel::TryRecvError;
 
 pub struct AsyncRunner;
 
@@ -56,6 +58,24 @@ impl AsyncRunner {
 			// 4. short delay
 			time_ext::sleep_millis(1).await;
 			// }
+		}
+	}
+	/// update the world in 1ms increments until recv has a value
+	pub async fn poll_and_update<T>(
+		mut update: impl FnMut(),
+		recv: Receiver<T>,
+	) -> T {
+		loop {
+			match recv.try_recv() {
+				Ok(out) => return out,
+				Err(TryRecvError::Empty) => {
+					update();
+					time_ext::sleep_millis(1).await;
+				}
+				Err(TryRecvError::Closed) => {
+					unreachable!("we control the send");
+				}
+			}
 		}
 	}
 }
