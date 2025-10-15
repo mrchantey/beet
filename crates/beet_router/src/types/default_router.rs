@@ -22,7 +22,7 @@ pub fn serve_on_ready() -> impl Bundle {
 }
 
 pub fn analytics_handler() -> impl Bundle {
-	ServerAction::build::<_, _, Result, _, _>(
+	ServerAction::new::<_, _, Result, _, _>(
 		HttpMethod::Post,
 		|In(input): In<Value>, mut commands: Commands| -> Result {
 			let ev = AnalyticsEvent::parse(input)?;
@@ -34,8 +34,8 @@ pub fn analytics_handler() -> impl Bundle {
 }
 
 
-pub fn app_info() -> impl Bundle {
-	(EndpointBuilder::get().with_path("/app-info").with_handler(
+pub fn app_info() -> EndpointBuilder {
+	EndpointBuilder::get().with_path("/app-info").with_handler(
 		|config: Res<PackageConfig>| {
 			let PackageConfig {
 				title,
@@ -54,12 +54,12 @@ pub fn app_info() -> impl Bundle {
 				</main>
 			})
 		},
-	),)
+	)
 }
 
 pub fn assets_bucket() -> impl Bundle {
-	ReadyAction::new(async |entity| {
-		let bucket = entity
+	ReadyAction::new_local(async |entity| {
+		let (fs_dir, bucket_name, service_access) = entity
 			.world()
 			.with_then(|world| {
 				let fs_dir =
@@ -68,10 +68,10 @@ pub fn assets_bucket() -> impl Bundle {
 					world.resource::<PackageConfig>().assets_bucket_name();
 				let service_access =
 					world.resource::<PackageConfig>().service_access;
-				s3_fs_selector(fs_dir, bucket_name, service_access)
+				(fs_dir, bucket_name, service_access)
 			})
-			.await
 			.await;
+		let bucket = s3_fs_selector(fs_dir, bucket_name, service_access).await;
 		entity
 			.insert(
 				BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
@@ -83,8 +83,8 @@ pub fn assets_bucket() -> impl Bundle {
 /// Bucket for handling html, usually added as a fallback
 /// if no request present.
 pub fn html_bucket() -> impl Bundle {
-	ReadyAction::new(async |entity| {
-		let bucket = entity
+	ReadyAction::new_local(async |entity| {
+		let (fs_dir, bucket_name, service_access) = entity
 			.world()
 			.with_then(|world| {
 				let fs_dir =
@@ -93,10 +93,10 @@ pub fn html_bucket() -> impl Bundle {
 					world.resource::<PackageConfig>().html_bucket_name();
 				let service_access =
 					world.resource::<PackageConfig>().service_access;
-				s3_fs_selector(fs_dir, bucket_name, service_access)
+				(fs_dir, bucket_name, service_access)
 			})
-			.await
 			.await;
+		let bucket = s3_fs_selector(fs_dir, bucket_name, service_access).await;
 		entity.insert(BucketEndpoint::new(bucket, None)).await;
 	})
 }
@@ -113,7 +113,7 @@ mod test {
 	#[sweet::test]
 	#[rustfmt::skip]
 	async fn works() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((
 				super::serve_on_ready(),
 				EndpointBuilder::get(),
@@ -124,9 +124,22 @@ mod test {
 			))
 			.await_ready()
 			.await
-			.oneshot(Request::get("/"))
+			.oneshot("/")
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test]
+	async fn test_app_info() {
+		RouterPlugin::world()
+			.with_resource(pkg_config!())
+			.spawn((RouteServer, InfallibleSequence, children![
+				app_info(),
+				html_bundle_to_response()
+			]))
+			.oneshot_str("/app-info")
+			.await
+			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
 }

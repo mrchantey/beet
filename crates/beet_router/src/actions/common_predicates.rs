@@ -75,7 +75,7 @@ mod test {
 	#[sweet::test]
 	async fn fallback() {
 		// request no response
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::fallback(),
 				EndpointBuilder::get()
@@ -86,7 +86,7 @@ mod test {
 			.xpect_eq(StatusCode::OK);
 
 		// request already consumed
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get().with_handler(StatusCode::IM_A_TEAPOT),
 				common_predicates::fallback(),
@@ -100,7 +100,7 @@ mod test {
 
 	#[sweet::test]
 	async fn is_ssr() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssr))
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::is_ssr(),
@@ -111,7 +111,7 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::OK);
 
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssg))
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::is_ssr(),
@@ -128,7 +128,7 @@ mod test {
 		use beet_rsx::prelude::HtmlBundle;
 		// request no response
 
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::contains_handler_bundle(),
 				EndpointBuilder::get()
@@ -139,7 +139,7 @@ mod test {
 			.xpect_eq(StatusCode::OK);
 
 		// request already consumed
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::contains_handler_bundle(),
 				EndpointBuilder::get(),

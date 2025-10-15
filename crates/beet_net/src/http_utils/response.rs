@@ -10,7 +10,7 @@ use std::convert::Infallible;
 
 /// Added by the route or its layers, otherwise an empty [`StatusCode::Ok`]
 /// will be returned.
-#[derive(Debug, Component, Resource)]
+#[derive(Debug, Component)]
 pub struct Response {
 	pub parts: response::Parts,
 	pub body: Body,

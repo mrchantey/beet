@@ -302,16 +302,23 @@ mod test {
 			.body(Bytes::new())
 			.unwrap()
 			.into();
-		app.insert_resource(req);
-		app.add_systems(Update, |mut commands: Commands, req: Res<Request>| {
-			let mut res = Response::ok();
-			res.parts.headers = req.parts.headers.clone();
-			commands.insert_resource(res);
-		});
+		let entity = app.world_mut().spawn(req).id();
+		app.add_systems(
+			Update,
+			move |mut commands: Commands, query: Query<&Request>| {
+				let req = query.single().unwrap();
+				let mut res = Response::ok();
+				res.parts.headers = req.parts.headers.clone();
+				commands.entity(entity).insert(res);
+			},
+		);
 		app.update();
 
-		let res = app.world_mut().remove_resource::<Response>().unwrap();
-		res.parts
+		app.world_mut()
+			.entity_mut(entity)
+			.take::<Response>()
+			.unwrap()
+			.parts
 			.headers
 			.get("content-length")
 			.unwrap()

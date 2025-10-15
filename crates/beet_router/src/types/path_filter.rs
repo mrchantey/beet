@@ -6,13 +6,6 @@ use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::path::Path;
 
-
-/// A list of [`RouteSegment::Dynamic`] and [`RouteSegment::Wildcard`]
-/// values extracted during path matching.
-// TODO deprecate for RouteContext after beet_router refactor
-#[derive(Default, Clone, Resource, Deref, DerefMut, Reflect)]
-pub struct DynSegmentMap(HashMap<String, String>);
-
 /// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.

@@ -1,13 +1,20 @@
-use crate::prelude::ApiEnvironment;
-use axum::extract::Request;
-use axum::extract::State;
-use axum::http::HeaderValue;
-use axum::http::Method;
-use axum::http::header;
-use axum::middleware::Next;
-use axum::response::IntoResponse;
-use axum::response::Response;
-use beet_net::prelude::*;
+todo!("convert from axum to beet");
+
+/// Append no-cache headers to a response
+pub fn append_no_cache_headers(val: impl IntoResponse) -> Response {
+	let mut response = val.into_response();
+	let headers = response.headers_mut();
+	headers.insert(
+		header::CACHE_CONTROL,
+		HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+	);
+	headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+	headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
+	// do something with `response`...
+
+	response
+}
+
 
 #[derive(Debug, Default, Clone)]
 pub struct CorsState {

@@ -129,7 +129,7 @@ mod test {
 		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				common_predicates::fallback(),
 				BucketEndpoint::new(bucket.clone(), None),
@@ -144,7 +144,7 @@ mod test {
 		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("bar/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![(
 				PathFilter::new("foo"),
 				children![(Sequence, children![

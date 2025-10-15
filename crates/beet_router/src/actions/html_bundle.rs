@@ -105,7 +105,7 @@ mod test {
 
 	#[sweet::test]
 	async fn simple() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get().with_handler(|| Html((
 					BeetRoot,
@@ -121,7 +121,7 @@ mod test {
 
 	#[sweet::test]
 	async fn with_template() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get()
@@ -136,7 +136,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn middleware() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get()

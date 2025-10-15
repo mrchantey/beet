@@ -210,6 +210,8 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 	)
 }
 
+
+/// Metadata collected for an endpoint
 #[derive(Debug, Clone)]
 pub struct EndpointMeta {
 	/// The entity this metadata is for
@@ -254,6 +256,40 @@ impl EndpointMeta {
 			})
 			.collect::<Vec<_>>()
 	}
+
+	/// filter the provided list of endpoint metadata
+	/// by those that are static GET endpoints
+	pub fn static_get(items: In<Vec<Self>>) -> Vec<Self> {
+		items
+			.0
+			.into_iter()
+			.filter(|meta| {
+				meta.route_segments.is_static()
+					&& meta.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
+					&& meta
+						.cache_strategy
+						.map(|s| s == CacheStrategy::Static)
+						.unwrap_or(false)
+			})
+			.collect()
+	}
+	/// filter the provided list of endpoint metadata
+	/// by those that are static GET endpoints with HTML
+	pub fn static_get_html(items: In<Vec<Self>>) -> Vec<Self> {
+		items
+			.0
+			.into_iter()
+			.filter(|meta| {
+				meta.route_segments.is_static()
+					&& meta.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
+					&& meta
+						.cache_strategy
+						.map(|s| s == CacheStrategy::Static)
+						.unwrap_or(false)
+					&& meta.html.is_some()
+			})
+			.collect()
+	}
 }
 
 #[cfg(test)]
@@ -265,7 +301,7 @@ mod test {
 
 	#[sweet::test]
 	async fn simple() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((RouteServer, EndpointBuilder::get()))
 			.oneshot(Request::get("/"))
 			.await
@@ -273,9 +309,46 @@ mod test {
 			.xpect_eq(StatusCode::OK);
 	}
 
+
+	#[sweet::test]
+	async fn dynamic_path() {
+		RouterPlugin::world()
+			.spawn((
+				RouteServer,
+				EndpointBuilder::get().with_path("/:path").with_handler(
+					async |_req: (),
+					       cx: EndpointContext|
+					       -> Result<Html<String>> {
+						Html(cx.dyn_segment("path").await?).xok()
+					},
+				),
+			))
+			.oneshot_str(Request::get("/bing"))
+			.await
+			.xpect_eq("bing");
+	}
+
+	#[sweet::test]
+	async fn children() {
+		use beet_flow::prelude::*;
+
+		let mut world = RouterPlugin::world();
+		let mut entity =
+			world.spawn((RouteServer, InfallibleSequence, children![
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_handler(|| "foo"),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_handler(|| "bar"),
+			]));
+		entity.oneshot_str("/foo").await.xpect_eq("foo");
+		entity.oneshot_str("/bar").await.xpect_eq("bar");
+	}
+
 	#[sweet::test]
 	async fn works() {
-		let mut world = FlowRouterPlugin::world();
+		let mut world = RouterPlugin::world();
 		let mut entity = world
 			.spawn((RouteServer, EndpointBuilder::post().with_path("foo")));
 

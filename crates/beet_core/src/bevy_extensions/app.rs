@@ -117,4 +117,9 @@ pub impl App {
 		plugin.build(self);
 		self
 	}
+
+	fn spawn(&mut self, bundle: impl Bundle) -> &mut Self {
+		self.world_mut().spawn(bundle);
+		self
+	}
 }

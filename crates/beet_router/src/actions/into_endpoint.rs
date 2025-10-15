@@ -2,6 +2,9 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
+use bevy::ecs::system::IntoObserverSystem;
+
+use crate::prelude::RouteQuery;
 
 /// A blanket trait for both:
 /// - [`IntoResponse`] types inserted verbatim
@@ -59,6 +62,19 @@ impl EndpointContext {
 	pub fn exchange(&self) -> AsyncEntity { self.world.entity(self.exchange) }
 	/// The world this endpoint is running in
 	pub fn world(&self) -> &AsyncWorld { &self.world }
+
+	pub async fn dyn_segment(&self, key: &str) -> Result<String> {
+		let this = self.clone();
+		let key = key.to_string();
+		self.world
+			.with_then(move |world| {
+				world.run_system_once(move |mut query: RouteQuery| {
+					query.dyn_segment(&this, &key)
+				})
+			})
+			.await
+			.map_err(|err| bevyhow!("{}", err))?
+	}
 }
 
 /// Helper for defining methods accepting requests and returning responses.
@@ -192,6 +208,18 @@ where
 	fn into_endpoint(self) -> impl Bundle { run_and_insert(self) }
 }
 
+pub struct ObserverIntoEndpoint;
+impl<System, M1> IntoEndpoint<(ObserverIntoEndpoint, M1)> for System
+where
+	System: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ IntoObserverSystem<GetOutcome, (), M1, ()>,
+{
+	fn into_endpoint(self) -> impl Bundle { OnSpawn::observe(self) }
+}
+
 
 #[cfg(test)]
 mod test {
@@ -208,7 +236,7 @@ mod test {
 	struct Foo(u32);
 
 	async fn assert<M>(endpoint: impl IntoEndpoint<M>) -> StatusCode {
-		let mut world = FlowRouterPlugin::world();
+		let mut world = RouterPlugin::world();
 		let exchange = world
 			.spawn(Request::get("/foo").with_json_body(&Foo(3)).unwrap())
 			.id();

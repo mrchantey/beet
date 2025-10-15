@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
-#[derive(Debug, Component, Resource)]
+#[derive(Debug, Component)]
 #[component(on_add=on_add)]
 pub struct Request {
 	pub parts: request::Parts,

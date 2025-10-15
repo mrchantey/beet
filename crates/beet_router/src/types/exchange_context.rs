@@ -79,4 +79,13 @@ impl RouteContext {
 			ControlFlow::Break(_) => Err(bevyhow!("PathFilter did not match")),
 		}
 	}
+
+	pub fn dyn_segments(&self) -> &HashMap<String, String> {
+		&self.dyn_segments
+	}
+	pub fn dyn_segment(&self, key: &str) -> Result<&String> {
+		self.dyn_segments
+			.get(key)
+			.ok_or_else(|| bevyhow!("No such dynamic segment key: {}", key))
+	}
 }

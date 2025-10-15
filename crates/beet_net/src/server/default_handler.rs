@@ -84,6 +84,7 @@ Request Complete
 
 
 #[cfg(test)]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

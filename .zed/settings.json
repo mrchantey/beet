@@ -9,12 +9,12 @@
 		"rust-analyzer": {
 			"initialization_options": {
 				"cargo": {
-					"target": "wasm32-unknown-unknown",
+					// "target": "wasm32-unknown-unknown",
 					"features": [
 						// "server",
 						// "client",
 						// "launch",
-						// "lambda",
+						"aws"
 						// "webdriver",
 						// "css",
 						// "sim",

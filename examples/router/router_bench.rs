@@ -14,7 +14,7 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			FlowRouterPlugin::default(),
+			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((RouteServer, InfallibleSequence, children![

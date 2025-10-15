@@ -70,20 +70,17 @@ impl ServerRunner {
 		}
 		app.init();
 
-		let world = std::mem::take(app.world_mut());
-		*app.world_mut() = AsyncActionSet::collect_and_run(world).await;
-
 		app.update();
 		if let Some(exit) = app.should_exit() {
 			exit.into_result()
 		} else if self.export_static {
 			Self::export_static(&mut app).await
 		} else {
-			#[cfg(feature = "axum")]
-			{
-				AxumRunner::new().run(app.world_mut()).await
-			}
-			#[cfg(not(feature = "axum"))]
+			// #[cfg(feature = "axum")]
+			// {
+			// 	// AxumRunner::new().run(app.world_mut()).await
+			// }
+			// #[cfg(not(feature = "axum"))]
 			todo!("hyper router");
 		}
 	}

@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "axum", "reload", "fs","server"]
+default = ["serde","tokio", "fs", "server"]
 server = ["beet_net/server"]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
@@ -29,10 +29,10 @@ axum = [
 	"dep:axum-extra",
 	"dep:axum-server",
 	"dep:tower",
+	"dep:tower-livereload",
 	"dep:tower-http",
 ]
 tokio = ["dep:tokio","beet_net/tokio"]
-reload = ["tower-livereload"]
 lambda = ["rustls-tls", "dep:lambda_http"]
 serde = [
 	"dep:serde",

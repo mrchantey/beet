@@ -51,6 +51,7 @@ pub(super) fn start_hyper_server(
 
 			let handler = handler.clone();
 			let _entity_fut = world.run_async(async move |world| {
+				// pass an AsyncWorld to the service_fn
 				let service = service_fn(move |req| {
 					let world = world.clone();
 					let handler = handler.clone();
@@ -81,11 +82,6 @@ pub(super) fn start_hyper_server(
 					}
 				}
 			});
-
-			// Spawn each connection handler as a separate async task
-			// bevy::tasks::IoTaskPool::get()
-			// 	.spawn()
-			// 	.detach();
 		}
 	});
 	Ok(())

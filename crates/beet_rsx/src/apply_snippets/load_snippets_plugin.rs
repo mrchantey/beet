@@ -2,6 +2,7 @@ use beet_core::prelude::*;
 
 
 /// Load all file snippets from the `snippets` directory on [`Startup`].
+#[derive(Default)]
 pub struct LoadSnippetsPlugin;
 
 impl Plugin for LoadSnippetsPlugin {

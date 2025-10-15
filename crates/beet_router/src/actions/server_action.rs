@@ -19,7 +19,7 @@ pub struct ServerAction;
 
 
 impl ServerAction {
-	pub fn build<T, Input, Out, M1, M2>(
+	pub fn new<T, Input, Out, M1, M2>(
 		method: HttpMethod,
 		handler: T,
 	) -> EndpointBuilder
@@ -56,7 +56,7 @@ impl ServerAction {
 		}
 	}
 
-	pub fn build_async<T, Input, Fut, Out, M2>(
+	pub fn new_async<T, Input, Fut, Out, M2>(
 		method: HttpMethod,
 		handler: T,
 	) -> EndpointBuilder
@@ -95,10 +95,10 @@ mod test {
 
 	#[sweet::test]
 	async fn no_input() {
-		FlowRouterPlugin::world()
+		RouterPlugin::world()
 			.spawn((
 				RouteServer,
-				ServerAction::build(HttpMethod::Post, (|| 2).pipe(Json::pipe)),
+				ServerAction::new(HttpMethod::Post, (|| 2).pipe(Json::pipe)),
 			))
 			.oneshot(
 				Request::post("/")
@@ -118,10 +118,10 @@ mod test {
 	}
 	#[sweet::test]
 	async fn post() {
-		let mut world = FlowRouterPlugin::world();
+		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
-			ServerAction::build(
+			ServerAction::new(
 				HttpMethod::Post,
 				(|val: In<u32>| val.0 + 2).pipe(Json::pipe),
 			)
@@ -149,10 +149,10 @@ mod test {
 	}
 	#[sweet::test]
 	async fn get_sync() {
-		let mut world = FlowRouterPlugin::world();
+		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
-			ServerAction::build_async(HttpMethod::Get, async |val: u32, _| {
+			ServerAction::new_async(HttpMethod::Get, async |val: u32, _| {
 				Json(val + 2)
 			}),
 		));

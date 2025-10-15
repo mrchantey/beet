@@ -7,20 +7,41 @@ use beet_rsx::prelude::*;
 
 
 #[derive(Default)]
-pub struct FlowRouterPlugin;
+pub struct RouterPlugin;
 
-impl Plugin for FlowRouterPlugin {
+impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<ApplyDirectivesPlugin>()
 			.init_plugin::<ControlFlowPlugin>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
-			.init_resource::<HtmlConstants>();
+			.init_resource::<HtmlConstants>()
+			.add_systems(PostStartup, insert_route_tree);
+
+		#[cfg(not(test))]
+		app.init_plugin::<LoadSnippetsPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-		app.init_plugin_with(ServerPlugin::default().without_server());
+		app.init_plugin_with(
+			ServerPlugin::default()
+				// user inserts their own server
+				.without_server(),
+		);
 	}
+}
+
+/// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
+pub fn insert_route_tree(world: &mut World) {
+	let paths = world
+		.run_system_cached(EndpointMeta::collect.pipe(EndpointMeta::static_get))
+		.unwrap()
+		.into_iter()
+		.map(|meta| {
+			(meta.entity(), meta.route_segments().annotated_route_path())
+		})
+		.collect::<Vec<_>>();
+	world.insert_resource(RoutePathTree::from_paths(paths));
 }
 
 
@@ -29,7 +50,11 @@ pub impl World {
 	/// Handle a single request and return the response
 	/// ## Panics
 	/// Panics if there is not exactly one `RouteServer` in the world.
-	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
+	fn oneshot(
+		&mut self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Response> {
+		let req = req.into();
 		let entity = self
 			.query_filtered::<Entity, With<RouteServer>>()
 			.single(self)
@@ -44,7 +69,11 @@ pub impl World {
 #[extend::ext(name=EntityWorldMutRouterExt)]
 pub impl EntityWorldMut<'_> {
 	/// Handle a single request and return the response
-	fn oneshot(&mut self, req: Request) -> impl Future<Output = Response> {
+	fn oneshot(
+		&mut self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Response> {
+		let req = req.into();
 		self.oneshot_bundle(req)
 	}
 	/// Handle a single request bundle and return the response
@@ -79,10 +108,22 @@ pub impl EntityWorldMut<'_> {
 		}
 	}
 }
+
+/// Added by default to the `required` Server for a [`RouteServer`]
+/// but can also be configured manually.
 /// This handler differs from the default route handler in that
 /// we use `beet_flow` primitives of GetOutcome / Outcome instead of
 /// `Insert, Request`.
-async fn flow_route_handler(
+///
+/// ## Example
+///
+/// ```rust
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// World::new().spawn(Server::default().with_handler(flow_route_handler))
+/// ```
+pub async fn flow_route_handler(
 	server_async: AsyncEntity,
 	request: impl Bundle,
 ) -> Response {
@@ -158,7 +199,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let mut world = FlowRouterPlugin::world();
+		let mut world = RouterPlugin::world();
 		world.all_entities().len().xpect_eq(0);
 		world
 			.spawn((RouteServer, EndWith(Outcome::Pass)))
@@ -168,5 +209,57 @@ mod test {
 			.xpect_eq(StatusCode::NOT_FOUND);
 		// exchange entity was cleaned up
 		world.all_entities().len().xpect_eq(1);
+	}
+
+	#[sweet::test]
+	async fn route_tree() {
+		let mut world = World::new();
+		world.spawn((RouteServer, CacheStrategy::Static, children![
+			EndpointBuilder::get()
+				.with_handler(|tree: Res<RoutePathTree>| tree.to_string()),
+			(
+				PathFilter::new("foo"),
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_handler(|| "foo")
+			),
+			(PathFilter::new("bar"), children![
+				EndpointBuilder::get()
+					.with_path("bazz")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_handler(|| "bazz")
+			]),
+			PathFilter::new("boo"),
+		]));
+		world.run_system_cached(insert_route_tree).unwrap();
+		world
+			.remove_resource::<RoutePathTree>()
+			.unwrap()
+			.flatten()
+			.xpect_eq(vec![
+				RoutePath::new("/bar/bazz"),
+				RoutePath::new("/foo"),
+			]);
+	}
+
+	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
+	#[sweet::test]
+	async fn server() {
+		let server = Server::new_test().with_handler(flow_route_handler);
+		let url = server.local_url();
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((MinimalPlugins, RouterPlugin))
+				.spawn((server, RouteServer, EndpointBuilder::get()))
+				.run();
+		});
+		time_ext::sleep_millis(10).await;
+		Request::get(&url)
+			.send()
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::OK);
 	}
 }

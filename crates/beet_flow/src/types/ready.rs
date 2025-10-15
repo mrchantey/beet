@@ -53,6 +53,30 @@ impl ReadyAction {
 			),
 		)
 	}
+	/// Runs the provided method when [`GetReady`] is triggered, and triggers
+	/// [`Ready`] upon completion regardless of the outcome.
+	pub fn new_local<Fut, Out>(
+		func: impl 'static + Send + Sync + Clone + FnOnce(AsyncEntity) -> Fut,
+	) -> (Self, OnSpawn)
+	where
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: AsyncTaskOut,
+	{
+		(
+			Self { sealed: default() },
+			OnSpawn::observe(
+				move |ev: On<GetReady>, mut commands: AsyncCommands| {
+					let entity = ev.event_target();
+					let observer = func.clone();
+					commands.run_local(async move |world| {
+						let out = observer(world.entity(entity)).await;
+						world.entity(entity).trigger(Ready).await;
+						out
+					});
+				},
+			),
+		)
+	}
 }
 
 

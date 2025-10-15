@@ -1,7 +1,7 @@
 //! The default handler spawns an entity with the [`Request`]
 //! and returns the [`response`] as soon as its inserted.
 //! This can be overridden by setting a custom handler,
-//! for a more detailed example of a custom handler see [`FlowRouterPlugin`]
+//! for a more detailed example of a custom handler see [`RouterPlugin`]
 use beet::prelude::*;
 
 fn main() {
