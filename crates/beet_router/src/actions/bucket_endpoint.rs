@@ -55,7 +55,6 @@ async fn bucket_to_response(
 	bucket: &Bucket,
 	path: &RoutePath,
 ) -> Result<Response> {
-	println!("fetching from bucket {path}");
 	if let Some(_extension) = path.extension() {
 		if let Some(url) = bucket.public_url(&path).await? {
 			debug!("redirecting to bucket: {}", url);

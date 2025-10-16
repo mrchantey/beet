@@ -41,7 +41,6 @@ fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
 
 fn on_next(
 	mut ev: On<ChildEnd<Outcome>>,
-	mut commands: Commands,
 	query: Query<&Children>,
 ) -> Result {
 	let target = ev.action();
@@ -61,9 +60,7 @@ fn on_next(
 		ev.propagate_child();
 	} else {
 		// run next
-		commands
-			.entity(children[index + 1])
-			.trigger_target(GetOutcome);
+		ev.trigger_next_with(children[index + 1], GetOutcome);
 	}
 	Ok(())
 }

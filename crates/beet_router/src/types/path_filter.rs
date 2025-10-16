@@ -43,7 +43,7 @@ fn parse_and_check_path_filter(
 	children: Query<&Children>,
 ) -> Result {
 	let filter = actions.get(ev.action())?;
-	let outcome = query.with_cx(&mut ev, |cx| cx.parse_filter(filter))?;
+	let outcome = query.with_cx(&ev, |cx| cx.parse_filter(filter))?;
 	match outcome {
 		Ok(_) => {
 			let child = children.get(ev.action())?[0];

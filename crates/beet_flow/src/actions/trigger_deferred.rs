@@ -23,6 +23,7 @@ use beet_core::prelude::*;
 #[component(storage = "SparseSet",on_add=on_add::<T>)]
 pub struct TriggerDeferred<T: ActionEvent> {
 	event: T,
+	agent: Option<Entity>,
 }
 
 impl<T> Default for TriggerDeferred<T>
@@ -40,7 +41,11 @@ impl TriggerDeferred<GetOutcome> {
 
 impl<T: ActionEvent> TriggerDeferred<T> {
 	/// Create a new [`TriggerOnSpawn`] with the provided event
-	pub fn new(event: T) -> Self { Self { event } }
+	pub fn new(event: T) -> Self { Self { event, agent: None } }
+	pub fn with_agent(mut self, agent: Entity) -> Self {
+		self.agent = Some(agent);
+		self
+	}
 }
 
 fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
@@ -50,9 +55,13 @@ fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 			.entity_mut(entity)
 			.take::<TriggerDeferred<T>>()
 			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
-		world
-			.entity_mut(entity)
-			.insert(OnSpawnDeferred::trigger_target(ev.event));
+		let bundle = if let Some(agent) = ev.agent {
+			OnSpawnDeferred::trigger_target(ev.event.with_agent(agent))
+		} else {
+			OnSpawnDeferred::trigger_target(ev.event)
+		};
+
+		world.entity_mut(entity).insert(bundle);
 		Ok(())
 	});
 }

@@ -30,16 +30,13 @@ pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
 	mut ev: On<GetOutcome>,
-	mut commands: Commands,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
 	let (mut action, children) = query.get_mut(ev.action())?;
 	action.clear();
 
 	if children.is_empty() {
-		commands
-			.entity(ev.action())
-			.trigger_target(Outcome::Pass);
+		ev.trigger_next(Outcome::Pass);
 		return Ok(());
 	}
 

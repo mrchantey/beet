@@ -69,6 +69,7 @@ impl RouteQuery<'_, '_> {
 		}
 		// 3. create from request
 		let request = self.requests.get(ev.get_exchange())?;
+
 		let cx = RouteContext::new(request.path());
 		cx_map.insert(ev.get_action(), cx);
 		let cx = cx_map.get_mut(&ev.get_action()).unwrap();

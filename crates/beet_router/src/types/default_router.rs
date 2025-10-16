@@ -46,7 +46,7 @@ pub fn default_router(
 					(Fallback, children![
 						html_bundle_to_response(),
 						assets_bucket(),
-						// html_bucket()
+						html_bucket()
 					]),
 				]),
 			]
@@ -198,20 +198,20 @@ mod test {
 		world.insert_resource(pkg_config!());
 		let mut entity = world.spawn(default_router(
 			EndWith(Outcome::Pass),
-			EndWith(Outcome::Pass),
-			// (Sequence, children![
-			// 	EndpointBuilder::get().with_path("foobar"),
-			// ]),
+			// EndWith(Outcome::Pass),
+			(Sequence, children![
+				EndpointBuilder::get().with_path("foobar"),
+			]),
 			EndWith(Outcome::Pass),
 		));
 
 
-		// entity
-		// 	.await_ready()
-		// 	.await
-		// 	.oneshot_str("/app-info")
-		// 	.await
-		// 	.xpect_contains("<h1>App Info</h1><p>Title: Beet</p>");
+		entity
+			.await_ready()
+			.await
+			.oneshot_str("/app-info")
+			.await
+			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 		entity
 			.await_ready()
 			.await
@@ -220,12 +220,12 @@ mod test {
 			.into_result()
 			.await
 			.unwrap();
-		// let mut stat = async |val: &str| entity.oneshot(val).await.status();
-		// stat("/bingbong").await.xpect_eq(StatusCode::NOT_FOUND);
-		// stat("/assets/bing").await.xpect_eq(StatusCode::NOT_FOUND);
-		// stat("/assets/branding/logo.png")
-		// 	.await
-		// 	.xpect_eq(StatusCode::OK);
-		// stat("/foobar").await.xpect_eq(StatusCode::OK);
+		let mut stat = async |val: &str| entity.oneshot(val).await.status();
+		stat("/bingbong").await.xpect_eq(StatusCode::NOT_FOUND);
+		stat("/assets/bing").await.xpect_eq(StatusCode::NOT_FOUND);
+		stat("/assets/branding/logo.png")
+			.await
+			.xpect_eq(StatusCode::OK);
+		stat("/foobar").await.xpect_eq(StatusCode::OK);
 	}
 }

@@ -67,7 +67,7 @@ fn repeat(
 	// otherwise run again on the next tick
 	commands
 		.entity(ev.action())
-		.insert(TriggerDeferred::new(GetOutcome));
+		.insert(TriggerDeferred::new(GetOutcome).with_agent(ev.agent()));
 	Ok(())
 }
 
