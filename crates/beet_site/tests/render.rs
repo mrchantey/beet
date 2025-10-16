@@ -5,13 +5,13 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 #[sweet::test]
-#[ignore]
+// #[ignore]
 async fn docs() {
 	server_plugin
 		.into_world()
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
-		.await_insert::<RouteServer>()
+		.await_event::<Insert, RouteServer>()
 		.await
 		.oneshot("/docs")
 		.await
@@ -29,7 +29,7 @@ async fn article_layout() {
 		.into_world()
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
-		.await_insert::<RouteServer>()
+		.await_event::<Insert, RouteServer>()
 		.await
 		.oneshot("/blog/post-1")
 		.await

@@ -58,6 +58,9 @@ impl Plugin for RouterArgs {
 
 fn export_static(mut commands: AsyncCommands) {
 	commands.run_local(async |world| -> Result {
+		// wait for the server to be ready
+		world.await_event::<Insert, RouteServer>().await;
+
 		let html = collect_html(world.clone()).await?;
 
 		for (path, html) in html {

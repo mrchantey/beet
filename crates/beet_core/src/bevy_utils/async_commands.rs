@@ -115,7 +115,7 @@ where
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded(1);
-	spawn_async_task_local(world, async move |world| {
+	spawn_async_task(world, async move |world| {
 		let out = func(world).await;
 		// allowed to drop recv
 		send.try_send(out).ok();

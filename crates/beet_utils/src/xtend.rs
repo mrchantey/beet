@@ -68,7 +68,7 @@ pub trait Xtend: Sized {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_core::prelude::*;
+	/// # use bevy::prelude::*;
 	/// # use beet_utils::prelude::*;
 	/// fn foo()-> Result<u32> {
 	///   7.xok()
