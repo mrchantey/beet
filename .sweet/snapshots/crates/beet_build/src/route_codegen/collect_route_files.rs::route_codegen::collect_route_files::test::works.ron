@@ -14,6 +14,7 @@ pub fn test_docs_routes() -> impl Bundle {
         InfallibleSequence,
         related! {
             Children[EndpointBuilder::new(_index::get).with_method(HttpMethod::Get)
+            .with_content_type(ContentType::Html)
             .with_predicate(common_predicates::is_ssr()).with_path("/")
             .with_cache_strategy(CacheStrategy::Static)]
         },

@@ -207,7 +207,7 @@ test-rsx *args:
 	cargo test -p beet_router						 --features=tokens,native-tls  											{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
-	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
+	cargo test -p beet_site							--no-default-features --features=server 						{{args}} -- {{test-threads}}
 
 
 test crate *args:

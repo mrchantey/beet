@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use beet_core::prelude::*;
+use clap::Parser;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]
 use crate::prelude::*;
@@ -21,6 +22,11 @@ pub struct RouterArgs {
 	#[cfg_attr(feature = "serde", command(subcommand))]
 	pub mode: Option<RenderMode>,
 }
+
+impl RouterArgs {
+	pub fn parse() -> Self { Parser::parse() }
+}
+
 impl Default for RouterArgs {
 	fn default() -> Self {
 		Self {

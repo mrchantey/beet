@@ -24,6 +24,9 @@ impl Plugin for BeetRunner {
 		#[cfg(feature = "launch")]
 		app.set_runner(LaunchRunner::runner);
 
+		#[cfg(feature = "server")]
+		app.add_plugins(RouterArgs::parse());
+
 		#[cfg(feature = "client")]
 		app.set_runner(ReactiveApp::runner);
 
