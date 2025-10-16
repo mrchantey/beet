@@ -72,17 +72,13 @@ impl ServerRunner {
 		app.init();
 
 		app.update();
-		if let Some(exit) = app.should_exit() {
-			exit.into_result()
-		} else if self.export_static {
-			Self::export_static(&mut app).await
+		if self.export_static {
+			Self::export_static(&mut app).await?;
+			// graceful shutdown, allow tasks to cancel
+			app.world_mut().write_message(AppExit::Success);
+			app.run().into_result()
 		} else {
-			// #[cfg(feature = "axum")]
-			// {
-			// 	// AxumRunner::new().run(app.world_mut()).await
-			// }
-			// #[cfg(not(feature = "axum"))]
-			todo!("lambda router");
+			app.run().into_result()
 		}
 	}
 

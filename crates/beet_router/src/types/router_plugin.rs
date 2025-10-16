@@ -28,6 +28,8 @@ impl Plugin for RouterPlugin {
 				// user inserts their own server
 				.without_server(),
 		);
+		#[cfg(feature = "lambda")]
+		app.add_systems(Startup, attach_lambda);
 	}
 }
 

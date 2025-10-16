@@ -115,7 +115,7 @@ static APP_STATE: LazyLock<Mutex<AppState>> = LazyLock::new(|| {
 
 #[template]
 fn Style() -> impl Bundle {
-	// css is much easier to write with the rsx_combinator macro
+	// css is much easier to write with the rsx_combinator! macro
 	// as many common css tokens like `1em` or `a:visited` are not valid rust tokens
 	rsx_combinator! {r"
 <style scope:global>

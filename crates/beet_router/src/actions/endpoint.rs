@@ -5,11 +5,14 @@ use beet_net::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Default, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct HtmlEndpoint;
+pub enum ContentType {
+	Html,
+	Json,
+}
 
 
 /// Endpoints are actions that will only run if the method and path are an
@@ -49,8 +52,8 @@ pub struct EndpointBuilder {
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
 	cache_strategy: Option<CacheStrategy>,
-	/// Marks this endpoint as an HTML endpoint
-	html: Option<HtmlEndpoint>,
+	/// Specify the content type for this endpoint
+	content_type: Option<ContentType>,
 	/// Whether to match the path exactly, defaults to true.
 	exact_path: bool,
 	/// Additional bundles to be run before the handler
@@ -73,7 +76,7 @@ impl Default for EndpointBuilder {
 			path: None,
 			method: Some(HttpMethod::Get),
 			cache_strategy: None,
-			html: None,
+			content_type: None,
 			exact_path: true,
 			additional_predicates: Vec::new(),
 		}
@@ -147,8 +150,8 @@ impl EndpointBuilder {
 		self
 	}
 
-	pub fn as_html(mut self) -> Self {
-		self.html = Some(HtmlEndpoint);
+	pub fn with_content_type(mut self, content_type: ContentType) -> Self {
+		self.content_type = Some(content_type);
 		self
 	}
 
@@ -192,7 +195,7 @@ impl EndpointBuilder {
 					if let Some(cache_strategy) = self.cache_strategy {
 						handler_entity.insert(cache_strategy);
 					}
-					if let Some(html) = self.html {
+					if let Some(html) = self.content_type {
 						handler_entity.insert(html);
 					}
 					if let Some(method) = self.method {
@@ -266,7 +269,7 @@ pub struct EndpointMeta {
 	/// The cache strategy for this endpoint, if any
 	cache_strategy: Option<CacheStrategy>,
 	/// Marks this endpoint as an HTML endpoint
-	html: Option<HtmlEndpoint>,
+	content_type: Option<ContentType>,
 }
 
 impl EndpointMeta {
@@ -276,7 +279,7 @@ impl EndpointMeta {
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
 	}
-	pub fn html(&self) -> Option<HtmlEndpoint> { self.html }
+	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
 
 
 	pub fn collect(
@@ -285,7 +288,7 @@ impl EndpointMeta {
 			&Endpoint,
 			Option<&HttpMethod>,
 			Option<&CacheStrategy>,
-			Option<&HtmlEndpoint>,
+			Option<&ContentType>,
 		)>,
 	) -> Vec<Self> {
 		query
@@ -295,7 +298,7 @@ impl EndpointMeta {
 				route_segments: endpoint.route_segments().clone(),
 				method: method.cloned(),
 				cache_strategy: cache_strategy.cloned(),
-				html: html.cloned(),
+				content_type: html.cloned(),
 			})
 			.collect::<Vec<_>>()
 	}
@@ -329,7 +332,7 @@ impl EndpointMeta {
 						.cache_strategy
 						.map(|s| s == CacheStrategy::Static)
 						.unwrap_or(false)
-					&& meta.html.is_some()
+					&& meta.content_type == Some(ContentType::Html)
 			})
 			.collect()
 	}

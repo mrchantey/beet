@@ -54,7 +54,8 @@ pub fn collect_route_files(
 					(RouteCollectionCategory::Pages, _) => {
 						let mut items = vec![
 							quote!(EndpointBuilder::new(#mod_ident::#func_ident)
-								.with_method(#method)),
+								.with_method(#method)
+								.with_content_type(ContentType::Html)),
 						];
 						// ssr check TODO very brittle
 						if segments.is_static()
@@ -71,12 +72,14 @@ pub fn collect_route_files(
 					}
 					(RouteCollectionCategory::Actions, true) => {
 						vec![
-							quote!(ServerAction::new_async #annoying_generics(#method, #mod_ident::#func_ident)),
+							quote!(ServerAction::new_async #annoying_generics(#method, #mod_ident::#func_ident)
+								.with_content_type(ContentType::Json)),
 						]
 					}
 					(RouteCollectionCategory::Actions, false) => {
 						vec![
-							quote!(ServerAction::new #annoying_generics(#method, #mod_ident::#func_ident)),
+							quote!(ServerAction::new #annoying_generics(#method, #mod_ident::#func_ident)
+								.with_content_type(ContentType::Json)),
 						]
 					}
 				};

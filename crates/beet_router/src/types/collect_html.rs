@@ -16,10 +16,12 @@ pub async fn collect_html(
 		EndpointMeta::collect.pipe(EndpointMeta::static_get_html),
 	)?;
 
+	debug!("building {} static html documents", metas.len());
+
 	let mut results = Vec::new();
 	for meta in metas {
 		let path = meta.route_segments().annotated_route_path();
-		debug!("building html for {}", &path);
+		trace!("building html for {}", &path);
 
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");
 
@@ -37,6 +39,7 @@ pub async fn collect_html(
 			.await?;
 		results.push((route_path, text));
 	}
+	debug!("collected {} static html documents", results.len());
 	results.xok()
 }
 
@@ -58,17 +61,17 @@ mod test {
 				.with_path("foo")
 				.with_handler(|| "foo")
 				.with_cache_strategy(CacheStrategy::Static)
-				.as_html(),
+				.with_content_type(ContentType::Html),
 			EndpointBuilder::get()
 				.with_path("bar")
 				.with_handler(|| "bar")
 				.with_cache_strategy(CacheStrategy::Static)
-				.as_html(),
+				.with_content_type(ContentType::Html),
 			// non-static
 			EndpointBuilder::get()
 				.with_path("bazz")
 				.with_handler(|| "bazz")
-				.as_html(),
+				.with_content_type(ContentType::Html),
 			// non-html
 			EndpointBuilder::get()
 				.with_path("boo")
