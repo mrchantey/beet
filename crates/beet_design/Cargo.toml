@@ -19,7 +19,7 @@ exclude = ["src/**/:*.rs"]
 # required-features = ["build"]
 
 [features]
-# default = ["mockups"]
+default = ["mockups"]
 client = []
 server = []
 mockups = []
@@ -31,6 +31,7 @@ beet_rsx.workspace = true
 beet_core.workspace = true
 beet_dom.workspace = true
 beet_net.workspace = true
+beet_flow.workspace = true
 beet_router.workspace = true
 chrono.workspace = true
 heck.workspace = true

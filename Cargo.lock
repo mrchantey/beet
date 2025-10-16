@@ -1404,6 +1404,7 @@ version = "0.0.7"
 dependencies = [
  "beet_core",
  "beet_dom",
+ "beet_flow",
  "beet_net",
  "beet_parse",
  "beet_router",

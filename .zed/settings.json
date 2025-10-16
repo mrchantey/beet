@@ -11,10 +11,10 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
-						// "server",
+						"server"
 						// "client",
 						// "launch",
-						"aws"
+						// "aws"
 						// "webdriver",
 						// "css",
 						// "sim",

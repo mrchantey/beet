@@ -121,7 +121,7 @@ pub impl EntityWorldMut<'_> {
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
-/// World::new().spawn(Server::default().with_handler(flow_route_handler))
+/// World::new().spawn(Server::default().with_handler(flow_route_handler));
 /// ```
 pub async fn flow_route_handler(
 	server_async: AsyncEntity,

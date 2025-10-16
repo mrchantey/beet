@@ -107,10 +107,8 @@ mod test {
 	async fn simple() {
 		RouterPlugin::world()
 			.spawn((RouteServer, Sequence, children![
-				EndpointBuilder::get().with_handler(|| Html((
-					BeetRoot,
-					rsx! {<div>hello world</div>}
-				))),
+				EndpointBuilder::get()
+					.with_handler(|| (BeetRoot, rsx! {<div>hello world</div>})),
 				html_bundle_to_response(),
 			]))
 			.oneshot_str(Request::get("/"))
@@ -125,7 +123,7 @@ mod test {
 			// .with_resource(RenderMode::Ssr)
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get()
-					.with_handler(|| Html(rsx! {<MyTemplate foo=42/>})),
+					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
 				html_bundle_to_response(),
 			]))
 			.oneshot_str(Request::get("/"))
@@ -140,7 +138,7 @@ mod test {
 			// .with_resource(RenderMode::Ssr)
 			.spawn((RouteServer, Sequence, children![
 				EndpointBuilder::get()
-					.with_handler(|| Html(rsx! {<MyTemplate foo=42/>})),
+					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
 				OnSpawn::observe(
 					|mut ev: On<GetOutcome>,
 					 query: HtmlBundleQuery<Without<Response>>,

@@ -5,6 +5,7 @@ use async_channel::Sender;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
+use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
 use bevy::tasks::IoTaskPool;
@@ -398,6 +399,30 @@ impl AsyncWorld {
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
 		self.with_then(move |world| world.run_system_cached_with(system, input))
+			.await
+	}
+	pub async fn run_system_once<O, M, S>(
+		&self,
+		system: S,
+	) -> Result<O, RunSystemError>
+	where
+		O: 'static + Send + Sync,
+		S: 'static + Send + IntoSystem<(), O, M>,
+	{
+		self.run_system_once_with(system, ()).await
+	}
+	pub async fn run_system_once_with<I, O, M, S>(
+		&self,
+		system: S,
+		input: I::Inner<'_>,
+	) -> Result<O, RunSystemError>
+	where
+		I: SystemInput + 'static,
+		for<'a> I::Inner<'a>: 'static + Send + Sync,
+		O: 'static + Send + Sync,
+		S: 'static + Send + IntoSystem<I, O, M>,
+	{
+		self.with_then(move |world| world.run_system_once_with(system, input))
 			.await
 	}
 	/// Spawn an async task

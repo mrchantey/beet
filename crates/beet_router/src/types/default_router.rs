@@ -22,9 +22,11 @@ pub fn serve_on_ready() -> impl Bundle {
 }
 
 pub fn analytics_handler() -> impl Bundle {
-	ServerAction::new::<_, _, Result, _, _>(
+	ServerAction::new::<_, _, Result<(), BevyError>, _, _>(
 		HttpMethod::Post,
-		|In(input): In<Value>, mut commands: Commands| -> Result {
+		|In(input): In<Value>,
+		 mut commands: Commands|
+		 -> Result<(), BevyError> {
 			let ev = AnalyticsEvent::parse(input)?;
 			commands.trigger(ev);
 			Ok(())
@@ -44,7 +46,7 @@ pub fn app_info() -> EndpointBuilder {
 				stage,
 				..
 			} = config.clone();
-			Html(rsx! {
+			rsx! {
 				<main>
 					<h1>App Info</h1>
 					<p>Title: {title}</p>
@@ -52,7 +54,7 @@ pub fn app_info() -> EndpointBuilder {
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
 				</main>
-			})
+			}
 		},
 	)
 }

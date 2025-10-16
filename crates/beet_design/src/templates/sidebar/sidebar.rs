@@ -41,6 +41,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(Serialize, Deserialize))]
 pub struct SidebarNode {
 	/// A Title Case name for the group
 	pub display_name: String,
@@ -179,35 +180,43 @@ mod test {
 	fn collect_sidebar_node() {
 		let mut world = World::new();
 
-		world.spawn((RouteHandler::ok(), children![(
-			PathFilter::new("docs"),
-			RouteHandler::ok(),
-			ArticleMeta {
-				title: Some("Docs".to_string()),
-				sidebar: SidebarInfo {
-					label: Some("Testing".to_string()),
-					order: Some(1),
-				},
-				..Default::default()
-			},
-			children![(
-				PathFilter::new("testing"),
-				RouteHandler::ok(),
-				ArticleMeta {
-					title: Some("Partying".to_string()),
-					sidebar: SidebarInfo {
-						label: Some("Partying".to_string()),
-						order: Some(2),
-					},
-					..Default::default()
-				},
-			)]
-		),]));
+		world.spawn((InfallibleSequence, children![
+			EndpointBuilder::get()
+				.with_path("docs")
+				.with_cache_strategy(CacheStrategy::Static)
+				.with_handler_bundle((
+					StatusCode::OK.into_endpoint(),
+					ArticleMeta {
+						title: Some("Docs".to_string()),
+						sidebar: SidebarInfo {
+							label: Some("Testing".to_string()),
+							order: Some(1),
+						},
+						..Default::default()
+					}
+				)),
+			(PathFilter::new("/docs"), children![
+				EndpointBuilder::get()
+					.with_path("testing")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_handler_bundle((
+						StatusCode::OK.into_endpoint(),
+						ArticleMeta {
+							title: Some("Partying".to_string()),
+							sidebar: SidebarInfo {
+								label: Some("Partying".to_string()),
+								order: Some(2),
+							},
+							..Default::default()
+						}
+					)),
+			])
+		]));
 		world.run_system_cached(insert_route_tree).unwrap();
 		world
 			.resource::<RoutePathTree>()
 			.to_string()
-			.xpect_eq("/\n/docs\n/docs/testing\n");
+			.xpect_eq("/*\n/docs\n/docs/testing\n");
 
 		world
 			.run_system_cached_with(
@@ -220,22 +229,7 @@ mod test {
 				},
 			)
 			.unwrap()
-			.xpect_eq(SidebarNode {
-				display_name: "Root".to_string(),
-				path: Some(RoutePath::new("/")),
-				children: vec![SidebarNode {
-					display_name: "Testing".to_string(),
-					path: Some(RoutePath::new("/docs")),
-					children: vec![SidebarNode {
-						display_name: "Partying".to_string(),
-						path: Some(RoutePath::new("/docs/testing")),
-						children: vec![],
-						expanded: false,
-					}],
-					expanded: false,
-				}],
-				expanded: false,
-			});
+			.xpect_snapshot();
 	}
 
 	#[test]

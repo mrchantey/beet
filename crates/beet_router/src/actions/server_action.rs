@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 
@@ -18,6 +19,51 @@ use serde::de::DeserializeOwned;
 pub struct ServerAction;
 
 
+pub trait IntoServerActionOut<M> {
+	fn into_action_response(self) -> Response;
+}
+pub struct SerdeResultIntoServerActionOut;
+impl<T, E> IntoServerActionOut<(SerdeResultIntoServerActionOut, E)>
+	for Result<T, E>
+where
+	T: Serialize,
+	E: Serialize,
+{
+	fn into_action_response(self) -> Response {
+		JsonResult::new(self).into_response()
+	}
+}
+pub struct BevyResultIntoServerActionOut;
+impl<T> IntoServerActionOut<Self> for Result<T, BevyError>
+where
+	T: Serialize,
+{
+	fn into_action_response(self) -> Response {
+		self.map(|val| {
+			serde_json::to_string(&val)
+				.map(|val| Response::ok_body(val, "application/json"))
+				.unwrap_or_else(|_| {
+					Response::from_status_body(
+						StatusCode::INTERNAL_SERVER_ERROR,
+						"Failed to serialize response body",
+						"text/plain",
+					)
+				})
+				.into_response()
+		})
+		.into_response()
+	}
+}
+pub struct TypeIntoServerActionOut;
+impl<T> IntoServerActionOut<(TypeIntoServerActionOut,)> for T
+where
+	T: Serialize,
+{
+	fn into_action_response(self) -> Response { Json(self).into_response() }
+}
+
+
+
 impl ServerAction {
 	pub fn new<T, Input, Out, M1, M2>(
 		method: HttpMethod,
@@ -27,7 +73,7 @@ impl ServerAction {
 		T: 'static + Send + Sync + Clone + IntoSystem<Input, Out, M1>,
 		Input: 'static + Send + SystemInput,
 		for<'a> Input::Inner<'a>: 'static + Send + Sync + DeserializeOwned,
-		Out: 'static + Send + Sync + IntoResponse<M2>,
+		Out: 'static + Send + Sync + IntoServerActionOut<M2>,
 	{
 		let builder = EndpointBuilder::default().with_method(method);
 		match method.has_body() {
@@ -35,22 +81,22 @@ impl ServerAction {
 			true => builder.with_handler(
 				async move |req: Json<Input::Inner<'_>>,
 				            cx: EndpointContext|
-				            -> Result<Out> {
+				            -> Result<Response> {
 					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
-					Ok(out)
+					Ok(out.into_action_response())
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input::Inner<'_>>,
 				            cx: EndpointContext|
-				            -> Result<Out> {
+				            -> Result<Response> {
 					let out = cx
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
-					Ok(out)
+					Ok(out.into_action_response())
 				},
 			),
 		}
@@ -63,22 +109,23 @@ impl ServerAction {
 	where
 		T: 'static + Send + Sync + Clone + Fn(Input, EndpointContext) -> Fut,
 		Input: 'static + Send + Sync + DeserializeOwned,
-		Out: 'static + Send + Sync + IntoResponse<M2>,
+		Out: 'static + Send + Sync + IntoServerActionOut<M2>,
 		Fut: 'static + Send + Future<Output = Out>,
 	{
 		let builder = EndpointBuilder::default().with_method(method);
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
-				async move |req: Json<Input>, cx: EndpointContext| -> Out {
-					handler.clone()(req.0, cx).await
+				async move |req: Json<Input>, cx: EndpointContext| {
+					handler.clone()(req.0, cx).await.into_action_response()
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input>,
-				            cx: EndpointContext|
-				            -> Out { handler.clone()(req.0, cx).await },
+				            cx: EndpointContext| {
+					handler.clone()(req.0, cx).await.into_action_response()
+				},
 			),
 		}
 	}
@@ -96,10 +143,7 @@ mod test {
 	#[sweet::test]
 	async fn no_input() {
 		RouterPlugin::world()
-			.spawn((
-				RouteServer,
-				ServerAction::new(HttpMethod::Post, (|| 2).pipe(Json::pipe)),
-			))
+			.spawn((RouteServer, ServerAction::new(HttpMethod::Post, || 2)))
 			.oneshot(
 				Request::post("/")
 					// no input means we need to specify unit type
@@ -121,11 +165,8 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn((
 			RouteServer,
-			ServerAction::new(
-				HttpMethod::Post,
-				(|val: In<u32>| val.0 + 2).pipe(Json::pipe),
-			)
-			.with_path("foo"),
+			ServerAction::new(HttpMethod::Post, |val: In<u32>| val.0 + 2)
+				.with_path("foo"),
 		));
 
 		//ok
@@ -153,7 +194,7 @@ mod test {
 		let mut entity = world.spawn((
 			RouteServer,
 			ServerAction::new_async(HttpMethod::Get, async |val: u32, _| {
-				Json(val + 2)
+				val + 2
 			}),
 		));
 

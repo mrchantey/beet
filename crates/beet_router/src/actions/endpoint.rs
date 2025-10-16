@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use bevy::ecs::relationship::RelatedSpawner;
 
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
@@ -52,6 +53,15 @@ pub struct EndpointBuilder {
 	html: Option<HtmlEndpoint>,
 	/// Whether to match the path exactly, defaults to true.
 	exact_path: bool,
+	/// Additional bundles to be run before the handler
+	additional_predicates: Vec<
+		Box<
+			dyn 'static
+				+ Send
+				+ Sync
+				+ FnOnce(&mut RelatedSpawner<'_, ChildOf>),
+		>,
+	>,
 }
 
 impl Default for EndpointBuilder {
@@ -65,11 +75,18 @@ impl Default for EndpointBuilder {
 			cache_strategy: None,
 			html: None,
 			exact_path: true,
+			additional_predicates: Vec::new(),
 		}
 	}
 }
 
 impl EndpointBuilder {
+	pub fn new<M>(
+		handler: impl 'static + Send + Sync + IntoEndpoint<M>,
+	) -> Self {
+		Self::default().with_handler(handler)
+	}
+
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
 	pub fn any_method() -> Self { Self::default().with_any_method() }
@@ -100,6 +117,18 @@ impl EndpointBuilder {
 	}
 	pub fn with_any_method(mut self) -> Self {
 		self.method = None;
+		self
+	}
+
+	/// Add additional actions to be run before the handler,
+	/// if they trigger a [`Outcome::Fail`] the handler will not run.
+	pub fn with_predicate(
+		mut self,
+		predicate: impl Bundle + 'static + Send + Sync,
+	) -> Self {
+		self.additional_predicates.push(Box::new(move |spawner| {
+			spawner.spawn(predicate);
+		}));
 		self
 	}
 
@@ -143,6 +172,10 @@ impl EndpointBuilder {
 					}
 					if let Some(method) = self.method {
 						spawner.spawn(check_method(method));
+					}
+
+					for predicate in self.additional_predicates {
+						(predicate)(spawner);
 					}
 
 					let mut handler_entity = spawner.spawn_empty();

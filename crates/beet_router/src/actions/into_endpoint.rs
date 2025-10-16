@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_dom::prelude::BeetRoot;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
@@ -13,13 +14,21 @@ trait IntoResponseBundle<M> {
 	fn into_response_bundle(self) -> impl Bundle;
 }
 
+/// Used to constrain a subtype of [`Bundle`] that we can assume
+/// the user would like converted to html.
+trait HtmlLike {}
+impl HtmlLike for RsxRoot {}
+impl<T> HtmlLike for (RsxRoot, T) {}
+impl HtmlLike for BeetRoot {}
+impl<T> HtmlLike for (BeetRoot, T) {}
+
 pub struct HtmlIntoResponseBundle;
-impl<B> IntoResponseBundle<HtmlIntoResponseBundle> for Html<B>
+impl<B> IntoResponseBundle<HtmlIntoResponseBundle> for B
 where
-	B: Bundle,
+	B: HtmlLike + Bundle,
 {
 	fn into_response_bundle(self) -> impl Bundle {
-		children![(HtmlBundle, self.0)]
+		children![(HtmlBundle, self)]
 	}
 }
 
@@ -194,6 +203,18 @@ where
 		})
 	}
 }
+pub struct CxSystemIntoEndpoint;
+impl<System, Req, Out, M2, M3>
+	IntoEndpoint<(CxSystemIntoEndpoint, Req, Out, M2, M3)> for System
+where
+	System: 'static + Send + Sync + Clone + FnMut(Req, EndpointContext) -> Out,
+	Req: 'static + Send + Sync + FromRequest<M2>,
+	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
+{
+	fn into_endpoint(self) -> impl Bundle {
+		run_and_insert(async move |req: Req, cx| self.clone()(req, cx))
+	}
+}
 
 
 pub struct AsyncSystemIntoEndpoint;
@@ -262,6 +283,13 @@ mod test {
 		assert(|| StatusCode::OK).await.xpect_eq(200);
 	}
 	#[sweet::test]
+	async fn cx_system() {
+		assert(|_: Json<Foo>, _: EndpointContext| StatusCode::OK)
+			.await
+			.xpect_eq(200);
+		assert(|| StatusCode::OK).await.xpect_eq(200);
+	}
+	#[sweet::test]
 	async fn async_system() {
 		async fn my_async_system(
 			_req: Json<Foo>,
@@ -279,6 +307,6 @@ mod test {
 	#[sweet::test]
 	async fn html() {
 		// just check compilation, see html_bundle for test
-		let _ = assert(|| Html(rsx! {<div>"hello world"</div>}));
+		let _ = assert(|| rsx! {<div>"hello world"</div>});
 	}
 }
