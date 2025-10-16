@@ -1,10 +1,12 @@
 pub use futures::future::try_join_all;
+use futures_lite::future::YieldNow;
 use std::pin::Pin;
 
 
 pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }
+pub fn yield_now() -> YieldNow { futures_lite::future::yield_now() }
 
 /// A 'static + Send, making it suitable for use-cases like tokio::spawn
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;

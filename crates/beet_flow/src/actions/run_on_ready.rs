@@ -96,7 +96,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let store = Store::default();
-		let mut world = AsyncPlugin::world();
+		let mut world = (MinimalPlugins, AsyncPlugin).into_world();
 		world
 			.spawn((RunOnReady, ReadyOnChildrenReady::default(), children![
 				ReadyAction::new(async |_| {

@@ -6,6 +6,8 @@ use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::path::Path;
 
+
+/// NOTE: currently only single child is supported
 /// A filter for matching routes based on path segments.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.

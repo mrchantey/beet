@@ -38,15 +38,12 @@ impl AsyncRunner {
 	/// an AppExit is triggered. Note that some tasks like http/socket listeners
 	/// will never complete in which case this will never return.
 	pub async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
+		// yield required for wasm to spawn tasks
+		async_ext::yield_now().await;
+
 		loop {
-			// println!("loopin");
 			// 1. update
 			world.update();
-			// println!(
-			// 	"CONTINUE async tasks in flight: {}",
-			// 	world.resource::<AsyncChannel>().task_count()
-			// );
-
 			// 2. exit if AppExit
 			if let Some(exit) = world.should_exit() {
 				return Some(exit);
@@ -57,7 +54,6 @@ impl AsyncRunner {
 			}
 			// 4. short delay
 			time_ext::sleep_millis(1).await;
-			// }
 		}
 	}
 	/// update the world in 1ms increments until recv has a value

@@ -11,7 +11,7 @@ async fn docs() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.oneshot("/docs")
-		.await·
+		.await
 		.into_result()
 		.await
 		.unwrap()
