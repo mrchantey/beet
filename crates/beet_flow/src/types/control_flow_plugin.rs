@@ -11,6 +11,7 @@ impl Plugin for ControlFlowPlugin {
 			.configure_sets(Update, PreTickSet)
 			.configure_sets(Update, TickSet.after(PreTickSet))
 			.configure_sets(Update, PostTickSet.after(TickSet))
+			.add_systems(PostStartup, get_ready_on_startup)
 			.add_systems(
 				Update,
 				// flush any triggers spawned by TriggerDeferred

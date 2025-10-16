@@ -60,6 +60,7 @@ pub fn default_router(
 /// [`RouteServer`] which will immediately start handling requests.
 pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
 	(
+		GetReadyOnStartup,
 		ReadyOnChildrenReady::default(),
 		OnSpawn::observe(move |ev: On<Ready>, mut commands: Commands| {
 			if ev.event_target() == ev.original_event_target() {
