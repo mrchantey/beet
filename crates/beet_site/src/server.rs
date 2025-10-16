@@ -14,7 +14,8 @@ pub fn server_plugin(app: &mut App) {
 			beet_design::mockups::mockups_routes(),
 			article_layout_middleware().with_path("docs"),
 			article_layout_middleware().with_path("blog"),
-			image_generator()
+			image_generator(),
+			(Fallback, children![html_bundle_to_response()])
 		],
 	));
 }

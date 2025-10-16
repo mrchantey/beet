@@ -5,22 +5,13 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 #[sweet::test]
-// #[ignore = "changes too often"]
 async fn docs() {
-	// let res = Router::new_bundle(routes_bundle)
-	// 	.oneshot("/docs")
-	// 	.await
-	// 	// .text()
-	// 	// .await
-	// 	.unwrap();
-	// println!("res: {res:?}");
-	// empty without snippets.ron?
-
-	Router::new(server_routes_plugin)
+	(MinimalPlugins, RouterPlugin, server_plugin)
+		.into_world()
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.oneshot("/docs")
-		.await
+		.await·
 		.into_result()
 		.await
 		.unwrap()
