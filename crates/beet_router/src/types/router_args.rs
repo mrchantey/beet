@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// Cli args for running a beet server.
 #[cfg_attr(feature = "serde", derive(clap::Parser))]
 #[cfg_attr(feature = "serde", command(version, about, long_about = None))]
-pub struct ServerRunner {
+pub struct RouterArgs {
 	/// Only export the static html files to the [`WorkspaceConfig::html_dir`],
 	/// and immediately exit.
 	#[cfg_attr(feature = "serde", arg(long))]
@@ -21,7 +21,7 @@ pub struct ServerRunner {
 	#[cfg_attr(feature = "serde", command(subcommand))]
 	pub mode: Option<RenderMode>,
 }
-impl Default for ServerRunner {
+impl Default for RouterArgs {
 	fn default() -> Self {
 		Self {
 			export_static: false,
@@ -42,55 +42,29 @@ pub enum RenderMode {
 	Ssr,
 }
 
-impl ServerRunner {
-	pub fn runner(app: App) -> AppExit {
-		#[cfg(not(feature = "serde"))]
-		todo!("wasm runner");
-		#[cfg(feature = "serde")]
-		{
-			use clap::Parser;
-			Self::parse().run(app).unwrap_or_exit();
-		}
-		AppExit::Success
-	}
-	#[cfg(target_arch = "wasm32")]
-	fn run(self, _: App) -> Result {
-		todo!("wasm runner");
-	}
-	#[cfg(not(target_arch = "wasm32"))]
-	#[tokio::main]
-	async fn run(self, mut app: App) -> Result {
+impl Plugin for RouterArgs {
+	fn build(&self, app: &mut App) {
 		PrettyTracing::default().init();
-		app.add_plugins(self.config_overrides);
+		app.add_plugins(self.config_overrides.clone());
 
 		if self.export_static {
-			app.insert_resource(RenderMode::Ssr);
+			app.insert_resource(RenderMode::Ssr)
+				.add_systems(PostStartup, export_static);
 		} else if !app.world().contains_resource::<RenderMode>() {
 			app.insert_resource(self.mode.unwrap_or_default());
 		}
-
-		app.init();
-
-		app.update();
-		if self.export_static {
-			Self::export_static(&mut app).await?;
-			// graceful shutdown, allow tasks to cancel
-			app.world_mut().write_message(AppExit::Success);
-			app.run().into_result()
-		} else {
-			app.run().into_result()
-		}
 	}
+}
 
-	/// Export static html files, with the router in SSG mode.
-	#[cfg(not(target_arch = "wasm32"))]
-	async fn export_static(app: &mut App) -> Result {
-		let html = collect_html(app.world_mut()).await?;
+fn export_static(mut commands: AsyncCommands) {
+	commands.run(async |world| -> Result {
+		let html = collect_html(world.clone()).await?;
 
 		for (path, html) in html {
 			trace!("Exporting html to {}", path);
 			fs_ext::write(path, &html)?;
 		}
+		world.write_message(AppExit::Success);
 		Ok(())
-	}
+	});
 }

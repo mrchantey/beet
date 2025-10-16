@@ -4,7 +4,6 @@ use beet::prelude::*;
 /// The plugin added to the router app
 pub fn server_plugin(app: &mut App) {
 	app.add_plugins((MinimalPlugins, RouterPlugin, AgentPlugin))
-		.set_runner(ServerRunner::runner)
 		.world_mut()
 		.spawn((RouteServer, InfallibleSequence, children![
 			pages_routes(),

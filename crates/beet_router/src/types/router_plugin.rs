@@ -28,6 +28,13 @@ impl Plugin for RouterPlugin {
 				// user inserts their own server
 				.without_server(),
 		);
+
+		#[cfg(all(not(test), feature = "serde"))]
+		{
+			use clap::Parser;
+			app.add_plugins(RouterArgs::parse());
+		}
+
 		#[cfg(feature = "lambda")]
 		app.add_systems(Startup, attach_lambda);
 	}

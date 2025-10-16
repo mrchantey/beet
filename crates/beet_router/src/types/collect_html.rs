@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 #[allow(unused_imports)]
 use beet_rsx::prelude::*;
 // use beet_router::types::RouteFunc;
@@ -7,18 +8,31 @@ use crate::prelude::*;
 
 /// Collect all static HTML endpoints in the [`Router`]
 pub async fn collect_html(
-	world: &mut World,
+	world: AsyncWorld,
 ) -> Result<Vec<(AbsPathBuf, String)>> {
-	let workspace_config = world.resource::<WorkspaceConfig>();
-	let html_dir = workspace_config.html_dir.into_abs();
+	let html_dir = world
+		.with_resource_then::<WorkspaceConfig, _>(|conf| {
+			conf.html_dir.into_abs()
+		})
+		.await;
 
-	let metas = world.run_system_cached(
-		EndpointMeta::collect.pipe(EndpointMeta::static_get_html),
-	)?;
+	let metas = world
+		.run_system_cached(
+			EndpointMeta::collect.pipe(EndpointMeta::static_get_html),
+		)
+		.await?;
 
 	debug!("building {} static html documents", metas.len());
 
 	let mut results = Vec::new();
+	let server = world
+		.with_then(|world| {
+			world
+				.query_filtered::<Entity, With<RouteServer>>()
+				.single(world)
+		})
+		.await?;
+	let server = world.entity(server);
 	for meta in metas {
 		let path = meta.route_segments().annotated_route_path();
 		trace!("building html for {}", &path);
@@ -27,9 +41,13 @@ pub async fn collect_html(
 
 		// let route_info = RouteInfo::get(path.clone());
 
-		let text = world
-			.oneshot(path.clone())
+
+
+		let text = flow_route_handler(server.clone(), Request::get(&path))
 			.await
+			.into_response()
+			// .with_then(|world| world.oneshot(path.clone()))
+			// .await
 			.into_result()
 			.await
 			.map_err(|err| {
@@ -79,8 +97,7 @@ mod test {
 				.with_cache_strategy(CacheStrategy::Static),
 		]));
 		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
-
-		collect_html(&mut world).await.unwrap().xpect_eq(vec![
+		world.run_async_then(collect_html).await.unwrap().xpect_eq(vec![
 			(ws_path.join("foo/index.html"), "foo".to_string()),
 			(ws_path.join("bar/index.html"), "bar".to_string()),
 		]);
