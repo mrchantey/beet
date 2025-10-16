@@ -439,6 +439,10 @@ required-features = ["rsx"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
+required-features = ["server"]
+[[example]]
+name = "router_full"
+path = "examples/router/router_full.rs"
 required-features = ["server", "native-tls"]
 [[example]]
 name = "router_bench"
