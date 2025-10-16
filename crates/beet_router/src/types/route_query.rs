@@ -19,7 +19,10 @@ impl ActionExchangePair for EndpointContext {
 	fn get_action(&self) -> Entity { self.action_id() }
 	fn get_exchange(&self) -> Entity { self.exchange_id() }
 }
-
+impl ActionExchangePair for MiddlewareContext {
+	fn get_action(&self) -> Entity { self.action() }
+	fn get_exchange(&self) -> Entity { self.exchange() }
+}
 
 
 #[derive(SystemParam)]

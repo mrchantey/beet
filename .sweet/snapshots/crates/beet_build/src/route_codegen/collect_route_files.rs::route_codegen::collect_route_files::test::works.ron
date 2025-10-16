@@ -10,9 +10,12 @@ use crate as test_site;
 pub mod _index;
 #[cfg(feature = "server")]
 pub fn test_docs_routes() -> impl Bundle {
-    related! {
-        Children[(CacheStrategy::Static, PathFilter { segments :
-        RouteSegments::_from_raw(vec![], true) }, HttpMethod::Get,
-        bundle_endpoint(_index::get), HandlerConditions::is_ssr())]
-    }
+    (
+        InfallibleSequence,
+        related! {
+            Children[EndpointBuilder::new(_index::get).with_method(HttpMethod::Get)
+            .with_predicate(common_predicates::is_ssr()).with_path("/")
+            .with_cache_strategy(CacheStrategy::Static)]
+        },
+    )
 }

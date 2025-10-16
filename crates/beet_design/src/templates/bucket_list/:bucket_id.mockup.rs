@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "client"), allow(unused))]
 use crate::prelude::*;
 
-pub async fn get(_req: (), cx: EndpointContext) -> Result<impl use<> + Bundle> {
+pub async fn get(_req: (), cx: EndpointContext) -> Result<impl use<> + IntoHtml> {
 	let bucket_id = cx.dyn_segment("bucket_id").await?.xmap(RoutePath::new);
 	rsx! { <Inner bucket_id=bucket_id client:load /> }.xok()
 }

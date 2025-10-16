@@ -248,6 +248,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
+default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom","net", "build"]

@@ -41,6 +41,14 @@ pub fn collect_route_files(
 				let method =
 					route_file_method.route_info.method.self_token_stream();
 				let is_async = route_file_method.item.sig.asyncness.is_some();
+				let annoying_generics = match route_file_method.returns_result()
+				{
+					true => {
+						quote! { ::<_,_,_,_,(SerdeResultIntoServerActionOut,_)> }
+					}
+					false => quote! {},
+				};
+
 
 				let mut builder_tokens = match (collection.category, is_async) {
 					(RouteCollectionCategory::Pages, _) => {
@@ -63,12 +71,12 @@ pub fn collect_route_files(
 					}
 					(RouteCollectionCategory::Actions, true) => {
 						vec![
-							quote!(ServerAction::new_async(#method, #mod_ident::#func_ident)),
+							quote!(ServerAction::new_async #annoying_generics(#method, #mod_ident::#func_ident)),
 						]
 					}
 					(RouteCollectionCategory::Actions, false) => {
 						vec![
-							quote!(ServerAction::new(#method, #mod_ident::#func_ident)),
+							quote!(ServerAction::new #annoying_generics(#method, #mod_ident::#func_ident)),
 						]
 					}
 				};
@@ -91,7 +99,7 @@ pub fn collect_route_files(
 		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
 			#[cfg(feature = "server")]
 			pub fn #collection_ident() -> impl Bundle {
-				#bundle
+				(InfallibleSequence, #bundle)
 			}
 		});
 	}

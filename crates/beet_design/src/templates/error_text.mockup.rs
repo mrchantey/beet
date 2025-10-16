@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! {
 		<div>
 			<ErrorText value=Some("this is an error".to_string()) />

@@ -6,7 +6,7 @@ use beet::prelude::*;
 use crate::prelude::*;
 #[allow(unused_imports)]
 use crate as test_site;
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
     ResolveSnippets::resolve((
         SnippetRoot {
             file: WsPathBuf::new("tests/test_site/test_docs/index.mdx"),

@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 /// https://lh3.googleusercontent.com/rfxJv95pIoJ3cEZ9ypfimJFC5Ps8sEEVBNWD36C-fy3DYvec8J_VLRosBkwTNsnpSCgSpxWXBypOXT8Ydm4fJOQ2ajWoy7SjocrzJcK7KA8=s0
 /// https://lh3.googleusercontent.com/S-tgf061eUWcbEBhyicTYR9PWVDeXSsSgZ2e2yYSr6Jn4W-F9z5czZCG6sv58wgJQODQakVRBDvUX5gaotfq3BuqMDLROrCO4D0Kz9F494LW=s0
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! {
 		<h2>Color Scheme - Light</h2>
 		<div class=ThemeToCss::DEFAULT_LIGHT_CLASS>{scheme()}</div>

@@ -530,12 +530,19 @@ impl AsyncEntity {
 		self.get::<T, _>(|comp| comp.clone()).await
 	}
 
-	pub async fn insert<B: Bundle>(&self, component: B) -> &Self {
+	pub async fn insert<B: Bundle>(&self, bundle: B) -> &Self {
 		self.with_then(|mut entity| {
-			entity.insert(component);
+			entity.insert(bundle);
 		})
 		.await;
 		self
+	}
+	/// Spawn a child and return its id
+	pub async fn spawn_child<B: Bundle>(&self, bundle: B) -> Entity {
+		let id = self.entity;
+		self.world
+			.with_then(move |world| world.spawn((bundle, ChildOf(id))).id())
+			.await
 	}
 
 	pub async fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(

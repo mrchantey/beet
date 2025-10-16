@@ -55,7 +55,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			.get_mut::<CodegenFile>()
 			.unwrap() // checked in query filter
 			.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn get() -> impl Bundle{
+				pub fn get() -> impl IntoHtml {
 					#tokens
 				}
 			));

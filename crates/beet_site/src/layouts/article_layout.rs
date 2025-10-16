@@ -2,18 +2,22 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-
-pub fn article_layout_middleware() -> impl Bundle {
-	(
-		HandlerConditions::contains_handler_bundle(),
-		RouteHandler::layer(|world: &mut World| {
-			let entity = world
-				.query_filtered::<Entity, With<HtmlBundle>>()
-				.single(world)
-				.unwrap(/*checked in handler conditions*/);
-
-			world.spawn((HtmlDocument, rsx! { <ArticleLayout>{entity}</ArticleLayout> }));
-		}),
+pub fn article_layout_middleware() -> EndpointBuilder {
+	EndpointBuilder::layer::<(Result, _, _, _)>(
+		|cx: In<MiddlewareContext>,
+		 query: HtmlBundleQuery,
+		 mut commands: Commands| {
+			let Some(html_bundle) = query.get(cx.exchange())? else {
+				return Ok(());
+			};
+			commands.spawn((
+				HtmlDocument,
+				HtmlBundle,
+				ChildOf(cx.exchange()),
+				rsx! { <ArticleLayout>{html_bundle}</ArticleLayout> },
+			));
+			Ok(())
+		},
 	)
 }
 

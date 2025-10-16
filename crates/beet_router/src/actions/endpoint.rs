@@ -90,7 +90,7 @@ impl EndpointBuilder {
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
 	pub fn any_method() -> Self { Self::default().with_any_method() }
-	/// Create a new endpoint with the provided handler
+	/// Create a new endpoint with the provided endpoint handler
 	pub fn with_handler<M>(
 		self,
 		handler: impl 'static + Send + Sync + IntoEndpoint<M>,
@@ -106,7 +106,17 @@ impl EndpointBuilder {
 		});
 		self
 	}
-
+	/// Create a new endpoint with the provided [`IntoMiddleware`] handler.
+	/// Middleware defaults to accepting any [`HttpMethod`].
+	pub fn layer<M>(
+		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
+	) -> Self {
+		Self {
+			method: None,
+			..default()
+		}
+		.with_handler_bundle(handler.into_middleware())
+	}
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
 		self.path = Some(PathFilter::new(path.as_ref()));
 		self
