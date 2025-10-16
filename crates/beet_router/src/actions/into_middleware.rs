@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::IntoResponse;
+use beet_net::prelude::*;
 use bevy::ecs::system::IntoResult;
 use bevy::ecs::system::RunSystemError;
 
@@ -8,6 +8,7 @@ use bevy::ecs::system::RunSystemError;
 /// or may not insert a response.
 /// Note that the [`Observer`] variant must trigger an [`Outcome::Pass`]
 /// on the `action` with the `exchange` as its agent.
+/// TODO tuples ie [`(MiddlewareContext, RoutePath, QueryParams)`]
 pub trait IntoMiddleware<M> {
 	fn into_middleware(self) -> impl Bundle;
 }
@@ -21,38 +22,84 @@ pub struct MiddlewareContext {
 	exchange: Entity,
 }
 
-
 impl MiddlewareContext {
 	pub fn action(&self) -> Entity { self.action }
 	pub fn exchange(&self) -> Entity { self.exchange }
 }
 
-trait MiddlewareIn {
-	fn from_cx(cx: MiddlewareContext) -> Self;
+trait MiddlewareIn<M>: Sized {
+	fn from_request_meta_and_cx(
+		request: &RequestMeta,
+		cx: &MiddlewareContext,
+	) -> Result<Self, Response>;
 }
-impl MiddlewareIn for MiddlewareContext {
-	fn from_cx(cx: MiddlewareContext) -> Self { cx }
+
+pub struct TupleMiddlewareIn;
+macro_rules! impl_tuple_middleware {
+($(#[$meta:meta])* $(($T:ident, $M:ident)),*) => {
+	$(#[$meta])*
+	impl<$($T,)* $($M,)*> MiddlewareIn<(TupleMiddlewareIn, $($M,)*)> for ($($T,)*)
+	where
+		$($T: MiddlewareIn<$M>,)*
+	{
+	fn from_request_meta_and_cx(
+		request: &RequestMeta,
+		cx: &MiddlewareContext,
+	) -> Result<Self, Response> {
+		Ok(($($T::from_request_meta_and_cx(request, cx)?,)*))
+	}
+	}
 }
-impl MiddlewareIn for () {
-	fn from_cx(_cx: MiddlewareContext) -> Self {}
+}
+
+variadics_please::all_tuples!(impl_tuple_middleware, 1, 15, T, M);
+
+
+impl MiddlewareIn<Self> for MiddlewareContext {
+	fn from_request_meta_and_cx(
+		_: &RequestMeta,
+		cx: &MiddlewareContext,
+	) -> Result<Self, Response> {
+		cx.clone().xok()
+	}
+}
+
+pub struct FromRequestRefMiddlewareIn;
+// includes unit type
+impl<T, M> MiddlewareIn<(FromRequestRefMiddlewareIn, M)> for T
+where
+	T: FromRequestMeta<M>,
+{
+	fn from_request_meta_and_cx(
+		request: &RequestMeta,
+		_: &MiddlewareContext,
+	) -> Result<Self, Response> {
+		T::from_request_meta(request)
+	}
 }
 
 pub struct SystemIntoMiddleware;
-impl<System, Input, Output, M1>
-	IntoMiddleware<(Output, Input, SystemIntoMiddleware, M1)> for System
+impl<System, Input, Output, M1, M2>
+	IntoMiddleware<(Output, Input, SystemIntoMiddleware, M1, M2)> for System
 where
 	System: 'static + Send + Sync + Clone + IntoSystem<Input, Output, M1>,
 	Input: 'static + Send + SystemInput,
-	for<'a> Input::Inner<'a>: 'static + Send + Sync + MiddlewareIn,
+	for<'a> Input::Inner<'a>: 'static + Send + Sync + MiddlewareIn<M2>,
 	Output: 'static + IntoResult<()>,
 	M1: 'static,
 {
 	fn into_middleware(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>, mut commands: Commands| {
+			move |mut ev: On<GetOutcome>,
+			      mut commands: Commands,
+			      request: Query<&RequestMeta>|
+			      -> Result {
 				let action = ev.action();
 				let exchange = ev.agent();
+				let request = request.get(exchange)?;
 				let cx = MiddlewareContext { action, exchange };
+				let input =
+					Input::Inner::from_request_meta_and_cx(request, &cx)?;
 				commands.run_system_once_with(
 					self.clone().pipe(
 						move |result: In<Output>, mut commands: Commands| {
@@ -65,36 +112,39 @@ where
 							}
 						},
 					),
-					Input::Inner::from_cx(cx),
+					input,
 				);
 				ev.trigger_next(Outcome::Pass);
+				Ok(())
 			},
 		)
 	}
 }
 
 pub struct AsyncSystemIntoMiddleware;
-impl<Func, Fut, Output> IntoMiddleware<(AsyncSystemIntoMiddleware, Output)>
-	for Func
+impl<Func, Fut, Input, Output, M1>
+	IntoMiddleware<(AsyncSystemIntoMiddleware, Input, Output, M1)> for Func
 where
-	Func: 'static
-		+ Send
-		+ Sync
-		+ Clone
-		+ FnOnce(MiddlewareContext, AsyncWorld) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(Input, AsyncWorld) -> Fut,
 	Fut: Send + Future<Output = Output>,
 	Output: 'static + IntoResult<()>,
+	Input: 'static + Send + Clone + MiddlewareIn<M1>,
 {
 	fn into_middleware(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>, mut commands: AsyncCommands| {
+			move |ev: On<GetOutcome>,
+			      mut commands: AsyncCommands,
+			      request: Query<&RequestMeta>|
+			      -> Result {
 				let action = ev.action();
 				let exchange = ev.agent();
+				let request = request.get(exchange)?;
 				let cx = MiddlewareContext { action, exchange };
 				let this = self.clone();
+				let input = Input::from_request_meta_and_cx(request, &cx)?;
 				commands.run(async move |world| {
 					if let Err(RunSystemError::Failed(err)) =
-						this(cx.clone(), world.clone()).await.into_result()
+						this(input.clone(), world.clone()).await.into_result()
 					{
 						world
 							.entity(exchange)
@@ -106,6 +156,7 @@ where
 						.trigger_target(Outcome::Pass.with_agent(cx.exchange()))
 						.await;
 				});
+				Ok(())
 			},
 		)
 	}
@@ -128,7 +179,7 @@ mod test {
 		assert(my_system2);
 		assert(|_: In<MiddlewareContext>| {});
 		fn my_system3(_cx: In<MiddlewareContext>) -> Result { Ok(()) }
-		assert::<(Result, _, _, _)>(my_system3);
+		assert::<(Result, _, _, _, _)>(my_system3);
 		// assert(my_system3);
 		// assert(|_: In<MiddlewareContext>| -> Result { Ok(()) });
 	}
@@ -138,7 +189,7 @@ mod test {
 		async fn my_async_system(_cx: MiddlewareContext, _world: AsyncWorld) {}
 		assert(my_async_system);
 		async fn my_async_system2(
-			_cx: MiddlewareContext,
+			_cx: (MiddlewareContext, MiddlewareContext),
 			_world: AsyncWorld,
 		) -> Result {
 			Ok(())

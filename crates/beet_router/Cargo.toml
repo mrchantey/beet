@@ -56,6 +56,7 @@ beet_rsx.workspace = true
 bevy.workspace = true
 
 # utils
+variadics_please.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

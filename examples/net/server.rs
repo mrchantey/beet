@@ -45,7 +45,7 @@ fn handler(
 	let num_visits = visit_counter.0;
 
 	let name = if let Ok(params) =
-		QueryParams::<MyParams>::from_request_ref(&request)
+		QueryParams::<MyParams>::from_request_meta(&request)
 	{
 		params.name.clone()
 	} else {

@@ -50,6 +50,10 @@ impl RequestMeta {
 	pub fn started(&self) -> Instant { self.started }
 	pub fn parts(&self) -> &request::Parts { &self.parts }
 }
+impl std::ops::Deref for RequestMeta {
+	type Target = request::Parts;
+	fn deref(&self) -> &Self::Target { &self.parts }
+}
 
 
 impl Request {
@@ -296,12 +300,14 @@ where
 }
 
 /// Types which consume a request by reference, not requiring its body
-pub trait FromRequestRef<M>: Sized {
-	fn from_request_ref(request: &Request) -> Result<Self, Response>;
+pub trait FromRequestMeta<M>: Sized {
+	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response>;
 }
 
-impl FromRequestRef<Self> for () {
-	fn from_request_ref(_request: &Request) -> Result<Self, Response> { Ok(()) }
+impl FromRequestMeta<Self> for () {
+	fn from_request_meta(_request: &RequestMeta) -> Result<Self, Response> {
+		Ok(())
+	}
 }
 
 // impl Into<()> for Request {
@@ -309,28 +315,29 @@ impl FromRequestRef<Self> for () {
 // }
 
 
-pub struct FromRequestRefMarker;
+pub struct FromRequestMetaMarker;
 
-impl<T, M> FromRequest<(FromRequestRefMarker, M)> for T
+impl<T, M> FromRequest<(FromRequestMetaMarker, M)> for T
 where
-	T: FromRequestRef<M>,
+	T: FromRequestMeta<M>,
 {
 	fn from_request(
 		request: Request,
 	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
-		Box::pin(async move { T::from_request_ref(&request) })
+		let meta = RequestMeta::new(request.parts);
+		Box::pin(async move { T::from_request_meta(&meta) })
 	}
 }
 
-impl<T, E, M> FromRequestRef<(E, M)> for T
-where
-	T: for<'a> TryFrom<&'a Request, Error = E>,
-	E: IntoResponse<M>,
-{
-	fn from_request_ref(request: &Request) -> Result<Self, Response> {
-		request.try_into().map_err(|e: E| e.into_response())
-	}
-}
+// impl<T, E, M> FromRequestMeta<(E, M)> for T
+// where
+// 	T: for<'a> TryFrom<&'a Request, Error = E>,
+// 	E: IntoResponse<M>,
+// {
+// 	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response> {
+// 		request.try_into().map_err(|e: E| e.into_response())
+// 	}
+// }
 
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }

@@ -4,10 +4,11 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
-/// Used on fallback handlers, ie 404 page.
-/// Passes only if the `exchange` has a [`Request`] but no [`Response`].
+/// A more strict version of [`no_response`],
+/// passes only if the `exchange` has a [`Request`] but no [`Response`].
 /// The no request check indicates the [`Request`] was not consumed by a handler
 /// and replaced by a partial response pattern like [`HtmlBundle`].
+/// Useful for fallback endpoints like a 404 page.
 pub fn fallback() -> impl Bundle {
 	OnSpawn::observe(
 		|mut ev: On<GetOutcome>,

@@ -34,12 +34,12 @@ async fn main() {
 						.json::<serde_json::Value>()
 						.await
 						.unwrap();
-						let doggo = res["message"].as_str().unwrap();
+						let doggo_url = res["message"].as_str().unwrap();
 
-						rsx!{
-							<img src="{doggo}"/>
-						}.xok()
-
+						rsx! {
+							<img src=doggo_url/>
+						}
+						.xok()
 					},
 				),
 			]));

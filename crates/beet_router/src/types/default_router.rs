@@ -5,17 +5,65 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use serde_json::Value;
 
-
+/// Create the default router configuration, providing
+/// three groups of `children![]` to run in between the
+/// default endpoints and fallbacks.
+///
+///
+/// - Waits for all [`Ready`] actions to complete before
+///   inserting the server
+/// - uses an [`InfallibleSequence`] to ensure
+///   all children run.
+/// - Runs a [`Fallback`] with common fallback
+///   handlers
+/// - Inserts an [`assets_bucket`]
+/// - Inserts an [`analytics_handler`]
+pub fn default_router(
+	// runs before default request middleware
+	request_middleware: impl Bundle,
+	// the actual routes
+	endpoints: impl Bundle,
+	// runs after `endpoints` and default endpoints
+	response_middleware: impl Bundle,
+) -> impl Bundle {
+	(insert_on_ready(RouteServer), InfallibleSequence, children![
+		request_middleware,
+		endpoints,
+		(
+			// Our goal here is to minimize performance overhead
+			// of default actions, this pattern ensures default
+			// fallbacks only run if no response is present
+			Sequence,
+			children![
+				common_predicates::no_response(),
+				(InfallibleSequence, children![
+					// # default endpoints
+					analytics_handler(),
+					app_info(),
+					// # default fallbacks
+					// stops after first succeeding fallback
+					// this is important to avoid response clobbering
+					(Fallback, children![
+						html_bundle_to_response(),
+						assets_bucket(),
+						// html_bucket()
+					]),
+				]),
+			]
+		),
+		response_middleware,
+	])
+}
 
 /// Create a [`ReadyOnChildrenReady`], allowing any
 /// [`ReadyAction`] children to complete before inserting the
 /// [`RouteServer`] which will immediately start handling requests.
-pub fn serve_on_ready() -> impl Bundle {
+pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
 	(
 		ReadyOnChildrenReady::default(),
-		OnSpawn::observe(|ev: On<Ready>, mut commands: Commands| {
+		OnSpawn::observe(move |ev: On<Ready>, mut commands: Commands| {
 			if ev.event_target() == ev.original_event_target() {
-				commands.entity(ev.event_target()).insert(RouteServer);
+				commands.entity(ev.event_target()).insert(bundle.clone());
 			}
 		}),
 	)
@@ -117,7 +165,7 @@ mod test {
 	async fn works() {
 		RouterPlugin::world()
 			.spawn((
-				super::serve_on_ready(),
+				super::insert_on_ready(RouteServer),
 				EndpointBuilder::get(),
 				children![(
 					EndWith(Outcome::Pass),
@@ -143,5 +191,41 @@ mod test {
 			.oneshot_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
+	}
+	#[sweet::test]
+	async fn test_default_router() {
+		let mut world = RouterPlugin::world();
+		world.insert_resource(pkg_config!());
+		let mut entity = world.spawn(default_router(
+			EndWith(Outcome::Pass),
+			EndWith(Outcome::Pass),
+			// (Sequence, children![
+			// 	EndpointBuilder::get().with_path("foobar"),
+			// ]),
+			EndWith(Outcome::Pass),
+		));
+
+
+		// entity
+		// 	.await_ready()
+		// 	.await
+		// 	.oneshot_str("/app-info")
+		// 	.await
+		// 	.xpect_contains("<h1>App Info</h1><p>Title: Beet</p>");
+		entity
+			.await_ready()
+			.await
+			.oneshot("/assets/branding/logo.png")
+			.await
+			.into_result()
+			.await
+			.unwrap();
+		// let mut stat = async |val: &str| entity.oneshot(val).await.status();
+		// stat("/bingbong").await.xpect_eq(StatusCode::NOT_FOUND);
+		// stat("/assets/bing").await.xpect_eq(StatusCode::NOT_FOUND);
+		// stat("/assets/branding/logo.png")
+		// 	.await
+		// 	.xpect_eq(StatusCode::OK);
+		// stat("/foobar").await.xpect_eq(StatusCode::OK);
 	}
 }

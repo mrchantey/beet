@@ -10,7 +10,7 @@
     <a href="https://docs.rs/beet"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="docs.rs docs" /></a>
   </p>
   <h3>
-     <a href="https://beetstack.dev/docs">Guidebook</a>
+     <a href="https://beetstack.dev">Website</a>
      <span> | </span>
     <a href="https://docs.rs/beet">API Docs</a>
     <!-- <span> | </span>

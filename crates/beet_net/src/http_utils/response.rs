@@ -16,6 +16,23 @@ pub struct Response {
 	pub body: Body,
 }
 
+impl std::error::Error for Response {}
+
+impl std::fmt::Display for Response {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"Response - Status: {}, Message: '{}'",
+			self.parts.status,
+			match &self.body {
+				Body::Stream(_) => "<stream>".into(),
+				Body::Bytes(bytes) =>
+					String::from_utf8_lossy(bytes).to_string(),
+			}
+		)
+	}
+}
+
 impl PartialEq for Response {
 	fn eq(&self, other: &Self) -> bool {
 		self.body.bytes_eq(&other.body)
@@ -282,7 +299,6 @@ impl IntoResponse<Self> for &[u8] {
 		Response::ok_body("dsds", "application/octet-stream")
 	}
 }
-
 
 impl IntoResponse<Self> for Infallible {
 	fn into_response(self) -> Response {

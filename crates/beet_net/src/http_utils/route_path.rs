@@ -32,9 +32,9 @@ impl std::fmt::Display for RoutePath {
 
 /// The uri path of the request, if the request has no leading slash
 /// this will be empty.
-impl FromRequestRef<Self> for RoutePath {
-	fn from_request_ref(req: &Request) -> Result<Self, Response> {
-		let path = req.parts.uri.path();
+impl FromRequestMeta<Self> for RoutePath {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
+		let path = req.uri.path();
 		Self::new(path).xok()
 	}
 }

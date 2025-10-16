@@ -23,9 +23,9 @@ impl BucketEndpoint {
 			.with_trailing_path()
 			.with_handler_bundle((
 				bucket,
-				async move |mut path: RoutePath,
-				            cx: EndpointContext|
-				            -> Result<Response> {
+				async move |(mut path, cx): (RoutePath, MiddlewareContext),
+				            world: AsyncWorld|
+				            -> Result {
 					if let Some(prefix) = &remove_prefix {
 						if let Ok(stripped) = path.strip_prefix(prefix) {
 							path = RoutePath::new(stripped);
@@ -33,24 +33,29 @@ impl BucketEndpoint {
 							bevybail!("prefix {prefix} not found in {path}");
 						}
 					}
-					let bucket = cx.action().get_cloned::<Bucket>().await?;
-					bucket_to_response(&bucket, &path)
+					let bucket = world
+						.entity(cx.action())
+						.get_cloned::<Bucket>()
+						.await?;
+					let response = bucket_to_response(&bucket, &path)
 						.await?
-						.into_response()
-						.xok()
+						.into_response();
+					world.entity(cx.exchange()).insert(response).await;
+					Ok(())
 				}
-				.into_endpoint(),
+				.into_middleware(),
 			))
 	}
 }
 
 
-
+/// Return either a 2XX or 3XX(redirect) response, otherwise error
 // TODO precompressed variants, ie `index.html.br`
 async fn bucket_to_response(
 	bucket: &Bucket,
 	path: &RoutePath,
 ) -> Result<Response> {
+	println!("fetching from bucket {path}");
 	if let Some(_extension) = path.extension() {
 		if let Some(url) = bucket.public_url(&path).await? {
 			debug!("redirecting to bucket: {}", url);

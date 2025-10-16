@@ -158,11 +158,11 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	}
 }
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> FromRequestRef<Self>
+impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
-	fn from_request_ref(req: &Request) -> Result<Self, Response> {
-		let query = req.parts.uri.query().ok_or_else(|| {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
+		let query = req.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
 		let value = Self::from_query_string(query).map_err(|err| {
@@ -196,13 +196,11 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<&Request>
-	for QueryParams<T>
-{
+impl<T: serde::de::DeserializeOwned> TryFrom<&RequestMeta> for QueryParams<T> {
 	type Error = HttpError;
 
-	fn try_from(req: &Request) -> std::result::Result<Self, Self::Error> {
-		let query = req.parts.uri.query().ok_or_else(|| {
+	fn try_from(req: &RequestMeta) -> std::result::Result<Self, Self::Error> {
+		let query = req.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
 		let params: T = serde_urlencoded::from_str(query).map_err(|err| {
