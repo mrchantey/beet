@@ -8,8 +8,6 @@ pub struct BeetPlugins {
 	:ApplyDirectivesPlugin,
 	#[cfg(feature = "build")]
 	:BuildPlugin,
-	#[cfg(feature = "server")]
-	:RouterPlugin,
 	:BeetRunner,
 }
 }

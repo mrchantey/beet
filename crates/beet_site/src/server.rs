@@ -3,10 +3,10 @@ use beet::prelude::*;
 
 /// The plugin added to the router app
 pub fn server_plugin(app: &mut App) {
-	app.add_plugins(AgentPlugin).world_mut().spawn((
-		RouteServer,
-		InfallibleSequence,
-		children![
+	app.add_plugins((MinimalPlugins, RouterPlugin, AgentPlugin))
+		.set_runner(ServerRunner::runner)
+		.world_mut()
+		.spawn((RouteServer, InfallibleSequence, children![
 			pages_routes(),
 			docs_routes(),
 			blog_routes(),
@@ -16,8 +16,7 @@ pub fn server_plugin(app: &mut App) {
 			article_layout_middleware().with_path("blog"),
 			image_generator(),
 			(Fallback, children![html_bundle_to_response()])
-		],
-	));
+		]));
 }
 
 #[allow(unused)]

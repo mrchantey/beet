@@ -68,6 +68,7 @@ impl ServerRunner {
 		} else if !app.world().contains_resource::<RenderMode>() {
 			app.insert_resource(self.mode.unwrap_or_default());
 		}
+
 		app.init();
 
 		app.update();
@@ -81,7 +82,7 @@ impl ServerRunner {
 			// 	// AxumRunner::new().run(app.world_mut()).await
 			// }
 			// #[cfg(not(feature = "axum"))]
-			todo!("hyper router");
+			todo!("lambda router");
 		}
 	}
 

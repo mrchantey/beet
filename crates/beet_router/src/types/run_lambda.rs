@@ -5,6 +5,13 @@ use lambda_http::Service;
 use lambda_http::lambda_runtime::Diagnostic;
 use lambda_http::tracing;
 
+
+pub fn attach_lambda(mut commands: AsyncCommands) {
+	commands.run(async move |world| -> Result { Ok(()) });
+}
+
+
+
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
 pub async fn run_lambda<'a, R, S, E>(handler: S) -> Result
 where

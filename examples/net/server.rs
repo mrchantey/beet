@@ -24,12 +24,12 @@ struct VisitCounter(u32);
 fn handler(
 	ev: On<Insert, Request>,
 	mut commands: Commands,
-	requests: Query<&Request>,
+	requests: Query<&RequestMeta>,
 	time: Res<Time>,
 	mut visit_counter: ResMut<VisitCounter>,
 ) -> Result {
 	let request = requests.get(ev.event_target())?;
-	let path = request.parts.uri.path();
+	let path = request.uri.path();
 	// our diy router :)
 	if path != "/" {
 		commands

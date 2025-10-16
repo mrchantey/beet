@@ -196,10 +196,8 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> TryFrom<&RequestMeta> for QueryParams<T> {
-	type Error = HttpError;
-
-	fn try_from(req: &RequestMeta) -> std::result::Result<Self, Self::Error> {
+impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
 		let query = req.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;

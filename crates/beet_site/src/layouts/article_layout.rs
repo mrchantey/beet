@@ -3,13 +3,15 @@ use beet::prelude::*;
 
 
 pub fn article_layout_middleware() -> EndpointBuilder {
-	EndpointBuilder::layer::<(Result, _, _, _)>(
+	EndpointBuilder::layer::<(Result, _, _, _, _)>(
 		|cx: In<MiddlewareContext>,
 		 query: HtmlBundleQuery,
-		 mut commands: Commands| {
+		 mut commands: Commands|
+		 -> Result {
 			let Some(html_bundle) = query.get(cx.exchange())? else {
 				return Ok(());
 			};
+			// nest the current HtmlBundle under a new root
 			commands.spawn((
 				HtmlDocument,
 				HtmlBundle,
