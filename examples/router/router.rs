@@ -24,7 +24,13 @@ async fn main() {
 						"text/plain"
 					)),
 					EndpointBuilder::get().with_path("foo").with_handler(
-						|| { Response::ok_body("hello foo", "text/plain") },
+						|| {
+							Response::ok_body(
+								"<div>hello foo</div>",
+								// this inserts the `content-type: text/html`  header
+								"text/html",
+							)
+						},
 					),
 				],
 			));

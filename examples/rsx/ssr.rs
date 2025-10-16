@@ -10,58 +10,58 @@ use std::sync::Mutex;
 fn main() {
 	App::new()
 		.add_plugins(BeetPlugins)
-		.add_systems(Startup, setup)
+		// .add_systems(Startup, setup)
 		.insert_resource(RenderMode::Ssr)
 		.run();
 }
 
-// #[rustfmt::skip]
-fn setup(mut commands: Commands) {
-	commands.insert_resource(Router::new_no_defaults(|app: &mut App| {
-		app.init_plugin::<HandlerPlugin>();
-		app.world_mut().spawn((RouterRoot, children![
-			// bundles are served as html documents
-			(PathFilter::new("/"), bundle_endpoint(|| rsx! {<Home/>})),
-			// common types implement IntoResponse
-			(PathFilter::new("/foo"), RouteHandler::endpoint(|| "bar")),
-			// middleware example
-			(
-				PathFilter::new("/hello-layer"),
-				// children are run in sequence
-				children![
-					RouteHandler::layer(modify_request),
-					bundle_endpoint(|req: In<Request>| {
-						// let body = req.body_str().unwrap_or_default();
-						todo!();
-						let body = String::new();
-						rsx! {
-							<Style/>
-							<main>
-								<div> hello {body}</div>
-								<a href="/">go home</a>
-							</main>
-						}
-					}),
-					RouteHandler::layer(modify_response),
-				]
-			)
-		]));
-	}));
-}
+// // #[rustfmt::skip]
+// fn setup(mut commands: Commands) {
+// 	commands.insert_resource(Router::new_no_defaults(|app: &mut App| {
+// 		app.init_plugin::<HandlerPlugin>();
+// 		app.world_mut().spawn((RouterRoot, children![
+// 			// bundles are served as html documents
+// 			(PathFilter::new("/"), bundle_endpoint(|| rsx! {<Home/>})),
+// 			// common types implement IntoResponse
+// 			(PathFilter::new("/foo"), RouteHandler::endpoint(|| "bar")),
+// 			// middleware example
+// 			(
+// 				PathFilter::new("/hello-layer"),
+// 				// children are run in sequence
+// 				children![
+// 					RouteHandler::layer(modify_request),
+// 					bundle_endpoint(|req: In<Request>| {
+// 						// let body = req.body_str().unwrap_or_default();
+// 						todo!();
+// 						let body = String::new();
+// 						rsx! {
+// 							<Style/>
+// 							<main>
+// 								<div> hello {body}</div>
+// 								<a href="/">go home</a>
+// 							</main>
+// 						}
+// 					}),
+// 					RouteHandler::layer(modify_response),
+// 				]
+// 			)
+// 		]));
+// 	}));
+// }
 
-// modifies the request body to "jimmy"
-fn modify_request(mut req: ResMut<Request>) { req.set_body("jimmy"); }
-fn modify_response(world: &mut World) {
-	let entity = world.query_filtered_once::<Entity, With<HtmlBundle>>()[0];
+// // modifies the request body to "jimmy"
+// fn modify_request(mut req: ResMut<Request>) { req.set_body("jimmy"); }
+// fn modify_response(world: &mut World) {
+// 	let entity = world.query_filtered_once::<Entity, With<HtmlBundle>>()[0];
 
-	world.spawn((HtmlDocument, rsx! {
-		<Style/>
-		<article>
-		<h1>Warm greetings!</h1>
-			{entity}
-		</article>
-	}));
-}
+// 	world.spawn((HtmlDocument, rsx! {
+// 		<Style/>
+// 		<article>
+// 		<h1>Warm greetings!</h1>
+// 			{entity}
+// 		</article>
+// 	}));
+// }
 
 
 #[template]

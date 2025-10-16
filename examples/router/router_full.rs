@@ -18,8 +18,12 @@ async fn main() {
 				EndpointBuilder::get().with_path("foo").with_handler(|| {
 					Response::ok_body("hello foo", "text/plain")
 				},),
+				//```md
+				// # Making Requests
+				// We can make requests inside handlers and use the response in the html
+				//```
 				EndpointBuilder::get().with_path("doggo").with_handler(
-					async |_: (), _: EndpointContext| -> Result<Response> {
+					async |_: (), _: EndpointContext| {
 						let res = Request::get(
 							"https://dog.ceo/api/breeds/image/random",
 						)
@@ -32,11 +36,10 @@ async fn main() {
 						.unwrap();
 						let doggo = res["message"].as_str().unwrap();
 
-						Response::ok_body(
-							format!(r#"<img src="{doggo}"/>"#),
-							"text/html",
-						)
-						.xok()
+						rsx!{
+							<img src="{doggo}"/>
+						}.xok()
+
 					},
 				),
 			]));
