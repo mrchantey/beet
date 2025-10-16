@@ -21,6 +21,7 @@ pub fn article_layout_middleware() -> EndpointBuilder {
 			Ok(())
 		},
 	)
+	.with_trailing_path()
 }
 
 #[template]

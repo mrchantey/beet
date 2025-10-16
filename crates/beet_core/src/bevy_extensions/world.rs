@@ -33,6 +33,26 @@ pub impl World {
 		self
 	}
 
+	fn await_insert<B: Bundle>(&mut self) -> impl Future<Output = &mut Self> {
+		let (send, recv) = async_channel::bounded(1);
+		self.add_observer(
+			move |ready: On<Insert, B>, mut commands: Commands| {
+				send.try_send(()).ok();
+				commands.entity(ready.observer()).despawn();
+			},
+		);
+		async move {
+			AsyncRunner::poll_and_update(
+				|| {
+					self.update();
+				},
+				recv,
+			)
+			.await;
+			self
+		}
+	}
+
 	/// The world equivelent of [`App::update`]
 	fn update(&mut self) { self.run_schedule(Main); }
 	/// The world equivelent of [`App::should_exit`]

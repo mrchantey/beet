@@ -5,11 +5,14 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 #[sweet::test]
+#[ignore]
 async fn docs() {
-	(MinimalPlugins, RouterPlugin, server_plugin)
+	server_plugin
 		.into_world()
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
+		.await_insert::<RouteServer>()
+		.await
 		.oneshot("/docs")
 		.await
 		.into_result()
@@ -19,4 +22,22 @@ async fn docs() {
 		.await
 		.unwrap()
 		.xpect_contains("docs");
+}
+#[sweet::test]
+async fn article_layout() {
+	server_plugin
+		.into_world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
+		.await_insert::<RouteServer>()
+		.await
+		.oneshot("/blog/post-1")
+		.await
+		.into_result()
+		.await
+		.unwrap()
+		.text()
+		.await
+		.unwrap()
+		.xpect_contains(r#"<meta charset="UTF-8"/><title>Beet</title>"#);
 }

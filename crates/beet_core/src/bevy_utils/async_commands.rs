@@ -453,6 +453,28 @@ impl AsyncWorld {
 			world.run_async_local(func);
 		})
 	}
+	pub async fn observe<E: Event, B: Bundle, M>(
+		&self,
+		observer: impl IntoObserverSystem<E, B, M>,
+	) -> &Self {
+		self.with_then(|world| {
+			world.add_observer(observer);
+		})
+		.await;
+		self
+	}
+
+	/// Await a single event of type E, then despawn the observer
+	pub async fn await_event<E: Event, B: Bundle>(&self) -> &Self {
+		let (send, recv) = async_channel::bounded(1);
+		self.observe(move |ev: On<E, B>, mut commands: Commands| {
+			send.try_send(()).ok();
+			commands.entity(ev.observer()).despawn();
+		})
+		.await;
+		recv.recv().await.ok();
+		self
+	}
 }
 
 #[derive(Clone)]
@@ -574,6 +596,17 @@ impl AsyncEntity {
 			entity.observe_any(observer);
 		})
 		.await;
+		self
+	}
+	/// Await a single event of type E for this entity, then despawn the observer
+	pub async fn await_event<E: Event, B: Bundle>(&self) -> &Self {
+		let (send, recv) = async_channel::bounded(1);
+		self.observe(move |ev: On<E, B>, mut commands: Commands| {
+			send.try_send(()).ok();
+			commands.entity(ev.observer()).despawn();
+		})
+		.await;
+		recv.recv().await.ok();
 		self
 	}
 

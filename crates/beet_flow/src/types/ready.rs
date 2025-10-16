@@ -86,8 +86,9 @@ pub impl EntityWorldMut<'_> {
 	/// when the entity triggers [`Ready`].
 	fn await_ready(&mut self) -> impl Future<Output = &mut Self> {
 		let (send, recv) = async_channel::bounded(1);
-		self.observe(move |_: On<Ready>| {
+		self.observe(move |ready: On<Ready>, mut commands: Commands| {
 			send.try_send(()).ok();
+			commands.entity(ready.observer()).despawn();
 		})
 		.trigger(GetReady)
 		.flush();

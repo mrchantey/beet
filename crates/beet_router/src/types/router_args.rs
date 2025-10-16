@@ -57,7 +57,7 @@ impl Plugin for RouterArgs {
 }
 
 fn export_static(mut commands: AsyncCommands) {
-	commands.run(async |world| -> Result {
+	commands.run_local(async |world| -> Result {
 		let html = collect_html(world.clone()).await?;
 
 		for (path, html) in html {
