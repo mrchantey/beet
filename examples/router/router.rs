@@ -1,9 +1,7 @@
 //! A basic example of using the beet router
 use beet::prelude::*;
 
-// boo tokio todo replace reqwest
-#[tokio::main]
-async fn main() {
+fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
