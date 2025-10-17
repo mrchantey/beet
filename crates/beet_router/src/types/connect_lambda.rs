@@ -1,21 +1,26 @@
-use std::convert::Infallible;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bytes::Bytes;
+use lambda_http::tower::service_fn;
 use lambda_http::tracing;
-use tower::service_fn;
 
 
-
-pub fn connect_lambda(mut commands: AsyncCommands) {
-	commands.run_local(run_lambda);
+/// Connects to lambda as an Insert<RouteServer> hook
+/// to allow for an async setup
+pub fn lambda_plugin(app: &mut App) {
+	app.world_mut().add_observer(
+		|ev: On<Insert, RouteServer>, mut commands: AsyncCommands| {
+			let entity = ev.event_target();
+			commands.run_local(async move |world| {
+				run_lambda(world.entity(entity)).await
+			});
+		},
+	);
 }
 
-
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
-async fn run_lambda(world: AsyncWorld) -> Result {
+async fn run_lambda(entity: AsyncEntity) -> Result {
 	// This variable only applies to API Gateway stages,
 	// you can remove it if you don't use them.
 	// i.e with: `GET /test-stage/todo/id/123` without: `GET /todo/id/123`
@@ -26,33 +31,11 @@ async fn run_lambda(world: AsyncWorld) -> Result {
 	// tracing::init_default_subscriber(); //we use PrettyTracing instead
 
 	tracing::info!("🌱 listening for requests");
-	lambda_http::run(service_fn(
-		async move |lambda_req| -> Result<
-			lambda_http::Response<lambda_http::Body>,
-			Infallible,
-		> {
-			let result: Result<lambda_http::Response<lambda_http::Body>> =
-				async move {
-					let request = lambda_to_request(lambda_req)?;
-					let response = world.oneshot(request).await?;
-					response_to_lambda(response).await
-				}
-				.await;
-			// Convert beet response to lambda response
-			match result {
-				Ok(lambda_res) => Ok(lambda_res),
-				Err(e) => {
-					tracing::error!("Beet/Lambda conversion failed: {}", e);
-					Ok(lambda_http::Response::builder()
-						.status(500)
-						.body(lambda_http::Body::Text(format!(
-							"Internal error",
-						)))
-						.unwrap())
-				}
-			}
-		},
-	))
+
+	lambda_http::run(service_fn(move |lambda_req| {
+		let entity = entity.clone();
+		handle_request(entity, lambda_req)
+	}))
 	.await
 	.map_err(|err| {
 		tracing::error!("Error running lambda: {:?}", err);
@@ -61,6 +44,35 @@ async fn run_lambda(world: AsyncWorld) -> Result {
 }
 
 
+/// Handler function that processes each lambda request
+async fn handle_request(
+	entity: AsyncEntity,
+	lambda_req: lambda_http::Request,
+) -> std::result::Result<
+	lambda_http::Response<lambda_http::Body>,
+	std::convert::Infallible,
+> {
+	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
+		let request = lambda_to_request(lambda_req)?;
+		let response = entity.oneshot(request).await?;
+		response_to_lambda(response).await
+	}
+	.await;
+
+	match result {
+		Ok(lambda_res) => Ok(lambda_res),
+		Err(e) => {
+			error!("Failed to process lambda request: {}", e);
+			Ok(lambda_http::Response::builder()
+				.status(500)
+				// dont leak internal error context to client
+				.body(lambda_http::Body::Text(
+					"Internal Server Error".to_string(),
+				))
+				.unwrap())
+		}
+	}
+}
 
 /// Convert lambda HTTP request to beet Request
 fn lambda_to_request(lambda_req: lambda_http::Request) -> Result<Request> {

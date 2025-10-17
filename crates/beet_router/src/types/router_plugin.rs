@@ -30,7 +30,7 @@ impl Plugin for RouterPlugin {
 		);
 
 		#[cfg(feature = "lambda")]
-		app.add_systems(Startup, connect_lambda);
+		app.add_plugins(lambda_plugin);
 	}
 }
 
@@ -48,7 +48,7 @@ pub fn insert_route_tree(world: &mut World) {
 }
 
 
-#[extend::ext(name=AsyncWorldExt)]
+#[extend::ext(name=AsyncWorldRouterExt)]
 pub impl AsyncWorld {
 	/// Handle a single request and return the response
 	/// ## Panics
@@ -65,9 +65,18 @@ pub impl AsyncWorld {
 						.single(world)
 				})
 				.await?;
-			let server = self.entity(server);
-			flow_route_handler(server.clone(), req.into()).await.xok()
+			self.entity(server).oneshot(req).await
 		}
+	}
+}
+#[extend::ext(name=AsyncEntityRouterExt)]
+pub impl AsyncEntity {
+	/// Handle a single request and return the response
+	fn oneshot(
+		&self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Result<Response>> {
+		async move { flow_route_handler(self.clone(), req.into()).await.xok() }
 	}
 }
 #[extend::ext(name=WorldRouterExt)]
@@ -177,9 +186,11 @@ pub async fn flow_route_handler(
 }
 
 
-/// The root of a server
+/// The root of a server. In non-wasm non-lambda environments
+/// this will also connect to a hyper server and listen for requests.
 #[derive(Clone, Component)]
-#[cfg_attr(all(not(target_arch = "wasm32"), feature = "server"),
+#[require(ServerStatus)]
+#[cfg_attr(all(not(target_arch = "wasm32"), not(feature = "lambda"), feature = "server"),
 	require(Server = Server::default().with_handler(flow_route_handler))
 )]
 #[component(on_add=on_add)]
@@ -188,6 +199,7 @@ pub struct RouteServer;
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	#[cfg(not(target_arch = "wasm32"))]
 	world.commands().entity(cx.entity).observe_any(
 		move |ev: On<Outcome>, mut commands: Commands| {
 			let exchange = ev.agent();

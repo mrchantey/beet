@@ -1,15 +1,21 @@
 use crate::prelude::*;
-use bevy::app::plugin_group;
 
-plugin_group! {
-/// This plugin group will add all the default plugins for a *Beet* application:
-pub struct BeetPlugins {
-	#[cfg(feature = "rsx")]
-	:ApplyDirectivesPlugin,
-	#[cfg(feature = "build")]
-	:BuildPlugin,
-	:BeetRunner,
-}
+/// This plugin will add all the default plugins
+/// for a *Beet* application, including the appropriate
+/// runner depending on feature flags.
+/// ## Note
+/// This plugin must be added *after* MinimalPlugins etc to
+/// ensure it has last say in setting the runner.
+pub struct BeetPlugins;
+
+impl Plugin for BeetPlugins {
+	fn build(&self, app: &mut App) {
+		#[cfg(feature = "rsx")]
+		app.init_plugin::<ApplyDirectivesPlugin>();
+		#[cfg(feature = "build")]
+		app.init_plugin::<BuildPlugin>();
+		app.init_plugin::<BeetRunner>();
+	}
 }
 
 
@@ -25,7 +31,7 @@ impl Plugin for BeetRunner {
 		app.set_runner(LaunchRunner::runner);
 
 		#[cfg(feature = "server")]
-		app.add_plugins(RouterArgs::parse());
+		app.set_runner(RouterRunner::runner);
 
 		#[cfg(feature = "client")]
 		app.set_runner(ReactiveApp::runner);
@@ -52,5 +58,13 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	let binary = "Client";
 
 	#[cfg(any(feature = "launch", feature = "server", feature = "client"))]
-	info!("\n🌱 Running Beet\nbinary: {binary}\n{}", *pkg_config);
+	info!(
+		"\n🌱 Running Beet\nbinary: {binary}\n{}build: {}",
+		*pkg_config,
+		if cfg!(debug_assertions) {
+			"debug"
+		} else {
+			"release"
+		},
+	);
 }

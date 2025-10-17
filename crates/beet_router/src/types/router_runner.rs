@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// Cli args for running a beet server.
 #[cfg_attr(feature = "serde", derive(clap::Parser))]
 #[cfg_attr(feature = "serde", command(version, about, long_about = None))]
-pub struct RouterArgs {
+pub struct RouterRunner {
 	/// Only export the static html files to the [`WorkspaceConfig::html_dir`],
 	/// and immediately exit.
 	#[cfg_attr(feature = "serde", arg(long))]
@@ -23,11 +23,27 @@ pub struct RouterArgs {
 	pub mode: Option<RenderMode>,
 }
 
-impl RouterArgs {
+impl RouterRunner {
 	pub fn parse() -> Self { Parser::parse() }
+
+	pub fn runner(mut app: App) -> AppExit {
+		app.add_plugins(Self::parse());
+		#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+		{
+			tokio::runtime::Builder::new_multi_thread()
+				.enable_all()
+				.build()
+				.unwrap()
+				.block_on(app.run_async())
+		}
+		#[cfg(not(all(feature = "tokio", not(target_arch = "wasm32"))))]
+		{
+			futures::executor::block_on(app.run_async())
+		}
+	}
 }
 
-impl Default for RouterArgs {
+impl Default for RouterRunner {
 	fn default() -> Self {
 		Self {
 			export_static: false,
@@ -48,7 +64,7 @@ pub enum RenderMode {
 	Ssr,
 }
 
-impl Plugin for RouterArgs {
+impl Plugin for RouterRunner {
 	fn build(&self, app: &mut App) {
 		PrettyTracing::default().init();
 		app.add_plugins(self.config_overrides.clone());
