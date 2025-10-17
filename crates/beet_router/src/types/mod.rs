@@ -12,9 +12,9 @@ mod collect_html;
 mod router_plugin;
 mod path_filter;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-mod run_lambda;
+mod connect_lambda;
 mod server_action_request;
 mod router_args;
 pub use router_plugin::*;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-pub(crate) use run_lambda::*;
+pub(crate) use connect_lambda::*;

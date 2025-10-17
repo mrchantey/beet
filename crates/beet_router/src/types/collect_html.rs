@@ -25,14 +25,7 @@ pub async fn collect_html(
 	debug!("building {} static html documents", metas.len());
 
 	let mut results = Vec::new();
-	let server = world
-		.with_then(|world| {
-			world
-				.query_filtered::<Entity, With<RouteServer>>()
-				.single(world)
-		})
-		.await?;
-	let server = world.entity(server);
+
 	for meta in metas {
 		let path = meta.route_segments().annotated_route_path();
 		trace!("building html for {}", &path);
@@ -41,11 +34,9 @@ pub async fn collect_html(
 
 		// let route_info = RouteInfo::get(path.clone());
 
-
-
-		let text = flow_route_handler(server.clone(), Request::get(&path))
-			.await
-			.into_response()
+		let text = world
+			.oneshot(Request::get(&path))
+			.await?
 			// .with_then(|world| world.oneshot(path.clone()))
 			// .await
 			.into_result()
@@ -97,9 +88,13 @@ mod test {
 				.with_cache_strategy(CacheStrategy::Static),
 		]));
 		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
-		world.run_async_then(collect_html).await.unwrap().xpect_eq(vec![
-			(ws_path.join("foo/index.html"), "foo".to_string()),
-			(ws_path.join("bar/index.html"), "bar".to_string()),
-		]);
+		world
+			.run_async_then(collect_html)
+			.await
+			.unwrap()
+			.xpect_eq(vec![
+				(ws_path.join("foo/index.html"), "foo".to_string()),
+				(ws_path.join("bar/index.html"), "bar".to_string()),
+			]);
 	}
 }

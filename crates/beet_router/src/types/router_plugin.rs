@@ -30,7 +30,7 @@ impl Plugin for RouterPlugin {
 		);
 
 		#[cfg(feature = "lambda")]
-		app.add_systems(Startup, attach_lambda);
+		app.add_systems(Startup, connect_lambda);
 	}
 }
 
@@ -48,6 +48,28 @@ pub fn insert_route_tree(world: &mut World) {
 }
 
 
+#[extend::ext(name=AsyncWorldExt)]
+pub impl AsyncWorld {
+	/// Handle a single request and return the response
+	/// ## Panics
+	/// Panics if there is not exactly one `RouteServer` in the world.
+	fn oneshot(
+		&self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Result<Response>> {
+		async move {
+			let server = self
+				.with_then(|world| {
+					world
+						.query_filtered::<Entity, With<RouteServer>>()
+						.single(world)
+				})
+				.await?;
+			let server = self.entity(server);
+			flow_route_handler(server.clone(), req.into()).await.xok()
+		}
+	}
+}
 #[extend::ext(name=WorldRouterExt)]
 pub impl World {
 	/// Handle a single request and return the response
