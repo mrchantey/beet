@@ -57,9 +57,9 @@ where
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	let mut step = query.get_mut(ev.event_target())?;
+	let mut step = query.get_mut(ev.action())?;
 	let (state, mut action, mut env, params, session_entity) =
-		agents.get_mut(ev.event_target())?;
+		agents.get_mut(ev.action())?;
 	let mut table = sessions.get_mut(**session_entity)?;
 
 	let outcome = env.step(&state, &action);
@@ -80,7 +80,7 @@ where
 	// 	action,
 	// 	outcome.reward
 	// );
-	commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
+	commands.entity(ev.action()).trigger_target(Outcome::Pass);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -103,7 +103,7 @@ mod test {
 		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.add_plugins((
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.init_resource::<RandomSource>()
@@ -127,7 +127,7 @@ mod test {
 				},
 				StepEnvironment::<FrozenLakeQTableSession>::new(0),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 

@@ -7,7 +7,7 @@ use beet::prelude::*;
 fn main() {
 	let mut app = App::new();
   app
-		.add_plugins((BeetFlowPlugin::default(), DebugFlowPlugin::default()));
+		.add_plugins((ControlFlowPlugin::default(), DebugFlowPlugin::default()));
 	let world = app.world_mut();
 
 
@@ -29,5 +29,5 @@ fn main() {
 		// here RunOnRunResult can be swapped out with a control flow action
 		// that decides which state to go to next
 		RunNext::new(transition),
-	)).trigger_action(GetOutcome).flush();
+	)).trigger_target(GetOutcome).flush();
 }

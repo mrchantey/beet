@@ -13,14 +13,14 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 ///	world.spawn((
 /// 	Fallback,
 /// 	children![
 /// 		EndWith(Outcome::Fail),
 /// 		EndWith(Outcome::Pass),
 ///    ]))
-///		.trigger_action(GetOutcome)
+///		.trigger_target(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -29,32 +29,25 @@ use beet_core::prelude::*;
 #[require(PreventPropagateEnd)]
 pub struct Fallback;
 
-fn on_start(
-	ev: On<GetOutcome>,
-	mut commands: Commands,
-	query: Query<&Children>,
-) -> Result {
-	let children = query.get(ev.event_target())?;
+fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
+	let children = query.get(ev.action())?;
 	if let Some(first_child) = children.iter().next() {
-		commands.entity(first_child).trigger_action(GetOutcome);
+		ev.trigger_next_with(first_child, GetOutcome);
 	} else {
-		commands
-			.entity(ev.event_target())
-			.trigger_action(Outcome::Fail);
+		ev.trigger_next(Outcome::Fail);
 	}
 	Ok(())
 }
 
 fn on_next(
-	ev: On<ChildEnd<Outcome>>,
-	mut commands: Commands,
+	mut ev: On<ChildEnd<Outcome>>,
 	query: Query<&Children>,
 ) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let child = ev.child();
 	// if any success, propagate the success
 	if ev.is_pass() {
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 		return Ok(());
 	}
 	let children = query.get(target)?;
@@ -64,12 +57,10 @@ fn on_next(
 		.ok_or_else(|| expect_action::to_have_child(&ev, child))?;
 	if index == children.len() - 1 {
 		// all done, propagate the failure
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 	} else {
 		// run next
-		commands
-			.entity(children[index + 1])
-			.trigger_action(GetOutcome);
+		ev.trigger_next_with(children[index + 1], GetOutcome);
 	}
 	Ok(())
 }
@@ -82,7 +73,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);
@@ -92,7 +83,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Fail)),
 				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![

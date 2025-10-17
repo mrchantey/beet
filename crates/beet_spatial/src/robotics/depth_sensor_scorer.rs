@@ -45,7 +45,7 @@ fn depth_sensor_scorer(
 	query: Query<&DepthSensorScorer>,
 	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,
 ) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let scorer = query.get(target)?;
 	let depth = sensors.get(target)?;
 	let next_score = if let Some(depth) = **depth {
@@ -57,6 +57,6 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	commands.entity(target).trigger_action(next_score);
+	commands.entity(target).trigger_target(next_score);
 	Ok(())
 }

@@ -24,7 +24,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(EntityObserver::new(gemini_message_request));
+		.insert(OnSpawn::observe(gemini_message_request));
 }
 
 impl GeminiAgent {
@@ -199,7 +199,7 @@ fn gemini_message_request(
 		// Persist usage and finalize the message
 		queue
 			.entity(actor)
-			.with(move |mut entity| {
+			.with_then(move |mut entity| {
 				let mut tokens = entity.get_mut::<TokenUsage>().unwrap();
 				tokens.input_tokens += input_tokens;
 				tokens.output_tokens += output_tokens;

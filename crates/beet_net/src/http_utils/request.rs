@@ -1,20 +1,60 @@
-use std::str::FromStr;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use http::Uri;
 use http::header::IntoHeaderName;
 use http::request;
+use std::str::FromStr;
 
 /// A generalized request [`Resource`] added to every route app before the
 /// request is processed.
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Component)]
+#[component(on_add=on_add)]
 pub struct Request {
 	pub parts: request::Parts,
-
-	pub body: Option<Bytes>,
+	pub body: Body,
 }
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	let parts = world
+		.entity(cx.entity)
+		.get::<Request>()
+		.unwrap()
+		.parts
+		.clone();
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(RequestMeta::new(parts));
+}
+
+/// Cloned from the [`Request`] when its added, allowing the [`Request`]
+/// to be consumed and for these parts to still be accessible.
+/// This component should not be removed
+#[derive(Debug, Component)]
+pub struct RequestMeta {
+	parts: request::Parts,
+	/// Note this is taken the moment the request is inserted. It does not account
+	/// for the approx 70us overhead created by using bevy at all.
+	started: Instant,
+}
+impl RequestMeta {
+	pub fn new(parts: request::Parts) -> Self {
+		Self {
+			parts,
+			started: Instant::now(),
+		}
+	}
+	pub fn method(&self) -> HttpMethod { self.parts.method.clone().into() }
+	pub fn path(&self) -> &str { self.parts.uri.path() }
+	pub fn started(&self) -> Instant { self.started }
+	pub fn parts(&self) -> &request::Parts { &self.parts }
+}
+impl std::ops::Deref for RequestMeta {
+	type Target = request::Parts;
+	fn deref(&self) -> &Self::Target { &self.parts }
+}
+
 
 impl Request {
 	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
@@ -25,11 +65,14 @@ impl Request {
 			.expect("Failed to create request parts")
 			.into_parts()
 			.0;
-		Self { parts, body: None }
+		Self {
+			parts,
+			body: default(),
+		}
 	}
 
 
-	pub fn from_parts(parts: request::Parts, body: Option<Bytes>) -> Self {
+	pub fn from_parts(parts: request::Parts, body: Body) -> Self {
 		Self { parts, body }
 	}
 
@@ -42,7 +85,7 @@ impl Request {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: None,
+			body: default(),
 		}
 	}
 	pub fn post(path: impl AsRef<str>) -> Self {
@@ -70,7 +113,16 @@ impl Request {
 	}
 
 	pub fn with_body(mut self, body: impl AsRef<[u8]>) -> Self {
-		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self.body = Bytes::copy_from_slice(body.as_ref()).into();
+		self
+	}
+
+	pub fn with_body_stream<S>(mut self, stream: S) -> Self
+	where
+		S: 'static + Send + Sync + futures::Stream<Item = Result<Bytes>>,
+	{
+		use send_wrapper::SendWrapper;
+		self.body = Body::Stream(SendWrapper::new(Box::pin(stream)));
 		self
 	}
 
@@ -81,7 +133,6 @@ impl Request {
 		body: &T,
 	) -> Result<Self, serde_json::Error> {
 		use beet_core::prelude::*;
-
 		let body = serde_json::to_string(body)?;
 		self.with_body(body)
 			.with_content_type("application/json")
@@ -89,7 +140,7 @@ impl Request {
 	}
 
 	pub fn set_body(&mut self, body: impl AsRef<[u8]>) -> &mut Self {
-		self.body = Some(Bytes::copy_from_slice(body.as_ref()));
+		self.body = Bytes::copy_from_slice(body.as_ref()).into();
 		self
 	}
 	pub fn with_header<K: IntoHeaderName>(
@@ -161,20 +212,14 @@ impl Request {
 		HttpMethod::from(self.parts.method.clone())
 	}
 
-	pub fn body_str(&self) -> Option<String> {
-		self.body
-			.as_ref()
-			.map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
-	}
-
 	pub fn from_http<T: Into<Bytes>>(request: http::Request<T>) -> Self {
 		let (parts, body) = request.into_parts();
-		let bytes = if HttpExt::has_body(&parts) {
-			Some(Bytes::from(body.into()))
+		let body = if HttpExt::has_body(&parts) {
+			Bytes::from(body.into()).into()
 		} else {
-			None
+			default()
 		};
-		Self { parts, body: bytes }
+		Self { parts, body }
 	}
 
 	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
@@ -184,7 +229,7 @@ impl Request {
 	) -> HttpResult<Self> {
 		use axum::extract::FromRequest;
 		let (parts, body) = request.into_parts();
-		let bytes = if HttpExt::has_body(&parts) {
+		let body = if HttpExt::has_body(&parts) {
 			let request =
 				axum::extract::Request::from_parts(parts.clone(), body);
 			let bytes =
@@ -194,13 +239,16 @@ impl Request {
 						err
 					))
 				})?;
-			Some(bytes)
+			bytes.into()
 		} else {
-			None
+			default()
 		};
-		Ok(Self { parts, body: bytes })
+		Ok(Self { parts, body })
 	}
-	pub fn into_http_request(self) -> http::Request<Bytes> { self.into() }
+	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {
+		let bytes = self.body.into_bytes().await?;
+		Ok(http::Request::from_parts(self.parts, bytes))
+	}
 }
 
 
@@ -215,21 +263,8 @@ impl From<RouteInfo> for Request {
 				.unwrap()
 				.into_parts()
 				.0,
-			body: None,
+			body: default(),
 		}
-	}
-}
-
-impl Into<()> for Request {
-	fn into(self) -> () {}
-}
-
-impl Into<http::Request<Bytes>> for Request {
-	fn into(self) -> http::Request<Bytes> {
-		http::Request::from_parts(
-			self.parts,
-			self.body.unwrap_or_else(Bytes::new),
-		)
 	}
 }
 
@@ -238,21 +273,71 @@ impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
 }
 
-/// Blanket impl for any type that is `TryFrom<Request, Error:IntoResponse>`.
+/// Types which consume a request, requiring its body which may be a stream
 pub trait FromRequest<M>: Sized {
-	fn from_request(request: Request) -> Result<Self, Response>;
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<Result<Self, Response>>;
+	// temp while migrating beet_router
+	fn from_request_sync(request: Request) -> Result<Self, Response> {
+		futures::executor::block_on(Self::from_request(request))
+	}
 }
+pub struct TryFromRequestMarker;
 
-impl<T, E> FromRequest<E> for T
+impl<T, E, M> FromRequest<(E, M, TryFromRequestMarker)> for T
 where
 	T: TryFrom<Request, Error = E>,
-	E: IntoResponse,
+	E: IntoResponse<M>,
 {
-	fn from_request(request: Request) -> Result<Self, Response> {
-		request.try_into().map_err(|e: E| e.into_response())
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
+		Box::pin(
+			async move { request.try_into().map_err(|e: E| e.into_response()) },
+		)
 	}
 }
 
+/// Types which consume a request by reference, not requiring its body
+pub trait FromRequestMeta<M>: Sized {
+	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response>;
+}
+
+impl FromRequestMeta<Self> for () {
+	fn from_request_meta(_request: &RequestMeta) -> Result<Self, Response> {
+		Ok(())
+	}
+}
+
+// impl Into<()> for Request {
+// 	fn into(self) -> () {}
+// }
+
+
+pub struct FromRequestMetaMarker;
+
+impl<T, M> FromRequest<(FromRequestMetaMarker, M)> for T
+where
+	T: FromRequestMeta<M>,
+{
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
+		let meta = RequestMeta::new(request.parts);
+		Box::pin(async move { T::from_request_meta(&meta) })
+	}
+}
+
+// impl<T, E, M> FromRequestMeta<(E, M)> for T
+// where
+// 	T: for<'a> TryFrom<&'a Request, Error = E>,
+// 	E: IntoResponse<M>,
+// {
+// 	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response> {
+// 		request.try_into().map_err(|e: E| e.into_response())
+// 	}
+// }
 
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }

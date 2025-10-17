@@ -153,7 +153,8 @@ test-all:
 	just test-core
 	just test-flow
 	just test-rsx
-	cargo test -p beet-cli --all-features -- {{test-threads}}
+	cargo test -p sweet-cli --all-features -- {{test-threads}}
+	cargo test -p beet-cli  --all-features -- {{test-threads}}
 
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
@@ -186,13 +187,12 @@ test-core *args:
 	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{args}} -- {{test-threads}}
 	cargo test -p beet_net						 	--features=tungstenite,native-tls  					{{args}} -- {{test-threads}}
 	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{args}} -- {{test-threads}}
-	cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 
 test-flow *args:
 	cargo test -p beet_flow 		--all-features 																						{{args}} -- {{test-threads}}
 	cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
 	cargo test -p beet_spatial																														{{args}} -- {{test-threads}}
-	cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	cargo test -p beet_flow 		--lib 										--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
 
@@ -207,7 +207,7 @@ test-rsx *args:
 	cargo test -p beet_router						 --features=tokens,native-tls  											{{args}} -- {{test-threads}}
 	cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
-	cargo test -p beet_site 						--no-default-features --features=server 						{{args}} -- {{test-threads}}
+	cargo test -p beet_site							--no-default-features --features=server 						{{args}} -- {{test-threads}}
 
 
 test crate *args:
@@ -292,7 +292,8 @@ search *args:
 
 # Run a command with the sweet cli without installing it
 sweet *args:
-	cargo run -p sweet-cli -- {{args}}
+	sweet {{args}}
+#cargo run -p sweet-cli -- {{args}}
 
 # Install the sweet cli
 install-sweet *args:

@@ -24,7 +24,7 @@ bevy_default = [
 ml = ["dep:beet_ml"]
 
 [dependencies]
-beet_flow = { workspace = true, features = ["reflect"] }
+beet_flow = { workspace = true }
 beet_ml = { workspace = true, features = [
 	"candle",
 	"spatial",

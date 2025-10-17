@@ -5,7 +5,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetFlowPlugin::default(),
+		ControlFlowPlugin::default(),
 		DebugFlowPlugin::default(),
 	))
 	.world_mut()
@@ -29,7 +29,7 @@ fn main() {
 			)
 		],
 	))
-	.trigger_action(GetOutcome);
+	.trigger_target(GetOutcome);
 	app.update();
 	app.update();
 	println!("done, subsequent updates will have no effect");

@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.7"
+version = "0.0.8-dev.4"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A Very Bevy Metaframework"
@@ -81,32 +81,32 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet_utils = { path = "crates/beet_utils", version = "0.0.7" }
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.7" }
+beet_utils = { path = "crates/beet_utils", version = "0.0.8-dev.4" }
+sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.4" }
 sweet = { path = "crates/sweet", version = "0.4.2" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.7" }
-beet_core = { path = "crates/beet_core", version = "0.0.7" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.4" }
+beet_core = { path = "crates/beet_core", version = "0.0.8-dev.4" }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.7" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.7" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.7" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.7" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.7" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.8-dev.4" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.8-dev.4" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.8-dev.4" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.8-dev.4" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.8-dev.4" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.7" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.7" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.7" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.7" }
-beet_build = { path = "crates/beet_build", version = "0.0.7" }
-beet_design = { path = "crates/beet_design", version = "0.0.7" }
-beet_net = { path = "crates/beet_net", version = "0.0.7" }
-beet_router = { path = "crates/beet_router", version = "0.0.7" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.7" }
-beet_query = { path = "crates/beet_query", version = "0.0.7" }
-beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.7" }
-beet_agent = { path = "crates/beet_agent", version = "0.0.7" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.8-dev.4" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.8-dev.4" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.8-dev.4" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.8-dev.4" }
+beet_build = { path = "crates/beet_build", version = "0.0.8-dev.4" }
+beet_design = { path = "crates/beet_design", version = "0.0.8-dev.4" }
+beet_net = { path = "crates/beet_net", version = "0.0.8-dev.4" }
+beet_router = { path = "crates/beet_router", version = "0.0.8-dev.4" }
+beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.4" }
+beet_query = { path = "crates/beet_query", version = "0.0.8-dev.4" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.8-dev.4" }
+beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.4" }
 
-beet = { path = "", version = "0.0.7" }
+beet = { path = "", version = "0.0.8-dev.4" }
 
 #💡 local
 bevy = { version = "0.17.0", default-features = false, features = [
@@ -120,6 +120,7 @@ bevy = { version = "0.17.0", default-features = false, features = [
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
+	# doesnt seem accurate, lists despawn location as spawn location
 	# "track_location",
 ] }
 
@@ -132,6 +133,7 @@ dotenv = "0.15"
 send_wrapper = "0.6"
 rapidhash = "1"
 web-time = "1"
+itertools = "0.14"
 tempfile = "3"
 mime_guess = "2"
 uuid = {version = "1",features=["js"]}
@@ -156,6 +158,7 @@ console_log = { version = "1", features = ["color"] }
 #💡 async
 futures = "0.3"
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
+pin-project = "1"
 async-channel = "2"
 async-executor = "1"
 async-fs = "2"
@@ -245,6 +248,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
+default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom","net", "build"]
@@ -355,12 +359,16 @@ uuid = { workspace = true, features = ["rng-getrandom"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = "", features = ["flow","examples"] }
+beet = { path = "", features = ["flow"] }
 # beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 serde.workspace = true
+serde_json.workspace = true
 clap.workspace = true
+async-executor.workspace = true
+futures.workspace = true
+tokio.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = "", features = ["fs"] }
@@ -388,6 +396,28 @@ path = "examples/agent/image.rs"
 required-features = ["agent","native-tls"]
 
 
+# 💡 Examples - net
+
+[[example]]
+name = "server"
+path = "examples/net/server.rs"
+required-features = ["server"]
+
+[[example]]
+name = "server_minimal"
+path = "examples/net/server_minimal.rs"
+required-features = ["server"]
+
+[[example]]
+name = "server_bench"
+path = "examples/net/server_bench.rs"
+required-features = ["server"]
+
+[[example]]
+name = "server_custom_handler"
+path = "examples/net/server_custom_handler.rs"
+required-features = ["server"]
+
 # 💡 Examples - dom
 [[example]]
 name = "csr"
@@ -403,6 +433,22 @@ required-features = ["server"]
 name = "hydration"
 path = "examples/rsx/hydration.rs"
 required-features = ["rsx"]
+
+# 💡 Examples - router
+
+[[example]]
+name = "router"
+path = "examples/router/router.rs"
+required-features = ["server"]
+[[example]]
+name = "router_full"
+path = "examples/router/router_full.rs"
+required-features = ["server", "native-tls"]
+[[example]]
+name = "router_bench"
+path = "examples/router/router_bench.rs"
+required-features = ["server"]
+
 
 # 💡 Examples - flow
 

@@ -33,10 +33,12 @@ impl RunEvent for GetOutcome {
 	Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect, ActionEvent,
 )]
 pub enum Outcome {
-	/// The action emitted a `Pass` outcome, which may mean it was able to
-	/// execute successfully or that a predicate passed.
+	/// More like a [`ControlFlow::Continue`] than an [`Ok`], may mean this action
+	/// was able to execute successfully or that a predicate passed.
 	Pass,
-	/// The action emitted a `Fail` outcome, this is not nessecarily an `Err`,
+	/// More like a [`ControlFlow::Break`] than an [`Err`], may mean a predicate failed
+	/// or this action could not execute for an *expected reason*, unlike an [`Err`] which
+	/// indicates some invalid state of the program.
 	Fail,
 }
 impl EndEvent for Outcome {
@@ -48,4 +50,14 @@ impl Outcome {
 	pub fn is_pass(&self) -> bool { self == &Outcome::Pass }
 	/// Returns `true` if the outcome is [`Outcome::Fail`]
 	pub fn is_fail(&self) -> bool { self == &Outcome::Fail }
+}
+
+
+impl std::fmt::Display for Outcome {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Outcome::Pass => write!(f, "Pass"),
+			Outcome::Fail => write!(f, "Fail"),
+		}
+	}
 }

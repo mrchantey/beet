@@ -60,9 +60,9 @@ fn play_animation_on_run(
 	query: Query<&PlayAnimation>,
 	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 ) -> Result {
-	let play_animation = query.get(ev.event_target())?;
+	let play_animation = query.get(ev.action())?;
 	let (mut player, mut transitions) =
-		agents.get_descendent_mut(ev.event_target())?;
+		agents.get_descendent_mut(ev.action())?;
 
 	if !player.is_playing_animation(play_animation.animation)
 		|| play_animation.trigger_if_playing
@@ -204,7 +204,7 @@ mod test {
 
 		app.world_mut()
 			.spawn((ChildOf(entity), PlayAnimation::new(index)))
-			.trigger_action(GetOutcome);
+			.trigger_target(GetOutcome);
 		store.get().xpect_empty();
 		app.update();
 		store.get().xpect_empty();

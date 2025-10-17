@@ -2,6 +2,28 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 
+pub fn pretty_print_duration(dur: Duration) -> String {
+	let total_secs = dur.as_secs();
+	let minutes = total_secs / 60;
+	let secs = total_secs % 60;
+	let millis = dur.subsec_millis();
+	if minutes > 0 {
+		format!("{}:{:02}.{:03} m", minutes, secs, millis)
+	} else if secs > 0 {
+		format!("{}.{:02} s", secs, millis)
+	} else if millis > 0 {
+		format!("{} ms", millis)
+	} else {
+		let micros = dur.subsec_micros();
+		if micros > 0 {
+			format!("{} µs", micros)
+		} else {
+			let nanos = dur.subsec_nanos();
+			format!("{} ns", nanos)
+		}
+	}
+}
+
 pub fn now_millis() -> u128 {
 	SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)

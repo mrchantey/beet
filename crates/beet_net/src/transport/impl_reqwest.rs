@@ -16,7 +16,7 @@ pub async fn send_reqwest(req: Request) -> Result<Response> {
 			);
 		}
 	}
-	let req = req.try_into()?;
+	let req = req.try_into_reqwest().await?;
 	let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
 		.send()
 		.await?;
@@ -24,11 +24,41 @@ pub async fn send_reqwest(req: Request) -> Result<Response> {
 	Ok(res)
 }
 
-impl TryInto<reqwest::Request> for Request {
-	type Error = reqwest::Error;
+impl Request {
+	pub async fn try_into_reqwest(self) -> Result<reqwest::Request> {
+		match self.body {
+			Body::Bytes(bytes) => {
+				let http_req = http::Request::from_parts(self.parts, bytes);
+				http_req.try_into().map_err(BevyError::from)
+			}
+			Body::Stream(stream) => {
+				use futures::TryStreamExt;
+				use reqwest::Body as ReqwestBody;
 
-	fn try_into(self) -> Result<reqwest::Request, Self::Error> {
-		self.into_http_request().try_into()
+				let stream_inner = stream.take();
+				let reqwest_body =
+					ReqwestBody::wrap_stream(stream_inner.map_err(|e| {
+						std::io::Error::new(
+							std::io::ErrorKind::Other,
+							format!("{}", e),
+						)
+					}));
+
+				let mut builder = reqwest::Request::new(
+					self.parts.method.clone(),
+					self.parts
+						.uri
+						.to_string()
+						.parse()
+						.map_err(BevyError::from)?,
+				);
+
+				*builder.headers_mut() = self.parts.headers;
+				*builder.body_mut() = Some(reqwest_body);
+
+				Ok(builder)
+			}
+		}
 	}
 }
 

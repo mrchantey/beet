@@ -1,7 +1,7 @@
+mod body;
 mod extractors;
-mod path_filter;
 mod response;
-pub use path_filter::*;
+pub use body::*;
 pub use response::*;
 mod request;
 pub use request::*;

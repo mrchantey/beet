@@ -3,9 +3,10 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
 
-/// Marker type indicating this entity was spawned via [`bundle_endpoint`].
+/// Marker type indicating this entity was spawned as a bundle and
+/// should be converted to an Ok html response by [`html_bundle_to_response`]
 #[derive(Component)]
-pub struct HandlerBundle;
+pub struct HtmlBundle;
 
 /// A node which is a descendant of a template root
 #[derive(Debug, Deref, Reflect, Component)]
@@ -37,7 +38,7 @@ pub fn apply_template_children(
 			// templates are roots
 			With<TemplateOf>,
 			// handler bundles are roots
-			With<HandlerBundle>,
+			With<HtmlBundle>,
 		)>,
 	>,
 	children: Query<&Children>,

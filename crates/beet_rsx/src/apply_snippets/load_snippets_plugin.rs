@@ -2,13 +2,14 @@ use beet_core::prelude::*;
 
 
 /// Load all file snippets from the `snippets` directory on [`Startup`].
+#[derive(Default)]
 pub struct LoadSnippetsPlugin;
 
 impl Plugin for LoadSnippetsPlugin {
 	#[allow(unused)]
 	fn build(&self, app: &mut App) {
 		#[cfg(not(target_arch = "wasm32"))]
-		app.init_plugin(crate::prelude::ApplyDirectivesPlugin)
+		app.init_plugin::<crate::prelude::ApplyDirectivesPlugin>()
 			.add_systems(Startup, load_all_file_snippets);
 	}
 }

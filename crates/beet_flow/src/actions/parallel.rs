@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::platform::collections::HashSet;
 
 /// An action that runs all of its children in parallel.
 /// ## Tags
@@ -13,14 +12,14 @@ use bevy::platform::collections::HashSet;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world.spawn((
 /// 	Parallel::default(),
 /// 	children![
 /// 		EndWith(Outcome::Pass),
 /// 		EndWith(Outcome::Pass),
 /// 	]))
-/// 	.trigger_action(GetOutcome)
+/// 	.trigger_target(GetOutcome)
 /// 	.flush();
 /// ```
 #[action(on_start, on_next)]
@@ -30,37 +29,33 @@ use bevy::platform::collections::HashSet;
 pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
-	ev: On<GetOutcome>,
-	mut commands: Commands,
+	mut ev: On<GetOutcome>,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.clear();
 
 	if children.is_empty() {
-		commands
-			.entity(ev.event_target())
-			.trigger_action(Outcome::Pass);
+		ev.trigger_next(Outcome::Pass);
 		return Ok(());
 	}
 
 	for child in children.iter() {
-		commands.entity(child).trigger_action(GetOutcome);
+		ev.trigger_next_with(child, GetOutcome);
 	}
 	Ok(())
 }
 
 fn on_next(
-	ev: On<ChildEnd<Outcome>>,
-	commands: Commands,
+	mut ev: On<ChildEnd<Outcome>>,
 	mut query: Query<(&mut Parallel, &Children)>,
 ) -> Result {
-	let target = ev.event_target();
+	let target = ev.action();
 	let child = ev.child();
 
 	// if any error, just propagate the error
 	if ev.is_fail() {
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 		return Ok(());
 	}
 
@@ -69,7 +64,7 @@ fn on_next(
 
 	// if all children have completed successfully, succeed
 	if action.len() == children.len() {
-		ChildEnd::propagate(commands, &ev);
+		ev.propagate_child();
 	}
 	Ok(())
 }
@@ -82,7 +77,7 @@ mod test {
 
 	#[test]
 	fn fails() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);
@@ -92,7 +87,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Pass)),
 				(Name::new("child2"), EndWith(Outcome::Fail)),
 			]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![
@@ -109,7 +104,7 @@ mod test {
 
 	#[test]
 	fn succeeds() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);
@@ -119,7 +114,7 @@ mod test {
 				(Name::new("child1"), EndWith(Outcome::Pass)),
 				(Name::new("child2"), EndWith(Outcome::Pass)),
 			]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run.get().xpect_eq(vec![

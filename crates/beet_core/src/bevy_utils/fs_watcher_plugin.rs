@@ -20,7 +20,7 @@ pub struct FsWatcherPlugin {
 
 impl Plugin for FsWatcherPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(AsyncPlugin)
+		app.init_plugin::<AsyncPlugin>()
 			.add_message::<WatchEvent>()
 			.insert_resource(self.watcher.clone())
 			.add_systems(PreStartup, watch_file_changes);

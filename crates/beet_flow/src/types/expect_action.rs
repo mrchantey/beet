@@ -39,15 +39,6 @@ pub fn to_have_asset(ev: impl Debug) -> String {
 	format!("Action asset was not loaded: {:#?}", ev)
 }
 
-/// Error for for when an [`OnRunAction`] or [`OnResultAction`] uses a placeholder
-/// and the request was made globally.
-pub fn to_specify_action(ev: impl Debug) -> String {
-	format!(
-		"Globally triggered ActionContext must specify an action: {:#?}",
-		ev
-	)
-}
-
 /// Error for for when an arbitrary entity is missing.
 pub fn to_have_other(ev: impl Debug) -> String {
 	format!("Other entity is missing from query: {:#?}", ev)

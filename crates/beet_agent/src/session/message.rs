@@ -62,8 +62,10 @@ pub struct MessageSpawner<T: Hash> {
 }
 impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 	pub async fn spawn(world: AsyncWorld, actor: Entity) -> Result<Self> {
-		let message =
-			world.spawn_then((Message::default(), ChildOf(actor))).await;
+		let message = world
+			.spawn_then((Message::default(), ChildOf(actor)))
+			.await
+			.id();
 
 
 		Self {
@@ -85,7 +87,8 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 			let entity = self
 				.world
 				.spawn_then((ChildOf(self.message), content))
-				.await;
+				.await
+				.id();
 			self.content_map.insert(key, entity);
 		}
 		Ok(self)

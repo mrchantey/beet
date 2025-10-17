@@ -1,3 +1,6 @@
+use bevy::prelude::*;
+use std::fs;
+use std::process::Command;
 /// Measure the compilation time for the assert! macro
 ///
 /// For context of an average large project:
@@ -31,10 +34,6 @@
 /// 10000 lines of 'assert' comilied in 55.00s, each line added 5.50ms
 /// 20000 lines of 'expect' comilied in 1.06s, each line added 0.05ms * this is incorrect, it actually took 10 mins
 /// 100000... no way dude
-use anyhow::Result;
-use std::fs;
-use std::process::Command;
-
 
 #[derive(Debug)]
 struct BenchAssert {

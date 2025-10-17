@@ -10,7 +10,7 @@
     <a href="https://docs.rs/beet"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="docs.rs docs" /></a>
   </p>
   <h3>
-     <a href="https://beetstack.dev/docs">Guidebook</a>
+     <a href="https://beetstack.dev">Website</a>
      <span> | </span>
     <a href="https://docs.rs/beet">API Docs</a>
     <!-- <span> | </span>
@@ -60,7 +60,7 @@ world
 			),
 		],
 	))
-	.trigger_action(GetOutcome)
+	.trigger_target(GetOutcome)
 	.flush();
 ```
 
@@ -122,6 +122,7 @@ This chart is for matching a bevy version against a particular beet version.
 
 | `bevy` | `beet` |
 | ------ | ------ |
+| 0.17   | 0.0.7  |
 | 0.16   | 0.0.6  |
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |

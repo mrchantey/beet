@@ -30,17 +30,16 @@ impl SucceedTimes {
 }
 
 fn succeed_times(
-	ev: On<GetOutcome>,
-	mut commands: Commands,
+	mut ev: On<GetOutcome>,
 	mut query: Query<&mut SucceedTimes>,
 ) -> Result {
-	let mut action = query.get_mut(ev.event_target())?;
+	let mut action = query.get_mut(ev.action())?;
 
 	if action.times < action.max_times {
 		action.times += 1;
-		commands.entity(ev.event_target()).trigger_action(Outcome::Pass);
+		ev.trigger_next(Outcome::Pass);
 	} else {
-		commands.entity(ev.event_target()).trigger_action(Outcome::Fail);
+		ev.trigger_next(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -53,28 +52,28 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		let entity = world.spawn(SucceedTimes::new(2)).id();
 
-		world.entity_mut(entity).trigger_action(GetOutcome).flush();
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 
 		on_result
 			.get()
 			.xpect_eq(vec![("Unknown".to_string(), Outcome::Pass)]);
-		world.entity_mut(entity).trigger_action(GetOutcome).flush();
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
 			("Unknown".to_string(), Outcome::Pass),
 			("Unknown".to_string(), Outcome::Pass),
 		]);
-		world.entity_mut(entity).trigger_action(GetOutcome).flush();
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
 			("Unknown".to_string(), Outcome::Pass),
 			("Unknown".to_string(), Outcome::Pass),
 			("Unknown".to_string(), Outcome::Fail),
 		]);
-		world.entity_mut(entity).trigger_action(GetOutcome).flush();
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 		on_result.get().xpect_eq(vec![
 			("Unknown".to_string(), Outcome::Pass),
 			("Unknown".to_string(), Outcome::Pass),

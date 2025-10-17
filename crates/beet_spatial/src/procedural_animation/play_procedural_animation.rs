@@ -68,7 +68,7 @@ pub(crate) fn play_procedural_animation(
 		agents.get_mut(action)?.translation = target_pos;
 
 		if t >= 1.0 {
-			commands.entity(action).trigger_action(Outcome::Pass);
+			commands.entity(action).trigger_target(Outcome::Pass);
 		}
 	}
 	Ok(())
@@ -86,7 +86,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			BeetSpatialPlugins::default(),
 		))
 		.insert_time();

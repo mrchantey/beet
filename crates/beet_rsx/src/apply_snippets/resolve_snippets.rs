@@ -4,53 +4,56 @@ use beet_dom::prelude::*;
 
 pub struct ResolveSnippets;
 
+/// A no-op BundleEffect (allowing for multiple insertions of same type),
+/// used to denote an `rsx bundle` in places like IntoEndpoint
+#[derive(BundleEffect)]
+pub struct RsxRoot;
+impl RsxRoot {
+	fn effect(self, _: &mut EntityWorldMut) {}
+}
+
 impl ResolveSnippets {
 	/// Create the `OnSpawn` which will immediately resolve the rsx snippet.
 	/// This is the entrypoint for the `rsx!` macro.
-	pub fn resolve(bundle: impl Bundle) -> OnSpawn {
-		OnSpawn::new(move |entity_ref| {
-			// hack to preserve a predefined SnippetRoot for tests
-			let root = entity_ref.get::<SnippetRoot>().cloned();
-			entity_ref.insert(bundle);
-			if let Some(root) = root {
-				entity_ref.insert(root);
-			}
-			if entity_ref.contains::<StaticRoot>() {
-				return;
-			}
-			let entity = entity_ref.id();
-			entity_ref.world_scope(|world| {
-				// world.log_component_names(entity);
-				// println!("Applying static rsx for {entity}");
-				world
-					.run_system_cached_with::<_, Result, _, _>(
-						apply_static_rsx,
-						entity,
-					)
-					// ignore skipped error
-					.unwrap_or(Ok(()))
-					.unwrap();
-				world
-					.run_system_cached_with::<_, Result, _, _>(
-						flush_on_spawn_deferred_recursive,
-						entity,
-					)
-					// ignore skipped error
-					.unwrap_or(Ok(()))
-					.unwrap();
-				world
-					.run_system_cached_with(apply_template_children, entity)
-					.unwrap_or(());
-				// world
-				// 	.run_system_cached_with::<_, Result, _, _>(
-				// 		apply_slots,
-				// 		entity,
-				// 	)
-				// 	// ignore skipped error
-				// 	.unwrap_or(Ok(()))
-				// 	.unwrap();
-			});
-		})
+	pub fn resolve(bundle: impl Bundle) -> (RsxRoot, OnSpawn) {
+		(
+			RsxRoot,
+			OnSpawn::new(move |entity_ref| {
+				// hack to preserve a predefined SnippetRoot for tests
+				let root = entity_ref.get::<SnippetRoot>().cloned();
+				entity_ref.insert(bundle);
+				if let Some(root) = root {
+					entity_ref.insert(root);
+				}
+				if entity_ref.contains::<StaticRoot>() {
+					return;
+				}
+				let entity = entity_ref.id();
+				entity_ref.world_scope(|world| {
+					// world.log_component_names(entity);
+					// println!("Applying static rsx for {entity}");
+					world
+						.run_system_cached_with::<_, Result, _, _>(
+							apply_static_rsx,
+							entity,
+						)
+						// ignore skipped error
+						.unwrap_or(Ok(()))
+						.unwrap();
+					world
+						.run_system_cached_with::<_, Result, _, _>(
+							flush_on_spawn_deferred_recursive,
+							entity,
+						)
+						// ignore skipped error
+						.unwrap_or(Ok(()))
+						.unwrap();
+					world
+						.run_system_cached_with(apply_template_children, entity)
+						.unwrap_or(());
+				});
+			}),
+		)
 	}
 }
 

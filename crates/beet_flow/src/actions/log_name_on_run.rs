@@ -8,10 +8,10 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world
 ///		.spawn((Name::new("root"), LogNameOnRun))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(log_name_on_run)]
 #[derive(Default, Component, Reflect)]
@@ -21,8 +21,8 @@ pub struct LogNameOnRun;
 
 /// Logs the [`Name`] of the entity when it runs.
 fn log_name_on_run(ev: On<GetOutcome>, query: Query<&Name>) -> Result {
-	if let Ok(name) = query.get(ev.event_target()) {
-		log::info!("Running: {name}");
+	if let Ok(name) = query.get(ev.action()) {
+		info!("Running: {name}");
 	}
 	Ok(())
 }
@@ -35,10 +35,10 @@ mod test {
 	/// run with `--nocapture` to check output
 	#[test]
 	fn action() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn((Name::new("root"), LogNameOnRun))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 	}
 }

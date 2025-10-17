@@ -58,7 +58,7 @@ mod test {
 	#[test]
 	pub fn works() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
+		app.add_plugins(ControlFlowPlugin::default());
 		app.insert_time();
 
 		let entity = app.world_mut().spawn(Running::default()).id();

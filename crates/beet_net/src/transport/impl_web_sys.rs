@@ -26,9 +26,20 @@ impl TryInto<web_sys::Request> for Request {
 	fn try_into(self) -> Result<web_sys::Request, Self::Error> {
 		let init = web_sys::RequestInit::new();
 		init.set_method(self.parts.method.as_str());
-		if let Some(body) = &self.body {
-			init.set_body(&js_sys::Uint8Array::from(body.as_ref()));
+
+		match &self.body {
+			Body::Bytes(bytes) if !bytes.is_empty() => {
+				init.set_body(&js_sys::Uint8Array::from(bytes.as_ref()));
+			}
+			Body::Stream(_) => {
+				let stream = create_readable_stream_from_body(self.body)?;
+				init.set_body(&stream);
+			}
+			Body::Bytes(_) => {
+				// Empty bytes, no body to set
+			}
 		}
+
 		let url = self.parts.uri.to_string();
 		let request =
 			web_sys::Request::new_with_str_and_init(&url, &init).map_jserr()?;
@@ -42,6 +53,55 @@ impl TryInto<web_sys::Request> for Request {
 		}
 		Ok(request)
 	}
+}
+
+fn create_readable_stream_from_body(
+	body: Body,
+) -> Result<web_sys::ReadableStream> {
+	use std::cell::RefCell;
+	use std::rc::Rc;
+	use wasm_bindgen::prelude::*;
+	use wasm_bindgen_futures::spawn_local;
+
+	let body_rc = Rc::new(RefCell::new(body));
+
+	let start = {
+		let body_rc = body_rc.clone();
+		Closure::wrap(Box::new(
+			move |controller: web_sys::ReadableStreamDefaultController| {
+				let body_rc = body_rc.clone();
+				spawn_local(async move {
+					let mut body_ref = body_rc.borrow_mut();
+					while let Ok(Some(chunk)) = body_ref.next().await {
+						let uint8_array =
+							js_sys::Uint8Array::from(chunk.as_ref());
+						if controller.enqueue_with_chunk(&uint8_array).is_err()
+						{
+							break;
+						}
+					}
+					let _ = controller.close();
+				});
+			},
+		)
+			as Box<dyn FnMut(web_sys::ReadableStreamDefaultController)>)
+	};
+
+	let underlying_source = js_sys::Object::new();
+	js_sys::Reflect::set(
+		&underlying_source,
+		&JsValue::from_str("start"),
+		start.as_ref().unchecked_ref(),
+	)
+	.map_jserr()?;
+
+	start.forget(); // Prevent the closure from being dropped
+
+	let stream =
+		web_sys::ReadableStream::new_with_underlying_source(&underlying_source)
+			.map_jserr()?;
+
+	Ok(stream)
 }
 
 

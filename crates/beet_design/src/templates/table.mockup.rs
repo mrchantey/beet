@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	let users = vec![
 		("Alice", 30, "Engineer"),
 		("Bob", 25, "Designer"),

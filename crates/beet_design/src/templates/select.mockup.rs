@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! { <Inner client:load /> }
 }
 

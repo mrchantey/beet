@@ -14,10 +14,10 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
-/// .trigger_action(GetOutcome);
+/// .trigger_target(GetOutcome);
 /// ```
 #[action(repeat)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
@@ -56,7 +56,7 @@ fn repeat(
 	query: Query<&Repeat>,
 	mut commands: Commands,
 ) -> Result {
-	let repeat = query.get(ev.event_target())?;
+	let repeat = query.get(ev.action())?;
 	if let Some(check) = &repeat.if_result_matches {
 		if *ev != *check {
 			// repeat is completed, propagate the result to the parent if it exists
@@ -66,8 +66,8 @@ fn repeat(
 	}
 	// otherwise run again on the next tick
 	commands
-		.entity(ev.event_target())
-		.insert(TriggerDeferred::new(GetOutcome));
+		.entity(ev.action())
+		.insert(TriggerDeferred::new(GetOutcome).with_agent(ev.agent()));
 	Ok(())
 }
 
@@ -79,12 +79,12 @@ mod test {
 
 	#[test]
 	fn repeat_always() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
 			.spawn((Repeat::default(), SucceedTimes::new(2)))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -101,12 +101,12 @@ mod test {
 
 	#[test]
 	fn repeat_if() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
 			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(1);
@@ -123,7 +123,7 @@ mod test {
 
 	#[test]
 	fn repeat_child() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
@@ -131,7 +131,7 @@ mod test {
 				Repeat::if_success(),
 				SucceedTimes::new(2)
 			)]))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_result.get().len().xpect_eq(2);

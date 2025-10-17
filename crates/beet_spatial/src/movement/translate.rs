@@ -18,7 +18,7 @@ use beet_flow::prelude::*;
 /// 	Transform::default(),
 ///		Translate::new(Vec3::new(1.0, 0., 0.)),
 ///		))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -58,7 +58,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
+		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
 		let agent = app
@@ -67,7 +67,7 @@ mod test {
 				Transform::default(),
 				Translate::new(Vec3::new(1.0, 0., 0.)),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 

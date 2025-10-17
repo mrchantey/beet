@@ -23,10 +23,11 @@ mod test_request {
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
-	const HTTPBIN: &str = "https://httpbin.org";
+	const HTTPBIN: &str = "https://postman-echo.com";
+	// const HTTPBIN: &str = "https://httpbin.org";
 
 	#[sweet::test]
-	#[ignore = "flaky example.com"]
+	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
 			.send()
@@ -107,10 +108,39 @@ mod test_request {
 			.xpect_contains("rawbytes");
 	}
 
+	#[sweet::test]
+	#[ignore = "flaky httpbin"]
+	async fn body_stream() {
+		use bytes::Bytes;
+
+		Request::post(format!("{HTTPBIN}/post"))
+			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
+				Ok(Bytes::from("chunk1")),
+				Ok(Bytes::from("chunk2")),
+				Ok(Bytes::from("chunk3")),
+			]))
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xmap(|text| {
+				// cross_log!("Response text: {}", text);
+				// The response should contain all our chunks
+				text.contains("chunk1")
+					&& text.contains("chunk2")
+					&& text.contains("chunk3")
+			})
+			.xpect_true();
+	}
+
 
 	#[test]
 	#[ignore = "flaky httpbin"]
-
 	fn query_params() {
 		// #[derive(Serialize)]
 		// struct Foo{

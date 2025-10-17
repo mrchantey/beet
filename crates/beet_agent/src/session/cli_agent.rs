@@ -87,8 +87,8 @@ impl CliAgentConfig {
 
 impl Plugin for CliAgentPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin(AgentPlugin)
-			.init_plugin(AsyncPlugin)
+		app.init_plugin::<AgentPlugin>()
+			.init_plugin::<AsyncPlugin>()
 			.insert_resource(self.config.clone())
 			.add_systems(Startup, self.into_system())
 			.add_observer(text_added)
@@ -182,7 +182,7 @@ impl CliAgentPlugin {
 
 
 fn terminal_user() -> impl Bundle {
-	(User, EntityObserver::new(user_message_request))
+	(User, OnSpawn::observe(user_message_request))
 }
 
 fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {

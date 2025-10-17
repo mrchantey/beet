@@ -99,7 +99,7 @@ mod test {
 		let mut app = App::new();
 
 		app.add_plugins((
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 			BeetSpatialPlugins::default(),
 		))
 		.insert_time();

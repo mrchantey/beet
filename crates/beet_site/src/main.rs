@@ -7,13 +7,13 @@ use beet_site::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((
-			BeetPlugins,
 			#[cfg(feature = "launch")]
 			launch_plugin,
 			#[cfg(feature = "server")]
 			server_plugin,
 			#[cfg(feature = "client")]
 			client_plugin,
+			BeetPlugins,
 		))
 		.insert_resource(PackageConfig{
 			title:"Beet".to_string(),

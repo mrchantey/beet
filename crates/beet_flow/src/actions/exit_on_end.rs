@@ -26,7 +26,7 @@ mod test {
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((EndWith(Outcome::Pass), ExitOnEnd))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		world.should_exit().unwrap().xpect_eq(AppExit::Success);

@@ -25,7 +25,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(EntityObserver::new(openai_message_request));
+		.insert(OnSpawn::observe(openai_message_request));
 }
 
 impl OpenAiAgent {
@@ -242,7 +242,7 @@ fn openai_message_request(
 					let id = body["response"]["id"].to_str()?.to_string();
 					queue
 						.entity(actor)
-						.with(move |mut entity| {
+						.with_then(move |mut entity| {
 							entity
 								.get_mut::<OpenAiAgent>()
 								.unwrap()

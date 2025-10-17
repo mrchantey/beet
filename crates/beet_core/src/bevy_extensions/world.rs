@@ -28,6 +28,41 @@ impl IntoWorld for App {
 }
 #[ext(name=WorldExt)]
 pub impl World {
+	fn with_resource<T: Resource>(&mut self, resource: T) -> &mut Self {
+		self.insert_resource(resource);
+		self
+	}
+
+	fn await_event<E: Event, B: Bundle>(
+		&mut self,
+	) -> impl Future<Output = &mut Self> {
+		// TODO cleaner but we get messy accessed threadlocal panic
+		// async move {
+		// 	self.run_async_then(async |world| {
+		// 		world.await_event::<E, B>().await;
+		// 	})
+		// 	.await;
+		// 	self
+		// }
+
+
+		let (send, recv) = async_channel::bounded(1);
+		self.add_observer(move |ev: On<E, B>, mut commands: Commands| {
+			send.try_send(()).ok();
+			commands.entity(ev.observer()).despawn();
+		});
+		async move {
+			AsyncRunner::poll_and_update(
+				|| {
+					self.update();
+				},
+				recv,
+			)
+			.await;
+			self
+		}
+	}
+
 	/// The world equivelent of [`App::update`]
 	fn update(&mut self) { self.run_schedule(Main); }
 	/// The world equivelent of [`App::should_exit`]
@@ -297,6 +332,7 @@ pub impl<W: IntoWorld> W {
 
 
 	/// copied from world.trigger_ref_with_caller
+	#[track_caller]
 	fn trigger_ref_with_caller_pub<'a, E: Event>(
 		&mut self,
 		event: &mut E,
@@ -322,8 +358,6 @@ mod test {
 
 	#[test]
 	fn serializes() {
-		use bevy::MinimalPlugins;
-
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.init();

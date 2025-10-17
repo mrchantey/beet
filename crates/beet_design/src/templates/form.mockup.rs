@@ -4,7 +4,7 @@ use bevy::reflect::DynamicStruct;
 
 
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! { <Inner client:load /> }
 }
 

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::platform::collections::HashMap;
 use std::cmp::Ordering;
 
 /// Aka `UtilitySelector`, Runs the child with the highest score.
@@ -26,7 +25,7 @@ use std::cmp::Ordering;
 ///			EndWith(Score::PASS),
 ///			EndWith(Outcome::Pass),
 ///		))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
@@ -36,25 +35,23 @@ use std::cmp::Ordering;
 pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(
-	ev: On<GetOutcome>,
-	mut commands: Commands,
+	mut ev: On<GetOutcome>,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.clear();
 
 	for child in children.iter() {
-		commands.entity(child).trigger_action(GetScore);
+		ev.trigger_next_with(child, GetScore);
 	}
 	Ok(())
 }
 
 fn on_receive_score(
-	ev: On<ChildEnd<Score>>,
-	mut commands: Commands,
+	mut ev: On<ChildEnd<Score>>,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.event_target())?;
+	let (mut action, children) = query.get_mut(ev.action())?;
 	action.insert(ev.child(), ev.value().clone());
 
 	// all children have reported their score, run the highest scoring child
@@ -63,7 +60,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		commands.entity(*highest).trigger_action(GetOutcome);
+		ev.trigger_next_with(*highest, GetOutcome);
 	}
 	Ok(())
 }
@@ -76,7 +73,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_run = collect_on_run(&mut world);
 		let on_result = collect_on_result(&mut world);
@@ -96,7 +93,7 @@ mod test {
 				EndWith(Score::PASS),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		on_request_score.len().xpect_eq(2);
 		on_score.len().xpect_eq(4);

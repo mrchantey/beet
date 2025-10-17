@@ -26,23 +26,19 @@ fn nearest_sentence(
 		&HandleWrapper<Bert>,
 		&Children,
 	)>,
-) {
-	let (_scorer, target_sentence, handle, children) = query
-		.get(ev.event_target())
-		.expect(&expect_action::to_have_action(&ev));
+) -> Result {
+	let (_scorer, target_sentence, handle, children) =
+		query.get(ev.action())?;
 	let bert = berts
 		.get_mut(handle)
 		.expect(&expect_action::to_have_asset(&ev));
-	match bert.closest_sentence_entity(
+	let entity = bert.closest_sentence_entity(
 		target_sentence.0.clone(),
 		children.iter().map(|e| e.clone()),
 		&sentences,
-	) {
-		Ok(entity) => {
-			commands.entity(entity).trigger_action(GetOutcome);
-		}
-		Err(e) => log::error!("SentenceFlow: {}", e),
-	}
+	)?;
+	commands.entity(entity).trigger_target(GetOutcome);
+	Ok(())
 }
 
 #[cfg(test)]
@@ -62,7 +58,7 @@ mod test {
 			MinimalPlugins,
 			workspace_asset_plugin(),
 			LanguagePlugin::default(),
-			BeetFlowPlugin::default(),
+			ControlFlowPlugin::default(),
 		))
 		.finish();
 		let on_run =
@@ -83,7 +79,7 @@ mod test {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));
 				parent.spawn((Name::new("kill"), Sentence::new("kill")));
 			})
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 

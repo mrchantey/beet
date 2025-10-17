@@ -7,7 +7,6 @@
 pub use utils::async_ext;
 pub use utils::time_ext;
 
-pub mod actions;
 pub mod arena;
 mod bevy_extensions;
 mod bevy_utils;
@@ -31,7 +30,6 @@ pub mod prelude {
 	#[cfg(not(doctest))]
 	#[allow(unused)]
 	pub(crate) use crate as beet_core;
-	pub use crate::actions::*;
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
@@ -46,8 +44,11 @@ pub mod prelude {
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
+	pub use bevy::log::LogPlugin;
 	pub use bevy::ecs::entity::MapEntities;
 	pub use bevy::ecs::lifecycle::HookContext;
+	pub use bevy::ecs::query::QueryData;
+	pub use bevy::ecs::query::QueryFilter;
 	pub use bevy::ecs::reflect::ReflectMapEntities;
 	pub use bevy::ecs::relationship::Relationship;
 	pub use bevy::ecs::schedule::ScheduleLabel;
@@ -57,6 +58,7 @@ pub mod prelude {
 	pub use bevy::ecs::world::DeferredWorld;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
+	pub use tracing::Level;
 
 	pub use bevy::prelude::*;
 	/// hack to fix bevy macros
@@ -84,6 +86,7 @@ pub mod prelude {
 }
 
 pub mod exports {
+	pub use itertools::Itertools;
 	// original exports
 	pub use async_channel;
 	pub use futures_lite;

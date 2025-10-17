@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_parse::prelude::unbounded_related;
+use beet_router::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse_quote;
@@ -36,68 +37,60 @@ pub fn collect_route_files(
 
 				let segments =
 					RouteSegments::parse(&route_file_method.route_info.path);
-				let mut components = vec![
-					collection.category.cache_strategy().self_token_stream(),
-					PathFilter::new(&route_file_method.route_info.path)
-						.self_token_stream(),
-				];
 
 				let method =
 					route_file_method.route_info.method.self_token_stream();
-
 				let is_async = route_file_method.item.sig.asyncness.is_some();
-				match collection.category {
-					RouteCollectionCategory::Pages => {
-						components.push(method);
-						// page routes are presumed to be bundles
-						match is_async {
-							true => components.push(quote! {
-								bundle_endpoint_async(#mod_ident::#func_ident)
-							}),
-							false => components.push(quote! {
-								bundle_endpoint(#mod_ident::#func_ident)
-							}),
-						}
+				let annoying_generics = match route_file_method.returns_result()
+				{
+					true => {
+						quote! { ::<_,_,_,_,(SerdeResultIntoServerActionOut,_)> }
+					}
+					false => quote! {},
+				};
 
-						// TODO this is a brittle check
+
+				let mut builder_tokens = match (collection.category, is_async) {
+					(RouteCollectionCategory::Pages, _) => {
+						let mut items = vec![
+							quote!(EndpointBuilder::new(#mod_ident::#func_ident)
+								.with_method(#method)
+								.with_content_type(ContentType::Html)),
+						];
+						// ssr check TODO very brittle
 						if segments.is_static()
 							&& collection.category.cache_strategy()
 								== CacheStrategy::Static
 							&& route_file_method.route_info.method
 								== HttpMethod::Get
 						{
-							components
-								.push(quote! {HandlerConditions::is_ssr()})
-						}
-					}
-					RouteCollectionCategory::Actions => {
-						let out_ty = match route_file_method.returns_result() {
-							true => quote! { JsonResult },
-							false => quote! { Json },
+							items.push(
+								quote!(.with_predicate(common_predicates::is_ssr())),
+							);
 						};
-						// Action routes may be any kind of route
-
-						match is_async {
-							true => components.push(quote! {
-								action_endpoint_async(
-									#method,
-									async move |val,mut world,entity|{
-										let out = #mod_ident::#func_ident(val, &mut world, entity).await;
-										(world, #out_ty::new(out))
-									}
-								)
-							}),
-							false => components.push(quote! {
-								action_endpoint(
-									#method,
-									#mod_ident::#func_ident.pipe(#out_ty::pipe)
-								)
-							}),
-						}
+						items
+					}
+					(RouteCollectionCategory::Actions, true) => {
+						vec![
+							quote!(ServerAction::new_async #annoying_generics(#method, #mod_ident::#func_ident)
+								.with_content_type(ContentType::Json)),
+						]
+					}
+					(RouteCollectionCategory::Actions, false) => {
+						vec![
+							quote!(ServerAction::new #annoying_generics(#method, #mod_ident::#func_ident)
+								.with_content_type(ContentType::Json)),
+						]
 					}
 				};
+				let path = route_file_method.route_info.path.to_string();
+				builder_tokens.push(quote!(.with_path(#path)));
+				let cache_strategy =
+					collection.category.cache_strategy().self_token_stream();
+				builder_tokens
+					.push(quote!(.with_cache_strategy(#cache_strategy)));
 
-				children.push(quote! {(#(#components),*)});
+				children.push(quote! {#(#builder_tokens)*});
 			}
 		}
 
@@ -109,7 +102,7 @@ pub fn collect_route_files(
 		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
 			#[cfg(feature = "server")]
 			pub fn #collection_ident() -> impl Bundle {
-				#bundle
+				(InfallibleSequence, #bundle)
 			}
 		});
 	}

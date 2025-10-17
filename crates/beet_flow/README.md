@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 let mut app = App::new();
 app.add_plugins((
 	// manages action lifecycles
-	BeetFlowPlugin::default(),
+	ControlFlowPlugin::default(),
 	// this will log the name of each action as it is triggered.
 	DebugFlowPlugin::default()
 ));
@@ -39,7 +39,7 @@ app.world_mut()
 			),
 		],
 	))
-	.trigger_action(GetOutcome)
+	.trigger_target(GetOutcome)
 	.flush();
 ```
 

@@ -35,7 +35,7 @@ impl Plugin for ApplyDirectivesPlugin {
 				load_client_islands.run_if(document_exists),
 			);
 		}
-		app.init_plugin(schedule_order_plugin)
+		app.init_plugin_with(schedule_order_plugin)
 			.add_plugins((SignalsPlugin, NodeTypesPlugin))
 			.init_resource::<HtmlConstants>()
 			.init_resource::<WorkspaceConfig>()

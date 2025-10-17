@@ -21,7 +21,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetFlowPlugin::default(),
+		ControlFlowPlugin::default(),
 		DebugFlowPlugin::with_result(),
 	))
 	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
@@ -34,10 +34,7 @@ fn main() {
 					Name::new("Long Running"),
 					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
-					EndInDuration::new(
-						Outcome::Pass,
-						Duration::from_secs(5),
-					),
+					EndInDuration::new(Outcome::Pass, Duration::from_secs(5)),
 				))
 				.with_children(|parent| {
 					// we need a nested sequence so that `RepeatFlow` is scoped
@@ -69,14 +66,14 @@ fn main() {
 							),
 						));
 				});
-			parent.spawn(Name::new("After Long Running")).observe(
+			parent.spawn(Name::new("After Long Running")).observe_any(
 				|_trigger: On<GetOutcome>| {
 					println!("After Long Running triggered, exiting");
 					std::process::exit(0);
 				},
 			);
 		})
-		.trigger_action(GetOutcome);
+		.trigger_target(GetOutcome);
 
 	app.run();
 }

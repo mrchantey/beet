@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 /// 	.spawn(EndWith(Outcome::Pass))
-/// 	.trigger_action(GetOutcome);
+/// 	.trigger_target(GetOutcome);
 /// ```
 #[action(end_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -23,13 +23,11 @@ pub struct EndWith<T: EndEvent + Clone = Outcome>(pub T);
 impl<T: EndEvent + Clone> EndWith<T> {}
 
 fn end_with<T: EndEvent + Clone>(
-	ev: On<T::Run>,
-	mut commands: Commands,
+	mut ev: On<T::Run>,
 	action: Query<&EndWith<T>>,
 ) -> Result {
-	let entity = ev.event_target();
-	let action = action.get(entity)?;
-	commands.entity(entity).trigger_action(action.0.clone());
+	let action = action.get(ev.action())?;
+	ev.trigger_next(action.0.clone());
 	Ok(())
 }
 
@@ -46,7 +44,7 @@ mod test {
 		let observed = observer_ext::observe_triggers::<Outcome>(&mut world);
 		world
 			.spawn(EndWith(Outcome::Pass))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		observed.len().xpect_eq(1);

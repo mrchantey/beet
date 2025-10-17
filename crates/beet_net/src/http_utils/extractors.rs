@@ -5,14 +5,14 @@ use http::HeaderMap;
 use http::StatusCode;
 use http::request;
 
-pub struct Html(pub String);
+pub struct Html<T>(pub T);
 pub struct Css(pub String);
 pub struct Javascript(pub String);
 pub struct Png(pub String);
 
 
-impl Into<Html> for String {
-	fn into(self) -> Html { Html(self) }
+impl Into<Html<Self>> for String {
+	fn into(self) -> Html<Self> { Html(self) }
 }
 impl Into<Css> for String {
 	fn into(self) -> Css { Css(self) }
@@ -72,7 +72,7 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 		match self.result {
 			Ok(val) => {
 				let ok_body = serde_json::to_string(&val)?;
-				Response::ok_body(&ok_body, "application/json")
+				Response::ok_body(ok_body, "application/json")
 			}
 			Err(err) => {
 				let err_body = serde_json::to_string(&err)?;
@@ -97,20 +97,22 @@ impl<T> Json<T> {
 	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
 }
 
-#[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
-	for Json<T>
-{
-	type Error = HttpError;
 
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
-		let body = req
-			.body
-			.ok_or_else(|| HttpError::bad_request("no body in request"))?;
-		let json: T = serde_json::from_slice(&body).map_err(|err| {
-			HttpError::bad_request(format!("Failed to parse JSON: {}", err))
-		})?;
-		Ok(Json(json))
+#[cfg(feature = "serde")]
+impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
+	fn from_request(
+		req: Request,
+	) -> MaybeSendBoxedFuture<Result<Self, Response>> {
+		Box::pin(async move {
+			let body = req.body.into_bytes().await.map_err(|err| {
+				error!("Failed to read request body: {}", err);
+				HttpError::bad_request("Failed to read stream")
+			})?;
+			let json = serde_json::from_slice(&body).map_err(|err| {
+				HttpError::bad_request(format!("Failed to parse JSON: {}", err))
+			})?;
+			Ok(Self(json))
+		})
 	}
 }
 #[cfg(feature = "serde")]
@@ -120,7 +122,7 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	fn try_into(self) -> Result<Response, Self::Error> {
 		let json_str = serde_json::to_string(&self.0)?;
 		Ok(Response::ok_body(
-			&json_str,
+			json_str,
 			"application/json; charset=utf-8",
 		))
 	}
@@ -156,20 +158,24 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	}
 }
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
+impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
-	type Error = HttpError;
-
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
-		let query = req.parts.uri.query().ok_or_else(|| {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
+		let query = req.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
-		let value = Self::from_query_string(query)?;
+		let value = Self::from_query_string(query).map_err(|err| {
+			HttpError::bad_request(format!(
+				"Failed to parse query params: {}",
+				err
+			))
+		})?;
 		Ok(Self(value))
 	}
 }
 
+#[derive(Debug, Clone, Deref)]
 pub struct QueryParams<T>(pub T);
 
 #[cfg(feature = "serde")]
@@ -190,13 +196,9 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::de::DeserializeOwned> std::convert::TryFrom<Request>
-	for QueryParams<T>
-{
-	type Error = HttpError;
-
-	fn try_from(req: Request) -> std::result::Result<Self, Self::Error> {
-		let query = req.parts.uri.query().ok_or_else(|| {
+impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
+		let query = req.uri.query().ok_or_else(|| {
 			HttpError::bad_request("no query params in request")
 		})?;
 		let params: T = serde_urlencoded::from_str(query).map_err(|err| {
@@ -218,30 +220,33 @@ impl<'a> Into<Response> for &'a str {
 
 impl Into<Response> for String {
 	fn into(self) -> Response {
-		Response::ok_body(&self, "text/plain; charset=utf-8")
+		Response::ok_body(self, "text/plain; charset=utf-8")
 	}
 }
 
-impl Into<Response> for Html {
+impl<T> Into<Response> for Html<T>
+where
+	T: Into<Body>,
+{
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "text/html; charset=utf-8")
+		Response::ok_body(self.0, "text/html; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Css {
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "text/css; charset=utf-8")
+		Response::ok_body(self.0, "text/css; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Javascript {
 	fn into(self) -> Response {
-		Response::ok_body(&self.0, "application/javascript; charset=utf-8")
+		Response::ok_body(self.0, "application/javascript; charset=utf-8")
 	}
 }
 
 impl Into<Response> for Png {
-	fn into(self) -> Response { Response::ok_body(&self.0, "image/png") }
+	fn into(self) -> Response { Response::ok_body(self.0, "image/png") }
 }
 
 
@@ -293,16 +298,23 @@ mod test {
 			.body(Bytes::new())
 			.unwrap()
 			.into();
-		app.insert_resource(req);
-		app.add_systems(Update, |mut commands: Commands, req: Res<Request>| {
-			let mut res = Response::ok();
-			res.parts.headers = req.parts.headers.clone();
-			commands.insert_resource(res);
-		});
+		let entity = app.world_mut().spawn(req).id();
+		app.add_systems(
+			Update,
+			move |mut commands: Commands, query: Query<&Request>| {
+				let req = query.single().unwrap();
+				let mut res = Response::ok();
+				res.parts.headers = req.parts.headers.clone();
+				commands.entity(entity).insert(res);
+			},
+		);
 		app.update();
 
-		let res = app.world_mut().remove_resource::<Response>().unwrap();
-		res.parts
+		app.world_mut()
+			.entity_mut(entity)
+			.take::<Response>()
+			.unwrap()
+			.parts
 			.headers
 			.get("content-length")
 			.unwrap()

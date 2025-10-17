@@ -88,7 +88,7 @@ pub(crate) fn trigger_on_animation_end<P: ActionEvent + Clone>(
 		if nearly_finished {
 			commands
 				.entity(action)
-				.trigger_action(on_end.payload.clone());
+				.trigger_target(on_end.payload.clone());
 		}
 	}
 	Ok(())

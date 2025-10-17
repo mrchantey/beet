@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 ///		.spawn(InsertOn::<GetOutcome, Running>::default())
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -26,6 +26,19 @@ pub struct InsertOn<E: ActionEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
+impl<E: ActionEvent> InsertOn<E, OnSpawnClone> {
+	pub fn new_func<B: Bundle>(
+		bundle: impl 'static + Send + Sync + Clone + FnOnce() -> B,
+	) -> Self {
+		Self {
+			bundle: OnSpawnClone::new(move |entity| {
+				entity.insert(bundle.clone()());
+			}),
+			phantom: PhantomData,
+			target_entity: TargetEntity::default(),
+		}
+	}
+}
 impl<E: ActionEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {
@@ -59,10 +72,9 @@ fn insert<E: ActionEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
-	agents: AgentQuery,
 ) -> Result {
-	let action = query.get(ev.event_target())?;
-	let target = action.target_entity.select_target(&ev, &agents);
+	let action = query.get(ev.action())?;
+	let target = action.target_entity.select_target(&ev);
 	commands.entity(target).insert(action.bundle.clone());
 	Ok(())
 }
@@ -80,7 +92,7 @@ mod test {
 
 		let entity = world
 			.spawn(InsertOn::<GetOutcome, Running>::default())
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();
@@ -88,7 +100,7 @@ mod test {
 	#[test]
 	fn on_result() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
+		app.add_plugins(ControlFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
@@ -96,7 +108,7 @@ mod test {
 				InsertOn::<Outcome, Running>::default(),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_some();

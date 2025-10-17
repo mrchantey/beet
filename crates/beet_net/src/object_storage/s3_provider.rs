@@ -8,18 +8,6 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-pub fn s3_bucket() -> impl Bundle {
-	AsyncAction::new(async move |mut world, entity| {
-		let bucket_name = world.resource::<PackageConfig>().html_bucket_name();
-		debug!("Connecting to S3 bucket: {bucket_name}");
-		let provider = S3Provider::create().await;
-		world
-			.entity_mut(entity)
-			.insert(Bucket::new(provider, bucket_name));
-		world
-	})
-}
-
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
 

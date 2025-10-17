@@ -4,6 +4,7 @@ use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
+use bevy::ecs::system::IntoObserverSystem;
 
 /// Type helper for [`SpawnWith`], useful for spawning any number of related entities
 /// like children.
@@ -51,49 +52,29 @@ impl OnSpawn {
 		})
 	}
 
-	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
-		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> Self {
+	pub fn trigger<M>(event: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
-			entity.trigger(ev);
+			entity.trigger_target(event);
 		})
 	}
-	pub fn trigger_option<'t, E: EntityEvent<Trigger<'t>: Default>>(
-		ev: Option<impl 'static + Send + Sync + FnOnce(Entity) -> E>,
+	pub fn trigger_option<M>(
+		event: Option<impl IntoEntityTargetEvent<M>>,
 	) -> Self {
 		Self::new(move |entity| {
-			if let Some(ev) = ev {
-				entity.trigger(ev);
+			if let Some(event) = event {
+				entity.trigger_target(event);
 			}
 		})
 	}
 
-	pub fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		event: E,
+	pub fn observe<E: Event, B: Bundle, M>(
+		observer: impl 'static + Send + Sync + IntoObserverSystem<E, B, M>,
 	) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_action(event);
+			entity.observe_any(observer);
 		})
 	}
-	pub fn trigger_action_option<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		event: Option<E>,
-	) -> Self {
-		Self::new(move |entity| {
-			if let Some(event) = event {
-				entity.trigger_action(event);
-			}
-		})
-	}
+
 
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }
@@ -156,16 +137,9 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	pub fn trigger_action<
-		'a,
-		const AUTO_PROPAGATE: bool,
-		E: Event<Trigger<'a> = ActionTrigger<AUTO_PROPAGATE, E, T>>,
-		T: 'static + Send + Sync + Traversal<E>,
-	>(
-		ev: E,
-	) -> Self {
+	pub fn trigger_target<M>(ev: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
-			entity.trigger_action(ev);
+			entity.trigger_target(ev);
 			Ok(())
 		})
 	}
@@ -305,5 +279,19 @@ mod test {
 		numbers.get().xpect_eq(&[1, 2, 3]);
 		#[cfg(not(target_arch = "wasm32"))]
 		numbers.get().xpect_eq(&[3, 1, 2]);
+	}
+
+	#[test]
+	fn observe() {
+		#[derive(EntityEvent)]
+		struct Foo(Entity);
+
+		let store = Store::default();
+		let mut world = World::new();
+		world
+			.spawn(OnSpawn::observe(move |_: On<Foo>| store.set(3)))
+			.trigger(Foo);
+
+		store.get().xpect_eq(3);
 	}
 }

@@ -70,7 +70,7 @@ pub fn fetch_npc(
 			max_speed: MaxSpeed(2.),
 			..default()
 		},
-		EntityObserver::new(
+		OnSpawn::observe(
 			|ev: On<Insert, SteerTarget>,
 			 steer_targets: Query<&SteerTarget>,
 			 sentences: Query<&Sentence>,
@@ -100,9 +100,21 @@ pub fn fetch_npc(
 			children![
 				(
 					Name::new("Apply Sentence Steer Target"),
-					SentenceSteerTarget::<Collectable>::new(
-						TargetEntity::Parent,
-					),
+					OnSpawn::new(|entity| {
+						let id = entity.id();
+						entity.world_scope(|world| {
+							let parent = world
+								.entity(id)
+								.get::<ChildOf>()
+								.unwrap()
+								.parent();
+							world.entity_mut(id).insert(SentenceSteerTarget::<
+								Collectable,
+							>::new(
+								TargetEntity::Other(parent),
+							));
+						})
+					}),
 					HandleWrapper(bert),
 					EndWith(Outcome::Pass),
 				),

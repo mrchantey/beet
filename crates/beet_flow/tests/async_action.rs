@@ -10,10 +10,10 @@ use sweet::prelude::*;
 struct Foo;
 
 fn foo(run: On<GetOutcome>, mut cmd: AsyncCommands) {
-	let entity = run.event_target();
+	let entity = run.action();
 	cmd.run(async move |world| {
 		time_ext::sleep(Duration::from_millis(20)).await;
-		world.entity(entity).trigger_action(Outcome::Pass).await;
+		world.entity(entity).trigger_target(Outcome::Pass).await;
 	});
 }
 
@@ -21,10 +21,10 @@ fn foo(run: On<GetOutcome>, mut cmd: AsyncCommands) {
 #[sweet::test]
 async fn works() {
 	let mut app = App::new();
-	app.add_plugins((MinimalPlugins, BeetFlowPlugin, AsyncPlugin));
+	app.add_plugins((ControlFlowPlugin, AsyncPlugin));
 	app.world_mut()
 		.spawn((Sequence, ExitOnEnd, children![Foo, EndWith(Outcome::Fail)]))
-		.trigger_action(GetOutcome);
+		.trigger_target(GetOutcome);
 
 	app.run_async().await.xpect_eq(AppExit::error());
 }

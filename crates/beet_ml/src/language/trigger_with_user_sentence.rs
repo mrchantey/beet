@@ -37,7 +37,7 @@ pub fn trigger_with_user_sentence<P: ActionEvent + Clone>(
 		sentence.0 = (**ev).clone().into();
 		commands
 			.entity(action)
-			.trigger_action(run_with_user_sentence.payload.clone());
+			.trigger_target(run_with_user_sentence.payload.clone());
 	}
 }
 
@@ -52,7 +52,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default())
+		app.add_plugins(ControlFlowPlugin::default())
 			.add_observer(trigger_with_user_sentence::<GetOutcome>);
 		let world = app.world_mut();
 		let on_run = observer_ext::observe_triggers::<GetOutcome>(world);

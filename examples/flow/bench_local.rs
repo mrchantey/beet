@@ -6,7 +6,7 @@ struct Run(Entity);
 #[derive(Default, Component)]
 struct TriggerCount(i32);
 
-fn increment(trigger: On<GetOutcome>, mut query: Query<&mut TriggerCount>) {
+fn increment(trigger: On<Run>, mut query: Query<&mut TriggerCount>) {
 	query.get_mut(trigger.event_target()).unwrap().as_mut().0 += 1;
 }
 

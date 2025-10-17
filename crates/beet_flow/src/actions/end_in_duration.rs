@@ -59,7 +59,7 @@ pub(crate) fn end_in_duration<T: ActionEvent + Clone>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_run.elapsed() >= action.duration {
-			commands.entity(entity).trigger_action(action.event.clone());
+			commands.entity(entity).trigger_target(action.event.clone());
 		}
 	}
 }
@@ -74,7 +74,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default()).insert_time();
+		app.add_plugins(ControlFlowPlugin::default()).insert_time();
 
 		let on_result =
 			observer_ext::observe_triggers::<Outcome>(app.world_mut());

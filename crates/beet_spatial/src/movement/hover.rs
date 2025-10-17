@@ -19,7 +19,7 @@ use std::f32::consts::TAU;
 /// 	Transform::default(),
 ///		Hover::new(2.,0.1),
 ///		))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -73,13 +73,13 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
+		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
 		let agent = app
 			.world_mut()
 			.spawn((Transform::default(), Hover::default()))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.id();
 
 		// the 'top' of a sine wave is a quarter of 1 hz

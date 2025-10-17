@@ -18,7 +18,7 @@ pub(crate) fn interrupt_run<T: RunEvent>(
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 	children: Populated<&Children>,
 ) {
-	let action = ev.event_target();
+	let action = ev.action();
 	for child in children
 		.iter_descendants(action)
 		.filter(|child| should_remove.contains(*child))
@@ -36,7 +36,7 @@ pub(crate) fn interrupt_end<T: EndEvent>(
 	children: Query<&Children>,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
-	let action = ev.event_target();
+	let action = ev.action();
 	// 1. always remove from this entity
 	if should_remove.contains(action) {
 		commands.entity(action).remove::<Running>();
@@ -61,30 +61,30 @@ mod test {
 
 	#[test]
 	fn interrupt_on_run() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn(children![Running])
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		world.query_once::<&Running>().len().xpect_eq(0);
 	}
 	#[test]
 	fn no_interrupt_on_run() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn(children![(NoInterrupt, Running)])
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		world.query_once::<&Running>().len().xpect_eq(1);
 	}
 
 	#[test]
 	fn interrupt_on_end() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		world
 			.spawn((Running, children![Running, (NoInterrupt, Running)]))
-			.trigger_action(Outcome::Pass)
+			.trigger_target(Outcome::Pass)
 			.flush();
 
 		// removes from parent and first child
@@ -92,10 +92,10 @@ mod test {
 	}
 	#[test]
 	fn interrupt_on_end_with_no_interrupt() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world
 			.spawn((NoInterrupt, Running))
-			.trigger_action(Outcome::Pass)
+			.trigger_target(Outcome::Pass)
 			.flush();
 		// leaves parent
 		world.query_once::<&Running>().len().xpect_eq(1);

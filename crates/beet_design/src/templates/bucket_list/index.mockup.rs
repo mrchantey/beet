@@ -4,7 +4,7 @@ use beet::prelude::*;
 
 
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! {
 		<h1>Buckets</h1>
 		<p>This example uses local storage to manage a list of items</p>

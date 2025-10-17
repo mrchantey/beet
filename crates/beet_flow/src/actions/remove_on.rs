@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 /// It is designed to work for both [`Run`] and [`End`] events.
 /// This action also has a corresponding [`InsertOn`] action.
 /// ## Example
-/// Removes the `Running` bundle when the `OnResult` event is triggered.
+/// Removes the `Running` bundle when the `Outcome` event is triggered.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -17,7 +17,7 @@ use std::marker::PhantomData;
 /// 		EndWith(Outcome::Pass),
 /// 		RemoveOn::<Outcome, Running>::default()
 /// 	))
-///		.trigger_action(GetOutcome);
+///		.trigger_target(GetOutcome);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -51,10 +51,9 @@ fn remove<E: ActionEvent, B: Bundle>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&RemoveOn<E, B>>,
-	agents: AgentQuery,
 ) -> Result {
-	let action = query.get(ev.event_target())?;
-	let target = action.target_entity.select_target(&ev, &agents);
+	let action = query.get(ev.action())?;
+	let target = action.target_entity.select_target(&ev);
 	commands.entity(target).remove::<B>();
 	Ok(())
 }
@@ -68,7 +67,7 @@ mod test {
 	#[test]
 	fn on_run() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
+		app.add_plugins(ControlFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
@@ -76,7 +75,7 @@ mod test {
 				Running::default(),
 				RemoveOn::<GetOutcome, Running>::default(),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();
@@ -84,7 +83,7 @@ mod test {
 	#[test]
 	fn on_result() {
 		let mut app = App::new();
-		app.add_plugins(BeetFlowPlugin::default());
+		app.add_plugins(ControlFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
@@ -93,7 +92,7 @@ mod test {
 				RemoveOn::<Outcome, Running>::default(),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush()
 			.id();
 		world.get::<Running>(entity).xpect_none();

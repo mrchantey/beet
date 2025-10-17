@@ -9,7 +9,8 @@ pub fn analytics_plugin(app: &mut App) {
 		.add_observer(handle_analytics_events);
 }
 
-
+// TODO deprecate after beet_router refactor, this should
+// be TableStore component on the endpoint
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct AnalyticsEventStore {
 	pub store: TableStore<AnalyticsEvent>,

@@ -348,10 +348,11 @@ pub fn local_bucket(name: impl Into<String>) -> Bucket {
 /// Select filesystem or S3 bucket based on [`ServiceAccess`] and feature flags
 #[allow(unused_variables)]
 pub async fn s3_fs_selector(
-	fs_path: &AbsPathBuf,
-	bucket_name: &str,
+	fs_path: AbsPathBuf,
+	bucket_name: impl AsRef<str>,
 	access: ServiceAccess,
 ) -> Bucket {
+	let bucket_name = bucket_name.as_ref();
 	match access {
 		ServiceAccess::Local => {
 			debug!("Bucket Selector - FS: {fs_path}");

@@ -34,6 +34,7 @@ pub use html_constants::*;
 /// Added to the [`BuildPlugin`] and the [`ApplyDirectives`] for static scene
 /// serde.
 /// This plugin is not unique, so can be added in multiple places.
+#[derive(Default)]
 pub struct NodeTypesPlugin;
 
 use beet_core::prelude::*;

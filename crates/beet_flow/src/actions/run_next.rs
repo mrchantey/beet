@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// # let mut world = BeetFlowPlugin::world();
+/// # let mut world = ControlFlowPlugin::world();
 /// let action = world
 /// 	.spawn(EndWith(Outcome::Pass))
 /// 	.id();
@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// 		EndWith(Outcome::Pass),
 /// 		RunNext::new(action)
 /// 	))
-/// 	.trigger_action(GetOutcome);
+/// 	.trigger_target(GetOutcome);
 /// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -58,20 +58,16 @@ impl RunNext {
 	}
 }
 
-fn run_next(
-	ev: On<Outcome>,
-	mut commands: Commands,
-	query: Query<&RunNext>,
-) -> Result {
+fn run_next(mut ev: On<Outcome>, query: Query<&RunNext>) -> Result {
 	let run_next = query
-		.get(ev.event_target())
+		.get(ev.action())
 		.expect(&expect_action::to_have_action(&ev));
 	if let Some(check) = &run_next.if_result_matches {
 		if *ev != *check {
 			return Ok(());
 		}
 	}
-	commands.entity(run_next.action).trigger_action(GetOutcome);
+	ev.trigger_next_with(run_next.action, GetOutcome);
 	Ok(())
 }
 
@@ -83,7 +79,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 
 		let on_result = collect_on_result(&mut world);
 		let on_run = collect_on_run(&mut world);
@@ -97,7 +93,7 @@ mod test {
 				RunNext::new(action1),
 				EndWith(Outcome::Pass),
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 
 		on_run

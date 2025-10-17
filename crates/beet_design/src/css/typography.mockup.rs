@@ -1,7 +1,6 @@
-use beet_rsx::prelude::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
 
-pub fn get() -> impl Bundle {
+pub fn get() -> impl IntoHtml {
 	rsx! {
 		<h1>This is a H1 Heading</h1>
 		<p>Here is some text under the heading</p>

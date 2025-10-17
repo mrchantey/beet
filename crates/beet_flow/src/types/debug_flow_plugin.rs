@@ -108,7 +108,7 @@ impl Plugin for DebugFlowPlugin {
 		}
 
 		if self.log_end {
-			app.init_resource::<DebugOnResult>();
+			app.init_resource::<DebugOutcome>();
 		}
 
 		if self.log_running {
@@ -216,7 +216,7 @@ pub struct DebugOnRun;
 /// Resource to enable logging for [log_on_run_result]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct DebugOnResult;
+pub struct DebugOutcome;
 /// Resource to enable logging for [log_running]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
@@ -241,7 +241,7 @@ fn log_on_run(
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.event_target(),
+		ev.action(),
 		&query,
 		"OnRun",
 		OnLogMessage::FLOW_COLOR,
@@ -257,11 +257,11 @@ fn log_on_run_result(
 	ev: On<Outcome>,
 	query: Query<&Name>,
 	mut out: MessageWriter<OnLogMessage>,
-	_m: When<Res<DebugOnResult>>,
+	_m: When<Res<DebugOutcome>>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.event_target(),
+		ev.action(),
 		&query,
 		&format!("{:?}", &ev.event()),
 		OnLogMessage::FLOW_COLOR,

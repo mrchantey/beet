@@ -41,29 +41,23 @@ where
 
 impl<T> ChildEnd<T>
 where
-	T: 'static + Send + Sync + Clone + ActionEvent,
+	T: Clone + ActionEvent,
 {
-	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists.
+	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists,
+	/// propagating the [`ActionTrigger::agent`]
 	pub fn trigger(mut commands: Commands, ev: &On<T>) {
-		let child = ev.event_target();
+		let child = ev.action();
 		let value = ev.event().clone();
+		let agent = ev.agent();
 
 		commands.queue(move |world: &mut World| {
 			if let Some(parent) = world.entity(child).get::<ChildOf>().clone() {
 				let parent = parent.parent();
-				world
-					.entity_mut(parent)
-					.trigger_action(ChildEnd { child, value });
+				world.entity_mut(parent).trigger_target(
+					ChildEnd { child, value }.with_agent(agent),
+				);
 			}
 		})
-	}
-	/// Trigger [`T`] on this [`event_target`], essentially propagating a
-	/// [`ChildEnd<T>`] into a [`T`] event.
-	pub fn propagate(mut commands: Commands, ev: &On<Self>) {
-		let entity = ev.event_target();
-		commands
-			.entity(entity)
-			.trigger_action(ev.event().clone().inner());
 	}
 	/// Get the entity that originated the [`End`]
 	pub fn child(&self) -> Entity { self.child }
@@ -99,17 +93,15 @@ where
 /// Propagate the [`ChildEnd`] event as an [`End`] on this entity
 /// unless it has a [`PreventPropagateEnd`] component.
 pub(crate) fn propagate_child_end<T>(
-	ev: On<ChildEnd<T>>,
-	mut commands: Commands,
+	mut ev: On<ChildEnd<T>>,
 	prevent: Query<(), With<PreventPropagateEnd>>,
 ) where
 	ChildEnd<T>: Clone + ActionEvent,
 	T: 'static + Send + Sync + Clone + ActionEvent,
 {
-	let target = ev.event_target();
+	let target = ev.action();
 	if !prevent.contains(target) {
-		let ev2 = ev.clone().inner();
-		commands.entity(target).trigger_action(ev2);
+		ev.propagate_child();
 	}
 }
 
@@ -119,26 +111,13 @@ mod test {
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
-	#[action(run_child, exit_on_result)]
+	#[action(run_child)]
 	#[derive(Component)]
 	struct Parent;
 
-	fn run_child(
-		ev: On<GetOutcome>,
-		mut commands: Commands,
-		children: Query<&Children>,
-	) {
-		let child = children.get(ev.event_target()).unwrap()[0];
-		commands.entity(child).trigger_action(GetOutcome);
-	}
-
-	fn exit_on_result(
-		ev: On<Outcome>,
-		mut commands: Commands,
-		// children: Query<&Children>,
-	) {
-		ev.is_pass().xpect_true();
-		commands.write_message(AppExit::Success);
+	fn run_child(mut ev: On<GetOutcome>, children: Query<&Children>) {
+		let child = children.get(ev.action()).unwrap()[0];
+		ev.trigger_next_with(child, GetOutcome);
 	}
 
 	#[action(succeed)]
@@ -148,23 +127,23 @@ mod test {
 
 	fn succeed(ev: On<GetOutcome>, mut commands: Commands) {
 		commands
-			.entity(ev.event_target())
-			.trigger_action(Outcome::Pass);
+			.entity(ev.action())
+			.trigger_target(Outcome::Pass);
 	}
 
 	#[test]
 	fn works() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
-			.spawn((Parent, children![Child]))
-			.trigger_action(GetOutcome)
+			.spawn((Parent, ExitOnEnd, children![Child]))
+			.trigger_target(GetOutcome)
 			.flush();
 		world.should_exit().xpect_eq(Some(AppExit::Success));
 	}
 	#[test]
 	fn prevent_propagate() {
-		let mut world = BeetFlowPlugin::world();
+		let mut world = ControlFlowPlugin::world();
 		world.insert_resource(Messages::<AppExit>::default());
 		world
 			.spawn((
@@ -172,7 +151,7 @@ mod test {
 				PreventPropagateEnd::<Outcome>::default(),
 				children![(Child)],
 			))
-			.trigger_action(GetOutcome)
+			.trigger_target(GetOutcome)
 			.flush();
 		world.should_exit().xpect_none();
 	}

@@ -63,13 +63,16 @@ pub trait Xtend: Sized {
 	fn xref(&self) -> &Self { self }
 	/// Convenience wrapper for `&mut self` in method chaining contexts.
 	fn xmut(&mut self) -> &mut Self { self }
-	/// Wraps the value in a [`Result::Ok`]
+	/// A message-chaining friendly way wrap this type in a [`Result::Ok`]
 	///
 	/// ## Example
 	///
 	/// ```rust
+	/// # use bevy::prelude::*;
 	/// # use beet_utils::prelude::*;
-	/// assert_eq!("foo".xok::<()>(), Ok("foo"));
+	/// fn foo()-> Result<u32> {
+	///   7.xok()
+	/// }
 	/// ```
 	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
 	/// Wraps the value in an [`Option::Some`]

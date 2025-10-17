@@ -24,7 +24,7 @@ fn main() {
 			default_value: StatValue(0.),
 		});
 	App::new()
-		.add_plugins((BeetFlowPlugin::default(), BeetSimPlugin))
+		.add_plugins((ControlFlowPlugin::default(), BeetSimPlugin))
 		.add_systems(
 			Startup,
 			(camera, agent, alcohol, kids_crying, short_stroll),

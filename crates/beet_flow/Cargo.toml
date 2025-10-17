@@ -14,16 +14,11 @@ categories.workspace = true
 
 [features]
 bevy_default = ["bevy/bevy_asset"]
-reflect = ["dep:serde", "bevy/serialize"]
 
 [dependencies]
 beet_core.workspace = true
-
 bevy.workspace = true
-log.workspace = true
 extend.workspace = true
-thiserror.workspace = true
-serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet.workspace = true
