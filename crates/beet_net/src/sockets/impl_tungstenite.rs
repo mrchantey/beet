@@ -1,5 +1,7 @@
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
+use async_channel::Receiver;
+use async_channel::Sender;
 use async_lock::Mutex;
 use async_tungstenite::tokio::accept_async;
 use async_tungstenite::tokio::connect_async;
@@ -7,7 +9,6 @@ use async_tungstenite::tungstenite::Error as TungError;
 use async_tungstenite::tungstenite::Message as TungMessage;
 use async_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
 use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
-use beet_core::async_ext::NativeSendBoxedFuture;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::FutureExt;
@@ -80,7 +81,7 @@ struct TungAcceptor {
 }
 
 impl SocketAcceptor for TungAcceptor {
-	fn accept(&mut self) -> NativeSendBoxedFuture<'_, Result<Socket>> {
+	fn accept(&mut self) -> LifetimeSendBoxedFuture<'_, Result<Socket>> {
 		Box::pin(async move {
 			loop {
 				// Try to receive a completed socket first

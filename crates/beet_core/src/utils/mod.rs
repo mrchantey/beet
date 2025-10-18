@@ -1,6 +1,7 @@
 pub mod async_ext;
 mod backoff;
 mod clone_func;
+pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;

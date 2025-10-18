@@ -1584,7 +1584,7 @@ name = "beet_query"
 version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_core",
  "beet_net",
  "beet_query_macros",

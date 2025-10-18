@@ -1,5 +1,4 @@
 use crate::prelude::sockets::*;
-use beet_core::async_ext::NativeSendBoxedFuture;
 use beet_core::prelude::*;
 use futures::Stream;
 use std::pin::Pin;
@@ -8,6 +7,7 @@ use std::pin::Pin;
 ///
 /// Platform-specific implementations provide the actual binding and accept logic.
 /// Each accepted connection returns a [`Socket`] that can be used like any client socket.
+#[derive(Component)]
 pub struct SocketServer {
 	pub(crate) acceptor: Box<dyn SocketAcceptor>,
 }
@@ -77,10 +77,10 @@ impl Stream for SocketServer {
 /// Platform-specific implementations live in their respective modules and are
 /// boxed into `SocketServer`.
 pub trait SocketAcceptor:
-	'static + MaybeSend + Stream<Item = Result<Socket>>
+	'static + Send + Sync + Stream<Item = Result<Socket>>
 {
 	/// Accept a new incoming WebSocket connection.
-	fn accept(&mut self) -> NativeSendBoxedFuture<'_, Result<Socket>>;
+	fn accept(&mut self) -> LifetimeSendBoxedFuture<'_, Result<Socket>>;
 
 	/// Get the local address this acceptor is bound to.
 	fn local_addr(&self) -> Result<std::net::SocketAddr>;

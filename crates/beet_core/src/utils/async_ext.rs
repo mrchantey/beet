@@ -13,6 +13,9 @@ pub fn yield_now() -> YieldNow { futures_lite::future::yield_now() }
 
 /// A 'static + Send, making it suitable for use-cases like tokio::spawn
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
+/// A 'static + Send, making it suitable for use-cases like tokio::spawn
+pub type LifetimeSendBoxedFuture<'a, T> =
+	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
 /// A BoxedFuture which is `Send` on non-wasm32 targets with multi_threaded enabled
 #[cfg(target_arch = "wasm32")]
@@ -20,13 +23,6 @@ pub type MaybeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
 /// A BoxedFuture which is `Send` on non-wasm32 targets with multi_threaded enabled
 #[cfg(not(target_arch = "wasm32"))]
 pub type MaybeSendBoxedFuture<'a, T> =
-	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
-/// A BoxedFuture which is `Send` on non-wasm32 targets
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
-pub type NativeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
-/// A BoxedFuture which is `Send` on non-wasm32 targets
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
-pub type NativeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
 /// Cross platform spawn_local function
