@@ -11,6 +11,26 @@ use bevy::ecs::world::CommandQueue;
 use bevy::tasks::IoTaskPool;
 use std::future::Future;
 
+/// In wasm an single threaded environment, wraps this type in a [`SendWrapper`],
+/// otherwise is just the type itself
+#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+pub type MaybeSendWrapper<T> = send_wrapper::SendWrapper<T>;
+/// In wasm an single threaded environment, wraps this type in a [`SendWrapper`],
+/// otherwise is just the type itself
+#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+pub type MaybeSendWrapper<T> = T;
+
+pub fn maybe_send_wrapper<T>(value: T) -> MaybeSendWrapper<T> {
+	#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+	{
+		send_wrapper::SendWrapper::new(value)
+	}
+	#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+	{
+		value
+	}
+}
+
 #[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
 pub trait MaybeSend: Send {}
 #[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]

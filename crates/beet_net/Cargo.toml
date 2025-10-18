@@ -44,6 +44,8 @@ serde = [
 	"uuid/serde",
 	"beet_core/serde",
 ]
+# currently required for socket_server spawn
+multi_threaded = ["beet_core/multi_threaded"]
 reqwest = ["dep:reqwest"]
 tungstenite = ["tokio","dep:async-tungstenite","dep:async-lock"]
 native-tls = ["reqwest?/default", "async-tungstenite?/tokio-native-tls"]

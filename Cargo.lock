@@ -1224,7 +1224,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-executor",
  "axum 0.8.6",
@@ -1258,7 +1258,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet",
  "bevy",
@@ -1278,7 +1278,7 @@ dependencies = [
 
 [[package]]
 name = "beet_agent"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-lock",
  "base64 0.22.1",
@@ -1305,7 +1305,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1341,7 +1341,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -1388,7 +1388,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_utils",
  "proc-macro2",
@@ -1400,7 +1400,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1420,7 +1420,7 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "base64 0.22.1",
  "beet_core",
@@ -1443,7 +1443,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "bevy",
@@ -1475,7 +1475,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1507,7 +1507,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -1556,7 +1556,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1581,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -1602,7 +1602,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1616,7 +1616,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-channel",
  "axum 0.8.6",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1685,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1695,7 +1695,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_parse",
@@ -1708,7 +1708,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "beet",
@@ -1733,7 +1733,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "async-fs",
  "bevy",
@@ -10079,7 +10079,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "beet",
  "bevy",
@@ -10095,7 +10095,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.8-dev.4"
+version = "0.0.8-dev.5"
 dependencies = [
  "anyhow",
  "proc-macro2",

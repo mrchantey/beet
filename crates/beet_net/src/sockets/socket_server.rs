@@ -1,4 +1,5 @@
 use crate::prelude::sockets::*;
+use beet_core::async_ext::NativeSendBoxedFuture;
 use beet_core::prelude::*;
 use futures::Stream;
 use std::pin::Pin;
@@ -8,7 +9,7 @@ use std::pin::Pin;
 /// Platform-specific implementations provide the actual binding and accept logic.
 /// Each accepted connection returns a [`Socket`] that can be used like any client socket.
 pub struct SocketServer {
-	pub(crate) acceptor: Box<DynSocketAcceptor>,
+	pub(crate) acceptor: Box<dyn SocketAcceptor>,
 }
 
 impl std::fmt::Debug for SocketServer {
@@ -24,11 +25,11 @@ impl SocketServer {
 	///
 	/// Use "127.0.0.1:0" to bind to any available port, then call `local_addr()` to get the actual address.
 	pub async fn bind(_addr: impl AsRef<str>) -> Result<Self> {
-		#[cfg(feature = "tungstenite")]
+		#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 		{
 			super::impl_tungstenite::bind_tungstenite(_addr).await
 		}
-		#[cfg(not(feature = "tungstenite"))]
+		#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
 		panic!("WebSocket server requires the 'tungstenite' feature")
 	}
 
@@ -36,7 +37,11 @@ impl SocketServer {
 	/// For one created based on features see [`Self::bind`]
 	///
 	/// This is intended for platform-specific constructors.
-	pub fn new(acceptor: Box<DynSocketAcceptor>) -> Self { Self { acceptor } }
+	pub fn new(acceptor: impl SocketAcceptor) -> Self {
+		Self {
+			acceptor: Box::new(acceptor),
+		}
+	}
 
 
 	/// Get the local address this server is bound to.
@@ -71,25 +76,22 @@ impl Stream for SocketServer {
 ///
 /// Platform-specific implementations live in their respective modules and are
 /// boxed into `SocketServer`.
-pub trait SocketAcceptor: Stream<Item = Result<Socket>> + 'static {
+pub trait SocketAcceptor:
+	'static + MaybeSend + Stream<Item = Result<Socket>>
+{
 	/// Accept a new incoming WebSocket connection.
-	fn accept(
-		&mut self,
-	) -> Pin<Box<dyn std::future::Future<Output = Result<Socket>> + Send + '_>>;
+	fn accept(&mut self) -> NativeSendBoxedFuture<'_, Result<Socket>>;
 
 	/// Get the local address this acceptor is bound to.
 	fn local_addr(&self) -> Result<std::net::SocketAddr>;
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-type DynSocketAcceptor = dyn SocketAcceptor + Send;
-
-#[cfg(target_arch = "wasm32")]
-type DynSocketAcceptor = dyn SocketAcceptor;
-
-
 #[cfg(test)]
-#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+#[cfg(all(
+	feature = "tungstenite",
+	feature = "multi_threaded",
+	not(target_arch = "wasm32")
+))]
 mod tests {
 	use super::super::Message;
 	use super::*;
@@ -120,27 +122,25 @@ mod tests {
 	}
 
 	#[sweet::test]
-	#[should_panic(expected = "Second client timed out")]
-	async fn only_one_connection_at_a_time() {
+	async fn handles_multiple_concurrent_connections() {
 		let mut server = SocketServer::bind("127.0.0.1:0").await.unwrap();
 		let addr = server.local_addr().unwrap();
 
 		let server_task = async move {
-			// Accept first client and block on it
+			// Accept first client and block on it for a bit
 			let mut socket1 = server.next().await.unwrap().unwrap();
 			let msg1 = socket1.next().await.unwrap().unwrap();
 
-			// Send response and keep connection alive for a bit
+			// Send response and keep connection alive
 			socket1.send(msg1).await.unwrap();
 			time_ext::sleep_millis(500).await;
 			socket1.close(None).await.ok();
 
-			// Now accept second client (but it will have timed out)
-			if let Some(Ok(mut socket2)) = server.next().await {
-				let msg2 = socket2.next().await.unwrap().unwrap();
-				socket2.send(msg2).await.unwrap();
-				socket2.close(None).await.ok();
-			}
+			// Accept second client (should succeed even though first is still connected)
+			let mut socket2 = server.next().await.unwrap().unwrap();
+			let msg2 = socket2.next().await.unwrap().unwrap();
+			socket2.send(msg2).await.unwrap();
+			socket2.close(None).await.ok();
 		};
 
 		let client1_task = async {
@@ -148,7 +148,9 @@ mod tests {
 			let url = format!("ws://{}", addr);
 			let mut client = Socket::connect(&url).await.unwrap();
 			client.send(Message::text("client1")).await.unwrap();
-			client.next().await.unwrap().unwrap();
+			let response = client.next().await.unwrap().unwrap();
+			matches!(response, Message::Text(ref s) if s == "client1")
+				.xpect_true();
 			client.close(None).await.ok();
 		};
 
@@ -156,32 +158,13 @@ mod tests {
 			time_ext::sleep_millis(100).await;
 			let url = format!("ws://{}", addr);
 
-			// This connection attempt will succeed, but server won't accept it
-			// until first client is done
-			let connect_result = async_ext::timeout(
-				std::time::Duration::from_millis(200),
-				Socket::connect(&url),
-			)
-			.await;
-
-			match connect_result {
-				Ok(Ok(mut client)) => {
-					// Connection established, try to send
-					let send_result = async_ext::timeout(
-						Duration::from_millis(200),
-						client.send(Message::text("client2")),
-					)
-					.await;
-
-					if send_result.is_err() {
-						panic!(
-							"Second client timed out waiting for server to accept"
-						);
-					}
-				}
-				Ok(Err(e)) => panic!("Second client failed to connect: {}", e),
-				Err(_) => panic!("Second client timed out"),
-			}
+			// This connection should succeed even though first client is still active
+			let mut client = Socket::connect(&url).await.unwrap();
+			client.send(Message::text("client2")).await.unwrap();
+			let response = client.next().await.unwrap().unwrap();
+			matches!(response, Message::Text(ref s) if s == "client2")
+				.xpect_true();
+			client.close(None).await.ok();
 		};
 
 		let _ = tokio::join!(server_task, client1_task, client2_task);

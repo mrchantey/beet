@@ -108,13 +108,13 @@ pub async fn connect_wasm(url: impl AsRef<str>) -> Result<Socket> {
 	ws.set_onopen(None);
 
 	// Build writer that holds the WebSocket and the closures to keep them alive
-	let writer = Box::new(WasmSocketWriter {
+	let writer = WasmSocketWriter {
 		ws,
 		_on_message: on_message,
 		_on_error: on_error,
 		_on_close: on_close,
 		_on_open: None, // already opened
-	});
+	};
 
 	Ok(Socket::new(rx, writer))
 }

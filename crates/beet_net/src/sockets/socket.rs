@@ -2,13 +2,35 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::Stream;
 use futures::future::BoxFuture;
-use send_wrapper::SendWrapper;
 use std::pin::Pin;
+
+pub trait SocketReader:
+	'static + MaybeSend + Stream<Item = Result<Message>>
+{
+}
+impl<T> SocketReader for T where
+	T: 'static + MaybeSend + Stream<Item = Result<Message>> + MaybeSend
+{
+}
+
+/// Platform-agnostic writer trait for WebSocket sinks.
+///
+/// Platform-specific implementations live in their respective modules and are
+/// boxed into `Socket`.
+pub trait SocketWriter: 'static + MaybeSend {
+	/// Send a message to the socket peer.
+	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
+	/// Close the socket with an optional close frame.
+	fn close_boxed(
+		&mut self,
+		close: Option<CloseFrame>,
+	) -> BoxFuture<'static, Result<()>>;
+}
 
 /// A cross-platform WebSocket that implements Stream of inbound [`Message`].
 pub struct Socket {
-	pub(crate) incoming: SendWrapper<Pin<Box<DynMessageStream>>>,
-	pub(crate) writer: SendWrapper<Box<DynSocketWriter>>,
+	pub(crate) reader: MaybeSendWrapper<Pin<Box<dyn SocketReader>>>,
+	pub(crate) writer: MaybeSendWrapper<Box<dyn SocketWriter>>,
 }
 
 impl std::fmt::Debug for Socket {
@@ -19,9 +41,7 @@ impl std::fmt::Debug for Socket {
 
 impl Socket {
 	#[allow(unused_variables)]
-	pub async fn connect(
-		url: impl AsRef<str>,
-	) -> bevy::prelude::Result<Socket> {
+	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
 		#[cfg(target_arch = "wasm32")]
 		{
 			super::impl_web_sys::connect_wasm(url).await
@@ -32,33 +52,21 @@ impl Socket {
 		}
 		#[cfg(not(any(target_arch = "wasm32", feature = "tungstenite")))]
 		{
-			panic!("WebSocket implementation not available - enable the tungstenite feature or target wasm32")
+			panic!(
+				"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
+			)
 		}
 	}
 
 	/// Create a new socket from a message stream and writer.
-	#[cfg(target_arch = "wasm32")]
-	pub(crate) fn new(
-		incoming: impl Stream<Item = Result<Message>> + 'static,
-		writer: Box<DynSocketWriter>,
-	) -> Self {
-		Self {
-			incoming: SendWrapper::new(Box::pin(incoming)),
-			writer: SendWrapper::new(writer),
-		}
-	}
-
-	/// Create a new socket from a message stream and writer.
-	// the non-wasm version must be Send
-	#[cfg(not(target_arch = "wasm32"))]
 	#[allow(dead_code)]
 	pub(crate) fn new(
-		incoming: impl Stream<Item = Result<Message>> + Send + 'static,
-		writer: Box<DynSocketWriter>,
+		reader: impl SocketReader,
+		writer: impl SocketWriter,
 	) -> Self {
 		Self {
-			incoming: SendWrapper::new(Box::pin(incoming)),
-			writer: SendWrapper::new(writer),
+			reader: maybe_send_wrapper(Box::pin(reader)),
+			writer: maybe_send_wrapper(Box::new(writer)),
 		}
 	}
 
@@ -80,7 +88,7 @@ impl Socket {
 	/// - The write half provides `send` and `close` methods.
 	pub fn split(self) -> (SocketRead, SocketWrite) {
 		let read = SocketRead {
-			incoming: self.incoming,
+			reader: self.reader,
 		};
 		let write = SocketWrite {
 			writer: self.writer,
@@ -96,39 +104,13 @@ impl Stream for Socket {
 		mut self: Pin<&mut Self>,
 		cx: &mut std::task::Context<'_>,
 	) -> std::task::Poll<Option<Self::Item>> {
-		Pin::new(&mut self.incoming).poll_next(cx)
+		Pin::new(&mut self.reader).poll_next(cx)
 	}
 }
 
-
-#[cfg(target_arch = "wasm32")]
-type DynMessageStream = dyn Stream<Item = Result<Message>>;
-/// crates like Axum/Tokio require Stream to be Send on native
-#[cfg(not(target_arch = "wasm32"))]
-type DynMessageStream = dyn Stream<Item = Result<Message>> + Send;
-
-/// Platform-agnostic writer trait for WebSocket sinks.
-///
-/// Platform-specific implementations live in their respective modules and are
-/// boxed into `Socket`.
-pub trait SocketWriter: 'static {
-	/// Send a message to the socket peer.
-	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
-	/// Close the socket with an optional close frame.
-	fn close_boxed(
-		&mut self,
-		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>>;
-}
-
-#[cfg(target_arch = "wasm32")]
-type DynSocketWriter = dyn SocketWriter;
-#[cfg(not(target_arch = "wasm32"))]
-type DynSocketWriter = dyn SocketWriter + Send;
-
 /// Read half returned by `Socket::split()`.
 pub struct SocketRead {
-	pub(crate) incoming: SendWrapper<Pin<Box<DynMessageStream>>>,
+	pub(crate) reader: MaybeSendWrapper<Pin<Box<dyn SocketReader>>>,
 }
 
 impl Stream for SocketRead {
@@ -138,13 +120,13 @@ impl Stream for SocketRead {
 		mut self: Pin<&mut Self>,
 		cx: &mut std::task::Context<'_>,
 	) -> std::task::Poll<Option<Self::Item>> {
-		Pin::new(&mut self.incoming).poll_next(cx)
+		Pin::new(&mut self.reader).poll_next(cx)
 	}
 }
 
 /// Write half returned by `Socket::split()`.
 pub struct SocketWrite {
-	pub(crate) writer: SendWrapper<Box<DynSocketWriter>>,
+	pub(crate) writer: MaybeSendWrapper<Box<dyn SocketWriter>>,
 }
 
 impl SocketWrite {
@@ -276,9 +258,8 @@ mod tests {
 
 	#[sweet::test]
 	async fn socket_stream_empty() {
-		let incoming = stream::empty::<Result<Message>>();
-		let mut socket =
-			Socket::new(incoming, Box::new(DummyWriter::default()));
+		let reader = stream::empty::<Result<Message>>();
+		let mut socket = Socket::new(reader, DummyWriter::default());
 
 		let next = socket.next().await;
 		next.is_none().xpect_true();
@@ -286,9 +267,9 @@ mod tests {
 
 	#[sweet::test]
 	async fn sending_records_messages() {
-		let incoming = stream::empty::<Result<Message>>();
+		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
-		let mut socket = Socket::new(incoming, Box::new(writer));
+		let mut socket = Socket::new(reader, writer);
 
 		socket.send(Message::text("hi")).await.unwrap();
 		socket.send(Message::binary(vec![9, 8, 7])).await.unwrap();
@@ -302,9 +283,9 @@ mod tests {
 
 	#[sweet::test]
 	async fn closing_records_reason() {
-		let incoming = stream::empty::<Result<Message>>();
+		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
-		let mut socket = Socket::new(incoming, Box::new(writer));
+		let mut socket = Socket::new(reader, writer);
 
 		let frame = CloseFrame {
 			code: 1000,
@@ -317,13 +298,13 @@ mod tests {
 
 	#[sweet::test]
 	async fn split_send_and_read() {
-		let incoming = stream::iter(vec![
+		let reader = stream::iter(vec![
 			Ok(Message::text("a")),
 			Ok(Message::binary(vec![1u8, 2, 3])),
 		]);
 
 		let writer = DummyWriter::default();
-		let socket = Socket::new(incoming, Box::new(writer));
+		let socket = Socket::new(reader, writer);
 
 		let (mut read, mut write) = socket.split();
 
@@ -342,9 +323,9 @@ mod tests {
 
 	#[sweet::test]
 	async fn split_close() {
-		let incoming = stream::empty::<Result<Message>>();
+		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
-		let socket = Socket::new(incoming, Box::new(writer));
+		let socket = Socket::new(reader, writer);
 
 		let (_read, write) = socket.split();
 

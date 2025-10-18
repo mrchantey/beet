@@ -23,7 +23,7 @@ impl ExportPdf {
 	#[allow(unused)]
 	pub async fn run(self) -> Result {
 		App::default()
-			.run_io_task(async move {
+			.run_io_task_local(async move {
 				let mut opts = PdfOptions {
 					page_ranges: self.page_ranges,
 					..default()

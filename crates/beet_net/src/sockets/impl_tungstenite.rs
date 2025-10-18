@@ -7,6 +7,7 @@ use async_tungstenite::tungstenite::Error as TungError;
 use async_tungstenite::tungstenite::Message as TungMessage;
 use async_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
 use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
+use beet_core::async_ext::NativeSendBoxedFuture;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::FutureExt;
@@ -18,6 +19,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 
 type DynTungSink =
 	dyn futures::Sink<TungMessage, Error = TungError> + Send + Unpin;
@@ -44,9 +46,9 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 	// Box the sink to make the writer object-safe
 	let sink_boxed: Pin<Box<DynTungSink>> = Box::pin(sink);
 
-	let writer = Box::new(TungWriter {
+	let writer = TungWriter {
 		sink: Arc::new(Mutex::new(sink_boxed)),
-	});
+	};
 
 	Ok(Socket::new(incoming, writer))
 }
@@ -61,32 +63,43 @@ pub async fn bind_tungstenite(addr: impl AsRef<str>) -> Result<SocketServer> {
 		.await
 		.map_err(|e| bevyhow!("Failed to bind server: {}", e))?;
 
-	let acceptor = Box::new(TungAcceptor {
+	let (socket_tx, socket_rx) = mpsc::unbounded_channel();
+
+	let acceptor = TungAcceptor {
 		listener,
-		pending: None,
-	});
+		socket_rx,
+		socket_tx,
+	};
 	Ok(SocketServer::new(acceptor))
 }
 
 struct TungAcceptor {
 	listener: TcpListener,
-	pending: Option<
-		Pin<Box<dyn std::future::Future<Output = Result<Socket>> + Send>>,
-	>,
+	socket_rx: mpsc::UnboundedReceiver<Result<Socket>>,
+	socket_tx: mpsc::UnboundedSender<Result<Socket>>,
 }
 
 impl SocketAcceptor for TungAcceptor {
-	fn accept(
-		&mut self,
-	) -> Pin<Box<dyn std::future::Future<Output = Result<Socket>> + Send + '_>>
-	{
+	fn accept(&mut self) -> NativeSendBoxedFuture<'_, Result<Socket>> {
 		Box::pin(async move {
-			let (stream, _addr) =
-				self.listener.accept().await.map_err(|e| {
-					bevyhow!("Failed to accept connection: {}", e)
-				})?;
+			loop {
+				// Try to receive a completed socket first
+				if let Ok(socket) = self.socket_rx.try_recv() {
+					return socket;
+				}
 
-			accept_connection(stream).await
+				// Otherwise accept a new connection and spawn it
+				let (stream, _addr) =
+					self.listener.accept().await.map_err(|e| {
+						bevyhow!("Failed to accept connection: {}", e)
+					})?;
+
+				let tx = self.socket_tx.clone();
+				async_ext::spawn_maybe_send(async move {
+					let result = accept_connection(stream).await;
+					let _ = tx.send(result);
+				});
+			}
 		})
 	}
 
@@ -104,33 +117,33 @@ impl futures::Stream for TungAcceptor {
 		mut self: Pin<&mut Self>,
 		cx: &mut std::task::Context<'_>,
 	) -> std::task::Poll<Option<Self::Item>> {
-		// if we have a pending handshake, poll it first
-		if let Some(mut fut) = self.pending.take() {
-			match fut.as_mut().poll(cx) {
-				std::task::Poll::Ready(result) => {
-					return std::task::Poll::Ready(Some(result));
-				}
-				std::task::Poll::Pending => {
-					self.pending = Some(fut);
-					return std::task::Poll::Pending;
-				}
+		// First check if we have any completed sockets
+		match self.socket_rx.poll_recv(cx) {
+			std::task::Poll::Ready(Some(socket)) => {
+				return std::task::Poll::Ready(Some(socket));
+			}
+			std::task::Poll::Ready(None) => {
+				// Channel closed, no more sockets
+				return std::task::Poll::Ready(None);
+			}
+			std::task::Poll::Pending => {
+				// No completed sockets yet, try to accept new connections
 			}
 		}
 
-		// try to accept a new connection
+		// Try to accept a new connection and spawn its handshake
 		match self.listener.poll_accept(cx) {
 			std::task::Poll::Ready(Ok((stream, _addr))) => {
-				let mut fut = Box::pin(accept_connection(stream));
-				// try to poll it immediately
-				match fut.as_mut().poll(cx) {
-					std::task::Poll::Ready(result) => {
-						std::task::Poll::Ready(Some(result))
-					}
-					std::task::Poll::Pending => {
-						self.pending = Some(fut);
-						std::task::Poll::Pending
-					}
-				}
+				let tx = self.socket_tx.clone();
+
+				async_ext::spawn_maybe_send(async move {
+					let result = accept_connection(stream).await;
+					let _ = tx.send(result);
+				});
+
+				// After spawning, wake ourselves to check for completed sockets
+				cx.waker().wake_by_ref();
+				std::task::Poll::Pending
 			}
 			std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Some(
 				Err(bevyhow!("Accept error: {}", e)),
@@ -148,7 +161,7 @@ async fn accept_connection(stream: TcpStream) -> Result<Socket> {
 	let (sink, stream) = ws_stream.split();
 
 	// Map incoming tungstenite messages to our cross-platform Message
-	let incoming = stream.map(|res| match res {
+	let reader = stream.map(|res| match res {
 		Ok(msg) => Ok(from_tung_msg(msg)),
 		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
 	});
@@ -156,11 +169,11 @@ async fn accept_connection(stream: TcpStream) -> Result<Socket> {
 	// Box the sink to make the writer object-safe
 	let sink_boxed: Pin<Box<DynTungSink>> = Box::pin(sink);
 
-	let writer = Box::new(TungWriter {
+	let writer = TungWriter {
 		sink: Arc::new(Mutex::new(sink_boxed)),
-	});
+	};
 
-	Ok(Socket::new(incoming, writer))
+	Ok(Socket::new(reader, writer))
 }
 
 fn from_tung_msg(msg: TungMessage) -> Message {
