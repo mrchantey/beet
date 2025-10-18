@@ -18,33 +18,30 @@ impl std::fmt::Debug for SocketServer {
 }
 
 impl SocketServer {
-	pub async fn new(addr: impl AsRef<str>) -> Result<Self> {
-		#[cfg(feature = "tungstenite")]
-		super::impl_tungstenite::bind_tungstenite(addr).await
-	}
-
-	/// Create a new server from a platform-specific acceptor.
-	///
-	/// This is intended for platform-specific constructors.
-	pub fn from_acceptor(acceptor: Box<DynSocketAcceptor>) -> Self {
-		Self { acceptor }
-	}
-
-
 	/// Bind a WebSocket server to the given address.
 	///
 	/// Returns a `SocketServer` that can accept incoming connections.
 	///
 	/// Use "127.0.0.1:0" to bind to any available port, then call `local_addr()` to get the actual address.
-	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-	pub async fn bind(addr: impl AsRef<str>) -> Result<Self> {
-		super::impl_tungstenite::bind_tungstenite(addr).await
+	pub async fn bind(_addr: impl AsRef<str>) -> Result<Self> {
+		#[cfg(feature = "tungstenite")]
+		{
+			super::impl_tungstenite::bind_tungstenite(_addr).await
+		}
+		#[cfg(not(feature = "tungstenite"))]
+		panic!("WebSocket server requires the 'tungstenite' feature")
 	}
+
+	/// Create a new server with the given adaptor.
+	/// For one created based on features see [`Self::bind`]
+	///
+	/// This is intended for platform-specific constructors.
+	pub fn new(acceptor: Box<DynSocketAcceptor>) -> Self { Self { acceptor } }
+
 
 	/// Get the local address this server is bound to.
 	///
 	/// This is useful when binding to port 0 to discover which port was assigned.
-	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
 		self.acceptor.local_addr()
 	}
@@ -89,3 +86,36 @@ type DynSocketAcceptor = dyn SocketAcceptor + Send;
 
 #[cfg(target_arch = "wasm32")]
 type DynSocketAcceptor = dyn SocketAcceptor;
+
+
+#[cfg(test)]
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+mod tests {
+	use super::super::Message;
+	use super::*;
+	use sweet::prelude::*;
+
+
+	#[sweet::test]
+	async fn server_binds_and_accepts() {
+		let mut server = SocketServer::bind("127.0.0.1:0").await.unwrap();
+		let addr = server.local_addr().unwrap();
+
+		let server_task = async {
+			let mut socket = server.next().await.unwrap().unwrap();
+			socket.next().await.unwrap().unwrap()
+		};
+
+		let client_task = async {
+			// give server time to start accepting
+			time_ext::sleep_millis(100).await;
+			let url = format!("ws://{}", addr);
+			let mut client = Socket::connect(&url).await.unwrap();
+			client.send(Message::text("hello server")).await.unwrap();
+			client.close(None).await.ok();
+		};
+
+		let (msg, _) = tokio::join!(server_task, client_task);
+		matches!(msg, Message::Text(ref s) if s == "hello server").xpect_true();
+	}
+}

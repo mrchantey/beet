@@ -65,7 +65,7 @@ pub async fn bind_tungstenite(addr: impl AsRef<str>) -> Result<SocketServer> {
 		listener,
 		pending: None,
 	});
-	Ok(SocketServer::from_acceptor(acceptor))
+	Ok(SocketServer::new(acceptor))
 }
 
 struct TungAcceptor {
@@ -276,7 +276,6 @@ impl SocketWriter for TungWriter {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use futures::StreamExt;
 	use sweet::prelude::*;
 
 	#[sweet::test]
@@ -302,28 +301,5 @@ mod tests {
 			matches!(super::from_tung_msg(t_close), Message::Close(_))
 				.xpect_true();
 		}
-	}
-
-	#[sweet::test]
-	async fn server_binds_and_accepts() {
-		let mut server = bind_tungstenite("127.0.0.1:0").await.unwrap();
-		let addr = server.local_addr().unwrap();
-
-		let server_task = async {
-			let mut socket = server.next().await.unwrap().unwrap();
-			socket.next().await.unwrap().unwrap()
-		};
-
-		let client_task = async {
-			// give server time to start accepting
-			time_ext::sleep_millis(100).await;
-			let url = format!("ws://{}", addr);
-			let mut client = connect_tungstenite(&url).await.unwrap();
-			client.send(Message::text("hello server")).await.unwrap();
-			client.close(None).await.ok();
-		};
-
-		let (msg, _) = tokio::join!(server_task, client_task);
-		matches!(msg, Message::Text(ref s) if s == "hello server").xpect_true();
 	}
 }
