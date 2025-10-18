@@ -118,4 +118,72 @@ mod tests {
 		let (msg, _) = tokio::join!(server_task, client_task);
 		matches!(msg, Message::Text(ref s) if s == "hello server").xpect_true();
 	}
+
+	#[sweet::test]
+	#[should_panic(expected = "Second client timed out")]
+	async fn only_one_connection_at_a_time() {
+		let mut server = SocketServer::bind("127.0.0.1:0").await.unwrap();
+		let addr = server.local_addr().unwrap();
+
+		let server_task = async move {
+			// Accept first client and block on it
+			let mut socket1 = server.next().await.unwrap().unwrap();
+			let msg1 = socket1.next().await.unwrap().unwrap();
+
+			// Send response and keep connection alive for a bit
+			socket1.send(msg1).await.unwrap();
+			time_ext::sleep_millis(500).await;
+			socket1.close(None).await.ok();
+
+			// Now accept second client (but it will have timed out)
+			if let Some(Ok(mut socket2)) = server.next().await {
+				let msg2 = socket2.next().await.unwrap().unwrap();
+				socket2.send(msg2).await.unwrap();
+				socket2.close(None).await.ok();
+			}
+		};
+
+		let client1_task = async {
+			time_ext::sleep_millis(50).await;
+			let url = format!("ws://{}", addr);
+			let mut client = Socket::connect(&url).await.unwrap();
+			client.send(Message::text("client1")).await.unwrap();
+			client.next().await.unwrap().unwrap();
+			client.close(None).await.ok();
+		};
+
+		let client2_task = async {
+			time_ext::sleep_millis(100).await;
+			let url = format!("ws://{}", addr);
+
+			// This connection attempt will succeed, but server won't accept it
+			// until first client is done
+			let connect_result = tokio::time::timeout(
+				std::time::Duration::from_millis(200),
+				Socket::connect(&url),
+			)
+			.await;
+
+			match connect_result {
+				Ok(Ok(mut client)) => {
+					// Connection established, try to send
+					let send_result = tokio::time::timeout(
+						std::time::Duration::from_millis(200),
+						client.send(Message::text("client2")),
+					)
+					.await;
+
+					if send_result.is_err() {
+						panic!(
+							"Second client timed out waiting for server to accept"
+						);
+					}
+				}
+				Ok(Err(e)) => panic!("Second client failed to connect: {}", e),
+				Err(_) => panic!("Second client timed out"),
+			}
+		};
+
+		let _ = tokio::join!(server_task, client1_task, client2_task);
+	}
 }
