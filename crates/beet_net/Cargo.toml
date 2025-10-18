@@ -45,14 +45,16 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest"]
-tungstenite = ["tokio","dep:async-tungstenite","dep:async-lock"]
-native-tls = ["reqwest?/default", "async-tungstenite?/tokio-native-tls"]
+tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io"]
+native-tls = [
+	"reqwest?/default",
+	"async-tungstenite?/async-native-tls"
+]
 rustls-tls = [
 	"reqwest?/rustls-tls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
-	"aws-sdk-s3?/rustls",
-	"async-tungstenite?/tokio-rustls-webpki-roots"
+	"aws-sdk-s3?/rustls"
 ]
 
 [dependencies]
@@ -96,7 +98,10 @@ async-process = { workspace = true, optional = true }
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",
 ] }
-async-tungstenite = { version = "0.28", optional = true, default-features = false, features = ["tokio-runtime","futures-03-sink"] }
+async-tungstenite = { version = "0.31", optional = true, default-features = false, features = [
+"async-std-runtime",
+"futures-03-sink"
+] }
 async-lock = {workspace = true, optional = true }
 
 #💡 server
@@ -158,5 +163,6 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_net = {path = ".", features = ["tokio", "native-tls"] }
+beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
 sweet.workspace = true
+tokio = { workspace = true, features = ["full"] }

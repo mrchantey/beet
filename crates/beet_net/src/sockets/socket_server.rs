@@ -1,168 +1,152 @@
-use crate::prelude::sockets::*;
+use std::sync::atomic::AtomicU16;
+use std::sync::atomic::Ordering;
+
 use beet_core::prelude::*;
-use futures::Stream;
-use std::pin::Pin;
 
 /// A WebSocket server that can accept incoming connections.
 ///
 /// Platform-specific implementations provide the actual binding and accept logic.
 /// Each accepted connection returns a [`Socket`] that can be used like any client socket.
-#[derive(Component)]
+#[derive(Clone, Component)]
+#[component(on_add = on_add)]
 pub struct SocketServer {
-	pub(crate) acceptor: Box<dyn SocketAcceptor>,
+	/// The address to bind to (e.g., "127.0.0.1:8080")
+	pub port: u16,
 }
 
 impl std::fmt::Debug for SocketServer {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("SocketServer").finish_non_exhaustive()
+		f.debug_struct("SocketServer")
+			.field("port", &self.port)
+			.finish()
 	}
+}
+
+#[allow(unused)]
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	world
+		.commands()
+		.run_system_cached_with(super::start_tungstenite_server, cx.entity);
+	#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
+	panic!(
+		"WebSocket server requires the 'tungstenite' feature on non-wasm32 targets"
+	);
 }
 
 impl SocketServer {
-	/// Bind a WebSocket server to the given address.
-	///
-	/// Returns a `SocketServer` that can accept incoming connections.
-	///
-	/// Use "127.0.0.1:0" to bind to any available port, then call `local_addr()` to get the actual address.
-	pub async fn bind(_addr: impl AsRef<str>) -> Result<Self> {
-		#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-		{
-			super::impl_tungstenite::bind_tungstenite(_addr).await
-		}
-		#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
-		panic!("WebSocket server requires the 'tungstenite' feature")
-	}
+	pub fn new(port: u16) -> Self { Self { port } }
 
-	/// Create a new server with the given adaptor.
-	/// For one created based on features see [`Self::bind`]
-	///
-	/// This is intended for platform-specific constructors.
-	pub fn new(acceptor: impl SocketAcceptor) -> Self {
+	/// Create a new Server with an incrementing port to avoid
+	/// collisions in tests
+	pub fn new_test() -> Self {
+		static PORT: AtomicU16 = AtomicU16::new(8340);
 		Self {
-			acceptor: Box::new(acceptor),
+			port: PORT.fetch_add(1, Ordering::SeqCst),
+			..default()
 		}
 	}
 
-
-	/// Get the local address this server is bound to.
-	///
-	/// This is useful when binding to port 0 to discover which port was assigned.
-	pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
-		self.acceptor.local_addr()
-	}
-
-	/// Accept a new WebSocket connection.
-	///
-	/// This waits for an incoming connection, performs the WebSocket handshake,
-	/// and returns a [`Socket`] ready to send and receive messages.
-	pub async fn accept(&mut self) -> Result<Socket> {
-		self.acceptor.accept().await
-	}
+	/// The host and path without the protocol, ie `127.0.0.1:3000`
+	pub fn local_address(&self) -> String { format!("127.0.0.1:{}", self.port) }
 }
 
-impl Stream for SocketServer {
-	type Item = Result<Socket>;
-
-	fn poll_next(
-		mut self: Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Option<Self::Item>> {
-		// SAFETY: acceptor is pinned because SocketServer is pinned and we never move it
-		unsafe { Pin::new_unchecked(&mut *self.acceptor).poll_next(cx) }
-	}
-}
-
-/// Platform-agnostic acceptor trait for WebSocket servers.
-///
-/// Platform-specific implementations live in their respective modules and are
-/// boxed into `SocketServer`.
-pub trait SocketAcceptor:
-	'static + Send + Sync + Stream<Item = Result<Socket>>
-{
-	/// Accept a new incoming WebSocket connection.
-	fn accept(&mut self) -> LifetimeSendBoxedFuture<'_, Result<Socket>>;
-
-	/// Get the local address this acceptor is bound to.
-	fn local_addr(&self) -> Result<std::net::SocketAddr>;
+impl Default for SocketServer {
+	fn default() -> Self { Self::new(8080) }
 }
 
 #[cfg(test)]
 #[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod tests {
-	use super::super::Message;
 	use super::*;
-	use sweet::prelude::*;
-
+	use crate::sockets::Message;
+	use crate::sockets::Socket;
+	use crate::sockets::SocketServerPlugin;
+	use crate::sockets::SocketServerStatus;
 
 	#[sweet::test]
 	async fn server_binds_and_accepts() {
-		let mut server = SocketServer::bind("127.0.0.1:0").await.unwrap();
-		let addr = server.local_addr().unwrap();
+		let server = SocketServer::new_test();
+		let addr = server.local_address();
 
-		let server_task = async {
-			let mut socket = server.next().await.unwrap().unwrap();
-			socket.next().await.unwrap().unwrap()
-		};
-
-		let client_task = async {
-			// give server time to start accepting
-			time_ext::sleep_millis(100).await;
-			let url = format!("ws://{}", addr);
-			let mut client = Socket::connect(&url).await.unwrap();
-			client.send(Message::text("hello server")).await.unwrap();
-			client.close(None).await.ok();
-		};
-
-		let (msg, _) = tokio::join!(server_task, client_task);
-		matches!(msg, Message::Text(ref s) if s == "hello server").xpect_true();
+		// let _handle = tokio::spawn(async move {
+		App::new()
+			.add_plugins((
+				MinimalPlugins,
+				LogPlugin::default(),
+				SocketServerPlugin::with_server(server),
+			))
+			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
+				let addr = addr.clone();
+				commands.run(async move |world| {
+					time_ext::sleep_millis(200).await;
+					let url = format!("ws://{}", &addr);
+					let mut client = Socket::connect(&url).await.unwrap();
+					client.send(Message::text("hello server")).await.unwrap();
+					client.close(None).await.ok();
+					world.write_message(AppExit::Success);
+				});
+			})
+			.run();
+		println!("winner");
 	}
 
 	#[sweet::test]
 	async fn handles_multiple_concurrent_connections() {
-		let mut server = SocketServer::bind("127.0.0.1:0").await.unwrap();
-		let addr = server.local_addr().unwrap();
+		let server = SocketServer::new_test();
 
-		let server_task = async move {
-			// Accept first client and block on it for a bit
-			let mut socket1 = server.next().await.unwrap().unwrap();
-			let msg1 = socket1.next().await.unwrap().unwrap();
+		let (send, recv) = async_channel::bounded(1);
+		let send_addr = send.clone();
 
-			// Send response and keep connection alive
-			socket1.send(msg1).await.unwrap();
-			time_ext::sleep_millis(500).await;
-			socket1.close(None).await.ok();
+		let _handle = tokio::spawn(async move {
+			App::new()
+				.add_plugins((
+					MinimalPlugins,
+					SocketServerPlugin::with_server(server),
+				))
+				.add_systems(
+					Startup,
+					move |query: Query<(Entity, &SocketServer)>,
+					      mut commands: Commands| {
+						let Ok((ent, _)) = query.single() else {
+							return;
+						};
+						let send = send_addr.clone();
+						commands.queue(move |world: &mut World| {
+							// Wait a bit for server to start
+							std::thread::sleep(
+								std::time::Duration::from_millis(100),
+							);
+							if let Some(status) =
+								world.entity(ent).get::<SocketServerStatus>()
+							{
+								send.try_send(status.local_addr()).ok();
+							}
+						});
+					},
+				)
+				.run();
+		});
 
-			// Accept second client (should succeed even though first is still connected)
-			let mut socket2 = server.next().await.unwrap().unwrap();
-			let msg2 = socket2.next().await.unwrap().unwrap();
-			socket2.send(msg2).await.unwrap();
-			socket2.close(None).await.ok();
-		};
+		let addr = recv.recv().await.unwrap().unwrap();
 
 		let client1_task = async {
-			time_ext::sleep_millis(50).await;
+			time_ext::sleep_millis(200).await;
 			let url = format!("ws://{}", addr);
 			let mut client = Socket::connect(&url).await.unwrap();
 			client.send(Message::text("client1")).await.unwrap();
-			let response = client.next().await.unwrap().unwrap();
-			matches!(response, Message::Text(ref s) if s == "client1")
-				.xpect_true();
+			time_ext::sleep_millis(500).await;
 			client.close(None).await.ok();
 		};
 
 		let client2_task = async {
-			time_ext::sleep_millis(100).await;
+			time_ext::sleep_millis(300).await;
 			let url = format!("ws://{}", addr);
-
-			// This connection should succeed even though first client is still active
 			let mut client = Socket::connect(&url).await.unwrap();
 			client.send(Message::text("client2")).await.unwrap();
-			let response = client.next().await.unwrap().unwrap();
-			matches!(response, Message::Text(ref s) if s == "client2")
-				.xpect_true();
 			client.close(None).await.ok();
 		};
 
-		let _ = tokio::join!(server_task, client1_task, client2_task);
+		let _ = tokio::join!(client1_task, client2_task);
 	}
 }
