@@ -2,35 +2,17 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::Stream;
 use futures::future::BoxFuture;
+use send_wrapper::SendWrapper;
 use std::pin::Pin;
 
-pub trait SocketReader:
-	'static + MaybeSend + Stream<Item = Result<Message>>
-{
-}
-impl<T> SocketReader for T where
-	T: 'static + MaybeSend + Stream<Item = Result<Message>> + MaybeSend
-{
-}
-
-/// Platform-agnostic writer trait for WebSocket sinks.
-///
-/// Platform-specific implementations live in their respective modules and are
-/// boxed into `Socket`.
-pub trait SocketWriter: 'static + MaybeSend {
-	/// Send a message to the socket peer.
-	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
-	/// Close the socket with an optional close frame.
-	fn close_boxed(
-		&mut self,
-		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>>;
-}
-
-/// A cross-platform WebSocket that implements Stream of inbound [`Message`].
+/// A cross-platform WebSocket that implements Stream of inbound [`Message`]
+/// and provides methods to send messages and close the connection.
+#[derive(Component)]
 pub struct Socket {
-	pub(crate) reader: MaybeSendWrapper<Pin<Box<dyn SocketReader>>>,
-	pub(crate) writer: MaybeSendWrapper<Box<dyn SocketWriter>>,
+	// SendWrapper for usage in bevy components
+	pub(crate) reader: SendWrapper<Pin<Box<dyn SocketReader>>>,
+	// SendWrapper for usage in bevy components
+	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
 }
 
 impl std::fmt::Debug for Socket {
@@ -65,8 +47,8 @@ impl Socket {
 		writer: impl SocketWriter,
 	) -> Self {
 		Self {
-			reader: maybe_send_wrapper(Box::pin(reader)),
-			writer: maybe_send_wrapper(Box::new(writer)),
+			reader: SendWrapper::new(Box::pin(reader)),
+			writer: SendWrapper::new(Box::new(writer)),
 		}
 	}
 
@@ -108,9 +90,19 @@ impl Stream for Socket {
 	}
 }
 
+pub trait SocketReader:
+	'static + MaybeSend + Stream<Item = Result<Message>>
+{
+}
+impl<T> SocketReader for T where
+	T: 'static + MaybeSend + Stream<Item = Result<Message>>
+{
+}
+
+
 /// Read half returned by `Socket::split()`.
 pub struct SocketRead {
-	pub(crate) reader: MaybeSendWrapper<Pin<Box<dyn SocketReader>>>,
+	pub(crate) reader: SendWrapper<Pin<Box<dyn SocketReader>>>,
 }
 
 impl Stream for SocketRead {
@@ -124,9 +116,23 @@ impl Stream for SocketRead {
 	}
 }
 
+/// Platform-agnostic writer trait for WebSocket sinks.
+///
+/// Platform-specific implementations live in their respective modules and are
+/// boxed into `Socket`.
+pub trait SocketWriter: 'static + MaybeSend {
+	/// Send a message to the socket peer.
+	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
+	/// Close the socket with an optional close frame.
+	fn close_boxed(
+		&mut self,
+		close: Option<CloseFrame>,
+	) -> BoxFuture<'static, Result<()>>;
+}
+
 /// Write half returned by `Socket::split()`.
 pub struct SocketWrite {
-	pub(crate) writer: MaybeSendWrapper<Box<dyn SocketWriter>>,
+	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
 }
 
 impl SocketWrite {

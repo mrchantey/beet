@@ -95,7 +95,7 @@ impl SocketAcceptor for TungAcceptor {
 					})?;
 
 				let tx = self.socket_tx.clone();
-				async_ext::spawn_maybe_send(async move {
+				async_ext::spawn(async move {
 					let result = accept_connection(stream).await;
 					let _ = tx.send(result);
 				});
@@ -136,7 +136,7 @@ impl futures::Stream for TungAcceptor {
 			std::task::Poll::Ready(Ok((stream, _addr))) => {
 				let tx = self.socket_tx.clone();
 
-				async_ext::spawn_maybe_send(async move {
+				async_ext::spawn(async move {
 					let result = accept_connection(stream).await;
 					let _ = tx.send(result);
 				});
@@ -174,6 +174,57 @@ async fn accept_connection(stream: TcpStream) -> Result<Socket> {
 	};
 
 	Ok(Socket::new(reader, writer))
+}
+
+struct TungWriter {
+	sink: Arc<Mutex<Pin<Box<DynTungSink>>>>,
+}
+
+impl SocketWriter for TungWriter {
+	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
+		let tmsg = to_tung_msg(msg);
+		let sink = self.sink.clone();
+		async move {
+			let mut guard = sink.lock().await;
+			guard
+				.send(tmsg)
+				.await
+				.map_err(|e| bevyhow!("WebSocket send failed: {}", e))?;
+			Ok(())
+		}
+		.boxed()
+	}
+	fn close_boxed(
+		&mut self,
+		close: Option<CloseFrame>,
+	) -> BoxFuture<'static, Result<()>> {
+		let sink = self.sink.clone();
+		async move {
+			let mut guard = sink.lock().await;
+			match close {
+				Some(cf) => {
+					let frame = TungCloseFrame {
+						code: close_code_from_u16(cf.code),
+						reason: Cow::Owned(cf.reason),
+					};
+					guard.send(TungMessage::Close(Some(frame))).await.map_err(
+						|e| bevyhow!("WebSocket close send failed: {}", e),
+					)?;
+					// ensure the sink closes gracefully after sending close
+					guard.close().await.map_err(|e| {
+						bevyhow!("WebSocket close failed: {}", e)
+					})?;
+				}
+				None => {
+					guard.close().await.map_err(|e| {
+						bevyhow!("WebSocket close failed: {}", e)
+					})?;
+				}
+			}
+			Ok(())
+		}
+		.boxed()
+	}
 }
 
 fn from_tung_msg(msg: TungMessage) -> Message {
@@ -234,57 +285,6 @@ fn close_code_to_u16(code: TungCloseCode) -> u16 {
 }
 
 fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
-
-struct TungWriter {
-	sink: Arc<Mutex<Pin<Box<DynTungSink>>>>,
-}
-
-impl SocketWriter for TungWriter {
-	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
-		let tmsg = to_tung_msg(msg);
-		let sink = self.sink.clone();
-		async move {
-			let mut guard = sink.lock().await;
-			guard
-				.send(tmsg)
-				.await
-				.map_err(|e| bevyhow!("WebSocket send failed: {}", e))?;
-			Ok(())
-		}
-		.boxed()
-	}
-	fn close_boxed(
-		&mut self,
-		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>> {
-		let sink = self.sink.clone();
-		async move {
-			let mut guard = sink.lock().await;
-			match close {
-				Some(cf) => {
-					let frame = TungCloseFrame {
-						code: close_code_from_u16(cf.code),
-						reason: Cow::Owned(cf.reason),
-					};
-					guard.send(TungMessage::Close(Some(frame))).await.map_err(
-						|e| bevyhow!("WebSocket close send failed: {}", e),
-					)?;
-					// ensure the sink closes gracefully after sending close
-					guard.close().await.map_err(|e| {
-						bevyhow!("WebSocket close failed: {}", e)
-					})?;
-				}
-				None => {
-					guard.close().await.map_err(|e| {
-						bevyhow!("WebSocket close failed: {}", e)
-					})?;
-				}
-			}
-			Ok(())
-		}
-		.boxed()
-	}
-}
 
 #[cfg(test)]
 mod tests {

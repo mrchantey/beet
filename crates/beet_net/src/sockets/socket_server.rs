@@ -87,11 +87,7 @@ pub trait SocketAcceptor:
 }
 
 #[cfg(test)]
-#[cfg(all(
-	feature = "tungstenite",
-	feature = "multi_threaded",
-	not(target_arch = "wasm32")
-))]
+#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 mod tests {
 	use super::super::Message;
 	use super::*;

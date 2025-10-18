@@ -29,19 +29,6 @@ pub type NativeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
 pub type NativeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
-
-/// Wrapper to handle spawning maybe send futures
-pub fn spawn_maybe_send<F>(fut: F)
-where
-	F: 'static + MaybeSend + Future<Output = ()>,
-{
-	#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
-	spawn(fut);
-
-	#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
-	spawn_local(fut);
-}
-
 /// Cross platform spawn_local function
 #[cfg(target_arch = "wasm32")]
 pub fn spawn_local<F>(fut: F)

@@ -16,6 +16,7 @@ type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send + Sync;
 
 pub enum Body {
 	Bytes(Bytes),
+	// SendWrapper for usage in bevy components
 	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
 }
 
