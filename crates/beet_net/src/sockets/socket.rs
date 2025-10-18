@@ -18,7 +18,6 @@ impl std::fmt::Debug for Socket {
 }
 
 impl Socket {
-	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
 	#[allow(unused_variables)]
 	pub async fn connect(
 		url: impl AsRef<str>,
@@ -31,11 +30,13 @@ impl Socket {
 		{
 			super::impl_tungstenite::connect_tungstenite(url).await
 		}
+		#[cfg(not(any(target_arch = "wasm32", feature = "tungstenite")))]
+		{
+			panic!("WebSocket implementation not available - enable the tungstenite feature or target wasm32")
+		}
 	}
 
 	/// Create a new socket from a message stream and writer.
-	///
-	/// This is intended for platform-specific constructors.
 	#[cfg(target_arch = "wasm32")]
 	pub(crate) fn new(
 		incoming: impl Stream<Item = Result<Message>> + 'static,
@@ -48,9 +49,9 @@ impl Socket {
 	}
 
 	/// Create a new socket from a message stream and writer.
-	///
-	/// This is intended for platform-specific constructors.
+	// the non-wasm version must be Send
 	#[cfg(not(target_arch = "wasm32"))]
+	#[allow(dead_code)]
 	pub(crate) fn new(
 		incoming: impl Stream<Item = Result<Message>> + Send + 'static,
 		writer: Box<DynSocketWriter>,
@@ -225,6 +226,7 @@ pub struct CloseFrame {
 
 
 #[cfg(test)]
+#[cfg(any(feature = "tungstenite", target_arch = "wasm32"))]
 mod tests {
 	use super::*;
 	use futures::FutureExt;

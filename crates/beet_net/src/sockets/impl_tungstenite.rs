@@ -1,6 +1,7 @@
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use async_lock::Mutex;
+use async_tungstenite::tokio::accept_async;
 use async_tungstenite::tokio::connect_async;
 use async_tungstenite::tungstenite::Error as TungError;
 use async_tungstenite::tungstenite::Message as TungMessage;
@@ -15,6 +16,8 @@ use futures::future::BoxFuture;
 use std::borrow::Cow;
 use std::pin::Pin;
 use std::sync::Arc;
+use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 
 type DynTungSink =
 	dyn futures::Sink<TungMessage, Error = TungError> + Send + Unpin;
@@ -30,6 +33,117 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 	let (ws_stream, _resp) = connect_async(url.as_ref())
 		.await
 		.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+	let (sink, stream) = ws_stream.split();
+
+	// Map incoming tungstenite messages to our cross-platform Message
+	let incoming = stream.map(|res| match res {
+		Ok(msg) => Ok(from_tung_msg(msg)),
+		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
+	});
+
+	// Box the sink to make the writer object-safe
+	let sink_boxed: Pin<Box<DynTungSink>> = Box::pin(sink);
+
+	let writer = Box::new(TungWriter {
+		sink: Arc::new(Mutex::new(sink_boxed)),
+	});
+
+	Ok(Socket::new(incoming, writer))
+}
+
+/// Bind a WebSocket server to the given address using tokio TcpListener and return a cross-platform `SocketServer`.
+///
+/// This function:
+/// - Binds a TCP listener to `addr`
+/// - Returns a `SocketServer` that can accept incoming WebSocket connections
+pub async fn bind_tungstenite(addr: impl AsRef<str>) -> Result<SocketServer> {
+	let listener = TcpListener::bind(addr.as_ref())
+		.await
+		.map_err(|e| bevyhow!("Failed to bind server: {}", e))?;
+
+	let acceptor = Box::new(TungAcceptor {
+		listener,
+		pending: None,
+	});
+	Ok(SocketServer::from_acceptor(acceptor))
+}
+
+struct TungAcceptor {
+	listener: TcpListener,
+	pending: Option<
+		Pin<Box<dyn std::future::Future<Output = Result<Socket>> + Send>>,
+	>,
+}
+
+impl SocketAcceptor for TungAcceptor {
+	fn accept(
+		&mut self,
+	) -> Pin<Box<dyn std::future::Future<Output = Result<Socket>> + Send + '_>>
+	{
+		Box::pin(async move {
+			let (stream, _addr) =
+				self.listener.accept().await.map_err(|e| {
+					bevyhow!("Failed to accept connection: {}", e)
+				})?;
+
+			accept_connection(stream).await
+		})
+	}
+
+	fn local_addr(&self) -> Result<std::net::SocketAddr> {
+		self.listener
+			.local_addr()
+			.map_err(|e| bevyhow!("Failed to get local address: {}", e))
+	}
+}
+
+impl futures::Stream for TungAcceptor {
+	type Item = Result<Socket>;
+
+	fn poll_next(
+		mut self: Pin<&mut Self>,
+		cx: &mut std::task::Context<'_>,
+	) -> std::task::Poll<Option<Self::Item>> {
+		// if we have a pending handshake, poll it first
+		if let Some(mut fut) = self.pending.take() {
+			match fut.as_mut().poll(cx) {
+				std::task::Poll::Ready(result) => {
+					return std::task::Poll::Ready(Some(result));
+				}
+				std::task::Poll::Pending => {
+					self.pending = Some(fut);
+					return std::task::Poll::Pending;
+				}
+			}
+		}
+
+		// try to accept a new connection
+		match self.listener.poll_accept(cx) {
+			std::task::Poll::Ready(Ok((stream, _addr))) => {
+				let mut fut = Box::pin(accept_connection(stream));
+				// try to poll it immediately
+				match fut.as_mut().poll(cx) {
+					std::task::Poll::Ready(result) => {
+						std::task::Poll::Ready(Some(result))
+					}
+					std::task::Poll::Pending => {
+						self.pending = Some(fut);
+						std::task::Poll::Pending
+					}
+				}
+			}
+			std::task::Poll::Ready(Err(e)) => std::task::Poll::Ready(Some(
+				Err(bevyhow!("Accept error: {}", e)),
+			)),
+			std::task::Poll::Pending => std::task::Poll::Pending,
+		}
+	}
+}
+
+async fn accept_connection(stream: TcpStream) -> Result<Socket> {
+	let ws_stream = accept_async(stream)
+		.await
+		.map_err(|e| bevyhow!("WebSocket handshake failed: {}", e))?;
 
 	let (sink, stream) = ws_stream.split();
 
@@ -162,6 +276,7 @@ impl SocketWriter for TungWriter {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use futures::StreamExt;
 	use sweet::prelude::*;
 
 	#[sweet::test]
@@ -187,5 +302,28 @@ mod tests {
 			matches!(super::from_tung_msg(t_close), Message::Close(_))
 				.xpect_true();
 		}
+	}
+
+	#[sweet::test]
+	async fn server_binds_and_accepts() {
+		let mut server = bind_tungstenite("127.0.0.1:0").await.unwrap();
+		let addr = server.local_addr().unwrap();
+
+		let server_task = async {
+			let mut socket = server.next().await.unwrap().unwrap();
+			socket.next().await.unwrap().unwrap()
+		};
+
+		let client_task = async {
+			// give server time to start accepting
+			time_ext::sleep_millis(100).await;
+			let url = format!("ws://{}", addr);
+			let mut client = connect_tungstenite(&url).await.unwrap();
+			client.send(Message::text("hello server")).await.unwrap();
+			client.close(None).await.ok();
+		};
+
+		let (msg, _) = tokio::join!(server_task, client_task);
+		matches!(msg, Message::Text(ref s) if s == "hello server").xpect_true();
 	}
 }

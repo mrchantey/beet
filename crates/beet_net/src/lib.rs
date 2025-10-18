@@ -6,7 +6,6 @@
 mod http_utils;
 mod object_storage;
 mod server;
-#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
 pub mod sockets;
 mod transport;
 
@@ -24,7 +23,6 @@ pub mod prelude {
 	pub use crate::http_utils::*;
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
-	#[cfg(any(target_arch = "wasm32", feature = "tungstenite"))]
 	pub use crate::sockets;
 	// pub use crate::transport::*;
 
