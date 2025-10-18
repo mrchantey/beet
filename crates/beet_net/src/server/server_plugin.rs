@@ -105,7 +105,7 @@ impl Server {
 	/// Create a new Server with an incrementing port to avoid
 	/// collisions in tests
 	pub fn new_test() -> Self {
-		static PORT: AtomicU16 = AtomicU16::new(8340);
+		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SERVER_TEST_PORT);
 		Self {
 			port: PORT.fetch_add(1, Ordering::SeqCst),
 			..default()

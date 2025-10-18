@@ -1,7 +1,7 @@
+use crate::prelude::*;
+use beet_core::prelude::*;
 use std::sync::atomic::AtomicU16;
 use std::sync::atomic::Ordering;
-
-use beet_core::prelude::*;
 
 /// A WebSocket server that can accept incoming connections.
 ///
@@ -40,7 +40,7 @@ impl SocketServer {
 	/// Create a new Server with an incrementing port to avoid
 	/// collisions in tests
 	pub fn new_test() -> Self {
-		static PORT: AtomicU16 = AtomicU16::new(8340);
+		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SOCKET_TEST_PORT);
 		Self {
 			port: PORT.fetch_add(1, Ordering::SeqCst),
 			..default()
@@ -52,7 +52,7 @@ impl SocketServer {
 }
 
 impl Default for SocketServer {
-	fn default() -> Self { Self::new(8080) }
+	fn default() -> Self { Self::new(DEFAULT_SOCKET_PORT) }
 }
 
 #[cfg(test)]
@@ -60,9 +60,7 @@ impl Default for SocketServer {
 mod tests {
 	use super::*;
 	use crate::sockets::Message;
-	use crate::sockets::Socket;
-	use crate::sockets::SocketServerPlugin;
-	use crate::sockets::SocketServerStatus;
+	use crate::sockets::*;
 
 	#[sweet::test]
 	async fn server_binds_and_accepts() {
@@ -88,65 +86,38 @@ mod tests {
 				});
 			})
 			.run();
-		println!("winner");
 	}
 
 	#[sweet::test]
 	async fn handles_multiple_concurrent_connections() {
 		let server = SocketServer::new_test();
+		let addr = server.local_address();
 
-		let (send, recv) = async_channel::bounded(1);
-		let send_addr = send.clone();
+		App::new()
+			.add_plugins((
+				MinimalPlugins,
+				SocketServerPlugin::with_server(server),
+			))
+			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
+				let addr = addr.clone();
+				commands.run(async move |world| {
+					time_ext::sleep_millis(200).await;
+					let url = format!("ws://{}", &addr);
 
-		let _handle = tokio::spawn(async move {
-			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					SocketServerPlugin::with_server(server),
-				))
-				.add_systems(
-					Startup,
-					move |query: Query<(Entity, &SocketServer)>,
-					      mut commands: Commands| {
-						let Ok((ent, _)) = query.single() else {
-							return;
-						};
-						let send = send_addr.clone();
-						commands.queue(move |world: &mut World| {
-							// Wait a bit for server to start
-							std::thread::sleep(
-								std::time::Duration::from_millis(100),
-							);
-							if let Some(status) =
-								world.entity(ent).get::<SocketServerStatus>()
-							{
-								send.try_send(status.local_addr()).ok();
-							}
-						});
-					},
-				)
-				.run();
-		});
+					let mut client1 = Socket::connect(&url).await.unwrap();
+					client1.send(Message::text("client1")).await.unwrap();
 
-		let addr = recv.recv().await.unwrap().unwrap();
+					time_ext::sleep_millis(100).await;
 
-		let client1_task = async {
-			time_ext::sleep_millis(200).await;
-			let url = format!("ws://{}", addr);
-			let mut client = Socket::connect(&url).await.unwrap();
-			client.send(Message::text("client1")).await.unwrap();
-			time_ext::sleep_millis(500).await;
-			client.close(None).await.ok();
-		};
+					let mut client2 = Socket::connect(&url).await.unwrap();
+					client2.send(Message::text("client2")).await.unwrap();
 
-		let client2_task = async {
-			time_ext::sleep_millis(300).await;
-			let url = format!("ws://{}", addr);
-			let mut client = Socket::connect(&url).await.unwrap();
-			client.send(Message::text("client2")).await.unwrap();
-			client.close(None).await.ok();
-		};
+					client1.close(None).await.ok();
+					client2.close(None).await.ok();
 
-		let _ = tokio::join!(client1_task, client2_task);
+					world.write_message(AppExit::Success);
+				});
+			})
+			.run();
 	}
 }
