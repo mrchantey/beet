@@ -158,7 +158,7 @@ mod tests {
 
 			// This connection attempt will succeed, but server won't accept it
 			// until first client is done
-			let connect_result = tokio::time::timeout(
+			let connect_result = async_ext::timeout(
 				std::time::Duration::from_millis(200),
 				Socket::connect(&url),
 			)
@@ -167,8 +167,8 @@ mod tests {
 			match connect_result {
 				Ok(Ok(mut client)) => {
 					// Connection established, try to send
-					let send_result = tokio::time::timeout(
-						std::time::Duration::from_millis(200),
+					let send_result = async_ext::timeout(
+						Duration::from_millis(200),
 						client.send(Message::text("client2")),
 					)
 					.await;
