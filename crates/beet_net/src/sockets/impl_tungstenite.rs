@@ -17,11 +17,18 @@ use futures::future::BoxFuture;
 
 use std::net::TcpListener;
 use std::net::TcpStream;
+use std::net::ToSocketAddrs;
 use std::pin::Pin;
 use std::sync::Arc;
 
+#[cfg(feature = "native-tls")]
+use async_native_tls::TlsConnector;
+
 type DynTungSink =
 	dyn futures::Sink<TungMessage, Error = TungError> + Send + Unpin;
+
+type DynTungStream =
+	dyn futures::Stream<Item = Result<TungMessage, TungError>> + Send + Unpin;
 
 /// Connect to a WebSocket endpoint using async-tungstenite and return a cross-platform `Socket`.
 ///
@@ -31,42 +38,84 @@ type DynTungSink =
 /// - Adapts the inbound `tungstenite::Message` stream into our cross-platform `Message`
 /// - Wraps the sink in a writer that implements the `SocketWriter` trait
 pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
-	println!("connecting");
 
 	// Parse URL to get host and port
 	let parsed_url = url::Url::parse(url.as_ref())
 		.map_err(|e| bevyhow!("Invalid URL: {}", e))?;
 	let host = parsed_url
 		.host_str()
-		.ok_or_else(|| bevyhow!("URL missing host"))?;
+		.ok_or_else(|| bevyhow!("URL missing host"))?
+		.to_string();
 	let port = parsed_url
 		.port_or_known_default()
 		.ok_or_else(|| bevyhow!("Cannot determine port"))?;
 
+	// Resolve DNS
+	let host_clone = host.clone();
+	let socket_addr = blocking::unblock(move || {
+		(host_clone.as_str(), port)
+			.to_socket_addrs()?
+			.next()
+			.ok_or_else(|| {
+				std::io::Error::new(
+					std::io::ErrorKind::NotFound,
+					"cannot resolve address",
+				)
+			})
+	})
+	.await
+	.map_err(|e| bevyhow!("DNS resolution failed: {}", e))?;
+
 	// Connect TCP stream with async-io
-	let addr = format!("{}:{}", host, port);
-	let socket_addr: std::net::SocketAddr = addr
-		.parse()
-		.map_err(|e| bevyhow!("Invalid address: {}", e))?;
-	let stream = Async::<TcpStream>::connect(socket_addr)
+	let tcp_stream = Async::<TcpStream>::connect(socket_addr)
 		.await
 		.map_err(|e| bevyhow!("TCP connect failed: {}", e))?;
 
-	// Perform WebSocket handshake
-	let (ws_stream, _resp) = client_async(url.as_ref(), stream)
-		.await
-		.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
-	println!("connected");
-	let (sink, stream) = ws_stream.split();
+	// Perform WebSocket handshake (with TLS if wss://)
+	let scheme = parsed_url.scheme();
+
+	let (sink_boxed, stream_boxed): (
+		Pin<Box<DynTungSink>>,
+		Pin<Box<DynTungStream>>,
+	) = match scheme {
+		"ws" => {
+			let (ws_stream, _resp) = client_async(url.as_ref(), tcp_stream)
+				.await
+				.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+			let (sink, stream) = ws_stream.split();
+			(Box::pin(sink), Box::pin(stream))
+		}
+		"wss" => {
+			#[cfg(feature = "native-tls")]
+			{
+				let connector = TlsConnector::new();
+				let tls_stream = connector
+					.connect(&host, tcp_stream)
+					.await
+					.map_err(|e| bevyhow!("TLS connect failed: {}", e))?;
+				let (ws_stream, _resp) = client_async(url.as_ref(), tls_stream)
+					.await
+					.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+				let (sink, stream) = ws_stream.split();
+				(Box::pin(sink), Box::pin(stream))
+			}
+			#[cfg(not(feature = "native-tls"))]
+			{
+				return Err(bevyhow!(
+					"WSS support requires native-tls feature to be enabled"
+				));
+			}
+		}
+		_ => {
+			return Err(bevyhow!("Unsupported URL scheme: {}", scheme));
+		}
+	};
 
 	// Map incoming tungstenite messages to our cross-platform Message
-	let incoming = stream.map(|res| match res {
+	let incoming = stream_boxed.map(|res| match res {
 		Ok(msg) => Ok(from_tung_msg(msg)),
 		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
 	});
-
-	// Box the sink to make the writer object-safe
-	let sink_boxed: Pin<Box<DynTungSink>> = Box::pin(sink);
 
 	let writer = TungWriter {
 		sink: Arc::new(Mutex::new(sink_boxed)),
@@ -101,15 +150,6 @@ pub(crate) fn start_tungstenite_server(
 
 		info!("WebSocket server listening on ws://{}", local_addr);
 
-		// Store the local address in the server status
-		world
-			.with_then(move |world| {
-				world
-					.entity_mut(entity)
-					.insert(SocketServerStatus { local_addr });
-			})
-			.await;
-
 		loop {
 			let (stream, addr) = listener
 				.accept()
@@ -117,7 +157,7 @@ pub(crate) fn start_tungstenite_server(
 				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))
 				.unwrap();
 
-			info!("New WebSocket connection from: {}", addr);
+			trace!("New WebSocket connection from: {}", addr);
 
 			// Spawn task to handle the WebSocket handshake and connection
 			let _entity_fut = world.run_async(async move |_world| {
@@ -143,10 +183,20 @@ async fn handle_connection(stream: Async<TcpStream>) -> Result<()> {
 		let msg =
 			msg.map_err(|e| bevyhow!("WebSocket receive error: {}", e))?;
 
-		// Echo the message back
-		sink.send(msg)
-			.await
-			.map_err(|e| bevyhow!("WebSocket send failed: {}", e))?;
+		// Check if it's a close message
+		if matches!(msg, TungMessage::Close(_)) {
+			// Don't echo close messages, just break
+			break;
+		}
+
+		// Echo the message back, but gracefully handle if connection is closed
+		if let Err(e) = sink.send(msg).await {
+			// Only log errors that aren't "connection closed" type errors
+			if !e.to_string().contains("closing") {
+				return Err(bevyhow!("WebSocket send failed: {}", e));
+			}
+			break;
+		}
 	}
 
 	Ok(())
@@ -259,17 +309,6 @@ fn close_code_to_u16(code: TungCloseCode) -> u16 {
 
 fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
 
-/// Status information for a running WebSocket server
-#[derive(Component)]
-pub struct SocketServerStatus {
-	local_addr: std::net::SocketAddr,
-}
-
-impl SocketServerStatus {
-	pub fn local_addr(&self) -> Result<std::net::SocketAddr> {
-		Ok(self.local_addr)
-	}
-}
 
 #[cfg(test)]
 mod tests {

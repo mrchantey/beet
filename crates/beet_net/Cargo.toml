@@ -45,10 +45,11 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest"]
-tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io"]
+tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
-	"async-tungstenite?/async-native-tls"
+	"async-tungstenite?/async-native-tls",
+	"dep:async-native-tls"
 ]
 rustls-tls = [
 	"reqwest?/rustls-tls",
@@ -103,6 +104,8 @@ async-tungstenite = { version = "0.31", optional = true, default-features = fals
 "futures-03-sink"
 ] }
 async-lock = {workspace = true, optional = true }
+blocking = { version = "1.6", optional = true }
+async-native-tls = { version = "0.5", optional = true }
 
 #💡 server
 
