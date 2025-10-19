@@ -5,14 +5,20 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 #[sweet::test]
-// #[ignore]
-async fn docs() {
-	server_plugin
-		.into_world()
+async fn test_layouts_series() {
+	let mut world = server_plugin.into_world();
+	world
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.await_event::<Insert, RouteServer>()
-		.await
+		.await;
+
+	docs(&mut world).await;
+	article_layout(&mut world).await;
+}
+// #[ignore]
+async fn docs(world: &mut World) {
+	world
 		.oneshot("/docs")
 		.await
 		.into_result()
@@ -23,14 +29,8 @@ async fn docs() {
 		.unwrap()
 		.xpect_contains("docs");
 }
-#[sweet::test]
-async fn article_layout() {
-	server_plugin
-		.into_world()
-		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
-		.await_event::<Insert, RouteServer>()
-		.await
+async fn article_layout(world: &mut World) {
+	world
 		.oneshot("/blog/post-1")
 		.await
 		.into_result()

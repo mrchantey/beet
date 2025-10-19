@@ -187,7 +187,7 @@ pub async fn flow_route_handler(
 /// this will also connect to a hyper server and listen for requests.
 #[derive(Clone, Component)]
 #[require(ServerStatus)]
-#[cfg_attr(all(not(target_arch = "wasm32"), not(feature = "lambda"), feature = "server"),
+#[cfg_attr(all(not(target_arch = "wasm32"), not(feature = "lambda"),not(test), feature = "server"),
 	require(Server = Server::default().with_handler(flow_route_handler))
 )]
 #[component(on_add=on_add)]
