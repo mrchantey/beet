@@ -115,7 +115,7 @@ pub fn action(
 /// #[event(auto_propagate)]
 /// struct MyEvent;
 /// ```
-#[proc_macro_derive(ActionEvent, attributes(action_event))]
+#[proc_macro_derive(ActionEvent, attributes(event))]
 pub fn action_event(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	entity_target_event::impl_action_event(input).into()
 }
@@ -129,7 +129,7 @@ pub fn action_event(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// #[event(auto_propagate)]
 /// struct MyEvent;
 /// ```
-#[proc_macro_derive(EntityTargetEvent, attributes(action_event))]
+#[proc_macro_derive(EntityTargetEvent, attributes(event))]
 pub fn entity_target_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

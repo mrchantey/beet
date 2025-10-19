@@ -152,7 +152,8 @@ impl SocketWrite {
 ///
 /// Mirrors common WS message types across platforms (e.g. web-sys and tungstenite)
 /// without leaking platform details into your code.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+#[event(auto_propagate)]
 pub enum Message {
 	/// A UTF-8 text message.
 	Text(String),

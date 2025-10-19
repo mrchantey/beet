@@ -140,8 +140,9 @@ impl<
 	T: Traversal<E>,
 > TriggerFromTarget for ActionTrigger<AUTO_PROPAGATE, E, T>
 {
-	fn trigger_from_target(entity: &mut EntityWorldMut) -> Self {
-		Self::new(ActionContext::new(entity))
+	fn trigger_from_target(entity: Entity) -> Self {
+		// agent will be found in the trigger
+		Self::new(ActionContext::new_no_agent(entity))
 	}
 }
 
@@ -159,6 +160,10 @@ unsafe impl<
 		trigger_context: &TriggerContext,
 		event: &mut E,
 	) {
+		if self.cx.agent == Entity::PLACEHOLDER {
+			self.cx.agent = self.cx.find_agent(&world);
+		}
+
 		let mut current_entity = self.cx.action;
 		// self.original_event_target = current_entity;
 

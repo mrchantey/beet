@@ -18,31 +18,37 @@ pub struct ActionContext {
 }
 
 impl ActionContext {
-	pub fn new(action_entity: &mut EntityWorldMut) -> Self {
-		let action = action_entity.id();
-
-		let agent = action_entity
-			.world_scope(move |world| {
-				world.flush();
-				world.run_system_once(
-					move |parents: Query<&ChildOf>,
-					      actions: Query<&ActionOf>| {
-						parents
-							.iter_ancestors_inclusive(action)
-							.find_map(|entity| {
-								actions.get(entity).ok().map(|a| a.get())
-							})
-							.unwrap_or(parents.root_ancestor(action))
-					},
-				)
-			})
-			.unwrap_or(action);
-
+	/// only for use by ActionEvent which will immediately
+	/// set with new_find_agent if the `action` is Entity::PLACEHOLDER
+	pub(super) fn new_no_agent(action: Entity) -> Self {
 		Self {
 			action,
-			agent,
+			agent: Entity::PLACEHOLDER,
 			queue: default(),
 		}
+	}
+	/// Use the hierarchy and [`ActionOf`] components to infer the
+	/// agent for this action.
+	pub(super) fn find_agent(&self, world: &World) -> Entity {
+		// first check for an ActionOf on the action entity directly
+		if let Some(action_of) = world.entity(self.action).get::<ActionOf>() {
+			return action_of.get();
+		}
+		// othwerwise visit ancestors
+		let mut agent = self.action;
+		while let Some(parent) = world.entity(agent).get::<ChildOf>() {
+			// first check if the current agent has an action
+			if let Some(action_of) =
+				world.entity(parent.get()).get::<ActionOf>()
+			{
+				agent = action_of.get();
+				break;
+			} else {
+				// otherwise move up the tree
+				agent = parent.get();
+			}
+		}
+		agent
 	}
 
 	pub fn new_with_agent(action: Entity, agent: Entity) -> Self {
@@ -86,9 +92,7 @@ impl ActionContext {
 		let action = self.action;
 		let caller = MaybeLocation::caller();
 		self.queue.push(move |world: &mut World| {
-			let mut entity = world.entity_mut(action);
-			let (mut ev, mut trigger) =
-				ev.into_entity_target_event(&mut entity);
+			let (mut ev, mut trigger) = ev.into_entity_target_event(action);
 			world.trigger_ref_with_caller_pub(&mut ev, &mut trigger, caller);
 		});
 		self
@@ -149,12 +153,12 @@ mod test {
 		let store = Store::new(Entity::PLACEHOLDER);
 		let agent = world.spawn_empty().id();
 		world
-			.spawn(children![(
-				set_agent(store),
-				OnSpawn::trigger(Run),
+			.spawn((
 				// allowed to add after OnSpawn::trigger?
 				ActionOf(agent),
-			)])
+				set_agent(store),
+			))
+			.trigger_target(Run)
 			.flush();
 		store.get().xpect_eq(agent);
 	}

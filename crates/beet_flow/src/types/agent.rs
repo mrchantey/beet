@@ -60,11 +60,11 @@ where
 
 	fn into_entity_target_event(
 		self,
-		entity: &mut EntityWorldMut,
+		entity: Entity,
 	) -> (Self::Event, Self::Trigger) {
 		let cx = match self.agent {
-			Some(agent) => ActionContext::new_with_agent(entity.id(), agent),
-			None => ActionContext::new(entity),
+			Some(agent) => ActionContext::new_with_agent(entity, agent),
+			None => ActionContext::new_no_agent(entity),
 		};
 		(self.event, ActionTrigger::new(cx))
 	}

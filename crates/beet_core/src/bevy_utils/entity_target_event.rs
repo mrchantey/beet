@@ -133,7 +133,7 @@ pub trait IntoEntityTargetEvent<M>: 'static + Send + Sync {
 
 	fn into_entity_target_event(
 		self,
-		entity: &mut EntityWorldMut,
+		entity: Entity,
 	) -> (Self::Event, Self::Trigger);
 }
 
@@ -151,9 +151,9 @@ where
 
 	fn into_entity_target_event(
 		self,
-		entity: &mut EntityWorldMut,
+		entity: Entity,
 	) -> (Self::Event, Self::Trigger) {
-		(self(entity.id()), default())
+		(self(entity), default())
 	}
 }
 
@@ -171,7 +171,7 @@ where
 
 	fn into_entity_target_event(
 		self,
-		entity: &mut EntityWorldMut,
+		entity: Entity,
 	) -> (Self::Event, Self::Trigger) {
 		(self, T::trigger_from_target(entity))
 	}
@@ -180,15 +180,13 @@ where
 
 
 pub trait TriggerFromTarget {
-	fn trigger_from_target(entity: &mut EntityWorldMut) -> Self;
+	fn trigger_from_target(entity: Entity) -> Self;
 }
 
 impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>> TriggerFromTarget
 	for EntityTargetTrigger<AUTO_PROPAGATE, E, T>
 {
-	fn trigger_from_target(entity: &mut EntityWorldMut) -> Self {
-		Self::new(entity.id())
-	}
+	fn trigger_from_target(entity: Entity) -> Self { Self::new(entity) }
 }
 
 #[extend::ext(name=EntityWorldMutActionEventExt)]
@@ -198,7 +196,7 @@ pub impl EntityWorldMut<'_> {
 		&mut self,
 		ev: impl IntoEntityTargetEvent<M>,
 	) -> &mut Self {
-		let (mut ev, mut trigger) = ev.into_entity_target_event(self);
+		let (mut ev, mut trigger) = ev.into_entity_target_event(self.id());
 		let caller = MaybeLocation::caller();
 		self.world_scope(move |world| {
 			world.trigger_ref_with_caller_pub(&mut ev, &mut trigger, caller);
@@ -248,7 +246,7 @@ pub impl EntityCommands<'_> {
 		let caller = MaybeLocation::caller();
 		self.queue(move |mut entity: EntityWorldMut| {
 			let (mut ev, mut trigger) =
-				ev.into_entity_target_event(&mut entity);
+				ev.into_entity_target_event(entity.id());
 			entity.world_scope(move |world| {
 				world.trigger_ref_with_caller_pub(
 					&mut ev,
