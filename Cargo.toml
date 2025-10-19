@@ -315,7 +315,7 @@ bevy_default = [
 #💡 utils
 fs = ["beet_agent?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
-tungstenite = ["beet_net?/tungstenite"]
+tungstenite = ["net", "beet_net?/tungstenite"]
 tokio = ["beet_net?/tokio"]
 
 # animation = ["beet_spatial?/animation"]
@@ -423,12 +423,12 @@ required-features = ["server"]
 [[example]]
 name = "socket_server"
 path = "examples/net/socket_server.rs"
-required-features = ["net", "tungstenite", "native-tls"]
+required-features = ["tungstenite"]
 
 [[example]]
 name = "socket_client"
 path = "examples/net/socket_client.rs"
-required-features = ["net", "tungstenite", "native-tls"]
+required-features = ["tungstenite"]
 
 # 💡 Examples - dom
 [[example]]

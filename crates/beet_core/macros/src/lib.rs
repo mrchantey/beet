@@ -1,8 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 mod action;
-mod action_event;
 mod bundle_effect;
+mod entity_target_event;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -108,13 +108,30 @@ pub fn action(
 /// Macro for [`ActionEvent`]
 ///
 /// ```ignore
+/// #[derive(ActionEvent)]
 /// /// Enable propagation using the given Traversal implementation
-/// #[action_event(propagate = &'static ChildOf)]
+/// #[event(propagate = &'static ChildOf)]
 /// /// Always propagate
-/// #[action_event(auto_propagate)]
+/// #[event(auto_propagate)]
 /// struct MyEvent;
 /// ```
 #[proc_macro_derive(ActionEvent, attributes(action_event))]
 pub fn action_event(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	action_event::impl_action_event(input).into()
+	entity_target_event::impl_action_event(input).into()
+}
+/// Macro for [`EntityTargetEvent`]
+///
+/// ```ignore
+/// #[derive(EntityTargetEvent)]
+/// /// Enable propagation using the given Traversal implementation
+/// #[event(propagate = &'static ChildOf)]
+/// /// Always propagate
+/// #[event(auto_propagate)]
+/// struct MyEvent;
+/// ```
+#[proc_macro_derive(EntityTargetEvent, attributes(action_event))]
+pub fn entity_target_event(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	entity_target_event::impl_entity_target_event(input).into()
 }

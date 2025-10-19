@@ -166,6 +166,5 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
+beet_net = {path = ".", features = ["tokio","tungstenite", "native-tls"] }
 sweet.workspace = true
-tokio = { workspace = true, features = ["full"] }

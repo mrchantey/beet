@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-use beet_rsx::prelude::*;
 use beet_core::prelude::*;
+use beet_rsx::prelude::*;
 use std::marker::PhantomData;
 use sweet::prelude::*;
 
@@ -60,8 +60,8 @@ fn MyNode(
 	#[field(no_into)] is_no_into: String,
 	#[field(flatten)] is_flatten: MyFlattenedNode,
 
-	#[field(into_type = "impl MarkerIntoString<M>")]
-	#[field(into_generics = "<M>")]
+	#[field(into_type = impl MarkerIntoString<M>)]
+	#[field(into_generics = <M>)]
 	#[field(into_func=marker_into_string)]
 	is_marker_into: String,
 	is_derived_getter: DerivedGetter<u32>,

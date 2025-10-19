@@ -6,8 +6,8 @@ use beet_core::prelude::*;
 /// - Creates a child of the server inserting the [`Request`] component
 /// - Adds a one-shot observer for [`On<Insert, Response>`],
 ///   then takes the response and despawns the entity.
-/// the default handler, adds about 100us to a request that
-/// doesnt involve the world at all: (40us vs 140us)
+/// the default handler adds about 100us to a request that
+/// doesnt involve mutating the world or running systems: (40us vs 140us)
 pub async fn default_handler(
 	entity: AsyncEntity,
 	request: Request,

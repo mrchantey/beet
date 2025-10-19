@@ -1,0 +1,3 @@
+impl Event for MyEvent {
+    type Trigger<'a> = EntityTargetTrigger<false, Self, &'static ChildOf>;
+}

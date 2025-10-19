@@ -5,13 +5,12 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example socket_server --features tungstenite,native-tls
+//! cargo run --example socket_server --features tungstenite
 //! ```
-//!
 //! Test with a WebSocket client:
 //! ```sh
 //! # In another terminal, run the echo endpoint test
-//! cargo test --package beet_net --features tungstenite,native-tls socket::tests::echo_endpoint
+//! cargo run --example socket_client --features tungstenite
 //! ```
 
 use beet::net::prelude::sockets::Message;
@@ -19,31 +18,14 @@ use beet::net::prelude::sockets::*;
 use beet::prelude::*;
 use futures::StreamExt;
 
-#[tokio::main]
-async fn main() -> Result {
-	let addr = "127.0.0.1:9001";
-	println!("Starting WebSocket server on ws://{}", addr);
-
-	let mut server = SocketServer::bind(addr).await?;
-	println!("Server listening, waiting for connections...");
-
-	// Accept connections in a loop
-	// Note: This handles one connection at a time synchronously
-	// to avoid SendWrapper thread issues until sockets become truly Send
-	while let Some(result) = server.next().await {
-		match result {
-			Ok(socket) => {
-				println!("New client connected");
-				// Handle connection synchronously on the same thread
-				if let Err(e) = handle_connection(socket).await {
-					eprintln!("Connection error: {}", e);
-				}
-			}
-			Err(e) => {
-				eprintln!("Failed to accept connection: {}", e);
-			}
-		}
-	}
+fn main() -> Result {
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			LogPlugin::default(),
+			SocketServerPlugin::with_server(SocketServer::new(9000)),
+		))
+		.run();
 
 	Ok(())
 }

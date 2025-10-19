@@ -199,7 +199,6 @@ pub struct RouteServer;
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	#[cfg(not(target_arch = "wasm32"))]
 	world.commands().entity(cx.entity).observe_any(
 		move |ev: On<Outcome>, mut commands: Commands| {
 			let exchange = ev.agent();

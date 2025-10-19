@@ -37,15 +37,15 @@ pub struct StructB<T: 'static> {
 #[derive(Debug, Default, Buildable)]
 pub struct StructC {
 	#[field(flatten)]
-	#[field(flatten = "StructA<usize>")]
+	#[field(flatten = StructA<usize>)]
 	pub struct_b: StructB<u32>,
 	pub field_c: bool,
 }
 #[derive(Debug, Default, Buildable)]
 pub struct StructD {
 	#[field(flatten)]
-	#[field(flatten = "StructB<u32>")]
-	#[field(flatten = "StructA<usize>")]
+	#[field(flatten = StructB<u32>)]
+	#[field(flatten = StructA<usize>)]
 	pub struct_c: StructC,
 	pub field_d: u32,
 }
@@ -54,8 +54,8 @@ pub struct StructD {
 #[derive(Debug, Default, Buildable)]
 struct ButtonB {
 	#[field(flatten)]
-	#[field(flatten = "StructB<u32>")]
-	#[field(flatten = "StructA<usize>")]
+	#[field(flatten = StructB<u32>)]
+	#[field(flatten = StructA<usize>)]
 	#[field(flatten = StructC)]
 	pub button_attrs: StructD,
 	pub field_button_b: u32,

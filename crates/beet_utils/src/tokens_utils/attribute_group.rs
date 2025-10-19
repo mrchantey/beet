@@ -1,10 +1,7 @@
 //! inspired by [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use syn::Expr;
-use syn::ExprLit;
 use syn::Ident;
-use syn::Lit;
 use syn::Member;
 use syn::Result;
 use syn::Token;
@@ -85,7 +82,7 @@ impl AttributeGroup {
 	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
 	/// Returns the value if the attribute is present and has a value.
-	pub fn get_value(&self, name: &str) -> Option<&Expr> {
+	pub fn get_value(&self, name: &str) -> Option<&TokenStream> {
 		self.get(name).map(|attr| attr.value.as_ref()).flatten()
 	}
 
@@ -104,7 +101,7 @@ impl AttributeGroup {
 #[derive(Debug)]
 pub struct AttributeItem {
 	pub key: Member,
-	pub value: Option<Expr>,
+	pub value: Option<TokenStream>,
 }
 
 
@@ -131,15 +128,8 @@ impl AttributeItem {
 	/// Handle `#[foo(bar="baz")]` and `#[foo(bar=bazz)]`, useful
 	/// for when generics are required that arent valid tokens
 	pub fn value_parsed<T: Parse>(&self) -> Result<Option<T>> {
-		if let Some(expr) = &self.value {
-			let val = if let Expr::Lit(ExprLit { lit, .. }) = expr
-				&& let Lit::Str(lit) = &lit
-			{
-				syn::parse_str(&lit.value())?
-			} else {
-				syn::parse2(expr.to_token_stream())?
-			};
-			Ok(Some(val))
+		if let Some(tokens) = &self.value {
+			Ok(Some(syn::parse2(tokens.clone())?))
 		} else {
 			Ok(None)
 		}

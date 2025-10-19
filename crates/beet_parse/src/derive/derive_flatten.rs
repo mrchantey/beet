@@ -1,13 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use quote::quote;
 use syn::DeriveInput;
-use syn::Expr;
-use syn::ExprLit;
 use syn::Ident;
-use syn::Lit;
 use syn::Result;
 use syn::Type;
 
@@ -43,7 +39,7 @@ pub fn impl_flatten(
 						#(#second_order_as_mut)*
 						// impl #impl_generics #field_buildable #marker_type_generics for #target_ident #type_generics #where_clause {
 							// 	fn get(&self) -> &#field_type { &self.#field_name }
-							// 	fn get_mut(&mut self) -> &mut #field_type { &mut self.#field_name }				
+							// 	fn get_mut(&mut self) -> &mut #field_type { &mut self.#field_name }
 							// }
 						})
 					}
@@ -64,26 +60,22 @@ fn second_order_impl(
 
 	let flatten_attrs = field.field_attributes.get_many("flatten");
 
-	flatten_attrs.iter().filter_map(|attr|{
-		attr.value.as_ref()
-	}).map(|expr|{
-		let ty: Type = if let Expr::Lit(ExprLit{lit,..}) = expr && let Lit::Str(lit) = &lit{
-			syn::parse_str(&lit.value())?
-		}else{
-			syn::parse2(expr.to_token_stream())?
+	flatten_attrs.iter().xtry_filter_map(|attr|{
+		let Some(ty) = attr.value_parsed::<Type>()? else{
+			return Ok(None);
 		};
 		if ty == *field.ty {
 			// its already implemented, should we warn unnecessary attr value?
-			return Ok(TokenStream::default());
+			return Ok(Some(TokenStream::default()));
 		}
 
-		Ok(quote!{
+		Ok(Some(quote!{
 			impl #impl_generics AsRef<#ty> for #target_ident #type_generics #where_clause {
 				fn as_ref(&self) -> &#ty { self.#field_ident.as_ref() }
 			}
 			impl #impl_generics AsMut<#ty> for #target_ident #type_generics #where_clause {
 				fn as_mut(&mut self) -> &mut #ty { self.#field_ident.as_mut() }
 		 }
-		})
-	}).collect()
+		}))
+	})
 }
