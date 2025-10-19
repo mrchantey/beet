@@ -38,7 +38,6 @@ type DynTungStream =
 /// - Adapts the inbound `tungstenite::Message` stream into our cross-platform `Message`
 /// - Wraps the sink in a writer that implements the `SocketWriter` trait
 pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
-
 	// Parse URL to get host and port
 	let parsed_url = url::Url::parse(url.as_ref())
 		.map_err(|e| bevyhow!("Invalid URL: {}", e))?;
@@ -112,7 +111,7 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 	};
 
 	// Map incoming tungstenite messages to our cross-platform Message
-	let incoming = stream_boxed.map(|res| match res {
+	let reader = stream_boxed.map(|res| match res {
 		Ok(msg) => Ok(from_tung_msg(msg)),
 		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
 	});
@@ -121,7 +120,7 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 		sink: Arc::new(Mutex::new(sink_boxed)),
 	};
 
-	Ok(Socket::new(incoming, writer))
+	Ok(Socket::new(reader, writer))
 }
 
 /// A tungstenite/bevy WebSocket server
@@ -154,59 +153,58 @@ pub(crate) fn start_tungstenite_server(
 			let (stream, addr) = listener
 				.accept()
 				.await
-				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))
-				.unwrap();
+				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))?;
 
 			trace!("New WebSocket connection from: {}", addr);
 
-			// Spawn task to handle the WebSocket handshake and connection
-			let _entity_fut = world.run_async(async move |_world| {
-				if let Err(err) = handle_connection(stream).await {
-					error!("WebSocket connection error: {:?}", err);
-				}
+			// Spawn a new task for each connection
+			// future can be discarded
+			let _entity_fut = world.run_async(async move |world| {
+				handle_connection(world.entity(entity), stream).await
 			});
 		}
 	});
 
 	Ok(())
 }
-
-async fn handle_connection(stream: Async<TcpStream>) -> Result<()> {
+async fn handle_connection(
+	server: AsyncEntity,
+	stream: Async<TcpStream>,
+) -> Result {
 	let ws_stream = accept_async(stream)
 		.await
 		.map_err(|e| bevyhow!("WebSocket handshake failed: {}", e))?;
+	let (sink, stream) = ws_stream.split();
 
-	let (mut sink, mut stream) = ws_stream.split();
+	let (sink_boxed, stream_boxed): (
+		Pin<Box<DynTungSink>>,
+		Pin<Box<DynTungStream>>,
+	) = (Box::pin(sink), Box::pin(stream));
 
-	// Echo server: forward messages back to the client
-	while let Some(msg) = stream.next().await {
-		let msg =
-			msg.map_err(|e| bevyhow!("WebSocket receive error: {}", e))?;
+	// Map incoming tungstenite messages to our cross-platform Message
+	let reader = stream_boxed.map(|res| match res {
+		Ok(msg) => Ok(from_tung_msg(msg)),
+		Err(err) => Err(bevyhow!("WebSocket receive error: {}", err)),
+	});
 
-		// Check if it's a close message
-		if matches!(msg, TungMessage::Close(_)) {
-			// Don't echo close messages, just break
-			break;
-		}
+	let writer = TungWriter {
+		sink: Arc::new(Mutex::new(sink_boxed)),
+	};
 
-		// Echo the message back, but gracefully handle if connection is closed
-		if let Err(e) = sink.send(msg).await {
-			// Only log errors that aren't "connection closed" type errors
-			if !e.to_string().contains("closing") {
-				return Err(bevyhow!("WebSocket send failed: {}", e));
-			}
-			break;
-		}
-	}
-
+	server
+		.spawn_child(Socket::new(reader, writer.clone()))
+		.await;
 	Ok(())
 }
 
+#[derive(Clone)]
 struct TungWriter {
 	sink: Arc<Mutex<Pin<Box<DynTungSink>>>>,
 }
 
 impl SocketWriter for TungWriter {
+	fn clone_boxed(&self) -> Box<dyn SocketWriter> { Box::new(self.clone()) }
+
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
 		let tmsg = to_tung_msg(msg);
 		let sink = self.sink.clone();

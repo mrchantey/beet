@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use beet_core::prelude::*;
@@ -110,24 +112,24 @@ pub async fn connect_wasm(url: impl AsRef<str>) -> Result<Socket> {
 	// Build writer that holds the WebSocket and the closures to keep them alive
 	let writer = WasmSocketWriter {
 		ws,
-		_on_message: on_message,
-		_on_error: on_error,
-		_on_close: on_close,
-		_on_open: None, // already opened
+		_on_message: Arc::new(on_message),
+		_on_error: Arc::new(on_error),
+		_on_close: Arc::new(on_close),
+		// already opened, no need to keep from drop
+		// _on_open: Some(Arc::new(on_open)),
 	};
 
 	Ok(Socket::new(rx, writer))
 }
-
+#[derive(Clone)]
 struct WasmSocketWriter {
 	ws: WebSocket,
-	// Keep closures alive while Socket is alive
-	_on_message: Closure<dyn FnMut(MessageEvent)>,
-	_on_error: Closure<dyn FnMut(Event)>,
-	_on_close: Closure<dyn FnMut(CloseEvent)>,
-	// Only used prior to open, cleared afterward
-	_on_open: Option<Closure<dyn FnMut(Event)>>,
+	// Keep closures from being dropped
+	_on_message: Arc<Closure<dyn FnMut(MessageEvent)>>,
+	_on_error: Arc<Closure<dyn FnMut(Event)>>,
+	_on_close: Arc<Closure<dyn FnMut(CloseEvent)>>,
 }
+
 
 impl WasmSocketWriter {
 	/// Clear all event handlers to prevent callbacks after drop
@@ -144,6 +146,8 @@ impl Drop for WasmSocketWriter {
 }
 
 impl SocketWriter for WasmSocketWriter {
+	fn clone_boxed(&self) -> Box<dyn SocketWriter> { Box::new(self.clone()) }
+
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>> {
 		let res = match msg {
 			Message::Text(s) => self.ws.send_with_str(&s).map_jserr(),

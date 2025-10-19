@@ -92,6 +92,9 @@ impl SocketServer {
 
 	/// The host and path without the protocol, ie `127.0.0.1:3000`
 	pub fn local_address(&self) -> String { format!("127.0.0.1:{}", self.port) }
+	pub fn local_url(&self) -> String {
+		format!("ws://{}", self.local_address())
+	}
 }
 
 impl Default for SocketServer {
@@ -104,11 +107,12 @@ mod tests {
 	use super::*;
 	use crate::sockets::Message;
 	use crate::sockets::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn server_binds_and_accepts() {
 		let server = SocketServer::new_test();
-		let addr = server.local_address();
+		let url = server.local_url();
 
 		App::new()
 			.add_plugins((
@@ -117,10 +121,9 @@ mod tests {
 				SocketServerPlugin::with_server(server),
 			))
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
-				let addr = addr.clone();
+				let url = url.clone();
 				commands.run(async move |world| {
 					time_ext::sleep_millis(200).await;
-					let url = format!("ws://{}", &addr);
 					let mut client = Socket::connect(&url).await.unwrap();
 					client.send(Message::text("hello server")).await.unwrap();
 					client.close(None).await.ok();
@@ -128,12 +131,13 @@ mod tests {
 				});
 			})
 			.run();
+		// exits ok
 	}
 
 	#[sweet::test]
 	async fn handles_multiple_concurrent_connections() {
 		let server = SocketServer::new_test();
-		let addr = server.local_address();
+		let url = server.local_url();
 
 		App::new()
 			.add_plugins((
@@ -141,11 +145,9 @@ mod tests {
 				SocketServerPlugin::with_server(server),
 			))
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
-				let addr = addr.clone();
+				let url = url.clone();
 				commands.run(async move |world| {
 					time_ext::sleep_millis(200).await;
-					let url = format!("ws://{}", &addr);
-
 					let mut client1 = Socket::connect(&url).await.unwrap();
 					client1.send(Message::text("client1")).await.unwrap();
 
@@ -161,5 +163,91 @@ mod tests {
 				});
 			})
 			.run();
+		// exits ok
+	}
+
+
+
+	/// This test shows a common sockets workflow
+	///
+	/// 1. client send text to server
+	/// 2. server echos text back
+	/// 3. client sends close to server
+	/// 4. server sends close back
+	///
+	#[sweet::test]
+	async fn ecs_sockets() {
+		let server = SocketServer::new_test();
+		let url = server.local_url();
+
+		let store = Store::default();
+		App::new()
+			.add_plugins((
+				MinimalPlugins,
+				// LogPlugin::default(),
+				SocketServerPlugin::default().without_server(),
+			))
+			.add_systems(Startup, move |mut commands: Commands| {
+				// server
+				commands.spawn(server.clone()).observe_any(
+					|ev: On<MessageRecv>, mut commands: Commands| match ev
+						.event()
+						.inner()
+					{
+						Message::Text(text) => {
+							commands
+								.entity(ev.original_target())
+								.trigger_target(MessageSend(Message::Text(
+									text.clone(),
+								)));
+						}
+						Message::Close(_) => {
+							commands
+								.entity(ev.original_target())
+								.trigger_target(MessageSend(Message::Close(
+									None,
+								)));
+						}
+						_ => {}
+					},
+				);
+				// client
+				commands
+					.spawn(Socket::insert_on_connect(&url))
+					.observe_any(
+						|ev: On<SocketReady>, mut commands: Commands| {
+							commands.entity(ev.target()).trigger_target(
+								MessageSend(Message::Text(
+									"hello matey".into(),
+								)),
+							);
+						},
+					)
+					.observe_any(
+						move |ev: On<MessageRecv>,
+					 mut commands: Commands,
+					 // mut sockets: Query<&mut Socket>
+						| match ev
+						.event()
+						.inner()
+					{
+						Message::Text(text) => {
+							text.xpect_eq("hello matey");
+							commands
+								.entity(ev.original_target())
+								.trigger_target(MessageSend(
+									Message::Close(None),
+								));
+						}
+						Message::Close(_) => {
+							store.set(true);
+							commands.write_message(AppExit::Success);
+						}
+						_ => {}
+					},
+					);
+			})
+			.run();
+		store.get().xpect_true();
 	}
 }

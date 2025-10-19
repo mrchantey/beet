@@ -115,11 +115,8 @@ pub impl EntityWorldMut<'_> {
 		&mut self,
 		bundle: impl Bundle,
 	) -> impl Future<Output = Response> {
-		let entity = self.id();
-		self.run_async_then(async move |world| {
-			flow_route_handler(world.entity(entity), bundle)
-				.await
-				.into_response()
+		self.run_async_then(async move |entity| {
+			flow_route_handler(entity, bundle).await.into_response()
 		})
 	}
 

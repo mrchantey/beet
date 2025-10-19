@@ -77,6 +77,40 @@ impl OnSpawn {
 
 
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
+
+	/// Create a new [`OnSpawn`] effect.
+	pub fn new_async<Fut, Out>(
+		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+	) -> Self
+	where
+		Fut: 'static + Send + Sync + Future<Output = Out>,
+		Out: 'static + AsyncTaskOut,
+	{
+		Self(Box::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world
+					.run_async(async move |world| func(world.entity(id)).await);
+			});
+		}))
+	}
+	/// Create a new [`OnSpawn`] effect.
+	pub fn new_async_local<Fut, Out>(
+		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+	) -> Self
+	where
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + AsyncTaskOut,
+	{
+		Self(Box::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world.run_async_local(async move |world| {
+					func(world.entity(id)).await
+				});
+			});
+		}))
+	}
 }
 
 

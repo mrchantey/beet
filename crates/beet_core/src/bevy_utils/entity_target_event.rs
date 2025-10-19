@@ -280,8 +280,8 @@ pub impl<'w, 't, const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 where
 	E: for<'a> Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 {
-	fn event_target(&self) -> Entity { self.trigger().event_target }
-	fn original_event_target(&self) -> Entity {
+	fn target(&self) -> Entity { self.trigger().event_target }
+	fn original_target(&self) -> Entity {
 		self.trigger().original_event_target
 	}
 }
@@ -300,7 +300,7 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let store = Store::new(Entity::PLACEHOLDER);
 		world.add_observer(move |ev: On<MyEvent>| {
-			store.set(ev.event_target());
+			store.set(ev.target());
 		});
 		world.entity_mut(entity).trigger_target(MyEvent).flush();
 		store.get().xpect_eq(entity);

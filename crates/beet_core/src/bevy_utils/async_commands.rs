@@ -3,6 +3,7 @@ use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::ecs::component::Mutable;
+use bevy::ecs::error::ErrorContext;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
@@ -222,12 +223,10 @@ impl AsyncTaskOut for () {
 
 impl AsyncTaskOut for Result {
 	fn apply(self, world: AsyncWorld) {
-		match self {
-			Ok(_) => {}
-			Err(e) => {
-				bevy::log::error!("Async task error: {:#}", e);
-				world.write_message(AppExit::error());
-			}
+		if let Err(err) = self {
+			world.handle_error(err, ErrorContext::Command {
+				name: "AsyncCommands".into(),
+			});
 		}
 	}
 }
@@ -495,6 +494,13 @@ impl AsyncWorld {
 		recv.recv().await.ok();
 		self
 	}
+
+	pub fn handle_error(&self, err: BevyError, cx: ErrorContext) -> &Self {
+		self.with(|world| {
+			world.default_error_handler()(err.into(), cx);
+		});
+		self
+	}
 }
 
 #[derive(Clone)]
@@ -695,20 +701,28 @@ pub impl World {
 pub impl EntityWorldMut<'_> {
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
-		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		let id = self.id();
+		spawn_async_task_local(
+			self.resource::<AsyncChannel>().world(),
+			move |world| func(world.entity(id)),
+		);
 		self
 	}
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
-		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Func: 'static + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		let id = self.id();
+		spawn_async_task_local(
+			self.resource::<AsyncChannel>().world(),
+			move |world| func(world.entity(id)),
+		);
 		self
 	}
 	/// Spawn the async task, flush all async tasks and return the output
@@ -717,14 +731,15 @@ pub impl EntityWorldMut<'_> {
 		func: Func,
 	) -> impl Future<Output = Out>
 	where
-		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: 'static + Send + Sync,
 	{
+		let id = self.id();
 		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
 			|| self.world_scope(World::update),
-			func,
+			move |world| func(world.entity(id)),
 		)
 	}
 	/// Spawn the async local task, flush all async tasks and return the output
@@ -733,14 +748,15 @@ pub impl EntityWorldMut<'_> {
 		func: Func,
 	) -> impl Future<Output = Out>
 	where
-		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Func: 'static + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static,
 	{
+		let id = self.id();
 		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
 			|| self.world_scope(World::update),
-			func,
+			move |world| func(world.entity(id)),
 		)
 	}
 }
@@ -808,20 +824,16 @@ mod test {
 		world.resource::<Count>().0.xpect_eq(2);
 	}
 	#[sweet::test]
+	#[should_panic = "intentional error"]
 	async fn results() {
-		// use bevy::ecs::error::DefaultErrorHandler;
 		let mut app = App::new();
 		app.add_plugins(AsyncPlugin);
-		// let mut world = (MinimalPlugins, AsyncPlugin).into_world();
 		let world = app.world_mut();
 		world.init_resource::<Count>();
-		// world.insert_resource(DefaultErrorHandler(bevy::ecs::error::ignore));
 		world.run_async_local(async |_| {
 			time_ext::sleep(Duration::from_millis(2)).await;
 			bevybail!("intentional error")
 		});
-
-		// AsyncRunner::flush_async_tasks(&mut world).await;
 
 		app.run_async().await.into_result().xpect_err();
 	}

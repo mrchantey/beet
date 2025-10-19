@@ -7,7 +7,8 @@ use std::pin::Pin;
 
 /// A cross-platform WebSocket that implements Stream of inbound [`Message`]
 /// and provides methods to send messages and close the connection.
-#[derive(Component)]
+///
+#[derive(BundleEffect)]
 pub struct Socket {
 	// SendWrapper for usage in bevy components
 	pub(crate) reader: SendWrapper<Pin<Box<dyn SocketReader>>>,
@@ -15,13 +16,43 @@ pub struct Socket {
 	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
 }
 
+
+
 impl std::fmt::Debug for Socket {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Socket").finish_non_exhaustive()
 	}
 }
-
+/// Triggered on a [`Socket`] entity after it has been connected
+/// and hooked up.
+#[derive(EntityTargetEvent)]
+pub struct SocketReady;
 impl Socket {
+	fn effect(self, entity: &mut EntityWorldMut) {
+		let (send, mut recv) = self.split();
+
+		entity
+			.observe_any(
+				move |ev: On<MessageSend>,
+				      mut commands: AsyncCommands|
+				      -> Result {
+					let mut send = send.clone();
+					let message = ev.event().clone();
+					commands
+						.run(async move |_| send.send(message.take()).await);
+					Ok(())
+				},
+			)
+			.run_async(async move |entity| -> Result {
+				while let Some(message) = recv.next().await {
+					let message = message?;
+					entity.trigger_target(MessageRecv(message)).await;
+				}
+				Ok(())
+			})
+			.trigger_target(SocketReady);
+	}
+
 	#[allow(unused_variables)]
 	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
 		#[cfg(target_arch = "wasm32")]
@@ -38,6 +69,14 @@ impl Socket {
 				"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
 			)
 		}
+	}
+	pub fn insert_on_connect(url: impl AsRef<str>) -> OnSpawn {
+		let url = url.as_ref().to_owned();
+		OnSpawn::new_async_local(async move |entity| -> Result {
+			let socket = Socket::connect(url).await?;
+			entity.insert(socket).await;
+			Ok(())
+		})
 	}
 
 	/// Create a new socket from a message stream and writer.
@@ -68,14 +107,14 @@ impl Socket {
 	///
 	/// - The read half implements `Stream<Item = Result<Message>>`.
 	/// - The write half provides `send` and `close` methods.
-	pub fn split(self) -> (SocketRead, SocketWrite) {
+	pub fn split(self) -> (SocketWrite, SocketRead) {
 		let read = SocketRead {
 			reader: self.reader,
 		};
 		let write = SocketWrite {
 			writer: self.writer,
 		};
-		(read, write)
+		(write, read)
 	}
 }
 
@@ -121,6 +160,8 @@ impl Stream for SocketRead {
 /// Platform-specific implementations live in their respective modules and are
 /// boxed into `Socket`.
 pub trait SocketWriter: 'static + MaybeSend {
+	fn clone_boxed(&self) -> Box<dyn SocketWriter>;
+
 	/// Send a message to the socket peer.
 	fn send_boxed(&mut self, msg: Message) -> BoxFuture<'static, Result<()>>;
 	/// Close the socket with an optional close frame.
@@ -131,6 +172,7 @@ pub trait SocketWriter: 'static + MaybeSend {
 }
 
 /// Write half returned by `Socket::split()`.
+
 pub struct SocketWrite {
 	pub(crate) writer: SendWrapper<Box<dyn SocketWriter>>,
 }
@@ -146,14 +188,19 @@ impl SocketWrite {
 		self.writer.close_boxed(close).await
 	}
 }
-
+impl Clone for SocketWrite {
+	fn clone(&self) -> Self {
+		Self {
+			writer: SendWrapper::new(self.writer.clone_boxed()),
+		}
+	}
+}
 
 /// A WebSocket message.
 ///
 /// Mirrors common WS message types across platforms (e.g. web-sys and tungstenite)
 /// without leaking platform details into your code.
-#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
-#[event(auto_propagate)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
 	/// A UTF-8 text message.
 	Text(String),
@@ -165,6 +212,24 @@ pub enum Message {
 	Pong(Bytes),
 	/// A close frame with an optional code and reason.
 	Close(Option<CloseFrame>),
+}
+
+/// A message to be sent by this [`Socket`] writer.
+#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+#[event(auto_propagate)]
+pub struct MessageSend(pub Message);
+impl MessageSend {
+	pub fn take(self) -> Message { self.0 }
+	pub fn inner(&self) -> &Message { &self.0 }
+}
+
+/// A message received by this [`Socket`] reader.
+#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+#[event(auto_propagate)]
+pub struct MessageRecv(pub Message);
+impl MessageRecv {
+	pub fn take(self) -> Message { self.0 }
+	pub fn inner(&self) -> &Message { &self.0 }
 }
 
 impl Message {
@@ -230,6 +295,9 @@ mod tests {
 	}
 
 	impl SocketWriter for DummyWriter {
+		fn clone_boxed(&self) -> Box<dyn SocketWriter> {
+			Box::new(self.clone())
+		}
 		fn send_boxed(
 			&mut self,
 			msg: Message,
@@ -313,7 +381,7 @@ mod tests {
 		let writer = DummyWriter::default();
 		let socket = Socket::new(reader, writer);
 
-		let (mut read, mut write) = socket.split();
+		let (mut write, mut read) = socket.split();
 
 		// send
 		write.send(Message::text("hi")).await.unwrap();
@@ -334,13 +402,13 @@ mod tests {
 		let writer = DummyWriter::default();
 		let socket = Socket::new(reader, writer);
 
-		let (_read, write) = socket.split();
+		let (send, _recv) = socket.split();
 
 		let frame = CloseFrame {
 			code: 1000,
 			reason: "bye".into(),
 		};
-		write.close(Some(frame.clone())).await.unwrap();
+		send.close(Some(frame.clone())).await.unwrap();
 		writer.closed.get().unwrap().xpect_eq(frame);
 	}
 
