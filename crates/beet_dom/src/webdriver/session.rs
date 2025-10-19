@@ -200,7 +200,7 @@ impl Session {
 	) -> Result<Self> {
 		let socket = Socket::connect(socket_url).await?;
 
-		let (read, write) = socket.split();
+		let (send, recv) = socket.split();
 		let (cmd_tx, cmd_rx) = async_channel::unbounded::<String>();
 		let (events_tx, events_rx) = async_channel::unbounded::<Value>();
 
@@ -212,13 +212,13 @@ impl Session {
 			pending: Mutex::new(HashMap::new()),
 			cmd_tx,
 			_cmd_rx: cmd_rx.clone(),
-			writer: Mutex::new(Some(write)),
+			writer: Mutex::new(Some(send)),
 			events_tx,
 			events_rx,
 		});
 
 		Self::spawn_writer(inner.clone(), cmd_rx);
-		Self::spawn_reader(inner.clone(), read);
+		Self::spawn_reader(inner.clone(), recv);
 
 		Ok(Self { inner })
 	}
