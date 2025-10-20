@@ -1,3 +1,4 @@
+pub mod common_handlers;
 mod socket;
 pub use socket::Message;
 pub use socket::*;

@@ -3,99 +3,66 @@
 //! This example demonstrates how to connect to a WebSocket server and
 //! send/receive messages.
 //!
-//! Run with:
-//! ```sh
-//! cargo run --example socket_client --features tungstenite,native-tls
-//! ```
-//!
 //! Make sure the server is running first:
 //! ```sh
-//! cargo run --example socket_server --features tungstenite,native-tls
+//! cargo run --example socket_server --features tungstenite
 //! ```
+//!
+//! Run with:
+//! ```sh
+//! cargo run --example socket_client --features tungstenite
+//! ```
+//!
 
 use beet::net::prelude::sockets::Message;
 use beet::net::prelude::sockets::*;
 use beet::prelude::*;
-use futures::StreamExt;
+use beet_net::sockets::common_handlers::PingTime;
 
-#[tokio::main]
-async fn main() -> Result {
-	let url = "ws://127.0.0.1:9001";
-	println!("Connecting to WebSocket server at {}", url);
+fn main() {
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			LogPlugin::default(),
+			AsyncPlugin::default(),
+		))
+		.spawn_then((
+			Socket::insert_on_connect("ws://127.0.0.1:9000"),
+			OnSpawn::observe(on_ready),
+			OnSpawn::observe(my_handler),
+			OnSpawn::observe(common_handlers::log_send),
+			OnSpawn::observe(common_handlers::echo_pingtime),
+			OnSpawn::observe(common_handlers::log_recv),
+		))
+		.run();
+	info!("Done");
+}
 
-	let mut socket = Socket::connect(url).await?;
-	println!("Connected to server!");
 
-	// Send some test messages
-	let messages = vec![
-		"Hello, server!",
-		"This is a test message",
-		"How are you doing?",
-		"Goodbye!",
-	];
+fn on_ready(ev: On<SocketReady>, mut commands: Commands) {
+	commands
+		.entity(ev.target())
+		// we'll send a PingTime ping to get the RTT
+		.trigger_target(MessageSend(PingTime::default().into_message()))
+		// we'll also send a text message that the server is expecting
+		.trigger_target(MessageSend(Message::Text(
+			"the cat sat on the".into(),
+		)));
+}
 
-	for msg in messages {
-		println!("Sending: {}", msg);
-		socket.send(Message::text(msg)).await?;
-
-		// Wait for echo response
-		if let Some(result) = socket.next().await {
-			match result {
-				Ok(Message::Text(text)) => {
-					println!("Received echo: {}", text);
-				}
-				Ok(Message::Binary(data)) => {
-					println!("Received binary echo: {} bytes", data.len());
-				}
-				Ok(Message::Close(frame)) => {
-					println!(
-						"Server closed connection: {:?}",
-						frame.as_ref().map(|f| &f.reason)
-					);
-					break;
-				}
-				Ok(_) => {
-					println!("Received other message type");
-				}
-				Err(e) => {
-					eprintln!("Error receiving message: {}", e);
-					break;
-				}
-			}
+fn my_handler(ev: On<MessageRecv>, mut commands: Commands) {
+	match ev.event().inner() {
+		// on receiving the expected message we'll send a close message
+		Message::Text(txt) if txt == "hat" => {
+			commands
+				.entity(ev.target())
+				.trigger_target(MessageSend(Message::Close(None)));
 		}
-
-		// Small delay between messages
-		time_ext::sleep_millis(100).await;
-	}
-
-	// Send a binary message
-	println!("Sending binary message");
-	let binary_data = vec![1u8, 2, 3, 4, 5];
-	socket.send(Message::binary(binary_data.clone())).await?;
-
-	if let Some(result) = socket.next().await {
-		match result {
-			Ok(Message::Binary(data)) => {
-				println!("Received binary echo: {:?}", data.as_ref());
-			}
-			Ok(msg) => {
-				println!("Received unexpected message type: {:?}", msg);
-			}
-			Err(e) => {
-				eprintln!("Error: {}", e);
-			}
+		// exit the app when the close is acknowledged
+		Message::Close(_) => {
+			println!("done!");
+			commands.write_message(AppExit::Success);
 		}
+		_ => {}
 	}
-
-	// Close the connection gracefully
-	println!("Closing connection");
-	socket
-		.close(Some(CloseFrame {
-			code: 1000,
-			reason: "Client finished".to_string(),
-		}))
-		.await?;
-
-	println!("Connection closed");
-	Ok(())
 }

@@ -4,44 +4,18 @@ use std::sync::atomic::AtomicU16;
 use std::sync::atomic::Ordering;
 
 /// Plugin for running bevy WebSocket servers.
-/// By default this plugin will spawn the default [`SocketServer`] on [`Startup`]
-pub struct SocketServerPlugin {
-	/// Spawn the server on add
-	pub spawn_server: Option<SocketServer>,
-}
+pub struct SocketServerPlugin {}
 
-impl SocketServerPlugin {
-	/// Create a new SocketServerPlugin that does not spawn a server
-	pub fn without_server(mut self) -> Self {
-		self.spawn_server = None;
-		self
-	}
-
-	pub fn with_server(server: SocketServer) -> Self {
-		Self {
-			spawn_server: Some(server),
-			..default()
-		}
-	}
-}
+impl SocketServerPlugin {}
 
 impl Default for SocketServerPlugin {
-	fn default() -> Self {
-		Self {
-			spawn_server: Some(SocketServer::default()),
-		}
-	}
+	fn default() -> Self { Self {} }
 }
 
 impl Plugin for SocketServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>();
-		if let Some(server) = &self.spawn_server {
-			let server = server.clone();
-			app.add_systems(Startup, move |mut commands: Commands| {
-				commands.spawn(server.clone());
-			});
-		}
+		// we may want to add more later
 	}
 }
 
@@ -97,6 +71,8 @@ impl SocketServer {
 	}
 }
 
+
+
 impl Default for SocketServer {
 	fn default() -> Self { Self::new(DEFAULT_SOCKET_PORT) }
 }
@@ -118,8 +94,9 @@ mod tests {
 			.add_plugins((
 				MinimalPlugins,
 				// LogPlugin::default(),
-				SocketServerPlugin::with_server(server),
+				SocketServerPlugin::default(),
 			))
+			.spawn_then(server)
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
 				let url = url.clone();
 				commands.run(async move |world| {
@@ -140,10 +117,8 @@ mod tests {
 		let url = server.local_url();
 
 		App::new()
-			.add_plugins((
-				MinimalPlugins,
-				SocketServerPlugin::with_server(server),
-			))
+			.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
+			.spawn_then(server)
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
 				let url = url.clone();
 				commands.run(async move |world| {
@@ -185,7 +160,7 @@ mod tests {
 			.add_plugins((
 				MinimalPlugins,
 				// LogPlugin::default(),
-				SocketServerPlugin::default().without_server(),
+				SocketServerPlugin::default(),
 			))
 			.add_systems(Startup, move |mut commands: Commands| {
 				// server

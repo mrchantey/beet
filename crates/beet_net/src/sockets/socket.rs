@@ -30,7 +30,6 @@ pub struct SocketReady;
 impl Socket {
 	fn effect(self, entity: &mut EntityWorldMut) {
 		let (send, mut recv) = self.split();
-
 		entity
 			.observe_any(
 				move |ev: On<MessageSend>,
@@ -38,17 +37,28 @@ impl Socket {
 				      -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
-					commands
-						.run(async move |_| send.send(message.take()).await);
+					commands.run(async move |_| {
+						// socket send errors are non-fatal
+						send.send(message.take()).await.unwrap_or_else(|err| {
+							error!("{:?}", err);
+						})
+					});
 					Ok(())
 				},
 			)
-			.run_async(async move |entity| -> Result {
+			.run_async(async move |entity| {
 				while let Some(message) = recv.next().await {
-					let message = message?;
-					entity.trigger_target(MessageRecv(message)).await;
+					match message {
+						Ok(msg) => {
+							entity.trigger_target(MessageRecv(msg)).await;
+						}
+						Err(err) => {
+							// socket receive errors break connection but are non-fatal
+							error!("{:?}", err);
+							break;
+						}
+					}
 				}
-				Ok(())
 			})
 			.trigger_target(SocketReady);
 	}
@@ -215,7 +225,7 @@ pub enum Message {
 }
 
 /// A message to be sent by this [`Socket`] writer.
-#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+#[derive(Debug, Clone, Deref, PartialEq, Eq, EntityTargetEvent)]
 #[event(auto_propagate)]
 pub struct MessageSend(pub Message);
 impl MessageSend {
@@ -224,7 +234,7 @@ impl MessageSend {
 }
 
 /// A message received by this [`Socket`] reader.
-#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
+#[derive(Debug, Clone, Deref, PartialEq, Eq, EntityTargetEvent)]
 #[event(auto_propagate)]
 pub struct MessageRecv(pub Message);
 impl MessageRecv {

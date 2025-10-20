@@ -16,58 +16,40 @@
 use beet::net::prelude::sockets::Message;
 use beet::net::prelude::sockets::*;
 use beet::prelude::*;
-use futures::StreamExt;
 
 fn main() -> Result {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			SocketServerPlugin::with_server(SocketServer::new(9000)),
+			SocketServerPlugin::default(),
+		))
+		.spawn_then((
+			SocketServer::new(9000),
+			OnSpawn::observe(my_handler),
+			// just echo back the close if you dont need to
+			// modify the CloseFrame
+			OnSpawn::observe(common_handlers::echo_close),
+			OnSpawn::observe(common_handlers::log_send),
+			OnSpawn::observe(common_handlers::log_recv),
 		))
 		.run();
 
 	Ok(())
 }
 
-async fn handle_connection(mut socket: Socket) -> Result<()> {
-	println!("Handling new connection");
-
-	// Echo messages back to the client
-	while let Some(result) = socket.next().await {
-		match result {
-			Ok(msg) => match msg {
-				Message::Text(text) => {
-					println!("Received text: {}", text);
-					socket.send(Message::text(text)).await?;
-				}
-				Message::Binary(data) => {
-					println!("Received binary: {} bytes", data.len());
-					socket.send(Message::binary(data)).await?;
-				}
-				Message::Ping(data) => {
-					println!("Received ping");
-					socket.send(Message::pong(data)).await?;
-				}
-				Message::Pong(_) => {
-					println!("Received pong");
-				}
-				Message::Close(frame) => {
-					println!(
-						"Received close: {:?}",
-						frame.as_ref().map(|f| &f.reason)
-					);
-					socket.close(frame).await?;
-					break;
-				}
-			},
-			Err(e) => {
-				eprintln!("Error receiving message: {}", e);
-				break;
-			}
+// an example handler receiving and sending messages.
+fn my_handler(recv: On<MessageRecv>, mut commands: Commands) {
+	match recv.event().inner() {
+		Message::Text(txt) if txt == "the cat sat on the" => {
+			commands
+				.entity(
+					// we added this observer to the server, the message was
+					// triggered by its child so we must use original_target
+					recv.original_target(),
+				)
+				.trigger_target(MessageSend(Message::Text("hat".into())));
 		}
+		_ => {}
 	}
-
-	println!("Connection closed");
-	Ok(())
 }
