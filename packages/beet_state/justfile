@@ -1,0 +1,12 @@
+
+
+
+
+run:
+	pnpx vite
+
+
+test:
+	pnpm test
+test-ci:
+	pnpm test --run

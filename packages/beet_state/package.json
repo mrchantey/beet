@@ -1,0 +1,35 @@
+{
+  "name": "hello-automerge",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "@vitest/browser": "^4.0.4",
+    "happy-dom": "^20.0.10",
+    "typescript": "~5.9.3",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^4.0.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:rolldown-vite@7.1.14"
+    }
+  },
+  "dependencies": {
+    "@automerge/automerge": "^3.1.2",
+    "@automerge/automerge-repo": "^2.4.0",
+    "@automerge/automerge-repo-network-broadcastchannel": "^2.4.0",
+    "@automerge/automerge-repo-solid-primitives": "^2.4.0",
+    "@automerge/automerge-repo-storage-indexeddb": "^2.4.0",
+    "neverthrow": "^8.2.0",
+    "solid-js": "^1.9.9",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}
