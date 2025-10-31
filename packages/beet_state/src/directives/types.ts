@@ -3,6 +3,11 @@ import type { RenderList } from "./RenderList";
 import type { RenderText } from "./RenderText";
 
 /**
+ * Helper type to make certain keys optional
+ */
+export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+/**
  * Base type for binding elements to state directives.
  */
 export type BindElement = {

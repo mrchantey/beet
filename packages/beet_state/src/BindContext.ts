@@ -9,10 +9,9 @@ import type {
 	RenderText,
 	StateDirective,
 	StateManifest,
+	PartialBy,
 } from "./directives";
-import { bindHandleEvent } from "./directives/HandleEvent";
-import { bindRenderList } from "./directives/RenderList";
-import { bindRenderText } from "./directives/RenderText";
+import { bindHandleEvent, bindRenderList, bindRenderText } from "./directives";
 
 /**
  * BindContext provides declarative bindings between DOM elements and Automerge documents.
@@ -54,21 +53,21 @@ export class BindContext {
 	/**
 	 * Create a HandleEvent directive configuration
 	 */
-	static handleEvent(config: Omit<HandleEvent, "kind">): HandleEvent {
+	static handleEvent(config: PartialBy<HandleEvent, "kind">): HandleEvent {
 		return { ...config, kind: "handle_event" };
 	}
 
 	/**
 	 * Create a RenderText directive configuration
 	 */
-	static renderText(config: Omit<RenderText, "kind">): RenderText {
+	static renderText(config: PartialBy<RenderText, "kind">): RenderText {
 		return { ...config, kind: "render_text" };
 	}
 
 	/**
 	 * Create a RenderList directive configuration
 	 */
-	static renderList(config: Omit<RenderList, "kind">): RenderList {
+	static renderList(config: PartialBy<RenderList, "kind">): RenderList {
 		return { ...config, kind: "render_list" };
 	}
 
