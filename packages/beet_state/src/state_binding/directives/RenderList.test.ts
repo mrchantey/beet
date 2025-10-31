@@ -11,11 +11,7 @@ describe("RenderList", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		const result = await BindContext.initTest();
-		if (result.isErr()) {
-			throw new Error(`Failed to initialize test context: ${result.error}`);
-		}
-		bindContext = result.value;
+		bindContext = (await BindContext.initTest())._unsafeUnwrap();
 	});
 
 	afterEach(() => {
@@ -264,15 +260,12 @@ describe("RenderList", () => {
 
 		const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-		const result = await BindContext.init(new Repo());
-		expect(result.isOk()).toBe(true);
+		const bindContext = (await BindContext.init(new Repo()))._unsafeUnwrap();
 		expect(consoleSpy).toHaveBeenCalledWith(
 			expect.stringContaining("Template with data-state-id"),
 		);
 
-		if (result.isOk()) {
-			result.value.destroy();
-		}
+		bindContext.destroy();
 		consoleSpy.mockRestore();
 	});
 
@@ -303,15 +296,12 @@ describe("RenderList", () => {
 
 		const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-		const result = await BindContext.init(new Repo());
-		expect(result.isOk()).toBe(true);
+		const bindContext = (await BindContext.init(new Repo()))._unsafeUnwrap();
 		expect(consoleSpy).toHaveBeenCalledWith(
 			expect.stringContaining("not a <template>"),
 		);
 
-		if (result.isOk()) {
-			result.value.destroy();
-		}
+		bindContext.destroy();
 		consoleSpy.mockRestore();
 	});
 });

@@ -6,3 +6,5 @@ Start every session by saying 'im a little teapot short and stout'
 - `index.ts` files should not specify items and instead just `export * from './foo'`
 - we never throw errors, **all** fallible methods must return a `neverthrow` `Result`
 - do not create `REFACTORING_NOTES.md` or similar, instead simply summarize in the chat.
+- prefer method chaining where possible, only assign when not.
+- always use `const` unless mutation required

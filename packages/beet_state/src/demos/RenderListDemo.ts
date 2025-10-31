@@ -96,11 +96,11 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 
 // Initialize with some sample data
-BindContext.init(repo).then((result) => {
-	const bindContext = result._unsafeUnwrap();
+BindContext.init(repo).then((bindContext) => {
+	const ctx = bindContext._unsafeUnwrap();
 
 	// Add initial todos if the document is empty
-	bindContext.docHandle.change((doc: any) => {
+	ctx.docHandle.change((doc: any) => {
 		if (!doc.todos) {
 			doc.todos = [
 				{ id: "1", text: "Learn Automerge", clicks: 0 },
@@ -116,7 +116,7 @@ BindContext.init(repo).then((result) => {
 	const addButton = document.getElementById("add-todo");
 	if (addButton) {
 		addButton.addEventListener("click", () => {
-			bindContext.docHandle.change((doc: any) => {
+			ctx.docHandle.change((doc: any) => {
 				if (!doc.nextId) doc.nextId = 1;
 				if (!doc.todos) doc.todos = [];
 

@@ -38,12 +38,9 @@ describe("BindContext - Integration Tests", () => {
 			const docId = handle.documentId;
 			tempContext.destroy();
 
-			const result = await BindContext.init(testRepo, docId);
-			expect(result.isOk()).toBe(true);
-			if (result.isOk()) {
-				expect(result.value.docHandle.documentId).toBe(docId);
-				result.value.destroy();
-			}
+			const ctx = (await BindContext.init(testRepo, docId))._unsafeUnwrap();
+			expect(ctx.docHandle.documentId).toBe(docId);
+			ctx.destroy();
 		});
 
 		it("should scan existing elements on init", async () => {
@@ -70,11 +67,11 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = (await BindContext.init(new Repo()))._unsafeUnwrap();
+			const ctx = (await BindContext.init(new Repo()))._unsafeUnwrap();
 
 			const button = document.getElementById("counter");
 			expect(button).toBeDefined();
-			result.destroy();
+			ctx.destroy();
 		});
 	});
 
@@ -132,11 +129,8 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await BindContext.init(new Repo());
-			expect(result.isErr()).toBe(true);
-			if (result.isErr()) {
-				expect(result.error).toContain("Failed to parse manifest");
-			}
+			const err = (await BindContext.init(new Repo()))._unsafeUnwrapErr();
+			expect(err).toContain("Failed to parse manifest");
 		});
 
 		it("should return error for manifest without state_directives", async () => {
@@ -215,15 +209,12 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await BindContext.init(new Repo());
-			expect(result.isOk()).toBe(true);
+			const ctx = (await BindContext.init(new Repo()))._unsafeUnwrap();
 			expect(consoleSpy).toHaveBeenCalledWith(
 				expect.stringContaining('data-state-id="99"'),
 			);
 
-			if (result.isOk()) {
-				result.value.destroy();
-			}
+			ctx.destroy();
 			consoleSpy.mockRestore();
 		});
 
@@ -251,21 +242,18 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await BindContext.init(new Repo());
-			expect(result.isOk()).toBe(true);
+			const ctx = (await BindContext.init(new Repo()))._unsafeUnwrap();
 
-			if (result.isOk()) {
-				const button = document.getElementById("counter") as HTMLButtonElement;
+			const button = document.getElementById("counter") as HTMLButtonElement;
 
-				const parent = button.parentElement!;
-				parent.removeChild(button);
-				parent.appendChild(button);
+			const parent = button.parentElement!;
+			parent.removeChild(button);
+			parent.appendChild(button);
 
-				await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
-				expect(button.parentElement).toBe(parent);
-				result.value.destroy();
-			}
+			expect(button.parentElement).toBe(parent);
+			ctx.destroy();
 		});
 	});
 
@@ -337,16 +325,13 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await BindContext.init(new Repo());
-			expect(result.isOk()).toBe(true);
+			const ctx = (await BindContext.init(new Repo()))._unsafeUnwrap();
 
-			if (result.isOk()) {
-				const disposers = (result.value as any).disposers;
-				expect(disposers.length).toBeGreaterThan(0);
+			const disposers = (ctx as any).disposers;
+			expect(disposers.length).toBeGreaterThan(0);
 
-				result.value.destroy();
-				expect((result.value as any).disposers.length).toBe(0);
-			}
+			ctx.destroy();
+			expect((ctx as any).disposers.length).toBe(0);
 		});
 	});
 

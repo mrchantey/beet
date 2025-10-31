@@ -6,11 +6,7 @@ describe("RenderText", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		const result = await BindContext.initTest();
-		if (result.isErr()) {
-			throw new Error(`Failed to initialize test context: ${result.error}`);
-		}
-		bindContext = result.value;
+		bindContext = (await BindContext.initTest())._unsafeUnwrap();
 	});
 
 	afterEach(() => {
