@@ -45,5 +45,4 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 	</div>
 `;
 
-const bindContext = new BindContext(repo);
-bindContext.init();
+BindContext.init(repo).then((result) => result._unsafeUnwrap());

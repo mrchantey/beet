@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Repo } from "@automerge/automerge-repo";
 import type { StateManifest } from "./directives";
 import { BindContext } from "./BindContext";
 
@@ -12,7 +13,7 @@ describe("BindContext - Integration Tests", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		bindContext = BindContext.newTest();
+		bindContext = (await BindContext.initTest())._unsafeUnwrap();
 	});
 
 	afterEach(() => {
@@ -21,21 +22,34 @@ describe("BindContext - Integration Tests", () => {
 
 	describe("initialization", () => {
 		it("should initialize and create a document handle", async () => {
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
+			expect(bindContext.docHandle).toBeDefined();
 			expect(localStorage.getItem("rootDocId")).toBeDefined();
 		});
 
 		it("should use provided docId if given", async () => {
-			const handle = bindContext.repo.create<TestDoc>();
-			const docId = handle.documentId;
+			document.body.innerHTML = "";
+			localStorage.clear();
 
-			const result = await bindContext.init(docId);
+			const testRepo = new Repo();
+			const tempContext = (bindContext = (
+				await BindContext.init(testRepo)
+			)._unsafeUnwrap());
+			const handle = tempContext.repo.create<TestDoc>();
+			const docId = handle.documentId;
+			tempContext.destroy();
+
+			const result = await BindContext.init(testRepo, docId);
 			expect(result.isOk()).toBe(true);
-			expect(localStorage.getItem("rootDocId")).toBeNull();
+			if (result.isOk()) {
+				expect(result.value.docHandle.documentId).toBe(docId);
+				result.value.destroy();
+			}
 		});
 
 		it("should scan existing elements on init", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.handleEvent({
@@ -56,16 +70,19 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
+			const result = (await BindContext.init(new Repo()))._unsafeUnwrap();
 
 			const button = document.getElementById("counter");
 			expect(button).toBeDefined();
+			result.destroy();
 		});
 	});
 
 	describe("manifest parsing", () => {
 		it("should parse valid manifest from script element", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.handleEvent({
@@ -86,20 +103,26 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
+			// created and destroyed without error
+			(await BindContext.init(new Repo()))._unsafeUnwrap().destroy();
 		});
 
 		it("should handle missing manifest gracefully", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			document.body.innerHTML = `
 				<button data-state-id="0">Test</button>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
+			// created and destroyed without error
+			(await BindContext.init(new Repo()))._unsafeUnwrap().destroy();
 		});
 
 		it("should return error for invalid manifest JSON", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			document.body.innerHTML = `
 				<div>
 					<button data-state-id="0">Test</button>
@@ -109,7 +132,7 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
+			const result = await BindContext.init(new Repo());
 			expect(result.isErr()).toBe(true);
 			if (result.isErr()) {
 				expect(result.error).toContain("Failed to parse manifest");
@@ -117,6 +140,9 @@ describe("BindContext - Integration Tests", () => {
 		});
 
 		it("should return error for manifest without state_directives", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			document.body.innerHTML = `
 				<div>
 					<button data-state-id="0">Test</button>
@@ -126,16 +152,17 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isErr()).toBe(true);
-			if (result.isErr()) {
-				expect(result.error).toContain("Invalid manifest");
-			}
+			expect((await BindContext.init(new Repo()))._unsafeUnwrapErr()).toContain(
+				"Invalid manifest",
+			);
 		});
 	});
 
 	describe("element binding", () => {
 		it("should find element by data-state-id", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.handleEvent({
@@ -156,14 +183,16 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
-
+			const cx = (await BindContext.init(new Repo()))._unsafeUnwrap();
 			const button = document.getElementById("my-button");
 			expect(button).toBeDefined();
+			cx.destroy();
 		});
 
 		it("should warn when element with data-state-id not found", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
 			const manifest: StateManifest = {
@@ -186,16 +215,22 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
+			const result = await BindContext.init(new Repo());
 			expect(result.isOk()).toBe(true);
 			expect(consoleSpy).toHaveBeenCalledWith(
 				expect.stringContaining('data-state-id="99"'),
 			);
 
+			if (result.isOk()) {
+				result.value.destroy();
+			}
 			consoleSpy.mockRestore();
 		});
 
 		it("should not bind the same element twice", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.handleEvent({
@@ -216,26 +251,26 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
+			const result = await BindContext.init(new Repo());
 			expect(result.isOk()).toBe(true);
 
-			const button = document.getElementById("counter") as HTMLButtonElement;
+			if (result.isOk()) {
+				const button = document.getElementById("counter") as HTMLButtonElement;
 
-			const parent = button.parentElement!;
-			parent.removeChild(button);
-			parent.appendChild(button);
+				const parent = button.parentElement!;
+				parent.removeChild(button);
+				parent.appendChild(button);
 
-			await new Promise((resolve) => setTimeout(resolve, 50));
+				await new Promise((resolve) => setTimeout(resolve, 50));
 
-			expect(button.parentElement).toBe(parent);
+				expect(button.parentElement).toBe(parent);
+				result.value.destroy();
+			}
 		});
 	});
 
 	describe("MutationObserver", () => {
 		it("should detect and bind dynamically added elements", async () => {
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
-
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.handleEvent({
@@ -269,9 +304,6 @@ describe("BindContext - Integration Tests", () => {
 
 	describe("cleanup", () => {
 		it("should disconnect MutationObserver on destroy", async () => {
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
-
 			const disconnectSpy = vi.fn();
 			const observer = (bindContext as any).mutationObserver;
 			if (observer) {
@@ -283,6 +315,9 @@ describe("BindContext - Integration Tests", () => {
 		});
 
 		it("should cleanup all disposers", async () => {
+			document.body.innerHTML = "";
+			localStorage.clear();
+
 			const manifest: StateManifest = {
 				state_directives: [
 					BindContext.renderText({
@@ -302,14 +337,16 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
+			const result = await BindContext.init(new Repo());
 			expect(result.isOk()).toBe(true);
 
-			const disposers = (bindContext as any).disposers;
-			expect(disposers.length).toBeGreaterThan(0);
+			if (result.isOk()) {
+				const disposers = (result.value as any).disposers;
+				expect(disposers.length).toBeGreaterThan(0);
 
-			bindContext.destroy();
-			expect((bindContext as any).disposers.length).toBe(0);
+				result.value.destroy();
+				expect((result.value as any).disposers.length).toBe(0);
+			}
 		});
 	});
 
@@ -341,8 +378,8 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
+			// Wait for MutationObserver to process
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			const button = document.getElementById("inc");
 			const display = document.getElementById("display");
@@ -413,10 +450,7 @@ describe("BindContext - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await bindContext.init();
-			expect(result.isOk()).toBe(true);
-
-			bindContext.docHandle?.change((doc: TestDoc) => {
+			bindContext.docHandle.change((doc: TestDoc) => {
 				doc.todos = [
 					{ id: "1", text: "Task 1", clicks: 0 },
 					{ id: "2", text: "Task 2", clicks: 0 },

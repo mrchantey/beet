@@ -42,7 +42,7 @@ export function bindHandleEvent(
  * Handle an action (increment, decrement, set)
  */
 function handleAction(config: HandleEvent, context: BindContext): void {
-	context.docHandle!.change((doc: any) => {
+	context.docHandle.change((doc: any) => {
 		const fieldPath = config.field_path;
 
 		switch (config.action) {

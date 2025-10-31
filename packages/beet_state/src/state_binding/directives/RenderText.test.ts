@@ -6,7 +6,11 @@ describe("RenderText", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		bindContext = BindContext.newTest();
+		const result = await BindContext.initTest();
+		if (result.isErr()) {
+			throw new Error(`Failed to initialize test context: ${result.error}`);
+		}
+		bindContext = result.value;
 	});
 
 	afterEach(() => {
@@ -33,8 +37,8 @@ describe("RenderText", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
+		// Wait for MutationObserver to process
+		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const display = document.getElementById("display");
 		expect(display).toBeDefined();
@@ -70,8 +74,8 @@ describe("RenderText", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
+		// Wait for MutationObserver to process
+		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		const countDisplay = document.getElementById("count");
 		const nameDisplay = document.getElementById("name");

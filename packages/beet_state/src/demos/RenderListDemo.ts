@@ -95,41 +95,39 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 	</div>
 `;
 
-const bindContext = new BindContext(repo);
-
 // Initialize with some sample data
-bindContext.init().then((result) => {
-	if (result.isOk()) {
-		// Add initial todos if the document is empty
-		bindContext.docHandle?.change((doc: any) => {
-			if (!doc.todos) {
-				doc.todos = [
-					{ id: "1", text: "Learn Automerge", clicks: 0 },
-					{ id: "2", text: "Build amazing apps", clicks: 0 },
-					{ id: "3", text: "Share with the world", clicks: 0 },
-				];
-				doc.nextId = 4;
-			}
+BindContext.init(repo).then((result) => {
+	const bindContext = result._unsafeUnwrap();
+
+	// Add initial todos if the document is empty
+	bindContext.docHandle.change((doc: any) => {
+		if (!doc.todos) {
+			doc.todos = [
+				{ id: "1", text: "Learn Automerge", clicks: 0 },
+				{ id: "2", text: "Build amazing apps", clicks: 0 },
+				{ id: "3", text: "Share with the world", clicks: 0 },
+			];
+			doc.nextId = 4;
+		}
+	});
+
+	// Add a custom handler to actually add todos when button is clicked
+	// (This is a workaround since we don't have a "push_item" action yet)
+	const addButton = document.getElementById("add-todo");
+	if (addButton) {
+		addButton.addEventListener("click", () => {
+			bindContext.docHandle.change((doc: any) => {
+				if (!doc.nextId) doc.nextId = 1;
+				if (!doc.todos) doc.todos = [];
+
+				const newId = String(doc.nextId);
+				doc.todos.push({
+					id: newId,
+					text: `Todo #${newId}`,
+					clicks: 0,
+				});
+				doc.nextId++;
+			});
 		});
 	}
 });
-
-// Add a custom handler to actually add todos when button is clicked
-// (This is a workaround since we don't have a "push_item" action yet)
-const addButton = document.getElementById("add-todo");
-if (addButton) {
-	addButton.addEventListener("click", () => {
-		bindContext.docHandle?.change((doc: any) => {
-			if (!doc.nextId) doc.nextId = 1;
-			if (!doc.todos) doc.todos = [];
-
-			const newId = String(doc.nextId);
-			doc.todos.push({
-				id: newId,
-				text: `Todo #${newId}`,
-				clicks: 0,
-			});
-			doc.nextId++;
-		});
-	});
-}

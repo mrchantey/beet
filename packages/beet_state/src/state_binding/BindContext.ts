@@ -25,29 +25,104 @@ import { bindHandleEvent, bindRenderList, bindRenderText } from "./directives";
  */
 export class BindContext {
 	public repo: Repo;
-	public docHandle: DocHandle<any> | null = null;
-	private mutationObserver: MutationObserver | null = null;
+	public docHandle: DocHandle<any>;
+	private mutationObserver: MutationObserver;
 	private boundElements = new WeakSet<Element>();
 	private disposers: Array<() => void> = [];
 	private pathPrefix?: string;
 
-	constructor(repo?: Repo, pathPrefix?: string) {
-		this.repo =
+	private constructor(
+		repo: Repo,
+		docHandle: DocHandle<any>,
+		mutationObserver: MutationObserver,
+		pathPrefix?: string,
+	) {
+		this.repo = repo;
+		this.docHandle = docHandle;
+		this.mutationObserver = mutationObserver;
+		this.pathPrefix = pathPrefix;
+	}
+
+	/**
+	 * Create a new BindContext instance
+	 */
+	static async init(
+		repo?: Repo,
+		rootDocId?: DocumentId,
+	): Promise<Result<BindContext, string>> {
+		const actualRepo =
 			repo ||
 			new Repo({
 				network: [new BroadcastChannelNetworkAdapter()],
 				storage: new IndexedDBStorageAdapter(),
 			});
-		this.pathPrefix = pathPrefix;
+
+		// Get or create the document handle
+		let docHandle: DocHandle<any>;
+		if (rootDocId) {
+			docHandle = await actualRepo.find(rootDocId);
+		} else {
+			const storedDocId = localStorage.getItem(
+				"rootDocId",
+			) as DocumentId | null;
+			if (storedDocId) {
+				docHandle = await actualRepo.find(storedDocId);
+			} else {
+				docHandle = actualRepo.create();
+				localStorage.setItem("rootDocId", docHandle.documentId);
+			}
+		}
+
+		// Set up MutationObserver for dynamic elements
+		const mutationObserver = new MutationObserver(() => {
+			// Observer will be configured after construction
+		});
+
+		const context = new BindContext(
+			actualRepo,
+			docHandle,
+			mutationObserver,
+			undefined,
+		);
+
+		// Configure the mutation observer to reference the context
+		mutationObserver.disconnect();
+		const configuredObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.type === "childList") {
+					mutation.addedNodes.forEach((node) => {
+						if (node.nodeType === Node.ELEMENT_NODE) {
+							context.scanElements(node as Element);
+						}
+					});
+				}
+			}
+		});
+
+		context.mutationObserver = configuredObserver;
+
+		// Scan existing elements
+		const scanResult = context.scanElements(document.body);
+		if (scanResult.isErr()) {
+			return err(`Failed to scan elements: ${scanResult.error}`);
+		}
+
+		// Start observing
+		configuredObserver.observe(document.body, {
+			childList: true,
+			subtree: true,
+		});
+
+		return ok(context);
 	}
 
 	/**
 	 * Create a test instance with document and localStorage cleared
 	 */
-	static newTest(repo?: Repo): BindContext {
+	static async initTest(repo?: Repo): Promise<Result<BindContext, string>> {
 		document.body.innerHTML = "";
 		localStorage.clear();
-		return new BindContext(repo || new Repo());
+		return BindContext.init(repo || new Repo());
 	}
 
 	/**
@@ -102,9 +177,12 @@ export class BindContext {
 	 * Create a scoped version of this context with a path prefix
 	 */
 	scoped(prefix: string): BindContext {
-		const scopedContext = new BindContext(this.repo, prefix);
-		scopedContext.docHandle = this.docHandle;
-		scopedContext.mutationObserver = this.mutationObserver;
+		const scopedContext = new BindContext(
+			this.repo,
+			this.docHandle,
+			this.mutationObserver,
+			prefix,
+		);
 		scopedContext.boundElements = this.boundElements;
 		// Note: disposers are NOT shared - each scoped context manages its own
 		return scopedContext;
@@ -168,52 +246,6 @@ export class BindContext {
 			current = current[key];
 		}
 		current[keys[keys.length - 1]] = value;
-	}
-
-	/**
-	 * Initialize BindContext by scanning existing elements and setting up MutationObserver
-	 */
-	async init(rootDocId?: DocumentId): Promise<Result<void, string>> {
-		// Get or create the document handle
-		if (rootDocId) {
-			this.docHandle = await this.repo.find(rootDocId);
-		} else {
-			const storedDocId = localStorage.getItem(
-				"rootDocId",
-			) as DocumentId | null;
-			if (storedDocId) {
-				this.docHandle = await this.repo.find(storedDocId);
-			} else {
-				this.docHandle = this.repo.create();
-				localStorage.setItem("rootDocId", this.docHandle.documentId);
-			}
-		}
-
-		// Scan existing elements
-		const scanResult = this.scanElements(document.body);
-		if (scanResult.isErr()) {
-			return err(`Failed to scan elements: ${scanResult.error}`);
-		}
-
-		// Set up MutationObserver for dynamic elements
-		this.mutationObserver = new MutationObserver((mutations) => {
-			for (const mutation of mutations) {
-				if (mutation.type === "childList") {
-					mutation.addedNodes.forEach((node) => {
-						if (node.nodeType === Node.ELEMENT_NODE) {
-							this.scanElements(node as Element);
-						}
-					});
-				}
-			}
-		});
-
-		this.mutationObserver.observe(document.body, {
-			childList: true,
-			subtree: true,
-		});
-
-		return ok();
 	}
 
 	/**
@@ -303,10 +335,6 @@ export class BindContext {
 		element: Element,
 		directive: StateDirective,
 	): Result<void, string> {
-		if (!this.docHandle) {
-			return err("No document handle available");
-		}
-
 		let result: Result<{ dispose?: () => void }, string>;
 
 		if (directive.kind === "handle_event") {
@@ -347,10 +375,7 @@ export class BindContext {
 		}
 		this.disposers = [];
 
-		if (this.mutationObserver) {
-			this.mutationObserver.disconnect();
-			this.mutationObserver = null;
-		}
+		this.mutationObserver.disconnect();
 		this.repo.networkSubsystem.adapters.forEach((adapter) => {
 			adapter?.disconnect?.();
 		});

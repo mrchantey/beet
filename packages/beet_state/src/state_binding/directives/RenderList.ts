@@ -92,12 +92,12 @@ export function bindRenderList(
 	// Initialize the array field if it doesn't exist
 	const fieldPath = directive.field_path;
 
-	let currentDoc = context.docHandle!.doc();
+	let currentDoc = context.docHandle.doc();
 	if (
 		currentDoc &&
 		context.getValueByPath(currentDoc, fieldPath) === undefined
 	) {
-		context.docHandle!.change((doc: any) => {
+		context.docHandle.change((doc: any) => {
 			if (context.getValueByPath(doc, fieldPath) === undefined) {
 				context.setValueByPath(doc, fieldPath, []);
 			}
@@ -116,7 +116,7 @@ export function bindRenderList(
 	listInstances.set(container, listInstance);
 
 	// Do initial reconciliation with current state
-	currentDoc = context.docHandle!.doc();
+	currentDoc = context.docHandle.doc();
 	if (currentDoc) {
 		const initialArray = context.getValueByPath(currentDoc, fieldPath) ?? [];
 		if (Array.isArray(initialArray)) {
@@ -151,9 +151,9 @@ export function bindRenderList(
 		}
 	};
 
-	context.docHandle!.on("change", changeHandler);
+	context.docHandle.on("change", changeHandler);
 	listInstance.disposeChangeListener = () => {
-		context.docHandle!.off("change", changeHandler);
+		context.docHandle.off("change", changeHandler);
 	};
 
 	return ok({

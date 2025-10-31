@@ -6,7 +6,11 @@ describe("HandleEvent", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		bindContext = BindContext.newTest();
+		const result = await BindContext.initTest();
+		if (result.isErr()) {
+			throw new Error(`Failed to initialize test context: ${result.error}`);
+		}
+		bindContext = result.value;
 	});
 
 	afterEach(() => {
@@ -33,9 +37,6 @@ describe("HandleEvent", () => {
 				</script>
 			</div>
 		`;
-
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
 
 		const button = document.getElementById("counter") as HTMLButtonElement;
 		expect(button).toBeDefined();
@@ -67,9 +68,6 @@ describe("HandleEvent", () => {
 				</script>
 			</div>
 		`;
-
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
 
 		const button = document.getElementById("counter") as HTMLButtonElement;
 		button.click();
@@ -105,9 +103,6 @@ describe("HandleEvent", () => {
 				</script>
 			</div>
 		`;
-
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
 
 		const incButton = document.getElementById("inc");
 		const decButton = document.getElementById("dec");

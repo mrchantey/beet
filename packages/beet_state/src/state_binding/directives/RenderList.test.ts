@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Repo } from "@automerge/automerge-repo";
 import { BindContext } from "../BindContext";
 import type { StateManifest } from "./types";
 
@@ -10,7 +11,11 @@ describe("RenderList", () => {
 	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		bindContext = BindContext.newTest();
+		const result = await BindContext.initTest();
+		if (result.isErr()) {
+			throw new Error(`Failed to initialize test context: ${result.error}`);
+		}
+		bindContext = result.value;
 	});
 
 	afterEach(() => {
@@ -57,10 +62,7 @@ describe("RenderList", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
-
-		bindContext.docHandle?.change((doc: TestDoc) => {
+		bindContext.docHandle.change((doc: TestDoc) => {
 			doc.todos = [
 				{ id: "1", text: "First todo" },
 				{ id: "2", text: "Second todo" },
@@ -115,10 +117,7 @@ describe("RenderList", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
-
-		bindContext.docHandle?.change((doc: TestDoc) => {
+		bindContext.docHandle.change((doc: TestDoc) => {
 			doc.todos = [
 				{ id: "1", text: "Item 1" },
 				{ id: "2", text: "Item 2" },
@@ -163,10 +162,7 @@ describe("RenderList", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
-
-		bindContext.docHandle?.change((doc: TestDoc) => {
+		bindContext.docHandle.change((doc: TestDoc) => {
 			doc.todos = [];
 		});
 
@@ -224,10 +220,7 @@ describe("RenderList", () => {
 			</div>
 		`;
 
-		const result = await bindContext.init();
-		expect(result.isOk()).toBe(true);
-
-		bindContext.docHandle?.change((doc: TestDoc) => {
+		bindContext.docHandle.change((doc: TestDoc) => {
 			doc.todos = [{ id: "1", text: "Test", clicks: 0 }];
 		});
 
@@ -243,6 +236,9 @@ describe("RenderList", () => {
 	});
 
 	it("should return error when template element is not found", async () => {
+		document.body.innerHTML = "";
+		localStorage.clear();
+
 		const mainManifest: StateManifest = {
 			state_directives: [
 				BindContext.renderList({
@@ -268,16 +264,22 @@ describe("RenderList", () => {
 
 		const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-		const result = await bindContext.init();
+		const result = await BindContext.init(new Repo());
 		expect(result.isOk()).toBe(true);
 		expect(consoleSpy).toHaveBeenCalledWith(
 			expect.stringContaining("Template with data-state-id"),
 		);
 
+		if (result.isOk()) {
+			result.value.destroy();
+		}
 		consoleSpy.mockRestore();
 	});
 
 	it("should return error when template_id points to non-template element", async () => {
+		document.body.innerHTML = "";
+		localStorage.clear();
+
 		const mainManifest: StateManifest = {
 			state_directives: [
 				BindContext.renderList({
@@ -301,12 +303,15 @@ describe("RenderList", () => {
 
 		const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-		const result = await bindContext.init();
+		const result = await BindContext.init(new Repo());
 		expect(result.isOk()).toBe(true);
 		expect(consoleSpy).toHaveBeenCalledWith(
 			expect.stringContaining("not a <template>"),
 		);
 
+		if (result.isOk()) {
+			result.value.destroy();
+		}
 		consoleSpy.mockRestore();
 	});
 });
