@@ -1,18 +1,20 @@
 import { Repo } from "@automerge/automerge-repo";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	HandleEvent,
-	StateBinder,
-	UpdateDom,
+	createHandleEvent,
+	createRenderList,
+	createRenderText,
 	type StateManifest,
-} from "./StateBinder";
+} from "./directives";
+import { StateBinder } from "./StateBinder";
 
 interface TestDoc {
 	count: number;
 	name?: string;
+	todos?: Array<{ id: string; text: string; clicks?: number }>;
 }
 
-describe("StateBinder", () => {
+describe("StateBinder - Integration Tests", () => {
 	let stateBinder: StateBinder;
 
 	beforeEach(async () => {
@@ -25,7 +27,7 @@ describe("StateBinder", () => {
 		stateBinder.destroy();
 	});
 
-	describe("init", () => {
+	describe("initialization", () => {
 		it("should initialize and create a document handle", async () => {
 			const result = await stateBinder.init();
 			expect(result.isOk()).toBe(true);
@@ -38,14 +40,13 @@ describe("StateBinder", () => {
 
 			const result = await stateBinder.init(docId);
 			expect(result.isOk()).toBe(true);
-			// Should not create a new one in localStorage
 			expect(localStorage.getItem("rootDocId")).toBeNull();
 		});
 
 		it("should scan existing elements on init", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -66,7 +67,6 @@ describe("StateBinder", () => {
 			const result = await stateBinder.init();
 			expect(result.isOk()).toBe(true);
 
-			// Verify the button was found and scanned
 			const button = document.getElementById("counter");
 			expect(button).toBeDefined();
 		});
@@ -76,7 +76,7 @@ describe("StateBinder", () => {
 		it("should parse valid manifest from script element", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -104,7 +104,6 @@ describe("StateBinder", () => {
 			`;
 
 			const result = await stateBinder.init();
-			// Should succeed but not bind anything
 			expect(result.isOk()).toBe(true);
 		});
 
@@ -147,7 +146,7 @@ describe("StateBinder", () => {
 		it("should find element by data-state-id", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -177,7 +176,7 @@ describe("StateBinder", () => {
 
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 99,
 						field_path: "count",
 						event: "click",
@@ -203,13 +202,11 @@ describe("StateBinder", () => {
 
 			consoleSpy.mockRestore();
 		});
-	});
 
-	describe("event binding", () => {
-		it("should bind click event to increment action", async () => {
+		it("should not bind the same element twice", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -232,123 +229,13 @@ describe("StateBinder", () => {
 
 			const button = document.getElementById("counter") as HTMLButtonElement;
 
-			// Get the doc handle to check state
-			const handle = stateBinder.repo.create<TestDoc>();
-			handle.change((doc: TestDoc) => {
-				doc.count = 0;
-			});
+			const parent = button.parentElement!;
+			parent.removeChild(button);
+			parent.appendChild(button);
 
-			// Simulate clicks
-			button.click();
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			// Wait a bit for the change to propagate
-			await new Promise((resolve) => setTimeout(resolve, 10));
-		});
-
-		it("should support decrement action", async () => {
-			const manifest: StateManifest = {
-				state_directives: [
-					HandleEvent.create({
-						el_state_id: 0,
-						field_path: "count",
-						event: "click",
-						action: "decrement",
-					}),
-				],
-			};
-
-			document.body.innerHTML = `
-				<div>
-					<button id="counter" data-state-id="0">Click me</button>
-					<script data-state-manifest type="application/json">
-					${JSON.stringify(manifest)}
-					</script>
-				</div>
-			`;
-
-			const result = await stateBinder.init();
-			expect(result.isOk()).toBe(true);
-
-			const button = document.getElementById("counter") as HTMLButtonElement;
-
-			// Simulate click
-			button.click();
-
-			// Just verify no errors
-			expect(true).toBe(true);
-		});
-
-		it("should bind multiple directives to different elements", async () => {
-			const manifest: StateManifest = {
-				state_directives: [
-					HandleEvent.create({
-						el_state_id: 0,
-						field_path: "count",
-						event: "click",
-						action: "increment",
-					}),
-					HandleEvent.create({
-						el_state_id: 1,
-						field_path: "count",
-						event: "click",
-						action: "decrement",
-					}),
-				],
-			};
-
-			document.body.innerHTML = `
-				<div>
-					<button id="inc" data-state-id="0">+</button>
-					<button id="dec" data-state-id="1">-</button>
-					<script data-state-manifest type="application/json">
-					${JSON.stringify(manifest)}
-					</script>
-				</div>
-			`;
-
-			const result = await stateBinder.init();
-			expect(result.isOk()).toBe(true);
-
-			const incButton = document.getElementById("inc");
-			const decButton = document.getElementById("dec");
-			expect(incButton).toBeDefined();
-			expect(decButton).toBeDefined();
-		});
-	});
-
-	describe("onchange binding with Solid effects", () => {
-		it("should set up onchange binding without errors", async () => {
-			const manifest: StateManifest = {
-				state_directives: [
-					UpdateDom.create({
-						el_state_id: 0,
-						field_path: "count",
-						onchange: {
-							kind: "set_with",
-							template: "The value is %VALUE%",
-						},
-					}),
-				],
-			};
-
-			document.body.innerHTML = `
-				<div>
-					<p id="display" data-state-id="0">Initial</p>
-					<script data-state-manifest type="application/json">
-					${JSON.stringify(manifest)}
-					</script>
-				</div>
-			`;
-
-			const result = await stateBinder.init();
-			expect(result.isOk()).toBe(true);
-
-			// The binding should be set up without errors
-			const display = document.getElementById("display");
-			expect(display).toBeDefined();
-
-			// Note: Testing Solid effects in a test environment is tricky
-			// The effect setup should not throw, which is what we're verifying here
+			expect(button.parentElement).toBe(parent);
 		});
 	});
 
@@ -359,7 +246,7 @@ describe("StateBinder", () => {
 
 			const manifest: StateManifest = {
 				state_directives: [
-					HandleEvent.create({
+					createHandleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -368,7 +255,6 @@ describe("StateBinder", () => {
 				],
 			};
 
-			// Add elements dynamically
 			const container = document.createElement("div");
 			const button = document.createElement("button");
 			button.id = "dynamic-button";
@@ -383,48 +269,9 @@ describe("StateBinder", () => {
 			container.appendChild(script);
 			document.body.appendChild(container);
 
-			// Wait for MutationObserver to trigger
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			// Verify element was processed (no errors)
 			expect(button.parentElement).toBe(container);
-		});
-
-		it("should not bind the same element twice", async () => {
-			const manifest: StateManifest = {
-				state_directives: [
-					HandleEvent.create({
-						el_state_id: 0,
-						field_path: "count",
-						event: "click",
-						action: "increment",
-					}),
-				],
-			};
-
-			document.body.innerHTML = `
-				<div>
-					<button id="counter" data-state-id="0">Click me</button>
-					<script data-state-manifest type="application/json">
-					${JSON.stringify(manifest)}
-					</script>
-				</div>
-			`;
-
-			const result = await stateBinder.init();
-			expect(result.isOk()).toBe(true);
-
-			const button = document.getElementById("counter") as HTMLButtonElement;
-
-			// Remove and re-add (should use WeakSet to track)
-			const parent = button.parentElement!;
-			parent.removeChild(button);
-			parent.appendChild(button);
-
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			// Should still work without duplicating listeners
-			expect(button.parentElement).toBe(parent);
 		});
 	});
 
@@ -434,7 +281,6 @@ describe("StateBinder", () => {
 			expect(result.isOk()).toBe(true);
 
 			const disconnectSpy = vi.fn();
-			// Access private observer and spy on it
 			const observer = (stateBinder as any).mutationObserver;
 			if (observer) {
 				observer.disconnect = disconnectSpy;
@@ -442,6 +288,161 @@ describe("StateBinder", () => {
 
 			stateBinder.destroy();
 			expect(disconnectSpy).toHaveBeenCalled();
+		});
+
+		it("should cleanup all disposers", async () => {
+			const manifest: StateManifest = {
+				state_directives: [
+					createRenderText({
+						el_state_id: 0,
+						field_path: "count",
+						template: "%VALUE%",
+					}),
+				],
+			};
+
+			document.body.innerHTML = `
+				<div>
+					<p data-state-id="0">Text</p>
+					<script data-state-manifest type="application/json">
+					${JSON.stringify(manifest)}
+					</script>
+				</div>
+			`;
+
+			const result = await stateBinder.init();
+			expect(result.isOk()).toBe(true);
+
+			const disposers = (stateBinder as any).disposers;
+			expect(disposers.length).toBeGreaterThan(0);
+
+			stateBinder.destroy();
+			expect((stateBinder as any).disposers.length).toBe(0);
+		});
+	});
+
+	describe("mixed directives", () => {
+		it("should handle multiple directive types together", async () => {
+			const manifest: StateManifest = {
+				state_directives: [
+					createHandleEvent({
+						el_state_id: 0,
+						field_path: "count",
+						event: "click",
+						action: "increment",
+					}),
+					createRenderText({
+						el_state_id: 1,
+						field_path: "count",
+						template: "Count: %VALUE%",
+					}),
+				],
+			};
+
+			document.body.innerHTML = `
+				<div>
+					<button id="inc" data-state-id="0">+</button>
+					<p id="display" data-state-id="1">Count: 0</p>
+					<script data-state-manifest type="application/json">
+					${JSON.stringify(manifest)}
+					</script>
+				</div>
+			`;
+
+			const result = await stateBinder.init();
+			expect(result.isOk()).toBe(true);
+
+			const button = document.getElementById("inc");
+			const display = document.getElementById("display");
+
+			expect(button).toBeDefined();
+			expect(display).toBeDefined();
+
+			// Verify both directives were bound
+			const disposers = (stateBinder as any).disposers;
+			expect(disposers.length).toBeGreaterThan(0);
+
+			// Verify clicking works without errors
+			button?.click();
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			expect(true).toBe(true);
+		});
+
+		it("should handle list with events and text rendering", async () => {
+			const templateManifest: StateManifest = {
+				state_directives: [
+					createRenderText({
+						el_state_id: 10,
+						field_path: "text",
+						template: "%VALUE%",
+					}),
+					createHandleEvent({
+						el_state_id: 11,
+						event: "click",
+						action: "increment",
+						field_path: "clicks",
+					}),
+					createRenderText({
+						el_state_id: 12,
+						field_path: "clicks",
+						template: "%VALUE%",
+					}),
+				],
+			};
+
+			const mainManifest: StateManifest = {
+				state_directives: [
+					createRenderList({
+						el_state_id: 0,
+						field_path: "todos",
+						template_id: 1,
+						item_key_path: "id",
+					}),
+				],
+			};
+
+			document.body.innerHTML = `
+				<div>
+					<ul data-state-id="0">
+						<template data-state-id="1">
+							<li>
+								<span data-state-id="10">Text</span>
+								<button data-state-id="11">+</button>
+								<span data-state-id="12">0</span>
+							</li>
+							<script data-state-manifest type="application/json">
+							${JSON.stringify(templateManifest)}
+							</script>
+						</template>
+					</ul>
+					<script data-state-manifest type="application/json">
+					${JSON.stringify(mainManifest)}
+					</script>
+				</div>
+			`;
+
+			const result = await stateBinder.init();
+			expect(result.isOk()).toBe(true);
+
+			stateBinder.docHandle?.change((doc: TestDoc) => {
+				doc.todos = [
+					{ id: "1", text: "Task 1", clicks: 0 },
+					{ id: "2", text: "Task 2", clicks: 0 },
+				];
+			});
+
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			const ul = document.querySelector('[data-state-id="0"]');
+			const listItems = ul?.querySelectorAll("li");
+			expect(listItems?.length).toBe(2);
+
+			const firstButton = document.querySelector("button");
+			firstButton?.click();
+
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			expect(true).toBe(true);
 		});
 	});
 });

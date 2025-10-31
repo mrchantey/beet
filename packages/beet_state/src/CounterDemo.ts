@@ -2,11 +2,11 @@ import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import {
-	HandleEvent,
-	StateBinder,
-	UpdateDom,
+	createHandleEvent,
+	createRenderText,
 	type StateManifest,
-} from "./StateBinder";
+} from "./directives";
+import { StateBinder } from "./StateBinder";
 import "./style.css";
 
 // Create the Automerge repo with storage and network adapters
@@ -18,19 +18,16 @@ const repo = new Repo({
 // Define the state manifest with all directives
 const stateManifest: StateManifest = {
 	state_directives: [
-		HandleEvent.create({
+		createHandleEvent({
 			el_state_id: 0,
 			field_path: "count",
 			event: "click",
 			action: "increment",
 		}),
-		UpdateDom.create({
+		createRenderText({
 			el_state_id: 1,
 			field_path: "count",
-			onchange: {
-				kind: "set_with",
-				template: "The value is %VALUE%",
-			},
+			template: "The value is %VALUE%",
 		}),
 	],
 };

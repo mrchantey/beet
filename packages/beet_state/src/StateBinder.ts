@@ -1,103 +1,16 @@
 import type { DocHandle, DocumentId } from "@automerge/automerge-repo";
 import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
-import { makeDocumentProjection } from "@automerge/automerge-repo-solid-primitives";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
-import { createEffect } from "solid-js";
 import { err, ok, Result } from "neverthrow";
-
-/**
- * Base type for binding elements to state directives.
- */
-export type BindElement = {
-	/** ID used to bind the element via data-state-id attribute */
-	el_state_id: number;
-};
-
-/**
- * Base type for field location information.
- * Contains the common fields needed to locate a field in an Automerge document.
- */
-export type FieldLocation = {
-	/** Repository identifier (currently unused, reserved for multi-repo support) */
-	doc_repo?: string;
-
-	/** Document ID to use (undefined means use the root document) */
-	doc_id?: string;
-
-	/** JSON path to the field in the document (e.g., "count", "user.name", "items[0].value"). Undefined means use the root of the document. */
-	field_path?: string;
-};
-
-/**
- * Defines how a DOM event should effect the specified document field.
- */
-export type HandleEvent = BindElement &
-	FieldLocation & {
-		/** Discriminant for union type */
-		kind: "handle_event";
-
-		/** DOM event name to listen for (e.g., "click", "input", "change") */
-		event: string;
-
-		/** Action to perform when the event fires */
-		action: "increment" | "decrement" | "set";
-	};
-
-/**
- * Defines how a DOM element should update when a document field changes.
- */
-export type UpdateDom = BindElement &
-	FieldLocation & {
-		/** Discriminant for union type */
-		kind: "update_dom";
-
-		/** Configuration for how to update the DOM */
-		onchange: {
-			/** Type of onchange handler */
-			kind: "set_with";
-			/** Template string with %VALUE% placeholder for the field value */
-			template: string;
-		};
-	};
-
-/**
- * Union type for all state directive configurations.
- */
-export type StateDirective = HandleEvent | UpdateDom;
-
-/**
- * Manifest containing all state directives for a root element.
- */
-export type StateManifest = {
-	/** Array of state directives to bind */
-	state_directives: StateDirective[];
-};
-
-/**
- * Helper type to make certain keys optional
- */
-type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-/**
- * Helper object for creating HandleEvent configurations
- */
-export const HandleEvent = {
-	create(directive: PartialBy<HandleEvent, "kind">): HandleEvent {
-		directive.kind = "handle_event";
-		return directive as HandleEvent;
-	},
-};
-
-/**
- * Helper object for creating UpdateDom configurations
- */
-export const UpdateDom = {
-	create(directive: PartialBy<UpdateDom, "kind">): UpdateDom {
-		directive.kind = "update_dom";
-		return directive as UpdateDom;
-	},
-};
+import {
+	bindHandleEvent,
+	bindRenderList,
+	bindRenderText,
+	type DirectiveContext,
+	type StateDirective,
+	type StateManifest,
+} from "./directives";
 
 /**
  * StateBinder provides declarative bindings between DOM elements and Automerge documents.
@@ -105,14 +18,16 @@ export const UpdateDom = {
  * Elements can be configured to:
  * - Trigger document updates in response to events (e.g., increment on click)
  * - Automatically update their content when document fields change
+ * - Render lists from arrays with template-based item rendering
  *
  * Configuration is done via a `data-state-manifest` script element containing a StateManifest.
  */
 export class StateBinder {
 	public repo: Repo;
-	private docHandle: DocHandle<any> | null = null;
+	public docHandle: DocHandle<any> | null = null;
 	private mutationObserver: MutationObserver | null = null;
 	private boundElements = new WeakSet<Element>();
+	private disposers: Array<() => void> = [];
 
 	constructor(repo?: Repo) {
 		this.repo =
@@ -244,7 +159,10 @@ export class StateBinder {
 			}
 
 			const element = elementResult.value;
-			this.bindElement(element, directive);
+			const bindResult = this.bindElement(element, directive);
+			if (bindResult.isErr()) {
+				console.warn(`Failed to bind element: ${bindResult.error}`);
+			}
 		}
 
 		return ok(undefined);
@@ -305,104 +223,70 @@ export class StateBinder {
 	/**
 	 * Bind a single element to its directive
 	 */
-	private bindElement(element: Element, directive: StateDirective): void {
+	private bindElement(
+		element: Element,
+		directive: StateDirective,
+	): Result<void, string> {
 		// Skip if already bound
 		if (this.boundElements.has(element)) {
-			return;
+			return ok(undefined);
 		}
 		this.boundElements.add(element);
 
-		this.bindDirective(element, directive);
+		return this.bindDirective(element, directive);
 	}
 
-	private bindDirective(element: Element, directive: StateDirective): void {
-		// Set up event handler if it's a HandleEvent directive
+	/**
+	 * Bind a directive to an element
+	 */
+	private bindDirective(
+		element: Element,
+		directive: StateDirective,
+	): Result<void, string> {
+		if (!this.docHandle) {
+			return err("No document handle available");
+		}
+
+		const context: DirectiveContext = {
+			docHandle: this.docHandle,
+			getValueByPath: this.getValueByPath.bind(this),
+			setValueByPath: this.setValueByPath.bind(this),
+			findElementForDirective: this.findElementForDirective.bind(this),
+		};
+
+		let result: Result<{ dispose?: () => void }, string>;
+
 		if (directive.kind === "handle_event") {
-			this.bindEvent(element, directive);
-		} // Set up onchange handler if it's a UpdateDom directive
-		else if (directive.kind === "update_dom") {
-			this.bindOnChange(element, directive);
-		}
-	}
-
-	/**
-	 * Bind an event listener to an element
-	 */
-	private bindEvent(element: Element, config: HandleEvent): void {
-		if (!this.docHandle) return;
-
-		element.addEventListener(config.event, () => {
-			this.handleAction(config);
-		});
-	}
-
-	/**
-	 * Handle an action (increment, decrement, set)
-	 */
-	private handleAction(config: HandleEvent): void {
-		if (!this.docHandle) return;
-
-		this.docHandle.change((doc: any) => {
-			const fieldPath = config.field_path;
-
-			switch (config.action) {
-				case "increment":
-					{
-						const currentValue = this.getValueByPath(doc, fieldPath) || 0;
-						this.setValueByPath(doc, fieldPath, currentValue + 1);
-					}
-					break;
-				case "decrement":
-					{
-						const currentValue = this.getValueByPath(doc, fieldPath) || 0;
-						this.setValueByPath(doc, fieldPath, currentValue - 1);
-					}
-					break;
-				case "set":
-					throw new Error("todo");
-					// For set, we'd need a value in the config
-					break;
-			}
-		});
-	}
-
-	/**
-	 * Bind an onchange handler using Solid effects
-	 */
-	private bindOnChange(element: Element, config: UpdateDom): void {
-		if (!this.docHandle) return;
-
-		// Initialize the field if it doesn't exist
-		const fieldPath = config.field_path;
-		const currentDoc = this.docHandle.doc();
-		if (
-			currentDoc &&
-			this.getValueByPath(currentDoc, fieldPath) === undefined
-		) {
-			this.docHandle.change((doc: any) => {
-				if (this.getValueByPath(doc, fieldPath) === undefined) {
-					this.setValueByPath(doc, fieldPath, 0);
-				}
-			});
+			result = bindHandleEvent(element, directive, context);
+		} else if (directive.kind === "render_text") {
+			result = bindRenderText(element, directive, context);
+		} else if (directive.kind === "render_list") {
+			result = bindRenderList(element, directive, context);
+		} else {
+			return err(`Unknown directive kind: ${(directive as any).kind}`);
 		}
 
-		const docProjection = makeDocumentProjection(this.docHandle);
+		if (result.isErr()) {
+			return err(result.error);
+		}
 
-		createEffect(() => {
-			const value = this.getValueByPath(docProjection as any, fieldPath) ?? 0;
+		if (result.value.dispose) {
+			this.disposers.push(result.value.dispose);
+		}
 
-			if (config.onchange.kind === "set_with") {
-				const template = config.onchange.template;
-				const text = template.replace("%VALUE%", String(value));
-				element.textContent = text;
-			}
-		});
+		return ok(undefined);
 	}
 
 	/**
 	 * Cleanup and disconnect observer
 	 */
 	destroy(): void {
+		// Cleanup all disposers
+		for (const dispose of this.disposers) {
+			dispose();
+		}
+		this.disposers = [];
+
 		if (this.mutationObserver) {
 			this.mutationObserver.disconnect();
 			this.mutationObserver = null;

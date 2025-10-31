@@ -1,0 +1,89 @@
+import { Repo } from "@automerge/automerge-repo";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { StateBinder } from "../StateBinder";
+import { createRenderText } from "./RenderText";
+import type { StateManifest } from "./types";
+
+describe("RenderText", () => {
+	let stateBinder: StateBinder;
+
+	beforeEach(async () => {
+		document.body.innerHTML = "";
+		localStorage.clear();
+		stateBinder = new StateBinder(new Repo());
+	});
+
+	afterEach(() => {
+		stateBinder.destroy();
+	});
+
+	it("should set up RenderText binding without errors", async () => {
+		const manifest: StateManifest = {
+			state_directives: [
+				createRenderText({
+					el_state_id: 0,
+					field_path: "count",
+					template: "The value is %VALUE%",
+				}),
+			],
+		};
+
+		document.body.innerHTML = `
+			<div>
+				<p id="display" data-state-id="0">Initial</p>
+				<script data-state-manifest type="application/json">
+				${JSON.stringify(manifest)}
+				</script>
+			</div>
+		`;
+
+		const result = await stateBinder.init();
+		expect(result.isOk()).toBe(true);
+
+		const display = document.getElementById("display");
+		expect(display).toBeDefined();
+
+		// Verify binding was created
+		const disposers = (stateBinder as any).disposers;
+		expect(disposers.length).toBeGreaterThan(0);
+	});
+
+	it("should support multiple RenderText directives", async () => {
+		const manifest: StateManifest = {
+			state_directives: [
+				createRenderText({
+					el_state_id: 0,
+					field_path: "count",
+					template: "Count: %VALUE%",
+				}),
+				createRenderText({
+					el_state_id: 1,
+					field_path: "name",
+					template: "Name: %VALUE%",
+				}),
+			],
+		};
+
+		document.body.innerHTML = `
+			<div>
+				<p id="count" data-state-id="0">Count</p>
+				<p id="name" data-state-id="1">Name</p>
+				<script data-state-manifest type="application/json">
+				${JSON.stringify(manifest)}
+				</script>
+			</div>
+		`;
+
+		const result = await stateBinder.init();
+		expect(result.isOk()).toBe(true);
+
+		const countDisplay = document.getElementById("count");
+		const nameDisplay = document.getElementById("name");
+		expect(countDisplay).toBeDefined();
+		expect(nameDisplay).toBeDefined();
+
+		// Verify both bindings were created
+		const disposers = (stateBinder as any).disposers;
+		expect(disposers.length).toBe(2);
+	});
+});
