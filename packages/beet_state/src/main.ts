@@ -1,2 +1,2 @@
-import "./RenderListDemo";
+import "./demos/RenderListDemo";
 // import "./CounterDemo";

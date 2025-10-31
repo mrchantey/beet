@@ -1,8 +1,8 @@
 import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
-import { type StateManifest } from "./directives";
-import { BindContext } from "./BindContext";
+import { type StateManifest } from "../state_binding";
+import { BindContext } from "../state_binding";
 import "./style.css";
 
 // Create the Automerge repo with storage and network adapters
