@@ -1,5 +1,3 @@
-import type { DocHandle } from "@automerge/automerge-repo";
-import { Result } from "neverthrow";
 import type { HandleEvent } from "./HandleEvent";
 import type { RenderList } from "./RenderList";
 import type { RenderText } from "./RenderText";
@@ -38,24 +36,6 @@ export type StateDirective = HandleEvent | RenderText | RenderList;
 export type StateManifest = {
 	/** Array of state directives to bind */
 	state_directives: StateDirective[];
-};
-
-/**
- * Helper type to make certain keys optional
- */
-export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-/**
- * Context passed to directive binders
- */
-export type DirectiveContext = {
-	docHandle: DocHandle<any>;
-	getValueByPath: (doc: any, path?: string) => any;
-	setValueByPath: (doc: any, path: string | undefined, value: any) => void;
-	findElementForDirective: (
-		root: Element,
-		directive: StateDirective,
-	) => Result<Element, string>;
 };
 
 /**

@@ -1,26 +1,22 @@
-import { Repo } from "@automerge/automerge-repo";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createHandleEvent } from "./HandleEvent";
-import { StateBinder } from "../StateBinder";
+import { BindContext } from "../BindContext";
 import type { StateManifest } from "./types";
 
 describe("HandleEvent", () => {
-	let stateBinder: StateBinder;
+	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		document.body.innerHTML = "";
-		localStorage.clear();
-		stateBinder = new StateBinder(new Repo());
+		bindContext = BindContext.newTest();
 	});
 
 	afterEach(() => {
-		stateBinder.destroy();
+		bindContext.destroy();
 	});
 
 	it("should bind click event to increment action", async () => {
 		const manifest: StateManifest = {
 			state_directives: [
-				createHandleEvent({
+				BindContext.handleEvent({
 					el_state_id: 0,
 					field_path: "count",
 					event: "click",
@@ -38,7 +34,7 @@ describe("HandleEvent", () => {
 			</div>
 		`;
 
-		const result = await stateBinder.init();
+		const result = await bindContext.init();
 		expect(result.isOk()).toBe(true);
 
 		const button = document.getElementById("counter") as HTMLButtonElement;
@@ -54,7 +50,7 @@ describe("HandleEvent", () => {
 	it("should support decrement action", async () => {
 		const manifest: StateManifest = {
 			state_directives: [
-				createHandleEvent({
+				BindContext.handleEvent({
 					el_state_id: 0,
 					field_path: "count",
 					event: "click",
@@ -72,7 +68,7 @@ describe("HandleEvent", () => {
 			</div>
 		`;
 
-		const result = await stateBinder.init();
+		const result = await bindContext.init();
 		expect(result.isOk()).toBe(true);
 
 		const button = document.getElementById("counter") as HTMLButtonElement;
@@ -85,13 +81,13 @@ describe("HandleEvent", () => {
 	it("should bind multiple directives to different elements", async () => {
 		const manifest: StateManifest = {
 			state_directives: [
-				createHandleEvent({
+				BindContext.handleEvent({
 					el_state_id: 0,
 					field_path: "count",
 					event: "click",
 					action: "increment",
 				}),
-				createHandleEvent({
+				BindContext.handleEvent({
 					el_state_id: 1,
 					field_path: "count",
 					event: "click",
@@ -110,7 +106,7 @@ describe("HandleEvent", () => {
 			</div>
 		`;
 
-		const result = await stateBinder.init();
+		const result = await bindContext.init();
 		expect(result.isOk()).toBe(true);
 
 		const incButton = document.getElementById("inc");

@@ -1,12 +1,8 @@
 import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
-import {
-	createHandleEvent,
-	createRenderText,
-	type StateManifest,
-} from "./directives";
-import { StateBinder } from "./StateBinder";
+import { type StateManifest } from "./directives";
+import { BindContext } from "./BindContext";
 import "./style.css";
 
 // Create the Automerge repo with storage and network adapters
@@ -18,13 +14,13 @@ const repo = new Repo({
 // Define the state manifest with all directives
 const stateManifest: StateManifest = {
 	state_directives: [
-		createHandleEvent({
+		BindContext.handleEvent({
 			el_state_id: 0,
 			field_path: "count",
 			event: "click",
 			action: "increment",
 		}),
-		createRenderText({
+		BindContext.renderText({
 			el_state_id: 1,
 			field_path: "count",
 			template: "The value is %VALUE%",
@@ -49,5 +45,5 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 	</div>
 `;
 
-const stateBinder = new StateBinder(repo);
-stateBinder.init();
+const bindContext = new BindContext(repo);
+bindContext.init();

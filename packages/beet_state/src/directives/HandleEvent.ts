@@ -1,11 +1,6 @@
 import { err, ok, type Result } from "neverthrow";
-import type {
-	BindElement,
-	BindResult,
-	DirectiveContext,
-	FieldLocation,
-	PartialBy,
-} from "./types";
+import type { BindContext } from "../BindContext";
+import type { BindElement, BindResult, FieldLocation } from "./types";
 
 /**
  * Defines how a DOM event should effect the specified document field.
@@ -23,22 +18,12 @@ export type HandleEvent = BindElement &
 	};
 
 /**
- * Helper function for creating HandleEvent configurations
- */
-export function createHandleEvent(
-	directive: PartialBy<HandleEvent, "kind">,
-): HandleEvent {
-	directive.kind = "handle_event";
-	return directive as HandleEvent;
-}
-
-/**
  * Bind a HandleEvent directive to an element
  */
 export function bindHandleEvent(
 	element: Element,
 	config: HandleEvent,
-	context: DirectiveContext,
+	context: BindContext,
 ): Result<BindResult, string> {
 	const handler = () => {
 		handleAction(config, context);
@@ -56,8 +41,8 @@ export function bindHandleEvent(
 /**
  * Handle an action (increment, decrement, set)
  */
-function handleAction(config: HandleEvent, context: DirectiveContext): void {
-	context.docHandle.change((doc: any) => {
+function handleAction(config: HandleEvent, context: BindContext): void {
+	context.docHandle!.change((doc: any) => {
 		const fieldPath = config.field_path;
 
 		switch (config.action) {
@@ -74,7 +59,7 @@ function handleAction(config: HandleEvent, context: DirectiveContext): void {
 				}
 				break;
 			case "set":
-				return err("set action not yet implemented");
+				return err("set action not yet implemented") as any;
 		}
 	});
 }

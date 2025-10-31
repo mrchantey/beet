@@ -1,16 +1,11 @@
 import { ok, err, type Result } from "neverthrow";
+import { BindContext } from "../BindContext";
 import type {
-    BindElement,
+	BindElement,
 	BindResult,
-	DirectiveContext,
 	FieldLocation,
-	PartialBy,
 	StateDirective,
-	StateManifest,
 } from "./types";
-import { bindHandleEvent } from "./HandleEvent";
-import { bindRenderTextScoped } from "./RenderText";
-
 
 /**
  * Defines how a template should be instantiated for each item in an array.
@@ -31,17 +26,6 @@ export type RenderList = BindElement &
 		 */
 		item_key_path?: string;
 	};
-
-
-/**
- * Helper function for creating RenderList configurations
- */
-export function createRenderList(
-	directive: PartialBy<RenderList, "kind">,
-): RenderList {
-	directive.kind = "render_list";
-	return directive as RenderList;
-}
 
 /**
  * Represents a single item instance in a rendered list
@@ -84,9 +68,8 @@ const listInstances = new WeakMap<Element, ListInstance>();
 export function bindRenderList(
 	container: Element,
 	directive: RenderList,
-	context: DirectiveContext,
+	context: BindContext,
 ): Result<BindResult, string> {
-
 	// Find the template element
 	const templateResult = context.findElementForDirective(container, {
 		...directive,
@@ -109,9 +92,12 @@ export function bindRenderList(
 	// Initialize the array field if it doesn't exist
 	const fieldPath = directive.field_path;
 
-	let currentDoc = context.docHandle.doc();
-	if (currentDoc && context.getValueByPath(currentDoc, fieldPath) === undefined) {
-		context.docHandle.change((doc: any) => {
+	let currentDoc = context.docHandle!.doc();
+	if (
+		currentDoc &&
+		context.getValueByPath(currentDoc, fieldPath) === undefined
+	) {
+		context.docHandle!.change((doc: any) => {
 			if (context.getValueByPath(doc, fieldPath) === undefined) {
 				context.setValueByPath(doc, fieldPath, []);
 			}
@@ -130,7 +116,7 @@ export function bindRenderList(
 	listInstances.set(container, listInstance);
 
 	// Do initial reconciliation with current state
-	currentDoc = context.docHandle.doc();
+	currentDoc = context.docHandle!.doc();
 	if (currentDoc) {
 		const initialArray = context.getValueByPath(currentDoc, fieldPath) ?? [];
 		if (Array.isArray(initialArray)) {
@@ -165,9 +151,9 @@ export function bindRenderList(
 		}
 	};
 
-	context.docHandle.on("change", changeHandler);
+	context.docHandle!.on("change", changeHandler);
 	listInstance.disposeChangeListener = () => {
-		context.docHandle.off("change", changeHandler);
+		context.docHandle!.off("change", changeHandler);
 	};
 
 	return ok({
@@ -190,11 +176,10 @@ function reconcileList(
 	listInstance: ListInstance,
 	array: any[],
 	arrayPath: string,
-	context: DirectiveContext,
+	context: BindContext,
 ): void {
 	const { directive, template, items } = listInstance;
 	const keyPath = directive.item_key_path;
-	const { getValueByPath } = context;
 
 	// Build map of current keys
 	const currentKeys = new Set<string>();
@@ -203,7 +188,7 @@ function reconcileList(
 	for (let i = 0; i < array.length; i++) {
 		const item = array[i];
 		const key = keyPath
-			? String(getValueByPath(item, keyPath) ?? i)
+			? String(context.getValueByPath(item, keyPath) ?? i)
 			: String(i);
 
 		currentKeys.add(key);
@@ -279,7 +264,7 @@ function createListItem(
 	index: number,
 	arrayPath: string,
 	key: string,
-	context: DirectiveContext,
+	context: BindContext,
 ): Result<ListItemInstance, string> {
 	// Clone the template content
 	const fragment = template.content.cloneNode(true) as DocumentFragment;
@@ -290,7 +275,6 @@ function createListItem(
 	) as HTMLScriptElement | null;
 
 	const elements: Element[] = [];
-	const itemDisposers: Array<() => void> = [];
 
 	// Collect all top-level elements from the fragment (excluding script tags)
 	const fragmentChildren = Array.from(fragment.children).filter(
@@ -298,18 +282,21 @@ function createListItem(
 	);
 	elements.push(...fragmentChildren);
 
+	// Create a scoped context for this list item
+	const itemPath = `${arrayPath}[${index}]`;
+	const scopedContext = context.scoped(itemPath);
+
 	// If there's a manifest, bind the cloned elements
 	if (manifestScript) {
-		const manifestResult = parseManifest(manifestScript);
+		const manifestResult = BindContext.parseManifest(manifestScript);
 
 		if (manifestResult.isErr()) {
 			return err(`Failed to parse template manifest: ${manifestResult.error}`);
 		}
 
 		const manifest = manifestResult.value;
-		const itemPath = `${arrayPath}[${index}]`;
 
-		// Bind each directive with scoped field paths
+		// Bind each directive using the scoped context
 		for (const directive of manifest.state_directives) {
 			// Find element within the cloned fragment
 			const elementResult = findElementInFragmentForDirective(
@@ -326,16 +313,8 @@ function createListItem(
 
 			const element = elementResult.value;
 
-			// Create a scoped directive with prefixed field path
-			const scopedDirective = scopeDirectiveToItem(directive, itemPath);
-
-			// Bind the directive
-			const bindResult = bindDirectiveScoped(
-				element,
-				scopedDirective,
-				context,
-				itemDisposers,
-			);
+			// Bind the directive with the scoped context
+			const bindResult = scopedContext.bindDirective(element, directive);
 
 			if (bindResult.isErr()) {
 				console.warn(`Failed to bind directive: ${bindResult.error}`);
@@ -348,37 +327,15 @@ function createListItem(
 		elements,
 		index,
 		dispose:
-			itemDisposers.length > 0
+			scopedContext["disposers"].length > 0
 				? () => {
-						itemDisposers.forEach((dispose) => dispose());
+						// Dispose all effects created in the scoped context
+						for (const dispose of scopedContext["disposers"]) {
+							dispose();
+						}
 					}
 				: undefined,
 	});
-}
-
-/**
- * Parse the state manifest from a script element
- */
-function parseManifest(
-	script: HTMLScriptElement,
-): Result<StateManifest, string> {
-	try {
-		const manifestJson = script.textContent || "";
-		const manifest = JSON.parse(manifestJson) as StateManifest;
-
-		if (
-			!manifest.state_directives ||
-			!Array.isArray(manifest.state_directives)
-		) {
-			return err("Invalid manifest: missing or invalid state_directives array");
-		}
-
-		return ok(manifest);
-	} catch (error) {
-		return err(
-			`Failed to parse manifest JSON: ${error instanceof Error ? error.message : String(error)}`,
-		);
-	}
 }
 
 /**
@@ -401,46 +358,4 @@ function findElementInFragmentForDirective(
 	}
 
 	return err(`Element with data-state-id="${directive.el_state_id}" not found`);
-}
-
-/**
- * Scope a directive's field path to a specific item path
- */
-function scopeDirectiveToItem(
-	directive: StateDirective,
-	itemPath: string,
-): StateDirective {
-	const fieldPath = directive.field_path;
-	const scopedPath = fieldPath ? `${itemPath}.${fieldPath}` : itemPath;
-
-	return {
-		...directive,
-		field_path: scopedPath,
-	};
-}
-
-/**
- * Bind a directive within a scoped context (for list items)
- */
-function bindDirectiveScoped(
-	element: Element,
-	directive: StateDirective,
-	context: DirectiveContext,
-	disposers: Array<() => void>,
-): Result<void, string> {
-	if (directive.kind === "handle_event") {
-		const result = bindHandleEvent(element, directive, context);
-		if (result.isErr()) return err(result.error);
-		if (result.value.dispose) {
-			disposers.push(result.value.dispose);
-		}
-		return ok(undefined);
-	} else if (directive.kind === "render_text") {
-		return bindRenderTextScoped(element, directive, context, disposers).map(
-			() => undefined,
-		);
-	}
-	// RenderList within RenderList would need special handling (nested lists)
-	// For now, we don't support it
-	return err(`Unsupported directive kind in template: ${directive.kind}`);
 }

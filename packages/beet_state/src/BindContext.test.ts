@@ -1,12 +1,6 @@
-import { Repo } from "@automerge/automerge-repo";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	createHandleEvent,
-	createRenderList,
-	createRenderText,
-	type StateManifest,
-} from "./directives";
-import { StateBinder } from "./StateBinder";
+import type { StateManifest } from "./directives";
+import { BindContext } from "./BindContext";
 
 interface TestDoc {
 	count: number;
@@ -14,31 +8,29 @@ interface TestDoc {
 	todos?: Array<{ id: string; text: string; clicks?: number }>;
 }
 
-describe("StateBinder - Integration Tests", () => {
-	let stateBinder: StateBinder;
+describe("BindContext - Integration Tests", () => {
+	let bindContext: BindContext;
 
 	beforeEach(async () => {
-		document.body.innerHTML = "";
-		localStorage.clear();
-		stateBinder = new StateBinder(new Repo());
+		bindContext = BindContext.newTest();
 	});
 
 	afterEach(() => {
-		stateBinder.destroy();
+		bindContext.destroy();
 	});
 
 	describe("initialization", () => {
 		it("should initialize and create a document handle", async () => {
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 			expect(localStorage.getItem("rootDocId")).toBeDefined();
 		});
 
 		it("should use provided docId if given", async () => {
-			const handle = stateBinder.repo.create<TestDoc>();
+			const handle = bindContext.repo.create<TestDoc>();
 			const docId = handle.documentId;
 
-			const result = await stateBinder.init(docId);
+			const result = await bindContext.init(docId);
 			expect(result.isOk()).toBe(true);
 			expect(localStorage.getItem("rootDocId")).toBeNull();
 		});
@@ -46,7 +38,7 @@ describe("StateBinder - Integration Tests", () => {
 		it("should scan existing elements on init", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -64,7 +56,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const button = document.getElementById("counter");
@@ -76,7 +68,7 @@ describe("StateBinder - Integration Tests", () => {
 		it("should parse valid manifest from script element", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -94,7 +86,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 		});
 
@@ -103,7 +95,7 @@ describe("StateBinder - Integration Tests", () => {
 				<button data-state-id="0">Test</button>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 		});
 
@@ -117,7 +109,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isErr()).toBe(true);
 			if (result.isErr()) {
 				expect(result.error).toContain("Failed to parse manifest");
@@ -134,7 +126,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isErr()).toBe(true);
 			if (result.isErr()) {
 				expect(result.error).toContain("Invalid manifest");
@@ -146,7 +138,7 @@ describe("StateBinder - Integration Tests", () => {
 		it("should find element by data-state-id", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -164,7 +156,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const button = document.getElementById("my-button");
@@ -176,7 +168,7 @@ describe("StateBinder - Integration Tests", () => {
 
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 99,
 						field_path: "count",
 						event: "click",
@@ -194,7 +186,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 			expect(consoleSpy).toHaveBeenCalledWith(
 				expect.stringContaining('data-state-id="99"'),
@@ -206,7 +198,7 @@ describe("StateBinder - Integration Tests", () => {
 		it("should not bind the same element twice", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -224,7 +216,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const button = document.getElementById("counter") as HTMLButtonElement;
@@ -241,12 +233,12 @@ describe("StateBinder - Integration Tests", () => {
 
 	describe("MutationObserver", () => {
 		it("should detect and bind dynamically added elements", async () => {
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
@@ -277,23 +269,23 @@ describe("StateBinder - Integration Tests", () => {
 
 	describe("cleanup", () => {
 		it("should disconnect MutationObserver on destroy", async () => {
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const disconnectSpy = vi.fn();
-			const observer = (stateBinder as any).mutationObserver;
+			const observer = (bindContext as any).mutationObserver;
 			if (observer) {
 				observer.disconnect = disconnectSpy;
 			}
 
-			stateBinder.destroy();
+			bindContext.destroy();
 			expect(disconnectSpy).toHaveBeenCalled();
 		});
 
 		it("should cleanup all disposers", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createRenderText({
+					BindContext.renderText({
 						el_state_id: 0,
 						field_path: "count",
 						template: "%VALUE%",
@@ -310,14 +302,14 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
-			const disposers = (stateBinder as any).disposers;
+			const disposers = (bindContext as any).disposers;
 			expect(disposers.length).toBeGreaterThan(0);
 
-			stateBinder.destroy();
-			expect((stateBinder as any).disposers.length).toBe(0);
+			bindContext.destroy();
+			expect((bindContext as any).disposers.length).toBe(0);
 		});
 	});
 
@@ -325,13 +317,13 @@ describe("StateBinder - Integration Tests", () => {
 		it("should handle multiple directive types together", async () => {
 			const manifest: StateManifest = {
 				state_directives: [
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 0,
 						field_path: "count",
 						event: "click",
 						action: "increment",
 					}),
-					createRenderText({
+					BindContext.renderText({
 						el_state_id: 1,
 						field_path: "count",
 						template: "Count: %VALUE%",
@@ -349,7 +341,7 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
 			const button = document.getElementById("inc");
@@ -359,7 +351,7 @@ describe("StateBinder - Integration Tests", () => {
 			expect(display).toBeDefined();
 
 			// Verify both directives were bound
-			const disposers = (stateBinder as any).disposers;
+			const disposers = (bindContext as any).disposers;
 			expect(disposers.length).toBeGreaterThan(0);
 
 			// Verify clicking works without errors
@@ -371,18 +363,18 @@ describe("StateBinder - Integration Tests", () => {
 		it("should handle list with events and text rendering", async () => {
 			const templateManifest: StateManifest = {
 				state_directives: [
-					createRenderText({
+					BindContext.renderText({
 						el_state_id: 10,
 						field_path: "text",
 						template: "%VALUE%",
 					}),
-					createHandleEvent({
+					BindContext.handleEvent({
 						el_state_id: 11,
 						event: "click",
 						action: "increment",
 						field_path: "clicks",
 					}),
-					createRenderText({
+					BindContext.renderText({
 						el_state_id: 12,
 						field_path: "clicks",
 						template: "%VALUE%",
@@ -392,7 +384,7 @@ describe("StateBinder - Integration Tests", () => {
 
 			const mainManifest: StateManifest = {
 				state_directives: [
-					createRenderList({
+					BindContext.renderList({
 						el_state_id: 0,
 						field_path: "todos",
 						template_id: 1,
@@ -421,10 +413,10 @@ describe("StateBinder - Integration Tests", () => {
 				</div>
 			`;
 
-			const result = await stateBinder.init();
+			const result = await bindContext.init();
 			expect(result.isOk()).toBe(true);
 
-			stateBinder.docHandle?.change((doc: TestDoc) => {
+			bindContext.docHandle?.change((doc: TestDoc) => {
 				doc.todos = [
 					{ id: "1", text: "Task 1", clicks: 0 },
 					{ id: "2", text: "Task 2", clicks: 0 },

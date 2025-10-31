@@ -1,14 +1,9 @@
 import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
-import {
-	createHandleEvent,
-	createRenderList,
-	createRenderText,
-	type StateManifest,
-} from "./directives";
+import { type StateManifest } from "./directives";
 import "./style.css";
-import { StateBinder } from "./StateBinder";
+import { BindContext } from "./BindContext";
 
 // Create the Automerge repo with storage and network adapters
 const repo = new Repo({
@@ -19,13 +14,13 @@ const repo = new Repo({
 // Define the main manifest with RenderList directive
 const mainManifest: StateManifest = {
 	state_directives: [
-		createRenderList({
+		BindContext.renderList({
 			el_state_id: 0,
 			field_path: "todos",
 			template_id: 1,
 			item_key_path: "id",
 		}),
-		createHandleEvent({
+		BindContext.handleEvent({
 			el_state_id: 2,
 			event: "click",
 			action: "increment",
@@ -37,23 +32,23 @@ const mainManifest: StateManifest = {
 // Template manifest (lives inside the template)
 const templateManifest: StateManifest = {
 	state_directives: [
-		createRenderText({
+		BindContext.renderText({
 			el_state_id: 10,
 			field_path: "text",
 			template: "%VALUE%",
 		}),
-		createRenderText({
+		BindContext.renderText({
 			el_state_id: 11,
 			field_path: "id",
 			template: "ID: %VALUE%",
 		}),
-		createHandleEvent({
+		BindContext.handleEvent({
 			el_state_id: 12,
 			event: "click",
 			action: "increment",
 			field_path: "clicks",
 		}),
-		createRenderText({
+		BindContext.renderText({
 			el_state_id: 13,
 			field_path: "clicks",
 			template: "Clicks: %VALUE%",
@@ -100,13 +95,13 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 	</div>
 `;
 
-const stateBinder = new StateBinder(repo);
+const bindContext = new BindContext(repo);
 
 // Initialize with some sample data
-stateBinder.init().then((result) => {
+bindContext.init().then((result) => {
 	if (result.isOk()) {
 		// Add initial todos if the document is empty
-		stateBinder.docHandle?.change((doc: any) => {
+		bindContext.docHandle?.change((doc: any) => {
 			if (!doc.todos) {
 				doc.todos = [
 					{ id: "1", text: "Learn Automerge", clicks: 0 },
@@ -124,7 +119,7 @@ stateBinder.init().then((result) => {
 const addButton = document.getElementById("add-todo");
 if (addButton) {
 	addButton.addEventListener("click", () => {
-		stateBinder.docHandle?.change((doc: any) => {
+		bindContext.docHandle?.change((doc: any) => {
 			if (!doc.nextId) doc.nextId = 1;
 			if (!doc.todos) doc.todos = [];
 

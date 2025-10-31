@@ -3,17 +3,19 @@ import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import { err, ok, Result } from "neverthrow";
-import {
-	bindHandleEvent,
-	bindRenderList,
-	bindRenderText,
-	type DirectiveContext,
-	type StateDirective,
-	type StateManifest,
+import type {
+	HandleEvent,
+	RenderList,
+	RenderText,
+	StateDirective,
+	StateManifest,
 } from "./directives";
+import { bindHandleEvent } from "./directives/HandleEvent";
+import { bindRenderList } from "./directives/RenderList";
+import { bindRenderText } from "./directives/RenderText";
 
 /**
- * StateBinder provides declarative bindings between DOM elements and Automerge documents.
+ * BindContext provides declarative bindings between DOM elements and Automerge documents.
  *
  * Elements can be configured to:
  * - Trigger document updates in response to events (e.g., increment on click)
@@ -22,32 +24,117 @@ import {
  *
  * Configuration is done via a `data-state-manifest` script element containing a StateManifest.
  */
-export class StateBinder {
+export class BindContext {
 	public repo: Repo;
 	public docHandle: DocHandle<any> | null = null;
 	private mutationObserver: MutationObserver | null = null;
 	private boundElements = new WeakSet<Element>();
 	private disposers: Array<() => void> = [];
+	private pathPrefix?: string;
 
-	constructor(repo?: Repo) {
+	constructor(repo?: Repo, pathPrefix?: string) {
 		this.repo =
 			repo ||
 			new Repo({
 				network: [new BroadcastChannelNetworkAdapter()],
 				storage: new IndexedDBStorageAdapter(),
 			});
+		this.pathPrefix = pathPrefix;
+	}
+
+	/**
+	 * Create a test instance with document and localStorage cleared
+	 */
+	static newTest(repo?: Repo): BindContext {
+		document.body.innerHTML = "";
+		localStorage.clear();
+		return new BindContext(repo || new Repo());
+	}
+
+	/**
+	 * Create a HandleEvent directive configuration
+	 */
+	static handleEvent(config: Omit<HandleEvent, "kind">): HandleEvent {
+		return { ...config, kind: "handle_event" };
+	}
+
+	/**
+	 * Create a RenderText directive configuration
+	 */
+	static renderText(config: Omit<RenderText, "kind">): RenderText {
+		return { ...config, kind: "render_text" };
+	}
+
+	/**
+	 * Create a RenderList directive configuration
+	 */
+	static renderList(config: Omit<RenderList, "kind">): RenderList {
+		return { ...config, kind: "render_list" };
+	}
+
+	/**
+	 * Parse a state manifest from a script element
+	 */
+	static parseManifest(
+		script: HTMLScriptElement,
+	): Result<StateManifest, string> {
+		try {
+			const manifestJson = script.textContent || "";
+			const manifest = JSON.parse(manifestJson) as StateManifest;
+
+			if (
+				!manifest.state_directives ||
+				!Array.isArray(manifest.state_directives)
+			) {
+				return err(
+					"Invalid manifest: missing or invalid state_directives array",
+				);
+			}
+
+			return ok(manifest);
+		} catch (error) {
+			return err(
+				`Failed to parse manifest JSON: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	/**
+	 * Create a scoped version of this context with a path prefix
+	 */
+	scoped(prefix: string): BindContext {
+		const scopedContext = new BindContext(this.repo, prefix);
+		scopedContext.docHandle = this.docHandle;
+		scopedContext.mutationObserver = this.mutationObserver;
+		scopedContext.boundElements = this.boundElements;
+		// Note: disposers are NOT shared - each scoped context manages its own
+		return scopedContext;
+	}
+
+	/**
+	 * Get the full path with prefix applied
+	 */
+	private getFullPath(path?: string): string | undefined {
+		if (!path) {
+			return this.pathPrefix;
+		}
+		if (!this.pathPrefix) {
+			return path;
+		}
+		return `${this.pathPrefix}.${path}`;
 	}
 
 	/**
 	 * Get a value from a document using a JSON path like "foo.bar[0].baz"
 	 * If path is undefined, returns the root document
 	 */
-	private getValueByPath(doc: any, path?: string): any {
-		if (!path) {
+	getValueByPath(doc: any, path?: string): any {
+		const fullPath = this.getFullPath(path);
+		if (!fullPath) {
 			return doc;
 		}
 		// Parse the path to handle both dot notation and bracket notation
-		const keys = path.match(/[^.[\]]+/g) || [];
+		const keys = fullPath.match(/[^.[\]]+/g) || [];
 		let value = doc;
 		for (const key of keys) {
 			if (value === undefined || value === null) {
@@ -62,12 +149,13 @@ export class StateBinder {
 	 * Set a value in a document using a JSON path like "foo.bar[0].baz"
 	 * If path is undefined, does nothing (can't replace root)
 	 */
-	private setValueByPath(doc: any, path: string | undefined, value: any): void {
-		if (!path) {
+	setValueByPath(doc: any, path: string | undefined, value: any): void {
+		const fullPath = this.getFullPath(path);
+		if (!fullPath) {
 			console.warn("Cannot set value at root document");
 			return;
 		}
-		const keys = path.match(/[^.[\]]+/g) || [];
+		const keys = fullPath.match(/[^.[\]]+/g) || [];
 		if (keys.length === 0) return;
 
 		let current = doc;
@@ -84,7 +172,7 @@ export class StateBinder {
 	}
 
 	/**
-	 * Initialize StateBinder by scanning existing elements and setting up MutationObserver
+	 * Initialize BindContext by scanning existing elements and setting up MutationObserver
 	 */
 	async init(rootDocId?: DocumentId): Promise<Result<void, string>> {
 		// Get or create the document handle
@@ -126,7 +214,7 @@ export class StateBinder {
 			subtree: true,
 		});
 
-		return ok(undefined);
+		return ok();
 	}
 
 	/**
@@ -140,10 +228,10 @@ export class StateBinder {
 
 		if (!manifestScript) {
 			// No manifest found, nothing to bind
-			return ok(undefined);
+			return ok();
 		}
 
-		const manifestResult = this.parseManifest(manifestScript);
+		const manifestResult = BindContext.parseManifest(manifestScript);
 		if (manifestResult.isErr()) {
 			return err(`Failed to parse manifest: ${manifestResult.error}`);
 		}
@@ -165,40 +253,13 @@ export class StateBinder {
 			}
 		}
 
-		return ok(undefined);
-	}
-
-	/**
-	 * Parse the state manifest from a script element
-	 */
-	private parseManifest(
-		script: HTMLScriptElement,
-	): Result<StateManifest, string> {
-		try {
-			const manifestJson = script.textContent || "";
-			const manifest = JSON.parse(manifestJson) as StateManifest;
-
-			if (
-				!manifest.state_directives ||
-				!Array.isArray(manifest.state_directives)
-			) {
-				return err(
-					"Invalid manifest: missing or invalid state_directives array",
-				);
-			}
-
-			return ok(manifest);
-		} catch (error) {
-			return err(
-				`Failed to parse manifest JSON: ${error instanceof Error ? error.message : String(error)}`,
-			);
-		}
+		return ok();
 	}
 
 	/**
 	 * Find the element corresponding to a directive's el_state_id
 	 */
-	private findElementForDirective(
+	findElementForDirective(
 		root: Element,
 		directive: StateDirective,
 	): Result<Element, string> {
@@ -229,7 +290,7 @@ export class StateBinder {
 	): Result<void, string> {
 		// Skip if already bound
 		if (this.boundElements.has(element)) {
-			return ok(undefined);
+			return ok();
 		}
 		this.boundElements.add(element);
 
@@ -239,7 +300,7 @@ export class StateBinder {
 	/**
 	 * Bind a directive to an element
 	 */
-	private bindDirective(
+	bindDirective(
 		element: Element,
 		directive: StateDirective,
 	): Result<void, string> {
@@ -247,21 +308,14 @@ export class StateBinder {
 			return err("No document handle available");
 		}
 
-		const context: DirectiveContext = {
-			docHandle: this.docHandle,
-			getValueByPath: this.getValueByPath.bind(this),
-			setValueByPath: this.setValueByPath.bind(this),
-			findElementForDirective: this.findElementForDirective.bind(this),
-		};
-
 		let result: Result<{ dispose?: () => void }, string>;
 
 		if (directive.kind === "handle_event") {
-			result = bindHandleEvent(element, directive, context);
+			result = bindHandleEvent(element, directive, this);
 		} else if (directive.kind === "render_text") {
-			result = bindRenderText(element, directive, context);
+			result = bindRenderText(element, directive, this);
 		} else if (directive.kind === "render_list") {
-			result = bindRenderList(element, directive, context);
+			result = bindRenderList(element, directive, this);
 		} else {
 			return err(`Unknown directive kind: ${(directive as any).kind}`);
 		}
@@ -274,7 +328,14 @@ export class StateBinder {
 			this.disposers.push(result.value.dispose);
 		}
 
-		return ok(undefined);
+		return ok();
+	}
+
+	/**
+	 * Add a disposer to this context's cleanup list
+	 */
+	addDisposer(dispose: () => void): void {
+		this.disposers.push(dispose);
 	}
 
 	/**
