@@ -43,6 +43,17 @@ export type StateManifest = {
 	state_directives: StateDirective[];
 };
 
+export const StateManifest = {
+	newScript(state_directives: StateDirective[]) {
+		let stateManifest: StateManifest = { state_directives };
+		return `
+<script data-state-manifest type="application/json">
+${JSON.stringify(stateManifest)}
+</script>
+`;
+	},
+};
+
 /**
  * Result of binding a directive
  */
