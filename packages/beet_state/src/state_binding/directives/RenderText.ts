@@ -1,7 +1,5 @@
-import { createRoot, createEffect } from "solid-js";
-import { makeDocumentProjection } from "@automerge/automerge-repo-solid-primitives";
 import { ok, type Result } from "neverthrow";
-import type { BindContext } from "../BindContext";
+import { BindContext } from "../BindContext";
 import type { BindElement, BindResult, FieldLocation } from "./types";
 
 /**
@@ -24,34 +22,16 @@ export function bindRenderText(
 	config: RenderText,
 	context: BindContext,
 ): Result<BindResult, string> {
-	const { docHandle } = context;
+	const set = () => {
+		const value = context.getValueByPath(config.field_path);
+		const template = config.template;
+		const text = template.replace("%VALUE%", String(value));
+		element.textContent = text;
+	};
 
-	// Initialize the field if it doesn't exist
-	const fieldPath = config.field_path;
-	const currentDoc = docHandle!.doc();
-	if (
-		currentDoc &&
-		context.getValueByPath(currentDoc, fieldPath) === undefined
-	) {
-		docHandle!.change((doc: any) => {
-			if (context.getValueByPath(doc, fieldPath) === undefined) {
-				context.setValueByPath(doc, fieldPath, 0);
-			}
-		});
-	}
+	// set once on init and every time on change
+	set();
+	context.onChange(set);
 
-	const docProjection = makeDocumentProjection(docHandle!);
-
-	const dispose = createRoot((dispose) => {
-		createEffect(() => {
-			const value =
-				context.getValueByPath(docProjection as any, fieldPath) ?? 0;
-			const template = config.template;
-			const text = template.replace("%VALUE%", String(value));
-			element.textContent = text;
-		});
-		return dispose;
-	});
-
-	return ok({ dispose });
+	return ok({});
 }

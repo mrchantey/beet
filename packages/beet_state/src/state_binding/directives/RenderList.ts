@@ -92,16 +92,8 @@ export function bindRenderList(
 	// Initialize the array field if it doesn't exist
 	const fieldPath = directive.field_path;
 
-	let currentDoc = context.docHandle.doc();
-	if (
-		currentDoc &&
-		context.getValueByPath(currentDoc, fieldPath) === undefined
-	) {
-		context.docHandle.change((doc: any) => {
-			if (context.getValueByPath(doc, fieldPath) === undefined) {
-				context.setValueByPath(doc, fieldPath, []);
-			}
-		});
+	if (context.getValueByPath(fieldPath) === undefined) {
+		context.setValueByPath(fieldPath, []);
 	}
 
 	// Initialize list instance tracking
@@ -116,37 +108,16 @@ export function bindRenderList(
 	listInstances.set(container, listInstance);
 
 	// Do initial reconciliation with current state
-	currentDoc = context.docHandle.doc();
-	if (currentDoc) {
-		const initialArray = context.getValueByPath(currentDoc, fieldPath) ?? [];
-		if (Array.isArray(initialArray)) {
-			reconcileList(
-				container,
-				listInstance,
-				initialArray,
-				fieldPath || "",
-				context,
-			);
-		}
-	}
+	reconcileList(listInstance, context);
 
 	// Set up doc change listener to trigger reconciliation
-	const changeHandler = ({ doc }: any) => {
+	const changeHandler = () => {
 		// Reconcile all list instances
 		for (const [_containerEl, instance] of Array.from(
 			document.querySelectorAll("[data-state-id]"),
 		).map((el) => [el, listInstances.get(el)] as const)) {
 			if (instance) {
-				const array = context.getValueByPath(doc, instance.arrayPath) ?? [];
-				if (Array.isArray(array)) {
-					reconcileList(
-						instance.container,
-						instance,
-						array,
-						instance.arrayPath,
-						context,
-					);
-				}
+				reconcileList(instance, context);
 			}
 		}
 	};
@@ -171,13 +142,7 @@ export function bindRenderList(
 /**
  * Reconcile the DOM to match the current array state
  */
-function reconcileList(
-	container: Element,
-	listInstance: ListInstance,
-	array: any[],
-	arrayPath: string,
-	context: BindContext,
-): void {
+function reconcileList(listInstance: ListInstance, context: BindContext): void {
 	const { directive, template, items } = listInstance;
 	const keyPath = directive.item_key_path;
 
@@ -185,10 +150,16 @@ function reconcileList(
 	const currentKeys = new Set<string>();
 	const newItemsOrder: string[] = [];
 
+	const array = context.getValueByPath(listInstance.arrayPath) ?? [];
+
 	for (let i = 0; i < array.length; i++) {
 		const item = array[i];
 		const key = keyPath
-			? String(context.getValueByPath(item, keyPath) ?? i)
+			? String(
+					context.getValueByPath(
+						`${listInstance.arrayPath}[${i}].${keyPath}`,
+					) ?? i,
+				)
 			: String(i);
 
 		currentKeys.add(key);
@@ -200,7 +171,7 @@ function reconcileList(
 				template,
 				item,
 				i,
-				arrayPath,
+				listInstance.arrayPath,
 				key,
 				context,
 			);
@@ -228,9 +199,9 @@ function reconcileList(
 			// Insert all elements from this item
 			for (const element of itemInstance.elements) {
 				if (insertBefore) {
-					container.insertBefore(element, insertBefore);
+					listInstance.container.insertBefore(element, insertBefore);
 				} else {
-					container.appendChild(element);
+					listInstance.container.appendChild(element);
 				}
 			}
 		}

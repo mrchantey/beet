@@ -1,4 +1,8 @@
-import type { DocHandle, DocumentId } from "@automerge/automerge-repo";
+import type {
+	DocHandle,
+	DocHandleChangePayload,
+	DocumentId,
+} from "@automerge/automerge-repo";
 import { Repo } from "@automerge/automerge-repo";
 import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
@@ -189,6 +193,32 @@ export class BindContext {
 	}
 
 	/**
+	 * Create a new context with a different docHandle
+	 */
+	withDoc(docHandle: DocHandle<any>): BindContext {
+		const newContext = new BindContext(
+			this.repo,
+			docHandle,
+			this.mutationObserver,
+			this.pathPrefix,
+		);
+		newContext.boundElements = this.boundElements;
+		newContext.disposers = this.disposers;
+		return newContext;
+	}
+
+	/**
+	 *
+	 * Register a callback for document changes
+	 */
+	onChange(callback: (payload: DocHandleChangePayload<any>) => void): void {
+		this.docHandle.on("change", callback);
+		this.addDisposer(() => {
+			this.docHandle.off("change", callback);
+		});
+	}
+
+	/**
 	 * Get the full path with prefix applied
 	 */
 	private getFullPath(path?: string): string | undefined {
@@ -202,10 +232,11 @@ export class BindContext {
 	}
 
 	/**
-	 * Get a value from a document using a JSON path like "foo.bar[0].baz"
+	 * Get a value from the context's document using a JSON path like "foo.bar[0].baz"
 	 * If path is undefined, returns the root document
 	 */
-	getValueByPath(doc: any, path?: string): any {
+	getValueByPath(path?: string): any {
+		const doc = this.docHandle.doc();
 		const fullPath = this.getFullPath(path);
 		if (!fullPath) {
 			return doc;
@@ -223,29 +254,32 @@ export class BindContext {
 	}
 
 	/**
-	 * Set a value in a document using a JSON path like "foo.bar[0].baz"
+	 * Set a value in the context's document using a JSON path like "foo.bar[0].baz"
 	 * If path is undefined, does nothing (can't replace root)
 	 */
-	setValueByPath(doc: any, path: string | undefined, value: any): void {
+	setValueByPath(path: string | undefined, value: any): void {
 		const fullPath = this.getFullPath(path);
 		if (!fullPath) {
 			console.warn("Cannot set value at root document");
 			return;
 		}
-		const keys = fullPath.match(/[^.[\]]+/g) || [];
-		if (keys.length === 0) return;
+		// TODO allow set at root path?
+		this.docHandle.change((doc: any) => {
+			const keys = fullPath.match(/[^.[\]]+/g) || [];
+			if (keys.length === 0) return;
 
-		let current = doc;
-		for (let i = 0; i < keys.length - 1; i++) {
-			const key = keys[i];
-			if (current[key] === undefined) {
-				// Determine if next key is numeric (array) or not (object)
-				const nextKey = keys[i + 1];
-				current[key] = /^\d+$/.test(nextKey) ? [] : {};
+			let current = doc;
+			for (let i = 0; i < keys.length - 1; i++) {
+				const key = keys[i];
+				if (current[key] === undefined) {
+					// Determine if next key is numeric (array) or not (object)
+					const nextKey = keys[i + 1];
+					current[key] = /^\d+$/.test(nextKey) ? [] : {};
+				}
+				current = current[key];
 			}
-			current = current[key];
-		}
-		current[keys[keys.length - 1]] = value;
+			current[keys[keys.length - 1]] = value;
+		});
 	}
 
 	/**

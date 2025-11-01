@@ -25,8 +25,8 @@ export function bindHandleEvent(
 	config: HandleEvent,
 	context: BindContext,
 ): Result<BindResult, string> {
-	const handler = () => {
-		handleAction(config, context);
+	const handler = (event: Event) => {
+		handleAction(event, config, context);
 	};
 
 	element.addEventListener(config.event, handler);
@@ -41,25 +41,27 @@ export function bindHandleEvent(
 /**
  * Handle an action (increment, decrement, set)
  */
-function handleAction(config: HandleEvent, context: BindContext): void {
-	context.docHandle.change((doc: any) => {
-		const fieldPath = config.field_path;
+function handleAction(
+	_event: Event,
+	config: HandleEvent,
+	context: BindContext,
+): void {
+	const fieldPath = config.field_path;
 
-		switch (config.action) {
-			case "increment":
-				{
-					const currentValue = context.getValueByPath(doc, fieldPath) || 0;
-					context.setValueByPath(doc, fieldPath, currentValue + 1);
-				}
-				break;
-			case "decrement":
-				{
-					const currentValue = context.getValueByPath(doc, fieldPath) || 0;
-					context.setValueByPath(doc, fieldPath, currentValue - 1);
-				}
-				break;
-			case "set":
-				return err("set action not yet implemented") as any;
-		}
-	});
+	switch (config.action) {
+		case "increment":
+			{
+				const currentValue = context.getValueByPath(fieldPath) || 0;
+				context.setValueByPath(fieldPath, currentValue + 1);
+			}
+			break;
+		case "decrement":
+			{
+				const currentValue = context.getValueByPath(fieldPath) || 0;
+				context.setValueByPath(fieldPath, currentValue - 1);
+			}
+			break;
+		case "set":
+			return err("set action not yet implemented") as any;
+	}
 }
