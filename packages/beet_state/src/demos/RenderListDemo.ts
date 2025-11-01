@@ -20,12 +20,6 @@ const mainManifest: StateManifest = {
 			template_id: 1,
 			item_key_path: "id",
 		}),
-		BindContext.handleEvent({
-			el_state_id: 2,
-			event: "click",
-			action: "increment",
-			field_path: "nextId",
-		}),
 	],
 };
 
