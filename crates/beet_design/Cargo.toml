@@ -19,7 +19,7 @@ exclude = ["src/**/:*.rs"]
 # required-features = ["build"]
 
 [features]
-default = ["mockups"]
+# default = ["mockups"]
 client = []
 server = []
 mockups = []
