@@ -36,14 +36,20 @@ pub fn compile_lambda(
 
 	let mut cmd = Command::new("cargo");
 
+	// Set CARGO_BUILD_TARGET to host architecture for proc-macro compatibility
+	// This is needed when cross-compiling on ARM hosts (e.g., ARM Surface/Mac)
+	// to ensure proc-macros are built for the host while the binary targets x86_64
+	#[cfg(target_arch = "aarch64")]
+	cmd.env("CARGO_BUILD_TARGET", "aarch64-unknown-linux-gnu");
+
 	// TODO we should support all lambda build featire
 	cmd.arg("lambda")
 		.envs(pkg_config.envs())
 		.args(build_cmd.get_args())
 		.arg("--lambda-dir")
 		.arg("target/lambda/crates")
-		.arg("--compiler")
-		.arg("cargo")
+		.arg("--target")
+		.arg("x86_64-unknown-linux-gnu")
 		.xtap(|cmd| {
 			debug!("🌱 Building lambda binary\n{:?}", cmd);
 		})

@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(feature = "nightly", feature(unboxed_closures, fn_traits))]
 // #![deny(missing_docs)]
-//!
 pub use beet_rsx_macros::*;
 pub mod apply_snippets;
 pub mod reactivity;
