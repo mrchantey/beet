@@ -94,21 +94,18 @@ BindContext.init(
 
 	// Add a custom handler to actually add todos when button is clicked
 	// (This is a workaround since we don't have a "push_item" action yet)
-	const addButton = document.getElementById("add-todo");
-	if (addButton) {
-		addButton.addEventListener("click", () => {
-			ctx.docHandle.change((doc: any) => {
-				if (!doc.nextId) doc.nextId = 1;
-				if (!doc.todos) doc.todos = [];
+	document.getElementById("add-todo")!.addEventListener("click", () => {
+		ctx.docHandle.change((doc: any) => {
+			if (!doc.nextId) doc.nextId = 1;
+			if (!doc.todos) doc.todos = [];
 
-				const newId = String(doc.nextId);
-				doc.todos.push({
-					id: newId,
-					text: `Todo #${newId}`,
-					clicks: 0,
-				});
-				doc.nextId++;
+			const newId = String(doc.nextId);
+			doc.todos.push({
+				id: newId,
+				text: `Todo #${newId}`,
+				clicks: 0,
 			});
+			doc.nextId++;
 		});
-	}
+	});
 });
