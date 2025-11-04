@@ -28,7 +28,7 @@ async fn main() {
 
 
 	// 3. Read Row
-	let rows = db
+	let _rows = db
 		.query(
 			User::stmt_select()
 				.and_where(Expr::col(UserCols::Email).eq("foo@example.com")),
@@ -47,7 +47,7 @@ async fn main() {
 	.unwrap();
 
 	// 5. Read Changes
-	let rows = User::stmt_select()
+	let _rows = User::stmt_select()
 		.and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
 		.query(&db)
 		.await

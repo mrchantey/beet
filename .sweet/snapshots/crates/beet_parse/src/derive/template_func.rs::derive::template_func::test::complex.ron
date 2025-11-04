@@ -8,7 +8,7 @@ pub(crate) struct MyNode {
 }
 impl MyNode {
     pub fn system(
-        #[allow(unused_variables)]
+        #[allow(unused_variables, unused_assignments)]
         In((my_entity, input)): In<(Entity, Self)>,
         world: &mut World,
         res: Res<Time>,

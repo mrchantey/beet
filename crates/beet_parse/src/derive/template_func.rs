@@ -126,7 +126,7 @@ fn impl_template_bundle(
 	Ok(quote! {
 
 	impl #impl_generics #ident #type_generics #where_clause {
-		pub fn system(#[allow(unused_variables)]In((#entity_ident, input)): In<(Entity,Self)>, #(#param_fields),*) #return_type{
+		pub fn system(#[allow(unused_variables, unused_assignments)]In((#entity_ident, input)): In<(Entity,Self)>, #(#param_fields),*) #return_type{
 				#[allow(unused_variables)]
 				let Self { #(#destructure_props),* } = input;
 				#(#body)*

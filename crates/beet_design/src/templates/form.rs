@@ -9,6 +9,7 @@ pub fn Form(
 	/// by default we call prevent_default on trigger, setting this will
 	/// not call prevent_default, allowing onsubmit events to bubble up
 	#[field(default)]
+	#[cfg_attr(not(target_arch = "wasm32"), allow(unused_assignments))]
 	bubble_up: bool,
 	onsubmit_dyn: Box<dyn 'static + Send + Sync + Fn(DynamicStruct)>,
 	#[field(flatten)] attrs: BaseHtmlAttributes,
