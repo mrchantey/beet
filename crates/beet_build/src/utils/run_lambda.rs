@@ -42,6 +42,8 @@ pub fn compile_lambda(
 		.args(build_cmd.get_args())
 		.arg("--lambda-dir")
 		.arg("target/lambda/crates")
+		.arg("--compiler")
+		.arg("cargo")
 		.xtap(|cmd| {
 			debug!("🌱 Building lambda binary\n{:?}", cmd);
 		})
