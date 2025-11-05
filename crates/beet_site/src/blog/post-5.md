@@ -5,6 +5,13 @@ created="2025-11-05"
 
 # The Full Moon Harvest #5
 
+Declarative State
+
+<iframe width="941" height="538" src="https://www.youtube.com/embed/BhLvfvw1rgw" title="Full Moon Harvest #5 | Declarative State" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+<br/>
+<br/>
+
 Writing a metaframework can be surprisingly straightforward: Start with an unmet need, and copy-pasta the best modern patterns and principles that align with this need. So far the web layer of beet has been entirely based on Astro which is taking the web dev world by storm with a single principle:
 
 > Make writing performant web apps a delightful developer experience.
@@ -31,7 +38,7 @@ fn Counter() -> impl Template {
 }
 ```
 
-Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare [from DDoSing itsself](https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/) two months ago due to a classic `useEffect` bug we can all relate to, I clearly remember my boss helping me debug the pesky `useEffect` I wrote that was causing a 60fps full page rerender.
+Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare [from DDoSing itsself](https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/) two months ago due to a classic `useEffect` bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner `useEffect` I wrote that was causing a 60fps full page rerender.
 
 HTMX circumnavigates this by pairing declarative template directives with SSR, demonstrating a crucial insight about web development:
 
@@ -47,7 +54,7 @@ Router::new().route("/clicked", |mut state: State<u32>| {
 });
 ```
 
-Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does com at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip *per every interaction*. 
+Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does com at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip *per every interaction*.
 
 Interesting but lets keep looking.
 
@@ -114,7 +121,7 @@ Importantly notice what is *missing* from the output: No js, no wasm, just some 
 
 [Automerge](https://automerge.org/) is an excellent sync-engine (with a very stylish new website), and some [initial prototypes](https://github.com/mrchantey/beet/blob/beet_state/packages/beet_state/src/demos/RenderListDemo.ts) with its `solidjs` layer have shown promise. The next iteration will likely be written in rust/bevy like the rest of beet is, automerge is already a rust wasm binary so we'd just be adding the dom binding layer on top of that. The key difference between this approach and client islands is that this wasm binary is pre-compiled, the user will rarely need to refetch it, even if the site content *or behavior* changes.
 
-Of course there are limitations to this approach. State mutations are constrained to specific verbs like `increment`, `push_form_data`, `set_from_target_value` in a similar way to the HTMX rendering verbs of `innerHTML`, `outerHTML`, etc. 
+Of course there are limitations to this approach. State mutations are constrained to specific verbs like `increment`, `push_form_data`, `set_from_target_value` in a similar way to the HTMX rendering verbs of `innerHTML`, `outerHTML`, etc.
 Here we're counting on the HTMX insight: 80% of reactive operations are CRUD-like and do not require custom client code. We can use Astro-style JS sprinkling for special cases and we still have client islands in the back pocket for inherently heavy applications like 3D rendering or robotics dashboards.
 
 There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in [our channel in the bevy discord](https://discord.com/channels/691052431525675048/1333204907414523964).
@@ -122,5 +129,5 @@ There is still a lot of questions around both in performance and developer exper
 
 ## A Fully ECS Router
 
-Aside from this exploration the stack bevyfication continues. Axum has now been entirely replaced by our own `hyper` layer using `beet_flow` for the router control flow, and inserting the `Request` and `Response` as entities. 
+Aside from this exploration the stack bevyfication continues. Axum has now been entirely replaced by our own `hyper` layer using `beet_flow` for the router control flow, and inserting the `Request` and `Response` as entities.
 The page you're viewing now is compiled, routed and rendered with ecs technology. Still a super experimental space but a fully ECS router allows for some really fun and interesting patterns, for example the outer content for this blog post is inserted by a render-aware middleware layer, an alternative to Astro's collection-template binding pattern.

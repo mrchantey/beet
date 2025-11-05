@@ -11,12 +11,10 @@ pub fn get() -> impl IntoHtml {
 				<div class="container">
 				<h1>Beet</h1>
 				// <img style="width:10em" src="/assets/branding/logo.png"/>
-				<p><b>"A Very Bevy Metaframework"</b></p>
+				<p><b>"An ECS Metaframework for the Fuller Stack."</b></p>
 				<Card style:cascade class="hero">
-				<p>"Fullstack Bevy with ECS at every layer of the stack."
-				<br/><br/>
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>
-				"Beet is under construction, if this project is of interest please come and say hi in our"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy discord channel</a>.</p>
+				<p>"Beet is under construction, if this project is of interest please come and say hi in our"<a href="https://discord.com/channels/691052431525675048/1333204907414523964">bevy discord channel</a>.</p>
 					<footer>
 						<Link
 							style:cascade
@@ -30,19 +28,14 @@ pub fn get() -> impl IntoHtml {
 						// 	>Get Started</Link>
 					</footer>
 				</Card>
-				// <h2>A Very Bevy Metaframework</h2>
-				// <ul>
-				// <li>"Very Bevy Licencing"<br/>"Beet inherits Bevy's MIT/Apache licenses"</li>
-				// <li>"Very Bevy Architecture"<br/>"Bevy primitives all the way down"</li>
-				// </ul>
-				<h2>"Very Bevy Web UI"</h2>
+				<h2>"Web UI"</h2>
 					<ClientCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/web-ui.rs"/>
-				<h2>"Very Bevy Server Actions"</h2>
+				<h2>"Server Actions"</h2>
 				<p>"See your requests in the network tab"</p>
 				<ServerCounter client:load initial=1 />
 					<pre node:code lang="rust" src="../content/server-actions.rs"/>
-				<h2>"Very Bevy Control Flow"</h2>
+				<h2>"Control Flow"</h2>
 					<pre node:code lang="rust" src="../content/realtime-agents.rs"/>
 				</div>
 			</ContentLayout>
