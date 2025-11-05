@@ -1,6 +1,5 @@
 +++
 title="The Full Moon Harvest #4"
-draft=true
 created="2025-10-07"
 +++
 
