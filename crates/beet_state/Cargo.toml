@@ -1,0 +1,29 @@
+[package]
+name = "beet_state"
+version.workspace = true
+edition.workspace = true
+description = "Declarative state synchronization and templating"
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+
+[features]
+
+[dependencies]
+beet_core.workspace = true
+bevy.workspace = true
+extend.workspace = true
+automerge = "0.7"
+autosurgeon = "0.9"
+
+
+[dev-dependencies]
+sweet.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
