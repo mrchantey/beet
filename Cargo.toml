@@ -228,7 +228,7 @@ tower-http = { version = "0.6", features = [
 
 #💡 web
 js-sys = "0.3"
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.100"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 # https://github.com/wasm-bindgen/wasm-bindgen/blob/215b914c739c598e5c076f8ed22df20d2c77a3dd/crates/web-sys/Cargo.toml#L45
