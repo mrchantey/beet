@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A Very Bevy Metaframework</strong>
+    <strong>A metaframework for the fuller stack</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,7 +18,11 @@
   </h3>
 </div>
 
-Beet brings bevy to the entire application stack. Going full-stack bevy is a big job and its early days so your mileage may vary depending on your application:
+Beet is an ECS metaframwork built on the bevy, a highly modular game engine. Using ECS across the stack provides a common paradigm for state and behavior, enabling a radically simple mental model for cross-domain applications.
+
+> 🚧 Mind your step! 🚧
+>
+> Beet is under construction, if this project is of interest please come and say hi in our [bevy discord channel](https://discord.com/channels/691052431525675048/1333204907414523964).
 
 **readiness meter**
 - 🦢 ready to go: documented and tested
@@ -46,22 +50,22 @@ Control flow crates for use in behavior paradigms like behavior trees, utility A
 
 ```rust
 world
-	.spawn((
-		Name::new("My Behavior"),
-		Sequence,
-		children![
-			(
-				Name::new("Hello"),
-				EndWith(Outcome::Pass),
-			),
-			(
-				Name::new("World"),
-				EndWith(Outcome::Pass),
-			),
-		],
-	))
-	.trigger_target(GetOutcome)
-	.flush();
+  .spawn((
+    Name::new("My Behavior"),
+    Sequence,
+    children![
+      (
+        Name::new("Hello"),
+        EndWith(Outcome::Pass),
+      ),
+      (
+        Name::new("World"),
+        EndWith(Outcome::Pass),
+      ),
+    ],
+  ))
+  .trigger_target(GetOutcome)
+  .flush();
 ```
 
 
@@ -75,8 +79,7 @@ world
 
 ## Web
 
-Crates for building and deploying web apps. At this stage it is only recommended to develop locally by cloning this repo. See [Contributing] (crates/beet_site/src/docs/contributing.md) for more details.
-
+Crates for building and deploying web apps. These crates are very experimental and changing frequently.
 
 ```rust
 #[template]
