@@ -130,3 +130,23 @@ This chart is for matching a bevy version against a particular beet version.
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
+
+
+## Local Development
+
+### Required Tools
+
+- Rust nightly
+- Just
+
+### Running
+
+Note that testing all crates involves compiling *many* crates, doing so from scratch usually results in a stack overflow in the rust compiler.
+To prevent this either run with RUST_MIN_STACK='some_gigantic_number', or just keep re-running the command until its all compiled. I usually just do the latter.
+
+```sh
+git clone https://github.com/mrchantey/beet
+cd beet
+just install-sweet
+just test-all
+```

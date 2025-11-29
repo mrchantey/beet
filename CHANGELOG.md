@@ -1,10 +1,10 @@
 # Changelog
+
+
 ## 0.0.8
 
 ### `beet_flow`
 - `BeetFlowPlugin` -> `ControlFlowPlugin`
-
-
 
 ## 0.0.7
 
