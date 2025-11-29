@@ -22,20 +22,17 @@ default:
 #💡 Init
 
 # Pull assets into their respective crates.
-init-flow:
-	just assets-pull
+init-repo:
+	just pull-assets
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
+	just install-sweet
+	cargo launch codegen
 
-assets-pull:
-	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-	tar -xzvf ./assets.tar.gz
-	rm ./assets.tar.gz
+pull-assets:
+	cargo launch --only=pull-assets
 
-assets-push:
-	aws s3 sync ./assets s3://bevyhub-public/assets --delete
-	tar -czvf ./assets.tar.gz ./assets
-	aws s3 cp ./assets.tar.gz s3://bevyhub-public/assets.tar.gz
-	rm ./assets.tar.gz
+push-assets:
+	cargo launch --only=push-assets
 
 # just test-site
 # just export-scenes
@@ -150,6 +147,10 @@ deploy-site *args:
 #💡 Test
 
 test-all:
+	@if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
+		echo "please download assets directory: just pull-assets"; \
+		exit 1; \
+	fi
 	just test-core
 	just test-flow
 	just test-rsx

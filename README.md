@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A metaframework for the fuller stack</strong>
+    <strong>A folk technology framework</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,11 +18,11 @@
   </h3>
 </div>
 
-Beet is an ECS metaframwork built on the bevy, a highly modular game engine. Using ECS across the stack provides a common paradigm for state and behavior, enabling a radically simple mental model for cross-domain applications.
+Beet is a framework for building technologies that can people can share, access and make their own like other forms of folk culture like music and story. Beet uses the Entity Component System architecture of Bevy, a modular game engine, to provide a common agnostic paradigm for state and behavior across domains like web, games and robotics.
 
 > 🚧 Mind your step! 🚧
 >
-> Beet is under construction, if this project is of interest please come and say hi in our [bevy discord channel](https://discord.com/channels/691052431525675048/1333204907414523964).
+> Beet is under construction, if this project is of interest please come and say hi in the [Beetmash Discord Server](https://discord.gg/CvrVwryu).
 
 **readiness meter**
 - 🦢 ready to go: documented and tested
@@ -147,6 +147,6 @@ To prevent this either run with RUST_MIN_STACK='some_gigantic_number', or just k
 ```sh
 git clone https://github.com/mrchantey/beet
 cd beet
-just install-sweet
+just init-repo
 just test-all
 ```

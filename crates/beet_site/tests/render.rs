@@ -39,5 +39,5 @@ async fn article_layout(world: &mut World) {
 		.text()
 		.await
 		.unwrap()
-		.xpect_contains(r#"<meta charset="UTF-8"/><title>Beet</title>"#);
+		.xpect_contains(r#"<meta charset="UTF-8"/><title>beet_site</title>"#);
 }
