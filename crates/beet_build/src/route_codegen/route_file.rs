@@ -101,7 +101,8 @@ pub(super) fn create_route_files(
 		};
 
 		// no existing route file found, create a new one
-		let mod_path = path_ext::create_relative(&codegen.output_dir()?, &file)?;
+		let mod_path =
+			path_ext::create_relative(&codegen.output_dir()?, &file)?;
 		let route_path = path_ext::create_relative(&collection.src, &file)?
 			.xmap(RoutePath::from_file_path)?;
 
@@ -118,7 +119,8 @@ pub(super) fn create_route_files(
 	}
 	Ok(())
 }
-
+/// Accepts a file path and outputs a reasonable identifier with
+/// best effort uniqueness.
 fn path_to_ident(path: &str) -> String {
 	let mut ident = String::new();
 	let mut chars = path.chars();

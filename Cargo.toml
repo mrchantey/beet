@@ -22,7 +22,7 @@ readme = "README.md"
 homepage = "https://beetstack.dev"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
+keywords = ["folk-technology", "web", "behavior", "game-ai", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
