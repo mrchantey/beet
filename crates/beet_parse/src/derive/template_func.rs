@@ -127,7 +127,7 @@ fn impl_template_bundle(
 
 	impl #impl_generics #ident #type_generics #where_clause {
 		pub fn system(#[allow(unused_variables, unused_assignments)]In((#entity_ident, input)): In<(Entity,Self)>, #(#param_fields),*) #return_type{
-				#[allow(unused_variables)]
+				#[allow(unused_variables, unused_assignments)]
 				let Self { #(#destructure_props),* } = input;
 				#(#body)*
 		}

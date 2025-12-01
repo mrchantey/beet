@@ -11,7 +11,7 @@ impl MyNode {
         #[allow(unused_variables, unused_assignments)]
         In((entity, input)): In<(Entity, Self)>,
     ) -> impl Bundle + use<> {
-        #[allow(unused_variables)]
+        #[allow(unused_variables, unused_assignments)]
         let Self { foo, mut bar } = input;
         ()
     }
