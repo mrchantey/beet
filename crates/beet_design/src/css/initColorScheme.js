@@ -41,7 +41,7 @@ function setScrollBar(scheme) {
 	document.documentElement.setAttribute("data-color-scheme", scollbarScheme);
 
 	// Trigger reflow by reading a property
-	document.body.clientWidth;
+	document.body?.clientWidth;
 
 	// Show the document
 	// edit: i dont think this is required and is causing fouc
