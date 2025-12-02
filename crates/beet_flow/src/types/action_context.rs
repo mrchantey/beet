@@ -5,7 +5,6 @@ use bevy::ecs::world::CommandQueue;
 use std::fmt;
 
 
-
 pub struct ActionContext {
 	/// The [`Action`] entity this event is currently triggered for
 	pub action: Entity,
@@ -15,6 +14,16 @@ pub struct ActionContext {
 	/// is found.
 	pub agent: Entity,
 	pub(super) queue: CommandQueue,
+}
+
+impl Clone for ActionContext {
+	fn clone(&self) -> Self {
+		Self {
+			action: self.action,
+			agent: self.agent,
+			queue: default(),
+		}
+	}
 }
 
 impl ActionContext {
@@ -29,6 +38,7 @@ impl ActionContext {
 	}
 	/// Use the hierarchy and [`ActionOf`] components to infer the
 	/// agent for this action.
+	// TODO may need to deprecate with bevy auto propagate components
 	pub(super) fn find_agent(&self, world: &World) -> Entity {
 		// first check for an ActionOf on the action entity directly
 		if let Some(action_of) = world.entity(self.action).get::<ActionOf>() {
@@ -83,6 +93,29 @@ impl ActionContext {
 		self.queue.push(move |world: &mut World| {
 			let mut trigger = ActionTrigger::new(cx);
 			world.trigger_ref_with_caller_pub(&mut event, &mut trigger, caller);
+		});
+		self
+	}
+
+	/// Run an async action, with a provided [`ActionContext`] and [`AsyncWorld`]
+	#[track_caller]
+	pub fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld, &mut ActionContext) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		let mut child_cx = self.clone();
+		// let caller = MaybeLocation::caller();
+		self.queue.push(move |world: &mut World| {
+			world.run_async(async move |world| {
+				func(world.clone(), &mut child_cx);
+				world
+					.with_then(move |world| {
+						child_cx.queue.apply(world);
+					})
+					.await;
+			});
 		});
 		self
 	}

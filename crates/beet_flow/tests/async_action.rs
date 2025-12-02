@@ -9,11 +9,12 @@ use sweet::prelude::*;
 #[derive(Component)]
 struct Foo;
 
-fn foo(run: On<GetOutcome>, mut cmd: AsyncCommands) {
-	let entity = run.action();
-	cmd.run(async move |world| {
+fn foo(mut ev: On<GetOutcome>) {
+	// ev.action()
+	ev.run_async(async move |_world, cx| {
 		time_ext::sleep(Duration::from_millis(20)).await;
-		world.entity(entity).trigger_target(Outcome::Pass).await;
+		// cx.trigger
+		cx.trigger_target(Outcome::Pass);
 	});
 }
 

@@ -54,6 +54,16 @@ where
 		self.trigger_mut().trigger_action_with_cx(action, event);
 		self
 	}
+
+	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld, &mut ActionContext) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		self.trigger_mut().run_async(func);
+		self
+	}
 }
 #[extend::ext(name=OnChildEndActionEventExt)]
 pub impl<'w, 't, T> On<'w, 't, ChildEnd<T>>
@@ -82,6 +92,7 @@ where
 /// If `AUTO_PROPAGATE` is `true`, [`ActionTrigger::propagate`] will default to `true`.
 pub struct ActionTrigger<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 {
+	/// The context for the current [`Action`]
 	cx: ActionContext,
 	/// Whether or not to continue propagating using the `T` [`Traversal`]. If this is false,
 	/// The [`Traversal`] will stop on the current entity.

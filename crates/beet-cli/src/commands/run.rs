@@ -30,7 +30,8 @@ impl RunCmd {
 
 fn default_runner() -> impl Bundle { (config_step(),) }
 
-fn config_step() -> impl Bundle {
+#[template]
+fn ConfigStep() -> impl Bundle {
 	
 	
 	rsx!{
