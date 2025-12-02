@@ -58,9 +58,9 @@ mod test {
 
 	fn foo(mut ev: On<GetOutcome>) {
 		// ev.action()
-		ev.run_async(async move |mut action| {
+		ev.run_async(async move |world, mut action| {
 			time_ext::sleep(Duration::from_millis(20)).await;
-			action.world().spawn_then(Name::new("foo")).await;
+			world.spawn_then(Name::new("foo")).await;
 			action.trigger_target(Outcome::Pass);
 		});
 	}

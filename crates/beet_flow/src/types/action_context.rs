@@ -101,16 +101,16 @@ impl ActionContext {
 	#[track_caller]
 	pub fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
-		Func: 'static + Send + FnOnce(AsyncAction) -> Fut,
+		Func: 'static + Send + FnOnce(AsyncWorld, AsyncAction) -> Fut,
 		Fut: MaybeSend + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		let child_cx = self.clone();
+		let cx = self.clone();
 		self.queue.push(move |world: &mut World| {
 			world.run_async(async move |world| {
-				// Wrap the world and context in an AsyncAction helper that applies its queue on drop.
-				let async_action = AsyncAction::new(world.clone(), child_cx);
-				func(async_action).await;
+				// Wrap the context in an AsyncAction helper that applies its queue on drop.
+				let async_action = AsyncAction::new(world.clone(), cx);
+				func(world.clone(), async_action).await;
 				// async_action dropped here; its Drop applies any queued commands
 			});
 		});
