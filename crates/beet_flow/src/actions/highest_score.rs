@@ -42,7 +42,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		ev.trigger_next_with(child, GetScore);
+		ev.trigger_action_with_cx(child, GetScore);
 	}
 	Ok(())
 }
@@ -60,7 +60,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		ev.trigger_next_with(*highest, GetOutcome);
+		ev.trigger_action_with_cx(*highest, GetOutcome);
 	}
 	Ok(())
 }

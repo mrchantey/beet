@@ -117,7 +117,7 @@ mod test {
 
 	fn run_child(mut ev: On<GetOutcome>, children: Query<&Children>) {
 		let child = children.get(ev.action()).unwrap()[0];
-		ev.trigger_next_with(child, GetOutcome);
+		ev.trigger_action_with_cx(child, GetOutcome);
 	}
 
 	#[action(succeed)]

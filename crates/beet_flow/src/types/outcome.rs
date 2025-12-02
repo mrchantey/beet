@@ -22,6 +22,7 @@ impl RunEvent for GetOutcome {
 	type End = Outcome;
 }
 
+/// Conceptually similar to [`ControlFlow`]
 /// The returned value from a [`GetOutcome`] request, indicating run status.
 /// [`Outcome`] is closer in spirit to [`ControlFlow`] than [`Result`], in that the
 /// [`Outcome::Fail`] status is frequently expected, and does not
@@ -33,10 +34,10 @@ impl RunEvent for GetOutcome {
 	Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect, ActionEvent,
 )]
 pub enum Outcome {
-	/// More like a [`ControlFlow::Continue`] than an [`Ok`], may mean this action
+	/// Similar to [`ControlFlow::Continue`], may mean this action
 	/// was able to execute successfully or that a predicate passed.
 	Pass,
-	/// More like a [`ControlFlow::Break`] than an [`Err`], may mean a predicate failed
+	/// Similar to [`ControlFlow::Break`], may mean a predicate failed
 	/// or this action could not execute for an *expected reason*, unlike an [`Err`] which
 	/// indicates some invalid state of the program.
 	Fail,

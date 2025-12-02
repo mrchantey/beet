@@ -7,7 +7,7 @@ use std::fmt;
 
 
 pub struct ActionContext {
-	/// The [`Entity`] this event is currently triggered for.
+	/// The [`Action`] entity this event is currently triggered for
 	pub action: Entity,
 	/// The 'agent' entity for this action.
 	/// Unless explicitly specified the agent is the first [`ActionOf`] in the
@@ -59,18 +59,21 @@ impl ActionContext {
 		}
 	}
 
-	/// Get the current action [`Entity`]
+	/// Get the current [`Action`] entity
 	pub fn action(&self) -> Entity { self.action }
 
-	/// Get the [`ActionContext::agent`] entity
+	/// Get the current [`Agent`] entity
 	pub fn agent(&self) -> Entity { self.agent }
 
+	/// Trigger the event on this [`Action`] with this action's context.
 	#[track_caller]
-	pub fn trigger_next(&mut self, event: impl ActionEvent) -> &mut Self {
-		self.trigger_next_with(self.action, event)
+	pub fn trigger_with_cx(&mut self, event: impl ActionEvent) -> &mut Self {
+		self.trigger_action_with_cx(self.action, event)
 	}
+
+	/// Trigger the event with the provided [`Action`] with this action's context.
 	#[track_caller]
-	pub fn trigger_next_with(
+	pub fn trigger_action_with_cx(
 		&mut self,
 		action: Entity,
 		mut event: impl ActionEvent,

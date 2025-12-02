@@ -37,9 +37,9 @@ fn succeed_times(
 
 	if action.times < action.max_times {
 		action.times += 1;
-		ev.trigger_next(Outcome::Pass);
+		ev.trigger_with_cx(Outcome::Pass);
 	} else {
-		ev.trigger_next(Outcome::Fail);
+		ev.trigger_with_cx(Outcome::Fail);
 	}
 	Ok(())
 }

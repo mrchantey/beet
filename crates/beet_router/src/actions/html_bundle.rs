@@ -60,7 +60,7 @@ pub fn html_bundle_to_response() -> impl Bundle {
 		 -> Result {
 			let exchange = ev.agent();
 			let Some(html_bundle) = query.get(ev.agent())? else {
-				ev.trigger_next(Outcome::Fail);
+				ev.trigger_with_cx(Outcome::Fail);
 				return Ok(());
 			};
 
@@ -79,7 +79,7 @@ pub fn html_bundle_to_response() -> impl Bundle {
 					.insert(Html(html).into_response());
 				Ok(())
 			});
-			ev.trigger_next(Outcome::Pass);
+			ev.trigger_with_cx(Outcome::Pass);
 			Ok(())
 		},
 	)
@@ -145,7 +145,7 @@ mod test {
 					 mut commands: Commands|
 					 -> Result {
 						let Some(html_bundle) = query.get(ev.agent())? else {
-							ev.trigger_next(Outcome::Fail);
+							ev.trigger_with_cx(Outcome::Fail);
 							return Ok(());
 						};
 						commands.spawn((
@@ -156,7 +156,7 @@ mod test {
 								"middleware!" {html_bundle}
 							},
 						));
-						ev.trigger_next(Outcome::Pass);
+						ev.trigger_with_cx(Outcome::Pass);
 						Ok(())
 					}
 				),

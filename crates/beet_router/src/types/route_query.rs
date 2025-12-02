@@ -124,7 +124,7 @@ mod test {
 								);
 							})
 							.unwrap();
-						ev.trigger_next_with(
+						ev.trigger_action_with_cx(
 							children.get(ev.action()).unwrap()[0],
 							GetOutcome,
 						);
@@ -138,7 +138,7 @@ mod test {
 								store.set(cx.path().clone().iter().join("/"));
 							})
 							.unwrap();
-						ev.trigger_next(Outcome::Pass);
+						ev.trigger_with_cx(Outcome::Pass);
 					}
 				)],
 			))

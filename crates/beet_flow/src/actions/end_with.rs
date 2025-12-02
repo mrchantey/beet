@@ -27,7 +27,7 @@ fn end_with<T: EndEvent + Clone>(
 	action: Query<&EndWith<T>>,
 ) -> Result {
 	let action = action.get(ev.action())?;
-	ev.trigger_next(action.0.clone());
+	ev.trigger_with_cx(action.0.clone());
 	Ok(())
 }
 

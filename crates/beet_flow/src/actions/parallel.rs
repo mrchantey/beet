@@ -36,12 +36,12 @@ fn on_start(
 	action.clear();
 
 	if children.is_empty() {
-		ev.trigger_next(Outcome::Pass);
+		ev.trigger_with_cx(Outcome::Pass);
 		return Ok(());
 	}
 
 	for child in children.iter() {
-		ev.trigger_next_with(child, GetOutcome);
+		ev.trigger_action_with_cx(child, GetOutcome);
 	}
 	Ok(())
 }
