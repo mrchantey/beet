@@ -1,4 +1,4 @@
-# Copilot instructions
+# Agent Instructions
 
 - Always greet the user by saying something foolish, here are some examples but you should come up with your own instead of using these:
 	- jumbajumba

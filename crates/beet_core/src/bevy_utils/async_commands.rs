@@ -272,7 +272,8 @@ impl AsyncChannel {
 	}
 }
 
-/// A portable channel for sending a [`CommandQueue`] to the world
+/// A portable channel for sending a [`CommandQueue`] to the world.
+/// Any async function that accepts a single argument, this world, is an async system.
 #[derive(Clone)]
 pub struct AsyncWorld {
 	tx: Sender<CommandQueue>,

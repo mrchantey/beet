@@ -3,6 +3,8 @@
 // For a full list of overridable settings, and general information on folder-specific settings,
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
+	// "snippet_sort_order": "inline",
+	"show_edit_predictions": false,
 	"show_completions_on_input": false,
 	// "autosave": "off",
 	"lsp": {
