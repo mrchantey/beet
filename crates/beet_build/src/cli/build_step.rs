@@ -9,12 +9,7 @@ pub fn BuildStep(
 	/// The cargo command to run
 	cmd: CargoBuildCmd,
 ) -> impl Bundle {
-	OnSpawn::observe(|ev: On<GetOutcome>, mut commands: AsyncCommands| {
-		let action = ev.action();
-		commands.run(async |world| {
-			world.trigger();
-			
-		});
-		// ev.trigg
+	OnSpawn::observe(|_ev: On<GetOutcome>, mut _commands: AsyncCommands| {
+		todo!("async actions");
 	})
 }
