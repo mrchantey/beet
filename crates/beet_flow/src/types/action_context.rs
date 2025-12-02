@@ -97,11 +97,11 @@ impl ActionContext {
 		self
 	}
 
-	/// Run an async action, with a provided [`ActionContext`] and [`AsyncWorld`]
+	/// Run an async function from this action with a provided [`AsyncAction`]
 	#[track_caller]
 	pub fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
-		Func: 'static + Send + FnOnce(AsyncWorld, AsyncAction) -> Fut,
+		Func: 'static + Send + FnOnce(AsyncAction) -> Fut,
 		Fut: MaybeSend + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
@@ -109,8 +109,9 @@ impl ActionContext {
 		self.queue.push(move |world: &mut World| {
 			world.run_async(async move |world| {
 				// Wrap the context in an AsyncAction helper that applies its queue on drop.
-				let async_action = AsyncAction::new(world.clone(), cx);
-				func(world.clone(), async_action).await;
+				let async_entity = world.entity(cx.action());
+				let async_action = AsyncAction::new(async_entity, cx);
+				func(async_action).await;
 				// async_action dropped here; its Drop applies any queued commands
 			});
 		});

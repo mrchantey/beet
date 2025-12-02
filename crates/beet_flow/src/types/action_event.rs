@@ -57,7 +57,7 @@ where
 
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
-		Func: 'static + Send + FnOnce(AsyncWorld, AsyncAction) -> Fut,
+		Func: 'static + Send + FnOnce(AsyncAction) -> Fut,
 		Fut: MaybeSend + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{

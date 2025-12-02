@@ -220,6 +220,11 @@ impl AsyncTaskOut for () {
 	fn apply(self, _: AsyncWorld) {}
 }
 
+#[cfg(feature = "nightly")]
+impl AsyncTaskOut for ! {
+	fn apply(self, _: AsyncWorld) {}
+}
+
 
 impl AsyncTaskOut for Result {
 	fn apply(self, world: AsyncWorld) {
@@ -512,7 +517,7 @@ pub struct AsyncEntity {
 
 impl AsyncEntity {
 	pub fn id(&self) -> Entity { self.entity }
-	pub fn world(&self) -> AsyncWorld { self.world.clone() }
+	pub fn world(&self) -> &AsyncWorld { &self.world }
 
 	pub fn with(
 		&self,

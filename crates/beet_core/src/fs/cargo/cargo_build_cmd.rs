@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
-use crate::prelude::*;
 
 /// Verbatim clone of cargo build/run args
 #[derive(Debug, Clone, Parser, Resource)]
@@ -382,7 +382,7 @@ impl CargoBuildCmd {
 		let mut command = Command::new("cargo");
 		command.args(&args);
 
-		
+
 		command.status()?.exit_ok()?;
 		Ok(self)
 	}

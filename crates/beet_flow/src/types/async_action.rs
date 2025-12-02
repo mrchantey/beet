@@ -6,18 +6,20 @@ use bevy::ecs::world::CommandQueue;
 /// A convenience wrapper around an [`AsyncWorld`] and [`ActionContext`],
 /// upon drop all commands in the [`ActionContext`] are applied to the [`AsyncWorld`]
 pub struct AsyncAction {
-	/// AsyncWorld used to schedule work back onto the main world
-	world: AsyncWorld,
+	/// AsyncEntity used to schedule work back onto the main world
+	entity: AsyncEntity,
 	/// The ActionContext local to this async task
 	cx: ActionContext,
 }
 
 impl AsyncAction {
-	pub fn new(world: AsyncWorld, cx: ActionContext) -> Self {
-		Self { world, cx }
+	pub fn new(entity: AsyncEntity, cx: ActionContext) -> Self {
+		Self { entity, cx }
 	}
+	/// Access the AsyncEntity representing this action
+	pub fn entity(&self) -> &AsyncEntity { &self.entity }
 	/// Access the AsyncWorld
-	pub fn world(&self) -> AsyncWorld { self.world.clone() }
+	pub fn world(&self) -> &AsyncWorld { self.entity.world() }
 	/// Access the ActionContext
 	pub fn context(&self) -> &ActionContext { &self.cx }
 	/// Access the ActionContext mutably
@@ -38,8 +40,7 @@ impl Drop for AsyncAction {
 		// Move the queued commands out, then apply them to the world
 		let mut queue = CommandQueue::default();
 		std::mem::swap(&mut self.cx.queue, &mut queue);
-		let world = self.world.clone();
-		world.with(move |world: &mut World| {
+		self.world().with(move |world: &mut World| {
 			queue.apply(world);
 		});
 	}
@@ -57,10 +58,9 @@ mod test {
 	struct Foo;
 
 	fn foo(mut ev: On<GetOutcome>) {
-		// ev.action()
-		ev.run_async(async move |world, mut action| {
+		ev.run_async(async move |mut action| {
 			time_ext::sleep(Duration::from_millis(20)).await;
-			world.spawn_then(Name::new("foo")).await;
+			action.world().spawn_then(Name::new("foo")).await;
 			action.trigger_target(Outcome::Pass);
 		});
 	}

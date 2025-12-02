@@ -1367,6 +1367,7 @@ dependencies = [
 name = "beet_build"
 version = "0.0.8-dev.6"
 dependencies = [
+ "async-process",
  "beet_core",
  "beet_dom",
  "beet_flow",

@@ -42,6 +42,7 @@ beet_net = { workspace = true, features = ["tokens"] }
 beet_router = { workspace = true, features = ["tokens"] }
 
 #💡 Utils
+async-process.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 rapidhash.workspace = true
