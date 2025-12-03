@@ -17,7 +17,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum SubCommands {
-	Run(RunCmd),
+	// Run(RunCmd),
 	Build(RunBuild),
 	New(RunNew),
 	Agent(AgentCmd),
