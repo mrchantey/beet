@@ -28,6 +28,10 @@ pub struct CliConfig {
 	pub launch_no_default_args: bool,
 }
 
+impl Default for CliConfig {
+	fn default() -> Self { Self::parse_from(&[""]) }
+}
+
 impl CliConfig {
 	pub fn launch_step(&self) -> BuildStep {
 		let mut args = Vec::new();
@@ -59,8 +63,9 @@ impl Plugin for CliPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((ControlFlowPlugin, BuildPlugin));
 
-		app.world_mut()
-			.spawn(OnSpawn::run_insert(launch_sequence))
-			.trigger_target(GetOutcome);
+		todo!("bsx");
+		// app.world_mut()
+		// 	.spawn(OnSpawn::run_insert(launch_sequence))
+		// 	.trigger_target(GetOutcome);
 	}
 }

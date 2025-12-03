@@ -3,6 +3,7 @@
 ## Context
 
 - when discussing code, assume rust unless user specifies otherwise
+- You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
 - when agent is told to run a command run that command before doing anything else, including searching the codebase
 - Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
 - NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.
@@ -13,6 +14,7 @@ We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io
 
 ## Style
 
+- Code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Always greet the user by saying something foolish, here are some examples but you should come up with your own instead of using these directly:
 	- jumbajumba
 	- chickadoodoo
