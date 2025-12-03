@@ -32,9 +32,9 @@ pub struct Fallback;
 fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
 	let children = query.get(ev.action())?;
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_next_with(first_child, GetOutcome);
+		ev.trigger_action_with_cx(first_child, GetOutcome);
 	} else {
-		ev.trigger_next(Outcome::Fail);
+		ev.trigger_with_cx(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -60,7 +60,7 @@ fn on_next(
 		ev.propagate_child();
 	} else {
 		// run next
-		ev.trigger_next_with(children[index + 1], GetOutcome);
+		ev.trigger_action_with_cx(children[index + 1], GetOutcome);
 	}
 	Ok(())
 }

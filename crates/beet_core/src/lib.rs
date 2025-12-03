@@ -1,6 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![cfg_attr(feature = "nightly", feature(fn_traits, unboxed_closures))]
+#![cfg_attr(
+	feature = "nightly",
+	feature(fn_traits, unboxed_closures, never_type)
+)]
 // allow name collision until exit_ok stablized
 #![allow(unstable_name_collisions)]
 
@@ -44,7 +47,6 @@ pub mod prelude {
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
 	pub use bevy::ecs as bevy_ecs;
-	pub use bevy::log::LogPlugin;
 	pub use bevy::ecs::entity::MapEntities;
 	pub use bevy::ecs::lifecycle::HookContext;
 	pub use bevy::ecs::query::QueryData;
@@ -56,6 +58,7 @@ pub mod prelude {
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
+	pub use bevy::log::LogPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use tracing::Level;

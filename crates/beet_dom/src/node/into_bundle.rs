@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 
-/// Very inclusive version of [`Bundle`], allowing primitives to be wrapped
+/// A superset of [`Bundle`], allowing primitives to be wrapped
 /// in a [`TextNode`] and entities to be reparented.
 ///
 /// ```rust ignore

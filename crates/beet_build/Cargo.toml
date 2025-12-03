@@ -33,14 +33,16 @@ required-features = ["css"]
 
 [dependencies]
 #💡 Internal
-beet_rsx = { workspace = true, features = ["tokens"] }
 beet_core = { workspace = true, features = ["fs", "bevy_scene", "tokens"] }
+beet_flow.workspace = true
 beet_parse.workspace = true
+beet_rsx = { workspace = true, features = ["tokens"] }
 beet_dom = { workspace = true, features = ["tokens"] }
 beet_net = { workspace = true, features = ["tokens"] }
 beet_router = { workspace = true, features = ["tokens"] }
 
 #💡 Utils
+async-process.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 rapidhash.workspace = true

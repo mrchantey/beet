@@ -1,8 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-use beet_parse::prelude::*;
 use beet_core::prelude::*;
+use beet_parse::prelude::*;
 use proc_macro::TokenStream;
 use syn::DeriveInput;
 use syn::ItemFn;
@@ -70,8 +70,12 @@ pub fn derive_props(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// ## Example
 ///
 /// ```rust ignore
+/// /// Returns a 'div' that may or may not be hidden
 /// #[template]
-/// fn MyTemplate(hidden:bool) -> impl Bundle {
+/// fn MyTemplate(
+/// 	/// Whether the element is hidden
+/// 	hidden: bool
+/// ) -> impl Bundle {
 /// 	rsx!{<div hidden={hidden}>hello world</div>}
 /// }
 /// ```

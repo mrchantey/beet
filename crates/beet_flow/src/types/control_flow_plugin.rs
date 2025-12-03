@@ -87,8 +87,7 @@ pub enum ActionTag {
 }
 
 
-/// test helper to collect all [`Run`] calls, storing their [`Name`] or "Unknown" if missing
-#[cfg(test)]
+/// Helper to collect all [`Run`] calls, storing their [`Name`] or "Unknown" if missing
 pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<GetOutcome>, query: Query<&Name>| {
@@ -102,8 +101,7 @@ pub fn collect_on_run(world: &mut World) -> Store<Vec<String>> {
 	store
 }
 
-/// Collect all [Outcome] with a [Name]
-#[cfg(test)]
+/// Collect all [`Outcome`] with a [`Name`]
 pub fn collect_on_result(world: &mut World) -> Store<Vec<(String, Outcome)>> {
 	let store = Store::default();
 	world.add_observer(move |ev: On<Outcome>, query: Query<&Name>| {

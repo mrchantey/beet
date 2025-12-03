@@ -67,7 +67,7 @@ fn run_next(mut ev: On<Outcome>, query: Query<&RunNext>) -> Result {
 			return Ok(());
 		}
 	}
-	ev.trigger_next_with(run_next.action, GetOutcome);
+	ev.trigger_action_with_cx(run_next.action, GetOutcome);
 	Ok(())
 }
 

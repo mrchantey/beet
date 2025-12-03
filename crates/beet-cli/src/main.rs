@@ -17,6 +17,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum SubCommands {
+	// Run(RunCmd),
 	Build(RunBuild),
 	New(RunNew),
 	Agent(AgentCmd),
@@ -28,6 +29,7 @@ enum SubCommands {
 #[tokio::main]
 async fn main() -> Result {
 	match Cli::parse().command {
+		// SubCommands::Run(cmd) => cmd.run().await,
 		SubCommands::Build(cmd) => cmd.run().await,
 		SubCommands::New(cmd) => cmd.run().await,
 		SubCommands::Agent(cmd) => cmd.run().await,

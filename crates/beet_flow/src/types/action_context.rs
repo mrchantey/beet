@@ -5,9 +5,8 @@ use bevy::ecs::world::CommandQueue;
 use std::fmt;
 
 
-
 pub struct ActionContext {
-	/// The [`Entity`] this event is currently triggered for.
+	/// The [`Action`] entity this event is currently triggered for
 	pub action: Entity,
 	/// The 'agent' entity for this action.
 	/// Unless explicitly specified the agent is the first [`ActionOf`] in the
@@ -15,6 +14,16 @@ pub struct ActionContext {
 	/// is found.
 	pub agent: Entity,
 	pub(super) queue: CommandQueue,
+}
+
+impl Clone for ActionContext {
+	fn clone(&self) -> Self {
+		Self {
+			action: self.action,
+			agent: self.agent,
+			queue: default(),
+		}
+	}
 }
 
 impl ActionContext {
@@ -29,6 +38,7 @@ impl ActionContext {
 	}
 	/// Use the hierarchy and [`ActionOf`] components to infer the
 	/// agent for this action.
+	// TODO may need to deprecate with bevy auto propagate components
 	pub(super) fn find_agent(&self, world: &World) -> Entity {
 		// first check for an ActionOf on the action entity directly
 		if let Some(action_of) = world.entity(self.action).get::<ActionOf>() {
@@ -59,18 +69,21 @@ impl ActionContext {
 		}
 	}
 
-	/// Get the current action [`Entity`]
+	/// Get the current [`Action`] entity
 	pub fn action(&self) -> Entity { self.action }
 
-	/// Get the [`ActionContext::agent`] entity
+	/// Get the current [`Agent`] entity
 	pub fn agent(&self) -> Entity { self.agent }
 
+	/// Trigger the event on this [`Action`] with this action's context.
 	#[track_caller]
-	pub fn trigger_next(&mut self, event: impl ActionEvent) -> &mut Self {
-		self.trigger_next_with(self.action, event)
+	pub fn trigger_with_cx(&mut self, event: impl ActionEvent) -> &mut Self {
+		self.trigger_action_with_cx(self.action, event)
 	}
+
+	/// Trigger the event with the provided [`Action`] with this action's context.
 	#[track_caller]
-	pub fn trigger_next_with(
+	pub fn trigger_action_with_cx(
 		&mut self,
 		action: Entity,
 		mut event: impl ActionEvent,
@@ -80,6 +93,27 @@ impl ActionContext {
 		self.queue.push(move |world: &mut World| {
 			let mut trigger = ActionTrigger::new(cx);
 			world.trigger_ref_with_caller_pub(&mut event, &mut trigger, caller);
+		});
+		self
+	}
+
+	/// Run an async function from this action with a provided [`AsyncAction`]
+	#[track_caller]
+	pub fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncAction) -> Fut,
+		Fut: MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		let cx = self.clone();
+		self.queue.push(move |world: &mut World| {
+			world.run_async(async move |world| {
+				// Wrap the context in an AsyncAction helper that applies its queue on drop.
+				let async_entity = world.entity(cx.action());
+				let async_action = AsyncAction::new(async_entity, cx);
+				func(async_action).await;
+				// async_action dropped here; its Drop applies any queued commands
+			});
 		});
 		self
 	}

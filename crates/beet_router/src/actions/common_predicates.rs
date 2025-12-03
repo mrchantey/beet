@@ -14,8 +14,8 @@ pub fn fallback() -> impl Bundle {
 		|mut ev: On<GetOutcome>,
 		 exchange: Query<(), (With<Request>, Without<Response>)>| {
 			match exchange.contains(ev.agent()) {
-				true => ev.trigger_next(Outcome::Pass),
-				false => ev.trigger_next(Outcome::Fail),
+				true => ev.trigger_with_cx(Outcome::Pass),
+				false => ev.trigger_with_cx(Outcome::Fail),
 			};
 		},
 	)
@@ -27,8 +27,8 @@ pub fn no_response() -> impl Bundle {
 	OnSpawn::observe(
 		|mut ev: On<GetOutcome>, exchange: Query<(), Without<Response>>| {
 			match exchange.contains(ev.agent()) {
-				true => ev.trigger_next(Outcome::Pass),
-				false => ev.trigger_next(Outcome::Fail),
+				true => ev.trigger_with_cx(Outcome::Pass),
+				false => ev.trigger_with_cx(Outcome::Fail),
 			};
 		},
 	)
@@ -44,8 +44,8 @@ pub fn contains_handler_bundle() -> impl Bundle {
 				.iter_direct_descendants(ev.agent())
 				.any(|child| handler_bundles.contains(child))
 			{
-				true => ev.trigger_next(Outcome::Pass),
-				false => ev.trigger_next(Outcome::Fail),
+				true => ev.trigger_with_cx(Outcome::Pass),
+				false => ev.trigger_with_cx(Outcome::Fail),
 			};
 		},
 	)
@@ -58,8 +58,8 @@ pub fn contains_handler_bundle() -> impl Bundle {
 pub fn is_ssr() -> impl Bundle {
 	OnSpawn::observe(|mut ev: On<GetOutcome>, render_mode: Res<RenderMode>| {
 		match *render_mode == RenderMode::Ssr {
-			true => ev.trigger_next(Outcome::Pass),
-			false => ev.trigger_next(Outcome::Fail),
+			true => ev.trigger_with_cx(Outcome::Pass),
+			false => ev.trigger_with_cx(Outcome::Fail),
 		};
 	})
 }

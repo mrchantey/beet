@@ -32,9 +32,9 @@ pub struct Sequence;
 fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
 	let children = query.get(ev.action())?;
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_next_with(first_child, GetOutcome);
+		ev.trigger_action_with_cx(first_child, GetOutcome);
 	} else {
-		ev.trigger_next(Outcome::Pass);
+		ev.trigger_with_cx(Outcome::Pass);
 	}
 	Ok(())
 }
@@ -57,7 +57,7 @@ fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
 		ev.propagate_child();
 	} else {
 		// run next
-		ev.trigger_next_with(children[index + 1], GetOutcome);
+		ev.trigger_action_with_cx(children[index + 1], GetOutcome);
 	}
 	Ok(())
 }

@@ -220,6 +220,11 @@ impl AsyncTaskOut for () {
 	fn apply(self, _: AsyncWorld) {}
 }
 
+#[cfg(feature = "nightly")]
+impl AsyncTaskOut for ! {
+	fn apply(self, _: AsyncWorld) {}
+}
+
 
 impl AsyncTaskOut for Result {
 	fn apply(self, world: AsyncWorld) {
@@ -272,7 +277,8 @@ impl AsyncChannel {
 	}
 }
 
-/// A portable channel for sending a [`CommandQueue`] to the world
+/// A portable channel for sending a [`CommandQueue`] to the world.
+/// Any async function that accepts a single argument, this world, is an async system.
 #[derive(Clone)]
 pub struct AsyncWorld {
 	tx: Sender<CommandQueue>,
@@ -511,7 +517,7 @@ pub struct AsyncEntity {
 
 impl AsyncEntity {
 	pub fn id(&self) -> Entity { self.entity }
-	pub fn world(&self) -> AsyncWorld { self.world.clone() }
+	pub fn world(&self) -> &AsyncWorld { &self.world }
 
 	pub fn with(
 		&self,

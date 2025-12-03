@@ -1,6 +1,5 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
-use bevy::ecs::error::BevyError;
 use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
@@ -102,7 +101,7 @@ impl AsRef<Path> for WsPathBuf {
 	fn as_ref(&self) -> &Path { self.0.as_ref() }
 }
 impl FromStr for WsPathBuf {
-	type Err = BevyError;
+	type Err = FsError;
 	fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::new(s)) }
 }
 impl Into<WsPathBuf> for &str {

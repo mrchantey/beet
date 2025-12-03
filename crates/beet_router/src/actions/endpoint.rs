@@ -228,7 +228,7 @@ fn check_exact_path() -> impl Bundle {
 					false => Outcome::Fail,
 				})?;
 			// println!("check_exact_path: {}", outcome);
-			ev.trigger_next(outcome);
+			ev.trigger_with_cx(outcome);
 			Ok(())
 		},
 	)
@@ -248,7 +248,7 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 					false => Outcome::Fail,
 				};
 				// println!("check_method: {}", outcome);
-				ev.trigger_next(outcome);
+				ev.trigger_with_cx(outcome);
 
 				Ok(())
 			},

@@ -31,20 +31,37 @@ pub impl<'w, 't, T> On<'w, 't, T>
 where
 	T: ActionEvent,
 {
+	/// The [`Entity`] this event is currently triggered for.
 	fn action(&self) -> Entity { self.trigger().cx.action }
+	/// The 'agent' entity for this action.
+	/// Unless explicitly specified the agent is the first [`ActionOf`] in the
+	/// action's ancestors (inclusive), or the root ancestor if no [`ActionOf`]
+	/// is found.
 	fn agent(&self) -> Entity { self.trigger().cx.agent }
+	/// Trigger the event on this [`Action`] with this action's context.
 	#[track_caller]
-	fn trigger_next(&mut self, event: impl ActionEvent) -> &mut Self {
-		self.trigger_mut().trigger_next(event);
+	fn trigger_with_cx(&mut self, event: impl ActionEvent) -> &mut Self {
+		self.trigger_mut().trigger_with_cx(event);
 		self
 	}
+	/// Trigger the event with the provided [`Action`] with this action's context.
 	#[track_caller]
-	fn trigger_next_with(
+	fn trigger_action_with_cx(
 		&mut self,
 		action: Entity,
 		event: impl ActionEvent,
 	) -> &mut Self {
-		self.trigger_mut().trigger_next_with(action, event);
+		self.trigger_mut().trigger_action_with_cx(action, event);
+		self
+	}
+
+	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncAction) -> Fut,
+		Fut: MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		self.trigger_mut().run_async(func);
 		self
 	}
 }
@@ -75,6 +92,7 @@ where
 /// If `AUTO_PROPAGATE` is `true`, [`ActionTrigger::propagate`] will default to `true`.
 pub struct ActionTrigger<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 {
+	/// The context for the current [`Action`]
 	cx: ActionContext,
 	/// Whether or not to continue propagating using the `T` [`Traversal`]. If this is false,
 	/// The [`Traversal`] will stop on the current entity.

@@ -1,6 +1,7 @@
 mod export_pdf;
 #[cfg(feature = "qrcode")]
 mod qrcode;
+mod run;
 mod run_build;
 mod run_new;
 pub use export_pdf::*;

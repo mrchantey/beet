@@ -47,10 +47,10 @@ fn parse_and_check_path_filter(
 	match outcome {
 		Ok(_) => {
 			let child = children.get(ev.action())?[0];
-			ev.trigger_next_with(child, GetOutcome);
+			ev.trigger_action_with_cx(child, GetOutcome);
 		}
 		Err(_) => {
-			ev.trigger_next(Outcome::Fail);
+			ev.trigger_with_cx(Outcome::Fail);
 		}
 	}
 

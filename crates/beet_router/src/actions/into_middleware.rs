@@ -114,7 +114,7 @@ where
 					),
 					input,
 				);
-				ev.trigger_next(Outcome::Pass);
+				ev.trigger_with_cx(Outcome::Pass);
 				Ok(())
 			},
 		)

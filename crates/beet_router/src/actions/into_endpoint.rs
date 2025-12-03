@@ -195,7 +195,7 @@ where
 				commands
 					.entity(ev.agent())
 					.insert(self.clone().into_response_bundle());
-				ev.trigger_next(Outcome::Pass);
+				ev.trigger_with_cx(Outcome::Pass);
 			},
 		)
 	}
