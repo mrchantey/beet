@@ -3,9 +3,12 @@
 // For a full list of overridable settings, and general information on folder-specific settings,
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
-	// "snippet_sort_order": "inline",
+	// "completions": {
+	// 	"words": "disabled"
+	// },
 	// "show_edit_predictions": false,
 	// "show_completions_on_input": false,
+	// "snippet_sort_order": "inline",
 	// "autosave": "off",
 	"lsp": {
 		"rust-analyzer": {
