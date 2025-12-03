@@ -35,7 +35,7 @@ pub enum ActorRole {
 	Name = Name::new("Agent"),
 	ActorRole=ActorRole::Agent
 )]
-pub struct Agent;
+pub struct AgentRole;
 
 /// Actor representing a human using the program, more than
 /// one user may participate in a session at a time.
@@ -44,17 +44,17 @@ pub struct Agent;
 	Name = Name::new("User"),
 	ActorRole=ActorRole::User
 )]
-pub struct User;
+pub struct UserRole;
 
 /// Also known as the system actor, the messages and actions
 /// performed by this entity carry more weight.
-/// For example [`Developer`] instructions overrule [`User`] instructions
+/// For example [`DeveloperRole`] instructions overrule [`UserRole`] instructions
 #[derive(Component)]
 #[require(
 	Name = Name::new("User"),
 	ActorRole=ActorRole::Developer
 )]
-pub struct Developer;
+pub struct DeveloperRole;
 
 
 

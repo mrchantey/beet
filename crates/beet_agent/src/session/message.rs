@@ -13,7 +13,7 @@ pub struct MessageView<'a> {
 
 /// A role relative to the actor:
 /// -  If the actor owns the content the role is [`Role::This`],
-/// - otherwise if the owner has a [`Developer`] component the role is [`Role::Developer`].
+/// - otherwise if the owner has a [`DeveloperRole`] component the role is [`Role::Developer`].
 /// Any other case is [`Role::Other`] which may be a user or another agent
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RelativeRole {

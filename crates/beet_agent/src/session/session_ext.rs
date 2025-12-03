@@ -44,7 +44,7 @@ pub fn user_message_session(agent:impl Bundle, user_message:impl Bundle)->impl B
 		Session::default(),
 		children![
 			(
-				User,
+				UserRole,
 				children![user_message],
 			),
 			(
@@ -74,7 +74,7 @@ pub async fn run_and_collect_file(session: impl Bundle) -> Vec<ContentEnum> {
 /// ## Panics
 /// Panics if no Agent entity is found
 pub fn collect_output(
-	agents: Query<Entity, With<Agent>>,
+	agents: Query<Entity, With<AgentRole>>,
 	children: Query<&Children>,
 	text: Query<&TextContent>,
 	files: Query<&FileContent>,

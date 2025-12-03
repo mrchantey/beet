@@ -9,7 +9,7 @@ pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
 pub const GEMINI_2_5_FLASH_IMAGE: &str = "gemini-2.5-flash-image-preview";
 
 #[derive(Component)]
-#[require(Agent)]
+#[require(AgentRole)]
 #[component(on_add=on_add)]
 pub struct GeminiAgent {
 	api_key: String,

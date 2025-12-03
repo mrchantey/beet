@@ -3,9 +3,7 @@ title="The Full Moon Harvest #3"
 created="2025-09-06"
 +++
 
-# The Full Moon Harvest #3
-
-Bevy's Five and Beet's Alive!
+# The Full Moon Harvest #3 - Bevy's Five and Beet's Alive!
 
 <iframe width="941" height="538" src="https://www.youtube.com/embed/J0zxMdsAk_I" title="Full Moon Harvest #3 | Big Diff" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 

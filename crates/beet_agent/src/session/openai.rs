@@ -9,7 +9,7 @@ use serde_json::json;
 const GPT_5_MINI: &str = "gpt-5-mini";
 
 #[derive(Component)]
-#[require(Agent)]
+#[require(AgentRole)]
 #[component(on_add=on_add)]
 pub struct OpenAiAgent {
 	api_key: String,

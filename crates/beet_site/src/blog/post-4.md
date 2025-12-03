@@ -3,9 +3,7 @@ title="The Full Moon Harvest #4"
 created="2025-10-07"
 +++
 
-# The Full Moon Harvest #4
-
-Action time!
+# The Full Moon Harvest #4 - Action time!
 
 <iframe width="941" height="538" src="https://www.youtube.com/embed/yI9tuBsrW1M" title="Full Moon Harvest #4 | Action Time" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 

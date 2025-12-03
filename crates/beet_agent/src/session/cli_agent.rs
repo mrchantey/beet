@@ -182,7 +182,7 @@ impl CliAgentPlugin {
 
 
 fn terminal_user() -> impl Bundle {
-	(User, OnSpawn::observe(user_message_request))
+	(UserRole, OnSpawn::observe(user_message_request))
 }
 
 fn text_added(ev: On<Add, TextContent>, cx: SessionParams) -> Result {
@@ -252,8 +252,8 @@ fn route_message_requests(
 	cx: SessionParams,
 	config: Res<CliAgentConfig>,
 	mut commands: Commands,
-	users: Query<Entity, With<User>>,
-	agents: Query<Entity, With<Agent>>,
+	users: Query<Entity, With<UserRole>>,
+	agents: Query<Entity, With<AgentRole>>,
 ) -> Result {
 	let actor = cx.actor(ev.event().event_target())?;
 	match actor.role {
