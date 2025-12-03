@@ -2,11 +2,10 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::cmp::Ordering;
 
-/// Aka `UtilitySelector`, Runs the child with the highest score.
-/// This action uses the principles of Utility AI.
-/// The mechanisim for requesting and returning a score is the same
-/// as that for requesting and returning a result, which is why
-/// we are able to use [`ReturnWith`] for each case.
+/// Aka `UtilitySelector`, runs the child with the highest [`Score`] using the principles of Utility AI.
+/// The mechanisim for requesting and returning a [`Score`] is the same
+/// as that for requesting and returning an [`Outcome`], which is why
+/// we are able to use [`EndWith`] for each case.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 ///
@@ -31,7 +30,6 @@ use std::cmp::Ordering;
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(PreventPropagateEnd<Score>)]
-// TODO sparseset instead of hashmap
 pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(

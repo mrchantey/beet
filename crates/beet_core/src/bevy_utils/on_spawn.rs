@@ -46,6 +46,23 @@ impl OnSpawn {
 		})
 	}
 
+	/// Run the system and insert the resulting bundle into the entity on spawn.
+	pub fn run_insert<
+		System: 'static + Send + Sync + IntoSystem<(), Out, Marker>,
+		Out: Bundle,
+		Marker,
+	>(
+		system: System,
+	) -> Self {
+		Self::new(move |entity| {
+			let bundle = entity
+				.world_scope(move |world| world.run_system_once(system))
+				.unwrap();
+			entity.insert(bundle);
+		})
+	}
+
+	/// Insert the resource into the world when the entity is spawned.
 	pub fn insert_resource(resource: impl Resource) -> Self {
 		Self::new(move |entity| {
 			entity.world_scope(move |world| world.insert_resource(resource));
