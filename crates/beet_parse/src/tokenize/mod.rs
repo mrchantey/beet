@@ -1,12 +1,8 @@
-//! Tokenizing is the process of converting a tree-like structure
+//! Tokenizing is the process of converting an ECS tree
 //! into a single [`TokenStream`], usually representing
 //! an instantiated `Bundle` of the structure.
-mod tokenize_combinator;
 mod tokenize_event_handler;
-pub use tokenize_combinator::*;
 pub use tokenize_event_handler::*;
-mod tokenize_rstml;
-pub use tokenize_rstml::*;
 mod tokenize_template;
 pub use tokenize_template::*;
 mod tokenize_bundle_tokens;

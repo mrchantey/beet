@@ -106,7 +106,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> TokenStream {
-		tokenize_rstml(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::parse_rstml(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]

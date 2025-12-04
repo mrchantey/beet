@@ -6,6 +6,8 @@ mod parse_rsx_tokens_plugin;
 pub use parse_rsx_tokens_plugin::*;
 mod collected_elements;
 pub use collected_elements::*;
+mod parse_rsx_tokens;
+pub use parse_rsx_tokens::*;
 mod parse_rstml_tokens;
 pub use parse_rstml_tokens::*;
 mod combinator_expr;

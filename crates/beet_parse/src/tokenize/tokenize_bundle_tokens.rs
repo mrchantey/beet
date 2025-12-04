@@ -58,11 +58,16 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse_rstml(tokens: TokenStream) -> TokenStream {
-		tokenize_rstml_tokens(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::parse_rstml_tokens(tokens, WsPathBuf::new(file!()))
+			.unwrap()
 	}
 
 	fn parse_combinator(tokens: &str) -> TokenStream {
-		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::parse_combinator_tokens(
+			tokens,
+			WsPathBuf::new(file!()),
+		)
+		.unwrap()
 	}
 
 	#[test]
@@ -88,9 +93,12 @@ mod test {
 	fn combinator_simple() { parse_combinator("<br/>").xpect_snapshot(); }
 	#[test]
 	fn combinator_siblings() {
-		tokenize_combinator_tokens("<br/><br/>", WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect_snapshot();
+		ParseRsxTokens::parse_combinator_tokens(
+			"<br/><br/>",
+			WsPathBuf::new(file!()),
+		)
+		.unwrap()
+		.xpect_snapshot();
 	}
 
 	#[test]

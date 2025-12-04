@@ -81,7 +81,7 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+		.xmap(|t| ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.xpect_snapshot();
 	}
@@ -92,42 +92,52 @@ mod test {
 			<br/>
 			<br/>
 		}
-		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+		.xmap(|t| ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.xpect_snapshot();
 	}
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
-			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.xmap(|t| {
+				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
+			})
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
-			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.xmap(|t| {
+				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
+			})
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_empty() {
 		quote! {<style></style>}
-			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.xmap(|t| {
+				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
+			})
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text() {
 		quote! {<style node:inline>foo{}</style>}
-			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.xmap(|t| {
+				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
+			})
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_src() {
 		quote! {<style src="foo.rs"/>}
-			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
+			.xmap(|t| {
+				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
+			})
 			.unwrap()
 			.xpect_snapshot();
 	}

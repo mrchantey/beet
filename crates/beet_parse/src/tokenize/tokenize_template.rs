@@ -1,7 +1,7 @@
 use crate::prelude::NodeExpr;
 use crate::tokenize::*;
-use beet_dom::prelude::*;
 use beet_core::prelude::*;
+use beet_dom::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -186,7 +186,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> TokenStream {
-		tokenize_rstml(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::parse_rstml(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
