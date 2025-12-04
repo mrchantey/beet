@@ -10,9 +10,8 @@ use syn::parse_macro_input;
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
 /// ```ignore
-/// let node = rsx! {<div> the value is {3}</div>};
+/// world.spawn(rsx! {<div> the value is {3}</div>});
 /// ```
-///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);

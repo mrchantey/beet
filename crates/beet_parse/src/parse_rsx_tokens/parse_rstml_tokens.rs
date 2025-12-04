@@ -1,3 +1,8 @@
+//! Functionality for converting rstml tokens into ECS representation.
+//! This process is entirely unopinionated and not specific to html with a few exceptions:
+//! ## raw text children of a style tag
+//! We try to mend the parts of style raw text that break like `2em` or `foo-bar`.
+//! This can be disabled by setting [`HtmlConstants::mend_raw_text_style_tags`] to false.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
@@ -166,7 +171,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::RawText(node) => {
 				let mut text = node.to_string_best();
-				if parent_cx == ParentContext::StyleTag {
+				if parent_cx == ParentContext::StyleTag
+					&& self.constants.mend_raw_text_style_tags
+				{
 					text = self.mend_style_raw_text(&text);
 				}
 				self.commands.entity(entity).insert((
@@ -360,6 +367,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					},
 					_ => {
 						// key-only attribute, ie `<div hidden>`
+						// no value to insert
 					}
 				};
 			}
@@ -409,19 +417,18 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		&mut self,
 		element: &NodeElement<RstmlCustomNode>,
 	) {
-		if element.children.is_empty()
-			|| !self
-				.constants
-				.self_closing_elements
-				.contains(element.open_tag.name.to_string().as_str())
+		if self
+			.constants
+			.self_closing_elements
+			.contains(element.open_tag.name.to_string().as_str())
+			&& !element.children.is_empty()
 		{
-			return;
+			self.diagnostics.push(Diagnostic::spanned(
+				element.open_tag.name.span(),
+				Level::Warning,
+				"Self closing elements cannot have children",
+			));
 		}
-		self.diagnostics.push(Diagnostic::spanned(
-			element.open_tag.name.span(),
-			Level::Warning,
-			"Self closing elements cannot have children",
-		));
 	}
 }
 
