@@ -18,25 +18,20 @@ pub fn tokenize_bundle_resolve_snippet(
 }
 
 
-/// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
+/// Recursive function that creates a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
 /// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
 /// see [`tokenize_bundle_tokens`].
-#[rustfmt::skip]
-pub fn tokenize_bundle(
-	world: &World,
-	entity: Entity,
-) -> Result<TokenStream> {
+pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
 	let mut items = Vec::new();
 	RsxComponents::tokenize_if_present(&world, &mut items, entity);
-	tokenize_element_attributes(world,&mut items, entity)?;
-	tokenize_template(world,&mut items, entity)?;
-	tokenize_node_exprs(world,&mut items, entity)?;
-	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
-	items
-		.xmap(unbounded_bundle)
-		.xok()
+	tokenize_element_attributes(world, &mut items, entity)?;
+	tokenize_template(world, &mut items, entity)?;
+	tokenize_node_exprs(world, &mut items, entity)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle)?;
+	items.xmap(unbounded_bundle).xok()
 }
 
+/// tokenize node expressions like the `{foobar}` in `<div>{foobar}</div>`
 fn tokenize_node_exprs(
 	world: &World,
 	items: &mut Vec<TokenStream>,
@@ -81,7 +76,7 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(|t| ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!())))
+		.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.xpect_snapshot();
 	}
@@ -92,52 +87,42 @@ mod test {
 			<br/>
 			<br/>
 		}
-		.xmap(|t| ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!())))
+		.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.xpect_snapshot();
 	}
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
-			.xmap(|t| {
-				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
-			})
+			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
-			.xmap(|t| {
-				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
-			})
+			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_empty() {
 		quote! {<style></style>}
-			.xmap(|t| {
-				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
-			})
+			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text() {
 		quote! {<style node:inline>foo{}</style>}
-			.xmap(|t| {
-				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
-			})
+			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn inner_text_src() {
 		quote! {<style src="foo.rs"/>}
-			.xmap(|t| {
-				ParseRsxTokens::parse_rstml(t, WsPathBuf::new(file!()))
-			})
+			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();
 	}

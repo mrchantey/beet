@@ -6,7 +6,6 @@ use quote::quote;
 use syn::Ident;
 
 
-/// bundle impl limit
 const BOUNDED_MAX: usize = 12;
 
 pub fn unbounded_related<T: TypePath>(
@@ -16,6 +15,7 @@ pub fn unbounded_related<T: TypePath>(
 	unbounded_related_ident(&ident, related).xok()
 }
 
+// solved in bevy 0.17?
 /// Uses `related!` if the number of related items can be represented as a tuple,
 /// otherwise use [`spawn_with`]
 pub fn unbounded_related_ident(

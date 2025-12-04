@@ -1,6 +1,8 @@
 //! Tokenizing is the process of converting an ECS tree
 //! into a single [`TokenStream`], usually representing
 //! an instantiated `Bundle` of the structure.
+mod tokenize_bsx;
+pub use tokenize_bsx::*;
 mod tokenize_event_handler;
 pub use tokenize_event_handler::*;
 mod tokenize_template;

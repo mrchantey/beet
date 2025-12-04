@@ -10,65 +10,69 @@ use proc_macro2::TokenStream;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ParseRsxTokens;
 
+fn rstml(tokens: TokenStream, source_file: WsPathBuf) -> impl Bundle {
+	(
+		SnippetRoot::new_from_tokens(source_file, &tokens),
+		InstanceRoot,
+		RstmlTokens::new(tokens),
+	)
+}
+fn combinator(tokens: &str, source_file: WsPathBuf) -> impl Bundle {
+	(
+		SnippetRoot::new(source_file, LineCol::default()),
+		InstanceRoot,
+		CombinatorTokens::new(tokens),
+	)
+}
+
 impl ParseRsxTokens {
 	/// Parse combinator string into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
-	pub fn parse_combinator(
+	pub fn combinator_to_rsx(
 		tokens: &str,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		ParseRsxTokens::parse_bundle(
-			(
-				SnippetRoot::new(source_file, LineCol::default()),
-				InstanceRoot,
-				CombinatorTokens::new(tokens),
-			),
+		Self::parse_bundle(
+			combinator(tokens, source_file),
 			tokenize_bundle_resolve_snippet,
 		)
 	}
 
 	/// Parse combinator string into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
-	pub fn parse_combinator_tokens(
+	pub fn combinator_to_rsx_tokens(
 		tokens: &str,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		ParseRsxTokens::parse_bundle(
-			(
-				SnippetRoot::new(source_file, LineCol::default()),
-				InstanceRoot,
-				CombinatorTokens::new(tokens),
-			),
+		Self::parse_bundle(
+			combinator(tokens, source_file),
 			tokenize_bundle_tokens,
 		)
 	}
 
-	/// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
-	pub fn parse_rstml(
+	/// Parse rstml tokens into a bsx representation, see [`tokenize_bsx_root`].
+	pub fn rstml_to_bsx(
 		tokens: TokenStream,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		ParseRsxTokens::parse_bundle(
-			(
-				SnippetRoot::new_from_tokens(source_file, &tokens),
-				InstanceRoot,
-				RstmlTokens::new(tokens),
-			),
+		Self::parse_bundle(rstml(tokens, source_file), tokenize_bsx_root)
+	}
+
+	/// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
+	pub fn rstml_to_rsx(
+		tokens: TokenStream,
+		source_file: WsPathBuf,
+	) -> Result<TokenStream> {
+		Self::parse_bundle(
+			rstml(tokens, source_file),
 			tokenize_bundle_resolve_snippet,
 		)
 	}
 
 	/// Parse rstml tokens into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
-	pub fn parse_rstml_tokens(
+	pub fn rstml_to_rsx_tokens(
 		tokens: TokenStream,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		ParseRsxTokens::parse_bundle(
-			(
-				SnippetRoot::new_from_tokens(source_file, &tokens),
-				InstanceRoot,
-				RstmlTokens::new(tokens),
-			),
-			tokenize_bundle_tokens,
-		)
+		Self::parse_bundle(rstml(tokens, source_file), tokenize_bundle_tokens)
 	}
 
 	/// Spawn the bundle, run the function with it, then return the result.

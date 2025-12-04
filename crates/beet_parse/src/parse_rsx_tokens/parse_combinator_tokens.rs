@@ -291,7 +291,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> TokenStream {
-		ParseRsxTokens::parse_combinator(str, WsPathBuf::new(file!()))
+		ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!()))
 			.unwrap()
 	}
 
@@ -301,7 +301,7 @@ mod test {
 	fn fragment() {
 		"<br/><br/>"
 			.xmap(|str| {
-				ParseRsxTokens::parse_combinator(
+				ParseRsxTokens::combinator_to_rsx(
 					str,
 					WsPathBuf::new(file!()),
 				)
@@ -438,7 +438,7 @@ mod test {
 	#[test]
 	#[ignore = "todo combinator raw text"]
 	fn preserves_whitespace() {
-		let out = ParseRsxTokens::parse_combinator(
+		let out = ParseRsxTokens::combinator_to_rsx(
 			r#"
 <pre><code class="language-rust">// A simple Rust function
 fn fibonacci(n: u32) -&gt; u32 {

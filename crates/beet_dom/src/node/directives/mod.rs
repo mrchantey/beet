@@ -1,6 +1,8 @@
 //! Directives inside rsx trees instruct beet to perform certain actions with the nodes
+mod bsx_directives;
 mod code_node;
 mod style_scope;
+pub use bsx_directives::*;
 pub use code_node::*;
 pub use style_scope::*;
 mod lang_node;
