@@ -3,17 +3,11 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    ResolveSnippets::resolve(
+    ResolveSnippets::resolve((
+        NodeTag(String::from("func")),
+        ElementNode { self_closing: true },
         OnSpawnDeferred::insert(
-            TemplateRoot::spawn(
-                    Spawn(
-                        <Func as Props>::Builder::default()
-                            .foo(bar)
-                            .build()
-                            .into_bundle(),
-                    ),
-                )
-                .into_bundle(),
+            <Func as Props>::Builder::default().foo(bar).build().into_bundle(),
         ),
-    )
+    ))
 }

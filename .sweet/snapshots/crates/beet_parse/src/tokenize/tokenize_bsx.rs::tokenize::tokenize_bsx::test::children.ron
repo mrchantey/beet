@@ -4,14 +4,14 @@
     #[allow(unused)]
     use beet_core::prelude::*;
     ResolveSnippets::resolve((
+        NodeTag(String::from("func")),
+        ElementNode { self_closing: false },
         OnSpawnDeferred::insert(
-            TemplateRoot::spawn(
-                    Spawn(<Func as Props>::Builder::default().build().into_bundle()),
-                )
-                .into_bundle(),
+            <Func as Props>::Builder::default().build().into_bundle(),
         ),
         related! {
-            Children[(), #[allow(unused_braces)] { bar }]
+            Children[TextNode(String::from("foo")), (ExprIdx(0u32), BlockNode,
+            OnSpawnDeferred::insert(#[allow(unused_braces)] { bar } .into_bundle()))]
         },
     ))
 }

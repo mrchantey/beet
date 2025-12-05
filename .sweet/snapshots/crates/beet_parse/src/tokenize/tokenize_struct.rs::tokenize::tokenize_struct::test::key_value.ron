@@ -3,7 +3,11 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    ResolveSnippets::resolve(
+    ResolveSnippets::resolve((
+        ExprIdx(0u32),
+        NodeTag(String::from("Transform")),
+        FragmentNode,
+        TemplateNode,
         OnSpawnDeferred::insert(
             Transform {
                 position: Vec3(0, 0, 0),
@@ -11,5 +15,5 @@
             }
                 .into_bundle(),
         ),
-    )
+    ))
 }
