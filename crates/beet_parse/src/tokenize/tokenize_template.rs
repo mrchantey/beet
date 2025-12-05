@@ -17,7 +17,6 @@ pub fn tokenize_template(
 	if !entity.contains::<TemplateNode>() {
 		return Ok(());
 	}
-
 	let Some(node_tag) = entity.get::<NodeTag>() else {
 		return Ok(());
 	};

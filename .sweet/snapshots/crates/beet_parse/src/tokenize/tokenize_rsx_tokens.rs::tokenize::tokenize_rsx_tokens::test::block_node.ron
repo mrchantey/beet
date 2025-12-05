@@ -6,15 +6,16 @@
     (
         SnippetRoot {
             file: WsPathBuf::new(
-                "crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs",
+                "crates/beet_parse/src/tokenize/tokenize_rsx_tokens.rs",
             ),
             start: LineCol { line: 1u32, col: 0u32 },
         },
         InstanceRoot,
         FragmentNode,
         related! {
-            Children[(ExprIdx(0u32), NodeTag(String::from("Foo")), FragmentNode,
-            TemplateNode)]
+            Children[(NodeTag(String::from("div")), ElementNode { self_closing :
+            false }, related! { Children[(ExprIdx(0u32), BlockNode,
+            NodeExpr(SendWrapper::new(syn::parse_quote!({ 7 }))))] })]
         },
     )
 }

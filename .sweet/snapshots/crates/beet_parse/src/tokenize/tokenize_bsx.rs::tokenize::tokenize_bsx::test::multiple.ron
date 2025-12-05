@@ -4,6 +4,6 @@
     #[allow(unused)]
     use beet_core::prelude::*;
     related! {
-        Children[func1(), func2()]
+        Children[(), ()]
     }
 }
