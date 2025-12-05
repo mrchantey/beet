@@ -28,7 +28,8 @@ pub fn tokenize_rsx(world: &World, entity: Entity) -> Result<TokenStream> {
 		tokenize_element_attributes(world, &mut items, entity)?;
 	}
 	if world.entity(entity).contains::<TemplateNode>() {
-		tokenize_template(world, &mut items, entity)?;
+		TokenizeTemplate { wrap_inner: true }
+			.tokenize(world, &mut items, entity)?;
 	}
 	tokenize_node_exprs(world, &mut items, entity)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_rsx)?;

@@ -28,9 +28,11 @@ pub fn tokenize_bsx_root(world: &World, entity: Entity) -> Result<TokenStream> {
 /// Recursively tokenize bsx for this entity
 fn tokenize_bsx(world: &World, entity: Entity) -> Result<TokenStream> {
 	let mut items = Vec::new();
+	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	// BsxComponents::tokenize_if_present(&world, &mut items, entity);
 	if world.entity(entity).contains::<ElementNode>() {
-		tokenize_template(world, &mut items, entity)?;
+		TokenizeTemplate { wrap_inner: false }
+			.tokenize(world, &mut items, entity)?;
 	}
 	if world.entity(entity).contains::<TemplateNode>() {
 		tokenize_struct(world, &mut items, entity)?;
@@ -46,7 +48,6 @@ fn tokenize_node_exprs(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
-	use quote::ToTokens;
 	if let Some(block) = world.entity(entity).get::<NodeExpr>() {
 		items.push(block.insert_deferred());
 	}
