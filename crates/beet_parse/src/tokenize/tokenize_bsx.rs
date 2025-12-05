@@ -46,8 +46,9 @@ fn tokenize_node_exprs(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
+	use quote::ToTokens;
 	if let Some(block) = world.entity(entity).get::<NodeExpr>() {
-		items.push(block.inner_parsed().self_token_stream());
+		items.push(block.insert_deferred());
 	}
 	Ok(())
 }
@@ -80,4 +81,6 @@ mod test {
 	}
 	#[test]
 	fn args() { parse(quote! {<func foo=bar/>}).xpect_snapshot(); }
+	#[test]
+	fn children() { parse(quote! {<func>foo{bar}</func>}).xpect_snapshot(); }
 }

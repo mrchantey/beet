@@ -11,10 +11,18 @@ pub fn template_func(input: ItemFn) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
+fn template_ident(input: &ItemFn) -> Ident {
+	use heck::ToUpperCamelCase;
+	let name = input.sig.ident.to_string();
+	let upper = name.to_upper_camel_case();
+	Ident::new(&upper, input.sig.ident.span())
+}
+
 fn parse(input: ItemFn) -> Result<TokenStream> {
 	let fields = NodeField::parse_item_fn(&input)?;
-	let define_struct = define_struct(&input, &fields)?;
-	let impl_template_bundle = impl_template_bundle(&input, &fields)?;
+	let ident = template_ident(&input);
+	let define_struct = define_struct(&input, &ident, &fields)?;
+	let impl_template_bundle = impl_template_bundle(&input, &ident, &fields)?;
 
 	let imports = if pkg_ext::is_internal() {
 		quote! {
@@ -37,11 +45,14 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 	})
 }
 
-fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
+fn define_struct(
+	func: &ItemFn,
+	ident: &Ident,
+	fields: &[NodeField],
+) -> Result<TokenStream> {
 	let attrs = &func.attrs;
 
 	let (_, type_generics, where_clause) = func.sig.generics.split_for_impl();
-	let ident = &func.sig.ident;
 
 	let fields = prop_fields(fields).map(|f| {
 		let ident = &f.ident;
@@ -65,6 +76,7 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 
 fn impl_template_bundle(
 	func: &ItemFn,
+	ident: &Ident,
 	fields: &[NodeField],
 ) -> Result<TokenStream> {
 	let destructure_props = prop_fields(fields).map(|field| {
@@ -85,7 +97,6 @@ fn impl_template_bundle(
 			#mutability #ident: #ty
 		}
 	});
-	let ident = &func.sig.ident;
 	let (impl_generics, type_generics, where_clause) =
 		func.sig.generics.split_for_impl();
 

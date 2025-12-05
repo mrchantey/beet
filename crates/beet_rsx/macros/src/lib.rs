@@ -10,6 +10,21 @@ use syn::parse_macro_input;
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
 /// ```ignore
+/// world.spawn(bsx! {<div> the value is {3}</div>});
+/// ```
+#[proc_macro]
+pub fn bsx(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	// this method creates a new app for every rstml macro,
+	// we may find it faster to reuse a single app, although
+	// parallelism will still be tricky because tokens are non-send
+	ParseRsxTokens::rstml_to_bsx(tokens.into(), source_file)
+		.unwrap_or_else(err_tokens)
+		.into()
+}
+
+/// Parse [`rsmtl`] tokens into a [`Bundle`].
+/// ```ignore
 /// world.spawn(rsx! {<div> the value is {3}</div>});
 /// ```
 #[proc_macro]

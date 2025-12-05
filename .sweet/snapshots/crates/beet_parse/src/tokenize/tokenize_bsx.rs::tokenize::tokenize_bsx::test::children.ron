@@ -1,0 +1,17 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    ResolveSnippets::resolve((
+        OnSpawnDeferred::insert(
+            TemplateRoot::spawn(
+                    Spawn(<Func as Props>::Builder::default().build().into_bundle()),
+                )
+                .into_bundle(),
+        ),
+        related! {
+            Children[(), #[allow(unused_braces)] { bar }]
+        },
+    ))
+}
