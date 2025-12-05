@@ -1,0 +1,13 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    ResolveSnippets::resolve((
+        ExprIdx(0u32),
+        NodeTag(String::from("Foo")),
+        FragmentNode,
+        TemplateNode,
+        OnSpawnDeferred::insert(Foo::default().into_bundle()),
+    ))
+}

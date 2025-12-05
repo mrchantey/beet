@@ -76,6 +76,10 @@ Received:
 				received.to_string().red(),
 			)
 		})?;
+
+		if std::env::args().any(|arg| arg == "--snap-show") {
+			println!("Snapshot:\n{}", expected);
+		}
 		Ok(Some(expected))
 	}
 }

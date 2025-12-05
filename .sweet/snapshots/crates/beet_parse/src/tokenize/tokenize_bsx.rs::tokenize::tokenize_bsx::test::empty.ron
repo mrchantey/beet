@@ -1,0 +1,7 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    ResolveSnippets::resolve(())
+}

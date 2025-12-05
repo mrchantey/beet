@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *tokenized*
 /// tree of nodes for the given [`Entity`], as opposed to the *finalized* tree,
 #[rustfmt::skip]
-pub fn tokenize_bundle_tokens(
+pub fn tokenize_rsx_tokens(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
@@ -15,7 +15,7 @@ pub fn tokenize_bundle_tokens(
 	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	tokenize_node_exprs_tokens(world, &mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
-	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_rsx_tokens)?;
 
 	items.xmap(unbounded_bundle).xok()
 }
@@ -58,11 +58,16 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse_rstml(tokens: TokenStream) -> TokenStream {
-		tokenize_rstml_tokens(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::rstml_to_rsx_tokens(tokens, WsPathBuf::new(file!()))
+			.unwrap()
 	}
 
 	fn parse_combinator(tokens: &str) -> TokenStream {
-		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::combinator_to_rsx_tokens(
+			tokens,
+			WsPathBuf::new(file!()),
+		)
+		.unwrap()
 	}
 
 	#[test]
@@ -88,9 +93,12 @@ mod test {
 	fn combinator_simple() { parse_combinator("<br/>").xpect_snapshot(); }
 	#[test]
 	fn combinator_siblings() {
-		tokenize_combinator_tokens("<br/><br/>", WsPathBuf::new(file!()))
-			.unwrap()
-			.xpect_snapshot();
+		ParseRsxTokens::combinator_to_rsx_tokens(
+			"<br/><br/>",
+			WsPathBuf::new(file!()),
+		)
+		.unwrap()
+		.xpect_snapshot();
 	}
 
 	#[test]

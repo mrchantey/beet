@@ -25,6 +25,8 @@ pub struct HtmlConstants {
 	pub wasm_name: String,
 	/// Tags whose inner text content is 'escaped', ie not parsed as rsx
 	pub raw_text_elements: std::collections::HashSet<&'static str>,
+	/// In rstml attempt to fix broken css tokens
+	pub mend_raw_text_style_tags: bool,
 	/// Tags that should not have style ids applied to them
 	pub ignore_style_id_tags: Vec<String>,
 	/// When parsing a [`HtmlDocument`], elements with these tags will be hoisted to the head of the document.
@@ -59,6 +61,7 @@ impl Default for HtmlConstants {
 				// raw_text_elements: ["script", "style"]
 				.into_iter()
 				.collect(),
+			mend_raw_text_style_tags: true,
 			ignore_style_id_tags: hoist_to_head_tags
 				.iter()
 				.cloned()
@@ -75,6 +78,17 @@ impl Default for HtmlConstants {
 	}
 }
 impl HtmlConstants {
+	/// Returns the default bsx constants, identical to rsx defaults
+	/// but removing a few rstml parser level opinions.
+	pub fn default_bsx_constants() -> Self {
+		Self {
+			mend_raw_text_style_tags: false,
+			raw_text_elements: default(),
+			self_closing_elements: default(),
+			..default()
+		}
+	}
+
 	/// Returns the attribute key for the style id
 	pub fn style_id_attribute(&self, id: u64) -> String {
 		format!("{}-{}", self.style_id_key, id)

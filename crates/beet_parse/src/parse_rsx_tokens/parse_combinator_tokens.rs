@@ -5,8 +5,8 @@ use beet_rsx_combinator::prelude::*;
 use std::collections::HashSet;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree, which can then
-/// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_bundle`]
-/// or [`tokenize_bundle_tokens`].
+/// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_rsx`]
+/// or [`tokenize_rsx_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
 #[require(SnippetRoot)]
@@ -291,7 +291,8 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> TokenStream {
-		tokenize_combinator(str, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!()))
+			.unwrap()
 	}
 
 	#[test]
@@ -300,7 +301,11 @@ mod test {
 	fn fragment() {
 		"<br/><br/>"
 			.xmap(|str| {
-				tokenize_combinator(str, WsPathBuf::new(file!())).unwrap()
+				ParseRsxTokens::combinator_to_rsx(
+					str,
+					WsPathBuf::new(file!()),
+				)
+				.unwrap()
 			})
 			.xpect_snapshot();
 	}
@@ -433,7 +438,7 @@ mod test {
 	#[test]
 	#[ignore = "todo combinator raw text"]
 	fn preserves_whitespace() {
-		let out = tokenize_combinator(
+		let out = ParseRsxTokens::combinator_to_rsx(
 			r#"
 <pre><code class="language-rust">// A simple Rust function
 fn fibonacci(n: u32) -&gt; u32 {

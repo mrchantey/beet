@@ -107,7 +107,7 @@ fn apply_static_rsx(
 	}
 
 	// we've taken all expressions, now we can clear the instance root
-	// for repoplulating with the static root.
+	// for repopulating with the static root.
 	commands
 		.entity(instance_root)
 		.despawn_related::<Children>()

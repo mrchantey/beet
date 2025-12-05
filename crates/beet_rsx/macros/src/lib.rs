@@ -10,16 +10,30 @@ use syn::parse_macro_input;
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
 /// ```ignore
-/// let node = rsx! {<div> the value is {3}</div>};
+/// world.spawn(bsx! {<div> the value is {3}</div>});
 /// ```
-///
+#[proc_macro]
+pub fn bsx(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	// this method creates a new app for every rstml macro,
+	// we may find it faster to reuse a single app, although
+	// parallelism will still be tricky because tokens are non-send
+	ParseRsxTokens::rstml_to_bsx(tokens.into(), source_file)
+		.unwrap_or_else(err_tokens)
+		.into()
+}
+
+/// Parse [`rsmtl`] tokens into a [`Bundle`].
+/// ```ignore
+/// world.spawn(rsx! {<div> the value is {3}</div>});
+/// ```
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	// this method creates a new app for every rstml macro,
 	// we may find it faster to reuse a single app, although
 	// parallelism will still be tricky because tokens are non-send
-	tokenize_rstml(tokens.into(), source_file)
+	ParseRsxTokens::rstml_to_rsx(tokens.into(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
@@ -29,7 +43,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
-	tokenize_rstml_tokens(tokens.into(), source_file)
+	ParseRsxTokens::rstml_to_rsx_tokens(tokens.into(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
@@ -39,7 +53,7 @@ pub fn rsx_combinator(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	let lit_str = syn::parse::<syn::LitStr>(tokens.into())
 		.expect("expected a string literal");
-	tokenize_combinator(&lit_str.value(), source_file)
+	ParseRsxTokens::combinator_to_rsx(&lit_str.value(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
@@ -49,7 +63,7 @@ pub fn rsx_combinator_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	let lit_str = syn::parse::<syn::LitStr>(tokens.into())
 		.expect("expected a string literal");
-	tokenize_combinator_tokens(&lit_str.value(), source_file)
+	ParseRsxTokens::combinator_to_rsx_tokens(&lit_str.value(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }

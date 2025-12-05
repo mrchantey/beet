@@ -8,7 +8,7 @@ use sweet::prelude::*;
 #[test]
 fn hello() {
 	#[template]
-	fn Hello(name: String, r#type: String) -> impl Bundle {
+	fn hello(name: String, r#type: String) -> impl Bundle {
 		rsx! { <div>hello {name}</div> }
 	}
 	rsx! { <Hello name="bill" type="foo" /> }

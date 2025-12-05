@@ -12,7 +12,7 @@ use syn::Expr;
 /// An expression in some part of the tree
 /// Almost all tokenizations must pass through this type
 /// including:
-/// - `rsx!` macro expresisons
+/// - `rsx!` macro expressisons
 /// - combinator expressions, first represented as [`CombinatorExpr`]
 /// - template spawn funcs: `<MyTemplate/>`
 ///
