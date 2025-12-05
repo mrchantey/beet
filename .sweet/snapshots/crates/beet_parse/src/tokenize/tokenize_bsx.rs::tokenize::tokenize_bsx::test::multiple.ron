@@ -3,7 +3,12 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    related! {
-        Children[(), ()]
-    }
+    ResolveSnippets::resolve(
+        related! {
+            Children[OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< Func1 as
+            Props > ::Builder::default().build().into_bundle())).into_bundle()),
+            OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< Func2 as Props >
+            ::Builder::default().build().into_bundle())).into_bundle())]
+        },
+    )
 }

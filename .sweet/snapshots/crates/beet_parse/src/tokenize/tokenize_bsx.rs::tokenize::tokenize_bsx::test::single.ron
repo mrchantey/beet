@@ -3,5 +3,14 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    ()
+    ResolveSnippets::resolve(
+        OnSpawnDeferred::insert(
+            TemplateRoot::spawn(
+                    Spawn(
+                        <MyFunc as Props>::Builder::default().build().into_bundle(),
+                    ),
+                )
+                .into_bundle(),
+        ),
+    )
 }

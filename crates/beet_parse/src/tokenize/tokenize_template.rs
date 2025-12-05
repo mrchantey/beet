@@ -2,6 +2,7 @@ use crate::prelude::NodeExpr;
 use crate::tokenize::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
+use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -14,9 +15,6 @@ pub fn tokenize_template(
 	entity: Entity,
 ) -> Result<()> {
 	let entity = world.entity(entity);
-	if !entity.contains::<TemplateNode>() {
-		return Ok(());
-	}
 	let Some(node_tag) = entity.get::<NodeTag>() else {
 		return Ok(());
 	};
@@ -63,7 +61,8 @@ pub fn tokenize_template(
 	}
 
 	let template_ident = Ident::new(
-		&node_tag.as_str(),
+		// normalize both <element-types> and <ElementTypes>
+		&node_tag.as_str().to_upper_camel_case(),
 		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 

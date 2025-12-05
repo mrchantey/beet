@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy::ecs::system::SystemParam;
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemParam;
 use proc_macro2::TokenStream;
 
 /// If the entity has this [`RelationshipTarget`], then map each

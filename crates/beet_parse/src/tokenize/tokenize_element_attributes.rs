@@ -14,9 +14,6 @@ pub fn tokenize_element_attributes(
 	entity: Entity,
 ) -> Result<()> {
 	let entity = world.entity(entity);
-	if !entity.contains::<ElementNode>() {
-		return Ok(());
-	};
 	let Some(attrs) = entity.get::<Attributes>() else {
 		return Ok(());
 	};

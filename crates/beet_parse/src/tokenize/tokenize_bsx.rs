@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Ident;
 
 
 
@@ -14,21 +12,29 @@ use syn::Ident;
 pub fn tokenize_bsx_root(world: &World, entity: Entity) -> Result<TokenStream> {
 	let children = world.entity(entity).get::<Children>();
 
-	match children.map_or(0, |c| c.len()) {
+	let inner = match children.map_or(0, |c| c.len()) {
 		// no children, return unit
-		0 => quote!(()).xok(),
+		0 => quote!(()),
 		// if one child we unwrap the first child
-		1 => tokenize_bsx(world, children.unwrap()[0]),
+		1 => tokenize_bsx(world, children.unwrap()[0])?,
 		// otherwise we parse as normal, the parent will simply be a list of children
-		_ => tokenize_bsx(world, entity),
+		_ => tokenize_bsx(world, entity)?,
+	};
+	quote! {
+		ResolveSnippets::resolve(#inner)
 	}
+	.xok()
 }
 /// Recursively tokenize bsx for this entity
 fn tokenize_bsx(world: &World, entity: Entity) -> Result<TokenStream> {
 	let mut items = Vec::new();
 	// BsxComponents::tokenize_if_present(&world, &mut items, entity);
-	tokenize_functions(world, &mut items, entity)?;
-	tokenize_structs(world, &mut items, entity)?;
+	if world.entity(entity).contains::<ElementNode>() {
+		tokenize_template(world, &mut items, entity)?;
+	}
+	if world.entity(entity).contains::<TemplateNode>() {
+		tokenize_structs(world, &mut items, entity)?;
+	}
 	tokenize_node_exprs(world, &mut items, entity)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bsx)?;
 	items.xmap(unbounded_bundle).xok()
@@ -46,33 +52,6 @@ fn tokenize_node_exprs(
 	Ok(())
 }
 
-fn tokenize_functions(
-	world: &World,
-	entity_components: &mut Vec<TokenStream>,
-	entity: Entity,
-) -> Result<()> {
-	let entity = world.entity(entity);
-	if !entity.contains::<ElementNode>() {
-		Ok(())
-	} else {
-		let tag = entity
-			.get::<NodeTag>()
-			.ok_or_else(|| bevyhow!("ElementNode must have a NodeTag"))?;
-		// convert <foo-bar> into foo_bar for rust conventions
-		use heck::ToSnakeCase;
-		let tag = tag.to_snake_case();
-		let func_ident: Ident = syn::parse_str(&tag)?;
-		// let struct_ident = format!("{}Props", tag.to_upper_camel_case());
-		let struct_ident = tag.to_upper_camel_case();
-
-		let Some(attributes) = entity.get::<Attributes>() else {
-			return Ok(());
-		};
-		entity_components.push(quote! {#func_ident()});
-
-		Ok(())
-	}
-}
 fn tokenize_structs(
 	world: &World,
 	_entity_components: &mut Vec<TokenStream>,
