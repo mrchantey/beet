@@ -33,7 +33,7 @@ fn tokenize_bsx(world: &World, entity: Entity) -> Result<TokenStream> {
 		tokenize_template(world, &mut items, entity)?;
 	}
 	if world.entity(entity).contains::<TemplateNode>() {
-		tokenize_structs(world, &mut items, entity)?;
+		tokenize_struct(world, &mut items, entity)?;
 	}
 	tokenize_node_exprs(world, &mut items, entity)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bsx)?;
@@ -50,19 +50,6 @@ fn tokenize_node_exprs(
 		items.push(block.inner_parsed().self_token_stream());
 	}
 	Ok(())
-}
-
-fn tokenize_structs(
-	world: &World,
-	_entity_components: &mut Vec<TokenStream>,
-	entity: Entity,
-) -> Result<()> {
-	let entity = world.entity(entity);
-	if !entity.contains::<TemplateNode>() {
-		Ok(())
-	} else {
-		Ok(())
-	}
 }
 
 #[cfg(test)]
@@ -86,8 +73,8 @@ mod test {
 	#[test]
 	fn multiple() {
 		parse(quote! {
-		<func1/>
-		<func2/>
+		<my_func/>
+		<MyStruct/>
 		})
 		.xpect_snapshot();
 	}

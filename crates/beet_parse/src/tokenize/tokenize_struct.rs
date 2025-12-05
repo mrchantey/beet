@@ -9,7 +9,7 @@ use quote::quote;
 use syn::Ident;
 
 
-pub fn tokenize_template(
+pub fn tokenize_struct(
 	world: &World,
 	entity_components: &mut Vec<TokenStream>,
 	entity: Entity,
@@ -19,8 +19,10 @@ pub fn tokenize_template(
 		return Ok(());
 	};
 	let node_tag_span = entity.get::<SpanOf<NodeTag>>();
-	let mut prop_assignments = Vec::new();
+	let mut field_assignments = Vec::new();
 
+	// if a 'no_default' attr is present, disable default
+	let mut force_default = true;
 	if let Some(attrs) = entity.get::<Attributes>() {
 		for attr_entity in attrs.iter() {
 			let key = maybe_spanned_attr_key(world, attr_entity).map(
@@ -33,22 +35,18 @@ pub fn tokenize_template(
 			let value = world.entity(attr_entity).get::<NodeExpr>().cloned();
 
 			match (key, value) {
-				// 1: Events
-				(Some((key_str, key)), Some(mut value))
-					if is_event(&key_str, &value) =>
-				{
-					tokenize_event_handler(&key_str, key.span(), &mut value)?;
-					let value = value.inner_parsed();
-					prop_assignments.push(quote! {.#key(#value)});
-				}
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
 					let value = value.inner_parsed();
-					prop_assignments.push(quote! {.#key(#value)});
+					field_assignments.push(quote! {#key: #value});
 				}
 				// 3. Key without value (boolean attribute)
-				(Some((_, key)), None) => {
-					prop_assignments.push(quote! {.#key(true)});
+				(Some((key_str, key)), None) => {
+					if key_str == "no_default" {
+						force_default = false;
+					} else {
+						field_assignments.push(quote! {#key: true});
+					}
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
@@ -66,10 +64,17 @@ pub fn tokenize_template(
 		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 
-	let template_def = quote! {
-			<#template_ident as Props>::Builder::default()
-			#(#prop_assignments)*
-			.build()
+	let template_def = if field_assignments.is_empty() {
+		quote!(#template_ident::default())
+	} else if force_default {
+		quote!(#template_ident {
+			#(#field_assignments),*,
+			..default()
+		})
+	} else {
+		quote!(#template_ident {
+			#(#field_assignments),*,
+		})
 	};
 
 	let inner = if entity.contains::<ClientLoadDirective>()
@@ -81,13 +86,14 @@ pub fn tokenize_template(
 		}
 	} else {
 		syn::parse_quote! {
-			TemplateRoot::spawn(Spawn(#template_def.into_bundle()))
+			#template_def
 		}
 	};
 	entity_components.push(NodeExpr::new(inner).insert_deferred());
 
 	Ok(())
 }
+
 
 #[cfg(test)]
 mod test {
@@ -98,13 +104,29 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> TokenStream {
-		ParseRsxTokens::rstml_to_rsx(tokens, WsPathBuf::new(file!())).unwrap()
+		ParseRsxTokens::rstml_to_bsx(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
+	fn empty() {
+		quote! {
+			<Foo/>
+		}
+		.xmap(parse)
+		.xpect_snapshot();
+	}
+	#[test]
 	fn key_value() {
 		quote! {
-			<Foo bar client:load/>
+			<Transform position=Vec3(0,0,0)/>
+		}
+		.xmap(parse)
+		.xpect_snapshot();
+	}
+	#[test]
+	fn no_default() {
+		quote! {
+			<Foo bar no_default/>
 		}
 		.xmap(parse)
 		.xpect_snapshot();

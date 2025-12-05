@@ -5,10 +5,9 @@
     use beet_core::prelude::*;
     ResolveSnippets::resolve(
         related! {
-            Children[OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< Func1 as
+            Children[OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< MyFunc as
             Props > ::Builder::default().build().into_bundle())).into_bundle()),
-            OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< Func2 as Props >
-            ::Builder::default().build().into_bundle())).into_bundle())]
+            OnSpawnDeferred::insert(MyStruct::default().into_bundle())]
         },
     )
 }

@@ -1,0 +1,15 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    ResolveSnippets::resolve(
+        OnSpawnDeferred::insert(
+            Transform {
+                position: Vec3(0, 0, 0),
+                ..default()
+            }
+                .into_bundle(),
+        ),
+    )
+}

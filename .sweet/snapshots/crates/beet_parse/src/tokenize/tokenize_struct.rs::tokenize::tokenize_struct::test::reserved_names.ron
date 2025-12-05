@@ -1,0 +1,9 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    use beet_core::prelude::*;
+    ResolveSnippets::resolve(
+        OnSpawnDeferred::insert(Foo { r#type: "bar", ..default() }.into_bundle()),
+    )
+}

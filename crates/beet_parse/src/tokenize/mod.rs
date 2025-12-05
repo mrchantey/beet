@@ -3,6 +3,8 @@
 //! an instantiated `Bundle` of the structure.
 mod tokenize_bsx;
 pub use tokenize_bsx::*;
+mod tokenize_struct;
+pub use tokenize_struct::*;
 mod tokenize_event_handler;
 pub use tokenize_event_handler::*;
 mod tokenize_template;
