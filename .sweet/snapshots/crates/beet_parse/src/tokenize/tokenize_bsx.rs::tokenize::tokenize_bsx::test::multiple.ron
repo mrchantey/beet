@@ -3,5 +3,7 @@
     use beet_dom::prelude::*;
     #[allow(unused)]
     use beet_core::prelude::*;
-    my_func()
+    related! {
+        Children[func1(), func2()]
+    }
 }

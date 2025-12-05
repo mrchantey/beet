@@ -38,7 +38,7 @@
 	},
 	"diagnostics": {},
 	"file_scan_exclusions": [
-		// ".sweet",
+		".sweet",
 		"**/.git",
 		".gitattributes",
 		"LICENSE-APACHE.txt",

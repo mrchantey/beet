@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *tokenized*
 /// tree of nodes for the given [`Entity`], as opposed to the *finalized* tree,
 #[rustfmt::skip]
-pub fn tokenize_bundle_tokens(
+pub fn tokenize_rsx_tokens(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
@@ -15,7 +15,7 @@ pub fn tokenize_bundle_tokens(
 	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	tokenize_node_exprs_tokens(world, &mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
-	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_rsx_tokens)?;
 
 	items.xmap(unbounded_bundle).xok()
 }

@@ -39,13 +39,13 @@ pub fn collapse_combinator_exprs(world: &mut World) -> Result {
 	// just do an iter, it shouldnt matter if nested ones are resolved first
 	while let Some(entity) = query.iter(world).next() {
 		if let Some(expr) =
-			// here we are only tokenizing with tokenize_bundle,
-			// if at some point we want to tokenize_bundle_tokens for combinator exprs
+			// here we are only tokenizing with tokenize_rsx,
+			// if at some point we want to tokenize_rsx_tokens for combinator exprs
 			// we should introduce a marker component to the root, and decide which to use here
 			tokenize_combinator_exprs_mapped(
 				world,
 				entity,
-				tokenize_bundle,
+				tokenize_rsx,
 			)? {
 			world
 				.entity_mut(entity)
@@ -97,7 +97,7 @@ fn tokenize_combinator_exprs(
 	entity: Entity,
 ) -> Result<()> {
 	if let Some(expr) =
-		tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle)?
+		tokenize_combinator_exprs_mapped(world, entity, tokenize_rsx)?
 	{
 		items.push(expr.insert_deferred());
 	}
@@ -111,7 +111,7 @@ fn tokenize_combinator_exprs_tokens(
 	entity: Entity,
 ) -> Result<()> {
 	if let Some(expr) =
-		tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle_tokens)?
+		tokenize_combinator_exprs_mapped(world, entity, tokenize_rsx_tokens)?
 	{
 		items.push(expr.self_token_stream());
 	}

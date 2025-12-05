@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
+use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
@@ -60,8 +61,15 @@ fn tokenize_functions(
 		// convert <foo-bar> into foo_bar for rust conventions
 		use heck::ToSnakeCase;
 		let tag = tag.to_snake_case();
-		let func_name: Ident = syn::parse_str(&tag)?;
-		entity_components.push(quote! {#func_name()});
+		let func_ident: Ident = syn::parse_str(&tag)?;
+		// let struct_ident = format!("{}Props", tag.to_upper_camel_case());
+		let struct_ident = tag.to_upper_camel_case();
+
+		let Some(attributes) = entity.get::<Attributes>() else {
+			return Ok(());
+		};
+		entity_components.push(quote! {#func_ident()});
+
 		Ok(())
 	}
 }
@@ -95,7 +103,15 @@ mod test {
 	#[test]
 	fn empty() { parse(quote! {}).xpect_snapshot(); }
 	#[test]
-	fn single() { parse(quote! {<my-struct/>}).xpect_snapshot(); }
-	// #[test]
-	// fn invalid() { parse(quote! {<d-iv/>}).xpect_snapshot(); }
+	fn single() { parse(quote! {<my-func/>}).xpect_snapshot(); }
+	#[test]
+	fn multiple() {
+		parse(quote! {
+		<func1/>
+		<func2/>
+		})
+		.xpect_snapshot();
+	}
+	#[test]
+	fn args() { parse(quote! {<func foo=bar/>}).xpect_snapshot(); }
 }

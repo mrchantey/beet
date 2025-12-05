@@ -5,8 +5,8 @@ use beet_rsx_combinator::prelude::*;
 use std::collections::HashSet;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree, which can then
-/// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_bundle`]
-/// or [`tokenize_bundle_tokens`].
+/// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_rsx`]
+/// or [`tokenize_rsx_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
 #[require(SnippetRoot)]

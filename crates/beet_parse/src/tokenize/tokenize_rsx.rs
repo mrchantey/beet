@@ -5,12 +5,12 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 
-/// Calls [`tokenize_bundle`] then wraps in [`ResolveSnippets::resolve`]
-pub fn tokenize_bundle_resolve_snippet(
+/// Calls [`tokenize_rsx`] then wraps in [`ResolveSnippets::resolve`]
+pub fn tokenize_rsx_resolve_snippet(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
-	let bundle = tokenize_bundle(world, entity)?;
+	let bundle = tokenize_rsx(world, entity)?;
 	quote! {
 		ResolveSnippets::resolve(#bundle)
 	}
@@ -20,14 +20,14 @@ pub fn tokenize_bundle_resolve_snippet(
 
 /// Recursive function that creates a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
 /// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
-/// see [`tokenize_bundle_tokens`].
-pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
+/// see [`tokenize_rsx_tokens`].
+pub fn tokenize_rsx(world: &World, entity: Entity) -> Result<TokenStream> {
 	let mut items = Vec::new();
 	RsxComponents::tokenize_if_present(&world, &mut items, entity);
 	tokenize_element_attributes(world, &mut items, entity)?;
 	tokenize_template(world, &mut items, entity)?;
 	tokenize_node_exprs(world, &mut items, entity)?;
-	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_rsx)?;
 	items.xmap(unbounded_bundle).xok()
 }
 
@@ -44,15 +44,15 @@ fn tokenize_node_exprs(
 }
 
 
-/// Calls [`tokenize_bundle`] and appends any diagnostics tokens like rstml
-/// compile errors. Prefer this method for macros, and [`tokenize_bundle`] for
+/// Calls [`tokenize_rsx`] and appends any diagnostics tokens like rstml
+/// compile errors. Prefer this method for macros, and [`tokenize_rsx`] for
 /// codegen.
-pub fn tokenize_bundle_with_errors(
+pub fn tokenize_rsx_with_errors(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
 	// TODO insert errors
-	let mut tokens = tokenize_bundle(world, entity)?;
+	let mut tokens = tokenize_rsx(world, entity)?;
 	if let Some(diagnostics) = world.entity(entity).get::<TokensDiagnostics>() {
 		let diagnostics = TokensDiagnostics((*diagnostics).clone());
 		tokens.extend(diagnostics.into_tokens());

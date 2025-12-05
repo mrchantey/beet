@@ -26,25 +26,25 @@ fn combinator(tokens: &str, source_file: WsPathBuf) -> impl Bundle {
 }
 
 impl ParseRsxTokens {
-	/// Parse combinator string into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
+	/// Parse combinator string into a *finalized* [`InstanceRoot`], see [`tokenize_rsx`].
 	pub fn combinator_to_rsx(
 		tokens: &str,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
 		Self::parse_bundle(
 			combinator(tokens, source_file),
-			tokenize_bundle_resolve_snippet,
+			tokenize_rsx_resolve_snippet,
 		)
 	}
 
-	/// Parse combinator string into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
+	/// Parse combinator string into a *tokenized* [`InstanceRoot`], see [`tokenize_rsx_tokens`].
 	pub fn combinator_to_rsx_tokens(
 		tokens: &str,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
 		Self::parse_bundle(
 			combinator(tokens, source_file),
-			tokenize_bundle_tokens,
+			tokenize_rsx_tokens,
 		)
 	}
 
@@ -56,23 +56,23 @@ impl ParseRsxTokens {
 		Self::parse_bundle(rstml(tokens, source_file), tokenize_bsx_root)
 	}
 
-	/// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
+	/// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_rsx`].
 	pub fn rstml_to_rsx(
 		tokens: TokenStream,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
 		Self::parse_bundle(
 			rstml(tokens, source_file),
-			tokenize_bundle_resolve_snippet,
+			tokenize_rsx_resolve_snippet,
 		)
 	}
 
-	/// Parse rstml tokens into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
+	/// Parse rstml tokens into a *tokenized* [`InstanceRoot`], see [`tokenize_rsx_tokens`].
 	pub fn rstml_to_rsx_tokens(
 		tokens: TokenStream,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		Self::parse_bundle(rstml(tokens, source_file), tokenize_bundle_tokens)
+		Self::parse_bundle(rstml(tokens, source_file), tokenize_rsx_tokens)
 	}
 
 	/// Spawn the bundle, run the function with it, then return the result.
@@ -99,4 +99,4 @@ impl ParseRsxTokens {
 	}
 }
 
-// for tests see ../tokenize_bundle.rs
+// for tests see ../tokenize_rsx.rs
