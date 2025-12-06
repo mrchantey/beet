@@ -2,11 +2,11 @@ use crate::prelude::NodeExpr;
 use crate::tokenize::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
-use syn::Ident;
+use syn::Expr;
 
 
 pub fn tokenize_struct(
@@ -58,20 +58,35 @@ pub fn tokenize_struct(
 		}
 	}
 
-	let template_ident = Ident::new(
+	let template_ident: Expr = syn::parse_str(
 		// normalize both <element-types> and <ElementTypes>
-		&node_tag.as_str().to_upper_camel_case(),
-		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
-	);
+		&node_tag,
+	)?;
+	// apply the span
+	let span = node_tag_span.map(|s| **s).unwrap_or(Span::call_site());
+	let template_ident: Expr =
+		syn::parse_quote_spanned! {span=>#template_ident};
 
-	let template_def = if field_assignments.is_empty() {
+
+	let no_attrs = field_assignments.is_empty();
+	let is_constructor = node_tag.contains(":");
+
+	let template_def = if no_attrs && is_constructor {
+		// currently unsupported as rstml doesnt support constructors
+		// https://github.com/rs-tml/rstml/issues/69
+		// ie <Transform::new() />
+		template_ident.to_token_stream()
+	} else if no_attrs {
+		// ie <Transform />
 		quote!(#template_ident::default())
 	} else if force_default {
+		// ie <Transform position={..}/>
 		quote!(#template_ident {
 			#(#field_assignments),*,
 			..default()
 		})
 	} else {
+		// ie <Transform no_default/>
 		quote!(#template_ident {
 			#(#field_assignments),*,
 		})
@@ -115,6 +130,7 @@ mod test {
 		.xmap(parse)
 		.xpect_snapshot();
 	}
+
 	#[test]
 	fn key_value() {
 		quote! {
@@ -123,6 +139,7 @@ mod test {
 		.xmap(parse)
 		.xpect_snapshot();
 	}
+
 	#[test]
 	fn no_default() {
 		quote! {

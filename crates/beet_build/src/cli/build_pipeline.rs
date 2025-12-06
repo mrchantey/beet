@@ -12,11 +12,7 @@ pub struct BuildPipeline {
 
 impl BuildPipeline {
 	/// Creates a new [`BuildPipeline`] with the given name.
-	pub fn new(name: &str) -> Self {
-		Self {
-			name: name.to_string(),
-		}
-	}
+	pub fn new(name: &str) -> Self { Self { name: name.into() } }
 }
 
 /// Runs the [`BuildPipeline`] with the name matching the
