@@ -27,6 +27,7 @@ impl TokenizeTemplate {
 		};
 		let node_tag_span = entity.get::<SpanOf<NodeTag>>();
 		let mut prop_assignments = Vec::new();
+		let mut components = Vec::new();
 
 		if let Some(attrs) = entity.get::<Attributes>() {
 			for attr_entity in attrs.iter() {
@@ -64,7 +65,7 @@ impl TokenizeTemplate {
 					}
 					// 4. Value without key (block/spread attribute)
 					(None, Some(value)) => {
-						entity_components.push(value.insert_deferred());
+						components.push(value);
 					}
 					// 5. No key or value, should be unreachable but no big deal
 					(None, None) => {}
@@ -72,9 +73,15 @@ impl TokenizeTemplate {
 			}
 		}
 
+		let mut tag_str = node_tag.to_upper_camel_case();
+		// dirty hack cos entity collision
+		if tag_str == "Entity" {
+			tag_str = "EmptyEntity".to_string();
+		}
+
 		let template_ident = Ident::new(
 			// normalize both <element-types> and <ElementTypes>
-			&node_tag.as_str().to_upper_camel_case(),
+			&tag_str,
 			node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 		);
 
@@ -98,7 +105,9 @@ impl TokenizeTemplate {
 				}
 			};
 		}
-		entity_components.push(NodeExpr::new(template_def).insert_deferred());
+		// merge all OnSpawnDeferred to avoid duplicate components
+		components.push(NodeExpr::new(template_def));
+		entity_components.push(NodeExpr::merge_deferred(&components));
 		Ok(())
 	}
 }
@@ -113,6 +122,9 @@ mod test {
 
 	fn parse(tokens: TokenStream) -> TokenStream {
 		ParseRsxTokens::rstml_to_rsx(tokens, WsPathBuf::new(file!())).unwrap()
+	}
+	fn parse_bsx(tokens: TokenStream) -> TokenStream {
+		ParseRsxTokens::rstml_to_bsx(tokens, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
@@ -129,6 +141,22 @@ mod test {
 			<Foo type="bar"/>
 		}
 		.xmap(parse)
+		.xpect_snapshot();
+	}
+	#[test]
+	fn entity() {
+		quote! {
+			<entity/>
+		}
+		.xmap(parse_bsx)
+		.xpect_snapshot();
+	}
+	#[test]
+	fn merge_deferred() {
+		quote! {
+			<entity {foo}/>
+		}
+		.xmap(parse_bsx)
 		.xpect_snapshot();
 	}
 }

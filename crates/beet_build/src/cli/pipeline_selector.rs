@@ -1,32 +1,19 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-
-/// Marks an action as a build pipeline with the given name.
-#[derive(Debug, Clone, Component)]
-pub struct BuildPipeline {
-	/// The kebab-case name of the pipeline used as a cli argument,
-	/// ie `all`, `client-only`, `pull-assets`
-	pub name: String,
-}
-
-impl BuildPipeline {
-	/// Creates a new [`BuildPipeline`] with the given name.
-	pub fn new(name: &str) -> Self { Self { name: name.into() } }
-}
+use beet_rsx::prelude::*;
 
 /// Runs the [`BuildPipeline`] with the name matching the
 /// [`CliConfig::pipeline`], or the first if none specified.
 /// If a pipeline is specified but not found an error is returned.
-#[action(pipeline_selector)]
-#[derive(Default, Component, Reflect)]
-pub struct PipelineSelector;
+#[template]
+pub fn pipeline_selector() -> impl Bundle { OnSpawn::observe(action) }
 
-fn pipeline_selector(
+fn action(
 	mut ev: On<GetOutcome>,
 	config: Res<CliConfig>,
 	query: Query<&Children>,
-	pipelines: Query<&BuildPipeline>,
+	pipelines: Query<&Name>,
 ) -> Result {
 	let children = query.get(ev.action())?;
 	if children.is_empty() {
@@ -45,18 +32,18 @@ fn pipeline_selector(
 		.filter_map(|child| pipelines.get(child).map(|p| (child, p)).ok())
 		.collect::<Vec<_>>();
 
-	if let Some(pipeline) = pipelines
+	if let Some((child, _name)) = pipelines
 		.iter()
-		.find(|(_, pipeline)| &pipeline.name == name)
+		.find(|(_, pipeline)| pipeline.as_str() == name.as_str())
 	{
 		// found the specified pipeline, run it
-		ev.trigger_action_with_cx(pipeline.0, GetOutcome);
+		ev.trigger_action_with_cx(*child, GetOutcome);
 		Ok(())
 	} else {
 		// specified pipeline not found, return error
 		let pipelines = pipelines
 			.iter()
-			.map(|(_, pipeline)| pipeline.name.as_str())
+			.map(|(_, pipeline)| pipeline.as_str())
 			.collect::<Vec<_>>()
 			.join(", ");
 		bevybail!(
@@ -72,21 +59,18 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
+
+	#[template]
 	fn pipeline_tree() -> impl Bundle {
-		(Name::new("root"), PipelineSelector::default(), children![
-			(
-				Name::new("child1"),
-				BuildPipeline::new("first"),
-				EndWith(Outcome::Pass)
-			),
-			(
-				Name::new("child2"),
-				BuildPipeline::new("second"),
-				EndWith(Outcome::Pass)
-			),
-		])
+		bsx! {
+			<pipeline_selector {Name::new("root")}>
+				<entity {(Name::new("first"), EndWith(Outcome::Pass))}/>
+				<entity {(Name::new("second"), EndWith(Outcome::Pass))}/>
+			</entity>
+		}
 	}
 
 	#[test]
@@ -107,17 +91,17 @@ mod test {
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn(pipeline_tree())
+			.spawn(bsx! {<pipeline_tree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 
 		// Should run root then first child
 		on_run
 			.get()
-			.xpect_eq(vec!["root".to_string(), "child1".to_string()]);
+			.xpect_eq(vec!["root".to_string(), "first".to_string()]);
 
 		on_result.get().xpect_eq(vec![
-			("child1".to_string(), Outcome::Pass),
+			("first".to_string(), Outcome::Pass),
 			("root".to_string(), Outcome::Pass),
 		]);
 	}
@@ -139,17 +123,17 @@ mod test {
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn(pipeline_tree())
+			.spawn(bsx! {<pipeline_tree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 
 		// Should run root then the named ("second") child
 		on_run
 			.get()
-			.xpect_eq(vec!["root".to_string(), "child2".to_string()]);
+			.xpect_eq(vec!["root".to_string(), "second".to_string()]);
 
 		on_result.get().xpect_eq(vec![
-			("child2".to_string(), Outcome::Pass),
+			("second".to_string(), Outcome::Pass),
 			("root".to_string(), Outcome::Pass),
 		]);
 	}
@@ -171,7 +155,7 @@ mod test {
 
 		// Spawn a PipelineSelector with two pipelines but none matching "nonexistent"
 		world
-			.spawn(pipeline_tree())
+			.spawn(bsx! {<pipeline_tree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 

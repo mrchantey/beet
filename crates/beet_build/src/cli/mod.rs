@@ -6,5 +6,5 @@ mod cli_plugin;
 pub use cli_plugin::*;
 mod build_step;
 pub use build_step::*;
-mod build_pipeline;
-pub use build_pipeline::*;
+mod pipeline_selector;
+pub use pipeline_selector::*;

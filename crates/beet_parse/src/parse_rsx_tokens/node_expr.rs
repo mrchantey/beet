@@ -96,4 +96,18 @@ impl NodeExpr {
 		let parsed = self.inner_parsed();
 		quote! { OnSpawnDeferred::insert(#parsed.into_bundle()) }
 	}
+
+	pub fn merge_deferred(items: &Vec<Self>) -> TokenStream {
+		let components = items.iter().map(|item| {
+			let parsed = item.inner_parsed();
+			quote! {
+				#parsed.into_bundle()
+			}
+		});
+		if components.len() == 1 {
+			quote! {OnSpawnDeferred::insert(#(#components),*)}
+		} else {
+			quote! {OnSpawnDeferred::insert((#(#components),*))}
+		}
+	}
 }

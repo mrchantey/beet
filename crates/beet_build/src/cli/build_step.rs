@@ -17,7 +17,7 @@ pub struct StdOutLine {
 /// Lines are streamed concurrently as they arrive. Empty lines are emitted (not skipped).
 /// Reader tasks are aborted if the process exits first.
 #[template]
-pub fn BuildStep(
+pub fn build_step(
 	/// The command to run
 	cmd: String,
 	/// The command argum
