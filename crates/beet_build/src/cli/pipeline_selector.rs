@@ -22,8 +22,8 @@ impl BuildPipeline {
 /// Runs the [`BuildPipeline`] with the name matching the
 /// [`CliConfig::pipeline`], or the first if none specified.
 /// If a pipeline is specified but not found an error is returned.
-#[template]
-pub fn pipeline_selector() -> impl Bundle { OnSpawn::observe(action) }
+#[construct]
+pub fn PipelineSelector() -> impl Bundle { OnSpawn::observe(action) }
 
 fn action(
 	mut ev: On<GetOutcome>,
@@ -79,10 +79,10 @@ mod test {
 	use sweet::prelude::*;
 
 
-	#[template]
-	fn pipeline_tree() -> impl Bundle {
+	#[construct]
+	fn PipelineTree() -> impl Bundle {
 		bsx! {
-			<pipeline_selector {Name::new("root")}>
+			<PipelineSelector {Name::new("root")}>
 				<entity {(
 					Name::new("first"),
 					BuildPipeline::new("first"),
@@ -115,7 +115,7 @@ mod test {
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn(bsx! {<pipeline_tree/>})
+			.spawn(bsx! {<PipelineTree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 
@@ -147,7 +147,7 @@ mod test {
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn(bsx! {<pipeline_tree/>})
+			.spawn(bsx! {<PipelineTree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 
@@ -179,7 +179,7 @@ mod test {
 
 		// Spawn a PipelineSelector with two pipelines but none matching "nonexistent"
 		world
-			.spawn(bsx! {<pipeline_tree/>})
+			.spawn(bsx! {<PipelineTree/>})
 			.trigger_target(GetOutcome)
 			.flush();
 

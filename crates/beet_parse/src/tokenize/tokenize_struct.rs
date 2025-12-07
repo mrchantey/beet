@@ -21,8 +21,9 @@ pub fn tokenize_struct(
 	};
 	let node_tag_span = entity.get::<SpanOf<NodeTag>>();
 	let mut field_assignments = Vec::new();
+	let mut components = Vec::new();
 
-	// if a 'default' attr is present, disable default
+	// if a 'default' attr is present, add a ..default()
 	let mut force_default = false;
 	if let Some(attrs) = entity.get::<Attributes>() {
 		for attr_entity in attrs.iter() {
@@ -51,7 +52,7 @@ pub fn tokenize_struct(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(value.insert_deferred());
+					components.push(value);
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}
@@ -105,8 +106,8 @@ pub fn tokenize_struct(
 			#template_def
 		}
 	};
-	entity_components.push(NodeExpr::new(inner).insert_deferred());
-
+	components.push(NodeExpr::new(inner));
+	entity_components.push(NodeExpr::merge_deferred(&components));
 	Ok(())
 }
 

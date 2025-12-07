@@ -65,7 +65,7 @@ fn define_struct(
 
 	let (_, type_generics, where_clause) = func.sig.generics.split_for_impl();
 
-	let fields = prop_fields(fields).map(|f| {
+	let struct_fields = prop_fields(fields).map(|f| {
 		let ident = &f.ident;
 		let attrs = &f.attrs;
 		let ty = f.ty;
@@ -78,18 +78,21 @@ fn define_struct(
 	let ident = &func.sig.ident;
 	let on_add = on_add_ident(func);
 
-	let derive = if opts.take {
-		quote! {#[derive(Component)]}
-	} else {
-		quote! {#[derive(Clone, Component)]}
+	let mut derives = vec![quote! {Component}];
+
+	if !opts.take {
+		derives.push(quote! {Clone});
 	};
+	if fields.is_empty() {
+		derives.push(quote! {Default});
+	}
 
 	Ok(quote! {
 	#(#attrs)*
-	#derive
+	#[derive(#(#derives),*)]
 	#[component(on_add = #on_add)]
 	#vis struct #ident #type_generics #where_clause {
-		#(#fields),*
+		#(#struct_fields),*
 	}
 	})
 }
