@@ -8,6 +8,6 @@
         NodeTag(String::from("Foo")),
         FragmentNode,
         TemplateNode,
-        OnSpawnDeferred::insert(Foo { r#type: "bar".into() }.into_bundle()),
+        OnSpawnDeferred::insert(Foo { bar: true, ..default() }.into_bundle()),
     ))
 }

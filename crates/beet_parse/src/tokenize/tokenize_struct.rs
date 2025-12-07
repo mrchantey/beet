@@ -22,8 +22,8 @@ pub fn tokenize_struct(
 	let node_tag_span = entity.get::<SpanOf<NodeTag>>();
 	let mut field_assignments = Vec::new();
 
-	// if a 'no_default' attr is present, disable default
-	let mut force_default = true;
+	// if a 'default' attr is present, disable default
+	let mut force_default = false;
 	if let Some(attrs) = entity.get::<Attributes>() {
 		for attr_entity in attrs.iter() {
 			let key = maybe_spanned_attr_key(world, attr_entity).map(
@@ -43,8 +43,8 @@ pub fn tokenize_struct(
 				}
 				// 3. Key without value (boolean attribute)
 				(Some((key_str, key)), None) => {
-					if key_str == "no_default" {
-						force_default = false;
+					if key_str == "default" {
+						force_default = true;
 					} else {
 						field_assignments.push(quote! {#key: true});
 					}
@@ -81,13 +81,13 @@ pub fn tokenize_struct(
 		// ie <Transform />
 		quote!(#template_ident::default())
 	} else if force_default {
-		// ie <Transform position={..}/>
+		// ie <Transform position={..} default/>
 		quote!(#template_ident {
 			#(#field_assignments),*,
 			..default()
 		})
 	} else {
-		// ie <Transform no_default/>
+		// ie <Transform position={..}/>
 		quote!(#template_ident {
 			#(#field_assignments),*,
 		})
@@ -142,9 +142,9 @@ mod test {
 	}
 
 	#[test]
-	fn no_default() {
+	fn default() {
 		quote! {
-			<Foo bar no_default/>
+			<Foo bar default/>
 		}
 		.xmap(parse)
 		.xpect_snapshot();

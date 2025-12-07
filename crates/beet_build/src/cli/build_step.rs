@@ -16,8 +16,8 @@ pub struct StdOutLine {
 ///
 /// Lines are streamed concurrently as they arrive. Empty lines are emitted (not skipped).
 /// Reader tasks are aborted if the process exits first.
-#[template]
-pub fn build_step(
+#[construct]
+pub fn BuildStep(
 	/// The command to run
 	cmd: String,
 	/// The command argum
@@ -71,7 +71,7 @@ mod test {
 		app.world_mut()
 			.spawn(bsx! {
 				<entity {(Sequence, ExitOnEnd)}>
-					<build_step cmd="echo" args=vec!["foobar".into()]/>
+					<BuildStep cmd="echo" args=vec!["foobar".into()]/>
 				</entity>
 			})
 			.trigger_target(GetOutcome);
