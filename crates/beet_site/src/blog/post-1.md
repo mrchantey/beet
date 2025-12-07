@@ -39,7 +39,7 @@ And that brings us to today, the first RC for the fullstack bevy experience with
 - Template Scoped Styles
 - Instant Template Reloading
 
-If this project is of interest come and say hi in the [beet ecosystem crate channel](https://discord.com/channels/691052431525675048/1333204907414523964), and keep me in the loop if you decide to give the quickstart a go. Its difficult to do much without stepping on a proverbial rake at the moment 😅
+If this project is of interest come and say hi in the [Beetmash Discord](https://discord.gg/DcURUQCXtx), and keep me in the loop if you decide to give the quickstart a go. Its difficult to do much without stepping on a proverbial rake at the moment 😅
 
 Happy Harvest!
 

@@ -22,7 +22,7 @@ Beet is a framework for building technologies that can people can share, access 
 
 > 🚧 Mind your step! 🚧
 >
-> Beet is under construction, if this project is of interest please come and say hi in the [Beetmash Discord Server](https://discord.gg/CvrVwryu).
+> Beet is under construction, if this project is of interest please come and say hi in the [Beetmash Discord Server](https://discord.gg/DcURUQCXtx).
 
 **readiness meter**
 - 🦢 ready to go: documented and tested

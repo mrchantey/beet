@@ -14,7 +14,7 @@ pub fn get() -> impl IntoHtml {
 				<p><b>"A folk technology framework"</b></p>
 				<Card style:cascade class="hero">
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>
-				<p>"Beet is under construction, if this project is of interest please come and say hi in the"<a href="https://discord.gg/CvrVwryu">Beetmash Discord Server</a>.</p>
+				<p>"Beet is under construction, if this project is of interest please come and say hi in the"<a href="https://discord.gg/DcURUQCXtx">Beetmash Discord Server</a>.</p>
 					<footer>
 						<Link
 							style:cascade

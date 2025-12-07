@@ -122,7 +122,7 @@ Importantly notice what is *missing* from the output: No js, no wasm, just some 
 Of course there are limitations to this approach. State mutations are constrained to specific verbs like `increment`, `push_form_data`, `set_from_target_value` in a similar way to the HTMX rendering verbs of `innerHTML`, `outerHTML`, etc.
 Here we're counting on the HTMX insight: 80% of reactive operations are CRUD-like and do not require custom client code. We can use Astro-style JS sprinkling for special cases and we still have client islands in the back pocket for inherently heavy applications like 3D rendering or robotics dashboards.
 
-There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in [our channel in the bevy discord](https://discord.com/channels/691052431525675048/1333204907414523964).
+There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the [Beetmash Discord](https://discord.gg/DcURUQCXtx).
 
 
 ## A Fully ECS Router
