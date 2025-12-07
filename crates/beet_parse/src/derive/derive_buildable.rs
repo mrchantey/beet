@@ -118,6 +118,7 @@ fn impl_buildable(
 	Ok(quote! {
 
 		#[doc = #builder_docs]
+		#[allow(missing_docs)]
 		#vis trait #buildable_ident #impl_generics: Sized + #where_clause {
 			fn get(&self) -> &#target_ident #type_generics;
 			fn get_mut(&mut self) -> &mut #target_ident #type_generics;
@@ -179,8 +180,6 @@ fn impl_buildable_blanket(input: &DeriveInput) -> TokenStream {
 mod name_lookup {
 	use super::*;
 	use syn::Ident;
-
-	/// implemented by [`#derive(Buildable)`]
 	pub fn buildable_ident(ident: &Ident) -> Ident {
 		format_ident!("{}Buildable", ident)
 	}

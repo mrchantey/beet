@@ -3,6 +3,22 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
+#[derive(Component)]
+pub struct BuildPipeline {
+	/// The kebab-case name of the pipeline, to be
+	/// matched by the [`pipeline_selector`]
+	pub name: String,
+}
+
+impl BuildPipeline {
+	/// Creates a new [`BuildPipeline`] with the given name.
+	pub fn new(name: &str) -> Self {
+		Self {
+			name: name.to_string(),
+		}
+	}
+}
+
 /// Runs the [`BuildPipeline`] with the name matching the
 /// [`CliConfig::pipeline`], or the first if none specified.
 /// If a pipeline is specified but not found an error is returned.
@@ -13,7 +29,7 @@ fn action(
 	mut ev: On<GetOutcome>,
 	config: Res<CliConfig>,
 	query: Query<&Children>,
-	pipelines: Query<&Name>,
+	pipelines: Query<&BuildPipeline>,
 ) -> Result {
 	let children = query.get(ev.action())?;
 	if children.is_empty() {
@@ -34,7 +50,7 @@ fn action(
 
 	if let Some((child, _name)) = pipelines
 		.iter()
-		.find(|(_, pipeline)| pipeline.as_str() == name.as_str())
+		.find(|(_, pipeline)| pipeline.name.as_str() == name.as_str())
 	{
 		// found the specified pipeline, run it
 		ev.trigger_action_with_cx(*child, GetOutcome);
@@ -43,7 +59,7 @@ fn action(
 		// specified pipeline not found, return error
 		let pipelines = pipelines
 			.iter()
-			.map(|(_, pipeline)| pipeline.as_str())
+			.map(|(_, pipeline)| pipeline.name.as_str())
 			.collect::<Vec<_>>()
 			.join(", ");
 		bevybail!(
@@ -67,8 +83,16 @@ mod test {
 	fn pipeline_tree() -> impl Bundle {
 		bsx! {
 			<pipeline_selector {Name::new("root")}>
-				<entity {(Name::new("first"), EndWith(Outcome::Pass))}/>
-				<entity {(Name::new("second"), EndWith(Outcome::Pass))}/>
+				<entity {(
+					Name::new("first"),
+					BuildPipeline::new("first"),
+					EndWith(Outcome::Pass)
+				)}/>
+				<entity {(
+					Name::new("second"),
+					BuildPipeline::new("second"),
+					EndWith(Outcome::Pass)
+				)}/>
 			</entity>
 		}
 	}

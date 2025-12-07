@@ -159,11 +159,9 @@ fn impl_required(
 
 mod name_lookup {
 	use super::*;
-	/// implemented by [`#derive(Node)`]
 	pub fn builder_ident(ident: &Ident) -> Ident {
 		format_ident!("{}Builder", ident)
 	}
-	/// implemented by [`#derive(Node)`]
 	pub fn required_ident(ident: &Ident) -> Ident {
 		format_ident!("{}Required", ident)
 	}

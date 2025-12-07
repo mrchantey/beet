@@ -60,8 +60,8 @@ pub fn build_step(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_dom::prelude::*;
 	use beet_flow::prelude::*;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]
@@ -69,13 +69,11 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((ControlFlowPlugin, AsyncPlugin));
 		app.world_mut()
-			.spawn((Sequence, ExitOnEnd, children![
-				BuildStep {
-					cmd: "echo".into(),
-					args: vec!["foobar".into()]
-				}
-				.into_bundle()
-			]))
+			.spawn(bsx! {
+				<entity {(Sequence, ExitOnEnd)}>
+					<build_step cmd="echo" args=vec!["foobar".into()]/>
+				</entity>
+			})
 			.trigger_target(GetOutcome);
 
 		app.run_async().await.xpect_eq(AppExit::Success);
