@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 /// probably the best templating layout ever
-#[derive(Clone, Component)]
+#[derive(Component)]
 #[component(on_add = on_add_my_node)]
 pub(crate) struct MyNode {
     /// some comment
@@ -14,7 +14,7 @@ fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {
         .queue(move |world: &mut World| {
             let mut entity_world_mut = world.entity_mut(entity);
             let id = entity_world_mut.id();
-            let this = entity_world_mut.get::<MyNode>().unwrap().clone();
+            let this = entity_world_mut.take::<MyNode>().unwrap();
             let bundle = {
                 #[allow(unused_variables, unused_assignments)]
                 let entity = id;

@@ -1,6 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;
 use sweet::prelude::*;
@@ -21,7 +20,7 @@ async fn parse_async(bundle: impl Bundle) -> String {
 
 #[test]
 fn simple() {
-	#[component]
+	#[construct]
 	fn Hello(name: String, my_entity: Entity, r#type: String) -> impl Bundle {
 		let _ = my_entity;
 		let _ = r#type;
@@ -34,8 +33,24 @@ fn simple() {
 	.xpect_eq("foo");
 }
 #[test]
+fn take() {
+	// some non-clone type
+	struct Foo;
+
+	#[construct(take)]
+	fn Hello(name: String, foo: Foo) -> impl Bundle {
+		let _ = foo;
+		Name::new(name)
+	}
+	parse(Hello {
+		name: "foo".into(),
+		foo: Foo,
+	})
+	.xpect_eq("foo");
+}
+#[test]
 fn system() {
-	#[component]
+	#[construct]
 	fn Hello(name: String, time: Res<Time>) -> impl Bundle {
 		let _ = time;
 		Name::new(name)
@@ -44,7 +59,7 @@ fn system() {
 }
 #[sweet::test]
 async fn test_async() {
-	#[component]
+	#[construct]
 	async fn Hello(name: String, my_entity: AsyncEntity) -> impl Bundle {
 		let _ = my_entity;
 		beet_core::exports::futures_lite::future::yield_now().await;

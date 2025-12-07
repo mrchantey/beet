@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
 /// probably the best templating layout ever
-#[derive(Clone, Component, Reflect)]
-#[reflect(Component)]
+#[derive(Clone, Component)]
 #[component(on_add = on_add_my_node)]
 pub(crate) struct MyNode {
     /// some comment

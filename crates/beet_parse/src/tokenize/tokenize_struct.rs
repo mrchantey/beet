@@ -9,6 +9,7 @@ use quote::quote;
 use syn::Expr;
 
 
+
 pub fn tokenize_struct(
 	world: &World,
 	entity_components: &mut Vec<TokenStream>,
@@ -38,7 +39,7 @@ pub fn tokenize_struct(
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
 					let value = value.inner_parsed();
-					field_assignments.push(quote! {#key: #value});
+					field_assignments.push(quote! {#key: #value.into()});
 				}
 				// 3. Key without value (boolean attribute)
 				(Some((key_str, key)), None) => {

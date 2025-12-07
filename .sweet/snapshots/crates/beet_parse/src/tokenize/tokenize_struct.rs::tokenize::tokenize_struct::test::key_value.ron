@@ -10,7 +10,7 @@
         TemplateNode,
         OnSpawnDeferred::insert(
             Transform {
-                position: Vec3(0, 0, 0),
+                position: Vec3(0, 0, 0).into(),
                 ..default()
             }
                 .into_bundle(),

@@ -1,20 +1,36 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
 use syn::Ident;
 use syn::ItemFn;
 use syn::Result;
 use syn::ReturnType;
 
-pub fn component_func(input: ItemFn) -> TokenStream {
-	parse(input).unwrap_or_else(|err| err.into_compile_error())
+pub fn component_func(input: ItemFn, attr: TokenStream) -> TokenStream {
+	parse(input, attr).unwrap_or_else(|err| err.into_compile_error())
 }
 
-fn parse(input: ItemFn) -> Result<TokenStream> {
+struct Options {
+	take: bool,
+}
+impl Options {
+	fn new(attr: TokenStream) -> Result<Self> {
+		let attrs = AttributeGroup::parse_punctated(attr)?;
+		Ok(Self {
+			take: attrs
+				.iter()
+				.any(|attr| attr.into_token_stream().to_string() == "take"),
+		})
+	}
+}
+
+fn parse(input: ItemFn, attr: TokenStream) -> Result<TokenStream> {
+	let opts = Options::new(attr)?;
 	let fields = NodeField::parse_item_fn(&input)?;
-	let define_struct = define_struct(&input, &fields)?;
-	let impl_on_add = impl_on_add(&input, &fields)?;
+	let define_struct = define_struct(&input, &opts, &fields)?;
+	let impl_on_add = impl_on_add(&input, &opts, &fields)?;
 
 	let imports = if pkg_ext::is_internal() {
 		quote! {
@@ -40,7 +56,11 @@ fn on_add_ident(func: &ItemFn) -> Ident {
 	Ident::new(&ident_str, func.sig.ident.span())
 }
 
-fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
+fn define_struct(
+	func: &ItemFn,
+	opts: &Options,
+	fields: &[NodeField],
+) -> Result<TokenStream> {
 	let attrs = &func.attrs;
 
 	let (_, type_generics, where_clause) = func.sig.generics.split_for_impl();
@@ -58,10 +78,15 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	let ident = &func.sig.ident;
 	let on_add = on_add_ident(func);
 
+	let derive = if opts.take {
+		quote! {#[derive(Component)]}
+	} else {
+		quote! {#[derive(Clone, Component)]}
+	};
+
 	Ok(quote! {
 	#(#attrs)*
-	#[derive(Clone, Component, Reflect)]
-	#[reflect(Component)]
+	#derive
 	#[component(on_add = #on_add)]
 	#vis struct #ident #type_generics #where_clause {
 		#(#fields),*
@@ -69,7 +94,11 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	})
 }
 
-fn impl_on_add(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
+fn impl_on_add(
+	func: &ItemFn,
+	opts: &Options,
+	fields: &[NodeField],
+) -> Result<TokenStream> {
 	let ident = &func.sig.ident;
 
 	let destructure_props = prop_fields(fields).map(|field| {
@@ -183,6 +212,12 @@ fn impl_on_add(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 		}
 	};
 
+	let this = if opts.take {
+		quote! { entity_world_mut.take::<#ident>().unwrap(); }
+	} else {
+		quote! { entity_world_mut.get::<#ident>().unwrap().clone(); }
+	};
+
 	Ok(quote! {
 		fn #on_add(mut world: DeferredWorld, cx: HookContext) {
 			// let component = world.entity(cx.entity).get::<Foo>().unwrap();
@@ -190,7 +225,7 @@ fn impl_on_add(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 			world.commands().queue(move |world: &mut World| {
 				let mut entity_world_mut = world.entity_mut(entity);
 				let id = entity_world_mut.id();
-				let this = entity_world_mut.get::<#ident>().unwrap().clone();
+				let this = #this
 				#inner
 			});
 		}
@@ -292,6 +327,7 @@ fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
 mod test {
 	use super::with_captured_lifetimes;
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use sweet::prelude::*;
 	use syn::PathSegment;
 
@@ -319,54 +355,81 @@ mod test {
 
 	#[test]
 	fn simple() {
-		component_func(syn::parse_quote! {
-			/// probably the best templating layout ever
-			pub(crate) fn MyNode(
-				/// some comment
-				foo:u32,
-				mut bar:u32
-			) -> impl Bundle{()}
-		})
+		component_func(
+			syn::parse_quote! {
+				/// probably the best templating layout ever
+				pub(crate) fn MyNode(
+					/// some comment
+					foo:u32,
+					mut bar:u32
+				) -> impl Bundle{()}
+			},
+			default(),
+		)
+		.xpect_snapshot();
+	}
+	#[test]
+	fn take() {
+		component_func(
+			syn::parse_quote! {
+				/// probably the best templating layout ever
+				pub(crate) fn MyNode(
+					/// some comment
+					foo:u32,
+					mut bar:u32
+				) -> impl Bundle{()}
+			},
+			quote::quote! {take},
+		)
 		.xpect_snapshot();
 	}
 	#[test]
 	fn system() {
-		component_func(syn::parse_quote! {
-			/// probably the best templating layout ever
-			pub(crate) fn MyNode(
-				/// some comment
-				foo:u32,
-				mut my_res: Res<Time>
-			) -> impl Bundle{()}
-		})
+		component_func(
+			syn::parse_quote! {
+				/// probably the best templating layout ever
+				pub(crate) fn MyNode(
+					/// some comment
+					foo:u32,
+					mut my_res: Res<Time>
+				) -> impl Bundle{()}
+			},
+			default(),
+		)
 		.xpect_snapshot();
 	}
 	#[test]
 	fn test_async() {
-		component_func(syn::parse_quote! {
-			/// probably the best templating layout ever
-			pub(crate) async fn MyNode(
-				/// some comment
-				foo: u32,
-				bar: AsyncEntity,
-			) -> impl Bundle{()}
-		})
+		component_func(
+			syn::parse_quote! {
+				/// probably the best templating layout ever
+				pub(crate) async fn MyNode(
+					/// some comment
+					foo: u32,
+					bar: AsyncEntity,
+				) -> impl Bundle{()}
+			},
+			default(),
+		)
 		.xpect_snapshot();
 	}
 	#[test]
 	fn complex() {
-		component_func(syn::parse_quote! {
-			/// probably the best templating layout ever
-			pub(crate) fn MyNode(
-				/// some comment
-				foo:u32,
-				mut bar:u32,
-				my_entity:Entity,
-				world: &mut World,
-				res: Res<Time>,
-				mut query: Query<&mut Transform>,
-			) -> impl Bundle{()}
-		})
+		component_func(
+			syn::parse_quote! {
+				/// probably the best templating layout ever
+				pub(crate) fn MyNode(
+					/// some comment
+					foo:u32,
+					mut bar:u32,
+					my_entity:Entity,
+					world: &mut World,
+					res: Res<Time>,
+					mut query: Query<&mut Transform>,
+				) -> impl Bundle{()}
+			},
+			default(),
+		)
 		.xpect_snapshot();
 	}
 }

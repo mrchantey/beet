@@ -113,17 +113,20 @@ pub fn template(
 
 /// Define a component of the same name with a constructor function called on add.
 ///
+/// By default the component is cloned to run the function, to instead take
+/// specify `#[construct(take)]`
+///
 /// ## Example
 ///
 /// ```rust ignore
-/// #[component]
+/// #[construct]
 /// fn Player(position: Vec3) -> impl Bundle {
 /// 	Transform::new(position.x, position.y, position.z)
 /// }
 /// ```
 /// Constructors can also be systems
 /// ```rust ignore
-/// #[component]
+/// #[construct]
 /// fn Player(
 /// 	position: Vec3,
 /// 	time: Res<Time>,
@@ -135,7 +138,7 @@ pub fn template(
 /// ```
 /// Constructors can also be async
 /// ```rust ignore
-/// #[component]
+/// #[construct]
 /// async fn Player(
 /// 	position: Vec3,
 /// 	entity: AsyncEntity,
@@ -145,14 +148,13 @@ pub fn template(
 /// ```
 
 #[proc_macro_attribute]
-pub fn component(
-	_attr: proc_macro::TokenStream,
+pub fn construct(
+	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as ItemFn);
-	component_func(input).into()
+	component_func(input, attr.into()).into()
 }
-
 
 /// Allow a struct to be included as a `#[field(flatten)]` of another struct
 #[proc_macro_derive(Buildable, attributes(field))]
