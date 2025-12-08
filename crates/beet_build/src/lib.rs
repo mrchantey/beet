@@ -48,13 +48,13 @@
 use crate::prelude::*;
 
 
-mod cli;
+mod pipeline;
 mod route_codegen;
 mod snippets;
 mod utils;
 
 pub mod prelude {
-	pub use crate::cli::*;
+	pub use crate::pipeline::*;
 	pub use crate::route_codegen::*;
 	pub use crate::snippets::*;
 	pub use crate::utils::*;
