@@ -6,7 +6,7 @@ use sweet::prelude::*;
 /// Tests the workflow of running a binary to output a `launch.ron` file.
 #[test]
 fn launch_scene() -> Result {
-	let dir = TempDir::new_workspace()?.keep();
+	let dir = TempDir::new_workspace()?;
 	let crate_dir =
 		WsPathBuf::new("crates/beet_build/tests/pipeline_test_crate")
 			.into_abs();

@@ -41,7 +41,7 @@ impl Default for TempDir {
 impl TempDir {
 	/// Creates a new temporary directory in the system's temporary directory.
 	///
-	/// The directory is created with a unique name in the format `beet_tmp<uuid>`,
+	/// The directory is created with a unique name in the format `beet_tmp_<uuid>`,
 	/// where `<uuid>` is a randomly generated UUID v4. The directory will be
 	/// automatically deleted when the `TempDir` instance is dropped.
 	///
@@ -54,14 +54,14 @@ impl TempDir {
 	/// ```
 	pub fn new() -> FsResult<Self> {
 		let temp_dir = std::env::temp_dir();
-		let dir_name = format!("beet_tmp{}", Uuid::new_v4().to_string());
+		let dir_name = format!("beet_tmp_{}", Uuid::new_v4().to_string());
 		let dir_path = temp_dir.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
 
 	/// Creates a new temporary directory relative to the workspace root.
 	///
-	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp<uuid>`,
+	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp_<uuid>`,
 	/// where `<uuid>` is a randomly generated UUID v4. This is useful for keeping
 	/// temporary files within the project structure.
 	///
@@ -75,7 +75,7 @@ impl TempDir {
 	pub fn new_workspace() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
 		let dir_name =
-			format!("target/tmp/beet_tmp{}", Uuid::new_v4().to_string());
+			format!("target/tmp/beet_tmp_{}", Uuid::new_v4().to_string());
 		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
@@ -168,7 +168,7 @@ mod tests {
 			// Verify it's in the workspace
 			let path_str = dir_path.to_string();
 			assert!(
-				path_str.contains("target/tmp/beet_tmp"),
+				path_str.contains("target/tmp/beet_tmp_"),
 				"Directory should be in workspace target/tmp"
 			);
 		} // temp is dropped here
