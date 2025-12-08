@@ -183,6 +183,7 @@ impl BuildFlags {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+// TODO deprecate for custom build pipelines
 pub enum BuildFlag {
 	/// Load all snippets defined in the [`WorkspaceConfig`]
 	ImportSnippets,

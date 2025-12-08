@@ -3,8 +3,7 @@ use clap::Parser;
 
 /// Run the beet project
 #[derive(Debug, Clone, Parser)]
-pub struct RunCmd {
-}
+pub struct RunCmd {}
 
 
 impl RunCmd {
@@ -15,16 +14,4 @@ impl RunCmd {
 			.run()
 			.into_result()
 	}
-}
-
-
-// fn default_runner() -> impl Bundle { (config_step(),) }
-
-#[template]
-fn ConfigStep() -> impl Bundle {
-	
-	
-	rsx!{
-		
-	}	
 }

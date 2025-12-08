@@ -3,7 +3,7 @@ use clap::Parser;
 
 /// Build the project
 #[derive(Debug, Clone, Parser)]
-pub struct RunBuild {
+pub struct BuildCmd {
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
 	pub(crate) build_cmd: CargoBuildCmd,
@@ -17,7 +17,7 @@ pub enum RunMode {
 
 
 
-impl RunBuild {
+impl BuildCmd {
 	pub async fn run(self) -> Result {
 		App::new()
 			.add_plugins(BuildPlugin::default())

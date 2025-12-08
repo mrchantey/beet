@@ -3,13 +3,13 @@ use clap::Parser;
 
 // simple cargo generate for now
 #[derive(Parser)]
-pub struct RunNew {
+pub struct NewCmd {
 	/// Additional arguments to pass to cargo generate
 	#[clap(last = true)]
 	pub additional_args: Vec<String>,
 }
 
-impl RunNew {
+impl NewCmd {
 	pub async fn run(self) -> Result {
 		todo!("update this")
 		// let mut command = Command::new("cargo");
