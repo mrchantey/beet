@@ -174,7 +174,20 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 		Ok(Self(value))
 	}
 }
-
+/// An extractor to represent query params as a struct.
+/// # Example
+/// ```
+/// # use beet_net::prelude::*;
+/// # use serde::Deserialize;
+/// #[derive(Deserialize)]
+/// struct MyParams {
+/// 	name: String,
+/// }
+///
+/// fn my_route(params: QueryParams<MyParams>) -> String {
+///   params.name.clone()
+/// }
+/// ```
 #[derive(Debug, Clone, Deref)]
 pub struct QueryParams<T>(pub T);
 

@@ -195,8 +195,8 @@ impl EndpointBuilder {
 					if let Some(cache_strategy) = self.cache_strategy {
 						handler_entity.insert(cache_strategy);
 					}
-					if let Some(html) = self.content_type {
-						handler_entity.insert(html);
+					if let Some(content_type) = self.content_type {
+						handler_entity.insert(content_type);
 					}
 					if let Some(method) = self.method {
 						handler_entity.insert(method);

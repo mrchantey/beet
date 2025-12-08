@@ -16,6 +16,8 @@ mod launch_scene;
 pub use launch_scene::*;
 mod cli_plugin;
 pub use cli_plugin::*;
+mod cli_args;
+pub use cli_args::*;
 mod terminal_command;
 pub use terminal_command::*;
 mod pipeline_selector;
