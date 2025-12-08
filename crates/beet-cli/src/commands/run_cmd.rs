@@ -9,8 +9,9 @@ pub struct RunCmd {}
 impl RunCmd {
 	pub async fn run(self) -> Result {
 		App::new()
-			.add_plugins(BuildPlugin::default())
-			.set_runner(LaunchRunner::runner)
+			// TODO new build plugin
+			// .add_plugins(BuildPlugin::default())
+			// .set_runner(LaunchRunner::runner)
 			.run()
 			.into_result()
 	}
