@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use crate::prelude::*;
@@ -22,6 +23,10 @@ pub struct TempDir {
 	path: AbsPathBuf,
 	/// Do not remove the directory on drop
 	keep: bool,
+}
+
+impl AsRef<Path> for TempDir {
+	fn as_ref(&self) -> &Path { &self.path }
 }
 
 impl std::ops::Deref for TempDir {
@@ -65,9 +70,9 @@ impl TempDir {
 	/// ```
 	/// # use beet_utils::prelude::*;
 	///
-	/// let temp = TempDir::new_workspace_relative().unwrap();
+	/// let temp = TempDir::new_workspace().unwrap();
 	/// ```
-	pub fn new_workspace_relative() -> FsResult<Self> {
+	pub fn new_workspace() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
 		let dir_name =
 			format!("target/tmp/beet_tmp{}", Uuid::new_v4().to_string());
@@ -146,7 +151,7 @@ mod tests {
 		let dir_path;
 		{
 			// Create a workspace-relative temp directory
-			let temp = TempDir::new_workspace_relative()
+			let temp = TempDir::new_workspace()
 				.expect("Failed to create workspace-relative temp directory");
 			dir_path = temp.path.clone();
 

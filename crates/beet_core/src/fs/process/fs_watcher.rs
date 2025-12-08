@@ -181,6 +181,15 @@ impl std::ops::Deref for WatchEventVec {
 	type Target = Vec<WatchEvent>;
 	fn deref(&self) -> &Self::Target { &self.events }
 }
+impl std::fmt::Display for WatchEventVec {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		for event in &self.events {
+			writeln!(f, "{}", event.display())?;
+		}
+		Ok(())
+	}
+}
+
 
 impl WatchEventVec {
 	pub fn new(events: DebounceEventResult) -> Result<Self> {

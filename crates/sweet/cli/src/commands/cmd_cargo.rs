@@ -61,7 +61,8 @@ impl CargoCmdExtra {
 		if self.no_default_filters == false {
 			self.filter
 				.include("**/*.rs")
-				.exclude("{.git,target,html}/**")
+				.exclude("**/target/**")
+				.exclude("**/.git/**")
 				.exclude("*/codegen/*");
 		}
 		let is_upstream = self
@@ -94,6 +95,7 @@ impl CargoCmdExtra {
 				continue;
 			}
 			self.run_binary()?;
+			// println!("change detected: \n{}", ev);
 		}
 
 		Ok(())
@@ -104,7 +106,7 @@ impl CargoCmdExtra {
 	/// Errors if not in watch mode and the command fails
 	fn run_binary(&self) -> Result {
 		if self.watch {
-			terminal::clear()?;
+			// terminal::clear()?;
 			println!("\n🤘 sweet as 🤘\n");
 		}
 		let result = self.build_cmd.spawn();

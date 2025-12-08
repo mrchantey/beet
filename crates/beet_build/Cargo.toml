@@ -33,7 +33,7 @@ required-features = ["css"]
 
 [dependencies]
 #💡 Internal
-beet_core = { workspace = true, features = ["fs", "bevy_scene", "tokens"] }
+beet_core = { workspace = true, features = ["rand", "fs", "bevy_scene", "tokens"] }
 beet_flow.workspace = true
 beet_parse.workspace = true
 beet_rsx = { workspace = true, features = ["tokens"] }
