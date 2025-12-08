@@ -64,7 +64,7 @@ fn action(
 			.join(", ");
 		bevybail!(
 			"
-No build pipeline found with name '{name}'
+No pipeline found with name '{name}'
 available pipelines: {pipelines}"
 		)
 	}
@@ -163,7 +163,7 @@ mod test {
 	}
 
 	#[test]
-	#[should_panic = "No build pipeline found with 'nonexistent'"]
+	#[should_panic = "No pipeline found with 'nonexistent'"]
 	fn errors_when_pipeline_not_found() {
 		let mut world = ControlFlowPlugin::world();
 
