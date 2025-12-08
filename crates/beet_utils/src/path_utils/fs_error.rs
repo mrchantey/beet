@@ -13,6 +13,8 @@ pub enum FsError {
 	FileNotFound { path: PathBuf },
 	#[error("Fs Error - Dir Not Found\nPath: {path}")]
 	DirNotFound { path: PathBuf },
+	#[error("Fs Error - Already Exists\nPath: {path}")]
+	AlreadyExists { path: PathBuf },
 	/// Catch-all error for io errors that are not [`io::ErrorKind::NotFound`]
 	#[error("Fs Error - IO\nPath: {path}\nError: {err}")]
 	Io { path: PathBuf, err: io::Error },

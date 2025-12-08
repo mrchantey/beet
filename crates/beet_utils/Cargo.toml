@@ -15,22 +15,36 @@ keywords.workspace = true
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote"]
 fs = ["dep:crossterm", "dep:async-fs", "dep:futures-lite"]
 serde = ["dep:serde", "dep:serde_json"]
+rand = ["dep:uuid"]
+# rand = ["dep:uuid","dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 [dependencies]
+bevy.workspace = true
+
+# utils
 glob.workspace = true
 clap.workspace = true
-bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
+
+# fs
 path-clean = "1"
 pathdiff = "0.2"
 
+# serde
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
+# tokens
 syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
+
+# rand
+uuid = { workspace = true, optional = true, features = ["v4"] }
+# rand = { workspace = true, optional = true }
+# rand_chacha = { workspace = true, optional = true }
+# getrandom = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-fs = { workspace = true, optional = true }

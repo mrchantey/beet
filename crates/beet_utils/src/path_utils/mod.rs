@@ -9,3 +9,7 @@ mod read_dir;
 pub use read_dir::*;
 mod abs_path_buf;
 pub use abs_path_buf::*;
+#[cfg(feature = "rand")]
+mod tempdir;
+#[cfg(feature = "rand")]
+pub use tempdir::*;

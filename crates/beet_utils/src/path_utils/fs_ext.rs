@@ -58,11 +58,11 @@ pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 }
 
 pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::exists(path)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		let path = path.as_ref();
 		match async_fs::metadata(path).await {
@@ -78,11 +78,11 @@ pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 }
 
 pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::create_dir_all(path)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		let path = path.as_ref();
 		async_fs::create_dir_all(path)
@@ -99,11 +99,11 @@ pub fn remove(path: impl AsRef<Path>) -> FsResult {
 }
 
 pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::remove(path)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		let path = path.as_ref();
 		match async_fs::metadata(path).await {
@@ -138,11 +138,11 @@ pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	std::fs::read(&path).map_err(|e| FsError::io(path, e))
 }
 pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::read(path)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		async_fs::read(&path)
 			.await
@@ -154,11 +154,11 @@ pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
 	std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e))
 }
 pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::read_to_string(path)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		async_fs::read_to_string(&path)
 			.await
@@ -203,11 +203,11 @@ pub async fn write_async(
 	path: impl AsRef<Path>,
 	data: impl AsRef<[u8]>,
 ) -> FsResult {
-	#[cfg(not(all(feature = "fs", not(target_arch="wasm32"))))]
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
 		fs_ext::write(path, data)
 	}
-	#[cfg(all(feature = "fs", not(target_arch="wasm32")))]
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	{
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {

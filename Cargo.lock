@@ -1833,6 +1833,7 @@ dependencies = [
  "syn 2.0.106",
  "thiserror 1.0.69",
  "tokio",
+ "uuid",
  "wasm-bindgen",
  "web-sys",
 ]

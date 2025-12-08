@@ -29,7 +29,7 @@ bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["beet_utils/serde", "dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 tokio = ["dep:tokio"]
-rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
+rand = ["beet_utils/rand", "dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 fs = [
 	"beet_utils/fs",
