@@ -4,14 +4,14 @@ use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
 #[derive(Component)]
-pub struct BuildPipeline {
+pub struct Pipeline {
 	/// The kebab-case name of the pipeline, to be
 	/// matched by the [`pipeline_selector`]
 	pub name: String,
 }
 
-impl BuildPipeline {
-	/// Creates a new [`BuildPipeline`] with the given name.
+impl Pipeline {
+	/// Creates a new [`Pipeline`] with the given name.
 	pub fn new(name: &str) -> Self {
 		Self {
 			name: name.to_string(),
@@ -19,7 +19,7 @@ impl BuildPipeline {
 	}
 }
 
-/// Runs the [`BuildPipeline`] with the name matching the
+/// Runs the [`Pipeline`] with the name matching the
 /// [`CliConfig::pipeline`], or the first if none specified.
 /// If a pipeline is specified but not found an error is returned.
 #[construct]
@@ -29,7 +29,7 @@ fn action(
 	mut ev: On<GetOutcome>,
 	config: Res<CliConfig>,
 	query: Query<&Children>,
-	pipelines: Query<&BuildPipeline>,
+	pipelines: Query<&Pipeline>,
 ) -> Result {
 	let children = query.get(ev.action())?;
 	if children.is_empty() {
@@ -85,12 +85,12 @@ mod test {
 			<PipelineSelector {Name::new("root")}>
 				<entity {(
 					Name::new("first"),
-					BuildPipeline::new("first"),
+					Pipeline::new("first"),
 					EndWith(Outcome::Pass)
 				)}/>
 				<entity {(
 					Name::new("second"),
-					BuildPipeline::new("second"),
+					Pipeline::new("second"),
 					EndWith(Outcome::Pass)
 				)}/>
 			</entity>

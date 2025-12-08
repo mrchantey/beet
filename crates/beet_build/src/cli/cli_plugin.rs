@@ -33,7 +33,7 @@ impl Default for CliConfig {
 }
 
 impl CliConfig {
-	pub fn launch_step(&self) -> BuildStep {
+	pub fn launch_step(&self) -> TerminalCommand {
 		let mut args = Vec::new();
 		if !self.launch_no_default_args {
 			args.push("run".into());
@@ -48,7 +48,7 @@ impl CliConfig {
 			args.extend(launch_cargo_args.split_whitespace().map(|s| s.into()));
 		}
 
-		BuildStep {
+		TerminalCommand {
 			cmd: "cargo".into(),
 			args,
 		}

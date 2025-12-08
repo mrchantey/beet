@@ -312,7 +312,6 @@ mod test {
 
 	#[sweet::test]
 	async fn works() -> Result {
-		std::env::temp
 		let tmp_dir = tempdir()?;
 		let mut rx = FsWatcher {
 			cwd: AbsPathBuf::new(tmp_dir.path().to_path_buf()).unwrap(),

@@ -10,14 +10,14 @@ pub struct StdOutLine {
 	pub is_err: bool,
 }
 
-/// A build step action that will run the provided command asynchronously,
+/// An action that will run the provided command asynchronously,
 /// calling [`Outcome::Pass`] if the command was successful or [`Outcome::Fail`] if it failed.
 /// All stdout and stderr lines are emitted as [`StdOutLine`] entity events.
 ///
 /// Lines are streamed concurrently as they arrive. Empty lines are emitted (not skipped).
 /// Reader tasks are aborted if the process exits first.
 #[construct]
-pub fn BuildStep(
+pub fn TerminalCommand(
 	/// The command to run
 	cmd: String,
 	/// The command argum
@@ -71,7 +71,7 @@ mod test {
 		app.world_mut()
 			.spawn(bsx! {
 				<entity {(Sequence, ExitOnEnd)}>
-					<BuildStep cmd="echo" args=vec!["foobar".into()]/>
+					<TerminalCommand cmd="echo" args=vec!["foobar".into()]/>
 				</entity>
 			})
 			.trigger_target(GetOutcome);

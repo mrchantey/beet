@@ -186,24 +186,6 @@ fn load_wasm_script(html_constants: &HtmlConstants) -> impl Bundle {
 	))
 }
 
-// fn insert_tree_location_map(&self, node: &WebNode, doc: &mut HtmlDocument) {
-// 	let loc_map = node.xpipe(NodeToTreeLocationMap);
-// 	let loc_map =
-// 		ron::ser::to_string_pretty(&loc_map, Default::default()).unwrap();
-// 	let el = HtmlElementNode::inline_script(loc_map, vec![
-// 		HtmlAttribute {
-// 			key: "type".to_string(),
-// 			value: Some("beet/ron".to_string()),
-// 		},
-// 		HtmlAttribute {
-// 			key: self.html_constants.loc_map_key.to_string(),
-// 			value: None,
-// 		},
-// 	]);
-// 	doc.body.push(el.into());
-// }
-
-
 fn script(content: impl Into<String>) -> impl Bundle {
 	(
 		ElementNode::open(),

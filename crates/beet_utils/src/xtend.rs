@@ -1,17 +1,3 @@
-/// Basically a `FnOnce` trait, but not nightly and a little less awkward to implement.
-pub trait Pipeline<In, Out = In> {
-	/// Consume self and apply to the target
-	fn apply(self, value: In) -> Out;
-}
-
-impl<F, In, Out> Pipeline<In, Out> for F
-where
-	F: FnOnce(In) -> Out,
-{
-	fn apply(self, value: In) -> Out { self(value) }
-}
-
-
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait Xtend: Sized {
@@ -51,12 +37,6 @@ pub trait Xtend: Sized {
 	fn xtap_mut(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
 		func(self);
 		self
-	}
-	/// Similar to [`Iterator::map`] but for any type, not just iterators,
-	/// using a custom [`Pipeline`] trait which behaves similarly to a `FnOnce` trait,
-	/// but available on stable rust.
-	fn xpipe<P: Pipeline<Self, O>, O>(self, pipeline: P) -> O {
-		pipeline.apply(self)
 	}
 
 	/// Convenience wrapper for `&self` in method chaining contexts.
