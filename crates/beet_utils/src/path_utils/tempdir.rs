@@ -9,19 +9,16 @@ use uuid::Uuid;
 /// guaranteed to be cleaned up when they go out of scope. The directory name
 /// is generated using a UUID v4 to ensure uniqueness and avoid collisions.
 ///
-/// # Examples
+/// # Example
 ///
-/// ```no_run
-/// use beet_utils::path_utils::TempDir;
+/// ```
+/// # use beet_utils::prelude::*;
 ///
 /// // Create a temporary directory in the system temp folder
-/// let temp = TempDir::new()?;
-///
-/// // Use the directory...
-/// // It will be automatically deleted when `temp` goes out of scope
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// let temp = TempDir::new().unwrap();
 /// ```
 pub struct TempDir {
+	/// The path to the temporary directory
 	path: AbsPathBuf,
 	/// Do not remove the directory on drop
 	keep: bool,
@@ -43,19 +40,12 @@ impl TempDir {
 	/// where `<uuid>` is a randomly generated UUID v4. The directory will be
 	/// automatically deleted when the `TempDir` instance is dropped.
 	///
-	/// # Returns
+	/// # Example
 	///
-	/// Returns `Ok(TempDir)` if the directory was successfully created, or an
-	/// error if directory creation failed.
+	/// ```
+	/// # use beet_utils::prelude::*;
 	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use beet_utils::path_utils::TempDir;
-	///
-	/// let temp = TempDir::new()?;
-	/// // Directory exists and can be used
-	/// # Ok::<(), Box<dyn std::error::Error>>(())
+	/// let temp = TempDir::new().unwrap();
 	/// ```
 	pub fn new() -> FsResult<Self> {
 		let temp_dir = std::env::temp_dir();
@@ -64,40 +54,18 @@ impl TempDir {
 		Self::new_with_path(dir_path)
 	}
 
-	/// Returns the path to the temporary directory.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use beet_utils::path_utils::TempDir;
-	///
-	/// let temp = TempDir::new()?;
-	/// let path = temp.path();
-	/// // Use the path to create files, etc.
-	/// # Ok::<(), Box<dyn std::error::Error>>(())
-	/// ```
-	pub fn path(&self) -> &AbsPathBuf { &self.path }
-
 	/// Creates a new temporary directory relative to the workspace root.
 	///
 	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp<uuid>`,
 	/// where `<uuid>` is a randomly generated UUID v4. This is useful for keeping
-	/// temporary files within the project structure, making them easier to locate
-	/// and manage during development.
+	/// temporary files within the project structure.
 	///
-	/// # Returns
+	/// # Example
 	///
-	/// Returns `Ok(TempDir)` if the directory was successfully created, or an
-	/// error if directory creation failed or the workspace root could not be determined.
+	/// ```
+	/// # use beet_utils::prelude::*;
 	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use beet_utils::path_utils::TempDir;
-	///
-	/// let temp = TempDir::new_workspace_relative()?;
-	/// // Directory exists at <workspace>/target/tmp/beet_tmp<uuid>
-	/// # Ok::<(), Box<dyn std::error::Error>>(())
+	/// let temp = TempDir::new_workspace_relative().unwrap();
 	/// ```
 	pub fn new_workspace_relative() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
@@ -119,25 +87,14 @@ impl TempDir {
 		})
 	}
 
+	/// Returns the path to the temporary directory.
+	pub fn path(&self) -> &AbsPathBuf { &self.path }
+
 	/// Marks this temporary directory to be kept on drop.
 	///
 	/// By default, the directory is removed when the `TempDir` is dropped.
 	/// Calling this method prevents the automatic cleanup, leaving the directory
 	/// on the filesystem.
-	///
-	/// # Returns
-	///
-	/// Returns `self` for method chaining.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use beet_utils::path_utils::TempDir;
-	///
-	/// let temp = TempDir::new()?.keep();
-	/// // Directory will NOT be deleted when temp goes out of scope
-	/// # Ok::<(), Box<dyn std::error::Error>>(())
-	/// ```
 	pub fn keep(mut self) -> Self {
 		self.keep = true;
 		self

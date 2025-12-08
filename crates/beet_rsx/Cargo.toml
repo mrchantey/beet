@@ -82,7 +82,7 @@ web-sys = { workspace = true, features = [
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
-beet_rsx = { path = "", features = ["tokens"] }
+beet_rsx = { path = ".", features = ["tokens"] }
 beet_core = { workspace = true, features = ["tokio"] }
 serde.workspace = true
 sweet.workspace = true

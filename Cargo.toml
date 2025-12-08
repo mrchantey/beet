@@ -361,7 +361,7 @@ uuid = { workspace = true, features = ["rng-getrandom"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = "", features = ["flow"] }
+beet = { path = ".", features = ["flow"] }
 # beet = { path = "", features = ["launch", "server", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
@@ -373,7 +373,7 @@ futures.workspace = true
 tokio.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet = { path = "", features = ["fs"] }
+beet = { path = ".", features = ["fs"] }
 tokio.workspace = true
 axum.workspace = true
 

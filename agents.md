@@ -2,11 +2,12 @@
 
 ## Context
 
-- when discussing code, assume rust unless user specifies otherwise
+- when discussing code, assume the language is rust unless user specifies otherwise
 - You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
 - when agent is told to run a command run that command before doing anything else, including searching the codebase
 - Always use rust conventions, unit tests at the bottom of the file are preferred over separate test files.
-- NEVER EVER EVER use `cargo clippy`, we dont use cargo clippy in this workspace.
+- Never use `cargo clippy`, we dont use cargo clippy in this workspace.
+- Never run `cargo clean` without permission, this project has many targets and dependencies, it takes an hour to rebuild everything
 - aim to leave code better than you found it, add missing documentation, edit ambiguous language and clean up antipatterns.
 - Do not create non-doc examples without being explictly asked to do so.
 - Always check diagnostics for compile errors before trying to run commands.
