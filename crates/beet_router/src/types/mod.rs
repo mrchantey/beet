@@ -1,6 +1,8 @@
+mod cli_router;
 mod default_router;
 mod exchange_context;
 mod route_query;
+pub use cli_router::*;
 pub use collect_html::*;
 pub use default_router::*;
 pub use exchange_context::*;

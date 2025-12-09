@@ -1,8 +1,7 @@
-use beet_core::prelude::*;
-use beet_net::exports::http;
-use beet_net::prelude::*;
+use crate::prelude::*;
 
 
+/// Parses Cli args into request style path and query
 pub struct CliArgs {
 	pub path: Vec<String>,
 	pub query: HashMap<String, Vec<String>>,
@@ -171,16 +170,6 @@ impl CliArgs {
 			}
 		}
 		path_str
-	}
-
-	pub fn into_request(&self) -> Result<Request> {
-		let path_str = self.into_path_string();
-		let parts = http::Request::builder()
-			.uri(path_str)
-			.body(())?
-			.into_parts()
-			.0;
-		Request::from_parts(parts, default()).xok()
 	}
 }
 
@@ -561,37 +550,6 @@ mod tests {
 
 		path_string.starts_with("/foo").xpect_true();
 		path_string.contains("key=").xpect_true();
-	}
-
-	#[test]
-	fn into_request_simple_path() {
-		let cli = CliArgs::parse("foo bar");
-		let request = cli.into_request();
-
-		request.is_ok().xpect_true();
-		let req = request.unwrap();
-		req.parts.uri.path().xpect_eq("/foo/bar");
-	}
-
-	#[test]
-	fn into_request_with_query() {
-		let cli = CliArgs::parse("api users --id=123");
-		let request = cli.into_request();
-
-		request.is_ok().xpect_true();
-		let req = request.unwrap();
-		req.parts.uri.path().xpect_eq("/api/users");
-		req.parts.uri.query().xpect_some();
-	}
-
-	#[test]
-	fn into_request_empty() {
-		let cli = CliArgs::parse("");
-		let request = cli.into_request();
-
-		request.is_ok().xpect_true();
-		let req = request.unwrap();
-		req.parts.uri.path().xpect_eq("/");
 	}
 
 	#[test]
