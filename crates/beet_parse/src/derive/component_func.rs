@@ -166,7 +166,10 @@ fn impl_on_add(
 
 	let is_system = fields.iter().any(|f| is_param(f));
 	let is_async = func.sig.asyncness.is_some();
-
+	let return_type_inner = match returns_result {
+		true => quote! {Result<_>},
+		false => quote! {_},
+	};
 
 	let inner = match (is_async, is_system) {
 		(true, true) => {
@@ -178,17 +181,17 @@ fn impl_on_add(
 			quote! {
 				world.run_async_local(async move |world| {
 					let #entity_ident = world.entity(id);
-					let bundle = {
+					let bundle: #return_type_inner = {
 						#func_body
 					 };
-					#entity_ident.insert(bundle).await;
+					#entity_ident.insert(bundle #maybe_unwrap).await;
 				});
 			}
 		}
 		(false, true) => {
 			// the constructor is a system
 			quote! {
-				let bundle = {
+				let bundle: #return_type_inner = {
 					fn system(#[allow(unused_variables, unused_assignments)]In((#entity_ident, this)): In<(Entity, #ident)>, #(#param_fields),*) #return_type {
 						#func_body
 					}
@@ -197,20 +200,20 @@ fn impl_on_add(
 						world.run_system_cached_with #maybe_generics(system, (id, this)).map_err(|err|
 							bevyhow!(#err_msg, err)
 						).unwrap_or_exit()
-					})#maybe_unwrap
+					})
 				};
-				entity_world_mut.insert(bundle);
+				entity_world_mut.insert(bundle #maybe_unwrap);
 			}
 		}
 		(false, false) => {
 			// the constructor simply accepts its component
 			quote! {
-				let bundle = {
+				let bundle: #return_type_inner = {
 					#[allow(unused_variables, unused_assignments)]
 					let #entity_ident = id;
 					#func_body
 				};
-				entity_world_mut.insert(bundle);
+				entity_world_mut.insert(bundle #maybe_unwrap);
 			}
 		}
 	};

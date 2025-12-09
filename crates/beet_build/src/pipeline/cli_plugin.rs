@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use beet_router::prelude::AsyncWorldRouterExt;
 use beet_router::prelude::Router;
 use beet_router::prelude::RouterPlugin;
+use beet_rsx::construct;
 use clap::Parser;
 
 #[derive(Resource)]
@@ -69,6 +69,29 @@ impl Plugin for CliPlugin {
 			// .init_plugin::<BuildPlugin>()
 			.add_systems(PostStartup, oneshot);
 	}
+}
+
+#[construct]
+pub fn CliRouter(repl_mode: ReplMode) -> Result<impl Bundle> {
+	
+	
+	Ok(())
+}
+
+// #[derive(Component)]
+// #[require(Router)]
+// pub struct CliRouter {
+// 	pub repl_mode: ReplMode,
+// }
+#[derive(Debug, Default, Clone)]
+pub enum ReplMode {
+	/// REPL mode determined by presence of '--repl' flag
+	#[default]
+	WithFlag,
+	/// REPL mode always on
+	Off,
+	/// REPL mode always off, cli will oneshot the args passed in
+	On,
 }
 
 

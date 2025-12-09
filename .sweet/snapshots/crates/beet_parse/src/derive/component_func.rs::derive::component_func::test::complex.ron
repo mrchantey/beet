@@ -15,7 +15,7 @@ fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {
             let mut entity_world_mut = world.entity_mut(entity);
             let id = entity_world_mut.id();
             let this = entity_world_mut.get::<MyNode>().unwrap().clone();
-            let bundle = {
+            let bundle: _ = {
                 fn system(
                     #[allow(unused_variables, unused_assignments)]
                     In((my_entity, this)): In<(Entity, MyNode)>,

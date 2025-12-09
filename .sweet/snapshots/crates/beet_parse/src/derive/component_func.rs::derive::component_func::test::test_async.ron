@@ -17,7 +17,7 @@ fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {
             world
                 .run_async_local(async move |world| {
                     let bar = world.entity(id);
-                    let bundle = {
+                    let bundle: _ = {
                         #[allow(unused_variables, unused_assignments)]
                         let MyNode { foo } = this;
                         ()
