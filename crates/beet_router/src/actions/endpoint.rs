@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use beet_rsx::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
 
@@ -15,18 +16,33 @@ pub enum ContentType {
 }
 
 
+#[construct]
+#[derive(Debug, PartialEq, Eq, Reflect, Props)]
+#[reflect(Component)]
+pub fn Route(
+	/// A collection of the content of every [`PathFilter`] in this entity's
+	/// ancestors(inclusive)
+	route_segments: RouteSegments,
+) -> impl Bundle {
+	// route_segments
+}
+
+
 /// Endpoints are actions that will only run if the method and path are an
 /// exact match.
 ///
 /// Usually this is not added directly, instead via the [`Endpoint::build`] constructor.
 /// Endpoints should only run if there are no trailing path segments,
 /// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
-#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
+#[construct]
+#[derive(Debug, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
-pub struct Endpoint {
+pub fn Endpoint(
 	/// A collection of the content of every [`PathFilter`] in this entity's
 	/// ancestors(inclusive)
 	route_segments: RouteSegments,
+) -> impl Bundle {
+	// route_segments
 }
 
 

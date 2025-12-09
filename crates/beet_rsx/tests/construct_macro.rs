@@ -70,3 +70,19 @@ async fn test_async() {
 		.await
 		.xpect_eq("foo");
 }
+
+
+#[test]
+fn props() {
+	#[construct]
+	#[derive(Props)]
+	fn Hello(
+		#[field(default = "pizza".into())] 
+		name: String,
+		time: Res<Time>,
+	) -> impl Bundle {
+		let _ = time;
+		Name::new(name)
+	}
+	parse(Hello { name: "foo".into() }).xpect_eq("foo");
+}
