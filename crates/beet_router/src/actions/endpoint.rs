@@ -19,12 +19,59 @@ pub enum ContentType {
 #[construct]
 #[derive(Debug, PartialEq, Eq, Reflect, Props)]
 #[reflect(Component)]
+#[rustfmt::skip]
 pub fn Route(
+	entity: EntityWorldMut,
+	/// The path filter for this route, defaults to empty
+	#[field(default=PathFilter::from_segments(default()))]
+	path_filter: PathFilter,
 	/// A collection of the content of every [`PathFilter`] in this entity's
 	/// ancestors(inclusive)
 	route_segments: RouteSegments,
-) -> impl Bundle {
-	// route_segments
+	exact_path: bool,
+	cache_strategy: Option<CacheStrategy>,
+	method: Option<HttpMethod>,
+	content_type: Option<ContentType>,
+) {
+
+	// spawn_with()
+	(
+		path_filter,
+		children![(
+			Sequence,
+			children![
+				// a sequence of predicates, each of which must
+				// pass for the handler to run
+				(
+					Sequence,
+					SlotTarget::named("predicate"),
+					children![
+						spawn_with::<Children, _>(move|parent|{
+							if exact_path {
+								parent.spawn(check_exact_path());
+							}
+						})
+					]
+				),
+				// the handler entity, this will only run if
+				// all predicates pass
+				(
+					SlotTarget::default(),
+					OnSpawn::new(move |entity|{
+						if let Some(method) = method {
+							entity.insert(method);
+						}
+						if let Some(cache_strategy) = cache_strategy {
+							entity.insert(cache_strategy);
+						}
+						if let Some(content_type) = content_type {
+							entity.insert(content_type);
+						}
+					})
+				)
+			]
+		)]
+	)
 }
 
 

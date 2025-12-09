@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy::ecs::system::SystemParam;
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemParam;
 
 
 /// An attribute belonging to the target entity, which may be

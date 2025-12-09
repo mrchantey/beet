@@ -47,6 +47,10 @@ pub enum SlotTarget {
 }
 
 impl SlotTarget {
+	pub fn named(name: impl Into<String>) -> Self {
+		SlotTarget::Named(name.into())
+	}
+
 	/// Returns the name of the slot target, or `None` if it's the default slot.
 	pub fn name(&self) -> Option<&str> {
 		match self {
@@ -93,8 +97,8 @@ pub fn extract_slot_targets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::ecs::system::RunSystemOnce;
 	use beet_core::prelude::*;
+	use bevy::ecs::system::RunSystemOnce;
 	use sweet::prelude::*;
 
 	#[test]

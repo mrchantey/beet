@@ -81,6 +81,12 @@ impl PathFilter {
 		}
 	}
 
+	pub fn from_segments(segments: Vec<PathSegment>) -> Self {
+		Self {
+			segments: RouteSegments::new(segments),
+		}
+	}
+
 	/// Consume a segment of the path for each segment in the filter,
 	/// returning the remaining path if all segments match.
 	pub fn matches(
