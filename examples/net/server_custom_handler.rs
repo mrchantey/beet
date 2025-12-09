@@ -10,7 +10,7 @@ fn main() {
 			MinimalPlugins,
 			LogPlugin::default(),
 			ServerPlugin::with_server(
-				Server::default().with_handler(my_handler),
+				HttpServer::default().with_handler(my_handler),
 			),
 		))
 		.run();

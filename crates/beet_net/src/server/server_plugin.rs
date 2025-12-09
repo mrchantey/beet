@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 #[derive(Default, Component)]
 pub struct Exchange;
 
-/// Points to the [`Server`] that this exchange was spawned by.
+/// Points to the [`HttpServer`] that this exchange was spawned by.
 /// We don't use [`Children`] because some server patterns have a different
 /// meaning for that, for example `beet_router` uses `beet_flow` to represent
 /// the routes, and the [`Exchange`] is an `agent`.
@@ -25,10 +25,10 @@ pub struct ExchangeOf(pub Entity);
 pub struct Exchanges(Vec<Entity>);
 
 /// Plugin for running bevy servers.
-/// by default this plugin will spawn the default [`Server`] on [`Startup`]
+/// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
 pub struct ServerPlugin {
 	/// Spawn the server on add
-	pub spawn_server: Option<Server>,
+	pub spawn_server: Option<HttpServer>,
 }
 
 
@@ -38,7 +38,7 @@ impl ServerPlugin {
 		self.spawn_server = None;
 		self
 	}
-	pub fn with_server(server: Server) -> Self {
+	pub fn with_server(server: HttpServer) -> Self {
 		Self {
 			spawn_server: Some(server),
 			..default()
@@ -48,7 +48,7 @@ impl ServerPlugin {
 impl Default for ServerPlugin {
 	fn default() -> Self {
 		Self {
-			spawn_server: Some(Server::default()),
+			spawn_server: Some(HttpServer::default()),
 		}
 	}
 }
@@ -82,7 +82,7 @@ type HandlerFn = Arc<
 #[derive(Clone, Component)]
 #[component(on_add=on_add)]
 #[require(ServerStatus)]
-pub struct Server {
+pub struct HttpServer {
 	/// The port the server listens on
 	pub port: u16,
 	/// The function called by hyper for each request
@@ -101,7 +101,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 
-impl Server {
+impl HttpServer {
 	/// Create a new Server with an incrementing port to avoid
 	/// collisions in tests
 	pub fn new_test() -> Self {
@@ -138,7 +138,7 @@ impl Server {
 	pub fn handler(&self) -> HandlerFn { self.handler.clone() }
 }
 
-impl Default for Server {
+impl Default for HttpServer {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,

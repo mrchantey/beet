@@ -188,10 +188,10 @@ pub async fn flow_route_handler(
 #[component(on_add=on_add)]
 pub struct Router;
 
-/// A [`Router`] that will map each [`Request`] and [`Response`] to a default [`Server`]
+/// A [`Router`] that will map each [`Request`] and [`Response`] to a default [`HttpServer`]
 #[cfg(feature = "server")]
 #[derive(Debug, Default, Clone, Component)]
-#[require(Router, Server = Server::default().with_handler(flow_route_handler))]
+#[require(Router, HttpServer = HttpServer::default().with_handler(flow_route_handler))]
 pub struct HttpRouter;
 
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
@@ -280,7 +280,7 @@ mod test {
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 	#[sweet::test]
 	async fn server() {
-		let server = Server::new_test().with_handler(flow_route_handler);
+		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()

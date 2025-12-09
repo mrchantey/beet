@@ -158,7 +158,7 @@ mod test {
 	#[sweet::test]
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 	async fn works() {
-		let server = Server::new_test().with_handler(flow_route_handler);
+		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();
 		let url = Url::parse(&url).unwrap();
 		let _handle = std::thread::spawn(move || {

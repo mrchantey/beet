@@ -26,7 +26,7 @@ use std::task::Poll;
 /// See [`Server::handler`] for customizing handlers
 pub(super) fn start_hyper_server(
 	In(entity): In<Entity>,
-	query: Query<&Server>,
+	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,
 ) -> Result {
 	let server = query.get(entity)?;
@@ -259,7 +259,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let server = Server::new_test().with_handler(
+		let server = HttpServer::new_test().with_handler(
 			async move |entity: AsyncEntity, req: Request| {
 				let time = entity
 					.world()
@@ -293,7 +293,7 @@ mod test {
 	}
 	#[sweet::test]
 	async fn stream_roundtrip() {
-		let server = Server::new_test().with_handler(
+		let server = HttpServer::new_test().with_handler(
 			async move |_: AsyncEntity, req: Request| {
 				Response::ok().with_body(req.body)
 			},
@@ -328,7 +328,7 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[sweet::test]
 	async fn stream_timestamp() {
-		let server = Server::new_test().with_handler(
+		let server = HttpServer::new_test().with_handler(
 			async move |_: AsyncEntity, req: Request| {
 				// Server adds 100ms delay per chunk
 				use futures::TryStreamExt;

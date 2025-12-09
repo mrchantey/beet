@@ -92,7 +92,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let server = Server::new_test();
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
