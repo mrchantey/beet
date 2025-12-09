@@ -186,7 +186,8 @@ impl RouteSegments {
 	/// Returns true if all segments are a [`PathSegment::Static`]
 	pub fn is_static(&self) -> bool { self.is_static }
 
-
+	/// Convert the segments to a [`RoutePath`] using annotations for dynamic segments,
+	/// ie `/foo/:bar/*bazz`
 	pub fn annotated_route_path(&self) -> RoutePath {
 		self.segments
 			.iter()

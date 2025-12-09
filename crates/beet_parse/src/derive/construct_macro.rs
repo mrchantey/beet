@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -229,20 +228,23 @@ fn impl_on_add(
 				entity_world_mut.insert(bundle #maybe_unwrap);
 			}
 		}
-		(false, false, is_entity_world_mut) => {
+		(false, false, true) => {
+			// the constructor simply accepts its component with EntityWorldMut
+			quote! {
+				let mut #entity_ident = entity_world_mut;
+				let bundle: #return_type_inner = {
+					#[allow(unused_variables, unused_assignments)]
+					#func_body
+				};
+				#entity_ident.insert(bundle #maybe_unwrap);
+			}
+		}
+		(false, false, false) => {
 			// the constructor simply accepts its component
-			let entity_ty = Ident::new(
-				if is_entity_world_mut {
-					"entity_world_mut"
-				} else {
-					"id"
-				},
-				Span::call_site(),
-			);
 			quote! {
 				let bundle: #return_type_inner = {
 					#[allow(unused_variables, unused_assignments)]
-					let #entity_ident = #entity_ty;
+					let #entity_ident = id;
 					#func_body
 				};
 				entity_world_mut.insert(bundle #maybe_unwrap);
