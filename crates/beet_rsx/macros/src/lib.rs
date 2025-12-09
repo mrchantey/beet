@@ -108,7 +108,7 @@ pub fn template(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as ItemFn);
-	template_func(input).into()
+	template_macro(input).into()
 }
 
 /// Define a component of the same name with a constructor function called on add.
@@ -153,7 +153,7 @@ pub fn construct(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as ItemFn);
-	component_func(input, attr.into()).into()
+	construct_macro(input, attr.into()).into()
 }
 
 /// Allow a struct to be included as a `#[field(flatten)]` of another struct

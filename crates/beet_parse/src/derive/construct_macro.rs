@@ -8,7 +8,7 @@ use syn::ItemFn;
 use syn::Result;
 use syn::ReturnType;
 
-pub fn component_func(input: ItemFn, attr: TokenStream) -> TokenStream {
+pub fn construct_macro(input: ItemFn, attr: TokenStream) -> TokenStream {
 	parse(input, attr).unwrap_or_else(|err| err.into_compile_error())
 }
 
@@ -87,13 +87,22 @@ fn define_struct(
 		derives.push(quote! {Default});
 	}
 
+	let struct_body = if fields.is_empty() {
+		// unit struct
+		quote! {;}
+	} else {
+		// struct with fields
+		quote! {{
+			#(#struct_fields),*
+		}}
+	};
+
+
 	Ok(quote! {
 	#(#attrs)*
 	#[derive(#(#derives),*)]
 	#[component(on_add = #on_add)]
-	#vis struct #ident #type_generics #where_clause {
-		#(#struct_fields),*
-	}
+	#vis struct #ident #type_generics #where_clause #struct_body
 	})
 }
 
@@ -361,7 +370,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		component_func(
+		construct_macro(
 			syn::parse_quote! {
 				/// probably the best templating layout ever
 				pub(crate) fn MyNode(
@@ -376,7 +385,7 @@ mod test {
 	}
 	#[test]
 	fn take() {
-		component_func(
+		construct_macro(
 			syn::parse_quote! {
 				/// probably the best templating layout ever
 				pub(crate) fn MyNode(
@@ -391,7 +400,7 @@ mod test {
 	}
 	#[test]
 	fn system() {
-		component_func(
+		construct_macro(
 			syn::parse_quote! {
 				/// probably the best templating layout ever
 				pub(crate) fn MyNode(
@@ -406,7 +415,7 @@ mod test {
 	}
 	#[test]
 	fn test_async() {
-		component_func(
+		construct_macro(
 			syn::parse_quote! {
 				/// probably the best templating layout ever
 				pub(crate) async fn MyNode(
@@ -421,7 +430,7 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		component_func(
+		construct_macro(
 			syn::parse_quote! {
 				/// probably the best templating layout ever
 				pub(crate) fn MyNode(

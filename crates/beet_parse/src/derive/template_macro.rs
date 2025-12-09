@@ -7,7 +7,7 @@ use syn::ItemFn;
 use syn::Result;
 use syn::ReturnType;
 
-pub fn template_func(input: ItemFn) -> TokenStream {
+pub fn template_macro(input: ItemFn) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
@@ -279,7 +279,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		template_func(syn::parse_quote! {
+		template_macro(syn::parse_quote! {
 			/// probably the best templating layout ever
 			pub(crate) fn MyNode(
 				/// some comment
@@ -291,7 +291,7 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		template_func(syn::parse_quote! {
+		template_macro(syn::parse_quote! {
 			/// probably the best templating layout ever
 			pub(crate) fn MyNode(
 				/// some comment

@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_router::prelude::AsyncWorldRouterExt;
-use beet_router::prelude::Router;
-use beet_router::prelude::RouterPlugin;
-use beet_rsx::construct;
+use beet_router::prelude::*;
+use beet_rsx::prelude::*;
 use clap::Parser;
 
 #[derive(Resource)]
@@ -64,49 +62,18 @@ pub fn launch_cmd() {}
 pub struct CliPlugin;
 
 impl Plugin for CliPlugin {
-	fn build(&self, app: &mut App) {
-		app.init_plugin::<RouterPlugin>()
-			// .init_plugin::<BuildPlugin>()
-			.add_systems(PostStartup, oneshot);
-	}
+	fn build(&self, app: &mut App) { app.init_plugin::<RouterPlugin>(); }
 }
 
 #[construct]
-pub fn CliRouter(repl_mode: ReplMode) -> Result<impl Bundle> {
-	
-	
+pub fn CliRouter() -> Result<impl Bundle> {
+	Ok((Router, OnSpawn::new_async(handler)))
+}
+
+async fn handler(entity: AsyncEntity) -> Result {
+	let req = CliArgs::parse_env().into_request()?;
+	let res = flow_route_handler(entity, req).await.into_result().await?;
+	let body = res.body.into_string().await?;
+	body.xprint();
 	Ok(())
-}
-
-// #[derive(Component)]
-// #[require(Router)]
-// pub struct CliRouter {
-// 	pub repl_mode: ReplMode,
-// }
-#[derive(Debug, Default, Clone)]
-pub enum ReplMode {
-	/// REPL mode determined by presence of '--repl' flag
-	#[default]
-	WithFlag,
-	/// REPL mode always on
-	Off,
-	/// REPL mode always off, cli will oneshot the args passed in
-	On,
-}
-
-
-fn oneshot(world: &mut World) {
-	world.run_async(async |world| -> Result {
-		let req = CliArgs::parse_env().into_request()?;
-		let res = world
-			.oneshot(req)
-			.await?
-			.into_result()
-			.await?
-			.body
-			.into_string()
-			.await?;
-		println!("{}", res);
-		Ok(())
-	});
 }
