@@ -1,9 +1,7 @@
 use beet_core::prelude::*;
-/// probably the best templating layout ever
 #[derive(Component, Clone)]
 #[component(on_add = on_add_my_node)]
 pub(crate) struct MyNode {
-    /// some comment
     pub foo: u32,
 }
 fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {

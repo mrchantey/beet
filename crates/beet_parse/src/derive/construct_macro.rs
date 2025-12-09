@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -174,19 +175,33 @@ fn impl_on_add(
 	};
 
 	let is_system = fields.iter().any(|f| is_param(f));
+	let is_entity_world_mut = fields
+		.iter()
+		.any(|f| f.last_segment_matches("EntityWorldMut"));
 	let is_async = func.sig.asyncness.is_some();
 	let return_type_inner = match returns_result {
 		true => quote! {Result<_>},
 		false => quote! {_},
 	};
 
-	let inner = match (is_async, is_system) {
-		(true, true) => {
+	let inner = match (is_async, is_system, is_entity_world_mut) {
+		(false, true, true) => {
+			quote! {
+				compile_error!("systems cannot use `EntityWorldMut`. Please only use system params or EntityWorldMut");
+			}
+		}
+		(true, _, true) => {
+			quote! {
+				compile_error!("async constructors cannot use `EntityWorldMut`. please use `AsyncEntity`");
+			}
+		}
+		(true, true, false) => {
 			quote! {
 				compile_error!("async constructors cannot have system params. please use `AsyncEntity`");
 			}
 		}
-		(true, false) => {
+		(true, false, false) => {
+			// the constructor is async
 			quote! {
 				world.run_async_local(async move |world| {
 					let #entity_ident = world.entity(id);
@@ -197,7 +212,7 @@ fn impl_on_add(
 				});
 			}
 		}
-		(false, true) => {
+		(false, true, false) => {
 			// the constructor is a system
 			quote! {
 				let bundle: #return_type_inner = {
@@ -214,12 +229,20 @@ fn impl_on_add(
 				entity_world_mut.insert(bundle #maybe_unwrap);
 			}
 		}
-		(false, false) => {
+		(false, false, is_entity_world_mut) => {
 			// the constructor simply accepts its component
+			let entity_ty = Ident::new(
+				if is_entity_world_mut {
+					"entity_world_mut"
+				} else {
+					"id"
+				},
+				Span::call_site(),
+			);
 			quote! {
 				let bundle: #return_type_inner = {
 					#[allow(unused_variables, unused_assignments)]
-					let #entity_ident = id;
+					let #entity_ident = #entity_ty;
 					#func_body
 				};
 				entity_world_mut.insert(bundle #maybe_unwrap);
@@ -328,6 +351,7 @@ fn is_param(field: &NodeField) -> bool {
 fn is_entity_param(field: &NodeField) -> bool {
 	field.last_segment_matches("Entity")
 		|| field.last_segment_matches("AsyncEntity")
+		|| field.last_segment_matches("EntityWorldMut")
 }
 
 fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
@@ -387,12 +411,7 @@ mod test {
 	fn take() {
 		construct_macro(
 			syn::parse_quote! {
-				/// probably the best templating layout ever
-				pub(crate) fn MyNode(
-					/// some comment
-					foo:u32,
-					mut bar:u32
-				) -> impl Bundle{()}
+				pub(crate) fn MyNode(foo:u32) -> impl Bundle{()}
 			},
 			quote::quote! {take},
 		)
@@ -402,9 +421,7 @@ mod test {
 	fn system() {
 		construct_macro(
 			syn::parse_quote! {
-				/// probably the best templating layout ever
 				pub(crate) fn MyNode(
-					/// some comment
 					foo:u32,
 					mut my_res: Res<Time>
 				) -> impl Bundle{()}
@@ -417,12 +434,17 @@ mod test {
 	fn test_async() {
 		construct_macro(
 			syn::parse_quote! {
-				/// probably the best templating layout ever
-				pub(crate) async fn MyNode(
-					/// some comment
-					foo: u32,
-					bar: AsyncEntity,
-				) -> impl Bundle{()}
+				pub(crate) async fn MyNode(bar: AsyncEntity, boo: u32) -> impl Bundle{()}
+			},
+			default(),
+		)
+		.xpect_snapshot();
+	}
+	#[test]
+	fn entity_world_mut() {
+		construct_macro(
+			syn::parse_quote! {
+				pub(crate) fn MyNode(foo: u32, bar: EntityWorldMut) -> impl Bundle{()}
 			},
 			default(),
 		)

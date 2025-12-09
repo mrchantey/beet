@@ -26,15 +26,32 @@ enum SubCommands {
 	Qrcode(QrCodeCmd),
 }
 
-#[tokio::main]
-async fn main() -> Result {
-	match Cli::parse().command {
-		SubCommands::Run(cmd) => cmd.run().await,
-		SubCommands::Build(cmd) => cmd.run().await,
-		SubCommands::New(cmd) => cmd.run().await,
-		SubCommands::Agent(cmd) => cmd.run().await,
-		SubCommands::ExportPdf(cmd) => cmd.run().await,
-		#[cfg(feature = "qrcode")]
-		SubCommands::Qrcode(cmd) => cmd.run().await,
-	}
+fn main() {
+	App::new()
+		.add_plugins((MinimalPlugins, CliPlugin))
+		.add_systems(Startup, cli_routes)
+		.run();
+}
+
+
+fn cli_routes(mut commands: Commands) {
+	commands.spawn((
+		CliRouter,
+		// this sequence type will ensure all endpoints are checked
+		// even if the previous one did not match
+		InfallibleSequence,
+		children![
+			EndpointBuilder::get().with_handler(|| Response::ok_body(
+				"hello world",
+				"text/plain"
+			)),
+			EndpointBuilder::get().with_path("foo").with_handler(|| {
+				Response::ok_body(
+					"<div>hello foo</div>",
+					// this inserts the `content-type: text/html`  header
+					"text/html",
+				)
+			},),
+		],
+	));
 }

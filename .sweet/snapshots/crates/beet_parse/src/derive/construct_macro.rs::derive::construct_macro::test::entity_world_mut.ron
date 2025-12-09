@@ -1,8 +1,8 @@
 use beet_core::prelude::*;
-#[derive(Component)]
+#[derive(Component, Clone)]
 #[component(on_add = on_add_my_node)]
 pub(crate) struct MyNode {
-    pub foo: u32,
+    pub boo: u32,
 }
 fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {
     let entity = cx.entity;
@@ -11,12 +11,12 @@ fn on_add_my_node(mut world: DeferredWorld, cx: HookContext) {
         .queue(move |world: &mut World| {
             let mut entity_world_mut = world.entity_mut(entity);
             let id = entity_world_mut.id();
-            let this = entity_world_mut.take::<MyNode>().unwrap();
+            let this = entity_world_mut.get::<MyNode>().unwrap().clone();
             let bundle: _ = {
                 #[allow(unused_variables, unused_assignments)]
-                let entity = id;
+                let bar = entity_world_mut;
                 #[allow(unused_variables, unused_assignments)]
-                let MyNode { foo } = this;
+                let MyNode { boo } = this;
                 ()
             };
             entity_world_mut.insert(bundle);

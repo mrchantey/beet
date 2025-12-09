@@ -379,15 +379,14 @@ mod test {
 		use beet_flow::prelude::*;
 
 		let mut world = RouterPlugin::world();
-		let mut entity =
-			world.spawn((Router, InfallibleSequence, children![
-				EndpointBuilder::get()
-					.with_path("foo")
-					.with_handler(|| "foo"),
-				EndpointBuilder::get()
-					.with_path("bar")
-					.with_handler(|| "bar"),
-			]));
+		let mut entity = world.spawn((Router, InfallibleSequence, children![
+			EndpointBuilder::get()
+				.with_path("foo")
+				.with_handler(|| "foo"),
+			EndpointBuilder::get()
+				.with_path("bar")
+				.with_handler(|| "bar"),
+		]));
 		entity.oneshot_str("/foo").await.xpect_eq("foo");
 		entity.oneshot_str("/bar").await.xpect_eq("bar");
 	}
@@ -395,8 +394,8 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world
-			.spawn((Router, EndpointBuilder::post().with_path("foo")));
+		let mut entity =
+			world.spawn((Router, EndpointBuilder::post().with_path("foo")));
 
 		// method and path match
 		entity
