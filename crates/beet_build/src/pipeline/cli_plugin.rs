@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_router::prelude::AsyncWorldRouterExt;
-use beet_router::prelude::RouteServer;
+use beet_router::prelude::Router;
 use beet_router::prelude::RouterPlugin;
 use clap::Parser;
 

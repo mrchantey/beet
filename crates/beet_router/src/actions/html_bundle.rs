@@ -106,7 +106,7 @@ mod test {
 	#[sweet::test]
 	async fn simple() {
 		RouterPlugin::world()
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				EndpointBuilder::get()
 					.with_handler(|| (BeetRoot, rsx! {<div>hello world</div>})),
 				html_bundle_to_response(),
@@ -121,7 +121,7 @@ mod test {
 	async fn with_template() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				EndpointBuilder::get()
 					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
 				html_bundle_to_response(),
@@ -136,7 +136,7 @@ mod test {
 	async fn middleware() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				EndpointBuilder::get()
 					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
 				OnSpawn::observe(

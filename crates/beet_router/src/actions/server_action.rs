@@ -143,7 +143,7 @@ mod test {
 	#[sweet::test]
 	async fn no_input() {
 		RouterPlugin::world()
-			.spawn((RouteServer, ServerAction::new(HttpMethod::Post, || 2)))
+			.spawn((Router, ServerAction::new(HttpMethod::Post, || 2)))
 			.oneshot(
 				Request::post("/")
 					// no input means we need to specify unit type
@@ -164,7 +164,7 @@ mod test {
 	async fn post() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn((
-			RouteServer,
+			Router,
 			ServerAction::new(HttpMethod::Post, |val: In<u32>| val.0 + 2)
 				.with_path("foo"),
 		));
@@ -192,7 +192,7 @@ mod test {
 	async fn get_sync() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn((
-			RouteServer,
+			Router,
 			ServerAction::new_async(HttpMethod::Get, async |val: u32, _| {
 				val + 2
 			}),

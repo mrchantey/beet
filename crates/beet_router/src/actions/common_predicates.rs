@@ -77,7 +77,7 @@ mod test {
 	async fn fallback() {
 		// request no response
 		RouterPlugin::world()
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				common_predicates::fallback(),
 				EndpointBuilder::get()
 			]))
@@ -88,7 +88,7 @@ mod test {
 
 		// request already consumed
 		RouterPlugin::world()
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				EndpointBuilder::get().with_handler(StatusCode::IM_A_TEAPOT),
 				common_predicates::fallback(),
 				EndpointBuilder::get(),
@@ -103,7 +103,7 @@ mod test {
 	async fn is_ssr() {
 		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssr))
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				common_predicates::is_ssr(),
 				EndpointBuilder::get()
 			]))
@@ -114,7 +114,7 @@ mod test {
 
 		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssg))
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				common_predicates::is_ssr(),
 				EndpointBuilder::get(),
 			]))
@@ -130,7 +130,7 @@ mod test {
 		// request no response
 
 		RouterPlugin::world()
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				common_predicates::contains_handler_bundle(),
 				EndpointBuilder::get()
 			]))
@@ -141,7 +141,7 @@ mod test {
 
 		// request already consumed
 		RouterPlugin::world()
-			.spawn((RouteServer, Sequence, children![
+			.spawn((Router, Sequence, children![
 				common_predicates::contains_handler_bundle(),
 				EndpointBuilder::get(),
 			]))

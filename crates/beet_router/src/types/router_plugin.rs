@@ -52,7 +52,7 @@ pub fn insert_route_tree(world: &mut World) {
 pub impl AsyncWorld {
 	/// Handle a single request and return the response
 	/// ## Panics
-	/// Panics if there is not exactly one `RouteServer` in the world.
+	/// Panics if there is not exactly one `Router` in the world.
 	fn oneshot(
 		&self,
 		req: impl Into<Request>,
@@ -60,9 +60,7 @@ pub impl AsyncWorld {
 		async move {
 			let server = self
 				.with_then(|world| {
-					world
-						.query_filtered::<Entity, With<RouteServer>>()
-						.single(world)
+					world.query_filtered::<Entity, With<Router>>().single(world)
 				})
 				.await?;
 			self.entity(server).oneshot(req).await
@@ -83,16 +81,16 @@ pub impl AsyncEntity {
 pub impl World {
 	/// Handle a single request and return the response
 	/// ## Panics
-	/// Panics if there is not exactly one `RouteServer` in the world.
+	/// Panics if there is not exactly one `Router` in the world.
 	fn oneshot(
 		&mut self,
 		req: impl Into<Request>,
 	) -> impl Future<Output = Response> {
 		let req = req.into();
 		let entity = self
-			.query_filtered::<Entity, With<RouteServer>>()
+			.query_filtered::<Entity, With<Router>>()
 			.single(self)
-			.expect("Expected a single RouteServer");
+			.expect("Expected a single Router");
 		self.run_async_then(async move |world| {
 			flow_route_handler(world.entity(entity), req)
 				.await
@@ -140,7 +138,7 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
-/// Added by default to the `required` Server for a [`RouteServer`]
+/// Added by default to the `required` Server for a [`Router`]
 /// but can also be configured manually.
 /// This handler differs from the default route handler in that
 /// we use `beet_flow` primitives of GetOutcome / Outcome instead of
@@ -185,13 +183,16 @@ pub async fn flow_route_handler(
 // TODO rename to Router
 /// The root of a server. In non-wasm non-lambda environments
 /// this will also connect to a hyper server and listen for requests.
-#[derive(Clone, Component)]
+#[derive(Debug, Default, Clone, Component)]
 #[require(ServerStatus)]
-#[cfg_attr(all(not(target_arch = "wasm32"), not(feature = "lambda"),not(test), feature = "server"),
-	require(Server = Server::default().with_handler(flow_route_handler))
-)]
 #[component(on_add=on_add)]
-pub struct RouteServer;
+pub struct Router;
+
+/// A [`Router`] that will map each [`Request`] and [`Response`] to a default [`Server`]
+#[cfg(feature = "server")]
+#[derive(Debug, Default, Clone, Component)]
+#[require(Router, Server = Server::default().with_handler(flow_route_handler))]
+pub struct HttpRouter;
 
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
@@ -235,7 +236,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		world.all_entities().len().xpect_eq(0);
 		world
-			.spawn((RouteServer, EndWith(Outcome::Pass)))
+			.spawn((Router, EndWith(Outcome::Pass)))
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
@@ -247,7 +248,7 @@ mod test {
 	#[sweet::test]
 	async fn route_tree() {
 		let mut world = World::new();
-		world.spawn((RouteServer, CacheStrategy::Static, children![
+		world.spawn((Router, CacheStrategy::Static, children![
 			EndpointBuilder::get()
 				.with_handler(|tree: Res<RoutePathTree>| tree.to_string()),
 			(
@@ -284,7 +285,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, RouterPlugin))
-				.spawn((server, RouteServer, EndpointBuilder::get()))
+				.spawn((server, Router, EndpointBuilder::get()))
 				.run();
 		});
 		time_ext::sleep_millis(10).await;

@@ -9,10 +9,10 @@ fn main() {
 			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			// The RouteServer is a beet_flow pattern, triggering `GetOutcome`
+			// The Router is a beet_flow pattern, triggering `GetOutcome`
 			// and returning the Response once `Outcome` is triggered
 			commands.spawn((
-				RouteServer,
+				HttpRouter,
 				// this sequence type will ensure all endpoints are checked
 				// even if the previous one did not match
 				InfallibleSequence,

@@ -6,11 +6,11 @@ use lambda_http::tower::service_fn;
 use lambda_http::tracing;
 
 
-/// Connects to lambda as an Insert<RouteServer> hook
+/// Connects to lambda as an Insert<Router> hook
 /// to allow for an async setup
 pub fn lambda_plugin(app: &mut App) {
 	app.world_mut().add_observer(
-		|ev: On<Insert, RouteServer>, mut commands: AsyncCommands| {
+		|ev: On<Insert, Router>, mut commands: AsyncCommands| {
 			let entity = ev.event_target();
 			commands.run_local(async move |world| {
 				run_lambda(world.entity(entity)).await

@@ -167,7 +167,7 @@ mod test {
 			let world = app.world_mut();
 			// let mut world = ServerPlugin::with_server(server).into_world();
 			world.init_resource::<RenderMode>();
-			world.spawn((server, RouteServer, InfallibleSequence, children![
+			world.spawn((server, Router, InfallibleSequence, children![
 				ServerAction::new(
 					HttpMethod::Get,
 					add_via_get.pipe(Json::pipe)

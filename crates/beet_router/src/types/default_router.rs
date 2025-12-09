@@ -26,7 +26,7 @@ pub fn default_router(
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl Bundle,
 ) -> impl Bundle {
-	(insert_on_ready(RouteServer), InfallibleSequence, children![
+	(insert_on_ready(HttpRouter), InfallibleSequence, children![
 		request_middleware,
 		endpoints,
 		(
@@ -57,7 +57,7 @@ pub fn default_router(
 
 /// Create a [`ReadyOnChildrenReady`], allowing any
 /// [`ReadyAction`] children to complete before inserting the
-/// [`RouteServer`] which will immediately start handling requests.
+/// [`Router`] which will immediately start handling requests.
 pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
 	(
 		GetReadyOnStartup,
@@ -166,7 +166,7 @@ mod test {
 	async fn works() {
 		RouterPlugin::world()
 			.spawn((
-				super::insert_on_ready(RouteServer),
+				super::insert_on_ready(Router),
 				EndpointBuilder::get(),
 				children![(
 					EndWith(Outcome::Pass),
@@ -185,7 +185,7 @@ mod test {
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())
-			.spawn((RouteServer, InfallibleSequence, children![
+			.spawn((Router, InfallibleSequence, children![
 				app_info(),
 				html_bundle_to_response()
 			]))

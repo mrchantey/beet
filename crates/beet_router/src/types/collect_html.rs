@@ -65,7 +65,7 @@ mod test {
 	#[sweet::test]
 	async fn children() {
 		let mut world = RouterPlugin::world();
-		world.spawn((RouteServer, InfallibleSequence, children![
+		world.spawn((Router, InfallibleSequence, children![
 			EndpointBuilder::get()
 				.with_path("foo")
 				.with_handler(|| "foo")

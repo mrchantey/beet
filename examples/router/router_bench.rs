@@ -17,7 +17,7 @@ fn main() {
 			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((RouteServer, InfallibleSequence, children![
+			commands.spawn((Router, InfallibleSequence, children![
 				EndpointBuilder::get().with_handler(|| Response::ok_body(
 					r#"
 						<h1>home</h1>

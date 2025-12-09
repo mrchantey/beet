@@ -348,7 +348,7 @@ mod test {
 	#[sweet::test]
 	async fn simple() {
 		RouterPlugin::world()
-			.spawn((RouteServer, EndpointBuilder::get()))
+			.spawn((Router, EndpointBuilder::get()))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
@@ -360,7 +360,7 @@ mod test {
 	async fn dynamic_path() {
 		RouterPlugin::world()
 			.spawn((
-				RouteServer,
+				Router,
 				EndpointBuilder::get().with_path("/:path").with_handler(
 					async |_req: (),
 					       cx: EndpointContext|
@@ -380,7 +380,7 @@ mod test {
 
 		let mut world = RouterPlugin::world();
 		let mut entity =
-			world.spawn((RouteServer, InfallibleSequence, children![
+			world.spawn((Router, InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_handler(|| "foo"),
@@ -396,7 +396,7 @@ mod test {
 	async fn works() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world
-			.spawn((RouteServer, EndpointBuilder::post().with_path("foo")));
+			.spawn((Router, EndpointBuilder::post().with_path("foo")));
 
 		// method and path match
 		entity

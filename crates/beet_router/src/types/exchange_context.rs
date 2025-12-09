@@ -14,7 +14,7 @@ pub struct ExchangeContext {
 	/// This allows us to check for exact path matches.
 	route_context_map: HashMap<Entity, RouteContext>,
 	/// A channel crated by the `flow_route_handler`,
-	/// sending this notifies the observer on the [`RouteServer`]
+	/// sending this notifies the observer on the [`Router`]
 	sender: Sender<Response>,
 }
 

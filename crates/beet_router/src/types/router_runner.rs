@@ -81,7 +81,7 @@ impl Plugin for RouterRunner {
 fn export_static(mut commands: AsyncCommands) {
 	commands.run_local(async |world| -> Result {
 		// wait for the server to be ready
-		world.await_event::<Insert, RouteServer>().await;
+		world.await_event::<Insert, Router>().await;
 
 		let html = collect_html(world.clone()).await?;
 
