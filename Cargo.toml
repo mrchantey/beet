@@ -252,7 +252,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
-launch = ["dom","net", "build"]
+launch = ["dom", "net", "build", "router"]
 server = ["serde","dom","fs", "net", "router", "design"]
 client = [
 	"rsx",
@@ -456,6 +456,7 @@ required-features = ["server"]
 [[example]]
 name = "cli_router"
 path = "examples/router/cli_router.rs"
+required-features = ["launch"]
 [[example]]
 name = "router_full"
 path = "examples/router/router_full.rs"

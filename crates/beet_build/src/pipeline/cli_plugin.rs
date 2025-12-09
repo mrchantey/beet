@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use beet_router::prelude::AsyncWorldRouterExt;
+use beet_router::prelude::RouteServer;
+use beet_router::prelude::RouterPlugin;
 use clap::Parser;
 
 #[derive(Resource)]
@@ -57,15 +60,30 @@ impl CliConfig {
 
 pub fn launch_cmd() {}
 
+#[derive(Default)]
 pub struct CliPlugin;
 
 impl Plugin for CliPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((ControlFlowPlugin, BuildPlugin));
-
-		todo!("bsx");
-		// app.world_mut()
-		// 	.spawn(OnSpawn::run_insert(launch_sequence))
-		// 	.trigger_target(GetOutcome);
+		app.init_plugin::<RouterPlugin>()
+			// .init_plugin::<BuildPlugin>()
+			.add_systems(PostStartup, oneshot);
 	}
+}
+
+
+fn oneshot(world: &mut World) {
+	world.run_async(async |world| -> Result {
+		let req = CliArgs::parse_env().into_request()?;
+		let res = world
+			.oneshot(req)
+			.await?
+			.into_result()
+			.await?
+			.body
+			.into_string()
+			.await?;
+		println!("{}", res);
+		Ok(())
+	});
 }

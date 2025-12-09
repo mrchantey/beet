@@ -97,6 +97,7 @@ impl Body {
 			}
 		}
 	}
+	/// Stringify the raw bytes into utf8 format
 	pub async fn into_string(self) -> Result<String> {
 		let bytes = self.into_bytes().await?;
 		String::from_utf8(bytes.to_vec())?.xok()
