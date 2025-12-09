@@ -23,6 +23,7 @@ server = [
 "dep:async-executor",
 "dep:pin-project"
 ]
+lambda = ["rustls-tls", "dep:lambda_http"]
 fs = ["beet_core/fs","dep:async-process"]
 tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
@@ -118,6 +119,9 @@ pin-project = { workspace = true, optional = true }
 
 # TODO bevy executor
 tokio = { workspace = true, optional = true, default-features = true, features = ["process"] }
+
+#💡 lambda
+lambda_http = { version = "0.16", optional = true }
 
 #💡 aws
 # lock down aws-sdk-s3 upstream, some weird nightly feature breaks it

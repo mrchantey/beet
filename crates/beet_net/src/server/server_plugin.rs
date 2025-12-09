@@ -66,7 +66,7 @@ impl Plugin for ServerPlugin {
 	}
 }
 
-type HandlerFn = Arc<
+pub(super) type HandlerFn = Arc<
 	Box<
 		dyn 'static
 			+ Send
@@ -90,13 +90,26 @@ pub struct HttpServer {
 }
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
+	world
+		.commands()
+		.run_system_cached_with(super::start_lambda_server, cx.entity);
+
+	#[cfg(all(
+		feature = "server",
+		not(feature = "lambda"),
+		not(target_arch = "wasm32")
+	))]
 	world
 		.commands()
 		.run_system_cached_with(super::start_hyper_server, cx.entity);
-	#[cfg(not(all(feature = "server", not(target_arch = "wasm32"))))]
+
+	#[cfg(not(any(
+		all(feature = "server", not(target_arch = "wasm32")),
+		all(feature = "lambda", not(target_arch = "wasm32"))
+	)))]
 	panic!(
-		"The ServerPlugin can only be used on non-wasm32 targets with the `server` feature enabled"
+		"The ServerPlugin can only be used on non-wasm32 targets with the `server` or `lambda` feature enabled"
 	);
 }
 

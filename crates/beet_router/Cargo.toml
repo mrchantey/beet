@@ -33,7 +33,6 @@ axum = [
 	"dep:tower-http",
 ]
 tokio = ["dep:tokio","beet_net/tokio"]
-lambda = ["rustls-tls", "dep:lambda_http"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
@@ -88,7 +87,6 @@ axum-server = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 tower-livereload = { workspace = true, optional = true }
 tower-http = { workspace = true, optional = true }
-lambda_http = { version = "0.16", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 beet_core.workspace = true

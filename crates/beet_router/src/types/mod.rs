@@ -6,15 +6,11 @@ pub use default_router::*;
 pub use exchange_context::*;
 pub use path_filter::*;
 pub use route_query::*;
-pub use server_action_request::*;
 pub use router_runner::*;
+pub use server_action_request::*;
 mod collect_html;
-mod router_plugin;
 mod path_filter;
-#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-mod connect_lambda;
-mod server_action_request;
+mod router_plugin;
 mod router_runner;
+mod server_action_request;
 pub use router_plugin::*;
-#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-pub(crate) use connect_lambda::*;
