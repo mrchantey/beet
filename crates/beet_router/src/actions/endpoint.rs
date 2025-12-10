@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
-use beet_rsx::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Component, Reflect)]
@@ -20,27 +19,43 @@ pub enum ContentType {
 /// Usually this is not added directly, instead via the [`Endpoint::build`] constructor.
 /// Endpoints should only run if there are no trailing path segments,
 /// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
-#[construct]
-#[derive(Debug, PartialEq, Eq, Reflect)]
+#[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
-pub fn Endpoint(
-	/// A collection of the content of every [`PathFilter`] in this entity's
-	/// ancestors(inclusive)
+pub struct Endpoint {
+	/// The entire route path for this endpoint
 	route_segments: RouteSegments,
-) -> impl Bundle {
-	// route_segments
+	/// The method to match, or None for any method.
+	method: Option<HttpMethod>,
+	/// The cache strategy for this endpoint, if any
+	cache_strategy: Option<CacheStrategy>,
+	/// Marks this endpoint as an HTML endpoint
+	content_type: Option<ContentType>,
 }
 
 
 impl Endpoint {
-	/// Call [`RouteSegments::collect`] on this entity, collecting
-	/// every parent [`PathFilter`]
-	pub(crate) fn new(route_segments: RouteSegments) -> Self {
-		Self { route_segments }
-	}
-
 	pub fn route_segments(&self) -> &RouteSegments { &self.route_segments }
+	pub fn method(&self) -> Option<HttpMethod> { self.method }
+	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
+		self.cache_strategy
+	}
+	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
+
+	/// Determines if this endpoint is a static GET endpoint
+	pub fn is_static_get(&self) -> bool {
+		self.route_segments.is_static()
+			&& self.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
+			&& self
+				.cache_strategy
+				.map(|s| s == CacheStrategy::Static)
+				.unwrap_or(false)
+	}
+	/// Determines if this endpoint is a static GET endpoint returning HTML
+	pub fn is_static_get_html(&self) -> bool {
+		self.is_static_get() && self.content_type == Some(ContentType::Html)
+	}
 }
+
 /// High level helper for building a correct [`Endpoint`] structure.
 /// The flexibility of `beet_router` makes it challenging to build a correct
 /// structure manually.
@@ -212,10 +227,14 @@ impl EndpointBuilder {
 							handler_id,
 						)
 						.unwrap();
-					spawner
-						.world_mut()
-						.entity_mut(handler_id)
-						.insert(Endpoint::new(route_segments));
+					spawner.world_mut().entity_mut(handler_id).insert((
+						Endpoint {
+							route_segments,
+							method: self.method,
+							cache_strategy: self.cache_strategy,
+							content_type: self.content_type,
+						},
+					));
 				});
 		});
 	}
@@ -259,86 +278,6 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 }
 
 
-/// Metadata collected for an endpoint
-#[derive(Debug, Clone)]
-pub struct EndpointMeta {
-	/// The entity this metadata is for
-	entity: Entity,
-	/// The segments for this endpoint
-	route_segments: RouteSegments,
-	/// The method to match, or None for any method.
-	method: Option<HttpMethod>,
-	/// The cache strategy for this endpoint, if any
-	cache_strategy: Option<CacheStrategy>,
-	/// Marks this endpoint as an HTML endpoint
-	content_type: Option<ContentType>,
-}
-
-impl EndpointMeta {
-	pub fn entity(&self) -> Entity { self.entity }
-	pub fn route_segments(&self) -> &RouteSegments { &self.route_segments }
-	pub fn method(&self) -> Option<HttpMethod> { self.method }
-	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
-		self.cache_strategy
-	}
-	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
-
-
-	pub fn collect(
-		query: Query<(
-			Entity,
-			&Endpoint,
-			Option<&HttpMethod>,
-			Option<&CacheStrategy>,
-			Option<&ContentType>,
-		)>,
-	) -> Vec<Self> {
-		query
-			.iter()
-			.map(|(entity, endpoint, method, cache_strategy, html)| Self {
-				entity,
-				route_segments: endpoint.route_segments().clone(),
-				method: method.cloned(),
-				cache_strategy: cache_strategy.cloned(),
-				content_type: html.cloned(),
-			})
-			.collect::<Vec<_>>()
-	}
-
-	/// filter the provided list of endpoint metadata
-	/// by those that are static GET endpoints
-	pub fn static_get(items: In<Vec<Self>>) -> Vec<Self> {
-		items
-			.0
-			.into_iter()
-			.filter(|meta| {
-				meta.route_segments.is_static()
-					&& meta.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
-					&& meta
-						.cache_strategy
-						.map(|s| s == CacheStrategy::Static)
-						.unwrap_or(false)
-			})
-			.collect()
-	}
-	/// filter the provided list of endpoint metadata
-	/// by those that are static GET endpoints with HTML
-	pub fn static_get_html(items: In<Vec<Self>>) -> Vec<Self> {
-		items
-			.0
-			.into_iter()
-			.filter(|meta| {
-				meta.route_segments.is_static()
-					&& meta.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
-					&& meta
-						.cache_strategy
-						.map(|s| s == CacheStrategy::Static)
-						.unwrap_or(false)
-					&& meta.content_type == Some(ContentType::Html)
-			})
-			.collect()
-	}
-}
 
 #[cfg(test)]
 mod test {
@@ -448,9 +387,9 @@ mod test {
 				),
 			],
 		));
-		world.run_system_cached(EndpointMeta::collect).unwrap()
+		world.query_once::<&Endpoint>()
     .into_iter()
-    .map(|meta| meta.route_segments().annotated_route_path())
+    .map(|endpoint| endpoint.route_segments().annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
 				RoutePath::new("/foo"),

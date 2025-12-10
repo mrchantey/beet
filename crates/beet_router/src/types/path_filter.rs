@@ -113,10 +113,7 @@ impl PathFilter {
 }
 
 /// Unlike [`PathFilter`] this type contains a full path to the endpoint
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
-)]
-#[reflect(Component)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]

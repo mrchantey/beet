@@ -34,11 +34,11 @@ impl Plugin for RouterPlugin {
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
 pub fn insert_route_tree(world: &mut World) {
 	let paths = world
-		.run_system_cached(EndpointMeta::collect.pipe(EndpointMeta::static_get))
-		.unwrap()
+		.query_once::<(Entity, &Endpoint)>()
 		.into_iter()
-		.map(|meta| {
-			(meta.entity(), meta.route_segments().annotated_route_path())
+		.filter(|(_, endpoint)| endpoint.is_static_get())
+		.map(|(entity, endpoint)| {
+			(entity, endpoint.route_segments().annotated_route_path())
 		})
 		.collect::<Vec<_>>();
 	world.insert_resource(RoutePathTree::from_paths(paths));

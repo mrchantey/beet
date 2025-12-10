@@ -17,10 +17,14 @@ pub async fn collect_html(
 		.await;
 
 	let metas = world
-		.run_system_cached(
-			EndpointMeta::collect.pipe(EndpointMeta::static_get_html),
-		)
-		.await?;
+		.with_then(|world| {
+			world
+				.query_once::<&Endpoint>()
+				.into_iter()
+				.filter(|endpoint| endpoint.is_static_get_html())
+				.collect::<Vec<_>>()
+		})
+		.await;
 
 	debug!("building {} static html documents", metas.len());
 
