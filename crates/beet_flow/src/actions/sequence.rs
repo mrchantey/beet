@@ -94,4 +94,45 @@ mod test {
 			("root".to_string(), Outcome::Fail),
 		]);
 	}
+
+	/// This test proves that observers are run in a breadth first order,
+	/// the Sequence commands are captured, then the "root" is pushed to the store,
+	/// then the children run. this means that multiple observers can be attached to the
+	/// root and be guaranteed to run before the children.
+	#[test]
+	fn action_order() {
+		let mut world = ControlFlowPlugin::world();
+
+		let store = Store::<Vec<_>>::default();
+
+		world
+			.spawn((
+				Sequence,
+				OnSpawn::observe(move |_: On<GetOutcome>| store.push("root")),
+				children![
+					(
+						Name::new("child1"),
+						EndWith(Outcome::Pass),
+						OnSpawn::observe(
+							move |_: On<GetOutcome>| store.push("child1")
+						),
+					),
+					(
+						Name::new("child2"),
+						EndWith(Outcome::Fail),
+						OnSpawn::observe(
+							move |_: On<GetOutcome>| store.push("child2")
+						),
+					),
+				],
+			))
+			.trigger_target(GetOutcome)
+			.flush();
+
+		store.get().xpect_eq(vec![
+			"root".to_string(),
+			"child1".to_string(),
+			"child2".to_string(),
+		]);
+	}
 }

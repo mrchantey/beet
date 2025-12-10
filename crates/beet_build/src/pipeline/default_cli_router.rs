@@ -22,6 +22,10 @@ pub fn default_cli_router() -> impl Bundle {
 					"foobar"
 				}
 			),
+			// (RouteSegments::new("build"), Sequence, children![
+			// 	exact_path(),
+			// 	build_server()
+			// ]),
 			(PathFilter::new("build"), children![build_server()])
 		],
 	)

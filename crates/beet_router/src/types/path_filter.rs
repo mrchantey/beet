@@ -112,7 +112,8 @@ impl PathFilter {
 	}
 }
 
-/// Unlike [`PathFilter`] this type contains a full path to the endpoint
+/// A collection of [`PathSegment`], also tracking whether any of them are dynamic or wildcard
+/// segments.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
@@ -148,7 +149,6 @@ impl RouteSegments {
 			.collect::<Vec<_>>()
 			.xmap(Self::new)
 	}
-
 
 	/// Parse a path into [`RouteSegments`]
 	/// ## Panics
