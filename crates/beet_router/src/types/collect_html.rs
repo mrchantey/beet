@@ -31,7 +31,7 @@ pub async fn collect_html(
 	let mut results = Vec::new();
 
 	for meta in metas {
-		let path = meta.route_segments().annotated_route_path();
+		let path = meta.all_segments().annotated_route_path();
 		trace!("building html for {}", &path);
 
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");

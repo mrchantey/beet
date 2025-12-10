@@ -23,7 +23,7 @@ pub enum ContentType {
 #[reflect(Component)]
 pub struct Endpoint {
 	/// The entire route path for this endpoint
-	route_segments: RouteSegments,
+	all_segments: RouteSegments,
 	/// The method to match, or None for any method.
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -34,7 +34,7 @@ pub struct Endpoint {
 
 
 impl Endpoint {
-	pub fn route_segments(&self) -> &RouteSegments { &self.route_segments }
+	pub fn all_segments(&self) -> &RouteSegments { &self.all_segments }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
@@ -43,7 +43,7 @@ impl Endpoint {
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
-		self.route_segments.is_static()
+		self.all_segments.is_static()
 			&& self.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
 			&& self
 				.cache_strategy
@@ -188,7 +188,19 @@ impl EndpointBuilder {
 			current_entity = entity
 				.world_scope(|world| world.spawn(ChildOf(current_entity)).id());
 		}
+
+
 		entity.world_scope(|world| {
+			let all_segments = world
+				.run_system_cached_with(RouteSegments::collect, current_entity)
+				.unwrap();
+			world.entity_mut(current_entity).insert(Endpoint {
+				all_segments,
+				method: self.method,
+				cache_strategy: self.cache_strategy,
+				content_type: self.content_type,
+			});
+
 			world
 				.entity_mut(current_entity)
 				.insert(Sequence)
@@ -219,22 +231,6 @@ impl EndpointBuilder {
 						handler_entity.insert(method);
 					}
 					(self.insert)(&mut handler_entity);
-					let handler_id = handler_entity.id();
-					let route_segments = spawner
-						.world_mut()
-						.run_system_cached_with(
-							RouteSegments::collect,
-							handler_id,
-						)
-						.unwrap();
-					spawner.world_mut().entity_mut(handler_id).insert((
-						Endpoint {
-							route_segments,
-							method: self.method,
-							cache_strategy: self.cache_strategy,
-							content_type: self.content_type,
-						},
-					));
 				});
 		});
 	}
@@ -389,12 +385,12 @@ mod test {
 		));
 		world.query_once::<&Endpoint>()
     .into_iter()
-    .map(|endpoint| endpoint.route_segments().annotated_route_path())
+    .map(|endpoint| endpoint.all_segments().annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
-				RoutePath::new("/foo"),
 				RoutePath::new("/foo/*bar"),
-				RoutePath::new("/foo/:quax")
+				RoutePath::new("/foo/:quax"),
+				RoutePath::new("/foo"),
 		]);
 	}
 }

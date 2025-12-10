@@ -7,7 +7,7 @@ use beet_rsx::prelude::*;
 
 #[construct]
 pub fn CliRouter() -> Result<impl Bundle> {
-	Ok((Router, OnSpawn::new_async(handler)))
+	Ok((Router, OnSpawn::new_async_local(handler)))
 }
 
 async fn handler(entity: AsyncEntity) -> Result {

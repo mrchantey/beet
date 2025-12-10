@@ -144,7 +144,7 @@ impl RoutePath {
 pub struct RoutePathTree {
 	/// The full route path for this node
 	pub route: RoutePath,
-	/// All endpoints with this path
+	/// All entities with an [`Endpoint`] that matches this path
 	pub endpoints: Vec<Entity>,
 	/// All child directories
 	pub children: Vec<RoutePathTree>,

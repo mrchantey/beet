@@ -135,6 +135,7 @@ impl RouteSegments {
 		filters: Query<&PathFilter>,
 	) -> RouteSegments {
 		parents
+			// get every PathFilter in ancestors
 			.iter_ancestors_inclusive(*entity)
 			.filter_map(|entity| filters.get(entity).ok())
 			.collect::<Vec<_>>()
@@ -142,6 +143,7 @@ impl RouteSegments {
 			.cloned()
 			// reverse to start from the root
 			.rev()
+			// extract the segments
 			.flat_map(|filter| filter.segments.segments)
 			.collect::<Vec<_>>()
 			.xmap(Self::new)

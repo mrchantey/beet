@@ -38,7 +38,7 @@ pub fn insert_route_tree(world: &mut World) {
 		.into_iter()
 		.filter(|(_, endpoint)| endpoint.is_static_get())
 		.map(|(entity, endpoint)| {
-			(entity, endpoint.route_segments().annotated_route_path())
+			(entity, endpoint.all_segments().annotated_route_path())
 		})
 		.collect::<Vec<_>>();
 	world.insert_resource(RoutePathTree::from_paths(paths));
