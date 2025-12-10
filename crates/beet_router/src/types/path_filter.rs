@@ -81,7 +81,7 @@ impl PathFilter {
 		}
 	}
 
-	pub fn from_segments(segments: Vec<PathSegment>) -> Self {
+	pub fn from_segments(segments: Vec<RouteSegment>) -> Self {
 		Self {
 			segments: RouteSegments::new(segments),
 		}
@@ -112,7 +112,7 @@ impl PathFilter {
 	}
 }
 
-/// A collection of [`PathSegment`], also tracking whether any of them are dynamic or wildcard
+/// A collection of [`RouteSegment`], also tracking whether any of them are dynamic or wildcard
 /// segments.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -120,12 +120,12 @@ impl PathFilter {
 #[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]
 // TODO remove component after beet_router refactor
 pub struct RouteSegments {
-	segments: Vec<PathSegment>,
+	segments: Vec<RouteSegment>,
 	is_static: bool,
 }
 
 impl std::ops::Deref for RouteSegments {
-	type Target = Vec<PathSegment>;
+	type Target = Vec<RouteSegment>;
 	fn deref(&self) -> &Self::Target { &self.segments }
 }
 
@@ -159,11 +159,11 @@ impl RouteSegments {
 			.to_string_lossy()
 			.split('/')
 			.filter(|s| !s.is_empty())
-			.map(PathSegment::new)
+			.map(RouteSegment::new)
 			.collect::<Vec<_>>();
 
 		for (index, segment) in segments.iter().enumerate() {
-			if matches!(segment, PathSegment::Wildcard(_))
+			if matches!(segment, RouteSegment::Wildcard(_))
 				&& index != segments.len() - 1
 			{
 				panic!("Malformed Route Path: Wildcard pattern must be last");
@@ -174,21 +174,21 @@ impl RouteSegments {
 	}
 
 	/// Called by to_tokens, this should never be used directly
-	pub fn _from_raw(segments: Vec<PathSegment>, is_static: bool) -> Self {
+	pub fn _from_raw(segments: Vec<RouteSegment>, is_static: bool) -> Self {
 		Self {
 			segments,
 			is_static,
 		}
 	}
 
-	pub fn new(segments: Vec<PathSegment>) -> Self {
+	pub fn new(segments: Vec<RouteSegment>) -> Self {
 		let is_static = segments.iter().all(|segment| segment.is_static());
 		Self {
 			segments,
 			is_static,
 		}
 	}
-	/// Returns true if all segments are a [`PathSegment::Static`]
+	/// Returns true if all segments are a [`RouteSegment::Static`]
 	pub fn is_static(&self) -> bool { self.is_static }
 
 	/// Convert the segments to a [`RoutePath`] using annotations for dynamic segments,
@@ -213,7 +213,7 @@ impl Default for RouteSegments {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum PathSegment {
+pub enum RouteSegment {
 	/// A static segment, the `foo` in `/foo`
 	Static(String),
 	/// A dynamic segment, the `foo` in `/:foo`
@@ -222,7 +222,7 @@ pub enum PathSegment {
 	Wildcard(String),
 }
 
-impl PathSegment {
+impl RouteSegment {
 	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
 	///
 	/// ## Panics
@@ -233,9 +233,9 @@ impl PathSegment {
 		// trim leading and trailing slashes
 		let trimmed = segment.trim_matches('/');
 		if trimmed.is_empty() {
-			panic!("PathSegment cannot be empty");
+			panic!("RouteSegment cannot be empty");
 		} else if trimmed.contains('/') {
-			panic!("PathSegment cannot contain internal slashes: {}", segment);
+			panic!("RouteSegment cannot contain internal slashes: {}", segment);
 		} else if trimmed.starts_with(':') {
 			Self::Dynamic(trimmed[1..].to_string())
 		} else if trimmed.starts_with('*') {
@@ -274,16 +274,16 @@ impl PathSegment {
 
 		match (self, path.pop_front()) {
 			// static match, continue with remaining path
-			(PathSegment::Static(val), Some(other)) if val == &other => {
+			(RouteSegment::Static(val), Some(other)) if val == &other => {
 				ControlFlow::Continue(())
 			}
 			// dynamic will always match, continue with remaining path
-			(PathSegment::Dynamic(key), Some(value)) => {
+			(RouteSegment::Dynamic(key), Some(value)) => {
 				insert(key.clone(), value);
 				ControlFlow::Continue(())
 			}
 			// wildcard consumes the rest of the path, continue with empty path
-			(PathSegment::Wildcard(key), Some(mut value)) => {
+			(RouteSegment::Wildcard(key), Some(mut value)) => {
 				// consume rest of path
 				while let Some(next) = path.pop_front() {
 					value.push('/');
@@ -293,19 +293,19 @@ impl PathSegment {
 				ControlFlow::Continue(())
 			}
 			// only a wildcard permits an empty path
-			(PathSegment::Wildcard(key), None) => {
+			(RouteSegment::Wildcard(key), None) => {
 				insert(key.clone(), "".to_string());
 				ControlFlow::Continue(())
 			}
 			// break if empty path or no matching static
-			(PathSegment::Static(_) | PathSegment::Dynamic(_), _) => {
+			(RouteSegment::Static(_) | RouteSegment::Dynamic(_), _) => {
 				ControlFlow::Break(())
 			}
 		}
 	}
 	pub fn is_static(&self) -> bool {
 		match self {
-			PathSegment::Static(_) => true,
+			RouteSegment::Static(_) => true,
 			_ => false,
 		}
 	}
@@ -313,29 +313,29 @@ impl PathSegment {
 	pub fn as_str(&self) -> &str { self.as_ref() }
 }
 
-impl AsRef<str> for PathSegment {
+impl AsRef<str> for RouteSegment {
 	fn as_ref(&self) -> &str {
 		match self {
-			PathSegment::Static(s) => s,
-			PathSegment::Dynamic(s) => s,
-			PathSegment::Wildcard(s) => s,
+			RouteSegment::Static(s) => s,
+			RouteSegment::Dynamic(s) => s,
+			RouteSegment::Wildcard(s) => s,
 		}
 	}
 }
 
-impl From<&str> for PathSegment {
+impl From<&str> for RouteSegment {
 	fn from(value: &str) -> Self { Self::new(value) }
 }
-impl From<String> for PathSegment {
+impl From<String> for RouteSegment {
 	fn from(value: String) -> Self { Self::new(value) }
 }
 /// Print the segment as-is without dynamic and wildcard annotations
-impl std::fmt::Display for PathSegment {
+impl std::fmt::Display for RouteSegment {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			PathSegment::Static(s) => write!(f, "{}", s),
-			PathSegment::Dynamic(s) => write!(f, "{}", s),
-			PathSegment::Wildcard(s) => write!(f, "{}", s),
+			RouteSegment::Static(s) => write!(f, "{}", s),
+			RouteSegment::Dynamic(s) => write!(f, "{}", s),
+			RouteSegment::Wildcard(s) => write!(f, "{}", s),
 		}
 	}
 }
