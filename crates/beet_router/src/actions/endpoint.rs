@@ -5,7 +5,6 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

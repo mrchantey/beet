@@ -2,15 +2,16 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
-pub struct ResolveSnippets;
 
-/// A no-op BundleEffect (allowing for multiple insertions of same type),
-/// used to denote an `rsx bundle` in places like IntoEndpoint
+/// A no-op BundleEffect used as a marker to denote an `rsx bundle`
+/// in blanket implementations like IntoHtml
 #[derive(BundleEffect)]
 pub struct RsxRoot;
 impl RsxRoot {
 	fn effect(self, _: &mut EntityWorldMut) {}
 }
+
+pub struct ResolveSnippets;
 
 impl ResolveSnippets {
 	/// Create the `OnSpawn` which will immediately resolve the rsx snippet.
