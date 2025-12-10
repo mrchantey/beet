@@ -21,7 +21,7 @@ pub(crate) fn compile_server(
 	let build_cmd = build_cmd
 		.clone()
 		.no_default_features()
-		.with_feature("server-local");
+		.feature("server-local");
 	Command::new("cargo")
 		.args(build_cmd.get_args())
 		.envs(pkg_config.envs())

@@ -114,6 +114,12 @@ impl CargoBuildCmd {
 		self.release = true;
 		self
 	}
+
+	pub fn package(mut self, package: impl Into<String>) -> Self {
+		self.package = Some(package.into());
+		self
+	}
+
 	pub fn parse() -> Self { Parser::parse() }
 	pub fn no_default_features(mut self) -> Self {
 		self.no_default_features = true;
@@ -128,7 +134,7 @@ impl CargoBuildCmd {
 		self
 	}
 
-	pub fn with_feature(mut self, feature: impl Into<String>) -> Self {
+	pub fn feature(mut self, feature: impl Into<String>) -> Self {
 		self.push_feature(feature);
 		self
 	}

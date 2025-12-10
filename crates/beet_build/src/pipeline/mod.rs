@@ -16,5 +16,7 @@ mod beet_file;
 pub use beet_file::*;
 mod cli_plugin;
 pub use cli_plugin::*;
+pub use default_cli_router::*;
+mod default_cli_router;
 mod terminal_command;
 pub use terminal_command::*;

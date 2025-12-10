@@ -32,7 +32,7 @@ pub fn compile_lambda(
 		// beet binaries should default to 'server' with 'native-tls' but we need
 		// to disable that to specify 'deploy' feature
 		.no_default_features()
-		.with_feature("server-lambda");
+		.feature("server-lambda");
 
 	let mut cmd = Command::new("cargo");
 

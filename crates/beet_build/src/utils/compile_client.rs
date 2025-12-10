@@ -16,7 +16,7 @@ pub fn compile_client(
 		.clone()
 		.target("wasm32-unknown-unknown")
 		.no_default_features()
-		.with_feature("client");
+		.feature("client");
 
 	Command::new("cargo")
 		.args(build_cmd.get_args())

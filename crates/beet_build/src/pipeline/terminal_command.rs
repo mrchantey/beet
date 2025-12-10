@@ -55,6 +55,15 @@ pub fn TerminalCommand(
 }
 
 
+impl TerminalCommand {
+	pub fn from_cargo(cargo: &CargoBuildCmd) -> Self {
+		Self {
+			cmd: "cargo".into(),
+			args: cargo.get_args().iter().map(|s| s.to_string()).collect(),
+		}
+	}
+}
+
 
 #[cfg(test)]
 mod test {
