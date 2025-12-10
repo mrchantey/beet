@@ -67,7 +67,7 @@ impl LaunchRunner {
 			.world()
 			.resource::<WorkspaceConfig>();
 		let cwd = config.root_dir.into_abs();
-		let filter = config.filter.clone();
+		let filter = config.snippet_filter.clone();
 
 		app.add_plugins((MinimalPlugins, FsWatcherPlugin {
 			watcher: FsWatcher {

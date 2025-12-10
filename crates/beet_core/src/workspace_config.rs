@@ -185,7 +185,7 @@ pub struct WorkspaceConfig {
 	/// Filter for extracting snippets,
 	/// excludes 'target' and 'node_modules' directories by default
 	#[reflect(ignore)] // TODO reflect GlobFilter
-	pub filter: GlobFilter,
+	pub snippet_filter: GlobFilter,
 	/// The root directory for extracting snippets
 	pub root_dir: WsPathBuf,
 	/// The output location for the generated template scene file
@@ -202,7 +202,7 @@ pub struct WorkspaceConfig {
 impl Default for WorkspaceConfig {
 	fn default() -> Self {
 		Self {
-			filter: GlobFilter::default()
+			snippet_filter: GlobFilter::default()
 				.with_exclude("*/target/*")
 				.with_exclude("*/codegen/*")
 				.with_exclude("*/.cache/*")
@@ -262,12 +262,12 @@ impl WorkspaceConfig {
 	}
 
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
-		self.filter.passes(path)
+		self.snippet_filter.passes(path)
 	}
 	pub fn get_files(&self) -> Result<Vec<AbsPathBuf>, FsError> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())?
 			.into_iter()
-			.filter(|path| self.filter.passes(path))
+			.filter(|path| self.snippet_filter.passes(path))
 			.map(|path| AbsPathBuf::new(path))
 			.collect()
 	}

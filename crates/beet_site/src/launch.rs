@@ -5,7 +5,7 @@ use beet::prelude::*;
 pub fn launch_plugin(app: &mut App) {
 	let mut config = WorkspaceConfig::default();
 	config
-		.filter
+		.snippet_filter
 		.include("*/crates/beet_design/src/**/*")
 		.include("*/crates/beet_site/src/**/*");
 
