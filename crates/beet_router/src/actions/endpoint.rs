@@ -237,7 +237,12 @@ impl EndpointBuilder {
 }
 
 /// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`RoutePattern`]
+/// at this point in the tree with no remaining parts.
+pub fn exact_route_match() -> impl Bundle { route_match(true) }
+/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`RoutePattern`]
 /// at this point in the tree, even if there are remaining parts.
+pub fn partial_route_match() -> impl Bundle { route_match(false) }
+
 fn route_match(exact_match: bool) -> impl Bundle {
 	(
 		Name::new("Route Match"),

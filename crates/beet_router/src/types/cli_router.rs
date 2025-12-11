@@ -12,9 +12,21 @@ pub fn CliRouter() -> Result<impl Bundle> {
 
 async fn handler(entity: AsyncEntity) -> Result {
 	let req = cli_args_to_request(CliArgs::parse_env())?;
-	let res = flow_route_handler(entity, req).await.into_result().await?;
-	let body = res.body.into_string().await?;
-	body.xprint();
+	let exit = match flow_route_handler(entity.clone(), req)
+		.await
+		.into_result()
+		.await
+	{
+		Ok(res) => {
+			res.body.into_string().await?.xprint();
+			AppExit::Success
+		}
+		Err(err) => {
+			error!("{}", err);
+			AppExit::error()
+		}
+	};
+	entity.world().write_message(exit);
 	Ok(())
 }
 

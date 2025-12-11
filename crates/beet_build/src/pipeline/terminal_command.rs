@@ -27,7 +27,7 @@ pub fn TerminalCommand(
 	OnSpawn::observe(move |mut ev: On<GetOutcome>| {
 		let cmd = cmd.clone();
 		let args = args.clone();
-		ev.run_async(async move |action| {
+		ev.run_async(async move |mut action| {
 			// 1. spawn the command
 			let mut child = Command::new(&cmd).args(&args).spawn()?;
 			// 2. take stdout/stderr pipes
@@ -47,7 +47,7 @@ pub fn TerminalCommand(
 				Ok(_) => Outcome::Pass,
 				Err(_) => Outcome::Fail,
 			};
-			action.entity().trigger_target(outcome).await;
+			action.trigger_with_cx(outcome);
 
 			Ok(())
 		});

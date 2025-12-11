@@ -25,6 +25,8 @@ fn run_on_ready(ev: On<Ready>, mut commands: Commands) {
 		commands
 			.entity(ev.event_target())
 			.trigger_target(GetOutcome);
+	} else {
+		warn!("RunOnReady mismatch.. todo how do we handle this?");
 	}
 }
 

@@ -55,7 +55,7 @@ pub fn default_router(
 								html_bundle_to_response(),
 								assets_bucket(),
 								html_bucket(),
-								not_found()
+								// default not found handled by Router
 							]),
 						]
 					),

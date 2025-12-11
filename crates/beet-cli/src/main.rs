@@ -28,7 +28,8 @@ enum SubCommands {
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, CliPlugin))
+		.add_plugins((MinimalPlugins, CliPlugin, LogPlugin::default()))
+		.try_set_error_handler(bevy::ecs::error::panic)
 		.add_systems(Startup, cli_routes)
 		.run();
 }

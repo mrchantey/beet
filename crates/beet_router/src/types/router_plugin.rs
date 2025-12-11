@@ -150,27 +150,26 @@ pub impl EntityWorldMut<'_> {
 /// World::new().spawn(HttpServer::default().with_handler(flow_route_handler));
 /// ```
 pub async fn flow_route_handler(
-	server_async: AsyncEntity,
+	router: AsyncEntity,
 	request: impl Bundle,
 ) -> Response {
-	let server = server_async.id();
+	let router_id = router.id();
 	let (send, recv) = async_channel::bounded(1);
-	server_async
+	router
 		.world()
 		.with_then(move |world| {
 			let exchange = world
 				.spawn((
-					ExchangeOf(server),
+					ExchangeOf(router_id),
 					request,
 					ExchangeContext::new(send),
 				))
 				.id();
 			world
-				.entity_mut(server)
+				.entity_mut(router_id)
 				.trigger_target(GetOutcome.with_agent(exchange));
 		})
 		.await;
-
 	recv.recv().await.unwrap_or_else(|_| {
 		error!("Sender was dropped, was the world dropped?");
 		Response::from_status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -195,14 +194,24 @@ pub struct HttpRouter;
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe_any(
-		move |ev: On<Outcome>, mut commands: Commands| {
+		move |ev: On<Outcome>, mut commands: Commands, route: RouteQuery| {
 			let exchange = ev.agent();
+			let path = route
+				.path(&ev)
+				.map(|path| path.to_string())
+				.unwrap_or_else(|_| "unknown".to_string());
 			// this observer
 			commands.queue(move |world: &mut World| -> Result {
 				let res = world
 					.entity_mut(exchange)
 					.take::<Response>()
-					.unwrap_or_else(|| Response::not_found());
+					.unwrap_or_else(|| {
+						Response::from_status_body(
+							StatusCode::NOT_FOUND,
+							format!("Resource not found at '{path}'"),
+							"text/plain",
+						)
+					});
 				let Some(cx) =
 					world.entity_mut(exchange).take::<ExchangeContext>()
 				else {
