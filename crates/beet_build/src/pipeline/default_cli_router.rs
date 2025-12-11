@@ -11,10 +11,9 @@ pub fn default_cli_router() -> impl Bundle {
 	(CliRouter, InfallibleSequence, children![
 		EndpointBuilder::default().with_handler(|| { "foobar" }),
 		EndpointBuilder::default().with_path("run").with_handler(
-			async |request: Request, _cx: EndpointContext| {
-				let path = request.parts.uri.path();
-				println!("path: {}", path);
-				"foobar"
+			async |_request: Request, _cx: EndpointContext| {
+				// let path = request.parts.uri.path();
+				"bazz"
 			}
 		),
 		// (RouteSegments::new("build"), Sequence, children![

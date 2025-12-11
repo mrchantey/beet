@@ -7,10 +7,10 @@ use beet_rsx::prelude::*;
 
 #[construct]
 pub fn CliRouter() -> Result<impl Bundle> {
-	Ok((Router, OnSpawn::new_async_local(handler)))
+	Ok((Router, OnSpawn::new_async_local(oneshot_cli_handler)))
 }
 
-async fn handler(entity: AsyncEntity) -> Result {
+async fn oneshot_cli_handler(entity: AsyncEntity) -> Result {
 	let req = cli_args_to_request(CliArgs::parse_env())?;
 	let exit = match flow_route_handler(entity.clone(), req)
 		.await
