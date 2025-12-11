@@ -7,6 +7,8 @@ pub use beet_agent as agent;
 #[cfg(feature = "build")]
 pub use beet_build as build;
 pub use beet_core as core;
+pub use beet_core::cross_log;
+pub use beet_core::cross_log_error;
 #[cfg(feature = "design")]
 pub use beet_design as design;
 #[cfg(feature = "dom")]
@@ -17,12 +19,10 @@ pub use beet_examples as examples;
 pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
-#[cfg(feature = "parse")]
-pub use beet_parse as parse;
-pub use beet_core::cross_log;
-pub use beet_core::cross_log_error;
 #[cfg(feature = "net")]
 pub use beet_net as net;
+#[cfg(feature = "parse")]
+pub use beet_parse as parse;
 #[cfg(feature = "router")]
 pub use beet_router as router;
 #[cfg(feature = "rsx")]
@@ -41,6 +41,8 @@ pub mod prelude {
 	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;
 	pub use crate::beet_plugins::*;
+	#[cfg(feature = "build")]
+	pub use crate::build::prelude::ClientProcess;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
 	pub use crate::core::prelude::Message;

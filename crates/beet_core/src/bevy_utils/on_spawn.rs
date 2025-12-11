@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
+use bevy::ecs::error::ErrorContext;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -24,6 +25,35 @@ pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
+/// Allow for Bundles and Results to be returned from methods
+pub trait ApplyToEntity<M>: 'static + Send + Sync {
+	fn apply(self, entity: &mut EntityWorldMut);
+}
+
+pub struct BundleApplyToEntityMarker;
+pub struct ResultApplyToEntityMarker;
+
+impl<T: Bundle> ApplyToEntity<BundleApplyToEntityMarker> for T {
+	fn apply(self, entity: &mut EntityWorldMut) { entity.insert(self); }
+}
+
+impl<T: Bundle> ApplyToEntity<ResultApplyToEntityMarker> for Result<T> {
+	fn apply(self, entity: &mut EntityWorldMut) {
+		match self {
+			Ok(bundle) => {
+				entity.insert(bundle);
+			}
+			Err(err) => entity.world_scope(|world| {
+				world.default_error_handler()(
+					err.into(),
+					ErrorContext::Command {
+						name: "ApplyToEntity".into(),
+					},
+				);
+			}),
+		}
+	}
+}
 impl OnSpawn {
 	/// Create a new [`OnSpawn`] effect.
 	pub fn new(
@@ -48,17 +78,18 @@ impl OnSpawn {
 
 	/// Run the system and insert the resulting bundle into the entity on spawn.
 	pub fn run_insert<
-		System: 'static + Send + Sync + IntoSystem<(), Out, Marker>,
-		Out: Bundle,
-		Marker,
+		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
+		M1,
+		Out: ApplyToEntity<M2>,
+		M2,
 	>(
 		system: System,
 	) -> Self {
 		Self::new(move |entity| {
-			let bundle = entity
+			entity
 				.world_scope(move |world| world.run_system_once(system))
-				.unwrap();
-			entity.insert(bundle);
+				.unwrap()
+				.apply(entity);
 		})
 	}
 

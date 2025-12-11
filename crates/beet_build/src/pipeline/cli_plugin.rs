@@ -30,7 +30,7 @@ impl Default for CliConfig {
 }
 
 impl CliConfig {
-	pub fn launch_step(&self) -> TerminalCommand {
+	pub fn launch_step(&self) -> ChildProcess {
 		let mut args = Vec::new();
 		if !self.launch_no_default_args {
 			args.push("run".into());
@@ -45,9 +45,10 @@ impl CliConfig {
 			args.extend(launch_cargo_args.split_whitespace().map(|s| s.into()));
 		}
 
-		TerminalCommand {
+		ChildProcess {
 			cmd: "cargo".into(),
 			args,
+			..default()
 		}
 	}
 }
@@ -60,6 +61,7 @@ pub struct CliPlugin;
 impl Plugin for CliPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<RouterPlugin>()
+			.insert_resource(CargoManifest::load().unwrap())
 			// temp: hardcoded until bevy scene overhaul
 			.insert_resource(PackageConfig {
 				title: "Beet".into(),

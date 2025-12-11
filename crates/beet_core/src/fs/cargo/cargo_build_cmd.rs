@@ -170,6 +170,9 @@ impl CargoBuildCmd {
 	/// For packages, binaries and examples that name is used to resolve the
 	/// executable name, otherwise the crate name is used.
 	/// In the case of a wasm target, the path will have a `.wasm` extension.
+	/// - The `pkg_name` must be passed in, this is different from [`Self::package`]
+	/// 	in that we need this name even for a non-workspace Cargo.toml
+	///
 	/// ## Panics
 	///
 	/// Panics if no crate name provided and no package, bin or example is set.
