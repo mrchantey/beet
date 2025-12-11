@@ -41,8 +41,6 @@ pub fn is_internal() -> bool {
 		"beet_sim",
 		"beet_spatial",
 		"beet_utils",
-		"beet_query",
-		"beet_query_macros",
 		"sweet",
 		"sweet_macros",
 	];

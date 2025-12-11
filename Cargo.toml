@@ -67,8 +67,6 @@ members = [
 	"crates/beet_design",
 	"crates/beet_dom",
 	"crates/beet_parse",
-	"crates/beet_query",
-	"crates/beet_query/macros",
 	"crates/beet_router",
 	"crates/beet_rsx_combinator",
 	"crates/beet_rsx/macros",
@@ -103,8 +101,6 @@ beet_design = { path = "crates/beet_design", version = "0.0.8-dev.9" }
 beet_net = { path = "crates/beet_net", version = "0.0.8-dev.9" }
 beet_router = { path = "crates/beet_router", version = "0.0.8-dev.9" }
 beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.9" }
-beet_query = { path = "crates/beet_query", version = "0.0.8-dev.9" }
-beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.8-dev.9" }
 beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.9" }
 
 beet = { path = "", version = "0.0.8-dev.9" }
@@ -288,7 +284,6 @@ flow = ["dep:beet_flow"]
 css = ["beet_parse?/css", "beet_rsx?/css"]
 design = ["rsx", "dep:beet_design"]
 webdriver = ["dom","beet_dom?/webdriver"]
-# query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
@@ -341,7 +336,6 @@ beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_agent = { workspace = true, optional = true }
-# beet_query = { workspace = true, optional = true }
 
 #💡 flow
 beet_flow = { workspace = true, optional = true }

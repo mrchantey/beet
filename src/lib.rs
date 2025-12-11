@@ -19,8 +19,6 @@ pub use beet_flow as flow;
 pub use beet_ml as ml;
 #[cfg(feature = "parse")]
 pub use beet_parse as parse;
-// #[cfg(feature = "query")]
-// pub use beet_query as query;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
 #[cfg(feature = "net")]
