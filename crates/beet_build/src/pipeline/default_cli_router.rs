@@ -52,6 +52,7 @@ fn build_server() -> impl Bundle {
 		Name::new("Build Server"),
 		beet_site_cmd()
 			.feature("server-local")
+			.no_default_features()
 			.cmd("build")
 			.xref()
 			.xmap(ChildProcess::from_cargo),
