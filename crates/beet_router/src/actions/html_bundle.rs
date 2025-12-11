@@ -53,35 +53,38 @@ where
 ///
 /// Errors if multiple [`HtmlBundle`] are found.
 pub fn html_bundle_to_response() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>,
-		 mut commands: Commands,
-		 query: HtmlBundleQuery<Without<Response>>|
-		 -> Result {
-			let exchange = ev.agent();
-			let Some(html_bundle) = query.get(ev.agent())? else {
-				ev.trigger_with_cx(Outcome::Fail);
-				return Ok(());
-			};
+	(
+		Name::new("Html Bundle Parser"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 query: HtmlBundleQuery<Without<Response>>|
+			 -> Result {
+				let exchange = ev.agent();
+				let Some(html_bundle) = query.get(ev.agent())? else {
+					ev.trigger_with_cx(Outcome::Fail);
+					return Ok(());
+				};
 
-			commands.queue(move |world: &mut World| -> Result {
-				// unless a [`BeetRoot`] is explicitly inserted,
-				// we assume this fragment should be wrapped in
-				// a [`HtmlDocument`], which also inserts a [`BeetRoot`]
-				if !world.entity_mut(html_bundle).contains::<BeetRoot>() {
-					world.entity_mut(html_bundle).insert(HtmlDocument);
-				}
-				world.run_schedule(ApplyDirectives);
-				let html = world
-					.run_system_cached_with(render_fragment, html_bundle)?;
-				world
-					.entity_mut(exchange)
-					.insert(Html(html).into_response());
+				commands.queue(move |world: &mut World| -> Result {
+					// unless a [`BeetRoot`] is explicitly inserted,
+					// we assume this fragment should be wrapped in
+					// a [`HtmlDocument`], which also inserts a [`BeetRoot`]
+					if !world.entity_mut(html_bundle).contains::<BeetRoot>() {
+						world.entity_mut(html_bundle).insert(HtmlDocument);
+					}
+					world.run_schedule(ApplyDirectives);
+					let html = world
+						.run_system_cached_with(render_fragment, html_bundle)?;
+					world
+						.entity_mut(exchange)
+						.insert(Html(html).into_response());
+					Ok(())
+				});
+				ev.trigger_with_cx(Outcome::Pass);
 				Ok(())
-			});
-			ev.trigger_with_cx(Outcome::Pass);
-			Ok(())
-		},
+			},
+		),
 	)
 }
 

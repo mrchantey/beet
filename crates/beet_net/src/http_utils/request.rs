@@ -46,7 +46,7 @@ impl RequestMeta {
 		}
 	}
 	pub fn method(&self) -> HttpMethod { self.parts.method.clone().into() }
-	pub fn path(&self) -> &str { self.parts.uri.path() }
+	pub fn path(&self) -> RoutePath { RoutePath::new(self.parts.uri.path()) }
 	pub fn started(&self) -> Instant { self.started }
 	pub fn parts(&self) -> &request::Parts { &self.parts }
 }

@@ -144,9 +144,9 @@ impl<'a> Parser<'_, '_, 'a> {
 		} else {
 			Ident::new("index", Span::call_site())
 		};
-		let segments = RouteSegments::parse(&route.route_info.path);
+		let route_pattern = RoutePattern::new(&route.route_info.path).unwrap();
 
-		let func = if segments.is_static() {
+		let func = if route_pattern.is_static() {
 			let route_path =
 				route.route_info.path.to_string_lossy().to_string();
 			parse_quote!(
@@ -155,7 +155,7 @@ impl<'a> Parser<'_, '_, 'a> {
 				}
 			)
 		} else {
-			let dyn_idents = segments
+			let dyn_idents = route_pattern
 				.iter()
 				.filter_map(|segment| {
 					if segment.is_static() {
@@ -166,7 +166,7 @@ impl<'a> Parser<'_, '_, 'a> {
 				})
 				.collect::<Vec<_>>();
 
-			let raw_str = segments
+			let raw_str = route_pattern
 				.iter()
 				.map(|segment| {
 					if segment.is_static() {

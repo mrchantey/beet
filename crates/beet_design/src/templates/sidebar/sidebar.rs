@@ -195,7 +195,7 @@ mod test {
 						..Default::default()
 					}
 				)),
-			(PathFilter::new("/docs"), children![
+			(RoutePartial::new("/docs"), Sequence, children![
 				EndpointBuilder::get()
 					.with_path("testing")
 					.with_cache_strategy(CacheStrategy::Static)

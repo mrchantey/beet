@@ -38,7 +38,7 @@ pub fn insert_route_tree(world: &mut World) {
 		.into_iter()
 		.filter(|(_, endpoint)| endpoint.is_static_get())
 		.map(|(entity, endpoint)| {
-			(entity, endpoint.all_segments().annotated_route_path())
+			(entity, endpoint.route_pattern().annotated_route_path())
 		})
 		.collect::<Vec<_>>();
 	world.insert_resource(RoutePathTree::from_paths(paths));
@@ -248,20 +248,17 @@ mod test {
 		world.spawn((Router, CacheStrategy::Static, children![
 			EndpointBuilder::get()
 				.with_handler(|tree: Res<RoutePathTree>| tree.to_string()),
-			(
-				PathFilter::new("foo"),
-				EndpointBuilder::get()
-					.with_path("foo")
-					.with_cache_strategy(CacheStrategy::Static)
-					.with_handler(|| "foo")
-			),
-			(PathFilter::new("bar"), children![
+			(EndpointBuilder::get()
+				.with_path("foo")
+				.with_cache_strategy(CacheStrategy::Static)
+				.with_handler(|| "foo")),
+			(RoutePartial::new("bar"), children![
 				EndpointBuilder::get()
 					.with_path("bazz")
 					.with_cache_strategy(CacheStrategy::Static)
 					.with_handler(|| "bazz")
 			]),
-			PathFilter::new("boo"),
+			RoutePartial::new("boo"),
 		]));
 		world.run_system_cached(insert_route_tree).unwrap();
 		world

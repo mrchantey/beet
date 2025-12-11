@@ -22,8 +22,8 @@ pub enum ContentType {
 #[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
 pub struct Endpoint {
-	/// The entire route path for this endpoint
-	all_segments: RouteSegments,
+	/// The full [`RoutePattern`] for this endpoint
+	route_pattern: RoutePattern,
 	/// The method to match, or None for any method.
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -34,7 +34,7 @@ pub struct Endpoint {
 
 
 impl Endpoint {
-	pub fn all_segments(&self) -> &RouteSegments { &self.all_segments }
+	pub fn route_pattern(&self) -> &RoutePattern { &self.route_pattern }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
@@ -43,7 +43,7 @@ impl Endpoint {
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
-		self.all_segments.is_static()
+		self.route_pattern.is_static()
 			&& self.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
 			&& self
 				.cache_strategy
@@ -64,7 +64,7 @@ pub struct EndpointBuilder {
 	/// The action to handle the request, by default always returns a 200 OK
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 	/// The path to match, or None for any path
-	path: Option<PathFilter>,
+	path: Option<RoutePartial>,
 	/// The method to match, or None for any method. Defaults to GET
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -138,7 +138,7 @@ impl EndpointBuilder {
 		.with_handler_bundle(handler.into_middleware())
 	}
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
-		self.path = Some(PathFilter::new(path.as_ref()));
+		self.path = Some(RoutePartial::new(path.as_ref()));
 		self
 	}
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
@@ -181,78 +181,91 @@ impl EndpointBuilder {
 	fn effect(self, entity: &mut EntityWorldMut) {
 		// the entity to eventually call [`Self::insert`] on, this will
 		// be some nested entity depending on the builder configuration
-		let mut current_entity = entity.id();
-
-		if let Some(path_filter) = self.path {
-			entity.insert(path_filter);
-			current_entity = entity
-				.world_scope(|world| world.spawn(ChildOf(current_entity)).id());
+		if let Some(pattern) = self.path {
+			entity.insert(pattern);
 		}
-
-
-		entity.world_scope(|world| {
-			let all_segments = world
-				.run_system_cached_with(RouteSegments::collect, current_entity)
-				.unwrap();
-			world.entity_mut(current_entity).insert(Endpoint {
-				all_segments,
-				method: self.method,
-				cache_strategy: self.cache_strategy,
-				content_type: self.content_type,
-			});
-
+		let id = entity.id();
+		let route_pattern: RoutePattern = entity.world_scope(|world| {
 			world
-				.entity_mut(current_entity)
-				.insert(Sequence)
-				.with_children(|spawner| {
-					// here we add the predicates as prior
-					// children in the behavior tree.
-					// Order is not important so long as the
-					// handler is last.
-					if self.exact_path {
-						spawner.spawn(check_exact_path());
-					}
-					if let Some(method) = self.method {
-						spawner.spawn(check_method(method));
-					}
-
-					for predicate in self.additional_predicates {
-						(predicate)(spawner);
-					}
-
-					let mut handler_entity = spawner.spawn_empty();
-					if let Some(cache_strategy) = self.cache_strategy {
-						handler_entity.insert(cache_strategy);
-					}
-					if let Some(content_type) = self.content_type {
-						handler_entity.insert(content_type);
-					}
-					if let Some(method) = self.method {
-						handler_entity.insert(method);
-					}
-					(self.insert)(&mut handler_entity);
-				});
+				.run_system_cached_with(RoutePattern::collect, id)
+				.unwrap()
 		});
+
+		entity
+			.insert((
+				Name::new(format!(
+					"Endpoint: {}",
+					route_pattern.annotated_route_path()
+				)),
+				Endpoint {
+					route_pattern,
+					method: self.method,
+					cache_strategy: self.cache_strategy,
+					content_type: self.content_type,
+				},
+				Sequence,
+			))
+			.with_children(|spawner| {
+				// here we add the predicates as prior
+				// children in the behavior tree.
+				// Order is not important so long as the
+				// handler is last.
+				spawner.spawn(route_match(self.exact_path));
+
+				if let Some(method) = self.method {
+					spawner.spawn(check_method(method));
+				}
+
+				for predicate in self.additional_predicates {
+					(predicate)(spawner);
+				}
+
+				let mut handler_entity =
+					spawner.spawn(Name::new("Route Handler"));
+				if let Some(cache_strategy) = self.cache_strategy {
+					handler_entity.insert(cache_strategy);
+				}
+				if let Some(content_type) = self.content_type {
+					handler_entity.insert(content_type);
+				}
+				if let Some(method) = self.method {
+					handler_entity.insert(method);
+				}
+				(self.insert)(&mut handler_entity);
+			});
 	}
 }
 
-fn check_exact_path() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>, mut query: RouteQuery| -> Result {
-			let outcome =
-				query.with_cx(&mut ev, |cx| match cx.path().is_empty() {
-					true => Outcome::Pass,
-					false => Outcome::Fail,
-				})?;
-			// println!("check_exact_path: {}", outcome);
-			ev.trigger_with_cx(outcome);
-			Ok(())
-		},
+/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`RoutePattern`]
+/// at this point in the tree, even if there are remaining parts.
+fn route_match(exact_match: bool) -> impl Bundle {
+	(
+		Name::new("Route Match"),
+		OnSpawn::observe(
+			move |mut ev: On<GetOutcome>, query: RouteQuery| -> Result {
+				let outcome = match query.route_match(&ev) {
+					// expected exact match, got partial match
+					Ok(route_match)
+						if exact_match && !route_match.exact_match() =>
+					{
+						Outcome::Fail
+					}
+					// got match
+					Ok(_) => Outcome::Pass,
+					// match failed
+					Err(_err) => Outcome::Fail,
+				};
+				ev.trigger_with_cx(outcome);
+				Ok(())
+			},
+		),
 	)
 }
 
+
 fn check_method(method: HttpMethod) -> impl Bundle {
 	(
+		Name::new("Method Check"),
 		method,
 		OnSpawn::observe(
 			|mut ev: On<GetOutcome>,
@@ -364,33 +377,33 @@ mod test {
 	fn test_collect_route_segments() {
 		let mut world = World::new();
 		world.spawn((
-			PathFilter::new("foo"),
+			RoutePartial::new("foo"),
 			EndpointBuilder::get(),
 			children![
 				children![
 					(
-						PathFilter::new("*bar"),
+						RoutePartial::new("*bar"),
 						EndpointBuilder::get()
 					),
-					PathFilter::new("bazz")
+					RoutePartial::new("bazz")
 				],
 				(
-					PathFilter::new("qux"),
+					RoutePartial::new("qux"),
 				),
 				(
-					PathFilter::new(":quax"),
+					RoutePartial::new(":quax"),
 					EndpointBuilder::get()
 				),
 			],
 		));
 		world.query_once::<&Endpoint>()
     .into_iter()
-    .map(|endpoint| endpoint.all_segments().annotated_route_path())
+    .map(|endpoint| endpoint.route_pattern().annotated_route_path())
     .collect::<Vec<_>>()
 		.xpect_eq(vec![
+				RoutePath::new("/foo"),
 				RoutePath::new("/foo/*bar"),
 				RoutePath::new("/foo/:quax"),
-				RoutePath::new("/foo"),
 		]);
 	}
 }

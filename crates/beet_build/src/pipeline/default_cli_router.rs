@@ -26,7 +26,7 @@ pub fn default_cli_router() -> impl Bundle {
 			// 	exact_path(),
 			// 	build_server()
 			// ]),
-			(PathFilter::new("build"), children![build_server()])
+			(RoutePartial::new("build"), children![build_server()])
 		],
 	)
 }

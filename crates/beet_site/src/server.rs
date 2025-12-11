@@ -3,22 +3,27 @@ use beet::prelude::*;
 
 /// The plugin added to the router app
 pub fn server_plugin(app: &mut App) {
-	app.add_plugins((MinimalPlugins, RouterPlugin, AgentPlugin))
-		.world_mut()
-		.spawn(default_router(
-			EndWith(Outcome::Pass),
-			(InfallibleSequence, children![
-				pages_routes(),
-				docs_routes(),
-				blog_routes(),
-				actions_routes(),
-				beet_design::mockups::mockups_routes(),
-				article_layout_middleware().with_path("docs"),
-				article_layout_middleware().with_path("blog"),
-				image_generator(),
-			]),
-			EndWith(Outcome::Pass),
-		));
+	app.add_plugins((
+		MinimalPlugins,
+		RouterPlugin,
+		AgentPlugin,
+		// DebugFlowPlugin::default(),
+	))
+	.world_mut()
+	.spawn(default_router(
+		EndWith(Outcome::Pass),
+		(InfallibleSequence, children![
+			pages_routes(),
+			docs_routes(),
+			blog_routes(),
+			actions_routes(),
+			beet_design::mockups::mockups_routes(),
+			article_layout_middleware().with_path("docs"),
+			article_layout_middleware().with_path("blog"),
+			image_generator(),
+		]),
+		EndWith(Outcome::Pass),
+	));
 }
 
 #[allow(unused)]

@@ -10,44 +10,53 @@ use beet_rsx::prelude::*;
 /// and replaced by a partial response pattern like [`HtmlBundle`].
 /// Useful for fallback endpoints like a 404 page.
 pub fn fallback() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>,
-		 exchange: Query<(), (With<Request>, Without<Response>)>| {
-			match exchange.contains(ev.agent()) {
-				true => ev.trigger_with_cx(Outcome::Pass),
-				false => ev.trigger_with_cx(Outcome::Fail),
-			};
-		},
+	(
+		Name::new("Fallback Predicate"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 exchange: Query<(), (With<Request>, Without<Response>)>| {
+				match exchange.contains(ev.agent()) {
+					true => ev.trigger_with_cx(Outcome::Pass),
+					false => ev.trigger_with_cx(Outcome::Fail),
+				};
+			},
+		),
 	)
 }
 
 /// Passes only if the `exchange` has no [`Response`],
 /// disregarding whether there is a [`Request`] or not.
 pub fn no_response() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>, exchange: Query<(), Without<Response>>| {
-			match exchange.contains(ev.agent()) {
-				true => ev.trigger_with_cx(Outcome::Pass),
-				false => ev.trigger_with_cx(Outcome::Fail),
-			};
-		},
+	(
+		Name::new("No Response Predicate"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>, exchange: Query<(), Without<Response>>| {
+				match exchange.contains(ev.agent()) {
+					true => ev.trigger_with_cx(Outcome::Pass),
+					false => ev.trigger_with_cx(Outcome::Fail),
+				};
+			},
+		),
 	)
 }
 
 /// Passes only if the `exchange` has a child with a [`HtmlBundle`]
 pub fn contains_handler_bundle() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>,
-		 children: Query<&Children>,
-		 handler_bundles: Query<(), With<HtmlBundle>>| {
-			match children
-				.iter_direct_descendants(ev.agent())
-				.any(|child| handler_bundles.contains(child))
-			{
-				true => ev.trigger_with_cx(Outcome::Pass),
-				false => ev.trigger_with_cx(Outcome::Fail),
-			};
-		},
+	(
+		Name::new("Handler Bundle Predicate"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 children: Query<&Children>,
+			 handler_bundles: Query<(), With<HtmlBundle>>| {
+				match children
+					.iter_direct_descendants(ev.agent())
+					.any(|child| handler_bundles.contains(child))
+				{
+					true => ev.trigger_with_cx(Outcome::Pass),
+					false => ev.trigger_with_cx(Outcome::Fail),
+				};
+			},
+		),
 	)
 }
 
@@ -56,12 +65,17 @@ pub fn contains_handler_bundle() -> impl Bundle {
 /// ## Panics
 /// Panics if there is no [`RenderMode`] resource.
 pub fn is_ssr() -> impl Bundle {
-	OnSpawn::observe(|mut ev: On<GetOutcome>, render_mode: Res<RenderMode>| {
-		match *render_mode == RenderMode::Ssr {
-			true => ev.trigger_with_cx(Outcome::Pass),
-			false => ev.trigger_with_cx(Outcome::Fail),
-		};
-	})
+	(
+		Name::new("SSR Predicate"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>, render_mode: Res<RenderMode>| {
+				match *render_mode == RenderMode::Ssr {
+					true => ev.trigger_with_cx(Outcome::Pass),
+					false => ev.trigger_with_cx(Outcome::Fail),
+				};
+			},
+		),
+	)
 }
 
 

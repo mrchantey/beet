@@ -149,16 +149,13 @@ mod test {
 		let path = RoutePath::from("bar/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![(
-				PathFilter::new("foo"),
-				children![(Sequence, children![
-					common_predicates::fallback(),
-					BucketEndpoint::new(
-						bucket.clone(),
-						Some(RoutePath::new("foo"))
-					),
-				])]
-			)]))
+			.spawn((Router, RoutePartial::new("foo"), Sequence, children![
+				common_predicates::fallback(),
+				BucketEndpoint::new(
+					bucket.clone(),
+					Some(RoutePath::new("foo"))
+				),
+			]))
 			.oneshot_str("/foo/bar")
 			.await
 			.xpect_str("<div>fallback</div>");

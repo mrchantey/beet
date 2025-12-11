@@ -26,33 +26,44 @@ pub fn default_router(
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl Bundle,
 ) -> impl Bundle {
-	(insert_on_ready(HttpRouter), InfallibleSequence, children![
-		request_middleware,
-		endpoints,
-		(
-			// Our goal here is to minimize performance overhead
-			// of default actions, this pattern ensures default
-			// fallbacks only run if no response is present
-			Sequence,
-			children![
-				common_predicates::no_response(),
-				(InfallibleSequence, children![
-					// # default endpoints
-					analytics_handler(),
-					app_info(),
-					// # default fallbacks
-					// stops after first succeeding fallback
-					// this is important to avoid response clobbering
-					(Fallback, children![
-						html_bundle_to_response(),
-						assets_bucket(),
-						html_bucket()
-					]),
-				]),
-			]
-		),
-		response_middleware,
-	])
+	(
+		Name::new("Router Root"),
+		insert_on_ready(HttpRouter),
+		InfallibleSequence,
+		children![
+			(Name::new("Request Middleware"), request_middleware),
+			(Name::new("Endpoints Root"), endpoints),
+			(
+				Name::new("Default Routes"),
+				// Our goal here is to minimize performance overhead
+				// of default actions, this pattern ensures default
+				// fallbacks only run if no response is present
+				Sequence,
+				children![
+					common_predicates::no_response(),
+					(
+						Name::new("Default Routes Nested"),
+						InfallibleSequence,
+						children![
+							// # default endpoints
+							analytics_handler(),
+							app_info(),
+							// # default fallbacks
+							// stops after first succeeding fallback
+							// this is important to avoid response clobbering
+							(Name::new("Fallbacks"), Fallback, children![
+								html_bundle_to_response(),
+								assets_bucket(),
+								html_bucket(),
+								not_found()
+							]),
+						]
+					),
+				]
+			),
+			(Name::new("Response Middleware"), response_middleware),
+		],
+	)
 }
 
 /// Create a [`ReadyOnChildrenReady`], allowing any
@@ -68,6 +79,13 @@ pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
 			}
 		}),
 	)
+}
+
+pub fn not_found() -> impl Bundle {
+	(Name::new("Not Found"), Sequence, children![
+		common_predicates::no_response(),
+		EndpointBuilder::new(StatusCode::NOT_FOUND).with_trailing_path()
+	])
 }
 
 pub fn analytics_handler() -> impl Bundle {
@@ -109,47 +127,57 @@ pub fn app_info() -> EndpointBuilder {
 }
 
 pub fn assets_bucket() -> impl Bundle {
-	ReadyAction::new_local(async |entity| {
-		let (fs_dir, bucket_name, service_access) = entity
-			.world()
-			.with_then(|world| {
-				let fs_dir =
-					world.resource::<WorkspaceConfig>().assets_dir.into_abs();
-				let bucket_name =
-					world.resource::<PackageConfig>().assets_bucket_name();
-				let service_access =
-					world.resource::<PackageConfig>().service_access;
-				(fs_dir, bucket_name, service_access)
-			})
-			.await;
-		let bucket = s3_fs_selector(fs_dir, bucket_name, service_access).await;
-		entity
-			.insert(
-				BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
-					.with_path("assets"),
-			)
-			.await;
-	})
+	(
+		Name::new("Assets Bucket"),
+		ReadyAction::new_local(async |entity| {
+			let (fs_dir, bucket_name, service_access) = entity
+				.world()
+				.with_then(|world| {
+					let fs_dir = world
+						.resource::<WorkspaceConfig>()
+						.assets_dir
+						.into_abs();
+					let bucket_name =
+						world.resource::<PackageConfig>().assets_bucket_name();
+					let service_access =
+						world.resource::<PackageConfig>().service_access;
+					(fs_dir, bucket_name, service_access)
+				})
+				.await;
+			let bucket =
+				s3_fs_selector(fs_dir, bucket_name, service_access).await;
+			entity
+				.insert(
+					BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
+						.with_path("assets"),
+				)
+				.await;
+		}),
+	)
 }
 /// Bucket for handling html, usually added as a fallback
 /// if no request present.
 pub fn html_bucket() -> impl Bundle {
-	ReadyAction::new_local(async |entity| {
-		let (fs_dir, bucket_name, service_access) = entity
-			.world()
-			.with_then(|world| {
-				let fs_dir =
-					world.resource::<WorkspaceConfig>().html_dir.into_abs();
-				let bucket_name =
-					world.resource::<PackageConfig>().html_bucket_name();
-				let service_access =
-					world.resource::<PackageConfig>().service_access;
-				(fs_dir, bucket_name, service_access)
-			})
-			.await;
-		let bucket = s3_fs_selector(fs_dir, bucket_name, service_access).await;
-		entity.insert(BucketEndpoint::new(bucket, None)).await;
-	})
+	(
+		Name::new("Html Bucket"),
+		ReadyAction::new_local(async |entity| {
+			let (fs_dir, bucket_name, service_access) = entity
+				.world()
+				.with_then(|world| {
+					let fs_dir =
+						world.resource::<WorkspaceConfig>().html_dir.into_abs();
+					let bucket_name =
+						world.resource::<PackageConfig>().html_bucket_name();
+					let service_access =
+						world.resource::<PackageConfig>().service_access;
+					(fs_dir, bucket_name, service_access)
+				})
+				.await;
+			let bucket =
+				s3_fs_selector(fs_dir, bucket_name, service_access).await;
+			entity.insert(BucketEndpoint::new(bucket, None)).await;
+		}),
+	)
 }
 
 
