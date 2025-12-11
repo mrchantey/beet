@@ -64,7 +64,6 @@ fn run_server() -> impl Bundle {
 		OnSpawn::run_insert::<_, _, Result<ChildProcess>, _>(
 			|manifest: Res<CargoManifest>| {
 				let exe_path = beet_site_cmd()
-					.feature("server-local")
 					.exe_path(manifest.package_name())
 					.to_string_lossy()
 					.to_string();

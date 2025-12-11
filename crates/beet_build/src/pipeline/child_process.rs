@@ -138,7 +138,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins(CliPlugin)
+		app.add_plugins((MinimalPlugins, CliPlugin))
 			.insert_resource(pkg_config!())
 			.world_mut()
 			.spawn(bsx! {
