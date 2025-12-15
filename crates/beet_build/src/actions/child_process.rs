@@ -128,8 +128,8 @@ impl ChildProcess {
 		self
 	}
 
-	pub fn arg(mut self, arg: impl Into<String>) -> Self {
-		self.args.push(arg.into());
+	pub fn arg(mut self, arg: impl AsRef<str>) -> Self {
+		self.args.push(arg.as_ref().to_string());
 		self
 	}
 

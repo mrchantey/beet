@@ -19,6 +19,8 @@ mod sst;
 pub use sst::*;
 mod lambda;
 pub use lambda::*;
+mod wasm;
+pub use wasm::*;
 mod child_process;
 pub use child_process::*;
 mod beet_file;

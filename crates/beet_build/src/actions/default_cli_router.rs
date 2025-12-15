@@ -12,6 +12,7 @@ pub fn default_cli_router() -> impl Bundle {
 		(single_action_route("deploy-sst", SstCommand {
 			cmd: SstSubcommand::Deploy
 		})),
+		(single_action_route("compile-wasm", CompileWasm)),
 		(single_action_route("compile-lambda", CompileLambda)),
 		(single_action_route("watch-lambda", WatchLambda)),
 		(single_action_route("push-assets", PushAssets)),
