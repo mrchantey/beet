@@ -1,50 +1,51 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use beet_rsx::prelude::*;
 
-pub fn push_assets(
-	ev: On<GetOutcome>,
-	pkg_config: Res<PackageConfig>,
-) -> Result {
+#[construct]
+pub fn PushAssets(pkg_config: Res<PackageConfig>) -> Result<impl Bundle> {
 	let src = AbsPathBuf::new_workspace_rel("assets")?.to_string();
 	let dst = format!("s3://{}/", pkg_config.assets_bucket_name());
-	sync(ev, src, dst);
-	Ok(())
+	(Name::new("Pull Assets"), RunS3Sync { src, dst }).xok()
 }
 
-
-pub fn pull_assets(
-	ev: On<GetOutcome>,
-	pkg_config: Res<PackageConfig>,
-) -> Result {
+#[construct]
+pub fn PullAssets(pkg_config: Res<PackageConfig>) -> Result<impl Bundle> {
 	let src = format!("s3://{}/", pkg_config.assets_bucket_name());
 	let dst = AbsPathBuf::new_workspace_rel("assets")?.to_string();
-	sync(ev, src, dst);
-	Ok(())
+	(Name::new("Pull Assets"), RunS3Sync { src, dst }).xok()
 }
 
-pub fn push_html(
-	ev: On<GetOutcome>,
+
+#[construct]
+pub fn PushHtml(
 	ws_config: Res<WorkspaceConfig>,
 	pkg_config: Res<PackageConfig>,
-) {
+) -> impl Bundle {
 	let src = ws_config.html_dir.into_abs().to_string();
 	let dst = format!("s3://{}", pkg_config.html_bucket_name());
-	sync(ev, src, dst);
+	(Name::new("Push Html"), RunS3Sync { src, dst })
 }
 
-fn sync(mut ev: On<GetOutcome>, src: String, dst: String) {
-	ev.run_async(async move |mut action| -> Result {
-		S3Sync {
-			src,
-			dst,
-			delete: true,
-			..default()
-		}
-		.send()
-		// fatal, propagate error instead of Outcome::Fail
-		.await?;
-		action.trigger_with_cx(Outcome::Pass);
-		Ok(())
-	});
+
+#[construct]
+fn RunS3Sync(src: String, dst: String) {
+	OnSpawn::observe(move |mut ev: On<GetOutcome>| {
+		let src = src.clone();
+		let dst = dst.clone();
+		ev.run_async(async move |mut action| -> Result {
+			S3Sync {
+				src,
+				dst,
+				delete: true,
+				..default()
+			}
+			.send()
+			// fatal, propagate error instead of Outcome::Fail
+			.await?;
+			action.trigger_with_cx(Outcome::Pass);
+			Ok(())
+		});
+	})
 }

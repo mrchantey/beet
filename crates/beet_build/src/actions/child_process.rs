@@ -114,8 +114,23 @@ impl ChildProcess {
 			..default()
 		}
 	}
+
+	pub fn command(mut self, cmd: impl Into<String>) -> Self {
+		self.cmd = cmd.into();
+		self
+	}
+
 	pub fn arg(mut self, arg: impl Into<String>) -> Self {
 		self.args.push(arg.into());
+		self
+	}
+
+	pub fn env(
+		mut self,
+		key: impl Into<String>,
+		value: impl Into<String>,
+	) -> Self {
+		self.envs.push((key.into(), value.into()));
 		self
 	}
 

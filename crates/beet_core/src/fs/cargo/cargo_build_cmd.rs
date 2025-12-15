@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Verbatim clone of cargo build/run args
-#[derive(Debug, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Parser, Component, Resource)]
 pub struct CargoBuildCmd {
 	/// The top level command to run: `build`, `run`, `test`, etc.
 	#[arg(long, default_value = "build")]

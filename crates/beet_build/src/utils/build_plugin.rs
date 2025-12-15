@@ -104,9 +104,9 @@ impl Plugin for BuildPlugin {
 						deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
 					)
 						.chain(),
-					compile_lambda
-						.run_if(BuildFlag::CompileLambda.should_run()),
-					deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
+					// compile_lambda
+					// 	.run_if(BuildFlag::CompileLambda.should_run()),
+					// deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
 					// (
 					// 	// push_html.run_if(BuildFlag::PushHtml.should_run()),
 					// 	// push_assets.run_if(BuildFlag::PushAssets.should_run()),

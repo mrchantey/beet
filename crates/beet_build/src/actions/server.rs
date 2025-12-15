@@ -2,11 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
-use crate::prelude::ChildHandle;
-use crate::prelude::ChildProcess;
-use crate::utils::CargoManifest;
-
-
 /// Marker to denote this process is running the server
 /// for a beet application. Killing the associated [`ChildHandle`]
 /// on this entity will kill the server.
@@ -14,11 +9,10 @@ use crate::utils::CargoManifest;
 pub struct ServerProcess;
 
 
-pub fn build_server() -> impl Bundle {
+pub fn build_server(cmd: CargoBuildCmd) -> impl Bundle {
 	(
 		Name::new("Build Server"),
-		beet_site_cmd()
-			.feature("server-local")
+		cmd.feature("server-local")
 			.no_default_features()
 			.cmd("build")
 			.xref()
@@ -26,13 +20,13 @@ pub fn build_server() -> impl Bundle {
 	)
 }
 
-pub fn run_server() -> impl Bundle {
+pub fn run_server(cmd: CargoBuildCmd) -> impl Bundle {
 	(
 		Name::new("Run Server"),
 		ServerProcess,
 		OnSpawn::run_insert::<_, _, Result<ChildProcess>, _>(
-			|manifest: Res<CargoManifest>| {
-				let exe_path = beet_site_cmd()
+			move |manifest: Res<CargoManifest>| {
+				let exe_path = cmd
 					.exe_path(manifest.package_name())
 					.to_string_lossy()
 					.to_string();
@@ -51,13 +45,13 @@ pub fn run_server() -> impl Bundle {
 
 /// Run the server binary with the `--export-static` flag to retrieve
 /// the static content like html pages.
-pub fn export_static_content() -> impl Bundle {
+pub fn export_static_content(cmd: CargoBuildCmd) -> impl Bundle {
 	(
 		Name::new("Export Static Content"),
 		ServerProcess,
 		OnSpawn::run_insert::<_, _, Result<ChildProcess>, _>(
-			|manifest: Res<CargoManifest>| {
-				let exe_path = beet_site_cmd()
+			move |manifest: Res<CargoManifest>| {
+				let exe_path = cmd
 					.exe_path(manifest.package_name())
 					.to_string_lossy()
 					.to_string();
