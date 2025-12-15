@@ -5,12 +5,10 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 pub fn default_cli_router() -> impl Bundle {
-	let build_cmd = beet_site_cmd();
-
-	(CliRouter, InfallibleSequence, children![
+	(CliRouter, InfallibleSequence, beet_site_cmd(), children![
 		(named_route("compile-lambda", children![
 			exact_route_match(),
-			compile_lambda(build_cmd.clone()),
+			CompileLambda,
 			respond_ok(),
 		])),
 		(named_route("watch-lambda", children![
@@ -35,14 +33,14 @@ pub fn default_cli_router() -> impl Bundle {
 		])),
 		(named_route("build", children![
 			exact_route_match(),
-			build_server(build_cmd.clone()),
+			BuildServer,
 			respond_ok(),
 		])),
 		(named_route("run", children![
 			exact_route_match(),
-			build_server(build_cmd.clone()),
+			BuildServer,
 			// kill_server(),
-			run_server(build_cmd.clone()),
+			RunServer,
 			respond_ok()
 		]))
 	])
