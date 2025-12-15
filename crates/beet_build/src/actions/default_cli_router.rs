@@ -6,36 +6,18 @@ use beet_router::prelude::*;
 
 pub fn default_cli_router() -> impl Bundle {
 	(CliRouter, InfallibleSequence, beet_site_cmd(), children![
-		(named_route("compile-lambda", children![
-			exact_route_match(),
-			CompileLambda,
-			respond_ok(),
-		])),
-		(named_route("watch-lambda", children![
-			exact_route_match(),
-			WatchLambda,
-			respond_ok(),
-		])),
-		(named_route("push-assets", children![
-			exact_route_match(),
-			PushAssets,
-			respond_ok(),
-		])),
-		(named_route("pull-assets", children![
-			exact_route_match(),
-			PullAssets,
-			respond_ok(),
-		])),
-		(named_route("push-html", children![
-			exact_route_match(),
-			PushHtml,
-			respond_ok(),
-		])),
-		(named_route("build", children![
-			exact_route_match(),
-			BuildServer,
-			respond_ok(),
-		])),
+		(single_action_route("refresh-sst", SstCommand {
+			cmd: SstSubcommand::Refresh
+		})),
+		(single_action_route("deploy-sst", SstCommand {
+			cmd: SstSubcommand::Deploy
+		})),
+		(single_action_route("compile-lambda", CompileLambda)),
+		(single_action_route("watch-lambda", WatchLambda)),
+		(single_action_route("push-assets", PushAssets)),
+		(single_action_route("pull-assets", PullAssets)),
+		(single_action_route("push-html", PushHtml)),
+		(single_action_route("build", BuildServer)),
 		(named_route("run", children![
 			exact_route_match(),
 			BuildServer,
@@ -56,16 +38,12 @@ fn named_route(name: impl AsRef<str>, children: impl Bundle) -> impl Bundle {
 	)
 }
 
-// fn single_action_route(
-// 	name: impl AsRef<str>,
-// 	children: impl Bundle,
-// ) -> impl Bundle {
-// 	(named_route(name, children![
-// 		exact_route_match(),
-// 		build_server(build_cmd.clone()),
-// 		respond_ok(),
-// 	]))
-// }
+fn single_action_route(
+	name: impl AsRef<str>,
+	action: impl Bundle,
+) -> impl Bundle {
+	named_route(name, children![exact_route_match(), action, respond_ok()])
+}
 
 fn beet_site_cmd() -> CargoBuildCmd {
 	CargoBuildCmd::default().package("beet_site")

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
@@ -29,6 +31,7 @@ impl Drop for ChildHandle {
 pub fn ChildProcess(
 	/// The command to run
 	cmd: String,
+	current_dir: Option<PathBuf>,
 	/// The command arguments
 	args: Vec<String>,
 	/// Environment variables to set
@@ -46,6 +49,7 @@ pub fn ChildProcess(
 		      mut commands: Commands|
 		      -> Result {
 			let cmd = cmd.clone();
+			let current_dir = current_dir.clone();
 			let args = args.clone();
 			let envs = envs.clone().xtend(config.envs());
 			if kill {
@@ -59,10 +63,13 @@ pub fn ChildProcess(
 					.join(" ");
 				info!("{} {} {}", envs_pretty, cmd, args.join(" "));
 				// 1. spawn the command
-				let mut child = async_process::Command::new(&cmd)
-					.args(&args)
-					.envs(envs)
-					.spawn()?;
+				let mut cmd = async_process::Command::new(&cmd);
+				cmd.args(&args).envs(envs);
+				if let Some(dir) = current_dir {
+					cmd.current_dir(dir);
+				}
+				let mut child = cmd.spawn()?;
+
 				// 2. take stdout/stderr pipes
 				// let stdout = child
 				// 	.stdout
@@ -101,6 +108,7 @@ impl Default for ChildProcess {
 			cmd: "true".into(),
 			args: default(),
 			envs: default(),
+			current_dir: None,
 			wait: true,
 			kill: true,
 		}
@@ -125,6 +133,11 @@ impl ChildProcess {
 		self
 	}
 
+	pub fn current_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+		self.current_dir = Some(dir.into());
+		self
+	}
+
 	pub fn env(
 		mut self,
 		key: impl Into<String>,
@@ -138,15 +151,10 @@ impl ChildProcess {
 		Self {
 			cmd: "cargo".into(),
 			args: cargo.get_args().iter().map(|s| s.to_string()).collect(),
-			envs: Vec::default(),
-			wait: true,
-			kill: true,
+			..default()
 		}
 	}
-}
 
-
-impl ChildProcess {
 	pub fn no_wait(mut self) -> Self {
 		self.wait = false;
 		self

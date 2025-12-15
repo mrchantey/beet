@@ -15,6 +15,8 @@
 
 mod server;
 pub use server::*;
+mod sst;
+pub use sst::*;
 mod lambda;
 pub use lambda::*;
 mod child_process;

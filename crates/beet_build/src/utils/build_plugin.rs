@@ -99,11 +99,11 @@ impl Plugin for BuildPlugin {
 					compile_client
 						.run_if(BuildFlag::CompileClient.should_run()),
 					// run_server.run_if(BuildFlag::RunServer.should_run()),
-					(
-						refresh_sst.run_if(BuildFlag::RefreshSst.should_run()),
-						deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
-					)
-						.chain(),
+					// (
+					// 	refresh_sst.run_if(BuildFlag::RefreshSst.should_run()),
+					// 	deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
+					// )
+					// 	.chain(),
 					// compile_lambda
 					// 	.run_if(BuildFlag::CompileLambda.should_run()),
 					// deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
