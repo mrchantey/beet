@@ -70,7 +70,7 @@ impl Plugin for BuildPlugin {
 			.init_resource::<CargoBuildCmd>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<LambdaConfig>()
-			.init_resource::<ServerHandle>()
+			// .init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			.add_systems(
@@ -107,12 +107,12 @@ impl Plugin for BuildPlugin {
 					compile_lambda
 						.run_if(BuildFlag::CompileLambda.should_run()),
 					deploy_lambda.run_if(BuildFlag::DeployLambda.should_run()),
-					(
-						push_html.run_if(BuildFlag::PushHtml.should_run()),
-						push_assets.run_if(BuildFlag::PushAssets.should_run()),
-						pull_assets.run_if(BuildFlag::PullAssets.should_run()),
-					)
-						.chain(),
+					// (
+					// 	// push_html.run_if(BuildFlag::PushHtml.should_run()),
+					// 	// push_assets.run_if(BuildFlag::PushAssets.should_run()),
+					// 	// pull_assets.run_if(BuildFlag::PullAssets.should_run()),
+					// )
+					// 	.chain(),
 					// lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),

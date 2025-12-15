@@ -4,34 +4,34 @@ use beet_dom::prelude::*;
 use std::process::Command;
 
 
-// /// After Codegen, build the router binary and run it once.
-// pub(crate) fn compile_server(
-// 	_query: Populated<(), Changed<FileExprHash>>,
-// 	mut handle: ResMut<ServerHandle>,
-// 	build_cmd: Res<CargoBuildCmd>,
-// 	pkg_config: Res<PackageConfig>,
-// ) -> Result {
-// 	// if the server is already running, kill it
-// 	// before the snippets are exported because
-// 	// because recompilation means it would contain stale instances.
-// 	if let Some(child) = &mut handle.0 {
-// 		child.kill()?;
-// 	}
+/// After Codegen, build the router binary and run it once.
+pub(crate) fn compile_server(
+	_query: Populated<(), Changed<FileExprHash>>,
+	mut handle: ResMut<ServerHandle>,
+	build_cmd: Res<CargoBuildCmd>,
+	pkg_config: Res<PackageConfig>,
+) -> Result {
+	// if the server is already running, kill it
+	// before the snippets are exported because
+	// because recompilation means it would contain stale instances.
+	if let Some(child) = &mut handle.0 {
+		child.kill()?;
+	}
 
-// 	let build_cmd = build_cmd
-// 		.clone()
-// 		.no_default_features()
-// 		.feature("server-local");
-// 	Command::new("cargo")
-// 		.args(build_cmd.get_args())
-// 		.envs(pkg_config.envs())
-// 		.xtap(|cmd| {
-// 			debug!("Building server binary\n{:?}", cmd);
-// 		})
-// 		.status()?
-// 		.exit_ok()?
-// 		.xok()
-// }
+	let build_cmd = build_cmd
+		.clone()
+		.no_default_features()
+		.feature("server-local");
+	Command::new("cargo")
+		.args(build_cmd.get_args())
+		.envs(pkg_config.envs())
+		.xtap(|cmd| {
+			debug!("Building server binary\n{:?}", cmd);
+		})
+		.status()?
+		.exit_ok()?
+		.xok()
+}
 
 
 /// After compiling server (if required) export the static files if *any*
@@ -72,27 +72,27 @@ impl Drop for ServerHandle {
 		}
 	}
 }
-// /// Run the server, holding a handle to the process.
-// pub(crate) fn run_server(
-// 	_query: Populated<(), Changed<FileExprHash>>,
-// 	mut handle: ResMut<ServerHandle>,
-// 	cmd: Res<CargoBuildCmd>,
-// 	manifest: Res<CargoManifest>,
-// 	pkg_config: Res<PackageConfig>,
-// ) -> Result {
-// 	if let Some(child) = &mut handle.0 {
-// 		child.kill()?;
-// 	}
-// 	// run once to export static
-// 	let exe_path = cmd.exe_path(manifest.package_name());
-// 	path_ext::assert_exists(&exe_path)?;
-// 	let child = Command::new(&exe_path)
-// 		.envs(pkg_config.envs())
-// 		.xtap(|cmd| {
-// 			debug!("Running server \n{:?}", cmd);
-// 		})
-// 		.spawn()?;
-// 	handle.0 = Some(child);
+/// Run the server, holding a handle to the process.
+pub(crate) fn run_server(
+	_query: Populated<(), Changed<FileExprHash>>,
+	mut handle: ResMut<ServerHandle>,
+	cmd: Res<CargoBuildCmd>,
+	manifest: Res<CargoManifest>,
+	pkg_config: Res<PackageConfig>,
+) -> Result {
+	if let Some(child) = &mut handle.0 {
+		child.kill()?;
+	}
+	// run once to export static
+	let exe_path = cmd.exe_path(manifest.package_name());
+	path_ext::assert_exists(&exe_path)?;
+	let child = Command::new(&exe_path)
+		.envs(pkg_config.envs())
+		.xtap(|cmd| {
+			debug!("Running server \n{:?}", cmd);
+		})
+		.spawn()?;
+	handle.0 = Some(child);
 
-// 	Ok(())
-// }
+	Ok(())
+}

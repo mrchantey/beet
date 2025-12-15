@@ -21,6 +21,8 @@ mod child_process;
 pub use child_process::*;
 mod beet_file;
 pub use beet_file::*;
+mod sync_buckets;
+pub use sync_buckets::*;
 mod cli_plugin;
 pub use cli_plugin::*;
 pub use default_cli_router::*;
