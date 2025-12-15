@@ -11,6 +11,7 @@ pub struct StdOutLine {
 
 /// Holds a handle to a spawned child process,
 /// killed on drop.
+/// This will only be inserted for a [`ChildProcess`] with `wait: false`
 #[derive(Component)]
 pub struct ChildHandle(async_process::Child);
 
@@ -47,8 +48,9 @@ pub fn ChildProcess(
 			let cmd = cmd.clone();
 			let args = args.clone();
 			let envs = envs.clone().xtend(config.envs());
-			commands.entity(ev.action()).remove::<ChildHandle>();
-
+			if kill {
+				commands.entity(ev.action()).remove::<ChildHandle>();
+			}
 			ev.run_async(async move |mut action| {
 				let envs_pretty = envs
 					.iter()
@@ -73,11 +75,13 @@ pub fn ChildProcess(
 				// 	.ok_or_else(|| bevyhow!("stderr not found"))?;
 
 				let outcome = if wait {
+					// wait for completion
 					match child.status().await?.exit_ok() {
 						Ok(_) => Outcome::Pass,
 						Err(_) => Outcome::Fail,
 					}
 				} else {
+					// pass immediately and store the child process
 					action.entity().insert(ChildHandle(child)).await;
 					Outcome::Pass
 				};
@@ -104,6 +108,17 @@ impl Default for ChildProcess {
 }
 
 impl ChildProcess {
+	pub fn new(cmd: impl Into<String>) -> Self {
+		Self {
+			cmd: cmd.into(),
+			..default()
+		}
+	}
+	pub fn arg(mut self, arg: impl Into<String>) -> Self {
+		self.args.push(arg.into());
+		self
+	}
+
 	pub fn from_cargo(cargo: &CargoBuildCmd) -> Self {
 		Self {
 			cmd: "cargo".into(),

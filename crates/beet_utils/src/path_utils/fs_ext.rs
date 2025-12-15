@@ -222,8 +222,8 @@ pub async fn write_async(
 	}
 }
 
-/// Write a file only if the data is different from the existing file,
-/// if the file does not exist, it will be created.
+/// Write a file only if the data is different from the existing file.
+/// If the file does not exist it will be created.
 pub fn write_if_diff(
 	path: impl AsRef<Path>,
 	data: impl AsRef<[u8]>,

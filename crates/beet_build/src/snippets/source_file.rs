@@ -11,7 +11,6 @@ use std::path::Path;
 /// in the [`WorkspaceConfig`]. These are loaded for different
 /// purposes by [`SnippetsPlugin`] and [`RouteCodegenSequence`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Component, Deref)]
-// #[component(immutable)]
 #[require(FileExprHash)]
 pub struct SourceFile {
 	/// The path to this source file
@@ -77,7 +76,7 @@ pub fn parse_file_watch_events(
 	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
-) -> bevy::prelude::Result {
+) -> Result {
 	for ev in events
 		.read()
 		// we only care about files specified in the config

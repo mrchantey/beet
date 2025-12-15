@@ -93,12 +93,12 @@ impl Plugin for BuildPlugin {
 					export_snippets
 						.run_if(BuildFlag::ExportSnippets.should_run()),
 					export_codegen.run_if(BuildFlag::Codegen.should_run()),
-					compile_server
-						.run_if(BuildFlag::CompileServer.should_run()),
-					export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),
+					// compile_server
+					// 	.run_if(BuildFlag::CompileServer.should_run()),
+					// export_server_ssg.run_if(BuildFlag::ExportSsg.should_run()),
 					compile_client
 						.run_if(BuildFlag::CompileClient.should_run()),
-					run_server.run_if(BuildFlag::RunServer.should_run()),
+					// run_server.run_if(BuildFlag::RunServer.should_run()),
 					(
 						refresh_sst.run_if(BuildFlag::RefreshSst.should_run()),
 						deploy_sst.run_if(BuildFlag::DeploySst.should_run()),
@@ -113,7 +113,7 @@ impl Plugin for BuildPlugin {
 						pull_assets.run_if(BuildFlag::PullAssets.should_run()),
 					)
 						.chain(),
-					lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
+					// lambda_log.run_if(BuildFlag::WatchLambda.should_run()),
 				)
 					.chain(),
 			);

@@ -32,7 +32,6 @@ pub fn push_html(
 	Ok(())
 }
 
-
 fn sync(In((src, dst)): In<(String, String)>) {
 	// TODO async systems (beet_flow w/ bevy 0.17)
 

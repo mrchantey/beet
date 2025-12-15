@@ -12,11 +12,16 @@
 //! Once the user-defined pipelines are loaded, the specified pipeline is run.
 //! See [`PipelineSelector`] for more information.
 //!
+
+mod server;
+pub use server::*;
+mod lambda;
+pub use lambda::*;
+mod child_process;
+pub use child_process::*;
 mod beet_file;
 pub use beet_file::*;
 mod cli_plugin;
 pub use cli_plugin::*;
 pub use default_cli_router::*;
 mod default_cli_router;
-mod child_process;
-pub use child_process::*;

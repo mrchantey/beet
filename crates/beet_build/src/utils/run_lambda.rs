@@ -113,20 +113,3 @@ pub fn deploy_lambda(
 	cmd.status()?.exit_ok()?.xok()
 }
 
-
-pub fn lambda_log(pkg_config: Res<PackageConfig>) -> Result {
-	let mut cmd = Command::new("aws");
-	let lambda_name = pkg_config.router_lambda_name();
-	println!("🌱 Watching Lambda logs {lambda_name}\n   {cmd:?}");
-	cmd.arg("logs")
-		.arg("tail")
-		.arg(format!("/aws/lambda/{lambda_name}"))
-		.arg("--format")
-		.arg("short") // detailed,short,json
-		.arg("--since")
-		.arg("2m")
-		.arg("--follow")
-		.status()?
-		.exit_ok()?
-		.xok()
-}

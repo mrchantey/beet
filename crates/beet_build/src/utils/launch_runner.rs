@@ -139,7 +139,6 @@ impl LaunchCmd {
 			Self::Lambda => vec![
 				BuildFlag::CompileLambda,
 				BuildFlag::DeployLambda,
-				BuildFlag::WatchLambda,
 			],
 		}
 	}
@@ -207,8 +206,6 @@ pub enum BuildFlag {
 	CompileLambda,
 	/// Deploy the lambda function
 	DeployLambda,
-	/// Watch the lambda function logs
-	WatchLambda,
 	/// Push from the html dir to s3 bucket
 	PushHtml,
 	/// Push assets dir to s3 bucket
@@ -241,7 +238,6 @@ impl std::fmt::Display for BuildFlag {
 			BuildFlag::RefreshSst => write!(f, "refresh-sst"),
 			BuildFlag::CompileLambda => write!(f, "compile-lambda"),
 			BuildFlag::DeployLambda => write!(f, "deploy-lambda"),
-			BuildFlag::WatchLambda => write!(f, "watch-lambda"),
 			BuildFlag::PushHtml => write!(f, "push-html"),
 			BuildFlag::PushAssets => write!(f, "push-assets"),
 			BuildFlag::PullAssets => write!(f, "pull-assets"),
@@ -268,7 +264,6 @@ impl FromStr for BuildFlag {
 			"refresh-sst" => Ok(BuildFlag::RefreshSst),
 			"compile-lambda" => Ok(BuildFlag::CompileLambda),
 			"deploy-lambda" => Ok(BuildFlag::DeployLambda),
-			"watch-lambda" => Ok(BuildFlag::WatchLambda),
 			"push-html" => Ok(BuildFlag::PushHtml),
 			"push-assets" => Ok(BuildFlag::PushAssets),
 			"pull-assets" => Ok(BuildFlag::PullAssets),
