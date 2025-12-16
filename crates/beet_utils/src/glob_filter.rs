@@ -1,25 +1,73 @@
 use bevy::prelude::*;
 use clap::Parser;
-use glob::Pattern;
-use glob::PatternError;
 use std::path::Path;
 
+/// A validated glob pattern that stores the pattern as a String
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlobPattern(String);
+
+impl GlobPattern {
+	/// Create a new GlobPattern, validating it's a valid glob pattern
+	/// Panics if the pattern is invalid
+	pub fn new(pattern: &str) -> Self {
+		// Validate it's a valid pattern
+		glob::Pattern::new(pattern).expect("Invalid glob pattern");
+		Self(pattern.to_string())
+	}
+
+	/// Get the pattern as a string slice
+	pub fn as_str(&self) -> &str { &self.0 }
+
+	/// Convert to glob::Pattern
+	/// Panics if the stored pattern is invalid (should never happen)
+	pub fn to_pattern(&self) -> glob::Pattern {
+		glob::Pattern::new(&self.0)
+			.expect("Invalid glob pattern stored in GlobPattern")
+	}
+
+	/// Convert from glob::Pattern
+	pub fn from_pattern(pattern: &glob::Pattern) -> Self {
+		Self(pattern.as_str().to_string())
+	}
+
+	pub fn matches(&self, text: &str) -> bool {
+		self.to_pattern().matches(text)
+	}
+
+	pub fn matches_path(&self, path: impl AsRef<Path>) -> bool {
+		self.to_pattern().matches_path(path.as_ref())
+	}
+}
+
+impl std::fmt::Display for GlobPattern {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+impl From<String> for GlobPattern {
+	fn from(s: String) -> Self {
+		glob::Pattern::new(&s).expect("Invalid glob pattern");
+		Self(s)
+	}
+}
+
+impl From<&str> for GlobPattern {
+	fn from(s: &str) -> Self { Self::new(s) }
+}
 
 /// glob for watch patterns
-#[derive(Default, Clone, PartialEq, Reflect, Parser)]
+#[derive(Debug, Default, Clone, PartialEq, Reflect, Parser)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all
 	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
-	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
-	pub include: Vec<glob::Pattern>,
+	include: Vec<GlobPattern>,
 	/// glob for ignore patterns
 	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
-	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
-	pub exclude: Vec<glob::Pattern>,
+	exclude: Vec<GlobPattern>,
 }
-
 
 impl std::fmt::Display for GlobFilter {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -39,44 +87,13 @@ impl std::fmt::Display for GlobFilter {
 	}
 }
 
-#[cfg(feature = "serde")]
-mod serde_glob_vec {
-
-	pub fn serialize<S>(
-		patterns: &Vec<glob::Pattern>,
-		serializer: S,
-	) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		use serde::ser::SerializeSeq;
-
-		let mut seq = serializer.serialize_seq(Some(patterns.len()))?;
-		for pattern in patterns {
-			seq.serialize_element(pattern.as_str())?;
-		}
-		seq.end()
-	}
-
-	pub fn deserialize<'de, D>(
-		deserializer: D,
-	) -> Result<Vec<glob::Pattern>, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		use serde::Deserialize;
-
-		let strs = Vec::<String>::deserialize(deserializer)?;
-		strs.into_iter()
-			.map(|s| glob::Pattern::new(&s).map_err(serde::de::Error::custom))
-			.collect()
-	}
-}
-
-
 impl GlobFilter {
-	pub fn parse_glob_pattern(s: &str) -> Result<glob::Pattern, PatternError> {
+	/// For use by clap parsers to verify a pattern before inserting
+	pub fn parse_glob_pattern(s: &str) -> Result<String, String> {
+		// Validate it's a valid pattern
 		glob::Pattern::new(s)
+			.map_err(|e| format!("Invalid glob pattern: {}", e))?;
+		Ok(s.to_string())
 	}
 
 	/// Wrap each pattern with wildcards if they dont already have them,
@@ -95,50 +112,65 @@ impl GlobFilter {
 		self
 	}
 
-	fn wrap_pattern_with_wildcard(pattern: &str) -> Pattern {
+	fn wrap_pattern_with_wildcard(pattern: &str) -> GlobPattern {
 		let starts = pattern.starts_with('*');
 		let ends = pattern.ends_with('*');
-		Pattern::new(&match (starts, ends) {
+		let wrapped = match (starts, ends) {
 			(true, true) => pattern.to_string(),
 			(true, false) => format!("{pattern}*"),
 			(false, true) => format!("*{pattern}"),
 			(false, false) => format!("*{pattern}*"),
-		})
-		.expect("Failed to create glob pattern")
+		};
+		GlobPattern(wrapped)
 	}
 
-	pub fn set_include(mut self, watch: Vec<&str>) -> Self {
-		self.include = watch
-			.iter()
-			.map(|w| glob::Pattern::new(w).unwrap())
-			.collect();
+	pub fn set_include(mut self, items: Vec<&str>) -> Self {
+		self.include = items.iter().map(|w| GlobPattern::new(w)).collect();
 		self
 	}
-	pub fn set_exclude(mut self, ignore: Vec<&str>) -> Self {
-		self.exclude = ignore
-			.iter()
-			.map(|w| glob::Pattern::new(w).unwrap())
-			.collect();
+
+	pub fn set_exclude(mut self, items: Vec<&str>) -> Self {
+		self.exclude = items.iter().map(|i| GlobPattern::new(i)).collect();
+		self
+	}
+	pub fn extend_include<T: AsRef<str>>(
+		mut self,
+		items: impl IntoIterator<Item = T>,
+	) -> Self {
+		self.include
+			.extend(items.into_iter().map(|w| GlobPattern::new(w.as_ref())));
+		self
+	}
+
+	pub fn extend_exclude<T: AsRef<str>>(
+		mut self,
+		items: impl IntoIterator<Item = T>,
+	) -> Self {
+		self.exclude
+			.extend(items.into_iter().map(|w| GlobPattern::new(w.as_ref())));
 		self
 	}
 
 	pub fn include(&mut self, pattern: &str) -> &mut Self {
-		self.include.push(glob::Pattern::new(pattern).unwrap());
+		self.include.push(GlobPattern::new(pattern));
 		self
 	}
+
 	pub fn exclude(&mut self, pattern: &str) -> &mut Self {
-		self.exclude.push(glob::Pattern::new(pattern).unwrap());
+		self.exclude.push(GlobPattern::new(pattern));
 		self
 	}
 
 	pub fn with_include(mut self, pattern: &str) -> Self {
-		self.include.push(glob::Pattern::new(pattern).unwrap());
+		self.include.push(GlobPattern::new(pattern));
 		self
 	}
+
 	pub fn with_exclude(mut self, pattern: &str) -> Self {
-		self.exclude.push(glob::Pattern::new(pattern).unwrap());
+		self.exclude.push(GlobPattern::new(pattern));
 		self
 	}
+
 	pub fn is_empty(&self) -> bool {
 		self.include.is_empty() && self.exclude.is_empty()
 	}
@@ -150,6 +182,7 @@ impl GlobFilter {
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.passes_include(&path) && self.passes_exclude(&path)
 	}
+
 	pub fn passes_include(&self, path: impl AsRef<Path>) -> bool {
 		self.include.is_empty()
 			|| self
@@ -157,6 +190,7 @@ impl GlobFilter {
 				.iter()
 				.any(|watch| watch.matches_path(path.as_ref()))
 	}
+
 	pub fn passes_exclude(&self, path: impl AsRef<Path>) -> bool {
 		!self
 			.exclude
@@ -165,35 +199,11 @@ impl GlobFilter {
 	}
 }
 
-
-impl std::fmt::Debug for GlobFilter {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("GlobFilter")
-			.field(
-				"include",
-				&self
-					.include
-					.iter()
-					.map(|p| p.to_string())
-					.collect::<Vec<_>>(),
-			)
-			.field(
-				"exclude",
-				&self
-					.exclude
-					.iter()
-					.map(|p| p.to_string())
-					.collect::<Vec<_>>(),
-			)
-			.finish()
-	}
-}
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use glob::Pattern;
+
 	#[test]
 	fn pattern() {
 		let pat = Pattern::new("*target*").unwrap();
@@ -201,6 +211,15 @@ mod test {
 		assert!(pat.matches("target"));
 		assert!(pat.matches("foo/target/foo"));
 	}
+
+	#[test]
+	fn glob_pattern_new() {
+		let gp = GlobPattern::new("*foo*");
+		assert_eq!(gp.as_str(), "*foo*");
+		assert!(gp.to_pattern().matches("foo"));
+		assert!(gp.to_pattern().matches("bar/foo/baz"));
+	}
+
 	#[test]
 	fn passes() {
 		// test include all but
@@ -259,5 +278,34 @@ mod test {
 		assert!(watcher.passes("src/lib.rs"));
 		assert!(watcher.passes("html/lib.rs"));
 		assert!(!watcher.passes("src/codegen/mockups.rs"));
+	}
+
+	#[test]
+	#[cfg(feature = "serde")]
+	fn serde_roundtrip() {
+		let filter = GlobFilter::default()
+			.with_include("**/*.rs")
+			.with_exclude("*target*");
+
+		let json = serde_json::to_string(&filter).unwrap();
+		let deserialized: GlobFilter = serde_json::from_str(&json).unwrap();
+
+		assert_eq!(filter, deserialized);
+		assert_eq!(filter.include.len(), 1);
+		assert_eq!(filter.exclude.len(), 1);
+		assert_eq!(filter.include[0].as_str(), "**/*.rs");
+		assert_eq!(filter.exclude[0].as_str(), "*target*");
+	}
+
+	#[test]
+	#[cfg(feature = "serde")]
+	fn glob_pattern_serde() {
+		let pattern = GlobPattern::new("*foo*");
+		let json = serde_json::to_string(&pattern).unwrap();
+		assert_eq!(json, "\"*foo*\"");
+
+		let deserialized: GlobPattern = serde_json::from_str(&json).unwrap();
+		assert_eq!(pattern, deserialized);
+		assert_eq!(deserialized.as_str(), "*foo*");
 	}
 }

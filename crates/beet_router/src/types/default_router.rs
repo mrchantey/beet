@@ -28,7 +28,7 @@ pub fn default_router(
 ) -> impl Bundle {
 	(
 		Name::new("Router Root"),
-		insert_on_ready(HttpRouter),
+		insert_on_ready(HttpRouter::new()),
 		InfallibleSequence,
 		children![
 			(Name::new("Request Middleware"), request_middleware),

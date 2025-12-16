@@ -190,6 +190,21 @@ pub struct Router;
 #[require(Router, HttpServer = HttpServer::default().with_handler(flow_route_handler))]
 pub struct HttpRouter;
 
+impl HttpRouter {
+	/// Create a new `HttpRouter` bundle, using the test HttpServer in test environments
+	pub fn new() -> impl Bundle + Clone {
+		#[cfg(not(test))]
+		{
+			Self
+		}
+		#[cfg(test)]
+		(
+			HttpServer::new_test().with_handler(flow_route_handler),
+			Self,
+		)
+	}
+}
+
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
