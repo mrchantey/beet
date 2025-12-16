@@ -28,11 +28,8 @@ macro_rules! abs_file {
 /// 2. the path is cleaned using [`path_clean`]
 ///
 /// ## Serialization
-/// Naturally serializing absolute paths is problematic for several reasons:
-/// - moving the serialized path between machines will break
-/// - often an `AbsPathBuf` is used for workspace config files, and workspace
-/// 	paths are more intuitive in that context.
-/// For these reasons the path is serialized and deserialized relative to the workspace root,
+/// Naturally serializing absolute paths is problematic, moving the serialized path between
+/// machines will break. Instead the path is serialized and deserialized relative to the workspace root,
 /// using [`fs_ext::workspace_root`].
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, bevy::reflect::Reflect,

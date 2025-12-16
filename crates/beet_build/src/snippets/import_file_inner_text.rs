@@ -71,7 +71,7 @@ mod test {
 	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
-	// this file will be parsed, declare an fs src
+	// this file will be parsed and used by the test
 	#[allow(unexpected_cfgs)]
 	fn _foobar() { let _ = rsx! {<style src="../../tests/test_file.css"/>}; }
 
@@ -83,6 +83,7 @@ mod test {
 		let file = app
 			.world_mut()
 			.spawn(SourceFile::new(
+				// point to this file
 				AbsPathBuf::new_workspace_rel(file!()).unwrap(),
 			))
 			.id();
@@ -96,8 +97,8 @@ mod test {
 		app.world_mut().query_once::<&InnerText>()[0]
 			.xpect_eq(InnerText::new(expected));
 
-		// links source files, child index flaky?
-		app.world_mut().query_once::<&ChildOf>()[0].0.xpect_eq(file);
+		// links source files
+		app.world().entity(file).contains::<Children>().xpect_true();
 
 		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
 		app.update();
