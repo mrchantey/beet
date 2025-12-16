@@ -26,7 +26,6 @@ impl Plugin for ParseRsxTokensPlugin {
 		app.init_resource::<SyntectConfig>();
 
 		app.insert_non_send_resource(rstml_parser)
-			.insert_schedule_before(Update, ParseRsxTokens)
 			.configure_sets(ParseRsxTokens, ModifyRsxTree)
 			.add_systems(
 				ParseRsxTokens,

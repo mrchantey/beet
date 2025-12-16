@@ -119,15 +119,14 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
-		app.world_mut().spawn(RouteFileCollection::test_site_docs());
-		app.update();
-		app.world_mut()
-			.query_filtered_once::<&CodegenFile, With<RouteFileCollection>>()[0]
-			.build_output()
-			.unwrap()
-			.to_token_stream()
-			.xpect_snapshot();
+		let mut world = BuildPlugin::world();
+		world.spawn(RouteFileCollection::test_site_docs());
+		world.run_schedule(ParseSourceFiles);
+		world.query_filtered_once::<&CodegenFile, With<RouteFileCollection>>()
+			[0]
+		.build_output()
+		.unwrap()
+		.to_token_stream()
+		.xpect_snapshot();
 	}
 }

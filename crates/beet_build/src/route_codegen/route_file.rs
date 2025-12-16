@@ -164,20 +164,17 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		let mut world = BuildPlugin::world();
 
-		let group = app
-			.world_mut()
+		let group = world
 			.spawn(RouteFileCollection::test_site_pages())
 			.id();
 
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		let source_file_entity =
-			app.world().entity(group).get::<Children>().unwrap()[0];
-		let route_file = app
-			.world()
+			world.entity(group).get::<Children>().unwrap()[0];
+		let route_file = world
 			.entity(source_file_entity)
 			.get::<RouteSourceFile>()
 			.unwrap();

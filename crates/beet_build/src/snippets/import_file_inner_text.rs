@@ -78,31 +78,29 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin);
-		let file = app
-			.world_mut()
+		let mut world = BuildPlugin::world();
+		let file = world
 			.spawn(SourceFile::new(
 				// point to this file
 				AbsPathBuf::new_workspace_rel(file!()).unwrap(),
 			))
 			.id();
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		#[cfg(feature = "css")]
 		let expected = "body[data-beet-style-id-PLACEHOLDER] {\n  color: #00f;\n}\n";
 		#[cfg(not(feature = "css"))]
 		let expected = include_str!("../../tests/test_file.css");
 
-		app.world_mut().query_once::<&InnerText>()[0]
-			.xpect_eq(InnerText::new(expected));
+		world.query_once::<&InnerText>()[0].xpect_eq(InnerText::new(expected));
 
 		// links source files
-		app.world().entity(file).contains::<Children>().xpect_true();
+		world.entity(file).contains::<Children>().xpect_true();
 
-		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
-		app.update();
+		world.query_once::<&ChildOf>().len().xpect_eq(2);
+		world.run_schedule(ParseSourceFiles);
+
 		// second update does not spawn a new ChildOf
-		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
+		world.query_once::<&ChildOf>().len().xpect_eq(2);
 	}
 }

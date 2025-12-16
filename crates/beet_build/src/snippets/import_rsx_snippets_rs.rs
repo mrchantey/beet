@@ -77,17 +77,15 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		let mut world = BuildPlugin::world();
 		let test_site_index = WsPathBuf::new("tests/test_site/pages/index.rs");
-		let entity = app
-			.world_mut()
+		let entity = world
 			.spawn(SourceFile::new(test_site_index.into_abs()))
 			.id();
 
-		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
-		app.world_mut()
+		world.run_schedule(ParseSourceFiles);
+		let child = world.entity(entity).get::<Children>().unwrap()[0];
+		world
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
 			// only the output of the snippet, not the instance

@@ -73,13 +73,12 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default())
-			.world_mut()
-			.spawn(RouteFileCollection::test_site_docs());
+		let mut world = BuildPlugin::world();
 
-		app.update();
-		app.world_mut()
+		world.spawn(RouteFileCollection::test_site_docs());
+
+		world.run_schedule(ParseSourceFiles);
+		world
 			.query_filtered_once::<&CodegenFile, With<CombinatorRouteCodegen>>(
 			)[0]
 		.build_output()

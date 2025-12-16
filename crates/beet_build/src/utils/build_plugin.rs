@@ -48,13 +48,11 @@ impl Plugin for BuildPlugin {
 			.init_plugin::<ParseRsxTokensPlugin>()
 			.init_plugin::<RouteCodegenPlugin>()
 			.init_plugin::<NodeTypesPlugin>()
-			.insert_schedule_before(Update, ParseSourceFiles)
 			.insert_resource(CargoManifest::load().unwrap())
 			.init_resource::<BuildFlags>()
 			.init_resource::<CargoBuildCmd>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<LambdaConfig>()
-			// .init_resource::<ServerHandle>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			.add_systems(
