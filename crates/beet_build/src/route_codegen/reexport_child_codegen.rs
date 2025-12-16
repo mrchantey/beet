@@ -26,7 +26,11 @@ pub fn reexport_child_codegen(
 							.p1()
 							.get(id)
 							.map(|c| {
-								(c.name(), c.pkg_name.clone(), c.output.clone())
+								(
+									c.name(),
+									c.pkg_name().cloned(),
+									c.output().clone(),
+								)
 							})
 							.ok()
 					})
@@ -37,10 +41,10 @@ pub fn reexport_child_codegen(
 	for (entity, child_paths) in items {
 		let mut p1 = query.p1();
 		let mut codegen = p1.get_mut(entity)?;
-		trace!("reexporting child codegen: {}", codegen.output);
+		trace!("reexporting child codegen: {}", codegen.output());
 
 		for (child_name, child_pkg_name, child_path) in child_paths {
-			if child_pkg_name != codegen.pkg_name {
+			if child_pkg_name.as_ref() != codegen.pkg_name() {
 				// this is imported from another package dont reexport
 				continue;
 			}

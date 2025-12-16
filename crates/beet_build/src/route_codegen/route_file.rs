@@ -68,7 +68,7 @@ pub fn reset_codegen_files(
 	for file in changed_exprs.iter() {
 		for parent in parents.iter_ancestors(file) {
 			if let Ok(mut codegen) = parent_codegen.get_mut(parent) {
-				trace!("Resetting changed codegen: {}", codegen.output);
+				trace!("Resetting changed codegen: {}", codegen.output());
 				codegen.set_added();
 				codegen.clear_items();
 			}

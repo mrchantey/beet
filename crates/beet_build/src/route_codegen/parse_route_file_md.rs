@@ -31,7 +31,7 @@ pub fn parse_route_file_md(
 		};
 
 		let collection_codegen_dir = collection_codegen
-			.output
+			.output()
 			.parent()
 			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
@@ -67,8 +67,8 @@ pub fn parse_route_file_md(
 #[cfg(test)]
 mod test {
 	use super::super::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

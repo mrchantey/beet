@@ -13,7 +13,7 @@ use syn::parse_quote;
 /// every route in this entities root, allowing this file
 /// to be nested under a `mod.rs`:
 ///
-#[derive(Debug, Clone, Default, Component)]
+#[derive(Debug, Clone, Default, Component, Reflect)]
 pub struct StaticRouteTree;
 
 /// Create a tree of routes from a list of [`FuncTokens`],

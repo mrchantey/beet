@@ -1,11 +1,8 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use heck::ToSnakeCase;
-use serde::Deserialize;
-use serde::Serialize;
+use quote::ToTokens;
 use syn::Expr;
 use syn::Item;
-
 
 /// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
 pub fn export_codegen(
@@ -19,54 +16,46 @@ pub fn export_codegen(
 	Ok(())
 }
 
-
 /// Every codegen file is created via this struct. It contains
-/// several utilities and standards that make the whole thing nicer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Component)]
+/// several utilities and standards for quality of life.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Default, Component)]
 pub struct CodegenFile {
 	/// The output codegen file location.
-	pub output: AbsPathBuf,
-	/// All of the imports that must be included both globally and inside each
-	/// inline module.
-	/// These will not be erased when the file is regenerated.
-	#[serde(
-		default = "default_imports",
-		rename = "import_tokens",
-		with = "syn_item_vec_serde"
-	)]
-	pub imports: Vec<Unspan<Item>>,
+	output: AbsPathBuf,
 	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
-	#[serde(default, rename = "package_name")]
-	pub pkg_name: Option<String>,
-	// List of all root level items to be included in the file.
-	// These are usually appended to as this struct is passed around.
-	#[serde(default, with = "syn_item_vec_serde")]
-	pub items: Vec<Unspan<Item>>,
-}
-
-fn default_imports() -> Vec<Unspan<Item>> {
-	vec![
-		Unspan::new(&syn::parse_quote!(
-			#[allow(unused_imports)]
-			use beet::prelude::*;
-		)),
-		Unspan::new(&syn::parse_quote!(
-			#[allow(unused_imports)]
-			use crate::prelude::*;
-		)),
-	]
+	pkg_name: Option<String>,
+	/// All of the imports that must be included both globally and inside each
+	/// inline module.
+	/// These will not be erased when the file is regenerated.
+	// it'd be nice to store these as a Vec<Item> but bevy reflect doesnt
+	// support custom serialization at this stage
+	imports: Vec<String>,
+	/// List of all root level items to be included in the file.
+	/// These are usually appended to as this struct is passed around.
+	// it'd be nice to store these as a Vec<Item> but bevy reflect doesnt
+	// support custom serialization at this stage
+	items: Vec<String>,
 }
 
 impl Default for CodegenFile {
 	fn default() -> Self {
 		Self {
-			imports: default_imports(),
 			output: WsPathBuf::new("src/codegen/mod.rs").into_abs(),
 			pkg_name: None,
-			items: Default::default(),
+			imports: default(),
+			items: default(),
 		}
+		.with_import(syn::parse_quote!(
+			#[allow(unused_imports)]
+			use beet::prelude::*;
+		))
+		.with_import(syn::parse_quote!(
+			#[allow(unused_imports)]
+			use crate::prelude::*;
+		))
 	}
 }
 
@@ -79,6 +68,13 @@ impl CodegenFile {
 		}
 	}
 
+	/// Get the output path for this codegen file.
+	pub fn output(&self) -> &AbsPathBuf { &self.output }
+	/// Get the package name alias, if set.
+	pub fn pkg_name(&self) -> Option<&String> { self.pkg_name.as_ref() }
+
+	/// Get the snake_case name of this codegen file,
+	/// if its a 'mod.rs' then the parent directory is used.
 	pub fn name(&self) -> String {
 		match self
 			.output
@@ -118,33 +114,49 @@ impl CodegenFile {
 	}
 
 	pub fn with_import(mut self, item: Item) -> Self {
-		self.imports.push(Unspan::new(&item));
+		self.imports.push(item.into_token_stream().to_string());
 		self
 	}
 	/// Set the imports for this codegen file, replacing the default and a
 	/// previously set imports.
 	pub fn set_imports(mut self, items: Vec<Item>) -> Self {
-		self.imports = items.iter().map(Unspan::new).collect();
+		self.imports = items
+			.iter()
+			.map(|item| item.into_token_stream().to_string())
+			.collect();
 		self
 	}
 
 
 	pub fn output_dir(&self) -> Result<AbsPathBuf> {
-		self.output.parent().ok_or_else(|| {
-			bevyhow!("Output path must have a parent directory")
-		})
+		self.output
+			.parent()
+			.ok_or_else(|| bevyhow!("Output path must have a parent directory"))
 	}
 	pub fn clear_items(&mut self) { self.items.clear(); }
 
-	pub fn add_item<T: Into<syn::Item>>(&mut self, item: T) {
-		self.items.push(Unspan::new(&item.into()));
+	pub fn add_item<T: Into<Item>>(&mut self, item: T) {
+		self.items.push(item.into().into_token_stream().to_string());
+	}
+
+	fn imports_to_tokens(&self) -> Result<Vec<Item>, syn::Error> {
+		self.imports
+			.iter()
+			.map(|s| syn::parse_str::<Item>(s))
+			.collect::<Result<_, _>>()
+	}
+	fn items_to_tokens(&self) -> Result<Vec<Item>, syn::Error> {
+		self.items
+			.iter()
+			.map(|s| syn::parse_str::<Item>(s))
+			.collect::<Result<_, _>>()
 	}
 
 	pub fn build_output(&self) -> Result<syn::File> {
-		let imports = &self.imports;
+		let imports = self.imports_to_tokens()?;
 		let crate_alias = self.crate_alias()?;
 
-		let items = &self.items;
+		let items = self.items_to_tokens()?;
 
 		Ok(syn::parse_quote! {
 			//! 🌱🌱🌱 This file has been auto generated by Beet.

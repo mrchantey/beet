@@ -1,12 +1,12 @@
-use std::path::Path;
-
+use bevy::prelude::*;
 use clap::Parser;
 use glob::Pattern;
 use glob::PatternError;
+use std::path::Path;
 
 
 /// glob for watch patterns
-#[derive(Default, Clone, PartialEq, Parser)]
+#[derive(Default, Clone, PartialEq, Reflect, Parser)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub struct GlobFilter {

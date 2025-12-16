@@ -36,7 +36,7 @@ pub fn import_rsx_snippets_md(
 				&& let Some(meta_block) =
 					ParseMarkdown::markdown_to_frontmatter_tokens(&file)?
 			{
-				let meta_type = &meta_type.0;
+				let meta_type = &meta_type.inner();
 				let err_msg = format!(
 					"Failed to parse frontmatter into {}",
 					meta_type.to_token_stream().to_string(),
@@ -56,8 +56,8 @@ pub fn import_rsx_snippets_md(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::prelude::*;
 	use beet_core::prelude::*;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

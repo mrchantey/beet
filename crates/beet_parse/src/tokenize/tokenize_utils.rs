@@ -85,7 +85,6 @@ fn type_path_to_ident<T: TypePath>() -> Result<Ident> {
 
 
 pub(super) fn non_reserved_key(key: &str, span: Span) -> Ident {
-	use bevy::platform::collections::HashSet;
 	use std::sync::LazyLock;
 
 	/// All reserved keywords as defined in https://doc.rust-lang.org/reference/keywords.html

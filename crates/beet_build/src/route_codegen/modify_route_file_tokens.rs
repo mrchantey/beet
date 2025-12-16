@@ -4,7 +4,8 @@ use beet_net::prelude::*;
 use std::path::PathBuf;
 
 /// Helper for common route mapping
-#[derive(Debug, Clone, PartialEq, Component)]
+#[derive(Debug, Clone, PartialEq, Reflect, Component)]
+#[reflect(Component)]
 pub struct ModifyRoutePath {
 	/// A base path to prepend to the route path
 	pub base_route: Option<RoutePath>,
@@ -12,7 +13,7 @@ pub struct ModifyRoutePath {
 	pub replace_route: Vec<ReplaceRoute>,
 }
 /// Replace some part of the route path with another string
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct ReplaceRoute {
 	/// The string to replace
 	from: String,

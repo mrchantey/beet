@@ -5,7 +5,8 @@ use syn::Item;
 
 /// Added as a child of any [`RouteFileCollection`] with a [`RouteFileCategory::Action`],
 /// meaning a client actions codegen will be created.
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Reflect, Component)]
+#[reflect(Component)]
 #[require(CodegenFile)]
 pub struct CollectClientActions {
 	/// Collapse single child functions into their parent mod
