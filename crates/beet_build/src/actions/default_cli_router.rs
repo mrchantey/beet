@@ -6,12 +6,14 @@ use beet_router::prelude::*;
 
 pub fn default_cli_router() -> impl Bundle {
 	(CliRouter, InfallibleSequence, beet_site_cmd(), children![
-		(single_action_route("refresh-sst", SstCommand {
-			cmd: SstSubcommand::Refresh
-		})),
-		(single_action_route("deploy-sst", SstCommand {
-			cmd: SstSubcommand::Deploy
-		})),
+		(single_action_route(
+			"refresh-sst",
+			SstCommand::new(SstSubcommand::Refresh)
+		)),
+		(single_action_route(
+			"deploy-sst",
+			SstCommand::new(SstSubcommand::Deploy)
+		)),
 		(single_action_route("compile-wasm", CompileWasm)),
 		(single_action_route("compile-lambda", CompileLambda)),
 		(single_action_route("watch-lambda", WatchLambda)),
@@ -21,13 +23,33 @@ pub fn default_cli_router() -> impl Bundle {
 		(single_action_route("build", BuildServer)),
 		(named_route("run", children![
 			exact_route_match(),
+			AddWorkspaceSourceFiles,
 			BuildServer,
 			// kill_server(),
 			RunServer,
 			respond_ok()
+		])),
+		(named_route("deploy", children![
+			exact_route_match(),
+			force_remote_service_access(),
+			//
+			BuildServer,
+			respond_ok()
 		]))
 	])
 }
+
+/// When deploying remote service access is the only option
+/// that makes sense
+fn force_remote_service_access() -> impl Bundle {
+	OnSpawn::observe(
+		|mut ev: On<GetOutcome>, mut config: ResMut<PackageConfig>| {
+			config.service_access = ServiceAccess::Remote;
+			ev.trigger_with_cx(Outcome::Pass);
+		},
+	)
+}
+
 
 fn named_route(name: impl AsRef<str>, children: impl Bundle) -> impl Bundle {
 	let name = name.as_ref();

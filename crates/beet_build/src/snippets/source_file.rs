@@ -4,7 +4,6 @@ use beet_core::exports::notify::event::CreateKind;
 use beet_core::exports::notify::event::ModifyKind;
 use beet_core::exports::notify::event::RemoveKind;
 use beet_core::prelude::*;
-use bevy::ecs::spawn::SpawnIter;
 use std::path::Path;
 
 /// Adde to an entity used to represent an file included
@@ -25,30 +24,6 @@ impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
-/// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
-/// This will run once for the initial load, afterwards [`parse_file_watch_events`]
-/// will incrementally load changed files.
-///
-/// These files are initially loaded as children of the [`SourceFileRoot`],
-/// but may be moved to a [`RouteFileCollection`] if the path matches.
-//  we could alternatively use import_route_file_collection to only load
-// source files used by file based routes
-#[cfg_attr(test, allow(dead_code))]
-pub fn load_workspace_source_files(
-	mut commands: Commands,
-	config: When<Res<WorkspaceConfig>>,
-) -> bevy::prelude::Result {
-	commands.spawn((
-		NonCollectionSourceFiles,
-		Children::spawn(SpawnIter(
-			config
-				.get_files()?
-				.into_iter()
-				.map(|path| SourceFile::new(path)),
-		)),
-	));
-	Ok(())
-}
 
 /// Parent of every [`SourceFile`] entity that exists outside of a [`RouteFileCollection`].
 #[derive(Component)]

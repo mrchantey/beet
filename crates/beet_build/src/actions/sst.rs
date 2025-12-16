@@ -8,15 +8,22 @@ pub fn SstCommand(
 	cmd: SstSubcommand,
 	pkg_config: Res<PackageConfig>,
 ) -> Result<impl Bundle> {
-	let sst_dir = std::env::current_dir()?.join("infra").canonicalize()?;
+	let sst_dir = WsPathBuf::default().join("infra");
 	ChildProcess::new("npx")
-		.current_dir(sst_dir)
+		.current_dir(sst_dir.to_string())
 		.arg("sst")
 		.arg(cmd.to_cmd())
 		.arg("--stage")
 		.arg(pkg_config.stage())
 		.xok()
 	// 	// 	"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
+}
+
+impl SstCommand {
+	/// Creates an `SstCommand` bundle for the given subcommand.
+	pub fn new(cmd: SstSubcommand) -> impl Bundle {
+		(Name::new("SST Command"), SstCommand { cmd })
+	}
 }
 
 

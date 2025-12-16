@@ -3,16 +3,9 @@ use beet_dom::prelude::*;
 
 
 pub fn export_snippets(world: &mut World) -> Result {
-	let snippets = world
-		.run_system_cached(collect_rsx_snippets)
-		.unwrap_or_default();
-	if snippets.is_empty() {
-		return Ok(());
-	}
-	tracing::info!("Exporting {} snippets", snippets.len());
-
 	#[cfg(not(test))]
 	{
+		// temp hack: just put them all in one big file
 		let scene = world.build_scene();
 		let path = world
 			.resource::<WorkspaceConfig>()
@@ -23,18 +16,28 @@ pub fn export_snippets(world: &mut World) -> Result {
 		fs_ext::write_if_diff(path, &scene)?;
 	}
 
-	// currently disabled until full roundtrip is stablized
-	// doesnt work because rsx snippets are somehow relating to each other?
-	// maybe templates..
 	#[cfg(test)]
-	for (path, entities) in snippets.into_iter() {
-		let scene = DynamicSceneBuilder::from_world(world)
-			.extract_entities(entities.into_iter())
-			.build();
+	{
+		// currently disabled until full roundtrip is stablized
+		// doesnt work because rsx snippets are somehow relating to each other?
+		// maybe templates..
+		let snippets = world
+			.run_system_cached(collect_rsx_snippets)
+			.unwrap_or_default();
+		if snippets.is_empty() {
+			return Ok(());
+		}
+		tracing::info!("Exporting {} snippets", snippets.len());
 
-		let scene = world.build_scene_with(scene);
-		tracing::trace!("Writing rsx snippet to {}", path.display());
-		fs_ext::write_if_diff(path, &scene)?;
+		for (path, entities) in snippets.into_iter() {
+			let scene = DynamicSceneBuilder::from_world(world)
+				.extract_entities(entities.into_iter())
+				.build();
+
+			let scene = world.build_scene_with(scene);
+			tracing::trace!("Writing rsx snippet to {}", path.display());
+			fs_ext::write_if_diff(path, &scene)?;
+		}
 	}
 
 	Ok(())
@@ -42,6 +45,7 @@ pub fn export_snippets(world: &mut World) -> Result {
 
 /// Collect all changed [`StaticRoot`]s, returning the output path
 /// and all entities that are part of the snippet.
+#[cfg_attr(not(test), allow(unused))]
 fn collect_rsx_snippets(
 	config: Res<WorkspaceConfig>,
 	query: Populated<(Entity, &SnippetRoot), Changed<StaticRoot>>,

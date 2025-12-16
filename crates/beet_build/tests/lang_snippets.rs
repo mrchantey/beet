@@ -20,7 +20,7 @@ fn works() {
 			<Roundtrip/>
 		}))
 		.id();
-	app.world_mut().run_schedule(BuildSequence);
+	app.world_mut().run_schedule(ParseSourceFiles);
 	app.world_mut().run_schedule(ApplyDirectives);
 	// app.update();
 	app.world_mut()

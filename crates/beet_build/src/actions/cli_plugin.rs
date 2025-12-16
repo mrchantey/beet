@@ -61,6 +61,7 @@ pub struct CliPlugin;
 impl Plugin for CliPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<RouterPlugin>()
+			.init_plugin::<BuildPlugin>()
 			.insert_resource(CargoManifest::load().unwrap())
 			// temp: hardcoded until bevy scene overhaul
 			.insert_resource(PackageConfig {
