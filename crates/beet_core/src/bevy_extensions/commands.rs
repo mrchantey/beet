@@ -9,6 +9,15 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
+	#[cfg(feature = "bevy_scene")]
+	fn load_scene(&mut self, scene: impl Into<String>) {
+		let scene = scene.into();
+		self.queue(move |world: &mut World| -> Result {
+			world.load_scene(&scene)
+		});
+	}
+
+
 	fn run_system_once_with<I, M, S>(
 		&mut self,
 		system: S,

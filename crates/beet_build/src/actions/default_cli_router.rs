@@ -21,9 +21,15 @@ pub fn default_cli_router() -> impl Bundle {
 		(single_action_route("pull-assets", PullAssets)),
 		(single_action_route("push-html", PushHtml)),
 		(single_action_route("build", BuildServer)),
-		(named_route("parse-files", add_and_parse_source_files())),
+		(named_route("parse-files", children![
+			exact_route_match(),
+			launch_sequence(),
+			AddWorkspaceSourceFiles,
+			parse_source_files()
+		])),
 		(named_route("run", children![
 			exact_route_match(),
+			launch_sequence(),
 			AddWorkspaceSourceFiles,
 			BuildServer,
 			// kill_server(),

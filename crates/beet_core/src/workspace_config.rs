@@ -184,9 +184,14 @@ macro_rules! pkg_config {
 pub struct WorkspaceConfig {
 	/// Filter for extracting snippets,
 	/// excludes 'target' and 'node_modules' directories by default
-	#[reflect(ignore)] // TODO reflect GlobFilter
 	pub snippet_filter: GlobFilter,
-	/// The root directory for extracting snippets
+	/// Files to watch, triggering a compile-and-run of the binary with
+	/// the `launch` feature on change.
+	pub launch_filter: GlobFilter,
+	/// Location of the `launch.ron` file to save the launch scene to.
+	/// See [`LaunchConfig::launch_file`] to direct the cli to this location.
+	pub launch_file: WsPathBuf,
+	/// The root directory for matching [`Self::snippet_filter`] and [`Self::launch_filter`]
 	pub root_dir: WsPathBuf,
 	/// The output location for the generated template scene file
 	pub snippets_dir: WsPathBuf,
@@ -207,6 +212,10 @@ impl Default for WorkspaceConfig {
 				.with_exclude("*/codegen/*")
 				.with_exclude("*/.cache/*")
 				.with_exclude("*/node_modules/*"),
+			launch_filter: GlobFilter::default()
+				.with_include("*/launch/*")
+				.with_include("*/launch.rs"),
+			launch_file: WsPathBuf::new("launch.ron"),
 			root_dir: {
 				#[cfg(test)]
 				{

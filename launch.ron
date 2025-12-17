@@ -1,0 +1,240 @@
+(
+  resources: {
+    "beet_build::actions::launch_hash::LaunchHash": (
+      hash: 2930691101847145196,
+    ),
+    "beet_core::workspace_config::PackageConfig": (
+      title: "Beet",
+      binary_name: "beet_site",
+      version: "0.0.8-dev.12",
+      description: "The beet website, built with beet",
+      homepage: "https://beetstack.dev",
+      repository: Some("https://github.com/mrchantey/beet"),
+      stage: "dev",
+      service_access: Local,
+    ),
+    "beet_core::workspace_config::WorkspaceConfig": (
+      snippet_filter: (
+        include: [
+          ("*/crates/beet_design/src/**/*"),
+          ("*/crates/beet_site/src/**/*"),
+        ],
+        exclude: [
+          ("*/target/*"),
+          ("*/codegen/*"),
+          ("*/.cache/*"),
+          ("*/node_modules/*"),
+        ],
+      ),
+      launch_filter: (
+        include: [
+          ("*/launch/*"),
+          ("*/launch.rs"),
+        ],
+        exclude: [],
+      ),
+      launch_scene: ("launch.ron"),
+      root_dir: (""),
+      snippets_dir: ("target/snippets"),
+      html_dir: ("target/client"),
+      assets_dir: ("assets"),
+      analytics_dir: ("target/analytics"),
+      client_islands_path: ("target/client_islands.ron"),
+    ),
+  },
+  entities: {
+    4294967288: (
+      components: {
+        "beet_build::route_codegen::collect_client_action_group::CollectClientActions": (
+          collapse_nodes: true,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/client_actions.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967289),
+      },
+    ),
+    4294967289: (
+      components: {
+        "beet_build::route_codegen::route_file_collection::RouteFileCollection": (
+          src: ("/home/pete/me/beet/crates/beet_site/src/actions"),
+          filter: (
+            include: [],
+            exclude: [],
+          ),
+          category: Actions,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/actions.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+        "bevy_ecs::hierarchy::Children": ([
+          4294967288,
+        ]),
+      },
+    ),
+    4294967290: (
+      components: {
+        "beet_build::route_codegen::modify_route_file_tokens::ModifyRoutePath": (
+          base_route: Some(("/docs/design")),
+          replace_route: [
+            (
+              from: ".mockup",
+              to: "",
+            ),
+          ],
+        ),
+        "beet_build::route_codegen::route_file_collection::MetaType": ("crate :: prelude :: ArticleMeta"),
+        "beet_build::route_codegen::route_file_collection::RouteFileCollection": (
+          src: ("/home/pete/me/beet/crates/beet_design/src"),
+          filter: (
+            include: [
+              ("*.mockup*"),
+            ],
+            exclude: [
+              ("/codegen/*"),
+            ],
+          ),
+          category: Pages,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_design/src/codegen/mockups.rs"),
+          pkg_name: Some("beet_design"),
+          imports: [
+            "# [allow (unused_imports)] use beet_core :: prelude :: * ;",
+            "# [allow (unused_imports)] use beet_rsx :: prelude :: * ;",
+            "# [allow (unused_imports)] use beet_dom :: prelude :: * ;",
+            "# [allow (unused_imports)] use beet_router :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+      },
+    ),
+    4294967291: (
+      components: {
+        "beet_build::route_codegen::modify_route_file_tokens::ModifyRoutePath": (
+          base_route: Some(("/blog")),
+          replace_route: [],
+        ),
+        "beet_build::route_codegen::route_file_collection::MetaType": ("beet :: prelude :: ArticleMeta"),
+        "beet_build::route_codegen::route_file_collection::RouteFileCollection": (
+          src: ("/home/pete/me/beet/crates/beet_site/src/blog"),
+          filter: (
+            include: [],
+            exclude: [],
+          ),
+          category: Pages,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/blog/mod.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+      },
+    ),
+    4294967292: (
+      components: {
+        "beet_build::route_codegen::modify_route_file_tokens::ModifyRoutePath": (
+          base_route: Some(("/docs")),
+          replace_route: [],
+        ),
+        "beet_build::route_codegen::route_file_collection::MetaType": ("beet :: prelude :: ArticleMeta"),
+        "beet_build::route_codegen::route_file_collection::RouteFileCollection": (
+          src: ("/home/pete/me/beet/crates/beet_site/src/docs"),
+          filter: (
+            include: [],
+            exclude: [],
+          ),
+          category: Pages,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/docs/mod.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+      },
+    ),
+    4294967293: (
+      components: {
+        "beet_build::route_codegen::route_file_collection::RouteFileCollection": (
+          src: ("/home/pete/me/beet/crates/beet_site/src/pages"),
+          filter: (
+            include: [],
+            exclude: [],
+          ),
+          category: Pages,
+        ),
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/pages.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+      },
+    ),
+    4294967294: (
+      components: {
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/route_tree.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::ChildOf": (4294967295),
+      },
+    ),
+    4294967295: (
+      components: {
+        "beet_build::utils::codegen_file::CodegenFile": (
+          output: ("/home/pete/me/beet/crates/beet_site/src/codegen/mod.rs"),
+          pkg_name: None,
+          imports: [
+            "# [allow (unused_imports)] use beet :: prelude :: * ;",
+            "# [allow (unused_imports)] use crate :: prelude :: * ;",
+          ],
+          items: [],
+        ),
+        "bevy_ecs::hierarchy::Children": ([
+          4294967294,
+          4294967293,
+          4294967292,
+          4294967291,
+          4294967290,
+          4294967289,
+        ]),
+      },
+    ),
+  },
+)

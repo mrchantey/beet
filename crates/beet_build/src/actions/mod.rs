@@ -3,7 +3,7 @@
 //!
 //! ## 1. Load Launch Scene
 //!
-//! The first step is to resolve the launch scene, usually located at `<workspace_root>/beet.ron`.
+//! The first step is to resolve the launch scene, usually located at `<workspace_root>/launch.ron`.
 //! This contains all information regarding the project configuration and pipeline definitions.
 //! See [`LaunchState`] for more information.
 //!
@@ -25,8 +25,8 @@ mod wasm;
 pub use wasm::*;
 mod child_process;
 pub use child_process::*;
-mod beet_file;
-pub use beet_file::*;
+mod launch_config;
+pub use launch_config::*;
 mod sync_buckets;
 pub use sync_buckets::*;
 mod cli_plugin;

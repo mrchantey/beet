@@ -61,6 +61,8 @@ pub mod prelude {
 	pub use bevy::log::LogPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
+	pub use bevy::platform::hash::FixedHasher;
+	pub use std::hash::BuildHasher;
 	pub use tracing::Level;
 
 	pub use bevy::prelude::*;

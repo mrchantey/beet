@@ -4,32 +4,6 @@ use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
 
-pub fn add_and_parse_source_files() -> impl Bundle {
-	(Sequence, children![
-		AddWorkspaceSourceFiles,
-		parse_source_files(),
-	])
-}
-
-
-pub fn parse_source_files() -> impl Bundle {
-	OnSpawn::observe(|mut ev: On<GetOutcome>, mut commands: Commands| {
-		commands.run_system_cached(ParseSourceFiles.run());
-		ev.trigger_with_cx(Outcome::Pass);
-	})
-}
-
-
-// #[construct]
-// pub fn
-/// ensure at least one FileExprHash is present to trigger
-/// listeners at least once
-#[deprecated = "unneeded cos we use beet flow now?"]
-pub fn init_file_expr_hash(mut commands: Commands) {
-	commands.spawn((Name::new("Empty FileExprHash"), FileExprHash::default()));
-}
-
-
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`parse_file_watch_events`]
 /// will incrementally add, remove and mark changed as needed.
@@ -41,22 +15,47 @@ pub fn init_file_expr_hash(mut commands: Commands) {
 // for live reloading
 #[construct]
 pub fn AddWorkspaceSourceFiles() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>,
-		 mut commands: Commands,
-		 config: Res<WorkspaceConfig>|
-		 -> Result {
-			commands.spawn((
-				NonCollectionSourceFiles,
-				Children::spawn(SpawnIter(
-					config
-						.get_files()?
-						.into_iter()
-						.map(|path| SourceFile::new(path)),
-				)),
-			));
-			ev.trigger_with_cx(Outcome::Pass);
-			Ok(())
-		},
+	(
+		Name::new("Add Workspace Source Files"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 config: Res<WorkspaceConfig>|
+			 -> Result {
+				commands.spawn((
+					NonCollectionSourceFiles,
+					Children::spawn(SpawnIter(
+						config
+							.get_files()?
+							.into_iter()
+							.map(|path| SourceFile::new(path)),
+					)),
+				));
+				ev.trigger_with_cx(Outcome::Pass);
+				Ok(())
+			},
+		),
 	)
+}
+
+
+
+pub fn parse_source_files() -> impl Bundle {
+	(
+		Name::new("Parse Source Files"),
+		OnSpawn::observe(|mut ev: On<GetOutcome>, mut commands: Commands| {
+			commands.run_system_cached(ParseSourceFiles.run());
+			ev.trigger_with_cx(Outcome::Pass);
+		}),
+	)
+}
+
+
+// #[construct]
+// pub fn
+/// ensure at least one FileExprHash is present to trigger
+/// listeners at least once
+#[deprecated = "unneeded cos we use beet flow now?"]
+pub fn init_file_expr_hash(mut commands: Commands) {
+	commands.spawn((Name::new("Empty FileExprHash"), FileExprHash::default()));
 }

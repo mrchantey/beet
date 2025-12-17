@@ -28,7 +28,7 @@ impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
 		// order matters, last flag wins
 		#[cfg(feature = "launch")]
-		app.set_runner(LaunchRunner::runner);
+		app.set_runner(LaunchHash::runner);
 
 		#[cfg(feature = "server")]
 		app.set_runner(RouterRunner::runner);
