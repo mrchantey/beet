@@ -203,6 +203,7 @@
     ),
     4294967294: (
       components: {
+        "beet_build::route_codegen::parse_route_tree::StaticRouteTree": (),
         "beet_build::utils::codegen_file::CodegenFile": (
           output: ("/home/pete/me/beet/crates/beet_site/src/codegen/route_tree.rs"),
           pkg_name: None,

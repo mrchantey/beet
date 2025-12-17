@@ -73,9 +73,8 @@ mod test {
 
 	#[test]
 	fn rsx_snippets() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default())
-			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
+		let mut world = BuildPlugin::world();
+		world.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 
 		let test_site_index = WsPathBuf::new("tests/test_site/pages/index.rs");
@@ -84,14 +83,13 @@ mod test {
 			.rsx_snippet_path(&test_site_index, 7)
 			.into_abs();
 
-		let _entity = app
-			.world_mut()
+		let _entity = world
 			.spawn(SourceFile::new(test_site_index.into_abs()))
 			.id();
 
 		fs_ext::remove(&snippet_path).ok();
 
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		let saved = fs_ext::read_to_string(snippet_path).unwrap();
 		// non-empty scene file
@@ -100,9 +98,8 @@ mod test {
 	#[test]
 	#[ignore = "lang snippet exports is a wip"]
 	fn lang_snippets() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default())
-			.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
+		let mut world = BuildPlugin::world();
+		world.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 		let path = WorkspaceConfig::default()
 			.lang_snippet_path(&WsPathBuf::new(file!()), 0)
@@ -115,7 +112,7 @@ mod test {
 
 		fs_ext::remove(&path).ok();
 
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		let saved = fs_ext::read_to_string(path).unwrap();
 		// non-empty scene file
