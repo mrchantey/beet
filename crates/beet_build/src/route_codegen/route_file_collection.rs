@@ -89,11 +89,15 @@ pub fn reparent_route_collection_source_files(
 		HashMap::default();
 	for (entity, collection) in collections.iter() {
 		for file in collection.read_files()? {
-			if file_collection_map.contains_key(&file) {
+			if let Some(existing) = file_collection_map.get(&file) {
+				assert_ne!(entity, *existing);
+				let collection2 = collections.get(*existing).unwrap().1;
 				bevybail!(
 					"
 Error: Collection Overlap: {}
-This file appears in multple collections,
+This file appears in multiple collections:
+Collection A: {collection2:#?}
+Collection B: {collection:#?}
 Please constrain the collection filters or roots",
 					file
 				);

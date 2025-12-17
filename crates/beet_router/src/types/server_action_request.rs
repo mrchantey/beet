@@ -86,7 +86,12 @@ where
 	Req: Serialize,
 {
 	pub fn into_request(self) -> Result<Request> {
-		let url = format!("{}{}", self.base_url, self.route_path);
+		let url = format!(
+			"{}{}",
+			// Route paths already have a leading slash
+			self.base_url.to_string().trim_end_matches("/"),
+			self.route_path
+		);
 		let req = Request::new(self.method, url);
 		match (self.method.has_body(), self.req_body) {
 			(_, None) => req,
@@ -126,8 +131,7 @@ where
 			}
 			// successful request, handler succeeded
 			status if status.is_success() => {
-				let ok = res.json().await?;
-				Ok(Ok(ok))
+				res.json::<JsonResult<Res, Err>>().await?.result.xok()
 			}
 			// failed request
 			_ => Err(res.into_error().await.into()),
@@ -136,13 +140,22 @@ where
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 	use sweet::prelude::*;
+
+
+	#[test]
+	fn req_path() {
+		ServerActionRequest::new(HttpMethod::Get, "/foo")
+			.into_request()
+			.unwrap()
+			.path()
+			.xpect_eq("/foo".into());
+	}
 
 	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
 	fn add_via_post(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }

@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
+// use beet_rsx::prelude::ApplyDirectives;
 use bevy::ecs::schedule::ScheduleLabel;
 use cargo_manifest::Manifest;
 
@@ -36,7 +37,7 @@ pub struct BuildPlugin;
 
 
 /// A schedule to load source files in a workspace,
-/// confert to an ECS representation using [`ParseRsxTokens`],
+/// convert to an ECS representation using [`ParseRsxTokens`],
 /// and then export the rsx snippets and codegen.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ParseSourceFiles;
@@ -69,6 +70,7 @@ impl Plugin for BuildPlugin {
 					ParseRsxTokens.run(),
 					update_file_expr_hash,
 					RouteCodegen.run(),
+					// ApplyDirectives.run(),
 					export_snippets,
 					export_codegen,
 					// compile_server

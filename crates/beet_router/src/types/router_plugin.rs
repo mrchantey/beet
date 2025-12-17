@@ -19,8 +19,12 @@ impl Plugin for RouterPlugin {
 			.init_resource::<HtmlConstants>()
 			.add_systems(PostStartup, insert_route_tree);
 
-		#[cfg(not(test))]
-		app.init_plugin::<LoadSnippetsPlugin>();
+		// #[cfg(all(
+		// 	not(target_arch = "wasm32"),
+		// 	not(test),
+		// 	feature = "server"
+		// ))]
+		// app.init_plugin::<LoadSnippetsPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 		app.init_plugin_with(

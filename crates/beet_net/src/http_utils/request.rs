@@ -208,6 +208,7 @@ impl Request {
 		Ok(self)
 	}
 
+	pub fn path(&self) -> RoutePath { RoutePath::new(self.parts.uri.path()) }
 	pub fn method(&self) -> HttpMethod {
 		HttpMethod::from(self.parts.method.clone())
 	}
