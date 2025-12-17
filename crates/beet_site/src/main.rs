@@ -20,7 +20,7 @@ fn main() {
 			..pkg_config!()
 		})
 		.add_systems(Startup,|config:Res<PackageConfig>|{
-			config.xprint_debug_formatted("config: ");
+			config.xprint_debug_formatted("config");
 		})
 		.run();
 }

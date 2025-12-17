@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_dom::prelude::IntoBundle;
 use beet_flow::prelude::*;
 use std::hash::Hasher;
 use std::path::PathBuf;
@@ -9,7 +8,7 @@ use std::path::PathBuf;
 /// In beet all config is determined in the launch scene.
 /// This config determines its location and configuration for generating
 /// as required.
-#[derive(Debug, Default, Clone, Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct LaunchConfig {
 	/// Location of the `launch.ron` file to load the launch scene from.
 	/// See [`WorkspaceConfig::launch_file`] to direct the generator to this location.
@@ -27,27 +26,32 @@ pub struct LaunchConfig {
 	pub no_default_args: bool,
 }
 
-impl LaunchConfig {
-	pub fn launch_step(&self) -> ChildProcess {
-		let mut args = Vec::new();
-		if !self.no_default_args {
-			args.push("run".into());
-			if let Some(package) = &self.package {
-				args.push("--package".into());
-				args.push(package.clone());
-			}
-			args.push("--features".into());
-			args.push("launch".into());
+impl Default for LaunchConfig {
+	fn default() -> Self {
+		Self {
+			launch_file: WsPathBuf::new("launch.ron"),
+			force_launch: false,
+			package: None,
+			additional_args: None,
+			no_default_args: false,
 		}
-		if let Some(launch_cargo_args) = &self.additional_args {
-			args.extend(launch_cargo_args.split_whitespace().map(|s| s.into()));
-		}
+	}
+}
 
-		ChildProcess {
-			cmd: "cargo".into(),
-			args,
-			..default()
-		}
+impl LaunchConfig {
+	/// Executed by a binary in its launch phase, resulting in
+	/// an output [`launch.ron`] file
+	pub fn runner(mut app: App) -> AppExit {
+		app.init();
+
+		app.update();
+		app.world_mut()
+			.run_system_once::<_, (), _>(insert_launch_hash)
+			.unwrap();
+		app.world_mut()
+			.run_system_once::<_, (), _>(export_launch_scene)
+			.unwrap();
+		AppExit::Success
 	}
 }
 
@@ -92,20 +96,6 @@ impl LaunchHash {
 		}
 		Ok(hasher.finish())
 	}
-
-	/// Executed by a binary in its launch phase, resulting in
-	/// an output [`launch.ron`] file
-	pub fn runner(mut app: App) -> AppExit {
-		app.init();
-		app.update();
-		app.world_mut()
-			.run_system_once::<_, (), _>(insert_launch_hash)
-			.unwrap();
-		app.world_mut()
-			.run_system_once::<_, (), _>(export_launch_scene)
-			.unwrap();
-		AppExit::Success
-	}
 }
 
 
@@ -122,7 +112,8 @@ fn export_launch_scene(world: &mut World) -> Result {
 	let scene = world.build_scene();
 	let launch_file =
 		world.resource::<WorkspaceConfig>().launch_file.into_abs();
-	fs_ext::write(launch_file, scene)?;
+	fs_ext::write(&launch_file, scene)?;
+	info!("Exported launch scene: {}", launch_file);
 	Ok(())
 }
 
@@ -142,7 +133,7 @@ pub fn launch_sequence() -> impl Bundle {
 				(
 					Name::new("Run Launch Step"),
 					OnSpawn::run_insert(|config: Res<LaunchConfig>| {
-						config.launch_step().into_bundle()
+						run_launch_step(&config)
 					})
 				)
 			]
@@ -214,7 +205,36 @@ fn launch_step_predicate(
 	Ok(())
 }
 
-
+/// Create a [`ChildProcess`] to run the launch step
+/// ## Panics
+/// Panics if no_default_args but no additional args present
+fn run_launch_step(config: &LaunchConfig) -> ChildProcess {
+	if config.no_default_args {
+		let additional_args = config
+			.additional_args
+			.clone()
+			.ok_or_else(|| {
+				bevyhow!(
+					"LaunchConfig::no_default_args is true but no additional_args provided"
+				)
+			})
+			.unwrap();
+		ChildProcess::from_args(additional_args.split_whitespace())
+	} else {
+		let mut cmd = CargoBuildCmd::new("run")
+			.no_default_features()
+			.feature("launch");
+		if let Some(package) = &config.package {
+			cmd = cmd.package(package);
+		}
+		let mut proc = ChildProcess::from_cargo(&cmd);
+		if let Some(launch_cargo_args) = &config.additional_args {
+			proc.args
+				.extend(launch_cargo_args.split_whitespace().map(|s| s.into()));
+		}
+		proc
+	}
+}
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

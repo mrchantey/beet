@@ -1,6 +1,6 @@
 (
   resources: {
-    "beet_build::actions::launch_hash::LaunchHash": (
+    "beet_build::actions::launch_config::LaunchHash": (
       hash: 2930691101847145196,
     ),
     "beet_core::workspace_config::PackageConfig": (
@@ -33,7 +33,7 @@
         ],
         exclude: [],
       ),
-      launch_scene: ("launch.ron"),
+      launch_file: ("launch.ron"),
       root_dir: (""),
       snippets_dir: ("target/snippets"),
       html_dir: ("target/client"),

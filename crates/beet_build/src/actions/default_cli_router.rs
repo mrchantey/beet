@@ -25,7 +25,8 @@ pub fn default_cli_router() -> impl Bundle {
 			exact_route_match(),
 			launch_sequence(),
 			AddWorkspaceSourceFiles,
-			parse_source_files()
+			parse_source_files(),
+			respond_ok()
 		])),
 		(named_route("run", children![
 			exact_route_match(),

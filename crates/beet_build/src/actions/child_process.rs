@@ -155,6 +155,23 @@ impl ChildProcess {
 		}
 	}
 
+	/// Uses the first argument as the command and the remaining as args
+	/// ## Panics
+	/// Panics if the args are empty
+	pub fn from_args(args: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+		let mut args = args.into_iter();
+		let cmd = args
+			.next()
+			.expect("ChildProcess::from_args requires at least one argument")
+			.as_ref()
+			.to_string();
+		Self {
+			cmd,
+			args: args.map(|s| s.as_ref().to_string()).collect(),
+			..default()
+		}
+	}
+
 	pub fn no_wait(mut self) -> Self {
 		self.wait = false;
 		self
