@@ -53,7 +53,7 @@ pub fn import_file_inner_text(
 					.insert(FileWatchedBy(source_file_ent));
 			} else {
 				warn!(
-					"file included by 'src=..' tag not found, changes will not be watched: {path:?}"
+					"no SourceFile matching an fs import ie '<style src='foo.css'/>'\nchanges will not be watched: {path:?}"
 				);
 			}
 		}

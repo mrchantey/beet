@@ -182,7 +182,7 @@ fn launch_step_predicate(
 		ev.trigger_with_cx(Outcome::Pass);
 		return Ok(());
 	};
-	// create a temp world to extract the beet file from the beet file
+	// create a temp world to extract resources from the launch scene
 	let mut temp_world = World::new();
 	temp_world.insert_resource(type_registry.clone());
 	temp_world.load_scene(scene)?;
@@ -195,10 +195,10 @@ fn launch_step_predicate(
 	let current_hash = LaunchHash::new(&ws_config)?;
 
 	let outcome = if &current_hash == launch_hash {
-		// hashes match, do nothing
+		// hashes match, should not run
 		Outcome::Fail
 	} else {
-		// run launch step if no match
+		// no match, should run
 		Outcome::Pass
 	};
 	ev.trigger_with_cx(outcome);

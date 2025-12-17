@@ -33,14 +33,12 @@ pub fn default_cli_router() -> impl Bundle {
 			launch_sequence(),
 			AddWorkspaceSourceFiles,
 			BuildServer,
-			// kill_server(),
 			RunServer,
 			respond_ok()
 		])),
 		(named_route("deploy", children![
 			exact_route_match(),
 			force_remote_service_access(),
-			//
 			BuildServer,
 			respond_ok()
 		]))
@@ -80,6 +78,6 @@ fn beet_site_cmd() -> CargoBuildCmd {
 	CargoBuildCmd::default().package("beet_site")
 }
 
-pub fn respond_ok() -> impl Bundle {
+fn respond_ok() -> impl Bundle {
 	(Name::new("Response"), StatusCode::OK.into_endpoint())
 }

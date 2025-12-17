@@ -76,8 +76,11 @@ impl AbsPathBuf {
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
 	/// be an absolute path. This uses [`path_ext::join_relative`] so
 	/// any leading `/` will be discarded.
+	/// After the join [`PathClean::clean`] will run to resolve relative
+	/// parts like `../`
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = path_ext::join_relative(&self.0, path);
+		let path = path.clean();
 		Self(path)
 	}
 
