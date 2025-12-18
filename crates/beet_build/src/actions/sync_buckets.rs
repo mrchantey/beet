@@ -7,7 +7,7 @@ use beet_rsx::prelude::*;
 pub fn PushAssets(pkg_config: Res<PackageConfig>) -> Result<impl Bundle> {
 	let src = AbsPathBuf::new_workspace_rel("assets")?.to_string();
 	let dst = format!("s3://{}/", pkg_config.assets_bucket_name());
-	(Name::new("Pull Assets"), RunS3Sync { src, dst }).xok()
+	(Name::new("Push Assets"), RunS3Sync { src, dst }).xok()
 }
 
 #[construct]

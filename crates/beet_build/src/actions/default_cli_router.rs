@@ -19,8 +19,9 @@ pub fn default_cli_router() -> impl Bundle {
 				"deploy-sst",
 				SstCommand::new(SstSubcommand::Deploy)
 			)),
-			(single_action_route("compile-wasm", CompileWasm)),
+			(single_action_route("compile-wasm", BuildWasm)),
 			(single_action_route("compile-lambda", CompileLambda)),
+			(single_action_route("deploy-lambda", DeployLambda)),
 			(single_action_route("watch-lambda", WatchLambda)),
 			(single_action_route("push-assets", PushAssets)),
 			(single_action_route("pull-assets", PullAssets)),
@@ -33,7 +34,7 @@ pub fn default_cli_router() -> impl Bundle {
 			(named_route("run", children![
 				exact_route_match(),
 				import_and_parse_source_files(),
-				// CompileWasm,
+				BuildWasm,
 				BuildServer,
 				ExportStaticContent,
 				RunServer,
@@ -41,22 +42,43 @@ pub fn default_cli_router() -> impl Bundle {
 			])),
 			(named_route("deploy", children![
 				exact_route_match(),
-				force_remote_service_access(),
+				apply_deploy_config(),
+				import_and_parse_source_files(),
+				BuildWasm,
 				BuildServer,
+				ExportStaticContent,
+				CompileLambda,
+				// push assets directly before deploying
+				// the lambda function to minimize
+				// server version mismatch
+				PushAssets,
+				PushHtml,
+				DeployLambda,
+				WatchLambda,
 				respond_ok()
 			]))
 		],
 	)
 }
 
-/// When deploying remote service access is the only option
-/// that makes sense
-fn force_remote_service_access() -> impl Bundle {
-	OnSpawn::observe(
-		|mut ev: On<GetOutcome>, mut config: ResMut<PackageConfig>| {
-			config.service_access = ServiceAccess::Remote;
-			ev.trigger_with_cx(Outcome::Pass);
-		},
+/// Apply non-optional settings for a deployed environment:
+/// - [`PackageConfig::service_access`] = [`ServiceAccess::Remote`]
+/// - [`CargoBuildCmd::release`] = `true`
+///   - Note: this setting is indepentent of [`PackageConfig::stage`]
+fn apply_deploy_config() -> impl Bundle {
+	(
+		Name::new("Apply Deploy Config"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 mut config: ResMut<PackageConfig>,
+			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>|
+			 -> Result {
+				config.service_access = ServiceAccess::Remote;
+				cmd.get_mut(ev.action())?.release = true;
+				ev.trigger_with_cx(Outcome::Pass);
+				Ok(())
+			},
+		),
 	)
 }
 

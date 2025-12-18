@@ -51,6 +51,7 @@ pub fn ChildProcess(
 			let cmd = cmd.clone();
 			let current_dir = current_dir.clone();
 			let args = args.clone();
+			println!("Package config {config:#?}");
 			let envs = envs.clone().xtend(config.envs());
 			if kill {
 				commands.entity(ev.action()).remove::<ChildHandle>();

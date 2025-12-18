@@ -5,7 +5,7 @@ use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
 #[construct]
-pub fn CompileWasm(
+pub fn BuildWasm(
 	query: AncestorQuery<&'static CargoBuildCmd>,
 ) -> Result<impl Bundle> {
 	let cmd = query
@@ -18,7 +18,7 @@ pub fn CompileWasm(
 
 	// wasm_opt(&cmd, &html_constants, &config.html_dir)?;
 
-	(Name::new("Compile Wasm"), Sequence, children![
+	(Name::new("Build Wasm"), Sequence, children![
 		ChildProcess::from_cargo(&cmd),
 		WasmBindgen,
 		WasmOpt

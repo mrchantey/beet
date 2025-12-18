@@ -78,7 +78,6 @@ fn simple_template() {
 #[test]
 fn nested_template() {
 	let mut world = BuildPlugin::world();
-	world.insert_resource(BuildFlags::None);
 
 	// create root static node
 	world.spawn((
@@ -133,8 +132,6 @@ fn common_idx_nested() -> SnippetRoot {
 fn build_scene(tokens: TokenStream) -> String {
 	let mut world = BuildPlugin::world();
 
-
-	world.insert_resource(BuildFlags::None);
 	let _entity = world
 		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();

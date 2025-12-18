@@ -74,7 +74,6 @@ mod test {
 	#[test]
 	fn rsx_snippets() {
 		let mut world = BuildPlugin::world();
-		world.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 
 		let test_site_index = WsPathBuf::new("tests/test_site/pages/index.rs");
@@ -99,7 +98,6 @@ mod test {
 	#[ignore = "lang snippet exports is a wip"]
 	fn lang_snippets() {
 		let mut world = BuildPlugin::world();
-		world.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
 
 		let path = WorkspaceConfig::default()
 			.lang_snippet_path(&WsPathBuf::new(file!()), 0)

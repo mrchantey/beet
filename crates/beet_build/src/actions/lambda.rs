@@ -21,14 +21,12 @@ pub struct LambdaConfig {
 #[construct]
 pub fn CompileLambda(
 	entity: Entity,
-	query: AncestorQuery<'_, '_, &'static CargoBuildCmd>,
+	query: AncestorQuery<&'static CargoBuildCmd>,
 ) -> impl Bundle {
 	let mut cmd = query
 		.get(entity)
 		.cloned()
 		.unwrap_or_default()
-		// force release, debug builds are generally way to big (450 MB) for lambda ( max 65 MB)
-		.release()
 		// beet binaries should default to 'server' with 'native-tls' but we need
 		// to disable that to specify 'deploy' feature
 		.no_default_features()
