@@ -1,21 +1,25 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
-use crate::actions::ChildProcess;
-
 #[construct]
-pub fn SstCommand(
-	cmd: SstSubcommand,
-	pkg_config: Res<PackageConfig>,
-) -> Result<impl Bundle> {
-	let sst_dir = WsPathBuf::default().join("infra");
-	ChildProcess::new("npx")
-		.current_dir(sst_dir.to_string())
-		.arg("sst")
-		.arg(cmd.to_cmd())
-		.arg("--stage")
-		.arg(pkg_config.stage())
-		.xok()
+pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
+	(OnSpawn::observe(
+		move |ev: On<GetOutcome>,
+		      mut cmd_params: CommandParams,
+		      pkg_config: Res<PackageConfig>| {
+			let config = CommandConfig::new("npx")
+				.arg("sst")
+				.arg(cmd.to_cmd())
+				.arg("--stage")
+				.arg(pkg_config.stage())
+				.current_dir(WsPathBuf::default().join("infra").to_string());
+
+			cmd_params.execute(ev, config)
+		},
+	),)
+
 	// 	// 	"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
 }
 

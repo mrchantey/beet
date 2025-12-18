@@ -19,7 +19,7 @@ pub fn default_cli_router() -> impl Bundle {
 				"deploy-sst",
 				SstCommand::new(SstSubcommand::Deploy)
 			)),
-			(single_action_route("compile-wasm", BuildWasm)),
+			(single_action_route("compile-wasm", build_wasm())),
 			(single_action_route("compile-lambda", CompileLambda)),
 			(single_action_route("deploy-lambda", DeployLambda)),
 			(single_action_route("watch-lambda", WatchLambda)),
@@ -34,7 +34,7 @@ pub fn default_cli_router() -> impl Bundle {
 			(named_route("run", children![
 				exact_route_match(),
 				import_and_parse_source_files(),
-				BuildWasm,
+				build_wasm(),
 				BuildServer,
 				ExportStaticContent,
 				RunServer,
@@ -42,9 +42,11 @@ pub fn default_cli_router() -> impl Bundle {
 			])),
 			(named_route("deploy", children![
 				exact_route_match(),
-				apply_deploy_config(),
 				import_and_parse_source_files(),
-				BuildWasm,
+				// apply after import, the scene loaded likely contains a
+				// PackageConfig
+				apply_deploy_config(),
+				build_wasm(),
 				BuildServer,
 				ExportStaticContent,
 				CompileLambda,
@@ -70,10 +72,12 @@ fn apply_deploy_config() -> impl Bundle {
 		Name::new("Apply Deploy Config"),
 		OnSpawn::observe(
 			|mut ev: On<GetOutcome>,
-			 mut config: ResMut<PackageConfig>,
+			 mut pkg_config: ResMut<PackageConfig>,
 			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>|
 			 -> Result {
-				config.service_access = ServiceAccess::Remote;
+				assert_eq!(pkg_config.service_access, ServiceAccess::Local);
+				pkg_config.service_access = ServiceAccess::Remote;
+				assert_eq!(pkg_config.service_access, ServiceAccess::Remote);
 				cmd.get_mut(ev.action())?.release = true;
 				ev.trigger_with_cx(Outcome::Pass);
 				Ok(())

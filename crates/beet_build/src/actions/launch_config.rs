@@ -125,18 +125,7 @@ pub fn launch_sequence() -> impl Bundle {
 			Name::new("Launch Step"),
 			Sequence,
 			// Run launch to generate scene if needed
-			children![
-				(
-					Name::new("Launch Step Predicate"),
-					OnSpawn::observe(launch_step_predicate)
-				),
-				(
-					Name::new("Run Launch Step"),
-					OnSpawn::run_insert(|config: Res<LaunchConfig>| {
-						run_launch_step(&config)
-					})
-				)
-			]
+			children![launch_step_predicate(), run_launch_step()]
 		),
 		// load beet file into world
 		// regardless of whether we needed to run the launch step
@@ -165,80 +154,98 @@ fn load_launch_scene(
 /// - [`LaunchConfig::launch_file`] exists and when loaded
 /// the [`LaunchHash`] does not match the current state
 /// and !force_lanch
-fn launch_step_predicate(
-	mut ev: On<GetOutcome>,
-	workspace_config: Res<WorkspaceConfig>,
-	launch_config: Res<LaunchConfig>,
-	type_registry: Res<AppTypeRegistry>,
-) -> Result<()> {
-	if launch_config.force_launch {
-		ev.trigger_with_cx(Outcome::Pass);
-		return Ok(());
-	}
-	let Ok(scene) =
-		fs_ext::read_to_string(&workspace_config.launch_file.into_abs())
-	else {
-		// no scene, should run
-		ev.trigger_with_cx(Outcome::Pass);
-		return Ok(());
-	};
-	// create a temp world to extract resources from the launch scene
-	let mut temp_world = World::new();
-	temp_world.insert_resource(type_registry.clone());
-	temp_world.load_scene(scene)?;
-	let launch_hash = temp_world.get_resource::<LaunchHash>().ok_or_else(||{
-		bevyhow!(
-			"LaunchHash is missing from launch scene, this can happen if it was not generated with the LaunchConfig::runner"
-		)
-	})?;
-	let ws_config = temp_world.resource::<WorkspaceConfig>();
-	let current_hash = LaunchHash::new(&ws_config)?;
+fn launch_step_predicate() -> impl Bundle {
+	(
+		Name::new("Launch Step Predicate"),
+		OnSpawn::observe(
+			|mut ev: On<GetOutcome>,
+			 workspace_config: Res<WorkspaceConfig>,
+			 launch_config: Res<LaunchConfig>,
+			 type_registry: Res<AppTypeRegistry>|
+			 -> Result<()> {
+				if launch_config.force_launch {
+					ev.trigger_with_cx(Outcome::Pass);
+					return Ok(());
+				}
+				let Ok(scene) = fs_ext::read_to_string(
+					&workspace_config.launch_file.into_abs(),
+				) else {
+					// no scene, should run
+					ev.trigger_with_cx(Outcome::Pass);
+					return Ok(());
+				};
+				// create a temp world to extract resources from the launch scene
+				let mut temp_world = World::new();
+				temp_world.insert_resource(type_registry.clone());
+				temp_world.load_scene(scene)?;
+				let launch_hash = temp_world.get_resource::<LaunchHash>().ok_or_else(||{
+					bevyhow!(
+						"LaunchHash is missing from launch scene, this can happen if it was not generated with the LaunchConfig::runner"
+					)
+				})?;
+				let ws_config = temp_world.resource::<WorkspaceConfig>();
+				let current_hash = LaunchHash::new(&ws_config)?;
 
-	let outcome = if &current_hash == launch_hash {
-		// hashes match, should not run
-		Outcome::Fail
-	} else {
-		// no match, should run
-		Outcome::Pass
-	};
-	ev.trigger_with_cx(outcome);
-	Ok(())
+				let outcome = if &current_hash == launch_hash {
+					// hashes match, should not run
+					Outcome::Fail
+				} else {
+					// no match, should run
+					Outcome::Pass
+				};
+				ev.trigger_with_cx(outcome);
+				Ok(())
+			},
+		),
+	)
 }
 
-/// Create a [`ChildProcess`] to run the launch step
+/// Execute a command to run the launch step using [`CommandConfig`]
 /// ## Panics
 /// Panics if no_default_args but no additional args present
-fn run_launch_step(config: &LaunchConfig) -> ChildProcess {
-	if config.no_default_args {
-		let additional_args = config
-			.additional_args
-			.clone()
-			.ok_or_else(|| {
-				bevyhow!(
-					"LaunchConfig::no_default_args is true but no additional_args provided"
-				)
-			})
-			.unwrap();
-		ChildProcess::from_args(additional_args.split_whitespace())
-	} else {
-		let mut cmd = CargoBuildCmd::new("run")
-			.no_default_features()
-			.feature("launch");
-		if let Some(package) = &config.package {
-			cmd = cmd.package(package);
-		}
-		let mut proc = ChildProcess::from_cargo(&cmd);
-		if let Some(launch_cargo_args) = &config.additional_args {
-			proc.args
-				.extend(launch_cargo_args.split_whitespace().map(|s| s.into()));
-		}
-		proc
-	}
+fn run_launch_step() -> impl Bundle {
+	(
+		Name::new("Run Launch Step"),
+		OnSpawn::observe(
+			|ev: On<GetOutcome>,
+			 mut cmd_params: CommandParams,
+			 config: Res<LaunchConfig>| {
+				let cmd_config = if config.no_default_args {
+					let additional_args = config
+						.additional_args
+						.clone()
+						.ok_or_else(|| {
+							bevyhow!(
+								"LaunchConfig::no_default_args is true but no additional_args provided"
+							)
+						})
+						.unwrap();
+					CommandConfig::parse(additional_args)
+				} else {
+					let mut cmd = CargoBuildCmd::new("run")
+						.no_default_features()
+						.feature("launch");
+					if let Some(package) = &config.package {
+						cmd = cmd.package(package);
+					}
+					let mut cmd_config = CommandConfig::from_cargo(&cmd);
+					if let Some(launch_cargo_args) = &config.additional_args {
+						for arg in launch_cargo_args.split_whitespace() {
+							cmd_config = cmd_config.arg(arg);
+						}
+					}
+					cmd_config
+				};
+
+				cmd_params.execute(ev, cmd_config)
+			},
+		),
+	)
 }
+
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 	use sweet::prelude::*;
 
 	#[test]

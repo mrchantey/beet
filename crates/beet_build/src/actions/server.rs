@@ -10,46 +10,48 @@ use beet_rsx::prelude::*;
 pub struct ServerProcess;
 
 #[construct]
-pub fn BuildServer(
-	entity: Entity,
-	query: AncestorQuery<&'static CargoBuildCmd>,
-) -> impl Bundle {
+pub fn BuildServer() -> impl Bundle {
 	(
 		Name::new("Build Server"),
-		query
-			.get(entity)
-			.cloned()
-			.unwrap_or_default()
-			.feature("server-local")
-			.no_default_features()
-			.cmd("build")
-			.xref()
-			.xmap(ChildProcess::from_cargo),
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      mut cmd_params: CommandParams,
+			      query: AncestorQuery<&'static CargoBuildCmd>| {
+				let config = query
+					.get(ev.action())
+					.cloned()
+					.unwrap_or_default()
+					.cmd("build")
+					.feature("server-local")
+					.no_default_features();
+
+				cmd_params.execute(ev, config)
+			},
+		),
 	)
 }
 
 #[construct]
-pub fn RunServer(
-	entity: Entity,
-	query: AncestorQuery<&'static CargoBuildCmd>,
-) -> impl Bundle {
-	let cmd = query.get(entity).cloned().unwrap_or_default();
+pub fn RunServer() -> impl Bundle {
 	(
 		Name::new("Run Server"),
 		ServerProcess,
-		OnSpawn::run_insert::<_, _, Result<ChildProcess>, _>(
-			move |manifest: Res<CargoManifest>| {
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      mut cmd_params: CommandParams,
+			      manifest: Res<CargoManifest>,
+			      query: AncestorQuery<&'static CargoBuildCmd>| {
+				let cmd = query.get(ev.action()).cloned().unwrap_or_default();
+
 				let exe_path = cmd
 					.exe_path(manifest.package_name())
 					.to_string_lossy()
 					.to_string();
 				path_ext::assert_exists(&exe_path)?;
 
-				ChildProcess {
-					cmd: exe_path,
-					..default()
-				}
-				.xok()
+				let config = CommandConfig::new(exe_path);
+
+				cmd_params.execute(ev, config)
 			},
 		),
 	)
@@ -59,29 +61,28 @@ pub fn RunServer(
 /// Run the server binary with the `--export-static` flag to retrieve
 /// the static content like html pages.
 #[construct]
-pub fn ExportStaticContent(
-	entity: Entity,
-	query: AncestorQuery<&'static CargoBuildCmd>,
-) -> impl Bundle {
-	let cmd = query.get(entity).cloned().unwrap_or_default();
-
+pub fn ExportStaticContent() -> impl Bundle {
 	(
 		Name::new("Export Static Content"),
 		ServerProcess,
-		OnSpawn::run_insert::<_, _, Result<ChildProcess>, _>(
-			move |manifest: Res<CargoManifest>| {
-				let exe_path = cmd
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      mut cmd_params: CommandParams,
+			      manifest: Res<CargoManifest>,
+			      query: AncestorQuery<&'static CargoBuildCmd>| {
+				let exe_path = query
+					.get(ev.action())
+					.cloned()
+					.unwrap_or_default()
 					.exe_path(manifest.package_name())
 					.to_string_lossy()
 					.to_string();
 				path_ext::assert_exists(&exe_path)?;
 
-				ChildProcess {
-					cmd: exe_path,
-					args: vec!["--export-static".into()],
-					..default()
-				}
-				.xok()
+				let config =
+					CommandConfig::new(exe_path).arg("--export-static");
+
+				cmd_params.execute(ev, config)
 			},
 		),
 	)
