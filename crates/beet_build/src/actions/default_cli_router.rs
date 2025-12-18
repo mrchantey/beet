@@ -35,7 +35,7 @@ pub fn default_cli_router() -> impl Bundle {
 				import_and_parse_source_files(),
 				BuildServer,
 				ExportStaticContent,
-				// CompileWasm,
+				CompileWasm,
 				RunServer,
 				respond_ok()
 			])),
