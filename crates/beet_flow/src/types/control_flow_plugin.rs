@@ -53,8 +53,8 @@ where
 	R::End: Clone,
 {
 	// app.add_observer(propagate_run::<Run>);
-	app.add_observer(interrupt_run::<R>);
-	app.add_observer(interrupt_end::<R::End>);
+	app.add_observer(interrupt_on_run::<R>);
+	app.add_observer(interrupt_on_end::<R::End>);
 	app.add_observer(propagate_end::<R::End>);
 	app.add_observer(propagate_child_end::<R::End>);
 }

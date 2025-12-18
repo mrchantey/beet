@@ -14,6 +14,7 @@ pub struct StdOutLine {
 /// with a [`ContinueRun`]. This component will be removed either
 /// when the command is executed again or the action is cancelled.
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct ChildHandle(async_process::Child);
 
 impl Drop for ChildHandle {

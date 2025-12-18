@@ -6,3 +6,5 @@ mod fs_watch_cmd;
 pub use fs_watch_cmd::*;
 mod graceful_child;
 pub use graceful_child::*;
+mod fs_watcher_plugin;
+pub use fs_watcher_plugin::*;

@@ -21,7 +21,11 @@ impl Plugin for CliPlugin {
 				stage: "dev".into(),
 				service_access: ServiceAccess::Local,
 			})
-			.add_systems(Update, poll_child_handles)
+			.add_systems(
+				Update,
+				// chain for determinism
+				(poll_child_handles, process_watch_events).chain(),
+			)
 			.add_observer(interrupt_child_handles)
 			// temp: hardcoded until cli args
 			.insert_resource(LaunchConfig {
