@@ -29,12 +29,12 @@ impl Plugin for FsWatcherPlugin {
 
 fn watch_file_changes(watcher: Res<FsWatcher>, mut commands: AsyncCommands) {
 	let watcher = watcher.clone();
-	commands.run(async move |queue| {
+	commands.run(async move |world| {
 		let mut rx = watcher.watch()?;
 		while let Some(ev) = rx.recv().await? {
 			if ev.has_mutate() {
 				let mutated = ev.take().into_iter().filter(|ev| ev.mutated());
-				queue.write_message_batch(mutated);
+				world.write_message_batch(mutated);
 			}
 		}
 

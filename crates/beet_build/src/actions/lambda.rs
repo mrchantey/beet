@@ -152,9 +152,11 @@ pub fn WatchLambda() -> impl Bundle {
 					.arg("short") // detailed,short,json
 					.arg("--since")
 					.arg("2m")
-					.arg("--follow")
-					// succeed immediatly to yield control for interruptions etc
-					.no_wait();
+					.arg("--follow");
+				// TODO eventually the deploy step will be simply diffing static
+				// scene files, in this case it will be on a live reload loop,
+				// so we can succeed immediatly here
+				// .no_wait();
 
 				cmd_params.execute(ev, config)
 			},
