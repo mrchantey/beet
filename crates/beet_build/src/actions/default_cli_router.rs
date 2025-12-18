@@ -43,8 +43,8 @@ pub fn default_cli_router() -> impl Bundle {
 			(named_route("deploy", children![
 				exact_route_match(),
 				import_and_parse_source_files(),
-				// apply after import, the scene loaded likely contains a
-				// PackageConfig
+				// apply after import to avoid clobber, 
+				// the scene loaded likely contains a PackageConfig
 				apply_deploy_config(),
 				build_wasm(),
 				BuildServer,
@@ -75,9 +75,7 @@ fn apply_deploy_config() -> impl Bundle {
 			 mut pkg_config: ResMut<PackageConfig>,
 			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>|
 			 -> Result {
-				assert_eq!(pkg_config.service_access, ServiceAccess::Local);
 				pkg_config.service_access = ServiceAccess::Remote;
-				assert_eq!(pkg_config.service_access, ServiceAccess::Remote);
 				cmd.get_mut(ev.action())?.release = true;
 				ev.trigger_with_cx(Outcome::Pass);
 				Ok(())

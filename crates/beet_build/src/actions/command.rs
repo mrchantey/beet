@@ -162,7 +162,6 @@ impl CommandParams<'_, '_> {
 			wait,
 			kill,
 		} = cmd_config.into();
-		assert_eq!(self.pkg_config.service_access, ServiceAccess::Remote);
 
 		let envs = envs.clone().xtend(self.pkg_config.envs());
 		if kill {

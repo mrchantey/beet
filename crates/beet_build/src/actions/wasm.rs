@@ -7,7 +7,9 @@ pub fn build_wasm() -> impl Bundle {
 	(Name::new("Build Wasm"), Sequence, children![
 		cargo_build_wasm(),
 		wasm_bindgen(),
-		wasm_opt()
+		wasm_size(false),
+		wasm_opt(),
+		wasm_size(true),
 	])
 }
 
@@ -76,6 +78,45 @@ fn wasm_bindgen() -> impl Bundle {
 	)
 }
 
+
+fn wasm_size(release_only: bool) -> impl Bundle {
+	(
+		Name::new("Wasm Size"),
+		OnSpawn::observe(
+			move |mut ev: On<GetOutcome>,
+			      html_constants: Res<HtmlConstants>,
+			      query: AncestorQuery<&'static CargoBuildCmd>,
+			      ws_config: Res<WorkspaceConfig>|
+			      -> Result {
+				let is_release =
+					query.get(ev.action()).cloned().unwrap_or_default().release;
+				if release_only && !is_release {
+					// noop
+				} else {
+					let wasm_file = wasm_file(&html_constants, &ws_config);
+					let size = std::fs::metadata(&wasm_file)?.len();
+					info!("🌱 wasm size: {} KB", size as usize / 1024);
+				}
+
+				ev.trigger_with_cx(Outcome::Pass);
+
+				Ok(())
+			},
+		),
+	)
+}
+
+fn wasm_file(
+	html_constants: &HtmlConstants,
+	ws_config: &WorkspaceConfig,
+) -> WsPathBuf {
+	ws_config.html_dir.join(format!(
+		"{}/{}_bg.wasm",
+		&html_constants.wasm_dir.display(),
+		&html_constants.wasm_name
+	))
+}
+
 fn wasm_opt() -> impl Bundle {
 	(
 		Name::new("Wasm Opt"),
@@ -96,11 +137,7 @@ fn wasm_opt() -> impl Bundle {
 
 				// only optimize in release mode
 				if cmd.release {
-					let wasm_file = ws_config.html_dir.join(format!(
-						"{}/{}_bg.wasm",
-						&html_constants.wasm_dir.display(),
-						&html_constants.wasm_name
-					));
+					let wasm_file = wasm_file(&html_constants, &ws_config);
 					let cmd_config = CommandConfig::new("wasm-opt")
 						.arg("-Oz")
 						.arg("--output")
@@ -110,14 +147,6 @@ fn wasm_opt() -> impl Bundle {
 				} else {
 					ev.trigger_with_cx(Outcome::Pass);
 				}
-				// let size_before = std::fs::metadata(&wasm_file)?.len();
-
-				// let size_after = std::fs::metadata(&wasm_file)?.len();
-				// debug!(
-				// 	"🌱 Reduced wasm binary from {} to {}",
-				// 	format!("{} KB", size_before as usize / 1024),
-				// 	format!("{} KB", size_after as usize / 1024)
-				// );
 				Ok(())
 			},
 		),
