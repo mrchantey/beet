@@ -152,7 +152,7 @@ mod test {
 	#[test]
 	fn lang_src() {
 		quote! {
-			<style src="./foobar"/>
+			<style src="../../../../tests/test_site/components/style.css"/>
 		}
 		.xmap(parse)
 		.xpect_snapshot();

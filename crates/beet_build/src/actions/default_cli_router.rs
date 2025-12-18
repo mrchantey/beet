@@ -33,9 +33,9 @@ pub fn default_cli_router() -> impl Bundle {
 			(named_route("run", children![
 				exact_route_match(),
 				import_and_parse_source_files(),
+				// CompileWasm,
 				BuildServer,
 				ExportStaticContent,
-				CompileWasm,
 				RunServer,
 				respond_ok()
 			])),

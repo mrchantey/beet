@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
+use bevy::prelude::*;
 use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
@@ -70,6 +71,16 @@ impl WsPathBuf {
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = self.0.join(path).clean();
 		Self::new(path)
+	}
+
+	pub fn parent(&self) -> Result<WsPathBuf> {
+		match self.0.parent() {
+			Some(parent) => Ok(WsPathBuf::new(parent)),
+			None => bevybail!(
+				"WsPathBuf has no parent: {}",
+				self.0.to_string_lossy()
+			),
+		}
 	}
 
 	/// Convert to a [`AbsPathBuf`]. This should be used instead of

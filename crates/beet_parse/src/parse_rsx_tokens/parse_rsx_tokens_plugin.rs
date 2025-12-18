@@ -57,6 +57,9 @@ impl Plugin for ParseRsxTokensPlugin {
 						.chain()
 						.before(ModifyRsxTree),
 					(
+						// importantly load_file_inner_text after ModifyRsxTree,
+						// beet_build uses import_file_inner_text which has different behavior
+						load_file_inner_text,
 						#[cfg(feature = "syntect")]
 						parse_syntect,
 						#[cfg(feature = "css")]

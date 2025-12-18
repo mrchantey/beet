@@ -126,7 +126,7 @@ mod test {
 	}
 	#[test]
 	fn inner_text_src() {
-		quote! {<style src="foo.rs"/>}
+		quote! {<foo src="tokenize_rsx.rs"/>}
 			.xmap(|t| ParseRsxTokens::rstml_to_rsx(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.xpect_snapshot();

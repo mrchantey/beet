@@ -68,7 +68,7 @@ impl std::fmt::Display for SnippetRoot {
 }
 
 impl SnippetRoot {
-	/// Create a new [`TemplateKey`] from a file and index.
+	/// Create a new [`SnippetRoot`] from a file and index.
 	pub fn new(file: WsPathBuf, start: LineCol) -> Self { Self { file, start } }
 	/// Convenience for using the `file!` and friends macros.
 	/// ## Example

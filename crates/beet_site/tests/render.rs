@@ -14,11 +14,26 @@ async fn test_layouts_series() {
 		.await_event::<Insert, Router>()
 		.await;
 
+	home(&mut world).await;
 	docs(&mut world).await;
 	article_layout(&mut world).await;
 	// correct_title(&mut world).await;
 }
-// #[ignore]
+
+async fn home(world: &mut World) {
+	world
+		.oneshot("/")
+		.await
+		.into_result()
+		.await
+		.unwrap()
+		.text()
+		.await
+		.unwrap()
+		// code snippets should be syntect parsed, ie <code>fn</code>..
+		.xnot()
+		.xpect_contains("fn Counter(initial: u32)");
+}
 async fn docs(world: &mut World) {
 	world
 		.oneshot("/docs")
@@ -34,6 +49,8 @@ async fn docs(world: &mut World) {
 		.xnot()
 		.xpect_contains("nav {");
 }
+
+
 async fn article_layout(world: &mut World) {
 	world
 		.oneshot("/blog/post-1")

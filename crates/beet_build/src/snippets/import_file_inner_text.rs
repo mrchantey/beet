@@ -21,7 +21,10 @@ pub fn import_file_inner_text(
 			.ok_or_else(|| {
 				bevyhow!("FileInnerText has no SourceFile parent: {entity:?}")
 			})?;
-		let path = source_file.parent().unwrap_or_default().join(&file_text.0);
+		let path = source_file
+			.parent()
+			.unwrap_or_default()
+			.join(&file_text.path);
 		let contents = fs_ext::read_to_string(&path)?;
 
 		// 1. change the FileInnerText to InnerText

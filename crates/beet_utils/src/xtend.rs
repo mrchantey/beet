@@ -1,3 +1,6 @@
+use crate::prelude::*;
+use bevy::prelude::*;
+
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait Xtend: Sized {
@@ -117,6 +120,31 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 			}
 		}
 		Ok(out)
+	}
+
+	/// Similar to [`Iterator::find_map`] but where the mapping can fail.
+	///
+	/// In the case of no Ok, the first error will be returned, otherwise
+	/// a "No items found" is returned.
+	fn xtry_find_map<O, E>(
+		self,
+		mut func: impl FnMut(T) -> Result<O, E>,
+	) -> Result<O>
+	where
+		E: Into<BevyError>,
+	{
+		let mut err = None;
+		for item in self.into_iter() {
+			match (func)(item) {
+				Ok(o) => return Ok(o),
+				Err(e) if err.is_none() => err = Some(e),
+				Err(_) => { /* ignore subsequent errors */ }
+			}
+		}
+		match err {
+			Some(e) => Err(e.into()),
+			None => bevybail!("No items found"),
+		}
 	}
 }
 

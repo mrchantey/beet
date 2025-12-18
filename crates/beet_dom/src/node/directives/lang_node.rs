@@ -93,19 +93,24 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 #[reflect(Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FileInnerText(
+pub struct FileInnerText {
 	/// path to the file relative to the source file,
-	pub String,
-);
+	pub path: String,
+}
+impl FileInnerText {
+	/// Create a new [`FileInnerText`] from a path `String`.
+	pub fn new(path: impl Into<String>) -> Self { Self { path: path.into() } }
+}
 
 
-/// if `beet_parse` has the `css` feature FileInnerText will be loaded by the macro
-/// and replaced with an `InnerText` containing the css, so this tokenization
-/// will not occur.
+/// A FileInnerText is tokenized directly `include_str!(file)`
+///
+/// When used in `beet_parse`, any [`FileInnerText`] that requires macro-level parsing
+/// will not be tokenized, and instead loaded by `load_file_inner_text`
 #[cfg(feature = "tokens")]
 impl TokenizeSelf for FileInnerText {
 	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-		let path = &self.0;
+		let path = &self.path;
 		// it would be nice to exclude this in client side but that doesnt work
 		// for dynamically added content.
 		tokens.extend(quote::quote! {

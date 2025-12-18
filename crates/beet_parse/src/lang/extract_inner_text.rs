@@ -24,13 +24,13 @@ pub fn extract_inner_text_file(
 			// TODO allow absolute paths?
 			commands
 				.entity(entity)
-				.insert(FileInnerText(value.0.clone()));
+				.insert(FileInnerText::new(value.0.clone()));
 			commands.entity(attr_entity).despawn();
 		}
 	}
 }
 
-/// Extract inner text from a non-slot [`ElementNode`] with a single child [`TextNode`]
+/// Extract inner text from a non-slot [`ElementNode`] with a single child [`TextNode`].
 pub fn extract_inner_text_element(
 	mut commands: Commands,
 	lit_nodes: Query<&TextNode>,
@@ -89,6 +89,33 @@ pub fn extract_inner_text_directive(
 	}
 }
 
+
+/// Source files that require in-macro parsing like CodeNode (syntect) or LangNode (lightning)
+/// need to be loaded at macro parse time.
+pub fn load_file_inner_text(
+	mut commands: Commands,
+	query: Query<
+		(Entity, &FileInnerText),
+		Or<(With<StyleElement>, With<ScriptElement>, With<CodeNode>)>,
+	>,
+	parents: Query<&ChildOf>,
+	snippet_roots: Query<&SnippetRoot>,
+) -> Result {
+	for (entity, file_inner_text) in query.iter() {
+		let root = parents
+			.iter_ancestors(entity)
+			.xtry_find_map(|ancestor| snippet_roots.get(ancestor))?;
+		let path = root.file.parent()?.join(&file_inner_text.path).into_abs();
+		let text = fs_ext::read_to_string(path)?;
+		commands
+			.entity(entity)
+			.remove::<FileInnerText>()
+			.insert(InnerText(text));
+	}
+	Ok(())
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -142,7 +169,7 @@ mod test {
 		entity
 			.get::<FileInnerText>()
 			.unwrap()
-			.xpect_eq(FileInnerText("./style.css".to_string()));
+			.xpect_eq(FileInnerText::new("./style.css".to_string()));
 		entity.contains::<Attributes>().xpect_false();
 	}
 
@@ -163,5 +190,33 @@ mod test {
 			.unwrap()
 			.xpect_eq(InnerText::new("div { color: red; }"));
 		entity.contains::<Children>().xpect_false();
+	}
+
+	#[test]
+	fn load_file_inner_text() {
+		let mut world = World::new();
+		let parent = world
+			.spawn(SnippetRoot::new(
+				WsPathBuf::new(file!()),
+				LineCol::new(0, 0),
+			))
+			.id();
+		let child = world
+			.spawn((
+				ChildOf(parent),
+				StyleElement,
+				FileInnerText::new("./extract_inner_text.rs"),
+			))
+			.id();
+		world
+			.run_system_cached::<(), _, _>(super::load_file_inner_text)
+			.unwrap();
+		let entity = world.entity(child);
+		entity.contains::<FileInnerText>().xpect_false();
+		entity
+			.get::<InnerText>()
+			.unwrap()
+			.0
+			.xpect_eq(include_str!("extract_inner_text.rs"));
 	}
 }
