@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Convert an [`End<Outcome>`] into an [`AppExit`]
+/// Convert an [`Outcome`] into an [`AppExit`]
 #[action(exit_on_end)]
 #[derive(Debug, Component)]
 pub struct ExitOnEnd;

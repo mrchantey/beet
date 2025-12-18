@@ -1,8 +1,6 @@
-use std::path::PathBuf;
-
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_rsx::prelude::*;
+use std::path::PathBuf;
 
 /// Emitted for each stdout/stderr line. `is_err` is true for stderr.
 #[derive(EntityTargetEvent)]
@@ -11,14 +9,53 @@ pub struct StdOutLine {
 	pub is_err: bool,
 }
 
-/// Holds a handle to a spawned child process,
-/// killed on drop.
-/// This will only be inserted for a [`ChildProcess`] with `wait: false`
+/// Holds a handle to a spawned child process, killed on drop.
+/// This will only be inserted for a command executed on actions
+/// with a [`ContinueRun`]. This component will be removed either
+/// when the command is executed again or the action is cancelled.
 #[derive(Component)]
 pub struct ChildHandle(async_process::Child);
 
 impl Drop for ChildHandle {
 	fn drop(&mut self) { self.0.kill().ok(); }
+}
+
+/// Polls all running child processes for completion,
+/// triggering the appropriate outcome and removing
+/// the [`ChildHandle`] component when done.
+pub fn poll_child_handles(
+	mut commands: Commands,
+	mut query: Populated<(Entity, &mut ChildHandle), With<Running>>,
+) -> Result {
+	for (entity, mut child_handle) in query.iter_mut() {
+		// try_status errors are an io::Error, we do not handle
+		// and instead propagate
+		if let Some(status) = child_handle.0.try_status()? {
+			let outcome = match status.success() {
+				true => Outcome::Pass,
+				false => Outcome::Fail,
+			};
+			commands
+				.entity(entity)
+				.remove::<ChildHandle>()
+				.trigger_target(outcome);
+		}
+	}
+	Ok(())
+}
+
+
+/// Removes any existing [`ChildHandle`] from an action
+/// when the [`Running`] component is removed, interrupting
+/// the process.
+pub fn interrupt_child_handles(
+	ev: On<Remove, Running>,
+	mut commands: Commands,
+	query: Query<Entity, With<ChildHandle>>,
+) {
+	if query.contains(ev.entity) {
+		commands.entity(ev.entity).remove::<ChildHandle>();
+	}
 }
 
 /// Configuration for command actions
@@ -33,12 +70,6 @@ pub struct CommandConfig {
 	/// Environment variables to set, in addition to
 	/// [`PackageConfig::envs`]
 	envs: Vec<(String, String)>,
-	/// Wait for the child to complete before triggering
-	/// [`Outcome::Pass`], alternatively set false to pass immediately
-	/// with the [`ChildHandle`] added.
-	wait: bool,
-	/// Kill any existing [`ChildHandle`] on this entity before running
-	kill: bool,
 }
 
 impl CommandConfig {
@@ -56,6 +87,12 @@ impl CommandConfig {
 			args: args.map(|s| s.to_string()).collect(),
 			..default()
 		}
+	}
+
+	/// Accepts a full shell command string, and runs
+	/// it via `sh -c <full_cmd>`
+	pub fn parse_shell(full_cmd: impl Into<String>) -> Self {
+		Self::from_parts("sh", vec!["-c".into(), full_cmd.into()])
 	}
 
 
@@ -100,15 +137,6 @@ impl CommandConfig {
 		self
 	}
 
-	pub fn no_wait(mut self) -> Self {
-		self.wait = false;
-		self
-	}
-	pub fn no_kill(mut self) -> Self {
-		self.kill = false;
-		self
-	}
-
 	pub fn from_cargo(cargo: &CargoBuildCmd) -> Self {
 		Self {
 			cmd: "cargo".into(),
@@ -125,8 +153,6 @@ impl Default for CommandConfig {
 			args: default(),
 			current_dir: None,
 			envs: default(),
-			wait: true,
-			kill: true,
 		}
 	}
 }
@@ -140,6 +166,8 @@ impl From<CargoBuildCmd> for CommandConfig {
 pub struct CommandParams<'w, 's> {
 	bevy_commands: Commands<'w, 's>,
 	pkg_config: Res<'w, PackageConfig>,
+	/// Used to check whether an action is interruptable
+	interruptable: Query<'w, 's, &'static ContinueRun>,
 }
 
 impl CommandParams<'_, '_> {
@@ -159,65 +187,59 @@ impl CommandParams<'_, '_> {
 			args,
 			current_dir,
 			envs,
-			wait,
-			kill,
 		} = cmd_config.into();
 
+		let interruptable = self.interruptable.contains(ev.action());
+
 		let envs = envs.clone().xtend(self.pkg_config.envs());
-		if kill {
+		self.bevy_commands
+			.entity(ev.action())
+			.remove::<ChildHandle>();
+		let envs_pretty = envs
+			.iter()
+			.map(|(k, v)| format!("{}={}", k, v))
+			.collect::<Vec<_>>()
+			.join(" ");
+		info!("{} {} {}", envs_pretty, cmd, args.join(" "));
+		// 1. spawn the command
+		let mut cmd = async_process::Command::new(&cmd);
+		cmd.args(&args).envs(envs);
+		if let Some(dir) = current_dir {
+			cmd.current_dir(dir);
+		}
+		let mut child = cmd.spawn()?;
+		// 2. take stdout/stderr pipes
+		// let stdout = child
+		// 	.stdout
+		// 	.take()
+		// 	.ok_or_else(|| bevyhow!("stdout not found"))?;
+
+		// let stderr = child
+		// 	.stderr
+		// 	.take()
+		// 	.ok_or_else(|| bevyhow!("stderr not found"))?;
+		if interruptable {
+			// store the child process and poll for completion
 			self.bevy_commands
 				.entity(ev.action())
-				.remove::<ChildHandle>();
-		}
-		ev.run_async(async move |mut action| {
-			let envs_pretty = envs
-				.iter()
-				.map(|(k, v)| format!("{}={}", k, v))
-				.collect::<Vec<_>>()
-				.join(" ");
-			info!("{} {} {}", envs_pretty, cmd, args.join(" "));
-			// 1. spawn the command
-			let mut cmd = async_process::Command::new(&cmd);
-			cmd.args(&args).envs(envs);
-			if let Some(dir) = current_dir {
-				cmd.current_dir(dir);
-			}
-			let mut child = cmd.spawn()?;
-
-			// 2. take stdout/stderr pipes
-			// let stdout = child
-			// 	.stdout
-			// 	.take()
-			// 	.ok_or_else(|| bevyhow!("stdout not found"))?;
-
-			// let stderr = child
-			// 	.stderr
-			// 	.take()
-			// 	.ok_or_else(|| bevyhow!("stderr not found"))?;
-
-			let outcome = if wait {
+				.insert(ChildHandle(child));
+		} else {
+			ev.run_async(async move |mut action| {
 				// wait for completion
-				match child.status().await?.exit_ok() {
-					Ok(_) => Outcome::Pass,
-					Err(_) => Outcome::Fail,
-				}
-			} else {
-				// pass immediately and store the child process
-				action.entity().insert(ChildHandle(child)).await;
-				Outcome::Pass
-			};
-
-			action.trigger_with_cx(outcome);
-
-			Ok(())
-		});
+				let outcome = match child.status().await?.success() {
+					true => Outcome::Pass,
+					false => Outcome::Fail,
+				};
+				action.trigger_with_cx(outcome);
+				Ok(())
+			});
+		}
 		Ok(())
 	}
 }
 /// An untyped command, for an example of a more
 /// user-friendly command see [`CargoCommand`]
-#[construct]
-pub fn RawCommand(config: CommandConfig) -> impl Bundle {
+pub fn raw_command(config: CommandConfig) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<GetOutcome>, mut cmd_params: CommandParams| {
 			cmd_params.execute(ev, config.clone())
@@ -240,11 +262,104 @@ mod test {
 		app.add_plugins((MinimalPlugins, CliPlugin))
 			.insert_resource(pkg_config!())
 			.world_mut()
-			.spawn((Sequence, ExitOnEnd, children![RawCommand {
-				config: CommandConfig::parse("echo foobar")
-			}]))
+			.spawn((Sequence, ExitOnEnd, children![raw_command(
+				CommandConfig::parse("true")
+			)]))
 			.trigger_target(GetOutcome);
 
 		app.run_async().await.xpect_eq(AppExit::Success);
+	}
+	#[sweet::test]
+	async fn continue_run_pass() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, CliPlugin))
+			.insert_resource(pkg_config!())
+			.world_mut()
+			.spawn((Sequence, ExitOnEnd, children![(
+				ContinueRun,
+				raw_command(CommandConfig::parse("true"))
+			)]))
+			.trigger_target(GetOutcome);
+		app.run_async().await.xpect_eq(AppExit::Success);
+	}
+	#[sweet::test]
+	async fn continue_run_fail() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, CliPlugin))
+			.insert_resource(pkg_config!())
+			.world_mut()
+			.spawn((Sequence, ExitOnEnd, children![(
+				ContinueRun,
+				raw_command(CommandConfig::parse("false"))
+			)]))
+			.trigger_target(GetOutcome);
+		app.run_async().await.xpect_eq(AppExit::from_code(1));
+	}
+
+	#[test]
+	fn interrupt_static() {
+		let mut app = App::new();
+		let entity = app
+			.add_plugins((MinimalPlugins, CliPlugin))
+			.insert_resource(pkg_config!())
+			.world_mut()
+			.spawn((Sequence, ExitOnFail, children![(
+				ContinueRun,
+				raw_command(CommandConfig::parse("false"))
+			)]))
+			.trigger_target(GetOutcome)
+			.id();
+
+		app.world_mut().flush();
+
+		// 1. child handle was inserted
+		app.world_mut()
+			.query_once::<&ChildHandle>()
+			.len()
+			.xpect_eq(1);
+
+		app.world_mut()
+			.entity_mut(entity)
+			.trigger_target(Outcome::Pass);
+
+		app.world_mut().flush();
+
+		// 2. child handle was removed
+		app.world_mut()
+			.query_once::<&ChildHandle>()
+			.len()
+			.xpect_eq(0);
+	}
+	#[sweet::test]
+	async fn interrupt_timed() {
+		let mut app = App::new();
+		let entity = app
+			.add_plugins((MinimalPlugins, CliPlugin))
+			.insert_resource(pkg_config!())
+			.world_mut()
+			.spawn((Sequence, ExitOnFail, children![(
+				ContinueRun,
+				// sleep at least 10 millis
+				raw_command(CommandConfig::parse_shell("sleep 0.01 && false"))
+			)]))
+			.trigger_target(GetOutcome)
+			.id();
+
+		app.add_systems(Update, move |mut commands: AsyncCommands| {
+			commands.run(async move |world| {
+				// short sleep
+				time_ext::sleep_millis(2).await;
+				// passing early interrupts child process
+				// uncomment this line to fail the test
+				world.entity(entity).trigger_target(Outcome::Pass).await;
+
+				// wait to ensure process didnt fail
+				time_ext::sleep_millis(20).await;
+				world.write_message(AppExit::Success);
+			});
+		})
+		.run_async()
+		.await
+		.xpect_eq(AppExit::Success);
 	}
 }
