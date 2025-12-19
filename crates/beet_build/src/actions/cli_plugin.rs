@@ -24,7 +24,7 @@ impl Plugin for CliPlugin {
 			.add_systems(
 				Update,
 				// chain for determinism
-				(poll_child_handles, process_watch_events).chain(),
+				poll_child_handles,
 			)
 			.add_observer(interrupt_child_handles)
 			// temp: hardcoded until cli args

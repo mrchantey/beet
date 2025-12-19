@@ -131,7 +131,6 @@ send_wrapper = "0.6"
 rapidhash = "1"
 web-time = "1"
 itertools = "0.14"
-tempfile = "3"
 mime_guess = "2"
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
@@ -207,20 +206,6 @@ bytes = "1"
 http = "1"
 http-body-util = "0.1"
 
-#💡 server
-axum = { version = "0.8", features = ["macros"] }
-axum-server = { version = "0.7" }
-axum-extra = "0.10"
-tower = "0.5"
-tower-livereload = { version = "0.9" }
-tower-http = { version = "0.6", features = [
-	"trace",
-	"fs",
-	"cors",
-	"normalize-path",
-	"set-header",
-] }
-
 #💡 web
 js-sys = "0.3"
 wasm-bindgen = "=0.2.100"
@@ -266,12 +251,10 @@ client = [
 native-tls = [
 	"beet_agent?/native-tls",
 	"beet_net?/native-tls",
-	"beet_router?/native-tls"
 ]
 rustls-tls = [
 	"beet_agent?/rustls-tls",
 	"beet_net?/rustls-tls",
-	"beet_router?/rustls-tls"
 ]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
@@ -289,7 +272,6 @@ rsx = ["dep:beet_rsx"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml","beet_ml/cuda"]
 # 💡 Server
-axum = ["beet_router?/axum"]
 lambda = ["rustls-tls", "beet_net?/lambda"]
 aws = ["beet_net?/aws","beet_router?/aws"]
 
@@ -370,7 +352,6 @@ tokio.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = ".", features = ["fs"] }
 tokio.workspace = true
-axum.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

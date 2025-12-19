@@ -19,6 +19,8 @@ mod source_files;
 pub use source_files::*;
 mod sst;
 pub use sst::*;
+mod dir_event_loop;
+pub use dir_event_loop::*;
 mod lambda;
 pub use lambda::*;
 mod wasm;

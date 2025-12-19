@@ -4,6 +4,11 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
+
+
+/// 🌱 Beet CLI 🌱
+///
+/// Welcome to the beet cli!
 pub fn default_cli_router() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
@@ -43,7 +48,7 @@ pub fn default_cli_router() -> impl Bundle {
 			(named_route("deploy", children![
 				exact_route_match(),
 				import_and_parse_source_files(),
-				// apply after import to avoid clobber, 
+				// apply after import to avoid clobber,
 				// the scene loaded likely contains a PackageConfig
 				apply_deploy_config(),
 				build_wasm(),
@@ -109,3 +114,16 @@ fn beet_site_cmd() -> CargoBuildCmd {
 fn respond_ok() -> impl Bundle {
 	(Name::new("Response"), StatusCode::OK.into_endpoint())
 }
+
+
+
+// fn new_from_template() -> impl Bundle {
+// // TODO lock down to commit matching the cli release
+// let mut command = Command::new("cargo");
+// command
+// 	.arg("generate")
+// 	.arg("--git")
+// 	.arg("https://github.com/mrchantey/beet")
+// 	.arg("crates/beet_new_web")
+// 	.args(&self.additional_args);
+// }

@@ -165,7 +165,8 @@ web-sys = {workspace = true, features = [
 [dev-dependencies]
 sweet.workspace = true
 serde_json.workspace = true
-tempfile.workspace = true
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
+beet_utils = {workspace = true, features = ["rand"]}

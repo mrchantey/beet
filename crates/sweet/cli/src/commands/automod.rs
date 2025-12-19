@@ -16,9 +16,6 @@ use syn::UseTree;
 #[derive(Debug, Default, Clone, Parser)]
 #[command(name = "mod")]
 pub struct AutoMod {
-	#[command(flatten)]
-	pub watcher: FsWatcher,
-
 	#[arg(short, long)]
 	pub quiet: bool,
 }
@@ -34,64 +31,50 @@ enum DidMutate {
 	},
 }
 
+#[allow(unused)]
+fn glob_filter() -> GlobFilter {
+	GlobFilter::default()
+		.with_exclude("*/tests/*")
+		.with_exclude("*/examples/*")
+		.with_exclude("*/bin/*")
+		.with_exclude("**/mod.rs")
+		.with_exclude("**/lib.rs")
+		.with_exclude("**/main.rs")
+		.with_include("**/*.rs")
+}
 
 impl AutoMod {
-	pub async fn run(mut self) -> Result {
-		self.watcher.assert_path_exists()?;
-		if !self.quiet {
-			println!(
-				"🤘 sweet as 🤘\nWatching for file changes in {}",
-				self.watcher.cwd.canonicalize()?.display()
-			);
-		}
-
-		self.watcher.filter = self
-			.watcher
-			.filter
-			.with_exclude("*/tests/*")
-			.with_exclude("*/examples/*")
-			.with_exclude("*/bin/*")
-			.with_exclude("**/mod.rs")
-			.with_exclude("**/lib.rs")
-			.with_exclude("**/main.rs")
-			.with_include("**/*.rs");
-		let mut rx = self.watcher.watch()?;
-		while let Some(ev) = rx.recv().await? {
-			let mut files = ModFiles::default();
-			let any_mutated = ev
-				.iter()
-				.map(|e| self.handle_event(&mut files, e))
-				.collect::<Result<Vec<_>>>()?
-				.into_iter()
-				.filter_map(|r| match r {
-					DidMutate::No => None,
-					DidMutate::Yes { action, path } => {
-						if !self.quiet {
-							println!(
-								"AutoMod: {action} {}",
-								path_ext::relative(&path)
-									.unwrap_or(&path)
-									.display(),
-							);
-						}
-						Some(())
+	pub async fn handle_events(ev: &DirEvent, quiet: bool) -> Result {
+		let mut files = ModFiles::default();
+		let any_mutated = ev
+			.iter()
+			.map(|e| Self::handle_event(&mut files, e))
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
+			.filter_map(|r| match r {
+				DidMutate::No => None,
+				DidMutate::Yes { action, path } => {
+					if !quiet {
+						println!(
+							"AutoMod: {action} {}",
+							path_ext::relative(&path)
+								.unwrap_or(&path)
+								.display(),
+						);
 					}
-				})
-				.next()
-				.is_some();
-			if any_mutated {
-				files.write_all()?;
-			}
+					Some(())
+				}
+			})
+			.next()
+			.is_some();
+		if any_mutated {
+			files.write_all()?;
 		}
 		Ok(())
 	}
 
 
-	fn handle_event(
-		&self,
-		files: &mut ModFiles,
-		e: &WatchEvent,
-	) -> Result<DidMutate> {
+	fn handle_event(files: &mut ModFiles, e: &PathEvent) -> Result<DidMutate> {
 		enum Step {
 			Insert,
 			Remove,

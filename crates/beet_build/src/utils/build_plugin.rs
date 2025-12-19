@@ -44,8 +44,7 @@ pub struct ParseSourceFiles;
 impl Plugin for BuildPlugin {
 	fn build(&self, app: &mut App) {
 		app.try_set_error_handler(bevy::ecs::error::panic);
-		app.add_message::<WatchEvent>()
-			.init_plugin::<ParseRsxTokensPlugin>()
+		app.init_plugin::<ParseRsxTokensPlugin>()
 			.init_plugin::<RouteCodegenPlugin>()
 			.init_plugin::<NodeTypesPlugin>()
 			.insert_resource(CargoManifest::load().unwrap())
@@ -54,6 +53,7 @@ impl Plugin for BuildPlugin {
 			.init_resource::<LambdaConfig>()
 			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
+			.add_observer(parse_dir_watch_events)
 			.add_systems(
 				ParseRsxTokens,
 				import_file_inner_text.in_set(ModifyRsxTree),
@@ -61,7 +61,6 @@ impl Plugin for BuildPlugin {
 			.add_systems(
 				ParseSourceFiles,
 				(
-					parse_file_watch_events,
 					reparent_route_collection_source_files,
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,

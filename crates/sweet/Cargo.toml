@@ -18,7 +18,6 @@ nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 bevy = ["dep:bevy"]
-axum = ["dep:axum"]
 
 [dependencies]
 #💡 internal
@@ -68,7 +67,6 @@ serde_json = { workspace = true, optional = true }
 beet_utils = { workspace = true, features = ["fs"] }
 
 tokio.workspace = true
-axum = { workspace = true, optional = true }
 pin-project-lite = "0.2.15"
 
 #💡 wasm

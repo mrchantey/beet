@@ -27,7 +27,6 @@ lambda = ["rustls-tls", "dep:lambda_http"]
 fs = ["beet_core/fs","dep:async-process"]
 tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
-axum = ["dep:axum"]
 aws = [
 	"serde",
 	"dep:crc-fast",
@@ -94,7 +93,6 @@ eventsource-stream = "0.2.3"
 futures.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-axum = { workspace = true, optional = true }
 async-process = { workspace = true, optional = true }
 # http (native)
 reqwest = { version = "0.12", default-features = false, optional = true, features = [

@@ -1,10 +1,4 @@
-mod command;
-pub use command::*;
+mod command_ext;
+pub use command_ext::*;
 mod fs_watcher;
 pub use fs_watcher::*;
-mod fs_watch_cmd;
-pub use fs_watch_cmd::*;
-mod graceful_child;
-pub use graceful_child::*;
-mod fs_watcher_plugin;
-pub use fs_watcher_plugin::*;

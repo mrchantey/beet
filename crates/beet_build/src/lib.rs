@@ -3,9 +3,9 @@
 //! There are several steps involved:
 //! ## Source Files
 //! - Startup - For every file specified in the [`WorkspaceConfig`], load a [`SourceFile`]
-//! - WatchEvent::Create - create a new corresponding [`SourceFile`]
-//! - WatchEvent::Remove - remove every matching [`SourceFile`]
-//! - WatchEvent::Modify - find the root source file and mark it as [`Changed`], despawning all children
+//! - EventKind::Create - create a new corresponding [`SourceFile`]
+//! - EventKind::Remove - remove every matching [`SourceFile`]
+//! - EventKind::Modify - find the root source file and mark it as [`Changed`], despawning all children
 //!
 //! ## Rsx Snippets
 //!

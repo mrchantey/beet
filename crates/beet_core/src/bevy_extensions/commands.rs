@@ -18,6 +18,17 @@ pub impl Commands<'_, '_> {
 	}
 
 
+	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		self.queue(move |world: &mut World| {
+			world.run_async(move |world| func(world));
+		});
+	}
+
 	fn run_system_once_with<I, M, S>(
 		&mut self,
 		system: S,

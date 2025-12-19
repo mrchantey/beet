@@ -2,10 +2,12 @@
 //! better suited to the application layer:
 //! - outputs the file path on fs error
 //! - creates missing directories when writing files
+
 use crate::prelude::*;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 
 /// The workspace relative directory for this file,
 /// internally using the `file!()` macro.
@@ -72,6 +74,8 @@ pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 		}
 	}
 }
+
+
 pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 	let path = path.as_ref();
 	fs::create_dir_all(path).map_err(|err| FsError::io(path, err))
@@ -91,11 +95,21 @@ pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
 	}
 }
 
-/// remove a directory and all its contents
+/// recursively remove a file or directory
 pub fn remove(path: impl AsRef<Path>) -> FsResult {
 	let path = path.as_ref();
-	fs::remove_dir_all(path).map_err(|err| FsError::io(path, err))?;
-	Ok(())
+	match fs::metadata(path) {
+		Ok(meta) => {
+			if meta.is_dir() {
+				fs::remove_dir_all(path)
+					.map_err(|err| FsError::io(path, err))?;
+			} else {
+				fs::remove_file(path).map_err(|err| FsError::io(path, err))?;
+			}
+			Ok(())
+		}
+		Err(err) => Err(FsError::io(path, err)),
+	}
 }
 
 pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
@@ -185,6 +199,26 @@ pub fn hash_bytes(bytes: &[u8]) -> u64 {
 pub fn hash_string(str: &str) -> u64 {
 	let bytes = str.as_bytes();
 	fs_ext::hash_bytes(bytes)
+}
+
+#[extend::ext]
+impl ExitStatus {
+	fn xresult(&self) -> bevy::prelude::Result<()> {
+		if self.success() {
+			Ok(())
+		} else {
+			bevybail!("Process exited with non-zero status: {}", self)
+		}
+	}
+}
+
+/// Run a 'touch' command for the provided path
+pub fn touch(path: impl AsRef<Path>) -> bevy::prelude::Result {
+	std::process::Command::new("touch")
+		.arg(path.as_ref())
+		.status()?
+		.xresult()?
+		.xok()
 }
 
 /// Write a file, ensuring the path exists

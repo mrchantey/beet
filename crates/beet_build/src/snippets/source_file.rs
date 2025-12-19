@@ -45,15 +45,15 @@ pub struct WatchedFiles(Vec<Entity>);
 
 /// Update [`SourceFile`] entities based on file watch events,
 /// including marking as [`Changed`] on modification.
-pub fn parse_file_watch_events(
+pub fn parse_dir_watch_events(
+	ev: On<DirEvent>,
 	mut commands: Commands,
-	mut events: MessageReader<WatchEvent>,
 	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> Result {
-	for ev in events
-		.read()
+	for ev in ev
+		.iter()
 		// we only care about files specified in the config
 		.filter(|ev| config.passes(&ev.path))
 	{

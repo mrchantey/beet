@@ -131,7 +131,7 @@ pub enum RouteCollectionCategory {
 	/// and will be included in the route tree.
 	#[default]
 	Pages,
-	/// Files contain arbitary axum routes,
+	/// Files contain arbitary routes,
 	/// and will be excluded from the route tree.
 	Actions,
 }
