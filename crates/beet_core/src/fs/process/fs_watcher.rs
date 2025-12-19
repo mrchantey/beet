@@ -46,6 +46,8 @@ pub fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
 }
 
 impl FsWatcher {
+	pub fn new(path: AbsPathBuf) -> Self { Self { path, ..default() } }
+
 	pub fn default_cargo() -> Self {
 		Self {
 			filter: GlobFilter::default()
@@ -302,7 +304,7 @@ mod test {
 		let tempdir = TempDir::new().unwrap();
 		let dir2 = tempdir.clone();
 		app.add_plugins(AsyncPlugin)
-			.spawn(FsWatcher::default().with_path(tempdir.clone()))
+			.spawn(FsWatcher::default().with_path(tempdir.path().clone()))
 			.add_observer(move |ev: On<DirEvent>, mut commands: Commands| {
 				for ev in ev.iter() {
 					if ev.path.starts_with(&dir2) {

@@ -145,6 +145,13 @@ impl CommandConfig {
 			..default()
 		}
 	}
+	pub fn into_action(self) -> impl Bundle {
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>, mut cmd_params: CommandParams| {
+				cmd_params.execute(ev, self.clone())
+			},
+		)
+	}
 }
 
 impl Default for CommandConfig {
@@ -238,16 +245,6 @@ impl CommandParams<'_, '_> {
 		Ok(())
 	}
 }
-/// An untyped command, for an example of a more
-/// user-friendly command see [`CargoCommand`]
-pub fn raw_command(config: CommandConfig) -> impl Bundle {
-	OnSpawn::observe(
-		move |ev: On<GetOutcome>, mut cmd_params: CommandParams| {
-			cmd_params.execute(ev, config.clone())
-		},
-	)
-}
-
 
 
 #[cfg(test)]
@@ -260,12 +257,11 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, CliPlugin))
-			.insert_resource(pkg_config!())
+		app.add_plugins(CliPlugin)
 			.world_mut()
-			.spawn((Sequence, ExitOnEnd, children![raw_command(
-				CommandConfig::parse("true")
-			)]))
+			.spawn((Sequence, ExitOnEnd, children![
+				CommandConfig::parse("true").into_action()
+			]))
 			.trigger_target(GetOutcome);
 
 		app.run_async().await.xpect_eq(AppExit::Success);
@@ -273,12 +269,11 @@ mod test {
 	#[sweet::test]
 	async fn continue_run_pass() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, CliPlugin))
-			.insert_resource(pkg_config!())
+		app.add_plugins(CliPlugin)
 			.world_mut()
 			.spawn((Sequence, ExitOnEnd, children![(
 				ContinueRun,
-				raw_command(CommandConfig::parse("true"))
+				CommandConfig::parse("true").into_action()
 			)]))
 			.trigger_target(GetOutcome);
 		app.run_async().await.xpect_eq(AppExit::Success);
@@ -286,12 +281,11 @@ mod test {
 	#[sweet::test]
 	async fn continue_run_fail() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, CliPlugin))
-			.insert_resource(pkg_config!())
+		app.add_plugins(CliPlugin)
 			.world_mut()
 			.spawn((Sequence, ExitOnEnd, children![(
 				ContinueRun,
-				raw_command(CommandConfig::parse("false"))
+				CommandConfig::parse("false").into_action()
 			)]))
 			.trigger_target(GetOutcome);
 		app.run_async().await.xpect_eq(AppExit::from_code(1));
@@ -301,12 +295,11 @@ mod test {
 	fn interrupt_static() {
 		let mut app = App::new();
 		let entity = app
-			.add_plugins((MinimalPlugins, CliPlugin))
-			.insert_resource(pkg_config!())
+			.add_plugins(CliPlugin)
 			.world_mut()
 			.spawn((Sequence, ExitOnFail, children![(
 				ContinueRun,
-				raw_command(CommandConfig::parse("false"))
+				CommandConfig::parse("false").into_action()
 			)]))
 			.trigger_target(GetOutcome)
 			.id();
@@ -335,32 +328,27 @@ mod test {
 	async fn interrupt_timed() {
 		let mut app = App::new();
 		let entity = app
-			.add_plugins((MinimalPlugins, CliPlugin))
-			.insert_resource(pkg_config!())
+			.add_plugins(CliPlugin)
 			.world_mut()
 			.spawn((Sequence, ExitOnFail, children![(
 				ContinueRun,
 				// sleep at least 10 millis
-				raw_command(CommandConfig::parse_shell("sleep 0.01 && false"))
+				CommandConfig::parse_shell("sleep 0.01 && false").into_action()
 			)]))
 			.trigger_target(GetOutcome)
 			.id();
 
-		app.add_systems(Update, move |mut commands: AsyncCommands| {
-			commands.run(async move |world| {
-				// short sleep
-				time_ext::sleep_millis(2).await;
-				// passing early interrupts child process
-				// uncomment this line to fail the test
-				world.entity(entity).trigger_target(Outcome::Pass).await;
+		app.world_mut().run_async(async move |world| {
+			// short sleep
+			time_ext::sleep_millis(2).await;
+			// passing early interrupts child process
+			// uncomment this line to fail the test
+			world.entity(entity).trigger_target(Outcome::Pass).await;
 
-				// wait to ensure process didnt fail
-				time_ext::sleep_millis(20).await;
-				world.write_message(AppExit::Success);
-			});
-		})
-		.run_async()
-		.await
-		.xpect_eq(AppExit::Success);
+			// wait to ensure process didnt fail
+			time_ext::sleep_millis(20).await;
+			world.write_message(AppExit::Success);
+		});
+		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 }

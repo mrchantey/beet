@@ -48,7 +48,7 @@ pub struct WatchedFiles(Vec<Entity>);
 pub fn parse_dir_watch_events(
 	ev: On<DirEvent>,
 	mut commands: Commands,
-	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
+	root_entity: Populated<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
 ) -> Result {
