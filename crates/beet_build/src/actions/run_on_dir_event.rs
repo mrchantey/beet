@@ -1,12 +1,12 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
-
-
 /// Listens for file watch events and retriggers the associated action,
 /// cancelling any children with [`Running`], [`ChildHandle`] etc.
 #[action(run_on_dir_event)]
 #[derive(Component)]
+// TODO FsWatcher cancel listener on remove, so this
+// could be replaced without duplicating listeners
 // #[require(FsWatcher)]
 pub struct RunOnDirEvent;
 
@@ -14,8 +14,6 @@ pub struct RunOnDirEvent;
 fn run_on_dir_event(ev: On<DirEvent>, mut commands: Commands) {
 	commands.entity(ev.target()).trigger_target(GetOutcome);
 }
-
-
 
 #[cfg(test)]
 mod tests {

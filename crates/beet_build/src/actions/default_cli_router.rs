@@ -36,6 +36,32 @@ pub fn default_cli_router() -> impl Bundle {
 				"parse-files",
 				import_and_parse_source_files()
 			)),
+			(named_route("parse-source-files", children![
+				exact_route_match(),
+				import_source_files(),
+				(
+					Name::new("Run Loop"),
+					// only insert the watcher after first run
+					InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
+					RunOnDirEvent,
+					InfallibleSequence,
+					children![
+						ParseSourceFiles::action(),
+						(Name::new("Full Rebuild Check"), Sequence, children![
+							FileExprChanged::new(),
+							(
+								Name::new("Pretend Rebuild.."),
+								EndWith(Outcome::Pass)
+							)
+						]),
+						(
+							// never return to emulate server
+							Name::new("Pretend Serve..")
+						),
+					]
+				),
+				// respond_ok()
+			])),
 			// never returns a result
 			(named_route("run", children![
 				exact_route_match(),
@@ -127,7 +153,6 @@ fn respond_ok() -> impl Bundle {
 }
 
 
-
 // fn new_from_template() -> impl Bundle {
 // // TODO lock down to commit matching the cli release
 // let mut command = Command::new("cargo");
@@ -137,4 +162,8 @@ fn respond_ok() -> impl Bundle {
 // 	.arg("https://github.com/mrchantey/beet")
 // 	.arg("crates/beet_new_web")
 // 	.args(&self.additional_args);
+//
+//
+//
+//
 // }
