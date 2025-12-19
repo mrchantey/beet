@@ -64,9 +64,9 @@ impl Plugin for BuildPlugin {
 					reparent_route_collection_source_files,
 					import_rsx_snippets_rs,
 					import_rsx_snippets_md,
-					ParseRsxTokens.run(),
+					ParseRsxTokens::run(),
 					update_file_expr_hash,
-					RouteCodegen.run(),
+					RouteCodegen::run(),
 					export_snippets,
 					export_codegen,
 				)

@@ -16,6 +16,7 @@ pub fn build_wasm() -> impl Bundle {
 fn cargo_build_wasm() -> impl Bundle {
 	(
 		Name::new("Cargo Build Wasm"),
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,
@@ -40,6 +41,7 @@ fn cargo_build_wasm() -> impl Bundle {
 fn wasm_bindgen() -> impl Bundle {
 	(
 		Name::new("Wasm Bindgen"),
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,
@@ -120,6 +122,7 @@ fn wasm_file(
 fn wasm_opt() -> impl Bundle {
 	(
 		Name::new("Wasm Opt"),
+		ContinueRun,
 		OnSpawn::observe(
 			move |mut ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,

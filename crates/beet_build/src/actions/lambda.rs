@@ -23,6 +23,7 @@ pub struct LambdaConfig {
 pub fn CompileLambda(entity: Entity) -> impl Bundle {
 	(
 		Name::new("Compile Lambda"),
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,
@@ -73,6 +74,7 @@ pub fn CompileLambda(entity: Entity) -> impl Bundle {
 pub fn DeployLambda() -> impl Bundle {
 	(
 		Name::new("Deploy Lambda"),
+		ContinueRun,
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
 			 mut cmd_params: CommandParams,

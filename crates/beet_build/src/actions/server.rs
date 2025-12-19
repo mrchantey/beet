@@ -13,6 +13,7 @@ pub struct ServerProcess;
 pub fn BuildServer() -> impl Bundle {
 	(
 		Name::new("Build Server"),
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,
@@ -36,6 +37,7 @@ pub fn RunServer() -> impl Bundle {
 	(
 		Name::new("Run Server"),
 		ServerProcess,
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,
@@ -65,6 +67,7 @@ pub fn ExportStaticContent() -> impl Bundle {
 	(
 		Name::new("Export Static Content"),
 		ServerProcess,
+		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut cmd_params: CommandParams,

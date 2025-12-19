@@ -7,6 +7,7 @@ use beet_flow::prelude::*;
 /// cancelling any children with [`Running`], [`ChildHandle`] etc.
 #[action(run_on_dir_event)]
 #[derive(Component)]
+// #[require(FsWatcher)]
 pub struct RunOnDirEvent;
 
 // we dont care about which events, just retrigger th
@@ -25,9 +26,6 @@ mod tests {
 
 	#[sweet::test]
 	async fn works() {
-		// let cmd =
-		// 	r#"for i in 1 2 3 4 5 6 7 8 9 10; do echo "$i"; sleep 1; done"#;
-
 		let tempdir = TempDir::new().unwrap();
 
 		let mut app = App::new();

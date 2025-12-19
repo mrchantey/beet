@@ -34,16 +34,27 @@ pub fn default_cli_router() -> impl Bundle {
 			(single_action_route("build", BuildServer)),
 			(single_action_route(
 				"parse-files",
-				import_and_parse_source_files(),
+				import_and_parse_source_files()
 			)),
+			// never returns a result
 			(named_route("run", children![
 				exact_route_match(),
-				import_and_parse_source_files(),
-				build_wasm(),
-				BuildServer,
-				ExportStaticContent,
-				RunServer,
-				respond_ok()
+				import_source_files(),
+				(
+					Name::new("Run Loop"),
+					// only insert the watcher after first run
+					InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
+					RunOnDirEvent,
+					Sequence,
+					children![
+						ParseSourceFiles::action(),
+						build_wasm(),
+						BuildServer,
+						ExportStaticContent,
+						RunServer,
+					]
+				),
+				// respond_ok()
 			])),
 			(named_route("deploy", children![
 				exact_route_match(),

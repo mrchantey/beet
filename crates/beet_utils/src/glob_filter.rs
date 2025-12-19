@@ -224,60 +224,71 @@ mod test {
 	fn passes() {
 		// test include all but
 
-		let watcher = GlobFilter::default().with_exclude("*bar*");
-		assert!(watcher.passes("foo"));
-		assert!(!watcher.passes("bar"));
-		assert!(!watcher.passes("foo/bar/bazz"));
+		let filter = GlobFilter::default().with_exclude("*bar*");
+		assert!(filter.passes("foo"));
+		assert!(!filter.passes("bar"));
+		assert!(!filter.passes("foo/bar/bazz"));
 
 		// test include only
 
-		let watcher = GlobFilter::default()
+		let filter = GlobFilter::default()
 			.with_include("*foo*")
 			.with_exclude("*bar*");
 
-		assert!(watcher.passes("bing/foo/bong"));
+		assert!(filter.passes("bing/foo/bong"));
 		// backslashes are normalized to forward slashes
-		assert!(watcher.passes("bing\\foo\\bong"));
-		assert!(!watcher.passes("froo"));
-		assert!(!watcher.passes("bar"));
+		assert!(filter.passes("bing\\foo\\bong"));
+		assert!(!filter.passes("froo"));
+		assert!(!filter.passes("bar"));
 
 		// test backslashes
 
-		let watcher = GlobFilter::default().with_include("*foo/bar*");
+		let filter = GlobFilter::default().with_include("*foo/bar*");
 
-		assert!(watcher.passes_include("foo/bar"));
-		assert!(watcher.passes_exclude("foo/bar"));
+		assert!(filter.passes_include("foo/bar"));
+		assert!(filter.passes_exclude("foo/bar"));
 
 
 
-		let watcher =
+		let filter =
 			GlobFilter::default().with_exclude("*apply_style_id_attributes*");
 		assert!(
 			false
-				== watcher.passes_exclude(
+				== filter.passes_exclude(
 					"templating::apply_style_id_attributes::test::nested_template"
 				)
 		);
+
+		// excludes only
+		let filter = GlobFilter::default()
+			.with_exclude("*.git*")
+			// temp until we get fine grained codegen control
+			.with_exclude("*codegen*")
+			.with_exclude("*target*");
+
+		assert!(
+			!filter.passes("/home/pete/me/beet/target/snippets/snippets.ron")
+		);
 		// test multi exclude
 
-		let watcher = GlobFilter::default()
+		let filter = GlobFilter::default()
 			.with_include("**/*.rs")
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 
-		assert!(watcher.passes("/foo/bar/bazz.rs"));
-		assert!(!watcher.passes("/foo/target/bazz.rs"));
+		assert!(filter.passes("/foo/bar/bazz.rs"));
+		assert!(!filter.passes("/foo/target/bazz.rs"));
 
 		// test or
 
-		let watcher = GlobFilter::default()
+		let filter = GlobFilter::default()
 			.with_include("**/*.rs")
 			.with_exclude("{.git,target,html}/**")
 			.with_exclude("*codegen*");
 
-		assert!(watcher.passes("src/lib.rs"));
-		assert!(watcher.passes("html/lib.rs"));
-		assert!(!watcher.passes("src/codegen/mockups.rs"));
+		assert!(filter.passes("src/lib.rs"));
+		assert!(filter.passes("html/lib.rs"));
+		assert!(!filter.passes("src/codegen/mockups.rs"));
 	}
 
 	#[test]

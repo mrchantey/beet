@@ -40,22 +40,20 @@ pub fn AddWorkspaceSourceFiles() -> impl Bundle {
 
 
 
-pub fn import_and_parse_source_files() -> impl Bundle {
-	(Name::new("Parse Source Files"), Sequence, children![
+pub fn import_source_files() -> impl Bundle {
+	(Name::new("Import Source Files"), Sequence, children![
 		launch_sequence(),
 		AddWorkspaceSourceFiles,
-		(
-			Name::new("Run Schedule - ParseSourceFiles"),
-			OnSpawn::observe(
-				|mut ev: On<GetOutcome>, mut commands: Commands| {
-					commands.run_system_cached(ParseSourceFiles.run());
-					ev.trigger_with_cx(Outcome::Pass);
-				}
-			)
-		),
 	])
 }
 
+pub fn import_and_parse_source_files() -> impl Bundle {
+	(
+		Name::new("Import and Parse Source Files"),
+		Sequence,
+		children![import_source_files(), ParseSourceFiles::action()],
+	)
+}
 
 // #[construct]
 // pub fn
