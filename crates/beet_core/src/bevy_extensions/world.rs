@@ -272,10 +272,19 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&mut self) -> String {
+		self.build_scene_with_builder(|builder| {
+			builder.deny_resource::<Time<Real>>()
+		})
+	}
+	/// Shorthand for building a serialized scene from the current world.
+	#[cfg(feature = "bevy_scene")]
+	fn build_scene_with_builder(
+		&mut self,
+		func: impl FnOnce(DynamicSceneBuilder) -> DynamicSceneBuilder,
+	) -> String {
 		let all_entities = self.all_entities();
 		let world = self.into_world();
-		let dyn_scene = DynamicSceneBuilder::from_world(world)
-			.deny_resource::<Time<Real>>()
+		let dyn_scene = func(DynamicSceneBuilder::from_world(world))
 			.extract_entities(all_entities.into_iter())
 			.extract_resources()
 			.build();
@@ -283,6 +292,7 @@ pub impl<W: IntoWorld> W {
 
 		self.build_scene_with(dyn_scene)
 	}
+
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene_with(&self, scene: DynamicScene) -> String {
 		use bevy::scene::ron;

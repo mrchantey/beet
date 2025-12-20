@@ -24,7 +24,6 @@ impl Plugin for RouterPlugin {
 		// 	not(test),
 		// 	feature = "server"
 		// ))]
-		// app.init_plugin::<LoadSnippetsPlugin>();
 
 		#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 		app.init_plugin_with(

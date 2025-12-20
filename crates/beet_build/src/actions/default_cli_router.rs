@@ -62,7 +62,6 @@ pub fn default_cli_router() -> impl Bundle {
 				),
 				// respond_ok()
 			])),
-			// never returns a result
 			(named_route("run", children![
 				exact_route_match(),
 				import_source_files(),
@@ -74,13 +73,20 @@ pub fn default_cli_router() -> impl Bundle {
 					Sequence,
 					children![
 						ParseSourceFiles::action(),
-						build_wasm(),
+						// build_wasm(),
 						BuildServer,
 						ExportStaticContent,
+						// never returns an outcome
 						RunServer,
 					]
 				),
-				// respond_ok()
+			])),
+			(named_route("serve", children![
+				exact_route_match(),
+				(Name::new("Serve"), Sequence, children![
+					BuildServer,
+					RunServer,
+				]),
 			])),
 			(named_route("deploy", children![
 				exact_route_match(),
