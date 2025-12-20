@@ -40,7 +40,8 @@ exclude = [
 	"infra",
 	"examples/todo-app",
 	"crates/beet_mcp",
-	"crates/beet_build/tests/pipeline_test_crate"
+	"crates/beet_build/tests/pipeline_test_crate",
+	"bevy"
 ]
 
 members = [

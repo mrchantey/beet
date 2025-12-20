@@ -75,7 +75,7 @@ pub fn default_cli_router() -> impl Bundle {
 						ParseSourceFiles::action(),
 						(Name::new("Build Check"), Sequence, children![
 							FileExprChanged::new(),
-							// build_wasm(),
+							build_wasm(),
 							BuildServer,
 						]),
 						ExportStaticContent,

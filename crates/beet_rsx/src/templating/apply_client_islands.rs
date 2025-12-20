@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use bevy::scene::ron;
 use bevy::scene::serde::SceneSerializer;
+use ron;
 
 
 pub fn apply_client_islands(world: &mut World) -> Result {
@@ -100,7 +100,7 @@ mod test {
 
 	fn parse(app: &mut App, bundle: impl Bundle) -> Result<String> {
 		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
-		
+
 		app.update();
 		let reg = app.world().resource::<AppTypeRegistry>();
 		reg.read()
