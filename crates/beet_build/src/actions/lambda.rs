@@ -51,7 +51,7 @@ pub fn CompileLambda(entity: Entity) -> impl Bundle {
 				// to ensure proc-macros are built for the host while the binary targets x86_64
 				#[cfg(target_arch = "aarch64")]
 				{
-					config = config
+					cmd_config = cmd_config
 						.env("CARGO_BUILD_TARGET", "aarch64-unknown-linux-gnu");
 				}
 				// debug!("🌱 Building lambda binary\n{:?}", config);
@@ -135,7 +135,7 @@ pub fn DeployLambda() -> impl Bundle {
 
 
 
-/// Listen for loggong messages from the router lambda,
+/// Listen for logging messages from the router lambda,
 /// this command never finishes.
 #[construct]
 pub fn WatchLambda() -> impl Bundle {

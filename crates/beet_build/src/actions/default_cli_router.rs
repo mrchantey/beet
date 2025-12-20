@@ -128,6 +128,7 @@ fn apply_deploy_config() -> impl Bundle {
 			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>|
 			 -> Result {
 				pkg_config.service_access = ServiceAccess::Remote;
+				pkg_config.stage = "prod".to_string();
 				cmd.get_mut(ev.action())?.release = true;
 				ev.trigger_with_cx(Outcome::Pass);
 				Ok(())
