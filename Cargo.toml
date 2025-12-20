@@ -136,12 +136,10 @@ itertools = "0.14"
 mime_guess = "2"
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
-# old rand until https://github.com/bevyengine/bevy/pull/18047
-# also when you update it remove all the RandomSource.0 in beet too please
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-# # wasm_js ignored in native
-getrandom = { version = "0.2.15", features = ["js"] }
+rand = "0.9"
+rand_chacha = "0.9"
+# wasm_js ignored in native
+getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
 
 #💡 logging

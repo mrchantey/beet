@@ -438,7 +438,7 @@ impl BackoffIter {
 			#[cfg(feature = "rand")]
 			rng: {
 				use rand::SeedableRng;
-				rand::rngs::StdRng::from_entropy()
+				rand::rngs::StdRng::from_rng(&mut rand::rng())
 			},
 			inner,
 		}
@@ -486,7 +486,7 @@ impl iter::Iterator for BackoffIter {
 		if self.inner.jitter != 0.0 {
 			use rand::Rng;
 			let jitter_factor = (self.inner.jitter * 100f32) as u32;
-			let random = self.rng.gen_range(0..jitter_factor * 2);
+			let random = self.rng.random_range(0..jitter_factor * 2);
 			let mut duration = duration.saturating_mul(100);
 			if random < jitter_factor {
 				let jitter = duration.saturating_mul(random) / 100;
