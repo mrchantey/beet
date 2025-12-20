@@ -65,15 +65,17 @@ fn define_struct(
 
 	let (_, type_generics, where_clause) = func.sig.generics.split_for_impl();
 
-	let struct_fields = prop_fields(fields).map(|f| {
-		let ident = &f.ident;
-		let attrs = &f.attrs;
-		let ty = f.ty;
-		quote! {
-			#(#attrs)*
-			pub #ident: #ty
-		}
-	});
+	let struct_fields = prop_fields(fields)
+		.map(|f| {
+			let ident = &f.ident;
+			let attrs = &f.attrs;
+			let ty = f.ty;
+			quote! {
+				#(#attrs)*
+				pub #ident: #ty
+			}
+		})
+		.collect::<Vec<_>>();
 	let vis = &func.vis;
 	let ident = &func.sig.ident;
 	let on_add = on_add_ident(func);
@@ -87,7 +89,7 @@ fn define_struct(
 		derives.push(quote! {Default});
 	}
 
-	let struct_body = if fields.is_empty() {
+	let struct_body = if struct_fields.is_empty() {
 		// unit struct
 		quote! {;}
 	} else {
@@ -334,7 +336,8 @@ fn system_param_fields<'a>(
 }
 
 fn is_param(field: &NodeField) -> bool {
-	const SYSTEM_PARAM_IDENTS: [&str; 7] = [
+	[
+		// built-in system params
 		"World",
 		"Commands",
 		"Res",
@@ -342,10 +345,15 @@ fn is_param(field: &NodeField) -> bool {
 		"Query",
 		"Populated",
 		"When",
-	];
-	SYSTEM_PARAM_IDENTS
-		.iter()
-		.any(|id| field.last_segment_matches(id))
+		// beet system params
+		"AsyncCommands",
+		"AncestorQuery",
+		"RouteQuery",
+		"DomBinding",
+		"DomDiff",
+	]
+	.iter()
+	.any(|id| field.last_segment_matches(id))
 		|| field.field_attributes.contains("param")
 }
 

@@ -3,8 +3,6 @@ use beet_core::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU16;
-use std::sync::atomic::Ordering;
 
 /// Represents a http request, may contain a [`Request`] or [`Response`]
 #[derive(Default, Component)]
@@ -83,7 +81,11 @@ pub(super) type HandlerFn = Arc<
 #[component(on_add=on_add)]
 #[require(ServerStatus)]
 pub struct HttpServer {
-	/// The port the server listens on
+	/// The port the server listens on. This may be updated at runtime,
+	/// for instance if the provided port is `0` it may be updated to
+	/// some random available port by the os like `98304`.
+	/// The presence of a [`TestApp`] resource will cause this port to
+	/// be reassigned to `0`.
 	pub port: u16,
 	/// The function called by hyper for each request
 	pub handler: HandlerFn,
@@ -118,6 +120,8 @@ impl HttpServer {
 	/// Create a new Server with an incrementing port to avoid
 	/// collisions in tests
 	pub fn new_test() -> Self {
+		use std::sync::atomic::AtomicU16;
+		use std::sync::atomic::Ordering;
 		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SERVER_TEST_PORT);
 		Self {
 			port: PORT.fetch_add(1, Ordering::SeqCst),

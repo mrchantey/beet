@@ -30,7 +30,6 @@ impl AsyncRunner {
 			}
 			// 3. delay next update
 			// no idea how long to sleep for
-			// println!("no async tasks in flight, sleeping..");
 			time_ext::sleep_millis(1).await;
 		}
 	}

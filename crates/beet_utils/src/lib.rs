@@ -2,6 +2,7 @@
 //! which is depended upon by all other crates.
 //! It should not be depended upon or referred to anywhere except for `beet_core`
 //! where all types and macros are re-exported, and in `sweet`.
+mod bevyhow;
 mod cross_log;
 mod glob_filter;
 #[cfg(target_arch = "wasm32")]
@@ -16,6 +17,9 @@ mod xtend;
 
 pub mod prelude {
 	pub use crate::abs_file;
+	pub use crate::bevybail;
+	pub use crate::bevyhow;
+	pub use crate::bevyhow::*;
 	pub use crate::cross_log;
 	pub use crate::cross_log_error;
 	pub use crate::dir;

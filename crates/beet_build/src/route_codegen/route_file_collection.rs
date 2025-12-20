@@ -1,22 +1,26 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::platform::collections::HashMap;
-use serde::Deserialize;
-use serde::Serialize;
-
+use quote::ToTokens;
 
 /// Added alongside a [`SourceFile`] for easy cohersion of route meta
-#[derive(Debug, PartialEq, Clone, Component)]
-pub struct MetaType(pub Unspan<syn::Type>);
+#[derive(Debug, PartialEq, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct MetaType(String);
 
 impl MetaType {
-	pub fn new(ty: syn::Type) -> Self { Self(Unspan::new(&ty)) }
+	pub fn new(ty: syn::Type) -> Self {
+		Self(ty.into_token_stream().to_string())
+	}
+	pub fn inner(&self) -> syn::Type {
+		syn::parse_str(&self.0).expect("MetaType contained invalid syn::Type")
+	}
 }
 
 /// Definition for a group of route files that should be collected together,
 /// including pages and actions.
-#[derive(Debug, PartialEq, Clone, Component)]
+#[derive(Debug, PartialEq, Clone, Reflect, Component)]
+#[reflect(Component)]
 #[require(CodegenFile)]
 pub struct RouteFileCollection {
 	/// The directory where the files are located.
@@ -85,11 +89,15 @@ pub fn reparent_route_collection_source_files(
 		HashMap::default();
 	for (entity, collection) in collections.iter() {
 		for file in collection.read_files()? {
-			if file_collection_map.contains_key(&file) {
+			if let Some(existing) = file_collection_map.get(&file) {
+				assert_ne!(entity, *existing);
+				let collection2 = collections.get(*existing).unwrap().1;
 				bevybail!(
 					"
 Error: Collection Overlap: {}
-This file appears in multple collections,
+This file appears in multiple collections:
+Collection A: {collection2:#?}
+Collection B: {collection:#?}
 Please constrain the collection filters or roots",
 					file
 				);
@@ -117,13 +125,13 @@ impl Default for RouteFileCollection {
 	}
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Reflect)]
 pub enum RouteCollectionCategory {
 	/// Files contain public functions named after the http methods,
 	/// and will be included in the route tree.
 	#[default]
 	Pages,
-	/// Files contain arbitary axum routes,
+	/// Files contain arbitary routes,
 	/// and will be excluded from the route tree.
 	Actions,
 }

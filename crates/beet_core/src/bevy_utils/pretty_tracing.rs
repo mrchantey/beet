@@ -47,8 +47,6 @@ impl PrettyTracing {
 			.with_line_number(true)
 			.with_env_filter(
 				tracing_subscriber::EnvFilter::from_default_env()
-					.add_directive("tower_http=debug".parse().unwrap())
-					.add_directive("axum::rejection=trace".parse().unwrap())
 					.add_directive("wgpu=error".parse().unwrap())
 					.add_directive("naga=warn".parse().unwrap())
 					.add_directive("bevy_app=warn".parse().unwrap())

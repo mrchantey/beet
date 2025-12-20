@@ -278,12 +278,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arc-swap"
-version = "1.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
-
-[[package]]
 name = "arg_enum_proc_macro"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1044,114 +1038,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a18ed336352031311f4e0b4dd2ff392d4fbb370777c9d18d7fc9d7359f73871"
-dependencies = [
- "axum-core",
- "axum-macros",
- "bytes",
- "form_urlencoded",
- "futures-util",
- "http 1.3.1",
- "http-body 1.0.1",
- "http-body-util",
- "hyper 1.7.0",
- "hyper-util",
- "itoa",
- "matchit",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "serde_core",
- "serde_json",
- "serde_path_to_error",
- "serde_urlencoded",
- "sync_wrapper",
- "tokio",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59446ce19cd142f8833f856eb31f3eb097812d1479ab224f54d72428ca21ea22"
-dependencies = [
- "bytes",
- "futures-core",
- "http 1.3.1",
- "http-body 1.0.1",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "sync_wrapper",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-extra"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9963ff19f40c6102c76756ef0a46004c0d58957d87259fc9208ff8441c12ab96"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "futures-util",
- "http 1.3.1",
- "http-body 1.0.1",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "serde_core",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-macros"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "604fde5e028fea851ce1d8570bbdc034bec850d157f7569d10f347d06808c05c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
-]
-
-[[package]]
-name = "axum-server"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "495c05f60d6df0093e8fb6e74aa5846a0ad06abaf96d76166283720bf740f8ab"
-dependencies = [
- "arc-swap",
- "bytes",
- "fs-err",
- "http 1.3.1",
- "http-body 1.0.1",
- "hyper 1.7.0",
- "hyper-util",
- "pin-project-lite",
- "rustls 0.23.32",
- "rustls-pemfile 2.2.0",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls 0.26.4",
- "tower-service",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1217,10 +1103,9 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-executor",
- "axum",
  "beet",
  "beet_agent",
  "beet_build",
@@ -1251,7 +1136,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet",
  "bevy",
@@ -1271,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "beet_agent"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-lock",
  "base64 0.22.1",
@@ -1298,7 +1183,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-process",
  "beet_core",
@@ -1336,7 +1221,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1369,7 +1254,6 @@ dependencies = [
  "serde_json",
  "sweet",
  "syn 2.0.106",
- "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "toml",
@@ -1383,7 +1267,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_utils",
  "proc-macro2",
@@ -1395,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1415,7 +1299,7 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "base64 0.22.1",
  "beet_core",
@@ -1438,7 +1322,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1459,7 +1343,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "bevy",
@@ -1470,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1502,7 +1386,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1514,7 +1398,6 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-s3",
- "axum",
  "base64 0.22.1",
  "beet_core",
  "beet_net",
@@ -1554,7 +1437,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1579,12 +1462,9 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-channel 2.5.0",
- "axum",
- "axum-extra",
- "axum-server",
  "base64 0.22.1",
  "beet_core",
  "beet_dom",
@@ -1604,9 +1484,6 @@ dependencies = [
  "sweet",
  "thiserror 1.0.69",
  "tokio",
- "tower",
- "tower-http",
- "tower-livereload",
  "tracing",
  "tracing-subscriber",
  "variadics_please",
@@ -1617,7 +1494,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1647,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1657,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_parse",
@@ -1670,7 +1547,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -1682,7 +1559,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "anyhow",
  "beet",
@@ -1695,7 +1572,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1712,7 +1589,7 @@ dependencies = [
 
 [[package]]
 name = "beet_utils"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "async-fs",
  "bevy",
@@ -4762,16 +4639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-err"
-version = "3.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44f150ffc8782f35521cec2b23727707cb4045706ba3c854e86bef66b3a8cdbd"
-dependencies = [
- "autocfg",
- "tokio",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5668,12 +5535,6 @@ dependencies = [
  "http-body 1.0.1",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "http-range-header"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
 
 [[package]]
 name = "http-serde"
@@ -6576,12 +6437,6 @@ name = "matches"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
-
-[[package]]
-name = "matchit"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "material-colors"
@@ -8668,7 +8523,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
 dependencies = [
  "openssl-probe",
- "rustls-pemfile 1.0.4",
+ "rustls-pemfile",
  "schannel",
  "security-framework 2.11.1",
 ]
@@ -8692,15 +8547,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
  "base64 0.21.7",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -9415,7 +9261,6 @@ name = "sweet"
 version = "0.4.2"
 dependencies = [
  "anyhow",
- "axum",
  "backtrace",
  "beet_utils",
  "bevy",
@@ -9452,7 +9297,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "beet",
  "bevy",
@@ -9468,7 +9313,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.8-dev.10"
+version = "0.0.8-dev.16"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -10028,7 +9873,6 @@ dependencies = [
  "tokio",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -10039,24 +9883,14 @@ checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
 dependencies = [
  "bitflags 2.9.4",
  "bytes",
- "futures-core",
  "futures-util",
  "http 1.3.1",
  "http-body 1.0.1",
- "http-body-util",
- "http-range-header",
- "httpdate",
  "iri-string",
- "mime",
- "mime_guess",
- "percent-encoding",
  "pin-project-lite",
- "tokio",
- "tokio-util",
  "tower",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -10064,20 +9898,6 @@ name = "tower-layer"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
-
-[[package]]
-name = "tower-livereload"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa6b29b17d4540f2bd9ec304ad39d280c4bdf291d0ea6c4123eeba10939af84"
-dependencies = [
- "bytes",
- "http 1.3.1",
- "http-body 1.0.1",
- "pin-project-lite",
- "tokio",
- "tower",
-]
 
 [[package]]
 name = "tower-service"

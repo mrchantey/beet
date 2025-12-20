@@ -3,16 +3,15 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_build::prelude::*;
-use beet_rsx::prelude::*;
 use beet_core::prelude::*;
+use beet_rsx::prelude::*;
 use sweet::prelude::*;
 
 #[test]
 fn works() {
 	let mut app = App::new();
 
-	app.add_plugins((BuildPlugin::default(), ApplyDirectivesPlugin::default()))
-		.insert_resource(BuildFlags::only(BuildFlag::ExportSnippets));
+	app.add_plugins((BuildPlugin::default(), ApplyDirectivesPlugin::default()));
 
 	let entity = app
 		.world_mut()
@@ -20,7 +19,7 @@ fn works() {
 			<Roundtrip/>
 		}))
 		.id();
-	app.world_mut().run_schedule(BuildSequence);
+	app.world_mut().run_schedule(ParseSourceFiles);
 	app.world_mut().run_schedule(ApplyDirectives);
 	// app.update();
 	app.world_mut()

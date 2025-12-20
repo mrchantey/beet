@@ -61,6 +61,8 @@ pub mod prelude {
 	pub use bevy::log::LogPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
+	pub use bevy::platform::hash::FixedHasher;
+	pub use std::hash::BuildHasher;
 	pub use tracing::Level;
 
 	pub use bevy::prelude::*;
@@ -79,8 +81,6 @@ pub mod prelude {
 	pub use web_time::Instant;
 
 	pub use crate::abs_file;
-	pub use crate::bevybail;
-	pub use crate::bevyhow;
 	pub use crate::cross_log;
 	pub use crate::cross_log_error;
 	pub use crate::dir;

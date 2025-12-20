@@ -3,6 +3,7 @@
 mod interrupt_on;
 pub use interrupt_on::*;
 mod exit_on_end;
+mod exit_on_fail;
 mod infallible_sequence;
 mod run_on_ready;
 mod trigger_deferred;
@@ -12,6 +13,7 @@ pub use trigger_deferred::*;
 mod end_with;
 pub use end_with::*;
 pub use exit_on_end::*;
+pub use exit_on_fail::*;
 mod end_in_duration;
 pub use end_in_duration::*;
 mod insert_on;

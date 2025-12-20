@@ -2,7 +2,6 @@ use anyhow::Result;
 use beet_utils::prelude::GlobFilter;
 use clap::Parser;
 use clap::ValueEnum;
-use glob::Pattern;
 use std::str::FromStr;
 use test::ShouldPanic;
 use test::TestDesc;
@@ -22,7 +21,7 @@ pub struct TestRunnerConfig {
 	pub filter: GlobFilter,
 	/// Shorthand for --include
 	#[arg(trailing_var_arg = true,value_parser = GlobFilter::parse_glob_pattern)]
-	pub also_include: Vec<Pattern>,
+	pub also_include: Vec<String>,
 	#[arg(long)]
 	/// Runs only tests that are marked with the [ignore](test::ignore) attribute.
 	pub ignored: bool,
@@ -63,14 +62,16 @@ pub struct TestRunnerConfig {
 
 impl TestRunnerConfig {
 	fn parse_inner(mut args: Self) -> Self {
-		args.filter.include.extend(
-			std::mem::take(&mut args.also_include)
-				.into_iter()
-				.filter(|p| {
-					!p.as_str().starts_with("--")
-						&& !p.as_str().starts_with("-")
-				}),
-		);
+		args.filter = args
+			.filter
+			.extend_include(
+				std::mem::take(&mut args.also_include).into_iter().filter(
+					|p| {
+						!p.as_str().starts_with("--")
+							&& !p.as_str().starts_with("-")
+					},
+				),
+			);
 		args.filter.wrap_all_with_wildcard();
 		args
 	}

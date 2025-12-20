@@ -9,10 +9,10 @@ use beet_core::prelude::*;
 pub struct NoInterrupt;
 
 
-/// removes [`Running`] from children when [`Run`] is called, unless they have a [`NoInterrupt`].
-/// Unlike [`interrupt_on_result`], this does not remove the `Running` component
+/// removes [`Running`] from children when [`T`] is called, unless they have a [`NoInterrupt`].
+/// Unlike [`interrupt_on_end`], this does not remove the `Running` component
 /// from the action entity, as it may have been *just added*.
-pub(crate) fn interrupt_run<T: RunEvent>(
+pub(crate) fn interrupt_on_run<T: RunEvent>(
 	ev: On<T>,
 	mut commands: Commands,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
@@ -30,7 +30,7 @@ pub(crate) fn interrupt_run<T: RunEvent>(
 
 /// Removes [`Running`] from the entity when [`End`] is triggered.
 /// Also removes [`Running`] from children unless they have a [`NoInterrupt`].
-pub(crate) fn interrupt_end<T: EndEvent>(
+pub(crate) fn interrupt_on_end<T: EndEvent>(
 	ev: On<T>,
 	mut commands: Commands,
 	children: Query<&Children>,
@@ -38,9 +38,9 @@ pub(crate) fn interrupt_end<T: EndEvent>(
 ) {
 	let action = ev.action();
 	// 1. always remove from this entity
-	if should_remove.contains(action) {
-		commands.entity(action).remove::<Running>();
-	}
+	// if should_remove.contains(action) {
+	commands.entity(action).remove::<Running>();
+	// }
 	// 2. only remove from children if NoInterrupt
 	for child in children
 		.iter_descendants(action)

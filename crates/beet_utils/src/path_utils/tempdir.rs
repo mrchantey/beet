@@ -18,6 +18,7 @@ use uuid::Uuid;
 /// // Create a temporary directory in the system temp folder
 /// let temp = TempDir::new().unwrap();
 /// ```
+#[derive(Debug, Clone)]
 pub struct TempDir {
 	/// The path to the temporary directory
 	path: AbsPathBuf,

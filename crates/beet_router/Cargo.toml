@@ -13,25 +13,13 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde","tokio", "fs", "server"]
+default = ["serde","tokio","fs", "server"]
 server = ["beet_net/server"]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
 client = ["beet_net/client"]
 fs = ["beet_net/fs"]
 aws = ["beet_net/aws"]
-# wip: axum features behind this flag
-axum = [
-	"beet_net/axum",
-	"beet_core/fs",
-	"tokio",
-	"dep:axum",
-	"dep:axum-extra",
-	"dep:axum-server",
-	"dep:tower",
-	"dep:tower-livereload",
-	"dep:tower-http",
-]
 tokio = ["dep:tokio","beet_net/tokio"]
 serde = [
 	"dep:serde",
@@ -39,10 +27,6 @@ serde = [
 	"dep:clap",
 	"dep:base64",
 	"beet_core/serde",
-]
-native-tls = []
-rustls-tls = [
-	"axum-server?/tls-rustls",
 ]
 
 [dependencies]
@@ -69,7 +53,6 @@ base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 
-
 # http
 bytes.workspace = true
 
@@ -78,15 +61,7 @@ futures.workspace = true
 async-channel.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-
-
 tokio = { workspace = true, optional = true, default-features = true }
-axum = { workspace = true, optional = true }
-axum-extra = { workspace = true, optional = true }
-axum-server = { workspace = true, optional = true }
-tower = { workspace = true, optional = true }
-tower-livereload = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 beet_core.workspace = true

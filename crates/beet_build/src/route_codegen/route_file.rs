@@ -68,7 +68,7 @@ pub fn reset_codegen_files(
 	for file in changed_exprs.iter() {
 		for parent in parents.iter_ancestors(file) {
 			if let Ok(mut codegen) = parent_codegen.get_mut(parent) {
-				trace!("Resetting changed codegen: {}", codegen.output);
+				trace!("Resetting changed codegen: {}", codegen.output());
 				codegen.set_added();
 				codegen.clear_items();
 			}
@@ -164,20 +164,17 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
+		let mut world = BuildPlugin::world();
 
-		let group = app
-			.world_mut()
+		let group = world
 			.spawn(RouteFileCollection::test_site_pages())
 			.id();
 
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		let source_file_entity =
-			app.world().entity(group).get::<Children>().unwrap()[0];
-		let route_file = app
-			.world()
+			world.entity(group).get::<Children>().unwrap()[0];
+		let route_file = world
 			.entity(source_file_entity)
 			.get::<RouteSourceFile>()
 			.unwrap();

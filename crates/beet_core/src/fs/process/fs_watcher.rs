@@ -1,16 +1,11 @@
 use crate::prelude::*;
-use clap::Parser;
-use notify::EventKind;
-// #[cfg(not(target_arch = "wasm32"))]
 pub use async_channel::Receiver;
 pub use async_channel::Sender;
-use notify::INotifyWatcher;
+use notify::EventKind;
 use notify::RecursiveMode;
 use notify::event::CreateKind;
 use notify::event::RemoveKind;
-use notify_debouncer_full::DebounceEventResult;
-use notify_debouncer_full::Debouncer;
-use notify_debouncer_full::NoCache;
+use notify_debouncer_full::DebouncedEvent;
 use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
 use std::time::Duration;
@@ -20,38 +15,55 @@ use std::time::Duration;
 /// ## Common pitfalls:
 /// - If the directory does not exist when the watcher
 /// 	starts it will error
-/// - If the directory is removed while watching, the
+/// - If the [`Self::path`] is removed while watching, the
 /// 	watcher will silently stop listening
-#[derive(Debug, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Component)]
+#[component(on_add=start_fs_watcher)]
 pub struct FsWatcher {
 	/// the path to watch
-	#[arg(long, default_value = "./")]
-	pub cwd: AbsPathBuf,
-	#[command(flatten)]
+	pub path: AbsPathBuf,
+	/// glob filter for paths to include/exclude
 	pub filter: GlobFilter,
 	/// debounce time in milliseconds
-	#[arg(
-		short,
-		long="debounce-millis",
-		value_parser = parse_duration,
-		default_value="50"
-	)]
 	pub debounce: Duration,
+	/// only send events that mutated paths
+	pub mutated_only: bool,
 }
+impl Default for FsWatcher {
+	fn default() -> Self {
+		Self {
+			path: AbsPathBuf::default(),
+			filter: GlobFilter::default(),
+			debounce: Duration::from_millis(50),
+			mutated_only: true,
+		}
+	}
+}
+
 
 pub fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
 	s.parse().map(Duration::from_millis)
 }
 
-impl Default for FsWatcher {
-	fn default() -> Self { Self::parse_from(&[""]) }
-}
-
-
 impl FsWatcher {
+	pub fn new(path: AbsPathBuf) -> Self { Self { path, ..default() } }
+
+	pub fn default_cargo() -> Self {
+		Self {
+			filter: GlobFilter::default()
+				.with_exclude("*.git*")
+				// temp until we get fine grained codegen control
+				.with_exclude("*codegen*")
+				.with_exclude("*target*"),
+			// avoid short burst refreshing
+			debounce: Duration::from_millis(100),
+			..default()
+		}
+	}
+
 	/// Sets the cwd for the watcher.
-	pub fn with_cwd(mut self, cwd: AbsPathBuf) -> Self {
-		self.cwd = cwd;
+	pub fn with_path(mut self, path: AbsPathBuf) -> Self {
+		self.path = path;
 		self
 	}
 
@@ -70,91 +82,70 @@ impl FsWatcher {
 	/// It is not valid to watch an empty path, it
 	/// will never be triggered!
 	pub fn assert_path_exists(&self) -> Result {
-		if self.cwd.exists() == false {
+		if self.path.exists() == false {
 			bevybail!(
 				"Path does not exist: {}\nOnly existing paths can be watched",
-				self.cwd.display()
+				self.path.display()
 			)
 		} else {
 			Ok(())
 		}
 	}
-	/// Return a [`WatchEventReceiver`] that will return
-	/// a [`WatchEventVec`] for each event that contains events
-	/// matching the [`Self::filter`].
-	///
-	/// ## Example
-	/// ```rust no_run
-	/// # use beet_core::prelude::*;
-	/// # async fn foo() -> Result {
-	///
-	/// let mut rx = FsWatcher::default().watch()?;
-	/// while let Some(events) = rx.recv().await? {
-	/// 	println!("Received events: {:?}", events);
-	/// }
-	///
-	/// # Ok(()) }
-	/// ```
-	pub fn watch(&self) -> Result<WatchEventReceiver> {
-		#[cfg(target_arch = "wasm32")]
-		panic!("File watching is not supported on wasm32");
-		self.assert_path_exists()?;
-		#[cfg(not(target_arch = "wasm32"))]
+}
+
+fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
+	let entity = cx.entity;
+	let watcher = world.entity(entity).get::<FsWatcher>().unwrap().clone();
+	world.commands().queue_async(async move |world| {
+		watcher.assert_path_exists()?;
 		let (tx, rx) = async_channel::unbounded();
-		let mut debouncer = new_debouncer(self.debounce, None, move |ev| {
-			if let Err(err) = tx.try_send(ev) {
-				eprintln!("{:?}", err);
-			}
+		let mut debouncer = new_debouncer(watcher.debounce, None, move |ev| {
+			// println!("EV! {:#?}", ev);
+			tx.try_send(ev).ok(/* ignore dropped rx, thats allowed */);
 		})?;
-		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
+		debouncer.watch(&watcher.path, RecursiveMode::Recursive)?;
 
-		#[cfg(not(target_arch = "wasm32"))]
-		return Ok(WatchEventReceiver {
-			rx,
-			_tx: debouncer,
-			filter: self.filter.clone(),
-		});
-
-		#[cfg(target_arch = "wasm32")]
-		unreachable!();
-	}
-}
-// TODO async iterator when stablizes
-// https://doc.rust-lang.org/std/async_iter/trait.AsyncIterator.html
-#[cfg(not(target_arch = "wasm32"))]
-pub struct WatchEventReceiver {
-	rx: Receiver<DebounceEventResult>,
-	filter: GlobFilter,
-	// keep reference to debouncer so it does not get dropped
-	_tx: Debouncer<INotifyWatcher, NoCache>,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl WatchEventReceiver {
-	pub async fn recv(&mut self) -> Result<Option<WatchEventVec>> {
-		while let Ok(ev) = self.rx.recv().await {
-			match WatchEventVec::new(ev)?
-				.apply_filter(|ev| self.filter.passes(&ev.path))
-			{
-				Some(ev_vec) => {
-					// receieved events that matches filter
-					return Ok(Some(ev_vec));
+		while let Ok(ev) = rx.recv().await {
+			let ev = match ev {
+				Ok(ev) => ev,
+				Err(errs) => {
+					bevybail!("Watch event contains errors: {:?}", errs);
 				}
-				// event received but did not match filter so keep waiting
-				None => continue,
-			}
+			};
+			let Some(ev) = DirEvent::new(ev)?
+				.apply_filter(|ev| watcher.filter.passes(&ev.path))
+			else {
+				// empty after filter
+				continue;
+			};
+
+			let ev = match (watcher.mutated_only, ev.has_mutate()) {
+				(true, false) => {
+					// mutated only but contains no mutated
+					continue;
+				}
+				(true, true) => {
+					// only send mutated events
+					ev.mutated()
+				}
+				(false, _) => ev,
+			};
+			world.entity(entity).trigger_target(ev).await;
 		}
-		// done receiving events
-		Ok(None)
-	}
+		Ok(())
+	})
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Message)]
-pub struct WatchEvent {
+
+/// An fs event that occured for a given file or directory.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct PathEvent {
+	/// The kind of fs event that occurred
 	pub kind: EventKind,
+	/// The path that the event occurred on
 	pub path: AbsPathBuf,
 }
-impl WatchEvent {
+impl PathEvent {
 	pub fn new(kind: EventKind, path: AbsPathBuf) -> Self {
 		Self { kind, path }
 	}
@@ -163,25 +154,21 @@ impl WatchEvent {
 	}
 	pub fn display(&self) -> String { format!("{}", self) }
 }
-impl std::fmt::Display for WatchEvent {
+impl std::fmt::Display for PathEvent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{:?}: {}", self.kind, self.path.display())
 	}
 }
 
-pub type WatchEventResult = Result<WatchEventVec, Vec<notify::Error>>;
+pub type WatchEventResult = Result<DirEvent, Vec<notify::Error>>;
 
-/// Wrapper for debounced events,
-/// queries are match
-#[derive(Debug, Default)]
-pub struct WatchEventVec {
-	events: Vec<WatchEvent>,
+/// Collection of each [`PathEvent`] present in a given [`DebounceEventResult`]
+#[derive(Debug, Default, Deref, EntityTargetEvent)]
+pub struct DirEvent {
+	events: Vec<PathEvent>,
 }
-impl std::ops::Deref for WatchEventVec {
-	type Target = Vec<WatchEvent>;
-	fn deref(&self) -> &Self::Target { &self.events }
-}
-impl std::fmt::Display for WatchEventVec {
+
+impl std::fmt::Display for DirEvent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		for event in &self.events {
 			writeln!(f, "{}", event.display())?;
@@ -190,16 +177,8 @@ impl std::fmt::Display for WatchEventVec {
 	}
 }
 
-
-impl WatchEventVec {
-	pub fn new(events: DebounceEventResult) -> Result<Self> {
-		let events = match events {
-			Ok(events) => events,
-			Err(errors) => {
-				bevybail!("Watch event contains errors: {:?}", errors)
-			}
-		};
-
+impl DirEvent {
+	pub fn new(events: Vec<DebouncedEvent>) -> Result<Self> {
 		Self {
 			events: events
 				.into_iter()
@@ -209,7 +188,7 @@ impl WatchEventVec {
 						.iter()
 						.map(move |path| {
 							let path = AbsPathBuf::new(path)?;
-							WatchEvent::new(kind.clone(), path).xok()
+							PathEvent::new(kind.clone(), path).xok()
 						})
 						.collect::<Vec<_>>()
 				})
@@ -218,13 +197,13 @@ impl WatchEventVec {
 		}
 		.xok()
 	}
-	pub fn take(self) -> Vec<WatchEvent> { self.events }
+	pub fn take(self) -> Vec<PathEvent> { self.events }
 
 
 	/// Returns None if no events match the filter
 	fn apply_filter(
 		mut self,
-		filter: impl Fn(&WatchEvent) -> bool,
+		filter: impl Fn(&PathEvent) -> bool,
 	) -> Option<Self> {
 		self.events.retain(|e| filter(e));
 		if self.events.is_empty() {
@@ -234,12 +213,12 @@ impl WatchEventVec {
 		}
 	}
 
-	pub fn any(&self, func: impl FnMut(&WatchEvent) -> bool) -> bool {
+	pub fn any(&self, func: impl FnMut(&PathEvent) -> bool) -> bool {
 		self.events.iter().any(func)
 	}
 	pub fn find<O>(
 		&self,
-		func: impl FnMut(&WatchEvent) -> Option<O>,
+		func: impl FnMut(&PathEvent) -> Option<O>,
 	) -> Option<O> {
 		self.events.iter().find_map(func)
 	}
@@ -247,8 +226,10 @@ impl WatchEventVec {
 	pub fn has_mutate(&self) -> bool {
 		self.has_create() || self.has_modify() || self.has_remove()
 	}
-	pub fn mutated(self) -> Vec<WatchEvent> {
-		self.events
+	/// Returns a new DirEvent containing only mutated events
+	pub fn mutated(self) -> Self {
+		let events = self
+			.events
 			.into_iter()
 			.filter_map(|e| {
 				if e.kind.is_create()
@@ -260,7 +241,8 @@ impl WatchEventVec {
 					None
 				}
 			})
-			.collect()
+			.collect();
+		Self { events }
 	}
 
 	pub fn mutated_pretty(self) -> Option<String> {
@@ -314,29 +296,27 @@ impl WatchEventVec {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use notify::EventKind;
-	use notify::event::CreateKind;
 	use sweet::prelude::*;
-	use tempfile::tempdir;
 
 	#[sweet::test]
-	async fn works() -> Result {
-		let tmp_dir = tempdir()?;
-		let mut rx = FsWatcher {
-			cwd: AbsPathBuf::new(tmp_dir.path().to_path_buf()).unwrap(),
-			..Default::default()
-		}
-		.watch()?;
-
-		let file_path = tmp_dir.path().join("foo.txt");
-		fs_ext::write(&file_path, "hello")?;
-
-		// does not hang
-		let ev = rx.recv().await?.unwrap();
-
-		ev[0].kind.xpect_eq(EventKind::Create(CreateKind::File));
-		ev[0].path.as_ref().xpect_eq(file_path);
-
-		Ok(())
+	async fn works() {
+		let mut app = App::new();
+		let tempdir = TempDir::new().unwrap();
+		let dir2 = tempdir.clone();
+		app.add_plugins(AsyncPlugin)
+			.spawn(FsWatcher::default().with_path(tempdir.path().clone()))
+			.add_observer(move |ev: On<DirEvent>, mut commands: Commands| {
+				for ev in ev.iter() {
+					if ev.path.starts_with(&dir2) {
+						commands.write_message(AppExit::Success);
+					}
+				}
+			});
+		// off-thread required for for multi_threaded, not sure why
+		std::thread::spawn(move || {
+			std::thread::sleep(Duration::from_millis(1));
+			fs_ext::write(tempdir.join("foobar.txt"), "foobar").unwrap();
+		});
+		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 }

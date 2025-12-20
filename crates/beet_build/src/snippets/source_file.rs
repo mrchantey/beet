@@ -4,14 +4,12 @@ use beet_core::exports::notify::event::CreateKind;
 use beet_core::exports::notify::event::ModifyKind;
 use beet_core::exports::notify::event::RemoveKind;
 use beet_core::prelude::*;
-use bevy::ecs::spawn::SpawnIter;
 use std::path::Path;
 
 /// Adde to an entity used to represent an file included
 /// in the [`WorkspaceConfig`]. These are loaded for different
 /// purposes by [`SnippetsPlugin`] and [`RouteCodegenSequence`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Component, Deref)]
-// #[component(immutable)]
 #[require(FileExprHash)]
 pub struct SourceFile {
 	/// The path to this source file
@@ -26,30 +24,6 @@ impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
-/// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
-/// This will run once for the initial load, afterwards [`parse_file_watch_events`]
-/// will incrementally load changed files.
-///
-/// These files are initially loaded as children of the [`SourceFileRoot`],
-/// but may be moved to a [`RouteFileCollection`] if the path matches.
-//  we could alternatively use import_route_file_collection to only load
-// source files used by file based routes
-#[cfg_attr(test, allow(dead_code))]
-pub fn load_workspace_source_files(
-	mut commands: Commands,
-	config: When<Res<WorkspaceConfig>>,
-) -> bevy::prelude::Result {
-	commands.spawn((
-		NonCollectionSourceFiles,
-		Children::spawn(SpawnIter(
-			config
-				.get_files()?
-				.into_iter()
-				.map(|path| SourceFile::new(path)),
-		)),
-	));
-	Ok(())
-}
 
 /// Parent of every [`SourceFile`] entity that exists outside of a [`RouteFileCollection`].
 #[derive(Component)]
@@ -71,15 +45,15 @@ pub struct WatchedFiles(Vec<Entity>);
 
 /// Update [`SourceFile`] entities based on file watch events,
 /// including marking as [`Changed`] on modification.
-pub fn parse_file_watch_events(
+pub fn parse_dir_watch_events(
+	ev: On<DirEvent>,
 	mut commands: Commands,
-	mut events: MessageReader<WatchEvent>,
-	root_entity: Query<Entity, With<NonCollectionSourceFiles>>,
+	root_entity: Populated<Entity, With<NonCollectionSourceFiles>>,
 	config: When<Res<WorkspaceConfig>>,
 	mut existing: Query<(Entity, &mut SourceFile)>,
-) -> bevy::prelude::Result {
-	for ev in events
-		.read()
+) -> Result {
+	for ev in ev
+		.iter()
 		// we only care about files specified in the config
 		.filter(|ev| config.passes(&ev.path))
 	{

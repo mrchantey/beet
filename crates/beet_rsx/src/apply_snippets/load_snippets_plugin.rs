@@ -6,11 +6,10 @@ use beet_core::prelude::*;
 pub struct LoadSnippetsPlugin;
 
 impl Plugin for LoadSnippetsPlugin {
-	#[allow(unused)]
 	fn build(&self, app: &mut App) {
-		#[cfg(not(target_arch = "wasm32"))]
 		app.init_plugin::<crate::prelude::ApplyDirectivesPlugin>()
-			.add_systems(Startup, load_all_file_snippets);
+			.add_systems(Startup, load_all_file_snippets_fine_grained);
+		// .add_systems(Startup, load_all_file_snippets);
 	}
 }
 

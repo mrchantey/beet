@@ -198,32 +198,6 @@ impl Response {
 		}
 	}
 
-	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-	pub async fn into_axum(self) -> axum::response::Response {
-		use axum::response::IntoResponse;
-
-		match self.body.into_bytes().await {
-			Ok(bytes) => axum::response::Response::from_parts(
-				self.parts,
-				axum::body::Body::from(bytes),
-			),
-			Err(_) => {
-				(StatusCode::INTERNAL_SERVER_ERROR, "failed to read body")
-					.into_response()
-			}
-		}
-	}
-
-	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-	pub async fn from_axum(resp: axum::response::Response) -> Result<Self> {
-		let (parts, body) = resp.into_parts();
-		let body = axum::body::to_bytes(body, usize::MAX).await?;
-		Self {
-			parts,
-			body: body.into(),
-		}
-		.xok()
-	}
 	/// convert the response into an error even if it is a 2xx status code,
 	/// extracting the status code and message from the body.
 	/// For a method that checks the status code see [`Response::into_result`].

@@ -208,6 +208,7 @@ impl Request {
 		Ok(self)
 	}
 
+	pub fn path(&self) -> RoutePath { RoutePath::new(self.parts.uri.path()) }
 	pub fn method(&self) -> HttpMethod {
 		HttpMethod::from(self.parts.method.clone())
 	}
@@ -222,29 +223,6 @@ impl Request {
 		Self { parts, body }
 	}
 
-	#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-	pub async fn from_axum<S: 'static + Send + Sync>(
-		request: axum::extract::Request,
-		state: &S,
-	) -> HttpResult<Self> {
-		use axum::extract::FromRequest;
-		let (parts, body) = request.into_parts();
-		let body = if HttpExt::has_body(&parts) {
-			let request =
-				axum::extract::Request::from_parts(parts.clone(), body);
-			let bytes =
-				Bytes::from_request(request, state).await.map_err(|err| {
-					HttpError::bad_request(format!(
-						"Failed to extract request: {}",
-						err
-					))
-				})?;
-			bytes.into()
-		} else {
-			default()
-		};
-		Ok(Self { parts, body })
-	}
 	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {
 		let bytes = self.body.into_bytes().await?;
 		Ok(http::Request::from_parts(self.parts, bytes))

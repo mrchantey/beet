@@ -16,7 +16,7 @@ name = "sweet"
 path = "src/main.rs"
 
 [dependencies]
-beet = { workspace = true, features = ["axum", "fs", "router"] }
+beet = { workspace = true, features = ["fs", "router"] }
 sweet.workspace = true
 rapidhash.workspace = true
 # auto_register_static rrequired for compilation, no idea why

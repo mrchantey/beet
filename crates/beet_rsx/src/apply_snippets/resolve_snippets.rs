@@ -81,7 +81,7 @@ fn apply_static_rsx(
 		return Ok(());
 	};
 
-	trace!(
+	info!(
 		"Applying snippets for {} at {}",
 		instance_root, snippet_root
 	);
@@ -118,7 +118,6 @@ fn apply_static_rsx(
 		.remove::<ExprIdx>();
 
 	// commands.run_system_cached_with(log_component_names, instance_root);
-
 	// apply the snippet tree
 	commands
 		.entity(static_root)

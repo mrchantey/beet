@@ -36,7 +36,7 @@ pub fn import_rsx_snippets_md(
 				&& let Some(meta_block) =
 					ParseMarkdown::markdown_to_frontmatter_tokens(&file)?
 			{
-				let meta_type = &meta_type.0;
+				let meta_type = &meta_type.inner();
 				let err_msg = format!(
 					"Failed to parse frontmatter into {}",
 					meta_type.to_token_stream().to_string(),
@@ -56,24 +56,23 @@ pub fn import_rsx_snippets_md(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::prelude::*;
 	use beet_core::prelude::*;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn parse_md() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
-		let entity = app
-			.world_mut()
+		let mut world = BuildPlugin::world();
+
+		let entity = world
 			.spawn(SourceFile::new(
 				WsPathBuf::new("tests/test_site/test_docs/hello.md").into_abs(),
 			))
 			.id();
 
-		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
-		app.world_mut()
+		world.run_schedule(ParseSourceFiles);
+		let child = world.entity(entity).get::<Children>().unwrap()[0];
+		world
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
 			// only the output of the snippet, not the instance
@@ -81,19 +80,17 @@ mod test {
 	}
 	#[test]
 	fn parse_mdx() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin::default());
-		let entity = app
-			.world_mut()
+		let mut world = BuildPlugin::world();
+		let entity = world
 			.spawn(SourceFile::new(
 				WsPathBuf::new("tests/test_site/test_docs/index.mdx")
 					.into_abs(),
 			))
 			.id();
 
-		app.update();
-		let child = app.world().entity(entity).get::<Children>().unwrap()[0];
-		app.world_mut()
+		world.run_schedule(ParseSourceFiles);
+		let child = world.entity(entity).get::<Children>().unwrap()[0];
+		world
 			.run_system_cached_with(render_fragment, child)
 			.unwrap()
 			// only the output of the snippet, not the instance

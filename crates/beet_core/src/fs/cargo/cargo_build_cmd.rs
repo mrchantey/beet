@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Verbatim clone of cargo build/run args
-#[derive(Debug, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Parser, Component, Resource)]
 pub struct CargoBuildCmd {
 	/// The top level command to run: `build`, `run`, `test`, etc.
 	#[arg(long, default_value = "build")]
@@ -105,6 +105,13 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
+	pub fn new(cmd: impl Into<String>) -> Self {
+		Self {
+			cmd: cmd.into(),
+			..default()
+		}
+	}
+
 	pub fn cmd(mut self, cmd: impl Into<String>) -> Self {
 		self.cmd = cmd.into();
 		self
@@ -318,15 +325,15 @@ impl CargoBuildCmd {
 			args.push("-Z");
 			args.push(z_flag.as_str());
 		}
-		if let Some(features_list) = features {
-			args.push("--features");
-			args.push(features_list.as_str());
+		if *no_default_features {
+			args.push("--no-default-features");
 		}
 		if *all_features {
 			args.push("--all-features");
 		}
-		if *no_default_features {
-			args.push("--no-default-features");
+		if let Some(features_list) = features {
+			args.push("--features");
+			args.push(features_list.as_str());
 		}
 		if let Some(jobs_count) = jobs {
 			args.push("--jobs");

@@ -14,7 +14,8 @@
         FragmentNode,
         related! {
             Children[(NodeTag(String::from("style")), ElementNode { self_closing :
-            true }, StyleElement, InnerText::new(include_str!("./foobar")))]
+            false }, StyleElement,
+            InnerText(String::from("body[data-beet-style-id-PLACEHOLDER] {\n  margin: 0;\n}\n")))]
         },
     ))
 }

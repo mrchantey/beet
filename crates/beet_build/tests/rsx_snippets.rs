@@ -77,12 +77,10 @@ fn simple_template() {
 
 #[test]
 fn nested_template() {
-	let mut app = App::new();
-	app.add_plugins(BuildPlugin::default())
-		.insert_resource(BuildFlags::None);
+	let mut world = BuildPlugin::world();
 
 	// create root static node
-	app.world_mut().spawn((
+	world.spawn((
 		StaticRoot,
 		common_idx(),
 		RstmlTokens::new(quote! {
@@ -92,16 +90,16 @@ fn nested_template() {
 		}),
 	));
 	// create nested static node
-	app.world_mut().spawn((
+	world.spawn((
 		StaticRoot,
 		common_idx_nested(),
 		RstmlTokens::new(quote! {
 			<after>"value: "{}</after>
 		}),
 	));
-	app.update();
+	world.run_schedule(ParseSourceFiles);
 
-	let scene = app.build_scene();
+	let scene = world.build_scene();
 	// println!("Exported Scene:\n{}", scene);
 
 	#[template]
@@ -132,36 +130,30 @@ fn common_idx_nested() -> SnippetRoot {
 }
 
 fn build_scene(tokens: TokenStream) -> String {
-	let mut app = App::new();
-	app.add_plugins(BuildPlugin::default())
-		.insert_resource(BuildFlags::None);
-	let _entity = app
-		.world_mut()
+	let mut world = BuildPlugin::world();
+
+	let _entity = world
 		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();
-	app.update();
+	world.run_schedule(ParseSourceFiles);
 
-	app.build_scene()
+	world.build_scene()
 }
 
 fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
-	let mut app = App::new();
-	app.add_plugins(ApplyDirectivesPlugin);
-	app.load_scene(scene).unwrap();
+	let mut world = ApplyDirectivesPlugin::world();
 
-	let root = app
-		.world_mut()
-		.spawn((HtmlDocument, common_idx(), bundle))
-		.id();
 
-	app.world_mut()
+	world.load_scene(scene).unwrap();
+
+	let root = world.spawn((HtmlDocument, common_idx(), bundle)).id();
+
+	world
 		.query_once::<&SnippetRoot>()
 		.len()
 		.xpect_greater_or_equal_to(2);
 
-	app.update();
+	world.run_schedule(ApplyDirectives);
 
-	app.world_mut()
-		.run_system_cached_with(render_fragment, root)
-		.unwrap()
+	world.run_system_cached_with(render_fragment, root).unwrap()
 }

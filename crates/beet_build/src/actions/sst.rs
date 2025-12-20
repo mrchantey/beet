@@ -1,39 +1,40 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
-use std::process::Command;
+use beet_flow::prelude::*;
+use beet_rsx::prelude::*;
 
+#[construct]
+pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
+	(OnSpawn::observe(
+		move |ev: On<GetOutcome>,
+		      mut cmd_params: CommandParams,
+		      pkg_config: Res<PackageConfig>| {
+			let config = CommandConfig::new("npx")
+				.arg("sst")
+				.arg(cmd.to_cmd())
+				.arg("--stage")
+				.arg(pkg_config.stage())
+				.current_dir(WsPathBuf::default().join("infra").to_string());
 
-pub fn refresh_sst(pkg_config: Res<PackageConfig>) -> Result {
-	run_sst(&pkg_config, "refresh")
+			cmd_params.execute(ev, config)
+		},
+	),)
+
+	// 	// 	"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
 }
-pub fn deploy_sst(pkg_config: Res<PackageConfig>) -> Result {
-	run_sst(&pkg_config, "deploy")
+
+impl SstCommand {
+	/// Creates an `SstCommand` bundle for the given subcommand.
+	pub fn new(cmd: SstSubcommand) -> impl Bundle {
+		(Name::new("SST Command"), SstCommand { cmd })
+	}
 }
 
-
-
-fn run_sst(pkg_config: &PackageConfig, subcommand: &str) -> Result {
-	let sst_dir = std::env::current_dir()?.join("infra").canonicalize()?;
-	let mut cmd = Command::new("npx");
-
-	cmd.current_dir(sst_dir).args(vec![
-		"sst",
-		subcommand,
-		"--stage",
-		&pkg_config.stage(),
-	]);
-	// .arg("--config")
-	// .arg("infra/sst.config.ts")
-
-	println!(
-		"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
-	);
-	cmd.status()?.exit_ok()?.xok()
-}
 
 /// Represents the available subcommands for the SST CLI.
 #[allow(unused)]
 #[derive(clap::ValueEnum, Clone, Debug)]
-enum SstSubcommand {
+pub enum SstSubcommand {
 	/// Initialize a new project
 	Init,
 	/// Run in development mode
@@ -74,7 +75,7 @@ enum SstSubcommand {
 impl SstSubcommand {
 	/// Returns the name of the subcommand as a string.
 	#[allow(unused)]
-	fn as_str(&self) -> &str {
+	fn to_cmd(&self) -> &str {
 		match self {
 			SstSubcommand::Init => "init",
 			SstSubcommand::Dev => "dev",

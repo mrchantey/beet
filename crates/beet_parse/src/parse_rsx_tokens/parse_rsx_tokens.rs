@@ -5,8 +5,10 @@ use bevy::ecs::schedule::ScheduleLabel;
 use proc_macro2::TokenStream;
 
 
-/// A sequence for parsing raw rstml token streams and combinator strings into
+/// A schedule for parsing raw rstml token streams and combinator strings into
 /// rsx trees, then extracting directives.
+/// This schedule is shared by macros and `beet_build` file parsing, enabling
+/// consistency amongst the original source code and live reloading.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct ParseRsxTokens;
 
@@ -42,10 +44,7 @@ impl ParseRsxTokens {
 		tokens: &str,
 		source_file: WsPathBuf,
 	) -> Result<TokenStream> {
-		Self::parse_bundle(
-			combinator(tokens, source_file),
-			tokenize_rsx_tokens,
-		)
+		Self::parse_bundle(combinator(tokens, source_file), tokenize_rsx_tokens)
 	}
 
 	/// Parse rstml tokens into a bsx representation, see [`tokenize_bsx_root`].

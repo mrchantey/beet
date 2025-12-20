@@ -15,7 +15,7 @@ keywords.workspace = true
 [features]
 default = ["markdown", "css"]
 css = [
-	# "beet_rsx/css", do we want this?
+	"beet_rsx/css",
 	"beet_parse/css",
 ]
 # should usually be enabled but slows down rust analyzer

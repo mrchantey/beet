@@ -13,7 +13,6 @@ pub mod client_actions;
 pub mod route_tree;
 
 #[cfg(any(feature = "server", feature = "client"))]
-// #[cfg(feature = "server")]
 pub mod codegen;
 
 #[cfg(any(feature = "server", feature = "client"))]

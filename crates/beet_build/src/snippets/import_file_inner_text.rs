@@ -21,7 +21,10 @@ pub fn import_file_inner_text(
 			.ok_or_else(|| {
 				bevyhow!("FileInnerText has no SourceFile parent: {entity:?}")
 			})?;
-		let path = source_file.parent().unwrap_or_default().join(&file_text.0);
+		let path = source_file
+			.parent()
+			.unwrap_or_default()
+			.join(&file_text.path);
 		let contents = fs_ext::read_to_string(&path)?;
 
 		// 1. change the FileInnerText to InnerText
@@ -53,7 +56,7 @@ pub fn import_file_inner_text(
 					.insert(FileWatchedBy(source_file_ent));
 			} else {
 				warn!(
-					"file included by 'src=..' tag not found, changes will not be watched: {path:?}"
+					"no SourceFile matching an fs import ie '<style src='foo.css'/>'\nchanges will not be watched: {path:?}"
 				);
 			}
 		}
@@ -71,37 +74,36 @@ mod test {
 	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
-	// this file will be parsed, declare an fs src
+	// this file will be parsed and used by the test
 	#[allow(unexpected_cfgs)]
 	fn _foobar() { let _ = rsx! {<style src="../../tests/test_file.css"/>}; }
 
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(BuildPlugin);
-		let file = app
-			.world_mut()
+		let mut world = BuildPlugin::world();
+		let file = world
 			.spawn(SourceFile::new(
+				// point to this file
 				AbsPathBuf::new_workspace_rel(file!()).unwrap(),
 			))
 			.id();
-		app.update();
+		world.run_schedule(ParseSourceFiles);
 
 		#[cfg(feature = "css")]
 		let expected = "body[data-beet-style-id-PLACEHOLDER] {\n  color: #00f;\n}\n";
 		#[cfg(not(feature = "css"))]
 		let expected = include_str!("../../tests/test_file.css");
 
-		app.world_mut().query_once::<&InnerText>()[0]
-			.xpect_eq(InnerText::new(expected));
+		world.query_once::<&InnerText>()[0].xpect_eq(InnerText::new(expected));
 
-		// links source files, child index flaky?
-		app.world_mut().query_once::<&ChildOf>()[0].0.xpect_eq(file);
+		// links source files
+		world.entity(file).contains::<Children>().xpect_true();
 
-		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
-		app.update();
+		world.query_once::<&ChildOf>().len().xpect_eq(2);
+		world.run_schedule(ParseSourceFiles);
+
 		// second update does not spawn a new ChildOf
-		app.world_mut().query_once::<&ChildOf>().len().xpect_eq(2);
+		world.query_once::<&ChildOf>().len().xpect_eq(2);
 	}
 }

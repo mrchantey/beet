@@ -136,14 +136,6 @@ impl From<HttpError> for Response {
 	}
 }
 
-#[cfg(all(feature = "axum", not(target_arch = "wasm32")))]
-impl axum::response::IntoResponse for HttpError {
-	fn into_response(self) -> axum::response::Response {
-		(self.status_code, self.message).into_response()
-	}
-}
-
-
 
 #[cfg(feature = "serde")]
 pub mod status_code_serde {

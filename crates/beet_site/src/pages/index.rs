@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-
 pub fn get() -> impl IntoHtml {
+	let a = 23;
 	rsx! {
 		<BeetContext>
 			<ContentLayout>

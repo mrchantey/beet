@@ -14,6 +14,8 @@ impl Plugin for BeetPlugins {
 		app.init_plugin::<ApplyDirectivesPlugin>();
 		#[cfg(feature = "build")]
 		app.init_plugin::<BuildPlugin>();
+		#[cfg(feature = "server")]
+		app.init_plugin::<LoadSnippetsPlugin>();
 		app.init_plugin::<BeetRunner>();
 	}
 }
@@ -28,7 +30,7 @@ impl Plugin for BeetRunner {
 	fn build(&self, app: &mut App) {
 		// order matters, last flag wins
 		#[cfg(feature = "launch")]
-		app.set_runner(LaunchRunner::runner);
+		app.set_runner(LaunchConfig::runner);
 
 		#[cfg(feature = "server")]
 		app.set_runner(RouterRunner::runner);
