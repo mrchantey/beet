@@ -70,11 +70,14 @@ pub fn default_cli_router() -> impl Bundle {
 					// only insert the watcher after first run
 					InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
 					RunOnDirEvent,
-					Sequence,
+					InfallibleSequence,
 					children![
 						ParseSourceFiles::action(),
-						// build_wasm(),
-						BuildServer,
+						(Name::new("Build Check"), Sequence, children![
+							FileExprChanged::new(),
+							// build_wasm(),
+							BuildServer,
+						]),
 						ExportStaticContent,
 						// never returns an outcome
 						RunServer,
@@ -85,6 +88,7 @@ pub fn default_cli_router() -> impl Bundle {
 				exact_route_match(),
 				(Name::new("Serve"), Sequence, children![
 					BuildServer,
+					ExportStaticContent,
 					RunServer,
 				]),
 			])),

@@ -9,7 +9,7 @@ pub fn get() -> impl IntoHtml {
 				<BeetHead slot="head"/>
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
-				<h1>Beetie</h1>
+				<h1>Beet</h1>
 				// <img style="width:10em" src="/assets/branding/logo.png"/>
 				<p><b>"A folk technology framework"</b></p>
 				<Card style:cascade class="hero">
