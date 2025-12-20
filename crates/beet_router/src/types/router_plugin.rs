@@ -258,7 +258,6 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		world.all_entities().len().xpect_eq(0);
 		world
 			.spawn((Router, EndWith(Outcome::Pass)))
 			.oneshot(Request::get("/foo"))
@@ -266,7 +265,7 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::NOT_FOUND);
 		// exchange entity was cleaned up
-		world.all_entities().len().xpect_eq(1);
+		world.query_once::<&ExchangeContext>().len().xpect_eq(0);
 	}
 
 	#[sweet::test]

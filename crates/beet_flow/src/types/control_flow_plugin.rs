@@ -14,21 +14,18 @@ impl Plugin for ControlFlowPlugin {
 			.add_systems(PostStartup, get_ready_on_startup)
 			.add_systems(
 				Update,
-				// flush any triggers spawned by TriggerDeferred
-				OnSpawnDeferred::flush.in_set(PreTickSet),
-			);
-		app.add_systems(
-			Update,
-			(
-				tick_run_timers,
-				// must be after tick_run_timers
-				end_in_duration::<Outcome>,
+				(
+					(
+						// flush any triggers spawned by TriggerDeferred
+						OnSpawnDeferred::flush,
+						tick_run_timers,
+					)
+						.in_set(PreTickSet),
+					end_in_duration::<Outcome>.in_set(TickSet),
+				),
 			)
-				.chain()
-				.in_set(TickSet),
-		)
-		.add_observer(reset_run_time_started)
-		.add_observer(reset_run_timer_stopped);
+			.add_observer(reset_run_time_started)
+			.add_observer(reset_run_timer_stopped);
 	}
 }
 

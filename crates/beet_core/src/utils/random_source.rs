@@ -1,13 +1,11 @@
+use crate::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
-use rand::distributions::DistIter;
-use rand::distributions::Standard;
-use rand::distributions::uniform::SampleRange;
-use rand::distributions::uniform::SampleUniform;
-use rand::prelude::Distribution;
+use rand::distr::Distribution;
+use rand::distr::StandardUniform;
+use rand::distr::uniform::SampleRange;
+use rand::distr::uniform::SampleUniform;
 use rand_chacha::ChaCha8Rng;
-use crate::prelude::*;
-
 
 /// A simple random source, by default retrieved from entropy.
 ///
@@ -42,8 +40,7 @@ impl RandomSource {
 
 impl Default for RandomSource {
 	fn default() -> Self {
-		// let rng = ChaCha8Rng::from_rng(&mut rand::rng());
-		let rng = ChaCha8Rng::from_rng(&mut rand::thread_rng()).unwrap();
+		let rng = ChaCha8Rng::from_rng(&mut rand::rng());
 		Self(rng)
 	}
 }
@@ -54,22 +51,21 @@ impl RandomSource {
 	/// see [Rng::random]
 	pub fn random<T>(&mut self) -> T
 	where
-		Standard: Distribution<T>,
+		StandardUniform: Distribution<T>,
 	{
-		// self.0.random() TODO update when bevy updates
-		self.0.r#gen()
+		self.0.random()
 	}
 
 	/// see [Rng::random_iter]
-	// pub fn random_iter<T>(
-	// 	self,
-	// ) -> rand::distr::Iter<rand::distr::StandardUniform, ChaCha8Rng, T>
-	// where
-	// 	Self: Sized,
-	// 	rand::distr::StandardUniform: rand::prelude::Distribution<T>,
-	// {
-	// 	self.0.random_iter()
-	// }
+	pub fn random_iter<T>(
+		self,
+	) -> rand::distr::Iter<StandardUniform, ChaCha8Rng, T>
+	where
+		Self: Sized,
+		StandardUniform: Distribution<T>,
+	{
+		self.0.random_iter()
+	}
 
 	/// see [Rng::random_range]
 	pub fn random_range<T, R>(&mut self, range: R) -> T
@@ -77,18 +73,15 @@ impl RandomSource {
 		T: SampleUniform,
 		R: SampleRange<T>,
 	{
-		self.0.gen_range(range)
-		// self.0.random_range(range)
+		self.0.random_range(range)
 	}
 
 	/// see [Rng::random_bool]
-	pub fn random_bool(&mut self, p: f64) -> bool { self.0.gen_bool(p) }
-	// pub fn random_bool(&mut self, p: f64) -> bool { self.0.random_bool(p) }
+	pub fn random_bool(&mut self, p: f64) -> bool { self.0.random_bool(p) }
 
 	/// see [Rng::random_ratio]
 	pub fn random_ratio(&mut self, numerator: u32, denominator: u32) -> bool {
-		self.0.gen_ratio(numerator, denominator)
-		// self.0.random_ratio(numerator, denominator)
+		self.0.random_ratio(numerator, denominator)
 	}
 
 	/// see [Rng::sample]
@@ -97,7 +90,10 @@ impl RandomSource {
 	}
 
 	/// see [Rng::sample_iter]
-	pub fn sample_iter<T, D>(self, distr: D) -> DistIter<D, ChaCha8Rng, T>
+	pub fn sample_iter<T, D>(
+		self,
+		distr: D,
+	) -> rand::distr::Iter<D, ChaCha8Rng, T>
 	where
 		D: Distribution<T>,
 		Self: Sized,

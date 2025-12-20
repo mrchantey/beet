@@ -23,7 +23,7 @@ client = []
 # adds css support for non-cli usage
 css = ["beet_rsx_macros/css"]
 serde = ["dep:serde", "beet_core/bevy_scene"]
-scene = ["bevy/bevy_scene", "beet_core/bevy_scene","beet_dom/bevy_scene"]
+scene = ["bevy/bevy_scene", "beet_core/bevy_scene","beet_dom/bevy_scene", "dep:ron"]
 bevy_default = ["bevy/bevy_text"]
 tokens = ["beet_core/tokens"]
 

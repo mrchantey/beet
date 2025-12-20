@@ -96,7 +96,7 @@ unsafe impl<
 				return;
 			}
 			if let Ok(entity) = world.get_entity(self.event_target)
-				&& let Some(item) = entity.get_components::<T>()
+				&& let Ok(item) = entity.get_components::<T>()
 				&& let Some(traverse_to) = T::traverse(item, event)
 			{
 				self.event_target = traverse_to;
@@ -281,9 +281,7 @@ where
 	E: for<'a> Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 {
 	fn target(&self) -> Entity { self.trigger().event_target }
-	fn original_target(&self) -> Entity {
-		self.trigger().original_event_target
-	}
+	fn original_target(&self) -> Entity { self.trigger().original_event_target }
 }
 #[cfg(test)]
 mod test {

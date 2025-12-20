@@ -24,8 +24,8 @@ pub fn default_cli_router() -> impl Bundle {
 				"deploy-sst",
 				SstCommand::new(SstSubcommand::Deploy)
 			)),
-			(single_action_route("compile-wasm", build_wasm())),
-			(single_action_route("compile-lambda", CompileLambda)),
+			(single_action_route("build-wasm", build_wasm())),
+			(single_action_route("build-lambda", CompileLambda)),
 			(single_action_route("deploy-lambda", DeployLambda)),
 			(single_action_route("watch-lambda", WatchLambda)),
 			(single_action_route("push-assets", PushAssets)),
@@ -75,7 +75,7 @@ pub fn default_cli_router() -> impl Bundle {
 						ParseSourceFiles::action(),
 						(Name::new("Build Check"), Sequence, children![
 							FileExprChanged::new(),
-							// build_wasm(),
+							build_wasm(),
 							BuildServer,
 						]),
 						ExportStaticContent,
