@@ -34,6 +34,11 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		input.generics.split_for_impl();
 	let input_ident = &input.ident;
 
+	// Build the use clause for precise captures
+	let generics_ty_list =
+		input.generics.type_params().map(|p| p.ident.clone());
+	let use_clause = quote! { + use<#(#generics_ty_list,)*> };
+
 	Ok(quote! {
 		impl #impl_generics bevy::ecs::bundle::DynamicBundle for #input_ident #type_generics #where_clause {
 			type Effect = Self;
@@ -52,14 +57,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		unsafe impl #impl_generics bevy::ecs::bundle::Bundle for #input_ident #type_generics #where_clause {
 			fn component_ids(
 				_components: &mut bevy::ecs::component::ComponentsRegistrator,
-				_ids: &mut impl FnMut(bevy::ecs::component::ComponentId),
-			) {
+			) -> impl Iterator<Item = bevy::ecs::component::ComponentId> #use_clause {
+				std::iter::empty()
 			}
 
 			fn get_component_ids(
 				_components: &bevy::ecs::component::Components,
-				_ids: &mut impl FnMut(Option<bevy::ecs::component::ComponentId>),
-			) {
+			) -> impl Iterator<Item = Option<bevy::ecs::component::ComponentId>> {
+				std::iter::empty()
 			}
 
 		}

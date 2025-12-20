@@ -21,3 +21,5 @@ tests/expect.rs
 
 packages/beet_state/node_modules
 packages/beet_state/dist
+
+bevy

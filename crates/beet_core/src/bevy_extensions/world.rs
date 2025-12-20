@@ -295,8 +295,8 @@ pub impl<W: IntoWorld> W {
 
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene_with(&self, scene: DynamicScene) -> String {
-		use bevy::scene::ron;
 		use bevy::scene::serde::SceneSerializer;
+		use ron;
 
 		let world = self.into_world();
 		let type_registry = world.resource::<AppTypeRegistry>();
@@ -325,8 +325,7 @@ pub impl<W: IntoWorld> W {
 		let scene = {
 			use serde::de::DeserializeSeed;
 			let type_registry = world.resource::<AppTypeRegistry>();
-			let mut deserializer =
-				bevy::scene::ron::de::Deserializer::from_str(scene)?;
+			let mut deserializer = ron::de::Deserializer::from_str(scene)?;
 			let scene_deserializer = bevy::scene::serde::SceneDeserializer {
 				type_registry: &type_registry.read(),
 			};
