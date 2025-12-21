@@ -9333,6 +9333,8 @@ version = "0.4.2"
 dependencies = [
  "anyhow",
  "backtrace",
+ "beet_core",
+ "beet_flow",
  "beet_utils",
  "bevy",
  "clap",
@@ -9353,6 +9355,7 @@ dependencies = [
  "quote",
  "rayon",
  "ron 0.8.1",
+ "send_wrapper",
  "serde",
  "serde_json",
  "sweet_macros",

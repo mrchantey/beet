@@ -1,8 +1,30 @@
+use test::ShouldPanic;
 use test::TestDesc;
+use test::TestType;
 
 pub fn is_equal_location(a: &TestDesc, b: &TestDesc) -> bool {
 	a.source_file == b.source_file && a.start_line == b.start_line
 }
+/// Creates a new TestDesc with the given name and source file.
+/// Other fields are set to sensible default values for a unit test.
+pub fn new(name: &str, file: &'static str) -> TestDesc {
+	TestDesc {
+		name: test::TestName::DynTestName(name.into()),
+		ignore: false,
+		ignore_message: None,
+		source_file: file,
+		start_line: 0,
+		start_col: 0,
+		end_line: 0,
+		end_col: 0,
+		compile_fail: false,
+		no_run: false,
+		should_panic: ShouldPanic::No,
+		test_type: TestType::UnitTest,
+	}
+}
+
+
 
 /// The `#[test]` macro replaces results with [useless error messages](https://github.com/rust-lang/rust/blob/a25032cf444eeba7652ce5165a2be450430890ba/library/test/src/lib.rs#L234)
 /// so we instead panic and instruct user to use `unwrap`.

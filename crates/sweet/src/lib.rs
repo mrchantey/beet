@@ -14,7 +14,6 @@ extern crate test;
 pub use sweet_macros;
 pub use sweet_macros::test;
 pub mod bevy_runner;
-pub use bevy_runner::*;
 // #[cfg(test)]
 // use libtest_runner::testlib_runner as libtest_runner;
 pub mod backtrace;
@@ -40,6 +39,7 @@ pub mod prelude {
 
 	pub use crate::backtrace::*;
 	pub use crate::bevy::*;
+	pub use crate::bevy_runner::*;
 	pub use crate::libtest::*;
 	pub use crate::logging::*;
 	pub use crate::matchers::*;

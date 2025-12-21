@@ -1,5 +1,32 @@
+use crate::prelude::*;
+use beet_core::prelude::*;
 use test::TestDescAndFn;
 use test::TestFn;
+
+pub fn new(
+	name: &str,
+	file: &'static str,
+	func: impl 'static + Send + FnOnce() -> Result<(), String>,
+) -> TestDescAndFn {
+	TestDescAndFn {
+		desc: test_desc_ext::new(name, file),
+		testfn: TestFn::DynTestFn(Box::new(func)),
+	}
+}
+
+
+pub fn insert(entity: &mut EntityWorldMut, test: TestDescAndFn) {
+	match test.testfn {
+		TestFn::StaticTestFn(func) => entity.insert(TestFunc::new(func)),
+		TestFn::DynTestFn(fn_once) => {
+			entity.insert(NonSendTestFunc::new(fn_once))
+		}
+		TestFn::StaticBenchFn(_) => todo!(),
+		TestFn::DynBenchFn(_) => todo!(),
+		TestFn::StaticBenchAsTestFn(_) => todo!(),
+		TestFn::DynBenchAsTestFn(_) => todo!(),
+	};
+}
 
 /// copied from https://github.com/rust-lang/rust/blob/a25032cf444eeba7652ce5165a2be450430890ba/library/test/src/lib.rs#L223
 /// Clones static values for putting into a dynamic vector, which test_main()
@@ -20,6 +47,8 @@ pub fn clone(test: &TestDescAndFn) -> TestDescAndFn {
 	}
 }
 
+
+#[deprecated]
 pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
 	match test.testfn {
 		TestFn::StaticTestFn(func) => func,
@@ -28,27 +57,17 @@ pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
 }
 
 
-// pub fn run(test: &TestDescAndFn) -> Result<(), String> {
-
+pub fn run(test: TestFn) -> Result<(), String> {
+	match test {
+		TestFn::StaticTestFn(func) => func(),
+		TestFn::DynTestFn(func) => func(),
+		_ => panic!("benches not yet supported"),
+	}
+}
 
 // 	// match test.testfn {
 // 	// 	TestFn::StaticTestFn(func) => func(),
 // 	// 	TestFn::StaticBenchFn(func) => func(&mut Bencher::()),
 // 	// 	_ => panic!("non-static tests are not supported"),
 // 	// }
-// }
-
-// pub fn into_runnable(self) -> Runnable {
-// 	match self {
-// 		StaticTestFn(f) => Runnable::Test(RunnableTest::Static(f)),
-// 		StaticBenchFn(f) => Runnable::Bench(RunnableBench::Static(f)),
-// 		StaticBenchAsTestFn(f) => {
-// 			Runnable::Test(RunnableTest::StaticBenchAsTest(f))
-// 		}
-// 		DynTestFn(f) => Runnable::Test(RunnableTest::Dynamic(f)),
-// 		DynBenchFn(f) => Runnable::Bench(RunnableBench::Dynamic(f)),
-// 		DynBenchAsTestFn(f) => {
-// 			Runnable::Test(RunnableTest::DynamicBenchAsTest(f))
-// 		}
-// 	}
 // }

@@ -21,12 +21,14 @@ serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 [dependencies]
 #💡 internal
 beet_utils.workspace = true
+beet_core.workspace = true
+beet_flow.workspace = true
 sweet_macros.workspace = true
 #💡 misc
 anyhow.workspace = true
 extend.workspace = true
 web-time.workspace = true
-
+send_wrapper.workspace = true
 #💡 logging
 log.workspace = true
 pretty_env_logger.workspace = true
