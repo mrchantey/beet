@@ -14,7 +14,8 @@ pub enum ContentType {
 }
 
 /// Endpoints are actions that will only run if the method and path are an
-/// exact match.
+/// exact match. There should only be one of these per route match,
+/// unlike non-endpoint entities that behave as middleware.
 ///
 /// Usually this is not added directly, instead via the [`Endpoint::build`] constructor.
 /// Endpoints should only run if there are no trailing path segments,
@@ -22,8 +23,9 @@ pub enum ContentType {
 #[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
 pub struct Endpoint {
-	/// The full [`RoutePattern`] for this endpoint
-	route_pattern: RoutePattern,
+	params: ParamsPattern,
+	/// The full [`PathPattern`] for this endpoint
+	path: PathPattern,
 	/// The method to match, or None for any method.
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -34,7 +36,7 @@ pub struct Endpoint {
 
 
 impl Endpoint {
-	pub fn route_pattern(&self) -> &RoutePattern { &self.route_pattern }
+	pub fn path(&self) -> &PathPattern { &self.path }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
@@ -43,7 +45,7 @@ impl Endpoint {
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
-		self.route_pattern.is_static()
+		self.path.is_static()
 			&& self.method.map(|m| m == HttpMethod::Get).unwrap_or(true)
 			&& self
 				.cache_strategy
@@ -61,10 +63,11 @@ impl Endpoint {
 /// structure manually.
 #[derive(BundleEffect)]
 pub struct EndpointBuilder {
+	// params: RoutePar
 	/// The action to handle the request, by default always returns a 200 OK
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 	/// The path to match, or None for any path
-	path: Option<RoutePartial>,
+	path: Option<PathPartial>,
 	/// The method to match, or None for any method. Defaults to GET
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -138,7 +141,7 @@ impl EndpointBuilder {
 		.with_handler_bundle(handler.into_middleware())
 	}
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
-		self.path = Some(RoutePartial::new(path.as_ref()));
+		self.path = Some(PathPartial::new(path.as_ref()));
 		self
 	}
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
@@ -185,20 +188,23 @@ impl EndpointBuilder {
 			entity.insert(pattern);
 		}
 		let id = entity.id();
-		let route_pattern: RoutePattern = entity.world_scope(|world| {
+		let path: PathPattern = entity.world_scope(|world| {
 			world
-				.run_system_cached_with(RoutePattern::collect, id)
+				.run_system_cached_with(PathPattern::collect_system, id)
+				.unwrap()
+		});
+		let params: ParamsPattern = entity.world_scope(|world| {
+			world
+				.run_system_cached_with(ParamsPattern::collect_system, id)
 				.unwrap()
 		});
 
 		entity
 			.insert((
-				Name::new(format!(
-					"Endpoint: {}",
-					route_pattern.annotated_route_path()
-				)),
+				Name::new(format!("Endpoint: {}", path.annotated_route_path())),
 				Endpoint {
-					route_pattern,
+					path,
+					params,
 					method: self.method,
 					cache_strategy: self.cache_strategy,
 					content_type: self.content_type,
@@ -236,10 +242,10 @@ impl EndpointBuilder {
 	}
 }
 
-/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`RoutePattern`]
+/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`PathPattern`]
 /// at this point in the tree with no remaining parts.
 pub fn exact_route_match() -> impl Bundle { route_match(true) }
-/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`RoutePattern`]
+/// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`PathPattern`]
 /// at this point in the tree, even if there are remaining parts.
 pub fn partial_route_match() -> impl Bundle { route_match(false) }
 
@@ -382,33 +388,35 @@ mod test {
 	fn test_collect_route_segments() {
 		let mut world = World::new();
 		world.spawn((
-			RoutePartial::new("foo"),
+			PathPartial::new("foo"),
 			EndpointBuilder::get(),
 			children![
 				children![
 					(
-						RoutePartial::new("*bar"),
+						PathPartial::new("*bar"),
 						EndpointBuilder::get()
 					),
-					RoutePartial::new("bazz")
+					PathPartial::new("bazz")
 				],
 				(
-					RoutePartial::new("qux"),
+					PathPartial::new("qux"),
 				),
 				(
-					RoutePartial::new(":quax"),
+					PathPartial::new(":quax"),
 					EndpointBuilder::get()
 				),
 			],
 		));
-		world.query_once::<&Endpoint>()
-    .into_iter()
-    .map(|endpoint| endpoint.route_pattern().annotated_route_path())
-    .collect::<Vec<_>>()
-		.xpect_eq(vec![
-				RoutePath::new("/foo"),
-				RoutePath::new("/foo/*bar"),
-				RoutePath::new("/foo/:quax"),
+		let mut paths = world
+			.query_once::<&Endpoint>()
+			.into_iter()
+			.map(|endpoint| endpoint.path().annotated_route_path())
+			.collect::<Vec<_>>();
+		paths.sort();
+		paths.xpect_eq(vec![
+			RoutePath::new("/foo"),
+			RoutePath::new("/foo/*bar"),
+			RoutePath::new("/foo/:quax"),
 		]);
 	}
 }

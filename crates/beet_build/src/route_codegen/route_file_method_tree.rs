@@ -6,7 +6,7 @@ use beet_router::prelude::*;
 pub struct RouteFileMethodTree {
 	/// The route path for this part of the tree. It may be
 	/// a parent or leaf node.
-	pub name: RouteSegment,
+	pub name: PathPatternSegment,
 	/// A list of entities with a [`RouteFileMethod`] component
 	/// that are associated with this route. These usually
 	/// originate from a single file but may come from sepearate collections
@@ -18,7 +18,7 @@ pub struct RouteFileMethodTree {
 }
 
 impl RouteFileMethodTree {
-	pub fn new(segment: impl Into<RouteSegment>) -> Self {
+	pub fn new(segment: impl Into<PathPatternSegment>) -> Self {
 		Self {
 			name: segment.into(),
 			funcs: Vec::new(),

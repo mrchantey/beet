@@ -142,7 +142,7 @@ fn named_route(name: impl AsRef<str>, children: impl Bundle) -> impl Bundle {
 	let name = name.as_ref();
 	(
 		Name::new(name.to_string()),
-		RoutePartial::new(name),
+		PathPartial::new(name),
 		Sequence,
 		children,
 	)

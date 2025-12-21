@@ -27,10 +27,11 @@ impl ActionExchangePair for MiddlewareContext {
 
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
-	requests: Query<'w, 's, &'static RequestMeta>,
+	pub requests: Query<'w, 's, &'static RequestMeta>,
 	// agents: Query<'w, 's, &'static mut ExchangeContext>,
-	parents: Query<'w, 's, &'static ChildOf>,
-	partials: Query<'w, 's, &'static RoutePartial>,
+	pub parents: Query<'w, 's, &'static ChildOf>,
+	pub path_partials: Query<'w, 's, &'static PathPartial>,
+	pub params_partials: Query<'w, 's, &'static ParamsPartial>,
 }
 
 impl RouteQuery<'_, '_> {
@@ -53,28 +54,12 @@ impl RouteQuery<'_, '_> {
 			.ok_or_else(|| bevyhow!("key not found: {}", key))
 	}
 
-	pub fn route_pattern(&self, action: Entity) -> Result<RoutePattern> {
-		self.parents
-			// get every PathFilter in ancestors
-			.iter_ancestors_inclusive(action)
-			.filter_map(|entity| self.partials.get(entity).ok())
-			.collect::<Vec<_>>()
-			.into_iter()
-			.cloned()
-			// reverse to start from the root
-			.rev()
-			// extract the segments
-			.flat_map(|filter| filter.segments)
-			.collect::<Vec<_>>()
-			.xmap(RoutePattern::from_segments)
-	}
-
 	pub fn route_match(
 		&self,
 		ev: &impl ActionExchangePair,
 	) -> Result<RouteMatch> {
 		let path = self.path(ev)?;
-		let pattern = self.route_pattern(ev.get_action())?;
+		let pattern = PathPattern::collect(ev.get_action(), &self)?;
 		// println!("matching path '{}' against pattern '{}'", path, pattern);
 
 		pattern.parse_path(&path)?.xok()

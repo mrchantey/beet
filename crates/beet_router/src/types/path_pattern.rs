@@ -8,53 +8,53 @@ use crate::types::RouteQuery;
 
 
 /// Represents the next part of the route pattern.
-/// All ancestor [`RoutePartial`] will be prepended when determining the route pattern
+/// All ancestor [`PathPartial`] will be prepended when determining the route pattern
 /// at this point in the tree.
 /// This is used to determine whether a handler should be invoked for a given request,
 /// and whether its children should be processed.
 #[derive(Debug, Clone, Deref, DerefMut, Component, Reflect)]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
-pub struct RoutePartial {
+pub struct PathPartial {
 	/// Segements that must match in order for the route to be valid,
 	/// an empty vector means only the root path `/` is valid.
-	pub segments: Vec<RouteSegment>,
+	pub segments: Vec<PathPatternSegment>,
 }
 
-impl RoutePartial {
-	/// Create a new `RoutePartial` with the given path which is split into segments.
+impl PathPartial {
+	/// Create a new `PathPartial` with the given path which is split into segments.
 	pub fn new(path: impl AsRef<Path>) -> Self { Self::parse(path).unwrap() }
 	pub fn parse(path: impl AsRef<Path>) -> Result<Self> {
 		Self {
-			segments: RoutePattern::new(path)?.segments,
+			segments: PathPattern::new(path)?.segments,
 		}
 		.xok()
 	}
 
-	pub fn from_segments(segments: Vec<RouteSegment>) -> Self {
+	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Self {
 		Self { segments }
 	}
 }
 
-/// A completed sequence of [`RouteSegment`] for some point in the route tree,
+/// A completed sequence of [`PathPatternSegment`] for some point in the route tree.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[cfg_attr(feature = "tokens", to_tokens(RouteSegments::_from_raw))]
-pub struct RoutePattern {
+#[cfg_attr(feature = "tokens", to_tokens(PathPatternSegments::_from_raw))]
+pub struct PathPattern {
 	/// The complete sequence of segments
-	segments: Vec<RouteSegment>,
-	/// Is true if all segments are [`RouteSegment::Static]
+	segments: Vec<PathPatternSegment>,
+	/// Is true if all segments are [`PathPatternSegment::Static`]
 	is_static: bool,
 }
 
-impl std::ops::Deref for RoutePattern {
-	type Target = Vec<RouteSegment>;
+impl std::ops::Deref for PathPattern {
+	type Target = Vec<PathPatternSegment>;
 	fn deref(&self) -> &Self::Target { &self.segments }
 }
 
-impl RoutePattern {
-	/// Parse a path into [`RouteSegments`]
+impl PathPattern {
+	/// Parse a path into [`PathPatternSegments`]
 	/// ## Errors
 	/// - Errors if path contains a wildcard pattern that isnt last
 	pub fn new(path: impl AsRef<Path>) -> Result<Self> {
@@ -62,18 +62,18 @@ impl RoutePattern {
 			.to_string_lossy()
 			.split('/')
 			.filter(|s| !s.is_empty())
-			.map(RouteSegment::new)
+			.map(PathPatternSegment::new)
 			.collect::<Vec<_>>()
 			.xmap(Self::from_segments)
 	}
 
-	/// Parse segments into a [`RoutePattern`]
+	/// Parse segments into a [`PathPattern`]
 	/// ## Errors
 	/// - Errors if path contains a wildcard pattern that isnt last
-	pub fn from_segments(segments: Vec<RouteSegment>) -> Result<Self> {
+	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Result<Self> {
 		let is_static = segments.iter().all(|segment| segment.is_static());
 		for (index, segment) in segments.iter().enumerate() {
-			if matches!(segment, RouteSegment::Wildcard(_))
+			if matches!(segment, PathPatternSegment::Wildcard(_))
 				&& index != segments.len() - 1
 			{
 				bevybail!(
@@ -89,23 +89,41 @@ impl RoutePattern {
 		.xok()
 	}
 
-	pub fn collect(
+	/// [`Self::Collect`] represented as a bevy system
+	pub fn collect_system(
 		entity: In<Entity>,
 		query: RouteQuery,
-	) -> Result<RoutePattern> {
-		query.route_pattern(entity.0)
+	) -> Result<PathPattern> {
+		Self::collect(*entity, &query)
+	}
+
+	pub fn collect(entity: Entity, query: &RouteQuery) -> Result<PathPattern> {
+		query
+			.parents
+			// get every PathFilter in ancestors
+			.iter_ancestors_inclusive(entity)
+			.filter_map(|entity| query.path_partials.get(entity).ok())
+			.collect::<Vec<_>>()
+			.into_iter()
+			.cloned()
+			// reverse to start from the root
+			.rev()
+			// extract the segments
+			.flat_map(|partial| partial.segments)
+			.collect::<Vec<_>>()
+			.xmap(Self::from_segments)
 	}
 
 
 	/// Called by to_tokens, this should never be used directly
-	pub fn _from_raw(segments: Vec<RouteSegment>, is_static: bool) -> Self {
+	pub fn _from_raw(segments: Vec<PathPatternSegment>, is_static: bool) -> Self {
 		Self {
 			segments,
 			is_static,
 		}
 	}
 
-	/// Returns true if all segments are a [`RouteSegment::Static`]
+	/// Returns true if all segments are a [`PathPatternSegment::Static`]
 	pub fn is_static(&self) -> bool { self.is_static }
 
 	/// Convert the segments to a [`RoutePath`] using annotations for dynamic segments,
@@ -118,7 +136,7 @@ impl RoutePattern {
 			.join("/")
 			.xmap(RoutePath::new)
 	}
-	/// Consume a segment of the path for each segment in the filter,
+	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
 	pub fn parse_path(
 		&self,
@@ -145,7 +163,7 @@ impl RoutePattern {
 	}
 }
 
-impl std::fmt::Display for RoutePattern {
+impl std::fmt::Display for PathPattern {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.annotated_route_path())
 	}
@@ -158,7 +176,7 @@ impl std::fmt::Display for RoutePattern {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum RouteSegment {
+pub enum PathPatternSegment {
 	/// A static segment, the `foo` in `/foo`
 	Static(String),
 	/// A dynamic segment, the `foo` in `/:foo`
@@ -183,19 +201,19 @@ pub type RouteMatchResult = Result<RouteMatch, RouteMatchError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
-	/// A [`RouteSegment::Static`] did not match its corresponding [`RoutePath`] part.
+	/// A [`PathPatternSegment::Static`] did not match its corresponding [`RoutePath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]
 	InvalidStatic { segment: String, path: String },
-	/// A [`RouteSegment::Static`] did not match its corresponding [`RoutePath`] part.
+	/// A [`PathPatternSegment::Static`] did not match its corresponding [`RoutePath`] part.
 	#[error(
 		"a segment '{segment}' expected at least one path segment, but it was empty"
 	)]
-	EmptyPath { segment: RouteSegment },
+	EmptyPath { segment: PathPatternSegment },
 }
 
-impl RouteSegment {
+impl PathPatternSegment {
 	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
 	///
 	/// ## Panics
@@ -206,9 +224,9 @@ impl RouteSegment {
 		// trim leading and trailing slashes
 		let trimmed = segment.trim_matches('/');
 		if trimmed.is_empty() {
-			panic!("RouteSegment cannot be empty");
+			panic!("PathPatternSegment cannot be empty");
 		} else if trimmed.contains('/') {
-			panic!("RouteSegment cannot contain internal slashes: {}", segment);
+			panic!("PathPatternSegment cannot contain internal slashes: {}", segment);
 		} else if trimmed.starts_with(':') {
 			Self::Dynamic(trimmed[1..].to_string())
 		} else if trimmed.starts_with('*') {
@@ -248,21 +266,21 @@ impl RouteSegment {
 
 		match (self, path.pop_front()) {
 			// static match, continue with remaining path
-			(RouteSegment::Static(val), Some(other)) if val == &other => Ok(()),
+			(PathPatternSegment::Static(val), Some(other)) if val == &other => Ok(()),
 			// static but no match, this is an error
-			(RouteSegment::Static(val), Some(other)) => {
+			(PathPatternSegment::Static(val), Some(other)) => {
 				Err(RouteMatchError::InvalidStatic {
 					segment: val.clone(),
 					path: other,
 				})
 			}
 			// dynamic will always match, continue with remaining path
-			(RouteSegment::Dynamic(key), Some(value)) => {
+			(PathPatternSegment::Dynamic(key), Some(value)) => {
 				insert(key.clone(), value);
 				Ok(())
 			}
 			// wildcard consumes the rest of the path, continue with empty path
-			(RouteSegment::Wildcard(key), Some(mut value)) => {
+			(PathPatternSegment::Wildcard(key), Some(mut value)) => {
 				// consume rest of path
 				while let Some(next) = path.pop_front() {
 					value.push('/');
@@ -279,7 +297,7 @@ impl RouteSegment {
 	}
 	pub fn is_static(&self) -> bool {
 		match self {
-			RouteSegment::Static(_) => true,
+			PathPatternSegment::Static(_) => true,
 			_ => false,
 		}
 	}
@@ -287,39 +305,33 @@ impl RouteSegment {
 	pub fn as_str(&self) -> &str { self.as_ref() }
 }
 
-impl AsRef<str> for RouteSegment {
+impl AsRef<str> for PathPatternSegment {
 	fn as_ref(&self) -> &str {
 		match self {
-			RouteSegment::Static(s) => s,
-			RouteSegment::Dynamic(s) => s,
-			RouteSegment::Wildcard(s) => s,
+			PathPatternSegment::Static(s) => s,
+			PathPatternSegment::Dynamic(s) => s,
+			PathPatternSegment::Wildcard(s) => s,
 		}
 	}
 }
 
-impl From<&str> for RouteSegment {
+impl From<&str> for PathPatternSegment {
 	fn from(value: &str) -> Self { Self::new(value) }
 }
-impl From<String> for RouteSegment {
+impl From<String> for PathPatternSegment {
 	fn from(value: String) -> Self { Self::new(value) }
 }
 /// Print the segment as-is without dynamic and wildcard annotations
-impl std::fmt::Display for RouteSegment {
+impl std::fmt::Display for PathPatternSegment {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			RouteSegment::Static(s) => write!(f, "{}", s),
-			RouteSegment::Dynamic(s) => write!(f, "{}", s),
-			RouteSegment::Wildcard(s) => write!(f, "{}", s),
+			PathPatternSegment::Static(s) => write!(f, "{}", s),
+			PathPatternSegment::Dynamic(s) => write!(f, "{}", s),
+			PathPatternSegment::Wildcard(s) => write!(f, "{}", s),
 		}
 	}
 }
 
-pub fn route_path_queue(path: &str) -> VecDeque<String> {
-	path.split('/')
-		.filter(|s| !s.is_empty())
-		.map(|s| s.to_string())
-		.collect::<VecDeque<_>>()
-}
 
 
 
@@ -335,7 +347,7 @@ mod test {
 		segments: &str,
 		route_path: &str,
 	) -> Result<RouteMatch, RouteMatchError> {
-		RoutePattern::new(segments)
+		PathPattern::new(segments)
 			.unwrap()
 			.parse_path(&RoutePath::new(route_path))
 	}
@@ -425,7 +437,7 @@ mod test {
 		parse("foo/*bar", "foo/bar/baz").xpect_ok();
 		// missing final segment
 		parse("foo/*bar", "foo").xpect_eq(Err(RouteMatchError::EmptyPath {
-			segment: RouteSegment::new("*bar"),
+			segment: PathPatternSegment::new("*bar"),
 		}));
 		parse("foo/*bar", "bar").xpect_err();
 		parse("/*foo", "").xpect_err();
