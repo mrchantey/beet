@@ -12,12 +12,11 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["bevy", "serde", "nightly", "tokens"]
+default = ["serde", "nightly", "tokens"]
 # allow for fn_traits, ie mock_fn(3);
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:serde", "dep:ron", "dep:serde_json"]
-bevy = ["dep:bevy"]
 
 [dependencies]
 #💡 internal
@@ -48,7 +47,7 @@ futures.workspace = true
 thread_local = "1.1.8"
 
 #💡 bevy
-bevy = { workspace = true, optional = true }
+bevy.workspace = true
 
 #💡 tokens
 proc-macro2 = { workspace = true, optional = true }

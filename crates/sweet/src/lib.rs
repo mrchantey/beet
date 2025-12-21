@@ -13,10 +13,11 @@ extern crate test;
 // the #[sweet::test] macro
 pub use sweet_macros;
 pub use sweet_macros::test;
+pub mod bevy_runner;
+pub use bevy_runner::*;
 // #[cfg(test)]
 // use libtest_runner::testlib_runner as libtest_runner;
 pub mod backtrace;
-#[cfg(feature = "bevy")]
 pub mod bevy;
 /// Utilities for [libtest](https://github.com/rust-lang/rust/tree/master/library/test)
 pub mod libtest;
@@ -38,7 +39,6 @@ pub mod wasm;
 pub mod prelude {
 
 	pub use crate::backtrace::*;
-	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
 	pub use crate::libtest::*;
 	pub use crate::logging::*;

@@ -34,8 +34,9 @@ fn main() {
 				// In practice this is quite a large tree,
 				// a well formed router should break much earlier.
 				// That said for a 200ms request this is unnoticable
-				EndpointBuilder::get().with_path("nested").with_handler_bundle(
-					nested_sequence(
+				EndpointBuilder::get()
+					.with_path("nested")
+					.with_handler_bundle(nested_sequence(
 						(|| Response::ok_body(
 							r#"
 							<h1>bench</h1>
@@ -43,14 +44,13 @@ fn main() {
 							"text/html",
 						))
 						.into_endpoint()
-					),
-				)
+					),)
 			]));
 		})
 		.run();
 }
 
-
+/// 100 nested sequences
 #[rustfmt::skip]
 fn nested_sequence(inner: impl Bundle) -> impl Bundle {
 (Sequence, children![
