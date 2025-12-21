@@ -18,7 +18,7 @@ impl CaseLogger for VanillaCaseLogger {
 			TestResult::Ignore(None) => "ignored".yellow(),
 			TestResult::Ignore(Some(msg)) => format!("ignored, {msg}").yellow(),
 		};
-		beet_utils::cross_log!(
+		beet_core::cross_log!(
 			"test {} ... {}",
 			result.desc.name.to_string(),
 			status,

@@ -1,4 +1,4 @@
-use beet_utils::prelude::*;
+use crate::shared_utils::pkg_ext;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -229,7 +229,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::parse;
-	use beet_utils::prelude::*;
 	use sweet::prelude::*;
 	use syn::DeriveInput;
 
@@ -241,7 +240,7 @@ mod test {
 				field2: String,
 			}
 		};
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn named_struct_constructor() {
@@ -252,7 +251,7 @@ mod test {
 				field2: String,
 			}
 		};
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 
 	#[test]
@@ -261,7 +260,7 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn tuple_struct_constructor() {
@@ -270,7 +269,7 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 
 	#[test]
@@ -283,7 +282,7 @@ mod test {
 			}
 		};
 
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 	#[test]
 	fn generics() {
@@ -291,6 +290,6 @@ mod test {
 			struct MyGenericStruct<U:Clone>{}
 		};
 
-		input.xmap(parse).unwrap().xpect_snapshot();
+		parse(input).unwrap().xpect_snapshot();
 	}
 }

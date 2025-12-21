@@ -14,7 +14,7 @@ use std::process::ExitStatus;
 /// ## Example
 ///
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let dir = dir!();
 /// ```
 #[macro_export]

@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// # Example
 ///
 /// ```
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 /// // Create a temporary directory in the system temp folder
 /// let temp = TempDir::new().unwrap();
@@ -49,7 +49,7 @@ impl TempDir {
 	/// # Example
 	///
 	/// ```
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let temp = TempDir::new().unwrap();
 	/// ```
@@ -69,7 +69,7 @@ impl TempDir {
 	/// # Example
 	///
 	/// ```
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	///
 	/// let temp = TempDir::new_workspace().unwrap();
 	/// ```

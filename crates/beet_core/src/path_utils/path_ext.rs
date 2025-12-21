@@ -106,7 +106,7 @@ pub fn is_relative_url(url: &str) -> bool {
 /// Create a relative path from a source to a destination:
 /// ## Example
 /// ```rust
-///	# use beet_utils::prelude::*;
+///	# use beet_core::prelude::*;
 /// # use std::path::PathBuf;
 /// assert_eq!(
 ///		path_ext::create_relative("src", "src/lib.rs").unwrap(),

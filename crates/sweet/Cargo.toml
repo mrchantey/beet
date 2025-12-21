@@ -20,7 +20,6 @@ serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 
 [dependencies]
 #💡 internal
-beet_utils.workspace = true
 beet_core.workspace = true
 beet_flow.workspace = true
 sweet_macros.workspace = true
@@ -65,7 +64,7 @@ serde_json = { workspace = true, optional = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_utils = { workspace = true, features = ["fs"] }
+beet_core = { workspace = true, features = ["fs"] }
 
 tokio.workspace = true
 pin-project-lite = "0.2.15"

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_utils::prelude::GlobFilter;
+use beet_core::prelude::GlobFilter;
 use clap::Parser;
 use clap::ValueEnum;
 use std::str::FromStr;
@@ -62,16 +62,14 @@ pub struct TestRunnerConfig {
 
 impl TestRunnerConfig {
 	fn parse_inner(mut args: Self) -> Self {
-		args.filter = args
-			.filter
-			.extend_include(
-				std::mem::take(&mut args.also_include).into_iter().filter(
-					|p| {
-						!p.as_str().starts_with("--")
-							&& !p.as_str().starts_with("-")
-					},
-				),
-			);
+		args.filter = args.filter.extend_include(
+			std::mem::take(&mut args.also_include)
+				.into_iter()
+				.filter(|p| {
+					!p.as_str().starts_with("--")
+						&& !p.as_str().starts_with("-")
+				}),
+		);
 		args.filter.wrap_all_with_wildcard();
 		args
 	}

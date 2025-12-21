@@ -60,17 +60,10 @@ impl CargoCmdExtra {
 				.exclude("**/.git/**")
 				.exclude("*/codegen/*");
 		}
-		let is_upstream = self
-			.build_cmd
-			.package
-			.as_ref()
-			// these crates are upstream of sweet test so do not support the watch command
-			.map(|p| ["beet_utils"].contains(&p.as_str()))
-			.unwrap_or(false);
 
 		// temp until cli args
 		let watch = true;
-		if watch && self.build_cmd.lib && !is_upstream {
+		if watch && self.build_cmd.lib {
 			// watching, only works if before any trailing args
 			self.build_cmd
 				.trailing_args

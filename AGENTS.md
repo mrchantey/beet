@@ -39,8 +39,8 @@
 	- bad: `// if there is not a match for the hash then we should run the launch step`
 
 ## Testing
-- This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_rsx`.
-- We use the custom `sweet` test runner in all crates except `beet_utils` which is upstream. prefers matchers.
+- This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
+- We use the custom `sweet` test runner and matchers in all crates.
 - Do not add the `test` prefix to function names
 		-	good: `adds_numbers`
 		- bad: `test_adds_numbers`

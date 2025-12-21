@@ -26,7 +26,7 @@ use std::str::FromStr;
 /// ## Example
 ///
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let path = WsPathBuf::new(file!());
 ///
 /// ```

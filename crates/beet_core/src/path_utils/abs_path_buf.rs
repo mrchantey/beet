@@ -13,7 +13,7 @@ use std::str::FromStr;
 /// ## Example
 ///
 /// ```rust
-/// # use beet_utils::prelude::*;
+/// # use beet_core::prelude::*;
 /// let path = abs_file!();
 /// ```
 #[macro_export]
@@ -63,7 +63,7 @@ impl AbsPathBuf {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let path = AbsPathBuf::new("Cargo.toml");
 	/// ```
 	pub fn new(path: impl AsRef<Path>) -> FsResult<Self> {
@@ -106,7 +106,7 @@ impl AbsPathBuf {
 	/// ## Example
 	///
 	/// ```
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let path = AbsPathBuf::new_workspace_rel(file!());
 	/// ```
 	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {

@@ -6,6 +6,7 @@ mod html_event_listener;
 pub use self::html_event_listener::*;
 mod interval;
 pub use self::interval::*;
+pub mod js_runtime;
 pub mod lifecycle_ext;
 mod poll;
 pub use self::poll::*;

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use colorize::AnsiColor;
 #[cfg(feature = "tokens")]
 use proc_macro2::TokenStream;
@@ -19,7 +19,7 @@ where
 	fn xpect_snapshot(&self) -> &Self {
 		#[cfg(target_arch = "wasm32")]
 		{
-			beet_utils::cross_log!("snapshot not yet supported on wasm32");
+			beet_core::cross_log!("snapshot not yet supported on wasm32");
 		}
 		#[cfg(not(target_arch = "wasm32"))]
 		{

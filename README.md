@@ -37,7 +37,6 @@ General patterns and tools for application development.
 
 | Crate                                        | Status | Description                                    |
 | -------------------------------------------- | ------ | ---------------------------------------------- |
-| [`beet_utils`](crates/beet_utils/Cargo.toml) | 🦢      | Base level utilities for beet crates           |
 | [`beet_core`](crates/beet_core/Cargo.toml)   | 🦢      | Core utilities and types for other beet crates |
 | [`beet_net`](crates/beet_net/Cargo.toml)     | 🐣      | Cross-platform networking utilities            |
 | [`sweet`](crates/sweet/Cargo.toml)           | 🐣      | A delightful cross-platform test runner        |

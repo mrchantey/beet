@@ -2,6 +2,7 @@ use crate::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
 
+
 /// Represents a section of a text file. When used as a component this entity
 /// represents this section.
 ///

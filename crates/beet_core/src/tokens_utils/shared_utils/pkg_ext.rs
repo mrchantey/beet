@@ -1,21 +1,21 @@
-
-
-
 /// when we need an internal package name for proc macros, ie `beet_core`,
 /// determine whether to use that internal name, or if it has been reexported
 /// by beet.
 ///
-/// - if its in `INTERNAL_CRATES` use `pkg_name` (reexport crate as crate_name for internal use)
+/// - if its internal and current use `crate`
+/// - if its in `INTERNAL_CRATES` use `pkg_name`
 /// - otherwise use `beet`
 ///
 /// We don't match pkg_name with current_pkg to return `crate` as that breaks in examples and integration tests
 ///
 /// Crates upstream of beet, like `beet_site` will not use the internal name
 pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
-	if is_internal() {
-		syn::parse_str(pkg_name).unwrap()
-	} else {
+	if !is_internal() {
 		syn::parse_str("beet").unwrap()
+	} else if pkg_name == std::env::var("CARGO_PKG_NAME").unwrap() {
+		syn::parse_str("crate").unwrap()
+	} else {
+		syn::parse_str(pkg_name).unwrap()
 	}
 }
 
@@ -40,7 +40,6 @@ pub fn is_internal() -> bool {
 		"beet_router",
 		"beet_sim",
 		"beet_spatial",
-		"beet_utils",
 		"sweet",
 		"sweet_macros",
 	];

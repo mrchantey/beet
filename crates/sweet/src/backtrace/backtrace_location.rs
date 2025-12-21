@@ -2,7 +2,7 @@ use ::test::TestDesc;
 use anyhow::Result;
 use backtrace::BacktraceFrame;
 #[cfg(target_arch = "wasm32")]
-use beet_utils::prelude::*;
+use beet_core::prelude::*;
 use colorize::*;
 use std::panic::PanicHookInfo;
 use std::path::Path;
@@ -207,7 +207,7 @@ impl BacktraceLocation {
 	/// 2. otherwise use [fs_ext::workspace_root]
 	pub fn cwd_root() -> PathBuf {
 		#[cfg(not(target_arch = "wasm32"))]
-		return beet_utils::prelude::workspace_root();
+		return beet_core::prelude::workspace_root();
 		#[cfg(target_arch = "wasm32")]
 		return js_runtime::sweet_root()
 			.map(PathBuf::from)
@@ -247,7 +247,7 @@ SWEET_ROOT = { value = "", relative = true }
 	let file = js_runtime::read_file(&path.to_string_lossy().to_string())
 		.ok_or_else(|| bail(&js_runtime::cwd()))?;
 	#[cfg(not(target_arch = "wasm32"))]
-	let file = beet_utils::prelude::fs_ext::read_to_string(path).map_err(|_| {
+	let file = beet_core::prelude::fs_ext::read_to_string(path).map_err(|_| {
 		bail(
 			&std::env::current_dir()
 				.unwrap_or_default()

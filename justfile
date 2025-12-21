@@ -176,13 +176,8 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
-# upstream from sweet
-test-beet-utils *args:
-	just watch 'cargo test -p beet_utils --lib --all-features --nocapture -- {{ args }}'
-
 # cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:
-	cargo test -p beet_utils 							--all-features 													 	{{ args }} -- {{ test-threads }}
 	cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
 	cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
 	cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}

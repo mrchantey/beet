@@ -2,6 +2,8 @@ pub mod env_ext;
 pub mod path_ext;
 mod ws_path_buf;
 pub use ws_path_buf::*;
+mod workspace_root;
+pub use workspace_root::*;
 mod fs_error;
 pub use fs_error::*;
 pub mod fs_ext;
@@ -9,7 +11,3 @@ mod read_dir;
 pub use read_dir::*;
 mod abs_path_buf;
 pub use abs_path_buf::*;
-#[cfg(feature = "rand")]
-mod tempdir;
-#[cfg(feature = "rand")]
-pub use tempdir::*;

@@ -59,7 +59,7 @@ impl FileResult {
 		}
 		let prefix = status.status_prefix();
 		let file = pretty_file_path(&self.file);
-		beet_utils::cross_log!("{} {}{}", prefix, file, status.message());
+		beet_core::cross_log!("{} {}{}", prefix, file, status.message());
 	}
 }
 

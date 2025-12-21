@@ -1,4 +1,6 @@
 use wasm_bindgen::prelude::*;
+
+#[cfg(not(test))]
 #[wasm_bindgen]
 unsafe extern "C" {
 	/// Get the current working directory, ie `Deno.cwd()`
@@ -27,5 +29,27 @@ unsafe extern "C" {
 	pub fn env_var(key: &str) -> Option<String>;
 	/// Get all environment variables as entries 2D array, ie `Object.entries(Deno.env.toObject())`
 	#[wasm_bindgen]
+	pub fn env_all() -> js_sys::Array;
+}
+
+#[cfg(test)]
+#[wasm_bindgen]
+unsafe extern "C" {
+	#[wasm_bindgen(js_name = "test_cwd")]
+	pub fn cwd() -> String;
+	#[wasm_bindgen(js_name = "test_exit")]
+	pub fn exit(code: i32);
+	#[wasm_bindgen(catch, js_name = "test_panic_to_error")]
+	pub fn panic_to_error(
+		f: &mut dyn FnMut() -> Result<(), String>,
+	) -> Result<(), JsValue>;
+	#[wasm_bindgen(js_name = "test_read_file")]
+	pub fn read_file(path: &str) -> Option<String>;
+	#[wasm_bindgen(js_name = "test_sweet_root")]
+	pub fn sweet_root() -> Option<String>;
+	#[wasm_bindgen]
+	#[wasm_bindgen(js_name = "test_env_var")]
+	pub fn env_var(key: &str) -> Option<String>;
+	#[wasm_bindgen(js_name = "test_env_all")]
 	pub fn env_all() -> js_sys::Array;
 }

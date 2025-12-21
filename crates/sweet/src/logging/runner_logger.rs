@@ -18,7 +18,7 @@ fn clear() {
 	#[cfg(target_arch = "wasm32")]
 	web_sys::console::clear();
 	#[cfg(not(target_arch = "wasm32"))]
-	beet_utils::prelude::terminal::clear().unwrap();
+	beet_core::prelude::terminal::clear().unwrap();
 }
 
 impl RunnerLogger {
@@ -33,7 +33,7 @@ impl RunnerLogger {
 			clear();
 		}
 		if !config.quiet {
-			beet_utils::cross_log!("\n{}\n\n{config}", Self::SWEET_AS)
+			beet_core::cross_log!("\n{}\n\n{config}", Self::SWEET_AS)
 		}
 
 		Self {
@@ -56,12 +56,12 @@ impl RunnerLogger {
 		let result_count = ResultCount::from_case_results(&self.cases);
 
 		if !self.config.quiet {
-			beet_utils::cross_log!("{}", self.case_results(&result_count));
+			beet_core::cross_log!("{}", self.case_results(&result_count));
 		}
 		self.on_results_printed();
 		if !self.config.watch && !result_count.succeeded() {
 			#[cfg(target_arch = "wasm32")]
-			beet_utils::js_runtime::exit(1);
+			beet_core::js_runtime::exit(1);
 			#[cfg(not(target_arch = "wasm32"))]
 			std::process::exit(1);
 		}

@@ -52,7 +52,7 @@ pub trait Xtend: Sized {
 	///
 	/// ```rust
 	/// # use bevy::prelude::*;
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// fn foo()-> Result<u32> {
 	///   7.xok()
 	/// }
@@ -62,14 +62,14 @@ pub trait Xtend: Sized {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// assert_eq!("foo".xsome(), Some("foo"));
 	/// ```
 	fn xsome(self) -> Option<Self> { Some(self) }
 
 	/// Convenience wrapper for [`Into::into`].
 	/// ```rust
-	/// # use beet_utils::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// assert_eq!(7_u32.xinto::<u64>(), 7);
 	/// ```
 	fn xinto<T: From<Self>>(self) -> T { T::from(self) }

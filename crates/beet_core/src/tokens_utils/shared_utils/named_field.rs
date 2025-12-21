@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use super::*;
 use syn::Attribute;
 use syn::Data;
 use syn::DeriveInput;
@@ -232,7 +232,7 @@ impl<'a> NamedField<'a> {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use super::*;
 	use syn::FnArg;
 	use syn::Type;
 
