@@ -32,6 +32,7 @@ unsafe extern "C" {
 	pub fn env_all() -> js_sys::Array;
 }
 
+// TODO this is just to get it to compile, we need a better solution
 #[cfg(test)]
 #[wasm_bindgen]
 unsafe extern "C" {

@@ -2,11 +2,16 @@
 /// determine whether to use that internal name, or if it has been reexported
 /// by beet.
 ///
+/// - if its external use `beet`
 /// - if its internal and current use `crate`
-/// - if its in `INTERNAL_CRATES` use `pkg_name`
-/// - otherwise use `beet`
+/// - if its a different internal  use `pkg_name`
 ///
-/// We don't match pkg_name with current_pkg to return `crate` as that breaks in examples and integration tests
+/// ## Examples and Integration Tests
+///
+/// Examples and integration tests will need to reexport the crate dependencies.
+/// If the macro expands to `crate::prelude::foo`
+/// then the example should `use beet_core::prelude;`
+/// which allows `crate::prelude` to resolve to `beet_core`.
 ///
 /// Crates upstream of beet, like `beet_site` will not use the internal name
 pub fn internal_or_beet(pkg_name: &str) -> syn::Path {

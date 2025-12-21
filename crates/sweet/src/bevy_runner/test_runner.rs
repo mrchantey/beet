@@ -43,21 +43,37 @@ fn insert_test_fn(entity: &mut EntityWorldMut, func: test::TestFn) {
 	};
 }
 fn insert_test_desc(entity: &mut EntityWorldMut, desc: test::TestDesc) {
+	let test::TestDesc {
+		name,
+		test_type,
+		source_file,
+		start_line,
+		start_col,
+		end_line,
+		end_col,
+		ignore,
+		ignore_message,
+		should_panic,
+		no_run,
+		compile_fail,
+	} = desc;
+
+
 	entity.insert((
-		Name::new(desc.name.to_string()),
-		TestType(desc.test_type),
+		Name::new(name.to_string()),
+		TestType(test_type),
 		FileSpan::new(
-			desc.source_file,
-			LineCol::new(desc.start_line as u32, desc.start_col as u32),
-			LineCol::new(desc.end_line as u32, desc.end_col as u32),
+			source_file,
+			LineCol::new(start_line as u32, start_col as u32),
+			LineCol::new(end_line as u32, end_col as u32),
 		),
 	));
-	if desc.ignore {
+	if ignore {
 		entity.insert(ShouldIgnore {
-			message: desc.ignore_message.map(|s| s.to_string()),
+			message: ignore_message.map(|s| s.to_string()),
 		});
 	}
-	match desc.should_panic {
+	match should_panic {
 		test::ShouldPanic::No => {}
 		test::ShouldPanic::Yes => {
 			entity.insert(ShouldPanic { message: None });
@@ -68,10 +84,10 @@ fn insert_test_desc(entity: &mut EntityWorldMut, desc: test::TestDesc) {
 			});
 		}
 	}
-	if desc.no_run {
+	if no_run {
 		entity.insert(ShouldNotRun);
 	}
-	if desc.compile_fail {
+	if compile_fail {
 		entity.insert(ShouldCompileFail);
 	}
 }
@@ -109,20 +125,6 @@ pub struct TestFail(String);
 impl Default for TestType {
 	fn default() -> Self { Self(test::TestType::UnitTest) }
 }
-
-// pub name: TestName,
-// pub ignore: bool,
-// pub ignore_message: Option<&'static str>,
-// pub source_file: &'static str,
-// pub start_line: usize,
-// pub start_col: usize,
-// pub end_line: usize,
-// pub end_col: usize,
-// pub should_panic: options::ShouldPanic,
-// pub compile_fail: bool,
-// pub no_run: bool,
-// pub test_type: TestType,
-
 
 pub fn start_test_runner(
 	mut commands: Commands,
@@ -290,7 +292,7 @@ mod tests {
 			.iter_to_string_indented()
 			.xpect_snapshot();
 	}
-	
+
 	#[test]
 	fn runs() { run(setup()); }
 }
