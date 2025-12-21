@@ -1,9 +1,11 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
 
-/// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
+/// Represents a section of a text file. When used as a component this entity
+/// represents this section.
+///
+/// This is also used to denote the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates.
 /// For the component version see [`FileSpanOf`].
 /// ## Example
@@ -11,7 +13,7 @@ use std::path::Path;
 /// let tree = rsx!{<div>hello</div>};
 /// //              ^ this location
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct FileSpan {
@@ -72,7 +74,7 @@ impl FileSpan {
 	/// ## Example
 	///
 	/// ```rust
-	/// # use beet_dom::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let loc = FileSpan::new_with_start(file!(), line!(), column!());
 	/// ```
 	/// ## Panics

@@ -15,19 +15,6 @@ pub fn new(
 }
 
 
-pub fn insert(entity: &mut EntityWorldMut, test: TestDescAndFn) {
-	match test.testfn {
-		TestFn::StaticTestFn(func) => entity.insert(TestFunc::new(func)),
-		TestFn::DynTestFn(fn_once) => {
-			entity.insert(NonSendTestFunc::new(fn_once))
-		}
-		TestFn::StaticBenchFn(_) => todo!(),
-		TestFn::DynBenchFn(_) => todo!(),
-		TestFn::StaticBenchAsTestFn(_) => todo!(),
-		TestFn::DynBenchAsTestFn(_) => todo!(),
-	};
-}
-
 /// copied from https://github.com/rust-lang/rust/blob/a25032cf444eeba7652ce5165a2be450430890ba/library/test/src/lib.rs#L223
 /// Clones static values for putting into a dynamic vector, which test_main()
 /// needs to hand out ownership of tests to parallel test runners.

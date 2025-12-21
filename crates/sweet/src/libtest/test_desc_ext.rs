@@ -1,3 +1,4 @@
+use beet_core::prelude::*;
 use test::ShouldPanic;
 use test::TestDesc;
 use test::TestType;
@@ -23,6 +24,7 @@ pub fn new(name: &str, file: &'static str) -> TestDesc {
 		test_type: TestType::UnitTest,
 	}
 }
+
 
 
 

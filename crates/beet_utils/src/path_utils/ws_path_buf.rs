@@ -10,13 +10,18 @@ use std::str::FromStr;
 
 
 /// ## Workspace PathBuf
+///
+/// Represents a [`PathBuf`] relative to the root of the workspace, usually
+/// containing the main [`Cargo.toml`]. When used as a component this indicates
+/// the entity represents a file or directory with the given path.
+/// The path does **not** have to exist.
+///
 /// A newtype with several indications:
 /// 1. the path is relative to the workspace root
 /// 2. the path is cleaned using [`path_clean`]
 /// 3. on windows backslashes are replaced by forward slashes
 ///    - This is done to ensure exact matches because this type is often used across architectures.
 ///
-/// The path does **not** have to exist
 ///
 /// ## Example
 ///
@@ -26,13 +31,8 @@ use std::str::FromStr;
 ///
 /// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(
-	Debug, Default, Clone, PartialEq, Eq, Hash, bevy::reflect::Reflect,
-)]
-pub struct WsPathBuf(
-	// TODO upstream Pathbuf Reflect
-	PathBuf,
-);
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+pub struct WsPathBuf(PathBuf);
 impl std::fmt::Display for WsPathBuf {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.0.to_string_lossy())

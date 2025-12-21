@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
 // #![feature(test)]
+// remove after bevy refactor
+#![allow(deprecated)]
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 // implement FnMut for MockFunc
