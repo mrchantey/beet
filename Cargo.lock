@@ -9389,7 +9389,6 @@ dependencies = [
 name = "sweet_macros"
 version = "0.0.8-dev.0"
 dependencies = [
- "anyhow",
  "proc-macro2",
  "quote",
  "syn 2.0.111",
