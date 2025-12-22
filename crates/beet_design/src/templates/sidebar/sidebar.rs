@@ -223,7 +223,7 @@ mod test {
 		world
 			.resource::<EndpointTree>()
 			.to_string()
-			.xpect_eq("/*\n/docs\n/docs/testing\n");
+			.xpect_eq("/docs\n/docs/testing\n");
 
 		world
 			.run_system_cached_with(

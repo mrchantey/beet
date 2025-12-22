@@ -1,3 +1,4 @@
+use bevy::app::Plugins;
 use bevy::prelude::*;
 use extend::ext;
 use std::time::Duration;
@@ -38,6 +39,18 @@ pub impl App {
 	/// Method chaining utility, calls `update` and returns `self`.
 	fn update_then(&mut self) -> &mut Self {
 		self.update();
+		self
+	}
+
+	#[track_caller]
+	fn with_plugins<M>(mut self, plugins: impl Plugins<M>) -> Self {
+		self.add_plugins(plugins);
+		self
+	}
+
+	#[track_caller]
+	fn with_entity<M>(mut self, bundle: impl Bundle) -> Self {
+		self.world_mut().spawn(bundle);
 		self
 	}
 }

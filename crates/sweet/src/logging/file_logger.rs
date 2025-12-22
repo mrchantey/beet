@@ -91,7 +91,7 @@ fn prepend_failing_test_name(result: &mut TestDescAndResult) {
 			.to_str()
 			.unwrap_or_default();
 
-		let test_name = test_desc_ext::short_name(&result.desc);
+		let test_name = test_ext::short_name(&result.desc);
 
 		let next = format!("\n\t• {file_stem} > {test_name} \n\n").red();
 		*val = format!("{next}{val}");

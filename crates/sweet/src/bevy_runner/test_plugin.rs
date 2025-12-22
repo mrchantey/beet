@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use super::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
@@ -8,6 +8,19 @@ impl Plugin for TestPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<ControlFlowPlugin>()
 			.init_plugin::<AsyncPlugin>()
-			.add_systems(Startup, start_test_runner);
+			.insert_schedule_before(Update, RunTests)
+			.add_systems(
+				RunTests,
+				(
+					filter_tests,
+					(run_tests_series, run_non_send_tests_series),
+					collect_tests,
+				)
+					.chain(),
+			);
 	}
 }
+
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
+pub struct RunTests;

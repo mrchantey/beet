@@ -1,4 +1,10 @@
+mod insert_tests;
 mod test_plugin;
+pub use insert_tests::*;
 pub use test_plugin::*;
 mod test_runner;
 pub use test_runner::*;
+mod test_filter;
+pub use test_filter::*;
+mod test_collector;
+pub use test_collector::*;

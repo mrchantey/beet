@@ -25,7 +25,7 @@ pub fn collect_runnable_tests(
 					.expect("channel was dropped");
 				None
 			} else {
-				Some(test_desc_and_fn_ext::clone(test))
+				Some(test_ext::clone_static(test))
 			}
 		})
 		.collect::<Vec<_>>();
