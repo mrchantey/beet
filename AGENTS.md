@@ -22,15 +22,18 @@
 	- i'm a little teapot
 	- choo choo i'm a tank engine
 	- whats good chicken
+- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+
+## Conventions
 
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
+- Unless a result consumer needs to check the error, always use `bevyhow!{}`, `bevybail!{}` and the bevy `Result` type reexported from `beet_core::prelude::*`
+from `beet_core`
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
 	- Entities: `ent`
-- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type.
-
 
 ## Documentation
 - documentation should always be as short and concise as possible.
@@ -41,6 +44,7 @@
 ## Testing
 - This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
 - We use the custom `sweet` test runner and matchers in all crates.
+- Test behavior only, do not create frivilous tests like `constructor_creates_struct`
 - Do not add the `test` prefix to function names
 		-	good: `adds_numbers`
 		- bad: `test_adds_numbers`

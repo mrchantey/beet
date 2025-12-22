@@ -193,11 +193,13 @@ impl EndpointBuilder {
 				.run_system_cached_with(PathPattern::collect_system, id)
 				.unwrap()
 		});
-		let params: ParamsPattern = entity.world_scope(|world| {
-			world
-				.run_system_cached_with(ParamsPattern::collect_system, id)
-				.unwrap()
-		});
+		let params = entity
+			.world_scope(|world| -> Result<ParamsPattern> {
+				world
+					.run_system_cached_with(ParamsPattern::collect_system, id)
+					.unwrap()
+			})
+			.unwrap();
 
 		entity
 			.insert((
