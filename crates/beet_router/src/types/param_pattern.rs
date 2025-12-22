@@ -83,6 +83,7 @@ impl ParamsPartial {
 /// all params used for this endpoint and its ancestors
 #[derive(
 	Debug,
+	Default,
 	Clone,
 	PartialEq,
 	Eq,
@@ -165,15 +166,18 @@ pub struct ParamMeta {
 
 impl std::fmt::Display for ParamMeta {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{} - kind: {}", self.name, self.value)?;
+		write!(f, "Param - name: {}", self.name)?;
 		if let Some(short) = self.short() {
-			write!(f, " short: -{}", short)?;
+			write!(f, ", short: -{}", short)?;
 		}
-		if self.is_required() {
-			write!(f, " (required)")?;
-		}
+		write!(
+			f,
+			", required: {}, kind: {}",
+			self.is_required(),
+			self.value
+		)?;
 		if let Some(desc) = self.description() {
-			write!(f, " desc: {}", desc)?;
+			write!(f, ", description: {}", desc)?;
 		}
 		Ok(())
 	}

@@ -1,7 +1,8 @@
-/*
 /api
+  Param - name: verbose, short: -v, required: false, kind: flag, description: Enable verbose output
 /api/:id
-/docs*
+  Param - name: format, short: -f, required: true, kind: single, description: Output format
+  Param - name: verbose, short: -v, required: false, kind: flag, description: Enable verbose output
 /docs/*path
-/users*
 /users/:userId
+  Param - name: tags, required: false, kind: multiple, description: User tags

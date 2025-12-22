@@ -33,6 +33,8 @@ use beet_core::prelude::*;
 pub struct EndpointTree {
 	/// The path pattern for this node
 	pub pattern: PathPattern,
+	/// The params pattern for this node
+	pub params: ParamsPattern,
 	/// The entity with an [`Endpoint`] at this exact path, if any
 	pub endpoint: Option<Entity>,
 	/// Child nodes in the tree
@@ -46,7 +48,9 @@ impl EndpointTree {
 		world
 			.query_once::<(Entity, &Endpoint)>()
 			.iter()
-			.map(|(entity, endpoint)| (*entity, endpoint.path().clone()))
+			.map(|(entity, endpoint)| {
+				(*entity, endpoint.path().clone(), endpoint.params().clone())
+			})
 			.collect::<Vec<_>>()
 			.xmap(Self::from_endpoints)
 	}
@@ -54,12 +58,13 @@ impl EndpointTree {
 	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
 	/// Returns an error if there are conflicting paths.
 	pub fn from_endpoints(
-		endpoints: Vec<(Entity, PathPattern)>,
+		endpoints: Vec<(Entity, PathPattern, ParamsPattern)>,
 	) -> Result<Self> {
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,
 			endpoint: Option<Entity>,
+			params: Option<ParamsPattern>,
 			// track segment type for conflict detection
 			segment_type: Option<SegmentType>,
 		}
@@ -84,7 +89,7 @@ impl EndpointTree {
 		let mut root = Node::default();
 
 		// build tree and detect conflicts
-		for (ent, pattern) in &endpoints {
+		for (ent, pattern, params) in &endpoints {
 			let segments = pattern.iter().cloned().collect::<Vec<_>>();
 			let mut node = &mut root;
 
@@ -132,7 +137,9 @@ impl EndpointTree {
 
 				node = node.children.entry(key).or_insert_with(|| Node {
 					segment_type: Some(seg_type),
-					..default()
+					endpoint: None,
+					params: None,
+					children: default(),
 				});
 
 				if is_last {
@@ -143,6 +150,7 @@ impl EndpointTree {
 						);
 					}
 					node.endpoint = Some(*ent);
+					node.params = Some(params.clone());
 				}
 			}
 
@@ -154,11 +162,16 @@ impl EndpointTree {
 					);
 				}
 				node.endpoint = Some(*ent);
+				node.params = Some(params.clone());
 			}
 		}
 
 		// recursively build EndpointTree from Node
-		fn build_tree(pattern: PathPattern, node: &Node) -> EndpointTree {
+		fn build_tree(
+			pattern: PathPattern,
+			params: ParamsPattern,
+			node: &Node,
+		) -> EndpointTree {
 			let mut children: Vec<EndpointTree> = node
 				.children
 				.iter()
@@ -177,7 +190,9 @@ impl EndpointTree {
 					child_segments.push(segment);
 					let child_pattern =
 						PathPattern::from_segments(child_segments).unwrap();
-					build_tree(child_pattern, child_node)
+					let child_params =
+						child_node.params.clone().unwrap_or(params.clone());
+					build_tree(child_pattern, child_params, child_node)
 				})
 				.collect();
 
@@ -185,12 +200,18 @@ impl EndpointTree {
 
 			EndpointTree {
 				pattern,
+				params: node.params.clone().unwrap_or(params),
 				endpoint: node.endpoint,
 				children,
 			}
 		}
 
-		build_tree(PathPattern::from_segments(vec![]).unwrap(), &root).xok()
+		build_tree(
+			PathPattern::from_segments(vec![]).unwrap(),
+			ParamsPattern::default(),
+			&root,
+		)
+		.xok()
 	}
 
 	/// Returns all endpoint paths in the tree
@@ -215,8 +236,12 @@ impl std::fmt::Display for EndpointTree {
 			node: &EndpointTree,
 			f: &mut std::fmt::Formatter<'_>,
 		) -> std::fmt::Result {
-			let suffix = if node.endpoint.is_some() { "" } else { "*" };
-			writeln!(f, "{}{suffix}", node.pattern.annotated_route_path())?;
+			if node.endpoint.is_some() {
+				writeln!(f, "{}", node.pattern.annotated_route_path())?;
+				for param in node.params.iter() {
+					writeln!(f, "  {}", param)?;
+				}
+			}
 			for child in &node.children {
 				inner(child, f)?;
 			}
@@ -246,6 +271,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -253,6 +279,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 
@@ -277,6 +304,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -284,6 +312,7 @@ mod test {
 					"bar".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 
@@ -308,6 +337,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -315,6 +345,7 @@ mod test {
 					"bar".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 
@@ -340,6 +371,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -347,6 +379,7 @@ mod test {
 					"bar".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent3,
@@ -355,6 +388,7 @@ mod test {
 					PathPatternSegment::Static("bar".to_string()),
 				])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 
@@ -375,6 +409,7 @@ mod test {
 					"foo".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -382,6 +417,7 @@ mod test {
 					"bar".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 
@@ -409,12 +445,28 @@ mod test {
 					"api".to_string(),
 				)])
 				.unwrap(),
+				ParamsPattern::from_metas(vec![
+					ParamMeta::new("verbose", ParamValue::Flag)
+						.with_short('v')
+						.with_description("Enable verbose output"),
+				])
+				.unwrap(),
 			),
 			(
 				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::Static("api".to_string()),
 					PathPatternSegment::Dynamic("id".to_string()),
+				])
+				.unwrap(),
+				ParamsPattern::from_metas(vec![
+					ParamMeta::new("verbose", ParamValue::Flag)
+						.with_short('v')
+						.with_description("Enable verbose output"),
+					ParamMeta::new("format", ParamValue::Single)
+						.with_short('f')
+						.with_description("Output format")
+						.required(),
 				])
 				.unwrap(),
 			),
@@ -425,6 +477,11 @@ mod test {
 					PathPatternSegment::Dynamic("userId".to_string()),
 				])
 				.unwrap(),
+				ParamsPattern::from_metas(vec![
+					ParamMeta::new("tags", ParamValue::Multiple)
+						.with_description("User tags"),
+				])
+				.unwrap(),
 			),
 			(
 				ent4,
@@ -433,6 +490,7 @@ mod test {
 					PathPatternSegment::Wildcard("path".to_string()),
 				])
 				.unwrap(),
+				ParamsPattern::from_metas(vec![]).unwrap(),
 			),
 		];
 
@@ -457,6 +515,7 @@ mod test {
 					PathPatternSegment::Dynamic("id".to_string()),
 				])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 			(
 				ent2,
@@ -465,6 +524,7 @@ mod test {
 					PathPatternSegment::Static("users".to_string()),
 				])
 				.unwrap(),
+				ParamsPattern::default(),
 			),
 		];
 

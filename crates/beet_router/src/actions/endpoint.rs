@@ -37,6 +37,7 @@ pub struct Endpoint {
 
 impl Endpoint {
 	pub fn path(&self) -> &PathPattern { &self.path }
+	pub fn params(&self) -> &ParamsPattern { &self.params }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
