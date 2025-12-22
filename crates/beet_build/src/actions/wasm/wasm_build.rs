@@ -19,7 +19,7 @@ fn cargo_build_wasm() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let cmd = query
 					.get(ev.action())
@@ -30,7 +30,7 @@ fn cargo_build_wasm() -> impl Bundle {
 					.no_default_features()
 					.feature("client");
 
-				cmd_params.execute(ev, cmd)
+				cmd_runner.run(ev, cmd)
 			},
 		),
 	)
@@ -44,7 +44,7 @@ fn wasm_bindgen() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      html_constants: Res<HtmlConstants>,
 			      manifest: Res<CargoManifest>,
 			      config: Res<WorkspaceConfig>,
@@ -74,7 +74,7 @@ fn wasm_bindgen() -> impl Bundle {
 					.arg("--no-typescript")
 					.arg(exe_path.to_string_lossy());
 
-				cmd_params.execute(ev, cmd_config)
+				cmd_runner.run(ev, cmd_config)
 			},
 		),
 	)
@@ -125,7 +125,7 @@ fn wasm_opt() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |mut ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      html_constants: Res<HtmlConstants>,
 			      ws_config: Res<WorkspaceConfig>,
 			      query: AncestorQuery<&'static CargoBuildCmd>|
@@ -146,7 +146,7 @@ fn wasm_opt() -> impl Bundle {
 						.arg("--output")
 						.arg(wasm_file.to_string_lossy())
 						.arg(wasm_file.to_string_lossy());
-					cmd_params.execute(ev, cmd_config)?;
+					cmd_runner.run(ev, cmd_config)?;
 				} else {
 					ev.trigger_with_cx(Outcome::Pass);
 				}

@@ -26,7 +26,7 @@ pub fn CompileLambda(entity: Entity) -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let cargo_cmd = query
 					.get(entity)
@@ -63,7 +63,7 @@ pub fn CompileLambda(entity: Entity) -> impl Bundle {
 					.arg("--target")
 					.arg("x86_64-unknown-linux-gnu");
 
-				cmd_params.execute(ev, cmd_config)
+				cmd_runner.run(ev, cmd_config)
 			},
 		),
 	)
@@ -77,7 +77,7 @@ pub fn DeployLambda() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
-			 mut cmd_params: CommandParams,
+			 mut cmd_runner: CommandRunner,
 			 workspace_config: Res<WorkspaceConfig>,
 			 lambda_config: Res<LambdaConfig>,
 			 pkg_config: Res<PackageConfig>| {
@@ -127,7 +127,7 @@ pub fn DeployLambda() -> impl Bundle {
 				// TODO print command with redacted environment variables
 				// println!("🌱 Deploying Lambda Binary to {lambda_name}");
 
-				cmd_params.execute(ev, config)
+				cmd_runner.run(ev, config)
 			},
 		),
 	)
@@ -143,7 +143,7 @@ pub fn WatchLambda() -> impl Bundle {
 		Name::new("Watch Lambda"),
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
-			 mut cmd_params: CommandParams,
+			 mut cmd_runner: CommandRunner,
 			 pkg_config: Res<PackageConfig>| {
 				let lambda_name = pkg_config.router_lambda_name();
 				let config = CommandConfig::new("aws")
@@ -160,7 +160,7 @@ pub fn WatchLambda() -> impl Bundle {
 				// so we can succeed immediatly here
 				// .no_wait();
 
-				cmd_params.execute(ev, config)
+				cmd_runner.run(ev, config)
 			},
 		),
 	)

@@ -18,7 +18,6 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
 	TestServer(TestServer),
-	TestWasm(TestWasm),
 	Run(CargoRun),
 	Test(CargoTest),
 }
@@ -27,7 +26,6 @@ enum Commands {
 async fn main() -> Result {
 	match Cli::parse().command {
 		Commands::TestServer(cmd) => cmd.run(),
-		Commands::TestWasm(cmd) => cmd.run(),
 		Commands::Run(cmd) => cmd.run().await,
 		Commands::Test(cmd) => cmd.run().await,
 	}

@@ -94,7 +94,7 @@ impl Default for EndpointBuilder {
 	fn default() -> Self {
 		Self {
 			insert: Box::new(|entity| {
-				entity.insert(StatusCode::OK.into_endpoint());
+				entity.insert(StatusCode::OK.into_endpoint_handler());
 			}),
 			path: None,
 			params: None,
@@ -109,7 +109,7 @@ impl Default for EndpointBuilder {
 
 impl EndpointBuilder {
 	pub fn new<M>(
-		handler: impl 'static + Send + Sync + IntoEndpoint<M>,
+		handler: impl 'static + Send + Sync + IntoEndpointHandler<M>,
 	) -> Self {
 		Self::default().with_handler(handler)
 	}
@@ -120,9 +120,9 @@ impl EndpointBuilder {
 	/// Create a new endpoint with the provided endpoint handler
 	pub fn with_handler<M>(
 		self,
-		handler: impl 'static + Send + Sync + IntoEndpoint<M>,
+		handler: impl 'static + Send + Sync + IntoEndpointHandler<M>,
 	) -> Self {
-		self.with_handler_bundle(handler.into_endpoint())
+		self.with_handler_bundle(handler.into_endpoint_handler())
 	}
 	/// Create a new endpoint with the provided bundle, the bundle must be
 	/// a `GetOutcome` / `Outcome` action, and usually inserts a response

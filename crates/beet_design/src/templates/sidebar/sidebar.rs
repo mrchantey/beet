@@ -192,7 +192,7 @@ mod test {
 				.with_path("docs")
 				.with_cache_strategy(CacheStrategy::Static)
 				.with_handler_bundle((
-					StatusCode::OK.into_endpoint(),
+					StatusCode::OK.into_endpoint_handler(),
 					ArticleMeta {
 						title: Some("Docs".to_string()),
 						sidebar: SidebarInfo {
@@ -207,7 +207,7 @@ mod test {
 					.with_path("testing")
 					.with_cache_strategy(CacheStrategy::Static)
 					.with_handler_bundle((
-						StatusCode::OK.into_endpoint(),
+						StatusCode::OK.into_endpoint_handler(),
 						ArticleMeta {
 							title: Some("Partying".to_string()),
 							sidebar: SidebarInfo {

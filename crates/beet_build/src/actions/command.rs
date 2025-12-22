@@ -112,6 +112,16 @@ impl CommandConfig {
 		self.args.push(arg.as_ref().to_string());
 		self
 	}
+
+	pub fn args(
+		mut self,
+		args: impl IntoIterator<Item = impl AsRef<str>>,
+	) -> Self {
+		self.args
+			.extend(args.into_iter().map(|s| s.as_ref().to_string()));
+		self
+	}
+
 	pub fn new(cmd: impl Into<String>) -> Self {
 		Self {
 			cmd: cmd.into(),
@@ -147,8 +157,8 @@ impl CommandConfig {
 	}
 	pub fn into_action(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>, mut cmd_params: CommandParams| {
-				cmd_params.execute(ev, self.clone())
+			move |ev: On<GetOutcome>, mut cmd_runner: CommandRunner| {
+				cmd_runner.run(ev, self.clone())
 			},
 		)
 	}
@@ -171,21 +181,21 @@ impl From<CargoBuildCmd> for CommandConfig {
 
 /// System param for executing command actions
 #[derive(SystemParam)]
-pub struct CommandParams<'w, 's> {
+pub struct CommandRunner<'w, 's> {
 	bevy_commands: Commands<'w, 's>,
 	pkg_config: Res<'w, PackageConfig>,
 	/// Used to check whether an action is interruptable
 	interruptable: Query<'w, 's, &'static ContinueRun>,
 }
 
-impl CommandParams<'_, '_> {
+impl CommandRunner<'_, '_> {
 	/// Run the provided command asynchronously,
 	/// calling [`Outcome::Pass`] if the command was successful or [`Outcome::Fail`] if it failed.
 	// /// All stdout and stderr lines are emitted as [`StdOutLine`] entity events.
 	// ///
 	// /// Lines are streamed concurrently as they arrive. Empty lines are emitted (not skipped).
 	// /// Reader tasks are aborted if the process exits first.
-	pub fn execute(
+	pub fn run(
 		&mut self,
 		mut ev: On<GetOutcome>,
 		cmd_config: impl Into<CommandConfig>,

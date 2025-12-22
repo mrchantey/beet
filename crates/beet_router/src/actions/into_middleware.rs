@@ -17,6 +17,14 @@ impl MiddlewareBuilder {
 	/// Middleware defaults to accepting a partial path match (allows trailing segments),
 	/// and accepting any [`HttpMethod`]
 	pub fn new<M>(
+		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
+	) -> impl Bundle {
+		handler.into_middleware()
+	}
+	/// Create a new endpoint with the provided [`IntoMiddleware`] handler.
+	/// Middleware defaults to accepting a partial path match (allows trailing segments),
+	/// and accepting any [`HttpMethod`]
+	pub fn with_path<M>(
 		path: impl AsRef<Path>,
 		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
 	) -> impl Bundle {

@@ -60,8 +60,6 @@ impl RouteQuery<'_, '_> {
 	) -> Result<PathMatch> {
 		let path = self.path(ev)?;
 		let pattern = PathPattern::collect(ev.get_action(), &self)?;
-		// println!("matching path '{}' against pattern '{}'", path, pattern);
-
 		pattern.parse_path(&path)?.xok()
 	}
 }

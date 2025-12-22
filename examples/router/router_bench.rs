@@ -43,7 +43,7 @@ fn main() {
 							<a href="/"> visit home </a>"#,
 							"text/html",
 						))
-						.into_endpoint()
+						.into_endpoint_handler()
 					),)
 			]));
 		})

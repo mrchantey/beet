@@ -110,8 +110,8 @@ impl EndpointContext {
 /// Helper for defining methods accepting requests and returning responses.
 /// These are converted to `On<GetOutcome>` observers.
 /// In the case where a request cannot be found a 500 response is inserted.
-pub trait IntoEndpoint<M> {
-	fn into_endpoint(self) -> impl Bundle;
+pub trait IntoEndpointHandler<M> {
+	fn into_endpoint_handler(self) -> impl Bundle;
 }
 /// Run the provided func, then call `into_exchange_bundle` on the output,
 /// inserting it directly into the `exchange`.
@@ -184,11 +184,11 @@ been taken by a previous route, please check for conficting endpoints.
 }
 /// A non-func type that can be converted directly into an exchange bundle.
 pub struct TypeIntoEndpoint;
-impl<T, M> IntoEndpoint<(TypeIntoEndpoint, M)> for T
+impl<T, M> IntoEndpointHandler<(TypeIntoEndpoint, M)> for T
 where
 	T: 'static + Send + Sync + Clone + IntoResponseBundle<M>,
 {
-	fn into_endpoint(self) -> impl Bundle {
+	fn into_endpoint_handler(self) -> impl Bundle {
 		// skip all the async shenannigans, just insert the response
 		OnSpawn::observe(
 			move |mut ev: On<GetOutcome>, mut commands: Commands| {
@@ -204,14 +204,14 @@ where
 
 pub struct SystemIntoEndpoint;
 impl<System, Req, Out, M1, M2, M3>
-	IntoEndpoint<(SystemIntoEndpoint, Req, Out, M1, M2, M3)> for System
+	IntoEndpointHandler<(SystemIntoEndpoint, Req, Out, M1, M2, M3)> for System
 where
 	System: 'static + Send + Sync + Clone + IntoSystem<Req, Out, M1>,
 	Req: 'static + Send + SystemInput,
 	for<'a> Req::Inner<'a>: 'static + Send + Sync + FromRequest<M2>,
 	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
 {
-	fn into_endpoint(self) -> impl Bundle {
+	fn into_endpoint_handler(self) -> impl Bundle {
 		run_and_insert(async move |req, cx| {
 			match cx.run_system_cached_with(self.clone(), req).await {
 				Ok(bundle) => TypeErasedResponseBundle(OnSpawn::insert(
@@ -226,13 +226,13 @@ where
 }
 pub struct CxSystemIntoEndpoint;
 impl<System, Req, Out, M2, M3>
-	IntoEndpoint<(CxSystemIntoEndpoint, Req, Out, M2, M3)> for System
+	IntoEndpointHandler<(CxSystemIntoEndpoint, Req, Out, M2, M3)> for System
 where
 	System: 'static + Send + Sync + Clone + FnMut(Req, EndpointContext) -> Out,
 	Req: 'static + Send + Sync + FromRequest<M2>,
 	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
 {
-	fn into_endpoint(self) -> impl Bundle {
+	fn into_endpoint_handler(self) -> impl Bundle {
 		run_and_insert(async move |req: Req, cx| self.clone()(req, cx))
 	}
 }
@@ -240,14 +240,14 @@ where
 
 pub struct AsyncSystemIntoEndpoint;
 impl<Func, Fut, Req, Res, M1, M2>
-	IntoEndpoint<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
+	IntoEndpointHandler<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
 where
 	Func: 'static + Send + Sync + Clone + FnOnce(Req, EndpointContext) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponseBundle<M2>,
 {
-	fn into_endpoint(self) -> impl Bundle { run_and_insert(self) }
+	fn into_endpoint_handler(self) -> impl Bundle { run_and_insert(self) }
 }
 
 #[cfg(test)]
@@ -264,13 +264,13 @@ mod test {
 	#[derive(Serialize, Deserialize)]
 	struct Foo(u32);
 
-	async fn assert<M>(handler: impl IntoEndpoint<M>) -> StatusCode {
+	async fn assert<M>(handler: impl IntoEndpointHandler<M>) -> StatusCode {
 		let mut world = RouterPlugin::world();
 		let exchange = world
 			.spawn(Request::get("/foo").with_json_body(&Foo(3)).unwrap())
 			.id();
 		world
-			.spawn(handler.into_endpoint())
+			.spawn(handler.into_endpoint_handler())
 			.trigger_target(GetOutcome.with_agent(exchange))
 			.flush();
 		AsyncRunner::flush_async_tasks(&mut world).await;

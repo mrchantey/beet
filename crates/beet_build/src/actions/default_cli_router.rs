@@ -13,7 +13,7 @@ pub fn default_cli_router() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
 		CliRouter,
-		InfallibleSequence,
+		Fallback,
 		beet_site_cmd(),
 		children![
 			EndpointBuilder::new(|tree: Res<EndpointTree>| {
@@ -24,6 +24,9 @@ pub fn default_cli_router() -> impl Bundle {
 			.with_path(""),
 			EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
 				.with_path("teapot"),
+			EndpointBuilder::default()
+				.with_path("run-wasm/*binary-path")
+				.with_handler_bundle(run_wasm()),
 			// (single_action_route("", help())),
 			(single_action_route(
 				"refresh-sst",
@@ -169,7 +172,10 @@ fn beet_site_cmd() -> CargoBuildCmd {
 }
 
 fn respond_ok() -> impl Bundle {
-	(Name::new("Response"), StatusCode::OK.into_endpoint())
+	(
+		Name::new("Response"),
+		StatusCode::OK.into_endpoint_handler(),
+	)
 }
 
 
