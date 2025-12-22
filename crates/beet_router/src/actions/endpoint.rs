@@ -129,17 +129,7 @@ impl EndpointBuilder {
 		});
 		self
 	}
-	/// Create a new endpoint with the provided [`IntoMiddleware`] handler.
-	/// Middleware defaults to accepting any [`HttpMethod`].
-	pub fn layer<M>(
-		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
-	) -> Self {
-		Self {
-			method: None,
-			..default()
-		}
-		.with_handler_bundle(handler.into_middleware())
-	}
+
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
 		self.path = Some(PathPartial::new(path.as_ref()));
 		self
@@ -218,7 +208,7 @@ impl EndpointBuilder {
 				// children in the behavior tree.
 				// Order is not important so long as the
 				// handler is last.
-				spawner.spawn(route_match(self.exact_path));
+				spawner.spawn(path_match(self.exact_path));
 
 				if let Some(method) = self.method {
 					spawner.spawn(check_method(method));
@@ -246,20 +236,20 @@ impl EndpointBuilder {
 
 /// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`PathPattern`]
 /// at this point in the tree with no remaining parts.
-pub fn exact_route_match() -> impl Bundle { route_match(true) }
+pub fn exact_path_match() -> impl Bundle { path_match(true) }
 /// Will trigger [`Outcome::Pass`] if the request [`RoutePath`] satisfies the [`PathPattern`]
 /// at this point in the tree, even if there are remaining parts.
-pub fn partial_route_match() -> impl Bundle { route_match(false) }
+pub fn partial_path_match() -> impl Bundle { path_match(false) }
 
-fn route_match(exact_match: bool) -> impl Bundle {
+fn path_match(exact_match: bool) -> impl Bundle {
 	(
-		Name::new("Route Match"),
+		Name::new("Check Path Match"),
 		OnSpawn::observe(
 			move |mut ev: On<GetOutcome>, query: RouteQuery| -> Result {
-				let outcome = match query.route_match(&ev) {
+				let outcome = match query.path_match(&ev) {
 					// expected exact match, got partial match
-					Ok(route_match)
-						if exact_match && !route_match.exact_match() =>
+					Ok(path_match)
+						if exact_match && !path_match.exact_match() =>
 					{
 						Outcome::Fail
 					}

@@ -47,17 +47,17 @@ impl RouteQuery<'_, '_> {
 		ev: &impl ActionExchangePair,
 		key: &str,
 	) -> Result<String> {
-		self.route_match(ev)?
+		self.path_match(ev)?
 			.dyn_map
 			.get(key)
 			.map(|key| key.clone())
 			.ok_or_else(|| bevyhow!("key not found: {}", key))
 	}
 
-	pub fn route_match(
+	pub fn path_match(
 		&self,
 		ev: &impl ActionExchangePair,
-	) -> Result<RouteMatch> {
+	) -> Result<PathMatch> {
 		let path = self.path(ev)?;
 		let pattern = PathPattern::collect(ev.get_action(), &self)?;
 		// println!("matching path '{}' against pattern '{}'", path, pattern);

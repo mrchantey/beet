@@ -37,7 +37,7 @@ pub fn default_cli_router() -> impl Bundle {
 				import_and_parse_source_files()
 			)),
 			(named_route("parse-source-files", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_source_files(),
 				(
 					Name::new("Run Loop"),
@@ -63,7 +63,7 @@ pub fn default_cli_router() -> impl Bundle {
 				// respond_ok()
 			])),
 			(named_route("run", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_source_files(),
 				(
 					Name::new("Run Loop"),
@@ -85,7 +85,7 @@ pub fn default_cli_router() -> impl Bundle {
 				),
 			])),
 			(named_route("serve", children![
-				exact_route_match(),
+				exact_path_match(),
 				(Name::new("Serve"), Sequence, children![
 					BuildServer,
 					ExportStaticContent,
@@ -93,7 +93,7 @@ pub fn default_cli_router() -> impl Bundle {
 				]),
 			])),
 			(named_route("deploy", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_and_parse_source_files(),
 				// apply after import to avoid clobber,
 				// the scene loaded likely contains a PackageConfig
@@ -152,7 +152,7 @@ fn single_action_route(
 	name: impl AsRef<str>,
 	action: impl Bundle,
 ) -> impl Bundle {
-	named_route(name, children![exact_route_match(), action, respond_ok()])
+	named_route(name, children![exact_path_match(), action, respond_ok()])
 }
 
 fn beet_site_cmd() -> CargoBuildCmd {

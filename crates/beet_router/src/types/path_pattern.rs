@@ -141,7 +141,7 @@ impl PathPattern {
 	pub fn parse_path(
 		&self,
 		path: &RoutePath,
-	) -> Result<RouteMatch, RouteMatchError> {
+	) -> Result<PathMatch, RouteMatchError> {
 		let mut remaining_path = path
 			.to_string_lossy()
 			.split('/')
@@ -155,7 +155,7 @@ impl PathPattern {
 		for segment in self.segments.iter() {
 			segment.parse_parts(&mut dyn_map, &mut remaining_path)?;
 		}
-		RouteMatch {
+		PathMatch {
 			remaining_path,
 			dyn_map,
 		}
@@ -188,16 +188,16 @@ pub enum PathPatternSegment {
 /// The result of a successful route match,
 /// containing the remaining unmatched path parts and a map of dynamic segments.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouteMatch {
+pub struct PathMatch {
 	pub remaining_path: VecDeque<String>,
 	pub dyn_map: HashMap<String, String>,
 }
-impl RouteMatch {
+impl PathMatch {
 	/// Returns true if there is no remaining path to match
 	pub fn exact_match(&self) -> bool { self.remaining_path.is_empty() }
 }
 
-pub type RouteMatchResult = Result<RouteMatch, RouteMatchError>;
+pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
@@ -346,7 +346,7 @@ mod test {
 	fn parse(
 		segments: &str,
 		route_path: &str,
-	) -> Result<RouteMatch, RouteMatchError> {
+	) -> Result<PathMatch, RouteMatchError> {
 		PathPattern::new(segments)
 			.unwrap()
 			.parse_path(&RoutePath::new(route_path))

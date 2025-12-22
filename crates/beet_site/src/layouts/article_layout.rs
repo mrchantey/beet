@@ -1,9 +1,11 @@
 use crate::prelude::*;
 use beet::prelude::*;
+use std::path::Path;
 
 
-pub fn article_layout_middleware() -> EndpointBuilder {
-	EndpointBuilder::layer::<(Result, _, _, _, _)>(
+pub fn article_layout_middleware(path: impl AsRef<Path>) -> impl Bundle {
+	MiddlewareBuilder::new(
+		path,
 		|cx: In<MiddlewareContext>,
 		 query: HtmlBundleQuery,
 		 mut commands: Commands|
@@ -21,7 +23,6 @@ pub fn article_layout_middleware() -> EndpointBuilder {
 			Ok(())
 		},
 	)
-	.with_trailing_path()
 }
 
 #[template]
