@@ -116,7 +116,10 @@ impl PathPattern {
 
 
 	/// Called by to_tokens, this should never be used directly
-	pub fn _from_raw(segments: Vec<PathPatternSegment>, is_static: bool) -> Self {
+	pub fn _from_raw(
+		segments: Vec<PathPatternSegment>,
+		is_static: bool,
+	) -> Self {
 		Self {
 			segments,
 			is_static,
@@ -138,17 +141,23 @@ impl PathPattern {
 	}
 	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
+	/// Adjacent slashes are preserved as empty strings, allowing wildcard segments
+	/// to reconstruct paths with double slashes like `foo//bar/baz.rs`.
 	pub fn parse_path(
 		&self,
 		path: &RoutePath,
 	) -> Result<PathMatch, RouteMatchError> {
-		let mut remaining_path = path
-			.to_string_lossy()
-			.split('/')
-			.filter(|s| !s.is_empty())
-			.map(|s| s.to_string())
-			.collect::<Vec<_>>()
-			.xmap(VecDeque::from);
+		let path_str = path.to_string_lossy();
+		let mut remaining_path = if path_str.is_empty() || path_str == "/" {
+			VecDeque::new()
+		} else {
+			path_str
+				.strip_prefix('/')
+				.unwrap_or(&path_str)
+				.split('/')
+				.map(|s| s.to_string())
+				.collect::<VecDeque<_>>()
+		};
 
 		let mut dyn_map = default();
 		// check each segment against the path
@@ -226,7 +235,10 @@ impl PathPatternSegment {
 		if trimmed.is_empty() {
 			panic!("PathPatternSegment cannot be empty");
 		} else if trimmed.contains('/') {
-			panic!("PathPatternSegment cannot contain internal slashes: {}", segment);
+			panic!(
+				"PathPatternSegment cannot contain internal slashes: {}",
+				segment
+			);
 		} else if trimmed.starts_with(':') {
 			Self::Dynamic(trimmed[1..].to_string())
 		} else if trimmed.starts_with('*') {
@@ -246,7 +258,8 @@ impl PathPatternSegment {
 
 	/// Attempts to match the segment against a path,
 	/// returning the remaining path if it matches.
-	/// In the case of a wildcard all remaining parts are consumed.
+	/// In the case of a wildcard all remaining parts are consumed, preserving
+	/// empty strings from adjacent slashes as `/` in the reconstructed path.
 	pub fn parse_parts(
 		&self,
 		dyn_map: &mut HashMap<String, String>,
@@ -266,7 +279,9 @@ impl PathPatternSegment {
 
 		match (self, path.pop_front()) {
 			// static match, continue with remaining path
-			(PathPatternSegment::Static(val), Some(other)) if val == &other => Ok(()),
+			(PathPatternSegment::Static(val), Some(other)) if val == &other => {
+				Ok(())
+			}
 			// static but no match, this is an error
 			(PathPatternSegment::Static(val), Some(other)) => {
 				Err(RouteMatchError::InvalidStatic {
@@ -274,14 +289,22 @@ impl PathPatternSegment {
 					path: other,
 				})
 			}
-			// dynamic will always match, continue with remaining path
+			// dynamic will always match non-empty strings, continue with remaining path
 			(PathPatternSegment::Dynamic(key), Some(value)) => {
-				insert(key.clone(), value);
-				Ok(())
+				if value.is_empty() {
+					// dynamic segment cannot match empty string (adjacent slash)
+					Err(RouteMatchError::InvalidStatic {
+						segment: "dynamic segment".to_string(),
+						path: value,
+					})
+				} else {
+					insert(key.clone(), value);
+					Ok(())
+				}
 			}
 			// wildcard consumes the rest of the path, continue with empty path
 			(PathPatternSegment::Wildcard(key), Some(mut value)) => {
-				// consume rest of path
+				// consume rest of path, preserving empty strings as slashes
 				while let Some(next) = path.pop_front() {
 					value.push('/');
 					value.push_str(&next);
@@ -462,6 +485,29 @@ mod test {
 		map.get("bar")
 			.cloned()
 			.xpect_eq(Some("bar/baz".to_string()));
+		map.len().xpect_eq(1);
+	}
+
+	#[test]
+	fn adjacent_slashes() {
+		// wildcard segments preserve adjacent slashes
+		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
+		map.get("bar")
+			.cloned()
+			.xpect_eq(Some("/bar/baz.rs".to_string()));
+		map.len().xpect_eq(1);
+
+		let map = parse("/*file", "/bar//baz.rs").unwrap().dyn_map;
+		map.get("file")
+			.cloned()
+			.xpect_eq(Some("bar//baz.rs".to_string()));
+		map.len().xpect_eq(1);
+
+		// multiple adjacent slashes
+		let map = parse("/*path", "foo///bar").unwrap().dyn_map;
+		map.get("path")
+			.cloned()
+			.xpect_eq(Some("foo///bar".to_string()));
 		map.len().xpect_eq(1);
 	}
 }
