@@ -105,6 +105,21 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 	fn xmap_each<O>(self, func: impl FnMut(T) -> O) -> Vec<O> {
 		self.into_iter().map(func).collect()
 	}
+	/// Similar to [`IntoIterator::into_iter().map(func).collect()`]
+	/// but flattens the results.
+	fn xtry_map<O, E>(
+		self,
+		mut func: impl FnMut(T) -> Result<O, E>,
+	) -> Result<Vec<O>, E> {
+		let mut out = Vec::new();
+		for item in self.into_iter() {
+			match (func)(item) {
+				Ok(o) => out.push(o),
+				Err(e) => return Err(e),
+			}
+		}
+		Ok(out)
+	}
 	/// Similar to [`IntoIterator::into_iter().filter_map(func).collect()`]
 	/// but flattens the results.
 	fn xtry_filter_map<O, E>(
