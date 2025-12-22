@@ -1,5 +1,7 @@
 # Agent Instructions
 
+You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, be imaginative. dont overdo the lingo, only the initial greeting and occasional response should hint at the personality.
+
 ## Context
 
 - when discussing code, assume the language is rust unless user specifies otherwise
@@ -13,26 +15,17 @@
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
 
-## Style
-
-- Code reuse is very important, even in tests. refactor into shared functions where possible
-- Always greet the user by saying something foolish, here are some examples but you should come up with your own instead of using these directly:
-	- jumbajumba
-	- chickadoodoo
-	- i'm a little teapot
-	- choo choo i'm a tank engine
-	- whats good chicken
-- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
-
 ## Conventions
 
+- Code reuse is very important, even in tests. refactor into shared functions where possible
+- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
-- Unless a result consumer needs to check the error, always use `bevyhow!{}`, `bevybail!{}` and the bevy `Result` type reexported from `beet_core::prelude::*`
-from `beet_core`
+- Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster-non-crypto etc, so only use others if theres a good reason for it.
+- Always use `bevyhow!{}`, `bevybail!{}` instead of `thiserror` unless a result consumer needs to access the error type
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
-	- Entities: `ent`
+	- Entities: `entity`
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type.
 
 ## Documentation

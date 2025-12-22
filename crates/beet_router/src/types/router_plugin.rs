@@ -36,15 +36,14 @@ impl Plugin for RouterPlugin {
 
 /// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
 pub fn insert_route_tree(world: &mut World) {
-	let paths = world
-		.query_once::<(Entity, &Endpoint)>()
-		.into_iter()
-		.filter(|(_, endpoint)| endpoint.is_static_get())
-		.map(|(entity, endpoint)| {
-			(entity, endpoint.path().annotated_route_path())
-		})
-		.collect::<Vec<_>>();
-	world.insert_resource(RoutePathTree::from_paths(paths));
+	match EndpointTree::from_world(world) {
+		Ok(tree) => {
+			world.insert_resource(tree);
+		}
+		Err(err) => {
+			error!("Failed to build EndpointTree: {}", err);
+		}
+	}
 }
 
 
@@ -273,7 +272,7 @@ mod test {
 		let mut world = World::new();
 		world.spawn((Router, CacheStrategy::Static, children![
 			EndpointBuilder::get()
-				.with_handler(|tree: Res<RoutePathTree>| tree.to_string()),
+				.with_handler(|tree: Res<EndpointTree>| tree.to_string()),
 			(EndpointBuilder::get()
 				.with_path("foo")
 				.with_cache_strategy(CacheStrategy::Static)
@@ -288,10 +287,14 @@ mod test {
 		]));
 		world.run_system_cached(insert_route_tree).unwrap();
 		world
-			.remove_resource::<RoutePathTree>()
+			.remove_resource::<EndpointTree>()
 			.unwrap()
 			.flatten()
+			.iter()
+			.map(|p| p.annotated_route_path())
+			.collect::<Vec<_>>()
 			.xpect_eq(vec![
+				RoutePath::new("/"),
 				RoutePath::new("/bar/bazz"),
 				RoutePath::new("/foo"),
 			]);

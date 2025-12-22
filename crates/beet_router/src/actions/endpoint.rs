@@ -300,7 +300,6 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 }
 
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
