@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::TypeInfo;
+use bevy::reflect::Typed;
 
 
 
@@ -21,6 +23,24 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub struct ParamsPartial {
 	pub items: Vec<ParamMeta>,
+}
+
+impl ParamsPartial {
+	fn from_reflect<T: Typed>() -> Result<Self> {
+		let mut items = Vec::new();
+		match T::type_info() {
+			TypeInfo::Struct(struct_info) => todo!(),
+			TypeInfo::Map(map_info) => todo!(),
+			TypeInfo::Tuple(tuple_info) => todo!(),
+			TypeInfo::TupleStruct(tuple_struct_info) => todo!(),
+			_ => {
+				bevybail!(
+					"Failed to parse ParamsPartial, only Struct, Map and tuples of these are allowed"
+				)
+			}
+		}
+		Self { items }.xok()
+	}
 }
 
 /// The param equivelent of a [`PathPattern`], denoting
@@ -164,7 +184,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn params_pattern_from_metas() {
+	fn pattern_from_metas() {
 		let metas = vec![
 			ParamMeta::new("zebra", "last", None, false, ParamValue::Single),
 			ParamMeta::new("alpha", "first", None, false, ParamValue::Flag),
@@ -179,7 +199,7 @@ mod test {
 	}
 
 	#[test]
-	fn params_pattern_deduplication() {
+	fn pattern_deduplication() {
 		let metas = vec![
 			ParamMeta::new(
 				"foo",
@@ -226,13 +246,13 @@ mod test {
 	}
 
 	#[test]
-	fn params_pattern_empty() {
+	fn pattern_empty() {
 		let pattern = ParamsPattern::from_metas(vec![]).unwrap();
 		pattern.items.is_empty().xpect_true();
 	}
 
 	#[test]
-	fn param_value_types() {
+	fn value_types() {
 		let flag =
 			ParamMeta::new("flag", "A flag", None, false, ParamValue::Flag);
 		let single = ParamMeta::new(
@@ -256,7 +276,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_meta_optional_variants() {
+	fn meta_optional_variants() {
 		let required = ParamMeta::new(
 			"req",
 			"Required param",
@@ -277,7 +297,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_meta_with_short() {
+	fn meta_with_short() {
 		let with_short = ParamMeta::new(
 			"verbose",
 			"Verbose output",
@@ -298,7 +318,7 @@ mod test {
 	}
 
 	#[test]
-	fn params_partial_items() {
+	fn partial_items() {
 		let metas = vec![
 			ParamMeta::new("foo", "Foo param", None, false, ParamValue::Flag),
 			ParamMeta::new(
@@ -320,7 +340,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_conflict_different_value_types() {
+	fn conflict_different_value_types() {
 		let metas = vec![
 			ParamMeta::new("foo", "description", None, false, ParamValue::Flag),
 			ParamMeta::new(
@@ -336,7 +356,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_conflict_different_optional() {
+	fn conflict_different_optional() {
 		let metas = vec![
 			ParamMeta::new(
 				"bar",
@@ -358,7 +378,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_conflict_different_short() {
+	fn conflict_different_short() {
 		let metas = vec![
 			ParamMeta::new(
 				"baz",
@@ -380,7 +400,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_conflict_different_description() {
+	fn conflict_different_description() {
 		let metas = vec![
 			ParamMeta::new(
 				"qux",
@@ -402,7 +422,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_no_conflict_identical_params() {
+	fn no_conflict_identical_params() {
 		let metas = vec![
 			ParamMeta::new(
 				"same",
@@ -426,7 +446,7 @@ mod test {
 	}
 
 	#[test]
-	fn param_conflict_multiple_params() {
+	fn conflict_multiple_params() {
 		let metas = vec![
 			ParamMeta::new("alpha", "first", None, false, ParamValue::Flag),
 			ParamMeta::new("beta", "second", None, false, ParamValue::Single),
@@ -441,5 +461,15 @@ mod test {
 		];
 
 		ParamsPattern::from_metas(metas).xpect_err();
+	}
+
+	#[test]
+	fn from_reflect() {
+		#[derive(Reflect)]
+		struct MyParams {
+			foo: u32,
+			bar: Option<String>,
+			bazz: Vec<f64>,
+		}
 	}
 }

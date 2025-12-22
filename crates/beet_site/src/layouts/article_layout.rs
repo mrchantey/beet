@@ -4,7 +4,7 @@ use std::path::Path;
 
 
 pub fn article_layout_middleware(path: impl AsRef<Path>) -> impl Bundle {
-	MiddlewareBuilder::new(
+	MiddlewareBuilder::new::<(Result, _, _, _, _)>(
 		path,
 		|cx: In<MiddlewareContext>,
 		 query: HtmlBundleQuery,

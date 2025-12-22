@@ -299,6 +299,9 @@ mod test {
 
 	#[sweet::test]
 	async fn simple() {
+		let _ = EndpointBuilder::new(|| {});
+		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
+
 		RouterPlugin::world()
 			.spawn((Router, EndpointBuilder::get()))
 			.oneshot(Request::get("/"))

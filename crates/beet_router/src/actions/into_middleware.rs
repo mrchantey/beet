@@ -196,8 +196,8 @@ mod test {
 
 	fn assert<M>(_: impl IntoMiddleware<M>) {}
 
-	#[sweet::test]
-	async fn system() {
+	#[test]
+	fn infers_type() {
 		fn my_system() {}
 		assert(my_system);
 		assert(|| {});
