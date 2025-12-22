@@ -12,8 +12,16 @@ pub trait Xtend: Sized {
 		func(&mut self);
 		self
 	}
+	/// just print the value and return it, debug formatted
+	fn xprint(self, prefix: impl AsRef<str>) -> Self
+	where
+		Self: std::fmt::Debug,
+	{
+		println!("{}: {:#?}", prefix.as_ref(), self);
+		self
+	}
 	/// just print the value and return it
-	fn xprint(self) -> Self
+	fn xprint_display(self) -> Self
 	where
 		Self: std::fmt::Display,
 	{
@@ -26,14 +34,6 @@ pub trait Xtend: Sized {
 		Self: std::fmt::Debug,
 	{
 		println!("{:?}", self);
-		self
-	}
-	/// just print the value and return it, debug formatted
-	fn xprint_debug_formatted(self, prefix: impl AsRef<str>) -> Self
-	where
-		Self: std::fmt::Debug,
-	{
-		println!("{}: {:#?}", prefix.as_ref(), self);
 		self
 	}
 	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.
@@ -74,10 +74,14 @@ pub trait Xtend: Sized {
 	/// ```
 	fn xinto<T: From<Self>>(self) -> T { T::from(self) }
 
+	/// Return a `String` containing the formatted `Debug` representation of the value.
+	fn xfmt(&self) -> String
+	where
+		Self: std::fmt::Debug,
+	{
+		format!("{:#?}", self)
+	}
 	/// Return a `String` containing the `Debug` representation of the value.
-	///
-	/// Unlike `xdebug` which prints the value to stdout and returns the value,
-	/// this method returns the formatted debug string.
 	fn xfmt_debug(&self) -> String
 	where
 		Self: std::fmt::Debug,
@@ -85,10 +89,9 @@ pub trait Xtend: Sized {
 		format!("{:?}", self)
 	}
 
+
 	/// Return a `String` containing the `Display` representation of the value.
-	///
-	/// Similar to `xfmt_debug`, but uses the `Display` formatting instead of `Debug`.
-	fn xfmt(&self) -> String
+	fn xfmt_display(&self) -> String
 	where
 		Self: std::fmt::Display,
 	{

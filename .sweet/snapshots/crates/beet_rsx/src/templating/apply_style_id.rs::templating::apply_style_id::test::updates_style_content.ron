@@ -1,1 +1,4 @@
-"<!DOCTYPE html><html><head><style>body[data-beet-style-id-0] {\n  color: red;\n}\n</style></head><body><div data-beet-style-id-0/></body></html>"
+<!DOCTYPE html><html><head><style>body[data-beet-style-id-0] {
+  color: red;
+}
+</style></head><body><div data-beet-style-id-0/></body></html>

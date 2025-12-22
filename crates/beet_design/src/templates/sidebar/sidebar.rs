@@ -236,6 +236,7 @@ mod test {
 				},
 			)
 			.unwrap()
+			.xfmt()
 			.xpect_snapshot();
 	}
 

@@ -1,0 +1,7 @@
+/*
+/api
+/api/:id
+/docs*
+/docs/*path
+/users*
+/users/:userId

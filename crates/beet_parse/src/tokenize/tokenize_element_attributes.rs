@@ -149,6 +149,8 @@ mod test {
 		.xmap(parse)
 		.xpect_snapshot();
 	}
+
+	#[cfg(feature = "css")]
 	#[test]
 	fn lang_src() {
 		quote! {

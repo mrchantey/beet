@@ -43,15 +43,12 @@ impl EndpointTree {
 	/// Builds an [`EndpointTree`] from all endpoints in the world.
 	/// Returns an error if there are conflicting paths.
 	pub fn from_world(world: &mut World) -> Result<Self> {
-		let endpoints = {
-			let mut query_state = QueryState::<(Entity, &Endpoint)>::new(world);
-			query_state
-				.iter(world)
-				.map(|(ent, endpoint)| (ent, endpoint.path().clone()))
-				.collect::<Vec<_>>()
-		};
-
-		Self::from_endpoints(endpoints)
+		world
+			.query_once::<(Entity, &Endpoint)>()
+			.iter()
+			.map(|(entity, endpoint)| (*entity, endpoint.path().clone()))
+			.collect::<Vec<_>>()
+			.xmap(Self::from_endpoints)
 	}
 
 	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
@@ -397,7 +394,7 @@ mod test {
 	}
 
 	#[test]
-	fn endpoint_tree_comprehensive_validation() {
+	fn complex() {
 		let mut world = World::new();
 		let ent1 = world.spawn_empty().id();
 		let ent2 = world.spawn_empty().id();
@@ -439,12 +436,10 @@ mod test {
 			),
 		];
 
-		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
-		let flattened = tree.flatten();
-		flattened.len().xpect_eq(4);
-
-		// verify tree structure is sorted
-		tree.children.len().xpect_eq(3); // api, users, docs
+		EndpointTree::from_endpoints(endpoints)
+			.unwrap()
+			.to_string()
+			.xpect_snapshot();
 	}
 
 	#[test]

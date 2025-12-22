@@ -31,7 +31,7 @@ async fn works() {
 		.await
 		.unwrap();
 
-	fs_ext::write("dump.txt", res.xfmt()).unwrap();
+	fs_ext::write("dump.txt", res.xfmt_display()).unwrap();
 
 
 	// Extract the base64 image string

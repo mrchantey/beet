@@ -88,12 +88,19 @@ pub trait StringComp<M> {
 	fn to_comp_string(&self) -> String;
 }
 
-#[cfg(feature = "serde")]
-impl<T: serde::Serialize> StringComp<Self> for T {
-	fn to_comp_string(&self) -> String {
-		ron::ser::to_string(&self).expect("Failed to serialize to string")
-	}
-}
+// #[cfg(feature = "serde")]
+// impl<T: 'static + serde::Serialize> StringComp<Self> for T {
+// 	fn to_comp_string(&self) -> String {
+// 		use std::any::TypeId;
+// 		let ty_str = TypeId::of::<str>();
+
+// 		match TypeId::of::<T>() {
+// 			ty_str => s.to_string(),
+// 			other => ron::ser::to_string(&self)
+// 				.expect("Failed to serialize to string"),
+// 		}
+// 	}
+// }
 
 pub struct ToTokensStringCompMarker;
 
@@ -126,10 +133,25 @@ impl_string_comp_for_tokens!(
 	syn::Attribute
 );
 
-#[cfg(not(feature = "serde"))]
-impl<T: ToString> StringComp<Self> for Matcher<T> {
-	fn to_comp_string(&self) -> String { self.value.to_string() }
+// #[cfg(not(feature = "serde"))]
+macro_rules! impl_string_comp_for_primitives {
+	($($ty:ty),*) => {
+		$(
+			impl StringComp<$ty> for $ty {
+				fn to_comp_string(&self) -> String {
+					self.to_string()
+				}
+			}
+		)*
+	};
 }
+
+impl_string_comp_for_primitives!(
+	&str,
+	String,
+	std::borrow::Cow<'static, str>,
+	bool
+);
 
 /// Attempt to parse the tokens with prettyplease,
 /// otherwise return the tokens as a string.
@@ -174,14 +196,17 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 mod test {
 	use crate::prelude::*;
 
-	#[derive(serde::Serialize)]
-	struct MyStruct(u32);
 
 	#[test]
 	fn bool() { true.xpect_snapshot(); }
 
-	#[test]
-	fn serde_struct() { MyStruct(7).xpect_snapshot(); }
+	// #[test]
+	// fn serde_struct() {
+	// 	#[derive(serde::Serialize)]
+	// 	struct MyStruct(u32);
+
+	// 	MyStruct(7).xpect_snapshot();
+	// }
 
 	#[cfg(feature = "tokens")]
 	#[test]

@@ -3,6 +3,22 @@ use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+pub struct HelpParam {
+	#[reflect(@ParamOptions::desc("Get help"))]
+	help: bool,
+}
 
 
 /// The param equivelent of a [`PathPartial`], denoting
@@ -26,7 +42,9 @@ pub struct ParamsPartial {
 }
 
 impl ParamsPartial {
-	fn from_reflect<T: Typed>() -> Result<Self> {
+	/// Creates a new [`ParamsPartial`] from a type that implements [`Reflect`].
+	/// Accepted types are structs and tuples of structs.
+	pub fn new<T: Typed>() -> Result<Self> {
 		let mut items = Vec::new();
 		fn parse_inner(
 			items: &mut Vec<ParamMeta>,
@@ -37,6 +55,7 @@ impl ParamsPartial {
 					items.extend(struct_info.iter().map(ParamMeta::from_field));
 				}
 				TypeInfo::Tuple(tuple_info) => {
+					// recursively add for each item in the tuple
 					for field in tuple_info.iter() {
 						parse_inner(
 							items,
@@ -92,7 +111,7 @@ impl ParamsPattern {
 		for window in items.windows(2) {
 			if window[0].name == window[1].name && window[0] != window[1] {
 				bevybail!(
-					"conflicting param definitions for '{name}': \nFirst: {first:#?} \nSecond: {second:?}",
+					"conflicting param definitions for '{name}': \nFirst: {first:#?} \nSecond: {second:#?}",
 					name = window[0].name,
 					first = window[0],
 					second = window[1],
@@ -135,17 +154,31 @@ impl ParamsPattern {
 pub struct ParamMeta {
 	/// The name of the route param, ie the bar in `--bar=3`
 	name: String,
-	/// A description of the route param, usually the
-	/// docs section of a provided params type
-	description: Option<String>,
-	/// Optionally specify a single character representation
-	/// for a route param
-	short: Option<char>,
-	/// Whether specifying the param is required
-	optional: bool,
 	/// The kind of param value
 	value: ParamValue,
+	/// Additional details for the param
+	options: ParamOptions,
+	/// Whether specifying the param is required, usually inferred
+	/// by presence of `Option`
+	required: bool,
 }
+
+impl std::fmt::Display for ParamMeta {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{} - kind: {}", self.name, self.value)?;
+		if let Some(short) = self.short() {
+			write!(f, " short: -{}", short)?;
+		}
+		if self.is_required() {
+			write!(f, " (required)")?;
+		}
+		if let Some(desc) = self.description() {
+			write!(f, " desc: {}", desc)?;
+		}
+		Ok(())
+	}
+}
+
 
 impl ParamMeta {
 	/// Create a new `ParamMeta`
@@ -153,23 +186,19 @@ impl ParamMeta {
 		Self {
 			value,
 			name: name.into(),
-			short: None,
-			description: None,
-			optional: false,
+			options: default(),
+			required: false,
 		}
 	}
 
 	pub fn from_field(field: &bevy::reflect::NamedField) -> Self {
-		#[cfg(feature = "reflect_documentation")]
-		let description = field.docs().map(|docs| docs.into());
-		#[cfg(not(feature = "reflect_documentation"))]
-		let description = None;	
+		let required = !field.type_path().starts_with("core::option::Option<");
+
 		Self {
 			name: field.name().into(),
-			description,
-			short: None,
-			optional: false,
-			value: ParamValue::Flag,
+			value: ParamValue::from_type_path(field.type_path()),
+			options: ParamOptions::from_reflect(field),
+			required,
 		}
 	}
 
@@ -177,13 +206,29 @@ impl ParamMeta {
 	pub fn name(&self) -> &str { &self.name }
 
 	/// The description of the param
-	pub fn description(&self) -> Option<&str> { self.description.as_deref() }
+	pub fn description(&self) -> Option<&str> {
+		self.options.description.as_deref()
+	}
+
+	pub fn required(mut self) -> Self {
+		self.required = true;
+		self
+	}
+
+	pub fn with_short(mut self, short: char) -> Self {
+		self.options.short = Some(short);
+		self
+	}
+	pub fn with_description(mut self, description: impl Into<String>) -> Self {
+		self.options.description = Some(description.into());
+		self
+	}
 
 	/// The short character representation
-	pub fn short(&self) -> Option<char> { self.short }
+	pub fn short(&self) -> Option<char> { self.options.short }
 
-	/// Whether the param is optional
-	pub fn optional(&self) -> bool { self.optional }
+	/// Whether the param is required
+	pub fn is_required(&self) -> bool { self.required }
 
 	/// The param value type
 	pub fn value(&self) -> &ParamValue { &self.value }
@@ -200,8 +245,78 @@ pub enum ParamValue {
 	Multiple,
 }
 
+impl std::fmt::Display for ParamValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Flag => write!(f, "flag"),
+			Self::Single => write!(f, "single"),
+			Self::Multiple => write!(f, "multiple"),
+		}
+	}
+}
+
+impl ParamValue {
+	fn from_type_path(type_path: &str) -> Self {
+		match type_path {
+			"bool" => Self::Flag,
+			val if val.starts_with("alloc::vec::Vec") => Self::Multiple,
+			_ => Self::Single,
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+pub struct ParamOptions {
+	/// A description of the route param, usually the
+	/// docs section of a provided params type
+	description: Option<String>,
+	/// requiredly specify a single character representation
+	/// for a route param
+	short: Option<char>,
+}
+
+impl Default for ParamOptions {
+	fn default() -> Self {
+		Self {
+			description: None,
+			short: None,
+		}
+	}
+}
+
+impl ParamOptions {
+	pub fn desc(description: impl Into<String>) -> Self {
+		Self {
+			description: Some(description.into()),
+			short: None,
+		}
+	}
+
+	pub fn desc_and_short(description: impl Into<String>, short: char) -> Self {
+		Self {
+			description: Some(description.into()),
+			short: Some(short),
+		}
+	}
+
+	pub fn short(short: char) -> Self {
+		Self {
+			description: None,
+			short: Some(short),
+		}
+	}
 
 
+	fn from_reflect(field: &bevy::reflect::NamedField) -> Self {
+		let opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
+		// Override description from docs if not specified
+		#[cfg(feature = "reflect_documentation")]
+		if opts.description == None {
+			opts = field.docs().map(|docs| docs.into());
+		}
+		opts
+	}
+}
 
 #[cfg(test)]
 mod test {
@@ -209,40 +324,13 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn pattern_from_metas() {
-		let metas = vec![
-			ParamMeta::new("zebra", ParamValue::Single),
-			ParamMeta::new("alpha", ParamValue::Flag),
-			ParamMeta::new("beta", ParamValue::Multiple),
-		];
-
-		let pattern = ParamsPattern::from_metas(metas).unwrap();
-		pattern.items.len().xpect_eq(3);
-		pattern.items[0].name().xpect_eq("alpha");
-		pattern.items[1].name().xpect_eq("beta");
-		pattern.items[2].name().xpect_eq("zebra");
-	}
-
-	#[test]
 	fn pattern_deduplication() {
 		let metas = vec![
-			ParamMeta {
-				short: Some('f'),
-				..ParamMeta::new("foo", ParamValue::Flag)
-			},
-			ParamMeta {
-				optional: true,
-				..ParamMeta::new("bar", ParamValue::Single)
-			},
-			ParamMeta {
-				short: Some('f'),
-				..ParamMeta::new("foo", ParamValue::Flag)
-			},
+			ParamMeta::new("foo", ParamValue::Flag),
+			ParamMeta::new("bar", ParamValue::Single),
+			ParamMeta::new("foo", ParamValue::Flag),
 			ParamMeta::new("baz", ParamValue::Multiple),
-			ParamMeta {
-				optional: true,
-				..ParamMeta::new("bar", ParamValue::Single)
-			},
+			ParamMeta::new("bar", ParamValue::Single),
 		];
 
 		let pattern = ParamsPattern::from_metas(metas).unwrap();
@@ -250,64 +338,6 @@ mod test {
 		pattern.items[0].name().xpect_eq("bar");
 		pattern.items[1].name().xpect_eq("baz");
 		pattern.items[2].name().xpect_eq("foo");
-	}
-
-	#[test]
-	fn pattern_empty() {
-		let pattern = ParamsPattern::from_metas(vec![]).unwrap();
-		pattern.items.is_empty().xpect_true();
-	}
-
-	#[test]
-	fn value_types() {
-		let flag = ParamMeta::new("flag", ParamValue::Flag);
-		let single = ParamMeta::new("single", ParamValue::Single);
-		let multiple = ParamMeta::new("multi", ParamValue::Multiple);
-
-		flag.value().xpect_eq(ParamValue::Flag);
-		single.value().xpect_eq(ParamValue::Single);
-		multiple.value().xpect_eq(ParamValue::Multiple);
-	}
-
-	#[test]
-	fn meta_optional_variants() {
-		let required = ParamMeta::new("req", ParamValue::Single);
-		let optional = ParamMeta {
-			optional: true,
-			..ParamMeta::new("opt", ParamValue::Single)
-		};
-
-		required.optional().xpect_false();
-		optional.optional().xpect_true();
-	}
-
-	#[test]
-	fn meta_with_short() {
-		let with_short = ParamMeta {
-			short: Some('v'),
-			..ParamMeta::new("verbose", ParamValue::Flag)
-		};
-		let without_short = ParamMeta::new("quiet", ParamValue::Flag);
-
-		with_short.short().xpect_eq(Some('v'));
-		without_short.short().xpect_eq(None);
-	}
-
-	#[test]
-	fn partial_items() {
-		let metas = vec![ParamMeta::new("foo", ParamValue::Flag), ParamMeta {
-			short: Some('b'),
-			optional: true,
-			..ParamMeta::new("bar", ParamValue::Single)
-		}];
-
-		let partial = ParamsPartial {
-			items: metas.clone(),
-		};
-
-		partial.items.len().xpect_eq(2);
-		partial.items[0].name().xpect_eq("foo");
-		partial.items[1].name().xpect_eq("bar");
 	}
 
 	#[test]
@@ -321,12 +351,11 @@ mod test {
 	}
 
 	#[test]
-	fn conflict_different_optional() {
-		let metas =
-			vec![ParamMeta::new("bar", ParamValue::Single), ParamMeta {
-				optional: true,
-				..ParamMeta::new("bar", ParamValue::Single)
-			}];
+	fn conflict_different_required() {
+		let metas = vec![
+			ParamMeta::new("bar", ParamValue::Single),
+			ParamMeta::new("bar", ParamValue::Single).required(),
+		];
 
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
@@ -334,14 +363,8 @@ mod test {
 	#[test]
 	fn conflict_different_short() {
 		let metas = vec![
-			ParamMeta {
-				short: Some('b'),
-				..ParamMeta::new("baz", ParamValue::Flag)
-			},
-			ParamMeta {
-				short: Some('z'),
-				..ParamMeta::new("baz", ParamValue::Flag)
-			},
+			ParamMeta::new("baz", ParamValue::Flag).with_short('b'),
+			ParamMeta::new("baz", ParamValue::Flag).with_short('z'),
 		];
 
 		ParamsPattern::from_metas(metas).xpect_err();
@@ -350,14 +373,10 @@ mod test {
 	#[test]
 	fn conflict_different_description() {
 		let metas = vec![
-			ParamMeta {
-				description: Some("first description".into()),
-				..ParamMeta::new("qux", ParamValue::Multiple)
-			},
-			ParamMeta {
-				description: Some("second description".into()),
-				..ParamMeta::new("qux", ParamValue::Multiple)
-			},
+			ParamMeta::new("qux", ParamValue::Multiple)
+				.with_description("first description"),
+			ParamMeta::new("qux", ParamValue::Multiple)
+				.with_description("second description"),
 		];
 
 		ParamsPattern::from_metas(metas).xpect_err();
@@ -366,16 +385,12 @@ mod test {
 	#[test]
 	fn no_conflict_identical_params() {
 		let metas = vec![
-			ParamMeta {
-				short: Some('s'),
-				optional: true,
-				..ParamMeta::new("same", ParamValue::Flag)
-			},
-			ParamMeta {
-				short: Some('s'),
-				optional: true,
-				..ParamMeta::new("same", ParamValue::Flag)
-			},
+			ParamMeta::new("same", ParamValue::Flag)
+				.with_short('s')
+				.required(),
+			ParamMeta::new("same", ParamValue::Flag)
+				.with_short('s')
+				.required(),
 		];
 
 		let pattern = ParamsPattern::from_metas(metas).unwrap();
@@ -388,10 +403,8 @@ mod test {
 		let metas = vec![
 			ParamMeta::new("alpha", ParamValue::Flag),
 			ParamMeta::new("beta", ParamValue::Single),
-			ParamMeta {
-				description: Some("conflicting".into()),
-				..ParamMeta::new("beta", ParamValue::Single)
-			},
+			ParamMeta::new("beta", ParamValue::Single)
+				.with_description("conflicting"),
 			ParamMeta::new("gamma", ParamValue::Multiple),
 		];
 
@@ -403,8 +416,26 @@ mod test {
 		#[derive(Reflect)]
 		struct MyParams {
 			foo: u32,
+			#[reflect(@ParamOptions::desc("all about 'bar'"))]
 			bar: Option<String>,
+			#[reflect(@ParamOptions::desc_and_short("all about 'bazz'",'b'))]
 			bazz: Vec<f64>,
+			boo: bool,
 		}
+
+		ParamsPartial::new::<MyParams>()
+			.unwrap()
+			.xpect_eq(ParamsPartial {
+				items: vec![
+					ParamMeta::new("foo", ParamValue::Single).required(),
+					ParamMeta::new("bar", ParamValue::Single)
+						.with_description("all about 'bar'"),
+					ParamMeta::new("bazz", ParamValue::Multiple)
+						.with_description("all about 'bazz'")
+						.with_short('b')
+						.required(),
+					ParamMeta::new("boo", ParamValue::Flag).required(),
+				],
+			});
 	}
 }

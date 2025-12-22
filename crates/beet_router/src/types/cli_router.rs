@@ -18,7 +18,7 @@ async fn oneshot_cli_handler(entity: AsyncEntity) -> Result {
 		.await
 	{
 		Ok(res) => {
-			res.body.into_string().await?.xprint();
+			res.body.into_string().await?.xprint_display();
 			AppExit::Success
 		}
 		Err(err) => {
