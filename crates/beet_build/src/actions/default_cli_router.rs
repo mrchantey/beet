@@ -16,6 +16,15 @@ pub fn default_cli_router() -> impl Bundle {
 		InfallibleSequence,
 		beet_site_cmd(),
 		children![
+			EndpointBuilder::new(|tree: Res<EndpointTree>| {
+				format!("🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string())
+				// StatusCode::OK
+			})
+			.with_params::<HelpParams>()
+			.with_path(""),
+			EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
+				.with_path("teapot"),
+			// (single_action_route("", help())),
 			(single_action_route(
 				"refresh-sst",
 				SstCommand::new(SstSubcommand::Refresh)

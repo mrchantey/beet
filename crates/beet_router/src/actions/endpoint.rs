@@ -69,6 +69,8 @@ pub struct EndpointBuilder {
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 	/// The path to match, or None for any path
 	path: Option<PathPartial>,
+	/// The params to match, or None for any params
+	params: Option<ParamsPartial>,
 	/// The method to match, or None for any method. Defaults to GET
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
@@ -95,6 +97,7 @@ impl Default for EndpointBuilder {
 				entity.insert(StatusCode::OK.into_endpoint());
 			}),
 			path: None,
+			params: None,
 			method: Some(HttpMethod::Get),
 			cache_strategy: None,
 			content_type: None,
@@ -133,6 +136,11 @@ impl EndpointBuilder {
 
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
 		self.path = Some(PathPartial::new(path.as_ref()));
+		self
+	}
+
+	pub fn with_params<T: bevy_reflect::Typed>(mut self) -> Self {
+		self.params = Some(ParamsPartial::new::<T>());
 		self
 	}
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
@@ -178,6 +186,10 @@ impl EndpointBuilder {
 		if let Some(pattern) = self.path {
 			entity.insert(pattern);
 		}
+		if let Some(params) = self.params {
+			entity.insert(params);
+		}
+
 		let id = entity.id();
 		let path: PathPattern = entity.world_scope(|world| {
 			world

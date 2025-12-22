@@ -15,7 +15,7 @@ use bevy::reflect::Typed;
 	Reflect,
 	Component,
 )]
-pub struct HelpParam {
+pub struct HelpParams {
 	#[reflect(@ParamOptions::desc("Get help"))]
 	help: bool,
 }
@@ -44,7 +44,11 @@ pub struct ParamsPartial {
 impl ParamsPartial {
 	/// Creates a new [`ParamsPartial`] from a type that implements [`Reflect`].
 	/// Accepted types are structs and tuples of structs.
-	pub fn new<T: Typed>() -> Result<Self> {
+	///
+	/// ## Panics
+	///
+	/// Panics if a non-struct is passed in or fields are missing TypeInfo
+	pub fn new<T: Typed>() -> Self {
 		let mut items = Vec::new();
 		fn parse_inner(
 			items: &mut Vec<ParamMeta>,
@@ -74,8 +78,8 @@ impl ParamsPartial {
 			Ok(())
 		}
 
-		parse_inner(&mut items, T::type_info())?;
-		Self { items }.xok()
+		parse_inner(&mut items, T::type_info()).unwrap();
+		Self { items }
 	}
 }
 
@@ -196,7 +200,13 @@ impl ParamMeta {
 	}
 
 	pub fn from_field(field: &bevy::reflect::NamedField) -> Self {
-		let required = !field.type_path().starts_with("core::option::Option<");
+		let value = ParamValue::from_type_path(field.type_path());
+		let required = match value {
+			ParamValue::Single => {
+				!field.type_path().starts_with("core::option::Option<")
+			}
+			_ => false,
+		};
 
 		Self {
 			name: field.name().into(),
@@ -427,19 +437,17 @@ mod test {
 			boo: bool,
 		}
 
-		ParamsPartial::new::<MyParams>()
-			.unwrap()
-			.xpect_eq(ParamsPartial {
-				items: vec![
-					ParamMeta::new("foo", ParamValue::Single).required(),
-					ParamMeta::new("bar", ParamValue::Single)
-						.with_description("all about 'bar'"),
-					ParamMeta::new("bazz", ParamValue::Multiple)
-						.with_description("all about 'bazz'")
-						.with_short('b')
-						.required(),
-					ParamMeta::new("boo", ParamValue::Flag).required(),
-				],
-			});
+		ParamsPartial::new::<MyParams>().xpect_eq(ParamsPartial {
+			items: vec![
+				ParamMeta::new("foo", ParamValue::Single).required(),
+				ParamMeta::new("bar", ParamValue::Single)
+					.with_description("all about 'bar'"),
+				ParamMeta::new("bazz", ParamValue::Multiple)
+					.with_description("all about 'bazz'")
+					.with_short('b'),
+				// .required(),
+				ParamMeta::new("boo", ParamValue::Flag),
+			],
+		});
 	}
 }
