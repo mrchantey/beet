@@ -62,6 +62,7 @@ web-time.workspace = true
 #💡 path
 path-clean = "1"
 pathdiff = "0.2"
+either = "1"
 
 #💡 serde
 serde = { workspace = true, optional = true }

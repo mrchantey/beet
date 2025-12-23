@@ -1,5 +1,5 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+// #![cfg_attr(test, feature(test, custom_test_frameworks))]
+// #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(
 	feature = "nightly",
 	feature(fn_traits, unboxed_closures, never_type)
@@ -42,6 +42,7 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;
+	pub use either::Either;
 	pub use std::marker::PhantomData;
 	// as a metaframework we're a superset of bevy,
 	// and more opinionated about kitchen sink prelude inclusions

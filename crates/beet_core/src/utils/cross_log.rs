@@ -18,3 +18,12 @@ macro_rules! cross_log_error {
         eprintln!($($t)*);
     })
 }
+
+
+/// cross-platform way of logging a breakpoint with line number
+#[macro_export]
+macro_rules! breakpoint {
+	() => {{
+		$crate::cross_log!("breakpoint at line {}", line!());
+	}};
+}
