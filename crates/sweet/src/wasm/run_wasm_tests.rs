@@ -12,11 +12,11 @@ pub fn run_wasm_tests_sync(
 	tests
 		.into_iter()
 		.filter_map(|test| {
-			let mut func = test_ext::func(&test);
+			let func = test_ext::func(&test);
 
 			let result = SweetTestCollector::with_scope(&test.desc, || {
 				PanicStore::with_scope(&test.desc, || {
-					js_runtime::panic_to_error(&mut func)
+					js_runtime::panic_to_error(func)
 				})
 			});
 

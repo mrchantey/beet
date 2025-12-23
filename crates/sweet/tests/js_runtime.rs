@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg(target_arch = "wasm32")]
+#![allow(deprecated)]
 use beet_core::prelude::*;
 use sweet::prelude::*;
 
@@ -14,8 +15,8 @@ fn cwd() {
 #[ignore = "take hook shenanigans"]
 // #[should_panic]
 fn panic_to_error() {
-	let mut f = || -> Result<(), String> { panic!("it panicked") };
-	let result = js_runtime::panic_to_error(&mut f);
+	let f = || -> Result<(), String> { panic!("it panicked") };
+	let result = js_runtime::panic_to_error(f);
 	assert!(
 		format!("{:?}", result)
 			.starts_with("Err(JsValue(RuntimeError: unreachable")

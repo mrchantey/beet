@@ -16,18 +16,9 @@ name = "sweet"
 path = "src/main.rs"
 
 [dependencies]
-beet = { workspace = true, features = ["fs", "router"] }
+beet = { workspace = true, features = ["build","router"] }
+# auto_register_static required for compilation, no idea why
+# bevy = { workspace = true,features = ["reflect_auto_register_static"]}
+
+[dev-dependencies]
 sweet.workspace = true
-rapidhash.workspace = true
-# auto_register_static rrequired for compilation, no idea why
-bevy = { workspace = true,features = ["reflect_auto_register_static"]}
-
-#💡 parsing
-proc-macro2.workspace = true
-syn.workspace = true
-quote.workspace = true
-prettyplease.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio.workspace = true
-clap.workspace = true

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use wasm_bindgen::prelude::*;
 
 #[cfg(not(test))]
@@ -13,9 +14,9 @@ unsafe extern "C" {
 	#[wasm_bindgen]
 	pub fn exit(code: i32);
 	/// Just run the function outside of the wasm boundary
-	/// ie `const panic_to_error = (f)=>f()`
+	/// ie `const catch_panic = (f)=>f()`
 	#[wasm_bindgen(catch)]
-	pub fn panic_to_error(
+	fn catch_no_abort_inner(
 		f: &mut dyn FnMut() -> Result<(), String>,
 	) -> Result<(), JsValue>;
 	/// Read a file from the filesystem, ie `Deno.read_file()`
@@ -40,9 +41,9 @@ unsafe extern "C" {
 	pub fn cwd() -> String;
 	#[wasm_bindgen(js_name = "test_exit")]
 	pub fn exit(code: i32);
-	#[wasm_bindgen(catch, js_name = "test_panic_to_error")]
-	pub fn panic_to_error(
-		func: impl FnOnce() -> Result<(), String>,
+	#[wasm_bindgen(catch, js_name = "test_catch_no_abort_inner")]
+	fn catch_no_abort_inner(
+		func: &mut dyn FnMut() -> Result<(), String>,
 	) -> Result<(), JsValue>;
 	#[wasm_bindgen(js_name = "test_read_file")]
 	pub fn read_file(path: &str) -> Option<String>;
@@ -53,4 +54,32 @@ unsafe extern "C" {
 	pub fn env_var(key: &str) -> Option<String>;
 	#[wasm_bindgen(js_name = "test_env_all")]
 	pub fn env_all() -> js_sys::Array;
+}
+
+#[deprecated]
+pub fn panic_to_error(
+	func: impl FnOnce() -> Result<(), String>,
+) -> Result<(), JsValue> {
+	let mut opt = Some(func);
+	catch_no_abort_inner(&mut || opt.take().expect("function already called")())
+}
+
+
+/// Run the function returning an opaque `()` error in the case of a panic.
+/// This has a relatively symmetrical api to `panic::catch_unwind`
+pub fn catch_no_abort(
+	func: impl FnOnce() -> Result<(), String>,
+) -> Result<Result<(), String>, ()> {
+	let mut opt = Some(func);
+	let outcome = catch_no_abort_inner(&mut || {
+		opt.take().expect("function already called")()
+	});
+	match outcome {
+		Ok(()) => Ok(Ok(())),
+		Err(err) if err.is_string() => {
+			crate::cross_log!("twas error!");
+			Ok(Err(err.as_string().expect("checked")))
+		}
+		Err(_) => Err(()),
+	}
 }

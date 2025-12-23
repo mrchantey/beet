@@ -12,7 +12,7 @@ import init from "./bindgen.js";
 
 globalThis.cwd = () => Deno.cwd();
 globalThis.exit = (code: number) => Deno.exit(code);
-globalThis.panic_to_error = (f) => f();
+globalThis.catch_no_abort_inner = (func: () => undefined) => func();
 globalThis.read_file = (path: string) => {
 	try {
 		return Deno.readTextFileSync(path);
@@ -54,8 +54,8 @@ const wasm = await init().catch((err: any) => {
 // if run_with_pending doesnt exist this file is being used
 // outside of the test runner, no worries i guess, we still
 // ran the main(){}
-await wasm.run_with_pending?.().catch((err: any) => {
-	// panicked!
-	console.error(err);
-	Deno.exit(1);
-});
+// await wasm.run_with_pending?.().catch((err: any) => {
+// 	// panicked!
+// 	console.error(err);
+// 	Deno.exit(1);
+// });

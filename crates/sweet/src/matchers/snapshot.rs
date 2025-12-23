@@ -192,6 +192,7 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 	}
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

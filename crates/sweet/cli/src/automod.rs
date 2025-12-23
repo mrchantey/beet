@@ -4,7 +4,6 @@ use beet::exports::notify::event::RenameMode;
 use beet::prelude::*;
 use clap::Parser;
 use quote::quote;
-use rapidhash::RapidHashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use syn::File;
@@ -273,7 +272,7 @@ fn use_item_ident(use_item: &ItemUse) -> Option<&Ident> {
 
 #[derive(Default, Clone)]
 struct ModFiles {
-	map: RapidHashMap<PathBuf, File>,
+	map: HashMap<PathBuf, File>,
 }
 
 impl ModFiles {

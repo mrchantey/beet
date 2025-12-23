@@ -16,9 +16,9 @@ pub enum TestOutcome {
 	Panic {
 		/// The payload downcast from the `Box<dyn Any>`
 		/// panic payload, or 'opaque payload'
-		payload: String,
+		payload: Option<String>,
 		/// The location of the panic if available
-		location: Option<LineCol>,
+		location: Option<FileSpan>,
 	},
 }
 
@@ -66,101 +66,47 @@ fn run_test(
 	test: &Test,
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result {
-	// temp: disable legacy test runner
-	let prev = std::panic::take_hook();
-	// gag panic hook
-
-	thread_local! {
-		static LOCATION: std::cell::Cell<Option<LineCol>> = std::cell::Cell::new(None);
-	}
-	std::panic::set_hook(Box::new(|info| {
-		if let Some(location) = info.location() {
-			LOCATION.with(|loc| {
-				loc.set(Some(LineCol::from_location(location)));
-			});
-		}
-	}));
-
-
-	// #[cfg(target_arch = "wasm32")]
-	// let result = js_runtime::panic_to_error(&mut func);
-
-	// #[cfg(not(target_arch = "wasm32"))]
-	let result =
-		std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || func()));
-
-	// js_runtime::
-	// let result = Ok(func());
-	std::panic::set_hook(prev);
+	let result = PanicContext::catch(func);
 
 	let outcome = match (result, test.should_panic) {
-		(Ok(Ok(())), test::ShouldPanic::No) => {
+		(PanicResult::Ok, test::ShouldPanic::No) => {
 			//ok
 			TestOutcome::Pass
 		}
-		(Ok(Ok(())), test::ShouldPanic::Yes) => {
+		(PanicResult::Ok, test::ShouldPanic::Yes) => {
 			//ok but should have panicked
 			TestOutcome::ExpectedPanic { message: None }
 		}
-		(Ok(Ok(())), test::ShouldPanic::YesWithMessage(message)) => {
+		(PanicResult::Ok, test::ShouldPanic::YesWithMessage(message)) => {
 			//ok but should have panicked
 			TestOutcome::ExpectedPanic {
 				message: Some(message.to_string()),
 			}
 		}
-		(Ok(Err(message)), _) => {
+		(PanicResult::Err(message), _) => {
 			// errored
 			TestOutcome::Err { message }
 		}
 		(
-			Err(_),
+			PanicResult::Panic { .. },
 			test::ShouldPanic::Yes | test::ShouldPanic::YesWithMessage(_),
 		) => {
 			// panicked and should have
 			TestOutcome::Pass
 		}
-		(Err(payload), test::ShouldPanic::No) => {
+		(PanicResult::Panic { location, payload }, test::ShouldPanic::No) => {
 			// panicked but shouldnt have
-			TestOutcome::Panic {
-				payload: panic_to_str(payload),
-				location: LOCATION.with(|loc| loc.take()),
-			}
+			TestOutcome::Panic { location, payload }
 		}
 	};
 	commands.entity(entity).insert(outcome);
 	Ok(())
 }
 
-
-
-// #[cfg(target_arch = "wasm32")]
-// fn panic_to_str(payload: wasm_bindgen::JsValue) -> String {
-// 	if payload.is_string() {
-// 		payload.as_string().unwrap()
-// 	} else {
-// 		format!("non-string payload: {:?}", payload)
-// 	}
-// }
-
-// #[cfg(not(target_arch = "wasm32"))]
-fn panic_to_str(payload: Box<dyn std::any::Any>) -> String {
-	if let Some(str) = payload.downcast_ref::<&str>() {
-		str.to_string()
-	} else if let Some(str) = payload.downcast_ref::<String>() {
-		str.clone()
-	} else {
-		"non-string panic payload".to_string()
-	}
-}
-
-
 #[cfg(test)]
 mod tests {
-	use test::TestDescAndFn;
-
 	use super::*;
-	use crate::libtest::test_desc_ext::TestDescExt;
-
+	use test::TestDescAndFn;
 
 	fn run_test(test: TestDescAndFn) -> TestOutcome {
 		let mut app = App::new().with_plugins(TestPlugin);
@@ -204,8 +150,12 @@ mod tests {
 		});
 		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
 			TestOutcome::Panic {
-				payload: "pizza".into(),
-				location: Some(LineCol::new(line!() - 3, 40)),
+				payload: Some("pizza".into()),
+				location: Some(FileSpan::new_with_start(
+					file!(),
+					line!() - 5,
+					40,
+				)),
 			},
 		);
 	}

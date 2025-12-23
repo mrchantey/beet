@@ -36,6 +36,26 @@ impl std::fmt::Display for FileSpan {
 }
 
 impl FileSpan {
+	pub fn new(
+		workspace_file_path: impl AsRef<Path>,
+		start: LineCol,
+		end: LineCol,
+	) -> Self {
+		Self {
+			file: WsPathBuf::new(workspace_file_path),
+			start,
+			end,
+		}
+	}
+
+	pub fn new_from_location(location: &std::panic::Location) -> Self {
+		Self {
+			file: WsPathBuf::new(location.file()),
+			start: LineCol::from_location(location),
+			end: LineCol::from_location(location),
+		}
+	}
+
 	#[cfg(feature = "tokens")]
 	pub fn new_from_span(
 		file: WsPathBuf,
@@ -59,17 +79,7 @@ impl FileSpan {
 		}
 	}
 
-	pub fn new(
-		workspace_file_path: impl AsRef<Path>,
-		start: LineCol,
-		end: LineCol,
-	) -> Self {
-		Self {
-			file: WsPathBuf::new(workspace_file_path),
-			start,
-			end,
-		}
-	}
+
 	/// Create a new [FileSpan] from a file path, line and column,
 	/// most commonly used by the `rsx!` macro.
 	/// ## Example

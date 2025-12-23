@@ -50,7 +50,7 @@ impl<F: Future<Output = Result<(), String>>> Future for TestFuture<F> {
 		// this should only be used if poll::ready!
 		let panic_output = PanicStore::with_scope(desc, || {
 			let mut test = Some(test);
-			js_runtime::panic_to_error(&mut || {
+			js_runtime::panic_to_error(|| {
 				let test = test.take().unwrap_throw();
 				let out = test.poll(cx);
 				future_poll_output = Some(match &out {

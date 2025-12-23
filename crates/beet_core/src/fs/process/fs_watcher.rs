@@ -92,7 +92,7 @@ impl FsWatcher {
 		}
 	}
 }
-
+// TODO kill watcher on remove component
 fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	let watcher = world.entity(entity).get::<FsWatcher>().unwrap().clone();

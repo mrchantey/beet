@@ -9350,15 +9350,7 @@ name = "sweet-cli"
 version = "0.0.8-dev.1"
 dependencies = [
  "beet",
- "bevy",
- "clap",
- "prettyplease",
- "proc-macro2",
- "quote",
- "rapidhash",
  "sweet",
- "syn 2.0.111",
- "tokio",
 ]
 
 [[package]]

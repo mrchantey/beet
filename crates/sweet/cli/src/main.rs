@@ -1,32 +1,35 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet::prelude::*;
-use clap::Parser;
-use clap::Subcommand;
-use sweet_cli::prelude::*;
 
-/// 🤘 Sweet CLI 🤘
-///
-/// A sweet as test runner.
-#[derive(Parser)]
-#[command(version)]
-struct Cli {
-	#[command(subcommand)]
-	command: Commands,
+fn main() {
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			CliPlugin,
+			// LogPlugin::default(),
+			// DebugFlowPlugin::default(),
+		))
+		.spawn_then(sweet_router())
+		.run();
 }
 
-#[derive(Subcommand)]
-enum Commands {
-	TestServer(TestServer),
-	Run(CargoRun),
-	Test(CargoTest),
-}
-
-#[tokio::main]
-async fn main() -> Result {
-	match Cli::parse().command {
-		Commands::TestServer(cmd) => cmd.run(),
-		Commands::Run(cmd) => cmd.run().await,
-		Commands::Test(cmd) => cmd.run().await,
-	}
+fn sweet_router() -> impl Bundle {
+	(Name::new("Sweet Router"), CliRouter, Fallback, children![
+		EndpointBuilder::new(|tree: Res<EndpointTree>| {
+			format!("🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string())
+			// StatusCode::OK
+		})
+		.with_params::<HelpParams>()
+		.with_path(""),
+		EndpointBuilder::default()
+			.with_path("run-wasm/*binary-path")
+			.with_handler_bundle((
+				Name::new("Run Wasm"),
+				InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
+				RunOnDirEvent,
+				InfallibleSequence,
+				children![run_wasm()]
+			)),
+	])
 }
