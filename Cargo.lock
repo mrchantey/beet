@@ -9313,6 +9313,7 @@ dependencies = [
  "backtrace",
  "beet_core",
  "beet_flow",
+ "beet_net",
  "bevy",
  "clap",
  "colorize",

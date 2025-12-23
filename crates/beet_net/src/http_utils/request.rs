@@ -223,6 +223,16 @@ impl Request {
 		Self { parts, body }
 	}
 
+	pub fn from_cli_args(args: CliArgs) -> Result<Self> {
+		let path_str = args.into_path_string();
+		let parts = http::Request::builder()
+			.uri(path_str)
+			.body(())?
+			.into_parts()
+			.0;
+		Self::from_parts(parts, default()).xok()
+	}
+
 	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {
 		let bytes = self.body.into_bytes().await?;
 		Ok(http::Request::from_parts(self.parts, bytes))

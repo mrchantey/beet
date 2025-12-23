@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use send_wrapper::SendWrapper;
 use test::TestDesc;
 use test::TestDescAndFn;
@@ -21,6 +22,7 @@ pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
 	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
 	(
 		TestRoot,
+		Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
 		Children::spawn(SpawnIter(test_bundles.into_iter())),
 	)
 }

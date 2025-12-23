@@ -1,18 +1,39 @@
+use std::panic::Location;
+
 use crate::prelude::*;
 use test::TestDescAndFn;
 use test::TestFn;
 
-/// Uses this file and an incrementing name: `test1`, `test2` etc
+/// Uses [`Location::caller`] to propagate test location and name
+#[track_caller]
 pub fn new_auto(
 	func: impl 'static + Send + FnOnce() -> Result<(), String>,
 ) -> TestDescAndFn {
-	static COUNTER: std::sync::atomic::AtomicUsize =
-		std::sync::atomic::AtomicUsize::new(1);
-	let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-	let name = format!("test{}", id);
+	let caller = Location::caller();
+
+	let name = caller.file().split('/').last().unwrap_or("").to_string();
+
+	let desc = TestDesc {
+		name: test::TestName::DynTestName(format!(
+			"{}#{}",
+			name,
+			caller.line()
+		)),
+		ignore: false,
+		ignore_message: None,
+		source_file: caller.file(),
+		start_line: caller.line() as usize,
+		start_col: caller.column() as usize,
+		end_line: caller.line() as usize,
+		end_col: caller.column() as usize,
+		compile_fail: false,
+		no_run: false,
+		should_panic: ShouldPanic::No,
+		test_type: TestType::UnitTest,
+	};
 
 	TestDescAndFn {
-		desc: test_ext::new_desc(&name, file!()),
+		desc,
 		testfn: TestFn::DynTestFn(Box::new(func)),
 	}
 }
@@ -57,7 +78,6 @@ pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
 		_ => panic!("non-static tests are not supported"),
 	}
 }
-
 
 pub fn run(test: TestFn) -> Result<(), String> {
 	match test {
@@ -106,6 +126,7 @@ pub fn new_desc(name: &str, file: &'static str) -> TestDesc {
 /// so we instead panic and instruct user to use `unwrap`.
 /// Also used by async wasm tests, we dont care what the result is, if ya
 /// want messages, panic! at the disco
+#[deprecated]
 pub fn result_to_panic<T, E>(result: Result<T, E>) {
 	match result {
 		Ok(_) => {}

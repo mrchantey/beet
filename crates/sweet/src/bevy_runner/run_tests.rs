@@ -22,6 +22,10 @@ pub enum TestOutcome {
 	},
 }
 
+impl TestOutcome {
+	pub fn is_pass(&self) -> bool { self == &TestOutcome::Pass }
+}
+
 pub(super) fn run_tests_series(
 	mut commands: Commands,
 	query: Populated<(Entity, &Test, &TestFunc), Without<ShouldSkip>>,
@@ -109,16 +113,18 @@ mod tests {
 	use test::TestDescAndFn;
 
 	fn run_test(test: TestDescAndFn) -> TestOutcome {
-		let mut app = App::new().with_plugins(TestPlugin);
+		let mut app = App::new().with_plugins((
+			// ensure app exits even with update loop
+			MinimalPlugins,
+			TestPlugin,
+		));
 		app.world_mut().spawn(tests_bundle(vec![test]));
 		let store = Store::new(None);
 
 		app.add_observer(
 			move |ev: On<Insert, TestOutcome>,
-			      outcomes: Query<&TestOutcome>,
-			      mut commands: Commands| {
+			      outcomes: Query<&TestOutcome>| {
 				store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
-				commands.write_message(AppExit::Success);
 			},
 		);
 		app.run();

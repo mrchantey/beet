@@ -17,7 +17,7 @@ impl Plugin for TestPlugin {
 				(
 					filter_tests,
 					(run_tests_series, run_non_send_tests_series),
-					collect_tests,
+					collect_outcomes,
 				)
 					.chain(),
 			);
