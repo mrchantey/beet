@@ -21,6 +21,9 @@ extern crate test;
 // the #[sweet::test] macro
 pub use sweet_macros;
 pub use sweet_macros::test;
+
+use crate::prelude::TestPlugin;
+use crate::prelude::tests_bundle_borrowed;
 pub mod bevy_runner;
 // #[cfg(test)]
 // use libtest_runner::testlib_runner as libtest_runner;
@@ -82,4 +85,13 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 		eprintln!("Test runner failed: {e}");
 		std::process::exit(1);
 	}
+}
+
+
+pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
+	use beet_core::prelude::*;
+	App::new()
+		.add_plugins(TestPlugin)
+		.spawn_then(tests_bundle_borrowed(tests))
+		.run();
 }

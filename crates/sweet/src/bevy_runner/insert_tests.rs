@@ -8,54 +8,52 @@ use test::TestDescAndFn;
 /// Insert the provided tests into the [`World`] by cloning.
 /// ## Panics
 /// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`]
-pub fn insert_tests_borrowed(world: &mut World, tests: &[&TestDescAndFn]) {
+pub fn tests_bundle_borrowed(tests: &[&TestDescAndFn]) -> impl Bundle {
 	let tests = tests
 		.iter()
 		.map(|test| test_ext::clone_static(test))
 		.collect();
-	insert_tests(world, tests);
+	tests_bundle(tests)
 }
 
 /// Inserts an owned set of tests.
-pub fn insert_tests(world: &mut World, tests: Vec<TestDescAndFn>) -> Entity {
-	// let mut app = App::new();
-	// app.add_plugins((MinimalPlugins, TestPlugin));
-	let root = world.spawn(TestRoot).id();
-	for test in tests {
-		let mut entity = world.spawn(ChildOf(root));
-		insert_test(&mut entity, test);
-	}
-	root
+pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
+	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
+	(
+		TestRoot,
+		Children::spawn(SpawnIter(test_bundles.into_iter())),
+	)
 }
 
-fn insert_test(entity: &mut EntityWorldMut, test: TestDescAndFn) {
-	insert_test_desc(entity, test.desc);
-	insert_test_fn(entity, test.testfn);
+fn test_bundle(test: TestDescAndFn) -> impl Bundle {
+	(test_desc_bundle(test.desc), test_fn_bundle(test.testfn))
 }
 
-fn insert_test_fn(entity: &mut EntityWorldMut, func: test::TestFn) {
+fn test_fn_bundle(func: test::TestFn) -> impl Bundle {
 	match func {
-		test::TestFn::StaticTestFn(func) => entity.insert(TestFunc::new(func)),
+		test::TestFn::StaticTestFn(func) => {
+			OnSpawn::insert(TestFunc::new(func))
+		}
 		test::TestFn::DynTestFn(fn_once) => {
-			entity.insert(NonSendTestFunc::new(fn_once))
+			OnSpawn::insert(NonSendTestFunc::new(fn_once))
 		}
 		test::TestFn::StaticBenchFn(_) => todo!(),
 		test::TestFn::DynBenchFn(_) => todo!(),
 		test::TestFn::StaticBenchAsTestFn(_) => todo!(),
 		test::TestFn::DynBenchAsTestFn(_) => todo!(),
-	};
+	}
 }
-fn insert_test_desc(entity: &mut EntityWorldMut, desc: test::TestDesc) {
-	ShouldSkip::insert(entity, &desc);
-	entity.insert((
+fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
+	(
 		Name::new(desc.name.to_string()),
 		FileSpan::new(
 			desc.source_file,
 			LineCol::new(desc.start_line as u32, desc.start_col as u32),
 			LineCol::new(desc.end_line as u32, desc.end_col as u32),
 		),
-		Test::new(desc),
-	));
+		Test::new(desc.clone()),
+		OnSpawn::new(move |entity| ShouldSkip::insert(entity, &desc)),
+	)
 }
 
 
@@ -156,7 +154,7 @@ mod tests {
 	#[test]
 	fn test_tree() {
 		let mut world = World::new();
-		let root = insert_tests(&mut world, setup());
+		let root = world.spawn(tests_bundle(setup())).id();
 		world
 			.component_names_related::<Children>(root)
 			.iter_to_string_indented()

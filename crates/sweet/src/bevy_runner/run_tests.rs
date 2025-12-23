@@ -24,7 +24,7 @@ pub enum TestOutcome {
 
 pub(super) fn run_tests_series(
 	mut commands: Commands,
-	query: Query<(Entity, &Test, &TestFunc), Without<ShouldSkip>>,
+	query: Populated<(Entity, &Test, &TestFunc), Without<ShouldSkip>>,
 ) -> Result {
 	for (entity, test, func) in query.iter() {
 		run_test(commands.reborrow(), entity, test, move || func.run())?;
@@ -36,7 +36,7 @@ pub(super) fn run_tests_series(
 pub(super) fn run_non_send_tests_series(
 	_: NonSendMarker,
 	mut commands: Commands,
-	mut query: Query<
+	mut query: Populated<
 		(Entity, &Test, &mut NonSendTestFunc),
 		Without<ShouldSkip>,
 	>,
@@ -110,9 +110,9 @@ mod tests {
 
 	fn run_test(test: TestDescAndFn) -> TestOutcome {
 		let mut app = App::new().with_plugins(TestPlugin);
-
-		insert_tests(app.world_mut(), vec![test]);
+		app.world_mut().spawn(tests_bundle(vec![test]));
 		let store = Store::new(None);
+
 		app.add_observer(
 			move |ev: On<Insert, TestOutcome>,
 			      outcomes: Query<&TestOutcome>,

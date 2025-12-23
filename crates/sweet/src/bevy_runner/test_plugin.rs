@@ -6,6 +6,9 @@ pub struct TestPlugin;
 
 impl Plugin for TestPlugin {
 	fn build(&self, app: &mut App) {
+		#[cfg(target_arch = "wasm32")]
+		console_error_panic_hook::set_once();
+
 		app.init_plugin::<ControlFlowPlugin>()
 			.init_plugin::<AsyncPlugin>()
 			.insert_schedule_before(Update, RunTests)

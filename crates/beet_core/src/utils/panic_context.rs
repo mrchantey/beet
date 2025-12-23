@@ -92,14 +92,12 @@ impl PanicContext {
 			Ok(Poll::Ready(Err(err))) => Poll::Ready(PanicResult::Err(err)),
 			Ok(Poll::Pending) => Poll::Pending,
 			Err(_) => {
-				crate::breakpoint!();
 				// panicked
 				let context = CONTEXT.with(|cx| {
 					cx.take().expect(
 						"panic without context, has the panic hook been overridden?",
 					)
 				});
-				crate::breakpoint!();
 				Poll::Ready(PanicResult::Panic {
 					payload: context.payload,
 					location: context.location,
