@@ -28,6 +28,13 @@ impl LineCol {
 		// assert_ne!(line, 0, "Line number must be greater than 0");
 		Self { line, col }
 	}
+	pub fn from_location(location: &std::panic::Location) -> Self {
+		Self {
+			line: location.line(),
+			col: location.column(),
+		}
+	}
+
 	pub fn line(&self) -> u32 { self.line }
 	pub fn col(&self) -> u32 { self.col }
 

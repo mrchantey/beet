@@ -42,7 +42,7 @@ unsafe extern "C" {
 	pub fn exit(code: i32);
 	#[wasm_bindgen(catch, js_name = "test_panic_to_error")]
 	pub fn panic_to_error(
-		f: &mut dyn FnMut() -> Result<(), String>,
+		func: impl FnOnce() -> Result<(), String>,
 	) -> Result<(), JsValue>;
 	#[wasm_bindgen(js_name = "test_read_file")]
 	pub fn read_file(path: &str) -> Option<String>;

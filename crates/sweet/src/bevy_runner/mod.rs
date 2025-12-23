@@ -1,6 +1,6 @@
 mod insert_tests;
-pub mod panic_ext2;
 mod test_plugin;
+mod catch_unwind_future;
 pub use insert_tests::*;
 pub use test_plugin::*;
 mod run_tests;

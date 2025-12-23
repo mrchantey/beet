@@ -8,7 +8,13 @@
 // implement FnMut for MockFunc
 #![cfg_attr(
 	feature = "nightly",
-	feature(fn_traits, backtrace_frames, unboxed_closures, test)
+	feature(
+		fn_traits,
+		backtrace_frames,
+		unboxed_closures,
+		test,
+		closure_track_caller
+	)
 )]
 
 extern crate test;

@@ -1,27 +1,24 @@
-use std::any::Any;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::NonSendMarker;
 
 /// the error message
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Component)]
 #[component(storage = "SparseSet")]
 pub enum TestOutcome {
+	/// The test either returned ok, or was expected to panic
 	Pass,
 	/// The test returned an [`Err(String)`]
-	Err {
-		message: String,
-	},
+	Err { message: String },
+	/// The test did not panic but was expected to
+	ExpectedPanic { message: Option<String> },
 	/// The test panicked
 	Panic {
 		/// The payload downcast from the `Box<dyn Any>`
 		/// panic payload, or 'opaque payload'
 		payload: String,
-	},
-	/// The test did not panic but was expected to
-	ExpectedPanic {
-		message: Option<String>,
+		/// The location of the panic if available
+		location: Option<LineCol>,
 	},
 }
 
@@ -51,7 +48,13 @@ pub(super) fn run_non_send_tests_series(
 			// unreachable because we remove the component immediately
 			NonSendTestFunc::new(|| unreachable!("test func already taken")),
 		);
-		run_test(commands.reborrow(), entity, test, move || func.run())?;
+		run_test(
+			commands.reborrow(),
+			entity,
+			test,
+			#[track_caller]
+			move || func.run(),
+		)?;
 	}
 	Ok(())
 }
@@ -66,11 +69,28 @@ fn run_test(
 	// temp: disable legacy test runner
 	let prev = std::panic::take_hook();
 	// gag panic hook
-	std::panic::set_hook(Box::new(|_| {
-		// println!("triggered hook");
+
+	thread_local! {
+		static LOCATION: std::cell::Cell<Option<LineCol>> = std::cell::Cell::new(None);
+	}
+	std::panic::set_hook(Box::new(|info| {
+		if let Some(location) = info.location() {
+			LOCATION.with(|loc| {
+				loc.set(Some(LineCol::from_location(location)));
+			});
+		}
 	}));
+
+
+	// #[cfg(target_arch = "wasm32")]
+	// let result = js_runtime::panic_to_error(&mut func);
+
+	// #[cfg(not(target_arch = "wasm32"))]
 	let result =
 		std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || func()));
+
+	// js_runtime::
+	// let result = Ok(func());
 	std::panic::set_hook(prev);
 
 	let outcome = match (result, test.should_panic) {
@@ -103,6 +123,7 @@ fn run_test(
 			// panicked but shouldnt have
 			TestOutcome::Panic {
 				payload: panic_to_str(payload),
+				location: LOCATION.with(|loc| loc.take()),
 			}
 		}
 	};
@@ -112,10 +133,17 @@ fn run_test(
 
 
 
+// #[cfg(target_arch = "wasm32")]
+// fn panic_to_str(payload: wasm_bindgen::JsValue) -> String {
+// 	if payload.is_string() {
+// 		payload.as_string().unwrap()
+// 	} else {
+// 		format!("non-string payload: {:?}", payload)
+// 	}
+// }
 
-
-
-fn panic_to_str(payload: Box<dyn Any>) -> String {
+// #[cfg(not(target_arch = "wasm32"))]
+fn panic_to_str(payload: Box<dyn std::any::Any>) -> String {
 	if let Some(str) = payload.downcast_ref::<&str>() {
 		str.to_string()
 	} else if let Some(str) = payload.downcast_ref::<String>() {
@@ -152,16 +180,11 @@ mod tests {
 	}
 
 	#[test]
-	fn works() {
+	fn works_sync() {
 		run_test(test_ext::new_auto(|| Ok(()))).xpect_eq(TestOutcome::Pass);
 		run_test(test_ext::new_auto(|| Err("pizza".into()))).xpect_eq(
 			TestOutcome::Err {
 				message: "pizza".into(),
-			},
-		);
-		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
-			TestOutcome::Panic {
-				payload: "pizza".into(),
 			},
 		);
 		run_test(test_ext::new_auto(|| panic!("expected")).with_should_panic())
@@ -179,5 +202,11 @@ mod tests {
 		.xpect_eq(TestOutcome::ExpectedPanic {
 			message: Some("boom".into()),
 		});
+		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
+			TestOutcome::Panic {
+				payload: "pizza".into(),
+				location: Some(LineCol::new(line!() - 3, 40)),
+			},
+		);
 	}
 }
