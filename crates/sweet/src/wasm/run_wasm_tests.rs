@@ -12,7 +12,7 @@ pub fn run_wasm_tests_sync(
 	tests
 		.into_iter()
 		.filter_map(|test| {
-			let mut func = test_desc_and_fn_ext::func(&test);
+			let mut func = test_ext::func(&test);
 
 			let result = SweetTestCollector::with_scope(&test.desc, || {
 				PanicStore::with_scope(&test.desc, || {

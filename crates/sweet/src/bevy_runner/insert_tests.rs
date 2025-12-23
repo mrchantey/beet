@@ -7,7 +7,7 @@ use test::TestDescAndFn;
 
 /// Insert the provided tests into the [`World`] by cloning.
 /// ## Panics
-/// Panics if dynamic tests or benches are passed in, see [`test_desc_and_fn_ext::clone`]
+/// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`]
 pub fn insert_tests_borrowed(world: &mut World, tests: &[&TestDescAndFn]) {
 	let tests = tests
 		.iter()
@@ -148,8 +148,8 @@ mod tests {
 			test_ext::new("test1", "crates/crate2/file1.rs", || Ok(())),
 			test_ext::new("test1", "crates/crate2/dir1/file1.rs", || Ok(())),
 			test_ext::new("test2", "crates/crate2/dir1/file1.rs", || Ok(())),
-			// test_desc_and_fn_ext::new("bar", file!(), || Err("poop".into())),
-			// test_desc_and_fn_ext::new("bar", file!(), || Ok(())),
+			// test_ext::new("bar", file!(), || Err("poop".into())),
+			// test_ext::new("bar", file!(), || Ok(())),
 		]
 	}
 

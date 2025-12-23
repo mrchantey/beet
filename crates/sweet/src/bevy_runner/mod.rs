@@ -1,10 +1,11 @@
 mod insert_tests;
+pub mod panic_ext2;
 mod test_plugin;
 pub use insert_tests::*;
 pub use test_plugin::*;
-mod test_runner;
-pub use test_runner::*;
-mod test_filter;
-pub use test_filter::*;
-mod test_collector;
-pub use test_collector::*;
+mod run_tests;
+pub use run_tests::*;
+mod filter_tests;
+pub use filter_tests::*;
+mod collect_outcomes;
+pub use collect_outcomes::*;

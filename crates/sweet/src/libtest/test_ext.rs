@@ -3,7 +3,7 @@ use test::TestDescAndFn;
 use test::TestFn;
 
 /// Uses this file and an incrementing name: `test1`, `test2` etc
-pub fn anon(
+pub fn new_auto(
 	func: impl 'static + Send + FnOnce() -> Result<(), String>,
 ) -> TestDescAndFn {
 	static COUNTER: std::sync::atomic::AtomicUsize =
