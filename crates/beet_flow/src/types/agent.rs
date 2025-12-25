@@ -103,11 +103,11 @@ where
 	/// - The root ancestor
 	/// currently this does NOT track the ActionContext::agent
 	// TODO track ActionContext::agent
-	pub fn entity(&self, entity: Entity) -> Entity {
+	pub fn entity(&self, action: Entity) -> Entity {
 		// cache root to avoid double traversal
-		let mut root = entity;
+		let mut root = action;
 		self.parents
-			.iter_ancestors_inclusive(entity)
+			.iter_ancestors_inclusive(action)
 			.find_map(|entity| {
 				root = entity;
 				if let Ok(action_of) = self.actions.get(entity) {
@@ -122,9 +122,9 @@ where
 	/// Get the query item for this `agent`
 	pub fn get(
 		&self,
-		entity: Entity,
+		action: Entity,
 	) -> Result<ROQueryItem<'_, 's, D>, QueryEntityError> {
-		let agent = self.entity(entity);
+		let agent = self.entity(action);
 		self.query.get(agent)
 	}
 

@@ -29,23 +29,19 @@ pub(crate) fn tick_run_timers(
 
 pub(crate) fn reset_run_time_started(
 	ev: On<Add, Running>,
-	mut query: Query<&mut RunTimer>,
-) {
+	mut query: Populated<&mut RunTimer>,
+) -> Result {
 	// println!("reset_run_time_started");
-	query
-		.get_mut(ev.event().event_target())
-		.map(|mut timer| timer.last_run.reset())
-		.ok();
+	query.get_mut(ev.event().event_target())?.last_run.reset();
+	Ok(())
 }
 pub(crate) fn reset_run_timer_stopped(
 	ev: On<Remove, Running>,
-	mut query: Query<&mut RunTimer>,
-) {
+	mut query: Populated<&mut RunTimer>,
+) -> Result {
 	// println!("reset_run_time_stopped");
-	query
-		.get_mut(ev.event().event_target())
-		.map(|mut timer| timer.last_end.reset())
-		.ok();
+	query.get_mut(ev.event().event_target())?.last_end.reset();
+	Ok(())
 }
 
 
