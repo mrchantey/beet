@@ -5,12 +5,20 @@ use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
-
 /// Describes an absolute path to a route, beginning with `/`.
+///
+/// This type represents the path portion of a URL or CLI command:
 ///
 /// ```txt
 /// https://example.com/foo/bar.txt
 ///                    ^^^^^^^^^^^^
+/// ```
+///
+/// For CLI commands, this represents the joined positional arguments:
+///
+/// ```txt
+/// myapp users list --verbose
+///       ^^^^^^^^^^
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -21,27 +29,25 @@ impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }
 }
 
-
-/// routes shouldnt have os specific paths
+/// Routes shouldn't have OS-specific paths
 /// so we allow to_string
 impl std::fmt::Display for RoutePath {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0.display())
+	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(formatter, "{}", self.0.display())
 	}
 }
 
-/// The uri path of the request, if the request has no leading slash
-/// this will be empty.
+/// Extract the route path from request metadata
 impl FromRequestMeta<Self> for RoutePath {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		let path = req.uri.path();
-		Self::new(path).xok()
+		Self::new(req.path_string()).xok()
 	}
 }
 
 impl From<String> for RoutePath {
 	fn from(value: String) -> Self { Self::new(value) }
 }
+
 impl From<&str> for RoutePath {
 	fn from(value: &str) -> Self { Self::new(value) }
 }
@@ -62,6 +68,7 @@ impl std::ops::Deref for RoutePath {
 impl AsRef<Path> for RoutePath {
 	fn as_ref(&self) -> &Path { self.0.as_path() }
 }
+
 impl AsRef<str> for RoutePath {
 	fn as_ref(&self) -> &str { self.0.to_str().unwrap_or_default() }
 }
@@ -90,8 +97,21 @@ impl RoutePath {
 		}
 	}
 
+	/// Creates a RoutePath from path segments
+	pub fn from_segments(segments: &[String]) -> Self {
+		if segments.is_empty() {
+			Self::default()
+		} else {
+			Self(PathBuf::from(format!("/{}", segments.join("/"))))
+		}
+	}
 
-	/// when joining with other paths ensure that the path
+	/// Creates a RoutePath from RequestParts
+	pub fn from_parts(parts: &RequestParts) -> Self {
+		Self::from_segments(parts.path())
+	}
+
+	/// When joining with other paths ensure that the path
 	/// does not start with a leading slash, as this would
 	/// cause the path to be treated as an absolute path
 	pub fn as_relative(&self) -> &Path {
@@ -108,8 +128,11 @@ impl RoutePath {
 			Self(self.0.join(&new_path))
 		}
 	}
+
+	/// Returns the inner PathBuf reference
 	pub fn inner(&self) -> &Path { &self.0 }
-	/// given a local path, return a new [`RoutePath`] with:
+
+	/// Given a local path, return a new [`RoutePath`] with:
 	/// - any extension removed
 	/// - 'index' file stems removed
 	/// - leading `/` added if not present
@@ -136,18 +159,33 @@ impl RoutePath {
 
 		Ok(Self(PathBuf::from(raw_str)))
 	}
+
+	/// Returns the path segments as a slice
+	pub fn segments(&self) -> Vec<&str> {
+		self.0
+			.to_str()
+			.unwrap_or_default()
+			.split('/')
+			.filter(|segment| !segment.is_empty())
+			.collect()
+	}
+
+	/// Returns the first segment of the path, if any
+	pub fn first_segment(&self) -> Option<&str> {
+		self.segments().first().copied()
+	}
+
+	/// Returns the last segment of the path, if any
+	pub fn last_segment(&self) -> Option<&str> {
+		self.segments().last().copied()
+	}
 }
-
-
-
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
-
-
 
 	#[test]
 	fn route_path() {
@@ -178,5 +216,43 @@ mod test {
 			.join(&RoutePath::new("/"))
 			.to_string()
 			.xpect_eq("/foo");
+	}
+
+	#[test]
+	fn from_segments() {
+		let segments =
+			vec!["api".to_string(), "users".to_string(), "123".to_string()];
+		let path = RoutePath::from_segments(&segments);
+		path.to_string().xpect_eq("/api/users/123");
+	}
+
+	#[test]
+	fn from_segments_empty() {
+		let path = RoutePath::from_segments(&[]);
+		path.to_string().xpect_eq("/");
+	}
+
+	#[test]
+	fn segments() {
+		let path = RoutePath::new("/api/users/123");
+		path.segments().xpect_eq(vec!["api", "users", "123"]);
+	}
+
+	#[test]
+	fn first_last_segment() {
+		let path = RoutePath::new("/api/users/123");
+		path.first_segment().unwrap().xpect_eq("api");
+		path.last_segment().unwrap().xpect_eq("123");
+
+		let empty_path = RoutePath::default();
+		empty_path.first_segment().xpect_none();
+		empty_path.last_segment().xpect_none();
+	}
+
+	#[test]
+	fn from_request_parts() {
+		let parts = RequestParts::get("/api/users/123");
+		let path = RoutePath::from_parts(&parts);
+		path.to_string().xpect_eq("/api/users/123");
 	}
 }

@@ -154,7 +154,7 @@ mod test {
 			.into_request()
 			.unwrap()
 			.path()
-			.xpect_eq("/foo".into());
+			.xpect_eq(vec!["foo".to_string()]);
 	}
 
 	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }

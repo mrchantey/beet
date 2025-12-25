@@ -39,9 +39,7 @@ mod tests {
 	fn into_request_simple_path() {
 		Request::from_cli_args(CliArgs::parse("foo bar"))
 			.unwrap()
-			.parts
-			.uri
-			.path()
+			.path_string()
 			.xpect_eq("/foo/bar");
 	}
 
@@ -49,17 +47,15 @@ mod tests {
 	fn into_request_with_query() {
 		let req = Request::from_cli_args(CliArgs::parse("api users --id=123"))
 			.unwrap();
-		req.parts.uri.path().xpect_eq("/api/users");
-		req.parts.uri.query().xpect_some();
+		req.path_string().xpect_eq("/api/users");
+		req.get_param("id").xpect_some();
 	}
 
 	#[test]
 	fn into_request_empty() {
 		Request::from_cli_args(CliArgs::parse(""))
 			.unwrap()
-			.parts
-			.uri
-			.path()
+			.path_string()
 			.xpect_eq("/");
 	}
 }

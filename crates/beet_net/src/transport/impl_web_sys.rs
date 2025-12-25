@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use http::HeaderValue;
 use http::StatusCode;
-use http::header::HeaderName;
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 
@@ -25,14 +23,16 @@ impl TryInto<web_sys::Request> for Request {
 
 	fn try_into(self) -> Result<web_sys::Request, Self::Error> {
 		let init = web_sys::RequestInit::new();
-		init.set_method(self.parts.method.as_str());
+		let method_str = self.method().to_string().to_uppercase();
+		init.set_method(&method_str);
 
-		match &self.body {
+		let (parts, body) = self.into_parts();
+		match &body {
 			Body::Bytes(bytes) if !bytes.is_empty() => {
 				init.set_body(&js_sys::Uint8Array::from(bytes.as_ref()));
 			}
 			Body::Stream(_) => {
-				let stream = create_readable_stream_from_body(self.body)?;
+				let stream = create_readable_stream_from_body(body)?;
 				init.set_body(&stream);
 			}
 			Body::Bytes(_) => {
@@ -40,16 +40,15 @@ impl TryInto<web_sys::Request> for Request {
 			}
 		}
 
-		let url = self.parts.uri.to_string();
+		let url = parts.uri().to_string();
 		let request =
 			web_sys::Request::new_with_str_and_init(&url, &init).map_jserr()?;
 
-		for (name, value) in self.parts.headers.iter() {
-			let name_str = name.as_str();
-			let value_str = value.to_str().map_err(|e| {
-				bevyhow!("Failed to set header {}: {}", name_str, e)
-			})?;
-			request.headers().set(name_str, value_str).map_jserr()?;
+		// Set headers from our multimap
+		for (name, values) in parts.headers().iter_all() {
+			for value in values {
+				request.headers().set(name, value).map_jserr()?;
+			}
 		}
 		Ok(request)
 	}
@@ -113,8 +112,9 @@ impl Response {
 		let status = StatusCode::from_u16(resp.status() as u16)
 			.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
-		// Headers
-		let mut headers = http::HeaderMap::new();
+		// Build ResponseParts with headers
+		let mut parts = ResponseParts::new(status);
+
 		let headers_iter = resp.headers();
 		let js_iter = js_sys::try_iter(&headers_iter)
 			.map_jserr()?
@@ -125,19 +125,13 @@ impl Response {
 			if arr.length() == 2 {
 				let key = arr.get(0).as_string().unwrap_or_default();
 				let value = arr.get(1).as_string().unwrap_or_default();
-				if let (Ok(header_name), Ok(header_value)) = (
-					HeaderName::from_bytes(key.as_bytes()),
-					HeaderValue::from_str(&value),
-				) {
-					headers.insert(header_name, header_value);
-				}
+				parts.parts_mut().insert_header(key.to_lowercase(), value);
 			}
 		}
 
-		let is_bytes = headers
-			.get("content-length")
-			.and_then(|v| v.to_str().ok())
-			.and_then(|s| s.parse::<u64>().ok())
+		let is_bytes = parts
+			.get_header("content-length")
+			.and_then(|val| val.parse::<u64>().ok())
 			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 
 		let body: Body = if is_bytes {
@@ -184,10 +178,6 @@ impl Response {
 			Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
 		};
 
-		let mut builder = http::Response::builder().status(status);
-		for (key, value) in headers.iter() {
-			builder = builder.header(key, value);
-		}
-		Ok(builder.body(body)?.into())
+		Ok(Response::from_parts(parts, Bytes::new()).with_body(body))
 	}
 }

@@ -106,19 +106,30 @@ async fn hyper_to_request(
 	// Create body based on size
 	let body = Body::Stream(SendWrapper::new(stream));
 
-	Request::from_parts(parts, body)
+	Request::from_parts(RequestParts::from(parts), body)
 }
 
 async fn response_to_hyper(
 	res: Response,
 ) -> hyper::Response<http_body_util::combinators::BoxBody<Bytes, std::io::Error>>
 {
-	let Response { parts, body } = res;
+	let (parts, body) = res.into_parts();
+
+	// Convert our ResponseParts to http::response::Parts
+	let http_parts: http::response::Parts =
+		parts.try_into().unwrap_or_else(|_| {
+			http::Response::builder()
+				.status(http::StatusCode::INTERNAL_SERVER_ERROR)
+				.body(())
+				.unwrap()
+				.into_parts()
+				.0
+		});
 
 	match body {
 		Body::Bytes(bytes) => {
 			let body = Full::new(bytes).map_err(|never| match never {}).boxed();
-			hyper::Response::from_parts(parts, body)
+			hyper::Response::from_parts(http_parts, body)
 		}
 		Body::Stream(stream) => {
 			// Convert our stream to a stream of Frames
@@ -132,7 +143,7 @@ async fn response_to_hyper(
 			});
 
 			let body = BodyExt::boxed(StreamBody::new(frame_stream));
-			hyper::Response::from_parts(parts, body)
+			hyper::Response::from_parts(http_parts, body)
 		}
 	}
 }
