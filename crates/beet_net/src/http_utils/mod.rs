@@ -1,5 +1,6 @@
 mod body;
 mod extractors;
+pub mod http_ext;
 mod parts;
 mod response;
 pub use body::*;

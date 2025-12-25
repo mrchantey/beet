@@ -160,13 +160,13 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		// Get query from URI string
-		let uri = req.uri();
-		let query =
-			uri.split_once('?').map(|(_, query)| query).ok_or_else(|| {
-				HttpError::bad_request("no query params in request")
-			})?;
-		let value = Self::from_query_string(query).map_err(|err| {
+		let query = req.query_string();
+		if query.is_empty() {
+			return Err(
+				HttpError::bad_request("no query params in request").into()
+			);
+		}
+		let value = Self::from_query_string(&query).map_err(|err| {
 			HttpError::bad_request(format!(
 				"Failed to parse query params: {}",
 				err
@@ -212,13 +212,13 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		// Get query from URI string
-		let uri = req.uri();
-		let query =
-			uri.split_once('?').map(|(_, query)| query).ok_or_else(|| {
-				HttpError::bad_request("no query params in request")
-			})?;
-		let params: T = serde_urlencoded::from_str(query).map_err(|err| {
+		let query = req.query_string();
+		if query.is_empty() {
+			return Err(
+				HttpError::bad_request("no query params in request").into()
+			);
+		}
+		let params: T = serde_urlencoded::from_str(&query).map_err(|err| {
 			HttpError::bad_request(format!(
 				"Failed to parse query params: {}",
 				err
@@ -272,46 +272,6 @@ pub struct RouteApp {
 	// pub create_app: Box<dyn Clone + Fn() -> App>,
 }
 
-pub struct HttpExt;
-
-impl HttpExt {
-	/// Check if HTTP request parts indicate a body is present
-	pub fn has_body(parts: &http::request::Parts) -> bool {
-		Self::has_body_by_content_length(&parts.headers)
-			|| Self::has_body_by_transfer_encoding(&parts.headers)
-	}
-
-	/// Check if RequestParts indicate a body is present
-	pub fn request_has_body(parts: &RequestParts) -> bool {
-		parts
-			.get_header("content-length")
-			.and_then(|val| val.parse::<usize>().ok())
-			.map(|len| len > 0)
-			.unwrap_or(false)
-			|| parts
-				.get_header("transfer-encoding")
-				.map(|val| val.contains("chunked"))
-				.unwrap_or(false)
-	}
-
-	pub fn has_body_by_content_length(headers: &http::HeaderMap) -> bool {
-		headers
-			.get("content-length")
-			.and_then(|val| val.to_str().ok())
-			.and_then(|str| str.parse::<usize>().ok())
-			.map(|len| len > 0)
-			.unwrap_or(false)
-	}
-
-	pub fn has_body_by_transfer_encoding(headers: &http::HeaderMap) -> bool {
-		headers
-			.get("transfer-encoding")
-			.and_then(|val| val.to_str().ok())
-			.map(|str| str.contains("chunked"))
-			.unwrap_or(false)
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -345,41 +305,16 @@ mod test {
 	}
 
 	#[test]
-	fn http_ext_has_body() {
-		let parts_with_body = http::Request::builder()
-			.method(http::Method::POST)
-			.uri("/test")
-			.header("content-length", "5")
-			.body(())
-			.unwrap()
-			.into_parts()
-			.0;
-
-		HttpExt::has_body(&parts_with_body).xpect_true();
-
-		let parts_without_body = http::Request::builder()
-			.method(http::Method::GET)
-			.uri("/test")
-			.body(())
-			.unwrap()
-			.into_parts()
-			.0;
-
-		HttpExt::has_body(&parts_without_body).xpect_false();
-	}
-
-	#[test]
-	fn request_parts_has_body() {
-		let parts = RequestPartsBuilder::new()
-			.method(HttpMethod::Post)
+	fn parts_has_body() {
+		let parts = PartsBuilder::new()
 			.path_str("/test")
 			.header("content-length", "5")
-			.build();
+			.build_request_parts(HttpMethod::Post);
 
-		HttpExt::request_has_body(&parts).xpect_true();
+		parts.has_body().xpect_true();
 
 		let parts_without = RequestParts::get("/test");
-		HttpExt::request_has_body(&parts_without).xpect_false();
+		parts_without.has_body().xpect_false();
 	}
 
 	#[test]

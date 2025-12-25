@@ -85,17 +85,16 @@ impl Response {
 	pub async fn try_from_reqwest(res: reqwest::Response) -> Result<Self> {
 		let status = res.status();
 
-		// Copy headers to our ResponseParts using ResponsePartsBuilder
-		let response_parts = {
-			let mut builder = ResponsePartsBuilder::new().status(status);
+		// Copy headers to our ResponseParts using PartsBuilder
+		let parts = {
+			let mut builder = PartsBuilder::new();
 			for (key, value) in res.headers().iter() {
 				if let Ok(value_str) = value.to_str() {
 					builder = builder.header(key.to_string(), value_str);
 				}
 			}
-			builder
+			builder.build_response_parts(status)
 		};
-		let parts = response_parts.build();
 
 		let is_bytes = res
 			.headers()

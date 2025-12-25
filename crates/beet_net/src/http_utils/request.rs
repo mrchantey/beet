@@ -6,7 +6,9 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! # use beet_net::prelude::*;
+//! # use beet_core::prelude::*;
 //! // Create an HTTP-style request
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
@@ -34,7 +36,8 @@ use http::header::IntoHeaderName;
 /// `Request` implements `Deref<Target = RequestParts>`, so all methods on
 /// [`RequestParts`] and [`Parts`] are available directly:
 ///
-/// ```ignore
+/// ```
+/// # use beet_net::prelude::*;
 /// let request = Request::get("/api/users?limit=10");
 /// assert_eq!(request.method(), &HttpMethod::Get);  // From RequestParts
 /// assert_eq!(request.path(), &["api", "users"]);   // From Parts via Deref
@@ -233,9 +236,6 @@ impl Request {
 	/// Insert a query parameter into the request
 	pub fn with_query_param(mut self, key: &str, value: &str) -> Result<Self> {
 		self.parts.parts_mut().insert_param(key, value);
-		// Update the URI string
-		let uri = self.build_uri_string();
-		self.parts.parts_mut().set_uri(uri);
 		Ok(self)
 	}
 
@@ -251,48 +251,7 @@ impl Request {
 			};
 			self.parts.parts_mut().insert_param(key, value);
 		}
-		let uri = self.build_uri_string();
-		self.parts.parts_mut().set_uri(uri);
 		Ok(self)
-	}
-
-	/// Builds the URI string from path and params, preserving scheme and authority if present
-	fn build_uri_string(&self) -> String {
-		let original_uri = self.parts.uri();
-
-		// Build the base (scheme + authority + path OR just path)
-		let base = if original_uri.contains("://") {
-			// Absolute URI - preserve scheme and authority, strip any existing query
-			original_uri
-				.split_once('?')
-				.map(|(base, _)| base)
-				.unwrap_or(original_uri)
-				.to_string()
-		} else {
-			// Relative URI - just use path
-			self.parts.path_string()
-		};
-
-		if self.parts.params().is_empty() {
-			base
-		} else {
-			let query = self
-				.parts
-				.params()
-				.iter_all()
-				.flat_map(|(key, values)| {
-					values.iter().map(move |value| {
-						if value.is_empty() {
-							key.clone()
-						} else {
-							format!("{}={}", key, value)
-						}
-					})
-				})
-				.collect::<Vec<_>>()
-				.join("&");
-			format!("{}?{}", base, query)
-		}
 	}
 
 	/// Returns the path as a RoutePath
@@ -312,7 +271,7 @@ impl Request {
 	/// Creates a request from an http::Request
 	pub fn from_http<T: Into<Bytes>>(request: http::Request<T>) -> Self {
 		let (http_parts, body) = request.into_parts();
-		let has_body = HttpExt::has_body(&http_parts);
+		let has_body = http_ext::has_body(&http_parts);
 		let parts = RequestParts::from(http_parts);
 		let body = if has_body {
 			Bytes::from(body.into()).into()

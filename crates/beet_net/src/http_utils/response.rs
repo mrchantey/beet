@@ -6,7 +6,9 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! # use beet_net::prelude::*;
+//! # use http::StatusCode;
 //! // Create an HTTP-style response
 //! let response = Response::ok().with_body("Hello, world!");
 //!
@@ -32,7 +34,9 @@ use std::convert::Infallible;
 /// `Response` implements `Deref<Target = ResponseParts>`, so all methods on
 /// [`ResponseParts`] and [`Parts`] are available directly:
 ///
-/// ```ignore
+/// ```
+/// # use beet_net::prelude::*;
+/// # use http::StatusCode;
 /// let response = Response::ok();
 /// assert_eq!(response.status(), StatusCode::OK);  // From ResponseParts
 /// ```

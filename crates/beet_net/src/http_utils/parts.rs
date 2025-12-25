@@ -12,6 +12,7 @@
 //!
 //! ```
 //! # use beet_net::prelude::*;
+//! # use beet_core::prelude::*;
 //! // From HTTP
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
@@ -125,8 +126,6 @@ pub struct Parts {
 	authority: String,
 	/// The path segments (split by `/` for HTTP, positional args for CLI)
 	path: Vec<String>,
-	/// The original URI string representation
-	uri: String,
 	/// Query parameters (HTTP) or flags/options (CLI)
 	///
 	/// For CLI flags:
@@ -135,8 +134,8 @@ pub struct Parts {
 	params: MultiMap,
 	/// HTTP headers or CLI environment variables
 	headers: MultiMap,
-	/// The HTTP version or CLI command version, if applicable
-	version: Option<String>,
+	/// The HTTP version or CLI command version
+	version: String,
 }
 
 impl Default for Parts {
@@ -145,10 +144,9 @@ impl Default for Parts {
 			scheme: Scheme::None,
 			authority: String::new(),
 			path: Vec::new(),
-			uri: "/".to_string(),
 			params: default(),
 			headers: default(),
-			version: None,
+			version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
 		}
 	}
 }
@@ -166,11 +164,8 @@ impl Parts {
 	/// Returns the path segments
 	pub fn path(&self) -> &Vec<String> { &self.path }
 
-	/// Returns the original URI string
-	pub fn uri(&self) -> &str { &self.uri }
-
-	/// Returns the version string, if any
-	pub fn version(&self) -> Option<&String> { self.version.as_ref() }
+	/// Returns the version string
+	pub fn version(&self) -> &str { &self.version }
 
 	/// Returns all parameters
 	pub fn params(&self) -> &MultiMap { &self.params }
@@ -180,9 +175,6 @@ impl Parts {
 
 	/// Returns a mutable reference to the headers
 	pub fn headers_mut(&mut self) -> &mut MultiMap { &mut self.headers }
-
-	/// Sets the URI string
-	pub fn set_uri(&mut self, uri: impl Into<String>) { self.uri = uri.into(); }
 
 	/// Adds a parameter
 	pub fn insert_param(
@@ -233,12 +225,48 @@ impl Parts {
 		self.headers.contains_key(key)
 	}
 
+	/// Check if this request indicates a body is present based on headers.
+	pub fn has_body(&self) -> bool {
+		self.get_header("content-length")
+			.and_then(|val| val.parse::<usize>().ok())
+			.map(|len| len > 0)
+			.unwrap_or(false)
+			|| self
+				.get_header("transfer-encoding")
+				.map(|val| val.contains("chunked"))
+				.unwrap_or(false)
+	}
+
 	/// Returns the path as a joined string with leading slash
 	pub fn path_string(&self) -> String {
 		if self.path.is_empty() {
 			"/".to_string()
 		} else {
 			format!("/{}", self.path.join("/"))
+		}
+	}
+
+	/// Returns the query string built from params.
+	/// This is the canonical way to get the query string.
+	pub fn query_string(&self) -> String { build_query_string(&self.params) }
+
+	/// Returns the full URI string, lazily constructed from scheme, authority, path, and params.
+	pub fn uri(&self) -> String {
+		let path = self.path_string();
+		let query = self.query_string();
+
+		// Build base with scheme and authority if present
+		let base = match (&self.scheme, self.authority.is_empty()) {
+			(Scheme::None, _) | (_, true) => path,
+			(scheme, false) => {
+				format!("{}://{}{}", scheme.as_str(), self.authority, path)
+			}
+		};
+
+		if query.is_empty() {
+			base
+		} else {
+			format!("{}?{}", base, query)
 		}
 	}
 
@@ -262,13 +290,12 @@ impl Parts {
 	}
 }
 
-/// Builder for constructing [`Parts`]
+/// Builder for constructing [`Parts`], [`RequestParts`], or [`ResponseParts`].
 #[derive(Debug, Clone, Default)]
 pub struct PartsBuilder {
 	scheme: Scheme,
 	authority: String,
 	path: Vec<String>,
-	uri: Option<String>,
 	params: MultiMap,
 	headers: MultiMap,
 	version: Option<String>,
@@ -299,12 +326,6 @@ impl PartsBuilder {
 	/// Sets the path from a string, splitting by `/`
 	pub fn path_str(mut self, path: &str) -> Self {
 		self.path = split_path(path);
-		self
-	}
-
-	/// Sets the URI string directly
-	pub fn uri(mut self, uri: impl Into<String>) -> Self {
-		self.uri = Some(uri.into());
 		self
 	}
 
@@ -345,23 +366,31 @@ impl PartsBuilder {
 
 	/// Builds the [`Parts`]
 	pub fn build(self) -> Parts {
-		let uri = self.uri.unwrap_or_else(|| {
-			let path_str = if self.path.is_empty() {
-				"/".to_string()
-			} else {
-				format!("/{}", self.path.join("/"))
-			};
-			path_str
-		});
-
 		Parts {
 			scheme: self.scheme,
 			authority: self.authority,
 			path: self.path,
-			uri,
 			params: self.params,
 			headers: self.headers,
-			version: self.version,
+			version: self
+				.version
+				.unwrap_or_else(|| http_ext::DEFAULT_HTTP_VERSION.to_string()),
+		}
+	}
+
+	/// Builds [`RequestParts`] with the given method
+	pub fn build_request_parts(self, method: HttpMethod) -> RequestParts {
+		RequestParts {
+			method,
+			parts: self.build(),
+		}
+	}
+
+	/// Builds [`ResponseParts`] with the given status
+	pub fn build_response_parts(self, status: StatusCode) -> ResponseParts {
+		ResponseParts {
+			status,
+			parts: self.build(),
 		}
 	}
 }
@@ -376,7 +405,8 @@ impl PartsBuilder {
 /// `RequestParts` implements `Deref<Target = Parts>`, so all methods
 /// on [`Parts`] are available directly:
 ///
-/// ```ignore
+/// ```
+/// # use beet_net::prelude::*;
 /// let parts = RequestParts::get("/api/users");
 /// assert_eq!(parts.path(), &["api", "users"]); // Deref to Parts
 /// assert_eq!(parts.method(), &HttpMethod::Get);
@@ -416,10 +446,8 @@ impl RequestParts {
 					.map(|auth| auth.to_string())
 					.unwrap_or_default();
 				let path_segments = split_path(uri.path());
-				let params = uri
-					.query()
-					.map(parse_query_string)
-					.unwrap_or_else(|| MultiMap::default());
+				let params =
+					uri.query().map(parse_query_string).unwrap_or_default();
 
 				return Self {
 					method,
@@ -427,47 +455,29 @@ impl RequestParts {
 						scheme,
 						authority,
 						path: path_segments,
-						uri: path_str.to_string(),
 						params,
 						headers: MultiMap::default(),
-						version: None,
+						version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
 					},
 				};
 			}
 		}
 
 		// Otherwise treat as path (may include query string)
-		// Split path and query if present
-		let (path_only, query_str) = path_str
-			.split_once('?')
-			.map(|(path, query)| (path, Some(query)))
-			.unwrap_or((path_str, None));
-
-		let mut builder = PartsBuilder::new().path_str(path_only).uri(
-			if path_str.starts_with('/') {
-				path_str.to_string()
-			} else {
-				format!("/{}", path_str)
-			},
-		);
-
-		// Parse query string into params
-		if let Some(query) = query_str {
-			for pair in query.split('&') {
-				if pair.is_empty() {
-					continue;
-				}
-				let (key, value) = match pair.split_once('=') {
-					Some((key, value)) => (key.to_string(), value.to_string()),
-					None => (pair.to_string(), String::new()),
-				};
-				builder = builder.param(key, value);
-			}
-		}
+		let (path_only, query_str) = split_path_and_query(path_str);
+		let path_segments = split_path(path_only);
+		let params = query_str.map(parse_query_string).unwrap_or_default();
 
 		Self {
 			method,
-			parts: builder.build(),
+			parts: Parts {
+				scheme: Scheme::None,
+				authority: String::new(),
+				path: path_segments,
+				params,
+				headers: MultiMap::default(),
+				version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
+			},
 		}
 	}
 
@@ -519,99 +529,6 @@ impl std::ops::Deref for RequestParts {
 
 impl std::ops::DerefMut for RequestParts {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
-}
-
-/// Builder for constructing [`RequestParts`]
-#[derive(Debug, Clone, Default)]
-pub struct RequestPartsBuilder {
-	method: HttpMethod,
-	parts_builder: PartsBuilder,
-}
-
-impl RequestPartsBuilder {
-	/// Creates a new builder with GET method
-	pub fn new() -> Self {
-		Self {
-			method: HttpMethod::Get,
-			parts_builder: PartsBuilder::new(),
-		}
-	}
-
-	/// Sets the HTTP method
-	pub fn method(mut self, method: HttpMethod) -> Self {
-		self.method = method;
-		self
-	}
-
-	/// Sets the scheme
-	pub fn scheme(mut self, scheme: Scheme) -> Self {
-		self.parts_builder = self.parts_builder.scheme(scheme);
-		self
-	}
-
-	/// Sets the authority
-	pub fn authority(mut self, authority: impl Into<String>) -> Self {
-		self.parts_builder = self.parts_builder.authority(authority);
-		self
-	}
-
-	/// Sets the path from segments
-	pub fn path(mut self, path: Vec<String>) -> Self {
-		self.parts_builder = self.parts_builder.path(path);
-		self
-	}
-
-	/// Sets the path from a string
-	pub fn path_str(mut self, path: &str) -> Self {
-		self.parts_builder = self.parts_builder.path_str(path);
-		self
-	}
-
-	/// Sets the URI string
-	pub fn uri(mut self, uri: impl Into<String>) -> Self {
-		self.parts_builder = self.parts_builder.uri(uri);
-		self
-	}
-
-	/// Adds a parameter
-	pub fn param(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.parts_builder = self.parts_builder.param(key, value);
-		self
-	}
-
-	/// Adds a flag
-	pub fn flag(mut self, key: impl Into<String>) -> Self {
-		self.parts_builder = self.parts_builder.flag(key);
-		self
-	}
-
-	/// Adds a header
-	pub fn header(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.parts_builder = self.parts_builder.header(key, value);
-		self
-	}
-
-	/// Sets the version
-	pub fn version(mut self, version: impl Into<String>) -> Self {
-		self.parts_builder = self.parts_builder.version(version);
-		self
-	}
-
-	/// Builds the [`RequestParts`]
-	pub fn build(self) -> RequestParts {
-		RequestParts {
-			method: self.method,
-			parts: self.parts_builder.build(),
-		}
-	}
 }
 
 /// Response-specific parts including HTTP status code.
@@ -685,62 +602,16 @@ impl std::ops::DerefMut for ResponseParts {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
 }
 
-/// Builder for constructing [`ResponseParts`]
-#[derive(Debug, Clone, Default)]
-pub struct ResponsePartsBuilder {
-	status: StatusCode,
-	parts_builder: PartsBuilder,
-}
-
-impl ResponsePartsBuilder {
-	/// Creates a new builder with OK status
-	pub fn new() -> Self {
-		Self {
-			status: StatusCode::OK,
-			parts_builder: PartsBuilder::new(),
-		}
-	}
-
-	/// Sets the status code
-	pub fn status(mut self, status: StatusCode) -> Self {
-		self.status = status;
-		self
-	}
-
-	/// Sets the scheme
-	pub fn scheme(mut self, scheme: Scheme) -> Self {
-		self.parts_builder = self.parts_builder.scheme(scheme);
-		self
-	}
-
-	/// Adds a header
-	pub fn header(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.parts_builder = self.parts_builder.header(key, value);
-		self
-	}
-
-	/// Sets the version
-	pub fn version(mut self, version: impl Into<String>) -> Self {
-		self.parts_builder = self.parts_builder.version(version);
-		self
-	}
-
-	/// Builds the [`ResponseParts`]
-	pub fn build(self) -> ResponseParts {
-		ResponseParts {
-			status: self.status,
-			parts: self.parts_builder.build(),
-		}
-	}
-}
-
 // ============================================================================
-// Conversion: http::request::Parts -> RequestParts
+// Private parsing helpers
 // ============================================================================
+
+/// Split a URI string into path and optional query string.
+fn split_path_and_query(uri: &str) -> (&str, Option<&str>) {
+	uri.split_once('?')
+		.map(|(path, query)| (path, Some(query)))
+		.unwrap_or((uri, None))
+}
 
 /// Convert an [`http::HeaderMap`] to a [`MultiMap`],
 /// with all keys converted to lower kebab-case
@@ -781,207 +652,6 @@ fn split_path(path: &str) -> Vec<String> {
 		.collect()
 }
 
-/// Convert http version to string
-fn http_version_to_string(version: http::Version) -> Option<String> {
-	match version {
-		http::Version::HTTP_09 => Some("0.9".to_string()),
-		http::Version::HTTP_10 => Some("1.0".to_string()),
-		http::Version::HTTP_11 => Some("1.1".to_string()),
-		http::Version::HTTP_2 => Some("2".to_string()),
-		http::Version::HTTP_3 => Some("3".to_string()),
-		_ => None,
-	}
-}
-
-impl From<http::request::Parts> for RequestParts {
-	fn from(http_parts: http::request::Parts) -> Self {
-		let uri = &http_parts.uri;
-
-		let scheme = Scheme::from(uri.scheme());
-		let authority = uri
-			.authority()
-			.map(|auth| auth.to_string())
-			.unwrap_or_default();
-		let path = split_path(uri.path());
-		let uri_string = uri.to_string();
-		let params = uri
-			.query()
-			.map(parse_query_string)
-			.unwrap_or_else(|| MultiMap::default());
-		let headers = header_map_to_multimap(&http_parts.headers);
-		let version = http_version_to_string(http_parts.version);
-		let method = HttpMethod::from(http_parts.method);
-
-		RequestParts {
-			method,
-			parts: Parts {
-				scheme,
-				authority,
-				path,
-				uri: uri_string,
-				params,
-				headers,
-				version,
-			},
-		}
-	}
-}
-
-impl From<&http::request::Parts> for RequestParts {
-	fn from(http_parts: &http::request::Parts) -> Self {
-		let uri = &http_parts.uri;
-
-		let scheme = Scheme::from(uri.scheme());
-		let authority = uri
-			.authority()
-			.map(|auth| auth.to_string())
-			.unwrap_or_default();
-		let path = split_path(uri.path());
-		let uri_string = uri.to_string();
-		let params = uri
-			.query()
-			.map(parse_query_string)
-			.unwrap_or_else(|| MultiMap::default());
-		let headers = header_map_to_multimap(&http_parts.headers);
-		let version = http_version_to_string(http_parts.version);
-		let method = HttpMethod::from(&http_parts.method);
-
-		RequestParts {
-			method,
-			parts: Parts {
-				scheme,
-				authority,
-				path,
-				uri: uri_string,
-				params,
-				headers,
-				version,
-			},
-		}
-	}
-}
-
-// ============================================================================
-// Conversion: http::response::Parts -> ResponseParts
-// ============================================================================
-
-impl From<http::response::Parts> for ResponseParts {
-	fn from(http_parts: http::response::Parts) -> Self {
-		let headers = header_map_to_multimap(&http_parts.headers);
-		let version = http_version_to_string(http_parts.version);
-
-		ResponseParts {
-			status: http_parts.status,
-			parts: Parts {
-				scheme: Scheme::None,
-				authority: String::new(),
-				path: Vec::new(),
-				uri: String::new(),
-				params: MultiMap::default(),
-				headers,
-				version,
-			},
-		}
-	}
-}
-
-impl From<&http::response::Parts> for ResponseParts {
-	fn from(http_parts: &http::response::Parts) -> Self {
-		let headers = header_map_to_multimap(&http_parts.headers);
-		let version = http_version_to_string(http_parts.version);
-
-		ResponseParts {
-			status: http_parts.status,
-			parts: Parts {
-				scheme: Scheme::None,
-				authority: String::new(),
-				path: Vec::new(),
-				uri: String::new(),
-				params: MultiMap::default(),
-				headers,
-				version,
-			},
-		}
-	}
-}
-
-// ============================================================================
-// Conversion: CliArgs -> RequestParts
-// ============================================================================
-
-impl From<CliArgs> for RequestParts {
-	fn from(cli: CliArgs) -> Self {
-		// For CLI, path segments are the positional arguments verbatim
-		let path = cli.path.clone();
-
-		// Convert query HashMap to MultiMap before consuming cli
-		// We need to capture flags (keys with empty value vectors) as well
-		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
-			if values.is_empty() {
-				// Flag without value - insert with empty string to mark presence
-				params.insert(key.clone(), String::new());
-			} else {
-				for value in values {
-					params.insert(key.clone(), value.clone());
-				}
-			}
-		}
-
-		// Build URI string for compatibility
-		let uri = cli.into_path_string();
-
-		RequestParts {
-			method: HttpMethod::Get, // CLI defaults to GET-like semantics
-			parts: Parts {
-				scheme: Scheme::Cli,
-				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
-				path,
-				uri,
-				params,
-				headers: MultiMap::default(),
-				version: std::env::var("CARGO_PKG_VERSION").ok(),
-			},
-		}
-	}
-}
-
-impl From<&CliArgs> for RequestParts {
-	fn from(cli: &CliArgs) -> Self {
-		let path = cli.path.clone();
-
-		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
-			for value in values {
-				params.insert(key.clone(), value.clone());
-			}
-		}
-
-		let uri = CliArgs {
-			path: cli.path.clone(),
-			query: cli.query.clone(),
-		}
-		.into_path_string();
-
-		RequestParts {
-			method: HttpMethod::Get,
-			parts: Parts {
-				scheme: Scheme::Cli,
-				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
-				path,
-				uri,
-				params,
-				headers: MultiMap::default(),
-				version: std::env::var("CARGO_PKG_VERSION").ok(),
-			},
-		}
-	}
-}
-
-// ============================================================================
-// Conversion: RequestParts/ResponseParts -> http types
-// ============================================================================
-
 /// Convert a MultiMap back to http::HeaderMap
 fn multimap_to_header_map(
 	multimap: &MultiMap,
@@ -1018,48 +688,195 @@ fn build_query_string(params: &MultiMap) -> String {
 	parts.join("&")
 }
 
+// ============================================================================
+// Conversion: http::request::Parts -> RequestParts
+// ============================================================================
+
+impl From<http::request::Parts> for RequestParts {
+	fn from(http_parts: http::request::Parts) -> Self {
+		let uri = &http_parts.uri;
+
+		let scheme = Scheme::from(uri.scheme());
+		let authority = uri
+			.authority()
+			.map(|auth| auth.to_string())
+			.unwrap_or_default();
+		let path = split_path(uri.path());
+		let params = uri.query().map(parse_query_string).unwrap_or_default();
+		let headers = header_map_to_multimap(&http_parts.headers);
+		let version = http_ext::version_to_string(http_parts.version);
+		let method = HttpMethod::from(http_parts.method);
+
+		RequestParts {
+			method,
+			parts: Parts {
+				scheme,
+				authority,
+				path,
+				params,
+				headers,
+				version,
+			},
+		}
+	}
+}
+
+impl From<&http::request::Parts> for RequestParts {
+	fn from(http_parts: &http::request::Parts) -> Self {
+		let uri = &http_parts.uri;
+
+		let scheme = Scheme::from(uri.scheme());
+		let authority = uri
+			.authority()
+			.map(|auth| auth.to_string())
+			.unwrap_or_default();
+		let path = split_path(uri.path());
+		let params = uri.query().map(parse_query_string).unwrap_or_default();
+		let headers = header_map_to_multimap(&http_parts.headers);
+		let version = http_ext::version_to_string(http_parts.version);
+		let method = HttpMethod::from(&http_parts.method);
+
+		RequestParts {
+			method,
+			parts: Parts {
+				scheme,
+				authority,
+				path,
+				params,
+				headers,
+				version,
+			},
+		}
+	}
+}
+
+// ============================================================================
+// Conversion: http::response::Parts -> ResponseParts
+// ============================================================================
+
+impl From<http::response::Parts> for ResponseParts {
+	fn from(http_parts: http::response::Parts) -> Self {
+		let headers = header_map_to_multimap(&http_parts.headers);
+		let version = http_ext::version_to_string(http_parts.version);
+
+		ResponseParts {
+			status: http_parts.status,
+			parts: Parts {
+				scheme: Scheme::None,
+				authority: String::new(),
+				path: Vec::new(),
+				params: MultiMap::default(),
+				headers,
+				version,
+			},
+		}
+	}
+}
+
+impl From<&http::response::Parts> for ResponseParts {
+	fn from(http_parts: &http::response::Parts) -> Self {
+		let headers = header_map_to_multimap(&http_parts.headers);
+		let version = http_ext::version_to_string(http_parts.version);
+
+		ResponseParts {
+			status: http_parts.status,
+			parts: Parts {
+				scheme: Scheme::None,
+				authority: String::new(),
+				path: Vec::new(),
+				params: MultiMap::default(),
+				headers,
+				version,
+			},
+		}
+	}
+}
+
+// ============================================================================
+// Conversion: CliArgs -> RequestParts
+// ============================================================================
+
+impl From<CliArgs> for RequestParts {
+	fn from(cli: CliArgs) -> Self {
+		// For CLI, path segments are the positional arguments verbatim
+		let path = cli.path.clone();
+
+		// Convert query HashMap to MultiMap before consuming cli
+		// We need to capture flags (keys with empty value vectors) as well
+		let mut params = MultiMap::default();
+		for (key, values) in &cli.query {
+			if values.is_empty() {
+				// Flag without value - insert with empty string to mark presence
+				params.insert(key.clone(), String::new());
+			} else {
+				for value in values {
+					params.insert(key.clone(), value.clone());
+				}
+			}
+		}
+
+		RequestParts {
+			method: HttpMethod::Get, // CLI defaults to GET-like semantics
+			parts: Parts {
+				scheme: Scheme::Cli,
+				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
+				path,
+				params,
+				headers: MultiMap::default(),
+				version: std::env::var("CARGO_PKG_VERSION").unwrap_or_else(
+					|_| http_ext::DEFAULT_CLI_VERSION.to_string(),
+				),
+			},
+		}
+	}
+}
+
+impl From<&CliArgs> for RequestParts {
+	fn from(cli: &CliArgs) -> Self {
+		let path = cli.path.clone();
+
+		let mut params = MultiMap::default();
+		for (key, values) in &cli.query {
+			if values.is_empty() {
+				params.insert(key.clone(), String::new());
+			} else {
+				for value in values {
+					params.insert(key.clone(), value.clone());
+				}
+			}
+		}
+
+		RequestParts {
+			method: HttpMethod::Get,
+			parts: Parts {
+				scheme: Scheme::Cli,
+				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
+				path,
+				params,
+				headers: MultiMap::default(),
+				version: http_ext::DEFAULT_CLI_VERSION.to_string(),
+			},
+		}
+	}
+}
+
+// ============================================================================
+// Conversion: RequestParts/ResponseParts -> http types
+// ============================================================================
+
 impl TryFrom<RequestParts> for http::request::Parts {
 	type Error = http::Error;
 
 	fn try_from(parts: RequestParts) -> Result<Self, Self::Error> {
 		let method: http::Method = parts.method.into();
 
-		// Build URI - preserve original if it has scheme/authority (absolute URL)
-		// Otherwise reconstruct from path and params
-		let uri_str = {
-			let original_uri = parts.parts.uri();
-			// Check if original URI has scheme (is absolute)
-			if original_uri.contains("://") {
-				// Use original URI, but may need to update query params
-				if parts.parts.params.is_empty() {
-					original_uri.to_string()
-				} else {
-					// Strip existing query and add our params
-					let base = original_uri
-						.split_once('?')
-						.map(|(base, _)| base)
-						.unwrap_or(original_uri);
-					format!(
-						"{}?{}",
-						base,
-						build_query_string(&parts.parts.params)
-					)
-				}
-			} else {
-				// Relative URI - build from path and params
-				if parts.parts.params.is_empty() {
-					parts.parts.path_string()
-				} else {
-					format!(
-						"{}?{}",
-						parts.parts.path_string(),
-						build_query_string(&parts.parts.params)
-					)
-				}
-			}
-		};
+		// Build URI from path and params
+		let uri_str = parts.parts.uri();
 
-		let mut builder = http::Request::builder().method(method).uri(&uri_str);
+		let mut builder = http::Request::builder()
+			.method(method)
+			.uri(&uri_str)
+			.version(http_ext::parse_version(&parts.parts.version));
 
 		// Add headers
 		if let Ok(header_map) = multimap_to_header_map(&parts.parts.headers) {
@@ -1077,7 +894,9 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 	type Error = http::Error;
 
 	fn try_from(parts: ResponseParts) -> Result<Self, Self::Error> {
-		let mut builder = http::Response::builder().status(parts.status);
+		let mut builder = http::Response::builder()
+			.status(parts.status)
+			.version(http_ext::parse_version(&parts.parts.version));
 
 		// Add headers
 		if let Ok(header_map) = multimap_to_header_map(&parts.parts.headers) {
@@ -1106,6 +925,7 @@ mod test {
 		parts.path().xpect_empty();
 		parts.uri().xpect_eq("/");
 		parts.scheme().clone().xpect_eq(Scheme::None);
+		parts.version().xpect_eq("1.1");
 	}
 
 	#[test]
@@ -1130,6 +950,33 @@ mod test {
 			.get_header("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
+	}
+
+	#[test]
+	fn parts_builder_request_parts() {
+		let parts = PartsBuilder::new()
+			.path_str("/api/users")
+			.param("page", "1")
+			.build_request_parts(HttpMethod::Post);
+
+		(*parts.method()).xpect_eq(HttpMethod::Post);
+		parts
+			.path()
+			.xpect_eq(vec!["api".to_string(), "users".to_string()]);
+		parts.get_param("page").unwrap().xpect_eq("1");
+	}
+
+	#[test]
+	fn parts_builder_response_parts() {
+		let parts = PartsBuilder::new()
+			.header("content-type", "text/html")
+			.build_response_parts(StatusCode::CREATED);
+
+		parts.status().xpect_eq(StatusCode::CREATED);
+		parts
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("text/html");
 	}
 
 	#[test]
@@ -1217,6 +1064,7 @@ mod test {
 			.xpect_eq(vec!["users".to_string(), "list".to_string()]);
 		parts.get_param("limit").unwrap().xpect_eq("10");
 		parts.has_param("verbose").xpect_true();
+		parts.version().xpect_eq("0.1.0");
 	}
 
 	#[test]
@@ -1236,6 +1084,29 @@ mod test {
 
 		let empty_parts = Parts::default();
 		empty_parts.path_string().xpect_eq("/");
+	}
+
+	#[test]
+	fn query_string() {
+		let parts = PartsBuilder::new()
+			.param("limit", "10")
+			.param("offset", "20")
+			.build();
+		let query = parts.query_string();
+		// Order may vary, so check both params are present
+		(&query).xpect_contains("limit=10");
+		(&query).xpect_contains("offset=20");
+	}
+
+	#[test]
+	fn uri_construction() {
+		let parts = PartsBuilder::new()
+			.path_str("/api/users")
+			.param("page", "1")
+			.build();
+		let uri = parts.uri();
+		(&uri).xpect_starts_with("/api/users?");
+		(&uri).xpect_contains("page=1");
 	}
 
 	#[test]
@@ -1268,12 +1139,11 @@ mod test {
 
 	#[test]
 	fn request_parts_to_http() {
-		let parts = RequestPartsBuilder::new()
-			.method(HttpMethod::Post)
+		let parts = PartsBuilder::new()
 			.path_str("/api/users")
 			.param("limit", "10")
 			.header("content-type", "application/json")
-			.build();
+			.build_request_parts(HttpMethod::Post);
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
@@ -1284,10 +1154,9 @@ mod test {
 
 	#[test]
 	fn response_parts_to_http() {
-		let parts = ResponsePartsBuilder::new()
-			.status(StatusCode::CREATED)
+		let parts = PartsBuilder::new()
 			.header("content-type", "application/json")
-			.build();
+			.build_response_parts(StatusCode::CREATED);
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -1311,5 +1180,18 @@ mod test {
 			.headers
 			.insert("x-custom".to_string(), "value".to_string());
 		parts.get_header("x-custom").unwrap().xpect_eq("value");
+	}
+
+	#[test]
+	fn has_body_detection() {
+		let mut parts = Parts::default();
+		parts.has_body().xpect_false();
+
+		parts.insert_header("content-length", "5");
+		parts.has_body().xpect_true();
+
+		let mut parts2 = Parts::default();
+		parts2.insert_header("transfer-encoding", "chunked");
+		parts2.has_body().xpect_true();
 	}
 }
