@@ -8,8 +8,7 @@ use test::TestType;
 /// # Examples
 ///
 /// ```
-/// use sweet::libtest::test_ext;
-/// use sweet::libtest::test_desc_ext::TestDescExt;
+/// use sweet::prelude::*;
 ///
 /// // Create a test descriptor with should_panic
 /// let desc = test_ext::new_desc("my_test", file!())

@@ -1,7 +1,9 @@
 mod body;
 mod extractors;
+mod parts;
 mod response;
 pub use body::*;
+pub use parts::*;
 pub use response::*;
 mod request;
 pub use request::*;
