@@ -21,8 +21,7 @@ pub fn tests_bundle_borrowed(tests: &[&TestDescAndFn]) -> impl Bundle {
 pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
 	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
 	(
-		TestRoot,
-		Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
+		// Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
 		Children::spawn(SpawnIter(test_bundles.into_iter())),
 	)
 }
@@ -57,10 +56,6 @@ fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
 		OnSpawn::new(move |entity| ShouldSkip::insert(entity, &desc)),
 	)
 }
-
-
-#[derive(Component)]
-pub struct TestRoot;
 
 /// Marker component added to test entities either
 /// upon spawn or after applying a filter.

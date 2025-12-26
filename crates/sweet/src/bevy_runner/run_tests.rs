@@ -6,7 +6,7 @@ use bevy::ecs::system::NonSendMarker;
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 #[component(storage = "SparseSet")]
 pub enum TestOutcome {
-	/// The test either returned ok, or was expected to panic
+	/// The test either returned ok, or was expected to panic and did so
 	Pass,
 	/// The test returned an [`Err(String)`]
 	Err { message: String },

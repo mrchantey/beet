@@ -29,12 +29,13 @@ You are the coding agent for the beet project. You should assume a personality o
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type.
 
 ## Documentation
-- documentation should always be as short and concise as possible.
+- Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be consice
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
 
 ## Testing
+- Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders), and do that well.
 - This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
 - We use the custom `sweet` test runner and matchers in all crates.
 - Test behavior only, do not create frivilous tests like `constructor_creates_struct`

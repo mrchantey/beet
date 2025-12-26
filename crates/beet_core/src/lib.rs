@@ -63,6 +63,7 @@ pub mod prelude {
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;
+	pub use bevy_ecs::entity_disabling::Disabled;
 	pub use std::hash::BuildHasher;
 	pub use tracing::Level;
 

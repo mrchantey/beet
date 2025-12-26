@@ -2,61 +2,6 @@ use bevy::prelude::*;
 use clap::Parser;
 use std::path::Path;
 
-/// A validated glob pattern that stores the pattern as a String
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GlobPattern(String);
-
-impl GlobPattern {
-	/// Create a new GlobPattern, validating it's a valid glob pattern
-	/// Panics if the pattern is invalid
-	pub fn new(pattern: &str) -> Self {
-		// Validate it's a valid pattern
-		glob::Pattern::new(pattern).expect("Invalid glob pattern");
-		Self(pattern.to_string())
-	}
-
-	/// Get the pattern as a string slice
-	pub fn as_str(&self) -> &str { &self.0 }
-
-	/// Convert to glob::Pattern
-	/// Panics if the stored pattern is invalid (should never happen)
-	pub fn to_pattern(&self) -> glob::Pattern {
-		glob::Pattern::new(&self.0)
-			.expect("Invalid glob pattern stored in GlobPattern")
-	}
-
-	/// Convert from glob::Pattern
-	pub fn from_pattern(pattern: &glob::Pattern) -> Self {
-		Self(pattern.as_str().to_string())
-	}
-
-	pub fn matches(&self, text: &str) -> bool {
-		self.to_pattern().matches(text)
-	}
-
-	pub fn matches_path(&self, path: impl AsRef<Path>) -> bool {
-		self.to_pattern().matches_path(path.as_ref())
-	}
-}
-
-impl std::fmt::Display for GlobPattern {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-impl From<String> for GlobPattern {
-	fn from(s: String) -> Self {
-		glob::Pattern::new(&s).expect("Invalid glob pattern");
-		Self(s)
-	}
-}
-
-impl From<&str> for GlobPattern {
-	fn from(s: &str) -> Self { Self::new(s) }
-}
-
 /// glob for watch patterns
 #[derive(Debug, Default, Clone, PartialEq, Reflect, Parser)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -198,6 +143,63 @@ impl GlobFilter {
 			.any(|watch| watch.matches_path(path.as_ref()))
 	}
 }
+
+
+/// A validated glob pattern that stores the pattern as a String
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlobPattern(String);
+
+impl GlobPattern {
+	/// Create a new GlobPattern, validating it's a valid glob pattern
+	/// Panics if the pattern is invalid
+	pub fn new(pattern: &str) -> Self {
+		// Validate it's a valid pattern
+		glob::Pattern::new(pattern).expect("Invalid glob pattern");
+		Self(pattern.to_string())
+	}
+
+	/// Get the pattern as a string slice
+	pub fn as_str(&self) -> &str { &self.0 }
+
+	/// Convert to glob::Pattern
+	/// Panics if the stored pattern is invalid (should never happen)
+	pub fn to_pattern(&self) -> glob::Pattern {
+		glob::Pattern::new(&self.0)
+			.expect("Invalid glob pattern stored in GlobPattern")
+	}
+
+	/// Convert from glob::Pattern
+	pub fn from_pattern(pattern: &glob::Pattern) -> Self {
+		Self(pattern.as_str().to_string())
+	}
+
+	pub fn matches(&self, text: &str) -> bool {
+		self.to_pattern().matches(text)
+	}
+
+	pub fn matches_path(&self, path: impl AsRef<Path>) -> bool {
+		self.to_pattern().matches_path(path.as_ref())
+	}
+}
+
+impl std::fmt::Display for GlobPattern {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+impl From<String> for GlobPattern {
+	fn from(s: String) -> Self {
+		glob::Pattern::new(&s).expect("Invalid glob pattern");
+		Self(s)
+	}
+}
+
+impl From<&str> for GlobPattern {
+	fn from(s: &str) -> Self { Self::new(s) }
+}
+
 
 #[cfg(test)]
 mod test {
