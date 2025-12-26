@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use send_wrapper::SendWrapper;
 use test::TestDesc;
 use test::TestDescAndFn;
