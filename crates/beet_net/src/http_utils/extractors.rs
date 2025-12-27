@@ -1,3 +1,5 @@
+//! Extractors are types for declaratively converting parts of an exchange
+//! into concrete types, for example [`QueryParams`]
 use crate::prelude::*;
 #[allow(unused)]
 use beet_core::prelude::*;
