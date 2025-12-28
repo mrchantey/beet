@@ -10,6 +10,8 @@ use uuid::Uuid;
 /// guaranteed to be cleaned up when they go out of scope. The directory name
 /// is generated using a UUID v4 to ensure uniqueness and avoid collisions.
 ///
+/// This type is not [`Clone`] as it removes the underlying directory on drop.
+///
 /// # Example
 ///
 /// ```
@@ -18,7 +20,7 @@ use uuid::Uuid;
 /// // Create a temporary directory in the system temp folder
 /// let temp = TempDir::new().unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TempDir {
 	/// The path to the temporary directory
 	path: AbsPathBuf,

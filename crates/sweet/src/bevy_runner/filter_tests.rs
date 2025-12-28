@@ -4,6 +4,9 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 
+
+/// Allow filtering tests by either named params or positional arguments,
+/// so `test foobar.ts` is the same as `test --include foober.ts`
 #[derive(Reflect)]
 pub struct FilterParams {
 	filter: GlobFilter,
