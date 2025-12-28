@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use bevy::reflect::Typed;
 
 pub trait ActionExchangePair {
 	fn get_action(&self) -> Entity;
@@ -42,6 +43,22 @@ impl RouteQuery<'_, '_> {
 		self.requests.get(ev.get_exchange())?.method().xok()
 	}
 
+	pub fn params<T: 'static + Send + Sync + FromReflect + Typed>(
+		&self,
+		exchange: Entity,
+	) -> Result<T> {
+		self.requests.get(exchange)?.params().parse::<T>()
+	}
+
+	pub fn path_match(
+		&self,
+		ev: &impl ActionExchangePair,
+	) -> Result<PathMatch> {
+		let path = self.path(ev)?;
+		let pattern = PathPattern::collect(ev.get_action(), &self)?;
+		pattern.parse_path(&path)?.xok()
+	}
+
 	pub fn dyn_segment(
 		&mut self,
 		ev: &impl ActionExchangePair,
@@ -52,14 +69,5 @@ impl RouteQuery<'_, '_> {
 			.get(key)
 			.map(|key| key.clone())
 			.ok_or_else(|| bevyhow!("key not found: {}", key))
-	}
-
-	pub fn path_match(
-		&self,
-		ev: &impl ActionExchangePair,
-	) -> Result<PathMatch> {
-		let path = self.path(ev)?;
-		let pattern = PathPattern::collect(ev.get_action(), &self)?;
-		pattern.parse_path(&path)?.xok()
 	}
 }

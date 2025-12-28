@@ -29,7 +29,7 @@ fn handler(
 	mut visit_counter: ResMut<VisitCounter>,
 ) -> Result {
 	let request = requests.get(ev.event_target())?;
-	let path = request.uri.path();
+	let path = request.path();
 	// our diy router :)
 	if path != "/" {
 		commands
