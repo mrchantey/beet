@@ -52,6 +52,8 @@ tokens = [
 beet_core_macros.workspace = true
 bevy.workspace = true
 
+#💡 utils
+multimap.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 rapidhash.workspace = true

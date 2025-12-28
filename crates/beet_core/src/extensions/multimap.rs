@@ -40,7 +40,7 @@
 //! assert!(params.limit.is_none());
 //! ```
 
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::reflect::DynamicStruct;
 use bevy::reflect::DynamicTuple;
 use bevy::reflect::DynamicTupleStruct;
@@ -54,21 +54,17 @@ use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use std::any::TypeId;
 
-type MultiMap = multimap::MultiMap<String, String, FixedHasher>;
+pub type MultiMap = multimap::MultiMap<String, String, FixedHasher>;
+
 
 /// Trait for parsing a `MultiMap` into a concrete reflected type.
-pub trait ReflectMultiMap {
+#[extend::ext]
+pub impl MultiMap {
 	/// Parse the multimap into a concrete type `T`.
 	///
 	/// The type `T` must implement `Reflect`, `FromReflect`, and `Typed`.
 	/// Nested structs are flattened, meaning all field names must be unique
 	/// across the entire type hierarchy.
-	fn parse<T>(&self) -> Result<T>
-	where
-		T: 'static + Send + Sync + FromReflect + Typed;
-}
-
-impl ReflectMultiMap for MultiMap {
 	fn parse<T>(&self) -> Result<T>
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,

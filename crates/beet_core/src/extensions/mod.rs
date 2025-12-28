@@ -2,10 +2,12 @@
 mod value;
 #[cfg(feature = "serde")]
 pub use value::*;
+mod multimap;
 mod vec;
 pub use vec::*;
 mod exit_status;
 pub use exit_status::*;
+pub use multimap::*;
 mod duration;
 pub use self::duration::*;
 mod option;

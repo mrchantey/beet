@@ -28,7 +28,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-type MultiMap = multimap::MultiMap<String, String, FixedHasher>;
 
 /// The transport scheme used for a request or response.
 ///
