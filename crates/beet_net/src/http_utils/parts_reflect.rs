@@ -10,7 +10,9 @@
 //! - `String` - direct string value
 //! - `Option<String>` - `None` if key is missing
 //! - `Vec<String>` - all values for a key
-//! - Nested structs/tuple structs (fields are flattened)
+//! - Newtype wrappers (single-field structs/tuple structs) - transparent, use parent field name
+//! - Nested multi-field structs/tuple structs - fields are flattened
+//! - `Vec<NewType>` - vectors of newtype wrappers
 //!
 //! # Example
 //!
@@ -44,7 +46,7 @@ use bevy::reflect::DynamicTuple;
 use bevy::reflect::DynamicTupleStruct;
 use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
-use bevy::reflect::ReflectKind;
+
 use bevy::reflect::StructInfo;
 use bevy::reflect::TupleInfo;
 use bevy::reflect::TupleStructInfo;
@@ -72,7 +74,7 @@ impl ReflectMultiMap for MultiMap {
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
 		let type_info = T::type_info();
-		let dynamic = build_dynamic_from_type_info(self, type_info)?;
+		let dynamic = build_dynamic_from_type_info(self, type_info, None)?;
 		T::from_reflect(dynamic.as_partial_reflect()).ok_or_else(|| {
 			bevyhow!(
 				"failed to convert dynamic type to {}",
@@ -86,11 +88,14 @@ impl ReflectMultiMap for MultiMap {
 fn build_dynamic_from_type_info(
 	map: &MultiMap,
 	type_info: &TypeInfo,
+	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
 	match type_info {
 		TypeInfo::Struct(info) => build_dynamic_struct(map, info),
-		TypeInfo::TupleStruct(info) => build_dynamic_tuple_struct(map, info),
-		TypeInfo::Tuple(info) => build_dynamic_tuple(map, info),
+		TypeInfo::TupleStruct(info) => {
+			build_dynamic_tuple_struct(map, info, field_prefix)
+		}
+		TypeInfo::Tuple(info) => build_dynamic_tuple(map, info, field_prefix),
 		other => {
 			bevybail!(
 				"unsupported type kind for ReflectMultiMap: {}\nSupported types are Struct, TupleStruct and Tuple",
@@ -127,6 +132,7 @@ fn build_dynamic_struct(
 fn build_dynamic_tuple_struct(
 	map: &MultiMap,
 	info: &TupleStructInfo,
+	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
 	let mut dynamic = DynamicTupleStruct::default();
 
@@ -134,8 +140,12 @@ fn build_dynamic_tuple_struct(
 		let field = info.field_at(field_idx).ok_or_else(|| {
 			bevyhow!("tuple struct field at index {} not found", field_idx)
 		})?;
-		// tuple struct fields are accessed by index as string
-		let field_name = field_idx.to_string();
+		// tuple struct fields are accessed by index as string, unless we have a prefix
+		let field_name = if let Some(prefix) = field_prefix {
+			prefix.to_string()
+		} else {
+			field_idx.to_string()
+		};
 		let field_type_id = field.type_id();
 		let field_type_info = field.type_info();
 
@@ -155,6 +165,7 @@ fn build_dynamic_tuple_struct(
 fn build_dynamic_tuple(
 	map: &MultiMap,
 	info: &TupleInfo,
+	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
 	let mut dynamic = DynamicTuple::default();
 
@@ -162,8 +173,12 @@ fn build_dynamic_tuple(
 		let field = info.field_at(field_idx).ok_or_else(|| {
 			bevyhow!("tuple field at index {} not found", field_idx)
 		})?;
-		// tuple fields are accessed by index as string
-		let field_name = field_idx.to_string();
+		// tuple fields are accessed by index as string, unless we have a prefix
+		let field_name = if let Some(prefix) = field_prefix {
+			prefix.to_string()
+		} else {
+			field_idx.to_string()
+		};
 		let field_type_id = field.type_id();
 		let field_type_info = field.type_info();
 
@@ -207,13 +222,54 @@ fn build_field_value(
 		return Ok(Box::new(value));
 	}
 
-	// Handle nested struct types by flattening
+	// Handle Vec of newtype wrappers by checking if it's a List type
 	if let Some(type_info) = field_type_info {
-		match type_info.kind() {
-			ReflectKind::Struct
-			| ReflectKind::TupleStruct
-			| ReflectKind::Tuple => {
-				return build_dynamic_from_type_info(map, type_info);
+		if let TypeInfo::List(list_info) = type_info {
+			// check if the item type is a single-field tuple struct or struct
+			if let Some(item_type_info) = list_info.item_info() {
+				let is_newtype = match item_type_info {
+					TypeInfo::TupleStruct(ts) => ts.field_len() == 1,
+					TypeInfo::Struct(s) => s.field_len() == 1,
+					_ => false,
+				};
+
+				if is_newtype {
+					return parse_vec_newtype_field(
+						map,
+						field_name,
+						item_type_info,
+					);
+				}
+			}
+		}
+	}
+
+	// Handle nested struct types
+	if let Some(type_info) = field_type_info {
+		match type_info {
+			TypeInfo::Struct(struct_info) => {
+				return build_dynamic_struct(map, struct_info);
+			}
+			TypeInfo::TupleStruct(tuple_struct_info) => {
+				// single-field tuple structs (newtypes) use parent field name
+				if tuple_struct_info.field_len() == 1 {
+					return build_dynamic_tuple_struct(
+						map,
+						tuple_struct_info,
+						Some(field_name),
+					);
+				} else {
+					// multi-field tuple structs are flattened
+					return build_dynamic_tuple_struct(
+						map,
+						tuple_struct_info,
+						None,
+					);
+				}
+			}
+			TypeInfo::Tuple(_) => {
+				// tuples are always flattened
+				return build_dynamic_from_type_info(map, type_info, None);
 			}
 			_ => {}
 		}
@@ -262,6 +318,31 @@ fn parse_vec_string_field(map: &MultiMap, field_name: &str) -> Vec<String> {
 	map.get_vec(field_name)
 		.map(|values| values.clone())
 		.unwrap_or_default()
+}
+
+/// Parse a Vec of newtype wrappers from the multimap.
+fn parse_vec_newtype_field(
+	map: &MultiMap,
+	field_name: &str,
+	item_type_info: &TypeInfo,
+) -> Result<Box<dyn PartialReflect>> {
+	use bevy::reflect::DynamicList;
+
+	let values = map.get_vec(field_name).map(|v| v.as_slice()).unwrap_or(&[]);
+	let mut dynamic_list = DynamicList::default();
+
+	for value in values {
+		// create a temporary map with the value
+		let mut temp_map = MultiMap::default();
+		temp_map.insert("0".to_string(), value.clone());
+
+		// build the newtype wrapper using index "0"
+		let item =
+			build_dynamic_from_type_info(&temp_map, item_type_info, Some("0"))?;
+		dynamic_list.push_box(item);
+	}
+
+	Ok(Box::new(dynamic_list))
 }
 
 #[cfg(test)]
@@ -517,5 +598,79 @@ mod test {
 		result
 			.vec_field
 			.xpect_eq(vec!["one".to_string(), "two".to_string()]);
+	}
+
+	#[derive(Debug, Default, Reflect, PartialEq)]
+	struct Foo(pub String);
+
+	#[derive(Debug, Default, Reflect, PartialEq)]
+	struct Bar(pub bool);
+
+	#[derive(Debug, Default, Reflect, PartialEq)]
+	struct Bazz(pub Vec<String>);
+
+	#[derive(Debug, Default, Reflect, PartialEq)]
+	struct ParamsWithNewtypes {
+		foo: Foo,
+		bar: Vec<Bar>,
+		bazz: Bazz,
+	}
+
+	#[test]
+	fn parses_newtype_tuple_struct_fields() {
+		let mut map = MultiMap::default();
+		map.insert("foo".into(), "hello".into());
+		map.insert("bar".into(), "true".into());
+		map.insert("bar".into(), "false".into());
+		map.insert("bazz".into(), "a".into());
+		map.insert("bazz".into(), "b".into());
+
+		let result: ParamsWithNewtypes = map.parse().unwrap();
+		result.foo.0.xpect_eq("hello".to_string());
+		result.bar.len().xpect_eq(2);
+		result.bar[0].0.xpect_true();
+		result.bar[1].0.xpect_false();
+		result
+			.bazz
+			.0
+			.xpect_eq(vec!["a".to_string(), "b".to_string()]);
+	}
+
+	#[test]
+	fn parses_exact_user_example() {
+		#[derive(Debug, Default, Reflect, PartialEq)]
+		struct UserFoo(pub String);
+		#[derive(Debug, Default, Reflect, PartialEq)]
+		struct UserBar(pub bool);
+		#[derive(Debug, Default, Reflect, PartialEq)]
+		struct UserBazz(pub Vec<String>);
+
+		#[derive(Debug, Default, Reflect, PartialEq)]
+		struct UserParams {
+			foo: UserFoo,
+			bar: Vec<UserBar>,
+			bazz: UserBazz,
+		}
+
+		let mut map = MultiMap::default();
+		map.insert("foo".into(), "test_value".into());
+		map.insert("bar".into(), "true".into());
+		map.insert("bar".into(), "false".into());
+		map.insert("bar".into(), "true".into());
+		map.insert("bazz".into(), "x".into());
+		map.insert("bazz".into(), "y".into());
+		map.insert("bazz".into(), "z".into());
+
+		let result: UserParams = map.parse().unwrap();
+		result.foo.0.xpect_eq("test_value".to_string());
+		result.bar.len().xpect_eq(3);
+		result.bar[0].0.xpect_true();
+		result.bar[1].0.xpect_false();
+		result.bar[2].0.xpect_true();
+		result.bazz.0.xpect_eq(vec![
+			"x".to_string(),
+			"y".to_string(),
+			"z".to_string(),
+		]);
 	}
 }
