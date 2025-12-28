@@ -1,9 +1,10 @@
-//! Reflection-based parsing of MultiMap into concrete types.
+//! Generic multimap and reflection-based parsing into concrete types.
 //!
-//! This module provides the [`ReflectMultiMap`] trait which enables converting
+//! This module provides [`MultiMap`], a generic map that stores multiple values per key,
+//! and the [`MultiMapReflectExt`] trait which enables converting
 //! `MultiMap<String, String>` data into concrete Rust types using bevy_reflect.
 //!
-//! # Supported Types
+//! # Supported Types for Reflection Parsing
 //!
 //! The target type must derive `Reflect` and `FromReflect`. Field types can be:
 //! - `bool` - parsed from "true"/"false" strings
@@ -46,20 +47,128 @@ use bevy::reflect::DynamicTuple;
 use bevy::reflect::DynamicTupleStruct;
 use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
-
 use bevy::reflect::StructInfo;
 use bevy::reflect::TupleInfo;
 use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use std::any::TypeId;
+use std::borrow::Borrow;
+use std::hash::BuildHasher;
+use std::hash::Hash;
 
-pub type MultiMap = multimap::MultiMap<String, String, FixedHasher>;
+/// A multimap that stores multiple values per key.
+///
+/// Unlike a standard `HashMap`, this allows multiple values to be associated
+/// with the same key. Values are stored in insertion order per key.
+#[derive(Debug, Clone)]
+pub struct MultiMap<K, V, S = FixedHasher> {
+	inner: HashMap<K, Vec<V>, S>,
+}
 
+/// Type alias for the common case of string keys and values.
+pub type StringMultiMap = MultiMap<String, String>;
 
-/// Trait for parsing a `MultiMap` into a concrete reflected type.
-#[extend::ext]
-pub impl MultiMap {
+impl<K, V, S: Default> Default for MultiMap<K, V, S> {
+	fn default() -> Self {
+		Self {
+			inner: HashMap::default(),
+		}
+	}
+}
+
+impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
+	for MultiMap<K, V, S>
+{
+	fn eq(&self, other: &Self) -> bool { self.inner == other.inner }
+}
+
+impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
+
+impl<K, V, S> MultiMap<K, V, S>
+where
+	K: Eq + Hash,
+	S: BuildHasher + Default,
+{
+	/// Create a new empty multimap.
+	pub fn new() -> Self { Self::default() }
+
+	/// Insert a key with no values.
+	/// If the key already exists, this is a no-op.
+	pub fn insert_key(&mut self, key: K) { self.inner.entry(key).or_default(); }
+
+	/// Insert a value for a key.
+	/// If the key already exists, the value is appended to the existing values.
+	pub fn insert(&mut self, key: K, value: V) {
+		self.inner.entry(key).or_default().push(value);
+	}
+
+	/// Get the first value for a key.
+	pub fn get<Q>(&self, key: &Q) -> Option<&V>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized,
+	{
+		self.inner.get(key).and_then(|values| values.first())
+	}
+
+	/// Get all values for a key.
+	pub fn get_vec<Q>(&self, key: &Q) -> Option<&Vec<V>>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized,
+	{
+		self.inner.get(key)
+	}
+
+	/// Get a mutable reference to all values for a key.
+	pub fn get_vec_mut<Q>(&mut self, key: &Q) -> Option<&mut Vec<V>>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized,
+	{
+		self.inner.get_mut(key)
+	}
+
+	/// Check if key exists.
+	pub fn contains_key<Q>(&self, key: &Q) -> bool
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized,
+	{
+		self.inner.contains_key(key)
+	}
+
+	/// Returns true if the multimap contains no keys.
+	pub fn is_empty(&self) -> bool { self.inner.is_empty() }
+
+	/// Returns the number of keys in the multimap.
+	pub fn len(&self) -> usize { self.inner.len() }
+
+	/// Iterate over all key-values pairs.
+	pub fn iter_all(&self) -> impl Iterator<Item = (&K, &Vec<V>)> {
+		self.inner.iter()
+	}
+
+	/// Iterate over all keys.
+	pub fn keys(&self) -> impl Iterator<Item = &K> { self.inner.keys() }
+
+	/// Remove a key and all its values.
+	pub fn remove<Q>(&mut self, key: &Q) -> Option<Vec<V>>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized,
+	{
+		self.inner.remove(key)
+	}
+
+	/// Clear all entries.
+	pub fn clear(&mut self) { self.inner.clear(); }
+}
+
+/// Trait for parsing a `MultiMap<String, String>` into a concrete reflected type.
+#[extend::ext(name=MultiMapReflectExt)]
+pub impl MultiMap<String, String> {
 	/// Parse the multimap into a concrete type `T`.
 	///
 	/// The type `T` must implement `Reflect`, `FromReflect`, and `Typed`.
@@ -82,7 +191,7 @@ pub impl MultiMap {
 
 /// Build a dynamic reflected value from type info and a multimap.
 fn build_dynamic_from_type_info(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	type_info: &TypeInfo,
 	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
@@ -103,7 +212,7 @@ fn build_dynamic_from_type_info(
 
 /// Build a DynamicStruct from a multimap using struct field info.
 fn build_dynamic_struct(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	info: &StructInfo,
 ) -> Result<Box<dyn PartialReflect>> {
 	let mut dynamic = DynamicStruct::default();
@@ -126,7 +235,7 @@ fn build_dynamic_struct(
 
 /// Build a DynamicTupleStruct from a multimap using tuple struct field info.
 fn build_dynamic_tuple_struct(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	info: &TupleStructInfo,
 	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
@@ -157,7 +266,7 @@ fn build_dynamic_tuple_struct(
 
 /// Build a DynamicTuple from a multimap using tuple field info.
 fn build_dynamic_tuple(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	info: &TupleInfo,
 	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
@@ -190,7 +299,7 @@ fn build_dynamic_tuple(
 
 /// Build a field value from the multimap based on the field's type.
 fn build_field_value(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	field_name: &str,
 	field_type_id: TypeId,
 	field_type_info: Option<&TypeInfo>,
@@ -222,8 +331,12 @@ fn build_field_value(
 			// check if the item type is a single-field tuple struct or struct
 			if let Some(item_type_info) = list_info.item_info() {
 				let is_newtype = match item_type_info {
-					TypeInfo::TupleStruct(ts) => ts.field_len() == 1,
-					TypeInfo::Struct(s) => s.field_len() == 1,
+					TypeInfo::TupleStruct(tuple_struct) => {
+						tuple_struct.field_len() == 1
+					}
+					TypeInfo::Struct(struct_info) => {
+						struct_info.field_len() == 1
+					}
 					_ => false,
 				};
 
@@ -267,7 +380,10 @@ fn build_field_value(
 }
 
 /// Parse a bool field from the multimap.
-fn parse_bool_field(map: &MultiMap, field_name: &str) -> Result<bool> {
+fn parse_bool_field(
+	map: &MultiMap<String, String>,
+	field_name: &str,
+) -> Result<bool> {
 	match map.get_vec(field_name) {
 		Some(values) if values.is_empty() => Ok(true), // key exists but no values (flag-style)
 		Some(values) => match values[0].to_lowercase().as_str() {
@@ -284,7 +400,10 @@ fn parse_bool_field(map: &MultiMap, field_name: &str) -> Result<bool> {
 }
 
 /// Parse a required String field from the multimap.
-fn parse_string_field(map: &MultiMap, field_name: &str) -> Result<String> {
+fn parse_string_field(
+	map: &MultiMap<String, String>,
+	field_name: &str,
+) -> Result<String> {
 	map.get(field_name)
 		.cloned()
 		.ok_or_else(|| bevyhow!("missing required field '{}'", field_name))
@@ -292,22 +411,23 @@ fn parse_string_field(map: &MultiMap, field_name: &str) -> Result<String> {
 
 /// Parse an optional String field from the multimap.
 fn parse_option_string_field(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	field_name: &str,
 ) -> Option<String> {
 	map.get(field_name).cloned()
 }
 
 /// Parse a Vec<String> field from the multimap (all values for the key).
-fn parse_vec_string_field(map: &MultiMap, field_name: &str) -> Vec<String> {
-	map.get_vec(field_name)
-		.map(|values| values.clone())
-		.unwrap_or_default()
+fn parse_vec_string_field(
+	map: &MultiMap<String, String>,
+	field_name: &str,
+) -> Vec<String> {
+	map.get_vec(field_name).cloned().unwrap_or_default()
 }
 
 /// Parse a Vec of newtype wrappers from the multimap.
 fn parse_vec_newtype_field(
-	map: &MultiMap,
+	map: &MultiMap<String, String>,
 	field_name: &str,
 	item_type_info: &TypeInfo,
 ) -> Result<Box<dyn PartialReflect>> {
@@ -318,7 +438,7 @@ fn parse_vec_newtype_field(
 
 	for value in values {
 		// create a temporary map with the value
-		let mut temp_map = MultiMap::default();
+		let mut temp_map = MultiMap::<String, String>::default();
 		temp_map.insert("0".to_string(), value.clone());
 
 		// build the newtype wrapper using index "0"
@@ -336,7 +456,7 @@ mod test {
 	use bevy::reflect::Reflect;
 	use sweet::prelude::*;
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct SimpleStruct {
 		name: String,
 		verbose: bool,
@@ -344,9 +464,9 @@ mod test {
 
 	#[test]
 	fn parses_simple_struct() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "true".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
+		map.insert("verbose".to_string(), "true".to_string());
 
 		let result: SimpleStruct = map.parse().unwrap();
 		result.name.xpect_eq("test".to_string());
@@ -355,38 +475,35 @@ mod test {
 
 	#[test]
 	fn parses_bool_variants() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "1".into());
+		// true variants
+		for val in ["true", "1", "yes", "on"] {
+			let mut map = MultiMap::new();
+			map.insert("name".to_string(), "x".to_string());
+			map.insert("verbose".to_string(), val.to_string());
+			let result: SimpleStruct = map.parse().unwrap();
+			result.verbose.xpect_true();
+		}
 
-		let result: SimpleStruct = map.parse().unwrap();
-		result.verbose.xpect_true();
-
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "yes".into());
-
-		let result: SimpleStruct = map.parse().unwrap();
-		result.verbose.xpect_true();
-
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "false".into());
-
-		let result: SimpleStruct = map.parse().unwrap();
-		result.verbose.xpect_false();
+		// false variants
+		for val in ["false", "0", "no", "off"] {
+			let mut map = MultiMap::new();
+			map.insert("name".to_string(), "x".to_string());
+			map.insert("verbose".to_string(), val.to_string());
+			let result: SimpleStruct = map.parse().unwrap();
+			result.verbose.xpect_false();
+		}
 	}
 
 	#[test]
 	fn missing_bool_defaults_false() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
 
 		let result: SimpleStruct = map.parse().unwrap();
 		result.verbose.xpect_false();
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct WithOptional {
 		required: String,
 		optional: Option<String>,
@@ -394,9 +511,9 @@ mod test {
 
 	#[test]
 	fn parses_optional_present() {
-		let mut map = MultiMap::default();
-		map.insert("required".into(), "req".into());
-		map.insert("optional".into(), "opt".into());
+		let mut map = MultiMap::new();
+		map.insert("required".to_string(), "req".to_string());
+		map.insert("optional".to_string(), "opt".to_string());
 
 		let result: WithOptional = map.parse().unwrap();
 		result.required.xpect_eq("req".to_string());
@@ -405,15 +522,15 @@ mod test {
 
 	#[test]
 	fn parses_optional_missing() {
-		let mut map = MultiMap::default();
-		map.insert("required".into(), "req".into());
+		let mut map = MultiMap::new();
+		map.insert("required".to_string(), "req".to_string());
 
 		let result: WithOptional = map.parse().unwrap();
 		result.required.xpect_eq("req".to_string());
-		result.optional.xpect_none();
+		result.optional.xpect_eq(None);
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct WithVec {
 		name: String,
 		tags: Vec<String>,
@@ -421,11 +538,11 @@ mod test {
 
 	#[test]
 	fn parses_vec_multiple_values() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("tags".into(), "a".into());
-		map.insert("tags".into(), "b".into());
-		map.insert("tags".into(), "c".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
+		map.insert("tags".to_string(), "a".to_string());
+		map.insert("tags".to_string(), "b".to_string());
+		map.insert("tags".to_string(), "c".to_string());
 
 		let result: WithVec = map.parse().unwrap();
 		result.name.xpect_eq("test".to_string());
@@ -438,19 +555,19 @@ mod test {
 
 	#[test]
 	fn parses_vec_empty() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
 
 		let result: WithVec = map.parse().unwrap();
-		result.tags.xpect_empty();
+		result.tags.xpect_eq(Vec::<String>::new());
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Inner {
 		inner_field: String,
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct WithNested {
 		outer_field: String,
 		nested: Inner,
@@ -458,9 +575,9 @@ mod test {
 
 	#[test]
 	fn parses_nested_struct_flattened() {
-		let mut map = MultiMap::default();
-		map.insert("outer_field".into(), "outer".into());
-		map.insert("inner_field".into(), "inner".into());
+		let mut map = MultiMap::new();
+		map.insert("outer_field".to_string(), "outer".to_string());
+		map.insert("inner_field".to_string(), "inner".to_string());
 
 		let result: WithNested = map.parse().unwrap();
 		result.outer_field.xpect_eq("outer".to_string());
@@ -469,26 +586,26 @@ mod test {
 
 	#[test]
 	fn errors_on_missing_required_field() {
-		let map = MultiMap::default();
-		let result = map.parse::<SimpleStruct>();
+		let map = MultiMap::<String, String>::new();
+		let result: Result<SimpleStruct> = map.parse();
 		result.xpect_err();
 	}
 
 	#[test]
 	fn errors_on_invalid_bool() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "maybe".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
+		map.insert("verbose".to_string(), "invalid".to_string());
 
-		let result = map.parse::<SimpleStruct>();
+		let result: Result<SimpleStruct> = map.parse();
 		result.xpect_err();
 	}
 
 	#[test]
 	fn empty_string_bool_is_true() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert("verbose".into(), "".into());
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
+		map.insert("verbose".to_string(), "".to_string());
 
 		let result: SimpleStruct = map.parse().unwrap();
 		result.verbose.xpect_true();
@@ -496,9 +613,9 @@ mod test {
 
 	#[test]
 	fn empty_value_list_bool_is_true() {
-		let mut map = MultiMap::default();
-		map.insert("name".into(), "test".into());
-		map.insert_many("verbose".into(), vec![]);
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "test".to_string());
+		map.insert_key("verbose".to_string());
 
 		let result: SimpleStruct = map.parse().unwrap();
 		result.verbose.xpect_true();
@@ -506,27 +623,27 @@ mod test {
 
 	#[test]
 	fn parses_tuple() {
-		let mut map = MultiMap::default();
-		map.insert("0".into(), "first".into());
-		map.insert("1".into(), "true".into());
+		let mut map = MultiMap::new();
+		map.insert("0".to_string(), "first".to_string());
+		map.insert("1".to_string(), "second".to_string());
 
-		let result: (String, bool) = map.parse().unwrap();
+		let result: (String, String) = map.parse().unwrap();
 		result.0.xpect_eq("first".to_string());
-		result.1.xpect_true();
+		result.1.xpect_eq("second".to_string());
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Level2 {
 		deep_field: String,
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Level1 {
-		mid_field: bool,
+		mid_field: String,
 		level2: Level2,
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Level0 {
 		top_field: String,
 		level1: Level1,
@@ -534,18 +651,18 @@ mod test {
 
 	#[test]
 	fn parses_deeply_nested_struct() {
-		let mut map = MultiMap::default();
-		map.insert("top_field".into(), "top".into());
-		map.insert("mid_field".into(), "true".into());
-		map.insert("deep_field".into(), "deep".into());
+		let mut map = MultiMap::new();
+		map.insert("top_field".to_string(), "top".to_string());
+		map.insert("mid_field".to_string(), "mid".to_string());
+		map.insert("deep_field".to_string(), "deep".to_string());
 
 		let result: Level0 = map.parse().unwrap();
 		result.top_field.xpect_eq("top".to_string());
-		result.level1.mid_field.xpect_true();
+		result.level1.mid_field.xpect_eq("mid".to_string());
 		result.level1.level2.deep_field.xpect_eq("deep".to_string());
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct AllFieldTypes {
 		string_field: String,
 		bool_field: bool,
@@ -555,12 +672,12 @@ mod test {
 
 	#[test]
 	fn parses_all_field_types_together() {
-		let mut map = MultiMap::default();
-		map.insert("string_field".into(), "hello".into());
-		map.insert("bool_field".into(), "on".into());
-		map.insert("optional_field".into(), "present".into());
-		map.insert("vec_field".into(), "one".into());
-		map.insert("vec_field".into(), "two".into());
+		let mut map = MultiMap::new();
+		map.insert("string_field".to_string(), "hello".to_string());
+		map.insert("bool_field".to_string(), "true".to_string());
+		map.insert("optional_field".to_string(), "present".to_string());
+		map.insert("vec_field".to_string(), "a".to_string());
+		map.insert("vec_field".to_string(), "b".to_string());
 
 		let result: AllFieldTypes = map.parse().unwrap();
 		result.string_field.xpect_eq("hello".to_string());
@@ -568,19 +685,19 @@ mod test {
 		result.optional_field.xpect_eq(Some("present".to_string()));
 		result
 			.vec_field
-			.xpect_eq(vec!["one".to_string(), "two".to_string()]);
+			.xpect_eq(vec!["a".to_string(), "b".to_string()]);
 	}
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Foo(pub String);
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Bar(pub bool);
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct Bazz(pub Vec<String>);
 
-	#[derive(Debug, Default, Reflect, PartialEq)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
 	struct ParamsWithNewtypes {
 		foo: Foo,
 		bar: Vec<Bar>,
@@ -589,12 +706,12 @@ mod test {
 
 	#[test]
 	fn parses_newtype_tuple_struct_fields() {
-		let mut map = MultiMap::default();
-		map.insert("foo".into(), "hello".into());
-		map.insert("bar".into(), "true".into());
-		map.insert("bar".into(), "false".into());
-		map.insert("bazz".into(), "a".into());
-		map.insert("bazz".into(), "b".into());
+		let mut map = MultiMap::new();
+		map.insert("foo".to_string(), "hello".to_string());
+		map.insert("bar".to_string(), "true".to_string());
+		map.insert("bar".to_string(), "false".to_string());
+		map.insert("bazz".to_string(), "a".to_string());
+		map.insert("bazz".to_string(), "b".to_string());
 
 		let result: ParamsWithNewtypes = map.parse().unwrap();
 		result.foo.0.xpect_eq("hello".to_string());
@@ -609,28 +726,30 @@ mod test {
 
 	#[test]
 	fn parses_exact_user_example() {
-		#[derive(Debug, Default, Reflect, PartialEq)]
+		#[derive(Debug, Reflect, Default, PartialEq)]
 		struct UserFoo(pub String);
-		#[derive(Debug, Default, Reflect, PartialEq)]
+
+		#[derive(Debug, Reflect, Default, PartialEq)]
 		struct UserBar(pub bool);
-		#[derive(Debug, Default, Reflect, PartialEq)]
+
+		#[derive(Debug, Reflect, Default, PartialEq)]
 		struct UserBazz(pub Vec<String>);
 
-		#[derive(Debug, Default, Reflect, PartialEq)]
+		#[derive(Debug, Reflect, Default, PartialEq)]
 		struct UserParams {
 			foo: UserFoo,
 			bar: Vec<UserBar>,
 			bazz: UserBazz,
 		}
 
-		let mut map = MultiMap::default();
-		map.insert("foo".into(), "test_value".into());
-		map.insert("bar".into(), "true".into());
-		map.insert("bar".into(), "false".into());
-		map.insert("bar".into(), "true".into());
-		map.insert("bazz".into(), "x".into());
-		map.insert("bazz".into(), "y".into());
-		map.insert("bazz".into(), "z".into());
+		let mut map = MultiMap::new();
+		map.insert("foo".to_string(), "test_value".to_string());
+		map.insert("bar".to_string(), "true".to_string());
+		map.insert("bar".to_string(), "false".to_string());
+		map.insert("bar".to_string(), "true".to_string());
+		map.insert("bazz".to_string(), "x".to_string());
+		map.insert("bazz".to_string(), "y".to_string());
+		map.insert("bazz".to_string(), "z".to_string());
 
 		let result: UserParams = map.parse().unwrap();
 		result.foo.0.xpect_eq("test_value".to_string());
@@ -643,5 +762,47 @@ mod test {
 			"y".to_string(),
 			"z".to_string(),
 		]);
+	}
+
+	#[test]
+	fn insert_key_creates_empty_entry() {
+		let mut map = MultiMap::<String, String>::new();
+		map.insert_key("flag".to_string());
+
+		map.contains_key("flag").xpect_true();
+		map.get_vec("flag").xpect_eq(Some(&Vec::<String>::new()));
+	}
+
+	#[test]
+	fn insert_key_noop_if_exists() {
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("key".to_string(), "value".to_string());
+		map.insert_key("key".to_string());
+
+		// Should not clear existing values
+		map.get_vec("key")
+			.xpect_eq(Some(&vec!["value".to_string()]));
+	}
+
+	#[test]
+	fn multimap_basic_operations() {
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("a".to_string(), "1".to_string());
+		map.insert("a".to_string(), "2".to_string());
+		map.insert("b".to_string(), "3".to_string());
+
+		map.len().xpect_eq(2);
+		map.is_empty().xpect_false();
+		map.get("a").xpect_eq(Some(&"1".to_string()));
+		map.get_vec("a")
+			.xpect_eq(Some(&vec!["1".to_string(), "2".to_string()]));
+		map.contains_key("a").xpect_true();
+		map.contains_key("c").xpect_false();
+
+		map.remove("a");
+		map.len().xpect_eq(1);
+
+		map.clear();
+		map.is_empty().xpect_true();
 	}
 }

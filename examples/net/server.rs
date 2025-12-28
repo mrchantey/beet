@@ -1,3 +1,4 @@
+//! Example of a basic server with hand-rolled routing and templating
 use beet::prelude::*;
 use serde::Deserialize;
 
@@ -30,8 +31,8 @@ fn handler(
 ) -> Result {
 	let request = requests.get(ev.event_target())?;
 	let path = request.path();
-	// our diy router :)
-	if path != "/" {
+	// our diy router, only match root path
+	if path.to_string_lossy() != "/" {
 		commands
 			.entity(ev.event_target())
 			.insert(Response::from_status_body(
@@ -59,7 +60,7 @@ fn handler(
 	} else {
 		default()
 	};
-
+	// simple templating with format!
 	let response_text = format!(
 		r#"
 <!DOCTYPE html>

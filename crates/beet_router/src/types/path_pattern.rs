@@ -248,7 +248,9 @@ pub struct PathPatternSegment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathMatch {
 	pub remaining_path: VecDeque<String>,
-	pub dyn_map: HashMap<String, String>,
+	/// Dynamic segment values. For duplicate and greedy segments, each matched path segment
+	/// is stored as a separate value.
+	pub dyn_map: MultiMap<String, String>,
 }
 impl PathMatch {
 	/// Returns true if there is no remaining path to match
@@ -402,24 +404,13 @@ impl PathPatternSegment {
 	/// Attempts to match the segment against a path,
 	/// returning the remaining path if it matches.
 	///
-	/// For greedy segments (OneOrMore, ZeroOrMore), all remaining parts are consumed,
-	/// preserving empty strings from adjacent slashes as `/` in the reconstructed path.
+	/// For greedy segments (OneOrMore, ZeroOrMore), all remaining parts are consumed
+	/// and stored as separate values in the multimap.
 	pub fn parse_parts(
 		&self,
-		dyn_map: &mut HashMap<String, String>,
+		dyn_map: &mut MultiMap<String, String>,
 		path: &mut VecDeque<String>,
 	) -> Result<(), RouteMatchError> {
-		let mut insert = |key: String, value: String| {
-			if dyn_map.contains_key(&key) {
-				error!(
-					"Duplicate dynamic segment key: {}\nThis will result in unexpected behavior
-					Please check for overlapping routes",
-					key
-				);
-			}
-			dyn_map.insert(key, value);
-		};
-
 		match (&self.modifier, path.pop_front()) {
 			// Static match - must match exactly
 			(PathPatternModifier::Static, Some(other))
@@ -447,7 +438,7 @@ impl PathPatternSegment {
 						path: value,
 					})
 				} else {
-					insert(self.name.clone(), value);
+					dyn_map.insert(self.name.clone(), value);
 					Ok(())
 				}
 			}
@@ -462,25 +453,25 @@ impl PathPatternSegment {
 				if value.is_empty() {
 					// Empty string from adjacent slash - treat as no match, put it back
 					path.push_front(value);
-					insert(self.name.clone(), String::new());
+					dyn_map.insert_key(self.name.clone());
 				} else {
-					insert(self.name.clone(), value);
+					dyn_map.insert(self.name.clone(), value);
 				}
 				Ok(())
 			}
 			(PathPatternModifier::Optional, None) => {
-				insert(self.name.clone(), String::new());
+				dyn_map.insert_key(self.name.clone());
 				Ok(())
 			}
 
 			// Dynamic OneOrMore - greedy, must have at least one segment
-			(PathPatternModifier::OneOrMore, Some(mut value)) => {
-				// Consume rest of path, preserving empty strings as slashes
+			(PathPatternModifier::OneOrMore, Some(value)) => {
+				// Insert first segment
+				dyn_map.insert(self.name.clone(), value);
+				// Insert remaining segments separately
 				while let Some(next) = path.pop_front() {
-					value.push('/');
-					value.push_str(&next);
+					dyn_map.insert(self.name.clone(), next);
 				}
-				insert(self.name.clone(), value);
 				Ok(())
 			}
 			(PathPatternModifier::OneOrMore, None) => {
@@ -490,18 +481,18 @@ impl PathPatternSegment {
 			}
 
 			// Dynamic ZeroOrMore - greedy, can match empty
-			(PathPatternModifier::ZeroOrMore, Some(mut value)) => {
-				// Consume rest of path, preserving empty strings as slashes
+			(PathPatternModifier::ZeroOrMore, Some(value)) => {
+				// Insert first segment
+				dyn_map.insert(self.name.clone(), value);
+				// Insert remaining segments separately
 				while let Some(next) = path.pop_front() {
-					value.push('/');
-					value.push_str(&next);
+					dyn_map.insert(self.name.clone(), next);
 				}
-				insert(self.name.clone(), value);
 				Ok(())
 			}
 			(PathPatternModifier::ZeroOrMore, None) => {
-				// Zero matches is valid for ZeroOrMore
-				insert(self.name.clone(), String::new());
+				// Zero matches is valid for ZeroOrMore - create empty entry
+				dyn_map.insert_key(self.name.clone());
 				Ok(())
 			}
 		}
@@ -656,21 +647,18 @@ mod test {
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "bar/baz").unwrap().dyn_map;
-		map.get("foo")
-			.cloned()
-			.xpect_eq(Some("bar/baz".to_string()));
+		map.get_vec("foo")
+			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
 		map.len().xpect_eq(1);
 
 		let map = parse("/*foo", "/bar/baz").unwrap().dyn_map;
-		map.get("foo")
-			.cloned()
-			.xpect_eq(Some("bar/baz".to_string()));
+		map.get_vec("foo")
+			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
 		map.len().xpect_eq(1);
 
 		let map = parse("foo/*bar", "foo/bar/baz").unwrap().dyn_map;
-		map.get("bar")
-			.cloned()
-			.xpect_eq(Some("bar/baz".to_string()));
+		map.get_vec("bar")
+			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
 		map.len().xpect_eq(1);
 	}
 
@@ -684,20 +672,21 @@ mod test {
 		parse("/*foo?", "").xpect_ok();
 		parse("foo/*bar?", "foo").xpect_ok();
 
-		// Empty match returns empty string
+		// Empty match creates key with no values
 		let map = parse("/*foo?", "").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.contains_key("foo").xpect_true();
+		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
 		map.len().xpect_eq(1);
 
 		let map = parse("foo/*bar?", "foo").unwrap().dyn_map;
-		map.get("bar").cloned().xpect_eq(Some(String::new()));
+		map.contains_key("bar").xpect_true();
+		map.get_vec("bar").xpect_eq(Some(&Vec::<String>::new()));
 		map.len().xpect_eq(1);
 
-		// Non-empty match works normally
+		// Non-empty match stores each segment separately
 		let map = parse("/*foo?", "bar/baz").unwrap().dyn_map;
-		map.get("foo")
-			.cloned()
-			.xpect_eq(Some("bar/baz".to_string()));
+		map.get_vec("foo")
+			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
 		map.len().xpect_eq(1);
 	}
 
@@ -709,14 +698,16 @@ mod test {
 		parse("/prefix/:foo?", "prefix").xpect_ok();
 		parse("/prefix/:foo?", "prefix/value").xpect_ok();
 
-		// Empty match returns empty string
+		// Empty match creates key with no values
 		let map = parse("/:foo?", "").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.contains_key("foo").xpect_true();
+		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
 		map.len().xpect_eq(1);
 
 		// With prefix
 		let map = parse("/prefix/:foo?", "prefix").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.contains_key("foo").xpect_true();
+		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
 		map.len().xpect_eq(1);
 
 		// Non-empty match
@@ -733,9 +724,8 @@ mod test {
 		parse("/:foo+", "").xpect_err();
 
 		let map = parse("/:foo+", "bar/baz").unwrap().dyn_map;
-		map.get("foo")
-			.cloned()
-			.xpect_eq(Some("bar/baz".to_string()));
+		map.get_vec("foo")
+			.xpect_eq(Some(&vec!["bar".to_string(), "baz".to_string()]));
 
 		// Test :foo* syntax (explicit ZeroOrMore)
 		parse("/:foo*", "bar").xpect_ok();
@@ -743,29 +733,37 @@ mod test {
 		parse("/:foo*", "").xpect_ok();
 
 		let map = parse("/:foo*", "").unwrap().dyn_map;
-		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.contains_key("foo").xpect_true();
+		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
 	}
 
 	#[test]
 	fn adjacent_slashes() {
-		// greedy segments preserve adjacent slashes
+		// greedy segments store each part separately, including empty strings from adjacent slashes
 		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
-		map.get("bar")
-			.cloned()
-			.xpect_eq(Some("/bar/baz.rs".to_string()));
+		map.get_vec("bar").xpect_eq(Some(&vec![
+			"".to_string(),
+			"bar".to_string(),
+			"baz.rs".to_string(),
+		]));
 		map.len().xpect_eq(1);
 
 		let map = parse("/*file", "/bar//baz.rs").unwrap().dyn_map;
-		map.get("file")
-			.cloned()
-			.xpect_eq(Some("bar//baz.rs".to_string()));
+		map.get_vec("file").xpect_eq(Some(&vec![
+			"bar".to_string(),
+			"".to_string(),
+			"baz.rs".to_string(),
+		]));
 		map.len().xpect_eq(1);
 
-		// multiple adjacent slashes
+		// multiple adjacent slashes stored as empty strings
 		let map = parse("/*path", "foo///bar").unwrap().dyn_map;
-		map.get("path")
-			.cloned()
-			.xpect_eq(Some("foo///bar".to_string()));
+		map.get_vec("path").xpect_eq(Some(&vec![
+			"foo".to_string(),
+			"".to_string(),
+			"".to_string(),
+			"bar".to_string(),
+		]));
 		map.len().xpect_eq(1);
 	}
 

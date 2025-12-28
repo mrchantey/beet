@@ -1421,7 +1421,6 @@ dependencies = [
  "js-sys",
  "lambda_http",
  "mime_guess",
- "multimap",
  "pin-project",
  "reqwest",
  "send_wrapper",
@@ -6640,15 +6639,6 @@ checksum = "ddd32fa8935aeadb8a8a6b6b351e40225570a37c43de67690383d87ef170cd08"
 dependencies = [
  "num-traits",
  "pxfm",
-]
-
-[[package]]
-name = "multimap"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
-dependencies = [
- "serde",
 ]
 
 [[package]]

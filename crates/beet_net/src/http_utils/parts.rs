@@ -130,9 +130,9 @@ pub struct Parts {
 	/// For CLI flags:
 	/// - Short and long versions are stored separately: `--foo` and `-f`
 	/// - Flags without values have empty vectors
-	params: MultiMap,
+	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
-	headers: MultiMap,
+	headers: MultiMap<String, String>,
 	/// The HTTP version or CLI command version
 	version: String,
 }
@@ -167,13 +167,17 @@ impl Parts {
 	pub fn version(&self) -> &str { &self.version }
 
 	/// Returns all parameters
-	pub fn params(&self) -> &MultiMap { &self.params }
+	pub fn params(&self) -> &MultiMap<String, String> { &self.params }
 
 	/// Returns a mutable reference to the parameters
-	pub fn params_mut(&mut self) -> &mut MultiMap { &mut self.params }
+	pub fn params_mut(&mut self) -> &mut MultiMap<String, String> {
+		&mut self.params
+	}
 
 	/// Returns a mutable reference to the headers
-	pub fn headers_mut(&mut self) -> &mut MultiMap { &mut self.headers }
+	pub fn headers_mut(&mut self) -> &mut MultiMap<String, String> {
+		&mut self.headers
+	}
 
 	/// Adds a parameter
 	pub fn insert_param(
@@ -194,7 +198,7 @@ impl Parts {
 	}
 
 	/// Returns all headers
-	pub fn headers(&self) -> &MultiMap { &self.headers }
+	pub fn headers(&self) -> &MultiMap<String, String> { &self.headers }
 
 	/// Gets the first value for a parameter
 	pub fn get_param(&self, key: &str) -> Option<&String> {
@@ -295,8 +299,8 @@ pub struct PartsBuilder {
 	scheme: Scheme,
 	authority: String,
 	path: Vec<String>,
-	params: MultiMap,
-	headers: MultiMap,
+	params: MultiMap<String, String>,
+	headers: MultiMap<String, String>,
 	version: Option<String>,
 }
 
@@ -455,7 +459,7 @@ impl RequestParts {
 						authority,
 						path: path_segments,
 						params,
-						headers: MultiMap::default(),
+						headers: MultiMap::<String, String>::default(),
 						version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
 					},
 				};
@@ -474,7 +478,7 @@ impl RequestParts {
 				authority: String::new(),
 				path: path_segments,
 				params,
-				headers: MultiMap::default(),
+				headers: MultiMap::<String, String>::default(),
 				version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
 			},
 		}
@@ -612,9 +616,9 @@ fn split_path_and_query(uri: &str) -> (&str, Option<&str>) {
 		.unwrap_or((uri, None))
 }
 
-/// Convert an [`http::HeaderMap`] to a [`MultiMap`],
+/// Convert an [`http::HeaderMap`] to a [`MultiMap<String, String>`],
 /// with all keys converted to lower kebab-case
-fn header_map_to_multimap(map: &http::HeaderMap) -> MultiMap {
+fn header_map_to_multimap(map: &http::HeaderMap) -> MultiMap<String, String> {
 	use heck::ToKebabCase;
 	let mut multi_map = MultiMap::default();
 	for (key, value) in map.iter() {
@@ -628,7 +632,7 @@ fn header_map_to_multimap(map: &http::HeaderMap) -> MultiMap {
 }
 
 /// Parse query string into a MultiMap
-fn parse_query_string(query: &str) -> MultiMap {
+fn parse_query_string(query: &str) -> MultiMap<String, String> {
 	let mut params = MultiMap::default();
 	for pair in query.split('&') {
 		if pair.is_empty() {
@@ -653,7 +657,7 @@ fn split_path(path: &str) -> Vec<String> {
 
 /// Convert a MultiMap back to http::HeaderMap
 fn multimap_to_header_map(
-	multimap: &MultiMap,
+	multimap: &MultiMap<String, String>,
 ) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {
 	use std::str::FromStr;
 	let mut headers = http::HeaderMap::new();
@@ -673,7 +677,7 @@ fn multimap_to_header_map(
 }
 
 /// Build query string from MultiMap
-fn build_query_string(params: &MultiMap) -> String {
+fn build_query_string(params: &MultiMap<String, String>) -> String {
 	let mut parts = Vec::new();
 	for (key, values) in params.iter_all() {
 		for value in values {
