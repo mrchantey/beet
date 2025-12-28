@@ -298,6 +298,7 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
+	/// this one is notoriously flaky
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
@@ -313,9 +314,10 @@ mod test {
 					}
 				}
 			});
+
 		// off-thread required for for multi_threaded, not sure why
 		std::thread::spawn(move || {
-			std::thread::sleep(Duration::from_millis(1));
+			std::thread::sleep(Duration::from_millis(100));
 			fs_ext::write(path.join("foobar.txt"), "foobar").unwrap();
 		});
 		app.run_async().await.xpect_eq(AppExit::Success);
