@@ -4,15 +4,15 @@ use beet_core::prelude::*;
 /// Collects all endpoints in an application and arranges them into a tree structure.
 ///
 /// This serves as a validation step, ensuring there is only a single endpoint for
-/// any given path pattern. It also detects conflicts between dynamic and wildcard
+/// any given path pattern. It also detects conflicts between dynamic and greedy
 /// segments that would cause ambiguous routing.
 ///
 /// ## Validation Rules
 /// - Only one endpoint per exact path pattern
 /// - Cannot mix static and dynamic segments at the same level (e.g., `/api/users` and `/api/:id`)
 /// - Cannot have multiple dynamic segments at the same level (e.g., `/:foo` and `/:bar`)
-/// - Cannot have multiple wildcard segments at the same level (e.g., `/*foo` and `/*bar`)
-/// - Wildcard segments must be the last segment in a path
+/// - Cannot have multiple greedy segments at the same level (e.g., `*foo` and `*bar`)
+/// - Greedy segments (OneOrMore, ZeroOrMore) must be the last segment in a path
 ///
 /// ## Example
 /// ```rust
@@ -65,25 +65,8 @@ impl EndpointTree {
 			children: HashMap<String, Node>,
 			endpoint: Option<Entity>,
 			params: Option<ParamsPattern>,
-			// track segment type for conflict detection
-			segment_type: Option<SegmentType>,
-		}
-
-		#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-		enum SegmentType {
-			Static,
-			Dynamic,
-			Wildcard,
-		}
-
-		impl SegmentType {
-			fn from_segment(seg: &PathPatternSegment) -> Self {
-				match seg {
-					PathPatternSegment::Static(_) => SegmentType::Static,
-					PathPatternSegment::Dynamic(_) => SegmentType::Dynamic,
-					PathPatternSegment::Wildcard(_) => SegmentType::Wildcard,
-				}
-			}
+			/// Track if this node represents a static segment for conflict detection
+			is_static: Option<bool>,
 		}
 
 		let mut root = Node::default();
@@ -93,26 +76,23 @@ impl EndpointTree {
 			let segments = pattern.iter().cloned().collect::<Vec<_>>();
 			let mut node = &mut root;
 
-			for (i, seg) in segments.iter().enumerate() {
-				let is_last = i == segments.len() - 1;
-				let seg_type = SegmentType::from_segment(seg);
-				let key = match seg {
-					PathPatternSegment::Static(s) => s.clone(),
-					PathPatternSegment::Dynamic(s) => format!(":{}", s),
-					PathPatternSegment::Wildcard(s) => format!("*{}", s),
-				};
+			for (idx, seg) in segments.iter().enumerate() {
+				let is_last = idx == segments.len() - 1;
+				let seg_is_static = seg.is_static();
+				// Use annotated string as key to distinguish different segment types
+				let key = seg.to_string_annotated();
 
 				// check for conflicts at this level
 				for (existing_key, existing_node) in &node.children {
-					let existing_type = existing_node.segment_type.unwrap();
+					let existing_is_static =
+						existing_node.is_static.unwrap_or(true);
 
-					// conflict if we have different dynamic/wildcard segments at same level
+					// conflict if we have different dynamic segments at same level
 					if existing_key != &key
-						&& seg_type != SegmentType::Static
-						&& existing_type != SegmentType::Static
+						&& !seg_is_static && !existing_is_static
 					{
 						bevybail!(
-							"Path conflict: Cannot have multiple dynamic/wildcard segments at same level. \
+							"Path conflict: Cannot have multiple dynamic/greedy segments at same level. \
 							Found '{}' and '{}' at the same position",
 							existing_key,
 							key
@@ -121,10 +101,7 @@ impl EndpointTree {
 
 					// conflict if mixing static with dynamic at same level
 					if existing_key != &key
-						&& ((seg_type == SegmentType::Static
-							&& existing_type != SegmentType::Static)
-							|| (seg_type != SegmentType::Static
-								&& existing_type == SegmentType::Static))
+						&& (seg_is_static != existing_is_static)
 					{
 						bevybail!(
 							"Path conflict: Cannot mix static and dynamic segments at same level. \
@@ -136,7 +113,7 @@ impl EndpointTree {
 				}
 
 				node = node.children.entry(key).or_insert_with(|| Node {
-					segment_type: Some(seg_type),
+					is_static: Some(seg_is_static),
 					endpoint: None,
 					params: None,
 					children: default(),
@@ -176,14 +153,8 @@ impl EndpointTree {
 				.children
 				.iter()
 				.map(|(key, child_node)| {
-					let segment = if let Some(stripped) = key.strip_prefix(':')
-					{
-						PathPatternSegment::Dynamic(stripped.to_string())
-					} else if let Some(stripped) = key.strip_prefix('*') {
-						PathPatternSegment::Wildcard(stripped.to_string())
-					} else {
-						PathPatternSegment::Static(key.clone())
-					};
+					// Parse the annotated key back into a segment
+					let segment = PathPatternSegment::new(key);
 
 					let mut child_segments =
 						pattern.iter().cloned().collect::<Vec<_>>();
@@ -267,17 +238,17 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent2,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
@@ -300,17 +271,17 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Dynamic(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::dynamic_required("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent2,
-				PathPattern::from_segments(vec![PathPatternSegment::Dynamic(
-					"bar".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::dynamic_required("bar"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
@@ -333,17 +304,17 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent2,
-				PathPattern::from_segments(vec![PathPatternSegment::Dynamic(
-					"bar".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::dynamic_required("bar"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
@@ -367,25 +338,25 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent2,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"bar".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("bar"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent3,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("foo".to_string()),
-					PathPatternSegment::Static("bar".to_string()),
+					PathPatternSegment::static_segment("foo"),
+					PathPatternSegment::static_segment("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
@@ -397,7 +368,7 @@ mod test {
 	}
 
 	#[test]
-	fn endpoint_tree_wildcard_conflict() {
+	fn endpoint_tree_greedy_conflict() {
 		let mut world = World::new();
 		let ent1 = world.spawn_empty().id();
 		let ent2 = world.spawn_empty().id();
@@ -405,17 +376,17 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Wildcard(
-					"foo".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::one_or_more("foo"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
 			(
 				ent2,
-				PathPattern::from_segments(vec![PathPatternSegment::Wildcard(
-					"bar".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::one_or_more("bar"),
+				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
@@ -441,9 +412,9 @@ mod test {
 		let endpoints = vec![
 			(
 				ent1,
-				PathPattern::from_segments(vec![PathPatternSegment::Static(
-					"api".to_string(),
-				)])
+				PathPattern::from_segments(vec![
+					PathPatternSegment::static_segment("api"),
+				])
 				.unwrap(),
 				ParamsPattern::from_metas(vec![
 					ParamMeta::new("verbose", ParamValue::Flag)
@@ -455,8 +426,8 @@ mod test {
 			(
 				ent2,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("api".to_string()),
-					PathPatternSegment::Dynamic("id".to_string()),
+					PathPatternSegment::static_segment("api"),
+					PathPatternSegment::dynamic_required("id"),
 				])
 				.unwrap(),
 				ParamsPattern::from_metas(vec![
@@ -473,8 +444,8 @@ mod test {
 			(
 				ent3,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("users".to_string()),
-					PathPatternSegment::Dynamic("userId".to_string()),
+					PathPatternSegment::static_segment("users"),
+					PathPatternSegment::dynamic_required("userId"),
 				])
 				.unwrap(),
 				ParamsPattern::from_metas(vec![
@@ -486,8 +457,8 @@ mod test {
 			(
 				ent4,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("docs".to_string()),
-					PathPatternSegment::Wildcard("path".to_string()),
+					PathPatternSegment::static_segment("docs"),
+					PathPatternSegment::one_or_more("path"),
 				])
 				.unwrap(),
 				ParamsPattern::from_metas(vec![]).unwrap(),
@@ -511,8 +482,8 @@ mod test {
 			(
 				ent1,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("api".to_string()),
-					PathPatternSegment::Dynamic("id".to_string()),
+					PathPatternSegment::static_segment("api"),
+					PathPatternSegment::dynamic_required("id"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
@@ -520,8 +491,8 @@ mod test {
 			(
 				ent2,
 				PathPattern::from_segments(vec![
-					PathPatternSegment::Static("api".to_string()),
-					PathPatternSegment::Static("users".to_string()),
+					PathPatternSegment::static_segment("api"),
+					PathPatternSegment::static_segment("users"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),

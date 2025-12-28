@@ -1,3 +1,4 @@
+//! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use std::collections::VecDeque;
@@ -6,6 +7,46 @@ use thiserror::Error;
 
 use crate::types::RouteQuery;
 
+/// Modifier for path pattern segments, aligned with URL Pattern API.
+///
+/// These modifiers control whether a segment is static or dynamic, and for dynamic
+/// segments they control cardinality and greediness:
+/// - `Static` - exact string match (default)
+/// - `Required` / `Optional` - match exactly one or zero-to-one segments (non-greedy)
+/// - `OneOrMore` / `ZeroOrMore` - match one+ or zero+ segments (greedy, consumes rest of path)
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub enum PathPatternModifier {
+	/// Default - static segment, exact string match
+	#[default]
+	Static,
+	/// Exactly one segment required (`:param`)
+	Required,
+	/// Zero or one segment (`:param?`)
+	Optional,
+	/// One or more segments, greedy (`:param+` or `*param`)
+	OneOrMore,
+	/// Zero or more segments, greedy (`:param*` or `*param?`)
+	ZeroOrMore,
+}
+
+impl PathPatternModifier {
+	/// Returns true if this modifier allows zero matches
+	pub fn is_optional(&self) -> bool {
+		matches!(self, Self::Optional | Self::ZeroOrMore)
+	}
+
+	/// Returns true if this modifier is greedy (consumes multiple segments)
+	pub fn is_greedy(&self) -> bool {
+		matches!(self, Self::OneOrMore | Self::ZeroOrMore)
+	}
+
+	/// Returns true if this is a static segment
+	pub fn is_static(&self) -> bool { matches!(self, Self::Static) }
+}
 
 /// Represents the next part of the route pattern.
 /// All ancestor [`PathPartial`] will be prepended when determining the route pattern
@@ -44,7 +85,7 @@ impl PathPartial {
 pub struct PathPattern {
 	/// The complete sequence of segments
 	segments: Vec<PathPatternSegment>,
-	/// Is true if all segments are [`PathPatternSegment::Static`]
+	/// Is true if all segments are static
 	is_static: bool,
 }
 
@@ -56,7 +97,7 @@ impl std::ops::Deref for PathPattern {
 impl PathPattern {
 	/// Parse a path into [`PathPatternSegments`]
 	/// ## Errors
-	/// - Errors if path contains a wildcard pattern that isnt last
+	/// - Errors if path contains a greedy pattern that isnt last
 	pub fn new(path: impl AsRef<Path>) -> Result<Self> {
 		path.as_ref()
 			.to_string_lossy()
@@ -69,15 +110,13 @@ impl PathPattern {
 
 	/// Parse segments into a [`PathPattern`]
 	/// ## Errors
-	/// - Errors if path contains a wildcard pattern that isnt last
+	/// - Errors if path contains a greedy pattern that isnt last
 	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Result<Self> {
 		let is_static = segments.iter().all(|segment| segment.is_static());
 		for (index, segment) in segments.iter().enumerate() {
-			if matches!(segment, PathPatternSegment::Wildcard(_))
-				&& index != segments.len() - 1
-			{
+			if segment.is_greedy() && index != segments.len() - 1 {
 				bevybail!(
-					"Malformed Route Path: Wildcard pattern must be last"
+					"Malformed Route Path: Greedy pattern (wildcard/repeating) must be last"
 				);
 			}
 		}
@@ -126,7 +165,7 @@ impl PathPattern {
 		}
 	}
 
-	/// Returns true if all segments are a [`PathPatternSegment::Static`]
+	/// Returns true if all segments are static
 	pub fn is_static(&self) -> bool { self.is_static }
 
 	/// Convert the segments to a [`RoutePath`] using annotations for dynamic segments,
@@ -141,7 +180,7 @@ impl PathPattern {
 	}
 	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
-	/// Adjacent slashes are preserved as empty strings, allowing wildcard segments
+	/// Adjacent slashes are preserved as empty strings, allowing greedy segments
 	/// to reconstruct paths with double slashes like `foo//bar/baz.rs`.
 	pub fn parse_path(
 		&self,
@@ -178,20 +217,30 @@ impl std::fmt::Display for PathPattern {
 	}
 }
 
-/// A segment of a route path, stripped of:
-/// - leading & trailing slashes `/`
-/// - dynamic prefixes `:`
-/// - wildcard prefixes `*`
+/// A segment of a route path.
+///
+/// Contains a name and a modifier that determines how the segment matches:
+/// - Static segments match exactly
+/// - Dynamic segments capture values from the path
+///
+/// ## Syntax
+///
+/// Aligned with URL Pattern API conventions:
+/// - `foo` - Static segment, exact match
+/// - `:foo` - Dynamic segment, matches exactly one path segment
+/// - `:foo?` - Optional dynamic, matches zero or one segment
+/// - `:foo+` - Repeating dynamic, matches one or more segments (greedy)
+/// - `:foo*` - Optional repeating, matches zero or more segments (greedy)
+/// - `*foo` - Shorthand for `:foo+` (one or more, greedy)
+/// - `*foo?` - Shorthand for `:foo*` (zero or more, greedy)
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum PathPatternSegment {
-	/// A static segment, the `foo` in `/foo`
-	Static(String),
-	/// A dynamic segment, the `foo` in `/:foo`
-	Dynamic(String),
-	/// A wildcard segment, the `foo` in `/*foo`
-	Wildcard(String),
+pub struct PathPatternSegment {
+	/// The segment name (without prefixes/suffixes like `:`, `*`, `?`, `+`)
+	name: String,
+	/// The modifier controlling how this segment matches
+	modifier: PathPatternModifier,
 }
 
 /// The result of a successful route match,
@@ -210,12 +259,12 @@ pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
-	/// A [`PathPatternSegment::Static`] did not match its corresponding [`RoutePath`] part.
+	/// A static segment did not match its corresponding [`RoutePath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]
 	InvalidStatic { segment: String, path: String },
-	/// A [`PathPatternSegment::Static`] did not match its corresponding [`RoutePath`] part.
+	/// A segment expected at least one path part but the path was empty.
 	#[error(
 		"a segment '{segment}' expected at least one path segment, but it was empty"
 	)]
@@ -223,7 +272,17 @@ pub enum RouteMatchError {
 }
 
 impl PathPatternSegment {
-	/// Parses a segment from a string, determining if it is static, dynamic, or wildcard.
+	/// Parses a segment from a string, determining if it is static or dynamic,
+	/// and extracting any modifiers.
+	///
+	/// ## Syntax
+	/// - `foo` - Static segment
+	/// - `:foo` - Dynamic, required (one segment)
+	/// - `:foo?` - Dynamic, optional (zero or one segment)
+	/// - `:foo+` - Dynamic, one or more (greedy)
+	/// - `:foo*` - Dynamic, zero or more (greedy)
+	/// - `*foo` - Shorthand for `:foo+`
+	/// - `*foo?` - Shorthand for `:foo*`
 	///
 	/// ## Panics
 	/// - Panics if the segment is empty after trimming leading and trailing slashes.
@@ -239,27 +298,112 @@ impl PathPatternSegment {
 				"PathPatternSegment cannot contain internal slashes: {}",
 				segment
 			);
-		} else if trimmed.starts_with(':') {
-			Self::Dynamic(trimmed[1..].to_string())
 		} else if trimmed.starts_with('*') {
-			Self::Wildcard(trimmed[1..].to_string())
+			// Wildcard shorthand: *foo or *foo?
+			let rest = &trimmed[1..];
+			if let Some(name) = rest.strip_suffix('?') {
+				// *foo? = zero or more (optional greedy)
+				Self {
+					name: name.to_string(),
+					modifier: PathPatternModifier::ZeroOrMore,
+				}
+			} else {
+				// *foo = one or more (required greedy)
+				Self {
+					name: rest.to_string(),
+					modifier: PathPatternModifier::OneOrMore,
+				}
+			}
+		} else if trimmed.starts_with(':') {
+			// Dynamic segment with possible modifier
+			let rest = &trimmed[1..];
+			if let Some(name) = rest.strip_suffix('?') {
+				Self {
+					name: name.to_string(),
+					modifier: PathPatternModifier::Optional,
+				}
+			} else if let Some(name) = rest.strip_suffix('+') {
+				Self {
+					name: name.to_string(),
+					modifier: PathPatternModifier::OneOrMore,
+				}
+			} else if let Some(name) = rest.strip_suffix('*') {
+				Self {
+					name: name.to_string(),
+					modifier: PathPatternModifier::ZeroOrMore,
+				}
+			} else {
+				Self {
+					name: rest.to_string(),
+					modifier: PathPatternModifier::Required,
+				}
+			}
 		} else {
-			Self::Static(trimmed.to_string())
-		}
-	}
-	/// Uses conventions of `:` and `*` to annotate non static segments
-	pub fn to_string_annotated(&self) -> String {
-		match self {
-			Self::Static(val) => val.clone(),
-			Self::Dynamic(val) => format!(":{}", val),
-			Self::Wildcard(val) => format!("*{}", val),
+			Self {
+				name: trimmed.to_string(),
+				modifier: PathPatternModifier::Static,
+			}
 		}
 	}
 
+	/// Creates a static segment
+	pub fn static_segment(name: impl Into<String>) -> Self {
+		Self {
+			name: name.into(),
+			modifier: PathPatternModifier::Static,
+		}
+	}
+
+	/// Creates a dynamic segment with the given modifier
+	pub fn dynamic(
+		name: impl Into<String>,
+		modifier: PathPatternModifier,
+	) -> Self {
+		Self {
+			name: name.into(),
+			modifier,
+		}
+	}
+
+	/// Creates a required dynamic segment (`:param`)
+	pub fn dynamic_required(name: impl Into<String>) -> Self {
+		Self::dynamic(name, PathPatternModifier::Required)
+	}
+
+	/// Creates an optional dynamic segment (`:param?`)
+	pub fn dynamic_optional(name: impl Into<String>) -> Self {
+		Self::dynamic(name, PathPatternModifier::Optional)
+	}
+
+	/// Creates a one-or-more greedy segment (`:param+` or `*param`)
+	pub fn one_or_more(name: impl Into<String>) -> Self {
+		Self::dynamic(name, PathPatternModifier::OneOrMore)
+	}
+
+	/// Creates a zero-or-more greedy segment (`:param*` or `*param?`)
+	pub fn zero_or_more(name: impl Into<String>) -> Self {
+		Self::dynamic(name, PathPatternModifier::ZeroOrMore)
+	}
+
+	/// Uses conventions of `:`, `*`, `?`, `+` to annotate segments
+	pub fn to_string_annotated(&self) -> String {
+		match self.modifier {
+			PathPatternModifier::Static => self.name.clone(),
+			PathPatternModifier::Required => format!(":{}", self.name),
+			PathPatternModifier::Optional => format!(":{}?", self.name),
+			PathPatternModifier::OneOrMore => format!("*{}", self.name),
+			PathPatternModifier::ZeroOrMore => format!("*{}?", self.name),
+		}
+	}
+
+	/// Returns true if this segment is greedy (consumes multiple path segments)
+	pub fn is_greedy(&self) -> bool { self.modifier.is_greedy() }
+
 	/// Attempts to match the segment against a path,
 	/// returning the remaining path if it matches.
-	/// In the case of a wildcard all remaining parts are consumed, preserving
-	/// empty strings from adjacent slashes as `/` in the reconstructed path.
+	///
+	/// For greedy segments (OneOrMore, ZeroOrMore), all remaining parts are consumed,
+	/// preserving empty strings from adjacent slashes as `/` in the reconstructed path.
 	pub fn parse_parts(
 		&self,
 		dyn_map: &mut HashMap<String, String>,
@@ -276,66 +420,108 @@ impl PathPatternSegment {
 			dyn_map.insert(key, value);
 		};
 
-
-		match (self, path.pop_front()) {
-			// static match, continue with remaining path
-			(PathPatternSegment::Static(val), Some(other)) if val == &other => {
+		match (&self.modifier, path.pop_front()) {
+			// Static match - must match exactly
+			(PathPatternModifier::Static, Some(other))
+				if self.name == other =>
+			{
 				Ok(())
 			}
-			// static but no match, this is an error
-			(PathPatternSegment::Static(val), Some(other)) => {
+			(PathPatternModifier::Static, Some(other)) => {
 				Err(RouteMatchError::InvalidStatic {
-					segment: val.clone(),
+					segment: self.name.clone(),
 					path: other,
 				})
 			}
-			// dynamic will always match non-empty strings, continue with remaining path
-			(PathPatternSegment::Dynamic(key), Some(value)) => {
+			(PathPatternModifier::Static, None) => {
+				Err(RouteMatchError::EmptyPath {
+					segment: self.clone(),
+				})
+			}
+
+			// Dynamic Required - must match exactly one non-empty segment
+			(PathPatternModifier::Required, Some(value)) => {
 				if value.is_empty() {
-					// dynamic segment cannot match empty string (adjacent slash)
 					Err(RouteMatchError::InvalidStatic {
 						segment: "dynamic segment".to_string(),
 						path: value,
 					})
 				} else {
-					insert(key.clone(), value);
+					insert(self.name.clone(), value);
 					Ok(())
 				}
 			}
-			// wildcard consumes the rest of the path, continue with empty path
-			(PathPatternSegment::Wildcard(key), Some(mut value)) => {
-				// consume rest of path, preserving empty strings as slashes
+			(PathPatternModifier::Required, None) => {
+				Err(RouteMatchError::EmptyPath {
+					segment: self.clone(),
+				})
+			}
+
+			// Dynamic Optional - matches zero or one segment
+			(PathPatternModifier::Optional, Some(value)) => {
+				if value.is_empty() {
+					// Empty string from adjacent slash - treat as no match, put it back
+					path.push_front(value);
+					insert(self.name.clone(), String::new());
+				} else {
+					insert(self.name.clone(), value);
+				}
+				Ok(())
+			}
+			(PathPatternModifier::Optional, None) => {
+				insert(self.name.clone(), String::new());
+				Ok(())
+			}
+
+			// Dynamic OneOrMore - greedy, must have at least one segment
+			(PathPatternModifier::OneOrMore, Some(mut value)) => {
+				// Consume rest of path, preserving empty strings as slashes
 				while let Some(next) = path.pop_front() {
 					value.push('/');
 					value.push_str(&next);
 				}
-				insert(key.clone(), value);
+				insert(self.name.clone(), value);
 				Ok(())
 			}
-			// break if empty path
-			(segment, None) => Err(RouteMatchError::EmptyPath {
-				segment: segment.clone(),
-			}),
-		}
-	}
-	pub fn is_static(&self) -> bool {
-		match self {
-			PathPatternSegment::Static(_) => true,
-			_ => false,
+			(PathPatternModifier::OneOrMore, None) => {
+				Err(RouteMatchError::EmptyPath {
+					segment: self.clone(),
+				})
+			}
+
+			// Dynamic ZeroOrMore - greedy, can match empty
+			(PathPatternModifier::ZeroOrMore, Some(mut value)) => {
+				// Consume rest of path, preserving empty strings as slashes
+				while let Some(next) = path.pop_front() {
+					value.push('/');
+					value.push_str(&next);
+				}
+				insert(self.name.clone(), value);
+				Ok(())
+			}
+			(PathPatternModifier::ZeroOrMore, None) => {
+				// Zero matches is valid for ZeroOrMore
+				insert(self.name.clone(), String::new());
+				Ok(())
+			}
 		}
 	}
 
-	pub fn as_str(&self) -> &str { self.as_ref() }
+	/// Returns true if this is a static segment
+	pub fn is_static(&self) -> bool { self.modifier.is_static() }
+
+	/// Returns the name of this segment
+	pub fn as_str(&self) -> &str { &self.name }
+
+	/// Returns the name of this segment
+	pub fn name(&self) -> &str { &self.name }
+
+	/// Returns the modifier for this segment
+	pub fn modifier(&self) -> PathPatternModifier { self.modifier }
 }
 
 impl AsRef<str> for PathPatternSegment {
-	fn as_ref(&self) -> &str {
-		match self {
-			PathPatternSegment::Static(s) => s,
-			PathPatternSegment::Dynamic(s) => s,
-			PathPatternSegment::Wildcard(s) => s,
-		}
-	}
+	fn as_ref(&self) -> &str { &self.name }
 }
 
 impl From<&str> for PathPatternSegment {
@@ -344,14 +530,10 @@ impl From<&str> for PathPatternSegment {
 impl From<String> for PathPatternSegment {
 	fn from(value: String) -> Self { Self::new(value) }
 }
-/// Print the segment as-is without dynamic and wildcard annotations
+/// Print the segment name without dynamic and wildcard annotations
 impl std::fmt::Display for PathPatternSegment {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			PathPatternSegment::Static(s) => write!(f, "{}", s),
-			PathPatternSegment::Dynamic(s) => write!(f, "{}", s),
-			PathPatternSegment::Wildcard(s) => write!(f, "{}", s),
-		}
+		write!(f, "{}", self.name)
 	}
 }
 
@@ -391,6 +573,7 @@ mod test {
 				.xpect_true();
 		}
 	}
+
 	#[test]
 	fn static_path() {
 		parse("/foobar", "foobar")
@@ -419,6 +602,7 @@ mod test {
 			map.is_empty().xpect_true();
 		}
 	}
+
 	#[test]
 	fn dynamic_path() {
 		parse("/:foo", "bar").xpect_ok();
@@ -451,14 +635,16 @@ mod test {
 		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
 		map.len().xpect_eq(1);
 	}
+
 	#[test]
 	fn wildcard_path() {
+		// Using *foo syntax (shorthand for :foo+, OneOrMore)
 		parse("/*foo", "bar").xpect_ok();
 		parse("/*foo", "/bar").xpect_ok();
 		parse("/*foo", "bar/baz").xpect_ok();
 		parse("/*foo", "/bar/baz").xpect_ok();
 		parse("foo/*bar", "foo/bar/baz").xpect_ok();
-		// missing final segment
+		// missing final segment - OneOrMore requires at least one
 		parse("foo/*bar", "foo").xpect_eq(Err(RouteMatchError::EmptyPath {
 			segment: PathPatternSegment::new("*bar"),
 		}));
@@ -489,8 +675,80 @@ mod test {
 	}
 
 	#[test]
+	fn optional_wildcard_path() {
+		// Using *foo? syntax (shorthand for :foo*, ZeroOrMore)
+		parse("/*foo?", "bar").xpect_ok();
+		parse("/*foo?", "/bar").xpect_ok();
+		parse("/*foo?", "bar/baz").xpect_ok();
+		// ZeroOrMore allows empty!
+		parse("/*foo?", "").xpect_ok();
+		parse("foo/*bar?", "foo").xpect_ok();
+
+		// Empty match returns empty string
+		let map = parse("/*foo?", "").unwrap().dyn_map;
+		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.len().xpect_eq(1);
+
+		let map = parse("foo/*bar?", "foo").unwrap().dyn_map;
+		map.get("bar").cloned().xpect_eq(Some(String::new()));
+		map.len().xpect_eq(1);
+
+		// Non-empty match works normally
+		let map = parse("/*foo?", "bar/baz").unwrap().dyn_map;
+		map.get("foo")
+			.cloned()
+			.xpect_eq(Some("bar/baz".to_string()));
+		map.len().xpect_eq(1);
+	}
+
+	#[test]
+	fn optional_dynamic_path() {
+		// Using :foo? syntax (Optional)
+		parse("/:foo?", "bar").xpect_ok();
+		parse("/:foo?", "").xpect_ok();
+		parse("/prefix/:foo?", "prefix").xpect_ok();
+		parse("/prefix/:foo?", "prefix/value").xpect_ok();
+
+		// Empty match returns empty string
+		let map = parse("/:foo?", "").unwrap().dyn_map;
+		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.len().xpect_eq(1);
+
+		// With prefix
+		let map = parse("/prefix/:foo?", "prefix").unwrap().dyn_map;
+		map.get("foo").cloned().xpect_eq(Some(String::new()));
+		map.len().xpect_eq(1);
+
+		// Non-empty match
+		let map = parse("/:foo?", "bar").unwrap().dyn_map;
+		map.get("foo").cloned().xpect_eq(Some("bar".to_string()));
+		map.len().xpect_eq(1);
+	}
+
+	#[test]
+	fn explicit_modifier_syntax() {
+		// Test :foo+ syntax (explicit OneOrMore)
+		parse("/:foo+", "bar").xpect_ok();
+		parse("/:foo+", "bar/baz").xpect_ok();
+		parse("/:foo+", "").xpect_err();
+
+		let map = parse("/:foo+", "bar/baz").unwrap().dyn_map;
+		map.get("foo")
+			.cloned()
+			.xpect_eq(Some("bar/baz".to_string()));
+
+		// Test :foo* syntax (explicit ZeroOrMore)
+		parse("/:foo*", "bar").xpect_ok();
+		parse("/:foo*", "bar/baz").xpect_ok();
+		parse("/:foo*", "").xpect_ok();
+
+		let map = parse("/:foo*", "").unwrap().dyn_map;
+		map.get("foo").cloned().xpect_eq(Some(String::new()));
+	}
+
+	#[test]
 	fn adjacent_slashes() {
-		// wildcard segments preserve adjacent slashes
+		// greedy segments preserve adjacent slashes
 		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
 		map.get("bar")
 			.cloned()
@@ -509,5 +767,80 @@ mod test {
 			.cloned()
 			.xpect_eq(Some("foo///bar".to_string()));
 		map.len().xpect_eq(1);
+	}
+
+	#[test]
+	fn segment_parsing() {
+		// Static
+		let seg = PathPatternSegment::new("foo");
+		seg.is_static().xpect_true();
+		seg.name().xpect_eq("foo");
+
+		// Dynamic Required
+		let seg = PathPatternSegment::new(":foo");
+		seg.modifier().xpect_eq(PathPatternModifier::Required);
+		seg.name().xpect_eq("foo");
+
+		// Dynamic Optional
+		let seg = PathPatternSegment::new(":foo?");
+		seg.modifier().xpect_eq(PathPatternModifier::Optional);
+		seg.name().xpect_eq("foo");
+
+		// Dynamic OneOrMore (explicit)
+		let seg = PathPatternSegment::new(":foo+");
+		seg.modifier().xpect_eq(PathPatternModifier::OneOrMore);
+		seg.name().xpect_eq("foo");
+
+		// Dynamic ZeroOrMore (explicit)
+		let seg = PathPatternSegment::new(":foo*");
+		seg.modifier().xpect_eq(PathPatternModifier::ZeroOrMore);
+		seg.name().xpect_eq("foo");
+
+		// Wildcard shorthand (OneOrMore)
+		let seg = PathPatternSegment::new("*foo");
+		seg.modifier().xpect_eq(PathPatternModifier::OneOrMore);
+		seg.name().xpect_eq("foo");
+
+		// Optional Wildcard shorthand (ZeroOrMore)
+		let seg = PathPatternSegment::new("*foo?");
+		seg.modifier().xpect_eq(PathPatternModifier::ZeroOrMore);
+		seg.name().xpect_eq("foo");
+	}
+
+	#[test]
+	fn annotated_output() {
+		PathPatternSegment::new("foo")
+			.to_string_annotated()
+			.xpect_eq("foo".to_string());
+		PathPatternSegment::new(":foo")
+			.to_string_annotated()
+			.xpect_eq(":foo".to_string());
+		PathPatternSegment::new(":foo?")
+			.to_string_annotated()
+			.xpect_eq(":foo?".to_string());
+		PathPatternSegment::new(":foo+")
+			.to_string_annotated()
+			.xpect_eq("*foo".to_string());
+		PathPatternSegment::new(":foo*")
+			.to_string_annotated()
+			.xpect_eq("*foo?".to_string());
+		PathPatternSegment::new("*foo")
+			.to_string_annotated()
+			.xpect_eq("*foo".to_string());
+		PathPatternSegment::new("*foo?")
+			.to_string_annotated()
+			.xpect_eq("*foo?".to_string());
+	}
+
+	#[test]
+	fn greedy_must_be_last() {
+		// Greedy patterns must be last
+		PathPattern::new("*foo/bar").xpect_err();
+		PathPattern::new(":foo+/bar").xpect_err();
+		PathPattern::new(":foo*/bar").xpect_err();
+
+		// Non-greedy patterns can be anywhere
+		PathPattern::new(":foo/bar").xpect_ok();
+		PathPattern::new(":foo?/bar").xpect_ok();
 	}
 }
