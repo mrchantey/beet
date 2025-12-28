@@ -9,6 +9,7 @@
 #![cfg_attr(
 	feature = "nightly",
 	feature(
+		never_type,
 		fn_traits,
 		backtrace_frames,
 		unboxed_closures,

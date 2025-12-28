@@ -33,9 +33,11 @@ send_wrapper.workspace = true
 #💡 logging
 log.workspace = true
 pretty_env_logger.workspace = true
-colorize.workspace = true
+nu-ansi-term.workspace = true
 backtrace = "0.3"
-# pretty_assertions
+# deprecate for nu-ansi-term
+colorize = "0.1"
+# deprecate for nu-ansi-term
 yansi = "1"
 diff = "0.1"
 

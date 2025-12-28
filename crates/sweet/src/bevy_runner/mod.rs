@@ -1,7 +1,8 @@
 mod insert_tests;
+mod register_async_test;
 mod test_plugin;
-mod catch_unwind_future;
 pub use insert_tests::*;
+pub use register_async_test::*;
 pub use test_plugin::*;
 mod run_tests;
 pub use run_tests::*;

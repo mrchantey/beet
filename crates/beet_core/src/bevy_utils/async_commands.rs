@@ -192,7 +192,15 @@ pub struct AsyncCommands<'w, 's> {
 }
 
 
-impl AsyncCommands<'_, '_> {
+impl<'w, 's> AsyncCommands<'w, 's> {
+	pub fn reborrow(&mut self) -> AsyncCommands<'w, '_> {
+		AsyncCommands {
+			commands: self.commands.reborrow(),
+			channel: Res::clone(&self.channel),
+		}
+	}
+
+
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)
 	where

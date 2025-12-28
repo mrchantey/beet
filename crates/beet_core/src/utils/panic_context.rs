@@ -47,13 +47,11 @@ impl PanicContext {
 	/// This method uses [`panic::set_hook`], calling the prev hook if
 	/// a panic occurs outside of this scope. Overriding set_hook will break
 	/// this method.
-	pub fn catch_async<Fut>(
-		func: impl FnOnce() -> Fut,
-	) -> impl Future<Output = PanicResult>
+	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
 	where
 		Fut: Future<Output = Result<(), String>>,
 	{
-		PanicContextFuture::new(async move { func().await })
+		PanicContextFuture::new(async move { fut.await })
 	}
 
 	/// Like [`Self::catch`] but supports [`Poll::Pending`] results
@@ -145,6 +143,11 @@ pub enum PanicResult {
 		location: Option<FileSpan>,
 	},
 }
+impl PanicResult {
+	pub fn is_ok(&self) -> bool { matches!(self, PanicResult::Ok) }
+	pub fn is_err(&self) -> bool { matches!(self, PanicResult::Err(_)) }
+	pub fn is_panic(&self) -> bool { matches!(self, PanicResult::Panic { .. }) }
+}
 
 
 /// A future that wraps each poll in [`PanicContext::catch_poll`], to ensure
@@ -179,6 +182,7 @@ mod tests {
 	#[test]
 	fn works() {
 		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
+		todo!("add back tests when non-panic-hook-taking runner is ready");
 		// PanicContext::catch(|| Err("foobar".into()))
 		// 	.xpect_eq(PanicResult::Err("foobar".into()));
 		// PanicContext::catch(|| panic!("foobar")).xpect_eq(PanicResult::Panic {

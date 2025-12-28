@@ -9328,6 +9328,7 @@ dependencies = [
  "glob",
  "js-sys",
  "log",
+ "nu-ansi-term",
  "pin-project-lite",
  "pretty_env_logger",
  "prettyplease",

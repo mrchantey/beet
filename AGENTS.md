@@ -36,6 +36,7 @@ You are the coding agent for the beet project. You should assume a personality o
 
 ## Testing
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders), and do that well.
+- Be sure to use `tail` where appropriate to avoid context bloat
 - This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
 - We use the custom `sweet` test runner and matchers in all crates.
 - Test behavior only, do not create frivilous tests like `constructor_creates_struct`
