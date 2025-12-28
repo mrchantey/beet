@@ -52,44 +52,22 @@ fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
 			LineCol::new(desc.end_line as u32, desc.end_col as u32),
 		),
 		Test::new(desc.clone()),
-		OnSpawn::new(move |entity| ShouldSkip::insert(entity, &desc)),
+		OnSpawn::new(move |entity| try_skip(entity, &desc)),
 	)
 }
-
-/// Marker component added to test entities either
-/// upon spawn or after applying a filter.
-#[derive(Debug, Component)]
-pub enum ShouldSkip {
-	/// The test has a `#[no_run]` attribute
-	NoRun,
-	/// The test has a `#[compile_fail]` attribute
-	CompileFail,
-	/// The test has an `#[ignore]` attribute
-	Ignore(Option<&'static str>),
-}
-
-
-impl ShouldSkip {
-	fn insert(entity: &mut EntityWorldMut, desc: &TestDesc) {
-		if desc.no_run {
-			entity.insert(ShouldSkip::NoRun);
-		}
-		if desc.compile_fail {
-			entity.insert(ShouldSkip::CompileFail);
-		}
-		if desc.ignore {
-			entity.insert(ShouldSkip::Ignore(desc.ignore_message));
-		}
+/// handle the skip cases that are statically known (before filtering)
+fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
+	if desc.no_run {
+		entity.insert(TestOutcome::Skip(TestSkip::NoRun));
+	}
+	if desc.compile_fail {
+		entity.insert(TestOutcome::Skip(TestSkip::CompileFail));
+	}
+	if desc.ignore {
+		entity.insert(TestOutcome::Skip(TestSkip::Ignore(desc.ignore_message)));
 	}
 }
 
-#[derive(Debug, Deref, Component)]
-pub struct ShouldPanic {
-	message: Option<String>,
-}
-
-#[derive(Debug, Component)]
-pub struct ShouldCompileFail;
 
 #[derive(Debug, Deref, Component)]
 pub struct Test {

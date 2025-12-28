@@ -25,8 +25,23 @@ use test::TestType;
 ///     .with_ignore(false);
 /// ```
 pub trait TestDescExt {
+	/// Get reference to the test descriptor
+	fn desc(&self) -> &TestDesc;
 	/// Get mutable reference to the test descriptor
 	fn desc_mut(&mut self) -> &mut TestDesc;
+
+	/// Get the short name of the test (without module path)
+	fn short_name(&self) -> &str {
+		let full_name = self.desc().name.as_slice();
+		match full_name.rfind("::") {
+			Some(idx) => &full_name[idx + 2..],
+			None => full_name,
+		}
+	}
+
+	fn file_and_short_name(&self) -> String {
+		format!("{}::{}", self.desc().source_file, self.short_name())
+	}
 
 	/// Set whether the test should be ignored.
 	fn with_ignore(mut self, should_ignore: bool) -> Self
@@ -115,9 +130,11 @@ pub trait TestDescExt {
 }
 
 impl TestDescExt for TestDesc {
+	fn desc(&self) -> &TestDesc { self }
 	fn desc_mut(&mut self) -> &mut TestDesc { self }
 }
 
 impl TestDescExt for TestDescAndFn {
+	fn desc(&self) -> &TestDesc { &self.desc }
 	fn desc_mut(&mut self) -> &mut TestDesc { &mut self.desc }
 }

@@ -17,6 +17,7 @@ pub struct FilterParams {
 }
 
 impl FilterParams {
+	/// merge the positional args with params, and check for 'exact' specification
 	fn parse(mut self, path_args: Option<&Vec<String>>) -> Self {
 		if let Some(args) = path_args {
 			self.filter = self.filter.extend_include(args);
