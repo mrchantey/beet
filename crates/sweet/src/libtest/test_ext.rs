@@ -15,7 +15,8 @@ pub fn new_auto(
 
 	let desc = TestDesc {
 		name: test::TestName::DynTestName(format!(
-			"{}#{}",
+			// approximate how a real test name would look
+			"libtest::test_ext::{}#{}",
 			name,
 			caller.line()
 		)),

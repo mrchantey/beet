@@ -25,6 +25,15 @@ impl ActionExchangePair for MiddlewareContext {
 	fn get_exchange(&self) -> Entity { self.exchange() }
 }
 
+pub struct ActionExchange {
+	pub action: Entity,
+	pub exchange: Entity,
+}
+impl ActionExchangePair for ActionExchange {
+	fn get_action(&self) -> Entity { self.action }
+	fn get_exchange(&self) -> Entity { self.exchange }
+}
+
 
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {

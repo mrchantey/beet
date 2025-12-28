@@ -2,6 +2,7 @@ use super::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
+#[derive(Default)]
 pub struct TestPlugin;
 
 impl Plugin for TestPlugin {

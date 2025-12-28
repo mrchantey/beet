@@ -91,6 +91,8 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
 	use beet_core::prelude::*;
 	use beet_net::prelude::Request;
+
+
 	App::new()
 		.add_plugins((MinimalPlugins, TestPlugin))
 		.spawn_then((

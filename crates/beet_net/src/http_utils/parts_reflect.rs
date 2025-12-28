@@ -134,29 +134,27 @@ fn build_dynamic_tuple_struct(
 	info: &TupleStructInfo,
 	field_prefix: Option<&str>,
 ) -> Result<Box<dyn PartialReflect>> {
+	// only single-field tuple structs (newtypes) are supported
+	if info.field_len() != 1 {
+		bevybail!("multi-field tuple structs not supported");
+	}
+
+	// field_prefix is required for tuple structs
+	let Some(prefix) = field_prefix else {
+		bevybail!("top level tuple structs not supported");
+	};
+
 	let mut dynamic = DynamicTupleStruct::default();
 
-	for field_idx in 0..info.field_len() {
-		let field = info.field_at(field_idx).ok_or_else(|| {
-			bevyhow!("tuple struct field at index {} not found", field_idx)
-		})?;
-		// tuple struct fields are accessed by index as string, unless we have a prefix
-		let field_name = if let Some(prefix) = field_prefix {
-			prefix.to_string()
-		} else {
-			field_idx.to_string()
-		};
-		let field_type_id = field.type_id();
-		let field_type_info = field.type_info();
+	let field = info
+		.field_at(0)
+		.ok_or_else(|| bevyhow!("tuple struct field at index 0 not found"))?;
 
-		let value = build_field_value(
-			map,
-			&field_name,
-			field_type_id,
-			field_type_info,
-		)?;
-		dynamic.insert_boxed(value);
-	}
+	let field_type_id = field.type_id();
+	let field_type_info = field.type_info();
+
+	let value = build_field_value(map, prefix, field_type_id, field_type_info)?;
+	dynamic.insert_boxed(value);
 
 	Ok(Box::new(dynamic))
 }
@@ -252,20 +250,11 @@ fn build_field_value(
 			}
 			TypeInfo::TupleStruct(tuple_struct_info) => {
 				// single-field tuple structs (newtypes) use parent field name
-				if tuple_struct_info.field_len() == 1 {
-					return build_dynamic_tuple_struct(
-						map,
-						tuple_struct_info,
-						Some(field_name),
-					);
-				} else {
-					// multi-field tuple structs are flattened
-					return build_dynamic_tuple_struct(
-						map,
-						tuple_struct_info,
-						None,
-					);
-				}
+				return build_dynamic_tuple_struct(
+					map,
+					tuple_struct_info,
+					Some(field_name),
+				);
 			}
 			TypeInfo::Tuple(_) => {
 				// tuples are always flattened
@@ -497,20 +486,6 @@ mod test {
 
 		let result = map.parse::<SimpleStruct>();
 		result.xpect_err();
-	}
-
-	#[derive(Debug, Default, Reflect, PartialEq)]
-	struct TupleStructWrapper(String, bool);
-
-	#[test]
-	fn parses_tuple_struct() {
-		let mut map = MultiMap::default();
-		map.insert("0".into(), "value".into());
-		map.insert("1".into(), "true".into());
-
-		let result: TupleStructWrapper = map.parse().unwrap();
-		result.0.xpect_eq("value".to_string());
-		result.1.xpect_true();
 	}
 
 	#[test]
