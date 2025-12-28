@@ -4,6 +4,9 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use bevy::reflect::Typed;
 
+
+// temp impl for matching an action with the exchange agent( request/response entity)
+// when we get many-many relations this should be easier
 pub trait ActionExchangePair {
 	fn get_action(&self) -> Entity;
 	fn get_exchange(&self) -> Entity;
@@ -25,6 +28,8 @@ impl ActionExchangePair for MiddlewareContext {
 	fn get_exchange(&self) -> Entity { self.exchange() }
 }
 
+
+// temp, this is getting messy
 pub struct ActionExchange {
 	pub action: Entity,
 	pub exchange: Entity,

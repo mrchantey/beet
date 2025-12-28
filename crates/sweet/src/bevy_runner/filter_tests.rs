@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-// use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use beet_router::prelude::*;
 
 
 #[derive(Reflect)]
@@ -14,7 +14,10 @@ pub struct FilterParams {
 }
 
 impl FilterParams {
-	fn try_wrap(mut self) -> Self {
+	fn parse(mut self, path_args: Option<&Vec<String>>) -> Self {
+		if let Some(args) = path_args {
+			self.filter = self.filter.extend_include(args);
+		}
 		if !self.exact {
 			self.filter.wrap_all_with_wildcard();
 		}
@@ -30,11 +33,21 @@ impl FilterParams {
 
 pub fn filter_tests(
 	mut commands: Commands,
-	requests: Populated<(&RequestMeta, &Children), Added<RequestMeta>>,
+	route_query: RouteQuery,
+	requests: Populated<(Entity, &RequestMeta, &Children), Added<RequestMeta>>,
 	tests: Populated<(Entity, &Test), Added<Test>>,
 ) -> Result {
-	for (request, children) in requests {
-		let filter = request.params().parse::<FilterParams>()?.try_wrap();
+	for (entity, request, children) in requests {
+		// TODO this is incorrect, action may be different entity
+		let path_match = route_query.path_match(&ActionExchange {
+			action: entity,
+			exchange: entity,
+		})?;
+		let path_args = path_match.dyn_map.get_vec("include");
+
+		let filter = request.params().parse::<FilterParams>()?.parse(path_args);
+
+
 
 		for (entity, _test) in children
 			.iter()
@@ -56,6 +69,7 @@ mod tests {
 	fn passes_filter(args: &str) -> bool {
 		let mut world = TestPlugin::world();
 		world.spawn((
+			PathPartial::new("*include?"),
 			Request::from_cli_args(CliArgs::parse(args)).unwrap(),
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));
@@ -68,6 +82,8 @@ mod tests {
 	#[test]
 	fn works() {
 		passes_filter("").xpect_true();
+		passes_filter("filter_tests.rs").xpect_true();
+		passes_filter("foobar").xpect_false();
 		passes_filter("--include foobar").xpect_false();
 		passes_filter("--include *filter_tests.rs").xpect_true();
 	}

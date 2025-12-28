@@ -23,6 +23,7 @@ serde = ["dep:serde", "dep:ron", "dep:serde_json"]
 beet_core.workspace = true
 beet_flow.workspace = true
 beet_net.workspace = true
+beet_router.workspace = true
 sweet_macros.workspace = true
 #💡 misc
 anyhow.workspace = true

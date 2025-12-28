@@ -9315,6 +9315,7 @@ dependencies = [
  "beet_core",
  "beet_flow",
  "beet_net",
+ "beet_router",
  "bevy",
  "clap",
  "colorize",
