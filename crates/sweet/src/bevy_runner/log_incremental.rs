@@ -89,7 +89,7 @@ mod tests {
 			TestPlugin,
 		));
 		app.world_mut().spawn((
-			Request::from_cli_args(CliArgs::parse("")).unwrap(),
+			Request::from_cli_str("").unwrap(),
 			tests_bundle(tests),
 		));
 		app.run();

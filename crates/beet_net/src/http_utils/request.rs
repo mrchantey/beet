@@ -289,6 +289,10 @@ impl Request {
 			body: default(),
 		})
 	}
+	pub fn from_cli_str(args: &str) -> Result<Self> {
+		let cli_args = CliArgs::parse(args);
+		Self::from_cli_args(cli_args)
+	}
 
 	/// Converts this request into an http::Request
 	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {

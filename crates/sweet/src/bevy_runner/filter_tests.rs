@@ -74,7 +74,7 @@ mod tests {
 		let mut world = TestPlugin::world();
 		world.spawn((
 			PathPartial::new("*include?"),
-			Request::from_cli_args(CliArgs::parse(args)).unwrap(),
+			Request::from_cli_str(args).unwrap(),
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));
 		world.update();
