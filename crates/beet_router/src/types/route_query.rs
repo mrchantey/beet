@@ -57,13 +57,6 @@ impl RouteQuery<'_, '_> {
 		self.requests.get(ev.get_exchange())?.method().xok()
 	}
 
-	pub fn params<T: 'static + Send + Sync + FromReflect + Typed>(
-		&self,
-		exchange: Entity,
-	) -> Result<T> {
-		self.requests.get(exchange)?.params().parse::<T>()
-	}
-
 	pub fn path_match(
 		&self,
 		ev: &impl ActionExchangePair,

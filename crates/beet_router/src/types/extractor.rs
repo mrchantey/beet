@@ -20,7 +20,7 @@ impl<T: Clone + FromReflect + Typed + Component> Extractor<'_, '_, T> {
 		if let Some(extractor) = extractor {
 			return Ok(extractor.clone());
 		} else {
-			let value = request.params().parse::<T>()?;
+			let value = request.params().parse_reflect::<T>()?;
 			self.commands.entity(exchange_entity).insert(value.clone());
 			Ok(value)
 		}

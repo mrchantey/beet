@@ -1,24 +1,27 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_router::prelude::Extractor;
 use yansi::Paint;
 
 
-#[derive(Reflect)]
+#[derive(Clone, Reflect, Component)]
 pub(super) struct LoggerParams {
 	/// Do not log test outcomes as they complete
 	no_incremental: bool,
 	no_color: bool,
+	quiet: bool,
 }
 
 /// Collects test outcomes once all tests have finished running
-pub fn log_incremental(
-	requests: Populated<(Entity, &RequestMeta, &Children), Added<RequestMeta>>,
+pub(super) fn log_incremental(
+	requests: Populated<(Entity, &Children), Added<RequestMeta>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
+	mut params: Extractor<LoggerParams>,
 ) -> Result {
-	for (_entity, req, children) in requests {
-		let params = req.params().parse::<LoggerParams>()?;
-		if params.no_incremental {
+	for (entity, children) in requests {
+		let params = params.get_param(entity)?;
+		if params.quiet || params.no_incremental {
 			continue;
 		}
 		let just_finished = children
@@ -30,6 +33,26 @@ pub fn log_incremental(
 			test_output_log(&params, test, outcome).xprint_display();
 		}
 	}
+	Ok(())
+}
+
+pub(super) fn log_final(
+	requests: Populated<(Entity, &FinalOutcome), Added<FinalOutcome>>,
+	mut params: Extractor<LoggerParams>,
+) -> Result {
+	for (entity, outcome) in requests {
+		let params = params.get_param(entity)?;
+		if params.quiet {
+			continue;
+		}
+		let num_fail = outcome.num_fail();
+		if num_fail == 0 {
+			beet_core::cross_log!("All Tests Passed");
+		} else {
+			beet_core::cross_log!("{} Tests Failed", num_fail);
+		};
+	}
+
 	Ok(())
 }
 
@@ -88,10 +111,8 @@ mod tests {
 			MinimalPlugins,
 			TestPlugin,
 		));
-		app.world_mut().spawn((
-			Request::from_cli_str("").unwrap(),
-			tests_bundle(tests),
-		));
+		app.world_mut()
+			.spawn((Request::from_cli_str("").unwrap(), tests_bundle(tests)));
 		app.run();
 	}
 

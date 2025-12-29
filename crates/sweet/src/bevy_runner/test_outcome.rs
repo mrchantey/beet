@@ -21,6 +21,8 @@ pub enum TestSkip {
 	CompileFail,
 	/// The test has an `#[ignore]` attribute
 	Ignore(Option<&'static str>),
+	/// The test was filtered out by user-specified filters
+	FailedFilter,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestFail {

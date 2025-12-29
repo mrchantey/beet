@@ -19,8 +19,9 @@ impl Plugin for TestPlugin {
 					filter_tests,
 					(run_tests_series, run_non_send_tests_series),
 					// #[cfg(not(test))]
-					log_incremental,
 					insert_final_outcome,
+					log_incremental,
+					log_final,
 					exit_on_done,
 				)
 					.chain(),

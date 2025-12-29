@@ -7,7 +7,7 @@ use beet_router::prelude::*;
 
 /// Allow filtering tests by either named params or positional arguments,
 /// so `test foobar.ts` is the same as `test --include foober.ts`
-#[derive(Reflect)]
+#[derive(Clone, Reflect, Component)]
 pub struct FilterParams {
 	filter: GlobFilter,
 	/// By default the glob filter will wrap
@@ -49,7 +49,11 @@ pub fn filter_tests(
 		})?;
 		let path_args = path_match.dyn_map.get_vec("include");
 
-		let filter = request.params().parse::<FilterParams>()?.parse(path_args);
+		// we dont use Extractor because this has extra extractor steps
+		let filter = request
+			.params()
+			.parse_reflect::<FilterParams>()?
+			.parse(path_args);
 
 
 
@@ -58,7 +62,9 @@ pub fn filter_tests(
 			.filter_map(|child| tests.get(child).ok())
 			.filter(|(_, test)| !filter.passes(test))
 		{
-			commands.entity(entity).insert(Disabled);
+			commands
+				.entity(entity)
+				.insert(TestOutcome::Skip(TestSkip::FailedFilter));
 		}
 	}
 	Ok(())
@@ -78,9 +84,7 @@ mod tests {
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));
 		world.update();
-		world
-			.query_filtered_once::<&Test, Without<Disabled>>()
-			.len() == 1
+		world.query_once::<&TestOutcome>()[0] == &TestOutcome::Pass
 	}
 
 	#[test]

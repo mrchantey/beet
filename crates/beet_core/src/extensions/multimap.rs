@@ -174,7 +174,7 @@ pub impl MultiMap<String, String> {
 	/// The type `T` must implement `Reflect`, `FromReflect`, and `Typed`.
 	/// Nested structs are flattened, meaning all field names must be unique
 	/// across the entire type hierarchy.
-	fn parse<T>(&self) -> Result<T>
+	fn parse_reflect<T>(&self) -> Result<T>
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
@@ -468,7 +468,7 @@ mod test {
 		map.insert("name".to_string(), "test".to_string());
 		map.insert("verbose".to_string(), "true".to_string());
 
-		let result: SimpleStruct = map.parse().unwrap();
+		let result: SimpleStruct = map.parse_reflect().unwrap();
 		result.name.xpect_eq("test".to_string());
 		result.verbose.xpect_true();
 	}
@@ -480,7 +480,7 @@ mod test {
 			let mut map = MultiMap::new();
 			map.insert("name".to_string(), "x".to_string());
 			map.insert("verbose".to_string(), val.to_string());
-			let result: SimpleStruct = map.parse().unwrap();
+			let result: SimpleStruct = map.parse_reflect().unwrap();
 			result.verbose.xpect_true();
 		}
 
@@ -489,7 +489,7 @@ mod test {
 			let mut map = MultiMap::new();
 			map.insert("name".to_string(), "x".to_string());
 			map.insert("verbose".to_string(), val.to_string());
-			let result: SimpleStruct = map.parse().unwrap();
+			let result: SimpleStruct = map.parse_reflect().unwrap();
 			result.verbose.xpect_false();
 		}
 	}
@@ -499,7 +499,7 @@ mod test {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
 
-		let result: SimpleStruct = map.parse().unwrap();
+		let result: SimpleStruct = map.parse_reflect().unwrap();
 		result.verbose.xpect_false();
 	}
 
@@ -515,7 +515,7 @@ mod test {
 		map.insert("required".to_string(), "req".to_string());
 		map.insert("optional".to_string(), "opt".to_string());
 
-		let result: WithOptional = map.parse().unwrap();
+		let result: WithOptional = map.parse_reflect().unwrap();
 		result.required.xpect_eq("req".to_string());
 		result.optional.xpect_eq(Some("opt".to_string()));
 	}
@@ -525,7 +525,7 @@ mod test {
 		let mut map = MultiMap::new();
 		map.insert("required".to_string(), "req".to_string());
 
-		let result: WithOptional = map.parse().unwrap();
+		let result: WithOptional = map.parse_reflect().unwrap();
 		result.required.xpect_eq("req".to_string());
 		result.optional.xpect_eq(None);
 	}
@@ -544,7 +544,7 @@ mod test {
 		map.insert("tags".to_string(), "b".to_string());
 		map.insert("tags".to_string(), "c".to_string());
 
-		let result: WithVec = map.parse().unwrap();
+		let result: WithVec = map.parse_reflect().unwrap();
 		result.name.xpect_eq("test".to_string());
 		result.tags.xpect_eq(vec![
 			"a".to_string(),
@@ -558,7 +558,7 @@ mod test {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
 
-		let result: WithVec = map.parse().unwrap();
+		let result: WithVec = map.parse_reflect().unwrap();
 		result.tags.xpect_eq(Vec::<String>::new());
 	}
 
@@ -579,7 +579,7 @@ mod test {
 		map.insert("outer_field".to_string(), "outer".to_string());
 		map.insert("inner_field".to_string(), "inner".to_string());
 
-		let result: WithNested = map.parse().unwrap();
+		let result: WithNested = map.parse_reflect().unwrap();
 		result.outer_field.xpect_eq("outer".to_string());
 		result.nested.inner_field.xpect_eq("inner".to_string());
 	}
@@ -587,7 +587,7 @@ mod test {
 	#[test]
 	fn errors_on_missing_required_field() {
 		let map = MultiMap::<String, String>::new();
-		let result: Result<SimpleStruct> = map.parse();
+		let result: Result<SimpleStruct> = map.parse_reflect();
 		result.xpect_err();
 	}
 
@@ -597,7 +597,7 @@ mod test {
 		map.insert("name".to_string(), "test".to_string());
 		map.insert("verbose".to_string(), "invalid".to_string());
 
-		let result: Result<SimpleStruct> = map.parse();
+		let result: Result<SimpleStruct> = map.parse_reflect();
 		result.xpect_err();
 	}
 
@@ -607,7 +607,7 @@ mod test {
 		map.insert("name".to_string(), "test".to_string());
 		map.insert("verbose".to_string(), "".to_string());
 
-		let result: SimpleStruct = map.parse().unwrap();
+		let result: SimpleStruct = map.parse_reflect().unwrap();
 		result.verbose.xpect_true();
 	}
 
@@ -617,7 +617,7 @@ mod test {
 		map.insert("name".to_string(), "test".to_string());
 		map.insert_key("verbose".to_string());
 
-		let result: SimpleStruct = map.parse().unwrap();
+		let result: SimpleStruct = map.parse_reflect().unwrap();
 		result.verbose.xpect_true();
 	}
 
@@ -627,7 +627,7 @@ mod test {
 		map.insert("0".to_string(), "first".to_string());
 		map.insert("1".to_string(), "second".to_string());
 
-		let result: (String, String) = map.parse().unwrap();
+		let result: (String, String) = map.parse_reflect().unwrap();
 		result.0.xpect_eq("first".to_string());
 		result.1.xpect_eq("second".to_string());
 	}
@@ -656,7 +656,7 @@ mod test {
 		map.insert("mid_field".to_string(), "mid".to_string());
 		map.insert("deep_field".to_string(), "deep".to_string());
 
-		let result: Level0 = map.parse().unwrap();
+		let result: Level0 = map.parse_reflect().unwrap();
 		result.top_field.xpect_eq("top".to_string());
 		result.level1.mid_field.xpect_eq("mid".to_string());
 		result.level1.level2.deep_field.xpect_eq("deep".to_string());
@@ -679,7 +679,7 @@ mod test {
 		map.insert("vec_field".to_string(), "a".to_string());
 		map.insert("vec_field".to_string(), "b".to_string());
 
-		let result: AllFieldTypes = map.parse().unwrap();
+		let result: AllFieldTypes = map.parse_reflect().unwrap();
 		result.string_field.xpect_eq("hello".to_string());
 		result.bool_field.xpect_true();
 		result.optional_field.xpect_eq(Some("present".to_string()));
@@ -713,7 +713,7 @@ mod test {
 		map.insert("bazz".to_string(), "a".to_string());
 		map.insert("bazz".to_string(), "b".to_string());
 
-		let result: ParamsWithNewtypes = map.parse().unwrap();
+		let result: ParamsWithNewtypes = map.parse_reflect().unwrap();
 		result.foo.0.xpect_eq("hello".to_string());
 		result.bar.len().xpect_eq(2);
 		result.bar[0].0.xpect_true();
@@ -751,7 +751,7 @@ mod test {
 		map.insert("bazz".to_string(), "y".to_string());
 		map.insert("bazz".to_string(), "z".to_string());
 
-		let result: UserParams = map.parse().unwrap();
+		let result: UserParams = map.parse_reflect().unwrap();
 		result.foo.0.xpect_eq("test_value".to_string());
 		result.bar.len().xpect_eq(3);
 		result.bar[0].0.xpect_true();
