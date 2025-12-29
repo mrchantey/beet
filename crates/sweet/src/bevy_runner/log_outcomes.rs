@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_router::prelude::Extractor;
+use beet_router::prelude::*;
 use yansi::Paint;
 
 
@@ -13,6 +13,13 @@ pub(super) struct LoggerParams {
 	quiet: bool,
 }
 
+impl RequestMetaExtractor for LoggerParams {
+	fn extract(request: &RequestMeta) -> Result<Self> {
+		request.params().parse_reflect()
+	}
+}
+
+
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_incremental(
 	requests: Populated<(Entity, &Children), Added<RequestMeta>>,
@@ -20,7 +27,7 @@ pub(super) fn log_incremental(
 	mut params: Extractor<LoggerParams>,
 ) -> Result {
 	for (entity, children) in requests {
-		let params = params.get_param(entity)?;
+		let params = params.get(entity)?;
 		if params.quiet || params.no_incremental {
 			continue;
 		}
@@ -41,7 +48,7 @@ pub(super) fn log_final(
 	mut params: Extractor<LoggerParams>,
 ) -> Result {
 	for (entity, outcome) in requests {
-		let params = params.get_param(entity)?;
+		let params = params.get(entity)?;
 		if params.quiet {
 			continue;
 		}

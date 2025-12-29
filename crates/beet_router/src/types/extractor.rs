@@ -3,6 +3,14 @@ use beet_net::prelude::*;
 use bevy::reflect::Typed;
 
 
+// TODO so similar to FromRequestMeta
+pub trait RequestMetaExtractor:
+	Sized + Clone + FromReflect + Typed + Component
+{
+	fn extract(request: &RequestMeta) -> Result<Self>;
+}
+
+
 /// A system param for extracting types from request params,
 /// and caching them by inserting as components alongside the request.
 #[derive(SystemParam)]
@@ -12,15 +20,15 @@ pub struct Extractor<'w, 's, T: Component> {
 }
 
 
-impl<T: Clone + FromReflect + Typed + Component> Extractor<'_, '_, T> {
+impl<T: RequestMetaExtractor> Extractor<'_, '_, T> {
 	/// Attempt to extract the param from the request, inserting it into the
 	/// request entity if it is missing.
-	pub fn get_param(&mut self, exchange_entity: Entity) -> Result<T> {
+	pub fn get(&mut self, exchange_entity: Entity) -> Result<T> {
 		let (request, extractor) = self.requests.get(exchange_entity)?;
 		if let Some(extractor) = extractor {
 			return Ok(extractor.clone());
 		} else {
-			let value = request.params().parse_reflect::<T>()?;
+			let value = T::extract(request)?;
 			self.commands.entity(exchange_entity).insert(value.clone());
 			Ok(value)
 		}
@@ -40,11 +48,17 @@ mod tests {
 			foo: bool,
 		}
 
+		impl RequestMetaExtractor for Foo {
+			fn extract(request: &RequestMeta) -> Result<Self> {
+				request.params().parse_reflect()
+			}
+		}
+
 		let mut world = World::new();
 		let entity = world.spawn(Request::from_cli_str("--foo").unwrap()).id();
 		world
 			.run_system_once(move |mut foo: Extractor<Foo>| {
-				foo.get_param(entity).unwrap()
+				foo.get(entity).unwrap()
 			})
 			.unwrap()
 			.foo

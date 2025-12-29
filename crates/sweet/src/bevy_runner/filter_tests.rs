@@ -16,6 +16,13 @@ pub struct FilterParams {
 	exact: bool,
 }
 
+impl RequestMetaExtractor for FilterParams {
+	fn extract(request: &RequestMeta) -> Result<Self> {
+		request.params().parse_reflect()
+	}
+}
+
+
 impl FilterParams {
 	/// merge the positional args with params, and check for 'exact' specification
 	fn parse(mut self, path_args: Option<&Vec<String>>) -> Self {

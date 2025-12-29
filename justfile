@@ -9,7 +9,7 @@
 
 set dotenv-load := true
 
-# it keeps asking for bigger stacks.. this is 1GB :(
+# fresh compile of beet is so big it keeps asking for bigger stacks.. this is 1GB 😭
 
 export RUST_MIN_STACK := '1073741824'
 
