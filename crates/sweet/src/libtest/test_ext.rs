@@ -81,7 +81,7 @@ pub fn clone_static(test: &TestDescAndFn) -> TestDescAndFn {
 			testfn: TestFn::StaticBenchFn(f),
 			desc: test.desc.clone(),
 		},
-		_ => panic!("non-static tests passed to test::test_main_static"),
+		_ => panic!("non-static tests cannot be cloned"),
 	}
 }
 

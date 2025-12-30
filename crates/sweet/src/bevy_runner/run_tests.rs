@@ -153,32 +153,11 @@ mod tests {
 		);
 	}
 
-	#[test]
-	fn works_async() {
-		register_async_test(async {
-			time_ext::sleep_millis(10).await;
-			Ok(())
-		});
-	}
-	#[test]
-	#[should_panic]
-	fn panics_async() {
-		register_async_test(async {
-			panic!();
-		});
-	}
-
-	#[test]
-	#[should_panic]
-	fn panics() {
-		panic!();
-	}
-
 	// Async tests cannot be tested in nested apps on WASM because
 	// async tasks require JS event loop ticks to progress, which don't
 	// happen in a synchronous update loop. These tests work on native.
-	#[cfg(not(target_arch = "wasm32"))]
 	#[test]
+	#[cfg_attr(target_arch = "wasm32", ignore)]
 	fn works_async() {
 		use crate::bevy_runner::register_async_test;
 

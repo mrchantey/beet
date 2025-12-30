@@ -17,7 +17,7 @@ pub trait Xtend: Sized {
 	where
 		Self: std::fmt::Debug,
 	{
-		println!("{}: {:#?}", prefix.as_ref(), self);
+		crate::cross_log!("{}: {:#?}", prefix.as_ref(), self);
 		self
 	}
 	/// just print the value and return it
@@ -25,7 +25,7 @@ pub trait Xtend: Sized {
 	where
 		Self: std::fmt::Display,
 	{
-		println!("{}", self);
+		crate::cross_log!("{}", self);
 		self
 	}
 	/// just print the value and return it, debug
@@ -33,7 +33,7 @@ pub trait Xtend: Sized {
 	where
 		Self: std::fmt::Debug,
 	{
-		println!("{:?}", self);
+		crate::cross_log!("{:?}", self);
 		self
 	}
 	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.
