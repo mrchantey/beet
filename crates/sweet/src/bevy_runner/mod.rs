@@ -14,5 +14,5 @@ mod run_tests;
 pub(self) use run_tests::*;
 mod filter_tests;
 pub use filter_tests::*;
-mod log_outcomes;
-pub(self) use log_outcomes::*;
+mod logger;
+pub(self) use logger::*;

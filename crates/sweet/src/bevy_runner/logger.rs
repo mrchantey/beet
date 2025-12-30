@@ -27,22 +27,22 @@ impl RequestMetaExtractor for LoggerParams {
 pub(super) fn log_initial(
 	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
 	mut logger_params: Extractor<LoggerParams>,
-	mut filter_params: Extractor<FilterParams>,
+	// mut filter_params: Extractor<FilterParams>,
 ) -> Result {
-	for (entity, req) in requests {
+	for (entity, _req) in requests {
 		let logger_params = logger_params.get(entity)?;
 		if logger_params.quiet {
 			continue;
 		}
-		let filter_params = filter_params.get(entity)?;
 
 		let mut out = Vec::new();
 
-		out.push(format!("Request: {:#?}", req));
-		out.push(format!("Test filter: {:#?}", filter_params));
+		out.push("🤘 sweet as 🤘".to_string());
+		// out.push(format!("Request: {:#?}", req));
+		// out.push(format!("Test filter: {:#?}", filter_params));
 
 
-		beet_core::cross_log!("{}", out.join("\n"));
+		beet_core::cross_log!("\n{}", out.join("\n"));
 	}
 	Ok(())
 }
@@ -138,9 +138,6 @@ pub(super) fn log_final(
 			continue;
 		}
 		let mut out = Vec::new();
-		out.push(summary_message(&params, outcome));
-		out.push(test_stats(&params, outcome));
-		out.push(run_stats(&params, outcome, req));
 		if outcome.num_fail() != 0 {
 			for (test, case_outcome) in
 				children.iter().filter_map(|child| tests.get(child).ok())
@@ -156,6 +153,9 @@ pub(super) fn log_final(
 				}
 			}
 		}
+		out.push(summary_message(&params, outcome));
+		out.push(String::new());
+		out.push(run_stats(&params, outcome, req));
 		beet_core::cross_log!("\n{}", out.join("\n"));
 	}
 
@@ -224,28 +224,13 @@ fn run_stats(
 ) -> String {
 	let duration = req.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
-	let num_ran = if params.no_color {
-		outcome.num_ran().xfmt_display()
-	} else {
-		Style::new()
-			.bold()
-			.paint(outcome.num_ran().xfmt_display())
-			.to_string()
-	};
-	let num_total = if params.no_color {
-		outcome.num_total().xfmt_display()
-	} else {
-		Style::new()
-			.bold()
-			.paint(outcome.num_total().xfmt_display())
-			.to_string()
-	};
 	let time = if params.no_color {
 		time
 	} else {
 		Color::Blue.bold().paint(time).to_string()
 	};
-	format!("{} of {} ran in {}", num_ran, num_total, time)
+	let test_stats = test_stats(params, outcome);
+	format!("{} in {}", test_stats, time)
 }
 
 fn failed_file_context(
@@ -254,12 +239,11 @@ fn failed_file_context(
 	outcome: &TestFail,
 ) -> Result<String> {
 	const LINE_CONTEXT_SIZE: usize = 2;
-
+	const TAB_SPACES: usize = 2;
 
 
 	let path = test.path().into_abs();
 	let file = fs_ext::read_to_string(path)?;
-	let file = file.replace('\t', "  ");
 	let lines = file.split('\n').collect::<Vec<_>>();
 	let max_digits = lines.len().to_string().len();
 
@@ -294,8 +278,11 @@ fn failed_file_context(
 			line_prefix = Style::new().dimmed().paint(line_prefix).to_string();
 		}
 
+		// replace tabs with spaces
+		let line_with_spaces = lines[i].replace("\t", &" ".repeat(TAB_SPACES));
+
 		// let prefix_len = 6;
-		output.push(format!("{} {}{}", prefix, line_prefix, lines[i]));
+		output.push(format!("{} {}{}", prefix, line_prefix, line_with_spaces));
 		if is_err_line {
 			let mut empty_line_prefix =
 				format!("{}|", " ".repeat(2 + max_digits));
@@ -364,7 +351,7 @@ fn fail_reason(params: &LoggerParams, outcome: &TestFail) -> String {
 				}
 				format!("{} {}", prefix, payload)
 			} else {
-				let mut prefix = "Panicked".to_string();
+				let mut prefix = "Panicked - opaque payload".to_string();
 				if !params.no_color {
 					prefix = Style::new().bold().paint(prefix).to_string();
 				}

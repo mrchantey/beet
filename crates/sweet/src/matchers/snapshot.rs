@@ -36,7 +36,7 @@ where
 					// snapshot saved, no assertion made
 				}
 				Err(e) => {
-					assert_ext::panic(e.to_string());
+					std::panic::panic_any(e.to_string());
 				}
 			}
 		}
@@ -47,19 +47,18 @@ where
 
 // returns whether the assertion should be made
 #[allow(dead_code)]
+#[track_caller]
 fn parse_snapshot(received: &str) -> Result<Option<String>> {
-	let desc = SweetTestCollector::current_test_desc()
-		.ok_or_else(|| anyhow::anyhow!("No current test description found"))?;
-
+	let loc = core::panic::Location::caller();
+	let snap_name = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
 	// use test name instead of linecol, which would no longer match on any line/col shifts
-	let file_name =
-		format!(".sweet/snapshots/{}::{}.ron", desc.source_file, desc.name);
+	let file_name = format!(".sweet/snapshots/{}.ron", snap_name);
 
 	let save_path = AbsPathBuf::new_workspace_rel(file_name)?;
 
 	if std::env::args().any(|arg| arg == "--snap") {
 		fs_ext::write(&save_path, received)?;
-		println!("Snapshot saved: {}", desc.name);
+		println!("Snapshot saved: {}", snap_name);
 		Ok(None)
 	} else {
 		let expected = fs_ext::read_to_string(&save_path).map_err(|_| {
