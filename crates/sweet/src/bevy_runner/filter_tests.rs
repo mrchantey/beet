@@ -7,9 +7,9 @@ use beet_router::prelude::*;
 
 /// Allow filtering tests by either named params or positional arguments,
 /// so `test foobar.ts` is the same as `test --include foober.ts`
-#[derive(Clone, Reflect, Component)]
+#[derive(Debug, Clone, Reflect, Component)]
 pub struct FilterParams {
-	filter: GlobFilter,
+	pub filter: GlobFilter,
 	/// By default the glob filter will wrap
 	/// all patterns in wildcards, so `*foo*` will match `/foo.rs`.
 	/// Specify `--exact` to disable this, ensuring an exact match.

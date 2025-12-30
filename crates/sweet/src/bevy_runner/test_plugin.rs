@@ -2,6 +2,21 @@ use super::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
+
+pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
+	use beet_net::prelude::*;
+	use beet_router::prelude::*;
+	App::new()
+		.add_plugins((MinimalPlugins, TestPlugin))
+		.spawn_then((
+			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
+			PathPartial::new("*include?"),
+			tests_bundle_borrowed(tests),
+		))
+		.run();
+}
+
+
 #[derive(Default)]
 pub struct TestPlugin;
 
@@ -16,6 +31,7 @@ impl Plugin for TestPlugin {
 			.add_systems(
 				RunTests,
 				(
+					log_initial,
 					filter_tests,
 					(run_tests_series, run_non_send_tests_series),
 					// #[cfg(not(test))]

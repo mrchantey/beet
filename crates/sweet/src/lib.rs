@@ -1,5 +1,5 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(crate::test_runner))]
+#![cfg_attr(test, test_runner(crate::test_runner2))]
 // #![feature(test)]
 // remove after bevy refactor
 #![allow(deprecated)]
@@ -21,11 +21,9 @@
 
 extern crate test;
 // the #[sweet::test] macro
+pub use bevy_runner::test_runner2;
 pub use sweet_macros;
 pub use sweet_macros::test;
-
-use crate::prelude::TestPlugin;
-use crate::prelude::tests_bundle_borrowed;
 pub mod bevy_runner;
 // #[cfg(test)]
 // use libtest_runner::testlib_runner as libtest_runner;
@@ -87,19 +85,4 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 		eprintln!("Test runner failed: {e}");
 		std::process::exit(1);
 	}
-}
-
-
-pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
-	use beet_core::prelude::*;
-	use beet_net::prelude::Request;
-
-
-	App::new()
-		.add_plugins((MinimalPlugins, TestPlugin))
-		.spawn_then((
-			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
-			tests_bundle_borrowed(tests),
-		))
-		.run();
 }

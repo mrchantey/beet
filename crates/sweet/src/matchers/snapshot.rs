@@ -16,6 +16,7 @@ where
 	/// Snapshots are saved using test name so only one snapshot per test is allowed.
 	/// # Panics
 	/// If the snapshot file cannot be read or written.
+	#[track_caller]
 	fn xpect_snapshot(&self) -> &Self {
 		#[cfg(target_arch = "wasm32")]
 		{

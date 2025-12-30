@@ -10,7 +10,11 @@ use nu_ansi_term::Style;
 pub(super) struct LoggerParams {
 	/// Do not log test outcomes as they complete
 	no_incremental: bool,
+	/// Log each skipped test
+	log_skipped: bool,
+	/// Disable ANSII colored output
 	no_color: bool,
+	/// Suppress all logger output
 	quiet: bool,
 }
 
@@ -20,10 +24,33 @@ impl RequestMetaExtractor for LoggerParams {
 	}
 }
 
+pub(super) fn log_initial(
+	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
+	mut logger_params: Extractor<LoggerParams>,
+	mut filter_params: Extractor<FilterParams>,
+) -> Result {
+	for (entity, req) in requests {
+		let logger_params = logger_params.get(entity)?;
+		if logger_params.quiet {
+			continue;
+		}
+		let filter_params = filter_params.get(entity)?;
+
+		let mut out = Vec::new();
+
+		out.push(format!("Request: {:#?}", req));
+		out.push(format!("Test filter: {:#?}", filter_params));
+
+
+		beet_core::cross_log!("{}", out.join("\n"));
+	}
+	Ok(())
+}
+
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_incremental(
-	requests: Populated<(Entity, &Children), Added<RequestMeta>>,
+	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
 	mut params: Extractor<LoggerParams>,
 ) -> Result {
@@ -38,6 +65,9 @@ pub(super) fn log_incremental(
 			.collect::<Vec<_>>();
 
 		for (test, outcome) in &just_finished {
+			if outcome.is_skip() && !params.log_skipped {
+				continue;
+			}
 			test_output_log(&params, test, outcome).xprint_display();
 		}
 	}
@@ -293,7 +323,7 @@ fn failed_heading(
 	test: &Test,
 	outcome: &TestFail,
 ) -> String {
-	let mut title = format!("Fail Summary · {}", test.short_file_and_name());
+	let mut title = test.short_file_and_name();
 	let reason = fail_reason(params, outcome);
 
 	if !params.no_color {
