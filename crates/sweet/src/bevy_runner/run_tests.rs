@@ -95,8 +95,10 @@ mod tests {
 			MinimalPlugins,
 			TestPlugin,
 		));
-		app.world_mut()
-			.spawn((Request::get("foo"), tests_bundle(vec![test])));
+		app.world_mut().spawn((
+			Request::from_cli_str("--quiet").unwrap(),
+			tests_bundle(vec![test]),
+		));
 		let store = Store::new(None);
 
 		app.add_observer(

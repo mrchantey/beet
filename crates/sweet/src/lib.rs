@@ -13,6 +13,7 @@
 		fn_traits,
 		backtrace_frames,
 		unboxed_closures,
+		if_let_guard,
 		test,
 		closure_track_caller
 	)

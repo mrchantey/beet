@@ -96,10 +96,10 @@ mod tests {
 
 	#[test]
 	fn works() {
-		passes_filter("").xpect_true();
-		passes_filter("filter_tests.rs").xpect_true();
-		passes_filter("foobar").xpect_false();
-		passes_filter("--include foobar").xpect_false();
-		passes_filter("--include *filter_tests.rs").xpect_true();
+		passes_filter("--quiet").xpect_true();
+		passes_filter("filter_tests.rs --quiet").xpect_true();
+		passes_filter("foobar --quiet").xpect_false();
+		passes_filter("--quiet --include foobar").xpect_false();
+		passes_filter("--quiet --include *filter_tests.rs").xpect_true();
 	}
 }

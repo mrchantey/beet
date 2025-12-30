@@ -1,3 +1,4 @@
+use beet_core::prelude::*;
 use test::ShouldPanic;
 use test::TestDesc;
 use test::TestDescAndFn;
@@ -39,8 +40,33 @@ pub trait TestDescExt {
 		}
 	}
 
-	fn file_and_short_name(&self) -> String {
-		format!("{}::{}", self.desc().source_file, self.short_name())
+	fn path(&self) -> WsPathBuf { WsPathBuf::new(self.desc().source_file) }
+
+	fn start(&self) -> LineCol {
+		LineCol {
+			line: self.desc().start_line as u32,
+			col: self.desc().start_col as u32,
+		}
+	}
+
+	fn end(&self) -> LineCol {
+		LineCol {
+			line: self.desc().end_line as u32,
+			col: self.desc().end_col as u32,
+		}
+	}
+
+	/// Spits the file name at 'src' and returns the final part
+	fn short_file(&self) -> &str {
+		let full_file = self.desc().source_file;
+		match full_file.rfind("src/") {
+			Some(idx) => &full_file[idx + 4..],
+			None => full_file,
+		}
+	}
+
+	fn short_file_and_name(&self) -> String {
+		format!("{} · {}", self.short_file(), self.short_name())
 	}
 
 	/// Set whether the test should be ignored.

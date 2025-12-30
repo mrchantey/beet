@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// the error message
@@ -39,6 +40,34 @@ pub enum TestFail {
 		location: Option<FileSpan>,
 	},
 }
+
+impl TestFail {
+	/// Gets the start location of the failure,
+	/// or the test location
+	pub fn start(&self, test: &Test) -> LineCol {
+		match self {
+			TestFail::Panic { location, .. }
+				if let Some(location) = location =>
+			{
+				location.start()
+			}
+			_ => test.start(),
+		}
+	}
+	/// Gets the end location of the failure,
+	/// or the test location
+	pub fn end(&self, test: &Test) -> LineCol {
+		match self {
+			TestFail::Panic { location, .. }
+				if let Some(location) = location =>
+			{
+				location.end()
+			}
+			_ => test.end(),
+		}
+	}
+}
+
 
 impl Into<TestOutcome> for TestFail {
 	fn into(self) -> TestOutcome { TestOutcome::Fail(self) }

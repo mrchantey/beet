@@ -12,10 +12,18 @@ pub struct FinalOutcome {
 }
 
 impl FinalOutcome {
+	/// number of tests that passed
 	pub fn num_pass(&self) -> usize { self.num_pass }
+	/// number of tests that were skipped
 	pub fn num_skip(&self) -> usize { self.num_skip }
+	/// number of tests that failed
 	pub fn num_fail(&self) -> usize { self.num_fail }
-
+	/// number of tests that were run (not skipped)
+	pub fn num_ran(&self) -> usize { self.num_pass + self.num_fail }
+	/// total number of tests, including those skipped
+	pub fn num_total(&self) -> usize {
+		self.num_pass + self.num_skip + self.num_fail
+	}
 
 	pub fn new(tests: &[(&Test, &TestOutcome)]) -> Self {
 		let mut num_pass = 0;
