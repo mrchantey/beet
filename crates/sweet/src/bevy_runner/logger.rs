@@ -345,13 +345,13 @@ fn fail_reason(params: &LoggerParams, outcome: &TestFail) -> String {
 		}
 		TestFail::Panic { payload, .. } => {
 			if let Some(payload) = payload {
-				let mut prefix = "Panicked:".to_string();
+				let mut prefix = "".to_string();
 				if !params.no_color {
 					prefix = Style::new().bold().paint(prefix).to_string();
 				}
-				format!("{} {}", prefix, payload)
+				format!("{}\n{}", prefix, payload)
 			} else {
-				let mut prefix = "Panicked - opaque payload".to_string();
+				let mut prefix = "Panic - opaque payload".to_string();
 				if !params.no_color {
 					prefix = Style::new().bold().paint(prefix).to_string();
 				}
