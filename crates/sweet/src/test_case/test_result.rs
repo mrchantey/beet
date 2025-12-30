@@ -73,27 +73,21 @@ impl TestResult {
 					BacktraceLocation::from_panic_info(info, desc)
 						.file_context()
 				};
-				let (payload, bt) =
+				let payload =
 					if let Some(str) = info.payload().downcast_ref::<&str>() {
-						(str.to_string(), panic_ctx())
+						str.to_string()
 					} else if let Some(str) =
 						info.payload().downcast_ref::<String>()
 					{
-						(str.clone(), panic_ctx())
+						str.clone()
 					} else if let Some(sweet_error) =
 						info.payload().downcast_ref::<SweetError>()
 					{
-						// in wasm the panic location is useless because its nested inside
-						// the matcher, use the desc location instead
-						#[cfg(target_arch = "wasm32")]
-						let bt_str = BacktraceLocation::from_test_desc(desc).file_context();
-						#[cfg(not(target_arch = "wasm32"))]
-						let bt_str = sweet_error.backtrace_str();
-						let payload = sweet_error.message.clone();
-						(payload, bt_str)
+						sweet_error.message.clone()
 					} else {
-						("Unknown Payload".to_string(), panic_ctx())
+						"Unknown Payload".to_string()
 					};
+				let bt = panic_ctx();
 
 				TestResult::Fail(Self::format_backtrace(
 					payload,

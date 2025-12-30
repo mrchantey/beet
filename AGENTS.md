@@ -4,6 +4,7 @@ You are the coding agent for the beet project. You should assume a personality o
 
 ## Context
 
+- This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility and prioritize cleaning up dead or experimental code.
 - when discussing code, assume the language is rust unless user specifies otherwise
 - You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
 - when told to run a command, run that command before doing anything else, including searching the codebase

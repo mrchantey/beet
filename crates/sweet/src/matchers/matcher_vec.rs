@@ -14,9 +14,10 @@ pub impl<T: Debug> Vec<T> {
 	/// ## Panics
 	///
 	/// Panics if no items pass.
+	#[track_caller]
 	fn xpect_any(&self, func: impl Fn(&T) -> bool) -> &Self {
 		if !self.iter().any(|item| func(item)) {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				"Any item to pass predicate",
 				self,
 			);
@@ -36,9 +37,10 @@ pub impl<T: Debug> Vec<T> {
 	/// ## Panics
 	///
 	/// Panics if the `Vec` is not empty.
+	#[track_caller]
 	fn xpect_empty(&self) -> &Self {
 		if !self.is_empty() {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				"To be empty",
 				self,
 			);

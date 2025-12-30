@@ -17,11 +17,12 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `ControlFlow::Continue`.
+	#[track_caller]
 	fn xpect_continue(&self) -> &Self {
 		match self {
 			ControlFlow::Continue(_) => self,
 			ControlFlow::Break(_) => {
-				assert_ext::panic_expected_received_display_debug(
+				panic_ext::panic_expected_received_display_debug(
 					"Continue", self,
 				);
 			}
@@ -41,11 +42,12 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `ControlFlow::Break`.
+	#[track_caller]
 	fn xpect_break(&self) -> &Self {
 		match self {
 			ControlFlow::Break(_) => self,
 			ControlFlow::Continue(_) => {
-				assert_ext::panic_expected_received_display_debug(
+				panic_ext::panic_expected_received_display_debug(
 					"Break", self,
 				);
 			}

@@ -1,7 +1,7 @@
+use crate::matchers::paint_ext;
 use crate::prelude::*;
 use anyhow::Result;
 use beet_core::prelude::*;
-use colorize::AnsiColor;
 #[cfg(feature = "tokens")]
 use proc_macro2::TokenStream;
 #[cfg(feature = "tokens")]
@@ -27,7 +27,7 @@ where
 			let received = self.to_comp_string();
 			match parse_snapshot(&received) {
 				Ok(Some(expected)) => {
-					assert_ext::assert_diff(
+					panic_ext::assert_diff(
 						&expected,
 						received.into_maybe_not(),
 					);
@@ -73,7 +73,7 @@ Received:
 {}
 				",
 				&save_path,
-				received.to_string().red(),
+				paint_ext::red(received),
 			)
 		})?;
 

@@ -14,11 +14,12 @@ pub impl<T> Option<T> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `Some(_)`.
+	#[track_caller]
 	fn xpect_some(&self) -> &Self {
 		match self {
 			Some(_) => self,
 			None => {
-				assert_ext::panic_expected_received_display("Some", "None");
+				panic_ext::panic_expected_received_display("Some", "None");
 			}
 		}
 	}
@@ -35,11 +36,12 @@ pub impl<T> Option<T> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `None`.
+	#[track_caller]
 	fn xpect_none(&self) -> &Self {
 		match self {
 			None => self,
 			Some(_) => {
-				assert_ext::panic_expected_received_display("None", "Some");
+				panic_ext::panic_expected_received_display("None", "Some");
 			}
 		}
 	}

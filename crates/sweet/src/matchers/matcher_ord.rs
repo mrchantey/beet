@@ -15,11 +15,12 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not less than `other`.
+	#[track_caller]
 	fn xpect_less_than(&self, other: T) -> &Self {
 		if *self < other {
 			self
 		} else {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				&format!("less than {:?}", other),
 				self,
 			);
@@ -37,11 +38,12 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not less or equal to `other`.
+	#[track_caller]
 	fn xpect_less_or_equal_to(&self, other: T) -> &Self {
 		if *self <= other {
 			self
 		} else {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				&format!("less or equal to {:?}", other),
 				self,
 			);
@@ -59,11 +61,12 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not greater than `other`.
+	#[track_caller]
 	fn xpect_greater_than(&self, other: T) -> &Self {
 		if *self > other {
 			self
 		} else {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				&format!("greater than {:?}", other),
 				self,
 			);
@@ -81,11 +84,12 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Panics
 	///
 	/// Panics if the value is not greater or equal to `other`.
+	#[track_caller]
 	fn xpect_greater_or_equal_to(&self, other: T) -> &Self {
 		if *self >= other {
 			self
 		} else {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				&format!("greater or equal to {:?}", other),
 				self,
 			);

@@ -15,11 +15,12 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `Ok(_)`.
+	#[track_caller]
 	fn xpect_ok(&self) -> &Self {
 		match self {
 			Ok(_) => self,
 			Err(_) => {
-				assert_ext::panic_expected_received_display_debug("Ok", self);
+				panic_ext::panic_expected_received_display_debug("Ok", self);
 			}
 		}
 	}
@@ -35,11 +36,12 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// ## Panics
 	///
 	/// Panics if the value is not `Err(_)`.
+	#[track_caller]
 	fn xpect_err(&self) -> &Self {
 		match self {
 			Err(_) => self,
 			Ok(_) => {
-				assert_ext::panic_expected_received_display_debug("Err", self);
+				panic_ext::panic_expected_received_display_debug("Err", self);
 			}
 		}
 	}
