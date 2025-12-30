@@ -75,6 +75,21 @@ pub impl App {
 		self.update();
 		self.should_exit().unwrap_or(AppExit::Success)
 	}
+
+
+	/// Running nested apps can break the ScheduleRunnerPlugin in wasm,
+	/// this just runs on a loop with zero breaks
+	fn run_loop(&mut self) -> AppExit {
+		self.init();
+		loop {
+			self.update();
+			if let Some(exit_code) = self.should_exit() {
+				return exit_code;
+			}
+		}
+	}
+
+
 	/// run an io task to completion, polling at 10 millisecond intervals
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where

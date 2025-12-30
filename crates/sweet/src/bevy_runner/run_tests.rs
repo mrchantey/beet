@@ -107,7 +107,8 @@ mod tests {
 				store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
 			},
 		);
-		app.run();
+
+		app.run_loop();
 		store.get().unwrap()
 	}
 

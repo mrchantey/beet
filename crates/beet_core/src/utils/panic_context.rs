@@ -62,9 +62,9 @@ impl PanicContext {
 		if INITIALIZED.get().is_none() {
 			Self::init();
 		}
-		CONTEXT.with(|cx| {
-			cx.set(None);
-		});
+		// keep previous, incase nested context
+		let prev_cx = CONTEXT.with(|cx| cx.take());
+		let prev_scope = IN_SCOPE.with(|in_scope| in_scope.get());
 		IN_SCOPE.with(|in_scope| in_scope.set(true));
 		// 2. run function
 		#[cfg(target_arch = "wasm32")]
@@ -81,11 +81,9 @@ impl PanicContext {
 		};
 		#[cfg(not(target_arch = "wasm32"))]
 		let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(func));
-		// 3. reset scope
-		IN_SCOPE.with(|in_scope| in_scope.set(false));
 
-		// 4. map and return the result
-		match result {
+		// 3. map the result
+		let result = match result {
 			Ok(Poll::Ready(Ok(()))) => Poll::Ready(PanicResult::Ok),
 			Ok(Poll::Ready(Err(err))) => Poll::Ready(PanicResult::Err(err)),
 			Ok(Poll::Pending) => Poll::Pending,
@@ -101,7 +99,11 @@ impl PanicContext {
 					location: context.location,
 				})
 			}
-		}
+		};
+		// 5. restore previous globals
+		IN_SCOPE.with(|in_scope| in_scope.set(prev_scope));
+		CONTEXT.with(|cx| cx.set(prev_cx));
+		result
 	}
 
 	fn init() {
@@ -109,16 +111,19 @@ impl PanicContext {
 		let default_hook = std::panic::take_hook();
 
 		std::panic::set_hook(Box::new(move |info| {
-			if !IN_SCOPE.with(|in_scope| in_scope.get()) {
+			if IN_SCOPE.with(|in_scope| in_scope.get()) {
+				// in a catch scope, capture context
+				CONTEXT.with(|cx| {
+					let payload = downcast_str(info.payload());
+					let location =
+						info.location().map(FileSpan::new_from_location);
+					cx.set(Some(PanicContext { payload, location }));
+				});
+			} else {
 				// not in a catch scope, use default hook
 				default_hook(info);
 				return;
 			}
-			CONTEXT.with(|cx| {
-				let payload = downcast_str(info.payload());
-				let location = info.location().map(FileSpan::new_from_location);
-				cx.set(Some(PanicContext { payload, location }));
-			});
 		}));
 	}
 }
@@ -178,6 +183,8 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 mod tests {
 	use super::*;
 	use sweet::prelude::*;
+
+	// TODO test nested panics, including in wasm
 
 	#[test]
 	fn works() {
