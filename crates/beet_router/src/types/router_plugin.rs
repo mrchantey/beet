@@ -215,7 +215,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 			let exchange = ev.agent();
 			let path = route
 				.path(&ev)
-				.map(|path| path.to_string())
+				.map(|p| p.xfmt_debug())
 				.unwrap_or_else(|_| "unknown".to_string());
 			// this observer
 			commands.queue(move |world: &mut World| -> Result {
@@ -225,7 +225,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 					.unwrap_or_else(|| {
 						Response::from_status_body(
 							StatusCode::NOT_FOUND,
-							format!("Resource not found at '{path}'"),
+							format!("Resource not found at {path}"),
 							"text/plain",
 						)
 					});

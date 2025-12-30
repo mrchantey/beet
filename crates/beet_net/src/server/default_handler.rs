@@ -70,7 +70,7 @@ pub fn exchange_meta(
 	};
 	let status = response.status();
 	let duration = meta.started().elapsed();
-	let path = meta.path();
+	let path = meta.path_string();
 	let method = meta.method();
 
 	let mut stats = servers.get_mut(exchange_of.get())?;

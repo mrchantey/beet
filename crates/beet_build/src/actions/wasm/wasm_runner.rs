@@ -40,7 +40,7 @@ fn wasm_bindgen() -> impl Bundle {
 			 mut cmd_runner: CommandRunner|
 			 -> Result {
 				let exe_path = query.dyn_segment(&ev, "binary-path")?;
-				// println!("bindgen, path: {}", param.to_string());
+				path_ext::assert_exists(&exe_path)?;
 				let cmd_config = CommandConfig::new("wasm-bindgen")
 					.arg("--out-dir")
 					.arg(sweet_target_dir().to_string_lossy())
@@ -109,12 +109,14 @@ fn run_deno() -> impl Bundle {
 				// args will look like this so skip 3
 				// sweet test-wasm binary-path *actual-args
 				// why doesnt it work with three?
-				let args = std::env::args().skip(2).collect::<Vec<_>>();
+				let args = std::env::args().skip(3).collect::<Vec<_>>();
+				// println!("Running with args {:?}", args);
 				let child = CommandConfig::new("deno")
 					.arg("--allow-read")
 					.arg("--allow-net")
 					.arg("--allow-env")
 					.arg(deno_runner_path().to_string_lossy())
+					.env("SWEET_ROOT", std::env::var("SWEET_ROOT")?)
 					.args(args);
 				cmd_runner.run(ev, child)
 			},

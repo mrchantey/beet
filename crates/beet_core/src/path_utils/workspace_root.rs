@@ -9,6 +9,7 @@ use std::str::FromStr;
 /// ## Panics
 /// - The current directory is not found
 /// - Insufficient permissions to access the current directory
+/// - In wasm and js_runtime::sweet_root returns None
 pub fn workspace_root() -> PathBuf {
 	if let Ok(root_str) = std::env::var("SWEET_ROOT") {
 		return PathBuf::from_str(&root_str).unwrap();
@@ -16,7 +17,9 @@ pub fn workspace_root() -> PathBuf {
 
 	#[cfg(target_arch = "wasm32")]
 	{
-		return PathBuf::default();
+		return crate::js_runtime::sweet_root()
+			.expect("No SWEET_ROOT env in js runtime")
+			.into();
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	{

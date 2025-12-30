@@ -254,7 +254,7 @@ pub fn exact_path_match() -> impl Bundle { path_match(true) }
 /// at this point in the tree, even if there are remaining parts.
 pub fn partial_path_match() -> impl Bundle { path_match(false) }
 
-fn path_match(exact_match: bool) -> impl Bundle {
+fn path_match(must_exact_match: bool) -> impl Bundle {
 	(
 		Name::new("Check Path Match"),
 		OnSpawn::observe(
@@ -262,7 +262,7 @@ fn path_match(exact_match: bool) -> impl Bundle {
 				let outcome = match query.path_match(&ev) {
 					// expected exact match, got partial match
 					Ok(path_match)
-						if exact_match && !path_match.exact_match() =>
+						if must_exact_match && !path_match.exact_match() =>
 					{
 						Outcome::Fail
 					}

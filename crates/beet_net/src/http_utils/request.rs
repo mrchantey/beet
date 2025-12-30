@@ -92,8 +92,6 @@ impl RequestMeta {
 
 	pub fn method(&self) -> HttpMethod { *self.parts.method() }
 
-	pub fn path(&self) -> RoutePath { RoutePath::new(self.parts.path_string()) }
-
 	pub fn started(&self) -> Instant { self.started }
 
 	/// Returns a reference to the request parts

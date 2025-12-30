@@ -2,6 +2,8 @@ use crate::prelude::*;
 
 
 /// Parses Cli args into request style path and query
+// TODO deprecate, just use Parts directly
+#[derive(Debug, Clone)]
 pub struct CliArgs {
 	pub path: Vec<String>,
 	pub query: HashMap<String, Vec<String>>,

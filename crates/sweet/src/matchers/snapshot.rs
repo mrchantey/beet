@@ -1,4 +1,3 @@
-use crate::matchers::paint_ext;
 use crate::prelude::*;
 use anyhow::Result;
 use beet_core::prelude::*;

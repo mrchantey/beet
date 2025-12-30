@@ -7,8 +7,8 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			CliPlugin,
-			// LogPlugin::default(),
-			// DebugFlowPlugin::default(),
+			LogPlugin::default(),
+			DebugFlowPlugin::default(),
 		))
 		.spawn_then(sweet_router())
 		.run();
@@ -23,6 +23,8 @@ fn sweet_router() -> impl Bundle {
 		.with_params::<HelpParams>()
 		.with_path(""),
 		EndpointBuilder::default()
+			// match trailing positionals too, they will be
+			// passed to the wasm runtime
 			.with_path("run-wasm/*binary-path")
 			.with_handler_bundle((
 				Name::new("Run Wasm"),

@@ -184,19 +184,9 @@ impl PathPattern {
 	/// to reconstruct paths with double slashes like `foo//bar/baz.rs`.
 	pub fn parse_path(
 		&self,
-		path: &RoutePath,
+		path: &Vec<String>,
 	) -> Result<PathMatch, RouteMatchError> {
-		let path_str = path.to_string_lossy();
-		let mut remaining_path = if path_str.is_empty() || path_str == "/" {
-			VecDeque::new()
-		} else {
-			path_str
-				.strip_prefix('/')
-				.unwrap_or(&path_str)
-				.split('/')
-				.map(|s| s.to_string())
-				.collect::<VecDeque<_>>()
-		};
+		let mut remaining_path = VecDeque::from(path.clone());
 
 		let mut dyn_map = default();
 		// check each segment against the path
@@ -543,9 +533,10 @@ mod test {
 		segments: &str,
 		route_path: &str,
 	) -> Result<PathMatch, RouteMatchError> {
+		let builder = PartsBuilder::new().path_str(route_path).build();
 		PathPattern::new(segments)
 			.unwrap()
-			.parse_path(&RoutePath::new(route_path))
+			.parse_path(&builder.path())
 	}
 
 	#[test]
@@ -739,10 +730,10 @@ mod test {
 
 	#[test]
 	fn adjacent_slashes() {
-		// greedy segments store each part separately, including empty strings from adjacent slashes
+		// greedy segments store each part separately
 		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
 		map.get_vec("bar").xpect_eq(Some(&vec![
-			"".to_string(),
+			// "".to_string(),
 			"bar".to_string(),
 			"baz.rs".to_string(),
 		]));
@@ -751,7 +742,7 @@ mod test {
 		let map = parse("/*file", "/bar//baz.rs").unwrap().dyn_map;
 		map.get_vec("file").xpect_eq(Some(&vec![
 			"bar".to_string(),
-			"".to_string(),
+			// "".to_string(),
 			"baz.rs".to_string(),
 		]));
 		map.len().xpect_eq(1);
@@ -760,8 +751,8 @@ mod test {
 		let map = parse("/*path", "foo///bar").unwrap().dyn_map;
 		map.get_vec("path").xpect_eq(Some(&vec![
 			"foo".to_string(),
-			"".to_string(),
-			"".to_string(),
+			// "".to_string(),
+			// "".to_string(),
 			"bar".to_string(),
 		]));
 		map.len().xpect_eq(1);

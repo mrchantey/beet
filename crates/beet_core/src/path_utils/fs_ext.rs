@@ -165,7 +165,11 @@ pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 }
 
 pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
-	std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e))
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::read_file(&path.as_ref().to_string_lossy())
+		.ok_or_else(|| FsError::file_not_found(path.as_ref()));
+	#[cfg(not(target_arch = "wasm32"))]
+	return std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e));
 }
 pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]

@@ -48,7 +48,7 @@ pub struct RouteQuery<'w, 's> {
 }
 
 impl RouteQuery<'_, '_> {
-	pub fn path(&self, ev: &impl ActionExchangePair) -> Result<RoutePath> {
+	pub fn path(&self, ev: &impl ActionExchangePair) -> Result<&Vec<String>> {
 		self.requests.get(ev.get_exchange())?.path().xok()
 	}
 	pub fn method(&self, ev: &impl ActionExchangePair) -> Result<HttpMethod> {
@@ -61,7 +61,7 @@ impl RouteQuery<'_, '_> {
 	) -> Result<PathMatch> {
 		let path = self.path(ev)?;
 		let pattern = PathPattern::collect(ev.get_action(), &self)?;
-		pattern.parse_path(&path)?.xok()
+		pattern.parse_path(path)?.xok()
 	}
 
 	pub fn dyn_segment(
