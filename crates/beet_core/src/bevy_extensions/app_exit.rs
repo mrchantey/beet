@@ -19,11 +19,10 @@ pub impl AppExit {
 		}
 	}
 
-	/// Exit the application with the given exit code.
-	fn into_exit(self) {
+	/// Exit the application with the given exit code in the case
+	/// of a native context. see [`JsRuntimePlugin`] for wasm exits
+	fn into_exit_native(self) {
 		#[cfg(not(target_arch = "wasm32"))]
 		std::process::exit(self.exit_code());
-		#[cfg(target_arch = "wasm32")]
-		crate::js_runtime::exit(self.exit_code());
 	}
 }

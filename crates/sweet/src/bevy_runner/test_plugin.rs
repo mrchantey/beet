@@ -7,6 +7,7 @@ pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 	App::new()
+		.init_plugin::<JsRuntimePlugin>()
 		.add_plugins((MinimalPlugins, TestPlugin))
 		.spawn_then((
 			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
@@ -14,7 +15,7 @@ pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
 			tests_bundle_borrowed(tests),
 		))
 		.run()
-		.into_exit();
+		.into_exit_native();
 }
 
 

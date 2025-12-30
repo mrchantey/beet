@@ -5,6 +5,7 @@ mod clone_func;
 mod file_span;
 mod line_col;
 mod panic_context;
+mod wasm_types;
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
@@ -15,6 +16,7 @@ pub use file_span::*;
 pub use line_col::*;
 pub use panic_context::*;
 pub use tree::*;
+pub use wasm_types::*;
 #[cfg(feature = "rand")]
 mod random_source;
 pub mod time_ext;

@@ -51,11 +51,9 @@ const wasm = await init().catch((err: any) => {
 	Deno.exit(1);
 });
 
-// if run_with_pending doesnt exist this file is being used
-// outside of the test runner, no worries i guess, we still
-// ran the main(){}
-// await wasm.run_with_pending?.().catch((err: any) => {
-// 	// panicked!
-// 	console.error(err);
-// 	Deno.exit(1);
-// });
+/// Keep the process alive, JsRuntimePlugin will decide when to exit
+await (async () => {
+	while (true) {
+		await new Promise((resolve) => setTimeout(resolve, 1_000));
+	}
+})();

@@ -9,11 +9,30 @@ use test::TestFn;
 pub fn new_auto(
 	func: impl 'static + Send + FnOnce() -> Result<(), String>,
 ) -> TestDescAndFn {
+	let desc = new_auto_desc();
+	TestDescAndFn {
+		desc,
+		testfn: TestFn::DynTestFn(Box::new(func)),
+	}
+}
+
+#[track_caller]
+pub fn new_auto_static(func: fn() -> Result<(), String>) -> TestDescAndFn {
+	let desc = new_auto_desc();
+	TestDescAndFn {
+		desc,
+		testfn: TestFn::StaticTestFn(func),
+	}
+}
+
+
+#[track_caller]
+pub fn new_auto_desc() -> TestDesc {
 	let caller = Location::caller();
 
 	let name = caller.file().split('/').last().unwrap_or("").to_string();
 
-	let desc = TestDesc {
+	TestDesc {
 		name: test::TestName::DynTestName(format!(
 			// approximate how a real test name would look
 			"libtest::test_ext::{}#{}",
@@ -31,11 +50,6 @@ pub fn new_auto(
 		no_run: false,
 		should_panic: ShouldPanic::No,
 		test_type: TestType::UnitTest,
-	};
-
-	TestDescAndFn {
-		desc,
-		testfn: TestFn::DynTestFn(Box::new(func)),
 	}
 }
 
