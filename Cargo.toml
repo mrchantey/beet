@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.8-dev.2"
+version = "0.0.8-dev.3"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "Malleable Application Framework"
@@ -80,29 +80,29 @@ members = [
 [workspace.dependencies]
 ## internal
 
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.2" }
+sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.3" }
 sweet = { path = "crates/sweet", version = "0.4.2" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.2" }
-beet_core = { path = "crates/beet_core", version = "0.0.8-dev.2" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.3" }
+beet_core = { path = "crates/beet_core", version = "0.0.8-dev.3" }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.8-dev.2" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.8-dev.2" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.8-dev.2" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.8-dev.2" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.8-dev.2" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.8-dev.3" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.8-dev.3" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.8-dev.3" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.8-dev.3" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.8-dev.3" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.8-dev.2" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.8-dev.2" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.8-dev.2" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.8-dev.2" }
-beet_build = { path = "crates/beet_build", version = "0.0.8-dev.2" }
-beet_design = { path = "crates/beet_design", version = "0.0.8-dev.2" }
-beet_net = { path = "crates/beet_net", version = "0.0.8-dev.2" }
-beet_router = { path = "crates/beet_router", version = "0.0.8-dev.2" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.2" }
-beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.2" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.8-dev.3" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.8-dev.3" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.8-dev.3" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.8-dev.3" }
+beet_build = { path = "crates/beet_build", version = "0.0.8-dev.3" }
+beet_design = { path = "crates/beet_design", version = "0.0.8-dev.3" }
+beet_net = { path = "crates/beet_net", version = "0.0.8-dev.3" }
+beet_router = { path = "crates/beet_router", version = "0.0.8-dev.3" }
+beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.3" }
+beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.3" }
 
-beet = { path = "", version = "0.0.8-dev.2" }
+beet = { path = "", version = "0.0.8-dev.3" }
 
 #💡 local
 bevy = { version = "0.18.0-rc.1", default-features = false, features = [
