@@ -16,7 +16,7 @@ name = "sweet"
 path = "src/main.rs"
 
 [dependencies]
-beet = { workspace = true, features = ["build","router"] }
+beet = { workspace = true, features = ["build","net","router"] }
 # auto_register_static required for compilation, no idea why
 # bevy = { workspace = true,features = ["reflect_auto_register_static"]}
 

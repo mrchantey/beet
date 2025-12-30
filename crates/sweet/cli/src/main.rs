@@ -30,8 +30,11 @@ fn sweet_router() -> impl Bundle {
 				Name::new("Run Wasm"),
 				InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
 				RunOnDirEvent,
-				InfallibleSequence,
-				children![run_wasm()]
+				Fallback,
+				children![
+					run_wasm(),
+					StatusCode::BAD_REQUEST.into_endpoint_handler(),
+				]
 			)),
 	])
 }

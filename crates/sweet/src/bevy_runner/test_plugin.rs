@@ -13,7 +13,8 @@ pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
 			PathPartial::new("*include?"),
 			tests_bundle_borrowed(tests),
 		))
-		.run();
+		.run()
+		.into_exit();
 }
 
 

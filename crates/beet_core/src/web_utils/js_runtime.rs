@@ -10,7 +10,8 @@ unsafe extern "C" {
 	#[wasm_bindgen]
 	pub fn cwd() -> String;
 	/// Use this instead of `std::process::exit` which outputs
-	/// an unholy `Uncaught RuntimeError: unreachable`
+	/// an unholy `Uncaught RuntimeError: unreachable`.
+	/// This also propagates the exit code.
 	#[wasm_bindgen]
 	pub fn exit(code: i32);
 	/// Just run the function outside of the wasm boundary
