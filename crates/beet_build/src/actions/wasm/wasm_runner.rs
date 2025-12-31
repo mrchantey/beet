@@ -106,17 +106,16 @@ fn run_deno() -> impl Bundle {
 		Name::new("Run Deno"),
 		OnSpawn::observe(
 			|ev: On<GetOutcome>, mut cmd_runner: CommandRunner| -> Result {
-				// args will look like this so skip 3
-				// sweet test-wasm binary-path *actual-args
-				// why doesnt it work with three?
-				let args = std::env::args().skip(3).collect::<Vec<_>>();
-				// println!("Running with args {:?}", args);
+				// args will look like this so skip 2
+				// `test-wasm binary-path ..actual-args`
+				let args =
+					env_ext::args().into_iter().skip(2).collect::<Vec<_>>();
 				let child = CommandConfig::new("deno")
+					.env("SWEET_ROOT", env_ext::var("SWEET_ROOT")?)
 					.arg("--allow-read")
 					.arg("--allow-net")
 					.arg("--allow-env")
 					.arg(deno_runner_path().to_string_lossy())
-					.env("SWEET_ROOT", std::env::var("SWEET_ROOT")?)
 					.args(args);
 				cmd_runner.run(ev, child)
 			},

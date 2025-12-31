@@ -34,6 +34,10 @@ globalThis.write_file = (path: string, content: Uint8Array) => {
 	return do_try(() => Deno.writeFileSync(path, content));
 };
 
+globalThis.env_args = () => {
+	return do_try(() => Deno.args, []);
+};
+
 // Expose single env var (maps undefined -> null for wasm-bindgen Option)
 // ## Errors
 // if --allow-env not granted

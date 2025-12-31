@@ -822,11 +822,11 @@ impl From<CliArgs> for RequestParts {
 			method: HttpMethod::Get, // CLI defaults to GET-like semantics
 			parts: Parts {
 				scheme: Scheme::Cli,
-				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
+				authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
 				path,
 				params,
 				headers: MultiMap::default(),
-				version: std::env::var("CARGO_PKG_VERSION").unwrap_or_else(
+				version: env_ext::var("CARGO_PKG_VERSION").unwrap_or_else(
 					|_| http_ext::DEFAULT_CLI_VERSION.to_string(),
 				),
 			},

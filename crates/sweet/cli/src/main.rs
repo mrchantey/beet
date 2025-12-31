@@ -7,8 +7,11 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			CliPlugin,
-			LogPlugin::default(),
-			DebugFlowPlugin::default(),
+			LogPlugin {
+				level: Level::WARN,
+				..default()
+			},
+			// DebugFlowPlugin::default(),
 		))
 		.spawn_then(sweet_router())
 		.run();

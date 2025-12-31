@@ -11,14 +11,9 @@ pub struct CliArgs {
 
 
 impl CliArgs {
+	/// Parses the CLI args from the environment, excluding program name
 	pub fn parse_env() -> Self {
-		// args are in format 'path_to_binary foo bar'
-		// we skip the binary path
-		std::env::args()
-			.skip(1)
-			.collect::<Vec<_>>()
-			.join(" ")
-			.xmap(|val| Self::parse(&val))
+		env_ext::args().join(" ").xmap(|val| Self::parse(&val))
 	}
 
 	pub fn parse(args: &str) -> Self {

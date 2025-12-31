@@ -1,12 +1,19 @@
-#[cfg(target_arch = "wasm32")]
-use crate::js_runtime;
-use crate::prelude::GlobFilter;
+use crate::prelude::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum EnvError {
 	#[error("Environment variable not found: {0}")]
 	NotFound(String),
+}
+
+/// Get the command line arguments, excluding the program name
+pub fn args() -> Vec<String> {
+	#[cfg(not(target_arch = "wasm32"))]
+	return std::env::args().skip(1).collect();
+	#[cfg(target_arch = "wasm32")]
+	// Deno.args already excludes program name
+	return array_ext::into_vec_str(js_runtime::env_args());
 }
 
 /// Try get the environment variable with the given key, returning

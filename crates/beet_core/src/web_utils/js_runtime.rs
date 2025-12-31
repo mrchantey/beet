@@ -29,6 +29,9 @@ unsafe extern "C" {
 	/// Write a file to the filesystem, ie `Deno.writeTextFileSync()`
 	#[wasm_bindgen]
 	pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
+	/// Get all command line arguments as array, ie `Deno.args`
+	#[wasm_bindgen]
+	pub fn env_args() -> js_sys::Array;
 	/// Get single environment variable by key, ie `Deno.env.get(key)`
 	#[wasm_bindgen]
 	pub fn env_var(key: &str) -> Option<String>;

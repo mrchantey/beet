@@ -6,6 +6,7 @@ use beet_flow::prelude::*;
 pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
+
 	App::new()
 		.init_plugin::<JsRuntimePlugin>()
 		.add_plugins((MinimalPlugins, TestPlugin))

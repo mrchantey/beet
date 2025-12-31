@@ -1,5 +1,6 @@
 mod animation_frame;
 pub use self::animation_frame::*;
+pub mod array_ext;
 pub mod file_ext;
 pub mod history_ext;
 mod html_event_listener;
