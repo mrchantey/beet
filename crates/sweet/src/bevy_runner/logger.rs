@@ -42,7 +42,7 @@ pub(super) fn log_initial(
 		// out.push(format!("Test filter: {:#?}", filter_params));
 
 
-		beet_core::cross_log!("\n{}", out.join("\n"));
+		beet_core::cross_log!("\n{}\n", out.join("\n"));
 	}
 	Ok(())
 }
@@ -156,7 +156,7 @@ pub(super) fn log_final(
 		out.push(summary_message(&params, outcome));
 		out.push(String::new());
 		out.push(run_stats(&params, outcome, req));
-		beet_core::cross_log!("\n{}", out.join("\n"));
+		beet_core::cross_log!("\n{}\n", out.join("\n"));
 	}
 
 	Ok(())

@@ -5,6 +5,8 @@ use beet_core::prelude::*;
 use proc_macro2::TokenStream;
 #[cfg(feature = "tokens")]
 use quote::ToTokens;
+use std::sync::LazyLock;
+use std::sync::Mutex;
 
 #[extend::ext(name=SweetSnapshot)]
 pub impl<T, M> T
@@ -12,7 +14,7 @@ where
 	T: StringComp<M>,
 {
 	/// Compares the value to a snapshot, saving it if the `--snap` flag is used.
-	/// Snapshots are saved using test name so only one snapshot per test is allowed.
+	/// Multiple snapshots per file are supported and indexed by their position.
 	/// # Panics
 	/// If the snapshot file cannot be read or written.
 	#[track_caller]
@@ -25,73 +27,249 @@ where
 			Ok(None) => {
 				// snapshot saved, no assertion made
 			}
-			Err(e) => {
-				panic_ext::panic_str(e.to_string());
+			Err(err) => {
+				panic_ext::panic_str(err.to_string());
 			}
 		}
 		self
 	}
 }
 
+/// Static cache for snapshot data, keyed by source file path.
+/// Each entry contains the parsed snapshot call locations and the snapshot values.
+struct SnapMap;
 
-// returns whether the assertion should be made
+impl SnapMap {
+	fn cache()
+	-> &'static Mutex<HashMap<WsPathBuf, (Vec<(u32, u32)>, Vec<String>)>> {
+		static CACHE: LazyLock<
+			Mutex<HashMap<WsPathBuf, (Vec<(u32, u32)>, Vec<String>)>>,
+		> = LazyLock::new(|| Mutex::new(HashMap::default()));
+		&CACHE
+	}
+
+	/// Get the snapshot for a given source file and line/column position.
+	/// Returns the snapshot string if found, or None if not found.
+	fn get(
+		file_path: &WsPathBuf,
+		line: u32,
+		col: u32,
+	) -> Result<Option<String>> {
+		let mut cache = Self::cache().lock().unwrap();
+
+		// load file data if not cached
+		if !cache.contains_key(file_path) {
+			let (locs, snapshots) = Self::load_file_data(file_path)?;
+			cache.insert(file_path.clone(), (locs, snapshots));
+		}
+
+		let (locs, snapshots) = cache.get(file_path).unwrap();
+
+		// find index of this location
+		let index = locs.iter().position(|(loc_line, loc_col)| {
+			*loc_line == line && *loc_col == col
+		});
+
+		match index {
+			Some(idx) => Ok(snapshots.get(idx).cloned()),
+			None => Err(anyhow::anyhow!(
+				"Snapshot location {}:{}:{} not found in parsed locations.\n\
+				This likely means the source file has changed since snapshots were generated.\n\
+				Please run `cargo test -- --snap` to regenerate snapshots.",
+				file_path,
+				line,
+				col
+			)),
+		}
+	}
+
+	/// Set the snapshot for a given source file and line/column position.
+	fn set(
+		file_path: &WsPathBuf,
+		line: u32,
+		col: u32,
+		value: String,
+	) -> Result<()> {
+		let mut cache = Self::cache().lock().unwrap();
+
+		// Load file data if not cached
+		if !cache.contains_key(file_path) {
+			let (locs, snapshots) = Self::load_file_data(file_path)?;
+			cache.insert(file_path.clone(), (locs, snapshots));
+		}
+
+		let (locs, snapshots) = cache.get_mut(file_path).unwrap();
+
+		// find index of this location
+		let index = locs.iter().position(|(loc_line, loc_col)| {
+			*loc_line == line && *loc_col == col
+		});
+
+		match index {
+			Some(idx) => {
+				// extend snapshots vec if needed
+				while snapshots.len() <= idx {
+					snapshots.push(String::new());
+				}
+				snapshots[idx] = value;
+			}
+			None => {
+				return Err(anyhow::anyhow!(
+					"Snapshot location {}:{}:{} not found in parsed locations",
+					file_path,
+					line,
+					col
+				));
+			}
+		}
+
+		// save updated snapshots
+		Self::save_snapshots(file_path, snapshots)?;
+
+		Ok(())
+	}
+
+	/// Load file data: parse source for snapshot locations and load existing snapshots.
+	fn load_file_data(
+		file_path: &WsPathBuf,
+	) -> Result<(Vec<(u32, u32)>, Vec<String>)> {
+		// parse source file to find all .xpect_snapshot() locations
+		let locs = Self::parse_snapshot_locations(file_path)?;
+
+		// load existing snapshots if they exist
+		let snap_path = Self::snapshot_path(file_path);
+		let snapshots = if snap_path.exists() {
+			let content = fs_ext::read_to_string(&snap_path)?;
+			ron::de::from_str::<Vec<String>>(&content).unwrap_or_default()
+		} else {
+			Vec::new()
+		};
+
+		Ok((locs, snapshots))
+	}
+
+	/// Parse the source file to find all `.xpect_snapshot()` call locations.
+	/// Returns a vec of (line, col) pairs in order of appearance.
+	/// Note: col points to the 'x' in 'xpect_snapshot', matching track_caller behavior.
+	/// Location::caller() uses tab width of 4 for column calculation.
+	fn parse_snapshot_locations(
+		file_path: &WsPathBuf,
+	) -> Result<Vec<(u32, u32)>> {
+		let abs_path = file_path.into_abs();
+		let source = fs_ext::read_to_string(&abs_path).map_err(|err| {
+			anyhow::anyhow!("Failed to read source file {}: {}", abs_path, err)
+		})?;
+
+		let pattern = ".xpect_snapshot()";
+		let mut locations = Vec::new();
+
+		for (line_idx, line_content) in source.lines().enumerate() {
+			let line_num = (line_idx + 1) as u32; // 1-indexed
+
+			// find all occurrences of .xpect_snapshot() in this line
+			let mut search_start = 0;
+			while let Some(pos) = line_content[search_start..].find(pattern) {
+				// calculate column with tab expansion (tab width = 4, matching rustc)
+				let byte_pos = search_start + pos + 1; // +1 to skip '.' and point to 'x'
+				let col = Self::byte_to_column(&line_content[..byte_pos]);
+				locations.push((line_num, col));
+				search_start += pos + pattern.len();
+			}
+		}
+
+		Ok(locations)
+	}
+
+	/// Convert byte position to column number, expanding tabs to width 4.
+	/// This matches the behavior of `Location::caller()`.
+	fn byte_to_column(text: &str) -> u32 {
+		let mut col = 1u32; // 1-indexed
+		for ch in text.chars() {
+			if ch == '\t' {
+				// tabs advance to next multiple of 4, +1
+				col = ((col - 1) / 4 + 1) * 4 + 1;
+			} else {
+				col += 1;
+			}
+		}
+		col
+	}
+
+	/// Get the path where snapshots for a source file are stored.
+	fn snapshot_path(file_path: &WsPathBuf) -> AbsPathBuf {
+		let file_name = format!(".sweet/snapshots/{}.snap", file_path);
+		AbsPathBuf::new_workspace_rel(file_name)
+			.expect("Failed to create snapshot path")
+	}
+
+	/// Save snapshots to file.
+	fn save_snapshots(
+		file_path: &WsPathBuf,
+		snapshots: &[String],
+	) -> Result<()> {
+		let snap_path = Self::snapshot_path(file_path);
+		let pretty_config = ron::ser::PrettyConfig::default()
+			.indentor("  ".to_string())
+			.new_line("\n".to_string());
+		let content = ron::ser::to_string_pretty(snapshots, pretty_config)?;
+		fs_ext::write(&snap_path, &content)?;
+		Ok(())
+	}
+}
+
+/// Parse snapshot - returns Some(expected) if assertion should be made, None if snapshot was saved.
 #[allow(dead_code)]
 #[track_caller]
 fn parse_snapshot(received: &str) -> Result<Option<String>> {
 	let loc = core::panic::Location::caller();
-	let snap_name = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
-	// use test name instead of linecol, which would no longer match on any line/col shifts
-	let file_name = format!(".sweet/snapshots/{}.ron", snap_name);
+	let file_path = WsPathBuf::new(loc.file());
+	let line = loc.line();
+	let col = loc.column();
 
-	let save_path = AbsPathBuf::new_workspace_rel(file_name)?;
+	let args: Vec<String> = std::env::args().collect();
+	let is_snap_mode = args.iter().any(|arg| arg == "--snap" || arg == "-s");
+	let is_snap_show = args.iter().any(|arg| arg == "--snap-show");
 
-	let env_vars = env_ext::vars();
-
-	if env_vars.iter().any(|arg| arg.0 == "--snap") {
-		fs_ext::write(&save_path, received)?;
-		beet_core::cross_log!("Snapshot saved: {}", snap_name);
+	if is_snap_mode {
+		SnapMap::set(&file_path, line, col, received.to_string())?;
+		beet_core::cross_log!("Snapshot saved: {}:{}:{}", file_path, line, col);
 		Ok(None)
 	} else {
-		let expected = fs_ext::read_to_string(&save_path).map_err(|_| {
+		let expected = SnapMap::get(&file_path, line, col)?;
 
-			anyhow::anyhow!(
-				"
-Snapshot file not found: {}
-please run `cargo test -- --snap` to generate, snapshots should be commited to version control
+		match expected {
+			Some(snap) => {
+				if is_snap_show {
+					beet_core::cross_log!("Snapshot:\n{}", snap);
+				}
+				Ok(Some(snap))
+			}
+			None => {
+				let snap_path = SnapMap::snapshot_path(&file_path);
+				Err(anyhow::anyhow!(
+					"
+Snapshot not found at index for {}:{}:{}
+Snapshot file: {}
+Please run `cargo test -- --snap` to generate, snapshots should be committed to version control
 
 Received:
 
 {}
-				",
-				&save_path,
-				paint_ext::red(received),
-			)
-		})?;
-
-		if env_vars.iter().any(|arg| arg.0 == "--snap-show") {
-			beet_core::cross_log!("Snapshot:\n{}", expected);
+					",
+					file_path,
+					line,
+					col,
+					snap_path,
+					paint_ext::red(received),
+				))
+			}
 		}
-		Ok(Some(expected))
 	}
 }
 
 pub trait StringComp<M> {
 	fn to_comp_string(&self) -> String;
 }
-
-// #[cfg(feature = "serde")]
-// impl<T: 'static + serde::Serialize> StringComp<Self> for T {
-// 	fn to_comp_string(&self) -> String {
-// 		use std::any::TypeId;
-// 		let ty_str = TypeId::of::<str>();
-
-// 		match TypeId::of::<T>() {
-// 			ty_str => s.to_string(),
-// 			other => ron::ser::to_string(&self)
-// 				.expect("Failed to serialize to string"),
-// 		}
-// 	}
-// }
 
 pub struct ToTokensStringCompMarker;
 
@@ -124,7 +302,6 @@ impl_string_comp_for_tokens!(
 	syn::Attribute
 );
 
-// #[cfg(not(feature = "serde"))]
 macro_rules! impl_string_comp_for_primitives {
 	($($ty:ty),*) => {
 		$(
@@ -187,17 +364,15 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 mod test {
 	use crate::prelude::*;
 
-
 	#[test]
 	fn bool() { true.xpect_snapshot(); }
 
-	// #[test]
-	// fn serde_struct() {
-	// 	#[derive(serde::Serialize)]
-	// 	struct MyStruct(u32);
-
-	// 	MyStruct(7).xpect_snapshot();
-	// }
+	#[test]
+	fn multiple_snapshots_in_one_test() {
+		"first".xpect_snapshot();
+		"second".xpect_snapshot();
+		"third".xpect_snapshot();
+	}
 
 	#[cfg(feature = "tokens")]
 	#[test]
