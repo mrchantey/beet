@@ -32,7 +32,8 @@ mod test_request {
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
@@ -43,7 +44,8 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn get_works() {
 		Request::get(format!("{HTTPBIN}/get"))
@@ -54,7 +56,8 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn post_json_works() {
 		Request::post(format!("{HTTPBIN}/post"))
@@ -67,7 +70,8 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn custom_header_works() {
 		Request::get(format!("{HTTPBIN}/headers"))
@@ -79,7 +83,8 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn put_and_delete_work() {
 		Request::get(format!("{HTTPBIN}/put"))
@@ -99,7 +104,8 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn body_raw_works() {
 		Request::get(format!("{HTTPBIN}/post"))
@@ -114,7 +120,8 @@ mod test_request {
 			.xpect_contains("rawbytes");
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn body_stream() {
 		use bytes::Bytes;
@@ -155,7 +162,8 @@ mod test_request {
 			.xpect_err();
 	}
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn query_params_work() {
 		Request::get(format!("{HTTPBIN}/get"))
@@ -193,7 +201,8 @@ mod test_response {
 	// const HTTPBIN: &str = "https://httpbin.org";
 	const HTTPBIN: &str = "https://httpbin.dev";
 
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn post() {
 		Request::post(format!("{HTTPBIN}/post"))
@@ -207,7 +216,8 @@ mod test_response {
 			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
 			.xpect_eq("bar");
 	}
-	#[sweet::test]
+	#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+	#[cfg_attr(target_arch = "wasm32", sweet::test)]
 	#[ignore = "flaky httpbin"]
 	async fn stream() {
 		let res = Request::get(format!("{HTTPBIN}/stream/3"))

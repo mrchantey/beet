@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use quote::ToTokens;
-use rapidhash::RapidHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -63,7 +62,7 @@ pub fn update_file_expr_hash(
 	)>,
 ) -> Result {
 	for (entity, source_file, mut hash) in query.iter_mut() {
-		let mut hasher = RapidHasher::default_const();
+		let mut hasher = FixedHasher::default().build_hasher();
 		HashNonSnippetRust {
 			macros: &macros,
 			hasher: &mut hasher,

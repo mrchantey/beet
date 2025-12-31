@@ -54,7 +54,6 @@ bevy.workspace = true
 #💡 utils
 tracing.workspace = true
 itertools.workspace = true
-rapidhash.workspace = true
 send_wrapper.workspace = true
 web-time.workspace = true
 # async-task.workspace = true

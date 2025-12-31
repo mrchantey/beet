@@ -126,7 +126,6 @@ heck = "0.4"
 glob = "0.3"
 dotenv = "0.15"
 send_wrapper = "0.6"
-rapidhash = "1"
 web-time = "1"
 itertools = "0.14"
 mime_guess = "2"
@@ -157,6 +156,14 @@ async-io = "2"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
+# strictly for testing only
+tokio = { version = "1", features = [
+	"macros",
+	"sync",
+	"rt",
+	"rt-multi-thread",
+	"time",
+] }
 
 #💡 macros
 

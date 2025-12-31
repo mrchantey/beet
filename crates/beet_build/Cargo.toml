@@ -45,7 +45,6 @@ beet_router = { workspace = true, features = ["tokens"] }
 async-process.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-rapidhash.workspace = true
 futures.workspace = true
 heck.workspace = true
 

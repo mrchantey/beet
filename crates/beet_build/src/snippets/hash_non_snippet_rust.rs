@@ -91,7 +91,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn hash(tokens: TokenStream) -> u64 {
-		let mut hasher = RapidHasher::default_const();
+		let mut hasher = FixedHasher::default().build_hasher();
 		HashNonSnippetRust {
 			hasher: &mut hasher,
 			macros: &TemplateMacros::default(),

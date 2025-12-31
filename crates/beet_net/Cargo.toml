@@ -43,7 +43,7 @@ serde = [
 	"uuid/serde",
 	"beet_core/serde",
 ]
-reqwest = ["dep:reqwest"]
+reqwest = ["dep:reqwest","dep:tokio"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
@@ -138,6 +138,9 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"rt-tokio",
 	"behavior-version-latest",
 ] }
+# actually a dev-dep but we need optional
+tokio = { workspace=true, optional=true }
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys.workspace = true

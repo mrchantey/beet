@@ -24,7 +24,7 @@ pub fn apply_lang_snippet_hashes(
 ) {
 	for (entity, tag, inner_text, scope, hoist) in query.iter() {
 		// Apply the hash
-		let mut hasher = rapidhash::RapidHasher::default();
+		let mut hasher = FixedHasher::default().build_hasher();
 		tag.hash(&mut hasher);
 		for (_, key, value) in attributes.all(entity) {
 			key.hash(&mut hasher);

@@ -3,7 +3,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::quote_spanned;
-use rapidhash::RapidHashSet;
 use send_wrapper::SendWrapper;
 use std::sync::LazyLock;
 
@@ -22,7 +21,7 @@ impl CollectedElements {
 		// Mark some of elements as type,
 		// and other as elements as fn in crate::docs,
 		// to give an example how to link tag with docs.
-		static ELEMENTS_AS_TYPE: LazyLock<RapidHashSet<&'static str>> =
+		static ELEMENTS_AS_TYPE: LazyLock<HashSet<&'static str>> =
 			LazyLock::new(|| {
 				vec!["html", "head", "meta", "link", "body"]
 					.into_iter()
