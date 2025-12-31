@@ -31,8 +31,6 @@ extend.workspace = true
 send_wrapper.workspace = true
 #💡 logging
 nu-ansi-term.workspace = true
-# deprecate for nu-ansi-term
-yansi = "1"
 diff = "0.1"
 
 #💡 parse

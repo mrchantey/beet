@@ -1,12 +1,15 @@
 //! From `pretty_assertions` crate, with some modifications.
 //! https://github.com/rust-pretty-assertions/rust-pretty-assertions/blob/main/pretty_assertions/src/printer.rs
+use crate::matchers::paint_ext;
 use core::fmt;
-use yansi::Color::Green;
-use yansi::Color::Red;
-use yansi::Style;
+use nu_ansi_term::Color;
+use nu_ansi_term::Style;
 
 const SIGN_LEFT: &str = "Expected:\n";
 const SIGN_RIGHT: &str = "Received:\n";
+
+const GREEN_BACKGROUND: u8 = 22;
+const RED_BACKGROUND: u8 = 52;
 
 /// Group character styling for an inline diff, to prevent wrapping each single
 /// character in terminal styling codes.
@@ -14,38 +17,36 @@ const SIGN_RIGHT: &str = "Received:\n";
 /// Styles are applied automatically each time a new style is given in `write_with_style`.
 struct InlineWriter<'a, Writer> {
 	f: &'a mut Writer,
-	style: Style,
+	style: Option<Style>,
 }
 
 impl<'a, Writer> InlineWriter<'a, Writer>
 where
 	Writer: fmt::Write,
 {
-	fn new(f: &'a mut Writer) -> Self {
-		InlineWriter {
-			f,
-			style: Style::new(),
-		}
-	}
+	fn new(f: &'a mut Writer) -> Self { InlineWriter { f, style: None } }
 
 	/// Push a new character into the buffer, specifying the style it should be written in.
-	fn write_with_style<T: Into<Style>>(
+	fn write_with_style(
 		&mut self,
 		c: &impl fmt::Display,
-		style: T,
+		style: Style,
 	) -> fmt::Result {
 		// If the style is the same as previously, just write character
-		let style = style.into();
-		if style == self.style {
+		if self.style == Some(style) {
 			write!(self.f, "{}", c)?;
 		} else {
 			// Close out previous style
-			self.style.fmt_suffix(self.f)?;
+			if self.style.is_some() {
+				write!(self.f, "\x1b[0m")?;
+			}
 
 			// Store new style and start writing it
-			style.fmt_prefix(self.f)?;
+			if paint_ext::is_enabled() {
+				write!(self.f, "{}", style.prefix())?;
+			}
 			write!(self.f, "{}", c)?;
-			self.style = style;
+			self.style = Some(style);
 		}
 		Ok(())
 	}
@@ -53,12 +54,15 @@ where
 	/// Finish any existing style and reset to default state.
 	fn finish(&mut self) -> fmt::Result {
 		// Close out previous style
-		self.style.fmt_suffix(self.f)?;
+		if self.style.is_some() && paint_ext::is_enabled() {
+			write!(self.f, "\x1b[0m")?;
+		}
 		writeln!(self.f)?;
-		self.style = Style::new();
+		self.style = None;
 		Ok(())
 	}
 }
+
 pub fn inline_diff(expected: &str, received: &str) -> String {
 	let mut output = String::new();
 	write_inline_diff(&mut output, expected, received)
@@ -81,9 +85,11 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	let mut writer = InlineWriter::new(f);
 
 	// Print the left string on one line, with differences highlighted
-	let light = Green;
-	let green_background = 22;
-	let heavy = Green.on_fixed(green_background).bold();
+	let light = Style::new().fg(Color::Green);
+	let heavy = Style::new()
+		.fg(Color::Green)
+		.on(Color::Fixed(GREEN_BACKGROUND))
+		.bold();
 	write!(writer.f, "{SIGN_LEFT}\n")?;
 	for change in diff.iter() {
 		match change {
@@ -99,9 +105,11 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	writer.finish()?;
 
 	// Print the right string on one line, with differences highlighted
-	let light = Red;
-	let red_background = 52;
-	let heavy = Red.on_fixed(red_background).bold();
+	let light = Style::new().fg(Color::Red);
+	let heavy = Style::new()
+		.fg(Color::Red)
+		.on(Color::Fixed(RED_BACKGROUND))
+		.bold();
 	write!(writer.f, "\n{SIGN_RIGHT}\n")?;
 	for change in diff.iter() {
 		match change {
@@ -119,6 +127,8 @@ fn write_inline_diff<TWrite: fmt::Write>(
 
 #[cfg(test)]
 mod test {
+	use crate::matchers::paint_ext;
+
 	use super::*;
 
 	// ANSI terminal codes used in our outputs.
@@ -132,8 +142,6 @@ mod test {
 
 	/// Given that both of our diff printing functions have the same
 	/// type signature, we can reuse the same test code for them.
-	///
-	/// This could probably be nicer with traits!
 	fn check_printer<TPrint>(
 		printer: TPrint,
 		left: &str,
@@ -142,19 +150,9 @@ mod test {
 	) where
 		TPrint: Fn(&mut String, &str, &str) -> fmt::Result,
 	{
+		paint_ext::set_enabled(true);
 		let mut actual = String::new();
 		printer(&mut actual, left, right).expect("printer function failed");
-		// println!(
-		// 	"## left ##\n\
-		//          {}\n\
-		//          ## right ##\n\
-		//          {}\n\
-		//          ## actual diff ##\n\
-		//          {}\n\
-		//          ## expected diff ##\n\
-		//          {}",
-		// 	left, right, actual, expected
-		// );
 		assert_eq!(actual, expected);
 	}
 

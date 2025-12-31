@@ -2,8 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
-use nu_ansi_term::Color;
-use nu_ansi_term::Style;
 
 
 #[derive(Clone, Reflect, Component)]
@@ -34,6 +32,8 @@ pub(super) fn log_initial(
 		if logger_params.quiet {
 			continue;
 		}
+		let _guard =
+			paint_ext::SetPaintEnabledTemp::new(!logger_params.no_color);
 
 		let mut out = Vec::new();
 
@@ -59,6 +59,8 @@ pub(super) fn log_incremental(
 		if params.quiet || params.no_incremental {
 			continue;
 		}
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+
 		let just_finished = children
 			.iter()
 			.filter_map(|child| just_finished.get(child).ok())
@@ -68,7 +70,7 @@ pub(super) fn log_incremental(
 			if outcome.is_skip() && !params.log_skipped {
 				continue;
 			}
-			test_output_log(&params, test, outcome).xprint_display();
+			test_output_log(&test, outcome).xprint_display();
 		}
 	}
 	Ok(())
@@ -79,47 +81,20 @@ pub(super) fn log_incremental(
 /// - pass: " PASS "
 /// - skip: " SKIP "
 /// - fail: " FAIL "
-fn outcome_prefix(params: &LoggerParams, outcome: &TestOutcome) -> String {
-	match (outcome, params.no_color) {
-		(TestOutcome::Pass, false) => Color::Black
-			.bold()
-			.on(Color::Green)
-			.paint(" PASS ")
-			.to_string(),
-		(TestOutcome::Pass, true) => " PASS ".to_string(),
-		(TestOutcome::Skip(_), false) => Color::Black
-			.bold()
-			.on(Color::Yellow)
-			.paint(" SKIP ")
-			.to_string(),
-		(TestOutcome::Skip(_), true) => " SKIP ".to_string(),
-		(TestOutcome::Fail(_), false) => Color::Black
-			.bold()
-			.on(Color::Red)
-			.paint(" FAIL ")
-			.to_string(),
-		(TestOutcome::Fail(_), true) => " FAIL ".to_string(),
+fn outcome_prefix(outcome: &TestOutcome) -> String {
+	match outcome {
+		TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
+		TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
+		TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
 	}
 }
 
-fn test_output_log(
-	params: &LoggerParams,
-	test: &Test,
-	outcome: &TestOutcome,
-) -> String {
-	let prefix = outcome_prefix(params, outcome);
-	test_heading_log(params, &prefix, test)
+fn test_output_log(test: &Test, outcome: &TestOutcome) -> String {
+	let prefix = outcome_prefix(outcome);
+	test_heading_log(&prefix, test)
 }
 
-fn test_heading_log(
-	_params: &LoggerParams,
-	prefix: &str,
-	test: &Test,
-) -> String {
-	// format!(
-	// 	"{} {}:{}:{} - {}\n",
-	// 	prefix, test.source_file, test.start_line, test.start_col, test.name
-	// )
+fn test_heading_log(prefix: &str, test: &Test) -> String {
 	format!("{} {}", prefix, test.short_file_and_name())
 }
 
@@ -137,6 +112,8 @@ pub(super) fn log_final(
 		if params.quiet {
 			continue;
 		}
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+
 		let mut out = Vec::new();
 		if outcome.num_fail() != 0 {
 			for (test, case_outcome) in
@@ -144,103 +121,68 @@ pub(super) fn log_final(
 			{
 				if let TestOutcome::Fail(fail) = case_outcome {
 					out.push(String::new());
-					out.push(failed_heading(&params, test, fail));
+					out.push(failed_heading(test, fail));
 					out.push(String::new());
-					out.push(failed_file_context(&params, test, fail)?);
+					out.push(failed_file_context(test, fail)?);
 					out.push(String::new());
-					out.push(failed_stacktrace(&params, test, fail));
+					out.push(failed_stacktrace(test, fail));
 					out.push(String::new());
 				}
 			}
 		}
-		out.push(summary_message(&params, outcome));
+		out.push(summary_message(outcome));
 		out.push(String::new());
-		out.push(run_stats(&params, outcome, req));
+		out.push(run_stats(outcome, req));
 		beet_core::cross_log!("\n{}\n", out.join("\n"));
 	}
 
 	Ok(())
 }
 
-#[allow(unused)]
-fn summary_message(params: &LoggerParams, outcome: &FinalOutcome) -> String {
+fn summary_message(outcome: &FinalOutcome) -> String {
 	if outcome.num_fail() == 0 && outcome.num_ran() != 0 {
-		let msg = "All tests passed";
-		if params.no_color {
-			msg.to_string()
-		} else {
-			Color::Cyan.bold().underline().paint(msg).to_string()
-		}
+		paint_ext::cyan_bold_underline("All tests passed")
 	} else if outcome.num_ran() == 0 {
-		let msg = "No tests ran";
-		if params.no_color {
-			msg.to_string()
-		} else {
-			Color::Red.bold().underline().paint(msg).to_string()
-		}
+		paint_ext::red_bold_underline("No tests ran")
 	} else {
-		let msg = format!("Some tests failed");
-		if params.no_color {
-			msg
-		} else {
-			Color::Red.bold().underline().paint(msg).to_string()
-		}
+		paint_ext::red_bold_underline("Some tests failed")
 	}
 }
 
-fn test_stats(params: &LoggerParams, outcome: &FinalOutcome) -> String {
+fn test_stats(outcome: &FinalOutcome) -> String {
 	let mut stats = Vec::new();
 	if outcome.num_fail() > 0 {
-		let fail_msg = format!("{} failed", outcome.num_fail());
-		if params.no_color {
-			stats.push(fail_msg);
-		} else {
-			stats.push(Color::Red.bold().paint(fail_msg).to_string());
-		}
+		stats.push(paint_ext::red_bold(format!(
+			"{} failed",
+			outcome.num_fail()
+		)));
 	}
 	if outcome.num_skip() > 0 {
-		let skip_msg = format!("{} skipped", outcome.num_skip());
-		if params.no_color {
-			stats.push(skip_msg);
-		} else {
-			stats.push(Color::Yellow.bold().paint(skip_msg).to_string());
-		}
+		stats.push(paint_ext::yellow_bold(format!(
+			"{} skipped",
+			outcome.num_skip()
+		)));
 	}
 	if outcome.num_pass() > 0 {
-		let pass_msg = format!("{} passed", outcome.num_pass());
-		if params.no_color {
-			stats.push(pass_msg);
-		} else {
-			stats.push(Color::Green.bold().paint(pass_msg).to_string());
-		}
+		stats.push(paint_ext::green_bold(format!(
+			"{} passed",
+			outcome.num_pass()
+		)));
 	}
 	stats.join(", ")
 }
 
-fn run_stats(
-	params: &LoggerParams,
-	outcome: &FinalOutcome,
-	req: &RequestMeta,
-) -> String {
+fn run_stats(outcome: &FinalOutcome, req: &RequestMeta) -> String {
 	let duration = req.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
-	let time = if params.no_color {
-		time
-	} else {
-		Color::Blue.bold().paint(time).to_string()
-	};
-	let test_stats = test_stats(params, outcome);
+	let time = paint_ext::blue_bold(time);
+	let test_stats = test_stats(outcome);
 	format!("{} in {}", test_stats, time)
 }
 
-fn failed_file_context(
-	params: &LoggerParams,
-	test: &Test,
-	outcome: &TestFail,
-) -> Result<String> {
+fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
-
 
 	let path = test.path().into_abs();
 	let file = fs_ext::read_to_string(path)?;
@@ -250,7 +192,7 @@ fn failed_file_context(
 	let start = outcome.start(test);
 
 	let mut output = Vec::new();
-	//line number is one-indexed
+	// line number is one-indexed
 	let buffer_start_line = usize::max(
 		0,
 		(start.line() as usize).saturating_sub(LINE_CONTEXT_SIZE + 1),
@@ -262,40 +204,29 @@ fn failed_file_context(
 	for i in buffer_start_line..buffer_end_line {
 		let curr_line_no = i + 1;
 		let is_err_line = curr_line_no == start.line() as usize;
-		let mut prefix = String::from(if is_err_line { ">" } else { " " });
-		if !params.no_color {
-			prefix = Color::Red.paint(prefix).to_string();
-		}
+		let prefix = if is_err_line {
+			paint_ext::red(">")
+		} else {
+			" ".to_string()
+		};
 
 		let buffer = {
 			let line_digits = curr_line_no.to_string().len();
 			let len = max_digits.saturating_sub(line_digits);
 			" ".repeat(len)
 		};
-		let mut line_prefix =
-			String::from(format!("{}{}|", curr_line_no, buffer));
-		if !params.no_color {
-			line_prefix = Style::new().dimmed().paint(line_prefix).to_string();
-		}
+		let line_prefix =
+			paint_ext::dimmed(format!("{}{}|", curr_line_no, buffer));
 
 		// replace tabs with spaces
 		let line_with_spaces = lines[i].replace("\t", &" ".repeat(TAB_SPACES));
 
-		// let prefix_len = 6;
 		output.push(format!("{} {}{}", prefix, line_prefix, line_with_spaces));
 		if is_err_line {
-			let mut empty_line_prefix =
-				format!("{}|", " ".repeat(2 + max_digits));
-			if !params.no_color {
-				empty_line_prefix =
-					Style::new().dimmed().paint(empty_line_prefix).to_string();
-			}
+			let empty_line_prefix =
+				paint_ext::dimmed(format!("{}|", " ".repeat(2 + max_digits)));
 			let col_buffer = " ".repeat(start.col() as usize);
-			let up_arrow = if params.no_color {
-				"^".to_string()
-			} else {
-				Color::Red.paint("^").to_string()
-			};
+			let up_arrow = paint_ext::red("^");
 			output.push(format!(
 				"{}{}{}",
 				empty_line_prefix, col_buffer, up_arrow
@@ -305,77 +236,44 @@ fn failed_file_context(
 
 	output.join("\n").xok()
 }
-fn failed_heading(
-	params: &LoggerParams,
-	test: &Test,
-	outcome: &TestFail,
-) -> String {
-	let mut title = test.short_file_and_name();
-	let reason = fail_reason(params, outcome);
 
-	if !params.no_color {
-		title = Color::Red.paint(title).to_string();
-	}
+fn failed_heading(test: &Test, outcome: &TestFail) -> String {
+	let title = paint_ext::red(test.short_file_and_name());
+	let reason = fail_reason(outcome);
 	format!("{}\n{}", title, reason)
 }
 
-fn fail_reason(params: &LoggerParams, outcome: &TestFail) -> String {
+fn fail_reason(outcome: &TestFail) -> String {
 	match outcome {
 		TestFail::Err { message } => {
-			let mut prefix = "Returned error:".to_string();
-			if !params.no_color {
-				prefix = Style::new().bold().paint(prefix).to_string();
-			}
+			let prefix = paint_ext::bold("Returned error:");
 			format!("{} {}", prefix, message)
 		}
 		TestFail::ExpectedPanic { message } => {
 			if let Some(message) = message {
-				let mut prefix = "Expected panic:".to_string();
-				if !params.no_color {
-					prefix = Style::new().bold().paint(prefix).to_string();
-				}
+				let prefix = paint_ext::bold("Expected panic:");
 				format!("{} {}", prefix, message)
 			} else {
-				let mut prefix = "Expected panic".to_string();
-				if !params.no_color {
-					prefix = Style::new().bold().paint(prefix).to_string();
-				}
-				prefix
+				paint_ext::bold("Expected panic")
 			}
 		}
 		TestFail::Panic { payload, .. } => {
 			if let Some(payload) = payload {
-				let mut prefix = "".to_string();
-				if !params.no_color {
-					prefix = Style::new().bold().paint(prefix).to_string();
-				}
+				let prefix = paint_ext::bold("");
 				format!("{}\n{}", prefix, payload)
 			} else {
-				let mut prefix = "Panic - opaque payload".to_string();
-				if !params.no_color {
-					prefix = Style::new().bold().paint(prefix).to_string();
-				}
-				prefix
+				paint_ext::bold("Panic - opaque payload")
 			}
 		}
 	}
 }
 
-fn failed_stacktrace(
-	params: &LoggerParams,
-	test: &Test,
-	outcome: &TestFail,
-) -> String {
-	let mut prefix = String::from("at");
-	let mut path = test.path().to_string();
+fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
+	let prefix = paint_ext::dimmed("at");
+	let path = paint_ext::cyan(test.path().to_string());
 	let start = outcome.start(test);
-	let mut line_loc = format!(":{}:{}", start.line(), start.col());
-
-	if !params.no_color {
-		prefix = Style::new().dimmed().paint(prefix).to_string();
-		path = Color::Cyan.paint(path).to_string();
-		line_loc = Style::new().dimmed().paint(line_loc).to_string();
-	}
+	let line_loc =
+		paint_ext::dimmed(format!(":{}:{}", start.line(), start.col()));
 	format!("{} {}{}", prefix, path, line_loc)
 }
 
