@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
 
-pub fn test_runner2(tests: &[&test::TestDescAndFn]) {
+pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 

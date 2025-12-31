@@ -4,7 +4,7 @@ use sweet::prelude::*;
 
 
 fn main() {
-	sweet::test_runner2(&[
+	sweet::test_runner(&[
 		&test_ext::new_auto_static(returns_ok),
 		&test_ext::new_auto_static(returns_err).with_ignore(true),
 		&test_ext::new_auto_static(panics).with_should_panic(),

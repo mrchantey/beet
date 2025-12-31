@@ -1,8 +1,7 @@
 use crate::prelude::*;
 
 
-
-#[deprecated = "use custom runner"]
+/// Run libtest with pretty filenames for unit tests.
 pub fn run_libtest_pretty(tests: &[&test::TestDescAndFn]) {
 	return test_main_with_filenames(tests);
 }
@@ -11,7 +10,6 @@ pub fn run_libtest_pretty(tests: &[&test::TestDescAndFn]) {
 fn test_main_with_filenames(tests: &[&test::TestDescAndFn]) {
 	let tests = apply_filenames(tests);
 	let tests = tests.iter().collect::<Vec<_>>();
-	println!("\n{}\n", RunnerLogger::SWEET_AS);
 	test::test_main_static(&tests);
 }
 
@@ -20,12 +18,7 @@ fn apply_filenames(tests: &[&test::TestDescAndFn]) -> Vec<test::TestDescAndFn> {
 		.into_iter()
 		.map(|test| {
 			let mut test = test_ext::clone_static(test);
-			test.desc.name = test::DynTestName(format!(
-				"{} - {}",
-				test.desc.source_file,
-				test_ext::short_name(&test.desc)
-			));
-			// test::StaticTestName(test.desc.source_file);
+			test.desc.name = test::DynTestName(test.desc.short_file_and_name());
 			test
 		})
 		.collect()

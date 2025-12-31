@@ -4,8 +4,11 @@ use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
+use bevy::ecs::system::IntoObserverSystem;
+use bevy::prelude::*;
 use extend::ext;
 use std::marker::PhantomData;
+
 /// system version
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
 	world.log_component_names(*entity);
@@ -355,6 +358,59 @@ pub impl<W: IntoWorld> W {
 			DeferredWorld::from(world)
 				.trigger_raw(event_key, event, trigger, caller);
 		}
+	}
+}
+
+
+
+/// Ease-of-use extensions for `bevy::World`
+#[ext(name=CoreWorldExtSweet)]
+pub impl World {
+	fn with_observer<E: Event, B: Bundle, M>(
+		mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> Self {
+		self.spawn(Observer::new(system));
+		self
+	}
+	fn observing<E: Event, B: Bundle, M>(
+		&mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> &mut Self {
+		self.spawn(Observer::new(system));
+		self
+	}
+
+	// TODO deprecated, bevy 0.16 fixes this
+	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&mut self,
+		event: E,
+	) -> &mut Self {
+		self.flush();
+		self.trigger(event);
+		self.flush();
+		self
+	}
+}
+
+#[extend::ext]
+pub impl<'w> EntityWorldMut<'w> {
+	/// 1. Flushes
+	/// 2. Triggers the given event for this entity, which will run any observers watching for it.
+	/// 3. Flushes
+	// #[deprecated = "world flushes automatically now"]
+	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&mut self,
+		event: E,
+	) -> &mut Self {
+		// let entity = self.id();
+		unsafe {
+			let world = self.world_mut();
+			world.flush();
+			world.trigger(event);
+			world.flush();
+		}
+		self
 	}
 }
 
