@@ -184,37 +184,34 @@ mod tests {
 	use super::*;
 	use sweet::prelude::*;
 
-	// TODO test nested panics, including in wasm
-
 	#[test]
 	fn works() {
 		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
-		todo!("add back tests when non-panic-hook-taking runner is ready");
-		// PanicContext::catch(|| Err("foobar".into()))
-		// 	.xpect_eq(PanicResult::Err("foobar".into()));
-		// PanicContext::catch(|| panic!("foobar")).xpect_eq(PanicResult::Panic {
-		// 	payload: Some("foobar".into()),
-		// 	location: Some(FileSpan::new_with_start(file!(), line!() - 2, 32)),
-		// });
+		PanicContext::catch(|| Err("foobar".into()))
+			.xpect_eq(PanicResult::Err("foobar".into()));
+		PanicContext::catch(|| panic!("foobar")).xpect_eq(PanicResult::Panic {
+			payload: Some("foobar".into()),
+			location: Some(FileSpan::new_with_start(file!(), line!() - 2, 31)),
+		});
 	}
-	// #[sweet::test]
-	// async fn works_async() {
-	// 	PanicContext::catch_async(async || Ok(()))
-	// 		.await
-	// 		.xpect_eq(PanicResult::Ok);
-	// 	PanicContext::catch_async(async || Err("foobar".into()))
-	// 		.await
-	// 		.xpect_eq(PanicResult::Err("foobar".into()));
-	// 	PanicContext::catch_async(async || {
-	// 		async_ext::yield_now().await;
-	// 		async_ext::yield_now().await;
-	// 		async_ext::yield_now().await;
-	// 		panic!("foobar")
-	// 	})
-	// 	.await
-	// 	.xpect_eq(PanicResult::Panic {
-	// 		payload: Some("foobar".into()),
-	// 		location: Some(FileSpan::new_with_start(file!(), line!() - 5, 13)),
-	// 	});
-	// }
+	#[sweet::test]
+	async fn works_async() {
+		PanicContext::catch_async(async { Ok(()) })
+			.await
+			.xpect_eq(PanicResult::Ok);
+		PanicContext::catch_async(async { Err("foobar".into()) })
+			.await
+			.xpect_eq(PanicResult::Err("foobar".into()));
+		PanicContext::catch_async(async {
+			async_ext::yield_now().await;
+			async_ext::yield_now().await;
+			async_ext::yield_now().await;
+			panic!("foobar")
+		})
+		.await
+		.xpect_eq(PanicResult::Panic {
+			payload: Some("foobar".into()),
+			location: Some(FileSpan::new_with_start(file!(), line!() - 5, 12)),
+		});
+	}
 }

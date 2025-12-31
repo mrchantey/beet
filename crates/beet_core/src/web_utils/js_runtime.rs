@@ -50,13 +50,16 @@ unsafe extern "C" {
 	pub fn exit(code: i32);
 	#[wasm_bindgen(catch, js_name = "test_catch_no_abort_inner")]
 	fn catch_no_abort_inner(
-		func: &mut dyn FnMut() -> Result<(), String>,
+		f: &mut dyn FnMut() -> Result<(), String>,
 	) -> Result<(), JsValue>;
 	#[wasm_bindgen(js_name = "test_read_file")]
-	pub fn read_file(path: &str) -> Option<String>;
-	#[wasm_bindgen(js_name = "test_sweet_root")]
-	pub fn sweet_root() -> Option<String>;
-	#[wasm_bindgen]
+	pub fn read_file(path: &str) -> Option<Vec<u8>>;
+	#[wasm_bindgen(js_name = "test_create_dir_all")]
+	pub fn create_dir_all(path: &str);
+	#[wasm_bindgen(js_name = "test_write_file")]
+	pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
+	#[wasm_bindgen(js_name = "test_env_args")]
+	pub fn env_args() -> js_sys::Array;
 	#[wasm_bindgen(js_name = "test_env_var")]
 	pub fn env_var(key: &str) -> Option<String>;
 	#[wasm_bindgen(js_name = "test_env_all")]

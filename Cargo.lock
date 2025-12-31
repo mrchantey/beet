@@ -9302,6 +9302,7 @@ dependencies = [
  "quote",
  "ron 0.8.1",
  "send_wrapper",
+ "sweet",
  "sweet_macros",
  "syn 2.0.111",
 ]

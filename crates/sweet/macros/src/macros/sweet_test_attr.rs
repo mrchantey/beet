@@ -13,8 +13,10 @@ pub fn parse_sweet_test(
 		let ident = &func.sig.ident;
 		let vis = &func.vis;
 		let block = &func.block;
+		let attrs = &func.attrs;
 		quote! {
 			#[test]
+			#(#attrs)*
 			#vis fn #ident(){
 				sweet::prelude::register_async_test(async #block)
 			}

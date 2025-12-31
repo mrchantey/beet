@@ -43,6 +43,9 @@ prettyplease = { workspace = true, optional = true }
 #💡 serde
 ron = { workspace = true, optional = true }
 
+[dev-dependencies]
+sweet = {path = ".", features = ["tokens"] }
+
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook.workspace = true
