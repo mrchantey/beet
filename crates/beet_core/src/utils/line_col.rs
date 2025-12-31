@@ -28,10 +28,12 @@ impl LineCol {
 		// assert_ne!(line, 0, "Line number must be greater than 0");
 		Self { line, col }
 	}
+	/// Create a LineCol from a std::panic::Location,
+	/// adjusting the column to be zero-indexed.
 	pub fn from_location(location: &std::panic::Location) -> Self {
 		Self {
 			line: location.line(),
-			col: location.column(),
+			col: location.column().saturating_sub(1),
 		}
 	}
 

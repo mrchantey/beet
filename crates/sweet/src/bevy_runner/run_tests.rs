@@ -146,7 +146,7 @@ mod tests {
 				location: Some(FileSpan::new_with_start(
 					file!(),
 					line!() - 5,
-					40,
+					39,
 				)),
 			}
 			.into(),
@@ -251,7 +251,7 @@ mod tests {
 				location: Some(FileSpan::new_with_start(
 					file!(),
 					line!() - 9,
-					17,
+					16,
 				)),
 			}
 			.into(),

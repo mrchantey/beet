@@ -40,21 +40,17 @@ where
 struct SnapMap;
 
 impl SnapMap {
-	fn cache()
-	-> &'static Mutex<HashMap<WsPathBuf, (Vec<(u32, u32)>, Vec<String>)>> {
+	fn cache() -> &'static Mutex<HashMap<WsPathBuf, (Vec<LineCol>, Vec<String>)>>
+	{
 		static CACHE: LazyLock<
-			Mutex<HashMap<WsPathBuf, (Vec<(u32, u32)>, Vec<String>)>>,
+			Mutex<HashMap<WsPathBuf, (Vec<LineCol>, Vec<String>)>>,
 		> = LazyLock::new(|| Mutex::new(HashMap::default()));
 		&CACHE
 	}
 
 	/// Get the snapshot for a given source file and line/column position.
-	/// Returns the snapshot string if found, or None if not found.
-	fn get(
-		file_path: &WsPathBuf,
-		line: u32,
-		col: u32,
-	) -> Result<Option<String>> {
+	/// Returns the snapshot string if found, or an error listing available locations.
+	fn get(file_path: &WsPathBuf, loc: LineCol) -> Result<String> {
 		let mut cache = Self::cache().lock().unwrap();
 
 		// load file data if not cached
@@ -66,30 +62,48 @@ impl SnapMap {
 		let (locs, snapshots) = cache.get(file_path).unwrap();
 
 		// find index of this location
-		let index = locs.iter().position(|(loc_line, loc_col)| {
-			*loc_line == line && *loc_col == col
-		});
+		let index = locs.iter().position(|l| *l == loc);
 
 		match index {
-			Some(idx) => Ok(snapshots.get(idx).cloned()),
-			None => Err(anyhow::anyhow!(
-				"Snapshot location {}:{}:{} not found in parsed locations.\n\
-				This likely means the source file has changed since snapshots were generated.\n\
-				Please run `cargo test -- --snap` to regenerate snapshots.",
-				file_path,
-				line,
-				col
-			)),
+			Some(idx) => match snapshots.get(idx).cloned() {
+				Some(snapshot) => Ok(snapshot),
+				None => {
+					let available = locs
+						.iter()
+						.map(|l| format!("  {}:{}", l.line, l.col))
+						.collect::<Vec<_>>()
+						.join("\n");
+					Err(anyhow::anyhow!(
+						"Snapshot at {}:{} exists in parsed locations but has no value.\n\
+						Available locations:\n{}\n\
+						Please run `cargo test -- --snap` to regenerate snapshots.",
+						loc.line,
+						loc.col,
+						available
+					))
+				}
+			},
+			None => {
+				let available = locs
+					.iter()
+					.map(|l| format!("  {}:{}", l.line, l.col))
+					.collect::<Vec<_>>()
+					.join("\n");
+				Err(anyhow::anyhow!(
+					"Snapshot location {}:{} not found in parsed locations.\n\
+					This likely means the source file has changed since snapshots were generated.\n\
+					Available locations:\n{}\n\
+					Please run `cargo test -- --snap` to regenerate snapshots.",
+					loc.line,
+					loc.col,
+					available
+				))
+			}
 		}
 	}
 
 	/// Set the snapshot for a given source file and line/column position.
-	fn set(
-		file_path: &WsPathBuf,
-		line: u32,
-		col: u32,
-		value: String,
-	) -> Result<()> {
+	fn set(file_path: &WsPathBuf, loc: LineCol, value: String) -> Result<()> {
 		let mut cache = Self::cache().lock().unwrap();
 
 		// Load file data if not cached
@@ -101,9 +115,7 @@ impl SnapMap {
 		let (locs, snapshots) = cache.get_mut(file_path).unwrap();
 
 		// find index of this location
-		let index = locs.iter().position(|(loc_line, loc_col)| {
-			*loc_line == line && *loc_col == col
-		});
+		let index = locs.iter().position(|l| *l == loc);
 
 		match index {
 			Some(idx) => {
@@ -114,11 +126,17 @@ impl SnapMap {
 				snapshots[idx] = value;
 			}
 			None => {
+				let available = locs
+					.iter()
+					.map(|l| format!("  {}:{}", l.line, l.col))
+					.collect::<Vec<_>>()
+					.join("\n");
 				return Err(anyhow::anyhow!(
-					"Snapshot location {}:{}:{} not found in parsed locations",
-					file_path,
-					line,
-					col
+					"Snapshot location {}:{} not found in parsed locations.\n\
+					Available locations:\n{}",
+					loc.line,
+					loc.col,
+					available
 				));
 			}
 		}
@@ -132,7 +150,7 @@ impl SnapMap {
 	/// Load file data: parse source for snapshot locations and load existing snapshots.
 	fn load_file_data(
 		file_path: &WsPathBuf,
-	) -> Result<(Vec<(u32, u32)>, Vec<String>)> {
+	) -> Result<(Vec<LineCol>, Vec<String>)> {
 		// parse source file to find all .xpect_snapshot() locations
 		let locs = Self::parse_snapshot_locations(file_path)?;
 
@@ -145,16 +163,26 @@ impl SnapMap {
 			Vec::new()
 		};
 
+		// verify snapshot count matches location count
+		if !snapshots.is_empty() && snapshots.len() != locs.len() {
+			return Err(anyhow::anyhow!(
+				"Snapshot count mismatch for {}:\n\
+				Found {} .xpect_snapshot() calls in source but {} snapshots in file.\n\
+				Please run `cargo test -- --snap` to regenerate snapshots.",
+				file_path,
+				locs.len(),
+				snapshots.len()
+			));
+		}
+
 		Ok((locs, snapshots))
 	}
 
 	/// Parse the source file to find all `.xpect_snapshot()` call locations.
-	/// Returns a vec of (line, col) pairs in order of appearance.
+	/// Returns a vec of LineCol in order of appearance.
 	/// Note: col points to the 'x' in 'xpect_snapshot', matching track_caller behavior.
 	/// Location::caller() uses tab width of 4 for column calculation.
-	fn parse_snapshot_locations(
-		file_path: &WsPathBuf,
-	) -> Result<Vec<(u32, u32)>> {
+	fn parse_snapshot_locations(file_path: &WsPathBuf) -> Result<Vec<LineCol>> {
 		let abs_path = file_path.into_abs();
 		let source = fs_ext::read_to_string(&abs_path).map_err(|err| {
 			anyhow::anyhow!("Failed to read source file {}: {}", abs_path, err)
@@ -171,8 +199,11 @@ impl SnapMap {
 			while let Some(pos) = line_content[search_start..].find(pattern) {
 				// calculate column with tab expansion (tab width = 4, matching rustc)
 				let byte_pos = search_start + pos + 1; // +1 to skip '.' and point to 'x'
-				let col = Self::byte_to_column(&line_content[..byte_pos]);
-				locations.push((line_num, col));
+				let col_1indexed =
+					Self::byte_to_column(&line_content[..byte_pos]);
+				// LineCol stores 0-indexed columns, but Location::caller() returns 1-indexed
+				let col_0indexed = col_1indexed.saturating_sub(1);
+				locations.push(LineCol::new(line_num, col_0indexed));
 				search_start += pos + pattern.len();
 			}
 		}
@@ -221,49 +252,30 @@ impl SnapMap {
 #[allow(dead_code)]
 #[track_caller]
 fn parse_snapshot(received: &str) -> Result<Option<String>> {
-	let loc = core::panic::Location::caller();
-	let file_path = WsPathBuf::new(loc.file());
-	let line = loc.line();
-	let col = loc.column();
+	let caller_loc = core::panic::Location::caller();
+	let file_path = WsPathBuf::new(caller_loc.file());
+	// Location::caller() returns 1-indexed line and column, but LineCol stores 0-indexed column
+	let loc = LineCol::from_location(&caller_loc);
 
 	let args: Vec<String> = std::env::args().collect();
 	let is_snap_mode = args.iter().any(|arg| arg == "--snap" || arg == "-s");
 	let is_snap_show = args.iter().any(|arg| arg == "--snap-show");
 
 	if is_snap_mode {
-		SnapMap::set(&file_path, line, col, received.to_string())?;
-		beet_core::cross_log!("Snapshot saved: {}:{}:{}", file_path, line, col);
+		SnapMap::set(&file_path, loc, received.to_string())?;
+		beet_core::cross_log!(
+			"Snapshot saved: {}:{}:{}",
+			file_path,
+			loc.line,
+			loc.col
+		);
 		Ok(None)
 	} else {
-		let expected = SnapMap::get(&file_path, line, col)?;
-
-		match expected {
-			Some(snap) => {
-				if is_snap_show {
-					beet_core::cross_log!("Snapshot:\n{}", snap);
-				}
-				Ok(Some(snap))
-			}
-			None => {
-				let snap_path = SnapMap::snapshot_path(&file_path);
-				Err(anyhow::anyhow!(
-					"
-Snapshot not found at index for {}:{}:{}
-Snapshot file: {}
-Please run `cargo test -- --snap` to generate, snapshots should be committed to version control
-
-Received:
-
-{}
-					",
-					file_path,
-					line,
-					col,
-					snap_path,
-					paint_ext::red(received),
-				))
-			}
+		let snap = SnapMap::get(&file_path, loc)?;
+		if is_snap_show {
+			beet_core::cross_log!("Snapshot:\n{}", snap);
 		}
+		Ok(Some(snap))
 	}
 }
 
