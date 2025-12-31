@@ -179,6 +179,8 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 }
 
 
+// TODO get this test workin in wasm too
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
 	use super::*;

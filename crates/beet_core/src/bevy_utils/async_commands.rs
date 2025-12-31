@@ -61,10 +61,7 @@ impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<TaskPoolPlugin>()
 			.init_resource::<AsyncChannel>()
-			.add_systems(
-				PreUpdate,
-				append_async_queues,
-			);
+			.add_systems(PreUpdate, append_async_queues);
 	}
 }
 /// Append all [`AsyncChannel::rx`]

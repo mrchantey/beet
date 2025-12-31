@@ -1,16 +1,15 @@
+# when testing compile speed is the most important
+[profile.test]
+opt-level = 0
+
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1
 
-# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+# Enable high optimizations for dependencies (incl. Bevy) which do not change often
+# but not for our code which takes longer to rebuild:
 [profile.dev.package."*"]
 opt-level = 3
-
-# sweet backtracing
-[profile.test]
-opt-level = 0
-[profile.test.package.sweet]
-opt-level = 0
 
 [workspace.package]
 version = "0.0.8-dev.3"
