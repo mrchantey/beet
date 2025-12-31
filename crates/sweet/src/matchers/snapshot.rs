@@ -156,11 +156,12 @@ impl SnapMap {
 
 		// load existing snapshots if they exist
 		let snap_path = Self::snapshot_path(file_path);
-		let snapshots = if snap_path.exists() {
-			let content = fs_ext::read_to_string(&snap_path)?;
-			ron::de::from_str::<Vec<String>>(&content).unwrap_or_default()
-		} else {
-			Vec::new()
+		let snapshots = match fs_ext::read_to_string(&snap_path) {
+			Ok(content) => {
+				ron::de::from_str::<Vec<String>>(&content).unwrap_or_default()
+			}
+			Err(FsError::FileNotFound { .. }) => Vec::new(),
+			Err(other) => Err(other)?,
 		};
 
 		// verify snapshot count matches location count
