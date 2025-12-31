@@ -37,7 +37,6 @@ impl Plugin for TestPlugin {
 					log_initial,
 					filter_tests,
 					(run_tests_series, run_non_send_tests_series),
-					// #[cfg(not(test))]
 					insert_final_outcome,
 					log_incremental,
 					log_final,

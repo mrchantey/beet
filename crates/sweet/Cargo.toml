@@ -28,28 +28,15 @@ sweet_macros.workspace = true
 #💡 misc
 anyhow.workspace = true
 extend.workspace = true
-web-time.workspace = true
 send_wrapper.workspace = true
 #💡 logging
-log.workspace = true
-pretty_env_logger.workspace = true
 nu-ansi-term.workspace = true
-backtrace = "0.3"
-# deprecate for nu-ansi-term
-colorize = "0.1"
 # deprecate for nu-ansi-term
 yansi = "1"
 diff = "0.1"
 
 #💡 parse
-glob.workspace = true
 clap.workspace = true
-
-#💡 async
-flume.workspace = true
-rayon.workspace = true
-futures.workspace = true
-thread_local = "1.1.8"
 
 #💡 bevy
 bevy.workspace = true
@@ -69,9 +56,6 @@ serde_json = { workspace = true, optional = true }
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_core = { workspace = true, features = ["fs"] }
-
-tokio.workspace = true
-pin-project-lite = "0.2.15"
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]

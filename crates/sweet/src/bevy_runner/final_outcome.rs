@@ -44,29 +44,40 @@ impl FinalOutcome {
 	}
 }
 
-/// Exits when all tests have finished
+/// Insert final when no tests to run
 pub fn insert_final_outcome(
 	mut commands: Commands,
-	requests: Populated<(Entity, &RequestMeta, &Children)>,
-	// run on change
-	_just_finished: Populated<(), Added<TestOutcome>>,
+	requests: Populated<
+		(Entity, &RequestMeta, Option<&Children>),
+		Without<FinalOutcome>,
+	>,
+	// listener query, running this system on
+	// either
+	// - added request (in case none to run)
+	// - added outcome (in case all done)
+	_listener: Populated<(), Or<(Added<RequestMeta>, Added<TestOutcome>)>>,
 	all_finished: Query<(&Test, &TestOutcome)>,
-	all_tests: Query<(), With<Test>>,
+	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
 ) {
 	for (entity, _req, children) in requests {
+		let Some(children) = children else {
+			commands.entity(entity).insert(FinalOutcome::new(&[]));
+			continue;
+		};
+
+		let still_running = children
+			.iter()
+			.filter_map(|child| still_running.get(child).ok())
+			.count();
+		if still_running > 0 {
+			continue;
+		}
 		let all_finished = children
 			.iter()
 			.filter_map(|child| all_finished.get(child).ok())
 			.collect::<Vec<_>>();
-		let num_tests = children
-			.iter()
-			.filter_map(|child| all_tests.get(child).ok())
-			.count();
-		if all_finished.len() != num_tests {
-			// not done yet
-			continue;
-		}
-		let outcome = FinalOutcome::new(&all_finished);
-		commands.entity(entity).insert(outcome);
+		commands
+			.entity(entity)
+			.insert(FinalOutcome::new(&all_finished));
 	}
 }
