@@ -17,26 +17,16 @@ where
 	/// If the snapshot file cannot be read or written.
 	#[track_caller]
 	fn xpect_snapshot(&self) -> &Self {
-		#[cfg(target_arch = "wasm32")]
-		{
-			beet_core::cross_log!("snapshot not yet supported on wasm32");
-		}
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			let received = self.to_comp_string();
-			match parse_snapshot(&received) {
-				Ok(Some(expected)) => {
-					panic_ext::assert_diff(
-						&expected,
-						received.into_maybe_not(),
-					);
-				}
-				Ok(None) => {
-					// snapshot saved, no assertion made
-				}
-				Err(e) => {
-					std::panic::panic_any(e.to_string());
-				}
+		let received = self.to_comp_string();
+		match parse_snapshot(&received) {
+			Ok(Some(expected)) => {
+				panic_ext::assert_diff(&expected, received.into_maybe_not());
+			}
+			Ok(None) => {
+				// snapshot saved, no assertion made
+			}
+			Err(e) => {
+				panic_ext::panic_str(e.to_string());
 			}
 		}
 		self
@@ -55,9 +45,11 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 
 	let save_path = AbsPathBuf::new_workspace_rel(file_name)?;
 
-	if std::env::args().any(|arg| arg == "--snap") {
+	let env_vars = env_ext::vars();
+
+	if env_vars.iter().any(|arg| arg.0 == "--snap") {
 		fs_ext::write(&save_path, received)?;
-		println!("Snapshot saved: {}", snap_name);
+		beet_core::cross_log!("Snapshot saved: {}", snap_name);
 		Ok(None)
 	} else {
 		let expected = fs_ext::read_to_string(&save_path).map_err(|_| {
@@ -76,8 +68,8 @@ Received:
 			)
 		})?;
 
-		if std::env::args().any(|arg| arg == "--snap-show") {
-			println!("Snapshot:\n{}", expected);
+		if env_vars.iter().any(|arg| arg.0 == "--snap-show") {
+			beet_core::cross_log!("Snapshot:\n{}", expected);
 		}
 		Ok(Some(expected))
 	}
@@ -191,7 +183,6 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 	}
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

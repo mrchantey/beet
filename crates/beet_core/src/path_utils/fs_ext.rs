@@ -1,8 +1,8 @@
-//! Wrappers around [`std::fs`] and [`async_fs`] with ergonomics
-//! better suited to the application layer:
+//! Cross-plaform file system utilities, including
+//! wrappers around [`std::fs`], [`async_fs`] and [`js_runtime`]
+//! with ergonomics better suited to the application layer:
 //! - outputs the file path on fs error
 //! - creates missing directories when writing files
-
 use crate::prelude::*;
 use std::fs;
 use std::path::Path;
@@ -23,8 +23,14 @@ macro_rules! dir {
 		std::path::Path::new(file!()).parent().unwrap()
 	};
 }
+
+
+/// Get the current working directory
 pub fn current_dir() -> FsResult<PathBuf> {
-	std::env::current_dir().map_err(|e| FsError::io(".", e))
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::cwd().xinto::<PathBuf>().xok();
+	#[cfg(not(target_arch = "wasm32"))]
+	return std::env::current_dir().map_err(|e| FsError::io(".", e));
 }
 
 /// Copy a directory recursively, creating it if it doesnt exist
@@ -37,7 +43,7 @@ pub fn copy_recursive(
 	let source = source.as_ref();
 	let destination = destination.as_ref();
 
-	fs::create_dir_all(&destination).ok();
+	fs_ext::create_dir_all(&destination)?;
 	for entry in ReadDir::all(source)? {
 		let file_name = path_ext::file_name(&entry)?;
 		if entry.is_dir() {
@@ -78,7 +84,10 @@ pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 
 pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 	let path = path.as_ref();
-	fs::create_dir_all(path).map_err(|err| FsError::io(path, err))
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::create_dir_all(&path.to_string_lossy()).xok();
+	#[cfg(not(target_arch = "wasm32"))]
+	return fs::create_dir_all(path).map_err(|err| FsError::io(path, err));
 }
 
 pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
@@ -149,7 +158,11 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 pub fn workspace_root() -> PathBuf { crate::prelude::workspace_root() }
 
 pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
-	std::fs::read(&path).map_err(|e| FsError::io(path, e))
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::read_file(&path.as_ref().to_string_lossy())
+		.ok_or_else(|| FsError::file_not_found(path.as_ref()));
+	#[cfg(not(target_arch = "wasm32"))]
+	return std::fs::read(&path).map_err(|e| FsError::io(path, e));
 }
 pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
@@ -165,11 +178,9 @@ pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 }
 
 pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
-	#[cfg(target_arch = "wasm32")]
-	return js_runtime::read_file(&path.as_ref().to_string_lossy())
-		.ok_or_else(|| FsError::file_not_found(path.as_ref()));
-	#[cfg(not(target_arch = "wasm32"))]
-	return std::fs::read_to_string(&path).map_err(|e| FsError::io(path, e));
+	fs_ext::read(path.as_ref()).and_then(|bytes| {
+		String::from_utf8(bytes).map_err(|e| FsError::other(path.as_ref(), e))
+	})
 }
 pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
@@ -229,10 +240,18 @@ pub fn touch(path: impl AsRef<Path>) -> bevy::prelude::Result {
 pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 	let path = path.as_ref();
 	if let Some(parent) = path.parent() {
-		fs::create_dir_all(parent).map_err(|err| FsError::io(parent, err))?;
+		fs_ext::create_dir_all(parent)?;
 	}
-	fs::write(path, data).map_err(|err| FsError::io(path, err))?;
-	Ok(())
+	#[cfg(target_arch = "wasm32")]
+	{
+		js_runtime::write_file(&path.to_string_lossy(), data.as_ref());
+		Ok(())
+	}
+	#[cfg(not(target_arch = "wasm32"))]
+	{
+		fs::write(path, data).map_err(|err| FsError::io(path, err))?;
+		Ok(())
+	}
 }
 
 /// Async version of write: Write a file, ensuring the path exists.
@@ -249,9 +268,7 @@ pub async fn write_async(
 	{
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
-			async_fs::create_dir_all(parent)
-				.await
-				.map_err(|err| FsError::io(parent, err))?;
+			fs_ext::create_dir_all_async(parent).await?;
 		}
 		async_fs::write(path, data)
 			.await

@@ -15,17 +15,20 @@ unsafe extern "C" {
 	#[wasm_bindgen]
 	pub fn exit(code: i32);
 	/// Just run the function outside of the wasm boundary
-	/// ie `const catch_panic = (f)=>f()`
+	/// ie `const catch_no_abort_inner = (f)=>f()`
 	#[wasm_bindgen(catch)]
 	fn catch_no_abort_inner(
 		f: &mut dyn FnMut() -> Result<(), String>,
 	) -> Result<(), JsValue>;
 	/// Read a file from the filesystem, ie `Deno.read_file()`
 	#[wasm_bindgen]
-	pub fn read_file(path: &str) -> Option<String>;
-	/// Get the SWEET_ROOT env var, ie `Deno.env.get("SWEET_ROOT")`
+	pub fn read_file(path: &str) -> Option<Vec<u8>>;
+	/// Ensure a directory exists, ie `Deno.ensureDir()`
 	#[wasm_bindgen]
-	pub fn sweet_root() -> Option<String>;
+	pub fn create_dir_all(path: &str);
+	/// Write a file to the filesystem, ie `Deno.writeTextFileSync()`
+	#[wasm_bindgen]
+	pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
 	/// Get single environment variable by key, ie `Deno.env.get(key)`
 	#[wasm_bindgen]
 	pub fn env_var(key: &str) -> Option<String>;

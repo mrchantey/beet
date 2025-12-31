@@ -206,12 +206,7 @@ impl BacktraceLocation {
 	/// 1. Prefix the path with $SWEET_ROOT if it exists,
 	/// 2. otherwise use [fs_ext::workspace_root]
 	pub fn cwd_root() -> PathBuf {
-		#[cfg(not(target_arch = "wasm32"))]
 		return beet_core::prelude::workspace_root();
-		#[cfg(target_arch = "wasm32")]
-		return js_runtime::sweet_root()
-			.map(PathBuf::from)
-			.unwrap_or_default();
 	}
 }
 
@@ -243,18 +238,15 @@ SWEET_ROOT = { value = "", relative = true }
 ```
 "#;
 
-	#[cfg(target_arch = "wasm32")]
-	let file = js_runtime::read_file(&path.to_string_lossy().to_string())
-		.ok_or_else(|| bail(&js_runtime::cwd()))?;
-	#[cfg(not(target_arch = "wasm32"))]
-	let file = beet_core::prelude::fs_ext::read_to_string(path).map_err(|_| {
-		bail(
-			&std::env::current_dir()
-				.unwrap_or_default()
-				.display()
-				.to_string(),
-		)
-	})?;
+	let file =
+		beet_core::prelude::fs_ext::read_to_string(path).map_err(|_| {
+			bail(
+				&std::env::current_dir()
+					.unwrap_or_default()
+					.display()
+					.to_string(),
+			)
+		})?;
 
 	Ok(file)
 }

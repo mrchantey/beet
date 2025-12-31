@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 /// 1. tries to get the `SWEET_ROOT` env var.
 /// 2. if wasm, returns an empty path
@@ -11,21 +11,19 @@ use std::str::FromStr;
 /// - Insufficient permissions to access the current directory
 /// - In wasm and js_runtime::sweet_root returns None
 pub fn workspace_root() -> PathBuf {
-	if let Ok(root_str) = std::env::var("SWEET_ROOT") {
-		return PathBuf::from_str(&root_str).unwrap();
+	if let Ok(root_str) = env_ext::var("SWEET_ROOT") {
+		return root_str.into();
 	}
-
 	#[cfg(target_arch = "wasm32")]
 	{
-		return crate::js_runtime::sweet_root()
-			.expect("No SWEET_ROOT env in js runtime")
-			.into();
+		unimplemented!(
+			"no SWEET_ROOT env in js runtime, full fs access is a wip"
+		);
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	{
 		use std::ffi::OsString;
-
-		let path = std::env::current_dir().unwrap();
+		let path = fs_ext::current_dir().unwrap();
 		let mut path_ancestors = path.as_path().ancestors();
 		while let Some(p) = path_ancestors.next() {
 			if std::fs::read_dir(p).unwrap().any(|p| {
