@@ -201,6 +201,7 @@ pub impl App {
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	#[derive(Default, Resource)]
 	struct Foo(Vec<f32>);

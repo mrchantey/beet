@@ -12,11 +12,10 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "nightly", "tokens"]
-# allow for fn_traits, ie mock_fn(3);
+default = ["serde", "nightly"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
-serde = ["dep:serde", "dep:ron", "dep:serde_json"]
+serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
@@ -26,15 +25,11 @@ beet_net.workspace = true
 beet_router.workspace = true
 sweet_macros.workspace = true
 #💡 misc
-anyhow.workspace = true
 extend.workspace = true
 send_wrapper.workspace = true
 #💡 logging
 nu-ansi-term.workspace = true
 diff = "0.1"
-
-#💡 parse
-clap.workspace = true
 
 #💡 bevy
 bevy.workspace = true
@@ -45,20 +40,9 @@ syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 prettyplease = { workspace = true, optional = true }
 
-
 #💡 serde
-serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-
-#💡 native
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_core = { workspace = true, features = ["fs"] }
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys.workspace = true
-web-sys = { workspace = true, features = ["HtmlElement"] }
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true

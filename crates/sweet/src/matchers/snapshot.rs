@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use beet_core::prelude::*;
 #[cfg(feature = "tokens")]
 use proc_macro2::TokenStream;
@@ -73,14 +72,14 @@ impl SnapMap {
 						.map(|l| format!("  {}:{}", l.line, l.col))
 						.collect::<Vec<_>>()
 						.join("\n");
-					Err(anyhow::anyhow!(
+					bevybail!(
 						"Snapshot at {}:{} exists in parsed locations but has no value.\n\
 						Available locations:\n{}\n\
 						Please run `cargo test -- --snap` to regenerate snapshots.",
 						loc.line,
 						loc.col,
 						available
-					))
+					)
 				}
 			},
 			None => {
@@ -89,7 +88,7 @@ impl SnapMap {
 					.map(|l| format!("  {}:{}", l.line, l.col))
 					.collect::<Vec<_>>()
 					.join("\n");
-				Err(anyhow::anyhow!(
+				bevybail!(
 					"Snapshot location {}:{} not found in parsed locations.\n\
 					This likely means the source file has changed since snapshots were generated.\n\
 					Available locations:\n{}\n\
@@ -97,7 +96,7 @@ impl SnapMap {
 					loc.line,
 					loc.col,
 					available
-				))
+				)
 			}
 		}
 	}
@@ -131,13 +130,13 @@ impl SnapMap {
 					.map(|l| format!("  {}:{}", l.line, l.col))
 					.collect::<Vec<_>>()
 					.join("\n");
-				return Err(anyhow::anyhow!(
+				bevybail!(
 					"Snapshot location {}:{} not found in parsed locations.\n\
 					Available locations:\n{}",
 					loc.line,
 					loc.col,
 					available
-				));
+				);
 			}
 		}
 
@@ -166,14 +165,14 @@ impl SnapMap {
 
 		// verify snapshot count matches location count
 		if !snapshots.is_empty() && snapshots.len() != locs.len() {
-			return Err(anyhow::anyhow!(
+			bevybail!(
 				"Snapshot count mismatch for {}:\n\
 				Found {} .xpect_snapshot() calls in source but {} snapshots in file.\n\
 				Please run `cargo test -- --snap` to regenerate snapshots.",
 				file_path,
 				locs.len(),
 				snapshots.len()
-			));
+			);
 		}
 
 		Ok((locs, snapshots))
@@ -186,7 +185,7 @@ impl SnapMap {
 	fn parse_snapshot_locations(file_path: &WsPathBuf) -> Result<Vec<LineCol>> {
 		let abs_path = file_path.into_abs();
 		let source = fs_ext::read_to_string(&abs_path).map_err(|err| {
-			anyhow::anyhow!("Failed to read source file {}: {}", abs_path, err)
+			bevyhow!("Failed to read source file {}: {}", abs_path, err)
 		})?;
 
 		let pattern = ".xpect_snapshot()";

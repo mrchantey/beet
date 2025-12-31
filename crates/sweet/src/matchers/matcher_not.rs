@@ -131,7 +131,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 
 	#[extend::ext]
 	impl<T, U> T

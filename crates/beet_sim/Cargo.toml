@@ -21,7 +21,6 @@ beet_flow.workspace = true
 beet_spatial.workspace = true
 bevy.workspace = true
 
-anyhow.workspace = true
 # temp, just for bundle placeholders
 
 

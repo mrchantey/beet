@@ -2,7 +2,6 @@ use beet::exports::notify::EventKind;
 use beet::exports::notify::event::ModifyKind;
 use beet::exports::notify::event::RenameMode;
 use beet::prelude::*;
-use clap::Parser;
 use quote::quote;
 use std::path::Path;
 use std::path::PathBuf;
@@ -12,10 +11,9 @@ use syn::ItemMod;
 use syn::ItemUse;
 use syn::UseTree;
 
-#[derive(Debug, Default, Clone, Parser)]
+#[derive(Debug, Default, Clone)]
 #[command(name = "mod")]
 pub struct AutoMod {
-	#[arg(short, long)]
 	pub quiet: bool,
 }
 

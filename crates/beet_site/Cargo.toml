@@ -25,7 +25,6 @@ client = ["server-client", "beet/client", "beet_design/mockups"]
 server-client = ["beet/agent"]
 
 [dependencies]
-anyhow.workspace = true
 serde.workspace = true
 beet.workspace = true
 beet_design.workspace = true

@@ -50,14 +50,14 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::anyhow;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn result() {
-		let ok = || -> anyhow::Result<()> { Ok(()) };
+		let ok = || -> Result<()> { Ok(()) };
 		ok().xpect_ok();
 
-		let err = || -> anyhow::Result<()> { Err(anyhow!("foo")) };
+		let err = || -> Result<()> { bevybail!("foo") };
 
 		err().xpect_err();
 	}

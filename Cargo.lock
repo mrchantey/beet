@@ -1551,7 +1551,6 @@ dependencies = [
 name = "beet_sim"
 version = "0.0.8-dev.3"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_spatial",
@@ -1563,7 +1562,6 @@ dependencies = [
 name = "beet_site"
 version = "0.0.8-dev.3"
 dependencies = [
- "anyhow",
  "beet",
  "beet_design",
  "getrandom 0.3.3",
@@ -9290,30 +9288,22 @@ dependencies = [
 name = "sweet"
 version = "0.4.2"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_net",
  "beet_router",
  "bevy",
- "clap",
  "console_error_panic_hook",
  "diff",
  "extend",
- "js-sys",
  "nu-ansi-term",
  "prettyplease",
  "proc-macro2",
  "quote",
  "ron 0.8.1",
  "send_wrapper",
- "serde",
- "serde_json",
  "sweet_macros",
  "syn 2.0.111",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

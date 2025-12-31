@@ -23,4 +23,4 @@ proc-macro2.workspace = true
 proc-macro2-diagnostics.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["tokens"]}
