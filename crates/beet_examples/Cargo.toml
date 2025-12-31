@@ -51,7 +51,6 @@ serde_json.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-console_log.workspace = true
 web-sys.workspace = true
 wasm-bindgen.workspace = true
 

@@ -4,8 +4,8 @@
 
 [target.wasm32-unknown-unknown]
 # this uses sweet for cargo run and cargo test
-# runner = 'sweet run-wasm'
-runner = 'cargo run -p sweet-cli -- run-wasm'
+runner = 'sweet run-wasm'
+# runner = 'cargo run -p sweet-cli -- run-wasm'
 # runner = 'cargo run -p sweet-cli -- test-wasm'
 rustflags = [
 	# remove in getrandom 0.3.4

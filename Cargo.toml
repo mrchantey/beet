@@ -146,7 +146,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 nu-ansi-term = "0.50"
 pretty_env_logger = "0.4"
-console_log = { version = "1", features = ["color"] }
 
 
 #💡 async
@@ -354,7 +353,6 @@ tokio.workspace = true
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook.workspace = true
 web-sys.workspace = true
-# console_log.workspace = true
 # js-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
