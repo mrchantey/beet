@@ -4,6 +4,8 @@ use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
+#[cfg(feature = "multi_threaded")]
+use bevy::ecs::schedule::ExecutorKind;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 use extend::ext;
@@ -66,8 +68,40 @@ pub impl World {
 		}
 	}
 
-	/// The world equivelent of [`App::update`]
-	fn update(&mut self) { self.run_schedule(Main); }
+	/// The world equivelent of [`App::update`].
+	///
+	/// In multi_threaded mode, this temporarily sets all schedules to use
+	/// single-threaded execution to avoid deadlocks when called from within
+	/// async tasks on IoTaskPool.
+	fn update(&mut self) {
+		#[cfg(feature = "multi_threaded")]
+		{
+			// Temporarily force single-threaded execution for all schedules
+			// to avoid deadlock when called from within a spawn_local task.
+			self.force_single_threaded_schedules();
+			self.run_schedule(Main);
+			self.clear_trackers();
+		}
+		#[cfg(not(feature = "multi_threaded"))]
+		{
+			self.run_schedule(Main);
+			self.clear_trackers();
+		}
+	}
+
+	/// Force all schedules in the world to use single-threaded execution.
+	/// This is necessary when running schedules from within async tasks
+	/// to avoid deadlocks with bevy's parallel schedule executor.
+	#[cfg(feature = "multi_threaded")]
+	fn force_single_threaded_schedules(&mut self) {
+		self.resource_scope(|_world, mut schedules: Mut<Schedules>| {
+			for (_label, schedule) in schedules.iter_mut() {
+				if schedule.get_executor_kind() == ExecutorKind::MultiThreaded {
+					schedule.set_executor_kind(ExecutorKind::SingleThreaded);
+				}
+			}
+		});
+	}
 	/// The world equivelent of [`App::should_exit`]
 	fn should_exit(&self) -> Option<AppExit> {
 		let mut reader = MessageCursor::default();

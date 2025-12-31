@@ -64,13 +64,16 @@ impl Plugin for AsyncPlugin {
 			.add_systems(PreUpdate, append_async_queues);
 	}
 }
-/// Append all [`AsyncChannel::rx`]
-fn append_async_queues(
-	mut commands: Commands,
-	channel: Res<AsyncChannel>,
-) -> Result {
-	while let Ok(mut queue) = channel.rx.try_recv() {
-		commands.append(&mut queue);
+/// Append all [`AsyncChannel::rx`] command queues directly to the world.
+fn append_async_queues(world: &mut World) -> Result {
+	// Clone the receiver to avoid borrow conflict
+	let rx = world.get_resource::<AsyncChannel>().map(|c| c.rx.clone());
+	let Some(rx) = rx else {
+		return Ok(());
+	};
+
+	while let Ok(mut queue) = rx.try_recv() {
+		queue.apply(world);
 	}
 	Ok(())
 }
@@ -270,6 +273,7 @@ impl AsyncChannel {
 	pub fn task_count(&self) -> usize { self.task_count }
 	/// Get the sender of the channel
 	pub fn tx(&self) -> Sender<CommandQueue> { self.tx.clone() }
+	/// Get the receiver of the channel
 	pub fn world(&self) -> AsyncWorld {
 		AsyncWorld {
 			tx: self.tx.clone(),
@@ -800,12 +804,7 @@ mod test {
 			})
 			.await;
 
-		// world not yet applied
-		world.resource::<Count>().0.xpect_eq(0);
-
-		AsyncRunner::flush_async_tasks(&mut world).await;
-
-		// world now applied
+		// Commands are applied by the final update in poll_and_update
 		world.resource::<Count>().0.xpect_eq(1);
 	}
 	#[sweet::test]

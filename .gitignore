@@ -12,6 +12,8 @@ file.pdf
 tests/assert.rs
 tests/expect.rs
 
+bevy
+
 **/codegen
 
 packages/beet_state/node_modules
