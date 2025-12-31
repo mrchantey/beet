@@ -1,7 +1,6 @@
 mod macros;
 use macros::*;
 use proc_macro::TokenStream;
-use sweet_test_attr::SweetTestAttr;
 
 /// A unified macro for handling all test cases:
 /// - sync native
@@ -28,7 +27,7 @@ use sweet_test_attr::SweetTestAttr;
 /// ```
 #[proc_macro_attribute]
 pub fn test(attr: TokenStream, input: TokenStream) -> TokenStream {
-	SweetTestAttr::parse(attr, input)
+	parse_sweet_test(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }

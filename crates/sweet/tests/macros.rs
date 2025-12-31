@@ -36,7 +36,6 @@ async fn it_tokio_waits_then_panics() {
 	panic!("waddup")
 }
 #[sweet::test]
-// #[should_panic]
 async fn it_sleeps() { yield_now().await; }
 
 #[sweet::test]

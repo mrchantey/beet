@@ -5,6 +5,7 @@ use std::pin::Pin;
 
 /// Called by the [`sweet::test`] macro in the case its provided an async
 /// function.
+#[track_caller]
 pub fn register_async_test<M>(fut: impl IntoFut<M>) {
 	REGISTERED_ASYNC_TEST.with(|cell| {
 		*cell.borrow_mut() = Some(Box::pin(fut.into_fut()));

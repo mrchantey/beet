@@ -1,47 +1,29 @@
-use super::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;
 
 
 
-/// The parser for the #[sweet] attribute
-pub struct SweetTestAttr;
-
-impl SweetTestAttr {
-	pub fn parse(
-		_attr: proc_macro::TokenStream,
-		input: proc_macro::TokenStream,
-	) -> syn::Result<TokenStream> {
-		let func = syn::parse::<ItemFn>(input)?;
-
-
-		if let Some(non_async) = non_async(&func) {
-			return Ok(non_async);
+pub fn parse_sweet_test(
+	_attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> syn::Result<TokenStream> {
+	let func = syn::parse::<ItemFn>(input)?;
+	let out = if func.sig.asyncness.is_some() {
+		let ident = &func.sig.ident;
+		let vis = &func.vis;
+		let block = &func.block;
+		quote! {
+			#[test]
+			#vis fn #ident(){
+				sweet::prelude::register_async_test(async #block)
+			}
 		}
-
-		let func_native = parse_native(&func)?;
-		let func_wasm = parse_wasm(&func)?;
-
-		let out = quote! {
-			#func_native
-			#func_wasm
-		};
-
-		Ok(out)
-	}
-}
-
-
-/// non async tests are just #[test]
-fn non_async(func: &ItemFn) -> Option<TokenStream> {
-	if func.sig.asyncness.is_some() {
-		return None;
-	}
-	let out = quote! {
-		#[test]
-		#func
-	}
-	.into();
-	Some(out)
+	} else {
+		quote! {
+			#[test]
+			#func
+		}
+	};
+	Ok(out)
 }

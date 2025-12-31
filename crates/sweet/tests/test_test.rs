@@ -33,3 +33,8 @@ fn panics_async() {
 		panic!();
 	});
 }
+#[sweet::test]
+fn sweet_test_sync() {}
+
+#[sweet::test]
+async fn sweet_test_async() { time_ext::sleep_millis(10).await; }
