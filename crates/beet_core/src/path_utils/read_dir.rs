@@ -417,7 +417,7 @@ mod test {
 #[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test_async {
 	use crate::prelude::*;
-	#[tokio::test]
+	#[sweet::test]
 	async fn fails() {
 		let err_str = ReadDir::default()
 			.read_async(fs_ext::test_dir().join("foo"))
@@ -428,7 +428,7 @@ mod test_async {
 		assert!(err_str.contains("test_dir/foo"));
 	}
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn dirs() {
 		let err_str = ReadDir::dirs_async(fs_ext::test_dir().join("foo"))
 			.await
@@ -442,7 +442,7 @@ mod test_async {
 		);
 	}
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn read_dir_recursive() {
 		assert_eq!(
 			ReadDir::dirs_recursive_async(fs_ext::test_dir())
@@ -453,7 +453,7 @@ mod test_async {
 		);
 	}
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn files() {
 		assert_eq!(
 			ReadDir::files_async(fs_ext::test_dir())
@@ -464,7 +464,7 @@ mod test_async {
 		);
 	}
 
-	#[tokio::test]
+	#[sweet::test]
 	async fn files_recursive() {
 		assert_eq!(
 			ReadDir::files_recursive_async(fs_ext::test_dir())

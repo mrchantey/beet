@@ -27,19 +27,7 @@ impl RouterRunner {
 	pub fn parse() -> Self { Parser::parse() }
 
 	pub fn runner(mut app: App) -> AppExit {
-		app.add_plugins(Self::parse());
-		#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
-		{
-			tokio::runtime::Builder::new_multi_thread()
-				.enable_all()
-				.build()
-				.unwrap()
-				.block_on(app.run_async())
-		}
-		#[cfg(not(all(feature = "tokio", not(target_arch = "wasm32"))))]
-		{
-			futures::executor::block_on(app.run_async())
-		}
+		app.add_plugins(Self::parse()).run()
 	}
 }
 

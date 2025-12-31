@@ -28,6 +28,7 @@ pub fn default_router(
 ) -> impl Bundle {
 	(
 		Name::new("Router Root"),
+		#[cfg(feature = "server")]
 		insert_on_ready(HttpRouter::new()),
 		InfallibleSequence,
 		children![

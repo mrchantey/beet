@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "reqwest", "fs"]
+default = ["serde", "fs"]
 # for conditional compilation in hooks
 client = []
 server = [
@@ -25,7 +25,6 @@ server = [
 ]
 lambda = ["rustls-tls", "dep:lambda_http"]
 fs = ["beet_core/fs","dep:async-process"]
-tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 aws = [
 	"serde",
@@ -116,9 +115,6 @@ async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 pin-project = { workspace = true, optional = true }
 
-# TODO bevy executor
-tokio = { workspace = true, optional = true, default-features = true, features = ["process"] }
-
 #💡 lambda
 lambda_http = { version = "0.16", optional = true }
 
@@ -169,5 +165,5 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_net = {path = ".", features = ["tokio","tungstenite", "native-tls"] }
+beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
 sweet.workspace = true

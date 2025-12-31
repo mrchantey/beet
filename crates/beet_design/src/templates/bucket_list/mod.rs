@@ -39,7 +39,8 @@ pub fn BucketList(
 				})
 				.collect::<Vec<_>>()
 				.xmap(set_items);
-		});
+		})
+		.detach();
 	});
 
 	rsx! {

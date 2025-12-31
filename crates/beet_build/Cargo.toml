@@ -48,7 +48,6 @@ tracing.workspace = true
 rapidhash.workspace = true
 futures.workspace = true
 heck.workspace = true
-rayon.workspace = true
 
 #💡 Tokens
 syn.workspace = true
@@ -71,10 +70,6 @@ clap.workspace = true
 
 #💡 Bevy
 bevy = { workspace = true, features = ["bevy_scene"] }
-flume = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

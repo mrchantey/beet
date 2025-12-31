@@ -255,7 +255,6 @@ impl Element {
 
 
 #[cfg(test)]
-#[cfg(feature = "tokio")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

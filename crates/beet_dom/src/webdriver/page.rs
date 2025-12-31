@@ -49,7 +49,6 @@ impl Page {
 
 	/// Spawn a default (chromium) driver process, create a session,
 	/// navigate to `url` and return both process + page.
-	#[cfg(feature = "tokio")]
 	pub async fn visit(url: &str) -> Result<(ClientProcess, Self)> {
 		let process = ClientProcess::new()?;
 		let session = process.new_session().await?;
@@ -149,7 +148,6 @@ impl Page {
 }
 
 #[cfg(test)]
-#[cfg(feature = "tokio")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

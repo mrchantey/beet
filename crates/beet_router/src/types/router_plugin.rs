@@ -192,6 +192,7 @@ pub struct Router;
 #[require(Router, HttpServer = HttpServer::default().with_handler(flow_route_handler))]
 pub struct HttpRouter;
 
+#[cfg(feature = "server")]
 impl HttpRouter {
 	/// Create a new `HttpRouter` bundle, using the test HttpServer in test environments
 	pub fn new() -> impl Bundle + Clone {

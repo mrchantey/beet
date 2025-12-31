@@ -2,8 +2,7 @@
 //! see the helper methods in `session_ext` for more detailed usage
 use beet::prelude::*;
 
-#[tokio::main]
-pub async fn main() {
+pub fn main() {
 	// 1. construct the session
 	let agent = GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE);
 	let message = session_ext::message(

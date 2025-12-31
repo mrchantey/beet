@@ -1,8 +1,9 @@
 use crate::prelude::*;
+use async_channel::Receiver;
+use async_channel::Sender;
+use beet_core::exports::futures_lite;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
-use flume::Receiver;
-use flume::Sender;
 
 // Subscribe to changes in a [`SignalEffect`] and queue a deduplicated app update,
 // which will call the effect in [`flush_signals`].
@@ -18,7 +19,9 @@ pub fn propagate_signal_effect(world: DeferredWorld, cx: HookContext) {
 	effect(move || {
 		subscribe();
 		// ignore errors if receiver dropped
-		sender.send(entity).ok();
+		futures_lite::future::block_on(async {
+			sender.send(entity).await.ok()
+		});
 		ReactiveApp::queue_update();
 	});
 }
@@ -33,7 +36,7 @@ pub struct DirtySignals {
 
 impl Default for DirtySignals {
 	fn default() -> Self {
-		let (send, recv) = flume::unbounded();
+		let (send, recv) = async_channel::unbounded();
 		Self { send, recv }
 	}
 }

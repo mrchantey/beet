@@ -49,7 +49,7 @@ where
 			let result = fut().await;
 			*out.borrow_mut() = Some(result);
 			resolve.call0(&JsValue::NULL).unwrap();
-		});
+		}).detach();
 	});
 	let timeout = timeout_reject(duration);
 

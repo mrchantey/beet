@@ -121,7 +121,6 @@ bevy = { version = "0.18.0-rc.1", default-features = false, features = [
 ] }
 
 #💡 utility
-anyhow = "1"
 thiserror = "1"
 heck = "0.4"
 glob = "0.3"
@@ -158,18 +157,6 @@ async-io = "2"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
-# todo replace with async channel
-flume = "0.11"
-# todo replace with bevy tasks
-rayon = "1"
-# todo replace with async-std
-tokio = { version = "1", features = [
-	"macros",
-	"sync",
-	"rt",
-	"rt-multi-thread",
-	"time",
-] }
 
 #💡 macros
 
@@ -290,7 +277,6 @@ bevy_default = [
 fs = ["beet_agent?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 tungstenite = ["net", "beet_net?/tungstenite"]
-tokio = ["beet_net?/tokio"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -323,9 +309,6 @@ beet_spatial = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio.workspace = true
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
 uuid = { workspace = true, features = ["rng-getrandom"] }
@@ -342,11 +325,9 @@ serde_json.workspace = true
 clap.workspace = true
 async-executor.workspace = true
 futures.workspace = true
-tokio.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = ".", features = ["fs"] }
-tokio.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

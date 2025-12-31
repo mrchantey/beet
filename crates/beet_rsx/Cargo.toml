@@ -39,11 +39,9 @@ extend.workspace = true
 strum.workspace = true
 rapidhash.workspace = true
 strum_macros.workspace = true
+async-channel.workspace = true
 prettyplease.workspace = true
 http.workspace = true
-
-# temp until proper bevy reactivity
-flume.workspace = true
 
 #💡 serde
 serde = { workspace = true, optional = true }
@@ -82,13 +80,10 @@ console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 beet_rsx = { path = ".", features = ["tokens"] }
-beet_core = { workspace = true, features = ["tokio"] }
+beet_core = { workspace = true }
 serde.workspace = true
 sweet.workspace = true
 
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true
 
 [[test]]
 name = "css"

@@ -11,12 +11,18 @@ impl Request {
 		{
 			super::impl_reqwest::send_reqwest(self).await
 		}
+		#[cfg(not(any(feature = "reqwest", target_arch = "wasm32")))]
+		{
+			panic!(
+				"No HTTP transport available, enable the 'reqwest' feature for native builds"
+			);
+		}
 	}
 }
 
 
 
-
+#[cfg(any(feature = "reqwest", target_arch = "wasm32"))]
 #[cfg(test)]
 mod test_request {
 	use crate::prelude::*;

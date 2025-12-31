@@ -28,7 +28,6 @@ bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
-tokio = ["dep:tokio"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 
 fs = [
@@ -103,7 +102,6 @@ futures.workspace = true
 async-executor.workspace = true
 async-io.workspace = true
 async-task.workspace = true
-tokio = { workspace = true, optional = true, features = ["sync", "fs"] }
 
 ## fs
 async-fs = { workspace = true, optional = true }
