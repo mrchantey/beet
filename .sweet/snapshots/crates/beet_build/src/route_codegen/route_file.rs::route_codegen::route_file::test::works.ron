@@ -1,2 +1,0 @@
-#[path = "../pages/docs/index.rs"]
-pub mod _docs;

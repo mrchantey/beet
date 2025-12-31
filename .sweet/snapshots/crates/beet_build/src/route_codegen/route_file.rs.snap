@@ -1,0 +1,3 @@
+[
+  "#[path = \"../pages/docs/index.rs\"]\npub mod _docs;\n",
+]

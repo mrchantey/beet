@@ -1,0 +1,4 @@
+[
+  "#[allow(non_snake_case)]\nfn OnAddFoo(\n    mut world: beet_core::prelude::DeferredWorld,\n    cx: beet_core::prelude::HookContext,\n) {\n    world.commands().entity(cx.entity).observe_any(bar).observe_any(bazz);\n}\n#[derive(Component)]\n#[component(on_add = OnAddFoo)]\nstruct Foo;\n",
+  "#[allow(non_snake_case)]\nfn OnAddFoo<T>(\n    mut world: beet_core::prelude::DeferredWorld,\n    cx: beet_core::prelude::HookContext,\n) {\n    world.commands().entity(cx.entity).observe_any(bar).observe_any(bazz::<T>);\n}\n#[derive(Component)]\n#[component(on_add = OnAddFoo::<T>)]\nstruct Foo<T>;\n",
+]

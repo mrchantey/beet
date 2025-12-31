@@ -1,0 +1,3 @@
+[
+  "impl Event for MyEvent {\n    type Trigger<\'a> = EntityTargetTrigger<false, Self, &\'static ChildOf>;\n}\n",
+]
