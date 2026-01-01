@@ -694,7 +694,7 @@ pub impl World {
 	{
 		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.update(),
+			|| self.update_local(),
 			func,
 		)
 	}
@@ -710,7 +710,7 @@ pub impl World {
 	{
 		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.update(),
+			|| self.update_local(),
 			func,
 		)
 	}
@@ -756,7 +756,7 @@ pub impl EntityWorldMut<'_> {
 		let id = self.id();
 		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.world_scope(World::update),
+			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)
 	}
@@ -773,7 +773,7 @@ pub impl EntityWorldMut<'_> {
 		let id = self.id();
 		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.world_scope(World::update),
+			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)
 	}

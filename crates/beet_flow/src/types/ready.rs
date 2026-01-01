@@ -96,7 +96,7 @@ pub impl EntityWorldMut<'_> {
 			AsyncRunner::poll_and_update(
 				|| {
 					self.world_scope(|world| {
-						world.update();
+						world.update_local();
 					})
 				},
 				recv,

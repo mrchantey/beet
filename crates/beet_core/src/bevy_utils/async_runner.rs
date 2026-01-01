@@ -51,7 +51,7 @@ impl AsyncRunner {
 
 		loop {
 			// 1. update first to process command queues
-			world.update();
+			world.update_local();
 			// 2. tick local tasks in multi-threaded mode
 			tick_task_pools();
 			// 3. exit if AppExit

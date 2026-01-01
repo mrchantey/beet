@@ -90,7 +90,7 @@ mod tests {
 			Request::from_cli_str(args).unwrap(),
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));
-		world.update();
+		world.update_local();
 		world.query_once::<&TestOutcome>()[0] == &TestOutcome::Pass
 	}
 

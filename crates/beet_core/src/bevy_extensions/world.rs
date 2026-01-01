@@ -59,7 +59,7 @@ pub impl World {
 		async move {
 			AsyncRunner::poll_and_update(
 				|| {
-					self.update();
+					self.update_local();
 				},
 				recv,
 			)
@@ -73,7 +73,7 @@ pub impl World {
 	/// In multi_threaded mode, this temporarily sets all schedules to use
 	/// single-threaded execution to avoid deadlocks when called from within
 	/// async tasks on IoTaskPool.
-	fn update(&mut self) {
+	fn update_local(&mut self) {
 		#[cfg(feature = "multi_threaded")]
 		{
 			// Temporarily force single-threaded execution for all schedules
