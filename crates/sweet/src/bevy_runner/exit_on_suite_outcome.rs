@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 
 
 /// Exits when all tests have finished
-pub fn exit_on_done(
+pub fn exit_on_suite_outcome(
 	mut commands: Commands,
 	finished: Populated<&SuiteOutcome, Added<SuiteOutcome>>,
 ) -> Result {

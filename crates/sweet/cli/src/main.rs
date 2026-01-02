@@ -2,7 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet::prelude::*;
 
-fn main() {
+fn main() -> Result<()> {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
@@ -14,7 +14,8 @@ fn main() {
 			// DebugFlowPlugin::default(),
 		))
 		.spawn_then(sweet_router())
-		.run();
+		.run()
+		.into_exit_native();
 }
 
 fn sweet_router() -> impl Bundle {

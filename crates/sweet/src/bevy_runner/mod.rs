@@ -1,10 +1,10 @@
-mod exit_on_done;
+mod exit_on_suite_outcome;
 mod suite_outcome;
 mod insert_tests;
 mod register_async_test;
 mod test_outcome;
 mod test_plugin;
-pub use exit_on_done::*;
+pub use exit_on_suite_outcome::*;
 pub use suite_outcome::*;
 pub use insert_tests::*;
 pub use register_async_test::*;

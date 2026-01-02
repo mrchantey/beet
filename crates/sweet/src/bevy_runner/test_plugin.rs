@@ -44,7 +44,7 @@ impl Plugin for TestPlugin {
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_suite_outcome,
-					exit_on_done,
+					exit_on_suite_outcome,
 				)
 					.chain(),
 			);
