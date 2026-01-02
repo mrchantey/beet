@@ -6,17 +6,18 @@ use beet_router::prelude::*;
 
 
 #[derive(Debug, Clone, Reflect, Component)]
+#[reflect(Default)]
 pub struct SuiteParams {
 	/// Timeout per test in the suite
-	timeout: Duration,
+	timeout_ms: u64,
 }
 
 impl Default for SuiteParams {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(5),
-		}
-	}
+	fn default() -> Self { Self { timeout_ms: 5_000 } }
+}
+impl SuiteParams {
+	/// Timeout per test in the suite
+	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
 }
 
 impl RequestMetaExtractor for SuiteParams {
@@ -105,7 +106,7 @@ pub fn insert_suite_outcome(
 	}
 }
 
-pub fn trigger_timeouts(
+pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
 	mut params: Extractor<SuiteParams>,
@@ -113,9 +114,10 @@ pub fn trigger_timeouts(
 ) -> Result {
 	for (entity, mut test, parent) in query.iter_mut() {
 		let params = params.get(parent.0)?;
+		let timeout = params.timeout();
 		test.tick(time.delta());
 		let elapsed = test.elapsed();
-		if elapsed >= params.timeout {
+		if elapsed >= timeout {
 			commands
 				.entity(entity)
 				.insert(TestOutcome::Fail(TestFail::Timeout { elapsed }));
@@ -132,11 +134,7 @@ mod tests {
 	use test::TestDescAndFn;
 
 	async fn run_test(test: TestDescAndFn) -> TestOutcome {
-		let mut app = App::new().with_plugins((
-			// ensure app exits even with update loop
-			MinimalPlugins,
-			TestPlugin,
-		));
+		let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
 
 		app.world_mut().spawn((
 			Request::from_cli_str("--quiet").unwrap(),
@@ -157,20 +155,20 @@ mod tests {
 		store.get().unwrap()
 	}
 
-	#[crate::test]
+	#[sweet::test]
 	async fn timeout() {
-		// run_test(test_ext::new_auto(|| {
-		// 	register_async_test(async {
-		// 		// time_ext::sleep_millis(15_000).await;
-		// 		panic!("pizza")
-		// 	});
-		// 	Ok(())
-		// }))
-		// .await
-		// .as_fail()
-		// .unwrap()
-		// .is_timeout()
-		// .xpect_false();
+		run_test(test_ext::new_auto(|| {
+			register_async_test(async {
+				time_ext::sleep_millis(15_000).await;
+				panic!("pizza")
+			});
+			Ok(())
+		}))
+		.await
+		.as_fail()
+		.unwrap()
+		.is_timeout()
+		.xpect_true();
 		// verify async test body is executed
 		// async_ext::yield_now().await;
 	}

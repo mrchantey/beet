@@ -7,7 +7,8 @@ use beet_router::prelude::*;
 
 /// Allow filtering tests by either named params or positional arguments,
 /// so `test foobar.ts` is the same as `test --include foober.ts`
-#[derive(Debug, Clone, Reflect, Component)]
+#[derive(Debug, Clone, Reflect, Component, Default)]
+#[reflect(Default)]
 pub struct FilterParams {
 	pub filter: GlobFilter,
 	/// By default the glob filter will wrap

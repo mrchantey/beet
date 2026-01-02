@@ -21,6 +21,7 @@
 extern crate test;
 // Allow the crate to reference itself as `sweet::` in tests,
 // required for the `#[sweet::test]` macro to use the correct thread local
+#[cfg(test)]
 extern crate self as sweet;
 // the #[sweet::test] macro
 pub use bevy_runner::test_runner;

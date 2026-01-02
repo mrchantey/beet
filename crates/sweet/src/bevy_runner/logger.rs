@@ -4,7 +4,8 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 
-#[derive(Clone, Reflect, Component)]
+#[derive(Clone, Reflect, Component, Default)]
+#[reflect(Default)]
 pub(super) struct LoggerParams {
 	/// Do not log test outcomes as they complete
 	no_incremental: bool,

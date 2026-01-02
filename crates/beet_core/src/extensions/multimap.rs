@@ -52,10 +52,17 @@ use bevy::reflect::TupleInfo;
 use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
+use bevy::reflect::attributes::CustomAttributes;
 use std::any::TypeId;
 use std::borrow::Borrow;
 use std::hash::BuildHasher;
 use std::hash::Hash;
+use std::str::FromStr;
+
+/// Marker attribute indicating a field is required when being
+/// parsed from a MultiMap, even if its parent type implements Default.
+#[derive(Debug, Copy, Clone, Reflect)]
+pub struct RequiredField;
 
 /// A multimap that stores multiple values per key.
 ///
@@ -181,8 +188,9 @@ pub impl MultiMap<String, String> {
 		let type_info = T::type_info();
 		let dynamic = build_dynamic_from_type_info(self, type_info, None)?;
 		T::from_reflect(dynamic.as_partial_reflect()).ok_or_else(|| {
+
 			bevyhow!(
-				"failed to convert dynamic type to {}",
+				"failed to convert dynamic type to {}\nThis can happen when a field is missing and the type does not #[reflect(Default)]",
 				type_info.type_path()
 			)
 		})
@@ -224,10 +232,17 @@ fn build_dynamic_struct(
 		let field_name = field.name();
 		let field_type_id = field.type_id();
 		let field_type_info = field.type_info();
+		let field_custom_attributes = field.custom_attributes();
 
-		let value =
-			build_field_value(map, field_name, field_type_id, field_type_info)?;
-		dynamic.insert_boxed(field_name, value);
+		if let Some(value) = build_field_value(
+			map,
+			field_name,
+			field_type_id,
+			field_type_info,
+			field_custom_attributes,
+		)? {
+			dynamic.insert_boxed(field_name, value);
+		}
 	}
 
 	Ok(Box::new(dynamic))
@@ -257,8 +272,18 @@ fn build_dynamic_tuple_struct(
 
 	let field_type_id = field.type_id();
 	let field_type_info = field.type_info();
+	let field_custom_attributes = field.custom_attributes();
 
-	let value = build_field_value(map, prefix, field_type_id, field_type_info)?;
+	let value = build_field_value(
+		map,
+		prefix,
+		field_type_id,
+		field_type_info,
+		field_custom_attributes,
+	)?
+	.ok_or_else(|| {
+		bevyhow!("missing required field '{}' for tuple struct", prefix)
+	})?;
 	dynamic.insert_boxed(value);
 
 	Ok(Box::new(dynamic))
@@ -284,13 +309,18 @@ fn build_dynamic_tuple(
 		};
 		let field_type_id = field.type_id();
 		let field_type_info = field.type_info();
+		let field_custom_attributes = field.custom_attributes();
 
 		let value = build_field_value(
 			map,
 			&field_name,
 			field_type_id,
 			field_type_info,
-		)?;
+			field_custom_attributes,
+		)?
+		.ok_or_else(|| {
+			bevyhow!("missing required field '{}' for tuple", field_name)
+		})?;
 		dynamic.insert_boxed(value);
 	}
 
@@ -303,59 +333,20 @@ fn build_field_value(
 	field_name: &str,
 	field_type_id: TypeId,
 	field_type_info: Option<&TypeInfo>,
-) -> Result<Box<dyn PartialReflect>> {
-	// Handle primitive/leaf types first
+	custom_attributes: &CustomAttributes,
+) -> Result<Option<Box<dyn PartialReflect>>> {
+	// bool/flag fields are a special case, we just need to
+	// check presence of the key
 	if field_type_id == TypeId::of::<bool>() {
-		let value = parse_bool_field(map, field_name)?;
-		return Ok(Box::new(value));
-	}
+		return parse_bool_field(map, field_name);
+	};
 
-	if field_type_id == TypeId::of::<String>() {
-		let value = parse_string_field(map, field_name)?;
-		return Ok(Box::new(value));
-	}
-
-	if field_type_id == TypeId::of::<Option<String>>() {
-		let value = parse_option_string_field(map, field_name);
-		return Ok(Box::new(value));
-	}
-
-	if field_type_id == TypeId::of::<Vec<String>>() {
-		let value = parse_vec_string_field(map, field_name);
-		return Ok(Box::new(value));
-	}
-
-	// Handle Vec of newtype wrappers by checking if it's a List type
-	if let Some(type_info) = field_type_info {
-		if let TypeInfo::List(list_info) = type_info {
-			// check if the item type is a single-field tuple struct or struct
-			if let Some(item_type_info) = list_info.item_info() {
-				let is_newtype = match item_type_info {
-					TypeInfo::TupleStruct(tuple_struct) => {
-						tuple_struct.field_len() == 1
-					}
-					TypeInfo::Struct(struct_info) => {
-						struct_info.field_len() == 1
-					}
-					_ => false,
-				};
-
-				if is_newtype {
-					return parse_vec_newtype_field(
-						map,
-						field_name,
-						item_type_info,
-					);
-				}
-			}
-		}
-	}
-
-	// Handle nested struct types
+	// Check for complex/nested types first (structs, tuples, lists)
+	// These are flattened and don't have a direct entry in the map
 	if let Some(type_info) = field_type_info {
 		match type_info {
 			TypeInfo::Struct(struct_info) => {
-				return build_dynamic_struct(map, struct_info);
+				return build_dynamic_struct(map, struct_info).map(Some);
 			}
 			TypeInfo::TupleStruct(tuple_struct_info) => {
 				// single-field tuple structs (newtypes) use parent field name
@@ -363,77 +354,200 @@ fn build_field_value(
 					map,
 					tuple_struct_info,
 					Some(field_name),
-				);
+				)
+				.map(Some);
 			}
 			TypeInfo::Tuple(_) => {
 				// tuples are always flattened
-				return build_dynamic_from_type_info(map, type_info, None);
+				return build_dynamic_from_type_info(map, type_info, None)
+					.map(Some);
+			}
+			TypeInfo::List(list_info) => {
+				// Handle Vec of newtype wrappers
+				if let Some(item_type_info) = list_info.item_info() {
+					let is_newtype = match item_type_info {
+						TypeInfo::TupleStruct(tuple_struct) => {
+							tuple_struct.field_len() == 1
+						}
+						TypeInfo::Struct(struct_info) => {
+							struct_info.field_len() == 1
+						}
+						_ => false,
+					};
+
+					if is_newtype {
+						let map_item =
+							if let Some(values) = map.get_vec(field_name) {
+								values
+							} else if custom_attributes
+								.get::<RequiredField>()
+								.is_some()
+							{
+								bevybail!(
+									"missing required field '{}'",
+									field_name
+								);
+							} else {
+								return Ok(None);
+							};
+
+						return parse_vec_newtype_field(
+							map_item,
+							item_type_info,
+						)
+						.map(Some);
+					}
+				}
 			}
 			_ => {}
 		}
 	}
 
+	// Now check if field exists in map for primitive types
+	let map_item = if let Some(values) = map.get_vec(field_name) {
+		values
+	} else if custom_attributes.get::<RequiredField>().is_some() {
+		bevybail!("missing required field '{}'", field_name);
+	} else {
+		// field not present and not required, return None to use default
+		return Ok(None);
+	};
+
+	// Handle primitive/leaf types
+	match field_type_id {
+		id if id == TypeId::of::<String>() => {
+			return parse_string_field(map_item);
+		}
+		id if id == TypeId::of::<Option<String>>() => {
+			return Ok(Some(Box::new(parse_option_string_field(map_item))));
+		}
+		id if id == TypeId::of::<Vec<String>>() => {
+			return Ok(Some(Box::new(parse_vec_string_field(map_item))));
+		}
+		id if id == TypeId::of::<i8>() => {
+			return parse_number_field::<i8>(map_item, field_name);
+		}
+		id if id == TypeId::of::<i16>() => {
+			return parse_number_field::<i16>(map_item, field_name);
+		}
+		id if id == TypeId::of::<i32>() => {
+			return parse_number_field::<i32>(map_item, field_name);
+		}
+		id if id == TypeId::of::<i64>() => {
+			return parse_number_field::<i64>(map_item, field_name);
+		}
+		id if id == TypeId::of::<i128>() => {
+			return parse_number_field::<i128>(map_item, field_name);
+		}
+		id if id == TypeId::of::<isize>() => {
+			return parse_number_field::<isize>(map_item, field_name);
+		}
+		id if id == TypeId::of::<u8>() => {
+			return parse_number_field::<u8>(map_item, field_name);
+		}
+		id if id == TypeId::of::<u16>() => {
+			return parse_number_field::<u16>(map_item, field_name);
+		}
+		id if id == TypeId::of::<u32>() => {
+			return parse_number_field::<u32>(map_item, field_name);
+		}
+		id if id == TypeId::of::<u64>() => {
+			return parse_number_field::<u64>(map_item, field_name);
+		}
+		id if id == TypeId::of::<u128>() => {
+			return parse_number_field::<u128>(map_item, field_name);
+		}
+		id if id == TypeId::of::<usize>() => {
+			return parse_number_field::<usize>(map_item, field_name);
+		}
+		id if id == TypeId::of::<f32>() => {
+			return parse_number_field::<f32>(map_item, field_name);
+		}
+		id if id == TypeId::of::<f64>() => {
+			return parse_number_field::<f64>(map_item, field_name);
+		}
+		_ => {}
+	}
+
 	bevybail!(
-		"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, or nested struct",
+		"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
 		field_name
 	)
+}
+
+/// Parse a number field from the multimap.
+fn parse_number_field<T: FromStr + PartialReflect>(
+	values: &Vec<String>,
+	field_name: &str,
+) -> Result<Option<Box<dyn PartialReflect>>>
+where
+	T::Err: std::fmt::Display,
+{
+	let value_str = values.first();
+
+	if value_str.is_none() {
+		return Ok(None);
+	}
+
+	let parsed = value_str.unwrap().parse::<T>().map_err(|err| {
+		bevyhow!(
+			"invalid numeric value for field '{}': '{}' ({})",
+			field_name,
+			value_str.unwrap(),
+			err
+		)
+	})?;
+
+	Ok(Some(Box::new(parsed)))
 }
 
 /// Parse a bool field from the multimap.
 fn parse_bool_field(
 	map: &MultiMap<String, String>,
 	field_name: &str,
-) -> Result<bool> {
+) -> Result<Option<Box<dyn PartialReflect>>> {
 	match map.get_vec(field_name) {
-		Some(values) if values.is_empty() => Ok(true), // key exists but no values (flag-style)
+		Some(values) if values.is_empty() => Ok(Some(Box::new(true))), // key exists but no values (flag-style)
 		Some(values) => match values[0].to_lowercase().as_str() {
-			"true" | "1" | "yes" | "on" | "" => Ok(true),
-			"false" | "0" | "no" | "off" => Ok(false),
+			"true" | "1" | "yes" | "on" | "" => Ok(Some(Box::new(true))),
+			"false" | "0" | "no" | "off" => Ok(Some(Box::new(false))),
 			other => bevybail!(
 				"invalid bool value for field '{}': '{}', expected true/false",
 				field_name,
 				other
 			),
 		},
-		None => Ok(false), // key doesn't exist, default to false
+		None => Ok(None), // key doesn't exist, return None to use default
 	}
 }
 
-/// Parse a required String field from the multimap.
+/// Parse a String field from the multimap.
 fn parse_string_field(
-	map: &MultiMap<String, String>,
-	field_name: &str,
-) -> Result<String> {
-	map.get(field_name)
-		.cloned()
-		.ok_or_else(|| bevyhow!("missing required field '{}'", field_name))
+	values: &Vec<String>,
+) -> Result<Option<Box<dyn PartialReflect>>> {
+	match values.first() {
+		Some(value) => Ok(Some(Box::new(value.clone()))),
+		None => Ok(None),
+	}
 }
 
 /// Parse an optional String field from the multimap.
-fn parse_option_string_field(
-	map: &MultiMap<String, String>,
-	field_name: &str,
-) -> Option<String> {
-	map.get(field_name).cloned()
+fn parse_option_string_field(values: &Vec<String>) -> Option<String> {
+	values.first().cloned()
 }
 
 /// Parse a Vec<String> field from the multimap (all values for the key).
-fn parse_vec_string_field(
-	map: &MultiMap<String, String>,
-	field_name: &str,
-) -> Vec<String> {
-	map.get_vec(field_name).cloned().unwrap_or_default()
+fn parse_vec_string_field(values: &Vec<String>) -> Vec<String> {
+	values.clone()
 }
 
 /// Parse a Vec of newtype wrappers from the multimap.
 fn parse_vec_newtype_field(
-	map: &MultiMap<String, String>,
-	field_name: &str,
+	values: &Vec<String>,
 	item_type_info: &TypeInfo,
 ) -> Result<Box<dyn PartialReflect>> {
 	use bevy::reflect::DynamicList;
 
-	let values = map.get_vec(field_name).map(|v| v.as_slice()).unwrap_or(&[]);
 	let mut dynamic_list = DynamicList::default();
 
 	for value in values {
@@ -457,6 +571,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct SimpleStruct {
 		name: String,
 		verbose: bool,
@@ -504,6 +619,7 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct WithOptional {
 		required: String,
 		optional: Option<String>,
@@ -531,6 +647,7 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct WithVec {
 		name: String,
 		tags: Vec<String>,
@@ -563,11 +680,13 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Inner {
 		inner_field: String,
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct WithNested {
 		outer_field: String,
 		nested: Inner,
@@ -586,8 +705,15 @@ mod test {
 
 	#[test]
 	fn errors_on_missing_required_field() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct RequiredStruct {
+			#[reflect(@RequiredField)]
+			name: String,
+		}
+
 		let map = MultiMap::<String, String>::new();
-		let result: Result<SimpleStruct> = map.parse_reflect();
+		let result: Result<RequiredStruct> = map.parse_reflect();
 		result.xpect_err();
 	}
 
@@ -633,17 +759,20 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Level2 {
 		deep_field: String,
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Level1 {
 		mid_field: String,
 		level2: Level2,
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Level0 {
 		top_field: String,
 		level1: Level1,
@@ -663,6 +792,7 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct AllFieldTypes {
 		string_field: String,
 		bool_field: bool,
@@ -689,15 +819,19 @@ mod test {
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Foo(pub String);
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Bar(pub bool);
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct Bazz(pub Vec<String>);
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[reflect(Default)]
 	struct ParamsWithNewtypes {
 		foo: Foo,
 		bar: Vec<Bar>,
@@ -727,15 +861,19 @@ mod test {
 	#[test]
 	fn parses_exact_user_example() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
 		struct UserFoo(pub String);
 
 		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
 		struct UserBar(pub bool);
 
 		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
 		struct UserBazz(pub Vec<String>);
 
 		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
 		struct UserParams {
 			foo: UserFoo,
 			bar: Vec<UserBar>,
@@ -804,5 +942,158 @@ mod test {
 
 		map.clear();
 		map.is_empty().xpect_true();
+	}
+
+	#[test]
+	fn parses_signed_integers() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct SignedInts {
+			i8_field: i8,
+			i16_field: i16,
+			i32_field: i32,
+			i64_field: i64,
+			i128_field: i128,
+			isize_field: isize,
+		}
+
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("i8_field".to_string(), "-42".to_string());
+		map.insert("i16_field".to_string(), "-1000".to_string());
+		map.insert("i32_field".to_string(), "-50000".to_string());
+		map.insert("i64_field".to_string(), "-9223372036854775807".to_string());
+		map.insert(
+			"i128_field".to_string(),
+			"-170141183460469231731687303715884105727".to_string(),
+		);
+		map.insert("isize_field".to_string(), "-12345".to_string());
+
+		let result: SignedInts = map.parse_reflect().unwrap();
+		result.i8_field.xpect_eq(-42);
+		result.i16_field.xpect_eq(-1000);
+		result.i32_field.xpect_eq(-50000);
+		result.i64_field.xpect_eq(-9223372036854775807);
+		result
+			.i128_field
+			.xpect_eq(-170141183460469231731687303715884105727);
+		result.isize_field.xpect_eq(-12345);
+	}
+
+	#[test]
+	fn parses_unsigned_integers() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct UnsignedInts {
+			u8_field: u8,
+			u16_field: u16,
+			u32_field: u32,
+			u64_field: u64,
+			u128_field: u128,
+			usize_field: usize,
+		}
+
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("u8_field".to_string(), "255".to_string());
+		map.insert("u16_field".to_string(), "65535".to_string());
+		map.insert("u32_field".to_string(), "4294967295".to_string());
+		map.insert("u64_field".to_string(), "18446744073709551615".to_string());
+		map.insert(
+			"u128_field".to_string(),
+			"340282366920938463463374607431768211455".to_string(),
+		);
+		map.insert("usize_field".to_string(), "99999".to_string());
+
+		let result: UnsignedInts = map.parse_reflect().unwrap();
+		result.u8_field.xpect_eq(255);
+		result.u16_field.xpect_eq(65535);
+		result.u32_field.xpect_eq(4294967295);
+		result.u64_field.xpect_eq(18446744073709551615);
+		result
+			.u128_field
+			.xpect_eq(340282366920938463463374607431768211455);
+		result.usize_field.xpect_eq(99999);
+	}
+
+	#[test]
+	fn parses_floats() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct Floats {
+			f32_field: f32,
+			f64_field: f64,
+		}
+
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("f32_field".to_string(), "3.14159".to_string());
+		map.insert("f64_field".to_string(), "-2.718281828459045".to_string());
+
+		let result: Floats = map.parse_reflect().unwrap();
+		result.f32_field.xpect_close(3.14159);
+		result.f64_field.xpect_close(-2.718281828459045);
+	}
+
+	#[test]
+	fn errors_on_invalid_number() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct WithInt {
+			value: i32,
+		}
+
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("value".to_string(), "not_a_number".to_string());
+
+		let result: Result<WithInt> = map.parse_reflect();
+		result.unwrap_err();
+	}
+
+	#[test]
+	fn errors_on_missing_required_number() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct WithInt {
+			#[reflect(@RequiredField)]
+			value: i32,
+		}
+
+		let map = MultiMap::<String, String>::new();
+
+		let result: Result<WithInt> = map.parse_reflect();
+		result.unwrap_err();
+	}
+
+	#[test]
+	fn parses_mixed_types_with_numbers() {
+		#[derive(Debug, Reflect)]
+		#[reflect(Default)]
+		struct MixedTypes {
+			name: String,
+			count: u32,
+			ratio: f64,
+			enabled: bool,
+		}
+
+		impl Default for MixedTypes {
+			fn default() -> Self {
+				Self {
+					name: default(),
+					count: 7,
+					ratio: default(),
+					enabled: default(),
+				}
+			}
+		}
+
+		let mut map = MultiMap::<String, String>::new();
+		map.insert("name".to_string(), "test".to_string());
+		// map.insert("count".to_string(), "42".to_string());
+		map.insert("ratio".to_string(), "0.75".to_string());
+		map.insert("enabled".to_string(), "true".to_string());
+
+		let result: MixedTypes = map.parse_reflect().unwrap();
+		result.name.xpect_eq("test".to_string());
+		result.count.xpect_eq(7);
+		result.ratio.xpect_close(0.75);
+		result.enabled.xpect_true();
 	}
 }

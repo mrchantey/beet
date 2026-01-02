@@ -1,6 +1,7 @@
 use super::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use bevy::time::TimePlugin;
 
 
 pub fn test_runner(tests: &[&test::TestDescAndFn]) {
@@ -30,14 +31,16 @@ impl Plugin for TestPlugin {
 
 		app.init_plugin::<ControlFlowPlugin>()
 			.init_plugin::<AsyncPlugin>()
+			.init_plugin::<TimePlugin>()
 			.insert_schedule_before(Update, RunTests)
 			.add_systems(
 				RunTests,
 				(
 					log_suite_running,
-					log_case_running,
 					filter_tests,
+					log_case_running,
 					(run_tests_series, run_non_send_tests_series),
+					trigger_timeouts,
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_suite_outcome,

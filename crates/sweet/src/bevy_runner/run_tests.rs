@@ -115,7 +115,7 @@ mod tests {
 		store.get().unwrap()
 	}
 
-	#[crate::test]
+	#[sweet::test]
 	async fn works_sync() {
 		run_test(test_ext::new_auto(|| Ok(())))
 			.await
@@ -173,7 +173,7 @@ mod tests {
 	async fn works_async() {
 		use crate::bevy_runner::register_async_test;
 
-		
+
 		run_test(test_ext::new_auto(|| {
 			register_async_test(async {
 				async_ext::yield_now().await;
