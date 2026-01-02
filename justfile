@@ -199,9 +199,10 @@ test-rsx *args:
 	cargo test -p beet_rsx_combinator 	--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_parse 						--all-features 	 	 																	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx   				--all-features   																				{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx   						--all-features   																		{{ args }} -- {{ test-threads }}
 	cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{ args }} -- {{ test-threads }}
-	cargo test -p beet_router						 --features=tokens  																{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--features=tokens,server														{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--features=tokens	--target wasm32-unknown-unknown	 	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_build 						--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_design 					--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}

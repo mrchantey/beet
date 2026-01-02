@@ -73,3 +73,4 @@ web-sys = { workspace = true, features = ["Storage"] }
 
 [dev-dependencies]
 sweet.workspace = true
+tokio.workspace = true

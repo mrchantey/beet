@@ -1470,6 +1470,7 @@ dependencies = [
  "serde_json",
  "sweet",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "variadics_please",
@@ -9263,6 +9264,7 @@ dependencies = [
 name = "sweet_macros"
 version = "0.0.8-dev.3"
 dependencies = [
+ "beet_core",
  "proc-macro2",
  "quote",
  "syn 2.0.111",

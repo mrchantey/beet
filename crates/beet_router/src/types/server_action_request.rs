@@ -169,7 +169,7 @@ mod test {
 	}
 
 	// only a single entry because set_server_url is static
-	#[sweet::test]
+	#[sweet::test(tokio)]
 	async fn works() {
 		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();

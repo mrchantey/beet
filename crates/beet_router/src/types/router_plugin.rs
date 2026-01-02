@@ -268,8 +268,8 @@ mod test {
 		world.query_once::<&ExchangeContext>().len().xpect_eq(0);
 	}
 
-	#[sweet::test]
-	async fn route_tree() {
+	#[test]
+	fn route_tree() {
 		let mut world = World::new();
 		world.spawn((Router, CacheStrategy::Static, children![
 			EndpointBuilder::get()
@@ -302,7 +302,7 @@ mod test {
 	}
 
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-	#[sweet::test]
+	#[sweet::test(tokio)]
 	async fn server() {
 		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();
