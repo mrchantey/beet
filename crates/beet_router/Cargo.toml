@@ -15,7 +15,11 @@ publish = true
 [features]
 default = ["serde", "fs"]
 reflect_documentation = ["bevy/reflect_documentation"]
-server = ["beet_net/server"]
+server = [
+	"beet_net/server",
+	# technically only required for internal tests
+	"beet_net/reqwest"
+]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
 client = ["beet_net/client"]

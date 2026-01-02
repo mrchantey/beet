@@ -222,6 +222,7 @@ mod test {
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
+	#[cfg(feature = "server")]
 	#[sweet::test]
 	async fn test_default_router() {
 		let mut world = RouterPlugin::world();
@@ -234,7 +235,6 @@ mod test {
 			]),
 			EndWith(Outcome::Pass),
 		));
-
 
 		entity
 			.await_ready()

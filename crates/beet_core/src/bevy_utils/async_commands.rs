@@ -2,6 +2,7 @@ use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
+use bevy::app::MainSchedulePlugin;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::error::ErrorContext;
 use bevy::ecs::system::IntoObserverSystem;
@@ -52,14 +53,16 @@ impl<T> MaybeSync for T {}
 
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.
-/// This plugin will init the [`TaskPoolPlugin`] if unintialized,
+/// This plugin will init the [`TaskPoolPlugin`] and [`MainSchedulePlugin`] if unintialized,
 /// so must be added after [`DefaultPlugins`] / [`MinimalPlugins`]
 #[derive(Default)]
 pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<TaskPoolPlugin>()
+		app.init_plugin_with(MainSchedulePlugin)
+			// this will add the system to tick_global_task_pools_on_main_thread() in the Last schedule
+			.init_plugin::<TaskPoolPlugin>()
 			.init_resource::<AsyncChannel>()
 			.add_systems(PreUpdate, append_async_queues);
 	}

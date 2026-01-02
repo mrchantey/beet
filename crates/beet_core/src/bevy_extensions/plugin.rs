@@ -18,8 +18,6 @@ where
 	where
 		T: Default,
 	{
-		let mut app = App::new();
-		app.add_plugins(T::default());
-		std::mem::take(app.world_mut())
+		T::default().into_world()
 	}
 }

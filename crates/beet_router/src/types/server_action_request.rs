@@ -140,6 +140,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -169,7 +170,6 @@ mod test {
 
 	// only a single entry because set_server_url is static
 	#[sweet::test]
-	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 	async fn works() {
 		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();

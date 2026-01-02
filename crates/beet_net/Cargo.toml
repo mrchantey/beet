@@ -109,7 +109,7 @@ async-native-tls = { version = "0.5", optional = true }
 #💡 server
 
 #💡 server
-hyper = { version = "1.7", features = ["server"], optional = true }
+hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
