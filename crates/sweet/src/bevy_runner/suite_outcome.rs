@@ -1,6 +1,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_router::prelude::*;
+
+
+
+#[derive(Debug, Clone, Reflect, Component)]
+pub struct SuiteParams {
+	/// Timeout per test in the suite
+	timeout: Duration,
+}
+
+impl Default for SuiteParams {
+	fn default() -> Self {
+		Self {
+			timeout: Duration::from_secs(5),
+		}
+	}
+}
+
+impl RequestMetaExtractor for SuiteParams {
+	fn extract(request: &RequestMeta) -> Result<Self> {
+		request.params().parse_reflect()
+	}
+}
 
 
 /// Added to the [`Request`] entity once all tests have completed
@@ -79,5 +102,75 @@ pub fn insert_suite_outcome(
 		commands
 			.entity(entity)
 			.insert(SuiteOutcome::new(&all_finished));
+	}
+}
+
+pub fn trigger_timeouts(
+	mut commands: Commands,
+	time: Res<Time>,
+	mut params: Extractor<SuiteParams>,
+	mut query: Populated<(Entity, &mut Test, &ChildOf), Without<TestOutcome>>,
+) -> Result {
+	for (entity, mut test, parent) in query.iter_mut() {
+		let params = params.get(parent.0)?;
+		test.tick(time.delta());
+		let elapsed = test.elapsed();
+		if elapsed >= params.timeout {
+			commands
+				.entity(entity)
+				.insert(TestOutcome::Fail(TestFail::Timeout { elapsed }));
+		}
+	}
+	Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use beet_net::prelude::Request;
+	use test::TestDescAndFn;
+
+	async fn run_test(test: TestDescAndFn) -> TestOutcome {
+		let mut app = App::new().with_plugins((
+			// ensure app exits even with update loop
+			MinimalPlugins,
+			TestPlugin,
+		));
+
+		app.world_mut().spawn((
+			Request::from_cli_str("--quiet").unwrap(),
+			tests_bundle(vec![test]),
+		));
+		let store = Store::new(None);
+
+		app.add_observer(
+			move |ev: On<Insert, TestOutcome>,
+			      outcomes: Query<&TestOutcome>| {
+				store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
+			},
+		);
+		// app.init();
+		// advance time past timeout
+		// app.update_with_secs(10);
+		app.run_async().await;
+		store.get().unwrap()
+	}
+
+	#[crate::test]
+	async fn timeout() {
+		panic!("here we are");
+		// run_test(test_ext::new_auto(|| {
+		// 	register_async_test(async {
+		// 		// time_ext::sleep_millis(15_000).await;
+		// 		panic!("pizza")
+		// 	});
+		// 	Ok(())
+		// }))
+		// .await
+		// .as_fail()
+		// .unwrap()
+		// .is_timeout()
+		// .xpect_false();
 	}
 }

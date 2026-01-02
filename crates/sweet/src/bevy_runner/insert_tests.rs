@@ -69,19 +69,35 @@ fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 }
 
 
-#[derive(Debug, Deref, Component)]
+#[derive(Debug, Component)]
 pub struct Test {
+	/// The test description
 	desc: TestDesc,
+	/// Counts the time elapsed since the test started
+	timer: Stopwatch,
+}
+
+impl std::ops::Deref for Test {
+	type Target = TestDesc;
+	fn deref(&self) -> &Self::Target { &self.desc }
 }
 
 impl Test {
-	pub fn new(desc: TestDesc) -> Self { Self { desc } }
+	pub fn new(desc: TestDesc) -> Self {
+		Self {
+			desc,
+			timer: default(),
+		}
+	}
 	pub fn desc(&self) -> &TestDesc { &self.desc }
 	/// Returns true if the test should not be run,
 	/// ie if `ignore` or `no_run` flag
 	pub fn do_not_run(&self) -> bool {
 		self.desc.ignore || self.desc.no_run || self.desc.compile_fail
 	}
+
+	pub fn tick(&mut self, delta: Duration) { self.timer.tick(delta); }
+	pub fn elapsed(&self) -> Duration { self.timer.elapsed() }
 }
 
 

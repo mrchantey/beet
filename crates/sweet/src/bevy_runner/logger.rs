@@ -293,6 +293,12 @@ fn fail_reason(outcome: &TestFail) -> String {
 				paint_ext::bold("Panic - opaque payload")
 			}
 		}
+		TestFail::Timeout { elapsed } => {
+			let prefix = paint_ext::bold("Timed out after:");
+			let time = time_ext::pretty_print_duration(*elapsed);
+			let time = paint_ext::blue(time);
+			format!("{} {}", prefix, time)
+		}
 	}
 }
 

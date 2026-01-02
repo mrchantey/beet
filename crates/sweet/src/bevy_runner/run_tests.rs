@@ -89,7 +89,7 @@ mod tests {
 	use beet_net::prelude::Request;
 	use test::TestDescAndFn;
 
-	fn run_test(test: TestDescAndFn) -> TestOutcome {
+	async fn run_test(test: TestDescAndFn) -> TestOutcome {
 		let mut app = App::new().with_plugins((
 			// ensure app exits even with update loop
 			MinimalPlugins,
@@ -109,56 +109,66 @@ mod tests {
 			},
 		);
 
-		app.run_loop();
+		app.run_async().await;
+		// app.run_loop();
 		store.get().unwrap()
 	}
 
-	#[test]
-	fn works_sync() {
-		run_test(test_ext::new_auto(|| Ok(()))).xpect_eq(TestOutcome::Pass);
-		run_test(test_ext::new_auto(|| Err("pizza".into()))).xpect_eq(
-			TestFail::Err {
-				message: "pizza".into(),
-			}
-			.into(),
-		);
+	#[crate::test]
+	async fn works_sync() {
+		run_test(test_ext::new_auto(|| Ok(())))
+			.await
+			.xpect_eq(TestOutcome::Pass);
+		run_test(test_ext::new_auto(|| Err("pizza".into())))
+			.await
+			.xpect_eq(
+				TestFail::Err {
+					message: "pizza".into(),
+				}
+				.into(),
+			);
 		run_test(test_ext::new_auto(|| panic!("expected")).with_should_panic())
+			.await
 			.xpect_eq(TestOutcome::Pass);
 		run_test(test_ext::new_auto(|| Ok(())).with_should_panic())
+			.await
 			.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 		run_test(
 			test_ext::new_auto(|| panic!("boom"))
 				.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 		run_test(
 			test_ext::new_auto(|| Ok(())).with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
 			}
 			.into(),
 		);
-		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
-			TestFail::Panic {
-				payload: Some("pizza".into()),
-				location: Some(FileSpan::new_with_start(
-					file!(),
-					line!() - 5,
-					39,
-				)),
-			}
-			.into(),
-		);
+		run_test(test_ext::new_auto(|| panic!("pizza")))
+			.await
+			.xpect_eq(
+				TestFail::Panic {
+					payload: Some("pizza".into()),
+					location: Some(FileSpan::new_with_start(
+						file!(),
+						line!() - 5,
+						39,
+					)),
+				}
+				.into(),
+			);
 	}
 
 	// Async tests cannot be tested in nested apps on WASM because
 	// async tasks require JS event loop ticks to progress, which don't
 	// happen in a synchronous update loop. These tests work on native.
-	#[test]
-	#[cfg_attr(target_arch = "wasm32", ignore)]
-	fn works_async() {
+	#[sweet::test]
+	async fn works_async() {
 		use crate::bevy_runner::register_async_test;
 
 		run_test(test_ext::new_auto(|| {
@@ -168,6 +178,7 @@ mod tests {
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(test_ext::new_auto(|| {
@@ -177,6 +188,7 @@ mod tests {
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(
 			TestFail::Err {
 				message: "pizza".into(),
@@ -194,6 +206,7 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -206,6 +219,7 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
+		.await
 		.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 
 		run_test(
@@ -218,6 +232,7 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -230,6 +245,7 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
@@ -245,6 +261,7 @@ mod tests {
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(
 			TestFail::Panic {
 				payload: Some("pizza".into()),

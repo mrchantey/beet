@@ -39,6 +39,8 @@ pub enum TestFail {
 		/// The location of the panic if available
 		location: Option<FileSpan>,
 	},
+	/// The test timed out
+	Timeout { elapsed: Duration },
 }
 
 impl TestFail {
@@ -66,6 +68,14 @@ impl TestFail {
 			_ => test.end(),
 		}
 	}
+	pub fn is_timeout(&self) -> bool {
+		matches!(self, TestFail::Timeout { .. })
+	}
+	pub fn is_panic(&self) -> bool { matches!(self, TestFail::Panic { .. }) }
+	pub fn is_error(&self) -> bool { matches!(self, TestFail::Err { .. }) }
+	pub fn is_expected_panic(&self) -> bool {
+		matches!(self, TestFail::ExpectedPanic { .. })
+	}
 }
 
 
@@ -80,6 +90,13 @@ impl TestOutcome {
 	pub fn is_pass(&self) -> bool { self == &TestOutcome::Pass }
 	pub fn is_fail(&self) -> bool { matches!(self, TestOutcome::Fail(_)) }
 	pub fn is_skip(&self) -> bool { matches!(self, TestOutcome::Skip(_)) }
+	pub fn as_fail(&self) -> Option<&TestFail> {
+		if let TestOutcome::Fail(fail) = self {
+			Some(fail)
+		} else {
+			None
+		}
+	}
 
 	/// Creates a TestOutcome from a PanicResult and whether the test should panic,
 	/// retreived via [`Test::should_panic`]
