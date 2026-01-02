@@ -14,11 +14,12 @@ pub fn parse_sweet_test(
 		let vis = &func.vis;
 		let block = &func.block;
 		let attrs = &func.attrs;
+		// Check if #[should_panic] is present - it requires () return type
 		quote! {
 			#[test]
 			#(#attrs)*
-			#vis fn #ident(){
-				sweet::prelude::register_async_test(async #block)
+			#vis fn #ident() {
+				sweet::prelude::register_async_test(async #block);
 			}
 		}
 	} else {

@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(crate::test_runner))]
 // #![feature(test)]
 // remove after bevy refactor
-#![allow(deprecated)]
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 // implement FnMut for MockFunc
@@ -20,6 +19,9 @@
 )]
 
 extern crate test;
+// Allow the crate to reference itself as `sweet::` in tests,
+// required for the `#[sweet::test]` macro to use the correct thread local
+extern crate self as sweet;
 // the #[sweet::test] macro
 pub use bevy_runner::test_runner;
 pub use sweet_macros;
@@ -37,14 +39,6 @@ pub mod prelude {
 	pub use crate::libtest::*;
 	pub use crate::matchers::*;
 	pub use crate::utils::*;
-}
-
-pub mod as_sweet {
-	pub use crate::prelude::*;
-	pub mod sweet {
-		pub use crate::exports;
-		pub use crate::prelude;
-	}
 }
 
 pub mod exports {}

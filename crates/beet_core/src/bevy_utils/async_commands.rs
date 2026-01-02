@@ -64,6 +64,7 @@ impl Plugin for AsyncPlugin {
 			.add_systems(PreUpdate, append_async_queues);
 	}
 }
+
 /// Append all [`AsyncChannel::rx`] command queues directly to the world.
 fn append_async_queues(world: &mut World) -> Result {
 	// Clone the receiver to avoid borrow conflict

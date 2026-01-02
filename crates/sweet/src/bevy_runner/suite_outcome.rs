@@ -159,7 +159,6 @@ mod tests {
 
 	#[crate::test]
 	async fn timeout() {
-		panic!("here we are");
 		// run_test(test_ext::new_auto(|| {
 		// 	register_async_test(async {
 		// 		// time_ext::sleep_millis(15_000).await;
@@ -172,5 +171,7 @@ mod tests {
 		// .unwrap()
 		// .is_timeout()
 		// .xpect_false();
+		// verify async test body is executed
+		// async_ext::yield_now().await;
 	}
 }

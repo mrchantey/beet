@@ -4,6 +4,7 @@ use beet_core::prelude::*;
 use bevy::ecs::system::NonSendMarker;
 
 
+
 pub(super) fn run_tests_series(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
@@ -156,7 +157,7 @@ mod tests {
 					payload: Some("pizza".into()),
 					location: Some(FileSpan::new_with_start(
 						file!(),
-						line!() - 5,
+						line!() - 7,
 						39,
 					)),
 				}
@@ -167,10 +168,12 @@ mod tests {
 	// Async tests cannot be tested in nested apps on WASM because
 	// async tasks require JS event loop ticks to progress, which don't
 	// happen in a synchronous update loop. These tests work on native.
+	// #[cfg(not(target_arch = "wasm32"))]
 	#[sweet::test]
 	async fn works_async() {
 		use crate::bevy_runner::register_async_test;
 
+		
 		run_test(test_ext::new_auto(|| {
 			register_async_test(async {
 				async_ext::yield_now().await;
@@ -267,7 +270,7 @@ mod tests {
 				payload: Some("pizza".into()),
 				location: Some(FileSpan::new_with_start(
 					file!(),
-					line!() - 9,
+					line!() - 10,
 					16,
 				)),
 			}
