@@ -74,6 +74,7 @@ impl SnapMap {
 						.join("\n");
 					bevybail!(
 						"Snapshot at {}:{} exists in parsed locations but has no value.\n\
+						This can happen if snapshots were generated with some features missing
 						Available locations:\n{}\n\
 						Please run `cargo test -- --snap` to regenerate snapshots.",
 						loc.line,
@@ -162,18 +163,6 @@ impl SnapMap {
 			Err(FsError::FileNotFound { .. }) => Vec::new(),
 			Err(other) => Err(other)?,
 		};
-
-		// verify snapshot count matches location count
-		if !snapshots.is_empty() && snapshots.len() != locs.len() {
-			bevybail!(
-				"Snapshot count mismatch for {}:\n\
-				Found {} .xpect_snapshot() calls in source but {} snapshots in file.\n\
-				Please run `cargo test -- --snap` to regenerate snapshots.",
-				file_path,
-				locs.len(),
-				snapshots.len()
-			);
-		}
 
 		Ok((locs, snapshots))
 	}

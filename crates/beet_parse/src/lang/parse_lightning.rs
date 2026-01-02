@@ -4,8 +4,6 @@ use lightningcss::printer::PrinterOptions;
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
 
 /// Parse css using lightningcss, applying styleid to selectors as required.
 pub fn parse_lightning(
@@ -22,7 +20,7 @@ pub fn parse_lightning(
 	query
 		.iter_mut()
 		.collect::<Vec<_>>()
-		.into_par_iter()
+		.into_iter()
 		.map(|(mut text, scope, span)| {
 			// Parse the stylesheet
 			let mut stylesheet =

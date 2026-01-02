@@ -1,0 +1,12 @@
+[
+  "<!DOCTYPE html><html><head><style></style></head><body><span data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style>body[data-beet-style-id-0] {\n  color: red;\n}\n</style></head><body><div data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div data-beet-style-id-0></div></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div data-beet-style-id-0><span data-beet-style-id-0/></div></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div/></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div/><span data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style></style></head><body><div data-beet-style-id-0/><div data-beet-style-id-0/></body></html>",
+  "<!DOCTYPE html><html><head><style>body[data-beet-style-id-0] {\n  color: red;\n}\n</style></head><body>\n<div data-beet-style-id-0>pow</div></body></html>",
+]

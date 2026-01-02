@@ -84,7 +84,12 @@ impl AsyncRunner {
 				Err(TryRecvError::Empty) => {
 					// Update to process command queues
 					update();
-					// Yield to let the executor poll other tasks
+					// Yield to let the executor poll other tasks.
+					// On WASM we need to actually sleep to return control to
+					// the JS event loop, otherwise setTimeout callbacks never fire.
+					#[cfg(target_arch = "wasm32")]
+					time_ext::sleep_millis(1).await;
+					#[cfg(not(target_arch = "wasm32"))]
 					async_ext::yield_now().await;
 					// Tick task pools to progress spawn_local tasks
 					tick_task_pools();

@@ -192,6 +192,7 @@ mod test_request {
 
 
 #[cfg(test)]
+#[cfg(any(feature = "reqwest", target_arch = "wasm32"))]
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
