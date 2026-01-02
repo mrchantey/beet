@@ -4,6 +4,7 @@ use std::path::Path;
 
 /// glob for watch patterns
 #[derive(Debug, Default, Clone, PartialEq, Reflect, Parser)]
+#[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all

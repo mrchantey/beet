@@ -6,14 +6,31 @@
 //!
 //! # Supported Types for Reflection Parsing
 //!
-//! The target type must derive `Reflect` and `FromReflect`. Field types can be:
+//! The target type must derive `Reflect`, `FromReflect`, and `Default`, plus include
+//! the `#[reflect(Default)]` attribute. Field types can be:
 //! - `bool` - parsed from "true"/"false" strings
 //! - `String` - direct string value
 //! - `Option<String>` - `None` if key is missing
 //! - `Vec<String>` - all values for a key
+//! - Numeric types (`i8`, `i16`, `i32`, `i64`, `i128`, `isize`, `u8`, `u16`, `u32`, `u64`, `u128`, `usize`, `f32`, `f64`)
 //! - Newtype wrappers (single-field structs/tuple structs) - transparent, use parent field name
 //! - Nested multi-field structs/tuple structs - fields are flattened
 //! - `Vec<NewType>` - vectors of newtype wrappers
+//!
+//! # Optional Fields and Defaults
+//!
+//! When a field is not present in the map, the parser will use the struct's `Default` value
+//! for that field. This allows flexible parsing where only provided fields are populated.
+//!
+//! **Important**: Both the struct and any nested structs must:
+//! 1. Derive `Default`
+//! 2. Include `#[reflect(Default)]` attribute
+//!
+//! Without `#[reflect(Default)]`, bevy's `FromReflect` cannot construct the type when
+//! fields are missing.
+//!
+//! To make a field required even when the struct has `Default`, use the `#[reflect(@RequiredField)]`
+//! attribute. Missing required fields will cause parsing to fail with an error.
 //!
 //! # Example
 //!
@@ -21,11 +38,12 @@
 //! # use beet_net::prelude::*;
 //! # use bevy::prelude::*;
 //! #[derive(Debug, Reflect, Default)]
+//! #[reflect(Default)]
 //! struct QueryParams {
-//!     name: String,
-//!     verbose: bool,
-//!     tags: Vec<String>,
-//!     limit: Option<String>,
+//!     name: String,              // uses Default if missing
+//!     verbose: bool,             // uses Default (false) if missing
+//!     tags: Vec<String>,         // uses Default (empty vec) if missing
+//!     limit: Option<String>,     // None if missing
 //! }
 //!
 //! let mut map = MultiMap::new();
@@ -39,6 +57,18 @@
 //! assert!(params.verbose);
 //! assert_eq!(params.tags, vec!["a", "b"]);
 //! assert!(params.limit.is_none());
+//! ```
+//!
+//! # Example with Required Fields
+//!
+//! ```ignore
+//! #[derive(Debug, Reflect, Default)]
+//! #[reflect(Default)]
+//! struct Config {
+//!     #[reflect(@RequiredField)]
+//!     api_key: String,           // must be present, will error if missing
+//!     timeout: u32,              // uses Default if missing
+//! }
 //! ```
 
 use crate::prelude::*;
@@ -59,8 +89,24 @@ use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::str::FromStr;
 
-/// Marker attribute indicating a field is required when being
-/// parsed from a MultiMap, even if its parent type implements Default.
+/// Marker attribute indicating a field is required during MultiMap parsing.
+///
+/// By default, when parsing a type with `#[reflect(Default)]`, missing fields
+/// will use the struct's `Default` value. Apply this attribute to a field
+/// to make it required instead - parsing will fail with an error if the
+/// field is not present in the map.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Reflect, Default)]
+/// #[reflect(Default)]
+/// struct Config {
+///     #[reflect(@RequiredField)]
+///     api_key: String,    // must be present, errors if missing
+///     timeout: u32,       // optional, uses Default (0) if missing
+/// }
+/// ```
 #[derive(Debug, Copy, Clone, Reflect)]
 pub struct RequiredField;
 
@@ -178,9 +224,41 @@ where
 pub impl MultiMap<String, String> {
 	/// Parse the multimap into a concrete type `T`.
 	///
-	/// The type `T` must implement `Reflect`, `FromReflect`, and `Typed`.
-	/// Nested structs are flattened, meaning all field names must be unique
-	/// across the entire type hierarchy.
+	/// The type `T` must implement `Reflect`, `FromReflect`, `Default`, and `Typed`,
+	/// and must have the `#[reflect(Default)]` attribute. Nested structs are flattened,
+	/// meaning all field names must be unique across the entire type hierarchy.
+	///
+	/// # Optional Fields and Defaults
+	///
+	/// Fields not present in the map will use the struct's `Default` value. This enables
+	/// flexible parsing where only provided fields need to be specified.
+	///
+	/// To make a field required, use `#[reflect(@RequiredField)]` - parsing will fail
+	/// if that field is missing.
+	///
+	/// # Nested Structs
+	///
+	/// Nested structs must also derive `Default` and include `#[reflect(Default)]`.
+	/// Their fields are flattened into the parent's namespace.
+	///
+	/// # Example
+	///
+	/// ```ignore
+	/// #[derive(Reflect, Default)]
+	/// #[reflect(Default)]
+	/// struct Config {
+	///     host: String,
+	///     port: u16,
+	/// }
+	///
+	/// let mut map = MultiMap::new();
+	/// map.insert("host".into(), "localhost".into());
+	/// // port is missing, will use Default (0)
+	///
+	/// let config: Config = map.parse_reflect().unwrap();
+	/// assert_eq!(config.host, "localhost");
+	/// assert_eq!(config.port, 0);
+	/// ```
 	fn parse_reflect<T>(&self) -> Result<T>
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,
@@ -188,9 +266,8 @@ pub impl MultiMap<String, String> {
 		let type_info = T::type_info();
 		let dynamic = build_dynamic_from_type_info(self, type_info, None)?;
 		T::from_reflect(dynamic.as_partial_reflect()).ok_or_else(|| {
-
 			bevyhow!(
-				"failed to convert dynamic type to {}\nThis can happen when a field is missing and the type does not #[reflect(Default)]",
+				"failed to convert dynamic type to {}",
 				type_info.type_path()
 			)
 		})
@@ -328,6 +405,14 @@ fn build_dynamic_tuple(
 }
 
 /// Build a field value from the multimap based on the field's type.
+///
+/// Returns `None` if the field is not present in the map and is not marked
+/// as required with `#[reflect(@RequiredField)]`. This allows the caller
+/// to skip inserting the field, letting bevy_reflect use the Default value.
+///
+/// For nested structs, tuples, and complex types, always attempts to build
+/// them (returning `Some`) since they're flattened and don't have a direct
+/// map entry.
 fn build_field_value(
 	map: &MultiMap<String, String>,
 	field_name: &str,
@@ -476,6 +561,9 @@ fn build_field_value(
 }
 
 /// Parse a number field from the multimap.
+///
+/// Returns `None` if the field has no values, allowing the caller to use
+/// the struct's default value for this field.
 fn parse_number_field<T: FromStr + PartialReflect>(
 	values: &Vec<String>,
 	field_name: &str,
@@ -502,6 +590,10 @@ where
 }
 
 /// Parse a bool field from the multimap.
+///
+/// Returns `None` if the key doesn't exist, allowing the struct's default
+/// value to be used. If the key exists with no value, returns `true` (flag-style).
+/// Supports: "true"/"false", "1"/"0", "yes"/"no", "on"/"off", or empty string.
 fn parse_bool_field(
 	map: &MultiMap<String, String>,
 	field_name: &str,
@@ -522,6 +614,9 @@ fn parse_bool_field(
 }
 
 /// Parse a String field from the multimap.
+///
+/// Returns `None` if no values are present, allowing the struct's default
+/// value to be used (typically an empty string).
 fn parse_string_field(
 	values: &Vec<String>,
 ) -> Result<Option<Box<dyn PartialReflect>>> {
@@ -1084,16 +1179,139 @@ mod test {
 			}
 		}
 
-		let mut map = MultiMap::<String, String>::new();
+		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
-		// map.insert("count".to_string(), "42".to_string());
-		map.insert("ratio".to_string(), "0.75".to_string());
+		map.insert("count".to_string(), "42".to_string());
+		map.insert("ratio".to_string(), "3.14".to_string());
 		map.insert("enabled".to_string(), "true".to_string());
 
 		let result: MixedTypes = map.parse_reflect().unwrap();
 		result.name.xpect_eq("test".to_string());
-		result.count.xpect_eq(7);
-		result.ratio.xpect_close(0.75);
+		result.count.xpect_eq(42);
+		result.ratio.xpect_eq(3.14);
 		result.enabled.xpect_true();
+
+		// test with missing fields, should use custom defaults
+		let mut map = MultiMap::new();
+		map.insert("name".to_string(), "partial".to_string());
+
+		let result: MixedTypes = map.parse_reflect().unwrap();
+		result.name.xpect_eq("partial".to_string());
+		result.count.xpect_eq(7); // custom default
+		result.ratio.xpect_eq(0.0); // default f64
+		result.enabled.xpect_false(); // default bool
+	}
+
+	#[test]
+	fn missing_optional_fields_use_defaults() {
+		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
+		struct Config {
+			host: String,
+			port: u16,
+			enabled: bool,
+			tags: Vec<String>,
+		}
+
+		// provide only some fields
+		let mut map = MultiMap::new();
+		map.insert("host".to_string(), "localhost".to_string());
+
+		let result: Config = map.parse_reflect().unwrap();
+		result.host.xpect_eq("localhost".to_string());
+		result.port.xpect_eq(0); // default u16
+		result.enabled.xpect_false(); // default bool
+		result.tags.xpect_eq(Vec::<String>::new()); // default vec
+	}
+
+	#[test]
+	fn nested_struct_fields_use_defaults() {
+		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
+		struct Database {
+			host: String,
+			port: u16,
+		}
+
+		#[derive(Debug, Reflect, Default, PartialEq)]
+		#[reflect(Default)]
+		struct AppConfig {
+			app_name: String,
+			database: Database,
+		}
+
+		// provide only top-level field and one nested field
+		let mut map = MultiMap::new();
+		map.insert("app_name".to_string(), "myapp".to_string());
+		map.insert("host".to_string(), "db.example.com".to_string());
+		// port is missing, should use default
+
+		let result: AppConfig = map.parse_reflect().unwrap();
+		result.app_name.xpect_eq("myapp".to_string());
+		result.database.host.xpect_eq("db.example.com".to_string());
+		result.database.port.xpect_eq(0); // default u16
+	}
+
+	#[test]
+	fn required_field_with_defaults() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct MixedRequirements {
+			#[reflect(@RequiredField)]
+			api_key: String,
+			timeout: u32,
+			retries: u32,
+		}
+
+		// missing required field should error
+		let mut map = MultiMap::new();
+		map.insert("timeout".to_string(), "30".to_string());
+
+		let result: Result<MixedRequirements> = map.parse_reflect();
+		result.unwrap_err();
+
+		// with required field present, optional fields use defaults
+		map.insert("api_key".to_string(), "secret123".to_string());
+
+		let result: MixedRequirements = map.parse_reflect().unwrap();
+		result.api_key.xpect_eq("secret123".to_string());
+		result.timeout.xpect_eq(30);
+		result.retries.xpect_eq(0); // default
+	}
+
+	#[test]
+	fn custom_defaults_are_respected() {
+		#[derive(Debug, Reflect, PartialEq)]
+		#[reflect(Default)]
+		struct CustomDefaults {
+			name: String,
+			count: u32,
+			ratio: f64,
+		}
+
+		impl Default for CustomDefaults {
+			fn default() -> Self {
+				Self {
+					name: "default_name".to_string(),
+					count: 100,
+					ratio: 0.5,
+				}
+			}
+		}
+
+		// empty map should use custom defaults
+		let map = MultiMap::<String, String>::new();
+		let result: CustomDefaults = map.parse_reflect().unwrap();
+		result.name.xpect_eq("default_name".to_string());
+		result.count.xpect_eq(100);
+		result.ratio.xpect_eq(0.5);
+
+		// partial map should mix provided values with defaults
+		let mut map = MultiMap::new();
+		map.insert("count".to_string(), "42".to_string());
+		let result: CustomDefaults = map.parse_reflect().unwrap();
+		result.name.xpect_eq("default_name".to_string());
+		result.count.xpect_eq(42);
+		result.ratio.xpect_eq(0.5);
 	}
 }

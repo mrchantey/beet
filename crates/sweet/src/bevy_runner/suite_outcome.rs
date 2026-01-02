@@ -130,40 +130,19 @@ pub(crate) fn trigger_timeouts(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_net::prelude::Request;
-	use test::TestDescAndFn;
-
-	async fn run_test(test: TestDescAndFn) -> TestOutcome {
-		let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
-
-		app.world_mut().spawn((
-			Request::from_cli_str("--quiet").unwrap(),
-			tests_bundle(vec![test]),
-		));
-		let store = Store::new(None);
-
-		app.add_observer(
-			move |ev: On<Insert, TestOutcome>,
-			      outcomes: Query<&TestOutcome>| {
-				store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
-			},
-		);
-		// app.init();
-		// advance time past timeout
-		// app.update_with_secs(10);
-		app.run_async().await;
-		store.get().unwrap()
-	}
 
 	#[sweet::test]
 	async fn timeout() {
-		run_test(test_ext::new_auto(|| {
-			register_async_test(async {
-				time_ext::sleep_millis(15_000).await;
-				panic!("pizza")
-			});
-			Ok(())
-		}))
+		test_ext::run_once(
+			Some("--timeout_ms=100"),
+			test_ext::new_auto(|| {
+				register_async_test(async {
+					time_ext::sleep_millis(15_000).await;
+					unreachable!("should timeout")
+				});
+				Ok(())
+			}),
+		)
 		.await
 		.as_fail()
 		.unwrap()

@@ -163,3 +163,34 @@ pub fn short_name(test: &TestDesc) -> String {
 		.map(|p| p.to_string())
 		.unwrap_or(path)
 }
+
+
+
+
+/// Runs a single test in an isolated Bevy app and returns the outcome.
+#[cfg(test)]
+pub async fn run_once(args: Option<&str>,test: TestDescAndFn) -> TestOutcome {
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
+
+	let args = if let Some(args) = args {
+		format!("{args} --quiet")
+	} else {
+		"--quiet".into()
+	};
+	app.world_mut().spawn((
+		Request::from_cli_str(&args).unwrap(),
+		tests_bundle(vec![test]),
+	));
+	let store = Store::new(None);
+
+	app.add_observer(
+		move |ev: On<Insert, TestOutcome>, outcomes: Query<&TestOutcome>| {
+			store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
+		},
+	);
+	app.run_async().await;
+	store.get().unwrap()
+}

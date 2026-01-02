@@ -87,32 +87,12 @@ fn run_test(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_net::prelude::Request;
 	use test::TestDescAndFn;
 
-	async fn run_test(test: TestDescAndFn) -> TestOutcome {
-		let mut app = App::new().with_plugins((
-			// ensure app exits even with update loop
-			MinimalPlugins,
-			TestPlugin,
-		));
-
-		app.world_mut().spawn((
-			Request::from_cli_str("--quiet").unwrap(),
-			tests_bundle(vec![test]),
-		));
-		let store = Store::new(None);
-
-		app.add_observer(
-			move |ev: On<Insert, TestOutcome>,
-			      outcomes: Query<&TestOutcome>| {
-				store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
-			},
-		);
-
-		app.run_async().await;
-		// app.run_loop();
-		store.get().unwrap()
+	fn run_test(
+		test: TestDescAndFn,
+	) -> impl std::future::Future<Output = TestOutcome> {
+		test_ext::run_once(None, test)
 	}
 
 	#[sweet::test]
@@ -165,10 +145,6 @@ mod tests {
 			);
 	}
 
-	// Async tests cannot be tested in nested apps on WASM because
-	// async tasks require JS event loop ticks to progress, which don't
-	// happen in a synchronous update loop. These tests work on native.
-	// #[cfg(not(target_arch = "wasm32"))]
 	#[sweet::test]
 	async fn works_async() {
 		use crate::bevy_runner::register_async_test;
