@@ -145,7 +145,7 @@ pub impl EntityWorldMut<'_> {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;

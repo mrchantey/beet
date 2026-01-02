@@ -86,7 +86,6 @@ mod test {
 	use super::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
-	use rapidhash::RapidHasher;
 	use std::hash::Hasher;
 	use sweet::prelude::*;
 
