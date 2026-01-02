@@ -182,7 +182,7 @@ where
 					{
 						world
 							.entity(exchange)
-							.insert(err.into_response())
+							.insert_then(err.into_response())
 							.await;
 					}
 					world

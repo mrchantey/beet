@@ -142,7 +142,7 @@ where
 								let res = func(req, context).await;
 								world
 									.entity(exchange)
-									.insert(res.into_response_bundle())
+									.insert_then(res.into_response_bundle())
 									.await;
 								// only pass condition
 								world
@@ -153,7 +153,7 @@ where
 									.await;
 							}
 							Err(response) => {
-								world.entity(exchange).insert(response).await;
+								world.entity(exchange).insert_then(response).await;
 								world
 									.entity(action)
 									.trigger_target(

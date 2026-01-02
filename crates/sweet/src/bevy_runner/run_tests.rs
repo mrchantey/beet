@@ -75,7 +75,7 @@ fn run_test(
 				let result = panic_result_fut.await;
 				let outcome =
 					TestOutcome::from_panic_result(result, should_panic);
-				world.entity(entity).insert(outcome).await;
+				world.entity(entity).insert(outcome);
 			});
 		}
 	}

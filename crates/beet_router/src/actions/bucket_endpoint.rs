@@ -40,7 +40,7 @@ impl BucketEndpoint {
 					let response = bucket_to_response(&bucket, &path)
 						.await?
 						.into_response();
-					world.entity(cx.exchange()).insert(response).await;
+					world.entity(cx.exchange()).insert_then(response).await;
 					Ok(())
 				}
 				.into_middleware(),
