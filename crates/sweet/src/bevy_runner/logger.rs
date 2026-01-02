@@ -8,6 +8,8 @@ use beet_router::prelude::*;
 pub(super) struct LoggerParams {
 	/// Do not log test outcomes as they complete
 	no_incremental: bool,
+	/// Log each test name before running it
+	log_runs: bool,
 	/// Log each skipped test
 	log_skipped: bool,
 	/// Disable ANSII colored output
@@ -22,7 +24,7 @@ impl RequestMetaExtractor for LoggerParams {
 	}
 }
 
-pub(super) fn log_initial(
+pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
 	mut logger_params: Extractor<LoggerParams>,
 	// mut filter_params: Extractor<FilterParams>,
@@ -47,9 +49,32 @@ pub(super) fn log_initial(
 	Ok(())
 }
 
+/// Collects test outcomes once all tests have finished running
+pub(super) fn log_case_running(
+	requests: Populated<(Entity, &Children), With<RequestMeta>>,
+	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
+	mut params: Extractor<LoggerParams>,
+) -> Result {
+	for (entity, children) in requests {
+		let params = params.get(entity)?;
+		if !params.log_runs {
+			continue;
+		}
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+
+
+		for test in children
+			.iter()
+			.filter_map(|child| just_started.get(child).ok())
+		{
+			log_case_runs(&test).xprint_display();
+		}
+	}
+	Ok(())
+}
 
 /// Collects test outcomes once all tests have finished running
-pub(super) fn log_incremental(
+pub(super) fn log_case_outcomes(
 	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
 	mut params: Extractor<LoggerParams>,
@@ -70,10 +95,17 @@ pub(super) fn log_incremental(
 			if outcome.is_skip() && !params.log_skipped {
 				continue;
 			}
-			test_output_log(&test, outcome).xprint_display();
+			log_case_output(&test, outcome).xprint_display();
 		}
 	}
 	Ok(())
+}
+
+
+
+fn log_case_runs(test: &Test) -> String {
+	let prefix = paint_ext::bg_yellow_black_bold(" RUNS ");
+	test_heading_log(&prefix, test)
 }
 
 
@@ -81,16 +113,12 @@ pub(super) fn log_incremental(
 /// - pass: " PASS "
 /// - skip: " SKIP "
 /// - fail: " FAIL "
-fn outcome_prefix(outcome: &TestOutcome) -> String {
-	match outcome {
+fn log_case_output(test: &Test, outcome: &TestOutcome) -> String {
+	let prefix = match outcome {
 		TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
 		TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
 		TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
-	}
-}
-
-fn test_output_log(test: &Test, outcome: &TestOutcome) -> String {
-	let prefix = outcome_prefix(outcome);
+	};
 	test_heading_log(&prefix, test)
 }
 
@@ -99,10 +127,10 @@ fn test_heading_log(prefix: &str, test: &Test) -> String {
 }
 
 
-pub(super) fn log_final(
+pub(super) fn log_suite_outcome(
 	requests: Populated<
-		(Entity, &RequestMeta, &FinalOutcome, &Children),
-		Added<FinalOutcome>,
+		(Entity, &RequestMeta, &SuiteOutcome, &Children),
+		Added<SuiteOutcome>,
 	>,
 	mut params: Extractor<LoggerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
@@ -139,7 +167,7 @@ pub(super) fn log_final(
 	Ok(())
 }
 
-fn summary_message(outcome: &FinalOutcome) -> String {
+fn summary_message(outcome: &SuiteOutcome) -> String {
 	if outcome.num_fail() == 0 && outcome.num_ran() != 0 {
 		paint_ext::cyan_bold_underline("All tests passed")
 	} else if outcome.num_ran() == 0 {
@@ -149,7 +177,7 @@ fn summary_message(outcome: &FinalOutcome) -> String {
 	}
 }
 
-fn test_stats(outcome: &FinalOutcome) -> String {
+fn test_stats(outcome: &SuiteOutcome) -> String {
 	let mut stats = Vec::new();
 	if outcome.num_fail() > 0 {
 		stats.push(paint_ext::red_bold(format!(
@@ -172,7 +200,7 @@ fn test_stats(outcome: &FinalOutcome) -> String {
 	stats.join(", ")
 }
 
-fn run_stats(outcome: &FinalOutcome, req: &RequestMeta) -> String {
+fn run_stats(outcome: &SuiteOutcome, req: &RequestMeta) -> String {
 	let duration = req.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
 	let time = paint_ext::blue_bold(time);

@@ -34,12 +34,13 @@ impl Plugin for TestPlugin {
 			.add_systems(
 				RunTests,
 				(
-					log_initial,
+					log_suite_running,
+					log_case_running,
 					filter_tests,
 					(run_tests_series, run_non_send_tests_series),
-					insert_final_outcome,
-					log_incremental,
-					log_final,
+					insert_suite_outcome,
+					log_case_outcomes,
+					log_suite_outcome,
 					exit_on_done,
 				)
 					.chain(),

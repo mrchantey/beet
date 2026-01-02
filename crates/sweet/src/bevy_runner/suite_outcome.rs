@@ -5,13 +5,13 @@ use beet_net::prelude::*;
 
 /// Added to the [`Request`] entity once all tests have completed
 #[derive(Component)]
-pub struct FinalOutcome {
+pub struct SuiteOutcome {
 	num_pass: usize,
 	num_skip: usize,
 	num_fail: usize,
 }
 
-impl FinalOutcome {
+impl SuiteOutcome {
 	/// number of tests that passed
 	pub fn num_pass(&self) -> usize { self.num_pass }
 	/// number of tests that were skipped
@@ -45,11 +45,11 @@ impl FinalOutcome {
 }
 
 /// Insert final when no tests to run
-pub fn insert_final_outcome(
+pub fn insert_suite_outcome(
 	mut commands: Commands,
 	requests: Populated<
 		(Entity, &RequestMeta, Option<&Children>),
-		Without<FinalOutcome>,
+		Without<SuiteOutcome>,
 	>,
 	// listener query, running this system on
 	// either
@@ -61,7 +61,7 @@ pub fn insert_final_outcome(
 ) {
 	for (entity, _req, children) in requests {
 		let Some(children) = children else {
-			commands.entity(entity).insert(FinalOutcome::new(&[]));
+			commands.entity(entity).insert(SuiteOutcome::new(&[]));
 			continue;
 		};
 
@@ -78,6 +78,6 @@ pub fn insert_final_outcome(
 			.collect::<Vec<_>>();
 		commands
 			.entity(entity)
-			.insert(FinalOutcome::new(&all_finished));
+			.insert(SuiteOutcome::new(&all_finished));
 	}
 }

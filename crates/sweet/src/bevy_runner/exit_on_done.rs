@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// Exits when all tests have finished
 pub fn exit_on_done(
 	mut commands: Commands,
-	finished: Populated<&FinalOutcome, Added<FinalOutcome>>,
+	finished: Populated<&SuiteOutcome, Added<SuiteOutcome>>,
 ) -> Result {
 	if let Some(outcome) = finished.iter().next() {
 		let exit = if outcome.num_fail() == 0 {

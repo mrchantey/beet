@@ -66,7 +66,13 @@ pub trait TestDescExt {
 	}
 
 	fn short_file_and_name(&self) -> String {
-		format!("{} · {}", self.short_file(), self.short_name())
+		format!(
+			"{}:{}:{} · {}",
+			self.short_file(),
+			self.desc().start_line,
+			self.desc().start_col,
+			self.short_name()
+		)
 	}
 
 	/// Set whether the test should be ignored.
