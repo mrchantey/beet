@@ -224,7 +224,7 @@ default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
-server = ["serde","dom","fs", "net", "router", "design"]
+server = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
 client = [
 	"rsx",
 	"design",
