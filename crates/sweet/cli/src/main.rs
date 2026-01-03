@@ -2,7 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet::prelude::*;
 
-fn main() -> Result<()> {
+fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,

@@ -31,7 +31,8 @@ pub fn ImageGenerator() -> impl Bundle {
 			if let Some(file) = content.first_file() {
 				set_image_url(Some(file.into_url()));
 			}
-		});
+		})
+		.detach();
 	};
 
 	rsx! {

@@ -332,7 +332,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(not(feature = "client"))]
+	#[cfg(feature = "css")]
 	fn style_src() {
 		HtmlFragment::parse_bundle(
 			rsx! { <style src="../../tests/test_file.css" /> },

@@ -72,7 +72,8 @@ fn Item(
 				}
 				Err(err) => set_err(Some(err.to_string())),
 			}
-		});
+		})
+		.detach();
 	};
 
 	let route = format!("{route_prefix}{}", path());
@@ -123,7 +124,8 @@ fn NewItem(
 				}
 				Err(err) => set_err(Some(err.to_string())),
 			}
-		});
+		})
+		.detach();
 	};
 
 	rsx! {
