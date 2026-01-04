@@ -25,10 +25,6 @@ pub struct RouterRunner {
 
 impl RouterRunner {
 	pub fn parse() -> Self { Parser::parse() }
-
-	pub fn runner(mut app: App) -> AppExit {
-		app.add_plugins(Self::parse()).run()
-	}
 }
 
 impl Default for RouterRunner {

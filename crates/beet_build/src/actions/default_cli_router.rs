@@ -93,6 +93,7 @@ pub fn default_cli_router() -> impl Bundle {
 						ExportStaticContent,
 						// never returns an outcome
 						RunServer,
+						// bevyhow!("unreachable! server shouldnt exit")
 					]
 				),
 			])),

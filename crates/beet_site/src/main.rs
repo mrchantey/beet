@@ -22,7 +22,8 @@ fn main() {
 		.add_systems(Startup,|config:Res<PackageConfig>|{
 			config.xprint("config");
 		})
-		.run();
+		.run()
+		.into_exit_native();
 }
 
 #[cfg(feature = "client")]

@@ -33,7 +33,7 @@ impl Plugin for BeetRunner {
 		app.set_runner(LaunchConfig::runner);
 
 		#[cfg(feature = "server")]
-		app.set_runner(RouterRunner::runner);
+		app.init_plugin_with(RouterRunner::parse());
 
 		#[cfg(feature = "client")]
 		app.set_runner(ReactiveApp::runner);

@@ -52,12 +52,12 @@ pub fn poll_child_handles(
 /// when the [`Running`] component is removed, interrupting
 /// the process.
 pub fn interrupt_child_handles(
-	ev: On<Remove, Running>,
+	ev: On<Outcome>,
 	mut commands: Commands,
 	query: Query<Entity, With<ChildHandle>>,
 ) {
-	if query.contains(ev.entity) {
-		commands.entity(ev.entity).remove::<ChildHandle>();
+	if query.contains(ev.action()) {
+		commands.entity(ev.action()).remove::<ChildHandle>();
 	}
 }
 
