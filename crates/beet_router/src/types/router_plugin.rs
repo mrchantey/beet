@@ -186,28 +186,6 @@ pub async fn flow_route_handler(
 #[component(on_add=on_add)]
 pub struct Router;
 
-/// A [`Router`] that will map each [`Request`] and [`Response`] to a default [`HttpServer`]
-#[cfg(feature = "server")]
-#[derive(Debug, Default, Clone, Component)]
-#[require(Router, HttpServer = HttpServer::default().with_handler(flow_route_handler))]
-pub struct HttpRouter;
-
-#[cfg(feature = "server")]
-impl HttpRouter {
-	/// Create a new `HttpRouter` bundle, using the test HttpServer in test environments
-	pub fn new() -> impl Bundle + Clone {
-		#[cfg(not(test))]
-		{
-			Self
-		}
-		#[cfg(test)]
-		(
-			HttpServer::new_test().with_handler(flow_route_handler),
-			Self,
-		)
-	}
-}
-
 // On<Outcome> we need to pass the `exchange` [`Response`] to the
 // [`ExchangeContext`], or else send a [`Response::not_found()`]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -233,7 +211,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				let Some(cx) =
 					world.entity_mut(exchange).take::<ExchangeContext>()
 				else {
-					bevybail!("Expected ExchangeContext on exchange entity");
+					bevybail!("Expected ExchangeContext on exchange entity. was an Outcome triggered without the agent attached?");
 				};
 				world.entity_mut(exchange).despawn();
 				cx.sender().try_send(res).map_err(|_| {
@@ -245,6 +223,28 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	);
 }
 
+
+/// A [`Router`] that will map each [`Request`] and [`Response`] to a default [`HttpServer`]
+#[cfg(feature = "server")]
+#[derive(Debug, Default, Clone, Component)]
+#[require(Router, HttpServer = HttpServer::default().with_handler(flow_route_handler))]
+pub struct HttpRouter;
+
+#[cfg(feature = "server")]
+impl HttpRouter {
+	/// Create a new `HttpRouter` bundle, using the test HttpServer in test environments
+	pub fn new() -> impl Bundle + Clone {
+		#[cfg(not(test))]
+		{
+			Self
+		}
+		#[cfg(test)]
+		(
+			HttpServer::new_test().with_handler(flow_route_handler),
+			Self,
+		)
+	}
+}
 
 
 #[cfg(test)]

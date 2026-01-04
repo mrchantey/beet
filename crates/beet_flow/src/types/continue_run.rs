@@ -10,10 +10,37 @@ use beet_core::prelude::*;
 /// ie any action that has a [`With<Running>`] query filter.
 /// It should not added to behaviors directly, because its easy to forget.
 /// For usage see the [`Running`] component.
+#[action(start_running, stop_running)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(RunTimer, InsertOn<GetOutcome, Running>, RemoveOn<Outcome, Running>)]
+#[require(RunTimer)]
 pub struct ContinueRun;
+
+
+fn start_running(
+	ev: On<GetOutcome>,
+	mut commands: Commands,
+	mut running: Query<&mut Running>,
+) {
+	if let Ok(mut running) = running.get_mut(ev.action()) {
+		running.0.push(ev.agent());
+	} else {
+		commands
+			.entity(ev.action())
+			.insert(Running(vec![ev.agent()]));
+	}
+}
+
+fn stop_running(
+	ev: On<Outcome>,
+	mut running: Query<&mut Running>,
+	mut commands: Commands,
+) {
+	if let Ok(mut running) = running.get_mut(ev.action()) {
+		running.retain(&mut commands, ev.action(), ev.agent());
+	}
+}
+
 
 /// A marker component added to an [ActionEntity] indicate this action is currently running.
 /// ## Example
@@ -39,12 +66,31 @@ pub struct ContinueRun;
 /// }
 /// ```
 /// As this is frequently added and removed, it is `SparseSet`.
-#[derive(Debug, Default, Copy, Clone, Component, PartialEq, Reflect)]
+#[derive(Debug, Default, Clone, Deref, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet")]
 #[reflect(Component)]
 #[require(RunTimer)]
-pub struct Running;
+pub struct Running(
+	// custom relations until self-referential and many-many
+	pub(crate) Vec<Entity>,
+);
 
+
+impl Running {
+	/// removes the given agent, and removes the Running component
+	/// if none left
+	pub fn retain(
+		&mut self,
+		commands: &mut Commands,
+		action: Entity,
+		agent: Entity,
+	) {
+		self.0.retain(|e| *e != agent);
+		if self.0.is_empty() {
+			commands.entity(action).remove::<Running>();
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {

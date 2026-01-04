@@ -15,15 +15,14 @@ pub struct NoInterrupt;
 pub(crate) fn interrupt_on_run<T: RunEvent>(
 	ev: On<T>,
 	mut commands: Commands,
-	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
+	mut running: Populated<&mut Running, Without<NoInterrupt>>,
 	children: Populated<&Children>,
 ) {
 	let action = ev.action();
-	for child in children
-		.iter_descendants(action)
-		.filter(|child| should_remove.contains(*child))
-	{
-		commands.entity(child).remove::<Running>();
+	for child in children.iter_descendants(action) {
+		if let Ok(mut running) = running.get_mut(child) {
+			running.retain(&mut commands, child, ev.agent());
+		}
 	}
 }
 
@@ -34,19 +33,20 @@ pub(crate) fn interrupt_on_end<T: EndEvent>(
 	ev: On<T>,
 	mut commands: Commands,
 	children: Query<&Children>,
-	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
+	mut running: Populated<(&mut Running, Option<&NoInterrupt>)>,
 ) {
-	let action = ev.action();
 	// 1. always remove from this entity
-	// if should_remove.contains(action) {
-	commands.entity(action).remove::<Running>();
-	// }
+	if let Ok((mut running, _)) = running.get_mut(ev.action()) {
+		running.retain(&mut commands, ev.action(), ev.agent());
+	}
+	let action = ev.action();
 	// 2. only remove from children if NoInterrupt
-	for child in children
-		.iter_descendants(action)
-		.filter(|child| should_remove.contains(*child))
-	{
-		commands.entity(child).remove::<Running>();
+	for child in children.iter_descendants(action) {
+		if let Ok((mut running, no_interrupt)) = running.get_mut(child)
+			&& no_interrupt.is_none()
+		{
+			running.retain(&mut commands, child, ev.agent());
+		}
 	}
 }
 
@@ -59,11 +59,30 @@ mod test {
 	use beet_core::prelude::*;
 	use sweet::prelude::*;
 
+
+	// ads running to this entity, with the root
+	// as its agent
+	fn root_running() -> impl Bundle {
+		(
+			ContinueRun,
+			OnSpawn::new(|entity| {
+				let mut root = entity.id();
+				while let Some(ChildOf(next)) =
+					entity.world().entity(root).get()
+				{
+					root = *next;
+				}
+				entity.insert(Running(vec![root]));
+			}),
+		)
+	}
+
 	#[test]
 	fn interrupt_on_run() {
 		let mut world = ControlFlowPlugin::world();
+
 		world
-			.spawn(children![Running])
+			.spawn(children![root_running()])
 			.trigger_target(GetOutcome)
 			.flush();
 		world.query_once::<&Running>().len().xpect_eq(0);
@@ -72,7 +91,7 @@ mod test {
 	fn no_interrupt_on_run() {
 		let mut world = ControlFlowPlugin::world();
 		world
-			.spawn(children![(NoInterrupt, Running)])
+			.spawn(children![(NoInterrupt, root_running())])
 			.trigger_target(GetOutcome)
 			.flush();
 		world.query_once::<&Running>().len().xpect_eq(1);
@@ -83,7 +102,10 @@ mod test {
 		let mut world = ControlFlowPlugin::world();
 
 		world
-			.spawn((Running, children![Running, (NoInterrupt, Running)]))
+			.spawn((root_running(), children![
+				root_running(),
+				(NoInterrupt, root_running())
+			]))
 			.trigger_target(Outcome::Pass)
 			.flush();
 
@@ -94,10 +116,9 @@ mod test {
 	fn interrupt_on_end_with_no_interrupt() {
 		let mut world = ControlFlowPlugin::world();
 		world
-			.spawn((NoInterrupt, Running))
+			.spawn((NoInterrupt, root_running()))
 			.trigger_target(Outcome::Pass)
 			.flush();
-		// leaves parent
-		world.query_once::<&Running>().len().xpect_eq(1);
+		world.query_once::<&Running>().len().xpect_eq(0);
 	}
 }

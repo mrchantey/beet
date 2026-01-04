@@ -26,9 +26,9 @@ impl Drop for ChildHandle {
 /// the [`ChildHandle`] component when done.
 pub fn poll_child_handles(
 	mut commands: Commands,
-	mut query: Populated<(Entity, &mut ChildHandle), With<Running>>,
+	mut query: Populated<(Entity, &Running, &mut ChildHandle)>,
 ) -> Result {
-	for (entity, mut child_handle) in query.iter_mut() {
+	for (entity, running, mut child_handle) in query.iter_mut() {
 		// try_status errors are an io::Error, we do not handle
 		// and instead propagate
 		if let Some(status) = child_handle.0.try_status()? {
@@ -36,10 +36,12 @@ pub fn poll_child_handles(
 				true => Outcome::Pass,
 				false => Outcome::Fail,
 			};
-			commands
-				.entity(entity)
-				.remove::<ChildHandle>()
-				.trigger_target(outcome);
+			for agent in running.iter() {
+				commands
+					.entity(entity)
+					.remove::<ChildHandle>()
+					.trigger_target(outcome.with_agent(*agent));
+			}
 		}
 	}
 	Ok(())
@@ -240,6 +242,7 @@ impl CommandRunner<'_, '_> {
 			// store the child process and poll for completion
 			self.bevy_commands
 				.entity(ev.action())
+				// TODO this only allows a single child process per action
 				.insert(ChildHandle(child));
 		} else {
 			ev.run_async(async move |mut action| {
