@@ -11,3 +11,4 @@ title = "The Full Moon Harvest"
 - [Post #4](/blog/post-4)
 - [Post #5](/blog/post-5)
 - [Post #6](/blog/post-6)
+- [Post #7](/blog/post-7)
