@@ -42,6 +42,25 @@ impl ServerPlugin {
 			..default()
 		}
 	}
+
+	/// Runs the app with a tokio runtime if the `lambda` feature is enabled.
+	pub fn maybe_tokio_runner(mut app: App) -> AppExit {
+		#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
+		{
+			tokio::runtime::Builder::new_multi_thread()
+				.enable_all()
+				.build()
+				.unwrap()
+				.block_on(app.run_async())
+		}
+		#[cfg(not(all(feature = "lambda", not(target_arch = "wasm32"))))]
+		{
+			// just use default runner
+			use bevy::app::ScheduleRunnerPlugin;
+			ScheduleRunnerPlugin::default().build(&mut app);
+			app.run()
+		}
+	}
 }
 impl Default for ServerPlugin {
 	fn default() -> Self {

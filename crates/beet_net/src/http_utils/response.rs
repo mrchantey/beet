@@ -80,6 +80,8 @@ impl std::ops::DerefMut for Response {
 }
 
 impl Response {
+	
+	
 	/// Creates an OK (200) response
 	pub fn ok() -> Self { Self::from_status(StatusCode::OK) }
 

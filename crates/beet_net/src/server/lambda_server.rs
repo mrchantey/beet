@@ -91,7 +91,7 @@ fn lambda_to_request(lambda_req: lambda_http::Request) -> Result<Request> {
 		// Request streaming not supported in lambda
 	};
 
-	Ok(Request::from_parts(parts, body))
+	Ok(Request::from_parts(parts.into(), body))
 }
 
 /// Convert beet Response to lambda HTTP response
@@ -99,7 +99,8 @@ async fn response_to_lambda(
 	beet_res: Response,
 ) -> Result<lambda_http::Response<lambda_http::Body>> {
 	// Response streaming not supported in lambda
-	let bytes = beet_res.body.into_bytes().await?;
+	let (parts, body) = beet_res.into_parts();
+	let bytes = body.into_bytes().await?;
 
 	// Convert bytes to lambda Body
 	let lambda_body = if bytes.is_empty() {
@@ -110,5 +111,6 @@ async fn response_to_lambda(
 			Err(_) => lambda_http::Body::Binary(bytes.to_vec()),
 		}
 	};
-	lambda_http::Response::from_parts(beet_res.parts, lambda_body).xok()
+	let http_parts = parts.try_into()?;
+	lambda_http::Response::from_parts(http_parts, lambda_body).xok()
 }

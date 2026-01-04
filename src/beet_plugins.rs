@@ -34,6 +34,11 @@ impl Plugin for BeetRunner {
 
 		#[cfg(feature = "server")]
 		app.init_plugin_with(RouterRunner::parse());
+		#[cfg(feature = "server")]
+		app.set_runner(ServerPlugin::maybe_tokio_runner);
+
+		#[cfg(feature = "client")]
+		app.init_plugin::<TaskPoolPlugin>();
 
 		#[cfg(feature = "client")]
 		app.set_runner(ReactiveApp::runner);
@@ -49,6 +54,7 @@ impl Plugin for BeetRunner {
 		);
 	}
 }
+
 
 #[allow(unused)]
 fn print_config(pkg_config: Res<PackageConfig>) {

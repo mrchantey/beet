@@ -23,7 +23,7 @@ server = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["rustls-tls", "dep:lambda_http"]
+lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
 aws = [
