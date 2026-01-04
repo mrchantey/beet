@@ -35,8 +35,8 @@ pub fn collect_route_files(
 			{
 				let func_ident = &route_file_method.item.sig.ident;
 
-				let route_pattern =
-					RoutePattern::new(&route_file_method.route_info.path)?;
+				let path_pattern =
+					PathPattern::new(&route_file_method.route_info.path)?;
 
 				let method =
 					route_file_method.route_info.method.self_token_stream();
@@ -58,7 +58,7 @@ pub fn collect_route_files(
 								.with_content_type(ContentType::Html)),
 						];
 						// ssr check TODO very brittle
-						if route_pattern.is_static()
+						if path_pattern.is_static()
 							&& collection.category.cache_strategy()
 								== CacheStrategy::Static
 							&& route_file_method.route_info.method

@@ -17,11 +17,10 @@ keywords.workspace = true
 proc-macro = true
 
 [dependencies]
-beet_utils = { workspace = true, features = ["tokens"] }
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
 proc-macro2-diagnostics.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["tokens"]}

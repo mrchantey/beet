@@ -2,6 +2,7 @@ use crate::prelude::*;
 use async_channel;
 use async_channel::Receiver;
 use async_channel::Sender;
+use bevy::app::MainSchedulePlugin;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::error::ErrorContext;
 use bevy::ecs::system::IntoObserverSystem;
@@ -52,25 +53,31 @@ impl<T> MaybeSync for T {}
 
 /// Plugin that polls background async work and applies produced CommandQueues
 /// to the main Bevy world.
-/// This plugin will init the [`TaskPoolPlugin`] if unintialized,
+/// This plugin will init the [`TaskPoolPlugin`] and [`MainSchedulePlugin`] if unintialized,
 /// so must be added after [`DefaultPlugins`] / [`MinimalPlugins`]
 #[derive(Default)]
 pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<TaskPoolPlugin>()
+		app.init_plugin_with(MainSchedulePlugin)
+			// this will add the system to tick_global_task_pools_on_main_thread() in the Last schedule
+			.init_plugin::<TaskPoolPlugin>()
 			.init_resource::<AsyncChannel>()
 			.add_systems(PreUpdate, append_async_queues);
 	}
 }
-/// Append all [`AsyncChannel::rx`]
-fn append_async_queues(
-	mut commands: Commands,
-	channel: Res<AsyncChannel>,
-) -> Result {
-	while let Ok(mut queue) = channel.rx.try_recv() {
-		commands.append(&mut queue);
+
+/// Append all [`AsyncChannel::rx`] command queues directly to the world.
+fn append_async_queues(world: &mut World) -> Result {
+	// Clone the receiver to avoid borrow conflict
+	let rx = world.get_resource::<AsyncChannel>().map(|c| c.rx.clone());
+	let Some(rx) = rx else {
+		return Ok(());
+	};
+
+	while let Ok(mut queue) = rx.try_recv() {
+		queue.apply(world);
 	}
 	Ok(())
 }
@@ -192,7 +199,15 @@ pub struct AsyncCommands<'w, 's> {
 }
 
 
-impl AsyncCommands<'_, '_> {
+impl<'w, 's> AsyncCommands<'w, 's> {
+	pub fn reborrow(&mut self) -> AsyncCommands<'w, '_> {
+		AsyncCommands {
+			commands: self.commands.reborrow(),
+			channel: Res::clone(&self.channel),
+		}
+	}
+
+
 	/// Spawn an async task, returing the spawned entity containing the [`AsyncTask`]
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)
 	where
@@ -262,6 +277,7 @@ impl AsyncChannel {
 	pub fn task_count(&self) -> usize { self.task_count }
 	/// Get the sender of the channel
 	pub fn tx(&self) -> Sender<CommandQueue> { self.tx.clone() }
+	/// Get the receiver of the channel
 	pub fn world(&self) -> AsyncWorld {
 		AsyncWorld {
 			tx: self.tx.clone(),
@@ -584,13 +600,21 @@ impl AsyncEntity {
 		self.get::<T, _>(|comp| comp.clone()).await
 	}
 
-	pub async fn insert<B: Bundle>(&self, bundle: B) -> &Self {
+	pub fn insert<B: Bundle>(&self, bundle: B) -> &Self {
+		self.with(|mut entity| {
+			entity.insert(bundle);
+		});
+		self
+	}
+
+	pub async fn insert_then<B: Bundle>(&self, bundle: B) -> &Self {
 		self.with_then(|mut entity| {
 			entity.insert(bundle);
 		})
 		.await;
 		self
 	}
+
 	/// Spawn a child and return its id
 	pub async fn spawn_child<B: Bundle>(&self, bundle: B) -> Entity {
 		let id = self.entity;
@@ -682,7 +706,7 @@ pub impl World {
 	{
 		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.update(),
+			|| self.update_local(),
 			func,
 		)
 	}
@@ -698,7 +722,7 @@ pub impl World {
 	{
 		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.update(),
+			|| self.update_local(),
 			func,
 		)
 	}
@@ -744,7 +768,7 @@ pub impl EntityWorldMut<'_> {
 		let id = self.id();
 		spawn_async_task_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.world_scope(World::update),
+			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)
 	}
@@ -761,7 +785,7 @@ pub impl EntityWorldMut<'_> {
 		let id = self.id();
 		spawn_async_task_local_then(
 			self.resource::<AsyncChannel>().world(),
-			|| self.world_scope(World::update),
+			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)
 	}
@@ -792,12 +816,7 @@ mod test {
 			})
 			.await;
 
-		// world not yet applied
-		world.resource::<Count>().0.xpect_eq(0);
-
-		AsyncRunner::flush_async_tasks(&mut world).await;
-
-		// world now applied
+		// Commands are applied by the final update in poll_and_update
 		world.resource::<Count>().0.xpect_eq(1);
 	}
 	#[sweet::test]

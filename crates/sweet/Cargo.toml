@@ -12,43 +12,27 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["bevy", "serde", "nightly", "tokens"]
-# allow for fn_traits, ie mock_fn(3);
+default = ["serde", "nightly"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
-serde = ["dep:serde", "dep:ron", "dep:serde_json"]
-bevy = ["dep:bevy"]
+serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
-beet_utils.workspace = true
+beet_core.workspace = true
+beet_flow.workspace = true
+beet_net.workspace = true
+beet_router.workspace = true
 sweet_macros.workspace = true
 #💡 misc
-anyhow.workspace = true
 extend.workspace = true
-web-time.workspace = true
-
+send_wrapper.workspace = true
 #💡 logging
-log.workspace = true
-pretty_env_logger.workspace = true
-colorize.workspace = true
-backtrace = "0.3"
-# pretty_assertions
-yansi = "1"
+nu-ansi-term.workspace = true
 diff = "0.1"
 
-#💡 parse
-glob.workspace = true
-clap.workspace = true
-
-#💡 async
-flume.workspace = true
-rayon.workspace = true
-futures.workspace = true
-thread_local = "1.1.8"
-
 #💡 bevy
-bevy = { workspace = true, optional = true }
+bevy.workspace = true
 
 #💡 tokens
 proc-macro2 = { workspace = true, optional = true }
@@ -56,24 +40,12 @@ syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 prettyplease = { workspace = true, optional = true }
 
-
 #💡 serde
-serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 
-#💡 native
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_utils = { workspace = true, features = ["fs"] }
-
-tokio.workspace = true
-pin-project-lite = "0.2.15"
+[dev-dependencies]
+sweet = {path = ".", features = ["tokens"] }
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-console_log.workspace = true
-js-sys.workspace = true
-web-sys = { workspace = true, features = ["HtmlElement"] }
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true

@@ -26,9 +26,9 @@ impl Drop for ChildHandle {
 /// the [`ChildHandle`] component when done.
 pub fn poll_child_handles(
 	mut commands: Commands,
-	mut query: Populated<(Entity, &mut ChildHandle), With<Running>>,
+	mut query: Populated<(Entity, &Running, &mut ChildHandle)>,
 ) -> Result {
-	for (entity, mut child_handle) in query.iter_mut() {
+	for (action, running, mut child_handle) in query.iter_mut() {
 		// try_status errors are an io::Error, we do not handle
 		// and instead propagate
 		if let Some(status) = child_handle.0.try_status()? {
@@ -36,10 +36,12 @@ pub fn poll_child_handles(
 				true => Outcome::Pass,
 				false => Outcome::Fail,
 			};
-			commands
-				.entity(entity)
-				.remove::<ChildHandle>()
-				.trigger_target(outcome);
+			for agent in running.iter() {
+				commands
+					.entity(action)
+					.remove::<ChildHandle>()
+					.trigger_target(outcome.with_agent(*agent));
+			}
 		}
 	}
 	Ok(())
@@ -50,12 +52,15 @@ pub fn poll_child_handles(
 /// when the [`Running`] component is removed, interrupting
 /// the process.
 pub fn interrupt_child_handles(
-	ev: On<Remove, Running>,
+	ev: On<Outcome>,
 	mut commands: Commands,
-	query: Query<Entity, With<ChildHandle>>,
+	query: Query<(), With<ChildHandle>>,
+	children: Query<&Children>,
 ) {
-	if query.contains(ev.entity) {
-		commands.entity(ev.entity).remove::<ChildHandle>();
+	for child in children.iter_descendants_inclusive(ev.action()) {
+		if query.contains(child) {
+			commands.entity(child).remove::<ChildHandle>();
+		}
 	}
 }
 
@@ -112,6 +117,16 @@ impl CommandConfig {
 		self.args.push(arg.as_ref().to_string());
 		self
 	}
+
+	pub fn args(
+		mut self,
+		args: impl IntoIterator<Item = impl AsRef<str>>,
+	) -> Self {
+		self.args
+			.extend(args.into_iter().map(|s| s.as_ref().to_string()));
+		self
+	}
+
 	pub fn new(cmd: impl Into<String>) -> Self {
 		Self {
 			cmd: cmd.into(),
@@ -147,8 +162,8 @@ impl CommandConfig {
 	}
 	pub fn into_action(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>, mut cmd_params: CommandParams| {
-				cmd_params.execute(ev, self.clone())
+			move |ev: On<GetOutcome>, mut cmd_runner: CommandRunner| {
+				cmd_runner.run(ev, self.clone())
 			},
 		)
 	}
@@ -171,21 +186,21 @@ impl From<CargoBuildCmd> for CommandConfig {
 
 /// System param for executing command actions
 #[derive(SystemParam)]
-pub struct CommandParams<'w, 's> {
+pub struct CommandRunner<'w, 's> {
 	bevy_commands: Commands<'w, 's>,
 	pkg_config: Res<'w, PackageConfig>,
 	/// Used to check whether an action is interruptable
 	interruptable: Query<'w, 's, &'static ContinueRun>,
 }
 
-impl CommandParams<'_, '_> {
+impl CommandRunner<'_, '_> {
 	/// Run the provided command asynchronously,
 	/// calling [`Outcome::Pass`] if the command was successful or [`Outcome::Fail`] if it failed.
 	// /// All stdout and stderr lines are emitted as [`StdOutLine`] entity events.
 	// ///
 	// /// Lines are streamed concurrently as they arrive. Empty lines are emitted (not skipped).
 	// /// Reader tasks are aborted if the process exits first.
-	pub fn execute(
+	pub fn run(
 		&mut self,
 		mut ev: On<GetOutcome>,
 		cmd_config: impl Into<CommandConfig>,
@@ -230,6 +245,7 @@ impl CommandParams<'_, '_> {
 			// store the child process and poll for completion
 			self.bevy_commands
 				.entity(ev.action())
+				// TODO this only allows a single child process per action
 				.insert(ChildHandle(child));
 		} else {
 			ev.run_async(async move |mut action| {

@@ -16,7 +16,7 @@ pub fn BuildServer() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let config = query
 					.get(ev.action())
@@ -26,7 +26,7 @@ pub fn BuildServer() -> impl Bundle {
 					.feature("server-local")
 					.no_default_features();
 
-				cmd_params.execute(ev, config)
+				cmd_runner.run(ev, config)
 			},
 		),
 	)
@@ -40,7 +40,7 @@ pub fn RunServer() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      manifest: Res<CargoManifest>,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let cmd = query.get(ev.action()).cloned().unwrap_or_default();
@@ -53,7 +53,7 @@ pub fn RunServer() -> impl Bundle {
 
 				let config = CommandConfig::new(exe_path);
 
-				cmd_params.execute(ev, config)
+				cmd_runner.run(ev, config)
 			},
 		),
 	)
@@ -70,7 +70,7 @@ pub fn ExportStaticContent() -> impl Bundle {
 		ContinueRun,
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut cmd_params: CommandParams,
+			      mut cmd_runner: CommandRunner,
 			      manifest: Res<CargoManifest>,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let exe_path = query
@@ -85,7 +85,7 @@ pub fn ExportStaticContent() -> impl Bundle {
 				let config =
 					CommandConfig::new(exe_path).arg("--export-static");
 
-				cmd_params.execute(ev, config)
+				cmd_runner.run(ev, config)
 			},
 		),
 	)

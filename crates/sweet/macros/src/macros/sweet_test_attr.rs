@@ -1,47 +1,53 @@
-use super::*;
+use beet_core::prelude::*;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
 use syn::ItemFn;
 
 
 
-/// The parser for the #[sweet] attribute
-pub struct SweetTestAttr;
+pub fn parse_sweet_test(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> syn::Result<TokenStream> {
+	let func = syn::parse::<ItemFn>(input)?;
+	let attrs = AttributeGroup::parse_punctated(attr.into())?;
+	let is_tokio = attrs
+		.iter()
+		.any(|attr| attr.to_token_stream().to_string() == "tokio");
 
-impl SweetTestAttr {
-	pub fn parse(
-		_attr: proc_macro::TokenStream,
-		input: proc_macro::TokenStream,
-	) -> syn::Result<TokenStream> {
-		let func = syn::parse::<ItemFn>(input)?;
 
+	let is_async = func.sig.asyncness.is_some();
 
-		if let Some(non_async) = non_async(&func) {
-			return Ok(non_async);
+	match (is_async, is_tokio) {
+		(true, true) => {
+			// wasm impl is recursive but oh well tokio dep is temp anyway
+			quote! {
+				#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
+				#[cfg_attr(target_arch = "wasm32", sweet::test)]
+				#func
+			}
 		}
-
-		let func_native = parse_native(&func)?;
-		let func_wasm = parse_wasm(&func)?;
-
-		let out = quote! {
-			#func_native
-			#func_wasm
-		};
-
-		Ok(out)
+		(true, false) => {
+			let ident = &func.sig.ident;
+			let vis = &func.vis;
+			let block = &func.block;
+			let attrs = &func.attrs;
+			// Check if #[should_panic] is present - it requires () return type
+			quote! {
+				#[test]
+				#(#attrs)*
+				#vis fn #ident() {
+					sweet::prelude::register_async_test(async #block);
+				}
+			}
+		}
+		(false, _) => {
+			quote! {
+				#[test]
+				#func
+			}
+		}
 	}
-}
-
-
-/// non async tests are just #[test]
-fn non_async(func: &ItemFn) -> Option<TokenStream> {
-	if func.sig.asyncness.is_some() {
-		return None;
-	}
-	let out = quote! {
-		#[test]
-		#func
-	}
-	.into();
-	Some(out)
+	.xok()
 }

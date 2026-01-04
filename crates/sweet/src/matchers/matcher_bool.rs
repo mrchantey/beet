@@ -14,8 +14,9 @@ pub impl bool {
 	/// ## Panics
 	///
 	/// Panics if the value is not `true`.
+	#[track_caller]
 	fn xpect_true(&self) -> &Self {
-		assert_ext::assert_expected_received_display(&true, self);
+		panic_ext::assert_expected_received_display(&true, self);
 		self
 	}
 	/// Performs an assertion ensuring this value is equal to `false`.
@@ -30,8 +31,9 @@ pub impl bool {
 	/// ## Panics
 	///
 	/// Panics if the value is not `false`.
+	#[track_caller]
 	fn xpect_false(&self) -> &Self {
-		assert_ext::assert_expected_received_display(&false, self);
+		panic_ext::assert_expected_received_display(&false, self);
 		self
 	}
 }

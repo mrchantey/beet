@@ -1,77 +1,45 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
 // #![feature(test)]
+// remove after bevy refactor
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 // implement FnMut for MockFunc
 #![cfg_attr(
 	feature = "nightly",
-	feature(fn_traits, backtrace_frames, unboxed_closures, test)
+	feature(
+		never_type,
+		fn_traits,
+		backtrace_frames,
+		unboxed_closures,
+		if_let_guard,
+		test,
+		closure_track_caller
+	)
 )]
 
 extern crate test;
+// Allow the crate to reference itself as `sweet::` in tests,
+// required for the `#[sweet::test]` macro to use the correct thread local
+#[cfg(test)]
+extern crate self as sweet;
 // the #[sweet::test] macro
+pub use bevy_runner::test_runner;
 pub use sweet_macros;
 pub use sweet_macros::test;
-// #[cfg(test)]
-// use libtest_runner::testlib_runner as libtest_runner;
-pub mod backtrace;
-#[cfg(feature = "bevy")]
-pub mod bevy;
+pub mod bevy_runner;
 /// Utilities for [libtest](https://github.com/rust-lang/rust/tree/master/library/test)
 pub mod libtest;
-/// Cross platform logging utils
-pub mod logging;
-/// Test runner module
-pub mod test_runner;
 pub mod utils;
 
 /// Matchers used for assertions: `true.xpect_true()`
 mod matchers;
-#[cfg(not(target_arch = "wasm32"))]
-#[doc(hidden)]
-pub mod native;
-pub mod test_case;
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
 
 pub mod prelude {
-
-	pub use crate::backtrace::*;
-	#[cfg(feature = "bevy")]
-	pub use crate::bevy::*;
+	pub use crate::bevy_runner::*;
 	pub use crate::libtest::*;
-	pub use crate::logging::*;
 	pub use crate::matchers::*;
-	#[cfg(not(target_arch = "wasm32"))]
-	pub use crate::native::*;
-	pub use crate::test_case::*;
-	pub use crate::test_runner::*;
 	pub use crate::utils::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use crate::wasm::*;
 }
 
-pub mod as_sweet {
-	pub use crate::prelude::*;
-	pub mod sweet {
-		pub use crate::exports;
-		pub use crate::prelude;
-	}
-}
-
-pub mod exports {
-	pub use anyhow::Result;
-}
-
-/// Entry point for the sweet test runner
-pub fn test_runner(tests: &[&test::TestDescAndFn]) {
-	#[cfg(target_arch = "wasm32")]
-	let result = crate::wasm::run_libtest_wasm(tests);
-	#[cfg(not(target_arch = "wasm32"))]
-	let result = crate::native::run_libtest_native(tests);
-	if let Err(e) = result {
-		eprintln!("Test runner failed: {e}");
-		std::process::exit(1);
-	}
-}
+pub mod exports {}

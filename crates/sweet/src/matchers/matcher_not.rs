@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 #[extend::ext(name=SweetNot)]
 pub impl<T> T {
+	/// Negate an outcome, wrapping it in MaybeNot::Negated
 	fn xnot(self) -> MaybeNot<T> { MaybeNot::Negated(self) }
 }
 
@@ -130,7 +131,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 
 	#[extend::ext]
 	impl<T, U> T

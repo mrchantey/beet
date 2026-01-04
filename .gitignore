@@ -1,25 +1,20 @@
-rustc-ice*
 assets
-assets.tar.gz
 target
+rustc-ice*
 .rustc_info.json
 .env
 .cache
 .vscode/settings.json
 dump.*
-openapi.yaml
-openapitools.json
-rust_bindings
-prompt.md
+plan.md
 file.pdf
 
 tests/assert.rs
 tests/expect.rs
 
-**/codegen
+bevy
 
+**/codegen
 
 packages/beet_state/node_modules
 packages/beet_state/dist
-
-bevy

@@ -1,14 +1,12 @@
 use crate::prelude::*;
+use async_process::Child;
+use async_process::Command;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
 use std::time::Duration;
-#[cfg(feature = "tokio")]
-use tokio::process::Child;
-#[cfg(feature = "tokio")]
-use tokio::process::Command;
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -166,7 +164,6 @@ impl Client {
 }
 
 
-#[cfg(feature = "tokio")]
 pub struct ClientProcess {
 	client: Client,
 	process: Child,
@@ -177,7 +174,6 @@ impl std::ops::Deref for ClientProcess {
 	fn deref(&self) -> &Self::Target { &self.client }
 }
 
-#[cfg(feature = "tokio")]
 impl ClientProcess {
 	pub fn new() -> Result<Self> { Self::new_with_opts(default()) }
 	pub fn new_with_opts(opts: Client) -> Result<Self> {
@@ -233,8 +229,8 @@ impl ClientProcess {
 			.xok()
 	}
 
-	pub async fn kill(mut self) -> Result<()> {
-		self.process.kill().await?;
+	pub fn kill(mut self) -> Result<()> {
+		self.process.kill()?;
 		Ok(())
 	}
 }

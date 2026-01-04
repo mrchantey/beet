@@ -1,8 +1,42 @@
+use std::path::Path;
+
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use bevy::ecs::system::IntoResult;
 use bevy::ecs::system::RunSystemError;
+
+
+pub struct MiddlewareBuilder {
+	pub method: Option<HttpMethod>,
+}
+
+impl MiddlewareBuilder {
+	/// Create a new endpoint with the provided [`IntoMiddleware`] handler.
+	/// Middleware defaults to accepting a partial path match (allows trailing segments),
+	/// and accepting any [`HttpMethod`]
+	pub fn new<M>(
+		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
+	) -> impl Bundle {
+		handler.into_middleware()
+	}
+	/// Create a new endpoint with the provided [`IntoMiddleware`] handler.
+	/// Middleware defaults to accepting a partial path match (allows trailing segments),
+	/// and accepting any [`HttpMethod`]
+	pub fn with_path<M>(
+		path: impl AsRef<Path>,
+		handler: impl 'static + Send + Sync + IntoMiddleware<M>,
+	) -> impl Bundle {
+		(
+			Name::new("Middleware Selector"),
+			Sequence,
+			PathPartial::new(path),
+			children![partial_path_match(), handler.into_middleware()],
+		)
+		// .with_handler_bundle(handler.into_middleware())
+	}
+}
 
 /// Helper for defining methods that do not consume the request, and may
 /// or may not insert a response.
@@ -148,7 +182,7 @@ where
 					{
 						world
 							.entity(exchange)
-							.insert(err.into_response())
+							.insert_then(err.into_response())
 							.await;
 					}
 					world
@@ -170,8 +204,8 @@ mod test {
 
 	fn assert<M>(_: impl IntoMiddleware<M>) {}
 
-	#[sweet::test]
-	async fn system() {
+	#[test]
+	fn infers_type() {
 		fn my_system() {}
 		assert(my_system);
 		assert(|| {});

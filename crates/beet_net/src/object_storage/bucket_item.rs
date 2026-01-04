@@ -56,7 +56,8 @@ impl BucketItem {
 					}
 					Err(err) => this.set_err(Some(err.to_string())),
 				}
-			});
+			})
+			.detach();
 		});
 
 		let this = self.clone();
@@ -69,7 +70,8 @@ impl BucketItem {
 						Ok(()) => {}
 						Err(err) => this.set_err(Some(err.to_string())),
 					}
-				});
+				})
+				.detach();
 			}
 		});
 	}

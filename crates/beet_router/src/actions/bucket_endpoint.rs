@@ -40,7 +40,7 @@ impl BucketEndpoint {
 					let response = bucket_to_response(&bucket, &path)
 						.await?
 						.into_response();
-					world.entity(cx.exchange()).insert(response).await;
+					world.entity(cx.exchange()).insert_then(response).await;
 					Ok(())
 				}
 				.into_middleware(),
@@ -149,7 +149,7 @@ mod test {
 		let path = RoutePath::from("bar/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		RouterPlugin::world()
-			.spawn((Router, RoutePartial::new("foo"), Sequence, children![
+			.spawn((Router, PathPartial::new("foo"), Sequence, children![
 				common_predicates::fallback(),
 				BucketEndpoint::new(
 					bucket.clone(),

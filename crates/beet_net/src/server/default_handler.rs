@@ -14,7 +14,7 @@ pub async fn default_handler(
 ) -> Response {
 	let id = entity.id();
 	let (send, recv) = async_channel::bounded(1);
-	entity
+	let exchange_entity = entity
 		.world()
 		.with_then(move |world| {
 			world
@@ -29,20 +29,32 @@ pub async fn default_handler(
 								.entity_mut(exchange)
 								.take::<Response>()
 								.unwrap_or_else(|| Response::not_found());
-							world.entity_mut(exchange).despawn();
 							send.try_send(response)
 								.expect("unreachable, we await recv");
 						});
 					},
 				)
-				.insert(request);
+				.insert(request)
+				.id()
 		})
 		.await;
 
-	recv.recv().await.unwrap_or_else(|_| {
+	let response = recv.recv().await.unwrap_or_else(|_| {
 		error!("Sender was dropped, was the world dropped?");
 		Response::from_status(StatusCode::INTERNAL_SERVER_ERROR)
-	})
+	});
+
+	// cleanup exchange entity after response is received
+	entity
+		.world()
+		.with_then(move |world| {
+			if let Ok(exchange) = world.get_entity_mut(exchange_entity) {
+				exchange.despawn();
+			}
+		})
+		.await;
+
+	response
 }
 
 
@@ -58,7 +70,7 @@ pub fn exchange_meta(
 	};
 	let status = response.status();
 	let duration = meta.started().elapsed();
-	let path = meta.path();
+	let path = meta.path_string();
 	let method = meta.method();
 
 	let mut stats = servers.get_mut(exchange_of.get())?;

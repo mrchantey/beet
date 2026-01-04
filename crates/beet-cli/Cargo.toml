@@ -25,8 +25,6 @@ qrcode = ["dep:qrcode","dep:image"]
 beet = { workspace = true, features = ["launch", "webdriver", "agent"] }
 ron.workspace = true
 clap.workspace = true
-tokio = { workspace = true, features = ["process"] }
-rapidhash.workspace = true
 bevy.workspace = true
 heck.workspace = true
 qrcode = {version = "0.14", optional = true }

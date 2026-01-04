@@ -92,7 +92,7 @@ impl FsWatcher {
 		}
 	}
 }
-
+// TODO kill watcher on remove component
 fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	let watcher = world.entity(entity).get::<FsWatcher>().unwrap().clone();
@@ -298,25 +298,30 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
+	/// this one is notoriously flaky
 	#[sweet::test]
 	async fn works() {
 		let mut app = App::new();
 		let tempdir = TempDir::new().unwrap();
-		let dir2 = tempdir.clone();
+		let path = tempdir.path().clone();
+		let path2 = path.clone();
 		app.add_plugins(AsyncPlugin)
-			.spawn(FsWatcher::default().with_path(tempdir.path().clone()))
+			.spawn(FsWatcher::default().with_path(path.clone()))
 			.add_observer(move |ev: On<DirEvent>, mut commands: Commands| {
 				for ev in ev.iter() {
-					if ev.path.starts_with(&dir2) {
+					if ev.path.starts_with(&path2) {
 						commands.write_message(AppExit::Success);
 					}
 				}
 			});
+
 		// off-thread required for for multi_threaded, not sure why
 		std::thread::spawn(move || {
-			std::thread::sleep(Duration::from_millis(1));
-			fs_ext::write(tempdir.join("foobar.txt"), "foobar").unwrap();
+			std::thread::sleep(Duration::from_millis(100));
+			fs_ext::write(path.join("foobar.txt"), "foobar").unwrap();
 		});
 		app.run_async().await.xpect_eq(AppExit::Success);
+		// tempdir kept alive until here to prevent cleanup race
+		drop(tempdir);
 	}
 }

@@ -147,7 +147,7 @@ pub fn assets_bucket() -> impl Bundle {
 			let bucket =
 				s3_fs_selector(fs_dir, bucket_name, service_access).await;
 			entity
-				.insert(
+				.insert_then(
 					BucketEndpoint::new(bucket, Some(RoutePath::new("assets")))
 						.with_path("assets"),
 				)
@@ -175,7 +175,7 @@ pub fn html_bucket() -> impl Bundle {
 				.await;
 			let bucket =
 				s3_fs_selector(fs_dir, bucket_name, service_access).await;
-			entity.insert(BucketEndpoint::new(bucket, None)).await;
+			entity.insert_then(BucketEndpoint::new(bucket, None)).await;
 		}),
 	)
 }
@@ -221,6 +221,7 @@ mod test {
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
+	#[cfg(feature = "server")]
 	#[sweet::test]
 	async fn test_default_router() {
 		let mut world = RouterPlugin::world();
@@ -233,7 +234,6 @@ mod test {
 			]),
 			EndWith(Outcome::Pass),
 		));
-
 
 		entity
 			.await_ready()

@@ -18,13 +18,14 @@ where
 	/// ## Panics
 	///
 	/// Panics if the value is not equal to `expected`.
+	#[track_caller]
 	fn xpect_eq<U>(&self, expected: U) -> &Self
 	where
 		T: PartialEq<U>,
 		U: Debug,
 	{
 		if self != &expected {
-			assert_ext::panic_expected_received_debug(expected, self);
+			panic_ext::panic_expected_received_debug(expected, self);
 		}
 		self
 	}
@@ -40,13 +41,14 @@ where
 	/// ## Panics
 	///
 	/// Panics if the value is equal to `expected`.
+	#[track_caller]
 	fn xpect_not_eq<U>(&self, expected: U) -> &Self
 	where
 		T: PartialEq<U>,
 		U: Debug,
 	{
 		if self == &expected {
-			assert_ext::panic_expected_received_display_debug(
+			panic_ext::panic_expected_received_display_debug(
 				format!("NOT {:?}", expected),
 				self,
 			);

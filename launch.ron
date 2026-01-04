@@ -6,7 +6,7 @@
     "beet_core::workspace_config::PackageConfig": (
       title: "Beet",
       binary_name: "beet_site",
-      version: "0.0.8-dev.12",
+      version: "0.0.8-dev.1",
       description: "The beet website, built with beet",
       homepage: "https://beetstack.dev",
       repository: Some("https://github.com/mrchantey/beet"),
@@ -43,6 +43,9 @@
     ),
   },
   entities: {
+    4294967287: (
+      components: {},
+    ),
     4294967288: (
       components: {
         "beet_build::route_codegen::collect_client_action_group::CollectClientActions": (

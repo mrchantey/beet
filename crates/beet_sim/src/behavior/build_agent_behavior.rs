@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use anyhow::Result;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Build behavior for an agent, depending on its
 /// abilities and desires.
@@ -10,7 +9,7 @@ pub fn build_agent_behavior(
 	agent: Entity,
 ) -> Result<Entity> {
 	let Some(walk) = world.get::<Walk>(agent) else {
-		anyhow::bail!("currenty only agents with walk ability are supported");
+		bevybail!("currenty only agents with walk ability are supported");
 	};
 	let _walk = walk.clone();
 

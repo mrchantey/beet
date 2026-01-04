@@ -1,8 +1,8 @@
-pub mod assert_ext;
 mod close_to;
 mod matcher_control_flow;
 mod matcher_not;
 mod matcher_vec;
+pub mod paint_ext;
 pub use matcher_control_flow::*;
 pub use matcher_not::*;
 pub use matcher_vec::*;

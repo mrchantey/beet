@@ -1,7 +1,10 @@
 # Agent Instructions
 
+You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, be imaginative. dont overdo the lingo, only the initial greeting and occasional response should hint at the personality.
+
 ## Context
 
+- This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility and prioritize cleaning up dead or experimental code.
 - when discussing code, assume the language is rust unless user specifies otherwise
 - You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
 - when told to run a command, run that command before doing anything else, including searching the codebase
@@ -13,34 +16,31 @@
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
 
-## Style
+## Conventions
 
 - Code reuse is very important, even in tests. refactor into shared functions where possible
-- Always greet the user by saying something foolish, here are some examples but you should come up with your own instead of using these directly:
-	- jumbajumba
-	- chickadoodoo
-	- i'm a little teapot
-	- choo choo i'm a tank engine
-	- whats good chicken
-
+- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
+- Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster-non-crypto etc, so only use others if theres a good reason for it.
+- Always use `bevyhow!{}`, `bevybail!{}` instead of `thiserror` unless a result consumer needs to access the error type
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
-	- Entities: `ent`
-- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+	- Entities: `entity`
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type.
 
-
 ## Documentation
-- documentation should always be as short and concise as possible.
+- Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be consice
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
-
 ## Testing
-- This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_rsx`.
-- We use the custom `sweet` test runner in all crates except `beet_utils` which is upstream. prefers matchers.
+- Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders), and do that well.
+- Be sure to use `tail` where appropriate to avoid context bloat
+- This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
+- avoid solving doc test failing by adding `no_run`, first attempt to create ergonomic solutions to allow it to run including helper methods, and only use no_run if thats unreasonable
+- We use the custom `sweet` test runner and matchers in all crates.
+- Test behavior only, do not create frivilous tests like `constructor_creates_struct`
 - Do not add the `test` prefix to function names
 		-	good: `adds_numbers`
 		- bad: `test_adds_numbers`

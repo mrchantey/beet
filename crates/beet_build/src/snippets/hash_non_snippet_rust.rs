@@ -86,12 +86,11 @@ mod test {
 	use super::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
-	use rapidhash::RapidHasher;
 	use std::hash::Hasher;
 	use sweet::prelude::*;
 
 	fn hash(tokens: TokenStream) -> u64 {
-		let mut hasher = RapidHasher::default_const();
+		let mut hasher = FixedHasher::default().build_hasher();
 		HashNonSnippetRust {
 			hasher: &mut hasher,
 			macros: &TemplateMacros::default(),

@@ -7,7 +7,7 @@ use beet_rsx::prelude::*;
 pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
 	(OnSpawn::observe(
 		move |ev: On<GetOutcome>,
-		      mut cmd_params: CommandParams,
+		      mut cmd_runner: CommandRunner,
 		      pkg_config: Res<PackageConfig>| {
 			let config = CommandConfig::new("npx")
 				.arg("sst")
@@ -16,7 +16,7 @@ pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
 				.arg(pkg_config.stage())
 				.current_dir(WsPathBuf::default().join("infra").to_string());
 
-			cmd_params.execute(ev, config)
+			cmd_runner.run(ev, config)
 		},
 	),)
 

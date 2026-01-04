@@ -4,6 +4,14 @@ use async_channel::TryRecvError;
 
 pub struct AsyncRunner;
 
+/// Tick global task pools to progress local tasks.
+/// This is required because `spawn_local` tasks can only be polled by the
+/// thread that owns the LocalExecutor.
+#[inline]
+fn tick_task_pools() {
+	#[cfg(not(target_arch = "wasm32"))]
+	bevy::tasks::tick_global_task_pools_on_main_thread();
+}
 
 #[extend::ext]
 pub impl App {
@@ -42,31 +50,53 @@ impl AsyncRunner {
 		async_ext::yield_now().await;
 
 		loop {
-			// 1. update
-			world.update();
-			// 2. exit if AppExit
+			// 1. update first to process command queues
+			world.update_local();
+			// 2. tick local tasks in multi-threaded mode
+			tick_task_pools();
+			// 3. exit if AppExit
 			if let Some(exit) = world.should_exit() {
 				return Some(exit);
 			}
-			// 3. exit if no remaining tasks
+			// 4. exit if no remaining tasks
 			if world.resource::<AsyncChannel>().task_count() == 0 {
 				return None;
 			}
-			// 4. short delay
+			// 5. short delay
 			time_ext::sleep_millis(1).await;
 		}
 	}
-	/// update the world in 1ms increments until recv has a value
+	/// Update the world in 1ms increments until recv has a value.
+	/// Ticks task pools after yielding to ensure spawned local tasks make progress.
+	/// Runs one final update after receiving the result to process any pending commands.
 	pub async fn poll_and_update<T>(
 		mut update: impl FnMut(),
 		recv: Receiver<T>,
 	) -> T {
 		loop {
 			match recv.try_recv() {
-				Ok(out) => return out,
-				Err(TryRecvError::Empty) => {
+				Ok(out) => {
+					// Run one final update to process any commands the async task
+					// sent before completing (e.g. resource modifications)
 					update();
+					return out;
+				}
+				Err(TryRecvError::Empty) => {
+					// Update to process command queues
+					update();
+					// Tick task pools BEFORE yielding to ensure newly spawned
+					// local tasks are polled in the same tick
+					tick_task_pools();
+					// Yield to let the executor poll other tasks.
+					// On WASM we need to actually sleep to return control to
+					// the JS event loop, otherwise setTimeout callbacks never fire.
+					#[cfg(target_arch = "wasm32")]
 					time_ext::sleep_millis(1).await;
+					#[cfg(not(target_arch = "wasm32"))]
+					async_ext::yield_now().await;
+					// Tick again after yielding to progress any tasks that were
+					// waiting on this task to yield
+					tick_task_pools();
 				}
 				Err(TryRecvError::Closed) => {
 					unreachable!("we control the send");

@@ -208,7 +208,7 @@ fn run_launch_step() -> impl Bundle {
 		Name::new("Run Launch Step"),
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
-			 mut cmd_params: CommandParams,
+			 mut cmd_runner: CommandRunner,
 			 config: Res<LaunchConfig>| {
 				let cmd_config = if config.no_default_args {
 					let additional_args = config
@@ -237,7 +237,7 @@ fn run_launch_step() -> impl Bundle {
 					cmd_config
 				};
 
-				cmd_params.execute(ev, cmd_config)
+				cmd_runner.run(ev, cmd_config)
 			},
 		),
 	)

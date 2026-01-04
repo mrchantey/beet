@@ -1,0 +1,6 @@
+[
+  "#[allow(unused, missing_docs)]\npub mod routes {\n    use super::*;\n    pub fn index() -> &\'static str {\n        \"/\"\n    }\n}\n",
+  "#[allow(unused, missing_docs)]\npub mod routes {\n    use super::*;\n    #[allow(unused, missing_docs)]\n    pub mod foo {\n        use super::*;\n        #[allow(unused, missing_docs)]\n        pub mod bar {\n            use super::*;\n            pub fn bazz(bar: &str, bazz: &str) -> String {\n                format!(\"/foo/{}/{}\", bar, bazz)\n            }\n        }\n    }\n}\n",
+  "#[allow(unused, missing_docs)]\npub mod routes {\n    use super::*;\n}\n",
+  "#[allow(unused, missing_docs)]\npub mod routes {\n    use super::*;\n    pub fn index() -> &\'static str {\n        \"/\"\n    }\n    pub fn bazz() -> &\'static str {\n        \"/bazz\"\n    }\n    #[allow(unused, missing_docs)]\n    pub mod foo {\n        use super::*;\n        pub fn bar() -> &\'static str {\n            \"/foo/bar\"\n        }\n        #[allow(unused, missing_docs)]\n        pub mod bazz {\n            use super::*;\n            pub fn index() -> &\'static str {\n                \"/foo/bazz\"\n            }\n            pub fn boo() -> &\'static str {\n                \"/foo/bazz/boo\"\n            }\n        }\n    }\n}\n",
+]

@@ -7,6 +7,9 @@ mod sendit;
 mod to_tokens;
 mod utils;
 
+#[path = "../../src/tokens_utils/shared_utils/mod.rs"]
+pub(crate) mod shared_utils;
+
 /// Implements `TokenizeSelf` for a struct or enum.
 /// All fields must also implement `TokenizeSelf`.
 ///

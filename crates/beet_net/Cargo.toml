@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "reqwest", "fs"]
+default = ["serde", "fs"]
 # for conditional compilation in hooks
 client = []
 server = [
@@ -23,9 +23,8 @@ server = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["rustls-tls", "dep:lambda_http"]
+lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
 fs = ["beet_core/fs","dep:async-process"]
-tokio = ["dep:tokio","beet_core/tokio"]
 tokens = ["beet_core/tokens"]
 aws = [
 	"serde",
@@ -44,7 +43,7 @@ serde = [
 	"uuid/serde",
 	"beet_core/serde",
 ]
-reqwest = ["dep:reqwest"]
+reqwest = ["dep:reqwest","dep:tokio"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
@@ -68,6 +67,7 @@ async-channel.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+heck.workspace = true
 tracing-subscriber.workspace = true
 send_wrapper.workspace = true
 uuid = {workspace = true, features = ["v7"]}
@@ -109,14 +109,11 @@ async-native-tls = { version = "0.5", optional = true }
 #💡 server
 
 #💡 server
-hyper = { version = "1.7", features = ["server"], optional = true }
+hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 pin-project = { workspace = true, optional = true }
-
-# TODO bevy executor
-tokio = { workspace = true, optional = true, default-features = true, features = ["process"] }
 
 #💡 lambda
 lambda_http = { version = "0.16", optional = true }
@@ -141,6 +138,9 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"rt-tokio",
 	"behavior-version-latest",
 ] }
+# actually a dev-dep but we need optional
+tokio = { workspace=true, optional=true }
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys.workspace = true
@@ -168,5 +168,5 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_net = {path = ".", features = ["tokio","tungstenite", "native-tls"] }
+beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
 sweet.workspace = true

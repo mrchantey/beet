@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::exports::http;
-use beet_net::prelude::*;
+use beet_net::prelude::Request;
 use beet_rsx::prelude::*;
 
 
@@ -11,14 +10,14 @@ pub fn CliRouter() -> Result<impl Bundle> {
 }
 
 async fn oneshot_cli_handler(entity: AsyncEntity) -> Result {
-	let req = cli_args_to_request(CliArgs::parse_env())?;
+	let req = Request::from_cli_args(CliArgs::parse_env())?;
 	let exit = match flow_route_handler(entity.clone(), req)
 		.await
 		.into_result()
 		.await
 	{
 		Ok(res) => {
-			res.body.into_string().await?.xprint();
+			res.body.into_string().await?.xprint_display();
 			AppExit::Success
 		}
 		Err(err) => {
@@ -31,16 +30,6 @@ async fn oneshot_cli_handler(entity: AsyncEntity) -> Result {
 }
 
 
-fn cli_args_to_request(args: CliArgs) -> Result<Request> {
-	let path_str = args.into_path_string();
-	let parts = http::Request::builder()
-		.uri(path_str)
-		.body(())?
-		.into_parts()
-		.0;
-	Request::from_parts(parts, default()).xok()
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -48,29 +37,25 @@ mod tests {
 
 	#[test]
 	fn into_request_simple_path() {
-		cli_args_to_request(CliArgs::parse("foo bar"))
+		Request::from_cli_str("foo bar")
 			.unwrap()
-			.parts
-			.uri
-			.path()
+			.path_string()
 			.xpect_eq("/foo/bar");
 	}
 
 	#[test]
 	fn into_request_with_query() {
-		let req =
-			cli_args_to_request(CliArgs::parse("api users --id=123")).unwrap();
-		req.parts.uri.path().xpect_eq("/api/users");
-		req.parts.uri.query().xpect_some();
+		let req = Request::from_cli_str("api users --id=123")
+			.unwrap();
+		req.path_string().xpect_eq("/api/users");
+		req.get_param("id").xpect_some();
 	}
 
 	#[test]
 	fn into_request_empty() {
-		cli_args_to_request(CliArgs::parse(""))
+		Request::from_cli_str("")
 			.unwrap()
-			.parts
-			.uri
-			.path()
+			.path_string()
 			.xpect_eq("/");
 	}
 }

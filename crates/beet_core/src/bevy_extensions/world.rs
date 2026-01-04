@@ -4,8 +4,13 @@ use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
+#[cfg(feature = "multi_threaded")]
+use bevy::ecs::schedule::ExecutorKind;
+use bevy::ecs::system::IntoObserverSystem;
+use bevy::prelude::*;
 use extend::ext;
 use std::marker::PhantomData;
+
 /// system version
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
 	world.log_component_names(*entity);
@@ -54,7 +59,7 @@ pub impl World {
 		async move {
 			AsyncRunner::poll_and_update(
 				|| {
-					self.update();
+					self.update_local();
 				},
 				recv,
 			)
@@ -63,8 +68,40 @@ pub impl World {
 		}
 	}
 
-	/// The world equivelent of [`App::update`]
-	fn update(&mut self) { self.run_schedule(Main); }
+	/// The world equivelent of [`App::update`].
+	///
+	/// In multi_threaded mode, this temporarily sets all schedules to use
+	/// single-threaded execution to avoid deadlocks when called from within
+	/// async tasks on IoTaskPool.
+	fn update_local(&mut self) {
+		#[cfg(feature = "multi_threaded")]
+		{
+			// Temporarily force single-threaded execution for all schedules
+			// to avoid deadlock when called from within a spawn_local task.
+			self.force_single_threaded_schedules();
+			self.run_schedule(Main);
+			self.clear_trackers();
+		}
+		#[cfg(not(feature = "multi_threaded"))]
+		{
+			self.run_schedule(Main);
+			self.clear_trackers();
+		}
+	}
+
+	/// Force all schedules in the world to use single-threaded execution.
+	/// This is necessary when running schedules from within async tasks
+	/// to avoid deadlocks with bevy's parallel schedule executor.
+	#[cfg(feature = "multi_threaded")]
+	fn force_single_threaded_schedules(&mut self) {
+		self.resource_scope(|_world, mut schedules: Mut<Schedules>| {
+			for (_label, schedule) in schedules.iter_mut() {
+				if schedule.get_executor_kind() == ExecutorKind::MultiThreaded {
+					schedule.set_executor_kind(ExecutorKind::SingleThreaded);
+				}
+			}
+		});
+	}
 	/// The world equivelent of [`App::should_exit`]
 	fn should_exit(&self) -> Option<AppExit> {
 		let mut reader = MessageCursor::default();
@@ -355,6 +392,59 @@ pub impl<W: IntoWorld> W {
 			DeferredWorld::from(world)
 				.trigger_raw(event_key, event, trigger, caller);
 		}
+	}
+}
+
+
+
+/// Ease-of-use extensions for `bevy::World`
+#[ext(name=CoreWorldExtSweet)]
+pub impl World {
+	fn with_observer<E: Event, B: Bundle, M>(
+		mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> Self {
+		self.spawn(Observer::new(system));
+		self
+	}
+	fn observing<E: Event, B: Bundle, M>(
+		&mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> &mut Self {
+		self.spawn(Observer::new(system));
+		self
+	}
+
+	// TODO deprecated, bevy 0.16 fixes this
+	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&mut self,
+		event: E,
+	) -> &mut Self {
+		self.flush();
+		self.trigger(event);
+		self.flush();
+		self
+	}
+}
+
+#[extend::ext]
+pub impl<'w> EntityWorldMut<'w> {
+	/// 1. Flushes
+	/// 2. Triggers the given event for this entity, which will run any observers watching for it.
+	/// 3. Flushes
+	// #[deprecated = "world flushes automatically now"]
+	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&mut self,
+		event: E,
+	) -> &mut Self {
+		// let entity = self.id();
+		unsafe {
+			let world = self.world_mut();
+			world.flush();
+			world.trigger(event);
+			world.flush();
+		}
+		self
 	}
 }
 

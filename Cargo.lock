@@ -1103,7 +1103,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-executor",
  "beet",
@@ -1121,7 +1121,6 @@ dependencies = [
  "beet_rsx",
  "beet_sim",
  "beet_spatial",
- "beet_utils",
  "bevy",
  "clap",
  "console_error_panic_hook",
@@ -1129,14 +1128,13 @@ dependencies = [
  "getrandom 0.3.3",
  "serde",
  "serde_json",
- "tokio",
  "uuid",
  "web-sys",
 ]
 
 [[package]]
 name = "beet-cli"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet",
  "bevy",
@@ -1147,16 +1145,14 @@ dependencies = [
  "proc-macro2",
  "qrcode",
  "quote",
- "rapidhash",
  "ron 0.8.1",
  "sweet",
  "syn 2.0.111",
- "tokio",
 ]
 
 [[package]]
 name = "beet_agent"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-lock",
  "base64 0.22.1",
@@ -1175,7 +1171,6 @@ dependencies = [
  "strum",
  "sweet",
  "thiserror 1.0.69",
- "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1183,7 +1178,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-process",
  "beet_core",
@@ -1197,7 +1192,6 @@ dependencies = [
  "cargo-manifest",
  "clap",
  "dotenv",
- "flume",
  "futures",
  "heck 0.4.1",
  "prettyplease",
@@ -1205,8 +1199,6 @@ dependencies = [
  "proc-macro2-diagnostics",
  "pulldown-cmark",
  "quote",
- "rapidhash",
- "rayon",
  "ron 0.8.1",
  "send_wrapper",
  "serde",
@@ -1214,24 +1206,26 @@ dependencies = [
  "sweet",
  "syn 2.0.111",
  "thiserror 1.0.69",
- "tokio",
  "toml",
  "tracing",
 ]
 
 [[package]]
 name = "beet_core"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
+ "async-fs",
  "async-io",
  "async-task",
+ "beet_core",
  "beet_core_macros",
- "beet_utils",
  "bevy",
  "clap",
+ "crossterm",
  "ctrlc",
+ "either",
  "extend",
  "futures",
  "futures-lite",
@@ -1242,12 +1236,13 @@ dependencies = [
  "js-sys",
  "notify",
  "notify-debouncer-full",
+ "path-clean",
+ "pathdiff",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
  "rand 0.9.2",
  "rand_chacha 0.9.0",
- "rapidhash",
  "ron 0.8.1",
  "send_wrapper",
  "serde",
@@ -1255,9 +1250,9 @@ dependencies = [
  "sweet",
  "syn 2.0.111",
  "thiserror 1.0.69",
- "tokio",
  "toml",
  "tracing",
+ "uuid",
  "variadics_please",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1267,9 +1262,8 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
- "beet_utils",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -1279,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1299,8 +1293,9 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
+ "async-process",
  "base64 0.22.1",
  "beet_core",
  "beet_dom",
@@ -1314,7 +1309,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sweet",
- "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1322,39 +1316,35 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_ml",
  "beet_spatial",
  "bevy",
- "console_log",
  "log",
  "pretty_env_logger",
  "serde",
  "serde_json",
  "sweet",
- "tokio",
  "wasm-bindgen",
  "web-sys",
 ]
 
 [[package]]
 name = "beet_flow"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "bevy",
  "extend",
  "sweet",
- "tokio",
 ]
 
 [[package]]
 name = "beet_ml"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1364,7 +1354,6 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "console_error_panic_hook",
- "console_log",
  "futures",
  "hf-hub",
  "js-sys",
@@ -1378,7 +1367,6 @@ dependencies = [
  "sweet",
  "thiserror 1.0.69",
  "tokenizers",
- "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1386,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1409,6 +1397,7 @@ dependencies = [
  "eventsource-stream",
  "extend",
  "futures",
+ "heck 0.4.1",
  "html-escape",
  "http 1.3.1",
  "http-body-util",
@@ -1437,7 +1426,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1449,8 +1438,6 @@ dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
- "rapidhash",
- "rayon",
  "regex",
  "ron 0.8.1",
  "rstml",
@@ -1462,7 +1449,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "base64 0.22.1",
@@ -1494,21 +1481,19 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
+ "async-channel 2.5.0",
  "beet_core",
  "beet_dom",
  "beet_rsx",
  "beet_rsx_macros",
  "bevy",
  "console_error_panic_hook",
- "console_log",
  "extend",
- "flume",
  "http 1.3.1",
  "js-sys",
  "prettyplease",
- "rapidhash",
  "ron 0.8.1",
  "send_wrapper",
  "serde",
@@ -1516,7 +1501,6 @@ dependencies = [
  "strum_macros",
  "sweet",
  "thiserror 1.0.69",
- "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1524,7 +1508,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1534,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "beet_parse",
@@ -1547,9 +1531,8 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
- "anyhow",
  "beet_core",
  "beet_flow",
  "beet_spatial",
@@ -1559,20 +1542,18 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
- "anyhow",
  "beet",
  "beet_design",
  "getrandom 0.3.3",
  "serde",
  "sweet",
- "tokio",
 ]
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1584,32 +1565,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "sweet",
- "web-sys",
-]
-
-[[package]]
-name = "beet_utils"
-version = "0.0.8-dev.0"
-dependencies = [
- "async-fs",
- "bevy",
- "clap",
- "crossterm",
- "extend",
- "futures-lite",
- "glob",
- "js-sys",
- "path-clean",
- "pathdiff",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 2.0.111",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
- "wasm-bindgen",
  "web-sys",
 ]
 
@@ -2388,7 +2343,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde",
- "spin 0.10.0",
+ "spin",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-time",
@@ -3368,12 +3323,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
-name = "colorize"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
-
-[[package]]
 name = "combine"
 version = "2.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3439,17 +3388,6 @@ checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
 dependencies = [
  "cfg-if",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "console_log"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
-dependencies = [
- "log",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4587,18 +4525,6 @@ dependencies = [
  "num-traits",
  "rand 0.9.2",
  "rand_distr",
-]
-
-[[package]]
-name = "flume"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da0e4dd2a88388a1f4ccc7c9ce104604dab68d9f408dc34cd45823d5a9069095"
-dependencies = [
- "futures-core",
- "futures-sink",
- "nanorand",
- "spin 0.9.8",
 ]
 
 [[package]]
@@ -6707,15 +6633,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanorand"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
-dependencies = [
- "getrandom 0.2.16",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8127,12 +8044,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f93e7e49bb0bf967717f7bd674458b3d6b0c5f48ec7e3038166026a69fc22223"
 
 [[package]]
-name = "rapidhash"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9813f789f95ee4fe6b4d01834404d7cccacbc3f6c029343af910b3c2835eb9f1"
-
-[[package]]
 name = "rav1e"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9205,15 +9116,6 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-dependencies = [
- "lock_api",
-]
-
-[[package]]
-name = "spin"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
@@ -9331,62 +9233,38 @@ dependencies = [
 name = "sweet"
 version = "0.4.2"
 dependencies = [
- "anyhow",
- "backtrace",
- "beet_utils",
+ "beet_core",
+ "beet_flow",
+ "beet_net",
+ "beet_router",
  "bevy",
- "clap",
- "colorize",
  "console_error_panic_hook",
- "console_log",
  "diff",
  "extend",
- "flume",
- "futures",
- "glob",
- "js-sys",
- "log",
- "pin-project-lite",
- "pretty_env_logger",
+ "nu-ansi-term",
  "prettyplease",
  "proc-macro2",
  "quote",
- "rayon",
  "ron 0.8.1",
- "serde",
- "serde_json",
+ "send_wrapper",
+ "sweet",
  "sweet_macros",
  "syn 2.0.111",
- "thread_local",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "web-time",
- "yansi",
 ]
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
  "beet",
- "bevy",
- "clap",
- "prettyplease",
- "proc-macro2",
- "quote",
- "rapidhash",
  "sweet",
- "syn 2.0.111",
- "tokio",
 ]
 
 [[package]]
 name = "sweet_macros"
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 dependencies = [
- "anyhow",
+ "beet_core",
  "proc-macro2",
  "quote",
  "syn 2.0.111",
@@ -9787,7 +9665,6 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
- "signal-hook-registry",
  "slab",
  "socket2 0.6.0",
  "tokio-macros",

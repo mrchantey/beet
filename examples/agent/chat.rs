@@ -3,8 +3,7 @@
 use beet::prelude::*;
 use clap::Parser;
 
-#[tokio::main]
-pub async fn main() {
+pub fn main() {
 	let mut plugin = CliAgentPlugin::parse();
 
 	// enabling this will add the image generation tool to the agent
@@ -18,8 +17,7 @@ pub async fn main() {
 
 	App::new()
 		.add_plugins((MinimalPlugins, plugin))
-		.run_async()
-		.await
+		.run()
 		.into_result()
 		.unwrap();
 }

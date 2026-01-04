@@ -1,0 +1,6 @@
+[
+  "<!DOCTYPE html><html><head><style>body[data-beet-style-id-0] {\n  color: red;\n}\n</style></head><body></body></html>",
+  "<style>body[data-beet-style-id-PLACEHOLDER] {\n  color: red;\n}\n</style>",
+  "<code lang=\"js\">let foo = \"bar\"</code>",
+  "<pre class=\"syntect-code\"><span style=\"color:#b48ead;\">fn </span><span style=\"color:#8fa1b3;\">foobar</span><span style=\"color:#c0c5ce;\">() -&gt; String {}</span></pre>",
+]

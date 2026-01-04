@@ -1,11 +1,13 @@
 mod animation_frame;
 pub use self::animation_frame::*;
+pub mod array_ext;
 pub mod file_ext;
 pub mod history_ext;
 mod html_event_listener;
 pub use self::html_event_listener::*;
 mod interval;
 pub use self::interval::*;
+pub mod js_runtime;
 pub mod lifecycle_ext;
 mod poll;
 pub use self::poll::*;

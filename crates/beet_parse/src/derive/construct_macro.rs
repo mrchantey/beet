@@ -209,7 +209,7 @@ fn impl_on_add(
 					let bundle: #return_type_inner = {
 						#func_body
 					 };
-					#entity_ident.insert(bundle #maybe_unwrap).await;
+					#entity_ident.insert_then(bundle #maybe_unwrap).await;
 				});
 			}
 		}

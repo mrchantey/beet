@@ -101,7 +101,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 		bundle: impl Bundle,
 	) -> Result<&mut Self> {
 		if let Ok(entity) = self.get_entity(&key) {
-			self.world.entity(entity).insert(bundle).await;
+			self.world.entity(entity).insert_then(bundle).await;
 		} else {
 			self.add(key, bundle).await?;
 		}
@@ -142,7 +142,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 	pub async fn finish_content(&mut self, key: T) -> Result<&mut Self> {
 		self.world
 			.entity(self.get_entity(&key)?)
-			.insert(ContentEnded::default())
+			.insert_then(ContentEnded::default())
 			.await;
 		self.finished_content.push(key);
 		Ok(self)

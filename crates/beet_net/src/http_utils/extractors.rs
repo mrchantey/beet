@@ -1,9 +1,9 @@
+//! Extractors are types for declaratively converting parts of an exchange
+//! into concrete types, for example [`QueryParams`]
 use crate::prelude::*;
 #[allow(unused)]
 use beet_core::prelude::*;
-use http::HeaderMap;
 use http::StatusCode;
-use http::request;
 
 pub struct Html<T>(pub T);
 pub struct Css(pub String);
@@ -162,10 +162,13 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		let query = req.uri.query().ok_or_else(|| {
-			HttpError::bad_request("no query params in request")
-		})?;
-		let value = Self::from_query_string(query).map_err(|err| {
+		let query = req.query_string();
+		if query.is_empty() {
+			return Err(
+				HttpError::bad_request("no query params in request").into()
+			);
+		}
+		let value = Self::from_query_string(&query).map_err(|err| {
 			HttpError::bad_request(format!(
 				"Failed to parse query params: {}",
 				err
@@ -211,10 +214,13 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		let query = req.uri.query().ok_or_else(|| {
-			HttpError::bad_request("no query params in request")
-		})?;
-		let params: T = serde_urlencoded::from_str(query).map_err(|err| {
+		let query = req.query_string();
+		if query.is_empty() {
+			return Err(
+				HttpError::bad_request("no query params in request").into()
+			);
+		}
+		let params: T = serde_urlencoded::from_str(&query).map_err(|err| {
 			HttpError::bad_request(format!(
 				"Failed to parse query params: {}",
 				err
@@ -268,56 +274,24 @@ pub struct RouteApp {
 	// pub create_app: Box<dyn Clone + Fn() -> App>,
 }
 
-pub struct HttpExt;
-
-impl HttpExt {
-	pub fn has_body(parts: &request::Parts) -> bool {
-		Self::has_body_by_content_length(&parts.headers)
-			|| Self::has_body_by_transfer_encoding(&parts.headers)
-	}
-
-	pub fn has_body_by_content_length(headers: &HeaderMap) -> bool {
-		headers
-			.get("content-length")
-			.and_then(|v| v.to_str().ok())
-			.and_then(|s| s.parse::<usize>().ok())
-			.map(|len| len > 0)
-			.unwrap_or(false)
-	}
-
-	pub fn has_body_by_transfer_encoding(headers: &HeaderMap) -> bool {
-		headers
-			.get("transfer-encoding")
-			.and_then(|v| v.to_str().ok())
-			.map(|s| s.contains("chunked"))
-			.unwrap_or(false)
-	}
-}
-
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-	use bytes::Bytes;
+	use super::*;
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn request_response_cycle() {
 		let mut app = App::new();
-		let req: Request = http::Request::builder()
-			.method(http::Method::POST)
-			.uri("https://example.com")
-			.header("content-length", "5")
-			.body(Bytes::new())
-			.unwrap()
-			.into();
+		let req = Request::post("/test")
+			.with_header(http::header::CONTENT_LENGTH, "5")
+			.with_body(b"hello");
+
 		let entity = app.world_mut().spawn(req).id();
 		app.add_systems(
 			Update,
 			move |mut commands: Commands, query: Query<&Request>| {
-				let req = query.single().unwrap();
-				let mut res = Response::ok();
-				res.parts.headers = req.parts.headers.clone();
+				let _req = query.single().unwrap();
+				let res = Response::ok().with_header("content-length", "5");
 				commands.entity(entity).insert(res);
 			},
 		);
@@ -327,11 +301,22 @@ mod test {
 			.entity_mut(entity)
 			.take::<Response>()
 			.unwrap()
-			.parts
-			.headers
-			.get("content-length")
+			.get_header("content-length")
 			.unwrap()
 			.xpect_eq("5");
+	}
+
+	#[test]
+	fn parts_has_body() {
+		let parts = PartsBuilder::new()
+			.path_str("/test")
+			.header("content-length", "5")
+			.build_request_parts(HttpMethod::Post);
+
+		parts.has_body().xpect_true();
+
+		let parts_without = RequestParts::get("/test");
+		parts_without.has_body().xpect_false();
 	}
 
 	#[test]

@@ -1,19 +1,18 @@
+# when testing compile speed is the most important
+[profile.test]
+opt-level = 0
+
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1
 
-# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+# Enable high optimizations for dependencies (incl. Bevy) which do not change often
+# but not for our code which takes longer to rebuild:
 [profile.dev.package."*"]
 opt-level = 3
 
-# sweet backtracing
-[profile.test]
-opt-level = 0
-[profile.test.package.sweet]
-opt-level = 0
-
 [workspace.package]
-version = "0.0.8-dev.0"
+version = "0.0.8-dev.4"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "Malleable Application Framework"
@@ -49,7 +48,6 @@ members = [
 	## 💡 Core
 	"crates/beet_core",
 	"crates/beet_core/macros",
-	"crates/beet_utils",
 	"crates/sweet/macros",
 	"crates/sweet",
 	"crates/sweet/cli",
@@ -81,30 +79,29 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet_utils = { path = "crates/beet_utils", version = "0.0.8-dev.0" }
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.0" }
+sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.4" }
 sweet = { path = "crates/sweet", version = "0.4.2" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.0" }
-beet_core = { path = "crates/beet_core", version = "0.0.8-dev.0" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.4" }
+beet_core = { path = "crates/beet_core", version = "0.0.8-dev.4" }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.8-dev.0" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.8-dev.0" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.8-dev.0" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.8-dev.0" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.8-dev.0" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.8-dev.4" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.8-dev.4" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.8-dev.4" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.8-dev.4" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.8-dev.4" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.8-dev.0" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.8-dev.0" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.8-dev.0" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.8-dev.0" }
-beet_build = { path = "crates/beet_build", version = "0.0.8-dev.0" }
-beet_design = { path = "crates/beet_design", version = "0.0.8-dev.0" }
-beet_net = { path = "crates/beet_net", version = "0.0.8-dev.0" }
-beet_router = { path = "crates/beet_router", version = "0.0.8-dev.0" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.0" }
-beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.0" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.8-dev.4" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.8-dev.4" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.8-dev.4" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.8-dev.4" }
+beet_build = { path = "crates/beet_build", version = "0.0.8-dev.4" }
+beet_design = { path = "crates/beet_design", version = "0.0.8-dev.4" }
+beet_net = { path = "crates/beet_net", version = "0.0.8-dev.4" }
+beet_router = { path = "crates/beet_router", version = "0.0.8-dev.4" }
+beet_dom = { path = "crates/beet_dom", version = "0.0.8-dev.4" }
+beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.4" }
 
-beet = { path = "", version = "0.0.8-dev.0" }
+beet = { path = "", version = "0.0.8-dev.4" }
 
 #💡 local
 bevy = { version = "0.18.0-rc.1", default-features = false, features = [
@@ -124,13 +121,11 @@ bevy = { version = "0.18.0-rc.1", default-features = false, features = [
 ] }
 
 #💡 utility
-anyhow = "1"
 thiserror = "1"
 heck = "0.4"
 glob = "0.3"
 dotenv = "0.15"
 send_wrapper = "0.6"
-rapidhash = "1"
 web-time = "1"
 itertools = "0.14"
 mime_guess = "2"
@@ -145,10 +140,9 @@ variadics_please = "1"
 #💡 logging
 log = "0.4"
 tracing = "0.1"
-colorize = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+nu-ansi-term = "0.50"
 pretty_env_logger = "0.4"
-console_log = { version = "1", features = ["color"] }
 
 
 #💡 async
@@ -162,11 +156,7 @@ async-io = "2"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
-# todo replace with async channel
-flume = "0.11"
-# todo replace with bevy tasks
-rayon = "1"
-# todo replace with async-std
+# strictly for testing only
 tokio = { version = "1", features = [
 	"macros",
 	"sync",
@@ -234,7 +224,7 @@ default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
-server = ["serde","dom","fs", "net", "router", "design"]
+server = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
 client = [
 	"rsx",
 	"design",
@@ -258,7 +248,7 @@ rustls-tls = [
 ]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
-rand = ["beet_utils/rand", "beet_core/rand"]
+rand = ["beet_core/rand"]
 agent = ["dep:beet_agent"]
 dom = ["css", "dep:beet_dom"]
 router = ["dep:beet_router"]
@@ -294,7 +284,6 @@ bevy_default = [
 fs = ["beet_agent?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 tungstenite = ["net", "beet_net?/tungstenite"]
-tokio = ["beet_net?/tokio"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -306,7 +295,6 @@ tokio = ["beet_net?/tokio"]
 bevy = { workspace = true }
 
 #💡 utils
-beet_utils.workspace = true
 beet_core.workspace = true
 
 #💡 web
@@ -328,9 +316,6 @@ beet_spatial = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio.workspace = true
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
 uuid = { workspace = true, features = ["rng-getrandom"] }
@@ -347,17 +332,14 @@ serde_json.workspace = true
 clap.workspace = true
 async-executor.workspace = true
 futures.workspace = true
-tokio.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = ".", features = ["fs"] }
-tokio.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook.workspace = true
 web-sys.workspace = true
-# console_log.workspace = true
 # js-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true

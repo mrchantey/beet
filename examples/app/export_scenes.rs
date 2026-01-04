@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 use bevyhub::prelude::*;

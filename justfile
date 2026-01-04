@@ -9,7 +9,7 @@
 
 set dotenv-load := true
 
-# it keeps asking for bigger stacks.. this is 1GB :(
+# fresh compile of beet is so big it keeps asking for bigger stacks.. this is 1GB 😭
 
 export RUST_MIN_STACK := '1073741824'
 
@@ -176,19 +176,14 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
-# upstream from sweet
-test-beet-utils *args:
-	just watch 'cargo test -p beet_utils --lib --all-features --nocapture -- {{ args }}'
-
 # cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:
-	cargo test -p beet_utils 							--all-features 													 	{{ args }} -- {{ test-threads }}
 	cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
 	cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
 	cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
-	cargo test -p beet_net						 	--features=tungstenite,native-tls  					{{ args }} -- {{ test-threads }}
+	cargo test -p beet_net						 	--features=reqwest,tungstenite,native-tls  	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:
@@ -204,9 +199,10 @@ test-rsx *args:
 	cargo test -p beet_rsx_combinator 	--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_parse 						--all-features 	 	 																	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx   				--all-features   																				{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx   						--all-features   																		{{ args }} -- {{ test-threads }}
 	cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{ args }} -- {{ test-threads }}
-	cargo test -p beet_router						 --features=tokens  																{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--features=tokens,server														{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--lib --features=tokens	--target wasm32-unknown-unknown	 	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_build 						--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_design 					--all-features																			{{ args }} -- {{ test-threads }}
 	cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}

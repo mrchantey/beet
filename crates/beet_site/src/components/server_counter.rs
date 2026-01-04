@@ -12,7 +12,7 @@ pub fn ServerCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 				.await
 				.expect("ServerCounter: failed to fetch from server");
 			set(value);
-		});
+		}).detach();
 	};
 
 	rsx! {

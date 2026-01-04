@@ -1,0 +1,3 @@
+[
+  "SidebarNode {\n    display_name: \"Root\",\n    path: None,\n    children: [\n        SidebarNode {\n            display_name: \"Docs\",\n            path: Some(\n                RoutePath(\n                    \"/docs\",\n                ),\n            ),\n            children: [\n                SidebarNode {\n                    display_name: \"Testing\",\n                    path: Some(\n                        RoutePath(\n                            \"/docs/testing\",\n                        ),\n                    ),\n                    children: [],\n                    expanded: false,\n                },\n            ],\n            expanded: false,\n        },\n    ],\n    expanded: false,\n}",
+]

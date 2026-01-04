@@ -1,4 +1,3 @@
-use beet_utils::prelude::Xtend;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn;
@@ -22,7 +21,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		.iter()
 		.find_map(|attr| {
 			if attr.path().is_ident("effect") {
-				attr.parse_args::<TokenStream>().unwrap().xsome()
+				Some(attr.parse_args::<TokenStream>().unwrap())
 			} else {
 				None
 			}

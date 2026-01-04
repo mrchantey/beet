@@ -1,5 +1,5 @@
-use beet_utils::prelude::AttributeGroup;
-use beet_utils::prelude::pkg_ext;
+use crate::shared_utils::AttributeGroup;
+use crate::shared_utils::pkg_ext;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;

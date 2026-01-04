@@ -140,6 +140,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -154,7 +155,7 @@ mod test {
 			.into_request()
 			.unwrap()
 			.path()
-			.xpect_eq("/foo".into());
+			.xpect_eq(vec!["foo".to_string()]);
 	}
 
 	fn add_via_get(In(params): In<(i32, i32)>) -> i32 { params.0 + params.1 }
@@ -168,8 +169,7 @@ mod test {
 	}
 
 	// only a single entry because set_server_url is static
-	#[sweet::test]
-	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
+	#[sweet::test(tokio)]
 	async fn works() {
 		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();

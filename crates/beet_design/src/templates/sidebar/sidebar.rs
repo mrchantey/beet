@@ -115,24 +115,28 @@ impl CollectSidebarNode {
 
 	pub fn collect(
 		this: In<Self>,
-		path_tree: Res<RoutePathTree>,
+		endpoint_tree: Res<EndpointTree>,
 		articles: Query<&ArticleMeta>,
 	) -> SidebarNode {
-		this.map_node(&path_tree, &articles)
+		this.map_node(&endpoint_tree, &articles)
 	}
 
 	fn map_node(
 		&self,
-		node: &RoutePathTree,
+		node: &EndpointTree,
 		articles: &Query<&ArticleMeta>,
 	) -> SidebarNode {
-		// get the first article meta for these endpoints
-		let meta = node.endpoints.iter().find_map(|e| articles.get(*e).ok());
-		let contains_endpoints = node.contains_endpoints();
+		// get the article meta for this endpoint
+		let meta = node.endpoint.and_then(|e| articles.get(e).ok());
+		let has_endpoint = node.endpoint.is_some();
+		let route_path = node.pattern.annotated_route_path();
 		let children = node
 			.children
 			.iter()
-			.filter(|child| self.include_filter.passes(&child.route.0))
+			.filter(|child| {
+				self.include_filter
+					.passes(&child.pattern.annotated_route_path().0)
+			})
 			.map(|child| self.map_node(child, articles))
 			.collect();
 
@@ -150,18 +154,21 @@ impl CollectSidebarNode {
 			}
 		}
 
+		let expanded = self.expanded_filter.passes(&route_path.0);
+		let path = if has_endpoint {
+			Some(route_path.clone())
+		} else {
+			None
+		};
+		let display_name = meta
+			.and_then(|m| m.sidebar_label().map(|label| label.to_string()))
+			.unwrap_or_else(|| pretty_route_name(&route_path));
+
 		SidebarNode {
-			display_name: meta
-				.map(|m| m.sidebar_label().map(|label| label.to_string()))
-				.flatten()
-				.unwrap_or_else(|| pretty_route_name(&node.route)),
-			path: if contains_endpoints {
-				Some(node.route.clone())
-			} else {
-				None
-			},
+			display_name,
+			path,
 			children,
-			expanded: self.expanded_filter.passes(&node.route.0),
+			expanded,
 		}
 	}
 }
@@ -185,7 +192,7 @@ mod test {
 				.with_path("docs")
 				.with_cache_strategy(CacheStrategy::Static)
 				.with_handler_bundle((
-					StatusCode::OK.into_endpoint(),
+					StatusCode::OK.into_endpoint_handler(),
 					ArticleMeta {
 						title: Some("Docs".to_string()),
 						sidebar: SidebarInfo {
@@ -195,12 +202,12 @@ mod test {
 						..Default::default()
 					}
 				)),
-			(RoutePartial::new("/docs"), Sequence, children![
+			(PathPartial::new("/docs"), Sequence, children![
 				EndpointBuilder::get()
 					.with_path("testing")
 					.with_cache_strategy(CacheStrategy::Static)
 					.with_handler_bundle((
-						StatusCode::OK.into_endpoint(),
+						StatusCode::OK.into_endpoint_handler(),
 						ArticleMeta {
 							title: Some("Partying".to_string()),
 							sidebar: SidebarInfo {
@@ -214,9 +221,9 @@ mod test {
 		]));
 		world.run_system_cached(insert_route_tree).unwrap();
 		world
-			.resource::<RoutePathTree>()
+			.resource::<EndpointTree>()
 			.to_string()
-			.xpect_eq("/*\n/docs\n/docs/testing\n");
+			.xpect_eq("/docs\n/docs/testing\n");
 
 		world
 			.run_system_cached_with(
@@ -229,6 +236,7 @@ mod test {
 				},
 			)
 			.unwrap()
+			.xfmt()
 			.xpect_snapshot();
 	}
 

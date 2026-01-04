@@ -1,3 +1,5 @@
+use bevy::tasks::IoTaskPool;
+use bevy::tasks::Task;
 pub use futures::future::try_join_all;
 use futures_lite::future::YieldNow;
 use std::pin::Pin;
@@ -25,59 +27,23 @@ pub type MaybeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
 pub type MaybeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
+
 /// Cross platform spawn_local function
-#[cfg(target_arch = "wasm32")]
-pub fn spawn_local<F>(fut: F)
-where
-	F: Future<Output = ()> + 'static,
-{
-	wasm_bindgen_futures::spawn_local(fut)
-}
-/// Cross platform spawn_local function
-// TODO deprecate for async-executor or bevy tasks?
-#[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
-pub fn spawn_local<F>(fut: F) -> tokio::task::JoinHandle<F::Output>
+pub fn spawn_local<F>(fut: F) -> Task<F::Output>
 where
 	F: Future + 'static,
-	F::Output: 'static,
+	F::Output: 'static + MaybeSend + MaybeSync,
 {
-	tokio::task::spawn_local(fut)
+	IoTaskPool::get().spawn_local(fut)
 }
 
-
-#[cfg(all(not(target_arch = "wasm32"), not(feature = "tokio")))]
-pub fn spawn_local<F>(_: F)
-where
-	F: Future<Output = ()> + 'static,
-{
-	unimplemented!("please enable tokio feature")
-}
-/// Cross platform spawn_local function
-#[cfg(target_arch = "wasm32")]
-pub fn spawn<F>(fut: F)
-where
-	F: Future<Output = ()> + 'static,
-{
-	wasm_bindgen_futures::spawn_local(fut)
-}
 /// Cross platform spawn function
-// TODO deprecate for async-executor or bevy tasks?
-#[cfg(all(not(target_arch = "wasm32"), feature = "tokio"))]
-pub fn spawn<F>(fut: F) -> tokio::task::JoinHandle<F::Output>
+pub fn spawn<F>(fut: F) -> Task<F::Output>
 where
-	F: Future + 'static + Send,
-	F::Output: 'static + Send,
+	F: Future + 'static + MaybeSend + MaybeSync,
+	F::Output: 'static + MaybeSend + MaybeSync,
 {
-	tokio::task::spawn(fut)
-}
-
-
-#[cfg(all(not(target_arch = "wasm32"), not(feature = "tokio")))]
-pub fn spawn<F>(_: F)
-where
-	F: Future<Output = ()> + 'static,
-{
-	unimplemented!("please enable tokio feature")
+	IoTaskPool::get().spawn(fut)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -13,9 +13,21 @@ pub fn default_cli_router() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
 		CliRouter,
-		InfallibleSequence,
+		Fallback,
 		beet_site_cmd(),
 		children![
+			EndpointBuilder::new(|tree: Res<EndpointTree>| {
+				format!("🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string())
+				// StatusCode::OK
+			})
+			.with_params::<HelpParams>()
+			.with_path(""),
+			EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
+				.with_path("teapot"),
+			EndpointBuilder::default()
+				.with_path("run-wasm/*binary-path")
+				.with_handler_bundle(run_wasm()),
+			// (single_action_route("", help())),
 			(single_action_route(
 				"refresh-sst",
 				SstCommand::new(SstSubcommand::Refresh)
@@ -37,7 +49,7 @@ pub fn default_cli_router() -> impl Bundle {
 				import_and_parse_source_files()
 			)),
 			(named_route("parse-source-files", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_source_files(),
 				(
 					Name::new("Run Loop"),
@@ -63,7 +75,7 @@ pub fn default_cli_router() -> impl Bundle {
 				// respond_ok()
 			])),
 			(named_route("run", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_source_files(),
 				(
 					Name::new("Run Loop"),
@@ -81,11 +93,12 @@ pub fn default_cli_router() -> impl Bundle {
 						ExportStaticContent,
 						// never returns an outcome
 						RunServer,
+						// bevyhow!("unreachable! server shouldnt exit")
 					]
 				),
 			])),
 			(named_route("serve", children![
-				exact_route_match(),
+				exact_path_match(),
 				(Name::new("Serve"), Sequence, children![
 					BuildServer,
 					ExportStaticContent,
@@ -93,7 +106,7 @@ pub fn default_cli_router() -> impl Bundle {
 				]),
 			])),
 			(named_route("deploy", children![
-				exact_route_match(),
+				exact_path_match(),
 				import_and_parse_source_files(),
 				// apply after import to avoid clobber,
 				// the scene loaded likely contains a PackageConfig
@@ -142,7 +155,7 @@ fn named_route(name: impl AsRef<str>, children: impl Bundle) -> impl Bundle {
 	let name = name.as_ref();
 	(
 		Name::new(name.to_string()),
-		RoutePartial::new(name),
+		PathPartial::new(name),
 		Sequence,
 		children,
 	)
@@ -152,7 +165,7 @@ fn single_action_route(
 	name: impl AsRef<str>,
 	action: impl Bundle,
 ) -> impl Bundle {
-	named_route(name, children![exact_route_match(), action, respond_ok()])
+	named_route(name, children![exact_path_match(), action, respond_ok()])
 }
 
 fn beet_site_cmd() -> CargoBuildCmd {
@@ -160,7 +173,10 @@ fn beet_site_cmd() -> CargoBuildCmd {
 }
 
 fn respond_ok() -> impl Bundle {
-	(Name::new("Response"), StatusCode::OK.into_endpoint())
+	(
+		Name::new("Response"),
+		StatusCode::OK.into_endpoint_handler(),
+	)
 }
 
 
