@@ -34,13 +34,13 @@ where
 }
 
 impl TriggerDeferred<GetOutcome> {
-	/// Create a new [`TriggerOnSpawn`] that triggers a [`GetOutcome`]
+	/// Create a new [`TriggerDeferred`] that triggers a [`GetOutcome`]
 	pub fn get_outcome() -> Self { default() }
 }
 
 
 impl<T: ActionEvent> TriggerDeferred<T> {
-	/// Create a new [`TriggerOnSpawn`] with the provided event
+	/// Create a new [`TriggerDeferred`] with the provided event
 	pub fn new(event: T) -> Self { Self { event, agent: None } }
 	pub fn with_agent(mut self, agent: Entity) -> Self {
 		self.agent = Some(agent);

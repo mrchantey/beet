@@ -159,23 +159,11 @@ pub(super) fn log_suite_outcome(
 				}
 			}
 		}
-		out.push(summary_message(outcome));
-		out.push(String::new());
 		out.push(run_stats(outcome, req));
 		beet_core::cross_log!("\n{}\n", out.join("\n"));
 	}
 
 	Ok(())
-}
-
-fn summary_message(outcome: &SuiteOutcome) -> String {
-	if outcome.num_fail() == 0 && outcome.num_ran() != 0 {
-		paint_ext::cyan_bold_underline("All tests passed")
-	} else if outcome.num_ran() == 0 {
-		paint_ext::red_bold_underline("No tests ran")
-	} else {
-		paint_ext::red_bold_underline("Some tests failed")
-	}
 }
 
 fn test_stats(outcome: &SuiteOutcome) -> String {
@@ -198,6 +186,10 @@ fn test_stats(outcome: &SuiteOutcome) -> String {
 			outcome.num_pass()
 		)));
 	}
+	if outcome.num_ran() == 0 {
+		stats.push(paint_ext::yellow_bold(format!("no tests ran")));
+	}
+
 	stats.join(", ")
 }
 

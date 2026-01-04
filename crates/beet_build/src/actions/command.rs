@@ -28,7 +28,7 @@ pub fn poll_child_handles(
 	mut commands: Commands,
 	mut query: Populated<(Entity, &Running, &mut ChildHandle)>,
 ) -> Result {
-	for (entity, running, mut child_handle) in query.iter_mut() {
+	for (action, running, mut child_handle) in query.iter_mut() {
 		// try_status errors are an io::Error, we do not handle
 		// and instead propagate
 		if let Some(status) = child_handle.0.try_status()? {
@@ -38,7 +38,7 @@ pub fn poll_child_handles(
 			};
 			for agent in running.iter() {
 				commands
-					.entity(entity)
+					.entity(action)
 					.remove::<ChildHandle>()
 					.trigger_target(outcome.with_agent(*agent));
 			}
@@ -54,10 +54,13 @@ pub fn poll_child_handles(
 pub fn interrupt_child_handles(
 	ev: On<Outcome>,
 	mut commands: Commands,
-	query: Query<Entity, With<ChildHandle>>,
+	query: Query<(), With<ChildHandle>>,
+	children: Query<&Children>,
 ) {
-	if query.contains(ev.action()) {
-		commands.entity(ev.action()).remove::<ChildHandle>();
+	for child in children.iter_descendants_inclusive(ev.action()) {
+		if query.contains(child) {
+			commands.entity(child).remove::<ChildHandle>();
+		}
 	}
 }
 

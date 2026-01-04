@@ -81,14 +81,6 @@ pub fn blue_bold(val: impl Display) -> String {
 	maybe_paint(Style::new().fg(Color::Blue).bold(), val)
 }
 
-// Underline bold colors
-pub fn cyan_bold_underline(val: impl Display) -> String {
-	maybe_paint(Style::new().fg(Color::Cyan).bold().underline(), val)
-}
-pub fn red_bold_underline(val: impl Display) -> String {
-	maybe_paint(Style::new().fg(Color::Red).bold().underline(), val)
-}
-
 // Background colors with black text (for badges like PASS/FAIL)
 pub fn bg_green_black_bold(val: impl Display) -> String {
 	maybe_paint(Style::new().fg(Color::Black).on(Color::Green).bold(), val)

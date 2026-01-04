@@ -112,7 +112,11 @@ mod test {
 				SteerBundle::default(),
 			))
 			.with_children(|parent| {
-				parent.spawn((Running, Wander::default()));
+				parent.spawn((
+					OnSpawn::trigger(GetOutcome),
+					ContinueRun,
+					Wander::default(),
+				));
 			})
 			.id();
 

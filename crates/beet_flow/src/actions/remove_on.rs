@@ -7,15 +7,15 @@ use std::marker::PhantomData;
 /// It is designed to work for both [`Run`] and [`End`] events.
 /// This action also has a corresponding [`InsertOn`] action.
 /// ## Example
-/// Removes the `Running` bundle when the `Outcome` event is triggered.
+/// Removes the `Name` bundle when the `Outcome` event is triggered.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// World::new()
 ///		.spawn((
-/// 		Running,
+/// 		Name::new("bill"),
 /// 		EndWith(Outcome::Pass),
-/// 		RemoveOn::<Outcome, Running>::default()
+/// 		RemoveOn::<Outcome, Name>::default()
 /// 	))
 ///		.trigger_target(GetOutcome);
 /// ```
