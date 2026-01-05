@@ -263,7 +263,7 @@ ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml","beet_ml/cuda"]
 # 💡 Server
 lambda = ["rustls-tls", "beet_net?/lambda"]
-aws = ["beet_net?/aws","beet_router?/aws"]
+aws = ["beet_net?/aws"]
 
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]

@@ -1,9 +1,11 @@
 mod body;
+mod extractor;
 mod extractors;
 pub mod http_ext;
 mod parts;
 mod response;
 pub use body::*;
+pub use extractor::*;
 pub use parts::*;
 pub use response::*;
 mod request;

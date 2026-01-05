@@ -24,7 +24,6 @@ tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
 client = ["beet_net/client"]
 fs = ["beet_net/fs"]
-aws = ["beet_net/aws"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
