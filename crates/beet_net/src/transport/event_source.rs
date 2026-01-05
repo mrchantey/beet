@@ -16,7 +16,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::tasks::futures_lite::StreamExt;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	#[ignore = "hits network"]

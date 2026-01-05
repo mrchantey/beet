@@ -115,7 +115,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use quote::ToTokens;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

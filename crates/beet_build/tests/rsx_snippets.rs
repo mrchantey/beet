@@ -12,7 +12,6 @@ use beet_parse::prelude::*;
 use beet_rsx::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use sweet::prelude::*;
 
 #[test]
 fn expressions() {

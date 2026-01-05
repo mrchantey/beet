@@ -248,7 +248,6 @@ fn maybe_panic(result: In<Result>) {
 mod test {
 	use super::*;
 	use bevy::ecs::system::RunSystemOnce;
-	use sweet::prelude::*;
 
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {
 		let mut world = World::new();

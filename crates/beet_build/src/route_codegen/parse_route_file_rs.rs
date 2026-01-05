@@ -61,7 +61,6 @@ mod test {
 	use super::super::*;
 	use beet_net::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

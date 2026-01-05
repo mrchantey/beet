@@ -138,7 +138,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
-	use sweet::prelude::*;
 
 
 	fn setup(bundle: impl Bundle) -> InnerText {

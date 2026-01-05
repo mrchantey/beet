@@ -58,7 +58,6 @@ fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -121,7 +121,6 @@ mod test {
 	use quote::ToTokens;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use sweet::prelude::*;
 	use syn::Item;
 
 	#[derive(Debug, Serialize, Deserialize)]

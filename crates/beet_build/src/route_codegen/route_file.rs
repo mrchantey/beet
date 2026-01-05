@@ -160,7 +160,6 @@ mod test {
 	use quote::ToTokens;
 	use std::ops::Deref;
 	use std::path::PathBuf;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

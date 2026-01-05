@@ -100,7 +100,6 @@ fn collect_changed_snippet_files(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn rsx_snippets() {

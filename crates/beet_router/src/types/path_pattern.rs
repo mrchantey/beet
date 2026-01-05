@@ -526,7 +526,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use sweet::prelude::*;
 
 	/// match segments against a route path
 	fn parse(

@@ -3,7 +3,6 @@
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;
 use std::marker::PhantomData;
-use sweet::prelude::*;
 
 #[test]
 fn works() {

@@ -202,7 +202,6 @@ fn script(content: impl Into<String>) -> impl Bundle {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn text() {

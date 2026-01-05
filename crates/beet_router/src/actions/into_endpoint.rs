@@ -259,7 +259,6 @@ mod test {
 	use beet_rsx::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use sweet::prelude::*;
 
 	#[derive(Serialize, Deserialize)]
 	struct Foo(u32);

@@ -3,7 +3,6 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use std::marker::PhantomData;
-use sweet::prelude::*;
 
 #[derive(Resource)]
 struct Visited;

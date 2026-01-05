@@ -227,7 +227,6 @@ mod test {
 	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
-	use sweet::prelude::*;
 	use syn::parse_quote;
 
 	#[test]

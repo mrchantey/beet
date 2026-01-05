@@ -82,7 +82,6 @@ mod test {
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use quote::quote;
-	use sweet::prelude::*;
 
 	#[test]
 	fn test_parse_event_handler() {

@@ -141,7 +141,6 @@ mod test {
 	use beet_net::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
-	use sweet::prelude::*;
 
 	fn mod_tree(methods: Vec<RouteFileMethod>) -> TokenStream {
 		let mut world = World::new();

@@ -38,7 +38,6 @@ pub fn separate_impulse<'a, T>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

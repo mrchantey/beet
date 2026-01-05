@@ -71,7 +71,6 @@ fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

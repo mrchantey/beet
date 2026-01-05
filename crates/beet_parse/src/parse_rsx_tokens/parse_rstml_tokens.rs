@@ -440,7 +440,6 @@ mod test {
 	use beet_dom::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
-	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> (World, Entity) {
 		let mut app = App::new();

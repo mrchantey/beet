@@ -34,7 +34,6 @@ pub fn align_impulse<'a, T>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 
 	fn spawn(world: &mut World, pos: Vec3, vel: Vec3) -> Entity {

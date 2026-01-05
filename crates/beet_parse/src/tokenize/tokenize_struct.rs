@@ -118,7 +118,6 @@ mod test {
 	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
-	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> TokenStream {
 		ParseRsxTokens::rstml_to_bsx(tokens, WsPathBuf::new(file!())).unwrap()

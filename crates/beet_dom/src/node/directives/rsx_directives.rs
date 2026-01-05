@@ -99,7 +99,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
-	use sweet::prelude::*;
 
 	#[test]
 	fn default_slot_target() {

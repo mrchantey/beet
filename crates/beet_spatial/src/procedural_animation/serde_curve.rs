@@ -98,7 +98,6 @@ mod test {
 	use beet_core::prelude::*;
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
-	use sweet::prelude::*;
 
 	#[test]
 	fn calculates_length() {

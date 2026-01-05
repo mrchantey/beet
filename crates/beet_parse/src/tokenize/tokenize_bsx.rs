@@ -60,7 +60,6 @@ mod test {
 	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
-	use sweet::prelude::*;
 
 	fn parse(tokens: TokenStream) -> TokenStream {
 		tokens

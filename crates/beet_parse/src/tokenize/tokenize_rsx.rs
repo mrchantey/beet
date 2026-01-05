@@ -71,7 +71,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use quote::quote;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

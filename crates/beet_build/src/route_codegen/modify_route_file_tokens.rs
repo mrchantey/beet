@@ -84,7 +84,6 @@ pub fn modify_route_file_tokens(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -288,7 +288,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use proc_macro2::TokenStream;
-	use sweet::prelude::*;
 
 	fn parse(str: &str) -> TokenStream {
 		ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!()))
