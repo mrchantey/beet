@@ -304,37 +304,37 @@ pub fn test_dir() -> PathBuf {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn workspace_root() {
-		assert_eq!(
-			fs_ext::workspace_root()
-				.file_stem()
-				.unwrap()
-				.to_str()
-				.unwrap(),
-			"beet"
-		);
-		assert!(fs_ext::workspace_root().join("Cargo.lock").exists());
+		fs_ext::workspace_root()
+			.file_stem()
+			.unwrap()
+			.to_str()
+			.unwrap()
+			.xpect_eq("beet");
+		fs_ext::workspace_root()
+			.join("Cargo.lock")
+			.exists()
+			.xpect_true();
 	}
 
 	#[test]
 	fn to_string() {
 		let content =
 			fs_ext::read_to_string(fs_ext::test_dir().join("mod.rs")).unwrap();
-		assert!(content.contains("pub mod included_dir;"));
+		content.contains("pub mod included_dir;").xpect_true();
 
-		assert!(
-			fs_ext::read_to_string(fs_ext::test_dir().join("foo.rs")).is_err()
-		);
+		fs_ext::read_to_string(fs_ext::test_dir().join("foo.rs")).xpect_err();
 	}
 
 	#[test]
 	fn to_bytes() {
 		let bytes = fs_ext::read(fs_ext::test_dir().join("mod.rs")).unwrap();
-		assert!(bytes.len() > 10);
+		bytes.len().xpect_greater_than(10);
 
-		assert!(fs_ext::read(fs_ext::test_dir().join("foo.rs")).is_err());
+		fs_ext::read(fs_ext::test_dir().join("foo.rs")).xpect_err();
 	}
 
 	#[test]
@@ -344,11 +344,11 @@ mod test {
 		let hash2 =
 			fs_ext::hash_file(fs_ext::test_dir().join("included_file.rs"))
 				.unwrap();
-		assert_ne!(hash1, hash2);
+		hash1.xpect_not_eq(hash2);
 
 		let str =
 			fs_ext::read_to_string(fs_ext::test_dir().join("mod.rs")).unwrap();
 		let hash3 = fs_ext::hash_string(&str);
-		assert_eq!(hash3, hash1);
+		hash3.xpect_eq(hash1);
 	}
 }

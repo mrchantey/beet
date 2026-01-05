@@ -125,6 +125,7 @@ impl Drop for TempDir {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn test_tempdir_new_creates_and_cleans_up() {
@@ -135,18 +136,12 @@ mod tests {
 			dir_path = temp.path.clone();
 
 			// Verify it exists
-			assert!(
-				dir_path.exists(),
-				"Temp directory should exist after creation"
-			);
-			assert!(dir_path.is_dir(), "Temp path should be a directory");
+			dir_path.exists().xpect_true();
+			dir_path.is_dir().xpect_true();
 		} // temp is dropped here
 
 		// Verify it was cleaned up
-		assert!(
-			!dir_path.exists(),
-			"Temp directory should be removed after drop"
-		);
+		dir_path.exists().xpect_false();
 	}
 
 	#[test]
@@ -159,28 +154,16 @@ mod tests {
 			dir_path = temp.path.clone();
 
 			// Verify it exists
-			assert!(
-				dir_path.exists(),
-				"Workspace-relative temp directory should exist after creation"
-			);
-			assert!(
-				dir_path.is_dir(),
-				"Workspace-relative temp path should be a directory"
-			);
+			dir_path.exists().xpect_true();
+			dir_path.is_dir().xpect_true();
 
 			// Verify it's in the workspace
 			let path_str = dir_path.to_string();
-			assert!(
-				path_str.contains("target/tmp/beet_tmp_"),
-				"Directory should be in workspace target/tmp"
-			);
+			path_str.contains("target/tmp/beet_tmp_").xpect_true();
 		} // temp is dropped here
 
 		// Verify it was cleaned up
-		assert!(
-			!dir_path.exists(),
-			"Workspace-relative temp directory should be removed after drop"
-		);
+		dir_path.exists().xpect_false();
 	}
 
 	#[test]
@@ -191,10 +174,7 @@ mod tests {
 		let temp2 =
 			TempDir::new().expect("Failed to create second temp directory");
 
-		assert_ne!(
-			temp1.path, temp2.path,
-			"Each temp directory should have a unique path"
-		);
+		temp1.path().clone().xpect_not_eq(temp2.path().clone());
 	}
 
 	#[test]
@@ -208,17 +188,11 @@ mod tests {
 			dir_path = temp.path().clone();
 
 			// Verify it exists
-			assert!(
-				dir_path.exists(),
-				"Temp directory should exist after creation"
-			);
+			dir_path.exists().xpect_true();
 		} // temp is dropped here
 
 		// Verify it was NOT cleaned up because we called keep()
-		assert!(
-			dir_path.exists(),
-			"Temp directory should still exist after drop when keep() is called"
-		);
+		dir_path.exists().xpect_true();
 
 		// Manual cleanup for this test
 		fs_ext::remove(&dir_path).ok();

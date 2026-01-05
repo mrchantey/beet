@@ -159,37 +159,31 @@ pub fn is_dir_or_extension(path: &impl AsRef<Path>, ext: &str) -> bool {
 mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		assert_eq!(
-			path_ext::create_relative("src", "src/lib.rs").unwrap(),
-			PathBuf::from("lib.rs")
-		);
-		assert_eq!(
-			path_ext::create_relative("foo/bar/src", "foo/bar/Cargo.toml")
-				.unwrap(),
-			PathBuf::from("../Cargo.toml")
-		);
+		path_ext::create_relative("src", "src/lib.rs")
+			.unwrap()
+			.xpect_eq(PathBuf::from("lib.rs"));
+		path_ext::create_relative("foo/bar/src", "foo/bar/Cargo.toml")
+			.unwrap()
+			.xpect_eq(PathBuf::from("../Cargo.toml"));
 	}
 
 	#[test]
 	fn join_relative() {
-		assert_eq!(
-			path_ext::join_relative("foo/bar", "baz/style.css"),
-			PathBuf::from("foo/bar/baz/style.css")
-		);
-		assert_eq!(
-			path_ext::join_relative("foo/bar", "/baz/style.css"),
-			PathBuf::from("foo/bar/baz/style.css")
-		);
+		path_ext::join_relative("foo/bar", "baz/style.css")
+			.xpect_eq(PathBuf::from("foo/bar/baz/style.css"));
+		path_ext::join_relative("foo/bar", "/baz/style.css")
+			.xpect_eq(PathBuf::from("foo/bar/baz/style.css"));
 	}
 
 	#[test]
 	fn is_relative() {
-		assert_eq!(path_ext::is_relative_url("style.css"), true);
-		assert_eq!(path_ext::is_relative_url("../style.css"), true);
-		assert_eq!(path_ext::is_relative_url("/style.css"), false);
-		assert_eq!(path_ext::is_relative_url("https://example.com"), false);
+		path_ext::is_relative_url("style.css").xpect_true();
+		path_ext::is_relative_url("../style.css").xpect_true();
+		path_ext::is_relative_url("/style.css").xpect_false();
+		path_ext::is_relative_url("https://example.com").xpect_false();
 	}
 }

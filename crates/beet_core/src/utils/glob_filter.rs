@@ -206,21 +206,22 @@ impl From<&str> for GlobPattern {
 mod test {
 	use crate::prelude::*;
 	use glob::Pattern;
+	use sweet::prelude::*;
 
 	#[test]
 	fn pattern() {
 		let pat = Pattern::new("*target*").unwrap();
-		assert!(!pat.matches("foo"));
-		assert!(pat.matches("target"));
-		assert!(pat.matches("foo/target/foo"));
+		pat.matches("foo").xpect_false();
+		pat.matches("target").xpect_true();
+		pat.matches("foo/target/foo").xpect_true();
 	}
 
 	#[test]
 	fn glob_pattern_new() {
 		let gp = GlobPattern::new("*foo*");
-		assert_eq!(gp.as_str(), "*foo*");
-		assert!(gp.to_pattern().matches("foo"));
-		assert!(gp.to_pattern().matches("bar/foo/baz"));
+		gp.as_str().xpect_eq("*foo*");
+		gp.to_pattern().matches("foo").xpect_true();
+		gp.to_pattern().matches("bar/foo/baz").xpect_true();
 	}
 
 	#[test]
@@ -228,9 +229,9 @@ mod test {
 		// test include all but
 
 		let filter = GlobFilter::default().with_exclude("*bar*");
-		assert!(filter.passes("foo"));
-		assert!(!filter.passes("bar"));
-		assert!(!filter.passes("foo/bar/bazz"));
+		filter.passes("foo").xpect_true();
+		filter.passes("bar").xpect_false();
+		filter.passes("foo/bar/bazz").xpect_false();
 
 		// test include only
 
@@ -238,29 +239,28 @@ mod test {
 			.with_include("*foo*")
 			.with_exclude("*bar*");
 
-		assert!(filter.passes("bing/foo/bong"));
+		filter.passes("bing/foo/bong").xpect_true();
 		// backslashes are normalized to forward slashes
-		assert!(filter.passes("bing\\foo\\bong"));
-		assert!(!filter.passes("froo"));
-		assert!(!filter.passes("bar"));
+		filter.passes("bing\\foo\\bong").xpect_true();
+		filter.passes("froo").xpect_false();
+		filter.passes("bar").xpect_false();
 
 		// test backslashes
 
 		let filter = GlobFilter::default().with_include("*foo/bar*");
 
-		assert!(filter.passes_include("foo/bar"));
-		assert!(filter.passes_exclude("foo/bar"));
+		filter.passes_include("foo/bar").xpect_true();
+		filter.passes_exclude("foo/bar").xpect_true();
 
 
 
 		let filter =
 			GlobFilter::default().with_exclude("*apply_style_id_attributes*");
-		assert!(
-			false
-				== filter.passes_exclude(
-					"templating::apply_style_id_attributes::test::nested_template"
-				)
-		);
+		filter
+			.passes_exclude(
+				"templating::apply_style_id_attributes::test::nested_template",
+			)
+			.xpect_false();
 
 		// excludes only
 		let filter = GlobFilter::default()
@@ -269,9 +269,9 @@ mod test {
 			.with_exclude("*codegen*")
 			.with_exclude("*target*");
 
-		assert!(
-			!filter.passes("/home/pete/me/beet/target/snippets/snippets.ron")
-		);
+		filter
+			.passes("/home/pete/me/beet/target/snippets/snippets.ron")
+			.xpect_false();
 		// test multi exclude
 
 		let filter = GlobFilter::default()
@@ -279,8 +279,8 @@ mod test {
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 
-		assert!(filter.passes("/foo/bar/bazz.rs"));
-		assert!(!filter.passes("/foo/target/bazz.rs"));
+		filter.passes("/foo/bar/bazz.rs").xpect_true();
+		filter.passes("/foo/target/bazz.rs").xpect_false();
 
 		// test or
 
@@ -289,9 +289,9 @@ mod test {
 			.with_exclude("{.git,target,html}/**")
 			.with_exclude("*codegen*");
 
-		assert!(filter.passes("src/lib.rs"));
-		assert!(filter.passes("html/lib.rs"));
-		assert!(!filter.passes("src/codegen/mockups.rs"));
+		filter.passes("src/lib.rs").xpect_true();
+		filter.passes("html/lib.rs").xpect_true();
+		filter.passes("src/codegen/mockups.rs").xpect_false();
 	}
 
 	#[test]
@@ -304,11 +304,11 @@ mod test {
 		let json = serde_json::to_string(&filter).unwrap();
 		let deserialized: GlobFilter = serde_json::from_str(&json).unwrap();
 
-		assert_eq!(filter, deserialized);
-		assert_eq!(filter.include.len(), 1);
-		assert_eq!(filter.exclude.len(), 1);
-		assert_eq!(filter.include[0].as_str(), "**/*.rs");
-		assert_eq!(filter.exclude[0].as_str(), "*target*");
+		filter.xpect_eq(deserialized);
+		filter.include.len().xpect_eq(1);
+		filter.exclude.len().xpect_eq(1);
+		filter.include[0].as_str().xpect_eq("**/*.rs");
+		filter.exclude[0].as_str().xpect_eq("*target*");
 	}
 
 	#[test]
@@ -316,10 +316,10 @@ mod test {
 	fn glob_pattern_serde() {
 		let pattern = GlobPattern::new("*foo*");
 		let json = serde_json::to_string(&pattern).unwrap();
-		assert_eq!(json, "\"*foo*\"");
+		json.xpect_eq("\"*foo*\"");
 
 		let deserialized: GlobPattern = serde_json::from_str(&json).unwrap();
-		assert_eq!(pattern, deserialized);
-		assert_eq!(deserialized.as_str(), "*foo*");
+		deserialized.as_str().xpect_eq("*foo*");
+		pattern.xpect_eq(deserialized);
 	}
 }

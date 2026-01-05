@@ -346,10 +346,10 @@ impl ReadDir {
 	}
 }
 
-#[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "just experiments"]
@@ -360,7 +360,7 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.path();
-		assert_eq!("../beet_core", a.to_str().unwrap());
+		a.to_str().unwrap().xpect_eq("../beet_core");
 		let _a =
 			std::fs::read_dir(std::env::current_dir().unwrap().join("../"))
 				.unwrap()
@@ -368,9 +368,8 @@ mod test {
 				.unwrap()
 				.unwrap()
 				.path();
-		// assert_eq!("../beet_core", a.to_str().unwrap());
+		// a.to_str().unwrap().xpect_eq("../beet_core");
 	}
-
 
 	#[test]
 	fn fails() {
@@ -379,7 +378,7 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
-		assert!(err_str.contains("test_dir/foo"));
+		err_str.contains("test_dir/foo").xpect_true();
 	}
 
 	#[test]
@@ -388,35 +387,40 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
-		assert!(err_str.contains("test_dir/foo"));
-		assert_eq!(ReadDir::dirs(fs_ext::test_dir()).unwrap().len(), 2);
+		err_str.contains("test_dir/foo").xpect_true();
+		ReadDir::dirs(fs_ext::test_dir()).unwrap().len().xpect_eq(2);
 	}
 
 	#[test]
 	fn read_dir_recursive() {
-		assert_eq!(
-			ReadDir::dirs_recursive(fs_ext::test_dir()).unwrap().len(),
-			2
-		);
+		ReadDir::dirs_recursive(fs_ext::test_dir())
+			.unwrap()
+			.len()
+			.xpect_eq(2);
 	}
 
 	#[test]
 	fn files() {
-		assert_eq!(ReadDir::files(fs_ext::test_dir()).unwrap().len(), 3);
+		ReadDir::files(fs_ext::test_dir())
+			.unwrap()
+			.len()
+			.xpect_eq(3);
 	}
 
 	#[test]
 	fn files_recursive() {
-		assert_eq!(
-			ReadDir::files_recursive(fs_ext::test_dir()).unwrap().len(),
-			5
-		);
+		ReadDir::files_recursive(fs_ext::test_dir())
+			.unwrap()
+			.len()
+			.xpect_eq(5);
 	}
 }
 
 #[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test_async {
 	use crate::prelude::*;
+	use sweet::prelude::*;
+
 	#[sweet::test]
 	async fn fails() {
 		let err_str = ReadDir::default()
@@ -425,7 +429,7 @@ mod test_async {
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
-		assert!(err_str.contains("test_dir/foo"));
+		err_str.contains("test_dir/foo").xpect_true();
 	}
 
 	#[sweet::test]
@@ -435,43 +439,38 @@ mod test_async {
 			.unwrap_err()
 			.to_string()
 			.replace("\\", "/");
-		assert!(err_str.contains("test_dir/foo"));
-		assert_eq!(
-			ReadDir::dirs_async(fs_ext::test_dir()).await.unwrap().len(),
-			2
-		);
+		err_str.contains("test_dir/foo").xpect_true();
+		ReadDir::dirs_async(fs_ext::test_dir())
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(2);
 	}
 
 	#[sweet::test]
 	async fn read_dir_recursive() {
-		assert_eq!(
-			ReadDir::dirs_recursive_async(fs_ext::test_dir())
-				.await
-				.unwrap()
-				.len(),
-			2
-		);
+		ReadDir::dirs_recursive_async(fs_ext::test_dir())
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(2);
 	}
 
 	#[sweet::test]
 	async fn files() {
-		assert_eq!(
-			ReadDir::files_async(fs_ext::test_dir())
-				.await
-				.unwrap()
-				.len(),
-			3
-		);
+		ReadDir::files_async(fs_ext::test_dir())
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(3);
 	}
 
 	#[sweet::test]
 	async fn files_recursive() {
-		assert_eq!(
-			ReadDir::files_recursive_async(fs_ext::test_dir())
-				.await
-				.unwrap()
-				.len(),
-			5
-		);
+		ReadDir::files_recursive_async(fs_ext::test_dir())
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(5);
 	}
 }

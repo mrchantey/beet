@@ -219,6 +219,8 @@ impl<'de> serde::Deserialize<'de> for AbsPathBuf {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
+
 
 
 	#[test]
@@ -231,39 +233,41 @@ mod test {
 		#[cfg(target_os = "windows")]
 		let expected = "foo\\bar\\boo.rs";
 
-		assert!(
-			AbsPathBuf::new("foo/bar/bazz/../boo.rs")
-				.unwrap()
-				.to_string_lossy()
-				.ends_with(expected)
-		);
+		AbsPathBuf::new("foo/bar/bazz/../boo.rs")
+			.unwrap()
+			.to_string_lossy()
+			.ends_with(expected)
+			.xpect_true();
 	}
 	#[test]
 	fn abs_file() {
-		assert!(abs_file!().to_string_lossy().ends_with("abs_path_buf.rs"));
+		abs_file!()
+			.to_string_lossy()
+			.ends_with("abs_path_buf.rs")
+			.xpect_true();
 	}
 	#[test]
 	fn workspace_rel() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
-		assert_eq!(buf, abs_file!());
+		buf.xpect_eq(abs_file!());
 		let workspace_rel = buf.into_ws_path().unwrap();
-		assert_eq!(workspace_rel.to_string_lossy(), file);
+		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
 	#[test]
 	fn workspace_rel_leading_slash() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(format!("/{file}")).unwrap();
-		assert_eq!(buf, abs_file!());
+		buf.xpect_eq(abs_file!());
 		let workspace_rel = buf.into_ws_path().unwrap();
-		assert_eq!(workspace_rel.to_string_lossy(), file);
+		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
 	#[test]
 	fn manifest_rel() {
 		let buf =
 			AbsPathBuf::new_manifest_rel("src/path_utils/abs_path_buf.rs")
 				.unwrap();
-		assert_eq!(buf, abs_file!());
+		buf.xpect_eq(abs_file!());
 	}
 
 	#[test]
@@ -280,6 +284,6 @@ mod test {
 			serde_json::from_str(&serialized).unwrap();
 
 		// Check if the roundtrip preserved the path
-		assert_eq!(original, deserialized);
+		original.xpect_eq(deserialized);
 	}
 }

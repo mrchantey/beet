@@ -233,6 +233,7 @@ impl<'a> NamedField<'a> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 	use syn::FnArg;
 	use syn::Type;
 
@@ -243,8 +244,8 @@ mod test {
 			pub foo: Option<u32>
 		};
 		let named = NamedField::parse_field(&field).unwrap();
-		assert!(named.is_optional());
-		assert_eq!(named.attrs.len(), 1);
+		named.is_optional().xpect_true();
+		named.attrs.len().xpect_eq(1);
 		// true.xpect_false();
 	}
 	#[test]
@@ -258,9 +259,9 @@ mod test {
 		};
 
 		let named = NamedField::parse_pat_ty(&field).unwrap();
-		assert!(named.is_optional());
+		named.is_optional().xpect_true();
 		let ty: Type = syn::parse_quote! { Foo<Bar> };
-		assert_eq!(named.inner_ty, &ty);
-		assert_eq!(named.attrs.len(), 1);
+		named.inner_ty.xpect_eq(ty);
+		named.attrs.len().xpect_eq(1);
 	}
 }

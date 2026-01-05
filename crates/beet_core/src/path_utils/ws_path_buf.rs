@@ -127,16 +127,15 @@ impl Into<WsPathBuf> for PathBuf {
 mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		assert_eq!(
-			WsPathBuf::new("Cargo.toml").as_path(),
-			PathBuf::from("Cargo.toml").as_path()
-		);
-		assert_eq!(
-			WsPathBuf::new("foo/../Cargo.toml").as_path(),
-			PathBuf::from("Cargo.toml").as_path()
-		);
+		WsPathBuf::new("Cargo.toml")
+			.as_path()
+			.xpect_eq(PathBuf::from("Cargo.toml").as_path());
+		WsPathBuf::new("foo/../Cargo.toml")
+			.as_path()
+			.xpect_eq(PathBuf::from("Cargo.toml").as_path());
 	}
 }
