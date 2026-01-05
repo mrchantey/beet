@@ -136,7 +136,7 @@ pub fn assert_diff<Received: AsRef<str>>(
 			panic_expected_received_display("NOT to be string", received_str);
 		}
 		(false, false) => {
-			panic_str(&crate::utils::pretty_diff::inline_diff(
+			panic_str(&crate::test_utils::pretty_diff::inline_diff(
 				expected,
 				received_str,
 			));

@@ -50,7 +50,6 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
 
 	#[test]
 	fn result() {

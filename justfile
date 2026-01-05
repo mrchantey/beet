@@ -178,11 +178,11 @@ test-ci *args:
 
 # cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:
+	cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
 	cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
 	cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
 	cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
 	cargo test -p beet_net						 	--features=reqwest,tungstenite,native-tls  	{{ args }} -- {{ test-threads }}
 	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 

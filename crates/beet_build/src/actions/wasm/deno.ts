@@ -52,6 +52,17 @@ globalThis.env_all = () => {
 	return do_try(() => Object.entries(Deno.env.toObject()), []);
 };
 
+// Test mode aliases (when running cargo test --target wasm32-unknown-unknown)
+globalThis.test_cwd = globalThis.cwd;
+globalThis.test_exit = globalThis.exit;
+globalThis.test_catch_no_abort_inner = globalThis.catch_no_abort_inner;
+globalThis.test_read_file = globalThis.read_file;
+globalThis.test_create_dir_all = globalThis.create_dir_all;
+globalThis.test_write_file = globalThis.write_file;
+globalThis.test_env_args = globalThis.env_args;
+globalThis.test_env_var = globalThis.env_var;
+globalThis.test_env_all = globalThis.env_all;
+
 const _wasm = await init().catch((err: any) => {
 	// panicked!
 	console.error(err);

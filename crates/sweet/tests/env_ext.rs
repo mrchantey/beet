@@ -1,7 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_core::prelude::*;
-use sweet::prelude::*;
 
 #[test]
 fn var() { env_ext::var("SWEET_ROOT").unwrap().xpect_ends_with("beet/"); }

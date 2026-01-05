@@ -19,7 +19,7 @@ serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
-beet_core.workspace = true
+beet_core = { workspace = true, features = ["testing"] }
 beet_flow.workspace = true
 beet_net.workspace = true
 beet_router.workspace = true

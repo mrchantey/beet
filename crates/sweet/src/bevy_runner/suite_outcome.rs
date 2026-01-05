@@ -133,7 +133,7 @@ mod tests {
 
 	#[sweet::test]
 	async fn timeout() {
-		test_ext::run_once(
+		run_test_once(
 			Some("--timeout_ms=100"),
 			test_ext::new_auto(|| {
 				register_async_test(async {

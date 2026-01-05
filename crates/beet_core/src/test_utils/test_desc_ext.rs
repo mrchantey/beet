@@ -1,4 +1,4 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use test::ShouldPanic;
 use test::TestDesc;
 use test::TestDescAndFn;

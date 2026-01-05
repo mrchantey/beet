@@ -100,6 +100,11 @@ impl Test {
 	pub fn elapsed(&self) -> Duration { self.timer.elapsed() }
 }
 
+impl TestDescExt for Test {
+	fn desc(&self) -> &TestDesc { &self.desc }
+	fn desc_mut(&mut self) -> &mut TestDesc { &mut self.desc }
+}
+
 
 #[derive(Debug, Copy, Clone, Component)]
 pub struct TestFunc(fn() -> Result<(), String>);

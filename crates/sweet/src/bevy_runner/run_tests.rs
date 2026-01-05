@@ -92,7 +92,7 @@ mod tests {
 	fn run_test(
 		test: TestDescAndFn,
 	) -> impl std::future::Future<Output = TestOutcome> {
-		test_ext::run_once(None, test)
+		run_test_once(None, test)
 	}
 
 	#[sweet::test]

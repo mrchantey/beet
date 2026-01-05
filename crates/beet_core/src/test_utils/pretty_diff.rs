@@ -1,6 +1,6 @@
 //! From `pretty_assertions` crate, with some modifications.
 //! https://github.com/rust-pretty-assertions/rust-pretty-assertions/blob/main/pretty_assertions/src/printer.rs
-use crate::matchers::paint_ext;
+use crate::prelude::paint_ext;
 use core::fmt;
 use nu_ansi_term::Color;
 use nu_ansi_term::Style;
@@ -127,7 +127,7 @@ fn write_inline_diff<TWrite: fmt::Write>(
 
 #[cfg(test)]
 mod test {
-	use crate::matchers::paint_ext;
+	use crate::test_utils::paint_ext;
 
 	use super::*;
 
