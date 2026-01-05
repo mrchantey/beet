@@ -689,3 +689,13 @@ harness = false
 name = "assert"
 path = "tests/benches/assert.rs"
 harness = false
+
+[[bench]]
+name = "control_flow_patterns"
+path = "tests/benches/control_flow_patterns.rs"
+harness = false
+
+[[bench]]
+name = "entity_spawn"
+path = "tests/benches/entity_spawn.rs"
+harness = false
