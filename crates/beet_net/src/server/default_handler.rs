@@ -100,6 +100,7 @@ Request Complete
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

@@ -174,6 +174,7 @@ impl Page {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn export_pdf_generates_valid_pdf() {

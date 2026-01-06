@@ -125,6 +125,7 @@ impl SessionParams<'_, '_> {
 pub(super) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 
 	async fn run_assertion(

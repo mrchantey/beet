@@ -148,9 +148,10 @@ impl Page {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn visit_and_read_title() {
