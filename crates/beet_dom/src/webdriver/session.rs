@@ -302,7 +302,7 @@ mod test {
 				// Simple BiDi round‑trip health check.
 				session.ping().await.unwrap();
 				session.kill().await.unwrap();
-				client.kill().await.unwrap();
+				client.kill().unwrap();
 			})
 			.await;
 	}

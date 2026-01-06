@@ -27,9 +27,6 @@ sweet_macros.workspace = true
 #💡 misc
 extend.workspace = true
 send_wrapper.workspace = true
-#💡 logging
-nu-ansi-term.workspace = true
-diff = "0.1"
 
 #💡 bevy
 bevy.workspace = true

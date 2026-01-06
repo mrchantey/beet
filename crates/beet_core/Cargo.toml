@@ -23,6 +23,7 @@ required-features = ["tokens"]
 
 [features]
 default = ["serde"]
+exchange = []
 nightly = []
 bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]

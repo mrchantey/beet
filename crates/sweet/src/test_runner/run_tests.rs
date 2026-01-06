@@ -1,5 +1,5 @@
-use crate::bevy_runner::MaybeAsync;
 use crate::prelude::*;
+use crate::test_runner::MaybeAsync;
 use beet_core::prelude::*;
 use bevy::ecs::system::NonSendMarker;
 
@@ -92,7 +92,7 @@ mod tests {
 	fn run_test(
 		test: TestDescAndFn,
 	) -> impl std::future::Future<Output = TestOutcome> {
-		run_test_once(None, test)
+		test_runner_ext::run(None, test)
 	}
 
 	#[sweet::test]
@@ -147,7 +147,7 @@ mod tests {
 
 	#[sweet::test]
 	async fn works_async() {
-		use crate::bevy_runner::register_async_test;
+		use crate::test_runner::register_async_test;
 
 
 		run_test(test_ext::new_auto(|| {

@@ -2,11 +2,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Runs a single test in an isolated Bevy app and returns the outcome.
-pub async fn run_test_once(
-	args: Option<&str>,
-	test: test::TestDescAndFn,
-) -> TestOutcome {
+/// Run a single test in an isolated Bevy app, returning the outcome
+pub async fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
 	let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
 
 	let args = if let Some(args) = args {

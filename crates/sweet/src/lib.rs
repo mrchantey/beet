@@ -24,15 +24,13 @@ extern crate test;
 #[cfg(test)]
 extern crate self as sweet;
 // the #[sweet::test] macro
-pub use bevy_runner::test_runner;
 pub use sweet_macros;
 pub use sweet_macros::test;
-pub mod bevy_runner;
-pub mod test_runner_ext;
+pub use test_runner::test_runner;
+pub mod test_runner;
 
 pub mod prelude {
-	pub use crate::bevy_runner::*;
-	pub use crate::test_runner_ext::*;
+	pub use crate::test_runner::*;
 	pub use beet_core::test_utils::*;
 }
 

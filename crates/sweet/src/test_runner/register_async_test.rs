@@ -2,6 +2,12 @@ use beet_core::prelude::*;
 use std::cell::RefCell;
 use std::pin::Pin;
 
+thread_local! {
+	/// A thread-local cell holding the currently registered async test, if any.
+	/// This technique allows an opaque `fn()` provided by libtest to register
+	/// an async tests.
+	static REGISTERED_ASYNC_TEST: RefCell<Option<Pin<Box<dyn AsyncTest>>>> = RefCell::new(None);
+}
 
 /// Called by the [`sweet::test`] macro in the case its provided an async
 /// function.
@@ -52,10 +58,6 @@ pub(super) fn try_run_async(
 	}
 }
 
-
-thread_local! {
-	static REGISTERED_ASYNC_TEST: RefCell<Option<Pin<Box<dyn AsyncTest>>>> = RefCell::new(None);
-}
 
 pub trait IntoFut<M> {
 	fn into_fut(self) -> impl AsyncTest;
