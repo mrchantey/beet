@@ -597,9 +597,7 @@ impl futures::Stream for BackoffStream {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use std::time::Duration;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn iter_without_rand_deterministic() {
@@ -752,7 +750,6 @@ mod tests {
 		it.next().xpect_eq(None);
 	}
 
-	#[cfg(feature = "_sweet_runner")]
 	#[sweet::test]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]

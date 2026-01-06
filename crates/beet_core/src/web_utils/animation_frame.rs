@@ -156,7 +156,6 @@ fn request_animation_frame(f: &Closure<dyn FnMut(f64)>) -> i32 {
 mod tests {
 	use super::AnimationFrame;
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[ignore = "requires dom"]
 	#[test]

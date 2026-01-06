@@ -206,7 +206,6 @@ impl From<&str> for GlobPattern {
 mod test {
 	use crate::prelude::*;
 	use glob::Pattern;
-	use sweet::prelude::*;
 
 	#[test]
 	fn pattern() {

@@ -183,8 +183,7 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 // sweet wasm runner uses PanicContext so cant test properly
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn works() {

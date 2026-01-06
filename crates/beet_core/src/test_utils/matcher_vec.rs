@@ -7,7 +7,7 @@ pub impl<T: Debug> Vec<T> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// vec![false, true].xpect_any(|v| *v == true);
 	/// ```
 	///
@@ -30,7 +30,7 @@ pub impl<T: Debug> Vec<T> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// Vec::<u32>::new().xpect_empty();
 	/// ```
 	///

@@ -262,7 +262,7 @@ mod tests {
 	use std::rc::Rc;
 
 	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 	// Example non-Send type for demonstration
 	#[derive(Debug)]
 	struct NonSendCounter {

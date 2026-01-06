@@ -14,7 +14,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 0.0.xpect_close(0.01);
 	/// ```
 	///
@@ -33,7 +33,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 3.14_f32.xpect_close_within(3.1415, 0.01_f32);
 	/// ```
 	///

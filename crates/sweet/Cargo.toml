@@ -21,7 +21,7 @@ serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
-beet_core = { workspace = true, optional = true }
+beet_core = { workspace = true, optional = true, features=["testing"] }
 beet_flow = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }

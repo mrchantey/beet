@@ -159,7 +159,6 @@ pub fn is_dir_or_extension(path: &impl AsRef<Path>, ext: &str) -> bool {
 mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

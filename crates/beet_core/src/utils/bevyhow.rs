@@ -43,9 +43,9 @@ macro_rules! bevybail {
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
 	use bevy::ecs::error::BevyError;
-	use bevy::prelude::Result;
-	use sweet::prelude::*;
+
 
 	#[test]
 	fn works() {

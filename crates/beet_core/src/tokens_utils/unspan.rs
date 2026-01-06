@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use quote::ToTokens;
 use std::fmt::Display;
 use syn::parse::Parse;
-use crate::prelude::*;
 
 
 
@@ -54,7 +54,6 @@ unsafe impl<T> Sync for Unspan<T> {}
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
-	use sweet::prelude::*;
 	use syn::Ident;
 
 	#[test]

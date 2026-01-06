@@ -18,6 +18,8 @@ pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
 mod path_utils;
+#[cfg(feature = "testing")]
+pub mod test_utils;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 pub mod utils;
@@ -36,6 +38,9 @@ pub mod prelude {
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
+	// #[cfg(test)]
+	#[cfg(feature = "testing")]
+	pub use crate::test_utils::*;
 	// pub use crate::exchange::*;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]

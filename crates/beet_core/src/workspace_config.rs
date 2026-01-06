@@ -286,8 +286,7 @@ impl WorkspaceConfig {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn works() {

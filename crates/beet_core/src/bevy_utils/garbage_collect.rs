@@ -24,7 +24,6 @@ fn on_remove(mut world: DeferredWorld, cx: HookContext) {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "needs investigation - despawn in hook API changed in 0.18"]

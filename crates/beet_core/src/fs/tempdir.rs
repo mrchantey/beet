@@ -124,8 +124,7 @@ impl Drop for TempDir {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn test_tempdir_new_creates_and_cleans_up() {

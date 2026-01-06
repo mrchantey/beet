@@ -173,8 +173,7 @@ impl CliArgs {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn parse_empty() {

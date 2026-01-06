@@ -63,4 +63,9 @@ cargo test -p my_crate --target wasm32-unknown-unknown
 ### `runner`
 
 Enables the sweet runner and internal dependencies. With this disabled the runner falls back to the built-in libtest runner.
-This feature also serves to reduce cyclic dependencies for internal beet crates. The runner itself depends on crates like `beet_net` and those crates use `sweet` for testing. While this is technically allowed by cargo (a given crate's test build is seperate from the library build), it drags out compile times and rust-analyzer doesn't like it. So web usually disable the runner for crates like `beet_core` during development, only enabling them in wasm or ci.
+
+## Contributing
+
+### Cyclic Dependencies
+
+The sweet runner depends on internal crates like `beet_net` and those crates use `sweet` for testing. While this is technically allowed by cargo (a given crate's test build is seperate from the library build), compiling like this should be avoided during development. For example a small change to `beet_core` would trigger recompilation of sweet and all its internal deps as well as the crate itself. Cyclic dependencies also break rust-analyzer, which is why the matchers live in beet_core.

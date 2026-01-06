@@ -128,7 +128,7 @@ impl<B: Bundle> Command for MaybeCommand<B> {
 mod tests {
 	use super::*;
 	use bevy::ecs::system::RunSystemOnce;
-	use sweet::prelude::*;
+
 
 	#[derive(Component)]
 	struct A;

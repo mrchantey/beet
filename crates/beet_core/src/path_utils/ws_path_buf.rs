@@ -127,7 +127,6 @@ impl Into<WsPathBuf> for PathBuf {
 mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

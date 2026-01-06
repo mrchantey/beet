@@ -797,7 +797,7 @@ pub impl EntityWorldMut<'_> {
 mod test {
 	use crate::prelude::*;
 	use bevy::tasks::futures_lite::future;
-	use sweet::prelude::*;
+
 
 
 	#[derive(Default, Resource, Clone)]

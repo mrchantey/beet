@@ -453,7 +453,6 @@ pub impl<'w> EntityWorldMut<'w> {
 #[cfg(feature = "bevy_scene")]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn serializes() {

@@ -286,7 +286,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[derive(EntityTargetEvent)]
 	struct MyEvent;

@@ -110,7 +110,6 @@ impl RandomSource {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn seed() {

@@ -1,15 +1,9 @@
-pub mod pretty_diff;
-pub mod run_libtest_pretty;
-mod test_desc_ext;
-mod test_fut;
-pub use test_desc_ext::*;
-pub use test_fut::*;
 mod close_to;
 mod matcher_control_flow;
 mod matcher_not;
 mod matcher_vec;
 pub mod paint_ext;
-pub mod test_ext;
+pub mod pretty_diff;
 pub use matcher_control_flow::*;
 pub use matcher_not::*;
 pub use matcher_vec::*;
@@ -29,7 +23,5 @@ mod matcher_result;
 pub use self::matcher_result::*;
 mod matcher_str;
 pub use self::matcher_str::*;
-#[cfg(feature = "runner")]
 mod snapshot;
-#[cfg(feature = "runner")]
 pub use snapshot::*;

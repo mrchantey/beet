@@ -172,7 +172,6 @@ pub fn path_name() -> String { current_window().location().pathname().unwrap() }
 #[cfg(target_arch = "wasm32")]
 mod tests {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 	use wasm_bindgen::JsValue;
 	use web_sys::Url;
 	use web_sys::window;

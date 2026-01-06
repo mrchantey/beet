@@ -99,8 +99,8 @@ where
 #[cfg(target_arch = "wasm32")]
 mod tests {
 	use super::*;
+	use crate::prelude::*;
 	use crate::web_utils::document_ext as doc;
-	use sweet::prelude::*;
 	use web_sys::HtmlDivElement;
 	use web_sys::HtmlParagraphElement;
 

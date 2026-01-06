@@ -410,7 +410,6 @@ impl CargoBuildCmd {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() { CargoBuildCmd::default().cmd.xpect_eq("build"); }

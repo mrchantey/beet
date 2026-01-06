@@ -49,7 +49,8 @@ where
 			let result = fut().await;
 			*out.borrow_mut() = Some(result);
 			resolve.call0(&JsValue::NULL).unwrap();
-		}).detach();
+		})
+		.detach();
 	});
 	let timeout = timeout_reject(duration);
 
@@ -84,7 +85,6 @@ fn timeout_reject(duration: Duration) -> Promise {
 mod test {
 	use crate::prelude::*;
 	use std::time::Duration;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	pub async fn works() {

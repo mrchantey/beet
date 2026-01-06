@@ -212,46 +212,53 @@ pub fn add_style_src_to_head(src: &str) -> Result<HtmlLinkElement, JsValue> {
 }
 
 #[cfg(test)]
-#[cfg(target_arch = "wasm32")]
 mod tests {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
+	use web_sys::HtmlDivElement;
+	use web_sys::HtmlLinkElement;
+	use web_sys::HtmlScriptElement;
 
 	#[ignore = "requires dom"]
 	#[test]
 	fn runs_in_wasm() {
 		// This ensures the test harness can reach the DOM.
-		let _ = document();
-		let _ = head();
-		let _ = body();
+		let _ = document_ext::document();
+		let _ = document_ext::head();
+		let _ = document_ext::body();
 	}
 
 	#[ignore = "requires dom"]
 	#[test]
 	fn creates_and_appends_div() {
-		clear_body();
+		document_ext::clear_body();
 
-		let div = create_div();
+		let div = document_ext::create_div();
 		div.set_id("greeting");
 		div.set_inner_html("hello");
-		append_child(&div);
+		document_ext::append_child(&div);
 
-		let found = query_selector::<HtmlDivElement>("#greeting").unwrap();
+		let found = document_ext::query_selector::<HtmlDivElement>("#greeting")
+			.unwrap();
 		found.inner_html().xpect_eq("hello");
 	}
 
 	#[ignore = "requires dom"]
 	#[sweet::test]
 	async fn adds_script_and_style() {
-		clear_body();
+		document_ext::clear_body();
 		let _script =
-			add_script_content_to_body("window.__beet_flag = 1;").unwrap();
-		let _style =
-			add_style_src_to_head("data:text/css,body{outline:0}").unwrap();
+			document_ext::add_script_content_to_body("window.__beet_flag = 1;")
+				.unwrap();
+		let _style = document_ext::add_style_src_to_head(
+			"data:text/css,body{outline:0}",
+		)
+		.unwrap();
 
-		let script_el = query_selector::<HtmlScriptElement>("body script");
-		let style_el =
-			query_selector::<HtmlLinkElement>("head link[rel='stylesheet']");
+		let script_el =
+			document_ext::query_selector::<HtmlScriptElement>("body script");
+		let style_el = document_ext::query_selector::<HtmlLinkElement>(
+			"head link[rel='stylesheet']",
+		);
 
 		script_el.is_some().xpect_true();
 		style_el.is_some().xpect_true();

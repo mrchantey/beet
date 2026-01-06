@@ -296,7 +296,6 @@ impl DirEvent {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	/// this one is notoriously flaky
 	#[sweet::test]

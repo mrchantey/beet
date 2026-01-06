@@ -9,7 +9,7 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::ops::ControlFlow;
 	/// ControlFlow::<(),()>::Continue(()).xpect_continue();
 	/// ```
@@ -34,7 +34,7 @@ pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// # use std::ops::ControlFlow;
 	/// ControlFlow::<(),()>::Break(()).xpect_break();
 	/// ```

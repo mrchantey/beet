@@ -661,9 +661,7 @@ fn parse_vec_newtype_field(
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use bevy::reflect::Reflect;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
 	#[reflect(Default)]

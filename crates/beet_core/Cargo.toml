@@ -25,12 +25,12 @@ required-features = ["tokens"]
 default = ["serde"]
 exchange = []
 nightly = []
+testing = ["dep:nu-ansi-term"]
 bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
-_sweet_runner = ["sweet/runner"]
 
 fs = [
 	"dep:notify",
@@ -59,6 +59,8 @@ tracing.workspace = true
 itertools.workspace = true
 send_wrapper.workspace = true
 web-time.workspace = true
+nu-ansi-term = { workspace = true, optional = true }
+
 # async-task.workspace = true
 
 #💡 path
@@ -173,7 +175,7 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["rand"]}
+beet_core = {path = ".", features=["testing", "rand"]}
 sweet.workspace = true
 # abs_path serde roundtrip
 serde_json.workspace = true

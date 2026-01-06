@@ -82,7 +82,6 @@ impl<C> SpanOf<C> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[derive(Component, ToTokens)]
 	struct Foo;

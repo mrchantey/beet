@@ -166,8 +166,8 @@ pub impl Value {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::prelude::*;
 	use serde_json::json;
-	use sweet::prelude::*;
 
 
 	#[test]

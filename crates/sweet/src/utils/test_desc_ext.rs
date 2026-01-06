@@ -25,7 +25,7 @@ use test::TestType;
 /// let test = test_ext::new("my_test", file!(), || Ok(()))
 ///     .with_should_panic()
 ///     .with_ignore(false);
-/// ```
+/// ``` 
 pub trait TestDescExt {
 	/// Get reference to the test descriptor
 	fn desc(&self) -> &TestDesc;

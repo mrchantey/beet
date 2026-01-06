@@ -9,7 +9,7 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// Ok::<(), ()>(()).xpect_ok();
 	/// ```
 	///
@@ -30,7 +30,7 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// Err::<(), ()>(()).xpect_err();
 	/// ```
 	///

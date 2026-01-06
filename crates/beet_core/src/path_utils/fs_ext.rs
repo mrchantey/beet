@@ -59,6 +59,9 @@ pub fn copy_recursive(
 
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::exists(&path.to_string_lossy()).xok();
+	#[cfg(not(target_arch = "wasm32"))]
 	match fs::exists(path) {
 		Ok(val) => Ok(val),
 		Err(err) => Err(FsError::io(path, err)),
@@ -301,10 +304,8 @@ pub fn test_dir() -> PathBuf {
 }
 
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn workspace_root() {
@@ -316,7 +317,8 @@ mod test {
 			.xpect_eq("beet");
 		fs_ext::workspace_root()
 			.join("Cargo.lock")
-			.exists()
+			.xmap(fs_ext::exists)
+			.unwrap()
 			.xpect_true();
 	}
 
