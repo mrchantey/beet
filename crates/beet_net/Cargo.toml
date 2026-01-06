@@ -56,6 +56,7 @@ rustls-tls = [
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls"
 ]
+_sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true
@@ -168,3 +169,7 @@ web-sys = { workspace = true, features = [
 [dev-dependencies]
 beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
 sweet.workspace = true
+
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+sweet = { workspace = true, features = ["runner"] }

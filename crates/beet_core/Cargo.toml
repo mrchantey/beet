@@ -177,3 +177,6 @@ beet_core = {path = ".", features=["rand"]}
 sweet.workspace = true
 # abs_path serde roundtrip
 serde_json.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+sweet = { workspace = true, features = ["runner"] }
