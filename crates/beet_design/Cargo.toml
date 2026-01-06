@@ -45,4 +45,4 @@ web-sys = { workspace = true, features = ["HtmlFormElement", "FormData"] }
 
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

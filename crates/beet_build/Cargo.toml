@@ -71,5 +71,5 @@ clap.workspace = true
 bevy = { workspace = true, features = ["bevy_scene"] }
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["tokens"] }
+sweet = { workspace = true, features = ["runner", "tokens"] }
 send_wrapper.workspace = true

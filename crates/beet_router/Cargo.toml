@@ -31,6 +31,7 @@ serde = [
 	"dep:base64",
 	"beet_core/serde",
 ]
+_sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true

@@ -12,6 +12,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
+# see readme for feature docs
 default = ["runner", "serde", "nightly"]
 runner = ["dep:beet_core", "dep:beet_flow", "dep:beet_net", "dep:beet_router", "serde"]
 nightly = []
@@ -45,9 +46,9 @@ prettyplease = { workspace = true, optional = true }
 #💡 serde
 ron = { workspace = true, optional = true }
 
-[dev-dependencies]
-sweet = {path = ".", features = ["tokens"] }
-
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook.workspace = true
+
+[dev-dependencies]
+sweet = {path = ".", features = ["runner", "tokens"] }

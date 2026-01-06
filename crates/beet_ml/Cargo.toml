@@ -62,7 +62,7 @@ console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 # beet_ml = { path = "", features = ["bevy_default", "spatial"] }
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}
 
 pretty_env_logger.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

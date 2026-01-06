@@ -1,4 +1,5 @@
-#	I'm using just to work with beet
+#	I'm temporarily using just to work with beet
+# Eventually all these patterns should be rolled into t
 #
 # ```rust
 # cargo binstall just

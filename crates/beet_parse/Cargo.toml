@@ -43,5 +43,5 @@ rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
 proc-macro2-diagnostics.workspace = true
 
 [dev-dependencies]
-sweet = {workspace = true,features=["tokens"]}
+sweet = {workspace = true, features=["runner", "tokens"]}
 beet_core = { workspace = true, features = ["bevy_scene"] }

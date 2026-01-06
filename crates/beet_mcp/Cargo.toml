@@ -62,4 +62,4 @@ tree-sitter-rust = "0.24"
 
 [dev-dependencies]
 tokio-test = "0.4"
-sweet = { path = "../sweet" }
+sweet = { path = "../sweet", features=["runner"] }

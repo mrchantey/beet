@@ -20,4 +20,4 @@ itertools = "0.14"
 thiserror.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

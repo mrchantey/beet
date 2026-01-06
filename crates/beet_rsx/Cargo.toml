@@ -81,7 +81,7 @@ console_error_panic_hook.workspace = true
 beet_rsx = { path = ".", features = ["tokens"] }
 beet_core = { workspace = true }
 serde.workspace = true
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}
 
 
 [[test]]

@@ -37,4 +37,4 @@ quote.workspace = true
 prettyplease.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

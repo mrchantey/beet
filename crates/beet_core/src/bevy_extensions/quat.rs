@@ -1,5 +1,5 @@
-use extend::ext;
 use crate::prelude::*;
+use extend::ext;
 
 #[ext]
 pub impl Quat {
@@ -51,7 +51,7 @@ pub impl Quat {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-		use sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -62,7 +62,7 @@ web-sys = { workspace = true, features = [
 
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_agent = { path = ".", features = ["native-tls"] }

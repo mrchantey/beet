@@ -401,6 +401,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "_sweet_runner")]
 	fn complex() {
 		let mut world = World::new();
 		let ent1 = world.spawn_empty().id();
