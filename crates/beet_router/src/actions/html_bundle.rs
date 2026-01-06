@@ -88,7 +88,6 @@ pub fn html_bundle_to_response() -> impl Bundle {
 	)
 }
 
-/// A [`RouteHandler`]
 
 #[cfg(test)]
 mod test {
