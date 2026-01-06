@@ -752,6 +752,7 @@ mod tests {
 		it.next().xpect_eq(None);
 	}
 
+	#[cfg(feature = "_sweet_runner")]
 	#[sweet::test]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]

@@ -30,6 +30,7 @@ bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
+_sweet_runner = ["sweet/runner"]
 
 fs = [
 	"dep:notify",

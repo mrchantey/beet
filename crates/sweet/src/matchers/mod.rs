@@ -1,8 +1,9 @@
 pub mod pretty_diff;
-mod run_libtest_pretty;
-pub use run_libtest_pretty::*;
+pub mod run_libtest_pretty;
 mod test_desc_ext;
+mod test_fut;
 pub use test_desc_ext::*;
+pub use test_fut::*;
 mod close_to;
 mod matcher_control_flow;
 mod matcher_not;

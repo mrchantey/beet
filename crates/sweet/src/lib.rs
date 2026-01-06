@@ -24,6 +24,8 @@ extern crate test;
 #[cfg(test)]
 extern crate self as sweet;
 // the #[sweet::test] macro
+#[cfg(not(feature = "runner"))]
+pub use matchers::run_libtest_pretty::test_runner;
 pub use sweet_macros;
 pub use sweet_macros::test;
 #[cfg(feature = "runner")]
@@ -31,6 +33,10 @@ pub use test_runner::test_runner;
 mod matchers;
 #[cfg(feature = "runner")]
 mod test_runner;
+#[cfg(not(feature = "runner"))]
+pub use matchers::block_on_async_test as handle_async_test;
+#[cfg(feature = "runner")]
+pub use test_runner::register_async_test as handle_async_test;
 
 pub mod prelude {
 	pub use crate::matchers::*;

@@ -52,6 +52,7 @@ pub trait TestDescExt {
 		}
 	}
 
+	#[cfg(feature = "runner")]
 	fn end(&self) -> LineCol {
 		LineCol {
 			line: self.desc().end_line as u32,

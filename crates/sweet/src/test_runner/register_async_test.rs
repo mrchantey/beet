@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use std::cell::RefCell;
 use std::pin::Pin;
@@ -27,10 +28,6 @@ pub(super) enum MaybeAsync {
 	Sync(PanicResult),
 }
 
-/// A trait representing an async test future that returns a Result<(), String>
-pub trait AsyncTest: 'static + Future<Output = Result<(), String>> {}
-impl<F> AsyncTest for F where F: 'static + Future<Output = Result<(), String>> {}
-
 
 /// Attempts to run the provided function as a synchronous test.
 ///
@@ -55,42 +52,6 @@ pub(super) fn try_run_async(
 			MaybeAsync::Async(Box::pin(PanicContext::catch_async(async_test)))
 		}
 		None => MaybeAsync::Sync(panic_outcome),
-	}
-}
-
-
-pub trait IntoFut<M> {
-	fn into_fut(self) -> impl AsyncTest;
-}
-pub struct ReturnsResult;
-pub struct ReturnsUnit;
-pub struct ReturnsNever;
-
-impl<T> IntoFut<ReturnsResult> for T
-where
-	T: AsyncTest,
-{
-	fn into_fut(self) -> impl AsyncTest { self }
-}
-impl<T> IntoFut<ReturnsUnit> for T
-where
-	T: 'static + Future<Output = ()>,
-{
-	fn into_fut(self) -> impl AsyncTest {
-		async move {
-			self.await;
-			Ok(())
-		}
-	}
-}
-impl<T> IntoFut<ReturnsNever> for T
-where
-	T: 'static + Future<Output = !>,
-{
-	fn into_fut(self) -> impl AsyncTest {
-		async move {
-			self.await;
-		}
 	}
 }
 
