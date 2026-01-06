@@ -4,6 +4,7 @@ use beet_core::exports;
 use beet_core::prelude;
 use beet_core::prelude::*;
 use quote::quote;
+use sweet::prelude::*;
 
 #[test]
 fn named() {

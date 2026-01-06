@@ -13,7 +13,7 @@ keywords.workspace = true
 
 [features]
 default = ["runner", "serde", "nightly"]
-runner = ["dep:beet_core", "dep:beet_flow", "dep:beet_net", "dep:beet_router"]
+runner = ["dep:beet_core", "dep:beet_flow", "dep:beet_net", "dep:beet_router", "serde"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:ron"]
