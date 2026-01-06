@@ -46,6 +46,7 @@ pub fn apply_reactive_text_nodes(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 
 	#[test]

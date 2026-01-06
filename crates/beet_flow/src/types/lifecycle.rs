@@ -109,6 +109,7 @@ pub(crate) fn propagate_child_end<T>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[action(run_child)]
 	#[derive(Component)]

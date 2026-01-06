@@ -51,6 +51,7 @@ impl Drop for AsyncAction {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[action(foo)]
 	#[derive(Component)]

@@ -253,6 +253,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

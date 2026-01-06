@@ -112,6 +112,7 @@ pub impl EntityWorldMut<'_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn await_ready() {

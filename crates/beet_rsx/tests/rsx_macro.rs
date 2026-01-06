@@ -5,6 +5,7 @@ use beet_core::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use beet_rsx::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
+use sweet::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]

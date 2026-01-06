@@ -27,6 +27,7 @@ impl Request {
 mod test_request {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
@@ -187,6 +188,8 @@ mod test_request {
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
+
 
 
 	// const HTTPBIN: &str = "https://httpbin.org";

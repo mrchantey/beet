@@ -138,6 +138,7 @@ fn deno_runner_path() -> PathBuf {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -18,6 +18,7 @@ fn exit_on_end(ev: On<Outcome>, mut commands: Commands) {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

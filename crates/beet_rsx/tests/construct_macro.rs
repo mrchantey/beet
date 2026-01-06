@@ -2,6 +2,7 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;
+use sweet::prelude::*;
 
 fn parse(bundle: impl Bundle) -> String {
 	let mut world = World::new();

@@ -129,6 +129,7 @@ impl ApplyAttributes<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[template]
 	fn MyTemplate() -> impl Bundle {

@@ -130,6 +130,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
 	use beet_rsx::prelude::*;
+	use sweet::prelude::*;
 
 	// TODO this is a hack, macro should include it
 	use beet_parse::prelude::*;

@@ -84,6 +84,7 @@ impl<H: Hasher> HashNonSnippetRust<'_, H> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use std::hash::Hasher;

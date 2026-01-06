@@ -40,6 +40,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

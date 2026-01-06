@@ -33,6 +33,7 @@ async fn oneshot_cli_handler(entity: AsyncEntity) -> Result {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn into_request_simple_path() {

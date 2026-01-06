@@ -311,6 +311,7 @@ fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	fn maps_messages_roundtrip() {

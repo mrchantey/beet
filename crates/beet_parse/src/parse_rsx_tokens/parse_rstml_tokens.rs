@@ -438,6 +438,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_dom::prelude::*;
+	use sweet::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 

@@ -96,6 +96,7 @@ fn square_curve(t: f32) -> Vec3 {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
 

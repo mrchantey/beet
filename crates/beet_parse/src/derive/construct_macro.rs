@@ -377,6 +377,7 @@ mod test {
 	use super::with_captured_lifetimes;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 	use syn::PathSegment;
 
 	#[test]

@@ -226,6 +226,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use sweet::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use syn::parse_quote;

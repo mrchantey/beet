@@ -257,6 +257,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 	use beet_rsx::prelude::*;
+	use sweet::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
 

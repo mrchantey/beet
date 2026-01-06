@@ -149,6 +149,7 @@ impl fmt::Debug for ActionContext {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[derive(ActionEvent)]
 	struct Run;

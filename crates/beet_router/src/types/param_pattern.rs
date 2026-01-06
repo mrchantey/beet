@@ -335,6 +335,7 @@ impl ParamOptions {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn pattern_deduplication() {

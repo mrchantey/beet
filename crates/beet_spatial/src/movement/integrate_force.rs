@@ -64,6 +64,7 @@ pub fn integrate_force(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	pub fn works() {

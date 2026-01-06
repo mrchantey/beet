@@ -227,6 +227,7 @@ impl std::fmt::Display for EndpointTree {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn endpoint_tree_detects_duplicates() {

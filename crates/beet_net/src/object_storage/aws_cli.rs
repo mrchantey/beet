@@ -343,6 +343,7 @@ fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 
 
 	#[sweet::test]

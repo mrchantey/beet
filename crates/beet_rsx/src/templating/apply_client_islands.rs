@@ -89,6 +89,7 @@ fn document_islands(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[template]
 	#[derive(Reflect)]

@@ -62,6 +62,7 @@ fn remove<E: ActionEvent, B: Bundle>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn on_run() {

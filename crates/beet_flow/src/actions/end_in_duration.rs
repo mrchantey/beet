@@ -69,6 +69,7 @@ pub(crate) fn end_in_duration<T: ActionEvent + Clone>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
