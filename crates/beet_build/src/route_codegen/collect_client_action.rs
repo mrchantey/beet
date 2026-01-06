@@ -28,8 +28,8 @@ impl ParseClientAction {
 			syn::ReturnType::Default => parse_quote! { () },
 			syn::ReturnType::Type(_, ty) => ty.clone(),
 		};
-		let method = &action.route_info.method.self_token_stream();
-		let path = &action.route_info.path.to_string_lossy();
+		let method = &action.method.self_token_stream();
+		let path = &action.path.to_string_lossy();
 		// let route_info = route_info.self_token_stream();
 
 		let docs = &action
@@ -225,6 +225,7 @@ impl ParseClientAction {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use syn::parse_quote;
@@ -267,22 +268,30 @@ mod test {
 	#[test]
 	fn get() {
 		ParseClientAction
-			.client_func(&RouteFileMethod::new_with("/add", &parse_quote! {
-				fn get() {
-					1 + 1
-				}
-			}))
+			.client_func(&RouteFileMethod::new_with(
+				"/add",
+				HttpMethod::Get,
+				&parse_quote! {
+					fn get() {
+						1 + 1
+					}
+				},
+			))
 			.to_token_stream()
 			.xpect_snapshot();
 	}
 	#[test]
 	fn get_with_result() {
 		ParseClientAction
-			.client_func(&RouteFileMethod::new_with("/add", &parse_quote! {
-				fn get(In((a,b)): In<(i32,i64)>) -> Result<u32, String> {
-					Ok(Ok(1 + 1))
-				}
-			}))
+			.client_func(&RouteFileMethod::new_with(
+				"/add",
+				HttpMethod::Get,
+				&parse_quote! {
+					fn get(In((a,b)): In<(i32,i64)>) -> Result<u32, String> {
+						Ok(Ok(1 + 1))
+					}
+				},
+			))
 			.to_token_stream()
 			.xpect_snapshot();
 	}

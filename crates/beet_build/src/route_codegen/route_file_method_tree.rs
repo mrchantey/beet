@@ -60,7 +60,7 @@ impl RouteFileMethodTree {
 		let mut this = RouteFileMethodTree::new("routes");
 		for func in funcs {
 			let mut current = &mut this;
-			for component in func.1.route_info.path.components() {
+			for component in func.1.path.components() {
 				match component {
 					std::path::Component::Normal(os_str)
 						if let Some(str) = os_str.to_str() =>
@@ -91,12 +91,12 @@ mod test {
 	fn world() -> World {
 		let mut world = World::new();
 		world.spawn_batch(vec![
-			RouteFileMethod::new("/"),
-			RouteFileMethod::new("/bazz"),
-			RouteFileMethod::new("/foo/bar"),
-			RouteFileMethod::new("/foo/bazz"),
-			RouteFileMethod::new("/foo/bazz/boo"),
-			RouteFileMethod::new(RouteInfo::post("/foo/bazz/boo")),
+			RouteFileMethod::new("/", HttpMethod::Get),
+			RouteFileMethod::new("/bazz", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bar", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz/boo", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz/boo", HttpMethod::Post),
 		]);
 		world
 	}

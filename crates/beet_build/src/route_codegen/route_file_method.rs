@@ -18,10 +18,11 @@ use syn::ItemFn;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
-	/// A reasonable route path generated from this file's local path,
-	/// and a method matching either the functions signature, or
+	/// A reasonable route path generated from this file's local path
+	pub path: RoutePath,
+	/// The HTTP method matching either the functions signature, or
 	/// `get` in the case of single file routes like markdown.
-	pub route_info: RouteInfo,
+	pub method: HttpMethod,
 	/// The signature of a route file method
 	pub item: Unspan<ItemFn>,
 }
@@ -31,23 +32,28 @@ impl AsRef<RouteFileMethod> for RouteFileMethod {
 
 
 impl RouteFileMethod {
-	/// create a new route file method with the given route info
+	/// create a new route file method with the given path and method
 	/// and a default function signature matching the method name.
-	pub fn new(route_info: impl Into<RouteInfo>) -> Self {
-		let route_info = route_info.into();
-		let method = route_info.method.to_string_lowercase();
-		let method_ident = quote::format_ident!("{method}");
+	pub fn new(path: impl Into<RoutePath>, method: HttpMethod) -> Self {
+		let path = path.into();
+		let method_name = method.to_string_lowercase();
+		let method_ident = quote::format_ident!("{method_name}");
 		Self {
-			route_info,
+			path,
+			method,
 			item: Unspan::new(&syn::parse_quote!(
 				fn #method_ident() {}
 			)),
 		}
 	}
-	pub fn new_with(route_info: impl Into<RouteInfo>, item: &ItemFn) -> Self {
-		let route_info = route_info.into();
+	pub fn new_with(
+		path: impl Into<RoutePath>,
+		method: HttpMethod,
+		item: &ItemFn,
+	) -> Self {
 		Self {
-			route_info,
+			path: path.into(),
+			method,
 			item: Unspan::new(item),
 		}
 	}
@@ -57,7 +63,7 @@ impl RouteFileMethod {
 		method: HttpMethod,
 	) -> Self {
 		let route = RoutePath::from_file_path(local_path).unwrap();
-		Self::new(RouteInfo::new(route, method))
+		Self::new(route, method)
 	}
 
 	/// Whether the return type of this method is a `Result`.
@@ -106,12 +112,14 @@ impl RouteFileMethodMeta {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_net::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn returns_result() {
 		RouteFileMethod::new_with(
 			"",
+			HttpMethod::Get,
 			&syn::parse_quote!(
 				fn get() {}
 			),
@@ -120,6 +128,7 @@ mod test {
 		.xpect_false();
 		RouteFileMethod::new_with(
 			"",
+			HttpMethod::Get,
 			&syn::parse_quote!(
 				fn get() -> Result<(), ()> {}
 			),
