@@ -151,7 +151,6 @@ impl Page {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn visit_and_read_title() {
@@ -173,7 +172,7 @@ mod test {
 					.to_string()
 					.xpect_eq("Example Domain");
 				page.kill().await.unwrap();
-				proc.kill().await.unwrap();
+				proc.kill().unwrap();
 			})
 			.await;
 	}

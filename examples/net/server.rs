@@ -30,9 +30,9 @@ fn handler(
 	mut visit_counter: ResMut<VisitCounter>,
 ) -> Result {
 	let request = requests.get(ev.event_target())?;
-	let path = request.path();
+	let path = request.path_string();
 	// our diy router, only match root path
-	if path.to_string_lossy() != "/" {
+	if path != "/" {
 		commands
 			.entity(ev.event_target())
 			.insert(Response::from_status_body(

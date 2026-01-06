@@ -248,7 +248,7 @@ mod test {
 		let client = ClientProcess::new_with_opts(client.clone()).unwrap();
 		let session = client.new_session().await.unwrap();
 		session.kill().await.unwrap();
-		client.kill().await.unwrap();
+		client.kill().unwrap();
 	}
 	#[sweet::test]
 	// #[ignore = "smoketest"]
@@ -260,6 +260,6 @@ mod test {
 		.unwrap();
 		let session = client.new_session().await.unwrap();
 		session.kill().await.unwrap();
-		client.kill().await.unwrap();
+		client.kill().unwrap();
 	}
 }
