@@ -312,12 +312,6 @@ fn header_name_to_string<K: IntoHeaderName>(key: K) -> String {
 		.unwrap_or_default()
 }
 
-impl From<RouteInfo> for Request {
-	fn from(route_info: RouteInfo) -> Self {
-		Self::new(route_info.method, route_info.path.to_string())
-	}
-}
-
 impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
 }

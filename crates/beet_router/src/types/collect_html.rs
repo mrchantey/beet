@@ -36,8 +36,6 @@ pub async fn collect_html(
 
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");
 
-		// let route_info = RouteInfo::get(path.clone());
-
 		let text = world
 			.oneshot(Request::get(&path))
 			.await?
