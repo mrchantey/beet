@@ -1225,7 +1225,6 @@ dependencies = [
  "clap",
  "crossterm",
  "ctrlc",
- "diff",
  "either",
  "extend",
  "futures",
@@ -1237,7 +1236,6 @@ dependencies = [
  "js-sys",
  "notify",
  "notify-debouncer-full",
- "nu-ansi-term",
  "path-clean",
  "pathdiff",
  "prettyplease",
@@ -4025,12 +4023,6 @@ dependencies = [
  "syn 2.0.111",
  "unicode-xid",
 ]
-
-[[package]]
-name = "diff"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "digest"
@@ -9243,6 +9235,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "extend",
+ "nu-ansi-term",
  "prettyplease",
  "proc-macro2",
  "quote",

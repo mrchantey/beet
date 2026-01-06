@@ -1,4 +1,5 @@
-use crate::prelude::*;
+#[cfg(feature = "runner")]
+use beet_core::prelude::*;
 use test::ShouldPanic;
 use test::TestDesc;
 use test::TestDescAndFn;
@@ -40,8 +41,10 @@ pub trait TestDescExt {
 		}
 	}
 
+	#[cfg(feature = "runner")]
 	fn path(&self) -> WsPathBuf { WsPathBuf::new(self.desc().source_file) }
 
+	#[cfg(feature = "runner")]
 	fn start(&self) -> LineCol {
 		LineCol {
 			line: self.desc().start_line as u32,

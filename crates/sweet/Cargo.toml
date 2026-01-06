@@ -12,21 +12,26 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "nightly"]
+default = ["runner", "serde", "nightly"]
+runner = ["dep:beet_core", "dep:beet_flow", "dep:beet_net", "dep:beet_router"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
-beet_core = { workspace = true, features = ["testing"] }
-beet_flow.workspace = true
-beet_net.workspace = true
-beet_router.workspace = true
+beet_core = { workspace = true, optional = true }
+beet_flow = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
+beet_router = { workspace = true, optional = true }
 sweet_macros.workspace = true
 #💡 misc
 extend.workspace = true
 send_wrapper.workspace = true
+
+#💡 logging
+nu-ansi-term.workspace = true
+
 
 #💡 bevy
 bevy.workspace = true

@@ -26,12 +26,16 @@ extern crate self as sweet;
 // the #[sweet::test] macro
 pub use sweet_macros;
 pub use sweet_macros::test;
+#[cfg(feature = "runner")]
 pub use test_runner::test_runner;
-pub mod test_runner;
+mod matchers;
+#[cfg(feature = "runner")]
+mod test_runner;
 
 pub mod prelude {
+	pub use crate::matchers::*;
+	#[cfg(feature = "runner")]
 	pub use crate::test_runner::*;
-	pub use beet_core::test_utils::*;
 }
 
 pub mod exports {}

@@ -1,4 +1,5 @@
-use super::*;
+use crate::prelude::*;
+use bevy::prelude::*;
 use std::fmt::Debug;
 
 #[extend::ext(name=SweetResult)]
@@ -50,13 +51,14 @@ pub impl<T: Debug, E: Debug> Result<T, E> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use bevy::prelude::*;
 
 	#[test]
 	fn result() {
-		let ok = || -> Result<()> { Ok(()) };
+		let ok = || -> Result { Ok(()) };
 		ok().xpect_ok();
 
-		let err = || -> Result<()> { bevybail!("foo") };
+		let err = || -> Result { Err("foo".into()) };
 
 		err().xpect_err();
 	}

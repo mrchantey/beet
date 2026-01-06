@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 #[cfg(feature = "tokens")]
 use proc_macro2::TokenStream;
 #[cfg(feature = "tokens")]
@@ -251,7 +252,7 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 
 	if is_snap_mode {
 		SnapMap::set(&file_path, loc, received.to_string())?;
-		crate::cross_log!(
+		beet_core::cross_log!(
 			"Snapshot saved: {}:{}:{}",
 			file_path,
 			loc.line,
@@ -261,7 +262,7 @@ fn parse_snapshot(received: &str) -> Result<Option<String>> {
 	} else {
 		let snap = SnapMap::get(&file_path, loc)?;
 		if is_snap_show {
-			crate::cross_log!("Snapshot:\n{}", snap);
+			beet_core::cross_log!("Snapshot:\n{}", snap);
 		}
 		Ok(Some(snap))
 	}

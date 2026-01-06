@@ -28,5 +28,7 @@ mod matcher_result;
 pub use self::matcher_result::*;
 mod matcher_str;
 pub use self::matcher_str::*;
+#[cfg(feature = "runner")]
 mod snapshot;
+#[cfg(feature = "runner")]
 pub use snapshot::*;

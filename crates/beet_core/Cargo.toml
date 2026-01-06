@@ -30,7 +30,6 @@ bevy_scene = ["bevy/bevy_scene", "serde"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
-testing = ["nightly","dep:nu-ansi-term","dep:diff"]
 
 fs = [
 	"dep:notify",
@@ -79,9 +78,6 @@ heck.workspace = true
 #💡 async
 futures-lite = { workspace = true, features = ["race"] }
 async-channel.workspace = true
-#💡 logging
-nu-ansi-term = { workspace = true, optional = true }
-diff = {version = "0.1", optional = true }
 
 # tokens dependencies
 syn = { workspace = true, optional = true }
@@ -176,7 +172,7 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["rand","testing"]}
+beet_core = {path = ".", features=["rand"]}
 sweet.workspace = true
 # abs_path serde roundtrip
 serde_json.workspace = true
