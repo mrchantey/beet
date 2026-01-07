@@ -1,20 +1,47 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+#[allow(unused)]
+pub(super) fn check_https_features(_req: &Request) -> Result {
+	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
+	{
+		if _req.scheme() == &Scheme::Https {
+			beet_core::bevybail!(
+				"Please enable either `beet/rustls-tls` or `beet/native-tls` feature to use HTTPS requests."
+			);
+		}
+	}
+	Ok(())
+}
+
+
 impl Request {
 	pub async fn send(self) -> Result<Response> {
 		#[cfg(target_arch = "wasm32")]
 		{
 			super::impl_web_sys::send_wasm(self).await
 		}
-		#[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
+		{
+			super::impl_ureq::send_ureq(self).await
+		}
+		#[cfg(all(
+			feature = "reqwest",
+			not(feature = "ureq"),
+			not(target_arch = "wasm32")
+		))]
 		{
 			super::impl_reqwest::send_reqwest(self).await
 		}
-		#[cfg(not(any(feature = "reqwest", target_arch = "wasm32")))]
+
+		#[cfg(not(any(
+			feature = "reqwest",
+			feature = "ureq",
+			target_arch = "wasm32"
+		)))]
 		{
 			panic!(
-				"No HTTP transport available, enable the 'reqwest' feature for native builds"
+				"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
 			);
 		}
 	}
@@ -22,7 +49,7 @@ impl Request {
 
 
 
-#[cfg(any(feature = "reqwest", target_arch = "wasm32"))]
+#[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
 #[cfg(test)]
 mod test_request {
 	use crate::prelude::*;
@@ -31,7 +58,7 @@ mod test_request {
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
@@ -42,7 +69,7 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn get_works() {
 		Request::get(format!("{HTTPBIN}/get"))
@@ -53,7 +80,7 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn post_json_works() {
 		Request::post(format!("{HTTPBIN}/post"))
@@ -66,7 +93,7 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn custom_header_works() {
 		Request::get(format!("{HTTPBIN}/headers"))
@@ -78,7 +105,7 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn put_and_delete_work() {
 		Request::get(format!("{HTTPBIN}/put"))
@@ -98,7 +125,7 @@ mod test_request {
 			.xpect_eq(200);
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn body_raw_works() {
 		Request::get(format!("{HTTPBIN}/post"))
@@ -113,7 +140,7 @@ mod test_request {
 			.xpect_contains("rawbytes");
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn body_stream() {
 		use bytes::Bytes;
@@ -154,7 +181,7 @@ mod test_request {
 			.xpect_err();
 	}
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn query_params_work() {
 		Request::get(format!("{HTTPBIN}/get"))
@@ -183,7 +210,7 @@ mod test_request {
 
 
 #[cfg(test)]
-#[cfg(any(feature = "reqwest", target_arch = "wasm32"))]
+#[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -191,7 +218,7 @@ mod test_response {
 	// const HTTPBIN: &str = "https://httpbin.org";
 	const HTTPBIN: &str = "https://httpbin.dev";
 
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn post() {
 		Request::post(format!("{HTTPBIN}/post"))
@@ -205,7 +232,7 @@ mod test_response {
 			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
 			.xpect_eq("bar");
 	}
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	#[ignore = "flaky httpbin"]
 	async fn stream() {
 		let res = Request::get(format!("{HTTPBIN}/stream/3"))

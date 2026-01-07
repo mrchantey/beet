@@ -44,14 +44,17 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
+ureq = ["dep:ureq"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
+	"ureq?/native-tls",
 	"async-tungstenite?/async-native-tls",
 	"dep:async-native-tls"
 ]
 rustls-tls = [
 	"reqwest?/rustls-tls",
+	"ureq?/rustls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls"
@@ -99,6 +102,7 @@ async-process = { workspace = true, optional = true }
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",
 ] }
+ureq = { version = "3.1", default-features = false, optional = true }
 async-tungstenite = { version = "0.31", optional = true, default-features = false, features = [
 "async-std-runtime",
 "futures-03-sink"
@@ -168,7 +172,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
+beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls"] }
 sweet.workspace = true
 
 

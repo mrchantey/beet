@@ -6,53 +6,51 @@ use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 
 
-pub(crate) async fn send_wasm(request: Request) -> Result<Response> {
-	let request: web_sys::Request = request.try_into()?;
+pub(super) async fn send_wasm(request: Request) -> Result<Response> {
+	let request: web_sys::Request = into_request(request)?;
 	let window = web_sys::window().ok_or_else(|| bevyhow!("No window"))?;
 	let promise = window.fetch_with_request(&request);
-	let resp_js = wasm_bindgen_futures::JsFuture::from(promise)
+	let res = wasm_bindgen_futures::JsFuture::from(promise)
 		.await
 		.map_jserr()?;
-	let resp = resp_js.dyn_into::<web_sys::Response>().map_jserr()?;
+	let res = res.dyn_into::<web_sys::Response>().map_jserr()?;
 
-	Response::from_web_sys(resp).await
+	into_response(res).await
 }
 
-impl TryInto<web_sys::Request> for Request {
-	type Error = BevyError;
 
-	fn try_into(self) -> Result<web_sys::Request, Self::Error> {
-		let init = web_sys::RequestInit::new();
-		let method_str = self.method().to_string().to_uppercase();
-		init.set_method(&method_str);
+fn into_request(req: Request) -> Result<web_sys::Request> {
+	let init = web_sys::RequestInit::new();
+	let method_str = req.method().to_string().to_uppercase();
+	init.set_method(&method_str);
 
-		let (parts, body) = self.into_parts();
-		match &body {
-			Body::Bytes(bytes) if !bytes.is_empty() => {
-				init.set_body(&js_sys::Uint8Array::from(bytes.as_ref()));
-			}
-			Body::Stream(_) => {
-				let stream = create_readable_stream_from_body(body)?;
-				init.set_body(&stream);
-			}
-			Body::Bytes(_) => {
-				// Empty bytes, no body to set
-			}
+	let (parts, body) = req.into_parts();
+	match &body {
+		Body::Bytes(bytes) if !bytes.is_empty() => {
+			init.set_body(&js_sys::Uint8Array::from(bytes.as_ref()));
 		}
-
-		let url = parts.uri().to_string();
-		let request =
-			web_sys::Request::new_with_str_and_init(&url, &init).map_jserr()?;
-
-		// Set headers from our multimap
-		for (name, values) in parts.headers().iter_all() {
-			for value in values {
-				request.headers().set(name, value).map_jserr()?;
-			}
+		Body::Stream(_) => {
+			let stream = create_readable_stream_from_body(body)?;
+			init.set_body(&stream);
 		}
-		Ok(request)
+		Body::Bytes(_) => {
+			// Empty bytes, no body to set
+		}
 	}
+
+	let url = parts.uri().to_string();
+	let request =
+		web_sys::Request::new_with_str_and_init(&url, &init).map_jserr()?;
+
+	// Set headers from our multimap
+	for (name, values) in parts.headers().iter_all() {
+		for value in values {
+			request.headers().set(name, value).map_jserr()?;
+		}
+	}
+	Ok(request)
 }
+
 
 fn create_readable_stream_from_body(
 	body: Body,
@@ -104,80 +102,75 @@ fn create_readable_stream_from_body(
 }
 
 
+async fn into_response(res: web_sys::Response) -> Result<Response> {
+	// Status
+	let status = StatusCode::from_u16(res.status() as u16)
+		.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
+	// Build ResponseParts with headers
+	let mut parts = ResponseParts::new(status);
 
-impl Response {
-	pub async fn from_web_sys(resp: web_sys::Response) -> Result<Self> {
-		// Status
-		let status = StatusCode::from_u16(resp.status() as u16)
-			.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-
-		// Build ResponseParts with headers
-		let mut parts = ResponseParts::new(status);
-
-		let headers_iter = resp.headers();
-		let js_iter = js_sys::try_iter(&headers_iter)
-			.map_jserr()?
-			.ok_or_else(|| bevyhow!("no iterator"))?;
-		for entry in js_iter {
-			let entry = entry.map_jserr()?;
-			let arr = js_sys::Array::from(&entry);
-			if arr.length() == 2 {
-				let key = arr.get(0).as_string().unwrap_or_default();
-				let value = arr.get(1).as_string().unwrap_or_default();
-				parts.parts_mut().insert_header(key.to_lowercase(), value);
-			}
+	let headers_iter = res.headers();
+	let js_iter = js_sys::try_iter(&headers_iter)
+		.map_jserr()?
+		.ok_or_else(|| bevyhow!("no iterator"))?;
+	for entry in js_iter {
+		let entry = entry.map_jserr()?;
+		let arr = js_sys::Array::from(&entry);
+		if arr.length() == 2 {
+			let key = arr.get(0).as_string().unwrap_or_default();
+			let value = arr.get(1).as_string().unwrap_or_default();
+			parts.parts_mut().insert_header(key.to_lowercase(), value);
 		}
-
-		let is_bytes = parts
-			.get_header("content-length")
-			.and_then(|val| val.parse::<u64>().ok())
-			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
-
-		let body: Body = if is_bytes {
-			// body is bytes
-			let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
-				resp.array_buffer().map_jserr()?,
-			)
-			.await
-			.map_jserr()?;
-			let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
-			let mut bytes_vec = vec![0; array_buffer.length() as usize];
-			array_buffer.copy_to(&mut bytes_vec);
-			Body::Bytes(Bytes::from(bytes_vec))
-		} else {
-			// body is stream
-			use bytes::Bytes;
-			use futures::stream;
-			use js_sys::Uint8Array;
-			use wasm_bindgen::prelude::*;
-			use wasm_bindgen_futures::JsFuture;
-			use web_sys::ReadableStreamDefaultReader;
-			let body = resp.body().ok_or_else(|| bevyhow!("No body"))?;
-
-			let reader: ReadableStreamDefaultReader =
-				body.get_reader().dyn_into().unwrap();
-
-			let byte_stream = stream::unfold(reader, |reader| async move {
-				let chunk = JsFuture::from(reader.read()).await.ok()?;
-				let done =
-					js_sys::Reflect::get(&chunk, &JsValue::from_str("done"))
-						.ok()?
-						.as_bool()?;
-				if done {
-					return None;
-				}
-
-				let value =
-					js_sys::Reflect::get(&chunk, &JsValue::from_str("value"))
-						.ok()?;
-				let bytes = Uint8Array::new(&value).to_vec();
-				Some((Ok(Bytes::from(bytes)), reader))
-			});
-
-			Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
-		};
-
-		Ok(Response::from_parts(parts, Bytes::new()).with_body(body))
 	}
+
+	let is_bytes = parts
+		.get_header("content-length")
+		.and_then(|val| val.parse::<u64>().ok())
+		.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
+
+	let body: Body = if is_bytes {
+		// body is bytes
+		let js_array_buffer = wasm_bindgen_futures::JsFuture::from(
+			res.array_buffer().map_jserr()?,
+		)
+		.await
+		.map_jserr()?;
+		let array_buffer = js_sys::Uint8Array::new(&js_array_buffer);
+		let mut bytes_vec = vec![0; array_buffer.length() as usize];
+		array_buffer.copy_to(&mut bytes_vec);
+		Body::Bytes(Bytes::from(bytes_vec))
+	} else {
+		// body is stream
+		use bytes::Bytes;
+		use futures::stream;
+		use js_sys::Uint8Array;
+		use wasm_bindgen::prelude::*;
+		use wasm_bindgen_futures::JsFuture;
+		use web_sys::ReadableStreamDefaultReader;
+		let body = res.body().ok_or_else(|| bevyhow!("No body"))?;
+
+		let reader: ReadableStreamDefaultReader =
+			body.get_reader().dyn_into().unwrap();
+
+		let byte_stream = stream::unfold(reader, |reader| async move {
+			let chunk = JsFuture::from(reader.read()).await.ok()?;
+			let done = js_sys::Reflect::get(&chunk, &JsValue::from_str("done"))
+				.ok()?
+				.as_bool()?;
+			if done {
+				return None;
+			}
+
+			let value =
+				js_sys::Reflect::get(&chunk, &JsValue::from_str("value"))
+					.ok()?;
+			let bytes = Uint8Array::new(&value).to_vec();
+			Some((Ok(Bytes::from(bytes)), reader))
+		});
+
+		Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
+	};
+
+	Ok(Response::from_parts(parts, Bytes::new()).with_body(body))
 }

@@ -301,7 +301,7 @@ mod test {
 	}
 
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-	#[sweet::test(tokio)]
+	#[sweet::test]
 	async fn server() {
 		let server = HttpServer::new_test().with_handler(flow_route_handler);
 		let url = server.local_url();
