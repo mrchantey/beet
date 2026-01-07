@@ -1,0 +1,12 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    ResolveSnippets::resolve((
+        NodeTag(String::from("entity")),
+        ElementNode { self_closing: true },
+        OnSpawnDeferred::insert(
+            <EmptyEntity as Props>::Builder::default().build().into_bundle(),
+        ),
+    ))
+}

@@ -1,0 +1,7 @@
+#[allow(unused, missing_docs)]
+pub mod routes {
+    use super::*;
+    pub fn index() -> &'static str {
+        "/"
+    }
+}

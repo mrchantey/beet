@@ -1,0 +1,21 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    ResolveSnippets::resolve((
+        SnippetRoot {
+            file: WsPathBuf::new(
+                "crates/beet_parse/src/tokenize/tokenize_template.rs",
+            ),
+            start: LineCol { line: 1u32, col: 0u32 },
+        },
+        InstanceRoot,
+        FragmentNode,
+        related! {
+            Children[(ExprIdx(0u32), NodeTag(String::from("Foo")), FragmentNode,
+            TemplateNode, OnSpawnDeferred::insert(TemplateRoot::spawn(Spawn(< Foo as
+            Props > ::Builder::default().r#type("bar").build().into_bundle()))
+            .into_bundle()))]
+        },
+    ))
+}

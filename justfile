@@ -184,8 +184,8 @@ snap:
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
     cargo test -p beet_parse 				--lib --all-features -- --snap
-    cargo test -p beet_router 				--lib --all-features -- --snap
-    cargo test -p beet_rsx 				--lib --all-features -- --snap
+    cargo test -p beet_router 			--lib --all-features -- --snap
+    cargo test -p beet_rsx 					--lib --all-features -- --snap
 
 # cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:

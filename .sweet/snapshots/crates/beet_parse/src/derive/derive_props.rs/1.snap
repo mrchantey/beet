@@ -1,0 +1,43 @@
+use beet_dom::prelude::*;
+impl Props for MyNode {
+    type Builder = MyNodeBuilder;
+    type Required = MyNodeRequired;
+}
+#[allow(missing_docs)]
+#[derive(Buildable)]
+struct MyNodeBuilder {
+    is_required: Option<u32>,
+    is_optional: Option<u32>,
+    #[field(default = 7)]
+    is_default: u32,
+    #[field(default)]
+    is_generic_default: Foo<u32>,
+}
+impl Default for MyNodeBuilder {
+    fn default() -> Self {
+        Self {
+            is_required: Default::default(),
+            is_optional: Default::default(),
+            is_default: 7,
+            is_generic_default: Default::default(),
+        }
+    }
+}
+impl PropsBuilder for MyNodeBuilder {
+    type Props = MyNode;
+    fn build(self) -> Self::Props {
+        Self::Props {
+            is_required: self
+                .is_required
+                .expect("Missing required field `MyNode::is_required`"),
+            is_optional: self.is_optional,
+            is_default: self.is_default,
+            is_generic_default: self.is_generic_default,
+        }
+    }
+}
+#[allow(missing_docs)]
+#[derive(Default)]
+struct MyNodeRequired {
+    pub is_required: bool,
+}

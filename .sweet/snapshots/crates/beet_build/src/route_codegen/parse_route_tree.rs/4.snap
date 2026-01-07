@@ -1,0 +1,27 @@
+#[allow(unused, missing_docs)]
+pub mod routes {
+    use super::*;
+    pub fn index() -> &'static str {
+        "/"
+    }
+    pub fn bazz() -> &'static str {
+        "/bazz"
+    }
+    #[allow(unused, missing_docs)]
+    pub mod foo {
+        use super::*;
+        pub fn bar() -> &'static str {
+            "/foo/bar"
+        }
+        #[allow(unused, missing_docs)]
+        pub mod bazz {
+            use super::*;
+            pub fn index() -> &'static str {
+                "/foo/bazz"
+            }
+            pub fn boo() -> &'static str {
+                "/foo/bazz/boo"
+            }
+        }
+    }
+}

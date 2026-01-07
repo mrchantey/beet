@@ -14,7 +14,11 @@ publish = true
 
 [features]
 default = ["serde", "fs"]
-reflect_documentation = ["bevy/reflect_documentation"]
+# reflect_documentation = [
+# # TODO broken bevy 0.18
+# # "bevy/bevy_reflect",
+# "bevy/reflect_documentation"
+# ]
 server = [
 	"beet_net/server",
 	# technically only required for internal tests
@@ -74,11 +78,12 @@ web-sys = { workspace = true, features = ["Storage"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"]}
-sweet.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-# TODO no more sweet -> beet_router dep so this can be in regular dev-deps
 sweet = { workspace = true, features = ["runner"] }
+# sweet.workspace = true
+
+# [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+# TODO no more sweet -> beet_router dep so this can be in regular dev-deps
+# sweet = { workspace = true, features = ["runner"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

@@ -1,0 +1,34 @@
+impl beet_core::prelude::TokenizeSelf for MyEnum {
+    fn self_tokens(&self, tokens: &mut beet_core::exports::proc_macro2::TokenStream) {
+        use beet_core::exports::quote;
+        use beet_core::exports::proc_macro2;
+        match self {
+            Self::A => {
+                tokens
+                    .extend(
+                        quote::quote! {
+                            MyEnum::A
+                        },
+                    );
+            }
+            Self::B(field0) => {
+                let field0 = field0.self_token_stream();
+                tokens
+                    .extend(
+                        quote::quote! {
+                            MyEnum::B(# field0)
+                        },
+                    );
+            }
+            Self::C { value } => {
+                let value = value.self_token_stream();
+                tokens
+                    .extend(
+                        quote::quote! {
+                            MyEnum::C { value : # value }
+                        },
+                    );
+            }
+        }
+    }
+}

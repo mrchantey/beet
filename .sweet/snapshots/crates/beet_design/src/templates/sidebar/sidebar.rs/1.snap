@@ -1,0 +1,28 @@
+SidebarNode {
+    display_name: "Root",
+    path: None,
+    children: [
+        SidebarNode {
+            display_name: "Docs",
+            path: Some(
+                RoutePath(
+                    "/docs",
+                ),
+            ),
+            children: [
+                SidebarNode {
+                    display_name: "Testing",
+                    path: Some(
+                        RoutePath(
+                            "/docs/testing",
+                        ),
+                    ),
+                    children: [],
+                    expanded: false,
+                },
+            ],
+            expanded: false,
+        },
+    ],
+    expanded: false,
+}

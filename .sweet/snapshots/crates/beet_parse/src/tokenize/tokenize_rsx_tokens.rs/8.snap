@@ -1,0 +1,24 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    (
+        SnippetRoot {
+            file: WsPathBuf::new(
+                "crates/beet_parse/src/tokenize/tokenize_rsx_tokens.rs",
+            ),
+            start: LineCol { line: 1u32, col: 0u32 },
+        },
+        InstanceRoot,
+        FragmentNode,
+        related! {
+            Children[(NodeTag(String::from("br")), ElementNode { self_closing : true
+            }, related! { Attributes[(AttributeKey(String::from("foo")),
+            NodeExpr(SendWrapper::new(syn::parse_quote!({ let class = "bar";
+            (NodeTag(String::from("div")), ElementNode { self_closing : true },
+            related!(Attributes[(AttributeKey::new("class"),
+            OnSpawnDeferred::insert(#[allow(unused_braces)] { class }
+            .into_bundle()), ExprIdx(1u32))])) }))))] })]
+        },
+    )
+}

@@ -1,0 +1,12 @@
+{
+    #[allow(unused)]
+    use beet_dom::prelude::*;
+    #[allow(unused)]
+    ResolveSnippets::resolve((
+        NodeTag(String::from("func")),
+        ElementNode { self_closing: true },
+        OnSpawnDeferred::insert(
+            <Func as Props>::Builder::default().foo(bar).build().into_bundle(),
+        ),
+    ))
+}
