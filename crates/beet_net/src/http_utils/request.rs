@@ -380,7 +380,6 @@ impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	#[test]
 	fn request_get() {

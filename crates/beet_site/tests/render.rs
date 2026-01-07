@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet::prelude::*;
 use beet_site::prelude::*;
-use beet_core::prelude::*;
 
 #[sweet::test]
 async fn test_layouts_series() {

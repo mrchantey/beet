@@ -138,7 +138,6 @@ fn deno_runner_path() -> PathBuf {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {
