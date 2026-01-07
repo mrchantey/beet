@@ -222,10 +222,10 @@ test-rsx *args:
     cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
 
 test crate *args:
-    sweet test -p {{ crate }} --lib --watch {{ args }}
+    just watch cargo test -p {{ crate }} --lib {{ args }}
 
 test-int crate test *args:
-    sweet test -p {{ crate }} --watch --test {{ test }} {{ args }}
+    just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}
 
 test-e2e crate *args:
     just watch cargo test -p {{ crate }} --lib --features=e2e -- 														--e2e	--watch {{ args }}
@@ -294,11 +294,7 @@ publish *args:
     cargo publish --workspace --allow-dirty --no-verify {{ args }}
 
 watch *command:
-    sweet watch \
-    --include '**/*.rs' \
-    --exclude '{.git,target,html}/**' \
-    --exclude '*/codegen/*' \
-    --cmd "{{ command }}"
+    just cli watch "{{ command }}"
 
 #💡 Misc
 

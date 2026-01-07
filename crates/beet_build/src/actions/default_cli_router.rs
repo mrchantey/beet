@@ -27,28 +27,25 @@ pub fn default_cli_router() -> impl Bundle {
 			EndpointBuilder::default()
 				.with_path("run-wasm/*binary-path")
 				.with_handler_bundle(run_wasm()),
-			// (single_action_route("", help())),
-			(single_action_route(
+			single_action_route("watch/*cmd?", watch()),
+			single_action_route(
 				"refresh-sst",
 				SstCommand::new(SstSubcommand::Refresh)
-			)),
-			(single_action_route(
+			),
+			single_action_route(
 				"deploy-sst",
 				SstCommand::new(SstSubcommand::Deploy)
-			)),
-			(single_action_route("build-wasm", build_wasm())),
-			(single_action_route("build-lambda", CompileLambda)),
-			(single_action_route("deploy-lambda", DeployLambda)),
-			(single_action_route("watch-lambda", WatchLambda)),
-			(single_action_route("push-assets", PushAssets)),
-			(single_action_route("pull-assets", PullAssets)),
-			(single_action_route("push-html", PushHtml)),
-			(single_action_route("build", BuildServer)),
-			(single_action_route(
-				"parse-files",
-				import_and_parse_source_files()
-			)),
-			(named_route("parse-source-files", children![
+			),
+			single_action_route("build-wasm", build_wasm()),
+			single_action_route("build-lambda", CompileLambda),
+			single_action_route("deploy-lambda", DeployLambda),
+			single_action_route("watch-lambda", WatchLambda),
+			single_action_route("push-assets", PushAssets),
+			single_action_route("pull-assets", PullAssets),
+			single_action_route("push-html", PushHtml),
+			single_action_route("build", BuildServer),
+			single_action_route("parse-files", import_and_parse_source_files()),
+			named_route("parse-source-files", children![
 				exact_path_match(),
 				import_source_files(),
 				(
@@ -73,8 +70,8 @@ pub fn default_cli_router() -> impl Bundle {
 					]
 				),
 				// respond_ok()
-			])),
-			(named_route("run", children![
+			]),
+			named_route("run", children![
 				exact_path_match(),
 				import_source_files(),
 				(
@@ -96,16 +93,16 @@ pub fn default_cli_router() -> impl Bundle {
 						// bevyhow!("unreachable! server shouldnt exit")
 					]
 				),
-			])),
-			(named_route("serve", children![
+			]),
+			named_route("serve", children![
 				exact_path_match(),
 				(Name::new("Serve"), Sequence, children![
 					BuildServer,
 					ExportStaticContent,
 					RunServer,
 				]),
-			])),
-			(named_route("deploy", children![
+			]),
+			named_route("deploy", children![
 				exact_path_match(),
 				import_and_parse_source_files(),
 				// apply after import to avoid clobber,
@@ -123,7 +120,41 @@ pub fn default_cli_router() -> impl Bundle {
 				DeployLambda,
 				WatchLambda,
 				respond_ok()
-			]))
+			])
+		],
+	)
+}
+
+fn watch() -> impl Bundle {
+	(
+		Name::new("Watch"),
+		// only insert the watcher after first run
+		InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
+		RunOnDirEvent,
+		InfallibleSequence,
+		OnSpawn::observe(|ev: On<DirEvent>| {
+			println!("Dir event: {}", ev.event());
+		}),
+		children![
+			(
+				Name::new("Run command"),
+				OnSpawn::observe(
+					|ev: On<GetOutcome>,
+					 mut cmd_runner: CommandRunner|
+					 -> Result {
+						let args = env_ext::args();
+						// skip the 'watch' command
+						let args = &args[1..].join(" ");
+						let config = CommandConfig::parse_shell(args);
+						cmd_runner.run(ev, config)?;
+						Ok(())
+					}
+				)
+			),
+			(
+				Name::new("Await file change"),
+				// never returns
+			),
 		],
 	)
 }
