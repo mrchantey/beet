@@ -1,3 +1,10 @@
+//! This module should be in `sweet` but exists here to avoid the issue of cyclic dependencies.
+//! The sweet runner depends on internal crates like `beet_net` and those crates use `sweet` for testing.
+//! While this is technically allowed by cargo because a crate's test build is seperate from the library build,
+//! it should be avoided during development for two major reasons:
+//! - Compilation times: A small change to `beet_core` would trigger recompilation of sweet and all its internal deps as well as the crate itself.
+//! - Rust Analyzer: Rust Analyzer [gives up](https://github.com/rust-lang/rust-analyzer/issues/14167) when coming across this kind of cyclic dependency.
+
 mod close_to;
 mod matcher_control_flow;
 mod matcher_not;
