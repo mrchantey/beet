@@ -33,23 +33,27 @@ use std::cmp::Ordering;
 pub struct HighestScore(HashMap<Entity, Score>);
 
 fn on_start(
-	mut ev: On<GetOutcome>,
+	ev: On<GetOutcome>,
+	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.action())?;
+	let target = ev.target();
+	let (mut action, children) = query.get_mut(target)?;
 	action.clear();
 
 	for child in children.iter() {
-		ev.trigger_action_with_cx(child, GetScore);
+		commands.entity(child).trigger_target(GetScore);
 	}
 	Ok(())
 }
 
 fn on_receive_score(
-	mut ev: On<ChildEnd<Score>>,
+	ev: On<ChildEnd<Score>>,
+	mut commands: Commands,
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) -> Result {
-	let (mut action, children) = query.get_mut(ev.action())?;
+	let target = ev.target();
+	let (mut action, children) = query.get_mut(target)?;
 	action.insert(ev.child(), ev.value().clone());
 
 	// all children have reported their score, run the highest scoring child
@@ -58,7 +62,7 @@ fn on_receive_score(
 			.iter()
 			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
 			.ok_or_else(|| expect_action::to_have_children(&ev))?;
-		ev.trigger_action_with_cx(*highest, GetOutcome);
+		commands.entity(*highest).trigger_target(GetOutcome);
 	}
 	Ok(())
 }

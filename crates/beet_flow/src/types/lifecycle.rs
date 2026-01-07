@@ -3,19 +3,21 @@ use beet_core::prelude::*;
 
 
 /// Trait for specifying a 'Run' event, similar to a 'request' in a request-response pattern.
-pub trait RunEvent: ActionEvent {
+/// Events implementing this trait must use `EntityTargetTrigger` as their trigger type.
+pub trait RunEvent: EntityTargetEvent {
 	/// The corresponding 'End' event type
 	type End: EndEvent<Run = Self>;
 }
 
 /// Trait for specifying an 'End' event, similar to a 'response' in a request-response pattern.
-pub trait EndEvent: ActionEvent {
+/// Events implementing this trait must use `EntityTargetTrigger` as their trigger type.
+pub trait EndEvent: EntityTargetEvent + Clone {
 	/// The corresponding 'Run' event type
 	type Run: RunEvent<End = Self>;
 }
 
 /// Event automatically triggered on the parent of an `event_target` when it triggers an [`End`].
-#[derive(Debug, Clone, PartialEq, Eq, ActionEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, EntityTargetEvent)]
 pub struct ChildEnd<T>
 where
 	T: 'static + Send + Sync,
@@ -41,21 +43,16 @@ where
 
 impl<T> ChildEnd<T>
 where
-	T: Clone + ActionEvent,
+	T: Clone + Event,
 {
-	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists,
-	/// propagating the [`ActionTrigger::agent`]
-	pub fn trigger(mut commands: Commands, ev: &On<T>) {
-		let child = ev.action();
-		let value = ev.event().clone();
-		let agent = ev.agent();
-
+	/// Trigger [`ChildEnd<T>`] for the *parent* of this event target if it exists.
+	pub fn trigger(mut commands: Commands, child: Entity, value: T) {
 		commands.queue(move |world: &mut World| {
 			if let Some(parent) = world.entity(child).get::<ChildOf>().clone() {
 				let parent = parent.parent();
-				world.entity_mut(parent).trigger_target(
-					ChildEnd { child, value }.with_agent(agent),
-				);
+				world
+					.entity_mut(parent)
+					.trigger_target(ChildEnd { child, value });
 			}
 		})
 	}
@@ -64,7 +61,7 @@ where
 	/// Get the [`End`] event that the child triggered
 	pub fn value(&self) -> &T { &self.value }
 	/// Convert a [`ChildEnd`] to an [`End`] by discarding
-	/// the `child` field and transfering the `target`
+	/// the `child` field
 	pub fn inner(self) -> T { self.value }
 }
 
@@ -83,25 +80,23 @@ impl<T> Default for PreventPropagateEnd<T> {
 
 /// Propagate the [`End`] event as a [`ChildEnd`] to this entities
 /// parent if it exists.
-pub(crate) fn propagate_end<T: ActionEvent>(ev: On<T>, commands: Commands)
-where
-	T: 'static + Send + Sync + Clone,
-{
-	ChildEnd::trigger(commands, &ev);
+pub(crate) fn propagate_end<T: EndEvent>(ev: On<T>, commands: Commands) {
+	ChildEnd::trigger(commands, ev.target(), ev.event().clone());
 }
 
 /// Propagate the [`ChildEnd`] event as an [`End`] on this entity
 /// unless it has a [`PreventPropagateEnd`] component.
 pub(crate) fn propagate_child_end<T>(
-	mut ev: On<ChildEnd<T>>,
+	ev: On<ChildEnd<T>>,
+	mut commands: Commands,
 	prevent: Query<(), With<PreventPropagateEnd>>,
 ) where
-	ChildEnd<T>: Clone + ActionEvent,
-	T: 'static + Send + Sync + Clone + ActionEvent,
+	T: EntityTargetEvent + Clone,
 {
-	let target = ev.action();
+	let target = ev.target();
 	if !prevent.contains(target) {
-		ev.propagate_child();
+		let value = ev.event().clone().inner();
+		commands.entity(target).trigger_target(value);
 	}
 }
 
@@ -114,20 +109,21 @@ mod test {
 	#[derive(Component)]
 	struct Parent;
 
-	fn run_child(mut ev: On<GetOutcome>, children: Query<&Children>) {
-		let child = children.get(ev.action()).unwrap()[0];
-		ev.trigger_action_with_cx(child, GetOutcome);
+	fn run_child(
+		ev: On<GetOutcome>,
+		children: Query<&Children>,
+		mut commands: Commands,
+	) {
+		let child = children.get(ev.target()).unwrap()[0];
+		commands.entity(child).trigger_target(GetOutcome);
 	}
 
 	#[action(succeed)]
 	#[derive(Component)]
-	// #[require(PreventPropagateEnd)]
 	struct Child;
 
 	fn succeed(ev: On<GetOutcome>, mut commands: Commands) {
-		commands
-			.entity(ev.action())
-			.trigger_target(Outcome::Pass);
+		commands.entity(ev.target()).trigger_target(Outcome::Pass);
 	}
 
 	#[test]

@@ -29,22 +29,31 @@ use beet_core::prelude::*;
 #[require(PreventPropagateEnd)]
 pub struct Sequence;
 
-fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
-	let children = query.get(ev.action())?;
+fn on_start(
+	ev: On<GetOutcome>,
+	mut commands: Commands,
+	query: Query<&Children>,
+) -> Result {
+	let target = ev.target();
+	let children = query.get(target)?;
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_action_with_cx(first_child, GetOutcome);
+		commands.entity(first_child).trigger_target(GetOutcome);
 	} else {
-		ev.trigger_with_cx(Outcome::Pass);
+		commands.entity(target).trigger_target(Outcome::Pass);
 	}
 	Ok(())
 }
 
-fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
-	let target = ev.action();
+fn on_next(
+	ev: On<ChildEnd<Outcome>>,
+	mut commands: Commands,
+	query: Query<&Children>,
+) -> Result {
+	let target = ev.target();
 	let child = ev.child();
 	// if any error, just propagate the error
 	if ev.is_fail() {
-		ev.propagate_child();
+		commands.entity(target).trigger_target(ev.value().clone());
 		return Ok(());
 	}
 	let children = query.get(target)?;
@@ -54,10 +63,12 @@ fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
 		.ok_or_else(|| expect_action::to_have_child(&ev, child))?;
 	if index == children.len() - 1 {
 		// all done, propagate the success
-		ev.propagate_child();
+		commands.entity(target).trigger_target(ev.value().clone());
 	} else {
 		// run next
-		ev.trigger_action_with_cx(children[index + 1], GetOutcome);
+		commands
+			.entity(children[index + 1])
+			.trigger_target(GetOutcome);
 	}
 	Ok(())
 }

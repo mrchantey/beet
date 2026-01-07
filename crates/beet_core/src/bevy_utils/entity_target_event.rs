@@ -123,10 +123,31 @@ unsafe impl<
 	}
 }
 
+/// A trait for events that use [`EntityTargetTrigger`] as their trigger type.
+/// This provides access to `.target()` on the observer's `On<E>` parameter.
+pub trait EntityTargetEvent:
+	'static
+	+ Send
+	+ Sync
+	+ for<'a> Event<
+		Trigger<'a> = EntityTargetTrigger<false, Self, &'static ChildOf>,
+	>
+{
+}
+
+impl<T> EntityTargetEvent for T where
+	T: 'static
+		+ Send
+		+ Sync
+		+ for<'a> Event<
+			Trigger<'a> = EntityTargetTrigger<false, T, &'static ChildOf>,
+		>
+{
+}
+
 /// An encompasing trait that includes all entity-like events:
 /// - [`EntityEvent`]
 /// - [`EntityTargetEvent`]
-/// - [`ActionEvent`]
 pub trait IntoEntityTargetEvent<M>: 'static + Send + Sync {
 	type Event: for<'a> Event<Trigger<'a> = Self::Trigger>;
 	type Trigger: 'static + Send + Sync + Trigger<Self::Event>;

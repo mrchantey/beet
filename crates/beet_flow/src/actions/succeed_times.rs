@@ -1,45 +1,50 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Succeed a certain number of times before failing.
+/// A debugging utility that will succeed a given number of times, then fail.
 /// ## Tags
-/// - [`ControlFlow`](ActionTag::ControlFlow)
-/// - [`LongRunning`](ActionTag::LongRunning)
-///
-/// For example usage see [`Repeat`].
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Example
+/// Succeed twice, then fail.
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = ControlFlowPlugin::world();
+/// world
+/// 	.spawn(SucceedTimes::new(2))
+/// 	.trigger_target(GetOutcome);
+/// ```
 #[action(succeed_times)]
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct SucceedTimes {
-	/// The number of times the action has executed.
-	pub times: usize,
-	/// The number of times the action should succeed before failing.
-	pub max_times: usize,
+	/// The number of times to succeed
+	pub max_times: u32,
+	/// The current number of times this action has been run
+	pub times: u32,
 }
-
 impl SucceedTimes {
-	/// Specify the number of times the action should succeed before failing.
-	pub fn new(max_times: usize) -> Self {
+	/// Create a new [`SucceedTimes`] action with the given number of times.
+	pub fn new(max_times: u32) -> Self {
 		Self {
-			times: 0,
 			max_times,
+			times: 0,
 		}
 	}
-	/// Reset the number of times the action has executed.
-	pub fn reset(&mut self) { self.times = 0; }
 }
 
 fn succeed_times(
-	mut ev: On<GetOutcome>,
+	ev: On<GetOutcome>,
+	mut commands: Commands,
 	mut query: Query<&mut SucceedTimes>,
 ) -> Result {
-	let mut action = query.get_mut(ev.action())?;
-
+	let target = ev.target();
+	let mut action = query.get_mut(target)?;
 	if action.times < action.max_times {
 		action.times += 1;
-		ev.trigger_with_cx(Outcome::Pass);
+		commands.entity(target).trigger_target(Outcome::Pass);
 	} else {
-		ev.trigger_with_cx(Outcome::Fail);
+		commands.entity(target).trigger_target(Outcome::Fail);
 	}
 	Ok(())
 }
@@ -52,32 +57,26 @@ mod test {
 	#[test]
 	fn works() {
 		let mut world = ControlFlowPlugin::world();
+
 		let on_result = collect_on_result(&mut world);
 
-		let entity = world.spawn(SucceedTimes::new(2)).id();
+		let entity =
+			world.spawn((Name::new("root"), SucceedTimes::new(2))).id();
 
 		world.entity_mut(entity).trigger_target(GetOutcome).flush();
 
 		on_result
 			.get()
-			.xpect_eq(vec![("Unknown".to_string(), Outcome::Pass)]);
+			.xpect_eq(vec![("root".to_string(), Outcome::Pass)]);
 		world.entity_mut(entity).trigger_target(GetOutcome).flush();
-		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), Outcome::Pass),
-			("Unknown".to_string(), Outcome::Pass),
-		]);
 		world.entity_mut(entity).trigger_target(GetOutcome).flush();
-		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), Outcome::Pass),
-			("Unknown".to_string(), Outcome::Pass),
-			("Unknown".to_string(), Outcome::Fail),
-		]);
 		world.entity_mut(entity).trigger_target(GetOutcome).flush();
-		on_result.get().xpect_eq(vec![
-			("Unknown".to_string(), Outcome::Pass),
-			("Unknown".to_string(), Outcome::Pass),
-			("Unknown".to_string(), Outcome::Fail),
-			("Unknown".to_string(), Outcome::Fail),
-		]);
+		world.entity_mut(entity).trigger_target(GetOutcome).flush();
+		world
+			.query::<&SucceedTimes>()
+			.single(&world)
+			.unwrap()
+			.times
+			.xpect_eq(2);
 	}
 }

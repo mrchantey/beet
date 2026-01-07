@@ -56,18 +56,19 @@ fn repeat(
 	query: Query<&Repeat>,
 	mut commands: Commands,
 ) -> Result {
-	let repeat = query.get(ev.action())?;
+	let target = ev.target();
+	let repeat = query.get(target)?;
 	if let Some(check) = &repeat.if_result_matches {
 		if *ev != *check {
 			// repeat is completed, propagate the result to the parent if it exists
-			ChildEnd::trigger(commands, &ev);
+			ChildEnd::trigger(commands, target, ev.event().clone());
 			return Ok(());
 		}
 	}
 	// otherwise run again on the next tick
 	commands
-		.entity(ev.action())
-		.insert(TriggerDeferred::new(GetOutcome).with_agent(ev.agent()));
+		.entity(target)
+		.insert(TriggerDeferred::get_outcome());
 	Ok(())
 }
 

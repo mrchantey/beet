@@ -1,10 +1,8 @@
 //! General purpose types used by actions in beet_flow.
-mod action_context;
 mod debug_flow_plugin;
 mod outcome;
 mod ready;
 mod schedule_label_ext;
-pub use action_context::*;
 pub use debug_flow_plugin::*;
 pub use ready::*;
 pub use schedule_label_ext::*;
@@ -20,10 +18,6 @@ mod control_flow_plugin;
 pub use control_flow_plugin::*;
 mod run_timer;
 pub use run_timer::*;
-mod action_event;
-mod async_action;
-pub use action_event::*;
-pub use async_action::*;
 mod agent;
 pub use agent::*;
 mod target_entity;
@@ -47,6 +41,6 @@ pub struct Action;
 /// > A no-op struct used for documentation purposes
 /// It is common for actions to have a single 'target' entity,
 /// for example each node in a behavior tree will do work on
-/// the entity with the [`Transform`], so the [`ActionContext`]
-/// tracks this entity as it traverses the tree.sd
+/// the entity with the [`Transform`]. Use [`AgentQuery`] to
+/// resolve the agent for a given action.
 pub struct Agent;

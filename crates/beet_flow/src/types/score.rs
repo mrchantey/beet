@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 	PartialOrd,
 	Component,
 	Reflect,
-	ActionEvent,
+	EntityTargetEvent,
 )]
 pub struct GetScore;
 
@@ -41,7 +41,7 @@ impl RunEvent for GetScore {
 	DerefMut,
 	Component,
 	Reflect,
-	ActionEvent,
+	EntityTargetEvent,
 )]
 pub struct Score(pub f32);
 

@@ -1,11 +1,15 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// An action that runs all of its children in order no matter what they return.
-/// When the last child finishes it will return [`Outcome::Pass`]
+/// Similar to [`Sequence`], but always succeeds regardless of child results.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Logic
+/// - If a child fails it will run the next child.
+/// - If a child succeeds it will run the next child.
+/// - If there are no more children to run it will succeed.
 /// ## Example
-/// Runs the first child, then the second child, then the third,
-/// and finally triggering [`Outcome::Pass`] on the root.
+/// Runs all children regardless of their results.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -15,7 +19,6 @@ use beet_core::prelude::*;
 /// 	children![
 /// 		EndWith(Outcome::Fail),
 /// 		EndWith(Outcome::Pass),
-/// 		EndWith(Outcome::Fail),
 ///    ]))
 ///		.trigger_target(GetOutcome)
 /// 	.flush();
@@ -26,30 +29,42 @@ use beet_core::prelude::*;
 #[require(PreventPropagateEnd)]
 pub struct InfallibleSequence;
 
-fn on_start(mut ev: On<GetOutcome>, query: Query<&Children>) -> Result {
-	let children = query.get(ev.action())?;
+fn on_start(
+	ev: On<GetOutcome>,
+	mut commands: Commands,
+	query: Query<&Children>,
+) -> Result {
+	let target = ev.target();
+	let children = query.get(target)?;
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_action_with_cx(first_child, GetOutcome);
+		commands.entity(first_child).trigger_target(GetOutcome);
 	} else {
-		ev.trigger_with_cx(Outcome::Pass);
+		commands.entity(target).trigger_target(Outcome::Pass);
 	}
 	Ok(())
 }
 
-fn on_next(mut ev: On<ChildEnd<Outcome>>, query: Query<&Children>) -> Result {
-	let target = ev.action();
+fn on_next(
+	ev: On<ChildEnd<Outcome>>,
+	mut commands: Commands,
+	query: Query<&Children>,
+) -> Result {
+	let target = ev.target();
 	let child = ev.child();
 	let children = query.get(target)?;
 	let index = children
 		.iter()
 		.position(|x| x == child)
 		.ok_or_else(|| expect_action::to_have_child(&ev, child))?;
+
 	if index == children.len() - 1 {
 		// all done, return pass
-		ev.trigger_with_cx(Outcome::Pass);
+		commands.entity(target).trigger_target(Outcome::Pass);
 	} else {
 		// run next
-		ev.trigger_action_with_cx(children[index + 1], GetOutcome);
+		commands
+			.entity(children[index + 1])
+			.trigger_target(GetOutcome);
 	}
 	Ok(())
 }

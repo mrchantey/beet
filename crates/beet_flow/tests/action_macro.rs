@@ -1,13 +1,12 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
 #[derive(Resource)]
 struct Visited;
 
-#[derive(ActionEvent)]
+#[derive(EntityTargetEvent)]
 struct Run<T: 'static + Send + Sync>(pub T);
 
 /// Demonstrates declaring generic and non-generic actions in macro

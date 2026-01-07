@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 	PartialOrd,
 	Ord,
 	Reflect,
-	ActionEvent,
+	EntityTargetEvent,
 )]
 pub struct GetOutcome;
 
@@ -31,7 +31,15 @@ impl RunEvent for GetOutcome {
 /// 'I successfully checked and no i am not near an enemy'.
 /// For actual error handling the system/observer should output a [`Result`]
 #[derive(
-	Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect, ActionEvent,
+	Debug,
+	Copy,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Reflect,
+	EntityTargetEvent,
 )]
 pub enum Outcome {
 	/// Similar to [`ControlFlow::Continue`], may mean this action
