@@ -343,8 +343,6 @@ fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
-
 
 	#[sweet::test]
 	fn builds_basic_sync_args() {
