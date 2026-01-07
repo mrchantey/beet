@@ -38,7 +38,6 @@ resolver = "2"
 exclude = [
 	"infra",
 	"examples/todo-app",
-	"crates/beet_mcp",
 	"crates/beet_build/tests/pipeline_test_crate",
 	"bevy"
 ]
