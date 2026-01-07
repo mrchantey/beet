@@ -1,3 +1,0 @@
-[
-  "NodeExpr(\n    SendWrapper::new(\n        syn::parse_quote!({ InnerText::new(#[allow(unused_braces)] { some_val }) }),\n    ),\n)",
-]

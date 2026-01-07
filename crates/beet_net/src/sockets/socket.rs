@@ -296,7 +296,6 @@ mod tests {
 	use futures::FutureExt;
 	use futures::StreamExt;
 	use futures::stream;
-	use beet_core::prelude::*;
 
 	#[derive(Default, Clone, Copy)]
 	struct DummyWriter {

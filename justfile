@@ -177,6 +177,16 @@ test-ci *args:
     just test-fmt
     just test-rsx
 
+snap:
+    cargo test -p sweet 						--lib --all-features -- --snap
+    cargo test -p beet_core_macros 	--lib --all-features -- --snap
+    cargo test -p beet_net					--lib --features=_sweet_runner,reqwest,tungstenite,native-tls -- --snap
+    cargo test -p beet_build 				--lib --all-features -- --snap
+    cargo test -p beet_design 			--lib --all-features -- --snap
+    cargo test -p beet_parse 				--lib --all-features -- --snap
+    cargo test -p beet_router 				--lib --all-features -- --snap
+    cargo test -p beet_rsx 				--lib --all-features -- --snap
+
 # cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:
     cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}

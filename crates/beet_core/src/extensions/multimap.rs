@@ -156,6 +156,10 @@ where
 		self.inner.entry(key).or_default().push(value);
 	}
 
+	pub fn insert_vec(&mut self, key: K, values: Vec<V>) {
+		self.inner.entry(key).or_default().extend(values);
+	}
+
 	/// Get the first value for a key.
 	pub fn get<Q>(&self, key: &Q) -> Option<&V>
 	where
