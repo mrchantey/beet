@@ -1,8 +1,9 @@
 //! Roundtrip bench of server requests
 use beet::prelude::*;
 
-#[tokio::main]
-async fn main() {
+
+fn main() { async_ext::block_on(main_async()); }
+async fn main_async() {
 	let _handle = std::thread::spawn(|| {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin::default()))

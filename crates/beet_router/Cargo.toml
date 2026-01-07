@@ -82,6 +82,3 @@ sweet = { workspace = true, features = ["runner"] }
 # [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 # TODO no more sweet -> beet_router dep so this can be in regular dev-deps
 # sweet = { workspace = true, features = ["runner"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true

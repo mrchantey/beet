@@ -1,8 +1,8 @@
 //! Example of using the beet router
 use beet::prelude::*;
 
-#[tokio::main]
-async fn main() {
+fn main() { async_ext::block_on(main_async()); }
+async fn main_async() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,

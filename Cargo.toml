@@ -159,14 +159,6 @@ async-io = "2"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
-# strictly for testing only
-tokio = { version = "1", features = [
-	"macros",
-	"sync",
-	"rt",
-	"rt-multi-thread",
-	"time",
-] }
 
 #💡 macros
 

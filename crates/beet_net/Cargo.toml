@@ -142,7 +142,14 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"behavior-version-latest",
 ] }
 # actually a dev-dep but we need optional
-tokio = { workspace=true, optional=true }
+# strictly for testing only
+tokio = { version = "1", features = [
+	# "macros",
+	# "sync",
+	# "rt",
+	# "rt-multi-thread",
+	# "time",
+], optional=true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

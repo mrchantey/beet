@@ -1475,7 +1475,6 @@ dependencies = [
  "serde_json",
  "sweet",
  "thiserror 1.0.69",
- "tokio",
  "tracing",
  "tracing-subscriber",
  "variadics_please",
