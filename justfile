@@ -178,6 +178,7 @@ test-ci *args:
     just test-rsx
 
 snap:
+    cargo test -p beet_core 				--lib --all-features -- --snap
     cargo test -p sweet 						--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
     cargo test -p beet_net					--lib --features=_sweet_runner,reqwest,tungstenite,native-tls -- --snap

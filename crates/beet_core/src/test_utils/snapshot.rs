@@ -357,6 +357,8 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 	}
 }
 
+// libtest doesnt allow us to pass the --snap option,
+// so use _sweet_runner feature with --snap for setting snapshots
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
