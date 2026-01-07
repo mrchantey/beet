@@ -104,13 +104,15 @@ beet_agent = { path = "crates/beet_agent", version = "0.0.8-dev.5" }
 beet = { path = "", version = "0.0.8-dev.5" }
 
 #💡 local
-bevy = { version = "0.18.0-rc.1", default-features = false, features = [
+bevy = { version = "0.18.0-rc.2", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
 	"bevy_log",
 	"bevy_color",
+	# bug, required cos bevy not compiling when beet_router includes this
+	# TODO remove after sweet local observers
 	"reflect_documentation",
-	# bevy reccommends to not do this in libraries but beet_core --all-features wont compile without it
+	# bevy recommends not to do this in libraries but beet_core --all-features wont compile without it
 	# even if feature forced on, not sure why
 	"reflect_auto_register",
 	# for most oneshot apps multi-threaded coldstart is much slower than
