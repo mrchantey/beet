@@ -27,8 +27,6 @@ pub use beet_parse as parse;
 pub use beet_router as router;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
-#[cfg(feature = "sim")]
-pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 pub mod prelude {
@@ -78,8 +76,6 @@ pub mod exports {
 	pub use crate::design::exports::*;
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
-	#[cfg(feature = "sim")]
-	pub use beet_sim::exports::*;
 	pub use bevy;
 }
 #[cfg(test)]

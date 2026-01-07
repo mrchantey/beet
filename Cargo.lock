@@ -1119,7 +1119,6 @@ dependencies = [
  "beet_parse",
  "beet_router",
  "beet_rsx",
- "beet_sim",
  "beet_spatial",
  "bevy",
  "clap",
@@ -1532,17 +1531,6 @@ dependencies = [
  "quote",
  "sweet",
  "syn 2.0.111",
-]
-
-[[package]]
-name = "beet_sim"
-version = "0.0.8-dev.5"
-dependencies = [
- "beet_core",
- "beet_flow",
- "beet_spatial",
- "bevy",
- "sweet",
 ]
 
 [[package]]

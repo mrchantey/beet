@@ -73,7 +73,6 @@ world
 | [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | An ECS control flow library                        |
 | [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Spatial actions built upon beet_flow               |
 | [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Machine Learning actions built upon beet_flow      |
-| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Game AI simulation primitives built upon beet_flow |
 
 
 ## Web
