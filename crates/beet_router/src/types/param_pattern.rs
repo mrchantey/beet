@@ -322,11 +322,12 @@ impl ParamOptions {
 
 
 	fn from_reflect(field: &bevy::reflect::NamedField) -> Self {
-		let opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
+		#[allow(unused_mut)]
+		let mut opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
 		// Override description from docs if not specified
 		#[cfg(feature = "reflect_documentation")]
 		if opts.description == None {
-			opts = field.docs().map(|docs| docs.into());
+			opts.description = field.docs().map(|docs| docs.into());
 		}
 		opts
 	}

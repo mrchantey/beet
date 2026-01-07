@@ -14,11 +14,9 @@ publish = true
 
 [features]
 default = ["serde", "fs"]
-# reflect_documentation = [
-# # TODO broken bevy 0.18
-# # "bevy/bevy_reflect",
-# "bevy/reflect_documentation"
-# ]
+reflect_documentation = [
+	"bevy/reflect_documentation"
+]
 server = [
 	"beet_net/server",
 	# technically only required for internal tests

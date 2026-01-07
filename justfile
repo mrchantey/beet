@@ -1,5 +1,5 @@
-#	I'm temporarily using just to work with beet
-# Eventually all these patterns should be rolled into t
+#	temporarily using just to work with beet
+# Eventually all these patterns should be rolled into the cli
 #
 # ```rust
 # cargo binstall just
@@ -179,8 +179,8 @@ test-ci *args:
 
 snap:
     cargo test -p beet_core 				--lib --all-features -- --snap
-    cargo test -p sweet 						--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
+    cargo test -p sweet 						--lib --all-features -- --snap
     cargo test -p beet_net					--lib --features=_sweet_runner,reqwest,tungstenite,native-tls -- --snap
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
@@ -197,7 +197,7 @@ test-core *args:
     cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
     cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
     cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_net						 	--features=_sweet_runner,reqwest,tungstenite,native-tls  	{{ args }} -- {{ test-threads }}
+    cargo test -p beet_net	--features=_sweet_runner,reqwest,tungstenite,native-tls {{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:

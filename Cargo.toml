@@ -109,6 +109,7 @@ bevy = { version = "0.18.0-rc.1", default-features = false, features = [
 	"debug",
 	"bevy_log",
 	"bevy_color",
+	"reflect_documentation",
 	# bevy reccommends to not do this in libraries but beet_core --all-features wont compile without it
 	# even if feature forced on, not sure why
 	"reflect_auto_register",
