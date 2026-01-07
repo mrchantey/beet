@@ -7,27 +7,27 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	let (parts, body) = req.into_parts();
 
 	// Build the agent with proper TLS configuration
-	#[cfg(feature = "native-tls")]
-	let agent = {
-		use ureq::config::Config;
-		use ureq::tls::TlsConfig;
-		use ureq::tls::TlsProvider;
 
-		Config::builder()
-			.tls_config(
-				TlsConfig::builder()
-					.provider(TlsProvider::NativeTls)
-					.build(),
-			)
-			.build()
-			.new_agent()
-	};
-
+	#[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+	let agent = ureq::config::Config::builder()
+		.tls_config(
+			ureq::tls::TlsConfig::builder()
+				.provider(ureq::tls::TlsProvider::NativeTls)
+				.build(),
+		)
+		.build()
+		.new_agent();
 	#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-	let agent = ureq::Agent::new();
-
+	let agent = ureq::config::Config::builder()
+		.tls_config(
+			ureq::tls::TlsConfig::builder()
+				.provider(ureq::tls::TlsProvider::NativeTls)
+				.build(),
+		)
+		.build()
+		.new_agent();
 	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
-	let agent = ureq::Agent::new();
+	let agent = ureq::config::Config::builder().build().new_agent();
 
 	// Convert to http::Request
 	let http_parts: http::request::Parts = parts.try_into()?;
