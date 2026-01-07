@@ -287,7 +287,6 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use proc_macro2::TokenStream;
 
 	fn parse(str: &str) -> TokenStream {

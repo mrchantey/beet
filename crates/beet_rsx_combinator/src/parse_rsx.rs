@@ -19,7 +19,7 @@ mod test {
 	use crate::prelude::*;
 	use combine::Parser;
 	use combine::combinator::parser;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	pub fn test_rsx_simple_expression() {

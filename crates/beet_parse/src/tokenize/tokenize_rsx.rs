@@ -70,7 +70,6 @@ pub fn tokenize_rsx_with_errors(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use quote::quote;
 
 	#[test]

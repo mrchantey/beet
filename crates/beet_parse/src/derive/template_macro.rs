@@ -26,7 +26,6 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 
 	let imports = if pkg_ext::is_internal() {
 		quote! {
-			use beet_core::prelude::*;
 		}
 	} else {
 		quote! {
@@ -252,7 +251,7 @@ fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
 mod test {
 	use super::with_captured_lifetimes;
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use syn::PathSegment;
 
 	#[test]

@@ -39,7 +39,6 @@ impl<T: RequestMetaExtractor> Extractor<'_, '_, T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -157,7 +157,6 @@ fn path_to_ident(path: &str) -> String {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use quote::ToTokens;
 	use std::ops::Deref;
 	use std::path::PathBuf;

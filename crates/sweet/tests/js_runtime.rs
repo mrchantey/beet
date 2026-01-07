@@ -4,7 +4,7 @@
 // #[cfg(target_arch = "wasm32")]
 // use beet_core::prelude::*;
 // #[cfg(target_arch = "wasm32")]
-// use sweet::prelude::*;
+// use beet_core::prelude::*;
 
 // #[cfg(target_arch = "wasm32")]
 #[test]

@@ -78,7 +78,6 @@ fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
 	use proc_macro2::Span;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;

@@ -335,7 +335,7 @@ impl ParamOptions {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn pattern_deduplication() {

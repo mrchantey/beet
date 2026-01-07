@@ -200,7 +200,7 @@ impl CodegenFile {
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use syn::ItemFn;
 
 	#[test]

@@ -920,7 +920,7 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn parts_default() {

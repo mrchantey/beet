@@ -5,7 +5,6 @@
 use beet_build::prelude::*;
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;
-use sweet::prelude::*;
 
 #[test]
 fn works() {

@@ -268,7 +268,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

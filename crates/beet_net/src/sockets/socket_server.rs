@@ -83,7 +83,7 @@ mod tests {
 	use super::*;
 	use crate::sockets::Message;
 	use crate::sockets::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	async fn server_binds_and_accepts() {

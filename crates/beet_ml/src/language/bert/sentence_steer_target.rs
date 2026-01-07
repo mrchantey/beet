@@ -85,7 +85,7 @@ fn sentence_steer_target<F: Component>(
 // 	use beet_flow::prelude::*;
 // 	use beet_spatial::steer::SteerTarget;
 // 	use beet_core::prelude::*;
-// 	use sweet::prelude::*;
+// 	use beet_core::prelude::*;
 
 // 	#[test]
 // 	fn works() {

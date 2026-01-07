@@ -93,7 +93,6 @@ pub fn tokenize_element_attributes(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 

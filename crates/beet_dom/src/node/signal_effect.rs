@@ -204,7 +204,6 @@ where
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 
 	#[cfg(not(feature = "nightly"))]

@@ -383,7 +383,7 @@ impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn response_ok() {

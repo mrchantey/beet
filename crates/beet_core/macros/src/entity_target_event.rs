@@ -73,7 +73,7 @@ fn parse_entity_target_event(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

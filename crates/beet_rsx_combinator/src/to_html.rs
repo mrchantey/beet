@@ -187,7 +187,7 @@ impl<T: ToHtml> ToHtml for Vec<T> {
 #[cfg(test)]
 mod test {
 	// use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() { true.xpect_true(); }

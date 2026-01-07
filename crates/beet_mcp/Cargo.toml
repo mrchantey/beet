@@ -61,5 +61,6 @@ text-splitter = { version = "0.26", features = ["code", "markdown"] }
 tree-sitter-rust = "0.24"
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
 tokio-test = "0.4"
 sweet = { path = "../sweet", features=["runner"] }

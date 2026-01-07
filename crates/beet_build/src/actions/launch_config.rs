@@ -245,8 +245,8 @@ fn run_launch_step() -> impl Bundle {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

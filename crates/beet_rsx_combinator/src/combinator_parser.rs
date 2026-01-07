@@ -58,7 +58,7 @@ impl<'a> From<ParseError<&'a str>> for CombinatorParserError<'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	pub fn empty() {

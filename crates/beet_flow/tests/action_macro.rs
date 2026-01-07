@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use sweet::prelude::*;
 use std::marker::PhantomData;
 
 #[derive(Resource)]

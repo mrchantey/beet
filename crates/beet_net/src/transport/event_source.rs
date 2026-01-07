@@ -15,7 +15,6 @@ impl Response {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use bevy::tasks::futures_lite::StreamExt;
 
 	#[sweet::test]

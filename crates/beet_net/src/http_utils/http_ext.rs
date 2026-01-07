@@ -61,7 +61,7 @@ pub const DEFAULT_CLI_VERSION: &str = "0.1.0";
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn has_body_with_content_length() {

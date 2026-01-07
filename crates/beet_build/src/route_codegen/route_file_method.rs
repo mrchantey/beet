@@ -113,7 +113,7 @@ impl RouteFileMethodMeta {
 mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn returns_result() {

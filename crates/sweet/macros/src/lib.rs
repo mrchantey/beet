@@ -11,7 +11,7 @@ use proc_macro::TokenStream;
 /// In the case of sync tests this simply replaces `#[sweet::test]` with `#[test]`.
 ///
 /// ```ignore
-/// # use sweet::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 /// #[sweet::test]
 /// fn my_test() {

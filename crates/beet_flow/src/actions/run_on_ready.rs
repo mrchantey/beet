@@ -98,7 +98,6 @@ fn handle_child_ready(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn no_children() {

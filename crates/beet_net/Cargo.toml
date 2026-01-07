@@ -167,6 +167,7 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
 beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
 sweet.workspace = true
 

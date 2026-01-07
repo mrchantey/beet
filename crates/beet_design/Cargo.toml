@@ -45,4 +45,5 @@ web-sys = { workspace = true, features = ["HtmlFormElement", "FormData"] }
 
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
 sweet = {workspace = true, features=["runner"]}

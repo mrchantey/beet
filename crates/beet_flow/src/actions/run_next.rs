@@ -75,7 +75,6 @@ fn run_next(mut ev: On<Outcome>, query: Query<&RunNext>) -> Result {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -6,7 +6,7 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use rustdoc_md::rustdoc_json_to_markdown;
 use rustdoc_md::rustdoc_json_types::Crate;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 pub struct Mddoc<'a> {
 	pub no_deps: bool,

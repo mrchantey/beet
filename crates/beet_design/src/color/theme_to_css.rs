@@ -177,7 +177,7 @@ impl ThemeToCss {
 // 	use lightningcss::stylesheet::StyleSheet;
 // 	use material_colors::color::Argb;
 // 	use material_colors::theme::ThemeBuilder;
-// 	use sweet::prelude::*;
+// 	use beet_core::prelude::*;
 
 // 	#[test]
 // 	fn works() {

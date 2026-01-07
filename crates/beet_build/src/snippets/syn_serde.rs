@@ -118,7 +118,6 @@ pub mod syn_item_vec_serde {
 mod test {
 	use super::syn_item_serde;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use quote::ToTokens;
 	use serde::Deserialize;
 	use serde::Serialize;

@@ -171,7 +171,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	fn start_ep(
 		mut commands: Commands,

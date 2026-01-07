@@ -7,7 +7,7 @@ use rmcp::schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 /*
 that also gets me thinking about the difference between the big expensive censored models and these local libre models, like in the 90s we got local 3d graphics which spawned the demo scene, what does that look like for ml

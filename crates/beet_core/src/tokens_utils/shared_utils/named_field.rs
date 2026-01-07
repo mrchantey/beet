@@ -232,6 +232,7 @@ impl<'a> NamedField<'a> {
 
 #[cfg(test)]
 mod test {
+	use super::NamedField;
 	use crate::prelude::*;
 	use syn::FnArg;
 	use syn::Type;

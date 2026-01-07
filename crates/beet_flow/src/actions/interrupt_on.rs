@@ -57,7 +57,6 @@ pub(crate) fn interrupt_on_end<T: EndEvent>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 
 	// ads running to this entity, with the root

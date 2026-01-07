@@ -7,7 +7,6 @@ use beet_dom::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use beet_rsx::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
-use sweet::prelude::*;
 
 
 fn is_equal(a: impl Bundle, b: impl Bundle) {

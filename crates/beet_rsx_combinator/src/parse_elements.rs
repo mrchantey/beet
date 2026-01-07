@@ -1044,7 +1044,7 @@ mod test {
 		);
 	}
 
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	pub fn test_rsx_fragment_empty() {

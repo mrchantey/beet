@@ -181,7 +181,7 @@ impl SidebarNode {}
 mod test {
 	use crate::prelude::*;
 	use beet_router::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn collect_sidebar_node() {

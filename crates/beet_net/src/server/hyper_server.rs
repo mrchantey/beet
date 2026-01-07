@@ -266,7 +266,6 @@ mod test {
 	use bytes::Bytes;
 	use std::time::Duration;
 	use std::time::Instant;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

@@ -96,7 +96,6 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 	use beet_rsx::prelude::*;
-	use sweet::prelude::*;
 
 	#[template]
 	pub fn MyTemplate(foo: u32) -> impl Bundle {

@@ -35,7 +35,6 @@ fn end_with<T: EndEvent + Clone>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -61,7 +61,6 @@ pub fn Form(
 #[cfg(test)]
 mod test {
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use bevy::reflect::DynamicStruct;
 
 	#[test]

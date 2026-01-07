@@ -34,7 +34,6 @@ fn parse(input: ItemFn, attr: TokenStream) -> Result<TokenStream> {
 
 	let imports = if pkg_ext::is_internal() {
 		quote! {
-			use beet_core::prelude::*;
 		}
 	} else {
 		quote! {
@@ -377,7 +376,6 @@ mod test {
 	use super::with_captured_lifetimes;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use syn::PathSegment;
 
 	#[test]

@@ -250,7 +250,7 @@ fn normalize_l2(v: &Tensor) -> Result<Tensor> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	// possibly flaky tests here, getting occasional 403 on tokenizer.json

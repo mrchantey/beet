@@ -83,7 +83,6 @@ fn insert<E: ActionEvent, B: Bundle + Clone>(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn on_run() {

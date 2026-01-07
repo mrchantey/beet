@@ -58,7 +58,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_rsx::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn parse_md() {

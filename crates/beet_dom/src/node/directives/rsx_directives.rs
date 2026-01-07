@@ -98,7 +98,6 @@ pub fn extract_slot_targets(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 
 	#[test]

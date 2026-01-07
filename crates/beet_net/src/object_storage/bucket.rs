@@ -377,7 +377,7 @@ pub async fn s3_fs_selector(
 #[cfg(test)]
 pub mod bucket_test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	pub async fn run(provider: impl BucketProvider) {
 		let bucket = Bucket::new(provider, "beet-test-bucket");

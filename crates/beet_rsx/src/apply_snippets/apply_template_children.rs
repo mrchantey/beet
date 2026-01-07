@@ -70,7 +70,7 @@ pub fn apply_template_children(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {

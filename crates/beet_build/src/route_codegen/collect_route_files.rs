@@ -111,7 +111,6 @@ pub fn collect_route_files(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 	use quote::ToTokens;
 
 	#[test]

@@ -146,7 +146,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::animation::AnimationEvent;
-	use sweet::prelude::*;
 
 	#[derive(Clone, AnimationEvent)]
 	struct MyEvent(u32);

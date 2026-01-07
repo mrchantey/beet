@@ -73,6 +73,7 @@ web-sys = { workspace = true, features = ["Storage"] }
 
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"]}
 sweet.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

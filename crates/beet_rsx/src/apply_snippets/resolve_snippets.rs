@@ -247,7 +247,7 @@ fn maybe_panic(result: In<Result>) {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 
 	fn parse(instance: impl Bundle, rsx_snippet: impl Bundle) -> String {

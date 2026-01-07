@@ -74,7 +74,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 mod test {
 	use super::*;
 	use quote::quote;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

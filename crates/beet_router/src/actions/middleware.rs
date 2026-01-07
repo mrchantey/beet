@@ -120,7 +120,7 @@ mod test {
 	use axum::response::IntoResponse;
 	use axum::routing::get;
 	use beet_net::exports::http::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use tower::util::ServiceExt;
 
 	async fn handler() -> impl IntoResponse { StatusCode::OK }

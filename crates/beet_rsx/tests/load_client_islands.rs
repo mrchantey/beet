@@ -3,7 +3,6 @@
 use beet_dom::prelude::*;
 use beet_rsx::prelude::*;
 use beet_core::prelude::*;
-use sweet::prelude::*;
 
 
 #[test]

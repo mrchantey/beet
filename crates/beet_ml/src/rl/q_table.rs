@@ -78,7 +78,6 @@ impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use sweet::prelude::*;
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates
 	/// that we can do realtime stuff and dont need to use an [`Environment`]
