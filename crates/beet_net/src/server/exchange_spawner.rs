@@ -97,77 +97,8 @@ impl ExchangeSpawner {
 		})
 	}
 
-	fn spawn(&self, world: &mut World) -> Entity { (self.func)(world) }
-
-	/// - Creates a child of the server inserting the [`Request`] component
-	/// - Adds a one-shot observer for [`On<Insert, Response>`],
-	///   then takes the response and despawns the entity.
-	/// the default handler adds about 100us to a request that
-	/// doesnt involve mutating the world or running systems: (40us vs 140us)
-	/// ## Panics
-	///
-	/// Panics if the provided server entity has no ExchangeHandler
-	pub async fn handle_request(
-		server: AsyncEntity,
-		request: impl Bundle,
-	) -> Response {
-		let server_id = server.id();
-		let (send, recv) = async_channel::bounded(1);
-		let exchange_entity = server
-			.world()
-			.with_then(move |world| {
-				let exchange_handler = world
-					.entity_mut(server_id)
-					.get::<ExchangeSpawner>()
-					.cloned()
-					.expect("Server has no ExchangeHandler");
-
-				let entity = exchange_handler.spawn(world);
-				world
-					.entity_mut(entity)
-					// add observer before inserting request to handle immediate response
-					.observe(
-						move |ev: On<Insert, Response>,
-						      mut commands: Commands| {
-							let exchange = ev.event_target();
-							let send = send.clone();
-							commands.queue(
-								move |world: &mut World| -> Result {
-									let response = world
-										.entity_mut(exchange)
-										.take::<Response>()
-										.ok_or_else(|| {
-											bevyhow!(
-												"Exchange entity missing Response component"
-											)
-										})?;
-									send.try_send(response)?;
-									Ok(())
-								},
-							);
-						},
-					)
-					.insert((request, ExchangeOf(server_id)))
-					.id()
-			})
-			.await;
-
-		let response = recv.recv().await.unwrap_or_else(|_| {
-			error!("Sender was dropped, was the world dropped?");
-			Response::from_status(StatusCode::INTERNAL_SERVER_ERROR)
-		});
-
-		// cleanup exchange entity after response is received
-		server
-			.world()
-			.with_then(move |world| {
-				if let Ok(exchange) = world.get_entity_mut(exchange_entity) {
-					exchange.despawn();
-				}
-			})
-			.await;
-
-		response
+	pub(super) fn spawn(&self, world: &mut World) -> Entity {
+		(self.func)(world)
 	}
 
 	pub fn mirror() -> Self {

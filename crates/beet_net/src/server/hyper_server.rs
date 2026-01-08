@@ -54,11 +54,7 @@ pub(super) fn start_hyper_server(
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = ExchangeSpawner::handle_request(
-							world.entity(entity),
-							req,
-						)
-						.await;
+						let res = world.entity(entity).oneshot(req).await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}

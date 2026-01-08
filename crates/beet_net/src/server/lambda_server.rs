@@ -53,9 +53,9 @@ async fn handle_request(
 	std::convert::Infallible,
 > {
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
-		let request = lambda_to_request(lambda_req)?;
-		let response = ExchangeSpawner::handle_request(entity, request).await;
-		response_to_lambda(response).await
+		let req = lambda_to_request(lambda_req)?;
+		let res = entity.oneshot(req).await;
+		response_to_lambda(res).await
 	}
 	.await;
 

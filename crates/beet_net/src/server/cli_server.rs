@@ -14,8 +14,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 			.entity_mut(entity)
 			.run_async(async move |entity| -> Result {
 				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res =
-					ExchangeSpawner::handle_request(entity.clone(), req).await;
+				let res = entity.oneshot(req).await;
 				let (parts, body) = res.into_parts();
 				let body = body.into_string().await?;
 				let exit = match parts.status_to_exit_code() {
