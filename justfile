@@ -173,7 +173,7 @@ snap:
     cargo test -p beet_core 				--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
     cargo test -p sweet 						--lib --all-features -- --snap
-    cargo test -p beet_net					--lib 							 -- --snap
+    cargo test -p beet_net					--lib --features=server -- --snap
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
     cargo test -p beet_parse 				--lib --all-features -- --snap
@@ -189,7 +189,7 @@ test-core *args:
     cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
     cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
     cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_net	 																												{{ args }} -- {{ test-threads }}
+    cargo test -p beet_net	--features=server																				{{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:
