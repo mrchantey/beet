@@ -37,6 +37,23 @@ where
 	/// A user defined query
 	pub query: Query<'w, 's, D, F>,
 }
+
+
+impl AgentQuery<'_, '_, (), ()> {
+	pub async fn entity_async(world: &AsyncWorld, action: Entity) -> Entity {
+		world
+			.with_then(move |world| {
+				world
+					.run_system_cached(move |query: AgentQuery| {
+						query.entity(action)
+					})
+					.unwrap()
+			})
+			.await
+	}
+}
+
+
 impl<'w, 's, D, F> AgentQuery<'w, 's, D, F>
 where
 	D: 'static + QueryData,
@@ -69,6 +86,11 @@ where
 	) -> Result<ROQueryItem<'_, 's, D>, QueryEntityError> {
 		let agent = self.entity(action);
 		self.query.get(agent)
+	}
+
+	pub fn contains(&self, entity: Entity) -> bool {
+		let agent = self.entity(entity);
+		self.query.contains(agent)
 	}
 
 	/// Get the query item for this `agent`

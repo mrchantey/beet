@@ -57,13 +57,7 @@ mod test {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.world_mut()
 			.spawn(bundle)
-			.run_async_then(async move |entity| {
-				ExchangeSpawner::handle_request(
-					entity.clone(),
-					Request::get("foo"),
-				)
-				.await
-			})
+			.oneshot(Request::get("foo"))
 			.await
 	}
 

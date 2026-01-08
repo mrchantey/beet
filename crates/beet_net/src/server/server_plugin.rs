@@ -21,6 +21,7 @@ pub struct Exchanges(Vec<Entity>);
 
 /// Plugin for running bevy servers.
 /// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
+#[derive(Default)]
 pub struct ServerPlugin;
 
 

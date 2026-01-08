@@ -109,7 +109,7 @@ impl ExchangeSpawner {
 	/// Panics if the provided server entity has no ExchangeHandler
 	pub async fn handle_request(
 		server: AsyncEntity,
-		request: Request,
+		request: impl Bundle,
 	) -> Response {
 		let server_id = server.id();
 		let (send, recv) = async_channel::bounded(1);
@@ -198,13 +198,7 @@ mod test {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.world_mut()
 			.spawn(bundle)
-			.run_async_then(async move |entity| {
-				ExchangeSpawner::handle_request(
-					entity.clone(),
-					Request::get("foo"),
-				)
-				.await
-			})
+			.oneshot(Request::get("foo"))
 			.await
 	}
 

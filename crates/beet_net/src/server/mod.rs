@@ -2,6 +2,7 @@ mod cli_server;
 mod exchange_spawner;
 #[cfg(feature = "flow")]
 mod exchange_spawner_flow;
+mod extensions;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
@@ -13,6 +14,7 @@ mod lambda_server;
 mod server_plugin;
 pub use cli_server::*;
 pub use exchange_spawner::*;
+pub use extensions::*;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
