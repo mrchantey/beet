@@ -32,7 +32,7 @@ fn set_text_on_run<F: Component>(
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,
 ) -> Result {
-	let set_text_on_run = query.get(ev.action())?;
+	let set_text_on_run = query.get(ev.target())?;
 	for mut text in texts.iter_mut() {
 		**text = set_text_on_run.value.to_string();
 	}
