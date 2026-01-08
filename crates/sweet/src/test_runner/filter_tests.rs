@@ -42,19 +42,16 @@ impl FilterParams {
 	}
 }
 
-
 pub fn filter_tests(
 	mut commands: Commands,
 	route_query: RouteQuery,
 	requests: Populated<(Entity, &RequestMeta, &Children), Added<RequestMeta>>,
 	tests: Populated<(Entity, &Test), Added<Test>>,
 ) -> Result {
-	for (entity, request, children) in requests {
-		// TODO this is incorrect, action may be different entity
-		let path_match = route_query.path_match(&ActionExchange {
-			action: entity,
-			exchange: entity,
-		})?;
+	for (agent, request, children) in requests {
+		// in this case the action is the agent
+		let action = agent;
+		let path_match = route_query.path_match(action)?;
 		let path_args = path_match.dyn_map.get_vec("include");
 
 		// we dont use Extractor because this has extra extractor steps

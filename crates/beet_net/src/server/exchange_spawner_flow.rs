@@ -8,11 +8,7 @@ impl ExchangeSpawner {
 	/// 2. Upon an [`Outcome`] a response will be inserted if none has been inserted already:
 	/// 	- [`Outcome::Pass`] -> [`StatusCode::OK`]
 	/// 	- [`Outcome::Fail`] -> [`StatusCode::INTERNAL_SERVER_ERROR`]
-	pub fn new_flow<F, B>(func: F) -> Self
-	where
-		F: 'static + Send + Sync + Clone + FnOnce() -> B,
-		B: Bundle,
-	{
+	pub fn new_flow(func: impl BundleFunc) -> Self {
 		Self::new_bundle(move || {
 			(
 				OnSpawn::observe(
@@ -39,7 +35,7 @@ impl ExchangeSpawner {
 						}
 					},
 				),
-				func.clone()(),
+				func.bundle_func(),
 			)
 		})
 	}

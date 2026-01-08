@@ -3,6 +3,18 @@ use beet_core::prelude::*;
 use std::sync::Arc;
 
 
+// Placeholder, will probs be replaced by bevy Template system
+pub trait BundleFunc: 'static + Send + Sync + Clone {
+	fn bundle_func(self) -> impl Bundle;
+}
+impl<F, T> BundleFunc for F
+where
+	F: 'static + Send + Sync + Clone + FnOnce() -> T,
+	T: Bundle,
+{
+	fn bundle_func(self) -> impl Bundle { self() }
+}
+
 /// The function called for each request,
 /// see [`default_handler`] for the default implementation.
 #[derive(Clone, Deref, Component)]
@@ -22,12 +34,10 @@ impl ExchangeSpawner {
 			func: Arc::new(Box::new(func)),
 		}
 	}
-	pub fn new_bundle<F, B>(func: F) -> Self
-	where
-		F: 'static + Send + Sync + Fn() -> B,
-		B: Bundle,
-	{
-		Self::new(move |world: &mut World| world.spawn(func()).id())
+	pub fn new_bundle(func: impl BundleFunc) -> Self {
+		Self::new(move |world: &mut World| {
+			world.spawn(func.clone().bundle_func()).id()
+		})
 	}
 
 	pub fn new_handler(

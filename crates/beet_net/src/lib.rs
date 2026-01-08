@@ -1,3 +1,7 @@
+//! ## Cross-platform networking utilities
+//!
+//! Beet net provides general purpose primitives for communicating between systems.
+//!
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(feature = "aws", feature(if_let_guard))]
