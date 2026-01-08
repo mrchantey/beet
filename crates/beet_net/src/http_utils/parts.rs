@@ -586,6 +586,21 @@ impl ResponseParts {
 	/// Returns the status code
 	pub fn status(&self) -> StatusCode { self.status }
 
+	/// Use exit code conventions to map a http status to an exit code
+	pub fn status_to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
+		let code = match self.status().as_u16() {
+			200..=299 => return Ok(()), // Success
+			400 => 64,                  // Bad request -> usage error
+			401 | 403 => 77,            // Auth issues -> permission denied
+			404 => 66,                  // Not found -> cannot open input
+			408 | 504 => 75,            // Timeout -> temp failure, retry
+			418 => 209,                 // Teapot -> half it just cos
+			500..=599 => 70,            // Server errors -> internal error
+			_ => 1,                     // General error
+		};
+		Err(std::num::NonZeroU8::new(code).unwrap())
+	}
+
 	/// Returns a mutable reference to the inner parts
 	pub fn parts_mut(&mut self) -> &mut Parts { &mut self.parts }
 

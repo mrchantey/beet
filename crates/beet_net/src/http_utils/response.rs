@@ -309,6 +309,10 @@ impl From<http::Response<Bytes>> for Response {
 	}
 }
 
+impl From<http::StatusCode> for Response {
+	fn from(status: http::StatusCode) -> Self { Response::from_status(status) }
+}
+
 /// Allows for blanket implementation of `Into<Response>`,
 /// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
 /// and Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
@@ -354,10 +358,6 @@ impl IntoResponse<Self> for Infallible {
 
 impl IntoResponse<Self> for () {
 	fn into_response(self) -> Response { Response::ok() }
-}
-
-impl IntoResponse<Self> for StatusCode {
-	fn into_response(self) -> Response { Response::from_status(self) }
 }
 
 impl<T: TryInto<Response>, M1> IntoResponse<(Self, M1)> for T
