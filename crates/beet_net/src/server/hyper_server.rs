@@ -26,13 +26,12 @@ use std::task::Poll;
 /// See [`Server::handler`] for customizing handlers
 pub(super) fn start_hyper_server(
 	In(entity): In<Entity>,
-	query: Query<(&HttpServer, &ServerHandler)>,
+	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,
 ) -> Result {
-	let (server, handler) = query.get(entity)?;
+	let server = query.get(entity)?;
 	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
 
-	let handler = handler.clone();
 	async_commands.run(async move |world| -> Result {
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
@@ -48,16 +47,18 @@ pub(super) fn start_hyper_server(
 			trace!("New connection from: {}", addr);
 			let io = BevyIo::new(tcp);
 
-			let handler = handler.clone();
 			let _entity_fut = world.run_async(async move |world| {
 				// pass an AsyncWorld to the service_fn
 				let service = service_fn(move |req| {
 					let world = world.clone();
-					let handler = handler.clone();
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = handler(world.entity(entity), req).await;
+						let res = ExchangeSpawner::handle_request(
+							world.entity(entity),
+							req,
+						)
+						.await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
@@ -276,19 +277,14 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					ServerHandler::new(
-						async move |entity: AsyncEntity, req: Request| {
-							let count = entity
-								.world()
-								.with_then(|world| {
-									world.query_once::<&ServerStatus>()[0]
-										.request_count()
-								})
-								.await;
-							assert!(count < 99999);
-							Response::ok().with_body(req.body)
-						},
-					),
+					ExchangeSpawner::new_handler(move |mut entity, req| {
+						let count = entity.world_scope(|world: &mut World| {
+							world.query_once::<&ServerStatus>()[0]
+								.request_count()
+						});
+						assert!(count < 99999);
+						Response::ok().with_body(req.body)
+					}),
 				))
 				.run();
 		});
@@ -310,7 +306,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((server, ServerHandler::mirror()))
+				.spawn_then((server, ExchangeSpawner::mirror()))
 				.run();
 		});
 		time_ext::sleep_millis(50).await;
@@ -341,29 +337,26 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
-					ServerHandler::new(
-						async move |_: AsyncEntity, req: Request| {
-							// Server adds 100ms delay per chunk
-							let delayed_stream = futures::stream::unfold(
-								req.body,
-								|mut body| async move {
-									match body.next().await {
-										Ok(Some(chunk)) => {
-											time_ext::sleep(
-												Duration::from_millis(100),
-											)
-											.await;
-											Some((Ok(chunk), body))
-										}
-										Ok(None) => None,
-										Err(e) => Some((Err(e), body)),
+					ExchangeSpawner::new_handler(move |_, req| {
+						// Server adds 100ms delay per chunk
+						let delayed_stream = futures::stream::unfold(
+							req.body,
+							|mut body| async move {
+								match body.next().await {
+									Ok(Some(chunk)) => {
+										time_ext::sleep(Duration::from_millis(
+											100,
+										))
+										.await;
+										Some((Ok(chunk), body))
 									}
-								},
-							);
-							Response::ok()
-								.with_body(Body::stream(delayed_stream))
-						},
-					),
+									Ok(None) => None,
+									Err(e) => Some((Err(e), body)),
+								}
+							},
+						);
+						Response::ok().with_body(Body::stream(delayed_stream))
+					}),
 					server,
 				))
 				.run();

@@ -579,6 +579,7 @@ impl AsyncEntity {
 		.await
 	}
 
+
 	pub async fn get_mut<T: Component<Mutability = Mutable>, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<T>) -> O,
@@ -598,6 +599,10 @@ impl AsyncEntity {
 
 	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
 		self.get::<T, _>(|comp| comp.clone()).await
+	}
+
+	pub async fn take<T: Component>(&self) -> Option<T> {
+		self.with_then(|mut entity| entity.take()).await
 	}
 
 	pub fn insert<B: Bundle>(&self, bundle: B) -> &Self {

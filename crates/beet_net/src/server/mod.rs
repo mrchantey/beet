@@ -1,4 +1,4 @@
-mod server_handler;
+mod exchange_spawner;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
@@ -8,7 +8,7 @@ mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
 mod server_plugin;
-pub use server_handler::*;
+pub use exchange_spawner::*;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),

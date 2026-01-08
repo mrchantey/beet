@@ -12,18 +12,15 @@ pub(super) fn start_lambda_server(
 	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,
 ) -> Result {
-	let server = query.get(entity)?;
-	let handler = server.handler();
-
 	async_commands.run_local(async move |world| -> Result {
-		run_lambda(world.entity(entity), handler).await
+		run_lambda(world.entity(entity)).await
 	});
 
 	Ok(())
 }
 
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
-async fn run_lambda(entity: AsyncEntity, handler: HandlerFn) -> Result {
+async fn run_lambda(entity: AsyncEntity) -> Result {
 	// This variable only applies to API Gateway stages,
 	// you can remove it if you don't use them.
 	// i.e with: `GET /test-stage/todo/id/123` without: `GET /todo/id/123`
@@ -37,7 +34,6 @@ async fn run_lambda(entity: AsyncEntity, handler: HandlerFn) -> Result {
 
 	lambda_http::run(service_fn(move |lambda_req| {
 		let entity = entity.clone();
-		let handler = handler.clone();
 		handle_request(entity, handler, lambda_req)
 	}))
 	.await
@@ -51,7 +47,6 @@ async fn run_lambda(entity: AsyncEntity, handler: HandlerFn) -> Result {
 /// Handler function that processes each lambda request
 async fn handle_request(
 	entity: AsyncEntity,
-	handler: HandlerFn,
 	lambda_req: lambda_http::Request,
 ) -> std::result::Result<
 	lambda_http::Response<lambda_http::Body>,
@@ -59,7 +54,7 @@ async fn handle_request(
 > {
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
 		let request = lambda_to_request(lambda_req)?;
-		let response = handler(entity, request).await;
+		let response = ExchangeSpawner::handle_request(entity, request).await;
 		response_to_lambda(response).await
 	}
 	.await;

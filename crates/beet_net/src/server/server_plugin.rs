@@ -47,18 +47,19 @@ impl ServerPlugin {
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>().add_observer(exchange_meta);
+		app.init_plugin::<AsyncPlugin>().add_observer(server_stats);
 	}
 }
 
-fn exchange_meta(
+
+/// Update server stats if available
+fn server_stats(
 	ev: On<Insert, Response>,
 	mut servers: Query<&mut ServerStatus>,
 	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
 ) -> Result {
 	let entity = ev.event_target();
 	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
-		// ignore if no match, probably a test
 		return Ok(());
 	};
 	let status = response.status();
@@ -66,7 +67,9 @@ fn exchange_meta(
 	let path = meta.path_string();
 	let method = meta.method();
 
-	let mut stats = servers.get_mut(exchange_of.get())?;
+	let Ok(mut stats) = servers.get_mut(exchange_of.get()) else {
+		return Ok(());
+	};
 
 	bevy::log::info!(
 		"
@@ -87,12 +90,13 @@ Request Complete
 	Ok(())
 }
 #[derive(Clone, Component)]
-#[component(on_add=on_add)]
-#[require(ServerHandler, ServerStatus)]
+#[component(on_add=on_add_http)]
+#[require(ExchangeSpawner, ServerStatus)]
 pub struct HttpServer {
 	/// The port the server listens on. This may be updated at runtime,
 	/// for instance if the provided port is `0` it may be updated to
 	/// some random available port by the os like `98304`.
+	/// This is ignored by lambda_server
 	pub port: u16,
 }
 
@@ -100,7 +104,7 @@ pub struct HttpServer {
 // using commands allows a ServerHandler to be inserted, instead of running immediately
 // and using the one inserted via Required.
 #[allow(unused)]
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
+fn on_add_http(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 	world
 		.commands()
@@ -179,7 +183,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					ServerHandler::new(async |_, _| {
+					ExchangeSpawner::new_handler(|_, _| {
 						Response::ok().with_body("hello")
 					}),
 				))
