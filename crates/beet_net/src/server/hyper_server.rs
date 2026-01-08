@@ -26,15 +26,14 @@ use std::task::Poll;
 /// See [`Server::handler`] for customizing handlers
 pub(super) fn start_hyper_server(
 	In(entity): In<Entity>,
-	query: Query<&HttpServer>,
+	query: Query<(&HttpServer, &ServerHandler)>,
 	mut async_commands: AsyncCommands,
 ) -> Result {
-	let server = query.get(entity)?;
+	let (server, handler) = query.get(entity)?;
 	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
-	let handler = server.handler();
 
+	let handler = handler.clone();
 	async_commands.run(async move |world| -> Result {
-		let handler = handler.clone();
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
 
@@ -269,28 +268,31 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let server = HttpServer::new_test().with_handler(
-			async move |entity: AsyncEntity, req: Request| {
-				let time = entity
-					.world()
-					.with_then(|world| {
-						world.query_once::<&ServerStatus>()[0].request_count()
-					})
-					.await;
-				assert!(time < 99999);
-				Response::ok().with_body(req.body)
-			},
-		);
+		let server = HttpServer::new_test();
 
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					server,
+					ServerHandler::new(
+						async move |entity: AsyncEntity, req: Request| {
+							let count = entity
+								.world()
+								.with_then(|world| {
+									world.query_once::<&ServerStatus>()[0]
+										.request_count()
+								})
+								.await;
+							assert!(count < 99999);
+							Response::ok().with_body(req.body)
+						},
+					),
 				))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 		for _ in 0..10 {
 			Request::post(&url)
 				.send()
@@ -303,20 +305,15 @@ mod test {
 	}
 	#[sweet::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test().with_handler(
-			async move |_: AsyncEntity, req: Request| {
-				Response::ok().with_body(req.body)
-			},
-		);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
-				))
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((server, ServerHandler::mirror()))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 		Request::post(url)
 			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
 				Ok(Bytes::from("foo")),
@@ -338,27 +335,33 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[sweet::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test().with_handler(
-			async move |_: AsyncEntity, req: Request| {
-				// Server adds 100ms delay per chunk
-				use futures::TryStreamExt;
-				let delayed_stream =
-					req.body.into_stream().and_then(move |chunk| async move {
-						time_ext::sleep(Duration::from_millis(100)).await;
-						Ok(chunk)
-					});
-				Response::ok().with_body(Body::stream(delayed_stream))
-			},
-		);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					ServerHandler::new(
+						async move |_: AsyncEntity, req: Request| {
+							// Server adds 100ms delay per chunk
+							use futures::TryStreamExt;
+							let delayed_stream = req
+								.body
+								.into_stream()
+								.and_then(move |chunk| async move {
+									time_ext::sleep(Duration::from_millis(100))
+										.await;
+									Ok(chunk)
+								});
+							Response::ok()
+								.with_body(Body::stream(delayed_stream))
+						},
+					),
+					server,
 				))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 
 		let start_time = Instant::now();
 
@@ -393,8 +396,14 @@ mod test {
 			let chunk_str = String::from_utf8(chunk.to_vec()).unwrap();
 			let final_elapsed = start_time.elapsed().as_millis() as u64;
 
+			println!(
+				"chunk_str: {:?}, final_elapsed: {}",
+				chunk_str, final_elapsed
+			);
+
 			// Parse the timestamp from the chunk
 			let parts: Vec<&str> = chunk_str.split(':').collect();
+			println!("parts: {:?}", parts);
 			let chunk_index: usize = parts[0].parse().unwrap();
 			let original_timestamp: u64 = parts[1].parse().unwrap();
 

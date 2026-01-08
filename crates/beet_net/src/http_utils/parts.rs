@@ -512,6 +512,9 @@ impl RequestParts {
 	/// Returns the HTTP method
 	pub fn method(&self) -> &HttpMethod { &self.method }
 
+	/// Returns a reference to the inner parts
+	pub fn parts(&self) -> &Parts { &self.parts }
+
 	/// Returns a mutable reference to the inner parts
 	pub fn parts_mut(&mut self) -> &mut Parts { &mut self.parts }
 
@@ -544,8 +547,8 @@ impl std::ops::DerefMut for RequestParts {
 /// on [`Parts`] are available directly.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseParts {
-	status: StatusCode,
-	parts: Parts,
+	pub status: StatusCode,
+	pub parts: Parts,
 }
 
 impl Default for ResponseParts {

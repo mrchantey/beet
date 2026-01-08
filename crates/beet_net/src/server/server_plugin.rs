@@ -1,8 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
 
 /// Represents a http request, may contain a [`Request`] or [`Response`]
 #[derive(Default, Component)]
@@ -24,25 +21,10 @@ pub struct Exchanges(Vec<Entity>);
 
 /// Plugin for running bevy servers.
 /// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
-pub struct ServerPlugin {
-	/// Spawn the server on add
-	pub spawn_server: Option<HttpServer>,
-}
+pub struct ServerPlugin;
 
 
 impl ServerPlugin {
-	/// Create a new ServerPlugin that does not spawn a server
-	pub fn without_server(mut self) -> Self {
-		self.spawn_server = None;
-		self
-	}
-	pub fn with_server(server: HttpServer) -> Self {
-		Self {
-			spawn_server: Some(server),
-			..default()
-		}
-	}
-
 	/// Runs the app with a tokio runtime if the `lambda` feature is enabled.
 	pub fn maybe_tokio_runner(mut app: App) -> AppExit {
 		#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
@@ -62,53 +44,61 @@ impl ServerPlugin {
 		}
 	}
 }
-impl Default for ServerPlugin {
-	fn default() -> Self {
-		Self {
-			spawn_server: Some(HttpServer::default()),
-		}
-	}
-}
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>().add_observer(exchange_meta);
-		if let Some(server) = &self.spawn_server {
-			let server = server.clone();
-			app.add_systems(Startup, move |mut commands: Commands| {
-				commands.spawn(server.clone());
-			});
-			// app.world_mut().spawn(server.clone());
-		}
 	}
 }
 
-pub(super) type HandlerFn = Arc<
-	Box<
-		dyn 'static
-			+ Send
-			+ Sync
-			+ Fn(
-				AsyncEntity,
-				Request,
-			) -> Pin<Box<dyn Send + Future<Output = Response>>>,
-	>,
->;
+fn exchange_meta(
+	ev: On<Insert, Response>,
+	mut servers: Query<&mut ServerStatus>,
+	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
+) -> Result {
+	let entity = ev.event_target();
+	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
+		// ignore if no match, probably a test
+		return Ok(());
+	};
+	let status = response.status();
+	let duration = meta.started().elapsed();
+	let path = meta.path_string();
+	let method = meta.method();
 
+	let mut stats = servers.get_mut(exchange_of.get())?;
 
+	bevy::log::info!(
+		"
+Request Complete
+  path:     {}
+  method:   {}
+  duration: {}
+  status:   {}
+  index:    {}
+",
+		path,
+		method,
+		time_ext::pretty_print_duration(duration),
+		status,
+		stats.request_count()
+	);
+	stats.increment_requests();
+	Ok(())
+}
 #[derive(Clone, Component)]
 #[component(on_add=on_add)]
-#[require(ServerStatus)]
+#[require(ServerHandler, ServerStatus)]
 pub struct HttpServer {
 	/// The port the server listens on. This may be updated at runtime,
 	/// for instance if the provided port is `0` it may be updated to
 	/// some random available port by the os like `98304`.
-	/// The presence of a [`TestApp`] resource will cause this port to
-	/// be reassigned to `0`.
 	pub port: u16,
-	/// The function called by hyper for each request
-	pub handler: HandlerFn,
 }
+
+
+// using commands allows a ServerHandler to be inserted, instead of running immediately
+// and using the one inserted via Required.
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
@@ -148,51 +138,19 @@ impl HttpServer {
 		}
 	}
 
-
 	pub fn local_url(&self) -> String {
 		format!("http://127.0.0.1:{}", self.port)
 	}
-
-	pub fn with_handler<F, Fut>(mut self, func: F) -> Self
-	where
-		F: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
-		Fut: Send + Future<Output = Response>,
-	{
-		self.set_handler(func);
-		self
-	}
-
-	pub fn set_handler<F, Fut>(&mut self, func: F) -> &mut Self
-	where
-		F: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
-		Fut: Send + Future<Output = Response>,
-	{
-		self.handler = box_it(func);
-		self
-	}
-
-	pub fn handler(&self) -> HandlerFn { self.handler.clone() }
 }
 
 impl Default for HttpServer {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,
-			handler: box_it(default_handler),
 		}
 	}
 }
 
-fn box_it<Func, Fut>(func: Func) -> HandlerFn
-where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
-	Fut: Send + Future<Output = Response>,
-{
-	Arc::new(Box::new(move |world, request| {
-		let func = func.clone();
-		Box::pin(async move { func.clone()(world, request).await })
-	}))
-}
 
 #[derive(Default, Component)]
 pub struct ServerStatus {
@@ -203,5 +161,43 @@ impl ServerStatus {
 	pub(super) fn increment_requests(&mut self) -> &mut Self {
 		self.request_count += 1;
 		self
+	}
+}
+
+#[cfg(test)]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[sweet::test]
+	async fn http_server() {
+		let server = HttpServer::new_test();
+		let url = server.local_url();
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					server,
+					ServerHandler::new(async |_, _| {
+						Response::ok().with_body("hello")
+					}),
+				))
+				.run();
+		});
+		time_ext::sleep_millis(50).await;
+		for _ in 0..10 {
+			Request::post(&url)
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.text()
+				.await
+				.unwrap()
+				.xpect_eq("hello");
+		}
 	}
 }

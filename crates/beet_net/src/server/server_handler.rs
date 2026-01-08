@@ -1,5 +1,61 @@
+use std::pin::Pin;
+use std::sync::Arc;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
+
+
+/// The function called for each request,
+/// see [`default_handler`] for the default implementation.
+#[derive(Clone, Deref, Component)]
+pub struct ServerHandler {
+	handler: HandlerFn,
+}
+
+impl ServerHandler {
+	pub fn new<F, Fut>(func: F) -> Self
+	where
+		F: 'static + Send + Sync + Clone + FnOnce(AsyncEntity, Request) -> Fut,
+		Fut: Send + Future<Output = Response>,
+	{
+		Self {
+			handler: Arc::new(Box::new(move |world, request| {
+				let func = func.clone();
+				Box::pin(async move { func.clone()(world, request).await })
+			})),
+		}
+	}
+	pub fn mirror() -> Self {
+		Self::new(|_, req| async {
+			Response::new(
+				ResponseParts {
+					parts: req.parts().parts().clone(),
+					status: StatusCode::OK,
+				},
+				req.body,
+			)
+		})
+	}
+
+	pub fn handler(&self) -> HandlerFn { self.handler.clone() }
+}
+
+impl Default for ServerHandler {
+	fn default() -> Self { Self::new(default_handler) }
+}
+
+pub(super) type HandlerFn = Arc<
+	Box<
+		dyn 'static
+			+ Send
+			+ Sync
+			+ Fn(
+				AsyncEntity,
+				Request,
+			) -> Pin<Box<dyn Send + Future<Output = Response>>>,
+	>,
+>;
+
 
 
 /// The default route handler:
@@ -55,83 +111,4 @@ pub async fn default_handler(
 		.await;
 
 	response
-}
-
-
-pub fn exchange_meta(
-	ev: On<Insert, Response>,
-	mut servers: Query<&mut ServerStatus>,
-	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
-) -> Result {
-	let entity = ev.event_target();
-	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
-		// ignore if no match, probably a test
-		return Ok(());
-	};
-	let status = response.status();
-	let duration = meta.started().elapsed();
-	let path = meta.path_string();
-	let method = meta.method();
-
-	let mut stats = servers.get_mut(exchange_of.get())?;
-
-	bevy::log::info!(
-		"
-Request Complete
-  path:     {}
-  method:   {}
-  duration: {}
-  status:   {}
-  index:    {}
-",
-		path,
-		method,
-		time_ext::pretty_print_duration(duration),
-		status,
-		stats.request_count()
-	);
-	stats.increment_requests();
-	Ok(())
-}
-
-
-#[cfg(test)]
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-
-	#[sweet::test]
-	async fn works() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
-		let _handle = std::thread::spawn(|| {
-			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
-				))
-				.add_observer(
-					|ev: On<Insert, Request>, mut commands: Commands| {
-						commands
-							.entity(ev.event_target())
-							.insert(Response::ok().with_body("hello"));
-					},
-				)
-				.run();
-		});
-		for _ in 0..10 {
-			Request::post(&url)
-				.send()
-				.await
-				.unwrap()
-				.into_result()
-				.await
-				.unwrap()
-				.text()
-				.await
-				.unwrap()
-				.xpect_eq("hello");
-		}
-	}
 }
