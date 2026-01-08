@@ -96,6 +96,7 @@ impl ExchangeSpawner {
 			)
 		})
 	}
+
 	fn spawn(&self, world: &mut World) -> Entity { (self.func)(world) }
 
 	/// - Creates a child of the server inserting the [`Request`] component
@@ -192,23 +193,28 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
-	fn works() {
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, ServerPlugin));
-		let store = Store::default();
-		app.world_mut().spawn(ExchangeSpawner::default()).run_async(
-			async move |entity| {
-				let res = ExchangeSpawner::handle_request(
+	async fn parse(bundle: impl Bundle) -> Response {
+		App::new()
+			.add_plugins((MinimalPlugins, ServerPlugin))
+			.world_mut()
+			.spawn(bundle)
+			.run_async_then(async move |entity| {
+				ExchangeSpawner::handle_request(
 					entity.clone(),
 					Request::get("foo"),
 				)
-				.await;
-				store.set(Some(res.status()));
-				entity.world().write_message(AppExit::Success);
-			},
-		);
-		app.run();
-		store.get().unwrap().xpect_eq(StatusCode::OK);
+				.await
+			})
+			.await
+	}
+
+	#[sweet::test]
+	async fn works() {
+		parse(ExchangeSpawner::new_handler(|_, _| {
+			StatusCode::IM_A_TEAPOT.into()
+		}))
+		.await
+		.status()
+		.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 }

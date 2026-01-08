@@ -26,6 +26,7 @@ server = [
 lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
+flow = ["dep:beet_flow"]
 aws = [
 	"serde",
 	"dep:crc-fast",
@@ -63,6 +64,7 @@ _sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true
+beet_flow = { workspace = true, optional = true }
 
 bevy.workspace = true
 
@@ -179,7 +181,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls"] }
+beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 sweet.workspace = true
 
 

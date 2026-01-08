@@ -1,5 +1,7 @@
 mod cli_server;
 mod exchange_spawner;
+#[cfg(feature = "flow")]
+mod exchange_spawner_flow;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),

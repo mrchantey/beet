@@ -1391,6 +1391,7 @@ dependencies = [
  "aws-sdk-s3",
  "base64 0.22.1",
  "beet_core",
+ "beet_flow",
  "beet_net",
  "bevy",
  "blocking",

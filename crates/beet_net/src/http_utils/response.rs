@@ -41,9 +41,18 @@ use std::convert::Infallible;
 /// assert_eq!(response.status(), StatusCode::OK);  // From ResponseParts
 /// ```
 #[derive(Debug, Component)]
+#[require(ResponseMarker = ResponseMarker{_sealed:()})]
 pub struct Response {
 	parts: ResponseParts,
 	pub body: Body,
+}
+
+
+/// Marker component to indicate that a response has been inserted.
+/// Even if the response gets taken this struct should remain.
+#[derive(Debug, Component)]
+pub struct ResponseMarker {
+	_sealed: (),
 }
 
 impl std::error::Error for Response {}
