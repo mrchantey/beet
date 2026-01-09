@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "flow")]
+use beet_flow::prelude::ControlFlowPlugin;
 
 /// Represents a http request, may contain a [`Request`] or [`Response`]
 #[derive(Default, Component)]
@@ -49,6 +51,8 @@ impl ServerPlugin {
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>().add_observer(server_stats);
+		#[cfg(feature = "flow")]
+		app.init_plugin::<ControlFlowPlugin>();
 	}
 }
 

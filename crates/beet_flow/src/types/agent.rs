@@ -42,14 +42,14 @@ where
 impl AgentQuery<'_, '_, (), ()> {
 	pub async fn entity_async(world: &AsyncWorld, action: Entity) -> Entity {
 		world
-			.with_then(move |world| {
-				world
-					.run_system_cached(move |query: AgentQuery| {
-						query.entity(action)
-					})
-					.unwrap()
-			})
+			.run_system_cached_with(
+				|In(action): In<Entity>, query: AgentQuery| {
+					query.entity(action)
+				},
+				action,
+			)
 			.await
+			.unwrap()
 	}
 }
 

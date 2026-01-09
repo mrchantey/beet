@@ -48,34 +48,32 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	async fn parse(bundle: impl Bundle) -> Response {
-		App::new()
-			.add_plugins((MinimalPlugins, ServerPlugin))
-			.world_mut()
-			.spawn(bundle)
-			.oneshot(Request::get("foo"))
-			.await
-	}
 
 	#[sweet::test]
 	async fn flow_inserts_response() {
 		use beet_flow::prelude::*;
-		parse(ExchangeSpawner::new_flow(|| {
-			OnSpawn::observe(|ev: On<GetOutcome>, mut commands: Commands| {
-				commands
-					.entity(ev.target())
-					.insert(Response::from_status(StatusCode::IM_A_TEAPOT));
-			})
-		}))
-		.await
-		.status()
-		.xpect_eq(StatusCode::IM_A_TEAPOT);
+		ServerPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				OnSpawn::observe(
+					|ev: On<GetOutcome>, mut commands: Commands| {
+						commands.entity(ev.target()).insert(
+							Response::from_status(StatusCode::IM_A_TEAPOT),
+						);
+					},
+				)
+			}))
+			.oneshot(Request::get("foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
 	#[sweet::test]
 	async fn flow_outcome_pass() {
 		use beet_flow::prelude::*;
-		parse(ExchangeSpawner::new_flow(|| EndWith(Outcome::Pass)))
+		ServerPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Pass)))
+			.oneshot(Request::get("foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
@@ -84,7 +82,9 @@ mod test {
 	#[sweet::test]
 	async fn flow_outcome_fail() {
 		use beet_flow::prelude::*;
-		parse(ExchangeSpawner::new_flow(|| EndWith(Outcome::Fail)))
+		ServerPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Fail)))
+			.oneshot(Request::get("foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);

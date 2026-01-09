@@ -11,18 +11,20 @@ pub fn server_plugin(app: &mut App) {
 	))
 	.world_mut()
 	.spawn(default_router(
-		EndWith(Outcome::Pass),
-		(InfallibleSequence, children![
-			pages_routes(),
-			docs_routes(),
-			blog_routes(),
-			actions_routes(),
-			beet_design::mockups::mockups_routes(),
-			article_layout_middleware("docs"),
-			article_layout_middleware("blog"),
-			image_generator(),
-		]),
-		EndWith(Outcome::Pass),
+		|| EndWith(Outcome::Pass),
+		|| {
+			(InfallibleSequence, children![
+				pages_routes(),
+				docs_routes(),
+				blog_routes(),
+				actions_routes(),
+				beet_design::mockups::mockups_routes(),
+				article_layout_middleware("docs"),
+				article_layout_middleware("blog"),
+				image_generator(),
+			])
+		},
+		|| EndWith(Outcome::Pass),
 	));
 }
 
