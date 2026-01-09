@@ -16,15 +16,20 @@ use beet_core::prelude::*;
 ///
 /// ## Example
 /// ```rust
-/// use beet_router::prelude::*;
-/// use beet_core::prelude::*;
+/// # use beet_router::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
 ///
 /// let mut world = World::new();
-/// world.spawn((Router, children![
-///     EndpointBuilder::get().with_path("api"),
-///     EndpointBuilder::get().with_path("users/:id"),
-///     EndpointBuilder::get().with_path("docs/*path"),
-/// ]));
+/// world.spawn(ExchangeSpawner::new_flow(|| {
+///   (
+/// 		InfallibleSequence, children![
+///       EndpointBuilder::get().with_path("api"),
+///       EndpointBuilder::get().with_path("users/:id"),
+///       EndpointBuilder::get().with_path("docs/*path"),
+///     ]
+/// 	)
+/// }));
 ///
 /// // build the tree and validate all paths
 /// let tree = EndpointTree::from_world(&mut world).unwrap();

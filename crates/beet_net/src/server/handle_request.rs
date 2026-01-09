@@ -221,15 +221,15 @@ async fn handle_request(server: AsyncEntity, request: impl Bundle) -> Response {
 	let exchange_entity = server
 		.world()
 		.with_then(move |world| {
-			let exchange_handler = world
+			let spawner = world
 				.entity_mut(server_id)
 				.get::<ExchangeSpawner>()
 				.cloned()
 				.expect("Server has no ExchangeHandler");
 
-			let entity = exchange_handler.spawn(world);
+			let agent = spawner.spawn(world);
 			world
-				.entity_mut(entity)
+				.entity_mut(agent)
 				// add observer before inserting request to handle immediate response
 				.observe(
 					move |ev: On<Insert, Response>, mut commands: Commands| {
@@ -241,7 +241,7 @@ async fn handle_request(server: AsyncEntity, request: impl Bundle) -> Response {
 								.take::<Response>()
 								.ok_or_else(|| {
 									bevyhow!(
-										"Exchange entity missing Response component"
+										"Response inserted but missing from exchange"
 									)
 								})?;
 							send.try_send(response)?;

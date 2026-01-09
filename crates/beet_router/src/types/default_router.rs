@@ -5,6 +5,8 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use serde_json::Value;
 
+// trait BundleFunc:'static+Send+S
+
 /// Create the default router configuration, providing
 /// three groups of `children![]` to run in between the
 /// default endpoints and fallbacks.
@@ -20,50 +22,56 @@ use serde_json::Value;
 /// - Inserts an [`analytics_handler`]
 pub fn default_router(
 	// runs before default request middleware
-	request_middleware: impl Bundle,
+	request_middleware: impl BundleFunc,
 	// the actual routes
-	endpoints: impl Bundle,
+	endpoints: impl BundleFunc,
 	// runs after `endpoints` and default endpoints
-	response_middleware: impl Bundle,
+	response_middleware: impl BundleFunc,
 ) -> impl Bundle {
-	(
-		Name::new("Router Root"),
-		insert_on_ready(HttpRouter::new()),
-		InfallibleSequence,
-		children![
-			(Name::new("Request Middleware"), request_middleware),
-			(Name::new("Endpoints Root"), endpoints),
-			(
-				Name::new("Default Routes"),
-				// Our goal here is to minimize performance overhead
-				// of default actions, this pattern ensures default
-				// fallbacks only run if no response is present
-				Sequence,
-				children![
-					common_predicates::no_response(),
-					(
-						Name::new("Default Routes Nested"),
-						InfallibleSequence,
-						children![
-							// # default endpoints
-							analytics_handler(),
-							app_info(),
-							// # default fallbacks
-							// stops after first succeeding fallback
-							// this is important to avoid response clobbering
-							(Name::new("Fallbacks"), Fallback, children![
-								html_bundle_to_response(),
-								assets_bucket(),
-								html_bucket(),
-								// default not found handled by Router
-							]),
-						]
-					),
-				]
-			),
-			(Name::new("Response Middleware"), response_middleware),
-		],
-	)
+	insert_on_ready((
+		HttpServer::default(),
+		ExchangeSpawner::new_flow(move || {
+			(Name::new("Router Root"), InfallibleSequence, children![
+				(
+					Name::new("Request Middleware"),
+					request_middleware.clone().bundle_func()
+				),
+				(Name::new("Endpoints Root"), endpoints.clone().bundle_func()),
+				(
+					Name::new("Default Routes"),
+					// Our goal here is to minimize performance overhead
+					// of default actions, this pattern ensures default
+					// fallbacks only run if no response is present
+					Sequence,
+					children![
+						common_predicates::no_response(),
+						(
+							Name::new("Default Routes Nested"),
+							InfallibleSequence,
+							children![
+								// # default endpoints
+								analytics_handler(),
+								app_info(),
+								// # default fallbacks
+								// stops after first succeeding fallback
+								// this is important to avoid response clobbering
+								(Name::new("Fallbacks"), Fallback, children![
+									html_bundle_to_response(),
+									assets_bucket(),
+									html_bucket(),
+									// default not found handled by Router
+								]),
+							]
+						),
+					]
+				),
+				(
+					Name::new("Response Middleware"),
+					response_middleware.clone().bundle_func()
+				),
+			])
+		}),
+	))
 }
 
 /// Create a [`ReadyOnChildrenReady`], allowing any
@@ -192,13 +200,16 @@ mod test {
 	#[rustfmt::skip]
 	async fn works() {
 		RouterPlugin::world()
-			.spawn((
-				super::insert_on_ready(Router),
-				EndpointBuilder::get(),
-				children![(
-					EndWith(Outcome::Pass),
-					ReadyAction::new(async |_| {})
-				)],
+			.spawn(
+				super::insert_on_ready(ExchangeSpawner::new_flow(||{
+					(
+						EndpointBuilder::get(),
+						children![(
+							EndWith(Outcome::Pass),
+							ReadyAction::new(async |_| {})
+						)]
+					)
+				}),
 			))
 			.await_ready()
 			.await
@@ -212,10 +223,12 @@ mod test {
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())
-			.spawn((Router, InfallibleSequence, children![
-				app_info(),
-				html_bundle_to_response()
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![
+					app_info(),
+					html_bundle_to_response()
+				])
+			}))
 			.oneshot_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
@@ -226,12 +239,14 @@ mod test {
 		let mut world = RouterPlugin::world();
 		world.insert_resource(pkg_config!());
 		let mut entity = world.spawn(default_router(
-			EndWith(Outcome::Pass),
+			|| EndWith(Outcome::Pass),
 			// EndWith(Outcome::Pass),
-			(Sequence, children![
-				EndpointBuilder::get().with_path("foobar"),
-			]),
-			EndWith(Outcome::Pass),
+			|| {
+				(Sequence, children![
+					EndpointBuilder::get().with_path("foobar"),
+				])
+			},
+			|| EndWith(Outcome::Pass),
 		));
 
 		entity

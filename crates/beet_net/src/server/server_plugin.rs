@@ -4,14 +4,16 @@ use beet_core::prelude::*;
 use beet_flow::prelude::ControlFlowPlugin;
 
 /// Represents a http request, may contain a [`Request`] or [`Response`]
-#[derive(Default, Component)]
+#[derive(Default, Reflect, Component)]
+#[reflect(Component)]
 pub struct Exchange;
 
 /// Points to the [`HttpServer`] that this exchange was spawned by.
 /// We don't use [`Children`] because some server patterns have a different
 /// meaning for that, for example `beet_router` uses `beet_flow` to represent
 /// the routes, and the [`Exchange`] is an `agent`.
-#[derive(Deref, Component)]
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
 #[relationship(relationship_target = Exchanges)]
 #[require(Exchange)]
 pub struct ExchangeOf(pub Entity);

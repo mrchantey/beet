@@ -70,7 +70,8 @@ where
 /// This component prevents a [`ChildEnd`] from automatically triggering
 /// an [`End`] with the same data, a requirement whenever you want to manually
 /// handle propagation, for instance in a [`Sequence`], [`HighestScore`] etc.
-#[derive(Component, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub struct PreventPropagateEnd<T = Outcome> {
 	phantom: PhantomData<T>,
 }

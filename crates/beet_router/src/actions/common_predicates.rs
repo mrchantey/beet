@@ -13,12 +13,18 @@ pub fn fallback() -> impl Bundle {
 	(
 		Name::new("Fallback Predicate"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
-			 exchange: Query<(), (With<Request>, Without<Response>)>| {
-				match exchange.contains(ev.agent()) {
-					true => ev.trigger_with_cx(Outcome::Pass),
-					false => ev.trigger_with_cx(Outcome::Fail),
+			|ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 agent_query: AgentQuery<
+				(),
+				(With<Request>, Without<Response>),
+			>| {
+				let action = ev.target();
+				let outcome = match agent_query.contains(action) {
+					true => Outcome::Pass,
+					false => Outcome::Fail,
 				};
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -30,11 +36,15 @@ pub fn no_response() -> impl Bundle {
 	(
 		Name::new("No Response Predicate"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>, exchange: Query<(), Without<Response>>| {
-				match exchange.contains(ev.agent()) {
-					true => ev.trigger_with_cx(Outcome::Pass),
-					false => ev.trigger_with_cx(Outcome::Fail),
+			|ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 agent_query: AgentQuery<(), Without<Response>>| {
+				let action = ev.target();
+				let outcome = match agent_query.contains(action) {
+					true => Outcome::Pass,
+					false => Outcome::Fail,
 				};
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -45,16 +55,21 @@ pub fn contains_handler_bundle() -> impl Bundle {
 	(
 		Name::new("Handler Bundle Predicate"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
+			 mut commands: Commands,
 			 children: Query<&Children>,
+			 agents: AgentQuery,
 			 handler_bundles: Query<(), With<HtmlBundle>>| {
-				match children
-					.iter_direct_descendants(ev.agent())
+				let action = ev.target();
+				let agent = agents.entity(action);
+				let outcome = match children
+					.iter_direct_descendants(agent)
 					.any(|child| handler_bundles.contains(child))
 				{
-					true => ev.trigger_with_cx(Outcome::Pass),
-					false => ev.trigger_with_cx(Outcome::Fail),
+					true => Outcome::Pass,
+					false => Outcome::Fail,
 				};
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -68,11 +83,15 @@ pub fn is_ssr() -> impl Bundle {
 	(
 		Name::new("SSR Predicate"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>, render_mode: Res<RenderMode>| {
-				match *render_mode == RenderMode::Ssr {
-					true => ev.trigger_with_cx(Outcome::Pass),
-					false => ev.trigger_with_cx(Outcome::Fail),
+			|ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 render_mode: Res<RenderMode>| {
+				let action = ev.target();
+				let outcome = match *render_mode {
+					RenderMode::Ssr => Outcome::Pass,
+					_ => Outcome::Fail,
 				};
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -87,25 +106,35 @@ mod test {
 	use beet_net::prelude::*;
 
 	#[sweet::test]
-	async fn fallback() {
+	async fn fallback_no_response() {
 		// request no response
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				common_predicates::fallback(),
-				EndpointBuilder::get()
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					common_predicates::fallback(),
+					EndpointBuilder::get()
+				])
+			}))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
+	}
 
+	#[sweet::test]
+	async fn fallback_request_consumed() {
 		// request already consumed
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get().with_handler(StatusCode::IM_A_TEAPOT),
-				common_predicates::fallback(),
-				EndpointBuilder::get(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(StatusCode::IM_A_TEAPOT),
+					common_predicates::fallback(),
+					EndpointBuilder::get().with_handler(|| -> () {
+						unreachable!();
+					}),
+				])
+			}))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
@@ -113,54 +142,65 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn is_ssr() {
+	async fn is_ssr_true() {
 		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssr))
-			.spawn((Router, Sequence, children![
-				common_predicates::is_ssr(),
-				EndpointBuilder::get()
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					common_predicates::is_ssr(),
+					EndpointBuilder::get()
+				])
+			}))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
-
-		RouterPlugin::world()
-			.xtap(|world| world.insert_resource(RenderMode::Ssg))
-			.spawn((Router, Sequence, children![
-				common_predicates::is_ssr(),
-				EndpointBuilder::get(),
-			]))
-			.oneshot(Request::get("/"))
-			.await
-			.status()
-			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
 	#[sweet::test]
-	async fn contains_handler_bundle() {
-		use beet_rsx::prelude::HtmlBundle;
-		// request no response
-
+	async fn is_ssr_false() {
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				common_predicates::contains_handler_bundle(),
-				EndpointBuilder::get()
-			]))
+			.xtap(|world| world.insert_resource(RenderMode::Ssg))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					common_predicates::is_ssr(),
+					EndpointBuilder::get(),
+				])
+			}))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+	}
+
+	#[sweet::test]
+	async fn contains_handler_bundle_no_response() {
+		use beet_rsx::prelude::HtmlBundle;
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					common_predicates::contains_handler_bundle(),
+					EndpointBuilder::get()
+				])
+			}))
+			// .oneshot(Request::get("/"))
 			.oneshot_bundle((Request::get("/"), children![HtmlBundle]))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
-
-		// request already consumed
+	}
+	#[sweet::test]
+	async fn contains_handler_bundle_request_consumed() {
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				common_predicates::contains_handler_bundle(),
-				EndpointBuilder::get(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					common_predicates::contains_handler_bundle(),
+					EndpointBuilder::get(),
+				])
+			}))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::NOT_FOUND);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 }

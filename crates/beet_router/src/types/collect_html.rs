@@ -38,7 +38,7 @@ pub async fn collect_html(
 
 		let text = world
 			.oneshot(Request::get(&path))
-			.await?
+			.await
 			// .with_then(|world| world.oneshot(path.clone()))
 			// .await
 			.into_result()
@@ -67,28 +67,30 @@ mod test {
 	#[sweet::test]
 	async fn children() {
 		let mut world = RouterPlugin::world();
-		world.spawn((Router, InfallibleSequence, children![
-			EndpointBuilder::get()
-				.with_path("foo")
-				.with_handler(|| "foo")
-				.with_cache_strategy(CacheStrategy::Static)
-				.with_content_type(ContentType::Html),
-			EndpointBuilder::get()
-				.with_path("bar")
-				.with_handler(|| "bar")
-				.with_cache_strategy(CacheStrategy::Static)
-				.with_content_type(ContentType::Html),
-			// non-static
-			EndpointBuilder::get()
-				.with_path("bazz")
-				.with_handler(|| "bazz")
-				.with_content_type(ContentType::Html),
-			// non-html
-			EndpointBuilder::get()
-				.with_path("boo")
-				.with_handler(|| "boo")
-				.with_cache_strategy(CacheStrategy::Static),
-		]));
+		world.spawn(ExchangeSpawner::new_flow(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_handler(|| "foo")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_content_type(ContentType::Html),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_handler(|| "bar")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_content_type(ContentType::Html),
+				// non-static
+				EndpointBuilder::get()
+					.with_path("bazz")
+					.with_handler(|| "bazz")
+					.with_content_type(ContentType::Html),
+				// non-html
+				EndpointBuilder::get()
+					.with_path("boo")
+					.with_handler(|| "boo")
+					.with_cache_strategy(CacheStrategy::Static),
+			])
+		}));
 		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
 		world
 			.run_async_then(collect_html)

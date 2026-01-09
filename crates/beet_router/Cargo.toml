@@ -37,7 +37,7 @@ _sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true
-beet_net.workspace = true
+beet_net = {workspace = true, features=["flow"]}
 beet_dom.workspace = true
 beet_flow.workspace = true
 beet_rsx.workspace = true
@@ -76,8 +76,8 @@ web-sys = { workspace = true, features = ["Storage"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"]}
-sweet = { workspace = true, features = ["runner"] }
-# sweet.workspace = true
+# sweet = { workspace = true, features = ["runner"] }
+sweet.workspace = true
 
 # [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 # TODO no more sweet -> beet_router dep so this can be in regular dev-deps

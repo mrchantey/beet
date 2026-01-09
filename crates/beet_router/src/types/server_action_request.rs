@@ -170,7 +170,7 @@ mod test {
 	// only a single entry because set_server_url is static
 	#[sweet::test]
 	async fn works() {
-		let server = HttpServer::new_test().with_handler(flow_route_handler);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let url = Url::parse(&url).unwrap();
 		let _handle = std::thread::spawn(move || {
@@ -179,23 +179,28 @@ mod test {
 			let world = app.world_mut();
 			// let mut world = ServerPlugin::with_server(server).into_world();
 			world.init_resource::<RenderMode>();
-			world.spawn((server, Router, InfallibleSequence, children![
-				ServerAction::new(
-					HttpMethod::Get,
-					add_via_get.pipe(Json::pipe)
-				)
-				.with_path("add"),
-				ServerAction::new(
-					HttpMethod::Post,
-					add_via_post.pipe(Json::pipe)
-				)
-				.with_path("add"),
-				ServerAction::new(
-					HttpMethod::Get,
-					increment_if_positive.pipe(JsonResult::pipe)
-				)
-				.with_path("increment_if_positive")
-			]));
+			world.spawn((
+				server,
+				ExchangeSpawner::new_flow(|| {
+					(InfallibleSequence, children![
+						ServerAction::new(
+							HttpMethod::Get,
+							add_via_get.pipe(Json::pipe)
+						)
+						.with_path("add"),
+						ServerAction::new(
+							HttpMethod::Post,
+							add_via_post.pipe(Json::pipe)
+						)
+						.with_path("add"),
+						ServerAction::new(
+							HttpMethod::Get,
+							increment_if_positive.pipe(JsonResult::pipe)
+						)
+						.with_path("increment_if_positive")
+					])
+				}),
+			));
 			app.run();
 		});
 		time_ext::sleep_millis(10).await;

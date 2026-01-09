@@ -11,7 +11,8 @@ pub struct HtmlBundleQuery<'w, 's, F = ()>
 where
 	F: 'static + QueryFilter,
 {
-	exchanges: Query<'w, 's, &'static Children, F>,
+	agent_query: AgentQuery<'w, 's, Entity, With<HtmlBundle>>,
+	agents: Query<'w, 's, &'static Children, F>,
 	html_bundles: Query<'w, 's, Entity, With<HtmlBundle>>,
 }
 
@@ -19,12 +20,14 @@ impl<F> HtmlBundleQuery<'_, '_, F>
 where
 	F: 'static + QueryFilter,
 {
-	/// Get the first [`HtmlBundle`] found in the direct children of the given `exchange`.
+	/// Get the first [`HtmlBundle`] found in the direct children of the agent for the given `action`.
 	/// Returns `None` if no [`HtmlBundle`] is found.
 	/// ## Errors
 	/// if multiple children are found.
-	pub fn get(&self, exchange: Entity) -> Result<Option<Entity>> {
-		let Ok(children) = self.exchanges.get(exchange) else {
+	pub fn get(&self, action: Entity) -> Result<Option<Entity>> {
+		let agent = self.agent_query.entity(action);
+
+		let Ok(children) = self.agents.get(agent) else {
 			return Ok(None);
 		};
 		let found = children
@@ -56,13 +59,14 @@ pub fn html_bundle_to_response() -> impl Bundle {
 	(
 		Name::new("Html Bundle Parser"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 mut commands: Commands,
 			 query: HtmlBundleQuery<Without<Response>>|
 			 -> Result {
-				let exchange = ev.agent();
-				let Some(html_bundle) = query.get(ev.agent())? else {
-					ev.trigger_with_cx(Outcome::Fail);
+				let action = ev.target();
+				let agent = query.agent_query.entity(action);
+				let Some(html_bundle) = query.get(action)? else {
+					commands.entity(action).trigger_target(Outcome::Fail);
 					return Ok(());
 				};
 
@@ -76,12 +80,10 @@ pub fn html_bundle_to_response() -> impl Bundle {
 					world.run_schedule(ApplyDirectives);
 					let html = world
 						.run_system_cached_with(render_fragment, html_bundle)?;
-					world
-						.entity_mut(exchange)
-						.insert(Html(html).into_response());
+					world.entity_mut(agent).insert(Html(html).into_response());
 					Ok(())
 				});
-				ev.trigger_with_cx(Outcome::Pass);
+				commands.entity(action).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		),
@@ -107,11 +109,15 @@ mod test {
 	#[sweet::test]
 	async fn simple() {
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| (BeetRoot, rsx! {<div>hello world</div>})),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get().with_handler(|| (
+						BeetRoot,
+						rsx! {<div>hello world</div>}
+					)),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_eq("<div>hello world</div>");
@@ -122,11 +128,13 @@ mod test {
 	async fn with_template() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_eq(
@@ -137,32 +145,37 @@ mod test {
 	async fn middleware() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
-				OnSpawn::observe(
-					|mut ev: On<GetOutcome>,
-					 query: HtmlBundleQuery<Without<Response>>,
-					 mut commands: Commands|
-					 -> Result {
-						let Some(html_bundle) = query.get(ev.agent())? else {
-							ev.trigger_with_cx(Outcome::Fail);
-							return Ok(());
-						};
-						commands.spawn((
-							HtmlDocument,
-							HtmlBundle,
-							ChildOf(ev.agent()),
-							rsx! {
-								"middleware!" {html_bundle}
-							},
-						));
-						ev.trigger_with_cx(Outcome::Pass);
-						Ok(())
-					}
-				),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+					OnSpawn::observe(
+						|ev: On<GetOutcome>,
+							agent_query: AgentQuery,
+						 query: HtmlBundleQuery<Without<Response>>,
+						 mut commands: Commands|
+						 -> Result {
+								let action = ev.target();
+							let agent = agent_query.entity(action);
+							let Some(html_bundle) = query.get(action)? else {
+								commands.entity(action).trigger_target(Outcome::Fail);
+								return Ok(());
+							};
+							commands.spawn((
+								HtmlDocument,
+								HtmlBundle,
+								ChildOf(agent),
+								rsx! {
+									"middleware!" {html_bundle}
+								},
+							));
+							commands.entity(action).trigger_target(Outcome::Pass);
+							Ok(())
+						}
+					),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_str("<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>");

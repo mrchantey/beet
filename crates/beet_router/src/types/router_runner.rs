@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use clap::Parser;
 // use beet_router::types::RouteFunc;
 #[allow(unused_imports)]
@@ -65,7 +66,7 @@ impl Plugin for RouterRunner {
 fn export_static(mut commands: AsyncCommands) {
 	commands.run_local(async |world| -> Result {
 		// wait for the server to be ready
-		world.await_event::<Insert, Router>().await;
+		world.await_event::<Insert, ExchangeSpawner>().await;
 
 		let html = collect_html(world.clone()).await?;
 

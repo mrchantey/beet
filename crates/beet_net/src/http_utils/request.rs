@@ -74,7 +74,7 @@ impl std::ops::DerefMut for Request {
 /// Cloned from the [`Request`] when its added, allowing the [`Request`]
 /// to be consumed and for these parts to still be accessible.
 /// This component should not be removed.
-#[derive(Debug, Component, Clone)]
+#[derive(Debug, Clone, Component)]
 pub struct RequestMeta {
 	parts: RequestParts,
 	/// Note this is taken the moment the request is inserted. It does not account

@@ -5,7 +5,8 @@ use beet_dom::prelude::*;
 
 /// Marker type indicating this entity was spawned as a bundle and
 /// should be converted to an Ok html response by [`html_bundle_to_response`]
-#[derive(Component)]
+#[derive(Reflect, Component)]
+#[reflect(Component)]
 pub struct HtmlBundle;
 
 /// A node which is a descendant of a template root

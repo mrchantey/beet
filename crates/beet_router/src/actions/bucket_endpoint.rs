@@ -23,9 +23,9 @@ impl BucketEndpoint {
 			.with_trailing_path()
 			.with_handler_bundle((
 				bucket,
-				async move |(mut path, cx): (RoutePath, MiddlewareContext),
-				            world: AsyncWorld|
-				            -> Result {
+				async move |mut path: RoutePath,
+				            action: AsyncEntity|
+				            -> Result<Response> {
 					if let Some(prefix) = &remove_prefix {
 						if let Ok(stripped) = path.strip_prefix(prefix) {
 							path = RoutePath::new(stripped);
@@ -33,17 +33,10 @@ impl BucketEndpoint {
 							bevybail!("prefix {prefix} not found in {path}");
 						}
 					}
-					let bucket = world
-						.entity(cx.action())
-						.get_cloned::<Bucket>()
-						.await?;
-					let response = bucket_to_response(&bucket, &path)
-						.await?
-						.into_response();
-					world.entity(cx.exchange()).insert_then(response).await;
-					Ok(())
+					let bucket = action.get_cloned::<Bucket>().await?;
+					bucket_to_response(&bucket, &path).await
 				}
-				.into_middleware(),
+				.into_endpoint_handler(),
 			))
 	}
 }
@@ -132,11 +125,13 @@ mod test {
 		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
-		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				common_predicates::fallback(),
-				BucketEndpoint::new(bucket.clone(), None),
-			]))
+		ServerPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(move || {
+				(Sequence, children![
+					common_predicates::fallback(),
+					BucketEndpoint::new(bucket.clone(), None),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_str("<div>fallback</div>");
@@ -148,13 +143,15 @@ mod test {
 		let path = RoutePath::from("bar/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		RouterPlugin::world()
-			.spawn((Router, PathPartial::new("foo"), Sequence, children![
-				common_predicates::fallback(),
-				BucketEndpoint::new(
-					bucket.clone(),
-					Some(RoutePath::new("foo"))
-				),
-			]))
+			.spawn(ExchangeSpawner::new_flow(move || {
+				(PathPartial::new("foo"), Sequence, children![
+					common_predicates::fallback(),
+					BucketEndpoint::new(
+						bucket.clone(),
+						Some(RoutePath::new("foo"))
+					),
+				])
+			}))
 			.oneshot_str("/foo/bar")
 			.await
 			.xpect_str("<div>fallback</div>");

@@ -9,7 +9,7 @@ use bevy::ecs::system::RunSystemError;
 
 
 pub struct MiddlewareBuilder {
-	pub method: Option<HttpMethod>,
+	// pub method: Option<HttpMethod>,
 }
 
 impl MiddlewareBuilder {
@@ -47,24 +47,10 @@ pub trait IntoMiddleware<M> {
 	fn into_middleware(self) -> impl Bundle;
 }
 
-/// An `action` / `exchange` pair for a current visit.
-#[derive(Clone)]
-pub struct MiddlewareContext {
-	/// The current action this exchange is visiting
-	action: Entity,
-	/// The `agent` of the action, containing the [`Request`] and [`Response`]
-	exchange: Entity,
-}
-
-impl MiddlewareContext {
-	pub fn action(&self) -> Entity { self.action }
-	pub fn exchange(&self) -> Entity { self.exchange }
-}
-
 trait MiddlewareIn<M>: Sized {
-	fn from_request_meta_and_cx(
+	fn from_request_meta_and_action(
 		request: &RequestMeta,
-		cx: &MiddlewareContext,
+		action: Entity,
 	) -> Result<Self, Response>;
 }
 
@@ -76,11 +62,11 @@ macro_rules! impl_tuple_middleware {
 	where
 		$($T: MiddlewareIn<$M>,)*
 	{
-	fn from_request_meta_and_cx(
+	fn from_request_meta_and_action(
 		request: &RequestMeta,
-		cx: &MiddlewareContext,
+		action: Entity,
 	) -> Result<Self, Response> {
-		Ok(($($T::from_request_meta_and_cx(request, cx)?,)*))
+		Ok(($($T::from_request_meta_and_action(request, action)?,)*))
 	}
 	}
 }
@@ -89,12 +75,12 @@ macro_rules! impl_tuple_middleware {
 variadics_please::all_tuples!(impl_tuple_middleware, 1, 15, T, M);
 
 
-impl MiddlewareIn<Self> for MiddlewareContext {
-	fn from_request_meta_and_cx(
+impl MiddlewareIn<Self> for Entity {
+	fn from_request_meta_and_action(
 		_: &RequestMeta,
-		cx: &MiddlewareContext,
+		action: Entity,
 	) -> Result<Self, Response> {
-		cx.clone().xok()
+		action.xok()
 	}
 }
 
@@ -104,9 +90,9 @@ impl<T, M> MiddlewareIn<(FromRequestRefMiddlewareIn, M)> for T
 where
 	T: FromRequestMeta<M>,
 {
-	fn from_request_meta_and_cx(
+	fn from_request_meta_and_action(
 		request: &RequestMeta,
-		_: &MiddlewareContext,
+		_: Entity,
 	) -> Result<Self, Response> {
 		T::from_request_meta(request)
 	}
@@ -124,16 +110,15 @@ where
 {
 	fn into_middleware(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>,
+			move |ev: On<GetOutcome>,
 			      mut commands: Commands,
-			      request: Query<&RequestMeta>|
+			      agent_query: AgentQuery<(Entity, &RequestMeta)>|
 			      -> Result {
-				let action = ev.action();
-				let exchange = ev.agent();
-				let request = request.get(exchange)?;
-				let cx = MiddlewareContext { action, exchange };
-				let input =
-					Input::Inner::from_request_meta_and_cx(request, &cx)?;
+				let action = ev.target();
+				let (agent, request) = agent_query.get(action)?;
+				let input = Input::Inner::from_request_meta_and_action(
+					request, action,
+				)?;
 				commands.run_system_once_with(
 					self.clone().pipe(
 						move |result: In<Output>, mut commands: Commands| {
@@ -141,14 +126,14 @@ where
 								result.0.into_result()
 							{
 								commands
-									.entity(exchange)
+									.entity(agent)
 									.insert(err.into_response());
 							}
 						},
 					),
 					input,
 				);
-				ev.trigger_with_cx(Outcome::Pass);
+				commands.entity(action).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		)
@@ -168,26 +153,35 @@ where
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut commands: AsyncCommands,
-			      request: Query<&RequestMeta>|
+			      agent_query: AgentQuery<(Entity, &RequestMeta)>|
 			      -> Result {
-				let action = ev.action();
-				let exchange = ev.agent();
-				let request = request.get(exchange)?;
-				let cx = MiddlewareContext { action, exchange };
+				let action = ev.target();
+				let (agent, request) = agent_query.get(action)?;
 				let this = self.clone();
-				let input = Input::from_request_meta_and_cx(request, &cx)?;
+				let input =
+					Input::from_request_meta_and_action(request, action)?;
 				commands.run(async move |world| {
-					if let Err(RunSystemError::Failed(err)) =
-						this(input.clone(), world.clone()).await.into_result()
-					{
-						world
-							.entity(exchange)
-							.insert_then(err.into_response())
-							.await;
-					}
+					let error_response =
+						if let Err(RunSystemError::Failed(err)) =
+							this(input.clone(), world.clone())
+								.await
+								.into_result()
+						{
+							Some(err.into_response())
+						} else {
+							None
+						};
+					// combine insert and trigger into one world access
+					// to avoid race with entity despawn after response insert
 					world
-						.entity(cx.action())
-						.trigger_target(Outcome::Pass.with_agent(cx.exchange()))
+						.with_then(move |world| {
+							if let Some(response) = error_response {
+								world.entity_mut(agent).insert(response);
+							}
+							world
+								.entity_mut(action)
+								.trigger_target(Outcome::Pass);
+						})
 						.await;
 				});
 				Ok(())
@@ -209,10 +203,10 @@ mod test {
 		fn my_system() {}
 		assert(my_system);
 		assert(|| {});
-		fn my_system2(_cx: In<MiddlewareContext>) {}
+		fn my_system2(_action: In<Entity>) {}
 		assert(my_system2);
-		assert(|_: In<MiddlewareContext>| {});
-		fn my_system3(_cx: In<MiddlewareContext>) -> Result { Ok(()) }
+		assert(|_: In<Entity>| {});
+		fn my_system3(_action: In<Entity>) -> Result { Ok(()) }
 		assert::<(Result, _, _, _, _)>(my_system3);
 		// assert(my_system3);
 		// assert(|_: In<MiddlewareContext>| -> Result { Ok(()) });
@@ -220,20 +214,18 @@ mod test {
 
 	#[sweet::test]
 	async fn async_system() {
-		async fn my_async_system(_cx: MiddlewareContext, _world: AsyncWorld) {}
+		async fn my_async_system(_action: Entity, _world: AsyncWorld) {}
 		assert(my_async_system);
 		async fn my_async_system2(
-			_cx: (MiddlewareContext, MiddlewareContext),
+			_action: (Entity, Entity),
 			_world: AsyncWorld,
 		) -> Result {
 			Ok(())
 		}
 		assert(my_async_system2);
-		assert(async |_cx: MiddlewareContext, _world: AsyncWorld| {});
-		assert(
-			async |_cx: MiddlewareContext, _world: AsyncWorld| -> Result {
-				Ok(())
-			},
-		);
+		assert(async |_action: Entity, _world: AsyncWorld| {});
+		assert(async |_action: Entity, _world: AsyncWorld| -> Result {
+			Ok(())
+		});
 	}
 }

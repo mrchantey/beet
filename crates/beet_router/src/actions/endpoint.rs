@@ -233,6 +233,7 @@ impl EndpointBuilder {
 
 				let mut handler_entity =
 					spawner.spawn(Name::new("Route Handler"));
+
 				if let Some(cache_strategy) = self.cache_strategy {
 					handler_entity.insert(cache_strategy);
 				}
@@ -258,8 +259,11 @@ fn path_match(must_exact_match: bool) -> impl Bundle {
 	(
 		Name::new("Check Path Match"),
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>, query: RouteQuery| -> Result {
-				let outcome = match query.path_match(&ev) {
+			move |ev: On<GetOutcome>,
+			      mut commands: Commands,
+			      query: RouteQuery| {
+				let action = ev.target();
+				let outcome = match query.path_match(action) {
 					// expected exact match, got partial match
 					Ok(path_match)
 						if must_exact_match && !path_match.exact_match() =>
@@ -271,8 +275,7 @@ fn path_match(must_exact_match: bool) -> impl Bundle {
 					// match failed
 					Err(_err) => Outcome::Fail,
 				};
-				ev.trigger_with_cx(outcome);
-				Ok(())
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -284,18 +287,18 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 		Name::new("Method Check"),
 		method,
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 query: RouteQuery,
-			 actions: Query<&HttpMethod>|
+			 actions: Query<&HttpMethod>,
+			 mut commands: Commands|
 			 -> Result {
-				let method = actions.get(ev.action())?;
-				let outcome = match query.method(&ev)? == *method {
+				let action = ev.target();
+				let method = actions.get(action)?;
+				let outcome = match query.method(action)? == *method {
 					true => Outcome::Pass,
 					false => Outcome::Fail,
 				};
-				// println!("check_method: {}", outcome);
-				ev.trigger_with_cx(outcome);
-
+				commands.entity(action).trigger_target(outcome);
 				Ok(())
 			},
 		),
@@ -307,7 +310,9 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
+	use beet_rsx::prelude::*;
 
 	#[sweet::test]
 	async fn simple() {
@@ -315,7 +320,29 @@ mod test {
 		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
 
 		RouterPlugin::world()
-			.spawn((Router, EndpointBuilder::get()))
+			.spawn(ExchangeSpawner::new_flow(|| EndpointBuilder::get()))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test]
+	async fn html_handler() {
+		RouterPlugin
+			.into_world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Name::new("My Exchange"), Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {"hello world"}),
+					(
+						Name::new("next"),
+						OnSpawn::observe(|_: On<GetOutcome>| {
+							panic!("here");
+						})
+					)
+				])
+			}))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
@@ -326,16 +353,18 @@ mod test {
 	#[sweet::test]
 	async fn dynamic_path() {
 		RouterPlugin::world()
-			.spawn((
-				Router,
+			.spawn(ExchangeSpawner::new_flow(|| {
 				EndpointBuilder::get().with_path("/:path").with_handler(
 					async |_req: (),
-					       cx: EndpointContext|
+					       action: AsyncEntity|
 					       -> Result<Html<String>> {
-						Html(cx.dyn_segment("path").await?).xok()
+						let path =
+							RouteQuery::dyn_segment_async(action, "path")
+								.await?;
+						Html(path).xok()
 					},
-				),
-			))
+				)
+			}))
 			.oneshot_str(Request::get("/bing"))
 			.await
 			.xpect_eq("bing");
@@ -346,14 +375,16 @@ mod test {
 		use beet_flow::prelude::*;
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn((Router, InfallibleSequence, children![
-			EndpointBuilder::get()
-				.with_path("foo")
-				.with_handler(|| "foo"),
-			EndpointBuilder::get()
-				.with_path("bar")
-				.with_handler(|| "bar"),
-		]));
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_handler(|| "foo"),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_handler(|| "bar"),
+			])
+		}));
 		entity.oneshot_str("/foo").await.xpect_eq("foo");
 		entity.oneshot_str("/bar").await.xpect_eq("bar");
 	}
@@ -361,8 +392,9 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		let mut entity =
-			world.spawn((Router, EndpointBuilder::post().with_path("foo")));
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			EndpointBuilder::post().with_path("foo")
+		}));
 
 		// method and path match
 		entity
