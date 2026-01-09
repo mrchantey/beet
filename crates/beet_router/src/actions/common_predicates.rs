@@ -174,23 +174,40 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn contains_handler_bundle_no_response() {
+	async fn contains_handler_bundle_pass() {
 		use beet_rsx::prelude::HtmlBundle;
+		// Test that the predicate passes when an upstream action spawns HtmlBundle
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
 				(Sequence, children![
+					// First action spawns HtmlBundle as child of agent
+					OnSpawn::observe(
+						|ev: On<GetOutcome>,
+						 agents: AgentQuery,
+						 mut commands: Commands| {
+							let agent = agents.entity(ev.target());
+							commands.entity(agent).with_children(|parent| {
+								parent.spawn(HtmlBundle);
+							});
+							commands
+								.entity(ev.target())
+								.trigger_target(Outcome::Pass);
+						},
+					),
+					// Then predicate checks for it
 					common_predicates::contains_handler_bundle(),
 					EndpointBuilder::get()
 				])
 			}))
-			// .oneshot(Request::get("/"))
-			.oneshot_bundle((Request::get("/"), children![HtmlBundle]))
+			.oneshot(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
+
 	#[sweet::test]
-	async fn contains_handler_bundle_request_consumed() {
+	async fn contains_handler_bundle_fail() {
+		// Test that the predicate fails when no HtmlBundle child exists
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
 				(Sequence, children![

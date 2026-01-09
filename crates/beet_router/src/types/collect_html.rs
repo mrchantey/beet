@@ -16,13 +16,27 @@ pub async fn collect_html(
 		})
 		.await;
 
+	// Spawn trees from ExchangeSpawners and collect their endpoints
 	let metas = world
 		.with_then(|world| {
-			world
-				.query_once::<&Endpoint>()
+			let (endpoints, spawned_roots) =
+				crate::types::endpoint_tree::spawn_and_collect_endpoints(world);
+
+			// Filter for static GET/HTML endpoints
+			let metas: Vec<Endpoint> = endpoints
 				.into_iter()
+				.filter_map(|(entity, _, _)| {
+					world.entity(entity).get::<Endpoint>().cloned()
+				})
 				.filter(|endpoint| endpoint.is_static_get_html())
-				.collect::<Vec<_>>()
+				.collect();
+
+			// Despawn the temporary trees
+			for root in spawned_roots {
+				world.entity_mut(root).despawn();
+			}
+
+			metas
 		})
 		.await;
 

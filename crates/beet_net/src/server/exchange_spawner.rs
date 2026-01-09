@@ -109,9 +109,10 @@ impl ExchangeSpawner {
 		})
 	}
 
-	pub(super) fn spawn(&self, world: &mut World) -> Entity {
-		(self.func)(world)
-	}
+	/// Spawns the exchange tree. Can be used both for processing requests
+	/// and for introspection purposes (e.g., collecting endpoints).
+	/// The caller is responsible for despawning the entity when done.
+	pub fn spawn(&self, world: &mut World) -> Entity { (self.func)(world) }
 
 	pub fn mirror() -> Self {
 		Self::new_handler(|_, req| {

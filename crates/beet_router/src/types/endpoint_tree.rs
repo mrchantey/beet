@@ -1,5 +1,33 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
+
+/// Spawns all ExchangeSpawner trees and collects Endpoint components.
+/// Returns the list of endpoints and the entities that were spawned (which the caller must despawn).
+pub(crate) fn spawn_and_collect_endpoints(
+	world: &mut World,
+) -> (Vec<(Entity, PathPattern, ParamsPattern)>, Vec<Entity>) {
+	let spawners: Vec<ExchangeSpawner> = world
+		.query_once::<&ExchangeSpawner>()
+		.iter()
+		.map(|s| (*s).clone())
+		.collect();
+
+	let mut spawned_roots = Vec::new();
+	for spawner in &spawners {
+		spawned_roots.push(spawner.spawn(world));
+	}
+
+	let endpoints: Vec<(Entity, PathPattern, ParamsPattern)> = world
+		.query_once::<(Entity, &Endpoint)>()
+		.iter()
+		.map(|(entity, endpoint)| {
+			(*entity, endpoint.path().clone(), endpoint.params().clone())
+		})
+		.collect();
+
+	(endpoints, spawned_roots)
+}
 
 /// Collects all endpoints in an application and arranges them into a tree structure.
 ///
@@ -19,6 +47,7 @@ use beet_core::prelude::*;
 /// # use beet_router::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 ///
 /// let mut world = World::new();
 /// world.spawn(ExchangeSpawner::new_flow(|| {
@@ -48,16 +77,23 @@ pub struct EndpointTree {
 
 impl EndpointTree {
 	/// Builds an [`EndpointTree`] from all endpoints in the world.
+	///
+	/// This spawns trees from all [`ExchangeSpawner`]s to collect their endpoints,
+	/// then despawns those temporary trees after collection.
+	///
 	/// Returns an error if there are conflicting paths.
 	pub fn from_world(world: &mut World) -> Result<Self> {
-		world
-			.query_once::<(Entity, &Endpoint)>()
-			.iter()
-			.map(|(entity, endpoint)| {
-				(*entity, endpoint.path().clone(), endpoint.params().clone())
-			})
-			.collect::<Vec<_>>()
-			.xmap(Self::from_endpoints)
+		let (endpoints, spawned_roots) = spawn_and_collect_endpoints(world);
+
+		// Build the tree before cleanup (endpoints reference these entities)
+		let tree = Self::from_endpoints(endpoints);
+
+		// Despawn the temporary trees
+		for root in spawned_roots {
+			world.entity_mut(root).despawn();
+		}
+
+		tree
 	}
 
 	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
