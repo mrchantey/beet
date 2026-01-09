@@ -57,7 +57,7 @@ mod test_request {
 
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
-
+	// TODO spin up our own server for tests
 	#[sweet::test]
 	// #[ignore = "flaky example.com"]
 	async fn works() {

@@ -18,6 +18,7 @@ mod test {
 	use bevy::tasks::futures_lite::StreamExt;
 
 	#[sweet::test]
+	// TODO spin up our own server for tests
 	#[ignore = "hits network"]
 	async fn works() {
 		let mut ev = Request::get("https://sse.dev/test")

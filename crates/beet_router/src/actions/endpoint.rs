@@ -310,9 +310,7 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
-	use beet_rsx::prelude::*;
 
 	#[sweet::test]
 	async fn simple() {
@@ -326,29 +324,6 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
-
-	#[sweet::test]
-	async fn html_handler() {
-		RouterPlugin
-			.into_world()
-			.spawn(ExchangeSpawner::new_flow(|| {
-				(Name::new("My Exchange"), Sequence, children![
-					EndpointBuilder::get()
-						.with_handler(|| rsx! {"hello world"}),
-					(
-						Name::new("next"),
-						OnSpawn::observe(|_: On<GetOutcome>| {
-							panic!("here");
-						})
-					)
-				])
-			}))
-			.oneshot(Request::get("/"))
-			.await
-			.status()
-			.xpect_eq(StatusCode::OK);
-	}
-
 
 	#[sweet::test]
 	async fn dynamic_path() {

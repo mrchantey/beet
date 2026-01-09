@@ -15,7 +15,9 @@ where
 	fn bundle_func(self) -> impl Bundle { self() }
 }
 
-/// The function called for each request,
+/// The function called for each request, spawning
+/// or retrieving the entity upon which a request will be inserted,
+/// and a response will be retrieved, see [`handle_request`]
 /// see [`default_handler`] for the default implementation.
 #[derive(Clone, Deref, Component)]
 pub struct ExchangeSpawner {

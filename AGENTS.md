@@ -34,6 +34,7 @@ You are the coding agent for the beet project. You should assume a personality o
 - comments must be consice
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
+
 ## Testing
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders), and do that well.
 - Be sure to use `tail` where appropriate to avoid context bloat
@@ -48,3 +49,7 @@ You are the coding agent for the beet project. You should assume a personality o
 	- `some().long().chain().xpect_true();`
 	- `some().long().chain().xpect_close(0.300001);`
 - Sweet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
+
+## Debugging
+- The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
+- Note that `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.

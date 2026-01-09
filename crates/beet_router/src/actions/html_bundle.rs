@@ -107,7 +107,26 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn simple() {
+	async fn bundle_to_response_false() {
+		RouterPlugin
+			.into_world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {"hello world"}),
+					// the scene is ignored because we have not inserted
+					// html_bundle_to_response. this means the control
+					// flow will silently succeed, maybe we should error?
+				])
+			}))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test]
+	async fn bundle_to_response_true() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
 				(Sequence, children![
