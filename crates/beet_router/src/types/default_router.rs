@@ -11,13 +11,9 @@ use serde_json::Value;
 /// three groups of `children![]` to run in between the
 /// default endpoints and fallbacks.
 ///
-///
-/// - Waits for all [`Ready`] actions to complete before
-///   inserting the server
-/// - uses an [`InfallibleSequence`] to ensure
-///   all children run.
-/// - Runs a [`Fallback`] with common fallback
-///   handlers
+/// - Waits for all [`Ready`] actions to complete via [`AwaitReady`]
+/// - Uses an [`InfallibleSequence`] to ensure all children run
+/// - Runs a [`Fallback`] with common fallback handlers
 /// - Inserts an [`assets_bucket`]
 /// - Inserts an [`analytics_handler`]
 pub fn default_router(
@@ -28,7 +24,7 @@ pub fn default_router(
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
 ) -> impl Bundle {
-	insert_on_ready((
+	(
 		HttpServer::default(),
 		ExchangeSpawner::new_flow(move || {
 			(InfallibleSequence, children![
@@ -71,21 +67,6 @@ pub fn default_router(
 					response_middleware.clone().bundle_func()
 				),
 			])
-		}),
-	))
-}
-
-/// Create a [`ReadyOnChildrenReady`], allowing any
-/// [`ReadyAction`] children to complete before inserting the
-/// [`Router`] which will immediately start handling requests.
-pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
-	(
-		GetReadyOnStartup,
-		ReadyOnChildrenReady::default(),
-		OnSpawn::observe(move |ev: On<Ready>, mut commands: Commands| {
-			if ev.event_target() == ev.original_event_target() {
-				commands.entity(ev.event_target()).insert(bundle.clone());
-			}
 		}),
 	)
 }
@@ -138,7 +119,7 @@ pub fn app_info() -> EndpointBuilder {
 pub fn assets_bucket() -> impl Bundle {
 	(
 		Name::new("Assets Bucket"),
-		ReadyAction::new_local(async |entity| {
+		ReadyAction::run_local(async |entity| {
 			let (fs_dir, bucket_name, service_access) = entity
 				.world()
 				.with_then(|world| {
@@ -169,7 +150,7 @@ pub fn assets_bucket() -> impl Bundle {
 pub fn html_bucket() -> impl Bundle {
 	(
 		Name::new("Html Bucket"),
-		ReadyAction::new_local(async |entity| {
+		ReadyAction::run_local(async |entity| {
 			let (fs_dir, bucket_name, service_access) = entity
 				.world()
 				.with_then(|world| {
@@ -197,30 +178,27 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[sweet::test(timeout_ms = 5000)]
 	#[rustfmt::skip]
 	async fn works() {
 		RouterPlugin::world()
-			.spawn(
-				super::insert_on_ready(ExchangeSpawner::new_flow(||{
-					(
+			.spawn(ExchangeSpawner::new_flow(||{
+				(
+					InfallibleSequence,
+					children![
+						(Name::new("Await Ready"), AwaitReady::default()),
 						EndpointBuilder::get(),
-						children![(
-							EndWith(Outcome::Pass),
-							ReadyAction::new(async |_| {})
-						)]
-					)
-				}),
-			))
-			.await_ready()
-			.await
+						ReadyAction::run(async |_| {}),
+					]
+				)
+			}))
 			.oneshot("/")
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
 
-	#[sweet::test]
+	#[sweet::test(timeout_ms = 5000)]
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())
@@ -235,13 +213,12 @@ mod test {
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
 	#[cfg(feature = "server")]
-	#[sweet::test]
+	#[sweet::test(timeout_ms = 10000)]
 	async fn test_default_router() {
 		let mut world = RouterPlugin::world();
 		world.insert_resource(pkg_config!());
 		let mut entity = world.spawn(default_router(
 			|| EndWith(Outcome::Pass),
-			// EndWith(Outcome::Pass),
 			|| {
 				(Sequence, children![
 					EndpointBuilder::get().with_path("foobar"),
@@ -251,14 +228,10 @@ mod test {
 		));
 
 		entity
-			.await_ready()
-			.await
 			.oneshot_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 		entity
-			.await_ready()
-			.await
 			.oneshot("/assets/branding/logo.png")
 			.await
 			.into_result()
