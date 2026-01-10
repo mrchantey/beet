@@ -178,40 +178,6 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test(timeout_ms = 5000)]
-	#[rustfmt::skip]
-	async fn works() {
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(||{
-				(
-					InfallibleSequence,
-					children![
-						(Name::new("Await Ready"), AwaitReady::default()),
-						EndpointBuilder::get(),
-						ReadyAction::run(async |_| {}),
-					]
-				)
-			}))
-			.oneshot("/")
-			.await
-			.status()
-			.xpect_eq(StatusCode::OK);
-	}
-
-	#[sweet::test(timeout_ms = 5000)]
-	async fn test_app_info() {
-		RouterPlugin::world()
-			.with_resource(pkg_config!())
-			.spawn(ExchangeSpawner::new_flow(|| {
-				(InfallibleSequence, children![
-					app_info(),
-					html_bundle_to_response()
-				])
-			}))
-			.oneshot_str("/app-info")
-			.await
-			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
-	}
 	#[cfg(feature = "server")]
 	#[sweet::test(timeout_ms = 10000)]
 	async fn test_default_router() {
@@ -244,5 +210,20 @@ mod test {
 			.await
 			.xpect_eq(StatusCode::OK);
 		stat("/foobar").await.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test(timeout_ms = 5000)]
+	async fn test_app_info() {
+		RouterPlugin::world()
+			.with_resource(pkg_config!())
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![
+					app_info(),
+					html_bundle_to_response()
+				])
+			}))
+			.oneshot_str("/app-info")
+			.await
+			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
 }

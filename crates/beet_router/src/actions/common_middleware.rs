@@ -16,7 +16,7 @@
 //!
 //! Response middleware like [`no_cache_headers`] should run after endpoints:
 //!
-//! ```no_run
+//! ```
 //! # use beet_router::prelude::*;
 //! # use beet_core::prelude::*;
 //! # use beet_flow::prelude::*;
@@ -33,13 +33,13 @@
 //!
 //! CORS requires both request-phase validation and response-phase header insertion:
 //!
-//! ```no_run
+//! ```
 //! # use beet_router::prelude::*;
 //! # use beet_core::prelude::*;
 //! # use beet_flow::prelude::*;
 //! # use beet_net::prelude::*;
 //! let config = CorsConfig::new(true, vec![]);
-//! ExchangeSpawner::new_flow(|| {
+//! ExchangeSpawner::new_flow(move || {
 //!     (InfallibleSequence, children![
 //!         // Request phase: validate origin, store in ValidatedOrigin component
 //!         common_middleware::cors_request(config.clone()),
@@ -56,13 +56,13 @@
 //! For OPTIONS preflight requests, use [`Fallback`] so the endpoint only runs if
 //! preflight didn't handle the request:
 //!
-//! ```no_run
+//! ```
 //! # use beet_router::prelude::*;
 //! # use beet_core::prelude::*;
 //! # use beet_flow::prelude::*;
 //! # use beet_net::prelude::*;
 //! let config = CorsConfig::new(true, vec![]);
-//! ExchangeSpawner::new_flow(|| {
+//! ExchangeSpawner::new_flow(move || {
 //!     (Fallback, children![
 //!         // Handle OPTIONS preflight and return early
 //!         common_middleware::cors_preflight(config.clone()),
@@ -82,7 +82,7 @@ use beet_net::prelude::*;
 /// If no Response exists, it triggers [`Outcome::Fail`].
 ///
 /// # Example
-/// ```no_run
+/// ```
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -173,7 +173,7 @@ pub struct ValidatedOrigin(pub String);
 /// Should be paired with [`cors_response`] to add CORS headers to the response.
 ///
 /// # Example
-/// ```no_run
+/// ```
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -261,7 +261,7 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 /// Should be paired with [`cors_request`] which validates and stores the origin.
 ///
 /// # Example
-/// ```no_run
+/// ```
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -335,13 +335,13 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 /// insert a response.
 ///
 /// # Example
-/// ```no_run
+/// ```
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// let config = CorsConfig::new(true, vec![]);
-/// ExchangeSpawner::new_flow(|| {
+/// ExchangeSpawner::new_flow(move || {
 ///     (Fallback, children![
 ///         // Handles OPTIONS and inserts complete response
 ///         common_middleware::cors_preflight(config.clone()),
