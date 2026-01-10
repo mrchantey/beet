@@ -1,8 +1,4 @@
 mod cli_server;
-mod exchange_spawner;
-#[cfg(feature = "flow")]
-mod exchange_spawner_flow;
-mod handle_request;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
@@ -11,10 +7,13 @@ mod handle_request;
 mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
+
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+mod http_server;
 mod server_plugin;
 pub use cli_server::*;
-pub use exchange_spawner::*;
-pub use handle_request::*;
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub use http_server::*;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
