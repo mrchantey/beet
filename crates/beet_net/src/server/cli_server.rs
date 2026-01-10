@@ -39,8 +39,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 mod tests {
 	use super::*;
 
-	#[test]
-	fn works() {
+	#[sweet::test]
+	async fn cli_server_works() {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
@@ -49,7 +49,8 @@ mod tests {
 					StatusCode::IM_A_TEAPOT.into()
 				}),
 			))
-			.run()
+			.run_async()
+			.await
 			.xpect_eq(AppExit::Error(209.try_into().unwrap()));
 	}
 

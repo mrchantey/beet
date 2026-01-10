@@ -26,7 +26,7 @@ fn sweet_router() -> impl Bundle {
 			(Fallback, children![
 				EndpointBuilder::new(|tree: Res<EndpointTree>| {
 					format!(
-						"🌱 Welcome to the Beet CLI 🌱\n{}",
+						"🤘 Welcome to the Sweet CLI 🤘\n{}",
 						tree.to_string()
 					)
 					// StatusCode::OK

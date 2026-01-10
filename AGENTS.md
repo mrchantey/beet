@@ -56,3 +56,5 @@ Beet is a rust project built on the bevy game engine
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
+- Beet is a cross-platform framework, never use println! as it is silent in wasm, all temp logging should be done either via `foo.xprint()` or `beet_core::cross_log!()` to ensure we get logs across platforms
+- In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
