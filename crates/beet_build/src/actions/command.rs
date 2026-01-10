@@ -26,9 +26,9 @@ impl Drop for ChildHandle {
 /// the [`ChildHandle`] component when done.
 pub fn poll_child_handles(
 	mut commands: Commands,
-	mut query: Populated<(Entity, &Running, &mut ChildHandle)>,
+	mut query: Populated<(Entity, &mut ChildHandle), With<Running>>,
 ) -> Result {
-	for (action, running, mut child_handle) in query.iter_mut() {
+	for (action, mut child_handle) in query.iter_mut() {
 		// try_status errors are an io::Error, we do not handle
 		// and instead propagate
 		if let Some(status) = child_handle.0.try_status()? {
@@ -36,12 +36,10 @@ pub fn poll_child_handles(
 				true => Outcome::Pass,
 				false => Outcome::Fail,
 			};
-			for agent in running.iter() {
-				commands
-					.entity(action)
-					.remove::<ChildHandle>()
-					.trigger_target(outcome.with_agent(*agent));
-			}
+			commands
+				.entity(action)
+				.remove::<ChildHandle>()
+				.trigger_target(outcome);
 		}
 	}
 	Ok(())
@@ -57,7 +55,7 @@ pub fn interrupt_child_handles(
 	query: Query<(), With<ChildHandle>>,
 	children: Query<&Children>,
 ) {
-	for child in children.iter_descendants_inclusive(ev.action()) {
+	for child in children.iter_descendants_inclusive(ev.target()) {
 		if query.contains(child) {
 			commands.entity(child).remove::<ChildHandle>();
 		}
@@ -191,6 +189,7 @@ pub struct CommandRunner<'w, 's> {
 	pkg_config: Res<'w, PackageConfig>,
 	/// Used to check whether an action is interruptable
 	interruptable: Query<'w, 's, &'static ContinueRun>,
+	async_commands: AsyncCommands<'w, 's>,
 }
 
 impl CommandRunner<'_, '_> {
@@ -202,7 +201,7 @@ impl CommandRunner<'_, '_> {
 	// /// Reader tasks are aborted if the process exits first.
 	pub fn run(
 		&mut self,
-		mut ev: On<GetOutcome>,
+		ev: On<GetOutcome>,
 		cmd_config: impl Into<CommandConfig>,
 	) -> Result {
 		let CommandConfig {
@@ -212,12 +211,11 @@ impl CommandRunner<'_, '_> {
 			envs,
 		} = cmd_config.into();
 
-		let interruptable = self.interruptable.contains(ev.action());
+		let action = ev.target();
+		let interruptable = self.interruptable.contains(action);
 
 		let envs = envs.clone().xtend(self.pkg_config.envs());
-		self.bevy_commands
-			.entity(ev.action())
-			.remove::<ChildHandle>();
+		self.bevy_commands.entity(action).remove::<ChildHandle>();
 		let envs_pretty = envs
 			.iter()
 			.map(|(k, v)| format!("{}={}", k, v))
@@ -244,18 +242,21 @@ impl CommandRunner<'_, '_> {
 		if interruptable {
 			// store the child process and poll for completion
 			self.bevy_commands
-				.entity(ev.action())
+				.entity(action)
 				// TODO this only allows a single child process per action
 				.insert(ChildHandle(child));
 		} else {
-			ev.run_async(async move |mut action| {
+			self.async_commands.run(async move |world: AsyncWorld| {
 				// wait for completion
-				let outcome = match child.status().await?.success() {
-					true => Outcome::Pass,
-					false => Outcome::Fail,
+				let outcome = match child.status().await {
+					Ok(status) if status.success() => Outcome::Pass,
+					_ => Outcome::Fail,
 				};
-				action.trigger_with_cx(outcome);
-				Ok(())
+				world
+					.with_then(move |world| {
+						world.entity_mut(action).trigger_target(outcome);
+					})
+					.await;
 			});
 		}
 		Ok(())

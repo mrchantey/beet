@@ -19,26 +19,37 @@ fn main() {
 }
 
 fn sweet_router() -> impl Bundle {
-	(Name::new("Sweet Router"), CliRouter, Fallback, children![
-		EndpointBuilder::new(|tree: Res<EndpointTree>| {
-			format!("🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string())
-			// StatusCode::OK
-		})
-		.with_params::<HelpParams>()
-		.with_path(""),
-		EndpointBuilder::default()
-			// match trailing positionals too, they will be
-			// passed to the wasm runtime
-			.with_path("run-wasm/*binary-path")
-			.with_handler_bundle((
-				Name::new("Run Wasm"),
-				InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
-				RunOnDirEvent,
-				Fallback,
-				children![
-					run_wasm(),
-					StatusCode::BAD_REQUEST.into_endpoint_handler(),
-				]
-			)),
-	])
+	(
+		Name::new("Sweet Router"),
+		CliServer,
+		ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				EndpointBuilder::new(|tree: Res<EndpointTree>| {
+					format!(
+						"🌱 Welcome to the Beet CLI 🌱\n{}",
+						tree.to_string()
+					)
+					// StatusCode::OK
+				})
+				.with_params::<HelpParams>()
+				.with_path(""),
+				EndpointBuilder::default()
+					// match trailing positionals too, they will be
+					// passed to the wasm runtime
+					.with_path("run-wasm/*binary-path")
+					.with_handler_bundle((
+						Name::new("Run Wasm"),
+						InsertOn::<GetOutcome, _>::new(
+							FsWatcher::default_cargo()
+						),
+						RunOnDirEvent,
+						Fallback,
+						children![
+							run_wasm(),
+							StatusCode::BAD_REQUEST.into_endpoint_handler(),
+						]
+					)),
+			])
+		}),
+	)
 }

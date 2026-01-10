@@ -5,7 +5,7 @@ use beet_rsx::prelude::*;
 
 #[construct]
 pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
-	(OnSpawn::observe(
+	OnSpawn::observe(
 		move |ev: On<GetOutcome>,
 		      mut cmd_runner: CommandRunner,
 		      pkg_config: Res<PackageConfig>| {
@@ -18,7 +18,7 @@ pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
 
 			cmd_runner.run(ev, config)
 		},
-	),)
+	)
 
 	// 	// 	"🌱 Running SST command: \n   {cmd:?}\n🌱 Interrupting this step may result in dangling resources"
 }

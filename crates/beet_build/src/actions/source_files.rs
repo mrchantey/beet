@@ -18,9 +18,9 @@ pub fn AddWorkspaceSourceFiles() -> impl Bundle {
 	(
 		Name::new("Add Workspace Source Files"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
-			 mut commands: Commands,
-			 config: Res<WorkspaceConfig>|
+			|ev: On<GetOutcome>,
+			 config: Res<WorkspaceConfig>,
+			 mut commands: Commands|
 			 -> Result {
 				commands.spawn((
 					NonCollectionSourceFiles,
@@ -31,7 +31,7 @@ pub fn AddWorkspaceSourceFiles() -> impl Bundle {
 							.map(|path| SourceFile::new(path)),
 					)),
 				));
-				ev.trigger_with_cx(Outcome::Pass);
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		),

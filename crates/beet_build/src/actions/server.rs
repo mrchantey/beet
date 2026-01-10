@@ -15,11 +15,11 @@ pub fn BuildServer() -> impl Bundle {
 		Name::new("Build Server"),
 		ContinueRun,
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>,
-			      mut cmd_runner: CommandRunner,
-			      query: AncestorQuery<&'static CargoBuildCmd>| {
+			|ev: On<GetOutcome>,
+			 mut cmd_runner: CommandRunner,
+			 query: AncestorQuery<&'static CargoBuildCmd>| {
 				let config = query
-					.get(ev.action())
+					.get(ev.target())
 					.cloned()
 					.unwrap_or_default()
 					.cmd("build")
@@ -39,11 +39,11 @@ pub fn RunServer() -> impl Bundle {
 		ServerProcess,
 		ContinueRun,
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>,
-			      mut cmd_runner: CommandRunner,
-			      manifest: Res<CargoManifest>,
-			      query: AncestorQuery<&'static CargoBuildCmd>| {
-				let cmd = query.get(ev.action()).cloned().unwrap_or_default();
+			|ev: On<GetOutcome>,
+			 mut cmd_runner: CommandRunner,
+			 manifest: Res<CargoManifest>,
+			 query: AncestorQuery<&'static CargoBuildCmd>| {
+				let cmd = query.get(ev.target()).cloned().unwrap_or_default();
 
 				let exe_path = cmd
 					.exe_path(manifest.package_name())
@@ -69,12 +69,12 @@ pub fn ExportStaticContent() -> impl Bundle {
 		ServerProcess,
 		ContinueRun,
 		OnSpawn::observe(
-			move |ev: On<GetOutcome>,
-			      mut cmd_runner: CommandRunner,
-			      manifest: Res<CargoManifest>,
-			      query: AncestorQuery<&'static CargoBuildCmd>| {
+			|ev: On<GetOutcome>,
+			 mut cmd_runner: CommandRunner,
+			 manifest: Res<CargoManifest>,
+			 query: AncestorQuery<&'static CargoBuildCmd>| {
 				let exe_path = query
-					.get(ev.action())
+					.get(ev.target())
 					.cloned()
 					.unwrap_or_default()
 					.exe_path(manifest.package_name())
@@ -96,13 +96,14 @@ pub fn KillServer() -> impl Bundle {
 	(
 		Name::new("Kill Server"),
 		OnSpawn::observe(
-		|mut ev: On<GetOutcome>,
-		 mut commands: Commands,
-		 query: Query<Entity, (With<ServerProcess>, With<ChildHandle>)>| {
-			for entity in query.iter() {
-				commands.entity(entity).remove::<ChildHandle>();
-			}
-			ev.trigger_with_cx(Outcome::Pass);
-		},
-	))
+			|ev: On<GetOutcome>,
+			 mut commands: Commands,
+			 query: Query<Entity, (With<ServerProcess>, With<ChildHandle>)>| {
+				for entity in query.iter() {
+					commands.entity(entity).remove::<ChildHandle>();
+				}
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
+			},
+		),
+	)
 }

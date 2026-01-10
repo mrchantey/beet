@@ -12,116 +12,131 @@ use beet_router::prelude::*;
 pub fn default_cli_router() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
-		CliRouter,
-		Fallback,
+		CliServer,
 		beet_site_cmd(),
-		children![
-			EndpointBuilder::new(|tree: Res<EndpointTree>| {
-				format!("🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string())
-				// StatusCode::OK
-			})
-			.with_params::<HelpParams>()
-			.with_path(""),
-			EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
-				.with_path("teapot"),
-			EndpointBuilder::default()
-				.with_path("run-wasm/*binary-path")
-				.with_handler_bundle(run_wasm()),
-			single_action_route("watch/*cmd?", watch()),
-			single_action_route(
-				"refresh-sst",
-				SstCommand::new(SstSubcommand::Refresh)
-			),
-			single_action_route(
-				"deploy-sst",
-				SstCommand::new(SstSubcommand::Deploy)
-			),
-			single_action_route("build-wasm", build_wasm()),
-			single_action_route("build-lambda", CompileLambda),
-			single_action_route("deploy-lambda", DeployLambda),
-			single_action_route("watch-lambda", WatchLambda),
-			single_action_route("push-assets", PushAssets),
-			single_action_route("pull-assets", PullAssets),
-			single_action_route("push-html", PushHtml),
-			single_action_route("build", BuildServer),
-			single_action_route("parse-files", import_and_parse_source_files()),
-			named_route("parse-source-files", children![
-				exact_path_match(),
-				import_source_files(),
-				(
-					Name::new("Run Loop"),
-					// only insert the watcher after first run
-					InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
-					RunOnDirEvent,
-					InfallibleSequence,
-					children![
-						ParseSourceFiles::action(),
-						(Name::new("Full Rebuild Check"), Sequence, children![
-							FileExprChanged::new(),
-							(
-								Name::new("Pretend Rebuild.."),
-								EndWith(Outcome::Pass)
-							)
-						]),
-						(
-							// never return to emulate server
-							Name::new("Pretend Serve..")
+		ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				EndpointBuilder::new(|tree: Res<EndpointTree>| {
+					format!(
+						"🌱 Welcome to the Beet CLI 🌱\n{}",
+						tree.to_string()
+					)
+					// StatusCode::OK
+				})
+				.with_params::<HelpParams>()
+				.with_path(""),
+				EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
+					.with_path("teapot"),
+				EndpointBuilder::default()
+					.with_path("run-wasm/*binary-path")
+					.with_handler_bundle(run_wasm()),
+				single_action_route("watch/*cmd?", watch()),
+				single_action_route(
+					"refresh-sst",
+					SstCommand::new(SstSubcommand::Refresh)
+				),
+				single_action_route(
+					"deploy-sst",
+					SstCommand::new(SstSubcommand::Deploy)
+				),
+				single_action_route("build-wasm", build_wasm()),
+				single_action_route("build-lambda", CompileLambda),
+				single_action_route("deploy-lambda", DeployLambda),
+				single_action_route("watch-lambda", WatchLambda),
+				single_action_route("push-assets", PushAssets),
+				single_action_route("pull-assets", PullAssets),
+				single_action_route("push-html", PushHtml),
+				single_action_route("build", BuildServer),
+				single_action_route(
+					"parse-files",
+					import_and_parse_source_files()
+				),
+				named_route("parse-source-files", children![
+					exact_path_match(),
+					import_source_files(),
+					(
+						Name::new("Run Loop"),
+						// only insert the watcher after first run
+						InsertOn::<GetOutcome, _>::new(
+							FsWatcher::default_cargo()
 						),
-					]
-				),
-				// respond_ok()
-			]),
-			named_route("run", children![
-				exact_path_match(),
-				import_source_files(),
-				(
-					Name::new("Run Loop"),
-					// only insert the watcher after first run
-					InsertOn::<GetOutcome, _>::new(FsWatcher::default_cargo()),
-					RunOnDirEvent,
-					InfallibleSequence,
-					children![
-						ParseSourceFiles::action(),
-						(Name::new("Build Check"), Sequence, children![
-							FileExprChanged::new(),
-							build_wasm(),
-							BuildServer,
-						]),
+						RunOnDirEvent,
+						InfallibleSequence,
+						children![
+							ParseSourceFiles::action(),
+							(
+								Name::new("Full Rebuild Check"),
+								Sequence,
+								children![
+									FileExprChanged::new(),
+									(
+										Name::new("Pretend Rebuild.."),
+										EndWith(Outcome::Pass)
+									)
+								]
+							),
+							(
+								// never return to emulate server
+								Name::new("Pretend Serve..")
+							),
+						]
+					),
+					// respond_ok()
+				]),
+				named_route("run", children![
+					exact_path_match(),
+					import_source_files(),
+					(
+						Name::new("Run Loop"),
+						// only insert the watcher after first run
+						InsertOn::<GetOutcome, _>::new(
+							FsWatcher::default_cargo()
+						),
+						RunOnDirEvent,
+						InfallibleSequence,
+						children![
+							ParseSourceFiles::action(),
+							(Name::new("Build Check"), Sequence, children![
+								FileExprChanged::new(),
+								build_wasm(),
+								BuildServer,
+							]),
+							ExportStaticContent,
+							// never returns an outcome
+							RunServer,
+							// bevyhow!("unreachable! server shouldnt exit")
+						]
+					),
+				]),
+				named_route("serve", children![
+					exact_path_match(),
+					(Name::new("Serve"), Sequence, children![
+						BuildServer,
 						ExportStaticContent,
-						// never returns an outcome
 						RunServer,
-						// bevyhow!("unreachable! server shouldnt exit")
-					]
-				),
-			]),
-			named_route("serve", children![
-				exact_path_match(),
-				(Name::new("Serve"), Sequence, children![
+					]),
+				]),
+				named_route("deploy", children![
+					exact_path_match(),
+					import_and_parse_source_files(),
+					// apply after import to avoid clobber,
+					// the scene loaded likely contains a PackageConfig
+					apply_deploy_config(),
+					build_wasm(),
 					BuildServer,
 					ExportStaticContent,
-					RunServer,
-				]),
-			]),
-			named_route("deploy", children![
-				exact_path_match(),
-				import_and_parse_source_files(),
-				// apply after import to avoid clobber,
-				// the scene loaded likely contains a PackageConfig
-				apply_deploy_config(),
-				build_wasm(),
-				BuildServer,
-				ExportStaticContent,
-				CompileLambda,
-				// push assets directly before deploying
-				// the lambda function to minimize
-				// server version mismatch
-				PushAssets,
-				PushHtml,
-				DeployLambda,
-				WatchLambda,
-				respond_ok()
+					CompileLambda,
+					// push assets directly before deploying
+					// the lambda function to minimize
+					// server version mismatch
+					PushAssets,
+					PushHtml,
+					DeployLambda,
+					WatchLambda,
+					respond_ok()
+				])
 			])
-		],
+		}),
 	)
 }
 
@@ -167,14 +182,15 @@ fn apply_deploy_config() -> impl Bundle {
 	(
 		Name::new("Apply Deploy Config"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 mut pkg_config: ResMut<PackageConfig>,
-			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>|
+			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>,
+			 mut commands: Commands|
 			 -> Result {
 				pkg_config.service_access = ServiceAccess::Remote;
 				pkg_config.stage = "prod".to_string();
-				cmd.get_mut(ev.action())?.release = true;
-				ev.trigger_with_cx(Outcome::Pass);
+				cmd.get_mut(ev.target())?.release = true;
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		),

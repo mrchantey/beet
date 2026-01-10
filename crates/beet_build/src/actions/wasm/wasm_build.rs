@@ -22,7 +22,7 @@ fn cargo_build_wasm() -> impl Bundle {
 			      mut cmd_runner: CommandRunner,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let cmd = query
-					.get(ev.action())
+					.get(ev.target())
 					.cloned()
 					.unwrap_or_default()
 					.cmd("build")
@@ -50,7 +50,7 @@ fn wasm_bindgen() -> impl Bundle {
 			      config: Res<WorkspaceConfig>,
 			      query: AncestorQuery<&'static CargoBuildCmd>| {
 				let exe_path = query
-					.get(ev.action())
+					.get(ev.target())
 					.cloned()
 					.unwrap_or_default()
 					.target("wasm32-unknown-unknown")
@@ -85,13 +85,14 @@ fn wasm_size(release_only: bool) -> impl Bundle {
 	(
 		Name::new("Wasm Size"),
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>,
+			move |ev: On<GetOutcome>,
 			      html_constants: Res<HtmlConstants>,
 			      query: AncestorQuery<&'static CargoBuildCmd>,
-			      ws_config: Res<WorkspaceConfig>|
+			      ws_config: Res<WorkspaceConfig>,
+			      mut commands: Commands|
 			      -> Result {
 				let is_release =
-					query.get(ev.action()).cloned().unwrap_or_default().release;
+					query.get(ev.target()).cloned().unwrap_or_default().release;
 				if release_only && !is_release {
 					// noop
 				} else {
@@ -100,7 +101,7 @@ fn wasm_size(release_only: bool) -> impl Bundle {
 					info!("🌱 wasm size: {} KB", size as usize / 1024);
 				}
 
-				ev.trigger_with_cx(Outcome::Pass);
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
 
 				Ok(())
 			},
@@ -124,14 +125,15 @@ fn wasm_opt() -> impl Bundle {
 		Name::new("Wasm Opt"),
 		ContinueRun,
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>,
+			move |ev: On<GetOutcome>,
 			      mut cmd_runner: CommandRunner,
 			      html_constants: Res<HtmlConstants>,
 			      ws_config: Res<WorkspaceConfig>,
-			      query: AncestorQuery<&'static CargoBuildCmd>|
+			      query: AncestorQuery<&'static CargoBuildCmd>,
+			      mut commands: Commands|
 			      -> Result {
 				let cmd = query
-					.get(ev.action())
+					.get(ev.target())
 					.cloned()
 					.unwrap_or_default()
 					.target("wasm32-unknown-unknown")
@@ -148,7 +150,7 @@ fn wasm_opt() -> impl Bundle {
 						.arg(wasm_file.to_string_lossy());
 					cmd_runner.run(ev, cmd_config)?;
 				} else {
-					ev.trigger_with_cx(Outcome::Pass);
+					commands.entity(ev.target()).trigger_target(Outcome::Pass);
 				}
 				Ok(())
 			},

@@ -10,9 +10,8 @@ pub struct CliServer;
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	world.commands().queue(move |world: &mut World| -> Result {
-		world
-			.entity_mut(entity)
-			.run_async(async move |entity| -> Result {
+		world.entity_mut(entity).run_async_local(
+			async move |entity| -> Result {
 				let req = Request::from_cli_args(CliArgs::parse_env())?;
 				let res = entity.oneshot(req).await;
 				let (parts, body) = res.into_parts();
@@ -30,7 +29,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				};
 				entity.world().write_message(exit);
 				Ok(())
-			});
+			},
+		);
 		Ok(())
 	});
 }
