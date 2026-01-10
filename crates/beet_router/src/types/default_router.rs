@@ -31,7 +31,7 @@ pub fn default_router(
 	insert_on_ready((
 		HttpServer::default(),
 		ExchangeSpawner::new_flow(move || {
-			(Name::new("Router Root"), InfallibleSequence, children![
+			(InfallibleSequence, children![
 				(
 					Name::new("Request Middleware"),
 					request_middleware.clone().bundle_func()

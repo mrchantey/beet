@@ -102,12 +102,15 @@ mod test {
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 	#[sweet::test]
 	async fn server() {
-		let server = HttpServer::new_test().with_handler(flow_route_handler);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, RouterPlugin))
-				.spawn((server, Router, EndpointBuilder::get()))
+				.spawn((
+					server,
+					ExchangeSpawner::new_flow(|| EndpointBuilder::get()),
+				))
 				.run();
 		});
 		time_ext::sleep_millis(10).await;
