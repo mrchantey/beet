@@ -9,9 +9,7 @@ async fn test_layouts_series() {
 
 	world
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
-		.await_event::<Insert, Router>()
-		.await;
+		.with_resource(RenderMode::Ssr);
 
 	home(&mut world).await;
 	docs(&mut world).await;

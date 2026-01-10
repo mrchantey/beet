@@ -117,6 +117,43 @@ impl EndpointBuilder {
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
 	pub fn any_method() -> Self { Self::default().with_any_method() }
+
+	/// Create middleware that accepts trailing path segments and any HTTP method.
+	/// Middleware runs for all matching paths and does not consume the request.
+	///
+	/// This is typically used for content-wrapping middleware that queries for handler
+	/// output (like [`HtmlBundle`](beet_rsx::prelude::HtmlBundle)) created by earlier
+	/// actions and wraps or transforms it.
+	///
+	/// For response header modification, consider using observers on [`On<Insert, Response>`]
+	/// instead, as those can react after the response is created.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_router::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// // Middleware that wraps HTML content in a layout
+	/// EndpointBuilder::middleware(
+	///     "blog",
+	///     OnSpawn::observe(|ev: On<GetOutcome>, mut commands: Commands| {
+	///         // Query for HtmlBundle on agent, wrap it, trigger Outcome::Pass
+	///         commands.entity(ev.target()).trigger_target(Outcome::Pass);
+	///     })
+	/// );
+	/// ```
+	pub fn middleware(
+		path: impl AsRef<str>,
+		handler: impl 'static + Send + Sync + Bundle,
+	) -> impl Bundle {
+		(
+			Name::new(format!("Middleware: {}", path.as_ref())),
+			Sequence,
+			PathPartial::new(path.as_ref()),
+			children![partial_path_match(), handler],
+		)
+	}
 	/// Create a new endpoint with the provided endpoint handler
 	pub fn with_handler<M>(
 		self,
@@ -397,6 +434,39 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
+	#[sweet::test]
+	async fn middleware_allows_trailing() {
+		use beet_flow::prelude::*;
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::middleware(
+					"api",
+					OnSpawn::observe(
+						|ev: On<GetOutcome>, mut commands: Commands| {
+							// Middleware just passes - demonstrates path matching
+							commands
+								.entity(ev.target())
+								.trigger_target(Outcome::Pass);
+						},
+					),
+				),
+				EndpointBuilder::get()
+					.with_path("api/users")
+					.with_handler(|| "users"),
+			])
+		}));
+
+		// Middleware allows trailing path segments, so this matches
+		entity
+			.oneshot(Request::get("/api/users"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+
 	#[test]
 	#[rustfmt::skip]
 	fn test_collect_route_segments() {
