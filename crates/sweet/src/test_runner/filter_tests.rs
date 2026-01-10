@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_router::prelude::*;
-
 
 
 /// Allow filtering tests by either named params or positional arguments,
@@ -17,23 +15,17 @@ pub struct FilterParams {
 	exact: bool,
 }
 
-impl RequestMetaExtractor for FilterParams {
-	fn extract(request: &RequestMeta) -> Result<Self> {
-		request.params().parse_reflect()
-	}
-}
-
 
 impl FilterParams {
-	/// merge the positional args with params, and check for 'exact' specification
-	fn parse(mut self, path_args: Option<&Vec<String>>) -> Self {
-		if let Some(args) = path_args {
-			self.filter = self.filter.extend_include(args);
+	fn new(req: &RequestMeta) -> Result<Self> {
+		let mut this = req.params().parse_reflect::<FilterParams>()?;
+		// extend include by positional args
+		this.filter = this.filter.extend_include(req.path());
+		// check for 'exact' specification
+		if !this.exact {
+			this.filter.wrap_all_with_wildcard();
 		}
-		if !self.exact {
-			self.filter.wrap_all_with_wildcard();
-		}
-		self
+		this.xok()
 	}
 
 	fn passes(&self, test: &Test) -> bool {
@@ -44,23 +36,12 @@ impl FilterParams {
 
 pub fn filter_tests(
 	mut commands: Commands,
-	route_query: RouteQuery,
-	requests: Populated<(Entity, &RequestMeta, &Children), Added<RequestMeta>>,
+	requests: Populated<(&RequestMeta, &Children), Added<RequestMeta>>,
 	tests: Populated<(Entity, &Test), Added<Test>>,
 ) -> Result {
-	for (agent, request, children) in requests {
-		// in this case the action is the agent
-		let action = agent;
-		let path_match = route_query.path_match(action)?;
-		let path_args = path_match.dyn_map.get_vec("include");
-
+	for (request, children) in requests {
 		// we dont use Extractor because this has extra extractor steps
-		let filter = request
-			.params()
-			.parse_reflect::<FilterParams>()?
-			.parse(path_args);
-
-
+		let filter = FilterParams::new(request)?;
 
 		for (entity, _test) in children
 			.iter()
@@ -84,7 +65,6 @@ mod tests {
 	fn passes_filter(args: &str) -> bool {
 		let mut world = TestPlugin::world();
 		world.spawn((
-			PathPartial::new("*include?"),
 			Request::from_cli_str(args).unwrap(),
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));

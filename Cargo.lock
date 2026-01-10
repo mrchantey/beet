@@ -9242,9 +9242,7 @@ name = "sweet"
 version = "0.4.2"
 dependencies = [
  "beet_core",
- "beet_flow",
  "beet_net",
- "beet_router",
  "bevy",
  "console_error_panic_hook",
  "extend",
