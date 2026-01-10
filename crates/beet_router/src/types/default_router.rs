@@ -32,6 +32,7 @@ pub fn default_router(
 		HttpServer::default(),
 		ExchangeSpawner::new_flow(move || {
 			(InfallibleSequence, children![
+				(Name::new("Await Ready"), AwaitReady::default()),
 				(
 					Name::new("Request Middleware"),
 					request_middleware.clone().bundle_func()

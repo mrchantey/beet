@@ -38,7 +38,7 @@ pub fn no_response() -> impl Bundle {
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
 			 mut commands: Commands,
-			 agent_query: AgentQuery<(), Without<Response>>| {
+			 agent_query: AgentQuery<(), Without<ResponseMarker>>| {
 				let action = ev.target();
 				let outcome = match agent_query.contains(action) {
 					true => Outcome::Pass,
