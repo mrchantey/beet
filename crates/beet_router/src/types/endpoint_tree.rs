@@ -63,6 +63,7 @@ pub(crate) fn spawn_and_collect_endpoints(
 /// // build the tree and validate all paths
 /// let tree = EndpointTree::from_world(&mut world).unwrap();
 /// ```
+// TODO this should be a component, inserted alongside the ExchangeSpawner
 #[derive(Debug, Clone, Resource)]
 pub struct EndpointTree {
 	/// The path pattern for this node
