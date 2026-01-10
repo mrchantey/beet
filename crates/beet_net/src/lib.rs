@@ -11,7 +11,7 @@ mod exchange;
 mod object_storage;
 mod server;
 pub mod sockets;
-mod transport;
+mod client;
 
 pub mod prelude {
 
