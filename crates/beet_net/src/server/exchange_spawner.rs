@@ -65,7 +65,10 @@ impl ExchangeSpawner {
 								)
 							})?;
 						let response = func(world.entity_mut(entity), req);
-						world.entity_mut(entity).insert(response);
+						world
+							.entity_mut(entity)
+							.insert(response)
+							.trigger_target(ExchangeComplete);
 						Ok(())
 					});
 				},
@@ -101,7 +104,13 @@ impl ExchangeSpawner {
 								)
 							})?;
 						let response = func(entity.clone(), req).await;
-						entity.insert(response);
+						entity
+							.with_then(move |mut entity| {
+								entity
+									.insert(response)
+									.trigger_target(ExchangeComplete);
+							})
+							.await;
 						Ok(())
 					});
 				},

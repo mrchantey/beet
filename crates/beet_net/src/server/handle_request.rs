@@ -1,6 +1,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Event triggered when an exchange completes and the response is ready to be taken.
+/// Triggered by both basic and flow-based exchange handlers.
+#[derive(EntityTargetEvent)]
+pub struct ExchangeComplete;
+
 
 /// Trait for handling oneshot requests on async types (immutable self)
 pub trait OneshotRequest {
@@ -207,14 +212,19 @@ impl OneshotRequest for AsyncWorld {
 }
 
 
-/// - Creates a child of the server inserting the [`Request`] component
-/// - Adds a one-shot observer for [`On<Insert, Response>`],
-///   then takes the response and despawns the entity.
-/// the default handler adds about 100us to a request that
-/// doesnt involve mutating the world or running systems: (40us vs 140us)
+/// Handles a single request-response exchange by spawning an agent entity and observing completion.
+///
+/// Observes [`ExchangeComplete`] event on the agent. Both basic and flow-based handlers
+/// trigger this event when ready, then this function takes the [`Response`] and returns it.
+///
+/// ## Performance
+///
+/// The default handler adds about 100us to a request that doesn't involve
+/// mutating the world or running systems: (40us vs 140us)
+///
 /// ## Panics
 ///
-/// Panics if the provided server entity has no ExchangeHandler
+/// Panics if the provided server entity has no [`ExchangeSpawner`]
 async fn handle_request(server: AsyncEntity, request: impl Bundle) -> Response {
 	let server_id = server.id();
 	let (send, recv) = async_channel::bounded(1);
@@ -228,27 +238,28 @@ async fn handle_request(server: AsyncEntity, request: impl Bundle) -> Response {
 				.expect("Server has no ExchangeHandler");
 
 			let agent = spawner.spawn(world);
+
+			// Observe ExchangeComplete event on the agent
+			world.entity_mut(agent).observe_any(
+				move |ev: On<ExchangeComplete>, mut commands: Commands| {
+					let exchange = ev.target();
+					let send = send.clone();
+					commands.queue(move |world: &mut World| -> Result {
+						let response = world
+							.entity_mut(exchange)
+							.take::<Response>()
+							.ok_or_else(|| {
+								bevyhow!(
+									"ExchangeComplete triggered but Response missing from agent"
+								)
+							})?;
+						send.try_send(response)?;
+						Ok(())
+					});
+				},
+			);
 			world
 				.entity_mut(agent)
-				// add observer before inserting request to handle immediate response
-				.observe(
-					move |ev: On<Insert, Response>, mut commands: Commands| {
-						let exchange = ev.event_target();
-						let send = send.clone();
-						commands.queue(move |world: &mut World| -> Result {
-							let response = world
-								.entity_mut(exchange)
-								.take::<Response>()
-								.ok_or_else(|| {
-									bevyhow!(
-										"Response inserted but missing from exchange"
-									)
-								})?;
-							send.try_send(response)?;
-							Ok(())
-						});
-					},
-				)
 				.insert((request, ExchangeOf(server_id)))
 				.id()
 		})

@@ -18,8 +18,7 @@ Beet is a rust project built on the bevy game engine
 
 ## Conventions
 
-- Always use rust conventions
-- Code reuse is very important, even in tests. refactor into shared functions where possible
+- DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
