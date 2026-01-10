@@ -64,6 +64,19 @@ impl IntoResponseBundle<Self> for TypeErasedResponseBundle {
 	fn into_response_bundle(self) -> impl Bundle { self.0 }
 }
 
+/// We formalize the insert step, order is critical
+fn insert_and_trigger(
+	world: &mut World,
+	action: Entity,
+	agent: Entity,
+	response: impl Bundle,
+	outcome: Outcome,
+) {
+	world.entity_mut(agent).insert(response);
+	world.entity_mut(action).trigger_target(outcome);
+}
+
+
 /// Helper for defining methods accepting requests and returning responses.
 /// These are converted to `On<GetOutcome>` observers.
 /// In the case where a request cannot be found a 500 response is inserted.
@@ -91,6 +104,7 @@ where
 				agents.parents.root_ancestor(action),
 				"agent cannot be action root, this will clobber action decendents upon scene insertion"
 			);
+
 			commands.queue(move |world: &mut World| {
 				// try to take the request
 				match world.entity_mut(agent).take::<Request>() {
@@ -105,12 +119,13 @@ where
 									let bundle = res.into_response_bundle();
 									world
 										.with_then(move |world| {
-											world
-												.entity_mut(agent)
-												.insert(bundle);
-											world
-												.entity_mut(action)
-												.trigger_target(Outcome::Pass);
+											insert_and_trigger(
+												world,
+												action,
+												agent,
+												bundle,
+												Outcome::Pass,
+											);
 										})
 										.await;
 								}
@@ -118,12 +133,13 @@ where
 									// insert response and trigger outcome in one world access
 									world
 										.with_then(move |world| {
-											world
-												.entity_mut(agent)
-												.insert(response);
-											world
-												.entity_mut(action)
-												.trigger_target(Outcome::Fail);
+											insert_and_trigger(
+												world,
+												action,
+												agent,
+												response,
+												Outcome::Fail,
+											);
 										})
 										.await;
 								}
@@ -131,16 +147,21 @@ where
 						});
 					}
 					None => {
-						world.entity_mut(agent).insert(
-							bevyhow!(
-								"
+						let response = bevyhow!(
+							"
 No Request found for endpoint, this is usually because it has already
 been taken by a previous route, please check for conficting endpoints.
-				"
-							)
-							.into_response(),
+			"
+						)
+						.into_response();
+
+						insert_and_trigger(
+							world,
+							action,
+							agent,
+							response,
+							Outcome::Fail,
 						);
-						world.entity_mut(action).trigger_target(Outcome::Fail);
 					}
 				}
 			});
@@ -161,12 +182,20 @@ where
 			      mut commands: Commands| {
 				let action = ev.target();
 				let agent = agents.entity(action);
+				let this = self.clone();
 				commands
 					.entity(agent)
 					// predicates like fallback depend on endpoints consuming the request
-					.remove::<Request>()
-					.insert(self.clone().into_response_bundle());
-				commands.entity(action).trigger_target(Outcome::Pass);
+					.remove::<Request>();
+				commands.queue(move |world: &mut World| {
+					insert_and_trigger(
+						world,
+						action,
+						agent,
+						this.into_response_bundle(),
+						Outcome::Pass,
+					);
+				});
 			},
 		)
 	}

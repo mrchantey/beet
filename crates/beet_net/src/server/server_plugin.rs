@@ -60,6 +60,7 @@ impl Plugin for ServerPlugin {
 
 
 /// Update server stats if available
+// TODO this is incorrect in flow routers, response middleware still has to run
 fn server_stats(
 	ev: On<Insert, Response>,
 	mut servers: Query<&mut ServerStatus>,

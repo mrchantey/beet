@@ -121,12 +121,12 @@ impl EndpointBuilder {
 	/// Create middleware that accepts trailing path segments and any HTTP method.
 	/// Middleware runs for all matching paths and does not consume the request.
 	///
-	/// This is typically used for content-wrapping middleware that queries for handler
-	/// output (like [`HtmlBundle`](beet_rsx::prelude::HtmlBundle)) created by earlier
-	/// actions and wraps or transforms it.
+	/// Unlike traditional routers, beet middleware has deep understanding of the state
+	/// of the exchange, for instance it can be used for templating content, where an
+	/// endpoint inserts a [`HtmlBundle`](beet_rsx::prelude::HtmlBundle), and the middleware
+	/// moves it into a layout.
 	///
-	/// For response header modification, consider using observers on [`On<Insert, Response>`]
-	/// instead, as those can react after the response is created.
+	/// It can also be used for traditional request/response middleware, see [common_middleware](./common_middleware.rs)
 	///
 	/// # Example
 	/// ```
@@ -347,6 +347,7 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
 	#[sweet::test]
@@ -468,7 +469,6 @@ mod test {
 
 
 	#[test]
-	#[rustfmt::skip]
 	fn test_collect_route_segments() {
 		let mut world = World::new();
 		world.spawn((
@@ -476,19 +476,11 @@ mod test {
 			EndpointBuilder::get(),
 			children![
 				children![
-					(
-						PathPartial::new("*bar"),
-						EndpointBuilder::get()
-					),
+					(PathPartial::new("*bar"), EndpointBuilder::get()),
 					PathPartial::new("bazz")
 				],
-				(
-					PathPartial::new("qux"),
-				),
-				(
-					PathPartial::new(":quax"),
-					EndpointBuilder::get()
-				),
+				(PathPartial::new("qux"),),
+				(PathPartial::new(":quax"), EndpointBuilder::get()),
 			],
 		));
 		let mut paths = world
@@ -503,4 +495,36 @@ mod test {
 			RoutePath::new("/foo/:quax"),
 		]);
 	}
+
+	#[sweet::test]
+	async fn response_exists() {
+		// Simple test to verify Response exists after endpoint
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| StatusCode::OK.into_response()),
+					OnSpawn::observe(
+						|ev: On<GetOutcome>,
+						 agents: AgentQuery,
+						 response_query: Query<&Response>,
+						 mut commands: Commands|
+						 -> Result {
+							let action = ev.target();
+							let agent = agents.entity(action);
+							response_query.contains(agent).xpect_true();
+							commands
+								.entity(action)
+								.trigger_target(Outcome::Pass);
+							Ok(())
+						},
+					),
+				])
+			}))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
 }
+
