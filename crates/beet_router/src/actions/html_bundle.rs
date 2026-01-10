@@ -61,7 +61,7 @@ pub fn html_bundle_to_response() -> impl Bundle {
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
 			 mut commands: Commands,
-			 query: HtmlBundleQuery<Without<Response>>|
+			 query: HtmlBundleQuery<Without<ResponseMarker>>|
 			 -> Result {
 				let action = ev.target();
 				let agent = query.agent_query.entity(action);
@@ -171,7 +171,7 @@ mod test {
 					OnSpawn::observe(
 						|ev: On<GetOutcome>,
 							agent_query: AgentQuery,
-						 query: HtmlBundleQuery<Without<Response>>,
+						 query: HtmlBundleQuery<Without<ResponseMarker>>,
 						 mut commands: Commands|
 						 -> Result {
 								let action = ev.target();

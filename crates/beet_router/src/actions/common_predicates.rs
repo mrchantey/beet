@@ -17,7 +17,7 @@ pub fn fallback() -> impl Bundle {
 			 mut commands: Commands,
 			 agent_query: AgentQuery<
 				(),
-				(With<Request>, Without<Response>),
+				(With<Request>, Without<ResponseMarker>),
 			>| {
 				let action = ev.target();
 				let outcome = match agent_query.contains(action) {
