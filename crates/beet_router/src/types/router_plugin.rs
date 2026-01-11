@@ -81,14 +81,8 @@ mod test {
 		}));
 
 		// Spawn and collect all endpoints
-		let (endpoints, spawned_roots) =
-			spawn_and_collect_endpoints(&mut world);
+		let endpoints = EndpointTree::endpoints_from_world(&mut world);
 		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
-
-		// Cleanup
-		for root in spawned_roots {
-			world.entity_mut(root).despawn();
-		}
 
 		tree.flatten()
 			.iter()

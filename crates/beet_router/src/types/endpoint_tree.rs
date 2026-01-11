@@ -2,33 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Spawns all ExchangeSpawner trees and collects Endpoint components.
-/// Returns the list of endpoints and the entities that were spawned (which the caller must despawn).
-pub fn spawn_and_collect_endpoints(
-	world: &mut World,
-) -> (Vec<(Entity, PathPattern, ParamsPattern)>, Vec<Entity>) {
-	let spawners: Vec<ExchangeSpawner> = world
-		.query_once::<&ExchangeSpawner>()
-		.iter()
-		.map(|s| (*s).clone())
-		.collect();
-
-	let mut spawned_roots = Vec::new();
-	for spawner in &spawners {
-		spawned_roots.push(spawner.spawn(world));
-	}
-
-	let endpoints: Vec<(Entity, PathPattern, ParamsPattern)> = world
-		.query_once::<(Entity, &Endpoint)>()
-		.iter()
-		.map(|(entity, endpoint)| {
-			(*entity, endpoint.path().clone(), endpoint.params().clone())
-		})
-		.collect();
-
-	(endpoints, spawned_roots)
-}
-
 /// Collects all endpoints in an application and arranges them into a tree structure.
 ///
 /// This serves as a validation step, ensuring there is only a single endpoint for
@@ -80,25 +53,31 @@ impl EndpointTree {
 	/// then despawns those temporary trees after collection.
 	///
 	/// Returns an error if there are conflicting paths.
-	pub fn from_world(world: &mut World) -> Result<Self> {
-		let (endpoints, spawned_roots) = spawn_and_collect_endpoints(world);
+	pub fn endpoints_from_world(world: &mut World) -> Vec<(Entity, Endpoint)> {
+		let spawned_roots = world
+			.query_once::<&ExchangeSpawner>()
+			.iter()
+			.map(|s| s.spawn(world))
+			.collect::<Vec<Entity>>();
 
+		let endpoints = world
+			.query_once::<(Entity, &Endpoint)>()
+			.iter()
+			.map(|(entity, endpoint)| (*entity, (*endpoint).clone()))
+			.collect::<Vec<_>>();
 		// Build the tree before cleanup (endpoints reference these entities)
-		let tree = Self::from_endpoints(endpoints);
 
 		// Despawn the temporary trees
 		for root in spawned_roots {
 			world.entity_mut(root).despawn();
 		}
 
-		tree
+		endpoints
 	}
 
 	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
 	/// Returns an error if there are conflicting paths.
-	pub fn from_endpoints(
-		endpoints: Vec<(Entity, PathPattern, ParamsPattern)>,
-	) -> Result<Self> {
+	pub fn from_endpoints(endpoints: Vec<(Entity, Endpoint)>) -> Result<Self> {
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,
@@ -111,8 +90,8 @@ impl EndpointTree {
 		let mut root = Node::default();
 
 		// build tree and detect conflicts
-		for (ent, pattern, params) in &endpoints {
-			let segments = pattern.iter().cloned().collect::<Vec<_>>();
+		for (ent, endpoint) in &endpoints {
+			let segments = endpoint.path().iter().cloned().collect::<Vec<_>>();
 			let mut node = &mut root;
 
 			for (idx, seg) in segments.iter().enumerate() {
@@ -162,11 +141,11 @@ impl EndpointTree {
 					if node.endpoint.is_some() {
 						bevybail!(
 							"Duplicate endpoint: Multiple endpoints defined for path '{}'",
-							pattern.annotated_route_path()
+							endpoint.path().annotated_route_path()
 						);
 					}
 					node.endpoint = Some(*ent);
-					node.params = Some(params.clone());
+					node.params = Some(endpoint.params().clone());
 				}
 			}
 
@@ -178,7 +157,7 @@ impl EndpointTree {
 					);
 				}
 				node.endpoint = Some(*ent);
-				node.params = Some(params.clone());
+				node.params = Some(endpoint.params().clone());
 			}
 		}
 
@@ -267,15 +246,24 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	fn create_endpoints(
+		endpoints: Vec<(PathPattern, ParamsPattern)>,
+	) -> Vec<(Entity, Endpoint)> {
+		let mut world = World::new();
+		endpoints
+			.into_iter()
+			.map(|(path, params)| {
+				let ent = world.spawn_empty().id();
+				(ent, Endpoint::new(path, params, None, None, None))
+			})
+			.collect()
+	}
+
+
 	#[test]
 	fn endpoint_tree_detects_duplicates() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -283,17 +271,15 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
-		let result = EndpointTree::from_endpoints(endpoints);
-		result
+		EndpointTree::from_endpoints(endpoints)
 			.unwrap_err()
 			.to_string()
 			.contains("Duplicate endpoint")
@@ -302,13 +288,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_detects_dynamic_conflicts() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("foo"),
 				])
@@ -316,14 +297,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -335,13 +315,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_detects_static_dynamic_mix() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -349,14 +324,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -368,14 +342,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_allows_different_static_paths() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-		let ent3 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -383,7 +351,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("bar"),
 				])
@@ -391,7 +358,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent3,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 					PathPatternSegment::static_segment("bar"),
@@ -399,7 +365,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
 		tree.flatten().len().xpect_eq(3);
@@ -407,13 +373,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_greedy_conflict() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::one_or_more("foo"),
 				])
@@ -421,14 +382,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::one_or_more("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -439,18 +399,10 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "_sweet_runner")]
+	// #[cfg(feature = "_sweet_runner")]
 	fn complex() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-		let ent3 = world.spawn_empty().id();
-		let ent4 = world.spawn_empty().id();
-
-		// valid tree with mixed static and dynamic paths at different levels
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 				])
@@ -463,7 +415,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::dynamic_required("id"),
@@ -481,7 +432,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent3,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("users"),
 					PathPatternSegment::dynamic_required("userId"),
@@ -494,7 +444,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent4,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("docs"),
 					PathPatternSegment::one_or_more("path"),
@@ -502,7 +451,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::from_metas(vec![]).unwrap(),
 			),
-		];
+		]);
 
 		EndpointTree::from_endpoints(endpoints)
 			.unwrap()
@@ -512,14 +461,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_rejects_dynamic_static_same_level() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		// cannot have /api/:id and /api/users at same level
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::dynamic_required("id"),
@@ -528,7 +471,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::static_segment("users"),
@@ -536,7 +478,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result

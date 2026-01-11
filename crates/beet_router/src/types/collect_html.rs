@@ -17,35 +17,23 @@ pub async fn collect_html(
 		.await;
 
 	// Spawn trees from ExchangeSpawners and collect their endpoints
-	let metas = world
+	let endpoints: Vec<Endpoint> = world
 		.with_then(|world| {
-			let (endpoints, spawned_roots) =
-				crate::types::endpoint_tree::spawn_and_collect_endpoints(world);
-
-			// Filter for static GET/HTML endpoints
-			let metas: Vec<Endpoint> = endpoints
+			EndpointTree::endpoints_from_world(world)
 				.into_iter()
-				.filter_map(|(entity, _, _)| {
-					world.entity(entity).get::<Endpoint>().cloned()
-				})
-				.filter(|endpoint| endpoint.is_static_get_html())
-				.collect();
-
-			// Despawn the temporary trees
-			for root in spawned_roots {
-				world.entity_mut(root).despawn();
-			}
-
-			metas
+				// Filter for static GET/HTML endpoints
+				.filter(|(_, endpoint)| endpoint.is_static_get_html())
+				.map(|(_, endpoint)| endpoint)
+				.collect()
 		})
 		.await;
 
-	debug!("building {} static html documents", metas.len());
+	debug!("building {} static html documents", endpoints.len());
 
 	let mut results = Vec::new();
 
-	for meta in metas {
-		let path = meta.path().annotated_route_path();
+	for endpoint in endpoints {
+		let path = endpoint.path().annotated_route_path();
 		trace!("building html for {}", &path);
 
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");

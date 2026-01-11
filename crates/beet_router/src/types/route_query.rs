@@ -65,8 +65,8 @@ impl RouteQuery<'_, '_> {
 			.await
 			.unwrap()
 	}
-	
-	
+
+
 	/// Get or build the endpoint tree for the given action,
 	/// caching the result in the root of the tree
 	pub fn endpoint_tree(&mut self, action: Entity) -> Result<EndpointTree> {
@@ -82,13 +82,10 @@ impl RouteQuery<'_, '_> {
 				.children
 				.iter_descendants_inclusive(root)
 				.filter_map(|child| {
-					self.endpoints.get(child).ok().map(|endpoint| {
-						(
-							child,
-							endpoint.path().clone(),
-							endpoint.params().clone(),
-						)
-					})
+					self.endpoints
+						.get(child)
+						.ok()
+						.map(|endpoint| (child, endpoint.clone()))
 				})
 				.collect();
 			let tree = EndpointTree::from_endpoints(endpoints)?;

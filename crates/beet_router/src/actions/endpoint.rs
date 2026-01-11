@@ -36,6 +36,23 @@ pub struct Endpoint {
 
 
 impl Endpoint {
+	#[cfg(test)]
+	pub(crate) fn new(
+		path: PathPattern,
+		params: ParamsPattern,
+		method: Option<HttpMethod>,
+		cache_strategy: Option<CacheStrategy>,
+		content_type: Option<ContentType>,
+	) -> Self {
+		Self {
+			path,
+			params,
+			method,
+			cache_strategy,
+			content_type,
+		}
+	}
+
 	pub fn path(&self) -> &PathPattern { &self.path }
 	pub fn params(&self) -> &ParamsPattern { &self.params }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
@@ -527,4 +544,3 @@ mod test {
 			.xpect_eq(StatusCode::OK);
 	}
 }
-
