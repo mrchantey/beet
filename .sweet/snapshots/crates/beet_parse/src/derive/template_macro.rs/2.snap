@@ -12,6 +12,7 @@ impl MyNode {
         world: &mut World,
         res: Res<Time>,
         mut query: Query<&mut Transform>,
+        custom_query: CustomQuery,
     ) -> impl Bundle + use<> {
         #[allow(unused_variables, unused_assignments)]
         let Self { foo, mut bar } = input;

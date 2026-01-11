@@ -45,6 +45,7 @@ impl<'a> NodeField<'a> {
 			"required",
 			"into",
 			"no_into",
+			"param",
 			"into_generics",
 			"into_func",
 			"into_type",

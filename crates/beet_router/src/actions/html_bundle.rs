@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::BeetRoot;
+use beet_dom::prelude::TemplateOf;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
@@ -13,7 +14,9 @@ where
 {
 	agent_query: AgentQuery<'w, 's, Entity, With<HtmlBundle>>,
 	agents: Query<'w, 's, &'static Children, F>,
+	children: Query<'w, 's, &'static ChildOf>,
 	html_bundles: Query<'w, 's, Entity, With<HtmlBundle>>,
+	templates: Query<'w, 's, &'static TemplateOf>,
 }
 
 impl<F> HtmlBundleQuery<'_, '_, F>
@@ -43,6 +46,36 @@ where
 				this is usually caused by multiple matching endpoints.
 				Please check each has a distinct Method and PathFilter"
 			),
+		}
+	}
+
+	/// Given an entity that is a descendant of an agent, get all actions
+	/// associated with that agent
+	pub fn actions_from_agent_descendant(
+		&self,
+		entity: Entity,
+	) -> Result<&Actions> {
+		let agent = self.children.root_ancestor(entity);
+		match self.agent_query.agents.get(agent) {
+			// the root is an agent
+			Ok(actions) => Ok(actions),
+			Err(_) => match self.templates.get(agent) {
+				// the template is not yet resolved, follow up to the agent root
+				Ok(template_of) => {
+					let template_agent =
+						self.children.root_ancestor(template_of.get());
+					self.agent_query.agents.get(template_agent).map_err(|_| {
+						bevyhow!(
+							"Could not find Actions for agent template descendant {:?}",
+							entity
+						)
+					})
+				}
+				Err(_) => bevybail!(
+					"Could not find Actions for agent descendant {:?}",
+					entity
+				),
+			},
 		}
 	}
 }
@@ -140,6 +173,36 @@ mod test {
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_eq("<div>hello world</div>");
+	}
+
+	#[sweet::test]
+	async fn endpoint_tree_from_agent_descendent() {
+		#[template]
+		fn Foobar(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("foo")
+						.with_handler(|| (BeetRoot, rsx! {<Foobar/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/foo"))
+			.await
+			.xpect_eq("/foo\n");
 	}
 
 

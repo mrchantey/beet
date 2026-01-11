@@ -34,6 +34,7 @@ where
 	pub children: Query<'w, 's, &'static Children>,
 	/// A [`ActionOf`] query
 	pub actions: Query<'w, 's, &'static ActionOf>,
+	pub agents: Query<'w, 's, &'static Actions>,
 	/// A user defined query
 	pub query: Query<'w, 's, D, F>,
 }
