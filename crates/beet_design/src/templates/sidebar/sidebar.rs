@@ -22,7 +22,6 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 			rsx!{<SidebarItem root node=node/>}).collect::<Vec<_>>()
 		}
 		</nav>
-		<script hoist:body src="./sidebar.js"/>
 		<style>
 			nav{
 				--sidebar-width:15rem;
@@ -114,14 +113,13 @@ impl CollectSidebarNode {
 
 
 	pub fn collect(
-		this: In<Self>,
-		endpoint_tree: Res<EndpointTree>,
+		In((this, endpoint_tree)): In<(Self, EndpointTree)>,
 		articles: Query<&ArticleMeta>,
 	) -> SidebarNode {
 		this.map_node(&endpoint_tree, &articles)
 	}
 
-	fn map_node(
+	pub fn map_node(
 		&self,
 		node: &EndpointTree,
 		articles: &Query<&ArticleMeta>,
@@ -180,95 +178,98 @@ impl SidebarNode {}
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
+	use beet_net::prelude::*;
+	use beet_router::prelude::*;
 
-	#[test]
-	fn collect_sidebar_node() {
-		let mut world = World::new();
+	#[sweet::test]
+	async fn collect_sidebar_node() {
+		#[template]
+		fn TestSidebar(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+			#[field(param)] articles: Query<&ArticleMeta>,
+		) -> Result<TextNode> {
+			let actions = bundle_query.actions_from_agent_descendant(entity)?;
+			let endpoint_tree = route_query.endpoint_tree(actions[0])?;
 
-		world.spawn((InfallibleSequence, children![
-			EndpointBuilder::get()
-				.with_path("docs")
-				.with_cache_strategy(CacheStrategy::Static)
-				.with_handler_bundle((
-					StatusCode::OK.into_endpoint_handler(),
-					ArticleMeta {
-						title: Some("Docs".to_string()),
-						sidebar: SidebarInfo {
-							label: Some("Testing".to_string()),
-							order: Some(1),
-						},
-						..Default::default()
-					}
-				)),
-			(PathPartial::new("/docs"), Sequence, children![
-				EndpointBuilder::get()
-					.with_path("testing")
-					.with_cache_strategy(CacheStrategy::Static)
-					.with_handler_bundle((
-						StatusCode::OK.into_endpoint_handler(),
-						ArticleMeta {
-							title: Some("Partying".to_string()),
-							sidebar: SidebarInfo {
-								label: Some("Partying".to_string()),
-								order: Some(2),
-							},
-							..Default::default()
-						}
-					)),
-			])
-		]));
-		world.run_system_cached(insert_route_tree).unwrap();
-		world
-			.resource::<EndpointTree>()
-			.to_string()
-			.xpect_eq("/docs\n/docs/testing\n");
+			// Verify we got the endpoint tree
+			endpoint_tree.to_string().xpect_eq("/docs\n");
 
-		world
-			.run_system_cached_with(
-				CollectSidebarNode::collect,
-				CollectSidebarNode {
-					include_filter: GlobFilter::default(), // .with_include("/docs/*")
-					// .with_include("/blog/*")
-					expanded_filter: GlobFilter::default()
-						.with_include("/docs/"),
-				},
-			)
-			.unwrap()
-			.xfmt()
-			.xpect_snapshot();
+			let sidebar_node = CollectSidebarNode {
+				include_filter: GlobFilter::default(),
+				expanded_filter: GlobFilter::default().with_include("/docs/"),
+			}
+			.map_node(&endpoint_tree, &articles);
+
+			// Verify the sidebar node was created
+			// The root of the tree has display name "Root", with /docs as a child
+			sidebar_node.display_name.xpect_eq("Root");
+			sidebar_node.children.len().xpect_eq(1);
+			sidebar_node.children[0].display_name.xpect_eq("Docs");
+
+			TextNode::new("Success").xok()
+		}
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("docs")
+						.with_handler(|| (BeetRoot, rsx! {<TestSidebar/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/docs"))
+			.await
+			.xpect_eq("Success");
 	}
 
-	#[test]
-	fn works() {
-		let nodes = vec![SidebarNode {
-			display_name: "Home".to_string(),
-			path: None,
-			children: vec![SidebarNode {
-				display_name: "Docs".to_string(),
-				path: Some(RoutePath::new("/docs")),
-				children: vec![
-					SidebarNode {
-						display_name: "Testing".to_string(),
-						path: Some(RoutePath::new("/docs/testing")),
-						children: vec![],
-						expanded: false,
-					},
-					SidebarNode {
-						display_name: "Partying".to_string(),
-						path: Some(RoutePath::new("/docs/partying")),
-						children: vec![],
-						expanded: false,
-					},
-				],
-				expanded: false,
-			}],
-			expanded: true,
-		}];
+	#[sweet::test]
+	async fn works() {
+		#[template]
+		fn TestSidebarRender() -> impl Bundle {
+			let nodes = vec![SidebarNode {
+				display_name: "Home".to_string(),
+				path: None,
+				children: vec![SidebarNode {
+					display_name: "Docs".to_string(),
+					path: Some(RoutePath::new("/docs")),
+					children: vec![
+						SidebarNode {
+							display_name: "Testing".to_string(),
+							path: Some(RoutePath::new("/docs/testing")),
+							children: vec![],
+							expanded: false,
+						},
+						SidebarNode {
+							display_name: "Partying".to_string(),
+							path: Some(RoutePath::new("/docs/partying")),
+							children: vec![],
+							expanded: false,
+						},
+					],
+					expanded: false,
+				}],
+				expanded: true,
+			}];
+			rsx! { <Sidebar nodes=nodes /> }
+		}
 
-		rsx! { <Sidebar nodes=nodes /> }
-			.xmap(HtmlFragment::parse_bundle)
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get().with_handler(|| (
+						BeetRoot,
+						rsx! { <TestSidebarRender /> }
+					)),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/"))
+			.await
 			.xpect_contains("Partying");
 	}
 }

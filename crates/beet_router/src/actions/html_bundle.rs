@@ -50,32 +50,30 @@ where
 	}
 
 	/// Given an entity that is a descendant of an agent, get all actions
-	/// associated with that agent
+	/// associated with that agent. Recursively follows template chains.
 	pub fn actions_from_agent_descendant(
 		&self,
 		entity: Entity,
 	) -> Result<&Actions> {
-		let agent = self.children.root_ancestor(entity);
-		match self.agent_query.agents.get(agent) {
-			// the root is an agent
-			Ok(actions) => Ok(actions),
-			Err(_) => match self.templates.get(agent) {
-				// the template is not yet resolved, follow up to the agent root
-				Ok(template_of) => {
-					let template_agent =
-						self.children.root_ancestor(template_of.get());
-					self.agent_query.agents.get(template_agent).map_err(|_| {
-						bevyhow!(
-							"Could not find Actions for agent template descendant {:?}",
-							entity
-						)
-					})
-				}
-				Err(_) => bevybail!(
+		let mut current = self.children.root_ancestor(entity);
+
+		// recursively follow template chain until we find an agent
+		loop {
+			if let Ok(actions) = self.agent_query.agents.get(current) {
+				// found an agent
+				return Ok(actions);
+			}
+
+			// follow the template chain
+			#[allow(unreachable_code)]
+			let Ok(template_of) = self.templates.get(current) else {
+				return bevybail!(
 					"Could not find Actions for agent descendant {:?}",
 					entity
-				),
-			},
+				);
+			};
+
+			current = self.children.root_ancestor(template_of.get());
 		}
 	}
 }
@@ -203,6 +201,79 @@ mod test {
 			.oneshot_str(Request::get("/foo"))
 			.await
 			.xpect_eq("/foo\n");
+	}
+
+	#[sweet::test]
+	async fn nested_template_actions() {
+		#[template]
+		fn Inner(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+		#[template]
+		fn Outer() -> impl Bundle {
+			rsx! {<Inner/>}
+		}
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("nested")
+						.with_handler(|| (BeetRoot, rsx! {<Outer/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/nested"))
+			.await
+			.xpect_eq("/nested\n");
+	}
+
+	#[sweet::test]
+	async fn deeply_nested_template_actions() {
+		#[template]
+		fn Level3(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+		#[template]
+		fn Level2() -> impl Bundle {
+			rsx! {<Level3/>}
+		}
+
+		#[template]
+		fn Level1() -> impl Bundle {
+			rsx! {<Level2/>}
+		}
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("deep")
+						.with_handler(|| (BeetRoot, rsx! {<Level1/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/deep"))
+			.await
+			.xpect_eq("/deep\n");
 	}
 
 

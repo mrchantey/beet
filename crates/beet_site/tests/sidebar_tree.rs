@@ -9,17 +9,25 @@ async fn works() {
 	let mut app = App::new();
 	app.add_plugins(server_plugin);
 	app.init().update();
+
+	let endpoints = EndpointTree::endpoints_from_world(app.world_mut());
+	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
+
 	app.world_mut()
 		.run_system_cached_with(
 			CollectSidebarNode::collect,
-			CollectSidebarNode {
-				include_filter: GlobFilter::default()
-					.with_include("/")
-					.with_include("/docs*")
-					.with_include("/blog*")
-					.with_include("/design*"),
-				expanded_filter: GlobFilter::default().with_include("/docs"),
-			},
+			(
+				CollectSidebarNode {
+					include_filter: GlobFilter::default()
+						.with_include("/")
+						.with_include("/docs*")
+						.with_include("/blog*")
+						.with_include("/design*"),
+					expanded_filter: GlobFilter::default()
+						.with_include("/docs"),
+				},
+				endpoint_tree,
+			),
 		)
 		.unwrap()
 		.paths()

@@ -41,7 +41,7 @@ Beet is a rust project built on the bevy game engine
 - We use the custom `sweet` test runner and matchers in all crates.
 - unit tests belong at the bottom of the file, the need for integration tests is rare
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders)
-- Be sure to use `tail` where appropriate to avoid context bloat
+- Be sure to use `tail` where appropriate to avoid context bloat. Always use `tail` with `just test-all`
 - This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
 - avoid solving doc test failing by adding `no_run`, first attempt to create ergonomic solutions to allow it to run including helper methods, and only use no_run if thats unreasonable
 - Do not add the `test` prefix to function names
