@@ -17,26 +17,13 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<ControlFlowPlugin>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
-			.init_resource::<HtmlConstants>()
-			.add_systems(PostStartup, insert_route_tree);
+			.init_resource::<HtmlConstants>();
 
 		// #[cfg(all(
 		// 	not(target_arch = "wasm32"),
 		// 	not(test),
 		// 	feature = "server"
 		// ))]
-	}
-}
-
-/// insert a route tree for the current world, added at startup by the [`RouterPlugin`].
-pub fn insert_route_tree(world: &mut World) {
-	match EndpointTree::from_world(world) {
-		Ok(tree) => {
-			world.insert_resource(tree);
-		}
-		Err(err) => {
-			error!("Failed to build EndpointTree: {}", err);
-		}
 	}
 }
 
@@ -64,13 +51,21 @@ mod test {
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
-	#[test]
-	fn route_tree() {
-		let mut world = World::new();
+	#[sweet::test]
+	async fn route_tree() {
+		let mut world = RouterPlugin::world();
 		world.spawn(ExchangeSpawner::new_flow(|| {
 			(CacheStrategy::Static, children![
-				EndpointBuilder::get()
-					.with_handler(|tree: Res<EndpointTree>| tree.to_string()),
+				EndpointBuilder::get().with_handler(
+					async |_: (), action: AsyncEntity| -> Result<String> {
+						let tree =
+							RouteQuery::with_async(action, |query, entity| {
+								query.endpoint_tree(entity)
+							})
+							.await?;
+						tree.to_string().xok()
+					}
+				),
 				(EndpointBuilder::get()
 					.with_path("foo")
 					.with_cache_strategy(CacheStrategy::Static)
@@ -84,11 +79,18 @@ mod test {
 				PathPartial::new("boo"),
 			])
 		}));
-		world.run_system_cached(insert_route_tree).unwrap();
-		world
-			.remove_resource::<EndpointTree>()
-			.unwrap()
-			.flatten()
+
+		// Spawn and collect all endpoints
+		let (endpoints, spawned_roots) =
+			spawn_and_collect_endpoints(&mut world);
+		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
+
+		// Cleanup
+		for root in spawned_roots {
+			world.entity_mut(root).despawn();
+		}
+
+		tree.flatten()
 			.iter()
 			.map(|p| p.annotated_route_path())
 			.collect::<Vec<_>>()

@@ -4,6 +4,14 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
+async fn show_tree(_: (), action: AsyncEntity) -> Result<String> {
+	let tree = RouteQuery::with_async(action, |query, entity| {
+		query.endpoint_tree(entity)
+	})
+	.await?;
+	format!("\n🌱 Welcome to the Beet CLI 🌱\n{}", tree.to_string()).xok()
+}
+
 
 
 /// 🌱 Beet CLI 🌱
@@ -19,15 +27,9 @@ pub fn default_cli_router() -> impl Bundle {
 				beet_site_cmd(),
 				Fallback,
 				children![
-					EndpointBuilder::new(|tree: Res<EndpointTree>| {
-						format!(
-							"\n🌱 Welcome to the Beet CLI 🌱\n{}",
-							tree.to_string()
-						)
-						// StatusCode::OK
-					})
-					.with_params::<HelpParams>()
-					.with_path(""),
+					EndpointBuilder::new(show_tree)
+						.with_params::<HelpParams>()
+						.with_path(""),
 					EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
 						.with_path("teapot"),
 					EndpointBuilder::default()

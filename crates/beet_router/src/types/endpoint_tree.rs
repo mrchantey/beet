@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 
 /// Spawns all ExchangeSpawner trees and collects Endpoint components.
 /// Returns the list of endpoints and the entities that were spawned (which the caller must despawn).
-pub(crate) fn spawn_and_collect_endpoints(
+pub fn spawn_and_collect_endpoints(
 	world: &mut World,
 ) -> (Vec<(Entity, PathPattern, ParamsPattern)>, Vec<Entity>) {
 	let spawners: Vec<ExchangeSpawner> = world
@@ -60,11 +60,8 @@ pub(crate) fn spawn_and_collect_endpoints(
 /// 	)
 /// }));
 ///
-/// // build the tree and validate all paths
-/// let tree = EndpointTree::from_world(&mut world).unwrap();
 /// ```
-// TODO this should be a component, inserted alongside the ExchangeSpawner
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone, Component)]
 pub struct EndpointTree {
 	/// The path pattern for this node
 	pub pattern: PathPattern,

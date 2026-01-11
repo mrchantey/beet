@@ -5,7 +5,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 
-
+/// Utilities for working with ancestors
 #[derive(SystemParam)]
 pub struct AncestorQuery<
 	'w,
@@ -13,6 +13,7 @@ pub struct AncestorQuery<
 	D: 'static + QueryData,
 	F: 'static + QueryFilter = (),
 > {
+	commands: Commands<'w, 's>,
 	query: Query<'w, 's, D, F>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
 }
@@ -68,7 +69,7 @@ impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 		}
 		bevybail!("No ancestor found matching query for entity {:?}", entity);
 	}
-	
+
 	/// Get the first ancestor of the given entity that matches the query,
 	/// exclusive of the given entity.
 	pub fn get_mut_exclusive<'a>(
@@ -89,5 +90,19 @@ impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 			return self.query.get_mut(e).map_err(|e| e.into());
 		}
 		bevybail!("No ancestor found matching query for entity {:?}", entity);
+	}
+
+	/// insert into the root ancestor
+	pub fn insert(
+		&mut self,
+		entity: Entity,
+		component: impl Bundle,
+	) -> Result<()>
+	where
+		'w: 's,
+	{
+		let root = self.ancestors.root_ancestor(entity);
+		self.commands.entity(root).insert(component);
+		Ok(())
 	}
 }

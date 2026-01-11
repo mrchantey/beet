@@ -28,11 +28,11 @@ use beet_core::prelude::*;
 #[require(ContinueRun)]
 pub struct AwaitReady {
 	/// The number of [`ReadyAction`] descendants that have triggered [`Ready`].
-	pub num_ready: u32,
+	num_ready: u32,
 	/// The number of descendants with a [`ReadyAction`] component.
-	pub num_actions: u32,
+	num_actions: u32,
 	/// Entities we're waiting for Ready signals from.
-	pub pending: HashSet<Entity>,
+	pending: HashSet<Entity>,
 }
 
 fn await_ready_start(

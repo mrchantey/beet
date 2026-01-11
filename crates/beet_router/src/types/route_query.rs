@@ -5,10 +5,14 @@ use beet_net::prelude::*;
 
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
+	commands: Commands<'w, 's>,
 	pub requests: AgentQuery<'w, 's, &'static RequestMeta>,
 	pub parents: Query<'w, 's, &'static ChildOf>,
+	pub children: Query<'w, 's, &'static Children>,
 	pub path_partials: Query<'w, 's, &'static PathPartial>,
 	pub params_partials: Query<'w, 's, &'static ParamsPartial>,
+	endpoint_trees: Query<'w, 's, &'static EndpointTree>,
+	endpoints: Query<'w, 's, &'static Endpoint>,
 }
 
 impl RouteQuery<'_, '_> {
@@ -45,20 +49,51 @@ impl RouteQuery<'_, '_> {
 	}
 
 	pub async fn with_async<F, O>(entity: AsyncEntity, func: F) -> O
-		where
-			F: 'static + Send + Sync + Clone + FnOnce(&mut RouteQuery, Entity) -> O,
-			O: 'static + Send + Sync,
+	where
+		F: 'static + Send + Sync + Clone + FnOnce(&mut RouteQuery, Entity) -> O,
+		O: 'static + Send + Sync,
+	{
+		let id = entity.id();
+		entity
+			.world()
+			.run_system_once_with(
+				|In((func, id)): In<(F, Entity)>, mut query: RouteQuery| {
+					func.clone()(&mut query, id)
+				},
+				(func, id),
+			)
+			.await
+			.unwrap()
+	}
+	
+	
+	/// Get or build the endpoint tree for the given action,
+	/// caching the result in the root of the tree
+	pub fn endpoint_tree(&mut self, action: Entity) -> Result<EndpointTree> {
+		if let Some(tree) = self
+			.parents
+			.iter_ancestors_inclusive(action)
+			.find_map(|entity| self.endpoint_trees.get(entity).ok())
 		{
-			let id = entity.id();
-			entity
-				.world()
-				.run_system_once_with(
-					|In((func, id)): In<(F, Entity)>, mut query: RouteQuery| {
-						func.clone()(&mut query, id)
-					},
-					(func, id),
-				)
-				.await
-				.unwrap()
+			tree.clone().xok()
+		} else {
+			let root = self.parents.root_ancestor(action);
+			let endpoints = self
+				.children
+				.iter_descendants_inclusive(root)
+				.filter_map(|child| {
+					self.endpoints.get(child).ok().map(|endpoint| {
+						(
+							child,
+							endpoint.path().clone(),
+							endpoint.params().clone(),
+						)
+					})
+				})
+				.collect();
+			let tree = EndpointTree::from_endpoints(endpoints)?;
+			self.commands.entity(root).insert(tree.clone());
+			tree.xok()
 		}
+	}
 }
