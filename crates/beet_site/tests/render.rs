@@ -12,9 +12,9 @@ async fn test_layouts_series() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr);
 
-	// home(&mut world).await;
+	home(&mut world).await;
 	docs(&mut world).await;
-	// article_layout(&mut world).await;
+	article_layout(&mut world).await;
 	// correct_title(&mut world).await;
 }
 

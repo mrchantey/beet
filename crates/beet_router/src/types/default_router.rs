@@ -55,7 +55,7 @@ pub fn default_router(
 								(Name::new("Fallbacks"), Fallback, children![
 									html_bundle_to_response(),
 									assets_bucket(),
-									html_bucket(),
+									ssg_html_bucket(),
 									// default not found handled by Router
 								]),
 							]
@@ -147,10 +147,25 @@ pub fn assets_bucket() -> impl Bundle {
 }
 /// Bucket for handling html, usually added as a fallback
 /// if no request present.
-pub fn html_bucket() -> impl Bundle {
+/// This only runs in [`RenderMode::Ssg`] to avoid EndpointTree
+/// conflicts with the SSR endpoints.
+pub fn ssg_html_bucket() -> impl Bundle {
 	(
 		Name::new("Html Bucket"),
 		ReadyAction::run_local(async |entity| {
+			if entity
+				.world()
+				.with_then(|world| {
+					world
+						.get_resource::<RenderMode>()
+						.map(|mode| matches!(mode, RenderMode::Ssr))
+						.unwrap_or(false)
+				})
+				.await
+			{
+				return;
+			}
+
 			let (fs_dir, bucket_name, service_access) = entity
 				.world()
 				.with_then(|world| {

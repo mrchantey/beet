@@ -36,8 +36,7 @@ pub fn article_layout_middleware(path: impl AsRef<Path>) -> impl Bundle {
 #[template]
 pub fn ArticleLayout(query: Query<&ArticleMeta>) -> impl Bundle {
 	for _item in query.iter() {
-		// blocked on immediately resolved templates
-		// panic!("tadaa! {:?}", _item);
+		//TODO we should use this to generate unique page names etc
 		println!("ArticleMeta: {:?}", _item);
 	}
 
