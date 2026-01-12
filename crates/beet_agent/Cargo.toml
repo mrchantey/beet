@@ -23,7 +23,7 @@ beet_net.workspace = true
 beet_core = { workspace = true, features = ["serde"] }
 
 # rig-core = { version = "0.18" }
-clap.workspace = true
+
 strum.workspace = true
 thiserror.workspace = true
 bevy.workspace = true

@@ -24,7 +24,6 @@ qrcode = ["dep:qrcode","dep:image"]
 # TODO only launch, others should be seperate apps
 beet = { workspace = true, features = ["launch", "webdriver", "agent"] }
 ron.workspace = true
-clap.workspace = true
 bevy.workspace = true
 heck.workspace = true
 qrcode = {version = "0.14", optional = true }

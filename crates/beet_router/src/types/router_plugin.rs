@@ -22,7 +22,6 @@ impl Plugin for RouterPlugin {
 
 
 #[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(clap::Subcommand))]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
 	/// to serve files from the bucket.

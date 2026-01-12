@@ -2,20 +2,16 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
-use clap::Parser;
 
 /// Deploy to AWS Lambda in release mode.
 // TODO infra as entities
-#[derive(Debug, Default, Clone, Parser, Resource)]
+#[derive(Debug, Default, Clone, Resource)]
 pub struct LambdaConfig {
 	/// A list of environment variables to pass to the lambda function
-	// #[clap(flatten)]
 	// pub env_filter: GlobFilter,
 	/// Specify the region to deploy the lambda function to
-	#[arg(long)]
 	pub region: Option<String>,
 	/// Specify the IAM role that the lambda function should use
-	#[arg(long)]
 	pub iam_role: Option<String>,
 }
 

@@ -2,24 +2,30 @@ use crate::prelude::Message;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
-use clap::Parser;
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
 pub struct CliAgentPlugin {
 	/// Initial prompt to start the chat
-	#[arg(short = 'p', long = "prompt")]
 	pub initial_prompt: Option<String>,
 	/// Initial prompt to start the chat
-	#[arg(value_name = "PROMPT", trailing_var_arg = true)]
 	pub initial_prompt_trailing: Vec<String>,
 	/// Paths to files to be included in the initial prompt
-	#[arg(short = 'f', long = "file", value_name = "FILE")]
 	pub input_files: Vec<std::path::PathBuf>,
 	/// Add the image generation tool
-	#[arg(long = "image")]
 	pub generate_images: bool,
-	#[clap(flatten)]
 	pub config: CliAgentConfig,
+}
+
+impl Default for CliAgentPlugin {
+	fn default() -> Self {
+		Self {
+			initial_prompt: None,
+			initial_prompt_trailing: Vec::new(),
+			input_files: Vec::new(),
+			generate_images: false,
+			config: CliAgentConfig::default(),
+		}
+	}
 }
 
 impl CliAgentPlugin {
@@ -40,17 +46,24 @@ macro_rules! print_flush {
 }
 
 
-#[derive(Debug, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct CliAgentConfig {
 	/// Run in oneshot mode, exiting after the first message received
-	#[arg(long)]
 	oneshot: bool,
 	/// Path without extension to write output images and text to
-	#[arg(short, long)]
 	out_file: Option<std::path::PathBuf>,
 	/// Overwrite existing files instead of creating new ones
-	#[arg(short = 'd', long)]
 	overwrite: bool,
+}
+
+impl Default for CliAgentConfig {
+	fn default() -> Self {
+		Self {
+			oneshot: false,
+			out_file: None,
+			overwrite: false,
+		}
+	}
 }
 
 impl CliAgentConfig {

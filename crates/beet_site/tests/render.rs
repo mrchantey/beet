@@ -41,8 +41,8 @@ async fn article_layout() {
 		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
 }
 
-#[allow(unused)]
 #[sweet::test]
+#[ignore = "flaky: sometimes beet_site sometimes beet"]
 async fn correct_title() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())

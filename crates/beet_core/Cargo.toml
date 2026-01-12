@@ -30,7 +30,7 @@ bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
-serde = ["dep:serde", "dep:serde_json", "dep:clap", "dep:ron", "dep:toml"]
+serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 _sweet_runner = ["sweet/runner"]
 
@@ -75,8 +75,6 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
-# workspace config
-clap = { workspace = true, optional = true }
 
 heck.workspace = true
 

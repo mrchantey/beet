@@ -1,17 +1,14 @@
 use bevy::prelude::*;
-use clap::Parser;
 use std::path::Path;
 
 /// glob for watch patterns
-#[derive(Debug, Default, Clone, PartialEq, Reflect, Parser)]
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all
-	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
 	include: Vec<GlobPattern>,
 	/// glob for ignore patterns
-	#[arg(long, value_parser = GlobFilter::parse_glob_pattern)]
 	exclude: Vec<GlobPattern>,
 }
 

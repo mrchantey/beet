@@ -39,7 +39,6 @@ serde = [
 	"dep:serde",
 	"dep:serde_json",
 	"dep:serde_urlencoded",
-	"dep:clap",
 	"dep:base64",
 	"uuid/serde",
 	"beet_core/serde",
@@ -80,7 +79,6 @@ uuid = {workspace = true, features = ["v7"]}
 async-lock.workspace = true
 
 # serde
-clap = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

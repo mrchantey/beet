@@ -33,7 +33,7 @@ impl SstCommand {
 
 /// Represents the available subcommands for the SST CLI.
 #[allow(unused)]
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum SstSubcommand {
 	/// Initialize a new project
 	Init,

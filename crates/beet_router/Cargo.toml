@@ -29,7 +29,6 @@ fs = ["beet_net/fs"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
-	"dep:clap",
 	"dep:base64",
 	"beet_core/serde",
 ]
@@ -54,7 +53,6 @@ send_wrapper.workspace = true
 http.workspace = true
 
 # serde
-clap = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

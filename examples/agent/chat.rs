@@ -1,10 +1,9 @@
 //! This example demonstrates a cli chat workflow,
 //! see [`CliAgentPlugin`] for more options.
 use beet::prelude::*;
-use clap::Parser;
 
 pub fn main() {
-	let mut plugin = CliAgentPlugin::parse();
+	let mut plugin = CliAgentPlugin::default();
 
 	// enabling this will add the image generation tool to the agent
 	// plugin.generate_images = true;
