@@ -2,11 +2,12 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
+use bevy::reflect::Typed;
 
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
 	commands: Commands<'w, 's>,
-	pub requests: AgentQuery<'w, 's, &'static RequestMeta>,
+	pub agents: AgentQuery<'w, 's, &'static RequestMeta>,
 	pub parents: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
 	pub path_partials: Query<'w, 's, &'static PathPartial>,
@@ -17,14 +18,14 @@ pub struct RouteQuery<'w, 's> {
 
 impl RouteQuery<'_, '_> {
 	pub fn request_meta(&self, action: Entity) -> Result<&RequestMeta> {
-		self.requests.get(action)?.xok()
+		self.agents.get(action)?.xok()
 	}
 
 	pub fn path(&self, action: Entity) -> Result<&Vec<String>> {
-		self.requests.get(action)?.path().xok()
+		self.agents.get(action)?.path().xok()
 	}
 	pub fn method(&self, action: Entity) -> Result<HttpMethod> {
-		self.requests.get(action)?.method().xok()
+		self.agents.get(action)?.method().xok()
 	}
 
 	pub fn path_match(&self, action: Entity) -> Result<PathMatch> {
@@ -70,7 +71,6 @@ impl RouteQuery<'_, '_> {
 			.unwrap()
 	}
 
-
 	/// Get or build the endpoint tree for the given action,
 	/// caching the result in the root of the tree
 	pub fn endpoint_tree(&mut self, action: Entity) -> Result<EndpointTree> {
@@ -93,5 +93,22 @@ impl RouteQuery<'_, '_> {
 			self.commands.entity(root).insert(tree.clone());
 			tree.xok()
 		}
+	}
+}
+
+
+#[derive(SystemParam)]
+pub struct RouteParamQuery<'w, 's, T: Clone + Component> {
+	pub agents: AgentQuery<'w, 's>,
+	pub params: ParamQuery<'w, 's, T>,
+}
+
+impl<T: Clone + Component> RouteParamQuery<'_, '_, T> {
+	pub fn get(&mut self, action: Entity) -> Result<T>
+	where
+		T: Sized + Clone + FromReflect + Typed + Component,
+	{
+		let agent = self.agents.entity(action);
+		self.params.get(agent)
 	}
 }

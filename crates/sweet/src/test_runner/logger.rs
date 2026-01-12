@@ -18,16 +18,10 @@ pub(super) struct LoggerParams {
 	quiet: bool,
 }
 
-impl RequestMetaExtractor for LoggerParams {
-	fn extract(request: &RequestMeta) -> Result<Self> {
-		request.params().parse_reflect()
-	}
-}
 
 pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
-	mut logger_params: Extractor<LoggerParams>,
-	// mut filter_params: Extractor<FilterParams>,
+	mut logger_params: ParamQuery<LoggerParams>,
 ) -> Result {
 	for (entity, _req) in requests {
 		let logger_params = logger_params.get(entity)?;
@@ -53,7 +47,7 @@ pub(super) fn log_suite_running(
 pub(super) fn log_case_running(
 	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-	mut params: Extractor<LoggerParams>,
+	mut params: ParamQuery<LoggerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -77,7 +71,7 @@ pub(super) fn log_case_running(
 pub(super) fn log_case_outcomes(
 	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
-	mut params: Extractor<LoggerParams>,
+	mut params: ParamQuery<LoggerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -132,7 +126,7 @@ pub(super) fn log_suite_outcome(
 		(Entity, &RequestMeta, &SuiteOutcome, &Children),
 		Added<SuiteOutcome>,
 	>,
-	mut params: Extractor<LoggerParams>,
+	mut params: ParamQuery<LoggerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
 ) -> Result {
 	for (entity, req, outcome, children) in requests {

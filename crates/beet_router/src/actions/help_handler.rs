@@ -167,7 +167,7 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 					&current_path,
 				);
 
-				let agent = route_query.requests.entity(action);
+				let agent = route_query.agents.entity(action);
 				commands.entity(agent).insert(
 					Response::new(default(), help_text.into())
 						.with_content_type("text/plain"),

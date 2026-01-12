@@ -192,24 +192,6 @@ pub fn beet_cli() -> impl Bundle {
 	)
 }
 
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-pub struct StageParams {
-	#[deref]
-	#[reflect(@ParamOptions::desc("Set deployment stage [ dev, prod, <custom> ]"))]
-	stage: Option<String>,
-}
-
 fn watch() -> impl Bundle {
 	(
 		Name::new("Watch"),
@@ -244,6 +226,31 @@ fn watch() -> impl Bundle {
 	)
 }
 
+
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+pub struct StageParams {
+	#[deref]
+	#[reflect(
+		default="stage",
+		@ParamOptions::desc("Deployment stage: dev(default), prod, <custom>"))]
+	stage: String,
+}
+fn stage() -> String { "dev".into() }
+impl Default for StageParams {
+	fn default() -> Self { Self { stage: stage() } }
+}
+
 /// Apply non-optional settings for a deployed environment:
 /// - [`PackageConfig::service_access`] = [`ServiceAccess::Remote`]
 /// - [`CargoBuildCmd::release`] = `true`
@@ -254,11 +261,13 @@ fn apply_deploy_config() -> impl Bundle {
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
 			 mut pkg_config: ResMut<PackageConfig>,
+			 mut params: RouteParamQuery<StageParams>,
 			 mut cmd: AncestorQuery<&'static mut CargoBuildCmd>,
 			 mut commands: Commands|
 			 -> Result {
+				// route_query.
 				pkg_config.service_access = ServiceAccess::Remote;
-				pkg_config.stage = "prod".to_string();
+				pkg_config.stage = params.get(ev.target())?.stage;
 				cmd.get_mut(ev.target())?.release = true;
 				commands.entity(ev.target()).trigger_target(Outcome::Pass);
 				Ok(())

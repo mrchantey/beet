@@ -4,6 +4,9 @@ use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use heck::ToKebabCase;
 
+
+
+
 /// The param equivelent of a [`PathPartial`], denoting
 /// all params used at this point in the graph. For the full
 /// list see [`Endpoint::params`]

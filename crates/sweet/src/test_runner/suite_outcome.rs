@@ -19,12 +19,6 @@ impl SuiteParams {
 	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
 }
 
-impl RequestMetaExtractor for SuiteParams {
-	fn extract(request: &RequestMeta) -> Result<Self> {
-		request.params().parse_reflect()
-	}
-}
-
 
 /// Added to the [`Request`] entity once all tests have completed
 #[derive(Component)]
@@ -108,7 +102,7 @@ pub fn insert_suite_outcome(
 pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
-	mut params: Extractor<SuiteParams>,
+	mut params: ParamQuery<SuiteParams>,
 	mut query: Populated<(Entity, &mut Test, &ChildOf), Without<TestOutcome>>,
 ) -> Result {
 	for (entity, mut test, parent) in query.iter_mut() {
