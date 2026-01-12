@@ -57,29 +57,49 @@ pub fn endpoint_help_predicate() -> impl Bundle {
 					.unwrap_or_default();
 
 				// Find the closest endpoint ancestor (if any)
-				let endpoint = ancestors
+				let endpoint_entity = ancestors
 					.iter_ancestors_inclusive(action)
-					.find_map(|entity| endpoints_query.get(entity).ok());
+					.find(|e| endpoints_query.contains(*e));
 
-				// Find direct child subcommands only
+				let endpoint =
+					endpoint_entity.and_then(|e| endpoints_query.get(e).ok());
+
+				// Find sibling endpoints as subcommands, but only for root/empty path
 				let mut subcommands = Vec::new();
-				if let Some(endpoint_entity) = ancestors
-					.iter_ancestors_inclusive(action)
-					.find(|e| endpoints_query.contains(*e))
-				{
-					// Get direct children of this endpoint entity
-					if let Ok(endpoint_children) = children.get(endpoint_entity)
-					{
-						for child in endpoint_children.iter() {
-							// Check if this child has an Endpoint component
-							if let Ok(child_endpoint) =
-								endpoints_query.get(child)
-							{
-								subcommands.push(child_endpoint);
+				if let Some(endpoint_entity) = endpoint_entity {
+					// Only show siblings if this is the root endpoint (empty path)
+					let is_root = endpoint
+						.map(|ep| ep.path().is_empty())
+						.unwrap_or(false);
+
+					if is_root {
+						// Get the parent of the endpoint to find siblings
+						if let Some(parent) =
+							ancestors.iter_ancestors(endpoint_entity).next()
+						{
+							// Get all children of the parent (siblings of current endpoint)
+							if let Ok(parent_children) = children.get(parent) {
+								for sibling in parent_children.iter() {
+									// Skip the current endpoint
+									if sibling == endpoint_entity {
+										continue;
+									}
+									// Check if this sibling has an Endpoint component
+									if let Ok(sibling_endpoint) =
+										endpoints_query.get(sibling)
+									{
+										// Skip empty path endpoints in subcommand list
+										if !sibling_endpoint.path().is_empty() {
+											subcommands.push(sibling_endpoint);
+										}
+									}
+								}
 							}
 						}
 					}
 				}
+
+
 
 				let help = EndpointHelp {
 					endpoint,
@@ -88,7 +108,6 @@ pub fn endpoint_help_predicate() -> impl Bundle {
 				};
 
 				let help_text = help.render();
-				help_text.clone().xprint_display();
 
 				commands
 					.entity(route_query.requests.entity(action))
@@ -143,10 +162,24 @@ impl<'a> EndpointHelp<'a> {
 		if let Some(endpoint) = self.endpoint {
 			output.push_str(&paint_ext::bold("Usage: "));
 
+			// Binary name from args[0], fallback to package name
+			let binary_name = std::env::args()
+				.next()
+				.and_then(|path| {
+					std::path::Path::new(&path)
+						.file_name()
+						.and_then(|n| n.to_str())
+						.map(|s| s.to_string())
+				})
+				.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string());
+			output.push_str(&binary_name);
+
 			// Path as positional arguments
-			output.push_str(&paint_ext::green(
-				self.format_path_cli(endpoint.path()),
-			));
+			let path_str = self.format_path_cli(endpoint.path());
+			if !path_str.is_empty() {
+				output.push(' ');
+				output.push_str(&paint_ext::green(path_str));
+			}
 
 			output.push_str("\n\n");
 
@@ -156,32 +189,33 @@ impl<'a> EndpointHelp<'a> {
 				output.push_str("\n\n");
 			}
 
-			// Command details
-			output.push_str(&paint_ext::bold("Command:\n"));
-			output.push_str("  ");
+			// Command details (only show if we have a non-empty path)
+			let path_str = self.format_path_cli(endpoint.path());
+			if !path_str.is_empty() {
+				output.push_str(&paint_ext::bold("Command:\n"));
+				output.push_str("  ");
 
-			// Path
-			output.push_str(&paint_ext::green(
-				self.format_path_cli(endpoint.path()),
-			));
+				// Path
+				output.push_str(&paint_ext::green(path_str));
 
-			// Content type
-			if let Some(content_type) = endpoint.content_type() {
-				output.push_str(&format!(
-					" {}",
-					paint_ext::dimmed(format!("[{:?}]", content_type))
-				));
+				// Content type
+				if let Some(content_type) = endpoint.content_type() {
+					output.push_str(&format!(
+						" {}",
+						paint_ext::dimmed(format!("[{:?}]", content_type))
+					));
+				}
+
+				// Cache strategy
+				if let Some(cache) = endpoint.cache_strategy() {
+					output.push_str(&format!(
+						" {}",
+						paint_ext::dimmed(format!("[{:?}]", cache))
+					));
+				}
+
+				output.push_str("\n");
 			}
-
-			// Cache strategy
-			if let Some(cache) = endpoint.cache_strategy() {
-				output.push_str(&format!(
-					" {}",
-					paint_ext::dimmed(format!("[{:?}]", cache))
-				));
-			}
-
-			output.push_str("\n");
 
 			// Path segments breakdown
 			if !endpoint.path().is_empty() {
@@ -564,31 +598,27 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn only_direct_children_shown() {
+	async fn root_shows_sibling_subcommands() {
 		use beet_flow::prelude::*;
 
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
 				(InfallibleSequence, children![
-					(PathPartial::new("api"), Sequence, children![
-						EndpointBuilder::get()
-							.with_path("users")
-							.with_description("List all users")
-							.with_handler(|| "list users"),
-						(PathPartial::new("items"), Sequence, children![
-							EndpointBuilder::get()
-								.with_path(":id")
-								.with_description("Get item by ID")
-								.with_handler(|| "get item"),
-						]),
-					]),
 					EndpointBuilder::get()
-						.with_path("posts/*slug")
-						.with_description("Get post by slug")
-						.with_handler(|| "get post"),
+						.with_path("")
+						.with_description("Root endpoint")
+						.with_handler(|| "root"),
+					EndpointBuilder::get()
+						.with_path("users")
+						.with_description("List all users")
+						.with_handler(|| "list users"),
+					EndpointBuilder::get()
+						.with_path("posts")
+						.with_description("List all posts")
+						.with_handler(|| "list posts"),
 				])
 			}))
-			.oneshot_str(Request::get("/api").with_query_param("help", ""))
+			.oneshot_str(Request::get("/").with_query_param("help", ""))
 			.await
 			.xpect_snapshot();
 	}
