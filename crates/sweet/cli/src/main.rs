@@ -2,14 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet::prelude::*;
 
-async fn show_tree(_: (), action: AsyncEntity) -> Result<String> {
-	let tree = RouteQuery::with_async(action, |query, entity| {
-		query.endpoint_tree(entity)
-	})
-	.await?;
-	format!("🤘 Welcome to the Sweet CLI 🤘\n{}", tree.to_string()).xok()
-}
-
 fn main() {
 	App::new()
 		.add_plugins((
@@ -32,8 +24,10 @@ fn sweet_router() -> impl Bundle {
 		CliServer,
 		ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				EndpointBuilder::new(show_tree)
+				help_handler(HelpFormat::Cli),
+				EndpointBuilder::get()
 					.with_params::<HelpParams>()
+					.with_description("🤘 Welcome to the Sweet CLI 🤘\n{}")
 					.with_path(""),
 				EndpointBuilder::default()
 					// match trailing positionals too, they will be

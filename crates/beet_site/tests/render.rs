@@ -14,6 +14,27 @@ async fn home() {
 		.xnot()
 		.xpect_contains("fn Counter(initial: u32)");
 }
+#[sweet::test]
+async fn help() {
+	// test with ssr
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router())
+		.oneshot_str("/?help")
+		.await
+		.xnot()
+		.xpect_contains("Welcome to Beet!");
+	// test with ssg
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssg)
+		.spawn(beet_site_router())
+		.oneshot_str("/?help")
+		.await
+		.xnot()
+		.xpect_contains("Welcome to Beet!");
+}
 
 #[sweet::test]
 async fn docs() {

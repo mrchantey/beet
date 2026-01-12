@@ -133,6 +133,21 @@ pub fn help_handler(default_format: HelpFormat) -> impl Bundle {
 	)
 }
 
+/// Renders help documentation for multiple endpoints
+fn render_help(
+	endpoints: &[Endpoint],
+	format: HelpFormat,
+	path: &Vec<String>,
+) -> String {
+	let formatter: Box<dyn EndpointHelpFormatter> = match format {
+		HelpFormat::Cli => Box::new(CliFormatter),
+		HelpFormat::Http => Box::new(HttpFormatter),
+	};
+
+	formatter.format(endpoints, path)
+}
+
+
 // recursively collect all endpoints from the tree
 fn collect_endpoints_from_tree(
 	node: &EndpointTree,
@@ -444,22 +459,6 @@ impl EndpointHelpFormatter for HttpFormatter {
 		.to_string()
 	}
 }
-
-/// Renders help documentation for multiple endpoints
-fn render_help(
-	endpoints: &[Endpoint],
-	format: HelpFormat,
-	path: &Vec<String>,
-) -> String {
-	let formatter: Box<dyn EndpointHelpFormatter> = match format {
-		HelpFormat::Cli => Box::new(CliFormatter),
-		HelpFormat::Http => Box::new(HttpFormatter),
-	};
-
-	formatter.format(endpoints, path)
-}
-
-
 
 /// Format for rendering endpoint help
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
