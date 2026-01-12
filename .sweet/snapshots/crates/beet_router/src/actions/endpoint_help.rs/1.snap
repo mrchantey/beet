@@ -1,2 +1,5 @@
-Welcome to my CLI!
-Endpoint { description: None, params: ParamsPattern { items: [] }, path: PathPattern { segments: [PathPatternSegment { name: "foobar", modifier: Static }], is_static: true }, method: Some(Get), cache_strategy: None, content_type: None }
+[1mUsage: bangboom[0m [36m[Get][0m [32m/foobar[0m
+
+[1mEndpoints:
+[0m  [36mGet   [0m [32m/foobar[0m
+

@@ -18,11 +18,16 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				let body = body.into_string().await?;
 				let exit = match parts.status_to_exit_code() {
 					Ok(()) => {
-						info!("{}", body);
+						body.xprint_display();
 						AppExit::Success
 					}
 					Err(code) => {
-						error!("{}", body);
+						let body = if body.is_empty() {
+							body
+						} else {
+							format!("Body:\n{}", body)
+						};
+						error!("Command failed\nStatus code: {code}\n{}", body);
 						// TODO map http status to
 						AppExit::Error(code)
 					}

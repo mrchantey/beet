@@ -1,0 +1,7 @@
+[1mUsage: app[0m [36m[Get][0m [32m/api/users[0m
+
+[1mEndpoints:
+[0m  [36mGet   [0m [32m/api/users[0m
+
+[1mAvailable subcommands:
+[0m  [36mPost [0m[32m/api/items/:id[0m

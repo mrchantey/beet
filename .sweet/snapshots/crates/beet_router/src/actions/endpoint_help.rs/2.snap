@@ -1,0 +1,12 @@
+[1mUsage: mycli[0m [36m[Get][0m [32m/api/:version/items/*path[0m
+
+[1mEndpoints:
+[0m  [36mGet   [0m [32m/api/:version/items/*path[0m
+    [2mPath segments:[0m
+      [33m:version[0m - [2m(dynamic)[0m
+      [33m*path[0m - [2m(captures one or more)[0m
+    [2mParameters:[0m
+      [33m--format            [0m[2m(value)    [0m[32moptional[0m - Output format
+      [33m--tags              [0m[2m(multiple) [0m[32moptional[0m - Tags to filter
+      [33m--verbose, -v       [0m[2m(flag)     [0m[32moptional[0m - Enable verbose output
+

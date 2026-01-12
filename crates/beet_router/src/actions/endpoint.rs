@@ -123,6 +123,7 @@ impl Default for EndpointBuilder {
 			exact_path: true,
 			additional_predicates: Vec::new(),
 		}
+		.with_predicate(endpoint_help_predicate(""))
 	}
 }
 
