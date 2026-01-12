@@ -20,9 +20,25 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
 					default_format: HelpFormat::Cli,
-					match_root: true,
+					match_root: false,
 					introduction: String::from("Router CLI"),
 				}),
+				EndpointBuilder::new(
+					// dont need to be async but zst restriction for sync systems
+					async move |_: (), entity: AsyncEntity| {
+						// actually serve the routes
+						entity
+							.world()
+							.spawn_then((
+								HttpServer::default(),
+								spawner.clone(),
+							))
+							.await;
+						// start serving, never resolve
+						std::future::pending::<()>().await;
+					}
+				)
+				.with_path("/"),
 				EndpointBuilder::new(
 					async move |_: (), entity: AsyncEntity| -> Result {
 						entity
@@ -39,22 +55,6 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 					}
 				)
 				.with_path("/export-static"),
-				EndpointBuilder::new(
-					// dont need to be async but zst restriction for sync systems
-					async move |_: (), entity: AsyncEntity| {
-						// actually serve the routes
-						entity
-							.world()
-							.spawn_then((
-								HttpServer::default(),
-								spawner.clone(),
-							))
-							.await;
-						// start serving, never resolve
-						std::future::pending::<()>().await;
-					}
-				)
-				.with_path("/")
 			])
 		}),
 	)
@@ -237,7 +237,9 @@ pub fn ssg_html_bucket() -> impl Bundle {
 				.await;
 			let bucket =
 				s3_fs_selector(fs_dir, bucket_name, service_access).await;
-			entity.insert_then(BucketEndpoint::new(bucket, None)).await;
+			entity
+				.insert_then(BucketEndpoint::new(bucket, None).non_canonical())
+				.await;
 		}),
 	)
 }

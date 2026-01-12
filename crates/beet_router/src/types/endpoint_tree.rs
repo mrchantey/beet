@@ -3,14 +3,17 @@ use beet_core::prelude::*;
 use beet_flow::prelude::Actions;
 use beet_net::prelude::*;
 
-/// Collects all endpoints in an application and arranges them into a tree structure.
+/// Collects all canonical endpoints in an application and arranges them into a tree structure.
 ///
-/// This serves as a validation step, ensuring there is only a single endpoint for
+/// This serves as a validation step, ensuring there is only a single canonical endpoint for
 /// any given path pattern. It also detects conflicts between dynamic and greedy
 /// segments that would cause ambiguous routing.
 ///
+/// Non-canonical endpoints are excluded from the tree to avoid conflicts with canonical routes.
+/// Use `EndpointBuilder::non_canonical()` for fallback endpoints that shouldn't conflict.
+///
 /// ## Validation Rules
-/// - Only one endpoint per exact path pattern
+/// - Only one canonical endpoint per exact path pattern
 /// - Cannot mix static and dynamic segments at the same level (e.g., `/api/users` and `/api/:id`)
 /// - Cannot have multiple dynamic segments at the same level (e.g., `/:foo` and `/:bar`)
 /// - Cannot have multiple greedy segments at the same level (e.g., `*foo` and `*bar`)
@@ -48,10 +51,11 @@ pub struct EndpointTree {
 }
 
 impl EndpointTree {
-	/// Builds an [`EndpointTree`] from all endpoints in the world.
+	/// Builds an [`EndpointTree`] from all canonical endpoints in the world.
 	///
 	/// This spawns trees from all [`ExchangeSpawner`]s to collect their endpoints,
 	/// then despawns those temporary trees after collection.
+	/// Non-canonical endpoints are excluded.
 	///
 	/// Returns an error if there are conflicting paths.
 	pub fn endpoints_from_world(world: &mut World) -> Vec<Endpoint> {
@@ -64,6 +68,7 @@ impl EndpointTree {
 		let endpoints = world
 			.query_once::<&Endpoint>()
 			.iter()
+			.filter(|endpoint| endpoint.is_canonical())
 			.map(|endpoint| (*endpoint).clone())
 			.collect();
 		// Build the tree before cleanup (endpoints reference these entities)
@@ -77,8 +82,8 @@ impl EndpointTree {
 	}
 
 	/// Builds a list of (Entity, Endpoint) by spawning an [`ExchangeSpawner`]
-	/// in the given world and collecting all endpoints from its descendants,
-	/// then despawning the exchange.
+	/// in the given world and collecting all canonical endpoints from its descendants,
+	/// then despawning the exchange. Non-canonical endpoints are excluded.
 	pub fn endpoints_from_exchange_spawner(
 		world: &mut World,
 		spawner: &ExchangeSpawner,
@@ -96,7 +101,11 @@ impl EndpointTree {
 					children
 						.iter_descendants_inclusive(actions[0])
 						.filter_map(|entity| {
-							endpoints.get(entity).ok().cloned()
+							endpoints
+								.get(entity)
+								.ok()
+								.filter(|endpoint| endpoint.is_canonical())
+								.cloned()
 						})
 						.collect::<Vec<_>>()
 						.xok()
@@ -108,7 +117,8 @@ impl EndpointTree {
 		endpoints.xok()
 	}
 
-	/// Get the endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
+	/// Get the canonical endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
+	/// Non-canonical endpoints are excluded.
 	pub fn endpoints_from_exchange(
 		root: In<Entity>,
 		actions: Query<&Actions>,
@@ -123,13 +133,16 @@ impl EndpointTree {
 				endpoints
 					.get(entity)
 					.ok()
+					.filter(|endpoint| endpoint.is_canonical())
 					.map(|endpoint| (entity, (*endpoint).clone()))
 			})
 			.collect::<Vec<_>>()
 			.xok()
 	}
 
-	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
+	/// Builds an [`EndpointTree`] from a list of (Entity, Endpoint).
+	/// Only canonical endpoints should be passed; non-canonical endpoints are typically
+	/// filtered out before calling this method.
 	/// Returns an error if there are conflicting paths.
 	pub fn from_endpoints(endpoints: Vec<(Entity, Endpoint)>) -> Result<Self> {
 		#[derive(Default)]
@@ -194,7 +207,8 @@ impl EndpointTree {
 				if is_last {
 					if node.endpoint.is_some() {
 						bevybail!(
-							"Duplicate endpoint: Multiple endpoints defined for path '{}'",
+							"Duplicate endpoint: Multiple canonical endpoints defined for path '{}'. \
+							Consider marking one as non-canonical with `.non_canonical()`",
 							endpoint.path().annotated_route_path()
 						);
 					}
@@ -207,7 +221,8 @@ impl EndpointTree {
 			if segments.is_empty() {
 				if node.endpoint.is_some() {
 					bevybail!(
-						"Duplicate endpoint: Multiple endpoints defined for path '/'"
+						"Duplicate endpoint: Multiple canonical endpoints defined for path '/'. \
+						Consider marking one as non-canonical with `.non_canonical()`"
 					);
 				}
 				node.endpoint = Some(*ent);
@@ -300,15 +315,27 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// Helper to create canonical endpoints for testing
 	fn create_endpoints(
 		endpoints: Vec<(PathPattern, ParamsPattern)>,
+	) -> Vec<(Entity, Endpoint)> {
+		create_endpoints_with_canonical(endpoints, true)
+	}
+
+	/// Helper to create endpoints with specified canonical flag
+	fn create_endpoints_with_canonical(
+		endpoints: Vec<(PathPattern, ParamsPattern)>,
+		is_canonical: bool,
 	) -> Vec<(Entity, Endpoint)> {
 		let mut world = World::new();
 		endpoints
 			.into_iter()
 			.map(|(path, params)| {
 				let ent = world.spawn_empty().id();
-				(ent, Endpoint::new(path, params, None, None, None))
+				(
+					ent,
+					Endpoint::new(path, params, None, None, None, is_canonical),
+				)
 			})
 			.collect()
 	}
@@ -453,7 +480,6 @@ mod test {
 	}
 
 	#[test]
-	// #[cfg(feature = "_sweet_runner")]
 	fn complex() {
 		let endpoints = create_endpoints(vec![
 			(
@@ -540,5 +566,34 @@ mod test {
 			.to_string()
 			.contains("Path conflict")
 			.xpect_true();
+	}
+
+	#[test]
+	fn non_canonical_endpoints_excluded() {
+		// Create two endpoints at the same path, one canonical, one not
+		let path_pattern = PathPattern::from_segments(vec![
+			PathPatternSegment::static_segment("foo"),
+		])
+		.unwrap();
+
+		let canonical_endpoints = create_endpoints_with_canonical(
+			vec![(path_pattern.clone(), ParamsPattern::default())],
+			true,
+		);
+		let non_canonical_endpoints = create_endpoints_with_canonical(
+			vec![(path_pattern, ParamsPattern::default())],
+			false,
+		);
+
+		// Filter non-canonical as would happen in real usage
+		let canonical_only: Vec<_> = canonical_endpoints
+			.xtend(non_canonical_endpoints)
+			.into_iter()
+			.filter(|(_, endpoint)| endpoint.is_canonical())
+			.collect();
+
+		// Should succeed - only one canonical endpoint at /foo
+		let tree = EndpointTree::from_endpoints(canonical_only).unwrap();
+		tree.flatten().len().xpect_eq(1);
 	}
 }

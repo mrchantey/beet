@@ -25,15 +25,15 @@ async fn help() {
 		.await
 		.xnot()
 		.xpect_contains("Welcome to Beet!");
-	// test with ssg - skip for now due to endpoint conflict
-	// RouterPlugin::world()
-	// 	.with_resource(pkg_config!())
-	// 	.with_resource(RenderMode::Ssg)
-	// 	.spawn(beet_site_router())
-	// 	.oneshot_str("/?help")
-	// 	.await
-	// 	.xnot()
-	// 	.xpect_contains("Welcome to Beet!");
+	// test with ssg
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssg)
+		.spawn(beet_site_router())
+		.oneshot_str("/?help")
+		.await
+		.xnot()
+		.xpect_contains("Welcome to Beet!");
 }
 
 #[sweet::test]

@@ -34,6 +34,9 @@ pub struct Endpoint {
 	cache_strategy: Option<CacheStrategy>,
 	/// Marks this endpoint as an HTML endpoint
 	content_type: Option<ContentType>,
+	/// Canonical endpoints are registered in the EndpointTree. Non-canonical endpoints
+	/// are fallbacks that won't conflict with canonical routes. Defaults to `true`.
+	is_canonical: bool,
 }
 
 
@@ -45,14 +48,15 @@ impl Endpoint {
 		method: Option<HttpMethod>,
 		cache_strategy: Option<CacheStrategy>,
 		content_type: Option<ContentType>,
+		is_canonical: bool,
 	) -> Self {
 		Self {
-			description: None,
 			path,
 			params,
 			method,
 			cache_strategy,
 			content_type,
+			is_canonical,
 		}
 	}
 
@@ -64,6 +68,7 @@ impl Endpoint {
 		self.cache_strategy
 	}
 	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
+	pub fn is_canonical(&self) -> bool { self.is_canonical }
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
@@ -101,6 +106,8 @@ pub struct EndpointBuilder {
 	exact_path: bool,
 	/// Optional description for this endpoint
 	description: Option<String>,
+	/// Whether this endpoint is canonical (registered in EndpointTree), defaults to true
+	is_canonical: bool,
 	/// Additional bundles to be run before the handler
 	additional_predicates: Vec<
 		Box<
@@ -125,6 +132,7 @@ impl Default for EndpointBuilder {
 			content_type: None,
 			exact_path: true,
 			description: None,
+			is_canonical: true,
 			additional_predicates: Vec::new(),
 		}
 	}
@@ -246,6 +254,14 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Mark this endpoint as non-canonical, preventing it from being registered
+	/// in the EndpointTree. Use this for fallback endpoints that shouldn't conflict
+	/// with canonical routes.
+	pub fn non_canonical(mut self) -> Self {
+		self.is_canonical = false;
+		self
+	}
+
 	fn effect(self, entity: &mut EntityWorldMut) {
 		// the entity to eventually call [`Self::insert`] on, this will
 		// be some nested entity depending on the builder configuration
@@ -280,6 +296,7 @@ impl EndpointBuilder {
 					method: self.method,
 					cache_strategy: self.cache_strategy,
 					content_type: self.content_type,
+					is_canonical: self.is_canonical,
 				},
 				Sequence,
 			))

@@ -85,6 +85,7 @@ impl RouteQuery<'_, '_> {
 					self.endpoints
 						.get(child)
 						.ok()
+						.filter(|endpoint| endpoint.is_canonical())
 						.map(|endpoint| (child, endpoint.clone()))
 				})
 				.collect();

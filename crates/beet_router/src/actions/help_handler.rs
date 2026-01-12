@@ -81,7 +81,7 @@ pub struct HelpParams {
 ///             help_handler(HelpHandlerConfig {
 ///                 default_format: HelpFormat::Cli,
 ///                 match_root: false,
-///                 prefix: String::from("Welcome to my CLI"),
+///                 introduction: String::from("Welcome to my CLI"),
 ///             }),
 ///             EndpointBuilder::get()
 ///                 .with_path("foo")
@@ -165,9 +165,10 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 				);
 
 				let agent = route_query.requests.entity(action);
-				commands
-					.entity(agent)
-					.insert(Response::new(default(), help_text.into()));
+				commands.entity(agent).insert(
+					Response::new(default(), help_text.into())
+						.with_content_type("text/plain"),
+				);
 
 				// pass to exit fallback early
 				commands.entity(action).trigger_target(Outcome::Pass);
