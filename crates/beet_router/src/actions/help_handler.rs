@@ -15,21 +15,24 @@ use beet_net::prelude::*;
 /// Parameters for configuring the help handler behavior
 #[derive(Debug, Clone)]
 pub struct HelpHandlerConfig {
+	/// Text inserted at the beginning of the formatted output
+	pub introduction: String,
 	/// The default format to use when rendering help
 	pub default_format: HelpFormat,
 	/// If true, handler runs when path segments are empty OR --help param is present
 	/// If false, handler only runs when --help param is present
 	pub match_root: bool,
-	/// Text inserted at the beginning of the formatted output
-	pub introduction: String,
+	/// If true, disable colored output
+	pub no_color: bool,
 }
 
 impl Default for HelpHandlerConfig {
 	fn default() -> Self {
 		Self {
+			introduction: String::from("Cli Help"),
 			default_format: default(),
 			match_root: false,
-			introduction: String::from("Cli Help"),
+			no_color: false,
 		}
 	}
 }
@@ -247,6 +250,8 @@ pub trait EndpointHelpFormatter {
 		endpoints: &[Endpoint],
 		path: &Vec<String>,
 	) -> String {
+		let _enabled = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+
 		if endpoints.is_empty() {
 			return self.format_none_found(path);
 		}
@@ -519,11 +524,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_description("The foo command")
@@ -548,11 +549,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::post()
 					.with_path("api/users")
 					.with_description("Create user")
@@ -582,11 +579,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("test")
 					.with_params::<TestParams>()
@@ -608,11 +601,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_handler(|| "foo response"),
@@ -629,11 +618,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("test")
 					.with_handler(|| "test"),
@@ -671,11 +656,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
-					introduction: String::new(),
-				}),
+				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("deploy")
 					.with_params::<TestParams>()

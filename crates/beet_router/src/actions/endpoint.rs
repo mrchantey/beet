@@ -57,6 +57,7 @@ impl Endpoint {
 			cache_strategy,
 			content_type,
 			is_canonical,
+			description: None,
 		}
 	}
 

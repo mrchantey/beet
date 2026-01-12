@@ -19,9 +19,8 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 		ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: false,
 					introduction: String::from("Router CLI"),
+					..default()
 				}),
 				EndpointBuilder::new(
 					// dont need to be async but zst restriction for sync systems
@@ -107,9 +106,10 @@ pub fn default_router(
 							// this is important to avoid response clobbering
 							(Name::new("Fallbacks"), Fallback, children![
 								help_handler(HelpHandlerConfig {
+									introduction: String::from("Beet Router"),
 									default_format: HelpFormat::Http,
-									match_root: false,
-									introduction: String::new(),
+									no_color: true,
+									..default()
 								}),
 								html_bundle_to_response(),
 								assets_bucket(),

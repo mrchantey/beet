@@ -22,9 +22,9 @@ pub fn beet_cli() -> impl Bundle {
 				Fallback,
 				children![
 					help_handler(HelpHandlerConfig {
-						default_format: HelpFormat::Cli,
-						match_root: true,
 						introduction: String::from("🌱 Beet CLI 🌱"),
+						match_root: true,
+						..default()
 					}),
 					EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
 						.with_path("teapot")
