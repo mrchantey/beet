@@ -130,6 +130,11 @@ pub struct Parts {
 	/// For CLI flags:
 	/// - Short and long versions are stored separately: `--foo` and `-f`
 	/// - Flags without values have empty vectors
+	///
+	/// ## Param Keys
+	/// - The keys are stored here verbatim with no parsing,
+	///  but `beet_router` will convert keys to `kebab-case` before deserializing
+	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
 	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
 	headers: MultiMap<String, String>,

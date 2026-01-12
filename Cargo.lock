@@ -1409,6 +1409,7 @@ dependencies = [
  "bevy",
  "extend",
  "futures",
+ "heck 0.4.1",
  "serde",
  "serde_json",
  "sweet",

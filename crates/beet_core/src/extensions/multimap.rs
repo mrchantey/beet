@@ -83,6 +83,7 @@ use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use heck::ToSnakeCase;
 use std::any::TypeId;
 use std::borrow::Borrow;
 use std::hash::BuildHasher;
@@ -232,6 +233,14 @@ pub impl MultiMap<String, String> {
 	/// and must have the `#[reflect(Default)]` attribute. Nested structs are flattened,
 	/// meaning all field names must be unique across the entire type hierarchy.
 	///
+	/// # Key Normalization
+	///
+	/// All keys in the multimap are automatically converted from kebab-case to snake_case
+	/// before reflection lookup. This allows CLI arguments and query parameters to use
+	/// kebab-case (e.g., `--help-format`) while struct fields use snake_case (e.g., `help_format`).
+	///
+	/// Both `help-format` and `help_format` in the map will match the `help_format` field.
+	///
 	/// # Optional Fields and Defaults
 	///
 	/// Fields not present in the map will use the struct's `Default` value. This enables
@@ -253,22 +262,40 @@ pub impl MultiMap<String, String> {
 	/// struct Config {
 	///     host: String,
 	///     port: u16,
+	///     max_retry_count: u32,
 	/// }
 	///
 	/// let mut map = MultiMap::new();
 	/// map.insert("host".into(), "localhost".into());
+	/// map.insert("max-retry-count".into(), "5".into()); // kebab-case works
 	/// // port is missing, will use Default (0)
 	///
 	/// let config: Config = map.parse_reflect().unwrap();
 	/// assert_eq!(config.host, "localhost");
 	/// assert_eq!(config.port, 0);
+	/// assert_eq!(config.max_retry_count, 5); // normalized from kebab-case
 	/// ```
 	fn parse_reflect<T>(&self) -> Result<T>
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
+		// normalize kebab-case keys to snake_case for reflection
+		let mut normalized = MultiMap::new();
+		for (key, values) in self.iter_all() {
+			let snake_key = key.to_snake_case();
+			if values.is_empty() {
+				// preserve empty value lists (flags with no value)
+				normalized.insert_key(snake_key);
+			} else {
+				for value in values {
+					normalized.insert(snake_key.clone(), value.clone());
+				}
+			}
+		}
+
 		let type_info = T::type_info();
-		let dynamic = build_dynamic_from_type_info(self, type_info, None)?;
+		let dynamic =
+			build_dynamic_from_type_info(&normalized, type_info, None)?;
 		T::from_reflect(dynamic.as_partial_reflect()).ok_or_else(|| {
 			bevyhow!(
 				"failed to convert dynamic type to {}",
@@ -1315,5 +1342,58 @@ mod test {
 		result.name.xpect_eq("default_name".to_string());
 		result.count.xpect_eq(42);
 		result.ratio.xpect_eq(0.5);
+	}
+
+	#[test]
+	fn kebab_case_keys_normalized_to_snake_case() {
+		#[derive(Debug, Reflect, PartialEq)]
+		#[reflect(Default)]
+		struct KebabParams {
+			help_format: String,
+			enable_verbose_mode: bool,
+			max_retry_count: u32,
+		}
+
+		impl Default for KebabParams {
+			fn default() -> Self {
+				Self {
+					help_format: String::new(),
+					enable_verbose_mode: false,
+					max_retry_count: 0,
+				}
+			}
+		}
+
+		// use kebab-case keys in the map
+		let mut map = MultiMap::new();
+		map.insert("help-format".to_string(), "cli".to_string());
+		map.insert_key("enable-verbose-mode".to_string());
+		map.insert("max-retry-count".to_string(), "5".to_string());
+
+		// should be normalized to snake_case for reflection
+		let result: KebabParams = map.parse_reflect().unwrap();
+		result.help_format.xpect_eq("cli".to_string());
+		result.enable_verbose_mode.xpect_true();
+		result.max_retry_count.xpect_eq(5);
+	}
+
+	#[test]
+	fn mixed_case_keys_all_normalized() {
+		#[derive(Debug, Reflect, Default)]
+		#[reflect(Default)]
+		struct MixedParams {
+			some_field: String,
+		}
+
+		// both kebab-case and snake_case should work
+		let mut map1 = MultiMap::new();
+		map1.insert("some-field".to_string(), "kebab".to_string());
+		let result1: MixedParams = map1.parse_reflect().unwrap();
+		result1.some_field.xpect_eq("kebab".to_string());
+
+		let mut map2 = MultiMap::new();
+		map2.insert("some_field".to_string(), "snake".to_string());
+		let result2: MixedParams = map2.parse_reflect().unwrap();
+		result2.some_field.xpect_eq("snake".to_string());
 	}
 }

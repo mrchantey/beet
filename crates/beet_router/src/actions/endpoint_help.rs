@@ -1,120 +1,131 @@
+//! Help handler for displaying endpoint documentation.
+//!
+//! # Kebab-case Parameter Convention
+//!
+//! This module demonstrates the kebab-case parameter system used throughout beet,
+//! the conversion happens automatically:
+//! - `ParamMeta::from_field()` converts snake_case field names to kebab-case for display
+//! - `MultiMap::parse_reflect()` normalizes kebab-case keys to snake_case before reflection lookup
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
-/// Predicate that checks for `--help` param on the request.
+
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+	Default,
+)]
+#[reflect(Default)]
+pub struct HelpParams {
+	#[deref]
+	#[reflect(@ParamOptions::desc("Get help"))]
+	help: bool,
+	#[reflect(@ParamOptions::desc("Help format (cli or http)"))]
+	help_format: Option<String>,
+}
+
+
+/// Creates a help handler middleware that responds to help parameters.
 ///
-/// If the `--help` param is not present, this predicate will pass through immediately.
-/// If present, it renders and returns formatted help documentation including:
-/// - Usage line with method and path
-/// - Endpoint details (method, path, content type, cache strategy)
-/// - Path segment breakdown (static vs dynamic segments)
-/// - Query parameters with descriptions and requirements
-/// - Available direct child subcommands
+/// This handler checks for `HelpParams` (--help, --help-format) and when found,
+/// renders documentation for all endpoints that partially match the current path.
 ///
-/// The help is returned as a response and the predicate fails to prevent
-/// further processing of the request.
+/// The handler should be added early in the request flow, typically in a Fallback
+/// so it can exit early when help is requested.
 ///
-/// By default, renders in CLI format. Use `--help-format=http` to render in HTTP format.
+/// # Arguments
+/// * `default_format` - The default format to use (Cli for CLI apps, Http for web apps)
 ///
 /// # Example
-/// ```no_run
+/// ```
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
-/// EndpointBuilder::get()
-///     .with_path("api/users")
-///     .with_description("List all users")
-///     .with_handler(|| "list users");
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// # async {
+/// RouterPlugin::world()
+///     .spawn(ExchangeSpawner::new_flow(|| {
+///         (Fallback, children![
+///             help_handler(HelpFormat::Cli),
+///             EndpointBuilder::get()
+///                 .with_path("foo")
+///                 .with_handler(|| "foo"),
+///         ])
+///     }))
+///     .oneshot_str(Request::get("/?help=true"))
+///     .await;
+/// # };
 /// ```
-pub fn endpoint_help_predicate() -> impl Bundle {
+pub fn help_handler(default_format: HelpFormat) -> impl Bundle {
 	(
-		Name::new("Endpoint Help"),
+		Name::new("Help Handler"),
 		OnSpawn::observe(
-			|ev: On<GetOutcome>,
-			 ancestors: Query<&ChildOf>,
-			 children: Query<&Children>,
-			 mut commands: Commands,
-			 route_query: RouteQuery,
-			 endpoints_query: Query<&Endpoint>|
-			 -> Result {
+			move |ev: On<GetOutcome>,
+			      mut route_query: RouteQuery,
+			      endpoints_query: Query<&Endpoint>,
+			      mut commands: Commands|
+			      -> Result {
 				let action = ev.target();
-				if !route_query.request_meta(action)?.has_param("help") {
+
+				// parse help params
+				let help_params = route_query
+					.request_meta(action)?
+					.params()
+					.parse_reflect::<HelpParams>()?;
+
+				// check if help was requested
+
+				if !help_params.help {
 					// no help requested, pass through
-					commands.entity(action).trigger_target(Outcome::Pass);
+					commands.entity(action).trigger_target(Outcome::Fail);
 					return Ok(());
 				}
 
-				// Determine format from --help-format parameter
-				let format = route_query
-					.request_meta(action)?
-					.get_param("help-format")
-					.and_then(|f| match f.as_str() {
-						"http" => Some(HelpFormat::Http),
-						"cli" => Some(HelpFormat::Cli),
-						_ => None,
-					})
-					.unwrap_or_default();
-
-				// Find the closest endpoint ancestor (if any)
-				let endpoint_entity = ancestors
-					.iter_ancestors_inclusive(action)
-					.find(|e| endpoints_query.contains(*e));
-
-				let endpoint =
-					endpoint_entity.and_then(|e| endpoints_query.get(e).ok());
-
-				// Find sibling endpoints as subcommands, but only for root/empty path
-				let mut subcommands = Vec::new();
-				if let Some(endpoint_entity) = endpoint_entity {
-					// Only show siblings if this is the root endpoint (empty path)
-					let is_root = endpoint
-						.map(|ep| ep.path().is_empty())
-						.unwrap_or(false);
-
-					if is_root {
-						// Get the parent of the endpoint to find siblings
-						if let Some(parent) =
-							ancestors.iter_ancestors(endpoint_entity).next()
-						{
-							// Get all children of the parent (siblings of current endpoint)
-							if let Ok(parent_children) = children.get(parent) {
-								for sibling in parent_children.iter() {
-									// Skip the current endpoint
-									if sibling == endpoint_entity {
-										continue;
-									}
-									// Check if this sibling has an Endpoint component
-									if let Ok(sibling_endpoint) =
-										endpoints_query.get(sibling)
-									{
-										// Skip empty path endpoints in subcommand list
-										if !sibling_endpoint.path().is_empty() {
-											subcommands.push(sibling_endpoint);
-										}
-									}
-								}
-							}
-						}
+				// determine format
+				let format = match help_params.help_format.as_deref() {
+					Some("http") => HelpFormat::Http,
+					Some("cli") => HelpFormat::Cli,
+					Some(other) => {
+						bevybail!("Unrecognized help_format '{}'", other);
 					}
-				}
-
-
-
-				let help = EndpointHelp {
-					endpoint,
-					subcommands,
-					format,
+					_ => default_format,
 				};
 
-				let help_text = help.render();
+				// get endpoint tree and filter by partial path match
+				let tree = route_query.endpoint_tree(action)?;
+				// get current path for filtering
+				let current_path = route_query.path(action)?;
 
+				// collect all endpoints that match
+				let mut matching_endpoints = Vec::new();
+				collect_endpoints_from_tree(
+					&tree,
+					current_path,
+					&mut matching_endpoints,
+					&endpoints_query,
+				);
+
+				// render help for all matching endpoints
+				let help_text =
+					render_help(&matching_endpoints, format, current_path);
+
+				let agent = route_query.requests.entity(action);
 				commands
-					.entity(route_query.requests.entity(action))
+					.entity(agent)
 					.insert(Response::new(default(), help_text.into()));
 
-				// mark as failed to stop further processing
-				commands.entity(action).trigger_target(Outcome::Fail);
+				// pass to exit fallback early
+				commands.entity(action).trigger_target(Outcome::Pass);
 
 				Ok(())
 			},
@@ -122,532 +133,513 @@ pub fn endpoint_help_predicate() -> impl Bundle {
 	)
 }
 
+// recursively collect all endpoints from the tree
+fn collect_endpoints_from_tree(
+	node: &EndpointTree,
+	current_path: &Vec<String>,
+	endpoints: &mut Vec<Endpoint>,
+	endpoints_query: &Query<&Endpoint>,
+) {
+	let node_depth = node.pattern.iter().count();
+	let current_depth = current_path.len();
+
+	// determine if we should include this node and/or recurse
+	if current_path.is_empty() {
+		// show all endpoints when no filter specified
+		if let Some(entity) = node.endpoint {
+			if let Ok(endpoint) = endpoints_query.get(entity) {
+				endpoints.push(endpoint.clone());
+			}
+		}
+		// always recurse when no filter
+		for child in &node.children {
+			collect_endpoints_from_tree(
+				child,
+				current_path,
+				endpoints,
+				endpoints_query,
+			);
+		}
+	} else if node_depth <= current_depth {
+		// node is at or above current depth - check if it's on the path
+		match node.pattern.parse_path(current_path) {
+			Ok(path_match) => {
+				// pattern matches current path
+				if path_match.exact_match() {
+					// exact match - show this endpoint and all children
+					if let Some(entity) = node.endpoint {
+						if let Ok(endpoint) = endpoints_query.get(entity) {
+							endpoints.push(endpoint.clone());
+						}
+					}
+				}
+				// recurse to children since we're on the right path
+				for child in &node.children {
+					collect_endpoints_from_tree(
+						child,
+						current_path,
+						endpoints,
+						endpoints_query,
+					);
+				}
+			}
+			Err(_) => {
+				// pattern doesn't match - don't include or recurse
+			}
+		}
+	}
+	// if node_depth > current_depth, we've gone too deep, don't include
+}
+
+/// Trait for formatting endpoint help documentation
+pub trait EndpointHelpFormatter {
+	/// Format the complete help output for multiple endpoints
+	fn format(&self, endpoints: &[Endpoint], path: &Vec<String>) -> String {
+		if endpoints.is_empty() {
+			return self.format_none_found(path);
+		}
+
+		let mut output = String::new();
+		output.push_str(&self.format_header());
+		output.push_str("\n\n");
+
+		for endpoint in endpoints {
+			output.push_str(&self.format_endpoint(endpoint));
+			output.push_str("\n");
+		}
+
+		output
+	}
+
+	fn format_none_found(&self, path: &Vec<String>) -> String;
+
+	/// Format the header section
+	fn format_header(&self) -> String;
+
+	/// Format a single endpoint
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String;
+
+	/// Format the path
+	fn format_path(&self, path: &PathPattern) -> String;
+
+	/// Format the parameters/flags
+	fn format_params(&self, endpoint: &Endpoint) -> String;
+
+	/// Format cache strategy (if applicable)
+	fn format_cache_strategy(&self, cache: &CacheStrategy) -> String {
+		format!("Cache: {:?}", cache)
+	}
+
+	/// Format content type (if applicable)
+	fn format_content_type(&self, content_type: &ContentType) -> String {
+		format!("Content-Type: {:?}", content_type)
+	}
+}
+
+/// CLI-style formatter with colored output
+struct CliFormatter;
+
+impl EndpointHelpFormatter for CliFormatter {
+	fn format_header(&self) -> String {
+		format!("\n{}", paint_ext::bold("Available commands:"))
+	}
+
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String {
+		let mut output = String::new();
+
+		// command path (CLI-style: space-separated, no slashes)
+		let path_str = self.format_path(endpoint.path());
+		output.push_str(&format!("  {}", paint_ext::green(&path_str)));
+
+		// description
+		if let Some(desc) = endpoint.description() {
+			output.push_str(&format!("\n    {}", desc));
+		}
+
+		// params
+		output.push_str(&self.format_params(endpoint));
+
+		output
+	}
+
+	fn format_path(&self, path: &PathPattern) -> String {
+		path.iter()
+			.map(|seg| {
+				if seg.is_static() {
+					seg.to_string()
+				} else if seg.is_greedy() {
+					format!("[*{}]", seg.name())
+				} else {
+					format!("[{}]", seg.name())
+				}
+			})
+			.collect::<Vec<_>>()
+			.join(" ")
+	}
+
+
+
+	fn format_params(&self, endpoint: &Endpoint) -> String {
+		if endpoint.params().is_empty() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!("\n    {}", paint_ext::dimmed("Flags:")));
+
+		for param in endpoint.params().iter() {
+			output.push_str("\n      ");
+
+			// name with short flag if present
+			let mut param_display = format!("--{}", param.name());
+			if let Some(short) = param.short() {
+				param_display.push_str(&format!(", -{}", short));
+			}
+			output
+				.push_str(&paint_ext::yellow(format!("{:20}", param_display)));
+
+			// value type
+			match param.value() {
+				ParamValue::Flag => {
+					output.push_str(&paint_ext::dimmed("(flag)     "))
+				}
+				ParamValue::Single => {
+					output.push_str(&paint_ext::dimmed("(value)    "))
+				}
+				ParamValue::Multiple => {
+					output.push_str(&paint_ext::dimmed("(multiple) "))
+				}
+			}
+
+			// required/optional
+			if param.is_required() {
+				output.push_str(&paint_ext::red("required"));
+			} else {
+				output.push_str(&paint_ext::green("optional"));
+			}
+
+			// description
+			if let Some(desc) = param.description() {
+				output.push_str(&format!(" - {}", desc));
+			}
+		}
+
+		output
+	}
+
+	fn format_none_found(&self, path: &Vec<String>) -> String {
+		let path_str = if path.is_empty() {
+			"<empty>".to_string()
+		} else {
+			path.join(" ")
+		};
+		paint_ext::red_bold(format!(
+			"No matching endpoints found for path: {}",
+			path_str
+		))
+		.to_string()
+	}
+}
+
+/// HTTP-style formatter with colored output
+struct HttpFormatter;
+
+impl EndpointHelpFormatter for HttpFormatter {
+	fn format_header(&self) -> String {
+		paint_ext::bold("Available endpoints:").to_string()
+	}
+
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String {
+		let mut output = String::new();
+
+		// method and path
+		let method = endpoint
+			.method()
+			.map(|m| format!("{:?}", m).to_uppercase())
+			.unwrap_or_else(|| "ANY".to_string());
+		let path = endpoint.path().annotated_route_path();
+
+		output.push_str(&format!(
+			"  {} {}",
+			paint_ext::cyan(&method),
+			paint_ext::green(&path.to_string())
+		));
+
+		// description
+		if let Some(desc) = endpoint.description() {
+			output.push_str(&format!("\n    {}", desc));
+		}
+
+		// query params
+		output.push_str(&self.format_params(endpoint));
+
+		// content type
+		if let Some(content_type) = endpoint.content_type() {
+			output.push_str(&format!(
+				"\n    {}",
+				paint_ext::dimmed(&self.format_content_type(&content_type))
+			));
+		}
+
+		// cache strategy
+		if let Some(cache) = endpoint.cache_strategy() {
+			output.push_str(&format!(
+				"\n    {}",
+				paint_ext::dimmed(&self.format_cache_strategy(&cache))
+			));
+		}
+
+		output
+	}
+
+	fn format_path(&self, path: &PathPattern) -> String {
+		path.annotated_route_path().to_string()
+	}
+
+
+
+	fn format_params(&self, endpoint: &Endpoint) -> String {
+		if endpoint.params().is_empty() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!(
+			"\n    {}",
+			paint_ext::bold("Query Parameters:")
+		));
+
+		for param in endpoint.params().iter() {
+			output.push_str(&format!(
+				"\n      {}",
+				paint_ext::yellow(param.name())
+			));
+			if param.is_required() {
+				output.push_str(&paint_ext::red(" (required)"));
+			} else {
+				output.push_str(&paint_ext::green(" (optional)"));
+			}
+			output.push_str(&format!(
+				" - {}",
+				paint_ext::dimmed(&param.value().to_string())
+			));
+			if let Some(desc) = param.description() {
+				output.push_str(&format!(": {}", desc));
+			}
+		}
+
+		output
+	}
+
+	fn format_none_found(&self, path: &Vec<String>) -> String {
+		let path_str = if path.is_empty() {
+			default()
+		} else {
+			path.join("/")
+		};
+		paint_ext::red_bold(format!(
+			"No matching endpoints found for path: /{}",
+			path_str
+		))
+		.to_string()
+	}
+}
+
+/// Renders help documentation for multiple endpoints
+fn render_help(
+	endpoints: &[Endpoint],
+	format: HelpFormat,
+	path: &Vec<String>,
+) -> String {
+	let formatter: Box<dyn EndpointHelpFormatter> = match format {
+		HelpFormat::Cli => Box::new(CliFormatter),
+		HelpFormat::Http => Box::new(HttpFormatter),
+	};
+
+	formatter.format(endpoints, path)
+}
+
+
+
 /// Format for rendering endpoint help
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum HelpFormat {
+	#[default]
 	/// CLI format with commands and flags
 	Cli,
 	/// HTTP format with methods and query params
 	Http,
 }
 
-impl Default for HelpFormat {
-	fn default() -> Self { Self::Cli }
-}
-
-/// Helper for rendering endpoint help documentation
-pub struct EndpointHelp<'a> {
-	/// The current endpoint if any
-	pub endpoint: Option<&'a Endpoint>,
-	/// Direct child endpoints (subcommands/subpaths)
-	pub subcommands: Vec<&'a Endpoint>,
-	/// Format to render in
-	pub format: HelpFormat,
-}
-
-impl<'a> EndpointHelp<'a> {
-	/// Render the help documentation
-	pub fn render(&self) -> String {
-		match self.format {
-			HelpFormat::Cli => self.render_cli(),
-			HelpFormat::Http => self.render_http(),
-		}
-	}
-
-	/// Render help in CLI format
-	pub fn render_cli(&self) -> String {
-		let mut output = String::new();
-
-		// Usage line
-		if let Some(endpoint) = self.endpoint {
-			output.push_str(&paint_ext::bold("Usage: "));
-
-			// Binary name from args[0], fallback to package name
-			let binary_name = std::env::args()
-				.next()
-				.and_then(|path| {
-					std::path::Path::new(&path)
-						.file_name()
-						.and_then(|n| n.to_str())
-						.map(|s| s.to_string())
-				})
-				.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string());
-			output.push_str(&binary_name);
-
-			// Path as positional arguments
-			let path_str = self.format_path_cli(endpoint.path());
-			if !path_str.is_empty() {
-				output.push(' ');
-				output.push_str(&paint_ext::green(path_str));
-			}
-
-			output.push_str("\n\n");
-
-			// Description if present
-			if let Some(desc) = endpoint.description() {
-				output.push_str(desc);
-				output.push_str("\n\n");
-			}
-
-			// Command details (only show if we have a non-empty path)
-			let path_str = self.format_path_cli(endpoint.path());
-			if !path_str.is_empty() {
-				output.push_str(&paint_ext::bold("Command:\n"));
-				output.push_str("  ");
-
-				// Path
-				output.push_str(&paint_ext::green(path_str));
-
-				// Content type
-				if let Some(content_type) = endpoint.content_type() {
-					output.push_str(&format!(
-						" {}",
-						paint_ext::dimmed(format!("[{:?}]", content_type))
-					));
-				}
-
-				// Cache strategy
-				if let Some(cache) = endpoint.cache_strategy() {
-					output.push_str(&format!(
-						" {}",
-						paint_ext::dimmed(format!("[{:?}]", cache))
-					));
-				}
-
-				output.push_str("\n");
-			}
-
-			// Path segments breakdown
-			if !endpoint.path().is_empty() {
-				let has_dynamic =
-					endpoint.path().iter().any(|seg| !seg.is_static());
-				if has_dynamic {
-					output.push_str(&format!(
-						"    {}\n",
-						paint_ext::dimmed("Arguments:")
-					));
-					for segment in endpoint.path().iter() {
-						if !segment.is_static() {
-							output.push_str(&format!(
-								"      {} - ",
-								paint_ext::yellow(
-									self.format_segment_cli(segment)
-								)
-							));
-							if segment.is_greedy() {
-								output.push_str(&paint_ext::dimmed(
-									"(captures one or more)",
-								));
-							} else {
-								output
-									.push_str(&paint_ext::dimmed("(required)"));
-							}
-							output.push_str("\n");
-						}
-					}
-				}
-			}
-
-			// Parameters
-			if !endpoint.params().is_empty() {
-				output.push_str(&format!(
-					"    {}\n",
-					paint_ext::dimmed("Flags:")
-				));
-				for param in endpoint.params().iter() {
-					output.push_str("      ");
-
-					// Name with short flag if present
-					let mut param_display = format!("--{}", param.name());
-					if let Some(short) = param.short() {
-						param_display.push_str(&format!(", -{}", short));
-					}
-					output.push_str(&paint_ext::yellow(format!(
-						"{:20}",
-						param_display
-					)));
-
-					// Value type
-					match param.value() {
-						ParamValue::Flag => {
-							output.push_str(&paint_ext::dimmed("(flag)     "))
-						}
-						ParamValue::Single => {
-							output.push_str(&paint_ext::dimmed("(value)    "))
-						}
-						ParamValue::Multiple => {
-							output.push_str(&paint_ext::dimmed("(multiple) "))
-						}
-					}
-
-					// Required/Optional
-					if param.is_required() {
-						output.push_str(&paint_ext::red("required"));
-					} else {
-						output.push_str(&paint_ext::green("optional"));
-					}
-
-					// Description
-					if let Some(desc) = param.description() {
-						output.push_str(&format!(" - {}", desc));
-					}
-
-					output.push_str("\n");
-				}
-			}
-			output.push_str("\n");
-		}
-
-		// Subcommands
-		if !self.subcommands.is_empty() {
-			output.push_str(&paint_ext::bold("Available subcommands:\n"));
-			for endpoint in &self.subcommands {
-				output.push_str("  ");
-
-				// Path
-				output.push_str(&paint_ext::green(
-					self.format_path_cli(endpoint.path()),
-				));
-
-				// Description if present
-				if let Some(desc) = endpoint.description() {
-					output.push_str(&format!(" - {}", paint_ext::dimmed(desc)));
-				}
-
-				output.push_str("\n");
-			}
-		}
-
-		output
-	}
-
-	/// Render help in HTTP format
-	pub fn render_http(&self) -> String {
-		let mut output = String::new();
-
-		// Usage line
-		if let Some(endpoint) = self.endpoint {
-			output.push_str(&paint_ext::bold("Usage: "));
-
-			// Method
-			if let Some(method) = endpoint.method() {
-				output.push_str(&paint_ext::cyan(format!("{} ", method)));
-			}
-
-			// Path
-			output.push_str(&paint_ext::green(
-				endpoint.path().annotated_route_path().to_string(),
-			));
-
-			// Query params
-			if !endpoint.params().is_empty() {
-				output.push('?');
-				let param_strs: Vec<String> = endpoint
-					.params()
-					.iter()
-					.map(|p| self.format_param_http(p))
-					.collect();
-				output.push_str(&param_strs.join("&"));
-			}
-
-			output.push_str("\n\n");
-
-			// Description if present
-			if let Some(desc) = endpoint.description() {
-				output.push_str(desc);
-				output.push_str("\n\n");
-			}
-
-			// Endpoint details
-			output.push_str(&paint_ext::bold("Endpoint:\n"));
-			output.push_str("  ");
-
-			// Method
-			if let Some(method) = endpoint.method() {
-				output.push_str(&paint_ext::cyan(format!(
-					"{:6}",
-					format!("{}", method)
-				)));
-			} else {
-				output.push_str(&paint_ext::dimmed("ANY   "));
-			}
-			output.push_str(" ");
-
-			// Path
-			output.push_str(&paint_ext::green(
-				endpoint.path().annotated_route_path().to_string(),
-			));
-
-			// Content type
-			if let Some(content_type) = endpoint.content_type() {
-				output.push_str(&format!(
-					" {}",
-					paint_ext::dimmed(format!("[{:?}]", content_type))
-				));
-			}
-
-			// Cache strategy
-			if let Some(cache) = endpoint.cache_strategy() {
-				output.push_str(&format!(
-					" {}",
-					paint_ext::dimmed(format!("[{:?}]", cache))
-				));
-			}
-
-			output.push_str("\n");
-
-			// Path segments breakdown
-			if !endpoint.path().is_empty() {
-				let has_dynamic =
-					endpoint.path().iter().any(|seg| !seg.is_static());
-				if has_dynamic {
-					output.push_str(&format!(
-						"    {}\n",
-						paint_ext::dimmed("Path segments:")
-					));
-					for segment in endpoint.path().iter() {
-						if !segment.is_static() {
-							output.push_str(&format!(
-								"      {} - ",
-								paint_ext::yellow(
-									segment.to_string_annotated()
-								)
-							));
-							if segment.is_greedy() {
-								output.push_str(&paint_ext::dimmed(
-									"(captures one or more)",
-								));
-							} else {
-								output
-									.push_str(&paint_ext::dimmed("(dynamic)"));
-							}
-							output.push_str("\n");
-						}
-					}
-				}
-			}
-
-			// Parameters
-			if !endpoint.params().is_empty() {
-				output.push_str(&format!(
-					"    {}\n",
-					paint_ext::dimmed("Query parameters:")
-				));
-				for param in endpoint.params().iter() {
-					output.push_str("      ");
-
-					// Name
-					output.push_str(&paint_ext::yellow(format!(
-						"{:20}",
-						self.format_param_http(param)
-					)));
-
-					// Value type
-					match param.value() {
-						ParamValue::Flag => {
-							output.push_str(&paint_ext::dimmed("(flag)     "))
-						}
-						ParamValue::Single => {
-							output.push_str(&paint_ext::dimmed("(value)    "))
-						}
-						ParamValue::Multiple => {
-							output.push_str(&paint_ext::dimmed("(multiple) "))
-						}
-					}
-
-					// Required/Optional
-					if param.is_required() {
-						output.push_str(&paint_ext::red("required"));
-					} else {
-						output.push_str(&paint_ext::green("optional"));
-					}
-
-					// Description
-					if let Some(desc) = param.description() {
-						output.push_str(&format!(" - {}", desc));
-					}
-
-					output.push_str("\n");
-				}
-			}
-			output.push_str("\n");
-		}
-
-		// Subpaths
-		if !self.subcommands.is_empty() {
-			output.push_str(&paint_ext::bold("Available endpoints:\n"));
-			for endpoint in &self.subcommands {
-				output.push_str("  ");
-
-				// Method
-				if let Some(method) = endpoint.method() {
-					output.push_str(&paint_ext::cyan(format!("{:6} ", method)));
-				} else {
-					output.push_str(&paint_ext::dimmed("ANY    "));
-				}
-
-				// Path
-				output.push_str(&paint_ext::green(
-					endpoint.path().annotated_route_path().to_string(),
-				));
-
-				// Description if present
-				if let Some(desc) = endpoint.description() {
-					output.push_str(&format!(" - {}", paint_ext::dimmed(desc)));
-				}
-
-				output.push_str("\n");
-			}
-		}
-
-		output
-	}
-
-	/// Format path for CLI rendering
-	fn format_path_cli(&self, path: &PathPattern) -> String {
-		path.iter()
-			.map(|seg| self.format_segment_cli(seg))
-			.collect::<Vec<_>>()
-			.join(" ")
-	}
-
-	/// Format a single segment for CLI rendering
-	fn format_segment_cli(&self, segment: &PathPatternSegment) -> String {
-		if segment.is_static() {
-			segment.to_string()
-		} else if segment.is_greedy() {
-			format!("[*{}]", segment.name())
-		} else {
-			format!("[{}]", segment.name())
-		}
-	}
-
-	/// Format param for HTTP rendering
-	fn format_param_http(&self, param: &ParamMeta) -> String {
-		match param.value() {
-			ParamValue::Flag => param.name().to_string(),
-			_ => format!("{}=<value>", param.name()),
-		}
-	}
-}
-
-// Integration tests in endpoint_help.rs action file verify the full behavior
-
-
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-	use beet_net::prelude::*;
+	use super::*;
 
 	#[sweet::test]
-	async fn simple() {
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+	async fn help_shows_matching_endpoints() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
 				EndpointBuilder::get()
-					.with_path("foobar")
-					.with_description("A simple endpoint for testing")
-			}))
-			.oneshot_str(Request::get("/foobar").with_query_param("help", ""))
-			.await
-			.xpect_snapshot();
+					.with_path("foo")
+					.with_description("The foo command")
+					.with_handler(|| "foo"),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_description("The bar command")
+					.with_handler(|| "bar"),
+			])
+		}));
+
+		let response = entity.oneshot_str(Request::get("/?help=true")).await;
+
+		response.clone().xpect_contains("foo");
+		response.clone().xpect_contains("The foo command");
+		response.clone().xpect_contains("bar");
+		response.xpect_contains("The bar command");
 	}
 
 	#[sweet::test]
-	async fn with_params_and_dynamic_path() {
+	async fn help_format_http() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
+				EndpointBuilder::post()
+					.with_path("api/users")
+					.with_description("Create user")
+					.with_handler(|| "create"),
+			])
+		}));
+
+		let response = entity
+			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		response.clone().xpect_contains("POST");
+		response.clone().xpect_contains("api/users");
+		response.xpect_contains("Create user");
+	}
+
+	#[sweet::test]
+	async fn help_with_params() {
 		#[derive(Reflect)]
 		struct TestParams {
-			#[reflect(@ParamOptions::desc_and_short("Enable verbose output", 'v'))]
+			#[reflect(@ParamOptions::desc("Enable verbose output"))]
 			verbose: bool,
-			#[reflect(@ParamOptions::desc("Output format"))]
+			#[reflect(@ParamOptions::desc_and_short("Output format", 'f'))]
 			format: Option<String>,
-			#[reflect(@ParamOptions::desc("Tags to filter"))]
-			tags: Vec<String>,
 		}
 
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
 				EndpointBuilder::get()
-					.with_path("api/:version/items/*path")
+					.with_path("test")
 					.with_params::<TestParams>()
-					.with_description("Fetch items with dynamic versioning")
-			}))
-			.oneshot_str(
-				Request::get("/api/v1/items/foo/bar")
-					.with_query_param("help", ""),
-			)
-			.await
-			.xpect_snapshot();
+					.with_description("Test command")
+					.with_handler(|| "test"),
+			])
+		}));
+
+		let response = entity.oneshot_str(Request::get("/?help=true")).await;
+
+		response.clone().xpect_contains("verbose");
+		response.clone().xpect_contains("Enable verbose output");
+		response.clone().xpect_contains("format");
+		response.xpect_contains(", -f");
 	}
 
 	#[sweet::test]
-	async fn http_format() {
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+	async fn no_help_passes_through() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
 				EndpointBuilder::get()
-					.with_path("foobar")
-					.with_description("A simple endpoint for testing")
-			}))
-			.oneshot_str(
-				Request::get("/foobar")
-					.with_query_param("help", "")
-					.with_query_param("help-format", "http"),
-			)
-			.await
-			.xpect_snapshot();
+					.with_path("foo")
+					.with_handler(|| "foo response"),
+			])
+		}));
+
+		let response = entity.oneshot_str(Request::get("/foo")).await;
+
+		response.xpect_eq("foo response");
 	}
 
 	#[sweet::test]
-	async fn root_shows_sibling_subcommands() {
-		use beet_flow::prelude::*;
+	async fn kebab_case_params_work() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
+				EndpointBuilder::get()
+					.with_path("test")
+					.with_handler(|| "test"),
+			])
+		}));
 
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
-				(InfallibleSequence, children![
-					EndpointBuilder::get()
-						.with_path("")
-						.with_description("Root endpoint")
-						.with_handler(|| "root"),
-					EndpointBuilder::get()
-						.with_path("users")
-						.with_description("List all users")
-						.with_handler(|| "list users"),
-					EndpointBuilder::get()
-						.with_path("posts")
-						.with_description("List all posts")
-						.with_handler(|| "list posts"),
-				])
-			}))
-			.oneshot_str(Request::get("/").with_query_param("help", ""))
-			.await
-			.xpect_snapshot();
+		// test both kebab-case and underscore variants
+		let response1 = entity
+			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.await;
+		response1.clone().xpect_contains("GET");
+
+		let response2 = entity
+			.oneshot_str(Request::get("/?help=true&help_format=http"))
+			.await;
+		response2.xpect_contains("GET");
 	}
 
 	#[sweet::test]
-	async fn no_subcommands_for_leaf_endpoint() {
-		use beet_flow::prelude::*;
+	async fn full_kebab_case_flow_integration() {
+		// demonstrates the complete kebab-case parameter system:
+		// 1. struct fields use snake_case
+		// 2. ParamMeta displays them as kebab-case
+		// 3. query params accept both formats
+		// 4. MultiMap normalizes to snake_case for reflection
 
-		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
-				(InfallibleSequence, children![(
-					PathPartial::new("api"),
-					Sequence,
-					children![
-						EndpointBuilder::get()
-							.with_path("teapot")
-							.with_description("I'm a teapot")
-							.with_handler(|| "teapot"),
-						EndpointBuilder::get()
-							.with_path("users")
-							.with_description("List all users")
-							.with_handler(|| "list users"),
-					]
-				),])
-			}))
-			.oneshot_str(
-				Request::get("/api/teapot").with_query_param("help", ""),
-			)
-			.await
-			.xpect_snapshot();
+		#[derive(Reflect)]
+		struct TestParams {
+			#[reflect(@ParamOptions::desc("Maximum retry attempts"))]
+			max_retry_count: u32,
+			#[reflect(@ParamOptions::desc("Enable verbose logging"))]
+			enable_verbose_mode: bool,
+		}
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpFormat::Cli),
+				EndpointBuilder::get()
+					.with_path("deploy")
+					.with_params::<TestParams>()
+					.with_description("Deploy application")
+					.with_handler(|| "deployed"),
+			])
+		}));
+
+		// CLI help shows kebab-case params
+		let help_response =
+			entity.oneshot_str(Request::get("/?help=true")).await;
+
+		help_response.clone().xpect_contains("--max-retry-count");
+		help_response
+			.clone()
+			.xpect_contains("--enable-verbose-mode");
+		help_response
+			.clone()
+			.xpect_contains("Maximum retry attempts");
+		help_response.xpect_contains("Enable verbose logging");
+
+		// HTTP help also shows kebab-case
+		let http_help = entity
+			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		http_help.clone().xpect_contains("max-retry-count");
+		http_help.xpect_contains("enable-verbose-mode");
 	}
 }
