@@ -38,6 +38,7 @@ pub fn BeetSidebarLayout(
 			),
 		)?
 		.children;
+
 	// let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>

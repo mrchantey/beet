@@ -22,6 +22,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 			rsx!{<SidebarItem root node=node/>}).collect::<Vec<_>>()
 		}
 		</nav>
+	  <script hoist:body src="./sidebar.js"/>
 		<style>
 			nav{
 				--sidebar-width:15rem;

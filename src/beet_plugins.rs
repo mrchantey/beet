@@ -19,8 +19,10 @@ impl Plugin for BeetPlugins {
 		app.init_plugin::<ApplyDirectivesPlugin>();
 		#[cfg(feature = "build")]
 		app.init_plugin::<BuildPlugin>();
-		#[cfg(feature = "server")]
-		app.init_plugin::<LoadSnippetsPlugin>();
+
+		// it causin too many problems
+		// #[cfg(feature = "server")]
+		// app.init_plugin::<LoadSnippetsPlugin>();
 		app.init_plugin::<BeetRunner>();
 	}
 }

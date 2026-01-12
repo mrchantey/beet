@@ -14,7 +14,7 @@ async fn works() {
 		.unwrap();
 	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
 
-	world
+	let root = world
 		.run_system_cached_with(
 			CollectSidebarNode::collect,
 			(
@@ -30,8 +30,11 @@ async fn works() {
 				endpoint_tree,
 			),
 		)
-		.unwrap()
-		.paths()
-		.len()
-		.xpect_greater_than(10);
+		.unwrap();
+
+	root.expanded.xpect_false();
+	root.children[0].display_name.xpect_eq("Blog");
+	root.children[0].expanded.xpect_false();
+	root.children[1].display_name.xpect_eq("Docs");
+	root.children[1].expanded.xpect_true();
 }

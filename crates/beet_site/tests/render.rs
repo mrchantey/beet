@@ -50,6 +50,5 @@ async fn correct_title() {
 		.spawn(beet_site_router())
 		.oneshot_str("/blog/post-1")
 		.await
-		.xnot()
 		.xpect_contains(r#"<title>Beet</title>"#);
 }
