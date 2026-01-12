@@ -21,6 +21,7 @@ pub fn beet_cli() -> impl Bundle {
 				beet_site_cargo_build_cmd(),
 				Fallback,
 				children![
+					help_handler(HelpFormat::Cli),
 					EndpointBuilder::get()
 						.with_path("")
 						.with_description("🌱 Beet CLI - Use --help to see available commands")
@@ -160,6 +161,7 @@ pub fn beet_cli() -> impl Bundle {
 						)),
 					EndpointBuilder::get()
 						.with_path("deploy")
+						.with_params::<StageParams>()
 						.with_description("Full deployment pipeline")
 						.with_handler_bundle((Sequence, children![
 							import_and_parse_source_files(),
@@ -182,6 +184,24 @@ pub fn beet_cli() -> impl Bundle {
 			)
 		}),
 	)
+}
+
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+pub struct StageParams {
+	#[deref]
+	#[reflect(@ParamOptions::desc("Set deployment stage [ dev, prod, <custom> ]"))]
+	stage: Option<String>,
 }
 
 fn watch() -> impl Bundle {

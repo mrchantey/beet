@@ -56,9 +56,7 @@ impl Endpoint {
 		}
 	}
 
-	pub fn description(&self) -> Option<&str> {
-		self.description.as_deref()
-	}
+	pub fn description(&self) -> Option<&str> { self.description.as_deref() }
 	pub fn path(&self) -> &PathPattern { &self.path }
 	pub fn params(&self) -> &ParamsPattern { &self.params }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
@@ -129,7 +127,6 @@ impl Default for EndpointBuilder {
 			description: None,
 			additional_predicates: Vec::new(),
 		}
-		.with_predicate(endpoint_help_predicate())
 	}
 }
 

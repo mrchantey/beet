@@ -3,24 +3,6 @@ use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-pub struct HelpParams {
-	#[reflect(@ParamOptions::desc("Get help"))]
-	help: bool,
-}
-
-
 /// The param equivelent of a [`PathPartial`], denoting
 /// all params used at this point in the graph. For the full
 /// list see [`Endpoint::params`]
