@@ -21,13 +21,11 @@ pub fn beet_cli() -> impl Bundle {
 				beet_site_cargo_build_cmd(),
 				Fallback,
 				children![
-					help_handler(HelpFormat::Cli),
-					EndpointBuilder::get()
-						.with_path("")
-						.with_description("🌱 Beet CLI - Use --help to see available commands")
-						.with_handler(|| {
-							"\n🌱 Welcome to the Beet CLI 🌱\n\nUse --help to see available commands."
-						}),
+					help_handler(HelpHandlerConfig {
+						default_format: HelpFormat::Cli,
+						match_root: true,
+						introduction: String::from("🌱 Beet CLI 🌱"),
+					}),
 					EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
 						.with_path("teapot")
 						.with_description("I'm a teapot"),
@@ -37,16 +35,22 @@ pub fn beet_cli() -> impl Bundle {
 						.with_handler_bundle(run_wasm()),
 					EndpointBuilder::get()
 						.with_path("watch/*cmd?")
-						.with_description("Watch for file changes and run command")
+						.with_description(
+							"Watch for file changes and run command"
+						)
 						.with_handler_bundle(watch()),
 					EndpointBuilder::get()
 						.with_path("refresh-sst")
 						.with_description("Refresh SST configuration")
-						.with_handler_bundle(SstCommand::new(SstSubcommand::Refresh)),
+						.with_handler_bundle(SstCommand::new(
+							SstSubcommand::Refresh
+						)),
 					EndpointBuilder::get()
 						.with_path("deploy-sst")
 						.with_description("Deploy using SST")
-						.with_handler_bundle(SstCommand::new(SstSubcommand::Deploy)),
+						.with_handler_bundle(SstCommand::new(
+							SstSubcommand::Deploy
+						)),
 					EndpointBuilder::get()
 						.with_path("build-wasm")
 						.with_description("Build wasm target")
@@ -85,7 +89,9 @@ pub fn beet_cli() -> impl Bundle {
 						.with_handler_bundle(import_and_parse_source_files()),
 					EndpointBuilder::get()
 						.with_path("parse-source-files")
-						.with_description("Parse source files with file watching")
+						.with_description(
+							"Parse source files with file watching"
+						)
 						.with_handler_bundle((Sequence, children![
 							import_source_files(),
 							(

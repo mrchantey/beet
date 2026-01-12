@@ -18,7 +18,11 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 		CliServer,
 		ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: true,
+					introduction: String::from("Router CLI"),
+				}),
 				EndpointBuilder::new(
 					async move |_: (), entity: AsyncEntity| -> Result {
 						entity
@@ -102,7 +106,11 @@ pub fn default_router(
 							// stops after first succeeding fallback
 							// this is important to avoid response clobbering
 							(Name::new("Fallbacks"), Fallback, children![
-								help_handler(HelpFormat::Http),
+								help_handler(HelpHandlerConfig {
+									default_format: HelpFormat::Http,
+									match_root: false,
+									introduction: String::new(),
+								}),
 								html_bundle_to_response(),
 								assets_bucket(),
 								ssg_html_bucket(),

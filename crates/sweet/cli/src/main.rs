@@ -24,11 +24,11 @@ fn sweet_router() -> impl Bundle {
 		CliServer,
 		ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
-				EndpointBuilder::get()
-					.with_params::<HelpParams>()
-					.with_description("🤘 Welcome to the Sweet CLI 🤘\n{}")
-					.with_path(""),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: true,
+					introduction: String::from("🤘 Sweet CLI 🤘"),
+				}),
 				EndpointBuilder::default()
 					// match trailing positionals too, they will be
 					// passed to the wasm runtime

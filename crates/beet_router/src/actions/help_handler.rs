@@ -12,6 +12,28 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
 
+/// Parameters for configuring the help handler behavior
+#[derive(Debug, Clone)]
+pub struct HelpHandlerConfig {
+	/// The default format to use when rendering help
+	pub default_format: HelpFormat,
+	/// If true, handler runs when path segments are empty OR --help param is present
+	/// If false, handler only runs when --help param is present
+	pub match_root: bool,
+	/// Text inserted at the beginning of the formatted output
+	pub introduction: String,
+}
+
+impl Default for HelpHandlerConfig {
+	fn default() -> Self {
+		Self {
+			default_format: default(),
+			match_root: false,
+			introduction: String::from("Cli Help"),
+		}
+	}
+}
+
 #[derive(
 	Debug,
 	Clone,
@@ -30,7 +52,7 @@ pub struct HelpParams {
 	#[deref]
 	#[reflect(@ParamOptions::desc("Get help"))]
 	help: bool,
-	#[reflect(@ParamOptions::desc("Help format (cli or http)"))]
+	#[reflect(@ParamOptions::desc("Help format: cli, http"))]
 	help_format: Option<String>,
 }
 
@@ -44,7 +66,7 @@ pub struct HelpParams {
 /// so it can exit early when help is requested.
 ///
 /// # Arguments
-/// * `default_format` - The default format to use (Cli for CLI apps, Http for web apps)
+/// * `params` - Configuration parameters for the help handler
 ///
 /// # Example
 /// ```
@@ -56,7 +78,11 @@ pub struct HelpParams {
 /// RouterPlugin::world()
 ///     .spawn(ExchangeSpawner::new_flow(|| {
 ///         (Fallback, children![
-///             help_handler(HelpFormat::Cli),
+///             help_handler(HelpHandlerConfig {
+///                 default_format: HelpFormat::Cli,
+///                 match_root: false,
+///                 prefix: String::from("Welcome to my CLI"),
+///             }),
 ///             EndpointBuilder::get()
 ///                 .with_path("foo")
 ///                 .with_handler(|| "foo"),
@@ -66,7 +92,7 @@ pub struct HelpParams {
 ///     .await;
 /// # };
 /// ```
-pub fn help_handler(default_format: HelpFormat) -> impl Bundle {
+pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 	(
 		Name::new("Help Handler"),
 		OnSpawn::observe(
@@ -78,46 +104,65 @@ pub fn help_handler(default_format: HelpFormat) -> impl Bundle {
 				let action = ev.target();
 
 				// parse help params
-				let help_params = route_query
+				let req_params = route_query
 					.request_meta(action)?
 					.params()
 					.parse_reflect::<HelpParams>()?;
 
-				// check if help was requested
+				// get current path for checking
+				let current_path = route_query.path(action)?.clone();
+				let is_root = current_path.is_empty();
 
-				if !help_params.help {
+				// check if help should run:
+				// - if match_root is true: run if help param OR path is empty
+				// - if match_root is false: run only if help param is present
+				let should_run = if handler_config.match_root {
+					req_params.help || is_root
+				} else {
+					req_params.help
+				};
+
+				if !should_run {
 					// no help requested, pass through
 					commands.entity(action).trigger_target(Outcome::Fail);
 					return Ok(());
 				}
 
-				// determine format
-				let format = match help_params.help_format.as_deref() {
-					Some("http") => HelpFormat::Http,
-					Some("cli") => HelpFormat::Cli,
-					Some(other) => {
-						bevybail!("Unrecognized help_format '{}'", other);
-					}
-					_ => default_format,
-				};
+
 
 				// get endpoint tree and filter by partial path match
 				let tree = route_query.endpoint_tree(action)?;
-				// get current path for filtering
-				let current_path = route_query.path(action)?;
 
 				// collect all endpoints that match
 				let mut matching_endpoints = Vec::new();
 				collect_endpoints_from_tree(
 					&tree,
-					current_path,
+					&current_path,
 					&mut matching_endpoints,
 					&endpoints_query,
 				);
 
+				// determine format
+				let format = match req_params.help_format.as_deref() {
+					Some("http") => HelpFormat::Http,
+					Some("cli") => HelpFormat::Cli,
+					Some(other) => {
+						bevybail!("Unrecognized help-format '{}'", other);
+					}
+					_ => handler_config.default_format,
+				};
+				let formatter: Box<dyn EndpointHelpFormatter> = match format {
+					HelpFormat::Cli => Box::new(CliFormatter),
+					HelpFormat::Http => Box::new(HttpFormatter),
+				};
+
+
 				// render help for all matching endpoints
-				let help_text =
-					render_help(&matching_endpoints, format, current_path);
+				let help_text = formatter.format(
+					&handler_config,
+					&matching_endpoints,
+					&current_path,
+				);
 
 				let agent = route_query.requests.entity(action);
 				commands
@@ -131,20 +176,6 @@ pub fn help_handler(default_format: HelpFormat) -> impl Bundle {
 			},
 		),
 	)
-}
-
-/// Renders help documentation for multiple endpoints
-fn render_help(
-	endpoints: &[Endpoint],
-	format: HelpFormat,
-	path: &Vec<String>,
-) -> String {
-	let formatter: Box<dyn EndpointHelpFormatter> = match format {
-		HelpFormat::Cli => Box::new(CliFormatter),
-		HelpFormat::Http => Box::new(HttpFormatter),
-	};
-
-	formatter.format(endpoints, path)
 }
 
 
@@ -209,12 +240,20 @@ fn collect_endpoints_from_tree(
 /// Trait for formatting endpoint help documentation
 pub trait EndpointHelpFormatter {
 	/// Format the complete help output for multiple endpoints
-	fn format(&self, endpoints: &[Endpoint], path: &Vec<String>) -> String {
+	fn format(
+		&self,
+		params: &HelpHandlerConfig,
+		endpoints: &[Endpoint],
+		path: &Vec<String>,
+	) -> String {
 		if endpoints.is_empty() {
 			return self.format_none_found(path);
 		}
 
 		let mut output = String::new();
+		output.push_str("\n");
+		output.push_str(&params.introduction);
+		output.push_str("\n\n");
 		output.push_str(&self.format_header());
 		output.push_str("\n\n");
 
@@ -479,7 +518,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_description("The foo command")
@@ -504,7 +547,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::post()
 					.with_path("api/users")
 					.with_description("Create user")
@@ -534,7 +581,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::get()
 					.with_path("test")
 					.with_params::<TestParams>()
@@ -556,7 +607,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_handler(|| "foo response"),
@@ -573,7 +628,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::get()
 					.with_path("test")
 					.with_handler(|| "test"),
@@ -611,7 +670,11 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
-				help_handler(HelpFormat::Cli),
+				help_handler(HelpHandlerConfig {
+					default_format: HelpFormat::Cli,
+					match_root: false,
+					introduction: String::new(),
+				}),
 				EndpointBuilder::get()
 					.with_path("deploy")
 					.with_params::<TestParams>()
