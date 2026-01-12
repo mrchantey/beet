@@ -228,17 +228,17 @@ impl Request {
 	) -> Result<Self> {
 		let key = serde_urlencoded::to_string(key)?;
 		let value = serde_urlencoded::to_string(value)?;
-		self.with_query_param(&key, &value)
+		self.with_query_param(&key, &value).xok()
 	}
 
 	/// Insert a query parameter into the request
-	pub fn with_query_param(mut self, key: &str, value: &str) -> Result<Self> {
+	pub fn with_query_param(mut self, key: &str, value: &str) -> Self {
 		self.parts.parts_mut().insert_param(key, value);
-		Ok(self)
+		self
 	}
 
 	/// Sets query parameters from a string
-	pub fn with_query_string(mut self, query: &str) -> Result<Self> {
+	pub fn with_query_string(mut self, query: &str) -> Self {
 		for pair in query.split('&') {
 			if pair.is_empty() {
 				continue;
@@ -249,7 +249,7 @@ impl Request {
 			};
 			self.parts.parts_mut().insert_param(key, value);
 		}
-		Ok(self)
+		self
 	}
 
 	/// Returns the path as a RoutePath
@@ -456,9 +456,7 @@ mod test {
 	fn request_with_query_param() {
 		let request = Request::get("/api/users")
 			.with_query_param("limit", "10")
-			.unwrap()
-			.with_query_param("offset", "20")
-			.unwrap();
+			.with_query_param("offset", "20");
 
 		request.get_param("limit").unwrap().xpect_eq("10");
 		request.get_param("offset").unwrap().xpect_eq("20");

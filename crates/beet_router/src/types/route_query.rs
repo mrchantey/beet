@@ -16,6 +16,10 @@ pub struct RouteQuery<'w, 's> {
 }
 
 impl RouteQuery<'_, '_> {
+	pub fn request_meta(&self, action: Entity) -> Result<&RequestMeta> {
+		self.requests.get(action)?.xok()
+	}
+
 	pub fn path(&self, action: Entity) -> Result<&Vec<String>> {
 		self.requests.get(action)?.path().xok()
 	}

@@ -186,9 +186,7 @@ mod test_request {
 	async fn query_params_work() {
 		Request::get(format!("{HTTPBIN}/get"))
 			.with_query_param("foo", "bar")
-			.unwrap()
 			.with_query_param("baz", "qux")
-			.unwrap()
 			.send()
 			.await
 			.unwrap()

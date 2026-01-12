@@ -29,7 +29,6 @@ fs = ["beet_net/fs"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
-	"dep:base64",
 	"beet_core/serde",
 ]
 _sweet_runner = ["sweet/runner"]
@@ -44,33 +43,18 @@ beet_rsx.workspace = true
 bevy.workspace = true
 
 # utils
-variadics_please.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-send_wrapper.workspace = true
-http.workspace = true
 
 # serde
-base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-
-# http
-bytes.workspace = true
 
 # async
 futures.workspace = true
 async-channel.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-beet_core.workspace = true
-js-sys.workspace = true
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
-web-sys = { workspace = true, features = ["Storage"] }
-
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

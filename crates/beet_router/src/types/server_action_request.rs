@@ -98,7 +98,7 @@ where
 			(true, Some(body)) => req.with_json_body(&body)?,
 			(false, Some(body)) => {
 				let payload = JsonQueryParams::to_query_string(&body)?;
-				req.with_query_string(&payload)?
+				req.with_query_string(&payload)
 			}
 		}
 		.xok()
