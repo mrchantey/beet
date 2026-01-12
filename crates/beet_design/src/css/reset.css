@@ -3,13 +3,12 @@
 *::after {
 	box-sizing: border-box;
 	background-repeat: no-repeat;
-
 }
 
 ::before,
 ::after {
-  text-decoration: inherit;
-  vertical-align: inherit;
+	text-decoration: inherit;
+	vertical-align: inherit;
 }
 
 * {
@@ -17,21 +16,24 @@
 }
 
 body {
-  width: 100%;
-  margin: 0;
+	width: 100%;
+	margin: 0;
 }
 
 main {
-  display: block;
+	display: block;
 }
-
 
 body > header,
 body > main,
 body > footer {
-  padding-block: var(--bt-block-spacing-vertical);
+	padding-block: var(--bt-block-spacing-vertical);
 }
 
 section {
-  margin-bottom: var(--bt-block-spacing-vertical);
+	margin-bottom: var(--bt-block-spacing-vertical);
+}
+iframe {
+	width: 100%;
+	aspect-ratio: 16 / 9;
 }

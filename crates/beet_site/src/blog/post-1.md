@@ -6,7 +6,7 @@ created= "2025-07-11"
 
 I'm very excited for the `0.0.6-rc.3` of beet, now available.
 
-<iframe width="941" height="538" src="https://www.youtube.com/embed/7koepBSRoUI" title="Full Moon Harvest #1 | Full Stack Bevy" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe src="https://www.youtube.com/embed/7koepBSRoUI" title="Full Moon Harvest #1 | Full Stack Bevy" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 <br/>
 <br/>

@@ -25,9 +25,9 @@ fn sweet_router() -> impl Bundle {
 		ExchangeSpawner::new_flow(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
-					default_format: HelpFormat::Cli,
-					match_root: true,
 					introduction: String::from("🤘 Sweet CLI 🤘"),
+					match_root: true,
+					..default()
 				}),
 				EndpointBuilder::default()
 					// match trailing positionals too, they will be

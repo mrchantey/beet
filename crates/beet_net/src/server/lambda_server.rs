@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::server::HandlerFn;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use lambda_http::tower::service_fn;
@@ -9,7 +8,6 @@ use lambda_http::tracing;
 /// Starts the Lambda runtime for the HttpServer
 pub(super) fn start_lambda_server(
 	In(entity): In<Entity>,
-	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,
 ) -> Result {
 	async_commands.run_local(async move |world| -> Result {
@@ -34,7 +32,7 @@ async fn run_lambda(entity: AsyncEntity) -> Result {
 
 	lambda_http::run(service_fn(move |lambda_req| {
 		let entity = entity.clone();
-		handle_request(entity, handler, lambda_req)
+		handle_request(entity, lambda_req)
 	}))
 	.await
 	.map_err(|err| {

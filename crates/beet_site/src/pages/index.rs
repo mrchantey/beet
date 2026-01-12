@@ -30,7 +30,7 @@ pub fn get() -> impl IntoHtml {
 				</Card>
 				<p>"Beet is a self-representing framework like smalltalk or hypercard. Everything from the CLI to the client application is a"<a href="https://bevy.org">"Bevy App"</a>", and all structure and behavior is written in Entity Component System architecture."
 				</p>
-				<iframe width="975" height="548" src="https://www.youtube.com/embed/JWYcoNOvdWE" title="Unifying the Fuller Stack with Entity Component System" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+				<iframe src="https://www.youtube.com/embed/JWYcoNOvdWE" title="Unifying the Fuller Stack with Entity Component System" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 				<h2>Smoke Tests</h2>
 				<h3>"Client Islands"</h3>
 				<ClientCounter client:load initial=1 />
@@ -50,7 +50,6 @@ pub fn get() -> impl IntoHtml {
 			gap:1.em;
 		}
 		.hero{
-			width: 30.em;
 			max-width: 30.em;
 		}
 		.hero>footer{
