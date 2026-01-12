@@ -23,6 +23,8 @@ pub enum ContentType {
 #[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
 pub struct Endpoint {
+	/// An optional description for this endpoint
+	description: Option<String>,
 	params: ParamsPattern,
 	/// The full [`PathPattern`] for this endpoint
 	path: PathPattern,
@@ -45,6 +47,7 @@ impl Endpoint {
 		content_type: Option<ContentType>,
 	) -> Self {
 		Self {
+			description: None,
 			path,
 			params,
 			method,
@@ -81,7 +84,6 @@ impl Endpoint {
 /// structure manually.
 #[derive(BundleEffect)]
 pub struct EndpointBuilder {
-	// params: RoutePar
 	/// The action to handle the request, by default always returns a 200 OK
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 	/// The path to match, or None for any path
@@ -264,6 +266,7 @@ impl EndpointBuilder {
 				Endpoint {
 					path,
 					params,
+					description: None,
 					method: self.method,
 					cache_strategy: self.cache_strategy,
 					content_type: self.content_type,

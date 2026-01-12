@@ -1,8 +1,10 @@
 mod bucket_endpoint;
 pub mod common_middleware;
 pub mod common_predicates;
+mod endpoint_help;
 pub mod html_bundle;
 pub use bucket_endpoint::*;
+pub use endpoint_help::*;
 pub use html_bundle::*;
 mod endpoint;
 pub use endpoint::*;

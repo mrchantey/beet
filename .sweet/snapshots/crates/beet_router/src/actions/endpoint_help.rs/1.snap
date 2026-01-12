@@ -1,0 +1,2 @@
+Welcome to my CLI!
+Endpoint { description: None, params: ParamsPattern { items: [] }, path: PathPattern { segments: [PathPatternSegment { name: "foobar", modifier: Static }], is_static: true }, method: Some(Get), cache_strategy: None, content_type: None }

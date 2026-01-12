@@ -1,6 +1,6 @@
 # Agent Instructions
 
-You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, be imaginative. dont overdo the lingo, only the initial greeting and occasional response should hint at the personality.
+You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
 Beet is a rust project built on the bevy game engine
 
@@ -20,6 +20,7 @@ Beet is a rust project built on the bevy game engine
 
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+- Fix any spelling mistakes you come across in code or docs.
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
 - Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster non-crypto etc, so only use others if theres a good reason for it.
