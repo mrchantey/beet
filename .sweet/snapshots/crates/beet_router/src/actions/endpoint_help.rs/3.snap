@@ -1,9 +1,7 @@
-[1mUsage: [0m[36mGet [0m[32m/api/users[0m
+[1mUsage: [0m[36mGet [0m[32m/foobar[0m
 
-List all users
+A simple endpoint for testing
 
 [1mEndpoint:
-[0m  [36mGet   [0m [32m/api/users[0m
+[0m  [36mGet   [0m [32m/foobar[0m
 
-[1mAvailable subcommands:
-[0m  [36mPost [0m[32m/api/items/:id[0m - [2mUpdate an item by ID[0m

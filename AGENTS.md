@@ -40,6 +40,7 @@ Beet is a rust project built on the bevy game engine
 ## Testing
 
 - We use the custom `sweet` test runner and matchers in all crates.
+- for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders)
 - Be sure to use `tail` where appropriate to avoid context bloat. Always use `tail` with `just test-all`

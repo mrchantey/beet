@@ -3,15 +3,292 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 
-struct EndpointHelp<'a> {
+/// Predicate that checks for `--help` param on the request.
+///
+/// If the `--help` param is not present, this predicate will pass through immediately.
+/// If present, it renders and returns formatted help documentation including:
+/// - Usage line with method and path
+/// - Endpoint details (method, path, content type, cache strategy)
+/// - Path segment breakdown (static vs dynamic segments)
+/// - Query parameters with descriptions and requirements
+/// - Available direct child subcommands
+///
+/// The help is returned as a response and the predicate fails to prevent
+/// further processing of the request.
+///
+/// By default, renders in CLI format. Use `--help-format=http` to render in HTTP format.
+///
+/// # Example
+/// ```no_run
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// EndpointBuilder::get()
+///     .with_path("api/users")
+///     .with_description("List all users")
+///     .with_handler(|| "list users");
+/// ```
+pub fn endpoint_help_predicate() -> impl Bundle {
+	(
+		Name::new("Endpoint Help"),
+		OnSpawn::observe(
+			|ev: On<GetOutcome>,
+			 ancestors: Query<&ChildOf>,
+			 children: Query<&Children>,
+			 mut commands: Commands,
+			 route_query: RouteQuery,
+			 endpoints_query: Query<&Endpoint>|
+			 -> Result {
+				let action = ev.target();
+				if !route_query.request_meta(action)?.has_param("help") {
+					// no help requested, pass through
+					commands.entity(action).trigger_target(Outcome::Pass);
+					return Ok(());
+				}
+
+				// Determine format from --help-format parameter
+				let format = route_query
+					.request_meta(action)?
+					.get_param("help-format")
+					.and_then(|f| match f.as_str() {
+						"http" => Some(HelpFormat::Http),
+						"cli" => Some(HelpFormat::Cli),
+						_ => None,
+					})
+					.unwrap_or_default();
+
+				// Find the closest endpoint ancestor (if any)
+				let endpoint = ancestors
+					.iter_ancestors_inclusive(action)
+					.find_map(|entity| endpoints_query.get(entity).ok());
+
+				// Find direct child subcommands only
+				let mut subcommands = Vec::new();
+				if let Some(endpoint_entity) = ancestors
+					.iter_ancestors_inclusive(action)
+					.find(|e| endpoints_query.contains(*e))
+				{
+					// Get direct children of this endpoint entity
+					if let Ok(endpoint_children) = children.get(endpoint_entity)
+					{
+						for child in endpoint_children.iter() {
+							// Check if this child has an Endpoint component
+							if let Ok(child_endpoint) =
+								endpoints_query.get(child)
+							{
+								subcommands.push(child_endpoint);
+							}
+						}
+					}
+				}
+
+				let help = EndpointHelp {
+					endpoint,
+					subcommands,
+					format,
+				};
+
+				let help_text = help.render();
+				help_text.clone().xprint_display();
+
+				commands
+					.entity(route_query.requests.entity(action))
+					.insert(Response::new(default(), help_text.into()));
+
+				// mark as failed to stop further processing
+				commands.entity(action).trigger_target(Outcome::Fail);
+
+				Ok(())
+			},
+		),
+	)
+}
+
+/// Format for rendering endpoint help
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpFormat {
+	/// CLI format with commands and flags
+	Cli,
+	/// HTTP format with methods and query params
+	Http,
+}
+
+impl Default for HelpFormat {
+	fn default() -> Self { Self::Cli }
+}
+
+/// Helper for rendering endpoint help documentation
+pub struct EndpointHelp<'a> {
 	/// The current endpoint if any
-	endpoint: Option<&'a Endpoint>,
-	/// Sibling endpoints (subcommands)
-	subcommands: Vec<&'a Endpoint>,
+	pub endpoint: Option<&'a Endpoint>,
+	/// Direct child endpoints (subcommands/subpaths)
+	pub subcommands: Vec<&'a Endpoint>,
+	/// Format to render in
+	pub format: HelpFormat,
 }
 
 impl<'a> EndpointHelp<'a> {
-	fn render(&self) -> String {
+	/// Render the help documentation
+	pub fn render(&self) -> String {
+		match self.format {
+			HelpFormat::Cli => self.render_cli(),
+			HelpFormat::Http => self.render_http(),
+		}
+	}
+
+	/// Render help in CLI format
+	pub fn render_cli(&self) -> String {
+		let mut output = String::new();
+
+		// Usage line
+		if let Some(endpoint) = self.endpoint {
+			output.push_str(&paint_ext::bold("Usage: "));
+
+			// Path as positional arguments
+			output.push_str(&paint_ext::green(
+				self.format_path_cli(endpoint.path()),
+			));
+
+			output.push_str("\n\n");
+
+			// Description if present
+			if let Some(desc) = endpoint.description() {
+				output.push_str(desc);
+				output.push_str("\n\n");
+			}
+
+			// Command details
+			output.push_str(&paint_ext::bold("Command:\n"));
+			output.push_str("  ");
+
+			// Path
+			output.push_str(&paint_ext::green(
+				self.format_path_cli(endpoint.path()),
+			));
+
+			// Content type
+			if let Some(content_type) = endpoint.content_type() {
+				output.push_str(&format!(
+					" {}",
+					paint_ext::dimmed(format!("[{:?}]", content_type))
+				));
+			}
+
+			// Cache strategy
+			if let Some(cache) = endpoint.cache_strategy() {
+				output.push_str(&format!(
+					" {}",
+					paint_ext::dimmed(format!("[{:?}]", cache))
+				));
+			}
+
+			output.push_str("\n");
+
+			// Path segments breakdown
+			if !endpoint.path().is_empty() {
+				let has_dynamic =
+					endpoint.path().iter().any(|seg| !seg.is_static());
+				if has_dynamic {
+					output.push_str(&format!(
+						"    {}\n",
+						paint_ext::dimmed("Arguments:")
+					));
+					for segment in endpoint.path().iter() {
+						if !segment.is_static() {
+							output.push_str(&format!(
+								"      {} - ",
+								paint_ext::yellow(
+									self.format_segment_cli(segment)
+								)
+							));
+							if segment.is_greedy() {
+								output.push_str(&paint_ext::dimmed(
+									"(captures one or more)",
+								));
+							} else {
+								output
+									.push_str(&paint_ext::dimmed("(required)"));
+							}
+							output.push_str("\n");
+						}
+					}
+				}
+			}
+
+			// Parameters
+			if !endpoint.params().is_empty() {
+				output.push_str(&format!(
+					"    {}\n",
+					paint_ext::dimmed("Flags:")
+				));
+				for param in endpoint.params().iter() {
+					output.push_str("      ");
+
+					// Name with short flag if present
+					let mut param_display = format!("--{}", param.name());
+					if let Some(short) = param.short() {
+						param_display.push_str(&format!(", -{}", short));
+					}
+					output.push_str(&paint_ext::yellow(format!(
+						"{:20}",
+						param_display
+					)));
+
+					// Value type
+					match param.value() {
+						ParamValue::Flag => {
+							output.push_str(&paint_ext::dimmed("(flag)     "))
+						}
+						ParamValue::Single => {
+							output.push_str(&paint_ext::dimmed("(value)    "))
+						}
+						ParamValue::Multiple => {
+							output.push_str(&paint_ext::dimmed("(multiple) "))
+						}
+					}
+
+					// Required/Optional
+					if param.is_required() {
+						output.push_str(&paint_ext::red("required"));
+					} else {
+						output.push_str(&paint_ext::green("optional"));
+					}
+
+					// Description
+					if let Some(desc) = param.description() {
+						output.push_str(&format!(" - {}", desc));
+					}
+
+					output.push_str("\n");
+				}
+			}
+			output.push_str("\n");
+		}
+
+		// Subcommands
+		if !self.subcommands.is_empty() {
+			output.push_str(&paint_ext::bold("Available subcommands:\n"));
+			for endpoint in &self.subcommands {
+				output.push_str("  ");
+
+				// Path
+				output.push_str(&paint_ext::green(
+					self.format_path_cli(endpoint.path()),
+				));
+
+				// Description if present
+				if let Some(desc) = endpoint.description() {
+					output.push_str(&format!(" - {}", paint_ext::dimmed(desc)));
+				}
+
+				output.push_str("\n");
+			}
+		}
+
+		output
+	}
+
+	/// Render help in HTTP format
+	pub fn render_http(&self) -> String {
 		let mut output = String::new();
 
 		// Usage line
@@ -27,6 +304,17 @@ impl<'a> EndpointHelp<'a> {
 			output.push_str(&paint_ext::green(
 				endpoint.path().annotated_route_path().to_string(),
 			));
+
+			// Query params
+			if !endpoint.params().is_empty() {
+				output.push('?');
+				let param_strs: Vec<String> = endpoint
+					.params()
+					.iter()
+					.map(|p| self.format_param_http(p))
+					.collect();
+				output.push_str(&param_strs.join("&"));
+			}
 
 			output.push_str("\n\n");
 
@@ -87,14 +375,17 @@ impl<'a> EndpointHelp<'a> {
 						if !segment.is_static() {
 							output.push_str(&format!(
 								"      {} - ",
-								paint_ext::yellow(segment.to_string_annotated())
+								paint_ext::yellow(
+									segment.to_string_annotated()
+								)
 							));
 							if segment.is_greedy() {
 								output.push_str(&paint_ext::dimmed(
 									"(captures one or more)",
 								));
 							} else {
-								output.push_str(&paint_ext::dimmed("(dynamic)"));
+								output
+									.push_str(&paint_ext::dimmed("(dynamic)"));
 							}
 							output.push_str("\n");
 						}
@@ -106,19 +397,15 @@ impl<'a> EndpointHelp<'a> {
 			if !endpoint.params().is_empty() {
 				output.push_str(&format!(
 					"    {}\n",
-					paint_ext::dimmed("Parameters:")
+					paint_ext::dimmed("Query parameters:")
 				));
 				for param in endpoint.params().iter() {
 					output.push_str("      ");
 
-					// Name with short flag if present
-					let mut param_display = format!("--{}", param.name());
-					if let Some(short) = param.short() {
-						param_display.push_str(&format!(", -{}", short));
-					}
+					// Name
 					output.push_str(&paint_ext::yellow(format!(
 						"{:20}",
-						param_display
+						self.format_param_http(param)
 					)));
 
 					// Value type
@@ -152,9 +439,9 @@ impl<'a> EndpointHelp<'a> {
 			output.push_str("\n");
 		}
 
-		// Subcommands
+		// Subpaths
 		if !self.subcommands.is_empty() {
-			output.push_str(&paint_ext::bold("Available subcommands:\n"));
+			output.push_str(&paint_ext::bold("Available endpoints:\n"));
 			for endpoint in &self.subcommands {
 				output.push_str("  ");
 
@@ -181,99 +468,37 @@ impl<'a> EndpointHelp<'a> {
 
 		output
 	}
+
+	/// Format path for CLI rendering
+	fn format_path_cli(&self, path: &PathPattern) -> String {
+		path.iter()
+			.map(|seg| self.format_segment_cli(seg))
+			.collect::<Vec<_>>()
+			.join(" ")
+	}
+
+	/// Format a single segment for CLI rendering
+	fn format_segment_cli(&self, segment: &PathPatternSegment) -> String {
+		if segment.is_static() {
+			segment.to_string()
+		} else if segment.is_greedy() {
+			format!("[*{}]", segment.name())
+		} else {
+			format!("[{}]", segment.name())
+		}
+	}
+
+	/// Format param for HTTP rendering
+	fn format_param_http(&self, param: &ParamMeta) -> String {
+		match param.value() {
+			ParamValue::Flag => param.name().to_string(),
+			_ => format!("{}=<value>", param.name()),
+		}
+	}
 }
 
-/// Predicate that checks for `--help` param on the request.
-///
-/// If the `--help` param is not present, this predicate will pass through immediately.
-/// If present, it renders and returns formatted help documentation including:
-/// - Usage line with method and path
-/// - Endpoint details (method, path, content type, cache strategy)
-/// - Path segment breakdown (static vs dynamic segments)
-/// - Query parameters with descriptions and requirements
-/// - Available sibling subcommands
-///
-/// The help is returned as a response and the predicate fails to prevent
-/// further processing of the request.
-///
-/// # Example
-/// ```no_run
-/// # use beet_router::prelude::*;
-/// # use beet_core::prelude::*;
-/// EndpointBuilder::get()
-///     .with_path("api/users")
-///     .with_description("List all users")
-///     .with_handler(|| "list users");
-/// ```
-pub fn endpoint_help_predicate() -> impl Bundle {
-	(
-		Name::new("Endpoint Help"),
-		OnSpawn::observe(
-			|ev: On<GetOutcome>,
-			 ancestors: Query<&ChildOf>,
-			 children: Query<&Children>,
-			 mut commands: Commands,
-			 route_query: RouteQuery,
-			 endpoints_query: Query<&Endpoint>|
-			 -> Result {
-				let action = ev.target();
-				if !route_query.request_meta(action)?.has_param("help") {
-					// no help requested, pass through
-					commands.entity(action).trigger_target(Outcome::Pass);
-					return Ok(());
-				}
+// Integration tests in endpoint_help.rs action file verify the full behavior
 
-				// Find the closest endpoint ancestor (if any)
-				let endpoint = ancestors
-					.iter_ancestors_inclusive(action)
-					.find_map(|entity| endpoints_query.get(entity).ok());
-
-				// Find subcommands (sibling endpoints)
-				let mut subcommands = Vec::new();
-				if let Some(endpoint_entity) = ancestors
-					.iter_ancestors_inclusive(action)
-					.find(|e| endpoints_query.contains(*e))
-				{
-					// Get the parent of this endpoint entity
-					if let Ok(parent_child_of) = ancestors.get(endpoint_entity)
-					{
-						let parent_entity = parent_child_of.parent();
-						// Get siblings of the endpoint entity
-						if let Ok(siblings) = children.get(parent_entity) {
-							for sibling in siblings.iter() {
-								// Skip self and check if sibling has Endpoint
-								if sibling != endpoint_entity {
-									if let Ok(sibling_endpoint) =
-										endpoints_query.get(sibling)
-									{
-										subcommands.push(sibling_endpoint);
-									}
-								}
-							}
-						}
-					}
-				}
-
-				let help = EndpointHelp {
-					endpoint,
-					subcommands,
-				};
-
-				let help_text = help.render();
-				help_text.clone().xprint_display();
-
-				commands
-					.entity(route_query.requests.entity(action))
-					.insert(Response::new(default(), help_text.into()));
-
-				// mark as failed to stop further processing
-				commands.entity(action).trigger_target(Outcome::Fail);
-
-				Ok(())
-			},
-		),
-	)
-}
 
 #[cfg(test)]
 mod test {
@@ -322,7 +547,24 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn with_children() {
+	async fn http_format() {
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				EndpointBuilder::get()
+					.with_path("foobar")
+					.with_description("A simple endpoint for testing")
+			}))
+			.oneshot_str(
+				Request::get("/foobar")
+					.with_query_param("help", "")
+					.with_query_param("help-format", "http"),
+			)
+			.await
+			.xpect_snapshot();
+	}
+
+	#[sweet::test]
+	async fn only_direct_children_shown() {
 		use beet_flow::prelude::*;
 
 		RouterPlugin::world()
@@ -333,10 +575,12 @@ mod test {
 							.with_path("users")
 							.with_description("List all users")
 							.with_handler(|| "list users"),
-						EndpointBuilder::post()
-							.with_path("items/:id")
-							.with_description("Update an item by ID")
-							.with_handler(|| "update item"),
+						(PathPartial::new("items"), Sequence, children![
+							EndpointBuilder::get()
+								.with_path(":id")
+								.with_description("Get item by ID")
+								.with_handler(|| "get item"),
+						]),
 					]),
 					EndpointBuilder::get()
 						.with_path("posts/*slug")
@@ -344,8 +588,34 @@ mod test {
 						.with_handler(|| "get post"),
 				])
 			}))
+			.oneshot_str(Request::get("/api").with_query_param("help", ""))
+			.await
+			.xpect_snapshot();
+	}
+
+	#[sweet::test]
+	async fn no_subcommands_for_leaf_endpoint() {
+		use beet_flow::prelude::*;
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![(
+					PathPartial::new("api"),
+					Sequence,
+					children![
+						EndpointBuilder::get()
+							.with_path("teapot")
+							.with_description("I'm a teapot")
+							.with_handler(|| "teapot"),
+						EndpointBuilder::get()
+							.with_path("users")
+							.with_description("List all users")
+							.with_handler(|| "list users"),
+					]
+				),])
+			}))
 			.oneshot_str(
-				Request::get("/api/users").with_query_param("help", ""),
+				Request::get("/api/teapot").with_query_param("help", ""),
 			)
 			.await
 			.xpect_snapshot();
