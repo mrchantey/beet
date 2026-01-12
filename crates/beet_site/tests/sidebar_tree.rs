@@ -6,14 +6,15 @@ use beet_site::prelude::*;
 
 #[sweet::test]
 async fn works() {
-	let mut app = App::new();
-	app.add_plugins(server_plugin);
-	app.init().update();
+	let mut world = server_plugin.into_world();
 
-	let endpoints = EndpointTree::endpoints_from_world(app.world_mut());
+	let root = beet_site_router().spawn(&mut world);
+	let endpoints = world
+		.run_system_once_with(EndpointTree::endpoints_from_exchange, root)
+		.unwrap();
 	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
 
-	app.world_mut()
+	world
 		.run_system_cached_with(
 			CollectSidebarNode::collect,
 			(

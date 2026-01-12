@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_flow::prelude::*;
@@ -18,13 +17,19 @@ impl Plugin for RouterPlugin {
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<RenderMode>()
 			.init_resource::<HtmlConstants>();
-
-		// #[cfg(all(
-		// 	not(target_arch = "wasm32"),
-		// 	not(test),
-		// 	feature = "server"
-		// ))]
 	}
+}
+
+
+#[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(clap::Subcommand))]
+pub enum RenderMode {
+	/// Static html routes will be skipped, using the [`bucket_handler`] fallback
+	/// to serve files from the bucket.
+	#[default]
+	Ssg,
+	/// All static html [`RouteHandler`] funcs will run instead of using the [`bucket_handler`].
+	Ssr,
 }
 
 
@@ -54,7 +59,7 @@ mod test {
 	#[sweet::test]
 	async fn route_tree() {
 		let mut world = RouterPlugin::world();
-		world.spawn(ExchangeSpawner::new_flow(|| {
+		let spawner = ExchangeSpawner::new_flow(|| {
 			(CacheStrategy::Static, children![
 				EndpointBuilder::get().with_handler(
 					async |_: (), action: AsyncEntity| -> Result<String> {
@@ -78,20 +83,17 @@ mod test {
 				]),
 				PathPartial::new("boo"),
 			])
-		}));
+		});
 
-		// Spawn and collect all endpoints
-		let endpoints = EndpointTree::endpoints_from_world(&mut world);
-		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
-
-		tree.flatten()
+		EndpointTree::endpoints_from_exchange_spawner(&mut world, &spawner)
+			.unwrap()
 			.iter()
-			.map(|p| p.annotated_route_path())
+			.map(|p| p.path().annotated_route_path())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
 				RoutePath::new("/"),
-				RoutePath::new("/bar/bazz"),
 				RoutePath::new("/foo"),
+				RoutePath::new("/bar/bazz"),
 			]);
 	}
 

@@ -10,7 +10,11 @@ pub fn server_plugin(app: &mut App) {
 		// DebugFlowPlugin::default(),
 	))
 	.world_mut()
-	.spawn(default_router(
+	.spawn(default_router_cli(beet_site_router()));
+}
+
+pub fn beet_site_router() -> ExchangeSpawner {
+	default_router(
 		|| EndWith(Outcome::Pass),
 		|| {
 			(InfallibleSequence, children![
@@ -25,7 +29,7 @@ pub fn server_plugin(app: &mut App) {
 			])
 		},
 		|| EndWith(Outcome::Pass),
-	));
+	)
 }
 
 #[allow(unused)]

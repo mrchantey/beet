@@ -370,6 +370,12 @@ impl AsyncWorld {
 			world.insert_resource(resource);
 		});
 	}
+	pub async fn insert_resource_then<R: Resource>(&self, resource: R) {
+		self.with_then(move |world: &mut World| {
+			world.insert_resource(resource);
+		})
+		.await;
+	}
 	pub fn with_resource<R: Resource>(
 		&self,
 		func: impl FnOnce(Mut<R>) + Send + 'static,

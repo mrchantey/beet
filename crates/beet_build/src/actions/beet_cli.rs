@@ -17,14 +17,14 @@ async fn show_tree(_: (), action: AsyncEntity) -> Result<String> {
 /// 🌱 Beet CLI 🌱
 ///
 /// Welcome to the beet cli!
-pub fn default_cli_router() -> impl Bundle {
+pub fn beet_cli() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
 		CliServer,
 		ExchangeSpawner::new_flow(|| {
 			(
-				// temporarily hardcode the beet site
-				beet_site_cmd(),
+				// temporarily hardcode the beet site as a component
+				beet_site_cargo_build_cmd(),
 				Fallback,
 				children![
 					EndpointBuilder::new(show_tree)
@@ -225,7 +225,7 @@ fn single_action_route(
 	named_route(name, children![exact_path_match(), action, respond_ok()])
 }
 
-fn beet_site_cmd() -> CargoBuildCmd {
+fn beet_site_cargo_build_cmd() -> CargoBuildCmd {
 	CargoBuildCmd::default().package("beet_site")
 }
 

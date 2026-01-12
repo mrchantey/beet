@@ -70,14 +70,10 @@ impl RouteQuery<'_, '_> {
 	/// Get or build the endpoint tree for the given action,
 	/// caching the result in the root of the tree
 	pub fn endpoint_tree(&mut self, action: Entity) -> Result<EndpointTree> {
-		if let Some(tree) = self
-			.parents
-			.iter_ancestors_inclusive(action)
-			.find_map(|entity| self.endpoint_trees.get(entity).ok())
-		{
+		let root = self.parents.root_ancestor(action);
+		if let Ok(tree) = self.endpoint_trees.get(root) {
 			tree.clone().xok()
 		} else {
-			let root = self.parents.root_ancestor(action);
 			let endpoints = self
 				.children
 				.iter_descendants_inclusive(root)

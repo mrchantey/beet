@@ -60,13 +60,12 @@ impl Plugin for ServerPlugin {
 
 
 /// Update server stats if available
-// TODO this is incorrect in flow routers, response middleware still has to run
 fn server_stats(
-	ev: On<Insert, Response>,
+	ev: On<ExchangeComplete>,
 	mut servers: Query<&mut ServerStatus>,
 	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
 ) -> Result {
-	let entity = ev.event_target();
+	let entity = ev.target();
 	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
 		return Ok(());
 	};

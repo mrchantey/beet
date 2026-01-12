@@ -16,4 +16,4 @@ fn main() {
 }
 
 
-fn cli_routes(mut commands: Commands) { commands.spawn(default_cli_router()); }
+fn cli_routes(mut commands: Commands) { commands.spawn(beet_cli()); }

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::Actions;
 use beet_net::prelude::*;
 
 /// Collects all endpoints in an application and arranges them into a tree structure.
@@ -53,7 +54,7 @@ impl EndpointTree {
 	/// then despawns those temporary trees after collection.
 	///
 	/// Returns an error if there are conflicting paths.
-	pub fn endpoints_from_world(world: &mut World) -> Vec<(Entity, Endpoint)> {
+	pub fn endpoints_from_world(world: &mut World) -> Vec<Endpoint> {
 		let spawned_roots = world
 			.query_once::<&ExchangeSpawner>()
 			.iter()
@@ -61,10 +62,10 @@ impl EndpointTree {
 			.collect::<Vec<Entity>>();
 
 		let endpoints = world
-			.query_once::<(Entity, &Endpoint)>()
+			.query_once::<&Endpoint>()
 			.iter()
-			.map(|(entity, endpoint)| (*entity, (*endpoint).clone()))
-			.collect::<Vec<_>>();
+			.map(|endpoint| (*endpoint).clone())
+			.collect();
 		// Build the tree before cleanup (endpoints reference these entities)
 
 		// Despawn the temporary trees
@@ -73,6 +74,59 @@ impl EndpointTree {
 		}
 
 		endpoints
+	}
+
+	/// Builds a list of (Entity, Endpoint) by spawning an [`ExchangeSpawner`]
+	/// in the given world and collecting all endpoints from its descendants,
+	/// then despawning the exchange.
+	pub fn endpoints_from_exchange_spawner(
+		world: &mut World,
+		spawner: &ExchangeSpawner,
+	) -> Result<Vec<Endpoint>> {
+		let root = spawner.spawn(world);
+
+		let endpoints = world
+			.run_system_cached_with::<_, Result<Vec<Endpoint>>, _, _>(
+				|root: In<Entity>,
+				 actions: Query<&Actions>,
+				 children: Query<&Children>,
+				 endpoints: Query<&Endpoint>| {
+					let actions = actions.get(*root)?;
+					assert_eq!(actions.len(), 1,);
+					children
+						.iter_descendants_inclusive(actions[0])
+						.filter_map(|entity| {
+							endpoints.get(entity).ok().cloned()
+						})
+						.collect::<Vec<_>>()
+						.xok()
+				},
+				root,
+			)??;
+
+		world.despawn(root);
+		endpoints.xok()
+	}
+
+	/// Get the endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
+	pub fn endpoints_from_exchange(
+		root: In<Entity>,
+		actions: Query<&Actions>,
+		children: Query<&Children>,
+		endpoints: Query<&Endpoint>,
+	) -> Result<Vec<(Entity, Endpoint)>> {
+		let actions = actions.get(*root)?;
+		assert_eq!(actions.len(), 1,);
+		children
+			.iter_descendants_inclusive(actions[0])
+			.filter_map(|entity| {
+				endpoints
+					.get(entity)
+					.ok()
+					.map(|endpoint| (entity, (*endpoint).clone()))
+			})
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
 	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).

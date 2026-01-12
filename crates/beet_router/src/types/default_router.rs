@@ -7,6 +7,56 @@ use serde_json::Value;
 
 // trait BundleFunc:'static+Send+S
 
+
+/// The entrypoint for a router with two endoints:
+/// - `/`: Serve the routes
+/// - `/export-static`: export static html
+pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
+	let spawner2 = spawner.clone();
+	(
+		Name::new("Router CLI"),
+		CliServer,
+		ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				EndpointBuilder::new(
+					async move |_: (), entity: AsyncEntity| -> Result {
+						entity
+							.world()
+							.insert_resource_then(RenderMode::Ssr)
+							.await;
+						let html =
+							collect_html(entity.world(), &spawner2).await?;
+						for (path, html) in html {
+							trace!("Exporting html to {}", path);
+							fs_ext::write(path, &html)?;
+						}
+						Ok(())
+					}
+				)
+				.with_path("/export-static"),
+				EndpointBuilder::new(
+					// dont need to be async but zst restriction for sync systems
+					async move |_: (), entity: AsyncEntity| {
+						// actually serve the routes
+						entity
+							.world()
+							.spawn_then((
+								HttpServer::default(),
+								spawner.clone(),
+							))
+							.await;
+						// start serving, never resolve
+						std::future::pending::<()>().await;
+					}
+				)
+				.with_path("/")
+			])
+		}),
+	)
+}
+
+
+
 /// Create the default router configuration, providing
 /// three groups of `children![]` to run in between the
 /// default endpoints and fallbacks.
@@ -23,52 +73,49 @@ pub fn default_router(
 	endpoints: impl BundleFunc,
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
-) -> impl Bundle {
-	(
-		HttpServer::default(),
-		ExchangeSpawner::new_flow(move || {
-			(InfallibleSequence, children![
-				(Name::new("Await Ready"), AwaitReady::default()),
-				(
-					Name::new("Request Middleware"),
-					request_middleware.clone().bundle_func()
-				),
-				(Name::new("Endpoints Root"), endpoints.clone().bundle_func()),
-				(
-					Name::new("Default Routes"),
-					// Our goal here is to minimize performance overhead
-					// of default actions, this pattern ensures default
-					// fallbacks only run if no response is present
-					Sequence,
-					children![
-						common_predicates::no_response(),
-						(
-							Name::new("Default Routes Nested"),
-							InfallibleSequence,
-							children![
-								// # default endpoints
-								analytics_handler(),
-								app_info(),
-								// # default fallbacks
-								// stops after first succeeding fallback
-								// this is important to avoid response clobbering
-								(Name::new("Fallbacks"), Fallback, children![
-									html_bundle_to_response(),
-									assets_bucket(),
-									ssg_html_bucket(),
-									// default not found handled by Router
-								]),
-							]
-						),
-					]
-				),
-				(
-					Name::new("Response Middleware"),
-					response_middleware.clone().bundle_func()
-				),
-			])
-		}),
-	)
+) -> ExchangeSpawner {
+	ExchangeSpawner::new_flow(move || {
+		(InfallibleSequence, children![
+			(Name::new("Await Ready"), AwaitReady::default()),
+			(
+				Name::new("Request Middleware"),
+				request_middleware.clone().bundle_func()
+			),
+			(Name::new("Endpoints Root"), endpoints.clone().bundle_func()),
+			(
+				Name::new("Default Routes"),
+				// Our goal here is to minimize performance overhead
+				// of default actions, this pattern ensures default
+				// fallbacks only run if no response is present
+				Sequence,
+				children![
+					common_predicates::no_response(),
+					(
+						Name::new("Default Routes Nested"),
+						InfallibleSequence,
+						children![
+							// # default endpoints
+							analytics_handler(),
+							app_info(),
+							// # default fallbacks
+							// stops after first succeeding fallback
+							// this is important to avoid response clobbering
+							(Name::new("Fallbacks"), Fallback, children![
+								html_bundle_to_response(),
+								assets_bucket(),
+								ssg_html_bucket(),
+								// default not found handled by Router
+							]),
+						]
+					),
+				]
+			),
+			(
+				Name::new("Response Middleware"),
+				response_middleware.clone().bundle_func()
+			),
+		])
+	})
 }
 
 pub fn not_found() -> impl Bundle {

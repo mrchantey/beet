@@ -47,7 +47,7 @@ pub fn export_server_ssg(
 	path_ext::assert_exists(&exe_path)?;
 	Command::new(&exe_path)
 		.envs(pkg_config.envs())
-		.arg("--export-static")
+		.arg("export-static")
 		.xtap(|cmd| {
 			debug!(
 				"Running server binary to generate static files \n{:?}",

@@ -60,7 +60,7 @@ pub fn RunServer() -> impl Bundle {
 }
 
 
-/// Run the server binary with the `--export-static` flag to retrieve
+/// Run the server binary with the `export-static` flag to retrieve
 /// the static content like html pages.
 #[construct]
 pub fn ExportStaticContent() -> impl Bundle {
@@ -82,8 +82,7 @@ pub fn ExportStaticContent() -> impl Bundle {
 					.to_string();
 				path_ext::assert_exists(&exe_path)?;
 
-				let config =
-					CommandConfig::new(exe_path).arg("--export-static");
+				let config = CommandConfig::new(exe_path).arg("export-static");
 
 				cmd_runner.run(ev, config)
 			},

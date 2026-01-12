@@ -4,44 +4,25 @@ use beet::prelude::*;
 use beet_site::prelude::*;
 
 #[sweet::test]
-// run in series to avoid server port clashes
-async fn test_layouts_series() {
-	let mut world = server_plugin.into_world();
-
-	world
+async fn home() {
+	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr);
-
-	home(&mut world).await;
-	docs(&mut world).await;
-	article_layout(&mut world).await;
-	// correct_title(&mut world).await;
-}
-
-async fn home(world: &mut World) {
-	world
-		.oneshot("/")
+		.with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router())
+		.oneshot_str("/")
 		.await
-		.into_result()
-		.await
-		.unwrap()
-		.text()
-		.await
-		.unwrap()
-		// code snippets should be syntect parsed, ie <code>fn</code>..
 		.xnot()
 		.xpect_contains("fn Counter(initial: u32)");
 }
-async fn docs(world: &mut World) {
-	world
-		.oneshot("/docs")
+
+#[sweet::test]
+async fn docs() {
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router())
+		.oneshot_str("/docs")
 		.await
-		.into_result()
-		.await
-		.unwrap()
-		.text()
-		.await
-		.unwrap()
 		.xpect_contains("docs")
 		// nav should be scoped style, ie nav[beet-style-id..]
 		.xnot()
@@ -49,28 +30,26 @@ async fn docs(world: &mut World) {
 }
 
 
-async fn article_layout(world: &mut World) {
-	world
-		.oneshot("/blog/post-1")
+#[sweet::test]
+async fn article_layout() {
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router())
+		.oneshot_str("/blog/post-1")
 		.await
-		.into_result()
-		.await
-		.unwrap()
-		.text()
-		.await
-		.unwrap()
 		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
 }
+
 #[allow(unused)]
-async fn correct_title(world: &mut World) {
-	world
-		.oneshot("/blog/post-1")
+#[sweet::test]
+async fn correct_title() {
+	RouterPlugin::world()
+		.with_resource(pkg_config!())
+		.with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router())
+		.oneshot_str("/blog/post-1")
 		.await
-		.into_result()
-		.await
-		.unwrap()
-		.text()
-		.await
-		.unwrap()
+		.xnot()
 		.xpect_contains(r#"<title>Beet</title>"#);
 }
