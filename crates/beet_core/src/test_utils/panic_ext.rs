@@ -1,6 +1,7 @@
 //! Panic and assertion helpers for matchers.
 //! All functions use `#[track_caller]` to capture the correct source location.
 use crate::prelude::*;
+use crate::utils::paint_ext;
 use std::fmt::Debug;
 use std::fmt::Display;
 

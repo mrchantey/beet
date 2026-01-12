@@ -1,3 +1,4 @@
+//! ANSI paint utilities
 use std::fmt::Display;
 
 use nu_ansi_term::Color;

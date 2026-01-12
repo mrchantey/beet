@@ -4,6 +4,8 @@ mod cli_args;
 mod clone_func;
 mod file_span;
 mod line_col;
+#[cfg(feature = "ansi_paint")]
+pub mod paint_ext;
 mod panic_context;
 mod wasm_types;
 pub use async_ext::LifetimeSendBoxedFuture;

@@ -56,6 +56,9 @@ impl Endpoint {
 		}
 	}
 
+	pub fn description(&self) -> Option<&str> {
+		self.description.as_deref()
+	}
 	pub fn path(&self) -> &PathPattern { &self.path }
 	pub fn params(&self) -> &ParamsPattern { &self.params }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
@@ -98,6 +101,8 @@ pub struct EndpointBuilder {
 	content_type: Option<ContentType>,
 	/// Whether to match the path exactly, defaults to true.
 	exact_path: bool,
+	/// Optional description for this endpoint
+	description: Option<String>,
 	/// Additional bundles to be run before the handler
 	additional_predicates: Vec<
 		Box<
@@ -121,9 +126,10 @@ impl Default for EndpointBuilder {
 			cache_strategy: None,
 			content_type: None,
 			exact_path: true,
+			description: None,
 			additional_predicates: Vec::new(),
 		}
-		.with_predicate(endpoint_help_predicate(""))
+		.with_predicate(endpoint_help_predicate())
 	}
 }
 
@@ -231,6 +237,12 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Sets a description for this endpoint, used in help output
+	pub fn with_description(mut self, description: impl Into<String>) -> Self {
+		self.description = Some(description.into());
+		self
+	}
+
 	/// Sets [`Self::exact_path`] to false
 	pub fn with_trailing_path(mut self) -> Self {
 		self.exact_path = false;
@@ -267,7 +279,7 @@ impl EndpointBuilder {
 				Endpoint {
 					path,
 					params,
-					description: None,
+					description: self.description,
 					method: self.method,
 					cache_strategy: self.cache_strategy,
 					content_type: self.content_type,

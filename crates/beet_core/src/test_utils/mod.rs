@@ -9,7 +9,6 @@ mod close_to;
 mod matcher_control_flow;
 mod matcher_not;
 mod matcher_vec;
-pub mod paint_ext;
 pub mod pretty_diff;
 pub use matcher_control_flow::*;
 pub use matcher_not::*;

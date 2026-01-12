@@ -23,126 +23,161 @@ pub fn beet_cli() -> impl Bundle {
 				children![
 					EndpointBuilder::get()
 						.with_path("")
-						.with_predicate(endpoint_help_predicate(
-							"🌱 beet 🌱"
-						))
+						.with_description("🌱 Beet CLI - Use --help to see available commands")
 						.with_handler(|| {
 							"\n🌱 Welcome to the Beet CLI 🌱\n\nUse --help to see available commands."
 						}),
 					EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
-						.with_path("teapot"),
+						.with_path("teapot")
+						.with_description("I'm a teapot"),
 					EndpointBuilder::default()
 						.with_path("run-wasm/*binary-path")
+						.with_description("Run a wasm binary")
 						.with_handler_bundle(run_wasm()),
-					single_action_route("watch/*cmd?", watch()),
-					single_action_route(
-						"refresh-sst",
-						SstCommand::new(SstSubcommand::Refresh)
-					),
-					single_action_route(
-						"deploy-sst",
-						SstCommand::new(SstSubcommand::Deploy)
-					),
-					single_action_route("build-wasm", build_wasm()),
-					single_action_route("build-lambda", CompileLambda),
-					single_action_route("deploy-lambda", DeployLambda),
-					single_action_route("watch-lambda", WatchLambda),
-					single_action_route("push-assets", PushAssets),
-					single_action_route("pull-assets", PullAssets),
-					single_action_route("push-html", PushHtml),
-					single_action_route("build", BuildServer),
-					single_action_route(
-						"parse-files",
-						import_and_parse_source_files()
-					),
-					named_route("parse-source-files", children![
-						exact_path_match(),
-						import_source_files(),
-						(
-							Name::new("Run Loop"),
-							// only insert the watcher after first run
-							InsertOn::<GetOutcome, _>::new(
-								FsWatcher::default_cargo()
+					EndpointBuilder::get()
+						.with_path("watch/*cmd?")
+						.with_description("Watch for file changes and run command")
+						.with_handler_bundle(watch()),
+					EndpointBuilder::get()
+						.with_path("refresh-sst")
+						.with_description("Refresh SST configuration")
+						.with_handler_bundle(SstCommand::new(SstSubcommand::Refresh)),
+					EndpointBuilder::get()
+						.with_path("deploy-sst")
+						.with_description("Deploy using SST")
+						.with_handler_bundle(SstCommand::new(SstSubcommand::Deploy)),
+					EndpointBuilder::get()
+						.with_path("build-wasm")
+						.with_description("Build wasm target")
+						.with_handler_bundle(build_wasm()),
+					EndpointBuilder::get()
+						.with_path("build-lambda")
+						.with_description("Compile lambda function")
+						.with_handler_bundle(CompileLambda),
+					EndpointBuilder::get()
+						.with_path("deploy-lambda")
+						.with_description("Deploy lambda function")
+						.with_handler_bundle(DeployLambda),
+					EndpointBuilder::get()
+						.with_path("watch-lambda")
+						.with_description("Watch lambda logs")
+						.with_handler_bundle(WatchLambda),
+					EndpointBuilder::get()
+						.with_path("push-assets")
+						.with_description("Push assets to remote")
+						.with_handler_bundle(PushAssets),
+					EndpointBuilder::get()
+						.with_path("pull-assets")
+						.with_description("Pull assets from remote")
+						.with_handler_bundle(PullAssets),
+					EndpointBuilder::get()
+						.with_path("push-html")
+						.with_description("Push HTML to remote")
+						.with_handler_bundle(PushHtml),
+					EndpointBuilder::get()
+						.with_path("build")
+						.with_description("Build server")
+						.with_handler_bundle(BuildServer),
+					EndpointBuilder::get()
+						.with_path("parse-files")
+						.with_description("Import and parse source files")
+						.with_handler_bundle(import_and_parse_source_files()),
+					EndpointBuilder::get()
+						.with_path("parse-source-files")
+						.with_description("Parse source files with file watching")
+						.with_handler_bundle((Sequence, children![
+							import_source_files(),
+							(
+								Name::new("Run Loop"),
+								// only insert the watcher after first run
+								InsertOn::<GetOutcome, _>::new(
+									FsWatcher::default_cargo()
+								),
+								RunOnDirEvent,
+								InfallibleSequence,
+								children![
+									ParseSourceFiles::action(),
+									(
+										Name::new("Full Rebuild Check"),
+										Sequence,
+										children![
+											FileExprChanged::new(),
+											(
+												Name::new("Pretend Rebuild.."),
+												EndWith(Outcome::Pass)
+											)
+										]
+									),
+									(
+										// never return to emulate server
+										Name::new("Pretend Serve..")
+									),
+								]
 							),
-							RunOnDirEvent,
-							InfallibleSequence,
-							children![
-								ParseSourceFiles::action(),
-								(
-									Name::new("Full Rebuild Check"),
-									Sequence,
-									children![
-										FileExprChanged::new(),
-										(
-											Name::new("Pretend Rebuild.."),
-											EndWith(Outcome::Pass)
-										)
-									]
+						])),
+					EndpointBuilder::get()
+						.with_path("run")
+						.with_description("Run the server with file watching")
+						.with_handler_bundle((Sequence, children![
+							import_source_files(),
+							(
+								Name::new("Run Loop"),
+								// only insert the watcher after first run
+								InsertOn::<GetOutcome, _>::new(
+									FsWatcher::default_cargo()
 								),
-								(
-									// never return to emulate server
-									Name::new("Pretend Serve..")
-								),
-							]
-						),
-						// respond_ok()
-					]),
-					named_route("run", children![
-						exact_path_match(),
-						import_source_files(),
-						(
-							Name::new("Run Loop"),
-							// only insert the watcher after first run
-							InsertOn::<GetOutcome, _>::new(
-								FsWatcher::default_cargo()
+								RunOnDirEvent,
+								InfallibleSequence,
+								children![
+									ParseSourceFiles::action(),
+									(
+										Name::new("Build Check"),
+										Sequence,
+										children![
+											FileExprChanged::new(),
+											build_wasm(),
+											BuildServer,
+										]
+									),
+									ExportStaticContent,
+									// never returns an outcome
+									RunServer,
+									// bevyhow!("unreachable! server shouldnt exit")
+								]
 							),
-							RunOnDirEvent,
-							InfallibleSequence,
+						])),
+					EndpointBuilder::get()
+						.with_path("serve")
+						.with_description("Build and serve the application")
+						.with_handler_bundle((
+							Name::new("Serve"),
+							Sequence,
 							children![
-								ParseSourceFiles::action(),
-								(
-									Name::new("Build Check"),
-									Sequence,
-									children![
-										FileExprChanged::new(),
-										build_wasm(),
-										BuildServer,
-									]
-								),
+								BuildServer,
 								ExportStaticContent,
-								// never returns an outcome
 								RunServer,
-								// bevyhow!("unreachable! server shouldnt exit")
 							]
-						),
-					]),
-					named_route("serve", children![
-						exact_path_match(),
-						(Name::new("Serve"), Sequence, children![
+						)),
+					EndpointBuilder::get()
+						.with_path("deploy")
+						.with_description("Full deployment pipeline")
+						.with_handler_bundle((Sequence, children![
+							import_and_parse_source_files(),
+							// apply after import to avoid clobber,
+							// the scene loaded likely contains a PackageConfig
+							apply_deploy_config(),
+							build_wasm(),
 							BuildServer,
 							ExportStaticContent,
-							RunServer,
-						]),
-					]),
-					named_route("deploy", children![
-						exact_path_match(),
-						import_and_parse_source_files(),
-						// apply after import to avoid clobber,
-						// the scene loaded likely contains a PackageConfig
-						apply_deploy_config(),
-						build_wasm(),
-						BuildServer,
-						ExportStaticContent,
-						CompileLambda,
-						// push assets directly before deploying
-						// the lambda function to minimize
-						// server version mismatch
-						PushAssets,
-						PushHtml,
-						DeployLambda,
-						WatchLambda,
-						respond_ok()
-					])
+							CompileLambda,
+							// push assets directly before deploying
+							// the lambda function to minimize
+							// server version mismatch
+							PushAssets,
+							PushHtml,
+							DeployLambda,
+							WatchLambda
+						]))
 				],
 			)
 		}),
@@ -207,33 +242,13 @@ fn apply_deploy_config() -> impl Bundle {
 }
 
 
-fn named_route(name: impl AsRef<str>, children: impl Bundle) -> impl Bundle {
-	let name = name.as_ref();
-	(
-		Name::new(name.to_string()),
-		PathPartial::new(name),
-		Sequence,
-		children,
-	)
-}
 
-fn single_action_route(
-	name: impl AsRef<str>,
-	action: impl Bundle,
-) -> impl Bundle {
-	named_route(name, children![exact_path_match(), action, respond_ok()])
-}
 
 fn beet_site_cargo_build_cmd() -> CargoBuildCmd {
 	CargoBuildCmd::default().package("beet_site")
 }
 
-fn respond_ok() -> impl Bundle {
-	(
-		Name::new("Response"),
-		StatusCode::OK.into_endpoint_handler(),
-	)
-}
+
 
 
 // fn new_from_template() -> impl Bundle {

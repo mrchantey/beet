@@ -34,7 +34,7 @@ serde = [
 _sweet_runner = ["sweet/runner"]
 
 [dependencies]
-beet_core.workspace = true
+beet_core = {workspace = true, features=["ansi_paint"]}
 beet_net = {workspace = true, features=["flow"]}
 beet_dom.workspace = true
 beet_flow.workspace = true
