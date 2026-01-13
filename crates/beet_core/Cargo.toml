@@ -33,7 +33,8 @@ bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
-_sweet_runner = ["sweet/runner"]
+# only uncomment when needed, cyclic dev deps break rust analyzer in weird ways
+# _sweet_runner = ["sweet/runner"]
 
 fs = [
 	"dep:notify",

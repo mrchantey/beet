@@ -115,7 +115,7 @@ fn run_deno() -> impl Bundle {
 				let args =
 					env_ext::args().into_iter().skip(2).collect::<Vec<_>>();
 				let child = CommandConfig::new("deno")
-					.env("SWEET_ROOT", env_ext::var("SWEET_ROOT")?)
+					.env("WORKSPACE_ROOT", env_ext::var("WORKSPACE_ROOT")?)
 					.arg("--allow-read")
 					.arg("--allow-net")
 					.arg("--allow-env")

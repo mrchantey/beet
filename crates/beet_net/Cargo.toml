@@ -59,7 +59,8 @@ rustls-tls = [
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls"
 ]
-_sweet_runner = ["sweet/runner"]
+# only uncomment when needed, cyclic dev deps break rust analyzer in weird ways
+# _sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true

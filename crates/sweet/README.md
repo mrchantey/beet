@@ -44,7 +44,7 @@ There are three steps to setting up the sweet runner:
 	# wasm requires the cli: `cargo binstall sweet-cli`
 	runner = 'sweet run-wasm'
 	[env]
-	SWEET_ROOT = { value = "", relative = true }
+	WORKSPACE_ROOT = { value = "", relative = true }
 	```
 3. Add the following attributes to binary entrypoints like `src/main.rs`.
 	```rust

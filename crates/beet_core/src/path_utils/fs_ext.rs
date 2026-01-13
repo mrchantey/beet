@@ -150,7 +150,7 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 	}
 }
 
-/// 1. tries to get the `SWEET_ROOT` env var.
+/// 1. tries to get the `WORKSPACE_ROOT` env var.
 /// 2. if wasm, returns an empty path
 /// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
 /// 4. Otherwise returns cwd

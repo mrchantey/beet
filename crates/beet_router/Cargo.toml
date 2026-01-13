@@ -31,7 +31,6 @@ serde = [
 	"dep:serde_json",
 	"beet_core/serde",
 ]
-_sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core = {workspace = true, features=["ansi_paint"]}

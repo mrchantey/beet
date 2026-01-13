@@ -17,4 +17,4 @@ rustflags = [
 ]
 
 [env]
-SWEET_ROOT = { value = "", relative = true }
+WORKSPACE_ROOT = { value = "", relative = true }
