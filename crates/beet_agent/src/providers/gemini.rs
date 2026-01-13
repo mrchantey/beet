@@ -158,12 +158,6 @@ fn gemini_message_request(
 			// println!("Gemini event: {body:#?}");
 
 			dump.push(body.clone());
-			fs_ext::write_async(
-				AbsPathBuf::new_workspace_rel("target/ai-dump.json").unwrap(),
-				serde_json::to_string_pretty(&dump).unwrap(),
-			)
-			.await
-			.unwrap();
 
 
 			// Update token usage if present
@@ -200,12 +194,15 @@ fn gemini_message_request(
 		queue
 			.entity(actor)
 			.with_then(move |mut entity| {
-				let mut tokens = entity.get_mut::<TokenUsage>().unwrap();
-				tokens.input_tokens += input_tokens;
-				tokens.output_tokens += output_tokens;
+				super::shared::update_token_usage(
+					&mut entity,
+					input_tokens,
+					output_tokens,
+				);
 			})
 			.await;
 
+		super::shared::write_dump(&dump).await?;
 		spawner.finish_message().await?;
 		Ok(())
 	});

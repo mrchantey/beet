@@ -159,12 +159,6 @@ fn openai_message_request(
 				continue;
 			};
 			dump.push(body.clone());
-			fs_ext::write_async(
-				AbsPathBuf::new_workspace_rel("target/ai-dump.json").unwrap(),
-				serde_json::to_string_pretty(&dump).unwrap(),
-			)
-			.await
-			.unwrap();
 
 			// body.xref().xprint_debug_formatted("response");
 			// https://platform.openai.com/docs/api-reference/responses_streaming/response
@@ -247,10 +241,11 @@ fn openai_message_request(
 								.get_mut::<OpenAiAgent>()
 								.unwrap()
 								.prev_response_id = Some(id);
-							let mut tokens =
-								entity.get_mut::<TokenUsage>().unwrap();
-							tokens.input_tokens += input_tokens;
-							tokens.output_tokens += output_tokens;
+							super::shared::update_token_usage(
+								&mut entity,
+								input_tokens,
+								output_tokens,
+							);
 						})
 						.await;
 					spawner.finish_message().await?;
@@ -264,6 +259,7 @@ fn openai_message_request(
 				}
 			};
 		}
+		super::shared::write_dump(&dump).await?;
 		Ok(())
 	});
 	Ok(())
