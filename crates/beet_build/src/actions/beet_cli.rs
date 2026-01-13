@@ -205,6 +205,7 @@ fn watch() -> impl Bundle {
 		children![
 			(
 				Name::new("Run command"),
+				ContinueRun,
 				OnSpawn::observe(
 					|ev: On<GetOutcome>,
 					 mut cmd_runner: CommandRunner|

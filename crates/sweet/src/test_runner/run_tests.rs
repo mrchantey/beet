@@ -89,64 +89,49 @@ mod tests {
 	use super::*;
 	use test::TestDescAndFn;
 
-	fn run_test(
-		test: TestDescAndFn,
-	) -> impl std::future::Future<Output = TestOutcome> {
+	fn run_test(test: TestDescAndFn) -> TestOutcome {
 		test_runner_ext::run(None, test)
 	}
 
 	#[sweet::test]
-	async fn works_sync() {
-		run_test(test_ext::new_auto(|| Ok(())))
-			.await
-			.xpect_eq(TestOutcome::Pass);
-		run_test(test_ext::new_auto(|| Err("pizza".into())))
-			.await
-			.xpect_eq(
-				TestFail::Err {
-					message: "pizza".into(),
-				}
-				.into(),
-			);
+	fn works_sync() {
+		run_test(test_ext::new_auto(|| Ok(()))).xpect_eq(TestOutcome::Pass);
+		run_test(test_ext::new_auto(|| Err("pizza".into()))).xpect_eq(
+			TestFail::Err {
+				message: "pizza".into(),
+			}
+			.into(),
+		);
 		run_test(test_ext::new_auto(|| panic!("expected")).with_should_panic())
-			.await
 			.xpect_eq(TestOutcome::Pass);
 		run_test(test_ext::new_auto(|| Ok(())).with_should_panic())
-			.await
 			.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 		run_test(
 			test_ext::new_auto(|| panic!("boom"))
 				.with_should_panic_message("boom"),
 		)
-		.await
 		.xpect_eq(TestOutcome::Pass);
 		run_test(
 			test_ext::new_auto(|| Ok(())).with_should_panic_message("boom"),
 		)
-		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
 			}
 			.into(),
 		);
-		run_test(test_ext::new_auto(|| panic!("pizza")))
-			.await
-			.xpect_eq(
-				TestFail::Panic {
-					payload: Some("pizza".into()),
-					location: Some(FileSpan::new_with_start(
-						file!(),
-						line!() - 7,
-						39,
-					)),
-				}
-				.into(),
-			);
+		let line = line!() + 1;
+		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
+			TestFail::Panic {
+				payload: Some("pizza".into()),
+				location: Some(FileSpan::new_with_start(file!(), line, 39)),
+			}
+			.into(),
+		);
 	}
 
 	#[sweet::test]
-	async fn works_async() {
+	fn works_async() {
 		use crate::test_runner::register_async_test;
 
 
@@ -157,7 +142,6 @@ mod tests {
 			});
 			Ok(())
 		}))
-		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(test_ext::new_auto(|| {
@@ -167,7 +151,6 @@ mod tests {
 			});
 			Ok(())
 		}))
-		.await
 		.xpect_eq(
 			TestFail::Err {
 				message: "pizza".into(),
@@ -185,7 +168,6 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
-		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -198,7 +180,6 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
-		.await
 		.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 
 		run_test(
@@ -211,7 +192,6 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
-		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -224,7 +204,6 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
-		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
@@ -232,6 +211,7 @@ mod tests {
 			.into(),
 		);
 
+		let line = line!() + 5;
 		run_test(test_ext::new_auto(|| {
 			register_async_test(async {
 				async_ext::yield_now().await;
@@ -240,15 +220,10 @@ mod tests {
 			});
 			Ok(())
 		}))
-		.await
 		.xpect_eq(
 			TestFail::Panic {
 				payload: Some("pizza".into()),
-				location: Some(FileSpan::new_with_start(
-					file!(),
-					line!() - 10,
-					16,
-				)),
+				location: Some(FileSpan::new_with_start(file!(), line, 16)),
 			}
 			.into(),
 		);

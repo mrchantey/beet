@@ -54,6 +54,7 @@ impl FsWatcher {
 				.with_exclude("*.git*")
 				// temp until we get fine grained codegen control
 				.with_exclude("*codegen*")
+				.with_exclude("*rustc-ice-*")
 				.with_exclude("*target*"),
 			// avoid short burst refreshing
 			debounce: Duration::from_millis(100),

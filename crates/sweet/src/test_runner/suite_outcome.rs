@@ -124,8 +124,8 @@ pub(crate) fn trigger_timeouts(
 mod tests {
 	use super::*;
 
-	#[sweet::test]
-	async fn timeout() {
+	#[test]
+	fn timeout() {
 		test_runner_ext::run(
 			Some("--timeout_ms=100"),
 			test_ext::new_auto(|| {
@@ -136,7 +136,6 @@ mod tests {
 				Ok(())
 			}),
 		)
-		.await
 		.as_fail()
 		.unwrap()
 		.is_timeout()
