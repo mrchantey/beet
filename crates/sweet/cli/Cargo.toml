@@ -21,4 +21,4 @@ beet = { workspace = true, features = ["build","net","router"] }
 # bevy = { workspace = true,features = ["reflect_auto_register_static"]}
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

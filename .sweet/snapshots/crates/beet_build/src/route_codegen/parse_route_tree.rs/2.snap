@@ -1,0 +1,15 @@
+#[allow(unused, missing_docs)]
+pub mod routes {
+    use super::*;
+    #[allow(unused, missing_docs)]
+    pub mod foo {
+        use super::*;
+        #[allow(unused, missing_docs)]
+        pub mod bar {
+            use super::*;
+            pub fn bazz(bar: &str, bazz: &str) -> String {
+                format!("/foo/{}/{}", bar, bazz)
+            }
+        }
+    }
+}

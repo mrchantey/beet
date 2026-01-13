@@ -1,13 +1,17 @@
+//! ## Cross-platform networking utilities
+//!
+//! Beet net provides general purpose primitives for communicating between systems.
+//!
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(feature = "aws", feature(if_let_guard))]
 
 
-mod http_utils;
+mod exchange;
 mod object_storage;
 mod server;
 pub mod sockets;
-mod transport;
+mod client;
 
 pub mod prelude {
 
@@ -23,7 +27,7 @@ pub mod prelude {
 	/// Default port for websocket connections (geckodriver only, chromedriver uses default port): 8339
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
-	pub use crate::http_utils::*;
+	pub use crate::exchange::*;
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
 	pub use crate::sockets;

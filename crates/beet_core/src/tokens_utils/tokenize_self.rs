@@ -245,7 +245,6 @@ impl_self_tokens!(
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

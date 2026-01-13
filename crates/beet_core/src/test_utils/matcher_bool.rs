@@ -7,7 +7,7 @@ pub impl bool {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// true.xpect_true();
 	/// ```
 	///
@@ -24,7 +24,7 @@ pub impl bool {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// false.xpect_false();
 	/// ```
 	///

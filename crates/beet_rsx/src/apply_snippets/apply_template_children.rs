@@ -5,7 +5,8 @@ use beet_dom::prelude::*;
 
 /// Marker type indicating this entity was spawned as a bundle and
 /// should be converted to an Ok html response by [`html_bundle_to_response`]
-#[derive(Component)]
+#[derive(Reflect, Component)]
+#[reflect(Component)]
 pub struct HtmlBundle;
 
 /// A node which is a descendant of a template root
@@ -70,7 +71,7 @@ pub fn apply_template_children(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {

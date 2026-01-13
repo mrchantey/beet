@@ -1,0 +1,8 @@
+[1mUsage: [0mbeet_router-d56469ae0ceb62cc
+
+Root endpoint
+
+
+[1mAvailable subcommands:
+[0m  [32musers[0m - [2mList all users[0m
+  [32mposts[0m - [2mList all posts[0m

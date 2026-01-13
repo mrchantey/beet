@@ -14,7 +14,6 @@ pub fn dom_imports() -> TokenStream {
 			#[allow(unused)]
 			use beet_dom::prelude::*;
 			#[allow(unused)]
-			use beet_core::prelude::*;
 		}
 	} else {
 		quote::quote! {

@@ -46,7 +46,8 @@ pub fn parse_route_file_rs(
 			commands.spawn((
 				ChildOf(entity),
 				RouteFileMethod::new_with(
-					RouteInfo::new(route_file.route_path.clone(), method),
+					route_file.route_path.clone(),
+					method,
 					func,
 				),
 			));
@@ -59,8 +60,8 @@ pub fn parse_route_file_rs(
 #[cfg(test)]
 mod test {
 	use super::super::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	#[test]
 	fn works() {
@@ -84,10 +85,7 @@ mod test {
 			.unwrap()
 			.clone();
 		// send_wrapper::SendWrapper::assert_send(&tokens);
-		route_method.route_info.method.xpect_eq(HttpMethod::Get);
-		route_method
-			.route_info
-			.path
-			.xpect_eq(RoutePath::new("/docs"));
+		route_method.method.xpect_eq(HttpMethod::Get);
+		route_method.path.xpect_eq(RoutePath::new("/docs"));
 	}
 }

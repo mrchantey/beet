@@ -1,4 +1,5 @@
 //! Example usage of the test runner
+use beet_core::prelude::*;
 use sweet::prelude::*;
 
 

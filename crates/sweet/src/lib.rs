@@ -23,16 +23,26 @@ extern crate test;
 // required for the `#[sweet::test]` macro to use the correct thread local
 #[cfg(test)]
 extern crate self as sweet;
+mod utils;
 // the #[sweet::test] macro
-pub use bevy_runner::test_runner;
 pub use sweet_macros;
 pub use sweet_macros::test;
-pub mod bevy_runner;
-pub mod test_runner_ext;
+#[cfg(feature = "runner")]
+pub use test_runner::test_runner;
+#[cfg(not(feature = "runner"))]
+pub use utils::run_libtest_pretty::test_runner;
+#[cfg(feature = "runner")]
+mod test_runner;
+#[cfg(feature = "runner")]
+pub use test_runner::register_async_test as handle_async_test;
+#[cfg(not(feature = "runner"))]
+pub use utils::block_on_async_test as handle_async_test;
 
 pub mod prelude {
-	pub use crate::bevy_runner::*;
-	pub use crate::test_runner_ext::*;
+	#[cfg(feature = "runner")]
+	pub use crate::test_runner::*;
+	pub use crate::utils::*;
+	#[cfg(feature = "runner")]
 	pub use beet_core::test_utils::*;
 }
 

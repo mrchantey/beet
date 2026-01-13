@@ -185,8 +185,9 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
+	use std::sync::Arc;
+	use std::sync::Mutex;
 
 	#[test]
 	fn signals() {

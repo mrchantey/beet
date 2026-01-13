@@ -39,7 +39,7 @@ fn wasm_bindgen() -> impl Bundle {
 			 mut query: RouteQuery,
 			 mut cmd_runner: CommandRunner|
 			 -> Result {
-				let exe_path = query.dyn_segment(&ev, "binary-path")?;
+				let exe_path = query.dyn_segment(ev.target(), "binary-path")?;
 				path_ext::assert_exists(&exe_path)?;
 				let cmd_config = CommandConfig::new("wasm-bindgen")
 					.arg("--out-dir")
@@ -60,28 +60,31 @@ fn wasm_bindgen() -> impl Bundle {
 fn init_deno() -> impl Bundle {
 	(
 		Name::new("Init Deno"),
-		OnSpawn::observe(|mut ev: On<GetOutcome>| -> Result {
-			let deno_runner_path = deno_runner_path();
-			let deno_str = include_str!("./deno.ts");
+		OnSpawn::observe(
+			|ev: On<GetOutcome>, mut commands: Commands| -> Result {
+				let deno_runner_path = deno_runner_path();
+				let deno_str = include_str!("./deno.ts");
 
-			// return if the deno file already exists
-			if fs_ext::exists(&deno_runner_path)? {
-				let runner_hash = fs_ext::hash_file(&deno_runner_path)?;
-				let deno_hash = fs_ext::hash_string(deno_str);
-				if runner_hash == deno_hash {
-					ev.trigger_with_cx(Outcome::Pass);
-					return Ok(());
-				}
-			};
-
-			let deno_installed =
-				match Command::new("deno").arg("--version").status() {
-					Ok(val) => val.success(),
-					_ => false,
+				// return if the deno file already exists
+				if fs_ext::exists(&deno_runner_path)? {
+					let runner_hash = fs_ext::hash_file(&deno_runner_path)?;
+					let deno_hash = fs_ext::hash_string(deno_str);
+					if runner_hash == deno_hash {
+						commands
+							.entity(ev.target())
+							.trigger_target(Outcome::Pass);
+						return Ok(());
+					}
 				};
-			if !deno_installed {
-				bevybail!(
-					"
+
+				let deno_installed =
+					match Command::new("deno").arg("--version").status() {
+						Ok(val) => val.success(),
+						_ => false,
+					};
+				if !deno_installed {
+					bevybail!(
+						"
 🦖 Sweet uses Deno for the wasm runner 🦖
 
 Install Deno via:
@@ -90,15 +93,16 @@ powershell: 	irm https://deno.land/install.ps1 | iex
 website: 			https://docs.deno.com/runtime/getting_started/installation/
 
 "
-				);
-			}
-			println!("copying deno file to {}", deno_runner_path.display());
+					);
+				}
+				println!("copying deno file to {}", deno_runner_path.display());
 
-			// wasm-bindgen will ensure parent dir exists
-			fs::write(deno_runner_path, deno_str)?;
-			ev.trigger_with_cx(Outcome::Pass);
-			Ok(())
-		}),
+				// wasm-bindgen will ensure parent dir exists
+				fs::write(deno_runner_path, deno_str)?;
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
+				Ok(())
+			},
+		),
 	)
 }
 fn run_deno() -> impl Bundle {
@@ -111,7 +115,7 @@ fn run_deno() -> impl Bundle {
 				let args =
 					env_ext::args().into_iter().skip(2).collect::<Vec<_>>();
 				let child = CommandConfig::new("deno")
-					.env("SWEET_ROOT", env_ext::var("SWEET_ROOT")?)
+					.env("WORKSPACE_ROOT", env_ext::var("WORKSPACE_ROOT")?)
 					.arg("--allow-read")
 					.arg("--allow-net")
 					.arg("--allow-env")

@@ -26,6 +26,7 @@ server = [
 lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
+flow = ["dep:beet_flow"]
 aws = [
 	"serde",
 	"dep:crc-fast",
@@ -38,27 +39,32 @@ serde = [
 	"dep:serde",
 	"dep:serde_json",
 	"dep:serde_urlencoded",
-	"dep:clap",
 	"dep:base64",
 	"uuid/serde",
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
+ureq = ["dep:ureq"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
+	"ureq?/native-tls",
 	"async-tungstenite?/async-native-tls",
 	"dep:async-native-tls"
 ]
 rustls-tls = [
 	"reqwest?/rustls-tls",
+	"ureq?/rustls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls"
 ]
+# only uncomment when needed, cyclic dev deps break rust analyzer in weird ways
+# _sweet_runner = ["sweet/runner"]
 
 [dependencies]
 beet_core.workspace = true
+beet_flow = { workspace = true, optional = true }
 
 bevy.workspace = true
 
@@ -74,7 +80,6 @@ uuid = {workspace = true, features = ["v7"]}
 async-lock.workspace = true
 
 # serde
-clap = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
@@ -98,6 +103,7 @@ async-process = { workspace = true, optional = true }
 reqwest = { version = "0.12", default-features = false, optional = true, features = [
 	"stream",
 ] }
+ureq = { version = "3.1", default-features = false, optional = true }
 async-tungstenite = { version = "0.31", optional = true, default-features = false, features = [
 "async-std-runtime",
 "futures-03-sink"
@@ -105,8 +111,6 @@ async-tungstenite = { version = "0.31", optional = true, default-features = fals
 async-lock = {workspace = true, optional = true }
 blocking = { version = "1.6", optional = true }
 async-native-tls = { version = "0.5", optional = true }
-
-#💡 server
 
 #💡 server
 hyper = { version = "1.7", features = ["server","http1"], optional = true }
@@ -139,7 +143,14 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"behavior-version-latest",
 ] }
 # actually a dev-dep but we need optional
-tokio = { workspace=true, optional=true }
+# strictly for testing only
+tokio = { version = "1", features = [
+	# "macros",
+	# "sync",
+	# "rt",
+	# "rt-multi-thread",
+	# "time",
+], optional=true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -168,5 +179,10 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_net = {path = ".", features = ["tungstenite", "native-tls"] }
+beet_core = { workspace = true, features = ["testing"] }
+beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 sweet.workspace = true
+
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+sweet = { workspace = true, features = ["runner"] }

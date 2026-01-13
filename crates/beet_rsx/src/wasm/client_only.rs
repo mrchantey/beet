@@ -50,7 +50,7 @@ pub(crate) fn mount_client_only(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	// use sweet::prelude::*;
+	// use beet_core::prelude::*;
 
 	#[test]
 	// we cant do anything with this because

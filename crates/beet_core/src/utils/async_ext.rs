@@ -77,7 +77,6 @@ pub async fn timeout<F: Future>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn timeout_completes_before_timeout() {

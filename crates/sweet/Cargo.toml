@@ -12,24 +12,25 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "nightly"]
+# see readme for feature docs
+default = ["runner", "serde", "nightly"]
+runner = ["dep:beet_core", "dep:beet_net", "serde"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:ron"]
 
 [dependencies]
 #💡 internal
-beet_core = { workspace = true, features = ["testing"] }
-beet_flow.workspace = true
-beet_net.workspace = true
-beet_router.workspace = true
+beet_core = { workspace = true, optional = true, features=["testing"] }
+beet_net = { workspace = true, optional = true }
 sweet_macros.workspace = true
 #💡 misc
 extend.workspace = true
 send_wrapper.workspace = true
+
 #💡 logging
 nu-ansi-term.workspace = true
-diff = "0.1"
+
 
 #💡 bevy
 bevy.workspace = true
@@ -43,9 +44,9 @@ prettyplease = { workspace = true, optional = true }
 #💡 serde
 ron = { workspace = true, optional = true }
 
-[dev-dependencies]
-sweet = {path = ".", features = ["tokens"] }
-
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook.workspace = true
+
+[dev-dependencies]
+sweet = {path = ".", features = ["runner", "tokens"] }

@@ -65,11 +65,11 @@ prettyplease.workspace = true
 cargo-manifest = "0.19"
 dotenv.workspace = true
 pulldown-cmark = { version = "0.13", optional = true }
-clap.workspace = true
 
 #💡 Bevy
 bevy = { workspace = true, features = ["bevy_scene"] }
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["tokens"] }
+beet_core = { workspace = true, features = ["testing"] }
+sweet = { workspace = true, features = ["runner", "tokens"] }
 send_wrapper.workspace = true

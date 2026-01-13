@@ -102,7 +102,6 @@ pub impl Vec3 {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	pub fn works() {

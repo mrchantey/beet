@@ -1,19 +1,35 @@
 // SIDEBAR RESIZE
 const SCREEN_BREAKPOINT = 1024;
 
-// TODO mobile sidebar button
-// hideOnSmallScreen()
+hideOnSmallScreen();
 handleCurrentPage();
+handleMenuToggle();
 
 function hideOnSmallScreen() {
 	const sidebar = document.getElementById("sidebar");
+	if (!sidebar) return;
+
 	const hide = () => sidebar.setAttribute("aria-hidden", "true");
 	const show = () => sidebar.setAttribute("aria-hidden", "false");
 
+	// Start hidden on small screens
 	if (globalThis.innerWidth < SCREEN_BREAKPOINT) hide();
+
+	// Hide/show on resize
 	globalThis.addEventListener("resize", () => {
 		if (globalThis.innerWidth >= SCREEN_BREAKPOINT) show();
 		else hide();
+	});
+}
+
+function handleMenuToggle() {
+	const menuButton = document.getElementById("menu-button");
+	const sidebar = document.getElementById("sidebar");
+
+	if (!menuButton || !sidebar) return;
+	menuButton.addEventListener("click", () => {
+		const isHidden = sidebar.getAttribute("aria-hidden") === "true";
+		sidebar.setAttribute("aria-hidden", isHidden ? "false" : "true");
 	});
 }
 
@@ -29,9 +45,9 @@ function handleCurrentPage() {
 	// handle show selected
 	links.forEach((link) => {
 		// console.log('links', link.href)
-		if (link.href === globalThis.location.href)
+		if (link.href === globalThis.location.href) {
 			link.setAttribute("aria-current", "page");
-		else link.removeAttribute("aria-current");
+		} else link.removeAttribute("aria-current");
 	});
 
 	// handle open sublists

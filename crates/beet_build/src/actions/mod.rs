@@ -20,5 +20,5 @@ mod sync_buckets;
 pub use sync_buckets::*;
 mod cli_plugin;
 pub use cli_plugin::*;
-pub use default_cli_router::*;
-mod default_cli_router;
+pub use beet_cli::*;
+mod beet_cli;

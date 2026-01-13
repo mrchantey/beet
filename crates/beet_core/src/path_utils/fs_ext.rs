@@ -59,6 +59,9 @@ pub fn copy_recursive(
 
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();
+	#[cfg(target_arch = "wasm32")]
+	return js_runtime::exists(&path.to_string_lossy()).xok();
+	#[cfg(not(target_arch = "wasm32"))]
 	match fs::exists(path) {
 		Ok(val) => Ok(val),
 		Err(err) => Err(FsError::io(path, err)),
@@ -147,7 +150,7 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 	}
 }
 
-/// 1. tries to get the `SWEET_ROOT` env var.
+/// 1. tries to get the `WORKSPACE_ROOT` env var.
 /// 2. if wasm, returns an empty path
 /// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
 /// 4. Otherwise returns cwd
@@ -301,10 +304,8 @@ pub fn test_dir() -> PathBuf {
 }
 
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn workspace_root() {
@@ -316,7 +317,8 @@ mod test {
 			.xpect_eq("beet");
 		fs_ext::workspace_root()
 			.join("Cargo.lock")
-			.exists()
+			.xmap(fs_ext::exists)
+			.unwrap()
 			.xpect_true();
 	}
 

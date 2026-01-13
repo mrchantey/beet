@@ -296,7 +296,7 @@ impl BucketProvider for S3Provider {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[sweet::test]
 	#[ignore = "hits remote s3"]

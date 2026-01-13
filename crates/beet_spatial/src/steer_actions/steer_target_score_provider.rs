@@ -33,8 +33,8 @@ fn provide_score(
 	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
 	query: Query<&SteerTargetScoreProvider>,
 ) -> Result {
-	let action = query.get(ev.action())?;
-	let (transform, target) = agents.get(ev.action())?;
+	let action = query.get(ev.target())?;
+	let (transform, target) = agents.get(ev.target())?;
 	let score = if let Ok(target) = target.get_position(&transforms) {
 		let dist = transform.translation().distance_squared(target);
 		if dist >= action.min_radius.powi(2)
@@ -48,7 +48,7 @@ fn provide_score(
 		0.
 	};
 	commands
-		.entity(ev.action())
+		.entity(ev.target())
 		.trigger_target(Score::new(score));
 	Ok(())
 }

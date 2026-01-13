@@ -25,9 +25,7 @@ fn parse(input: ItemFn) -> Result<TokenStream> {
 	let impl_template_bundle = impl_template_bundle(&input, &ident, &fields)?;
 
 	let imports = if pkg_ext::is_internal() {
-		quote! {
-			use beet_core::prelude::*;
-		}
+		quote! {}
 	} else {
 		quote! {
 			use beet::prelude::*;
@@ -90,7 +88,7 @@ fn impl_template_bundle(
 	let param_fields = system_param_fields(fields).map(|field| {
 		let ident = &field.ident;
 		let ty = &field.ty;
-		let attrs = &field.attrs;
+		let attrs = &field.non_field_attrs();
 		let mutability = field.mutability;
 		quote! {
 			#(#attrs)*
@@ -216,27 +214,24 @@ const SYSTEM_PARAM_IDENTS: [&str; 7] = [
 fn prop_fields<'a>(
 	fields: &'a [NodeField],
 ) -> impl Iterator<Item = &'a NodeField<'a>> {
-	fields
-		.iter()
-		.filter(|f| !f.last_segment_matches("Entity"))
-		.filter(|f| {
-			!SYSTEM_PARAM_IDENTS
-				.iter()
-				.any(|id| f.last_segment_matches(id))
-		})
+	fields.iter().filter(|f| {
+		!f.last_segment_matches("Entity") && !is_system_param_field(f)
+	})
 }
 
 fn system_param_fields<'a>(
 	fields: &'a [NodeField],
 ) -> impl Iterator<Item = &'a NodeField<'a>> {
-	fields
-		.iter()
-		.filter(|f| !f.last_segment_matches("Entity"))
-		.filter(|f| {
-			SYSTEM_PARAM_IDENTS
-				.iter()
-				.any(|id| f.last_segment_matches(id))
-		})
+	fields.iter().filter(|f| {
+		is_system_param_field(f) && !f.last_segment_matches("Entity")
+	})
+}
+
+fn is_system_param_field(field: &NodeField) -> bool {
+	field.field_attributes.contains("param")
+		|| SYSTEM_PARAM_IDENTS
+			.iter()
+			.any(|id| field.last_segment_matches(id))
 }
 
 
@@ -252,7 +247,7 @@ fn entity_param_ident<'a>(fields: &'a [NodeField]) -> Option<&'a Ident> {
 mod test {
 	use super::with_captured_lifetimes;
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use syn::PathSegment;
 
 	#[test]
@@ -301,6 +296,8 @@ mod test {
 				world: &mut World,
 				res: Res<Time>,
 				mut query: Query<&mut Transform>,
+				#[field(param)]
+				custom_query: CustomQuery
 			) -> impl Bundle{()}
 		})
 		.xpect_snapshot();

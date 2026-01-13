@@ -9,11 +9,12 @@ pub fn PushAssets() -> impl Bundle {
 		Name::new("Push Assets"),
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      pkg_config: Res<PackageConfig>|
+			      pkg_config: Res<PackageConfig>,
+			      commands: AsyncCommands|
 			      -> Result {
 				let src = AbsPathBuf::new_workspace_rel("assets")?.to_string();
 				let dst = format!("s3://{}/", pkg_config.assets_bucket_name());
-				s3_sync(ev, src, dst);
+				s3_sync(ev, src, dst, commands);
 				Ok(())
 			},
 		),
@@ -26,11 +27,12 @@ pub fn PullAssets() -> impl Bundle {
 		Name::new("Pull Assets"),
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      pkg_config: Res<PackageConfig>|
+			      pkg_config: Res<PackageConfig>,
+			      commands: AsyncCommands|
 			      -> Result {
 				let src = format!("s3://{}/", pkg_config.assets_bucket_name());
 				let dst = AbsPathBuf::new_workspace_rel("assets")?.to_string();
-				s3_sync(ev, src, dst);
+				s3_sync(ev, src, dst, commands);
 				Ok(())
 			},
 		),
@@ -45,30 +47,45 @@ pub fn PushHtml() -> impl Bundle {
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      pkg_config: Res<PackageConfig>,
-			      ws_config: Res<WorkspaceConfig>| {
+			      ws_config: Res<WorkspaceConfig>,
+			      commands: AsyncCommands| {
 				let src = ws_config.html_dir.into_abs().to_string();
 				let dst = format!("s3://{}", pkg_config.html_bucket_name());
-				s3_sync(ev, src, dst)
+				s3_sync(ev, src, dst, commands)
 			},
 		),
 	)
 }
 
 
-fn s3_sync(mut ev: On<GetOutcome>, src: String, dst: String) {
+fn s3_sync(
+	ev: On<GetOutcome>,
+	src: String,
+	dst: String,
+	mut commands: AsyncCommands,
+) {
 	let src = src.clone();
 	let dst = dst.clone();
-	ev.run_async(async move |mut action| -> Result {
-		S3Sync {
+	let target = ev.target();
+	commands.run(async move |world: AsyncWorld| {
+		let result = S3Sync {
 			src,
 			dst,
 			delete: true,
 			..default()
 		}
 		.send()
-		// fatal, propagate error instead of Outcome::Fail
-		.await?;
-		action.trigger_with_cx(Outcome::Pass);
-		Ok(())
+		.await;
+
+		world
+			.with_then(move |world| {
+				let outcome = if result.is_ok() {
+					Outcome::Pass
+				} else {
+					Outcome::Fail
+				};
+				world.entity_mut(target).trigger_target(outcome);
+			})
+			.await;
 	});
 }

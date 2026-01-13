@@ -344,7 +344,6 @@ fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
 mod test {
 	use super::*;
 
-
 	#[sweet::test]
 	fn builds_basic_sync_args() {
 		let aws = AwsCli::new()

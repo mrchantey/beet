@@ -39,6 +39,20 @@ pub struct NamedField<'a> {
 }
 
 impl<'a> NamedField<'a> {
+	/// Returns all attributes that are not under the `field` key, ie #[field(default)]
+	pub fn non_field_attrs(&self) -> Vec<&'a Attribute> {
+		self.attrs
+			.iter()
+			.filter(|attr| {
+				if let Meta::List(list) = &attr.meta {
+					list.path.is_ident("field") == false
+				} else {
+					true
+				}
+			})
+			.collect()
+	}
+
 	pub fn parse_item_fn(input: &'a ItemFn) -> Result<Vec<NamedField<'a>>> {
 		input
 			.sig
@@ -232,8 +246,8 @@ impl<'a> NamedField<'a> {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use sweet::prelude::*;
+	use super::NamedField;
+	use crate::prelude::*;
 	use syn::FnArg;
 	use syn::Type;
 

@@ -147,7 +147,7 @@ mod test {
 	use crate::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	const MARKDOWN: &str = r#"
 +++

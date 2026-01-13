@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 
 
-/// This action will insert the provided bundle when the specified action is triggered.
-/// It is designed to work for both [`Run`] and [`End`] events.
+/// This action will insert the provided bundle when the specified event is triggered.
+/// It is designed to work for both [`GetOutcome`] and [`Outcome`] events.
 /// This action also has a corresponding [`RemoveOn`] action.
 /// ## Example
-/// Inserts the `Running` bundle when the `Run` event is triggered.
+/// Inserts the `Running` bundle when the `GetOutcome` event is triggered.
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct InsertOn<E: ActionEvent, B: Bundle + Clone> {
+pub struct InsertOn<E: EntityTargetEvent, B: Bundle + Clone> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
 	/// The target entity to insert the bundle into.
@@ -26,7 +26,7 @@ pub struct InsertOn<E: ActionEvent, B: Bundle + Clone> {
 	phantom: PhantomData<E>,
 }
 
-impl<E: ActionEvent> InsertOn<E, OnSpawnClone> {
+impl<E: EntityTargetEvent> InsertOn<E, OnSpawnClone> {
 	pub fn new_func<B: Bundle>(
 		bundle: impl 'static + Send + Sync + Clone + FnOnce() -> B,
 	) -> Self {
@@ -39,7 +39,7 @@ impl<E: ActionEvent> InsertOn<E, OnSpawnClone> {
 		}
 	}
 }
-impl<E: ActionEvent, B: Bundle + Clone> InsertOn<E, B> {
+impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
 	/// Specify the bundle to be inserted
 	pub fn new(bundle: B) -> Self {
 		Self {
@@ -58,7 +58,9 @@ impl<E: ActionEvent, B: Bundle + Clone> InsertOn<E, B> {
 	}
 }
 
-impl<E: ActionEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
+impl<E: EntityTargetEvent, B: Bundle + Clone + Default> Default
+	for InsertOn<E, B>
+{
 	fn default() -> Self {
 		Self {
 			bundle: default(),
@@ -68,14 +70,16 @@ impl<E: ActionEvent, B: Bundle + Clone + Default> Default for InsertOn<E, B> {
 	}
 }
 
-fn insert<E: ActionEvent, B: Bundle + Clone>(
+fn insert<E: EntityTargetEvent, B: Bundle + Clone>(
 	ev: On<E>,
 	mut commands: Commands,
 	query: Query<&InsertOn<E, B>>,
+	agent_query: AgentQuery,
 ) -> Result {
-	let action = query.get(ev.action())?;
-	let target = action.target_entity.select_target(&ev);
-	commands.entity(target).insert(action.bundle.clone());
+	let action = ev.target();
+	let insert_on = query.get(action)?;
+	let target = insert_on.target_entity.get(action, &agent_query);
+	commands.entity(target).insert(insert_on.bundle.clone());
 	Ok(())
 }
 

@@ -80,9 +80,10 @@ impl ServerAction {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
 				async move |req: Json<Input::Inner<'_>>,
-				            cx: EndpointContext|
+				            action: AsyncEntity|
 				            -> Result<Response> {
-					let out = cx
+					let out = action
+						.world()
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
 					Ok(out.into_action_response())
@@ -91,9 +92,10 @@ impl ServerAction {
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input::Inner<'_>>,
-				            cx: EndpointContext|
+				            action: AsyncEntity|
 				            -> Result<Response> {
-					let out = cx
+					let out = action
+						.world()
 						.run_system_cached_with(handler.clone(), req.0)
 						.await?;
 					Ok(out.into_action_response())
@@ -107,7 +109,7 @@ impl ServerAction {
 		handler: T,
 	) -> EndpointBuilder
 	where
-		T: 'static + Send + Sync + Clone + Fn(Input, EndpointContext) -> Fut,
+		T: 'static + Send + Sync + Clone + Fn(Input, AsyncEntity) -> Fut,
 		Input: 'static + Send + Sync + DeserializeOwned,
 		Out: 'static + Send + Sync + IntoServerActionOut<M2>,
 		Fut: 'static + Send + Future<Output = Out>,
@@ -116,22 +118,20 @@ impl ServerAction {
 		match method.has_body() {
 			// ie `POST`, `PUT`, etc
 			true => builder.with_handler(
-				async move |req: Json<Input>, cx: EndpointContext| {
-					handler.clone()(req.0, cx).await.into_action_response()
+				async move |req: Json<Input>, action: AsyncEntity| {
+					handler.clone()(req.0, action).await.into_action_response()
 				},
 			),
 			// ie `GET`, `DELETE`, etc
 			false => builder.with_handler(
 				async move |req: JsonQueryParams<Input>,
-				            cx: EndpointContext| {
-					handler.clone()(req.0, cx).await.into_action_response()
+				            action: AsyncEntity| {
+					handler.clone()(req.0, action).await.into_action_response()
 				},
 			),
 		}
 	}
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -142,7 +142,9 @@ mod test {
 	#[sweet::test]
 	async fn no_input() {
 		RouterPlugin::world()
-			.spawn((Router, ServerAction::new(HttpMethod::Post, || 2)))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				ServerAction::new(HttpMethod::Post, || 2)
+			}))
 			.oneshot(
 				Request::post("/")
 					// no input means we need to specify unit type
@@ -162,11 +164,10 @@ mod test {
 	#[sweet::test]
 	async fn post() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn((
-			Router,
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			ServerAction::new(HttpMethod::Post, |val: In<u32>| val.0 + 2)
-				.with_path("foo"),
-		));
+				.with_path("foo")
+		}));
 
 		//ok
 		entity
@@ -190,12 +191,11 @@ mod test {
 	#[sweet::test]
 	async fn get_sync() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn((
-			Router,
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
 			ServerAction::new_async(HttpMethod::Get, async |val: u32, _| {
 				val + 2
-			}),
-		));
+			})
+		}));
 
 		//ok
 		entity

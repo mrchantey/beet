@@ -5,7 +5,7 @@ use std::fs::{
 	self,
 };
 use std::io::Write;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 fn main() -> Result {
 	let map = FrozenLakeMap::default_four_by_four();

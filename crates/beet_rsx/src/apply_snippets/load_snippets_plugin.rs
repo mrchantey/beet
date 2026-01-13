@@ -27,7 +27,17 @@ pub fn load_all_file_snippets(world: &mut World) -> Result {
 pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	let config = world.resource::<WorkspaceConfig>();
 
-	let files = ReadDir::files_recursive(config.snippets_dir().into_abs())?;
+	let files = match ReadDir::files_recursive(config.snippets_dir().into_abs())
+	{
+		Ok(files) => files,
+		Err(err) => {
+			warn!(
+				"Error reading snippets directory at {}\n{err}",
+				config.snippets_dir()
+			);
+			return Ok(());
+		}
+	};
 	let num_files = files.len();
 	let start = std::time::Instant::now();
 	// TODO fine-grained loading with watcher

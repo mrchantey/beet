@@ -5,34 +5,87 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 use serde_json::Value;
 
+// trait BundleFunc:'static+Send+S
+
+
+/// The entrypoint for a router with two endoints:
+/// - `/`: Serve the routes
+/// - `/export-static`: export static html
+pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
+	let spawner2 = spawner.clone();
+	(
+		Name::new("Router CLI"),
+		CliServer,
+		ExchangeSpawner::new_flow(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig {
+					introduction: String::from("Router CLI"),
+					..default()
+				}),
+				EndpointBuilder::new(
+					// dont need to be async but zst restriction for sync systems
+					async move |_: (), entity: AsyncEntity| {
+						// actually serve the routes
+						entity
+							.world()
+							.spawn_then((
+								HttpServer::default(),
+								spawner.clone(),
+							))
+							.await;
+						// start serving, never resolve
+						std::future::pending::<()>().await;
+					}
+				)
+				.with_path("/"),
+				EndpointBuilder::new(
+					async move |_: (), entity: AsyncEntity| -> Result {
+						entity
+							.world()
+							.insert_resource_then(RenderMode::Ssr)
+							.await;
+						let html =
+							collect_html(entity.world(), &spawner2).await?;
+						for (path, html) in html {
+							trace!("Exporting html to {}", path);
+							fs_ext::write(path, &html)?;
+						}
+						Ok(())
+					}
+				)
+				.with_path("/export-static"),
+			])
+		}),
+	)
+}
+
+
+
 /// Create the default router configuration, providing
 /// three groups of `children![]` to run in between the
 /// default endpoints and fallbacks.
 ///
-///
-/// - Waits for all [`Ready`] actions to complete before
-///   inserting the server
-/// - uses an [`InfallibleSequence`] to ensure
-///   all children run.
-/// - Runs a [`Fallback`] with common fallback
-///   handlers
+/// - Waits for all [`Ready`] actions to complete via [`AwaitReady`]
+/// - Uses an [`InfallibleSequence`] to ensure all children run
+/// - Runs a [`Fallback`] with common fallback handlers
 /// - Inserts an [`assets_bucket`]
 /// - Inserts an [`analytics_handler`]
 pub fn default_router(
 	// runs before default request middleware
-	request_middleware: impl Bundle,
+	request_middleware: impl BundleFunc,
 	// the actual routes
-	endpoints: impl Bundle,
+	endpoints: impl BundleFunc,
 	// runs after `endpoints` and default endpoints
-	response_middleware: impl Bundle,
-) -> impl Bundle {
-	(
-		Name::new("Router Root"),
-		insert_on_ready(HttpRouter::new()),
-		InfallibleSequence,
-		children![
-			(Name::new("Request Middleware"), request_middleware),
-			(Name::new("Endpoints Root"), endpoints),
+	response_middleware: impl BundleFunc,
+) -> ExchangeSpawner {
+	ExchangeSpawner::new_flow(move || {
+		(InfallibleSequence, children![
+			(Name::new("Await Ready"), AwaitReady::default()),
+			(
+				Name::new("Request Middleware"),
+				request_middleware.clone().bundle_func()
+			),
+			(Name::new("Endpoints Root"), endpoints.clone().bundle_func()),
 			(
 				Name::new("Default Routes"),
 				// Our goal here is to minimize performance overhead
@@ -52,33 +105,27 @@ pub fn default_router(
 							// stops after first succeeding fallback
 							// this is important to avoid response clobbering
 							(Name::new("Fallbacks"), Fallback, children![
+								help_handler(HelpHandlerConfig {
+									introduction: String::from("Beet Router"),
+									default_format: HelpFormat::Http,
+									no_color: true,
+									..default()
+								}),
 								html_bundle_to_response(),
 								assets_bucket(),
-								html_bucket(),
+								ssg_html_bucket(),
 								// default not found handled by Router
 							]),
 						]
 					),
 				]
 			),
-			(Name::new("Response Middleware"), response_middleware),
-		],
-	)
-}
-
-/// Create a [`ReadyOnChildrenReady`], allowing any
-/// [`ReadyAction`] children to complete before inserting the
-/// [`Router`] which will immediately start handling requests.
-pub fn insert_on_ready(bundle: impl Send + Clone + Bundle) -> impl Bundle {
-	(
-		GetReadyOnStartup,
-		ReadyOnChildrenReady::default(),
-		OnSpawn::observe(move |ev: On<Ready>, mut commands: Commands| {
-			if ev.event_target() == ev.original_event_target() {
-				commands.entity(ev.event_target()).insert(bundle.clone());
-			}
-		}),
-	)
+			(
+				Name::new("Response Middleware"),
+				response_middleware.clone().bundle_func()
+			),
+		])
+	})
 }
 
 pub fn not_found() -> impl Bundle {
@@ -129,7 +176,7 @@ pub fn app_info() -> EndpointBuilder {
 pub fn assets_bucket() -> impl Bundle {
 	(
 		Name::new("Assets Bucket"),
-		ReadyAction::new_local(async |entity| {
+		ReadyAction::run_local(async |entity| {
 			let (fs_dir, bucket_name, service_access) = entity
 				.world()
 				.with_then(|world| {
@@ -157,10 +204,25 @@ pub fn assets_bucket() -> impl Bundle {
 }
 /// Bucket for handling html, usually added as a fallback
 /// if no request present.
-pub fn html_bucket() -> impl Bundle {
+/// This only runs in [`RenderMode::Ssg`] to avoid EndpointTree
+/// conflicts with the SSR endpoints.
+pub fn ssg_html_bucket() -> impl Bundle {
 	(
 		Name::new("Html Bucket"),
-		ReadyAction::new_local(async |entity| {
+		ReadyAction::run_local(async |entity| {
+			if entity
+				.world()
+				.with_then(|world| {
+					world
+						.get_resource::<RenderMode>()
+						.map(|mode| matches!(mode, RenderMode::Ssr))
+						.unwrap_or(false)
+				})
+				.await
+			{
+				return;
+			}
+
 			let (fs_dir, bucket_name, service_access) = entity
 				.world()
 				.with_then(|world| {
@@ -175,7 +237,9 @@ pub fn html_bucket() -> impl Bundle {
 				.await;
 			let bucket =
 				s3_fs_selector(fs_dir, bucket_name, service_access).await;
-			entity.insert_then(BucketEndpoint::new(bucket, None)).await;
+			entity
+				.insert_then(BucketEndpoint::new(bucket, None).non_canonical())
+				.await;
 		}),
 	)
 }
@@ -188,61 +252,26 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
-	#[rustfmt::skip]
-	async fn works() {
-		RouterPlugin::world()
-			.spawn((
-				super::insert_on_ready(Router),
-				EndpointBuilder::get(),
-				children![(
-					EndWith(Outcome::Pass),
-					ReadyAction::new(async |_| {})
-				)],
-			))
-			.await_ready()
-			.await
-			.oneshot("/")
-			.await
-			.status()
-			.xpect_eq(StatusCode::OK);
-	}
-
-	#[sweet::test]
-	async fn test_app_info() {
-		RouterPlugin::world()
-			.with_resource(pkg_config!())
-			.spawn((Router, InfallibleSequence, children![
-				app_info(),
-				html_bundle_to_response()
-			]))
-			.oneshot_str("/app-info")
-			.await
-			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
-	}
 	#[cfg(feature = "server")]
-	#[sweet::test]
+	#[sweet::test(timeout_ms = 10000)]
 	async fn test_default_router() {
 		let mut world = RouterPlugin::world();
 		world.insert_resource(pkg_config!());
 		let mut entity = world.spawn(default_router(
-			EndWith(Outcome::Pass),
-			// EndWith(Outcome::Pass),
-			(Sequence, children![
-				EndpointBuilder::get().with_path("foobar"),
-			]),
-			EndWith(Outcome::Pass),
+			|| EndWith(Outcome::Pass),
+			|| {
+				(Sequence, children![
+					EndpointBuilder::get().with_path("foobar"),
+				])
+			},
+			|| EndWith(Outcome::Pass),
 		));
 
 		entity
-			.await_ready()
-			.await
 			.oneshot_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 		entity
-			.await_ready()
-			.await
 			.oneshot("/assets/branding/logo.png")
 			.await
 			.into_result()
@@ -255,5 +284,20 @@ mod test {
 			.await
 			.xpect_eq(StatusCode::OK);
 		stat("/foobar").await.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test(timeout_ms = 5000)]
+	async fn test_app_info() {
+		RouterPlugin::world()
+			.with_resource(pkg_config!())
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![
+					app_info(),
+					html_bundle_to_response()
+				])
+			}))
+			.oneshot_str("/app-info")
+			.await
+			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}
 }

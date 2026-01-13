@@ -21,4 +21,8 @@ bevy.workspace = true
 extend.workspace = true
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
 sweet.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+sweet = { workspace = true, features = ["runner"] }

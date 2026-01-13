@@ -66,17 +66,14 @@ pub fn modify_route_file_tokens(
 		};
 
 		let mut route_path = if let Some(base_route) = &modifier.base_route {
-			base_route
-				.join(&route.route_info.path)
-				.to_string_lossy()
-				.to_string()
+			base_route.join(&route.path).to_string_lossy().to_string()
 		} else {
-			route.route_info.path.to_string_lossy().to_string()
+			route.path.to_string_lossy().to_string()
 		};
 		for ReplaceRoute { from, to } in &modifier.replace_route {
 			route_path = route_path.replace(from, to);
 		}
-		route.route_info.path = RoutePath::new(route_path);
+		route.path = RoutePath::new(route_path);
 	}
 }
 
@@ -84,6 +81,7 @@ pub fn modify_route_file_tokens(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	#[test]
 	fn works() {
@@ -91,7 +89,10 @@ mod test {
 
 		let entity = world
 			.spawn((
-				RouteFileMethod::new(&*file!().replace(".rs", "")),
+				RouteFileMethod::new(
+					&*file!().replace(".rs", ""),
+					HttpMethod::Get,
+				),
 				ModifyRoutePath::default()
 					.base_route("/design")
 					.replace_route(
@@ -105,7 +106,6 @@ mod test {
 		world
 			.get::<RouteFileMethod>(entity)
 			.unwrap()
-			.route_info
 			.path
 			.to_string()
 			.xpect_eq("/design/modify_route_file_tokens");

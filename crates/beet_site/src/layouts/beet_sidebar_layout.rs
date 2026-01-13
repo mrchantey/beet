@@ -4,20 +4,41 @@ use beet::prelude::*;
 
 
 #[template]
-pub fn BeetSidebarLayout(world: &mut World) -> Result<impl Bundle> {
+pub fn BeetSidebarLayout(
+	entity: Entity,
+	world: &mut World,
+) -> Result<impl Bundle> {
+	let endpoint_tree = world.run_system_cached_with(
+		|entity: In<Entity>,
+		 bundle_query: HtmlBundleQuery,
+		 mut route_query: RouteQuery|
+		 -> Result<EndpointTree> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(*entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			route_query.endpoint_tree(actions[0])
+		},
+		entity,
+	)?;
+
 	let sidebar_nodes = world
 		.run_system_cached_with(
 			CollectSidebarNode::collect,
-			CollectSidebarNode {
-				include_filter: GlobFilter::default()
-					.with_include("/")
-					.with_include("/docs*")
-					.with_include("/blog*")
-					.with_include("/design*"),
-				expanded_filter: GlobFilter::default().with_include("/docs"),
-			},
+			(
+				CollectSidebarNode {
+					include_filter: GlobFilter::default()
+						.with_include("/")
+						.with_include("/docs*")
+						.with_include("/blog*")
+						.with_include("/design*"),
+					expanded_filter: GlobFilter::default()
+						.with_include("/docs"),
+				},
+				endpoint_tree,
+			),
 		)?
 		.children;
+
 	// let sidebar_nodes = todo!("get route tree");
 	rsx! {
 		<BeetContext>

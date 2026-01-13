@@ -370,6 +370,12 @@ impl AsyncWorld {
 			world.insert_resource(resource);
 		});
 	}
+	pub async fn insert_resource_then<R: Resource>(&self, resource: R) {
+		self.with_then(move |world: &mut World| {
+			world.insert_resource(resource);
+		})
+		.await;
+	}
 	pub fn with_resource<R: Resource>(
 		&self,
 		func: impl FnOnce(Mut<R>) + Send + 'static,
@@ -579,6 +585,7 @@ impl AsyncEntity {
 		.await
 	}
 
+
 	pub async fn get_mut<T: Component<Mutability = Mutable>, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<T>) -> O,
@@ -598,6 +605,10 @@ impl AsyncEntity {
 
 	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
 		self.get::<T, _>(|comp| comp.clone()).await
+	}
+
+	pub async fn take<T: Component>(&self) -> Option<T> {
+		self.with_then(|mut entity| entity.take()).await
 	}
 
 	pub fn insert<B: Bundle>(&self, bundle: B) -> &Self {
@@ -797,7 +808,7 @@ pub impl EntityWorldMut<'_> {
 mod test {
 	use crate::prelude::*;
 	use bevy::tasks::futures_lite::future;
-	use sweet::prelude::*;
+
 
 
 	#[derive(Default, Resource, Clone)]

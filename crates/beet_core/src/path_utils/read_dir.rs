@@ -349,7 +349,6 @@ impl ReadDir {
 #[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "just experiments"]
@@ -419,7 +418,6 @@ mod test {
 #[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test_async {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn fails() {

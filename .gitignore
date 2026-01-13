@@ -9,6 +9,8 @@ dump.*
 plan.md
 file.pdf
 
+launch.ron
+
 tests/assert.rs
 tests/expect.rs
 

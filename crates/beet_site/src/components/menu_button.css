@@ -1,0 +1,68 @@
+/*temp throwaway impl */
+
+.bt-menu-button {
+	display: none;
+
+	pointer-events: auto;
+
+	height: var(--bt-form-element-height);
+	padding: var(--bt-spacing);
+
+	border-radius: var(--bt-form-element-border-radius);
+	font-size: var(--bt-form-element-font-size);
+	font-weight: var(--bt-form-element-font-weight);
+	font-family: var(--bt-font-family);
+	border: none;
+
+	display: flex;
+	color: var(--bt-color-text);
+	background-color: var(--bt-color-background);
+	--bt-color-background: transparent;
+}
+
+@media (max-width: 1024px) {
+	.bt-menu-button {
+		display: inline-flex;
+	}
+}
+
+/*copied from button.css */
+
+.bt-menu-button {
+	/* see bt-form.css for base definition */
+	opacity: var(--bt-opacity);
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	--bt-prev-transition: opacity var(--bt-transition);
+	transition:
+		opacity var(--bt-transition),
+		transform var(--bt-transition);
+}
+
+.bt-menu-button .bt-c-icon {
+	font-size: 1.8em;
+	/* margin: 0 0.5em; */
+}
+
+.bt-menu-button:hover {
+	--bt-opacity: var(--bt-opacity-hover);
+}
+
+.bt-menu-button:active {
+	--bt-opacity: var(--bt-opacity-active);
+}
+
+.bt-menu-button:disabled {
+	cursor: inherit;
+	--bt-opacity: var(--bt-opacity-disabled);
+}
+
+/* undo typography defaults */
+.bt-menu-button * {
+	margin-top: inherit;
+	margin-bottom: inherit;
+	color: inherit;
+	font-style: inherit;
+	font-weight: inherit;
+}

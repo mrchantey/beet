@@ -73,7 +73,6 @@ pub async fn sleep(duration: Duration) {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {

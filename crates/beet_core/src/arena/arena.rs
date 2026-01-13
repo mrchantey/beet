@@ -191,7 +191,7 @@ impl<T: 'static> ArenaHandle<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	// Example Send type for demonstration
 	#[derive(Debug, Clone)]

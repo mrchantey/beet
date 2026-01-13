@@ -10,12 +10,19 @@ pub struct BeetPlugins;
 
 impl Plugin for BeetPlugins {
 	fn build(&self, app: &mut App) {
+		PrettyTracing::default().init();
+		app.try_set_error_handler(bevy::ecs::error::panic);
+		// do we do console error panic hook here?
+		// console_error_panic_hook::set_once();
+
 		#[cfg(feature = "rsx")]
 		app.init_plugin::<ApplyDirectivesPlugin>();
 		#[cfg(feature = "build")]
 		app.init_plugin::<BuildPlugin>();
-		#[cfg(feature = "server")]
-		app.init_plugin::<LoadSnippetsPlugin>();
+
+		// it causin too many problems
+		// #[cfg(feature = "server")]
+		// app.init_plugin::<LoadSnippetsPlugin>();
 		app.init_plugin::<BeetRunner>();
 	}
 }
@@ -32,8 +39,6 @@ impl Plugin for BeetRunner {
 		#[cfg(feature = "launch")]
 		app.set_runner(LaunchConfig::runner);
 
-		#[cfg(feature = "server")]
-		app.init_plugin_with(RouterRunner::parse());
 		#[cfg(feature = "server")]
 		app.set_runner(ServerPlugin::maybe_tokio_runner);
 

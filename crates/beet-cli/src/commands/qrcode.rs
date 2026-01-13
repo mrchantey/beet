@@ -1,27 +1,31 @@
 use beet::prelude::*;
-use clap::Parser;
 use image::Rgb;
 use qrcode::QrCode;
 
 
 
 /// Build the project
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
 pub struct QrCodeCmd {
 	/// Input url (positional)
-	#[arg(value_name = "PROMPT", trailing_var_arg = true)]
 	pub input: Vec<String>,
 	/// Output file (-o, --output)
-	#[clap(short = 'o', long = "output",
-		default_value="qrcode.png",
-	 value_parser = clap::value_parser!(std::path::PathBuf))]
 	pub output: std::path::PathBuf,
 	/// Light color (--light)
-	#[clap(long = "light", default_value = "255,255,255")]
 	pub light: String,
 	/// Dark color (--dark)
-	#[clap(long = "dark", default_value = "0,0,0")]
 	pub dark: String,
+}
+
+impl Default for QrCodeCmd {
+	fn default() -> Self {
+		Self {
+			input: Vec::new(),
+			output: "qrcode.png".into(),
+			light: "255,255,255".to_string(),
+			dark: "0,0,0".to_string(),
+		}
+	}
 }
 
 

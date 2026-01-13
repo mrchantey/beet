@@ -15,7 +15,7 @@ categories = { workspace = true }
 bevy_default = ["bevy/default","beet_core/bevy_default"]
 
 [dependencies]
-beet_flow = { workspace = true }
+beet_flow.workspace = true
 beet_core = { workspace = true, features = ["rand"] }
 
 bevy.workspace = true
@@ -31,4 +31,4 @@ strum_macros.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

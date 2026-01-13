@@ -1,3 +1,0 @@
-[
-  "/api\n  Param - name: verbose, short: -v, required: false, kind: flag, description: Enable verbose output\n/api/:id\n  Param - name: format, short: -f, required: true, kind: single, description: Output format\n  Param - name: verbose, short: -v, required: false, kind: flag, description: Enable verbose output\n/docs/*path\n/users/:userId\n  Param - name: tags, required: false, kind: multiple, description: User tags\n",
-]

@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// let mut world = World::new();
 /// world.spawn((
-///		Running::default(),
+///		Running,
 ///		EndInDuration::pass(Duration::from_secs(2)),
 ///	));
 ///
@@ -50,7 +50,7 @@ impl EndInDuration<Outcome> {
 	}
 }
 
-pub(crate) fn end_in_duration<T: ActionEvent + Clone>(
+pub(crate) fn end_in_duration<T: EndEvent>(
 	mut commands: Commands,
 	mut query: Populated<
 		(Entity, &RunTimer, &mut EndInDuration<T>),
@@ -78,10 +78,8 @@ mod test {
 		let on_result =
 			observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
-		app.world_mut().spawn((
-			Running::default(),
-			EndInDuration::pass(Duration::from_secs(2)),
-		));
+		app.world_mut()
+			.spawn((Running, EndInDuration::pass(Duration::from_secs(2))));
 
 		app.update_with_secs(1);
 

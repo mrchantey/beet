@@ -13,12 +13,10 @@ where
 	fn action() -> impl Bundle {
 		(
 			Name::new(format!("Run Schedule - {:?}", T::default())),
-			OnSpawn::observe(
-				|mut ev: On<GetOutcome>, mut commands: Commands| {
-					commands.run_system_cached(T::run());
-					ev.trigger_with_cx(Outcome::Pass);
-				},
-			),
+			OnSpawn::observe(|ev: On<GetOutcome>, mut commands: Commands| {
+				commands.run_system_cached(T::run());
+				commands.entity(ev.target()).trigger_target(Outcome::Pass);
+			}),
 		)
 	}
 }

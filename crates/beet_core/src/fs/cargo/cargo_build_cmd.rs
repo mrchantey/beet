@@ -1,107 +1,109 @@
 use crate::prelude::*;
-use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
 
 /// Verbatim clone of cargo build/run args
-#[derive(Debug, Clone, Parser, Component, Resource)]
+#[derive(Debug, Clone, Component)]
 pub struct CargoBuildCmd {
 	/// The top level command to run: `build`, `run`, `test`, etc.
-	#[arg(long, default_value = "build")]
 	pub cmd: String,
 	/// Package with the target to run
-	#[arg(short = 'p', long = "package")]
 	pub package: Option<String>,
 	/// Name of the bin target to run
-	#[arg(long)]
 	pub bin: Option<String>,
 	/// Name of the example target to run
-	#[arg(long)]
 	pub example: Option<String>,
 	/// Specify the integration test to
-	#[arg(long)]
 	pub test: Option<String>,
 	/// Build artifacts in release mode, with optimizations
-	#[arg(long)]
 	pub release: bool,
 	/// Only test lib
-	#[arg(long)]
 	pub lib: bool,
 	/// Only test docs
-	#[arg(long)]
 	pub doc: bool,
 	/// Build for the target triple
-	#[arg(long)]
 	pub target: Option<String>,
-	#[arg(long)]
 	pub message_format: Option<String>,
 	/// Use verbose output (-vv very verbose/build.rs output)
-	#[arg(short = 'v', long, action = clap::ArgAction::Count)]
 	pub verbose: u8,
 	/// Do not print cargo log messages
-	#[arg(short, long)]
 	pub quiet: bool,
 	/// Coloring: auto, always, never
-	#[arg(long)]
 	pub color: Option<String>,
 	/// Override a configuration value
-	#[arg(long)]
 	pub config: Option<String>,
 	/// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
-	#[arg(short = 'Z', long)]
 	pub z: Option<String>,
 	/// Space or comma separated list of features to activate
-	#[arg(short = 'F', long = "features")]
 	pub features: Option<String>,
 	/// Activate all available features
-	#[arg(long)]
 	pub all_features: bool,
 	/// Do not activate the `default` feature
-	#[arg(long)]
 	pub no_default_features: bool,
 	/// Number of parallel jobs, defaults to # of CPUs.
-	#[arg(short = 'j', long)]
 	pub jobs: Option<String>,
 	/// Do not abort the build as soon as there is an error
-	#[arg(long)]
 	pub keep_going: bool,
 	/// Build artifacts with the specified profile
-	#[arg(long)]
 	pub profile: Option<String>,
 	/// Directory for all generated artifacts
-	#[arg(long)]
 	pub target_dir: Option<String>,
 	/// Output build graph in JSON (unstable)
-	#[arg(long)]
 	pub unit_graph: bool,
 	/// Timing output formats (unstable) (comma separated): html, json
-	#[arg(long)]
 	pub timings: Option<String>,
 	/// Path to Cargo.toml
-	#[arg(long)]
 	pub manifest_path: Option<String>,
 	/// Path to Cargo.lock (unstable)
-	#[arg(long)]
 	pub lockfile_path: Option<String>,
 	/// Ignore `rust-version` specification in packages
-	#[arg(long)]
 	pub ignore_rust_version: bool,
 	/// Assert that `Cargo.lock` will remain unchanged
-	#[arg(long)]
 	pub locked: bool,
 	/// Run without accessing the network
-	#[arg(long)]
 	pub offline: bool,
 	/// Equivalent to specifying both --locked and --offline
-	#[arg(long)]
 	pub frozen: bool,
 	/// Any additional arguments passed to cargo
-	#[arg(trailing_var_arg = true, allow_hyphen_values = true)]
 	pub trailing_args: Vec<String>,
 }
 
 impl Default for CargoBuildCmd {
-	fn default() -> Self { Self::parse_from(&[""]) }
+	fn default() -> Self {
+		Self {
+			cmd: "build".to_string(),
+			package: None,
+			bin: None,
+			example: None,
+			test: None,
+			release: false,
+			lib: false,
+			doc: false,
+			target: None,
+			message_format: None,
+			verbose: 0,
+			quiet: false,
+			color: None,
+			config: None,
+			z: None,
+			features: None,
+			all_features: false,
+			no_default_features: false,
+			jobs: None,
+			keep_going: false,
+			profile: None,
+			target_dir: None,
+			unit_graph: false,
+			timings: None,
+			manifest_path: None,
+			lockfile_path: None,
+			ignore_rust_version: false,
+			locked: false,
+			offline: false,
+			frozen: false,
+			trailing_args: Vec::new(),
+		}
+	}
 }
 
 impl CargoBuildCmd {
@@ -127,7 +129,6 @@ impl CargoBuildCmd {
 		self
 	}
 
-	pub fn parse() -> Self { Parser::parse() }
 	pub fn no_default_features(mut self) -> Self {
 		self.no_default_features = true;
 		self
@@ -410,7 +411,6 @@ impl CargoBuildCmd {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() { CargoBuildCmd::default().cmd.xpect_eq("build"); }

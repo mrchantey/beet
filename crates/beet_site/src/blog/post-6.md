@@ -5,7 +5,7 @@ created="2025-12-04"
 
 # The Full Moon Harvest #6 - Folk Technology
 
-<iframe width="941" height="538" src="https://www.youtube.com/embed/NFjdN8KGkg8" title="Full Moon Harvest #6 | Folk Technology" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe src="https://www.youtube.com/embed/NFjdN8KGkg8" title="Full Moon Harvest #6 | Folk Technology" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 Last week I was lucky enough to attend the first DevOps Days in my hometown of Wollongong, Australia. DevOps Days has a very cool format, employing tools like five-minute Ignite Talks and group discussions called Open Spaces to ensure all voices have an opportunity to be heard. It is designed to foster a marketplace of ideas and the experience reminded me of my love for folk festivals. The same principles of abundance that bring these events to life can and should shape how we design software.
 
@@ -36,4 +36,4 @@ Folk technology is alive and well—we can see it in game jams, makerspaces, and
 
 At DevOps Days Wollongong, I gave a talk describing the problems these silos create for developers, and the principles that make ECS architecture different. I believe it is our best shot at fulfilling Kay's vision for the Computer Revolution—technology as beautiful and free as music.
 
-<iframe width="941" height="538" src="https://www.youtube.com/embed/oK1o0AX-FRU" title="Unifying the Fuller Stack with ECS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe src="https://www.youtube.com/embed/oK1o0AX-FRU" title="Unifying the Fuller Stack with ECS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>

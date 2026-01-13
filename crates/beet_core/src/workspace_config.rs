@@ -4,29 +4,6 @@ use heck::ToKebabCase;
 use std::path::Path;
 use std::str::FromStr;
 
-
-/// Override settings typically set via environment variables like `BEET_STAGE`.
-#[derive(Debug, Default, Clone, Resource)]
-#[cfg_attr(feature = "serde", derive(clap::Parser))]
-pub struct ConfigOverrides {
-	/// Override the `BEET_STAGE` environment variable.
-	/// The pulumi stage to use for deployments and infra resource names.
-	/// By default this is set to `dev` in debug builds and `prod` in release builds.
-	#[cfg_attr(feature = "serde", arg(long))]
-	pub stage: Option<String>,
-}
-
-
-impl Plugin for ConfigOverrides {
-	fn build(&self, app: &mut App) {
-		app.insert_resource(self.clone());
-		if let Some(stage) = &self.stage {
-			app.world_mut().resource_mut::<PackageConfig>().stage =
-				stage.clone();
-		}
-	}
-}
-
 /// Settings for the package, usually set via `pkg_config!()`.
 /// This resource is required for all beet applications and should be consistent
 /// across launch, server and client binaries.
@@ -286,8 +263,7 @@ impl WorkspaceConfig {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn works() {

@@ -7,7 +7,7 @@ pub impl<T> Option<T> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// Some(1).xpect_some();
 	/// ```
 	///
@@ -28,7 +28,7 @@ pub impl<T> Option<T> {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// let v: Option<i32> = None;
 	/// v.xpect_none();
 	/// ```

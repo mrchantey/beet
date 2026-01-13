@@ -53,5 +53,6 @@ console_error_panic_hook.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
 beet_dom = {path = ".", features=["nightly"]}
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}

@@ -26,6 +26,9 @@ unsafe extern "C" {
 	/// Ensure a directory exists, ie `Deno.ensureDir()`
 	#[wasm_bindgen]
 	pub fn create_dir_all(path: &str);
+	/// Check if a file, directory or link exists, ie `Deno.existsSync()`
+	#[wasm_bindgen]
+	pub fn exists(path: &str) -> bool;
 	/// Write a file to the filesystem, ie `Deno.writeTextFileSync()`
 	#[wasm_bindgen]
 	pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
@@ -54,6 +57,8 @@ unsafe extern "C" {
 	) -> Result<(), JsValue>;
 	#[wasm_bindgen(js_name = "test_read_file")]
 	pub fn read_file(path: &str) -> Option<Vec<u8>>;
+	#[wasm_bindgen(js_name = "test_exists")]
+	pub fn exists(path: &str) -> bool;
 	#[wasm_bindgen(js_name = "test_create_dir_all")]
 	pub fn create_dir_all(path: &str);
 	#[wasm_bindgen(js_name = "test_write_file")]

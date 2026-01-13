@@ -25,14 +25,15 @@ impl FileExprChanged {
 }
 
 fn run_on_file_expr(
-	mut ev: On<GetOutcome>,
+	ev: On<GetOutcome>,
 	action_query: Query<&FileExprChanged>,
 	changed_query: Query<&SourceFile, Changed<FileExprHash>>,
+	mut commands: Commands,
 ) -> Result {
 	let outcome = if changed_query.is_empty() {
 		// no changed files
 		Outcome::Fail
-	} else if let Some(filter) = &action_query.get(ev.action())?.filter {
+	} else if let Some(filter) = &action_query.get(ev.target())?.filter {
 		if changed_query
 			.iter()
 			.any(|source_file| filter.passes(source_file))
@@ -48,7 +49,7 @@ fn run_on_file_expr(
 		Outcome::Pass
 	};
 
-	ev.trigger_with_cx(outcome);
+	commands.entity(ev.target()).trigger_target(outcome);
 
 	Ok(())
 }

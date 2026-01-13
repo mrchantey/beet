@@ -38,7 +38,7 @@ pub fn parse_sweet_test(
 				#[test]
 				#(#attrs)*
 				#vis fn #ident() {
-					sweet::prelude::register_async_test(async #block);
+					sweet::handle_async_test(async #block);
 				}
 			}
 		}

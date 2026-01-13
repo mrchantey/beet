@@ -1,14 +1,19 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::Actions;
+use beet_net::prelude::*;
 
-/// Collects all endpoints in an application and arranges them into a tree structure.
+/// Collects all canonical endpoints in an application and arranges them into a tree structure.
 ///
-/// This serves as a validation step, ensuring there is only a single endpoint for
+/// This serves as a validation step, ensuring there is only a single canonical endpoint for
 /// any given path pattern. It also detects conflicts between dynamic and greedy
 /// segments that would cause ambiguous routing.
 ///
+/// Non-canonical endpoints are excluded from the tree to avoid conflicts with canonical routes.
+/// Use `EndpointBuilder::non_canonical()` for fallback endpoints that shouldn't conflict.
+///
 /// ## Validation Rules
-/// - Only one endpoint per exact path pattern
+/// - Only one canonical endpoint per exact path pattern
 /// - Cannot mix static and dynamic segments at the same level (e.g., `/api/users` and `/api/:id`)
 /// - Cannot have multiple dynamic segments at the same level (e.g., `/:foo` and `/:bar`)
 /// - Cannot have multiple greedy segments at the same level (e.g., `*foo` and `*bar`)
@@ -16,20 +21,24 @@ use beet_core::prelude::*;
 ///
 /// ## Example
 /// ```rust
-/// use beet_router::prelude::*;
-/// use beet_core::prelude::*;
+/// # use beet_router::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 ///
 /// let mut world = World::new();
-/// world.spawn((Router, children![
-///     EndpointBuilder::get().with_path("api"),
-///     EndpointBuilder::get().with_path("users/:id"),
-///     EndpointBuilder::get().with_path("docs/*path"),
-/// ]));
+/// world.spawn(ExchangeSpawner::new_flow(|| {
+///   (
+/// 		InfallibleSequence, children![
+///       EndpointBuilder::get().with_path("api"),
+///       EndpointBuilder::get().with_path("users/:id"),
+///       EndpointBuilder::get().with_path("docs/*path"),
+///     ]
+/// 	)
+/// }));
 ///
-/// // build the tree and validate all paths
-/// let tree = EndpointTree::from_world(&mut world).unwrap();
 /// ```
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Clone, Component)]
 pub struct EndpointTree {
 	/// The path pattern for this node
 	pub pattern: PathPattern,
@@ -42,24 +51,100 @@ pub struct EndpointTree {
 }
 
 impl EndpointTree {
-	/// Builds an [`EndpointTree`] from all endpoints in the world.
+	/// Builds an [`EndpointTree`] from all canonical endpoints in the world.
+	///
+	/// This spawns trees from all [`ExchangeSpawner`]s to collect their endpoints,
+	/// then despawns those temporary trees after collection.
+	/// Non-canonical endpoints are excluded.
+	///
 	/// Returns an error if there are conflicting paths.
-	pub fn from_world(world: &mut World) -> Result<Self> {
-		world
-			.query_once::<(Entity, &Endpoint)>()
+	pub fn endpoints_from_world(world: &mut World) -> Vec<Endpoint> {
+		let spawned_roots = world
+			.query_once::<&ExchangeSpawner>()
 			.iter()
-			.map(|(entity, endpoint)| {
-				(*entity, endpoint.path().clone(), endpoint.params().clone())
-			})
-			.collect::<Vec<_>>()
-			.xmap(Self::from_endpoints)
+			.map(|s| s.spawn(world))
+			.collect::<Vec<Entity>>();
+
+		let endpoints = world
+			.query_once::<&Endpoint>()
+			.iter()
+			.filter(|endpoint| endpoint.is_canonical())
+			.map(|endpoint| (*endpoint).clone())
+			.collect();
+		// Build the tree before cleanup (endpoints reference these entities)
+
+		// Despawn the temporary trees
+		for root in spawned_roots {
+			world.entity_mut(root).despawn();
+		}
+
+		endpoints
 	}
 
-	/// Builds an [`EndpointTree`] from a list of (Entity, PathPattern).
+	/// Builds a list of (Entity, Endpoint) by spawning an [`ExchangeSpawner`]
+	/// in the given world and collecting all canonical endpoints from its descendants,
+	/// then despawning the exchange. Non-canonical endpoints are excluded.
+	pub fn endpoints_from_exchange_spawner(
+		world: &mut World,
+		spawner: &ExchangeSpawner,
+	) -> Result<Vec<Endpoint>> {
+		let root = spawner.spawn(world);
+
+		let endpoints = world
+			.run_system_cached_with::<_, Result<Vec<Endpoint>>, _, _>(
+				|root: In<Entity>,
+				 actions: Query<&Actions>,
+				 children: Query<&Children>,
+				 endpoints: Query<&Endpoint>| {
+					let actions = actions.get(*root)?;
+					assert_eq!(actions.len(), 1,);
+					children
+						.iter_descendants_inclusive(actions[0])
+						.filter_map(|entity| {
+							endpoints
+								.get(entity)
+								.ok()
+								.filter(|endpoint| endpoint.is_canonical())
+								.cloned()
+						})
+						.collect::<Vec<_>>()
+						.xok()
+				},
+				root,
+			)??;
+
+		world.despawn(root);
+		endpoints.xok()
+	}
+
+	/// Get the canonical endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
+	/// Non-canonical endpoints are excluded.
+	pub fn endpoints_from_exchange(
+		root: In<Entity>,
+		actions: Query<&Actions>,
+		children: Query<&Children>,
+		endpoints: Query<&Endpoint>,
+	) -> Result<Vec<(Entity, Endpoint)>> {
+		let actions = actions.get(*root)?;
+		assert_eq!(actions.len(), 1,);
+		children
+			.iter_descendants_inclusive(actions[0])
+			.filter_map(|entity| {
+				endpoints
+					.get(entity)
+					.ok()
+					.filter(|endpoint| endpoint.is_canonical())
+					.map(|endpoint| (entity, (*endpoint).clone()))
+			})
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	/// Builds an [`EndpointTree`] from a list of (Entity, Endpoint).
+	/// Only canonical endpoints should be passed; non-canonical endpoints are typically
+	/// filtered out before calling this method.
 	/// Returns an error if there are conflicting paths.
-	pub fn from_endpoints(
-		endpoints: Vec<(Entity, PathPattern, ParamsPattern)>,
-	) -> Result<Self> {
+	pub fn from_endpoints(endpoints: Vec<(Entity, Endpoint)>) -> Result<Self> {
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,
@@ -72,8 +157,8 @@ impl EndpointTree {
 		let mut root = Node::default();
 
 		// build tree and detect conflicts
-		for (ent, pattern, params) in &endpoints {
-			let segments = pattern.iter().cloned().collect::<Vec<_>>();
+		for (ent, endpoint) in &endpoints {
+			let segments = endpoint.path().iter().cloned().collect::<Vec<_>>();
 			let mut node = &mut root;
 
 			for (idx, seg) in segments.iter().enumerate() {
@@ -122,12 +207,13 @@ impl EndpointTree {
 				if is_last {
 					if node.endpoint.is_some() {
 						bevybail!(
-							"Duplicate endpoint: Multiple endpoints defined for path '{}'",
-							pattern.annotated_route_path()
+							"Duplicate endpoint: Multiple canonical endpoints defined for path '{}'. \
+							Consider marking one as non-canonical with `.non_canonical()`",
+							endpoint.path().annotated_route_path()
 						);
 					}
 					node.endpoint = Some(*ent);
-					node.params = Some(params.clone());
+					node.params = Some(endpoint.params().clone());
 				}
 			}
 
@@ -135,11 +221,12 @@ impl EndpointTree {
 			if segments.is_empty() {
 				if node.endpoint.is_some() {
 					bevybail!(
-						"Duplicate endpoint: Multiple endpoints defined for path '/'"
+						"Duplicate endpoint: Multiple canonical endpoints defined for path '/'. \
+						Consider marking one as non-canonical with `.non_canonical()`"
 					);
 				}
 				node.endpoint = Some(*ent);
-				node.params = Some(params.clone());
+				node.params = Some(endpoint.params().clone());
 			}
 		}
 
@@ -228,15 +315,36 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// Helper to create canonical endpoints for testing
+	fn create_endpoints(
+		endpoints: Vec<(PathPattern, ParamsPattern)>,
+	) -> Vec<(Entity, Endpoint)> {
+		create_endpoints_with_canonical(endpoints, true)
+	}
+
+	/// Helper to create endpoints with specified canonical flag
+	fn create_endpoints_with_canonical(
+		endpoints: Vec<(PathPattern, ParamsPattern)>,
+		is_canonical: bool,
+	) -> Vec<(Entity, Endpoint)> {
+		let mut world = World::new();
+		endpoints
+			.into_iter()
+			.map(|(path, params)| {
+				let ent = world.spawn_empty().id();
+				(
+					ent,
+					Endpoint::new(path, params, None, None, None, is_canonical),
+				)
+			})
+			.collect()
+	}
+
+
 	#[test]
 	fn endpoint_tree_detects_duplicates() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -244,17 +352,15 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
-		let result = EndpointTree::from_endpoints(endpoints);
-		result
+		EndpointTree::from_endpoints(endpoints)
 			.unwrap_err()
 			.to_string()
 			.contains("Duplicate endpoint")
@@ -263,13 +369,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_detects_dynamic_conflicts() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("foo"),
 				])
@@ -277,14 +378,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -296,13 +396,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_detects_static_dynamic_mix() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -310,14 +405,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::dynamic_required("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -329,14 +423,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_allows_different_static_paths() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-		let ent3 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 				])
@@ -344,7 +432,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("bar"),
 				])
@@ -352,7 +439,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent3,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("foo"),
 					PathPatternSegment::static_segment("bar"),
@@ -360,7 +446,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let tree = EndpointTree::from_endpoints(endpoints).unwrap();
 		tree.flatten().len().xpect_eq(3);
@@ -368,13 +454,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_greedy_conflict() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::one_or_more("foo"),
 				])
@@ -382,14 +463,13 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::one_or_more("bar"),
 				])
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -401,16 +481,8 @@ mod test {
 
 	#[test]
 	fn complex() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-		let ent3 = world.spawn_empty().id();
-		let ent4 = world.spawn_empty().id();
-
-		// valid tree with mixed static and dynamic paths at different levels
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 				])
@@ -423,7 +495,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::dynamic_required("id"),
@@ -441,7 +512,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent3,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("users"),
 					PathPatternSegment::dynamic_required("userId"),
@@ -454,7 +524,6 @@ mod test {
 				.unwrap(),
 			),
 			(
-				ent4,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("docs"),
 					PathPatternSegment::one_or_more("path"),
@@ -462,7 +531,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::from_metas(vec![]).unwrap(),
 			),
-		];
+		]);
 
 		EndpointTree::from_endpoints(endpoints)
 			.unwrap()
@@ -472,14 +541,8 @@ mod test {
 
 	#[test]
 	fn endpoint_tree_rejects_dynamic_static_same_level() {
-		let mut world = World::new();
-		let ent1 = world.spawn_empty().id();
-		let ent2 = world.spawn_empty().id();
-
-		// cannot have /api/:id and /api/users at same level
-		let endpoints = vec![
+		let endpoints = create_endpoints(vec![
 			(
-				ent1,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::dynamic_required("id"),
@@ -488,7 +551,6 @@ mod test {
 				ParamsPattern::default(),
 			),
 			(
-				ent2,
 				PathPattern::from_segments(vec![
 					PathPatternSegment::static_segment("api"),
 					PathPatternSegment::static_segment("users"),
@@ -496,7 +558,7 @@ mod test {
 				.unwrap(),
 				ParamsPattern::default(),
 			),
-		];
+		]);
 
 		let result = EndpointTree::from_endpoints(endpoints);
 		result
@@ -504,5 +566,34 @@ mod test {
 			.to_string()
 			.contains("Path conflict")
 			.xpect_true();
+	}
+
+	#[test]
+	fn non_canonical_endpoints_excluded() {
+		// Create two endpoints at the same path, one canonical, one not
+		let path_pattern = PathPattern::from_segments(vec![
+			PathPatternSegment::static_segment("foo"),
+		])
+		.unwrap();
+
+		let canonical_endpoints = create_endpoints_with_canonical(
+			vec![(path_pattern.clone(), ParamsPattern::default())],
+			true,
+		);
+		let non_canonical_endpoints = create_endpoints_with_canonical(
+			vec![(path_pattern, ParamsPattern::default())],
+			false,
+		);
+
+		// Filter non-canonical as would happen in real usage
+		let canonical_only: Vec<_> = canonical_endpoints
+			.xtend(non_canonical_endpoints)
+			.into_iter()
+			.filter(|(_, endpoint)| endpoint.is_canonical())
+			.collect();
+
+		// Should succeed - only one canonical endpoint at /foo
+		let tree = EndpointTree::from_endpoints(canonical_only).unwrap();
+		tree.flatten().len().xpect_eq(1);
 	}
 }

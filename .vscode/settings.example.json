@@ -10,7 +10,7 @@
 		"beet/aws"
 	],
 	"deno.enable": true,
-	"deno.disablePaths": ["target","examples/todo-app/target"],
+	"deno.disablePaths": ["target"],
 	"files.exclude": {
 		"infra/.sst": true,
 		"**/.git": true,

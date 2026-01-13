@@ -73,7 +73,6 @@ world
 | [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | An ECS control flow library                        |
 | [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Spatial actions built upon beet_flow               |
 | [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Machine Learning actions built upon beet_flow      |
-| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Game AI simulation primitives built upon beet_flow |
 
 
 ## Web
@@ -114,7 +113,6 @@ fn Counter(initial: i32) -> impl Bundle {
 | [`beet_agent`](crates/beet_agent/Cargo.toml)       | 🐉      | ECS agentic workflow patterns                    |
 | [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
 | [`emby`](crates/emby/Cargo.toml)                   | 🐉      | the beetmash ambassador                          |
-| [`beet_mcp`](crates/beet_mcp/Cargo.toml)           | 🐉      | Experimental mcp server                          |
 
 
 ## Bevy Versions

@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use beet_rsx::prelude::*;
-use sweet::prelude::*;
+use beet_core::prelude::*;
 
 #[test]
 fn works() {

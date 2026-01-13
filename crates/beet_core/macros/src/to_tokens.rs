@@ -229,7 +229,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::parse;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use syn::DeriveInput;
 
 	#[test]

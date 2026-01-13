@@ -60,9 +60,9 @@ fn play_animation_on_run(
 	query: Query<&PlayAnimation>,
 	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 ) -> Result {
-	let play_animation = query.get(ev.action())?;
+	let play_animation = query.get(ev.target())?;
 	let (mut player, mut transitions) =
-		agents.get_descendent_mut(ev.action())?;
+		agents.get_descendent_mut(ev.target())?;
 
 	if !player.is_playing_animation(play_animation.animation)
 		|| play_animation.trigger_if_playing
@@ -146,7 +146,6 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::animation::AnimationEvent;
-	use sweet::prelude::*;
 
 	#[derive(Clone, AnimationEvent)]
 	struct MyEvent(u32);

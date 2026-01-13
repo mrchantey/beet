@@ -14,11 +14,13 @@ publish = true
 
 [features]
 default = ["serde", "fs"]
-reflect_documentation = ["bevy/reflect_documentation"]
+reflect_documentation = [
+	"bevy/reflect_documentation"
+]
 server = [
 	"beet_net/server",
 	# technically only required for internal tests
-	"beet_net/reqwest"
+	"beet_net/ureq"
 ]
 tokens = ["beet_core/tokens"]
 # for conditional compilation in hooks
@@ -27,14 +29,12 @@ fs = ["beet_net/fs"]
 serde = [
 	"dep:serde",
 	"dep:serde_json",
-	"dep:clap",
-	"dep:base64",
 	"beet_core/serde",
 ]
 
 [dependencies]
-beet_core.workspace = true
-beet_net.workspace = true
+beet_core = {workspace = true, features=["ansi_paint"]}
+beet_net = {workspace = true, features=["flow"]}
 beet_dom.workspace = true
 beet_flow.workspace = true
 beet_rsx.workspace = true
@@ -42,37 +42,20 @@ beet_rsx.workspace = true
 bevy.workspace = true
 
 # utils
-variadics_please.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-send_wrapper.workspace = true
-http.workspace = true
+heck.workspace = true
 
 # serde
-clap = { workspace = true, optional = true }
-base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-
-# http
-bytes.workspace = true
 
 # async
 futures.workspace = true
 async-channel.workspace = true
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-beet_core.workspace = true
-js-sys.workspace = true
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
-web-sys = { workspace = true, features = ["Storage"] }
-
-
 [dev-dependencies]
-sweet.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true
+beet_core = { workspace = true, features = ["testing"] }
+sweet = { workspace = true, features = ["runner"] }

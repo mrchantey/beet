@@ -4,9 +4,9 @@
 
 [target.wasm32-unknown-unknown]
 # this uses sweet for cargo run and cargo test
-# runner = 'sweet run-wasm'
+runner = 'sweet run-wasm'
 # uncomment this line when developing the runner
-runner = 'cargo run -p sweet-cli -- run-wasm'
+# runner = 'cargo run -p sweet-cli -- run-wasm'
 rustflags = [
 	# remove in getrandom 0.3.4
 	"--cfg",
@@ -17,10 +17,4 @@ rustflags = [
 ]
 
 [env]
-SWEET_ROOT = { value = "", relative = true }
-
-
-[alias]
-# TODO bring back cli which will call both of these
-launch = "run -p beet_site --no-default-features --features launch -- --package beet_site"
-serve = "run -p beet_site --no-default-features --features server"
+WORKSPACE_ROOT = { value = "", relative = true }

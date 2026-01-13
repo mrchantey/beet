@@ -174,7 +174,7 @@ mod tests {
 	use super::HtmlEventListener;
 	use crate::web_utils::document_ext as doc;
 
-	use sweet::prelude::*;
+	use crate::prelude::*;
 	use web_sys::HtmlButtonElement;
 	use web_sys::MouseEvent;
 

@@ -227,12 +227,6 @@ pub struct DebugRunning;
 pub struct DebugToStdOut;
 
 
-// fn log_to_stdout(mut read: MessageReader<OnLogMessage>) {
-// 	for msg in read.read() {
-// 		println!("{}", msg.0);
-// 	}
-// }
-
 fn log_on_run(
 	ev: On<GetOutcome>,
 	query: Query<&Name>,
@@ -241,7 +235,7 @@ fn log_on_run(
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.action(),
+		ev.target(),
 		&query,
 		"OnRun",
 		OnLogMessage::FLOW_COLOR,
@@ -261,7 +255,7 @@ fn log_on_run_result(
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
-		ev.action(),
+		ev.target(),
 		&query,
 		&format!("{:?}", &ev.event()),
 		OnLogMessage::FLOW_COLOR,

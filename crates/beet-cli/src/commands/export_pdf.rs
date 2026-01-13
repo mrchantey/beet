@@ -1,22 +1,27 @@
 use beet::prelude::*;
-use clap::Parser;
 
 /// Build the project
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone)]
 pub struct ExportPdf {
 	/// Input url (positional)
 	/// Disable margins
-	#[clap(long = "no-margin")]
 	pub no_margin: bool,
 	pub input: String,
 	/// Output file (-o, --output)
-	#[clap(short = 'o', long = "output",
-	default_value = "file.pdf",
-	 value_parser = clap::value_parser!(std::path::PathBuf))]
 	pub output: std::path::PathBuf,
 	/// Page ranges to export, e.g. "1-5, 8, 11-13", or leave empty to export all
-	#[clap(short = 'r', long = "ranges")]
 	pub page_ranges: Vec<String>,
+}
+
+impl Default for ExportPdf {
+	fn default() -> Self {
+		Self {
+			no_margin: false,
+			input: String::new(),
+			output: "file.pdf".into(),
+			page_ranges: Vec::new(),
+		}
+	}
 }
 
 impl ExportPdf {

@@ -1,4 +1,0 @@
-[
-  "#[allow(unused)]\npub async fn get() -> Result<()> {\n    ServerActionRequest::new(HttpMethod::Get, \"/add\").send().await\n}\n",
-  "#[allow(unused)]\npub async fn get(a: i32, b: i64) -> Result<Result<u32, String>> {\n    ServerActionRequest::new(HttpMethod::Get, \"/add\")\n        .with_body((a, b))\n        .send_fallible()\n        .await\n}\n",
-]

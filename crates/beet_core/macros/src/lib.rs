@@ -10,6 +10,14 @@ mod utils;
 #[path = "../../src/tokens_utils/shared_utils/mod.rs"]
 pub(crate) mod shared_utils;
 
+
+// for compatibility with beet_core in tests like
+// named_field.rs
+#[cfg(test)]
+pub(crate) mod prelude {
+	pub use beet_core::prelude::*;
+}
+
 /// Implements `TokenizeSelf` for a struct or enum.
 /// All fields must also implement `TokenizeSelf`.
 ///

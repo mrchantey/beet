@@ -1,4 +1,4 @@
-mod default_handler;
+mod cli_server;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),
@@ -7,8 +7,13 @@ mod default_handler;
 mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
+
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+mod http_server;
 mod server_plugin;
-pub use default_handler::*;
+pub use cli_server::*;
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub use http_server::*;
 #[cfg(all(
 	feature = "server",
 	not(feature = "lambda"),

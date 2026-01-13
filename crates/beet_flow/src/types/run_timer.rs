@@ -31,7 +31,6 @@ pub(crate) fn reset_run_time_started(
 	ev: On<Add, Running>,
 	mut query: Populated<&mut RunTimer>,
 ) -> Result {
-	// println!("reset_run_time_started");
 	query.get_mut(ev.event().event_target())?.last_run.reset();
 	Ok(())
 }
@@ -39,7 +38,6 @@ pub(crate) fn reset_run_timer_stopped(
 	ev: On<Remove, Running>,
 	mut query: Populated<&mut RunTimer>,
 ) -> Result {
-	// println!("reset_run_time_stopped");
 	query.get_mut(ev.event().event_target())?.last_end.reset();
 	Ok(())
 }
@@ -56,7 +54,7 @@ mod test {
 		app.add_plugins(ControlFlowPlugin::default());
 		app.insert_time();
 
-		let entity = app.world_mut().spawn(Running::default()).id();
+		let entity = app.world_mut().spawn(Running).id();
 
 		app.update_with_secs(1);
 

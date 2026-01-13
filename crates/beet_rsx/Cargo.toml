@@ -79,9 +79,9 @@ console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 beet_rsx = { path = ".", features = ["tokens"] }
-beet_core = { workspace = true }
+beet_core = { workspace = true, features = ["testing"] }
 serde.workspace = true
-sweet.workspace = true
+sweet = {workspace = true, features=["runner"]}
 
 
 [[test]]

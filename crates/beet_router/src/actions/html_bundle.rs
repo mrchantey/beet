@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::BeetRoot;
+use beet_dom::prelude::TemplateOf;
 use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
@@ -11,20 +12,25 @@ pub struct HtmlBundleQuery<'w, 's, F = ()>
 where
 	F: 'static + QueryFilter,
 {
-	exchanges: Query<'w, 's, &'static Children, F>,
+	agent_query: AgentQuery<'w, 's, Entity, With<HtmlBundle>>,
+	agents: Query<'w, 's, &'static Children, F>,
+	children: Query<'w, 's, &'static ChildOf>,
 	html_bundles: Query<'w, 's, Entity, With<HtmlBundle>>,
+	templates: Query<'w, 's, &'static TemplateOf>,
 }
 
 impl<F> HtmlBundleQuery<'_, '_, F>
 where
 	F: 'static + QueryFilter,
 {
-	/// Get the first [`HtmlBundle`] found in the direct children of the given `exchange`.
+	/// Get the first [`HtmlBundle`] found in the direct children of the agent for the given `action`.
 	/// Returns `None` if no [`HtmlBundle`] is found.
 	/// ## Errors
 	/// if multiple children are found.
-	pub fn get(&self, exchange: Entity) -> Result<Option<Entity>> {
-		let Ok(children) = self.exchanges.get(exchange) else {
+	pub fn get(&self, action: Entity) -> Result<Option<Entity>> {
+		let agent = self.agent_query.entity(action);
+
+		let Ok(children) = self.agents.get(agent) else {
 			return Ok(None);
 		};
 		let found = children
@@ -42,6 +48,34 @@ where
 			),
 		}
 	}
+
+	/// Given an entity that is a descendant of an agent, get all actions
+	/// associated with that agent. Recursively follows template chains.
+	pub fn actions_from_agent_descendant(
+		&self,
+		entity: Entity,
+	) -> Result<&Actions> {
+		let mut current = self.children.root_ancestor(entity);
+
+		// recursively follow template chain until we find an agent
+		loop {
+			if let Ok(actions) = self.agent_query.agents.get(current) {
+				// found an agent
+				return Ok(actions);
+			}
+
+			// follow the template chain
+			#[allow(unreachable_code)]
+			let Ok(template_of) = self.templates.get(current) else {
+				return bevybail!(
+					"Could not find Actions for agent descendant {:?}",
+					entity
+				);
+			};
+
+			current = self.children.root_ancestor(template_of.get());
+		}
+	}
 }
 
 
@@ -56,13 +90,14 @@ pub fn html_bundle_to_response() -> impl Bundle {
 	(
 		Name::new("Html Bundle Parser"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 mut commands: Commands,
-			 query: HtmlBundleQuery<Without<Response>>|
+			 query: HtmlBundleQuery<Without<ResponseMarker>>|
 			 -> Result {
-				let exchange = ev.agent();
-				let Some(html_bundle) = query.get(ev.agent())? else {
-					ev.trigger_with_cx(Outcome::Fail);
+				let action = ev.target();
+				let agent = query.agent_query.entity(action);
+				let Some(html_bundle) = query.get(action)? else {
+					commands.entity(action).trigger_target(Outcome::Fail);
 					return Ok(());
 				};
 
@@ -76,12 +111,10 @@ pub fn html_bundle_to_response() -> impl Bundle {
 					world.run_schedule(ApplyDirectives);
 					let html = world
 						.run_system_cached_with(render_fragment, html_bundle)?;
-					world
-						.entity_mut(exchange)
-						.insert(Html(html).into_response());
+					world.entity_mut(agent).insert(Html(html).into_response());
 					Ok(())
 				});
-				ev.trigger_with_cx(Outcome::Pass);
+				commands.entity(action).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		),
@@ -105,16 +138,142 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn simple() {
+	async fn bundle_to_response_false() {
+		RouterPlugin
+			.into_world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {"hello world"}),
+					// the scene is ignored because we have not inserted
+					// html_bundle_to_response. this means the control
+					// flow will silently succeed, maybe we should error?
+				])
+			}))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+	#[sweet::test]
+	async fn bundle_to_response_true() {
 		RouterPlugin::world()
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| (BeetRoot, rsx! {<div>hello world</div>})),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get().with_handler(|| (
+						BeetRoot,
+						rsx! {<div>hello world</div>}
+					)),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_eq("<div>hello world</div>");
+	}
+
+	#[sweet::test]
+	async fn endpoint_tree_from_agent_descendent() {
+		#[template]
+		fn Foobar(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("foo")
+						.with_handler(|| (BeetRoot, rsx! {<Foobar/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/foo"))
+			.await
+			.xpect_eq("/foo\n");
+	}
+
+	#[sweet::test]
+	async fn nested_template_actions() {
+		#[template]
+		fn Inner(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+		#[template]
+		fn Outer() -> impl Bundle {
+			rsx! {<Inner/>}
+		}
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("nested")
+						.with_handler(|| (BeetRoot, rsx! {<Outer/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/nested"))
+			.await
+			.xpect_eq("/nested\n");
+	}
+
+	#[sweet::test]
+	async fn deeply_nested_template_actions() {
+		#[template]
+		fn Level3(
+			entity: Entity,
+			#[field(param)] bundle_query: HtmlBundleQuery,
+			#[field(param)] mut route_query: RouteQuery,
+		) -> Result<TextNode> {
+			let actions =
+				bundle_query.actions_from_agent_descendant(entity).unwrap();
+			assert_eq!(actions.len(), 1);
+			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			TextNode::new(text).xok()
+		}
+
+		#[template]
+		fn Level2() -> impl Bundle {
+			rsx! {<Level3/>}
+		}
+
+		#[template]
+		fn Level1() -> impl Bundle {
+			rsx! {<Level2/>}
+		}
+
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_path("deep")
+						.with_handler(|| (BeetRoot, rsx! {<Level1/>})),
+					html_bundle_to_response(),
+				])
+			}))
+			.oneshot_str(Request::get("/deep"))
+			.await
+			.xpect_eq("/deep\n");
 	}
 
 
@@ -122,11 +281,13 @@ mod test {
 	async fn with_template() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_eq(
@@ -137,32 +298,37 @@ mod test {
 	async fn middleware() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn((Router, Sequence, children![
-				EndpointBuilder::get()
-					.with_handler(|| rsx! {<MyTemplate foo=42/>}),
-				OnSpawn::observe(
-					|mut ev: On<GetOutcome>,
-					 query: HtmlBundleQuery<Without<Response>>,
-					 mut commands: Commands|
-					 -> Result {
-						let Some(html_bundle) = query.get(ev.agent())? else {
-							ev.trigger_with_cx(Outcome::Fail);
-							return Ok(());
-						};
-						commands.spawn((
-							HtmlDocument,
-							HtmlBundle,
-							ChildOf(ev.agent()),
-							rsx! {
-								"middleware!" {html_bundle}
-							},
-						));
-						ev.trigger_with_cx(Outcome::Pass);
-						Ok(())
-					}
-				),
-				html_bundle_to_response(),
-			]))
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(Sequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+					OnSpawn::observe(
+						|ev: On<GetOutcome>,
+							agent_query: AgentQuery,
+						 query: HtmlBundleQuery<Without<ResponseMarker>>,
+						 mut commands: Commands|
+						 -> Result {
+								let action = ev.target();
+							let agent = agent_query.entity(action);
+							let Some(html_bundle) = query.get(action)? else {
+								commands.entity(action).trigger_target(Outcome::Fail);
+								return Ok(());
+							};
+							commands.spawn((
+								HtmlDocument,
+								HtmlBundle,
+								ChildOf(agent),
+								rsx! {
+									"middleware!" {html_bundle}
+								},
+							));
+							commands.entity(action).trigger_target(Outcome::Pass);
+							Ok(())
+						}
+					),
+					html_bundle_to_response(),
+				])
+			}))
 			.oneshot_str(Request::get("/"))
 			.await
 			.xpect_str("<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>");

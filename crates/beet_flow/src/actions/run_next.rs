@@ -58,16 +58,20 @@ impl RunNext {
 	}
 }
 
-fn run_next(mut ev: On<Outcome>, query: Query<&RunNext>) -> Result {
+fn run_next(
+	ev: On<Outcome>,
+	mut commands: Commands,
+	query: Query<&RunNext>,
+) -> Result {
 	let run_next = query
-		.get(ev.action())
+		.get(ev.target())
 		.expect(&expect_action::to_have_action(&ev));
 	if let Some(check) = &run_next.if_result_matches {
 		if *ev != *check {
 			return Ok(());
 		}
 	}
-	ev.trigger_action_with_cx(run_next.action, GetOutcome);
+	commands.entity(run_next.action).trigger_target(GetOutcome);
 	Ok(())
 }
 

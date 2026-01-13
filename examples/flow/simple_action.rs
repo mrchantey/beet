@@ -7,9 +7,7 @@ struct LogOnRun(pub String);
 
 fn log_on_run(ev: On<GetOutcome>, query: Query<&LogOnRun>) {
 	let name = query
-		// ensure that we use ev.event_target(), wich is the 'action entity'
-		// ev.target() is the 'action observer'
-		.get(ev.action())
+		.get(ev.target())
 		// common pattern for getting an action,
 		// it should never be missing
 		.expect(&expect_action::to_have_action(&ev));

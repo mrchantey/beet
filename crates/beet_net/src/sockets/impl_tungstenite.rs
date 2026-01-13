@@ -310,7 +310,11 @@ fn close_code_from_u16(code: u16) -> TungCloseCode { TungCloseCode::from(code) }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
+	use super::Message;
+	use super::from_tung_msg;
+	use super::to_tung_msg;
+	use beet_core::prelude::*;
+	use bytes::Bytes;
 
 	#[sweet::test]
 	fn maps_messages_roundtrip() {
@@ -320,17 +324,17 @@ mod tests {
 		let pong = Message::pong(Bytes::from_static(b"q"));
 		let close = Message::close(1000, "bye");
 
-		let t_text = super::to_tung_msg(text.clone());
-		let t_bin = super::to_tung_msg(bin.clone());
-		let t_ping = super::to_tung_msg(ping.clone());
-		let t_pong = super::to_tung_msg(pong.clone());
-		let t_close = super::to_tung_msg(close.clone());
+		let t_text = to_tung_msg(text.clone());
+		let t_bin = to_tung_msg(bin.clone());
+		let t_ping = to_tung_msg(ping.clone());
+		let t_pong = to_tung_msg(pong.clone());
+		let t_close = to_tung_msg(close.clone());
 
-		super::from_tung_msg(t_text).xpect_eq(text);
-		super::from_tung_msg(t_bin).xpect_eq(bin);
-		super::from_tung_msg(t_ping).xpect_eq(ping);
-		super::from_tung_msg(t_pong).xpect_eq(pong);
+		from_tung_msg(t_text).xpect_eq(text);
+		from_tung_msg(t_bin).xpect_eq(bin);
+		from_tung_msg(t_ping).xpect_eq(ping);
+		from_tung_msg(t_pong).xpect_eq(pong);
 		// Close roundtrip may lose exact code mapping on older tungstenite, but should remain Close(..)
-		matches!(super::from_tung_msg(t_close), Message::Close(_)).xpect_true();
+		matches!(from_tung_msg(t_close), Message::Close(_)).xpect_true();
 	}
 }

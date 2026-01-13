@@ -23,7 +23,7 @@ beet_net.workspace = true
 beet_core = { workspace = true, features = ["serde"] }
 
 # rig-core = { version = "0.18" }
-clap.workspace = true
+
 strum.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
@@ -62,7 +62,8 @@ web-sys = { workspace = true, features = [
 
 
 [dev-dependencies]
-sweet.workspace = true
+beet_core = { workspace = true, features = ["testing"] }
+sweet = {workspace = true, features=["runner"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_agent = { path = ".", features = ["native-tls"] }

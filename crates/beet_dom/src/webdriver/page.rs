@@ -148,7 +148,7 @@ impl Page {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 

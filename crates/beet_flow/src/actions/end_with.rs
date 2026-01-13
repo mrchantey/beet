@@ -23,11 +23,13 @@ pub struct EndWith<T: EndEvent + Clone = Outcome>(pub T);
 impl<T: EndEvent + Clone> EndWith<T> {}
 
 fn end_with<T: EndEvent + Clone>(
-	mut ev: On<T::Run>,
+	ev: On<T::Run>,
+	mut commands: Commands,
 	action: Query<&EndWith<T>>,
 ) -> Result {
-	let action = action.get(ev.action())?;
-	ev.trigger_with_cx(action.0.clone());
+	let target = ev.target();
+	let action = action.get(target)?;
+	commands.entity(target).trigger_target(action.0.clone());
 	Ok(())
 }
 

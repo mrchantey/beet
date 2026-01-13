@@ -164,18 +164,19 @@ mod test {
 
 	#[test]
 	fn simple() {
-		mod_tree(vec![RouteFileMethod::new("/bazz")]).xpect_snapshot();
+		mod_tree(vec![RouteFileMethod::new("/bazz", HttpMethod::Get)])
+			.xpect_snapshot();
 	}
 
 
 	#[test]
 	fn correct_tree_structure() {
 		mod_tree(vec![
-			RouteFileMethod::new("bazz"),
-			RouteFileMethod::new("foo/bar"),
-			RouteFileMethod::new("foo/boo"),
-			RouteFileMethod::new(RouteInfo::post("foo/boo")),
-			RouteFileMethod::new(RouteInfo::post("foo/bing/bong")),
+			RouteFileMethod::new("bazz", HttpMethod::Get),
+			RouteFileMethod::new("foo/bar", HttpMethod::Get),
+			RouteFileMethod::new("foo/boo", HttpMethod::Get),
+			RouteFileMethod::new("foo/boo", HttpMethod::Post),
+			RouteFileMethod::new("foo/bing/bong", HttpMethod::Post),
 		])
 		.xpect_snapshot();
 	}

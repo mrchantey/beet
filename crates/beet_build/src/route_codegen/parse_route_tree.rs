@@ -135,7 +135,6 @@ impl<'a> Parser<'_, '_, 'a> {
 		// otherwise specify `index` as the name
 		let route_ident = if tree.children.is_empty() {
 			let name = route
-				.route_info
 				.path
 				.file_stem()
 				.map(|s| s.to_string_lossy().to_snake_case())
@@ -144,11 +143,10 @@ impl<'a> Parser<'_, '_, 'a> {
 		} else {
 			Ident::new("index", Span::call_site())
 		};
-		let path_pattern = PathPattern::new(&route.route_info.path).unwrap();
+		let path_pattern = PathPattern::new(&route.path).unwrap();
 
 		let func = if path_pattern.is_static() {
-			let route_path =
-				route.route_info.path.to_string_lossy().to_string();
+			let route_path = route.path.to_string_lossy().to_string();
 			parse_quote!(
 				pub fn #route_ident()-> &'static str{
 					#route_path
@@ -202,12 +200,12 @@ mod test {
 	fn world() -> World {
 		let mut world = World::new();
 		world.spawn_batch(vec![
-			RouteFileMethod::new("/"),
-			RouteFileMethod::new("/bazz"),
-			RouteFileMethod::new("/foo/bar"),
-			RouteFileMethod::new("/foo/bazz"),
-			RouteFileMethod::new("/foo/bazz/boo"),
-			RouteFileMethod::new(RouteInfo::post("/foo/bazz/boo")),
+			RouteFileMethod::new("/", HttpMethod::Get),
+			RouteFileMethod::new("/bazz", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bar", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz/boo", HttpMethod::Get),
+			RouteFileMethod::new("/foo/bazz/boo", HttpMethod::Post),
 		]);
 		world
 	}
@@ -229,11 +227,18 @@ mod test {
 	}
 
 	#[test]
-	fn single() { parse(vec![RouteFileMethod::new("/")]).xpect_snapshot(); }
+	fn single() {
+		parse(vec![RouteFileMethod::new("/", HttpMethod::Get)])
+			.xpect_snapshot();
+	}
 
 	#[test]
 	fn dynamic() {
-		parse(vec![RouteFileMethod::new("/foo/:bar/*bazz")]).xpect_snapshot();
+		parse(vec![RouteFileMethod::new(
+			"/foo/:bar/*bazz",
+			HttpMethod::Get,
+		)])
+		.xpect_snapshot();
 	}
 
 	#[test]

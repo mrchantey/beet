@@ -10,7 +10,7 @@ pub fn ClientCounter(#[field(default = 0)] initial: i32) -> impl Bundle {
 		<Button
 			variant=ButtonVariant::Outlined
 			onclick=move |_| set(get() + 1)>
-			Cookie Count: {get}
+			Client Cookie Count: {get}
 		</Button>
 	</div>
 	<style>

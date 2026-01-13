@@ -13,7 +13,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// "foo".xpect_str("foo");
 	/// "foo".xnot().xpect_str("bar");
 	/// ```
@@ -33,7 +33,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// "foobar".xpect_contains("bar");
 	/// "foobar".xnot().xpect_contains("bazz");
 	/// ```
@@ -58,7 +58,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// "foobar".xpect_starts_with("foo");
 	/// "foobar".xnot().xpect_starts_with("bazz");
 	/// ```
@@ -83,7 +83,7 @@ where
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// "foobar".xpect_ends_with("bar");
 	/// "foobar".xnot().xpect_ends_with("bazz");
 	/// ```

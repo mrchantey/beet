@@ -126,7 +126,6 @@ pub(super) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-
 	async fn run_assertion(
 		agent: impl Bundle,
 		text: &str,

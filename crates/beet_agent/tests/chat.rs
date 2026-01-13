@@ -2,7 +2,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 // use beet_agent::prelude::*;
 use beet_net::prelude::*;
-// use sweet::prelude::*;
 
 #[sweet::test]
 async fn works() {

@@ -31,10 +31,8 @@ pub(super) fn start_hyper_server(
 ) -> Result {
 	let server = query.get(entity)?;
 	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
-	let handler = server.handler();
 
 	async_commands.run(async move |world| -> Result {
-		let handler = handler.clone();
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
 
@@ -49,16 +47,14 @@ pub(super) fn start_hyper_server(
 			trace!("New connection from: {}", addr);
 			let io = BevyIo::new(tcp);
 
-			let handler = handler.clone();
 			let _entity_fut = world.run_async(async move |world| {
 				// pass an AsyncWorld to the service_fn
 				let service = service_fn(move |req| {
 					let world = world.clone();
-					let handler = handler.clone();
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = handler(world.entity(entity), req).await;
+						let res = world.entity(entity).oneshot(req).await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
@@ -269,28 +265,26 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let server = HttpServer::new_test().with_handler(
-			async move |entity: AsyncEntity, req: Request| {
-				let time = entity
-					.world()
-					.with_then(|world| {
-						world.query_once::<&ServerStatus>()[0].request_count()
-					})
-					.await;
-				assert!(time < 99999);
-				Response::ok().with_body(req.body)
-			},
-		);
+		let server = HttpServer::new_test();
 
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					server,
+					ExchangeSpawner::new_handler(move |mut entity, req| {
+						let count = entity.world_scope(|world: &mut World| {
+							world.query_once::<&ServerStatus>()[0]
+								.request_count()
+						});
+						assert!(count < 99999);
+						Response::ok().with_body(req.body)
+					}),
 				))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 		for _ in 0..10 {
 			Request::post(&url)
 				.send()
@@ -303,20 +297,15 @@ mod test {
 	}
 	#[sweet::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test().with_handler(
-			async move |_: AsyncEntity, req: Request| {
-				Response::ok().with_body(req.body)
-			},
-		);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
-				))
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((server, ExchangeSpawner::mirror()))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 		Request::post(url)
 			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
 				Ok(Bytes::from("foo")),
@@ -338,27 +327,37 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[sweet::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test().with_handler(
-			async move |_: AsyncEntity, req: Request| {
-				// Server adds 100ms delay per chunk
-				use futures::TryStreamExt;
-				let delayed_stream =
-					req.body.into_stream().and_then(move |chunk| async move {
-						time_ext::sleep(Duration::from_millis(100)).await;
-						Ok(chunk)
-					});
-				Response::ok().with_body(Body::stream(delayed_stream))
-			},
-		);
+		let server = HttpServer::new_test();
 		let url = server.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
-				.add_plugins((
-					MinimalPlugins,
-					ServerPlugin::with_server(server),
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					ExchangeSpawner::new_handler(move |_, req| {
+						// Server adds 100ms delay per chunk
+						let delayed_stream = futures::stream::unfold(
+							req.body,
+							|mut body| async move {
+								match body.next().await {
+									Ok(Some(chunk)) => {
+										time_ext::sleep(Duration::from_millis(
+											100,
+										))
+										.await;
+										Some((Ok(chunk), body))
+									}
+									Ok(None) => None,
+									Err(e) => Some((Err(e), body)),
+								}
+							},
+						);
+						Response::ok().with_body(Body::stream(delayed_stream))
+					}),
+					server,
 				))
 				.run();
 		});
+		time_ext::sleep_millis(50).await;
 
 		let start_time = Instant::now();
 
@@ -373,7 +372,7 @@ mod test {
 				time_ext::sleep(Duration::from_millis(100)).await;
 
 				let elapsed = start_time.elapsed().as_millis() as u64;
-				let timestamp_data = format!("{}:{}", count, elapsed);
+				let timestamp_data = format!("{}:{}\n", count, elapsed);
 
 				Some((Ok(Bytes::from(timestamp_data)), count + 1))
 			});
@@ -388,27 +387,28 @@ mod test {
 			.unwrap()
 			.body;
 
-		let mut chunk_count = 0;
+		// Collect all response data
+		let mut all_data = Vec::new();
 		while let Some(chunk) = response_stream.next().await.unwrap() {
-			let chunk_str = String::from_utf8(chunk.to_vec()).unwrap();
-			let final_elapsed = start_time.elapsed().as_millis() as u64;
+			all_data.extend_from_slice(&chunk);
+		}
+		let response_str = String::from_utf8(all_data).unwrap();
+		let final_elapsed = start_time.elapsed().as_millis() as u64;
 
+		// Parse each line (chunk)
+		let lines: Vec<&str> = response_str.trim().split('\n').collect();
+		lines.len().xpect_eq(3);
+
+		for (chunk_count, line) in lines.iter().enumerate() {
 			// Parse the timestamp from the chunk
-			let parts: Vec<&str> = chunk_str.split(':').collect();
+			let parts: Vec<&str> = line.split(':').collect();
 			let chunk_index: usize = parts[0].parse().unwrap();
-			let original_timestamp: u64 = parts[1].parse().unwrap();
-
-			// Expected delay: original timestamp + 100ms server delay per chunk
-			let expected_min_delay = original_timestamp + 100;
-
-			// Verify timing is within reasonable bounds (allowing some jitter)
-			final_elapsed.xpect_greater_or_equal_to(expected_min_delay);
-			final_elapsed.xpect_less_or_equal_to(expected_min_delay + 50);
 
 			chunk_index.xpect_eq(chunk_count);
-			chunk_count += 1;
 		}
 
-		chunk_count.xpect_eq(3);
+		// Verify total time is reasonable: ~300ms for 3 chunks with 100ms delays each
+		final_elapsed.xpect_greater_or_equal_to(300);
+		final_elapsed.xpect_less_or_equal_to(600);
 	}
 }

@@ -23,6 +23,8 @@ pub enum ContentType {
 #[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
 pub struct Endpoint {
+	/// An optional description for this endpoint
+	description: Option<String>,
 	params: ParamsPattern,
 	/// The full [`PathPattern`] for this endpoint
 	path: PathPattern,
@@ -32,10 +34,34 @@ pub struct Endpoint {
 	cache_strategy: Option<CacheStrategy>,
 	/// Marks this endpoint as an HTML endpoint
 	content_type: Option<ContentType>,
+	/// Canonical endpoints are registered in the EndpointTree. Non-canonical endpoints
+	/// are fallbacks that won't conflict with canonical routes. Defaults to `true`.
+	is_canonical: bool,
 }
 
 
 impl Endpoint {
+	#[cfg(test)]
+	pub(crate) fn new(
+		path: PathPattern,
+		params: ParamsPattern,
+		method: Option<HttpMethod>,
+		cache_strategy: Option<CacheStrategy>,
+		content_type: Option<ContentType>,
+		is_canonical: bool,
+	) -> Self {
+		Self {
+			path,
+			params,
+			method,
+			cache_strategy,
+			content_type,
+			is_canonical,
+			description: None,
+		}
+	}
+
+	pub fn description(&self) -> Option<&str> { self.description.as_deref() }
 	pub fn path(&self) -> &PathPattern { &self.path }
 	pub fn params(&self) -> &ParamsPattern { &self.params }
 	pub fn method(&self) -> Option<HttpMethod> { self.method }
@@ -43,6 +69,7 @@ impl Endpoint {
 		self.cache_strategy
 	}
 	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
+	pub fn is_canonical(&self) -> bool { self.is_canonical }
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
@@ -64,7 +91,6 @@ impl Endpoint {
 /// structure manually.
 #[derive(BundleEffect)]
 pub struct EndpointBuilder {
-	// params: RoutePar
 	/// The action to handle the request, by default always returns a 200 OK
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 	/// The path to match, or None for any path
@@ -79,6 +105,10 @@ pub struct EndpointBuilder {
 	content_type: Option<ContentType>,
 	/// Whether to match the path exactly, defaults to true.
 	exact_path: bool,
+	/// Optional description for this endpoint
+	description: Option<String>,
+	/// Whether this endpoint is canonical (registered in EndpointTree), defaults to true
+	is_canonical: bool,
 	/// Additional bundles to be run before the handler
 	additional_predicates: Vec<
 		Box<
@@ -102,6 +132,8 @@ impl Default for EndpointBuilder {
 			cache_strategy: None,
 			content_type: None,
 			exact_path: true,
+			description: None,
+			is_canonical: true,
 			additional_predicates: Vec::new(),
 		}
 	}
@@ -117,6 +149,43 @@ impl EndpointBuilder {
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
 	pub fn any_method() -> Self { Self::default().with_any_method() }
+
+	/// Create middleware that accepts trailing path segments and any HTTP method.
+	/// Middleware runs for all matching paths and does not consume the request.
+	///
+	/// Unlike traditional routers, beet middleware has deep understanding of the state
+	/// of the exchange, for instance it can be used for templating content, where an
+	/// endpoint inserts a [`HtmlBundle`](beet_rsx::prelude::HtmlBundle), and the middleware
+	/// moves it into a layout.
+	///
+	/// It can also be used for traditional request/response middleware, see [common_middleware](./common_middleware.rs)
+	///
+	/// # Example
+	/// ```
+	/// # use beet_router::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// // Middleware that wraps HTML content in a layout
+	/// EndpointBuilder::middleware(
+	///     "blog",
+	///     OnSpawn::observe(|ev: On<GetOutcome>, mut commands: Commands| {
+	///         // Query for HtmlBundle on agent, wrap it, trigger Outcome::Pass
+	///         commands.entity(ev.target()).trigger_target(Outcome::Pass);
+	///     })
+	/// );
+	/// ```
+	pub fn middleware(
+		path: impl AsRef<str>,
+		handler: impl 'static + Send + Sync + Bundle,
+	) -> impl Bundle {
+		(
+			Name::new(format!("Middleware: {}", path.as_ref())),
+			Sequence,
+			PathPartial::new(path.as_ref()),
+			children![partial_path_match(), handler],
+		)
+	}
 	/// Create a new endpoint with the provided endpoint handler
 	pub fn with_handler<M>(
 		self,
@@ -174,9 +243,23 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Sets a description for this endpoint, used in help output
+	pub fn with_description(mut self, description: impl Into<String>) -> Self {
+		self.description = Some(description.into());
+		self
+	}
+
 	/// Sets [`Self::exact_path`] to false
 	pub fn with_trailing_path(mut self) -> Self {
 		self.exact_path = false;
+		self
+	}
+
+	/// Mark this endpoint as non-canonical, preventing it from being registered
+	/// in the EndpointTree. Use this for fallback endpoints that shouldn't conflict
+	/// with canonical routes.
+	pub fn non_canonical(mut self) -> Self {
+		self.is_canonical = false;
 		self
 	}
 
@@ -210,9 +293,11 @@ impl EndpointBuilder {
 				Endpoint {
 					path,
 					params,
+					description: self.description,
 					method: self.method,
 					cache_strategy: self.cache_strategy,
 					content_type: self.content_type,
+					is_canonical: self.is_canonical,
 				},
 				Sequence,
 			))
@@ -233,6 +318,7 @@ impl EndpointBuilder {
 
 				let mut handler_entity =
 					spawner.spawn(Name::new("Route Handler"));
+
 				if let Some(cache_strategy) = self.cache_strategy {
 					handler_entity.insert(cache_strategy);
 				}
@@ -258,8 +344,11 @@ fn path_match(must_exact_match: bool) -> impl Bundle {
 	(
 		Name::new("Check Path Match"),
 		OnSpawn::observe(
-			move |mut ev: On<GetOutcome>, query: RouteQuery| -> Result {
-				let outcome = match query.path_match(&ev) {
+			move |ev: On<GetOutcome>,
+			      mut commands: Commands,
+			      query: RouteQuery| {
+				let action = ev.target();
+				let outcome = match query.path_match(action) {
 					// expected exact match, got partial match
 					Ok(path_match)
 						if must_exact_match && !path_match.exact_match() =>
@@ -271,8 +360,7 @@ fn path_match(must_exact_match: bool) -> impl Bundle {
 					// match failed
 					Err(_err) => Outcome::Fail,
 				};
-				ev.trigger_with_cx(outcome);
-				Ok(())
+				commands.entity(action).trigger_target(outcome);
 			},
 		),
 	)
@@ -284,18 +372,18 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 		Name::new("Method Check"),
 		method,
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 query: RouteQuery,
-			 actions: Query<&HttpMethod>|
+			 actions: Query<&HttpMethod>,
+			 mut commands: Commands|
 			 -> Result {
-				let method = actions.get(ev.action())?;
-				let outcome = match query.method(&ev)? == *method {
+				let action = ev.target();
+				let method = actions.get(action)?;
+				let outcome = match query.method(action)? == *method {
 					true => Outcome::Pass,
 					false => Outcome::Fail,
 				};
-				// println!("check_method: {}", outcome);
-				ev.trigger_with_cx(outcome);
-
+				commands.entity(action).trigger_target(outcome);
 				Ok(())
 			},
 		),
@@ -307,6 +395,7 @@ fn check_method(method: HttpMethod) -> impl Bundle {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
 	#[sweet::test]
@@ -315,27 +404,28 @@ mod test {
 		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
 
 		RouterPlugin::world()
-			.spawn((Router, EndpointBuilder::get()))
+			.spawn(ExchangeSpawner::new_flow(|| EndpointBuilder::get()))
 			.oneshot(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
 	}
 
-
 	#[sweet::test]
 	async fn dynamic_path() {
 		RouterPlugin::world()
-			.spawn((
-				Router,
+			.spawn(ExchangeSpawner::new_flow(|| {
 				EndpointBuilder::get().with_path("/:path").with_handler(
 					async |_req: (),
-					       cx: EndpointContext|
+					       action: AsyncEntity|
 					       -> Result<Html<String>> {
-						Html(cx.dyn_segment("path").await?).xok()
+						let path =
+							RouteQuery::dyn_segment_async(action, "path")
+								.await?;
+						Html(path).xok()
 					},
-				),
-			))
+				)
+			}))
 			.oneshot_str(Request::get("/bing"))
 			.await
 			.xpect_eq("bing");
@@ -346,14 +436,16 @@ mod test {
 		use beet_flow::prelude::*;
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn((Router, InfallibleSequence, children![
-			EndpointBuilder::get()
-				.with_path("foo")
-				.with_handler(|| "foo"),
-			EndpointBuilder::get()
-				.with_path("bar")
-				.with_handler(|| "bar"),
-		]));
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_handler(|| "foo"),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_handler(|| "bar"),
+			])
+		}));
 		entity.oneshot_str("/foo").await.xpect_eq("foo");
 		entity.oneshot_str("/bar").await.xpect_eq("bar");
 	}
@@ -361,8 +453,9 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		let mut entity =
-			world.spawn((Router, EndpointBuilder::post().with_path("foo")));
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			EndpointBuilder::post().with_path("foo")
+		}));
 
 		// method and path match
 		entity
@@ -370,27 +463,60 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);
-		// method does not match
+		// method does not match - returns 500 because single endpoint failure
+		// (404 requires a router with fallback structure)
 		entity
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::NOT_FOUND);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		// path does not match
 		entity
 			.oneshot(Request::get("/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::NOT_FOUND);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		// path has extra parts
 		entity
 			.oneshot(Request::get("/foo/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::NOT_FOUND);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
+	#[sweet::test]
+	async fn middleware_allows_trailing() {
+		use beet_flow::prelude::*;
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::middleware(
+					"api",
+					OnSpawn::observe(
+						|ev: On<GetOutcome>, mut commands: Commands| {
+							// Middleware just passes - demonstrates path matching
+							commands
+								.entity(ev.target())
+								.trigger_target(Outcome::Pass);
+						},
+					),
+				),
+				EndpointBuilder::get()
+					.with_path("api/users")
+					.with_handler(|| "users"),
+			])
+		}));
+
+		// Middleware allows trailing path segments, so this matches
+		entity
+			.oneshot(Request::get("/api/users"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+
 	#[test]
-	#[rustfmt::skip]
 	fn test_collect_route_segments() {
 		let mut world = World::new();
 		world.spawn((
@@ -398,19 +524,11 @@ mod test {
 			EndpointBuilder::get(),
 			children![
 				children![
-					(
-						PathPartial::new("*bar"),
-						EndpointBuilder::get()
-					),
+					(PathPartial::new("*bar"), EndpointBuilder::get()),
 					PathPartial::new("bazz")
 				],
-				(
-					PathPartial::new("qux"),
-				),
-				(
-					PathPartial::new(":quax"),
-					EndpointBuilder::get()
-				),
+				(PathPartial::new("qux"),),
+				(PathPartial::new(":quax"), EndpointBuilder::get()),
 			],
 		));
 		let mut paths = world
@@ -424,5 +542,36 @@ mod test {
 			RoutePath::new("/foo/*bar"),
 			RoutePath::new("/foo/:quax"),
 		]);
+	}
+
+	#[sweet::test]
+	async fn response_exists() {
+		// Simple test to verify Response exists after endpoint
+		RouterPlugin::world()
+			.spawn(ExchangeSpawner::new_flow(|| {
+				(InfallibleSequence, children![
+					EndpointBuilder::get()
+						.with_handler(|| StatusCode::OK.into_response()),
+					OnSpawn::observe(
+						|ev: On<GetOutcome>,
+						 agents: AgentQuery,
+						 response_query: Query<&Response>,
+						 mut commands: Commands|
+						 -> Result {
+							let action = ev.target();
+							let agent = agents.entity(action);
+							response_query.contains(agent).xpect_true();
+							commands
+								.entity(action)
+								.trigger_target(Outcome::Pass);
+							Ok(())
+						},
+					),
+				])
+			}))
+			.oneshot(Request::get("/"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
 	}
 }

@@ -8,7 +8,7 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 1.xpect_less_than(2);
 	/// ```
 	///
@@ -31,7 +31,7 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 2.xpect_less_or_equal_to(2);
 	/// ```
 	///
@@ -54,7 +54,7 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 3.xpect_greater_than(2);
 	/// ```
 	///
@@ -77,7 +77,7 @@ pub impl<T: PartialOrd + Debug + Copy> T {
 	/// ## Example
 	///
 	/// ```
-	/// # use sweet::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// 3.xpect_greater_or_equal_to(3);
 	/// ```
 	///

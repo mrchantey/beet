@@ -42,7 +42,8 @@ log.workspace = true
 pretty_env_logger.workspace = true
 
 [dev-dependencies]
-sweet.workspace = true
+beet_core = { workspace = true, features = ["testing"] }
+sweet = {workspace = true, features=["runner"]}
 log.workspace = true
 pretty_env_logger.workspace = true
 serde.workspace = true

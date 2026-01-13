@@ -46,7 +46,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "we need to get sentence_flow back up and running, ie the req/res model like score"]

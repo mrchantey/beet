@@ -48,10 +48,10 @@ pub fn parse_route_file_md(
 
 		commands.spawn((
 			ChildOf(entity),
-			RouteFileMethod::new(RouteInfo {
-				path: route_file.route_path.clone(),
-				method: HttpMethod::Get,
-			}),
+			RouteFileMethod::new(
+				route_file.route_path.clone(),
+				HttpMethod::Get,
+			),
 		));
 		// here the markdown will be generated in its own codegen
 		commands.spawn((
@@ -95,6 +95,6 @@ mod test {
 			.get::<RouteFileMethod>()
 			.unwrap()
 			.clone();
-		method.route_info.path.xpect_eq(RoutePath::new("/"));
+		method.path.xpect_eq(RoutePath::new("/"));
 	}
 }

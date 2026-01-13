@@ -106,7 +106,7 @@ mod test {
 	use crate::prelude::*;
 	use serde_json::Value;
 	use serde_json::json;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	fn event() -> Value {
 		json! ({

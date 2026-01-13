@@ -179,12 +179,11 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 }
 
 
-// TODO get this test workin in wasm too
-#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
+// sweet wasm runner uses PanicContext so cant test properly
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-	use super::*;
-	use sweet::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn works() {
@@ -196,6 +195,8 @@ mod tests {
 			location: Some(FileSpan::new_with_start(file!(), line!() - 2, 31)),
 		});
 	}
+
+
 	#[sweet::test]
 	async fn works_async() {
 		PanicContext::catch_async(async { Ok(()) })

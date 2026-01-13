@@ -1,10 +1,8 @@
 use beet::prelude::*;
-use clap::Parser;
 
 /// Start a chat application
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Default)]
 pub struct AgentCmd {
-	#[clap(flatten)]
 	plugin: CliAgentPlugin,
 }
 

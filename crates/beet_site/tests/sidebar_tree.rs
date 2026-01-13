@@ -6,23 +6,35 @@ use beet_site::prelude::*;
 
 #[sweet::test]
 async fn works() {
-	let mut app = App::new();
-	app.add_plugins(server_plugin);
-	app.init().update();
-	app.world_mut()
+	let mut world = server_plugin.into_world();
+
+	let root = beet_site_router().spawn(&mut world);
+	let endpoints = world
+		.run_system_once_with(EndpointTree::endpoints_from_exchange, root)
+		.unwrap();
+	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
+
+	let root = world
 		.run_system_cached_with(
 			CollectSidebarNode::collect,
-			CollectSidebarNode {
-				include_filter: GlobFilter::default()
-					.with_include("/")
-					.with_include("/docs*")
-					.with_include("/blog*")
-					.with_include("/design*"),
-				expanded_filter: GlobFilter::default().with_include("/docs"),
-			},
+			(
+				CollectSidebarNode {
+					include_filter: GlobFilter::default()
+						.with_include("/")
+						.with_include("/docs*")
+						.with_include("/blog*")
+						.with_include("/design*"),
+					expanded_filter: GlobFilter::default()
+						.with_include("/docs"),
+				},
+				endpoint_tree,
+			),
 		)
-		.unwrap()
-		.paths()
-		.len()
-		.xpect_greater_than(10);
+		.unwrap();
+
+	root.expanded.xpect_false();
+	root.children[0].display_name.xpect_eq("Blog");
+	root.children[0].expanded.xpect_false();
+	root.children[1].display_name.xpect_eq("Docs");
+	root.children[1].expanded.xpect_true();
 }

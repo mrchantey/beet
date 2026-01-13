@@ -15,7 +15,8 @@ fn tick_task_pools() {
 
 #[extend::ext]
 pub impl App {
-	/// A non-send runner
+	/// Run the app asynchronously, particularly useful for cases like
+	/// wasm where `App::run` just succeeds immediately
 	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
 		AsyncRunner::run(std::mem::take(self))
 	}

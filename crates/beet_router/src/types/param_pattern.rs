@@ -2,23 +2,9 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
+use heck::ToKebabCase;
 
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-pub struct HelpParams {
-	#[reflect(@ParamOptions::desc("Get help"))]
-	help: bool,
-}
+
 
 
 /// The param equivelent of a [`PathPartial`], denoting
@@ -110,14 +96,14 @@ impl ParamsPattern {
 	/// ## Errors
 	/// - Errors if params with the same name have conflicting definitions
 	pub fn from_metas(mut items: Vec<ParamMeta>) -> Result<Self> {
-		items.sort_by(|a, b| a.name.cmp(&b.name));
+		items.sort_by(|a, b| a.key.cmp(&b.key));
 
 		// check for conflicts before deduplication
 		for window in items.windows(2) {
-			if window[0].name == window[1].name && window[0] != window[1] {
+			if window[0].key == window[1].key && window[0] != window[1] {
 				bevybail!(
 					"conflicting param definitions for '{name}': \nFirst: {first:#?} \nSecond: {second:#?}",
-					name = window[0].name,
+					name = window[0].key,
 					first = window[0],
 					second = window[1],
 				);
@@ -155,10 +141,16 @@ impl ParamsPattern {
 }
 
 /// Metadata for a specific param at a route
+///
+/// Field names are automatically converted from snake_case to kebab-case for
+/// use in CLI arguments and query parameters. This means a struct field named
+/// `help_format` will be accessible as `--help-format` in CLI and `help-format`
+/// in query parameters.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub struct ParamMeta {
-	/// The name of the route param, ie the bar in `--bar=3`
-	name: String,
+	/// The kebab-case key of the route param, ie the `foo-bar` in `--foo-bar=3`.
+	/// Automatically converted from snake_case field names (e.g., `help_format` → `help-format`).
+	key: String,
 	/// The kind of param value
 	value: ParamValue,
 	/// Additional details for the param
@@ -170,7 +162,7 @@ pub struct ParamMeta {
 
 impl std::fmt::Display for ParamMeta {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "Param - name: {}", self.name)?;
+		write!(f, "Param - name: {}", self.key)?;
 		if let Some(short) = self.short() {
 			write!(f, ", short: -{}", short)?;
 		}
@@ -193,7 +185,7 @@ impl ParamMeta {
 	pub fn new(name: impl Into<String>, value: ParamValue) -> Self {
 		Self {
 			value,
-			name: name.into(),
+			key: name.into(),
 			options: default(),
 			required: false,
 		}
@@ -209,7 +201,7 @@ impl ParamMeta {
 		};
 
 		Self {
-			name: field.name().into(),
+			key: field.name().to_kebab_case(),
 			value: ParamValue::from_type_path(field.type_path()),
 			options: ParamOptions::from_reflect(field),
 			required,
@@ -217,7 +209,7 @@ impl ParamMeta {
 	}
 
 	/// The name of the param
-	pub fn name(&self) -> &str { &self.name }
+	pub fn name(&self) -> &str { &self.key }
 
 	/// The description of the param
 	pub fn description(&self) -> Option<&str> {
@@ -322,11 +314,12 @@ impl ParamOptions {
 
 
 	fn from_reflect(field: &bevy::reflect::NamedField) -> Self {
-		let opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
+		#[allow(unused_mut)]
+		let mut opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
 		// Override description from docs if not specified
 		#[cfg(feature = "reflect_documentation")]
 		if opts.description == None {
-			opts = field.docs().map(|docs| docs.into());
+			opts.description = field.docs().map(|docs| docs.into());
 		}
 		opts
 	}
@@ -448,5 +441,22 @@ mod test {
 				ParamMeta::new("boo", ParamValue::Flag),
 			],
 		});
+	}
+
+	#[test]
+	fn snake_case_converts_to_kebab_case() {
+		#[derive(Reflect)]
+		struct SnakeCaseParams {
+			help_format: Option<String>,
+			enable_verbose_mode: bool,
+			max_retry_count: u32,
+		}
+
+		let partial = ParamsPartial::new::<SnakeCaseParams>();
+
+		// verify field names are converted to kebab-case
+		partial.items[0].name().xpect_eq("help-format");
+		partial.items[1].name().xpect_eq("enable-verbose-mode");
+		partial.items[2].name().xpect_eq("max-retry-count");
 	}
 }

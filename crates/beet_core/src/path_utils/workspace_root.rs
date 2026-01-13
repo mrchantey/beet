@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use std::path::PathBuf;
 
-/// 1. tries to get the `SWEET_ROOT` env var.
+/// 1. tries to get the `WORKSPACE_ROOT` env var.
 /// 2. if wasm, returns an empty path
 /// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
 /// 4. Otherwise returns cwd
@@ -9,16 +9,14 @@ use std::path::PathBuf;
 /// ## Panics
 /// - The current directory is not found
 /// - Insufficient permissions to access the current directory
-/// - In wasm and js_runtime::sweet_root returns None
+/// - In wasm and js_runtime::WORKSPACE_ROOT returns None
 pub fn workspace_root() -> PathBuf {
-	if let Ok(root_str) = env_ext::var("SWEET_ROOT") {
+	if let Ok(root_str) = env_ext::var("WORKSPACE_ROOT") {
 		return root_str.into();
 	}
 	#[cfg(target_arch = "wasm32")]
 	{
-		unimplemented!(
-			"no SWEET_ROOT env in js runtime, full fs access is a wip"
-		);
+		panic!("no WORKSPACE_ROOT env in js runtime");
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	{

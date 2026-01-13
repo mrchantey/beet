@@ -35,11 +35,9 @@ pub fn collect_route_files(
 			{
 				let func_ident = &route_file_method.item.sig.ident;
 
-				let path_pattern =
-					PathPattern::new(&route_file_method.route_info.path)?;
+				let path_pattern = PathPattern::new(&route_file_method.path)?;
 
-				let method =
-					route_file_method.route_info.method.self_token_stream();
+				let method = route_file_method.method.self_token_stream();
 				let is_async = route_file_method.item.sig.asyncness.is_some();
 				let annoying_generics = match route_file_method.returns_result()
 				{
@@ -61,8 +59,7 @@ pub fn collect_route_files(
 						if path_pattern.is_static()
 							&& collection.category.cache_strategy()
 								== CacheStrategy::Static
-							&& route_file_method.route_info.method
-								== HttpMethod::Get
+							&& route_file_method.method == HttpMethod::Get
 						{
 							items.push(
 								quote!(.with_predicate(common_predicates::is_ssr())),
@@ -83,7 +80,7 @@ pub fn collect_route_files(
 						]
 					}
 				};
-				let path = route_file_method.route_info.path.to_string();
+				let path = route_file_method.path.to_string();
 				builder_tokens.push(quote!(.with_path(#path)));
 				let cache_strategy =
 					collection.category.cache_strategy().self_token_stream();

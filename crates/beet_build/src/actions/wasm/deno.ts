@@ -12,7 +12,7 @@
 // https://github.com/wasm-bindgen/wasm-bindgen/blob/main/crates/cli/src/wasm_bindgen_test_runner/deno.rs
 import init from "./bindgen.js";
 import { dirname } from "https://deno.land/std/path/mod.ts";
-import { ensureDirSync } from "https://deno.land/std/fs/mod.ts";
+import { ensureDirSync, existsSync } from "https://deno.land/std/fs/mod.ts";
 
 globalThis.cwd = () => {
 	return do_try(() => Deno.cwd());
@@ -27,6 +27,9 @@ globalThis.read_file = (path: string) => {
 	return do_try(() => Deno.readFileSync(path));
 };
 
+globalThis.exists = (path: string) => {
+	return do_try(() => existsSync(path), false);
+};
 globalThis.create_dir_all = (path: string) => {
 	return do_try(() => ensureDirSync(path));
 };
@@ -52,9 +55,10 @@ globalThis.env_all = () => {
 	return do_try(() => Object.entries(Deno.env.toObject()), []);
 };
 
-// Test mode aliases (when running cargo test --target wasm32-unknown-unknown)
+// Test mode aliases (when running cargo test -p beet_core)
 globalThis.test_cwd = globalThis.cwd;
 globalThis.test_exit = globalThis.exit;
+globalThis.test_exists = globalThis.exists;
 globalThis.test_catch_no_abort_inner = globalThis.catch_no_abort_inner;
 globalThis.test_read_file = globalThis.read_file;
 globalThis.test_create_dir_all = globalThis.create_dir_all;

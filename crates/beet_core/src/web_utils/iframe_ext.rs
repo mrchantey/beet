@@ -83,8 +83,8 @@ pub async fn wait_for_load(iframe: &HtmlIFrameElement) {
 #[cfg(target_arch = "wasm32")]
 mod tests {
 	use super::*;
+	use crate::prelude::*;
 	use crate::web_utils::document_ext as doc;
-	use sweet::prelude::*;
 
 	#[ignore = "requires dom"]
 	#[test]

@@ -1,6 +1,7 @@
 //! Panic and assertion helpers for matchers.
 //! All functions use `#[track_caller]` to capture the correct source location.
 use crate::prelude::*;
+use crate::utils::paint_ext;
 use std::fmt::Debug;
 use std::fmt::Display;
 
@@ -136,10 +137,7 @@ pub fn assert_diff<Received: AsRef<str>>(
 			panic_expected_received_display("NOT to be string", received_str);
 		}
 		(false, false) => {
-			panic_str(&crate::test_utils::pretty_diff::inline_diff(
-				expected,
-				received_str,
-			));
+			panic_str(&pretty_diff::inline_diff(expected, received_str));
 		}
 	}
 }

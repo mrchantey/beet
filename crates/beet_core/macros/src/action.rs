@@ -84,7 +84,7 @@ struct MyAction;
 mod test {
 	use super::parse;
 	use quote::quote;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 	use syn::DeriveInput;
 
 	#[test]

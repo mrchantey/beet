@@ -421,7 +421,7 @@ pub mod table_test {
 	use crate::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 	pub struct MyObject {

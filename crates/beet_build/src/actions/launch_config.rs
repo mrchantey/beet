@@ -137,7 +137,7 @@ pub fn launch_sequence() -> impl Bundle {
 }
 
 fn load_launch_scene(
-	mut ev: On<GetOutcome>,
+	ev: On<GetOutcome>,
 	mut commands: Commands,
 	config: Res<LaunchConfig>,
 ) -> Result {
@@ -145,7 +145,7 @@ fn load_launch_scene(
 	let scene = fs_ext::read_to_string(&config.launch_file.into_abs())?;
 	commands.load_scene(scene);
 
-	ev.trigger_with_cx(Outcome::Pass);
+	commands.entity(ev.target()).trigger_target(Outcome::Pass);
 	Ok(())
 }
 
@@ -158,20 +158,21 @@ fn launch_step_predicate() -> impl Bundle {
 	(
 		Name::new("Launch Step Predicate"),
 		OnSpawn::observe(
-			|mut ev: On<GetOutcome>,
+			|ev: On<GetOutcome>,
 			 workspace_config: Res<WorkspaceConfig>,
 			 launch_config: Res<LaunchConfig>,
-			 type_registry: Res<AppTypeRegistry>|
+			 type_registry: Res<AppTypeRegistry>,
+			 mut commands: Commands|
 			 -> Result<()> {
 				if launch_config.force_launch {
-					ev.trigger_with_cx(Outcome::Pass);
+					commands.entity(ev.target()).trigger_target(Outcome::Pass);
 					return Ok(());
 				}
 				let Ok(scene) = fs_ext::read_to_string(
 					&workspace_config.launch_file.into_abs(),
 				) else {
 					// no scene, should run
-					ev.trigger_with_cx(Outcome::Pass);
+					commands.entity(ev.target()).trigger_target(Outcome::Pass);
 					return Ok(());
 				};
 				// create a temp world to extract resources from the launch scene
@@ -193,7 +194,7 @@ fn launch_step_predicate() -> impl Bundle {
 					// no match, should run
 					Outcome::Pass
 				};
-				ev.trigger_with_cx(outcome);
+				commands.entity(ev.target()).trigger_target(outcome);
 				Ok(())
 			},
 		),
@@ -245,7 +246,8 @@ fn run_launch_step() -> impl Bundle {
 
 #[cfg(test)]
 mod test {
-	use super::*;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

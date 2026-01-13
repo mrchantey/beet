@@ -169,7 +169,7 @@ mod name_lookup {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {

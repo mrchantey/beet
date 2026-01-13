@@ -1,5 +1,3 @@
-// how to fix this late bound?
-#![allow(late_bound_lifetime_arguments)]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -21,14 +19,13 @@ use beet_core::prelude::*;
 /// This component is SparsSet as it is frequently added and removed.
 #[derive(Clone, Component)]
 #[component(storage = "SparseSet",on_add=on_add::<T>)]
-pub struct TriggerDeferred<T: ActionEvent> {
+pub struct TriggerDeferred<T: EntityTargetEvent> {
 	event: T,
-	agent: Option<Entity>,
 }
 
 impl<T> Default for TriggerDeferred<T>
 where
-	T: ActionEvent + Default,
+	T: EntityTargetEvent + Default,
 {
 	fn default() -> Self { Self::new(default()) }
 }
@@ -39,29 +36,22 @@ impl TriggerDeferred<GetOutcome> {
 }
 
 
-impl<T: ActionEvent> TriggerDeferred<T> {
+impl<T: EntityTargetEvent> TriggerDeferred<T> {
 	/// Create a new [`TriggerDeferred`] with the provided event
-	pub fn new(event: T) -> Self { Self { event, agent: None } }
-	pub fn with_agent(mut self, agent: Entity) -> Self {
-		self.agent = Some(agent);
-		self
-	}
+	pub fn new(event: T) -> Self { Self { event } }
 }
 
-fn on_add<T: ActionEvent>(mut world: DeferredWorld, cx: HookContext) {
+fn on_add<T: EntityTargetEvent>(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	world.commands().queue(move |world: &mut World| -> Result {
 		let ev = world
 			.entity_mut(entity)
 			.take::<TriggerDeferred<T>>()
 			.ok_or_else(|| bevyhow!("TriggerDeferred: component missing"))?;
-		let bundle = if let Some(agent) = ev.agent {
-			OnSpawnDeferred::trigger_target(ev.event.with_agent(agent))
-		} else {
-			OnSpawnDeferred::trigger_target(ev.event)
-		};
 
-		world.entity_mut(entity).insert(bundle);
+		world
+			.entity_mut(entity)
+			.insert(OnSpawnDeferred::trigger_target(ev.event));
 		Ok(())
 	});
 }

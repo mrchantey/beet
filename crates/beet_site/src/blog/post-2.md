@@ -3,11 +3,11 @@ title = "The Full Moon Harvest #2"
 created= "2025-08-09"
 +++
 
-# The Full Moon Harvest #2 - Bevy Router
+# The Full Moon Harvest #2 - ECS Router
 
 The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!
 
-<iframe width="941" height="538" src="https://www.youtube.com/embed/YKiHKQJmEoU" title="Full Moon Harverst #2 | Bevy Router" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe src="https://www.youtube.com/embed/YKiHKQJmEoU" title="Full Moon Harverst #2 | Bevy Router" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 <br/>
 <br/>
