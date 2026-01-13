@@ -48,7 +48,6 @@ impl Plugin for BuildPlugin {
 			.init_plugin::<RouteCodegenPlugin>()
 			.init_plugin::<NodeTypesPlugin>()
 			.insert_resource(CargoManifest::load().unwrap())
-			.init_resource::<CargoBuildCmd>()
 			.init_resource::<WorkspaceConfig>()
 			.init_resource::<LambdaConfig>()
 			.init_resource::<HtmlConstants>()
