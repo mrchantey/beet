@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 async fn works() {
 	dotenv::dotenv().ok();
 	let mut res = Request::post("https://api.openai.com/v1/chat/completions")
-		.with_auth_bearer(&std::env::var("OPENAI_API_KEY").unwrap())
+		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
 		.with_json_body(&serde_json::json! {{
 			// "model": "gpt-5",
 			"model": "gpt-4o-mini",

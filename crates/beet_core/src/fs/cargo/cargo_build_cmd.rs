@@ -185,7 +185,7 @@ impl CargoBuildCmd {
 	///
 	/// Panics if no crate name provided and no package, bin or example is set.
 	pub fn exe_path(&self, pkg_name: Option<&str>) -> PathBuf {
-		let target_dir = std::env::var("CARGO_TARGET_DIR")
+		let target_dir = env_ext::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".to_string());
 		let mut path = PathBuf::from(target_dir);
 

@@ -39,7 +39,7 @@ impl GeminiAgent {
 	/// If the GEMINI_API_KEY environment variable is not set.
 	pub fn from_env() -> Self {
 		Self {
-			api_key: std::env::var("GEMINI_API_KEY").unwrap(),
+			api_key: env_ext::var("GEMINI_API_KEY").unwrap(),
 			completion_model: GEMINI_2_5_FLASH.into(),
 			tools: Vec::new(),
 		}

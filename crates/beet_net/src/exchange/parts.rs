@@ -876,7 +876,7 @@ impl From<&CliArgs> for RequestParts {
 			method: HttpMethod::Get,
 			parts: Parts {
 				scheme: Scheme::Cli,
-				authority: std::env::var("CARGO_PKG_NAME").unwrap_or_default(),
+				authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
 				path,
 				params,
 				headers: MultiMap::default(),

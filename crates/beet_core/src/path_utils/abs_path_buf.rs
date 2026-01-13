@@ -121,7 +121,7 @@ impl AbsPathBuf {
 	/// ## Panics
 	/// Panics if `CARGO_MANIFEST_DIR` is not set.
 	pub fn new_manifest_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		std::env::var("CARGO_MANIFEST_DIR")
+		env_ext::var("CARGO_MANIFEST_DIR")
 			.unwrap()
 			.xref()
 			.xmap(Path::new)

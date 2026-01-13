@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use bevy::log::tracing;
 use bevy::log::tracing_subscriber;
-use std::env;
 use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 
@@ -29,8 +29,8 @@ impl PrettyTracing {
 	/// as defined in [`lambda_http::tracing::init_default_subscriber_with_writer`]
 	///
 	pub fn init(&self) {
-		let log_level = env::var("AWS_LAMBDA_LOG_LEVEL")
-			.or_else(|_| env::var("RUST_LOG"))
+		let log_level = env_ext::var("AWS_LAMBDA_LOG_LEVEL")
+			.or_else(|_| env_ext::var("RUST_LOG"))
 			.map(|val| LevelFilter::from_str(&val).ok())
 			.ok()
 			.flatten()

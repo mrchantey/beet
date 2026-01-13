@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 async fn works() {
 	dotenv::dotenv().ok();
 	let res = Request::post("https://api.openai.com/v1/images/generations")
-		.with_auth_bearer(&std::env::var("OPENAI_API_KEY").unwrap())
+		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
 		.with_json_body(&serde_json::json! {{
 			"model": "gpt-image-1",
 			"prompt": "An Arduino Alvic with a phone mounted on top horizontally, on the phone cute happy robot eyes like eve from Wall-E

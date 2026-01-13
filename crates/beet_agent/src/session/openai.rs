@@ -34,7 +34,7 @@ impl OpenAiAgent {
 	/// If the OPENAI_API_KEY environment variable is not set.
 	pub fn from_env() -> Self {
 		Self {
-			api_key: std::env::var("OPENAI_API_KEY").unwrap(),
+			api_key: env_ext::var("OPENAI_API_KEY").unwrap(),
 			completion_model: GPT_5_MINI.into(),
 			base_url: "https://api.openai.com/v1".to_string(),
 			prev_response_id: None,

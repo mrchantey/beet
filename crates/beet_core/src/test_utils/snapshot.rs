@@ -236,8 +236,7 @@ enum SnapMode {
 }
 impl SnapMode {
 	fn parse() -> Self {
-		let args: Vec<String> = std::env::args().collect();
-		let args = args;
+		let args = env_ext::args();
 		let contains = |flag: &str| args.iter().any(|arg| arg == flag);
 		if contains("--snap-show") {
 			Self::Show
