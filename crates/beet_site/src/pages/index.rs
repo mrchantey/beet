@@ -32,12 +32,8 @@ pub fn get() -> impl IntoHtml {
 				</p>
 				<iframe src="https://www.youtube.com/embed/JWYcoNOvdWE" title="Unifying the Fuller Stack with Entity Component System" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 				<h2>Smoke Tests</h2>
-				<h3>"Client Islands"</h3>
 				<ClientCounter client:load initial=1 />
-				<pre node:code lang="rust" src="../content/web-ui.rs"/>
-				<h3>"Server Actions"</h3>
 				<ServerCounter client:load initial=1 />
-				<pre node:code lang="rust" src="../content/server-actions.rs"/>
 				</div>
 			</ContentLayout>
 		</BeetContext>
