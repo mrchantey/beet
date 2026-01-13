@@ -82,9 +82,10 @@ pub struct HelpParams {
 ///     .spawn(ExchangeSpawner::new_flow(|| {
 ///         (Fallback, children![
 ///             help_handler(HelpHandlerConfig {
+///                 introduction: String::from("Welcome to my CLI"),
 ///                 default_format: HelpFormat::Cli,
 ///                 match_root: false,
-///                 introduction: String::from("Welcome to my CLI"),
+///                 no_color: false,
 ///             }),
 ///             EndpointBuilder::get()
 ///                 .with_path("foo")

@@ -5,10 +5,10 @@ title = "The Full Moon Harvest"
 
 # The Full Moon Harvest
 
-- [Post #1](/blog/post-1)
-- [Post #2](/blog/post-2)
-- [Post #3](/blog/post-3)
-- [Post #4](/blog/post-4)
-- [Post #5](/blog/post-5)
-- [Post #6](/blog/post-6)
-- [Post #7](/blog/post-7)
+- [#1 - Full Stack Bevy](/blog/post-1)
+- [#2 - ECS Router](/blog/post-2)
+- [#3 - Bevy's Five and Beet's Alive!](/blog/post-3)
+- [#4 - Action time!](/blog/post-4)
+- [#5 - Declarative State](/blog/post-5)
+- [#6 - Folk Technology](/blog/post-6)
+- [#7 - Malleable Application Framework](/blog/post-7)

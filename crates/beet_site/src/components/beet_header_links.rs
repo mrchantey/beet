@@ -8,9 +8,9 @@ pub fn BeetHeaderLinks() -> impl Bundle {
 		<button class="bt-menu-button" id="menu-button">
 			Menu
 		</button>
-		<Link variant=ButtonVariant::Text href=routes::docs::index()>
-			Docs
-		</Link>
+		// <Link variant=ButtonVariant::Text href=routes::docs::index()>
+		// 	Docs
+		// </Link>
 		<Link variant=ButtonVariant::Text href=routes::blog::index()>
 			Blog
 		</Link>

@@ -3,7 +3,7 @@ title = "The Full Moon Harvest #2"
 created= "2025-08-09"
 +++
 
-# The Full Moon Harvest #2 - Bevy Router
+# The Full Moon Harvest #2 - ECS Router
 
 The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!
 
