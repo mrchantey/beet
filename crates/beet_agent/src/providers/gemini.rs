@@ -159,7 +159,7 @@ fn gemini_message_request(
 
 			dump.push(body.clone());
 			fs_ext::write_async(
-				AbsPathBuf::new_workspace_rel("dump.json").unwrap(),
+				AbsPathBuf::new_workspace_rel("target/ai-dump.json").unwrap(),
 				serde_json::to_string_pretty(&dump).unwrap(),
 			)
 			.await
@@ -219,22 +219,22 @@ mod test {
 
 	#[sweet::test]
 	async fn text_to_text() {
-		super::super::test::text_to_text(GeminiAgent::from_env()).await;
+		test_utils::text_to_text(GeminiAgent::from_env()).await;
 	}
 
 	#[sweet::test]
 	async fn textfile_to_text() {
-		super::super::test::textfile_to_text(GeminiAgent::from_env()).await;
+		test_utils::textfile_to_text(GeminiAgent::from_env()).await;
 	}
 
 	#[sweet::test]
 	async fn image_to_text() {
-		super::super::test::image_to_text(GeminiAgent::from_env()).await;
+		test_utils::image_to_text(GeminiAgent::from_env()).await;
 	}
 
 	#[sweet::test]
 	async fn text_to_image() {
-		super::super::test::text_to_image(
+		test_utils::text_to_image(
 			GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE),
 		)
 		.await;

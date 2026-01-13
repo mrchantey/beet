@@ -122,7 +122,7 @@ impl SessionParams<'_, '_> {
 }
 
 #[cfg(test)]
-pub(super) mod test {
+pub mod test_utils {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 

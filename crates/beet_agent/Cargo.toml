@@ -19,7 +19,7 @@ native-tls = ["beet_net/native-tls"]
 fs = ["beet_core/fs"]
 
 [dependencies]
-beet_net.workspace = true
+beet_net = { workspace = true, features = ["ureq"] }
 beet_core = { workspace = true, features = ["serde"] }
 
 # rig-core = { version = "0.18" }
