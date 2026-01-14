@@ -123,7 +123,7 @@ fn ollama_message_request(
 
 	let req = provider.chat_req(&messages)?;
 
-	commands.run(async move |queue| {
+	commands.run_local(async move |queue| {
 		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
 
 		let mut body_stream = req.send().await?.body;

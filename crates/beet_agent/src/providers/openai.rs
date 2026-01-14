@@ -145,7 +145,7 @@ fn openai_message_request(
 	assert!(input.len() > 0, "cannot send request with no input");
 	let req = provider.responses_req(&input)?;
 
-	commands.run(async move |queue| {
+	commands.run_local(async move |queue| {
 		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
 
 		let mut stream = req.send().await?.event_source().await?;

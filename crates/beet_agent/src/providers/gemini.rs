@@ -139,7 +139,7 @@ fn gemini_message_request(
 
 	let req = provider.stream_req(&contents)?;
 
-	commands.run(async move |queue| {
+	commands.run_local(async move |queue| {
 		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
 
 		let mut stream = req.send().await?.event_source().await?;

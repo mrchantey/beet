@@ -262,7 +262,6 @@ pub struct FileContent {
 
 impl FileContent {
 	/// Create new file content, either from a file path or url
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn new(path: impl AsRef<str>) -> Result<Self> {
 		let path = path.as_ref();
 		let mime_type = mime_guess::from_path(path)
@@ -323,7 +322,6 @@ impl FileData {
 		Self::Uri(uri.as_ref().to_string())
 	}
 	/// Create new file data, either from a file path or url
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn new(path: impl AsRef<str>, mime_type: &str) -> Result<Self> {
 		let path = path.as_ref();
 		// If it's a url or already a data: url, keep as Uri

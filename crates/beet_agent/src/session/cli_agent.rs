@@ -136,11 +136,12 @@ impl CliAgentPlugin {
 		move |mut commands| {
 			let initial_prompt = initial_prompt.clone();
 			let paths = paths.clone();
-			commands.run(async move |queue| {
-				let files = async_ext::try_join_all(paths.into_iter().map(
-					async |path| FileContent::new(path.to_string_lossy()).await,
-				))
-				.await?;
+			commands.run_local(async move |queue| {
+				let files =
+					async_ext::try_join_all(paths.into_iter().map(|path| {
+						FileContent::new(path.to_string_lossy().to_string())
+					}))
+					.await?;
 
 				queue.with(move |world| {
 					#[rustfmt::skip]
@@ -243,7 +244,7 @@ fn file_inserted(
 		let filename = config.next_available_filename(file.extension())?;
 		print_flush!("\n{} > file: {}", actor.role, filename);
 		let file = file.clone();
-		commands.run(async move |_| {
+		commands.run_local(async move |_| {
 			let data = file.data.get().await?;
 			fs_ext::write_async(filename, data).await?;
 			Ok(())
@@ -291,7 +292,7 @@ fn user_message_request(
 	cx: SessionParams,
 ) -> Result {
 	let actor = cx.actor(ev.event_target())?.entity;
-	commands.run(async move |queue| {
+	commands.run_local(async move |queue| {
 		use std::io;
 		use std::io::Write;
 
