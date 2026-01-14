@@ -1,56 +1,8 @@
 use beet_core::prelude::*;
+use beet_core::tokens_utils::AttributeGroup;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use quote::quote;
 use syn::ItemFn;
-use syn::LitInt;
-use syn::Token;
-use syn::parse::Parse;
-use syn::parse::ParseStream;
-
-
-
-struct TestParams {
-	timeout_ms: Option<u64>,
-}
-
-impl Parse for TestParams {
-	fn parse(input: ParseStream) -> syn::Result<Self> {
-		let mut timeout_ms = None;
-
-		while !input.is_empty() {
-			let lookahead = input.lookahead1();
-			if lookahead.peek(syn::Ident) {
-				let ident: syn::Ident = input.parse()?;
-				match ident.to_string().as_str() {
-					"timeout_ms" => {
-						input.parse::<Token![=]>()?;
-						let lit: LitInt = input.parse()?;
-						timeout_ms = Some(lit.base10_parse()?);
-					}
-					"tokio" => {
-						// Skip tokio attribute, handled separately
-					}
-					_ => {
-						return Err(syn::Error::new(
-							ident.span(),
-							format!("unknown test parameter: {}", ident),
-						));
-					}
-				}
-
-				// Parse optional comma
-				if input.peek(Token![,]) {
-					input.parse::<Token![,]>()?;
-				}
-			} else {
-				return Err(lookahead.error());
-			}
-		}
-
-		Ok(TestParams { timeout_ms })
-	}
-}
 
 pub fn parse_sweet_test(
 	attr: proc_macro::TokenStream,
@@ -58,27 +10,33 @@ pub fn parse_sweet_test(
 ) -> syn::Result<TokenStream> {
 	let func = syn::parse::<ItemFn>(input)?;
 
-	// Parse test parameters
-	let test_params = if attr.is_empty() {
-		TestParams { timeout_ms: None }
+	// Convert proc_macro::TokenStream to proc_macro2::TokenStream
+	let attr_tokens: TokenStream = attr.into();
+
+	// Parse attributes using AttributeGroup
+	let attrs = if attr_tokens.is_empty() {
+		AttributeGroup { attributes: vec![] }
 	} else {
-		syn::parse::<TestParams>(attr.clone())?
+		// Create a synthetic attribute to parse
+		let synthetic_attr: syn::Attribute =
+			syn::parse_quote!(#[sweet(#attr_tokens)]);
+		AttributeGroup::parse(&[synthetic_attr], "sweet")?
 	};
 
-	let attrs = AttributeGroup::parse_punctated(attr.into())?;
-	let is_tokio = attrs
-		.iter()
-		.any(|attr| attr.to_token_stream().to_string() == "tokio");
+	attrs.validate_allowed_keys(&["timeout_ms", "tokio"])?;
 
-	// Generate params registration code if we have params
-	let params_registration = if let Some(timeout_ms) = test_params.timeout_ms {
+	let timeout_ms = attrs.get_value_parsed::<syn::LitInt>("timeout_ms")?;
+	let is_tokio = attrs.contains("tokio");
+
+	// Build test params
+	let params_expr = if let Some(timeout_lit) = timeout_ms {
 		quote! {
-			sweet::register_test_params(
-				sweet::TestCaseParams::new().with_timeout_ms(#timeout_ms)
-			);
+			sweet::TestCaseParams::new().with_timeout_ms(#timeout_lit)
 		}
 	} else {
-		quote! {}
+		quote! {
+			sweet::TestCaseParams::new()
+		}
 	};
 
 	let is_async = func.sig.asyncness.is_some();
@@ -97,13 +55,14 @@ pub fn parse_sweet_test(
 			let vis = &func.vis;
 			let block = &func.block;
 			let attrs = &func.attrs;
-			// Check if #[should_panic] is present - it requires () return type
 			quote! {
 				#[test]
 				#(#attrs)*
 				#vis fn #ident() {
-					#params_registration
-					sweet::handle_async_test(async #block);
+					sweet::register_sweet_test(
+						#params_expr,
+						async #block
+					);
 				}
 			}
 		}
@@ -119,7 +78,6 @@ pub fn parse_sweet_test(
 				#[test]
 				#(#attrs)*
 				#vis fn #ident(#sig_inputs) #sig_output {
-					#params_registration
 					#block
 				}
 			}

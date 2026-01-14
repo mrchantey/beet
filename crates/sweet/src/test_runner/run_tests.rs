@@ -72,10 +72,8 @@ fn run_test(
 		params,
 	} = super::try_run_async(func);
 
-	// Insert test params if provided
-	if let Some(params) = params {
-		commands.entity(entity).insert(params);
-	}
+	// Always insert test params (they're always present now)
+	commands.entity(entity).insert(params);
 
 	match maybe_async {
 		MaybeAsync::Sync(panic_result) => {
@@ -156,11 +154,8 @@ mod tests {
 
 	#[sweet::test]
 	async fn works_async() {
-		use crate::test_runner::register_async_test;
-
-
 		run_test(test_ext::new_auto(|| {
-			register_async_test(async {
+			register_sweet_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				Ok(())
 			});
@@ -170,7 +165,7 @@ mod tests {
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(test_ext::new_auto(|| {
-			register_async_test(async {
+			register_sweet_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				Err("pizza".into())
 			});
@@ -186,7 +181,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_async_test(async {
+				register_sweet_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("expected")
 				});
@@ -199,7 +194,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_async_test(async {
+				register_sweet_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					Ok(())
 				});
@@ -212,7 +207,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_async_test(async {
+				register_sweet_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("boom")
 				});
@@ -225,7 +220,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_async_test(async {
+				register_sweet_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					Ok(())
 				});
@@ -243,7 +238,7 @@ mod tests {
 
 		let line = line!() + 4;
 		run_test(test_ext::new_auto(|| {
-			register_async_test(async {
+			register_sweet_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				panic!("pizza")
 			});
@@ -257,5 +252,54 @@ mod tests {
 			}
 			.into(),
 		);
+	}
+
+	#[sweet::test]
+	async fn unified_registration() {
+		use crate::test_runner::register_sweet_test;
+
+		// Test unified registration with params
+		run_test(test_ext::new_auto(|| {
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(5000),
+				async {
+					async_ext::yield_now().await;
+					Ok(())
+				},
+			);
+			Ok(())
+		}))
+		.await
+		.xpect_eq(TestOutcome::Pass);
+
+		// Test unified registration handles failures
+		run_test(test_ext::new_auto(|| {
+			register_sweet_test(TestCaseParams::new(), async {
+				async_ext::yield_now().await;
+				Err("unified error".into())
+			});
+			Ok(())
+		}))
+		.await
+		.xpect_eq(
+			TestFail::Err {
+				message: "unified error".into(),
+			}
+			.into(),
+		);
+
+		// Test unified registration with should_panic
+		run_test(
+			test_ext::new_auto(|| {
+				register_sweet_test(TestCaseParams::new(), async {
+					async_ext::yield_now().await;
+					panic!("expected panic")
+				});
+				Ok(())
+			})
+			.with_should_panic(),
+		)
+		.await
+		.xpect_eq(TestOutcome::Pass);
 	}
 }

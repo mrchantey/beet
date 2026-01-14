@@ -24,15 +24,17 @@ fn panics() -> Result<(), String> {
 
 
 fn returns_ok_async() -> Result<(), String> {
-	register_async_test(async { Ok(()) });
+	register_sweet_test(TestCaseParams::new(), async { Ok(()) });
 	Ok(())
 }
 fn returns_err_async() -> Result<(), String> {
-	register_async_test(async { Err("foo".to_string()) });
+	register_sweet_test(TestCaseParams::new(), async {
+		Err("foo".to_string())
+	});
 	Ok(())
 }
 fn panics_async() -> Result<(), String> {
-	register_async_test(async {
+	register_sweet_test(TestCaseParams::new(), async {
 		panic!("whoops");
 	});
 	Ok(())

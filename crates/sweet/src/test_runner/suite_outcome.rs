@@ -167,7 +167,7 @@ mod tests {
 	}
 
 	// Note: We cannot timeout pure synchronous Send+Sync tests (StaticTestFn)
-	// because they might call `register_async_test`, which uses thread-local
+	// because they might call `register_sweet_test`, which uses thread-local
 	// storage. If we spawn the test in a separate thread for timeout enforcement,
 	// the async test registration happens in the wrong thread and is lost.
 	// Therefore, we rely on `trigger_timeouts` for async tests only.
@@ -175,7 +175,7 @@ mod tests {
 	#[sweet::test]
 	async fn timeout_async() {
 		did_timeout(test_ext::new_auto(|| {
-			register_async_test(async {
+			register_sweet_test(TestCaseParams::new(), async {
 				time_ext::sleep_millis(100).await;
 				unreachable!("should timeout")
 			});
@@ -190,11 +190,13 @@ mod tests {
 		// Suite timeout is 10ms, but per-test timeout is 1000ms
 		// Test sleeps for 50ms, so suite would timeout but per-test won't
 		let test = test_ext::new_auto(|| {
-			register_test_params(TestCaseParams::new().with_timeout_ms(1000));
-			register_async_test(async {
-				time_ext::sleep_millis(50).await;
-				Ok(())
-			});
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(1000),
+				async {
+					time_ext::sleep_millis(50).await;
+					Ok(())
+				},
+			);
 			Ok(())
 		});
 
@@ -207,11 +209,13 @@ mod tests {
 	async fn per_test_timeout_enforced() {
 		// Per-test timeout is 10ms, test sleeps for 100ms
 		let test = test_ext::new_auto(|| {
-			register_test_params(TestCaseParams::new().with_timeout_ms(10));
-			register_async_test(async {
-				time_ext::sleep_millis(100).await;
-				unreachable!("should timeout")
-			});
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(10),
+				async {
+					time_ext::sleep_millis(100).await;
+					unreachable!("should timeout")
+				},
+			);
 			Ok(())
 		});
 
@@ -227,11 +231,13 @@ mod tests {
 	async fn macro_timeout_enforced() {
 		// Test that per-test timeout from macro attribute works
 		let test = test_ext::new_auto(|| {
-			register_test_params(TestCaseParams::new().with_timeout_ms(10));
-			register_async_test(async {
-				time_ext::sleep_millis(100).await;
-				unreachable!("should timeout")
-			});
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(10),
+				async {
+					time_ext::sleep_millis(100).await;
+					unreachable!("should timeout")
+				},
+			);
 			Ok(())
 		});
 
@@ -247,11 +253,13 @@ mod tests {
 	async fn macro_timeout_not_reached() {
 		// Test that per-test timeout allows test to complete if under limit
 		let test = test_ext::new_auto(|| {
-			register_test_params(TestCaseParams::new().with_timeout_ms(5000));
-			register_async_test(async {
-				time_ext::sleep_millis(10).await;
-				Ok(())
-			});
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(5000),
+				async {
+					time_ext::sleep_millis(10).await;
+					Ok(())
+				},
+			);
 			Ok(())
 		});
 
@@ -264,11 +272,13 @@ mod tests {
 	async fn macro_timeout_sync() {
 		// Test that per-test timeout works with sync wrapper for async test
 		let test = test_ext::new_auto(|| {
-			register_test_params(TestCaseParams::new().with_timeout_ms(200));
-			register_async_test(async {
-				time_ext::sleep_millis(50).await;
-				Ok(())
-			});
+			register_sweet_test(
+				TestCaseParams::new().with_timeout_ms(200),
+				async {
+					time_ext::sleep_millis(50).await;
+					Ok(())
+				},
+			);
 			Ok(())
 		});
 

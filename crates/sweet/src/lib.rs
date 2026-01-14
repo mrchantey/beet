@@ -36,7 +36,8 @@ mod test_runner;
 #[cfg(feature = "runner")]
 pub use test_runner::TestCaseParams;
 #[cfg(feature = "runner")]
-pub use test_runner::register_async_test as handle_async_test;
+#[cfg(feature = "runner")]
+pub use test_runner::register_sweet_test;
 #[cfg(feature = "runner")]
 pub use test_runner::register_test_params;
 #[cfg(not(feature = "runner"))]
