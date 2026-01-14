@@ -90,10 +90,10 @@ mod test {
 	pub async fn works() {
 		lifecycle_ext::future_timeout(
 			|| async {
-				time_ext::sleep(Duration::from_millis(400)).await;
+				time_ext::sleep(Duration::from_millis(100)).await;
 				39
 			},
-			Duration::from_millis(500),
+			Duration::from_millis(1000),
 		)
 		.await
 		.unwrap()

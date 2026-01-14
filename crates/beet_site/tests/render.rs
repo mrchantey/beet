@@ -1,9 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+#![cfg_attr(test, test_runner(beet::test_runner))]
 use beet::prelude::*;
 use beet_site::prelude::*;
 
-#[beet_core::test]
+#[beet::test]
 async fn home() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
@@ -14,7 +14,7 @@ async fn home() {
 		.xnot()
 		.xpect_contains("fn Counter(initial: u32)");
 }
-#[beet_core::test]
+#[beet::test]
 async fn help() {
 	// test with ssr
 	RouterPlugin::world()
@@ -36,7 +36,7 @@ async fn help() {
 		.xpect_contains("Welcome to Beet!");
 }
 
-#[beet_core::test]
+#[beet::test]
 async fn docs() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
@@ -51,7 +51,7 @@ async fn docs() {
 }
 
 
-#[beet_core::test]
+#[beet::test]
 async fn article_layout() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
@@ -62,7 +62,7 @@ async fn article_layout() {
 		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
 }
 
-#[beet_core::test]
+#[beet::test]
 #[ignore = "flaky: sometimes beet_site sometimes beet"]
 async fn correct_title() {
 	RouterPlugin::world()

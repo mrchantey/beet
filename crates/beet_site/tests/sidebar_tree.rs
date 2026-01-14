@@ -1,10 +1,10 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+#![cfg_attr(test, test_runner(beet::test_runner))]
 use beet::prelude::*;
 use beet_site::prelude::*;
 
 
-#[beet_core::test]
+#[beet::test]
 async fn works() {
 	let mut world = server_plugin.into_world();
 

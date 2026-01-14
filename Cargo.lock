@@ -1462,7 +1462,6 @@ name = "beet_site"
 version = "0.0.8-dev.5"
 dependencies = [
  "beet",
- "beet_core",
  "beet_design",
  "getrandom 0.3.3",
  "serde",

@@ -1,10 +1,6 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 
-
-
-
-
 /// Exits when all tests have finished
 pub fn exit_on_suite_outcome(
 	mut commands: Commands,

@@ -1,5 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+#![cfg_attr(test, test_runner(beet::test_runner))]
 
 #[cfg(any(feature = "server", feature = "launch"))]
 pub mod infra;

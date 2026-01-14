@@ -9,6 +9,12 @@ pub use beet_build as build;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
+#[cfg(feature = "testing")]
+pub use beet_core::test;
+#[cfg(feature = "testing")]
+pub use beet_core::test_runner;
+#[cfg(feature = "testing")]
+pub use beet_core::testing;
 #[cfg(feature = "design")]
 pub use beet_design as design;
 #[cfg(feature = "dom")]
@@ -51,10 +57,10 @@ pub mod prelude {
 	pub use crate::flow::prelude::*;
 	#[cfg(feature = "ml")]
 	pub use crate::ml::prelude::*;
-	#[cfg(feature = "parse")]
-	pub use crate::parse::prelude::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
+	#[cfg(feature = "parse")]
+	pub use crate::parse::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "rsx")]

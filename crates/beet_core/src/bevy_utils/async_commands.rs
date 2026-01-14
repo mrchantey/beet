@@ -334,10 +334,14 @@ impl AsyncWorld {
 		});
 		self.send(queue);
 		async move {
-			out_rx
-				.recv()
-				.await
-				.expect("channel closed, was the world dropped?")
+			match out_rx.recv().await {
+				Ok(out) => out,
+				Err(_) => {
+					// Channel closed - world was dropped during teardown.
+					// Abort by pending forever; the runtime will clean us up.
+					std::future::pending().await
+				}
+			}
 		}
 	}
 
