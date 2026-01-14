@@ -8,12 +8,14 @@ fn main() {
 			MinimalPlugins,
 			CliPlugin,
 			LogPlugin::default(),
+			JsRuntimePlugin,
 			#[cfg(debug_assertions)]
 			DebugFlowPlugin::default(),
 		))
 		.try_set_error_handler(bevy::ecs::error::panic)
 		.add_systems(Startup, cli_routes)
-		.run();
+		.run()
+		.into_exit_native();
 }
 
 
