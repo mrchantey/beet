@@ -860,7 +860,7 @@ mod test {
 		world.resource::<Count>().0.xpect_eq(2);
 	}
 	#[crate::test]
-	#[should_panic]
+	#[should_panic = "intentional error"]
 	async fn results() {
 		let mut app = App::new();
 		app.set_error_handler(bevy::ecs::error::panic);

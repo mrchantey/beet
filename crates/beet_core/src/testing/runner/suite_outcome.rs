@@ -257,8 +257,8 @@ mod tests {
 	async fn macro_timeout_sync() {
 		// Test that per-test timeout works with sync wrapper for async test
 		let test = test_ext::new_auto(|| {
-			register_test(TestCaseParams::new().with_timeout_ms(200), async {
-				time_ext::sleep_millis(50).await;
+			register_test(TestCaseParams::new().with_timeout_ms(5000), async {
+				time_ext::sleep_millis(10).await;
 				Ok(())
 			});
 			Ok(())

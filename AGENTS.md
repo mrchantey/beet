@@ -18,7 +18,7 @@ Beet is a rust project built on the bevy game engine
 
 ## Conventions
 
-
+- Do not be lazy, if asked to fix a bug and you encounter another issue, fix that too.
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have

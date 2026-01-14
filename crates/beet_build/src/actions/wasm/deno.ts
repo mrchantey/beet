@@ -24,7 +24,7 @@ globalThis.catch_no_abort_inner = (func: () => undefined) => {
 	return func();
 };
 globalThis.read_file = (path: string) => {
-	return do_try(() => Deno.readFileSync(path));
+	return do_try(() => Deno.readFileSync(path), null, true);
 };
 
 globalThis.exists = (path: string) => {
@@ -81,12 +81,18 @@ await loop_forever();
 // A try-catch wrapper that will log the error and return on_err
 // if an exception is raised. Useful for wasm wrappers where
 // we still want to return something, like None or empty array
-function do_try<Ok, Err = null>(func: () => Ok, on_err: Err = null): Ok | Err {
+function do_try<Ok, Err = null>(
+	func: () => Ok,
+	on_err: Err = null,
+	silent: boolean = false,
+): Ok | Err {
 	try {
 		return func();
 	} catch (err) {
 		// If --allow-env not granted
-		console.error(err);
+		if (!silent) {
+			console.error(err);
+		}
 		return on_err;
 	}
 }
