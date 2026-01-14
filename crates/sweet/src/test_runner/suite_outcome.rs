@@ -122,25 +122,54 @@ pub(crate) fn trigger_timeouts(
 
 #[cfg(test)]
 mod tests {
+	use test::TestDescAndFn;
+	use test::TestFn;
+
 	use super::*;
 
-	#[test]
-	fn timeout() {
-		test_runner_ext::run(
-			Some("--timeout_ms=100"),
-			test_ext::new_auto(|| {
-				register_async_test(async {
-					time_ext::sleep_millis(15_000).await;
-					unreachable!("should timeout")
-				});
-				Ok(())
-			}),
-		)
-		.as_fail()
-		.unwrap()
-		.is_timeout()
+	async fn did_timeout(test: TestDescAndFn) -> bool {
+		test_runner_ext::run(Some("--timeout_ms=10"), test)
+			.await
+			.as_fail()
+			.unwrap()
+			.is_timeout()
+	}
+
+	fn loop_sync() {
+		let elapsed = Instant::now();
+		loop {
+			if elapsed.elapsed().as_millis() > 100 {
+				panic!("should timeout");
+			}
+		}
+	}
+
+	#[sweet::test]
+	async fn timeout_non_send_sync() {
+		did_timeout(TestDescAndFn {
+			desc: test_ext::new_auto_desc(),
+			testfn: TestFn::DynTestFn(Box::new(|| loop_sync().xok())),
+		})
+		.await
+		.xpect_false();
+	}
+
+	// Note: We cannot timeout pure synchronous Send+Sync tests (StaticTestFn)
+	// because they might call `register_async_test`, which uses thread-local
+	// storage. If we spawn the test in a separate thread for timeout enforcement,
+	// the async test registration happens in the wrong thread and is lost.
+	// Therefore, we rely on `trigger_timeouts` for async tests only.
+
+	#[sweet::test]
+	async fn timeout_async() {
+		did_timeout(test_ext::new_auto(|| {
+			register_async_test(async {
+				time_ext::sleep_millis(100).await;
+				unreachable!("should timeout")
+			});
+			Ok(())
+		}))
+		.await
 		.xpect_true();
-		// verify async test body is executed
-		// async_ext::yield_now().await;
 	}
 }

@@ -5,10 +5,10 @@ use bevy::ecs::system::NonSendMarker;
 
 
 
+#[track_caller]
 pub(super) fn run_tests_series(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
-
 	query: Populated<
 		(Entity, &Test, &TestFunc),
 		(Added<TestFunc>, Without<TestOutcome>),
@@ -19,7 +19,7 @@ pub(super) fn run_tests_series(
 			commands.reborrow(),
 			async_commands.reborrow(),
 			entity,
-			test,
+			test.should_panic,
 			move || func.run(),
 		)?;
 	}
@@ -27,6 +27,9 @@ pub(super) fn run_tests_series(
 }
 
 
+
+
+#[track_caller]
 pub(super) fn run_non_send_tests_series(
 	_: NonSendMarker,
 	mut commands: Commands,
@@ -47,8 +50,7 @@ pub(super) fn run_non_send_tests_series(
 			commands.reborrow(),
 			async_commands.reborrow(),
 			entity,
-			test,
-			#[track_caller]
+			test.should_panic,
 			move || func.run(),
 		)?;
 	}
@@ -56,14 +58,14 @@ pub(super) fn run_non_send_tests_series(
 }
 
 
+#[track_caller]
 fn run_test(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	entity: Entity,
-	test: &Test,
+	should_panic: test::ShouldPanic,
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result {
-	let should_panic = test.should_panic;
 	match super::try_run_async(func) {
 		MaybeAsync::Sync(panic_result) => {
 			let outcome =
@@ -80,40 +82,49 @@ fn run_test(
 		}
 	}
 
-
 	Ok(())
 }
+
+
 
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use test::TestDescAndFn;
 
-	fn run_test(test: TestDescAndFn) -> TestOutcome {
-		test_runner_ext::run(None, test)
+	async fn run_test(test: TestDescAndFn) -> TestOutcome {
+		test_runner_ext::run(None, test).await
 	}
 
 	#[sweet::test]
-	fn works_sync() {
-		run_test(test_ext::new_auto(|| Ok(()))).xpect_eq(TestOutcome::Pass);
-		run_test(test_ext::new_auto(|| Err("pizza".into()))).xpect_eq(
-			TestFail::Err {
-				message: "pizza".into(),
-			}
-			.into(),
-		);
+	async fn works_sync() {
+		run_test(test_ext::new_auto(|| Ok(())))
+			.await
+			.xpect_eq(TestOutcome::Pass);
+		run_test(test_ext::new_auto(|| Err("pizza".into())))
+			.await
+			.xpect_eq(
+				TestFail::Err {
+					message: "pizza".into(),
+				}
+				.into(),
+			);
 		run_test(test_ext::new_auto(|| panic!("expected")).with_should_panic())
+			.await
 			.xpect_eq(TestOutcome::Pass);
 		run_test(test_ext::new_auto(|| Ok(())).with_should_panic())
+			.await
 			.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 		run_test(
 			test_ext::new_auto(|| panic!("boom"))
 				.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 		run_test(
 			test_ext::new_auto(|| Ok(())).with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
@@ -121,17 +132,19 @@ mod tests {
 			.into(),
 		);
 		let line = line!() + 1;
-		run_test(test_ext::new_auto(|| panic!("pizza"))).xpect_eq(
-			TestFail::Panic {
-				payload: Some("pizza".into()),
-				location: Some(FileSpan::new_with_start(file!(), line, 39)),
-			}
-			.into(),
-		);
+		run_test(test_ext::new_auto(|| panic!("pizza")))
+			.await
+			.xpect_eq(
+				TestFail::Panic {
+					payload: Some("pizza".into()),
+					location: Some(FileSpan::new_with_start(file!(), line, 39)),
+				}
+				.into(),
+			);
 	}
 
 	#[sweet::test]
-	fn works_async() {
+	async fn works_async() {
 		use crate::test_runner::register_async_test;
 
 
@@ -142,6 +155,7 @@ mod tests {
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(test_ext::new_auto(|| {
@@ -151,6 +165,7 @@ mod tests {
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(
 			TestFail::Err {
 				message: "pizza".into(),
@@ -168,6 +183,7 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -180,6 +196,7 @@ mod tests {
 			})
 			.with_should_panic(),
 		)
+		.await
 		.xpect_eq(TestFail::ExpectedPanic { message: None }.into());
 
 		run_test(
@@ -192,6 +209,7 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(
@@ -204,6 +222,7 @@ mod tests {
 			})
 			.with_should_panic_message("boom"),
 		)
+		.await
 		.xpect_eq(
 			TestFail::ExpectedPanic {
 				message: Some("boom".into()),
@@ -211,15 +230,15 @@ mod tests {
 			.into(),
 		);
 
-		let line = line!() + 5;
+		let line = line!() + 4;
 		run_test(test_ext::new_auto(|| {
 			register_async_test(async {
-				async_ext::yield_now().await;
 				async_ext::yield_now().await;
 				panic!("pizza")
 			});
 			Ok(())
 		}))
+		.await
 		.xpect_eq(
 			TestFail::Panic {
 				payload: Some("pizza".into()),

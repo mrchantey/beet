@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use std::time::Duration;
 use std::time::SystemTime;
 
@@ -70,6 +71,35 @@ pub async fn sleep(duration: Duration) {
 
 
 
+/// Runs a Send+Sync function with a timeout on native platforms.
+/// Returns `Ok(PanicResult)` if completed, `Err(elapsed)` if timed out.
+///
+/// On native, spawns the function in a thread and uses `recv_timeout`.
+/// On WASM, cannot enforce hard timeouts for sync code, so this is not available.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn timeout_sync(
+	func: impl 'static + Send + Sync + FnOnce() -> Result<(), String>,
+	timeout: Duration,
+) -> Result<PanicResult, Duration> {
+	use std::sync::mpsc;
+
+	let (sender, receiver) = mpsc::channel();
+	let timeout_start = Instant::now();
+
+	std::thread::spawn(move || {
+		let _ = sender.send(PanicContext::catch(func));
+	});
+
+	match receiver.recv_timeout(timeout) {
+		Ok(result) => Ok(result),
+		Err(mpsc::RecvTimeoutError::Timeout) => Err(timeout_start.elapsed()),
+		Err(mpsc::RecvTimeoutError::Disconnected) => {
+			Ok(PanicResult::Err("Thread disconnected unexpectedly".into()))
+		}
+	}
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -79,5 +109,26 @@ mod test {
 		let now = Instant::now();
 		time_ext::sleep(Duration::from_millis(100)).await;
 		now.elapsed().as_millis().xpect_greater_or_equal_to(100);
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	#[sweet::test]
+	fn timeout_sync_completes() {
+		let result =
+			time_ext::timeout_sync(|| Ok(()), Duration::from_millis(100));
+		result.unwrap().xpect(PanicResult::Ok);
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	#[sweet::test]
+	fn timeout_sync_times_out() {
+		let result = time_ext::timeout_sync(
+			|| {
+				std::thread::sleep(Duration::from_millis(200));
+				Ok(())
+			},
+			Duration::from_millis(10),
+		);
+		result.unwrap_err();
 	}
 }

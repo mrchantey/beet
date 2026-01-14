@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Run a single test in an isolated Bevy app, returning the outcome
-pub fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
+pub async fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
 	let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
 
 	let args = if let Some(args) = args {
@@ -22,6 +22,6 @@ pub fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
 			store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
 		},
 	);
-	app.run();
+	app.run_async().await;
 	store.get().unwrap()
 }
