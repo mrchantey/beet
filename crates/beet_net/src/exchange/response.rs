@@ -14,7 +14,7 @@
 //!
 //! // Create error responses
 //! let not_found = Response::not_found();
-//! let error = Response::from_status(StatusCode::INTERNAL_SERVER_ERROR);
+//! let error = Response::from_status(StatusCode::InternalError);
 //! ```
 
 use crate::prelude::*;

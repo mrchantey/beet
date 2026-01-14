@@ -37,8 +37,7 @@ pub struct JsonResult<T, E> {
 
 impl JsonResult<(), ()> {
 	#[cfg(feature = "http")]
-	pub const DEFAULT_ERR_STATUS: StatusCode =
-		StatusCode::Http(http::StatusCode::IM_A_TEAPOT);
+	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::ImATeapot;
 	#[cfg(not(feature = "http"))]
 	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::InternalError;
 }
@@ -285,7 +284,7 @@ mod test {
 	fn request_response_cycle() {
 		let mut app = App::new();
 		let req = Request::post("/test")
-			.with_header(http::header::CONTENT_LENGTH, "5")
+			.with_header("content-length", "5")
 			.with_body(b"hello");
 
 		let entity = app.world_mut().spawn(req).id();

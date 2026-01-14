@@ -1,5 +1,6 @@
 mod body;
 mod extractors;
+#[cfg(feature = "http")]
 pub mod http_ext;
 mod parts;
 mod response;

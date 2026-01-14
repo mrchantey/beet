@@ -159,10 +159,10 @@ mod test {
 	#[cfg(feature = "http")]
 	async fn works() {
 		parse(ExchangeSpawner::new_handler(|_, _| {
-			StatusCode::Http(http::StatusCode::IM_A_TEAPOT).into()
+			StatusCode::ImATeapot.into()
 		}))
 		.await
 		.status()
-		.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
+		.xpect_eq(StatusCode::ImATeapot);
 	}
 }

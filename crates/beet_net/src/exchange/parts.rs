@@ -88,12 +88,14 @@ impl std::fmt::Display for Scheme {
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<&http::uri::Scheme> for Scheme {
 	fn from(scheme: &http::uri::Scheme) -> Self {
 		Self::from_str(scheme.as_str())
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<Option<&http::uri::Scheme>> for Scheme {
 	fn from(scheme: Option<&http::uri::Scheme>) -> Self {
 		scheme.map(Self::from).unwrap_or(Self::None)
@@ -447,6 +449,7 @@ impl RequestParts {
 		// Check if this is a full URI with scheme (http://, https://, etc.)
 		if path_str.contains("://") {
 			// Parse as full URI
+			#[cfg(feature = "http")]
 			if let Ok(uri) = path_str.parse::<http::Uri>() {
 				let scheme = Scheme::from(uri.scheme());
 				let authority = uri
@@ -591,12 +594,7 @@ impl ResponseParts {
 
 	/// Use exit code conventions to map a status to an exit code
 	pub fn status_to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
-		let code: u8 = self.status().into();
-		if code == 0 {
-			Ok(())
-		} else {
-			Err(std::num::NonZeroU8::new(code).unwrap())
-		}
+		self.status().to_exit_code()
 	}
 
 	/// Returns a mutable reference to the inner parts
@@ -634,6 +632,7 @@ fn split_path_and_query(uri: &str) -> (&str, Option<&str>) {
 
 /// Convert an [`http::HeaderMap`] to a [`MultiMap<String, String>`],
 /// with all keys converted to lower kebab-case
+#[cfg(feature = "http")]
 fn header_map_to_multimap(map: &http::HeaderMap) -> MultiMap<String, String> {
 	use heck::ToKebabCase;
 	let mut multi_map = MultiMap::default();
@@ -672,6 +671,7 @@ fn split_path(path: &str) -> Vec<String> {
 }
 
 /// Convert a MultiMap back to http::HeaderMap
+#[cfg(feature = "http")]
 fn multimap_to_header_map(
 	multimap: &MultiMap<String, String>,
 ) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {
@@ -711,6 +711,7 @@ fn build_query_string(params: &MultiMap<String, String>) -> String {
 // Conversion: http::request::Parts -> RequestParts
 // ============================================================================
 
+#[cfg(feature = "http")]
 impl From<http::request::Parts> for RequestParts {
 	fn from(http_parts: http::request::Parts) -> Self {
 		let uri = &http_parts.uri;
@@ -740,6 +741,7 @@ impl From<http::request::Parts> for RequestParts {
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<&http::request::Parts> for RequestParts {
 	fn from(http_parts: &http::request::Parts) -> Self {
 		let uri = &http_parts.uri;
@@ -885,6 +887,7 @@ impl From<&CliArgs> for RequestParts {
 // Conversion: RequestParts/ResponseParts -> http types
 // ============================================================================
 
+#[cfg(feature = "http")]
 impl TryFrom<RequestParts> for http::request::Parts {
 	type Error = http::Error;
 
@@ -911,6 +914,7 @@ impl TryFrom<RequestParts> for http::request::Parts {
 	}
 }
 
+#[cfg(feature = "http")]
 impl TryFrom<ResponseParts> for http::response::Parts {
 	type Error = http::Error;
 
@@ -991,11 +995,9 @@ mod test {
 	fn parts_builder_response_parts() {
 		let parts = PartsBuilder::new()
 			.header("content-type", "text/html")
-			.build_response_parts(StatusCode::Http(http::StatusCode::CREATED));
+			.build_response_parts(StatusCode::Ok);
 
-		parts
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
+		parts.status().xpect_eq(StatusCode::Ok);
 		parts
 			.get_header("content-type")
 			.unwrap()
@@ -1030,6 +1032,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn from_http_request_parts() {
 		let http_parts = http::Request::builder()
 			.method(http::Method::POST)
@@ -1069,9 +1072,7 @@ mod test {
 
 		let parts = ResponseParts::from(http_parts);
 
-		parts
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
+		parts.status().xpect_eq(StatusCode::Created);
 		parts
 			.get_header("content-type")
 			.unwrap()

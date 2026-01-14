@@ -35,6 +35,11 @@ pub enum StatusCode {
 	#[default]
 	Ok,
 
+	/// Resource created successfully (exit code: 0).
+	///
+	/// Similar to HTTP 201 Created.
+	Created,
+
 	/// Request was malformed or invalid (exit code: 64).
 	///
 	/// Similar to HTTP 400 Bad Request.
@@ -120,6 +125,21 @@ pub enum StatusCode {
 	/// Similar to HTTP 412 Precondition Failed.
 	PreconditionFailed,
 
+	/// I'm a teapot (exit code: 1).
+	///
+	/// Similar to HTTP 418 I'm a Teapot.
+	ImATeapot,
+
+	/// Resource moved permanently (exit code: 0).
+	///
+	/// Similar to HTTP 301 Moved Permanently.
+	MovedPermanently,
+
+	/// Resource temporarily redirected (exit code: 0).
+	///
+	/// Similar to HTTP 307 Temporary Redirect.
+	TemporaryRedirect,
+
 	/// Invalid state for operation (exit code: 1).
 	///
 	/// Operation cannot be performed in current state.
@@ -159,6 +179,7 @@ impl std::fmt::Display for StatusCode {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Ok => write!(f, "OK"),
+			Self::Created => write!(f, "Created"),
 			Self::MalformedRequest => write!(f, "Malformed Request"),
 			Self::Unauthorized => write!(f, "Unauthorized"),
 			Self::Forbidden => write!(f, "Forbidden"),
@@ -169,6 +190,9 @@ impl std::fmt::Display for StatusCode {
 			Self::PayloadTooLarge => write!(f, "Payload Too Large"),
 			Self::RateLimitExceeded => write!(f, "Rate Limit Exceeded"),
 			Self::PreconditionFailed => write!(f, "Precondition Failed"),
+			Self::ImATeapot => write!(f, "I'm a Teapot"),
+			Self::MovedPermanently => write!(f, "Moved Permanently"),
+			Self::TemporaryRedirect => write!(f, "Temporary Redirect"),
 			Self::InternalError => write!(f, "Internal Error"),
 			Self::NotImplemented => write!(f, "Not Implemented"),
 			Self::ServiceUnavailable => write!(f, "Service Unavailable"),
@@ -193,20 +217,70 @@ impl StatusCode {
 	///
 	/// Checks for:
 	/// - `StatusCode::Ok`
-	/// - `StatusCode::Http` with 2XX range
+	/// - `StatusCode::Http` with 2XX range or 3XX redirects
 	/// - `StatusCode::Process` with exit code 0
+	/// - Redirect variants
 	pub fn is_ok(&self) -> bool {
 		match self {
-			Self::Ok => true,
+			Self::Ok
+			| Self::Created
+			| Self::MovedPermanently
+			| Self::TemporaryRedirect => true,
 			#[cfg(feature = "http")]
-			Self::Http(status) => status.is_success(),
+			Self::Http(status) => status.is_success() || status.is_redirection(),
 			Self::Process(code) => *code == 0,
 			_ => false,
 		}
 	}
 
+	/// Creates a StatusCode from a raw HTTP status code number.
+	///
+	/// Maps common HTTP codes to semantic variants, otherwise wraps in `Http`.
+	#[cfg(feature = "http")]
+	pub fn from_http_raw(http_status_code: u16) -> Self {
+		match http_status_code {
+			200 => Self::Ok,
+			201 => Self::Created,
+			301 => Self::MovedPermanently,
+			307 => Self::TemporaryRedirect,
+			400 => Self::MalformedRequest,
+			401 => Self::Unauthorized,
+			403 => Self::Forbidden,
+			404 => Self::NotFound,
+			405 => Self::MethodNotAllowed,
+			408 => Self::RequestTimeout,
+			409 => Self::Conflict,
+			412 => Self::PreconditionFailed,
+			413 => Self::PayloadTooLarge,
+			418 => Self::ImATeapot,
+			429 => Self::RateLimitExceeded,
+			500 => Self::InternalError,
+			501 => Self::NotImplemented,
+			503 => Self::ServiceUnavailable,
+			504 => Self::GatewayTimeout,
+			_ => {
+				// Fallback to Http variant for unknown codes
+				http::StatusCode::from_u16(http_status_code)
+					.map(Self::Http)
+					.unwrap_or(Self::InternalError)
+			}
+		}
+	}
+
 	/// Returns `true` if this status represents an error.
 	pub fn is_err(&self) -> bool { !self.is_ok() }
+
+	/// Converts status to exit code convention result.
+	///
+	/// Returns `Ok(())` for success (exit code 0), or `Err(NonZeroU8)` for errors.
+	pub fn to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
+		let code: u8 = (*self).into();
+		if code == 0 {
+			Ok(())
+		} else {
+			Err(std::num::NonZeroU8::new(code).unwrap())
+		}
+	}
 
 	/// Returns `true` if this is a client error (4XX or semantic equivalent).
 	pub fn is_client_error(&self) -> bool {
@@ -221,6 +295,7 @@ impl StatusCode {
 			| Self::PayloadTooLarge
 			| Self::RateLimitExceeded
 			| Self::PreconditionFailed
+			| Self::ImATeapot
 			| Self::InvalidArgument => true,
 			#[cfg(feature = "http")]
 			Self::Http(status) => status.is_client_error(),
@@ -247,26 +322,7 @@ impl StatusCode {
 #[cfg(feature = "http")]
 impl From<http::StatusCode> for StatusCode {
 	fn from(status: http::StatusCode) -> Self {
-		// Map common HTTP codes to semantic variants
-		match status.as_u16() {
-			200 => Self::Ok,
-			400 => Self::MalformedRequest,
-			401 => Self::Unauthorized,
-			403 => Self::Forbidden,
-			404 => Self::NotFound,
-			405 => Self::MethodNotAllowed,
-			408 => Self::RequestTimeout,
-			409 => Self::Conflict,
-			413 => Self::PayloadTooLarge,
-			429 => Self::RateLimitExceeded,
-			412 => Self::PreconditionFailed,
-			500 => Self::InternalError,
-			501 => Self::NotImplemented,
-			503 => Self::ServiceUnavailable,
-			504 => Self::GatewayTimeout,
-			// Everything else stays as HTTP
-			_ => Self::Http(status),
-		}
+		Self::from_http_raw(status.as_u16())
 	}
 }
 
@@ -275,6 +331,7 @@ impl From<StatusCode> for http::StatusCode {
 	fn from(status: StatusCode) -> Self {
 		match status {
 			StatusCode::Ok => http::StatusCode::OK,
+			StatusCode::Created => http::StatusCode::CREATED,
 			StatusCode::MalformedRequest => http::StatusCode::BAD_REQUEST,
 			StatusCode::Unauthorized => http::StatusCode::UNAUTHORIZED,
 			StatusCode::Forbidden => http::StatusCode::FORBIDDEN,
@@ -290,6 +347,11 @@ impl From<StatusCode> for http::StatusCode {
 			}
 			StatusCode::PreconditionFailed => {
 				http::StatusCode::PRECONDITION_FAILED
+			}
+			StatusCode::ImATeapot => http::StatusCode::IM_A_TEAPOT,
+			StatusCode::MovedPermanently => http::StatusCode::MOVED_PERMANENTLY,
+			StatusCode::TemporaryRedirect => {
+				http::StatusCode::TEMPORARY_REDIRECT
 			}
 			StatusCode::InternalError => {
 				http::StatusCode::INTERNAL_SERVER_ERROR
@@ -337,7 +399,7 @@ impl From<StatusCode> for u8 {
 	/// - 77: Permission denied (EX_NOPERM)
 	fn from(status: StatusCode) -> Self {
 		match status {
-			StatusCode::Ok => 0,
+			StatusCode::Ok | StatusCode::Created => 0,
 			StatusCode::MalformedRequest | StatusCode::InvalidArgument => 64, // EX_USAGE
 			StatusCode::Unauthorized | StatusCode::Forbidden => 77, // EX_NOPERM
 			StatusCode::NotFound
@@ -345,14 +407,16 @@ impl From<StatusCode> for u8 {
 			| StatusCode::Conflict
 			| StatusCode::PayloadTooLarge
 			| StatusCode::PreconditionFailed
+			| StatusCode::ImATeapot
 			| StatusCode::InvalidState
 			| StatusCode::Cancelled
 			| StatusCode::NotImplemented
 			| StatusCode::UpstreamFailure => 1, // General error
+			StatusCode::MovedPermanently | StatusCode::TemporaryRedirect => 0, // Redirects are success
 			StatusCode::RequestTimeout
 			| StatusCode::RateLimitExceeded
 			| StatusCode::GatewayTimeout => 75, // EX_TEMPFAIL
-			StatusCode::InternalError => 70,                        // EX_SOFTWARE
+			StatusCode::InternalError => 70, // EX_SOFTWARE
 			StatusCode::ServiceUnavailable | StatusCode::NoResponse => 69, // EX_UNAVAILABLE
 			StatusCode::AlreadyExists | StatusCode::ResourceExhausted => 73, // EX_CANTCREAT
 			StatusCode::DataLoss => 74,                                      // EX_IOERR
@@ -468,7 +532,7 @@ mod test {
 		StatusCode::from(http::StatusCode::NOT_FOUND)
 			.xpect_eq(StatusCode::NotFound);
 		StatusCode::from(http::StatusCode::IM_A_TEAPOT)
-			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 
 	#[test]
@@ -480,11 +544,25 @@ mod test {
 		let status: http::StatusCode = StatusCode::NotFound.into();
 		status.xpect_eq(http::StatusCode::NOT_FOUND);
 
-		let status: http::StatusCode =
-			StatusCode::Http(http::StatusCode::IM_A_TEAPOT).into();
+		let status: http::StatusCode = StatusCode::ImATeapot.into();
 		status.xpect_eq(http::StatusCode::IM_A_TEAPOT);
 	}
 
 	#[test]
 	fn default_is_ok() { StatusCode::default().xpect_eq(StatusCode::Ok); }
+
+	#[test]
+	fn to_exit_code() {
+		StatusCode::Ok.to_exit_code().unwrap();
+		StatusCode::InternalError
+			.to_exit_code()
+			.unwrap_err()
+			.get()
+			.xpect_eq(70);
+		StatusCode::NotFound
+			.to_exit_code()
+			.unwrap_err()
+			.get()
+			.xpect_eq(1);
+	}
 }

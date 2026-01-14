@@ -101,7 +101,7 @@ mod test {
 						let action = ev.target();
 						let agent = agents.entity(action);
 						commands.entity(agent).insert(Response::from_status(
-							StatusCode::Http(http::StatusCode::IM_A_TEAPOT),
+							StatusCode::ImATeapot,
 						));
 						commands.entity(action).trigger_target(Outcome::Pass);
 					},
@@ -110,7 +110,7 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 
 	#[sweet::test]
@@ -151,9 +151,9 @@ mod test {
 					let agent = agents.entity(action);
 					agent.xpect_not_eq(action);
 					agent.xpect_not_eq(agents.parents.root_ancestor(action));
-					commands.entity(agent).insert(Response::from_status(
-						StatusCode::Http(http::StatusCode::IM_A_TEAPOT),
-					));
+					commands
+						.entity(agent)
+						.insert(Response::from_status(StatusCode::ImATeapot));
 					commands.entity(action).trigger_target(Outcome::Pass);
 				},
 			)
@@ -163,6 +163,6 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 }

@@ -102,18 +102,7 @@ fn create_readable_stream_from_body(
 
 
 async fn into_response(res: web_sys::Response) -> Result<Response> {
-	// Status
-	#[cfg(feature = "http")]
-	let status = StatusCode::from(
-		http::StatusCode::from_u16(res.status() as u16)
-			.unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR),
-	);
-	#[cfg(not(feature = "http"))]
-	let status = if res.status() >= 200 && res.status() < 300 {
-		StatusCode::Ok
-	} else {
-		StatusCode::Process(1)
-	};
+	let status = StatusCode::from_http_raw(res.status() as u16);
 
 	// Build ResponseParts with headers
 	let mut parts = ResponseParts::new(status);

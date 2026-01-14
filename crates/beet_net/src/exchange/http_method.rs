@@ -79,11 +79,16 @@ impl HttpMethod {
 	pub fn to_string_lowercase(&self) -> String {
 		self.to_string().to_ascii_lowercase()
 	}
+	#[cfg(feature = "http")]
 	pub fn into_http(self) -> http::Method { self.into() }
 }
+
+#[cfg(feature = "http")]
 impl From<http::Method> for HttpMethod {
 	fn from(value: http::Method) -> Self { Self::from(&value) }
 }
+
+#[cfg(feature = "http")]
 impl From<&http::Method> for HttpMethod {
 	fn from(method: &http::Method) -> Self {
 		// case insensitive
@@ -102,6 +107,7 @@ impl From<&http::Method> for HttpMethod {
 	}
 }
 
+#[cfg(feature = "http")]
 impl Into<http::Method> for HttpMethod {
 	fn into(self) -> http::Method {
 		match self {

@@ -52,7 +52,7 @@ mod tests {
 			.spawn_then((
 				CliServer,
 				ExchangeSpawner::new_handler(|_, _| {
-					StatusCode::Http(http::StatusCode::IM_A_TEAPOT).into()
+					StatusCode::ImATeapot.into()
 				}),
 			))
 			.run_async()

@@ -22,7 +22,7 @@ extend.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-sweet.workspace = true
+sweet = { workspace = true, features = ["runner"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 sweet = { workspace = true, features = ["runner"] }

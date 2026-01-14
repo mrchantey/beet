@@ -26,7 +26,7 @@ pub fn beet_cli() -> impl Bundle {
 						match_root: true,
 						..default()
 					}),
-					EndpointBuilder::new(|| { StatusCode::IM_A_TEAPOT })
+					EndpointBuilder::new(|| { StatusCode::ImATeapot })
 						.with_path("teapot")
 						.with_description("I'm a teapot"),
 					EndpointBuilder::default()

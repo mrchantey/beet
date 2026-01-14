@@ -164,9 +164,7 @@ pub mod status_code_serde {
 		#[cfg(feature = "http")]
 		{
 			let code = u16::deserialize(deserializer)?;
-			let http_status = http::StatusCode::from_u16(code)
-				.map_err(serde::de::Error::custom)?;
-			Ok(StatusCode::from(http_status))
+			Ok(StatusCode::from_http_raw(code))
 		}
 		#[cfg(not(feature = "http"))]
 		{
