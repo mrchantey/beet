@@ -1,4 +1,4 @@
-use crate::shared_utils::AttributeGroup;
+use crate::shared_utils::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;
@@ -26,26 +26,28 @@ pub fn parse_test_attr(
 
 	let timeout_ms = attrs.get_value_parsed::<syn::LitInt>("timeout_ms")?;
 	let is_tokio = attrs.contains("tokio");
+	let beet_core = pkg_ext::internal_or_beet("beet_core");
 
 	// Build test params
 	let params_expr = if let Some(timeout_lit) = timeout_ms {
 		quote! {
-			beet_core::testing::TestCaseParams::new().with_timeout_ms(#timeout_lit)
+			#beet_core::testing::TestCaseParams::new().with_timeout_ms(#timeout_lit)
 		}
 	} else {
 		quote! {
-			beet_core::testing::TestCaseParams::new()
+			#beet_core::testing::TestCaseParams::new()
 		}
 	};
 
 	let is_async = func.sig.asyncness.is_some();
+
 
 	Ok(match (is_async, is_tokio) {
 		(true, true) => {
 			// wasm impl is recursive but oh well tokio dep is temp anyway
 			quote! {
 				#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
-				#[cfg_attr(target_arch = "wasm32", beet_core::sweet_test)]
+				#[cfg_attr(target_arch = "wasm32", #beet_core::test)]
 				#func
 			}
 		}
@@ -58,7 +60,7 @@ pub fn parse_test_attr(
 				#[test]
 				#(#attrs)*
 				#vis fn #ident() {
-					beet_core::testing::register_test(
+					#beet_core::testing::register_test(
 						#params_expr,
 						async #block
 					);

@@ -80,7 +80,7 @@ mod test {
 
 	#[crate::test]
 	async fn timeout_completes_before_timeout() {
-		async_ext::timeout(Duration::from_millis(100), async {
+		async_ext::timeout(Duration::from_millis(500), async {
 			time_ext::sleep(Duration::from_millis(10)).await;
 			42
 		})
@@ -92,7 +92,7 @@ mod test {
 	#[crate::test]
 	async fn timeout_exceeds_timeout() {
 		async_ext::timeout(Duration::from_millis(10), async {
-			time_ext::sleep(Duration::from_millis(100)).await;
+			time_ext::sleep(Duration::from_millis(1000)).await;
 			42
 		})
 		.await

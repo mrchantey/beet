@@ -52,9 +52,6 @@ install-cli *args:
 lambda-build:
     cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
 
-run-mod *args:
-    just sweet mod --exclude */codegen/* {{ args }}
-
 # Run and watch a workspace example
 run example *args:
     just watch just run-ci {{ example }} {{ args }}
@@ -81,7 +78,7 @@ run-csr:
 build-csr:
     cargo build --example csr --features=client --target wasm32-unknown-unknown
     wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
-    sweet serve target/examples/csr
+    just cli serve target/examples/csr
 
 launch *args:
     cargo launch -w {{ args }}
@@ -96,7 +93,7 @@ build-hydration:
     cargo run --example hydration --features=css
     cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
     wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
-    sweet serve target/examples/hydration
+    just cli serve target/examples/hydration
 
 doc crate *args:
     just watch cargo doc -p {{ crate }} --open {{ args }}
@@ -237,10 +234,10 @@ test-agent:
     --out-dir=assets/tests/agents/out
 
 example-chat *args:
-    sweet run -w --example chat 	--features=native-tls,agent -- {{ args }}
+    just watch cargo run --example chat 	--features=native-tls,agent -- {{ args }}
 
 example-image *args:
-    sweet run -w --example image 	--features=native-tls,agent -- {{ args }}
+    just watch cargo run --example image 	--features=native-tls,agent -- {{ args }}
 
 clear-rust-analyzer:
     rm -rf $CARGO_TARGET_DIR/rust-analyzer

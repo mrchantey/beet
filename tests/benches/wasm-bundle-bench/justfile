@@ -1,6 +1,6 @@
 
 watch:
-	sweet watch \
+	just cli watch \
 	--include "*src*" 			\
 	--cmd "just build"			\
 

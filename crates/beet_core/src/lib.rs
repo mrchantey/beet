@@ -42,7 +42,7 @@ pub mod utils;
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
 /// Re-export sweet_test as test for ergonomic `#[beet_core::test]` usage
-pub use beet_core_macros::sweet_test as test;
+pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
 pub use web_utils::js_runtime;

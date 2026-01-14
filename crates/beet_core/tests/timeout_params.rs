@@ -1,7 +1,12 @@
+#![cfg_attr(test, feature(custom_test_frameworks))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration tests for per-test timeout parameters
 //!
 //! This demonstrates the `timeout_ms` parameter on `#[beet_core::test]` which allows
 //! per-test timeout configuration, overriding the suite-level timeout.
+use beet_core::testing;
+
+
 
 /// Test with custom timeout - async function
 /// This test has a 100ms timeout which is plenty for a 10ms sleep

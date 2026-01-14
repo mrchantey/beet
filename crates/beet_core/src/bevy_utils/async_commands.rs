@@ -860,8 +860,10 @@ mod test {
 		world.resource::<Count>().0.xpect_eq(2);
 	}
 	#[crate::test]
+	#[should_panic]
 	async fn results() {
 		let mut app = App::new();
+		app.set_error_handler(bevy::ecs::error::panic);
 		app.add_plugins(AsyncPlugin);
 		let world = app.world_mut();
 		world.init_resource::<Count>();

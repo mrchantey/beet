@@ -155,26 +155,26 @@ pub fn entity_target_event(
 /// - async native
 /// - async wasm
 ///
-/// In the case of sync tests this simply replaces `#[beet_core::sweet_test]` with `#[test]`.
+/// In the case of sync tests this simply replaces `#[beet::test]` with `#[test]`.
 ///
 /// ## Parameters
 ///
 /// - `timeout_ms`: Optional per-test timeout in milliseconds. Overrides suite-level timeout.
 ///
 /// ```ignore
-/// # use beet_core::prelude::*;
+/// # use beet::prelude::*;
 ///
-/// #[beet_core::sweet_test]
+/// #[beet::test]
 /// fn my_test() {
 /// 	assert_eq!(2 + 2, 4);
 /// }
 ///
-/// #[beet_core::sweet_test]
+/// #[beet::test]
 /// async fn my_async_test() {
 /// 	// some cross-platform async function 🥳
 /// }
 ///
-/// #[beet_core::sweet_test(timeout_ms = 100)]
+/// #[beet::test(timeout_ms = 100)]
 /// async fn my_quick_test() {
 /// 	// this test will timeout after 100ms
 /// }
@@ -182,7 +182,7 @@ pub fn entity_target_event(
 ///
 /// ```
 #[proc_macro_attribute]
-pub fn sweet_test(
+pub fn beet_test(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
