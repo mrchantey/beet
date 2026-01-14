@@ -19,7 +19,7 @@ pub(super) struct LoggerParams {
 	quiet: bool,
 }
 
-
+#[allow(unused)]
 pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
 	mut logger_params: ParamQuery<LoggerParams>,
@@ -34,7 +34,7 @@ pub(super) fn log_suite_running(
 
 		let mut out = Vec::new();
 
-		out.push("🤘 sweet as 🤘".to_string());
+		out.push("🌱 beet test 🌱".to_string());
 		// out.push(format!("Request: {:#?}", req));
 		// out.push(format!("Test filter: {:#?}", filter_params));
 

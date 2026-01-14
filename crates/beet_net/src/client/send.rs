@@ -196,11 +196,8 @@ mod test_request {
 			.xpect_contains("baz");
 	}
 
-	// #[test]
-	// fn bad_url_fails() { Request::get("/foobar"); }
 	#[test]
 	#[should_panic]
-	#[cfg(not(target_arch = "wasm32"))] // sweet panic catch broken :(
 	fn invalid_header_fails() {
 		Request::get("http://localhost").with_header("bad\nheader", "val");
 	}

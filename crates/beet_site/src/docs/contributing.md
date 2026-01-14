@@ -24,10 +24,10 @@ cargo binstall --no-confirm wasm-opt
 sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 # Command runner
 cargo binstall just
-# Test runner
-just install-sweet
+# Beet cli
+just install-cli
 # Run all tests
-just test-rsx
+just test-all
 ```
 
 ### Troubleshooting

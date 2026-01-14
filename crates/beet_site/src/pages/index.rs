@@ -28,9 +28,9 @@ pub fn get() -> impl IntoHtml {
 						// 	>Get Started</Link>
 					</footer>
 				</Card>
+				<iframe src="https://www.youtube.com/embed/a-Sx0aEhDhc" title="Unifying the Fuller Stack with ECS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 				<p>"Beet is a self-representing framework like smalltalk or hypercard. Everything from the CLI to the client application is a"<a href="https://bevy.org">"Bevy App"</a>", and all structure and behavior is written in Entity Component System architecture."
 				</p>
-				<iframe src="https://www.youtube.com/embed/JWYcoNOvdWE" title="Unifying the Fuller Stack with Entity Component System" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 				<h2>Smoke Tests</h2>
 				<ClientCounter client:load initial=1 />
 				<ServerCounter client:load initial=1 />

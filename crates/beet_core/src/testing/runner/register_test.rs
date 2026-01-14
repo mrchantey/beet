@@ -1,6 +1,6 @@
-//! Sweet test registration mechanism.
+//! Test registration mechanism.
 //!
-//! This module provides the unified registration system for sweet tests.
+//! This module provides the unified registration system for tests.
 //!
 //! ## Registration Patterns
 //!
@@ -8,8 +8,8 @@
 //! - No registration, runs directly via libtest
 //! - Standard sync test execution
 //!
-//! ### Sweet tests (`#[beet_core::test]`)
-//! - Unified registration via `register_sweet_test()`
+//! ### Beet tests (`#[beet::test]`)
+//! - Unified registration via `register_test()`
 //! - Registers both `TestCaseParams` AND test future in a single call
 //! - Thread-local storage allows opaque `fn()` from libtest to provide async tests
 //! - Params are available before awaiting the future, enabling:
@@ -26,8 +26,8 @@
 //!
 //! ## How it works
 //!
-//! 1. `#[beet_core::test]` macro generates code calling `register_sweet_test(params, async_body)`
-//! 2. Both params and test are stored together in thread-local `REGISTERED_SWEET_TEST`
+//! 1. `#[beet_core::test]` macro generates code calling `register_test(params, async_body)`
+//! 2. Both params and test are stored together in thread-local `REGISTERED_TEST`
 //! 3. Test runner calls `try_run_async()` which:
 //!    - Invokes the test function (triggering registration)
 //!    - Extracts both params and async test from thread-local
@@ -42,19 +42,19 @@ use std::cell::RefCell;
 use std::pin::Pin;
 
 thread_local! {
-	/// Thread-local storage for sweet test registration.
-	/// When a test function is invoked by libtest, it calls `register_sweet_test`
+	/// Thread-local storage for test registration.
+	/// When a test function is invoked by libtest, it calls `register_test`
 	/// which populates this cell with both the async test future and params.
-	static REGISTERED_SWEET_TEST: RefCell<Option<SweetTestRegistration>> = RefCell::new(None);
+	static REGISTERED_TEST: RefCell<Option<TestRegistration>> = RefCell::new(None);
 }
 
-/// Registration data for a sweet test, containing both the test future and params
-struct SweetTestRegistration {
+/// Registration data for a test, containing both the test future and params
+struct TestRegistration {
 	async_test: Pin<Box<dyn AsyncTest>>,
 	params: TestCaseParams,
 }
 
-/// Unified registration for sweet tests - registers both params and test future.
+/// Unified registration for tests - registers both params and test future.
 ///
 /// Called by the `#[beet_core::test]` macro to register test configuration and the
 /// async test body in a single call. This ensures params are available before
@@ -75,7 +75,7 @@ struct SweetTestRegistration {
 /// ```ignore
 /// #[test]
 /// fn my_test() {
-///     beet_core::testing::register_sweet_test(
+///     beet_core::testing::register_test(
 ///         beet_core::testing::TestCaseParams::new().with_timeout_ms(1000),
 ///         async { assert!(true); }
 ///     );
@@ -87,29 +87,12 @@ struct SweetTestRegistration {
 /// 2. Use params for timeout enforcement, retries, etc.
 /// 3. Insert params as ECS components for system access
 #[track_caller]
-pub fn register_sweet_test<M>(params: TestCaseParams, fut: impl IntoFut<M>) {
-	REGISTERED_SWEET_TEST.with(|cell| {
-		*cell.borrow_mut() = Some(SweetTestRegistration {
+pub fn register_test<M>(params: TestCaseParams, fut: impl IntoFut<M>) {
+	REGISTERED_TEST.with(|cell| {
+		*cell.borrow_mut() = Some(TestRegistration {
 			async_test: Box::pin(fut.into_fut()),
 			params,
 		});
-	});
-}
-
-/// Legacy function for registering test parameters separately.
-/// Prefer `register_sweet_test` which registers both at once.
-#[track_caller]
-pub fn register_test_params(params: TestCaseParams) {
-	REGISTERED_SWEET_TEST.with(|cell| {
-		let mut registration = cell.borrow_mut();
-		if let Some(reg) = registration.as_mut() {
-			reg.params = params;
-		} else {
-			*registration = Some(SweetTestRegistration {
-				async_test: Box::pin(async { Ok(()) }),
-				params,
-			});
-		}
 	});
 }
 
@@ -129,7 +112,7 @@ pub(super) struct TestRunResult {
 }
 
 /// Attempts to run the provided function as a synchronous test.
-/// If the function registers a sweet test via `register_sweet_test` or legacy methods,
+/// If the function registers a test via `register_test` or legacy methods,
 /// returns the async test future and params. Otherwise runs as sync test.
 ///
 /// ## Panics
@@ -137,18 +120,17 @@ pub(super) struct TestRunResult {
 pub(super) fn try_run_async(
 	func: impl FnOnce() -> Result<(), String>,
 ) -> TestRunResult {
-	REGISTERED_SWEET_TEST.with(|cell| {
+	REGISTERED_TEST.with(|cell| {
 		if cell.borrow().is_some() {
 			panic!(
-				"sweet test was registered outside of a test run. This is not supported"
+				"test was registered outside of a test run. This is not supported"
 			);
 		}
 	});
 
 	let panic_outcome = PanicContext::catch(func);
 
-	let registration =
-		REGISTERED_SWEET_TEST.with(|cell| cell.borrow_mut().take());
+	let registration = REGISTERED_TEST.with(|cell| cell.borrow_mut().take());
 
 	match registration {
 		Some(reg) => {

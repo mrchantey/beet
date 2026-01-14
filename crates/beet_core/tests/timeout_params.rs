@@ -15,7 +15,7 @@ async fn timeout_param_async_passes() {
 /// Demonstrates that timeout_ms works with sync tests that register async bodies
 #[beet_core::test(timeout_ms = 500)]
 fn timeout_param_sync_with_async_body() {
-	beet_core::testing::register_sweet_test(Default::default(), async {
+	beet_core::testing::register_test(Default::default(), async {
 		beet_core::time_ext::sleep_millis(10).await;
 		assert_eq!(2 + 2, 4);
 	});

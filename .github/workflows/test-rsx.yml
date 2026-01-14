@@ -52,8 +52,8 @@ jobs:
       uses: cargo-bins/cargo-binstall@main
     - name: 🔨 Install wasm bindgen cli
       run: cargo binstall wasm-bindgen-cli --version 0.2.104    || true
-    - name: 🔨 Install sweet cli
-      run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
+    - name: 🔨 Install beet cli
+      run: cargo binstall beet-cli --version 0.3.0-rc.3        || true
     - name: 📋 Init repo
       run: just init-rsx
     - name: 🔎 Test

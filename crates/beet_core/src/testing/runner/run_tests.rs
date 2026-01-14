@@ -155,7 +155,7 @@ mod tests {
 	#[crate::test]
 	async fn works_async() {
 		run_test(test_ext::new_auto(|| {
-			register_sweet_test(TestCaseParams::new(), async {
+			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				Ok(())
 			});
@@ -165,7 +165,7 @@ mod tests {
 		.xpect_eq(TestOutcome::Pass);
 
 		run_test(test_ext::new_auto(|| {
-			register_sweet_test(TestCaseParams::new(), async {
+			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				Err("pizza".into())
 			});
@@ -181,7 +181,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_sweet_test(TestCaseParams::new(), async {
+				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("expected")
 				});
@@ -194,7 +194,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_sweet_test(TestCaseParams::new(), async {
+				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					Ok(())
 				});
@@ -207,7 +207,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_sweet_test(TestCaseParams::new(), async {
+				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("boom")
 				});
@@ -220,7 +220,7 @@ mod tests {
 
 		run_test(
 			test_ext::new_auto(|| {
-				register_sweet_test(TestCaseParams::new(), async {
+				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					Ok(())
 				});
@@ -238,7 +238,7 @@ mod tests {
 
 		let line = line!() + 4;
 		run_test(test_ext::new_auto(|| {
-			register_sweet_test(TestCaseParams::new(), async {
+			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				panic!("pizza")
 			});
@@ -256,17 +256,14 @@ mod tests {
 
 	#[crate::test]
 	async fn unified_registration() {
-		use crate::testing::runner::register_sweet_test;
+		use crate::testing::runner::register_test;
 
 		// Test unified registration with params
 		run_test(test_ext::new_auto(|| {
-			register_sweet_test(
-				TestCaseParams::new().with_timeout_ms(5000),
-				async {
-					async_ext::yield_now().await;
-					Ok(())
-				},
-			);
+			register_test(TestCaseParams::new().with_timeout_ms(5000), async {
+				async_ext::yield_now().await;
+				Ok(())
+			});
 			Ok(())
 		}))
 		.await
@@ -274,7 +271,7 @@ mod tests {
 
 		// Test unified registration handles failures
 		run_test(test_ext::new_auto(|| {
-			register_sweet_test(TestCaseParams::new(), async {
+			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				Err("unified error".into())
 			});
@@ -291,7 +288,7 @@ mod tests {
 		// Test unified registration with should_panic
 		run_test(
 			test_ext::new_auto(|| {
-				register_sweet_test(TestCaseParams::new(), async {
+				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("expected panic")
 				});

@@ -186,7 +186,7 @@ pub fn sweet_test(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	parse_sweet_test(attr, input)
+	parse_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }

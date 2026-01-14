@@ -7,7 +7,7 @@
 // Includes utilty methods akin to `std::fs`
 //
 // This file is cached and will be replaced on hash change
-// For more info see [js_runtime_extern.rs](crates/sweet/src/wasm/js_runtime_extern.rs)
+// For more info see [js_runtime.rs](crates/beet_core/src/wasm_utils/js_runtime.rs)
 // for context see how the wasm-bindgen deno runner works
 // https://github.com/wasm-bindgen/wasm-bindgen/blob/main/crates/cli/src/wasm_bindgen_test_runner/deno.rs
 import init from "./bindgen.js";

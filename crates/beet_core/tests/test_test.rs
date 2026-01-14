@@ -20,7 +20,7 @@ fn should_panic() {
 
 #[test]
 fn returns_ok_async() {
-	register_sweet_test(TestCaseParams::new(), async {
+	register_test(TestCaseParams::new(), async {
 		time_ext::sleep_millis(10).await;
 		Ok(())
 	});
@@ -28,12 +28,12 @@ fn returns_ok_async() {
 #[test]
 #[should_panic]
 fn panics_async() {
-	register_sweet_test(TestCaseParams::new(), async {
+	register_test(TestCaseParams::new(), async {
 		panic!();
 	});
 }
 #[beet_core::test]
-fn sweet_test_sync() {}
+fn beet_test_sync() {}
 
 #[beet_core::test]
-async fn sweet_test_async() { time_ext::sleep_millis(10).await; }
+async fn beet_test_async() { time_ext::sleep_millis(10).await; }

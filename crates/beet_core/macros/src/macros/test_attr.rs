@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;
 
-pub fn parse_sweet_test(
+pub fn parse_test_attr(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> syn::Result<TokenStream> {
@@ -18,8 +18,8 @@ pub fn parse_sweet_test(
 	} else {
 		// Create a synthetic attribute to parse
 		let synthetic_attr: syn::Attribute =
-			syn::parse_quote!(#[sweet(#attr_tokens)]);
-		AttributeGroup::parse(&[synthetic_attr], "sweet")?
+			syn::parse_quote!(#[beet(#attr_tokens)]);
+		AttributeGroup::parse(&[synthetic_attr], "beet")?
 	};
 
 	attrs.validate_allowed_keys(&["timeout_ms", "tokio"])?;
@@ -58,7 +58,7 @@ pub fn parse_sweet_test(
 				#[test]
 				#(#attrs)*
 				#vis fn #ident() {
-					beet_core::testing::register_sweet_test(
+					beet_core::testing::register_test(
 						#params_expr,
 						async #block
 					);
