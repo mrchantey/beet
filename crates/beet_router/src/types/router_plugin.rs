@@ -39,7 +39,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Pass)))
@@ -55,7 +55,7 @@ mod test {
 			.xpect_eq(StatusCode::InternalError);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn route_tree() {
 		let mut world = RouterPlugin::world();
 		let spawner = ExchangeSpawner::new_flow(|| {
@@ -97,7 +97,7 @@ mod test {
 	}
 
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
-	#[sweet::test]
+	#[beet_core::test]
 	async fn server() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();

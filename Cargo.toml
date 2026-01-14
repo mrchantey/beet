@@ -46,9 +46,6 @@ members = [
 	## 💡 Core
 	"crates/beet_core",
 	"crates/beet_core/macros",
-	"crates/sweet/macros",
-	"crates/sweet",
-	"crates/sweet/cli",
 
 	## 💡 Flow
 	"crates/beet_examples",
@@ -76,8 +73,6 @@ members = [
 [workspace.dependencies]
 ## internal
 
-sweet_macros = { path = "crates/sweet/macros", version = "0.0.8-dev.5" }
-sweet = { path = "crates/sweet", version = "0.4.2", default-features = false, features = ["nightly"] }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.8-dev.5" }
 beet_core = { path = "crates/beet_core", version = "0.0.8-dev.5" }
 

@@ -1,5 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 #[cfg(feature = "bevy_default")]
 pub mod components;
 #[cfg(feature = "bevy_default")]

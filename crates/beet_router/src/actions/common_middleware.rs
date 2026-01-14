@@ -440,7 +440,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn no_cache_headers_works() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
@@ -461,7 +461,7 @@ mod test {
 			});
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cors_allows_origin() {
 		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
 		RouterPlugin::world()
@@ -485,7 +485,7 @@ mod test {
 			});
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cors_blocks_origin() {
 		let config = CorsConfig::new(false, vec![]);
 		RouterPlugin::world()
@@ -504,7 +504,7 @@ mod test {
 			.xpect_eq(StatusCode::Forbidden);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cors_allows_any() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()
@@ -528,7 +528,7 @@ mod test {
 			});
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cors_preflight_works() {
 		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
 		RouterPlugin::world()
@@ -556,7 +556,7 @@ mod test {
 			});
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cors_preflight_non_options_passthrough() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()
@@ -581,7 +581,7 @@ mod test {
 			});
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn multiple_middleware_chain() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()

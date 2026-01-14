@@ -184,7 +184,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn collect_sidebar_node() {
 		#[template]
 		fn TestSidebar(
@@ -228,7 +228,7 @@ mod test {
 			.xpect_eq("Success");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		#[template]
 		fn TestSidebarRender() -> impl Bundle {

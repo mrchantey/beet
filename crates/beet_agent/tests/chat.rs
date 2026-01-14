@@ -1,10 +1,10 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 // use beet_agent::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-#[sweet::test]
+#[beet_core::test]
 async fn works() {
 	dotenv::dotenv().ok();
 	let mut res = Request::post("https://api.openai.com/v1/chat/completions")

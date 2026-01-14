@@ -194,7 +194,7 @@ mod tests {
 		let _ = window().unwrap();
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	#[ignore = "requires dom"]
 	async fn read_write_params() {
 		// Start from a known baseline

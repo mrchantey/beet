@@ -175,7 +175,7 @@ impl BucketProvider for LocalStorageProvider {
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let provider = LocalStorageProvider::new();
 		bucket_test::run(provider).await;

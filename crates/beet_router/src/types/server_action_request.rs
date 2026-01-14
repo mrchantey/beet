@@ -168,7 +168,7 @@ mod test {
 	}
 
 	// only a single entry because set_server_url is static
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();

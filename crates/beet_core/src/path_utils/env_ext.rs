@@ -65,5 +65,3 @@ pub fn vars_filtered(filter: GlobFilter) -> Vec<(String, String)> {
 		.filter(|(key, _)| filter.passes(key))
 		.collect()
 }
-
-//upstream of sweet, see sweet/tests/env_ext for tests

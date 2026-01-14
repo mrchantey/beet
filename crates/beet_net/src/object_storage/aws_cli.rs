@@ -344,7 +344,7 @@ fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
 mod test {
 	use super::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	fn builds_basic_sync_args() {
 		let aws = AwsCli::new()
 			.with_profile("dev")
@@ -398,7 +398,7 @@ mod test {
 		argv.contains(&"STANDARD_IA".to_string()).xpect_true();
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	fn preserves_filter_order() {
 		let aws = AwsCli::new();
 		let local = AbsPathBuf::new("some/dir").unwrap();
@@ -436,7 +436,7 @@ mod test {
 		]);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[should_panic]
 	async fn rejects_non_s3_uri() {
 		S3Sync::push(AbsPathBuf::new("out").unwrap(), "not-an-s3-uri")

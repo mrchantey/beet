@@ -73,7 +73,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn children() {
 		let mut world = RouterPlugin::world();
 		let spawner = ExchangeSpawner::new_flow(|| {

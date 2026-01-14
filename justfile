@@ -30,7 +30,6 @@ default:
 init-repo:
     just pull-assets
     mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
-    just install-sweet
     cargo launch codegen
 
 pull-assets:
@@ -149,7 +148,6 @@ test-all:
     just test-core
     just test-flow
     just test-rsx
-    cargo test -p sweet-cli --all-features -- {{ test-threads }}
     cargo test -p beet-cli  --all-features -- {{ test-threads }}
 
 # cargo test --workspace -- {{args}}
@@ -172,7 +170,6 @@ test-ci *args:
 snap:
     cargo test -p beet_core 				--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
-    cargo test -p sweet 						--lib --all-features -- --snap
     cargo test -p beet_net					--lib --features=server -- --snap
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
@@ -182,12 +179,9 @@ snap:
     cargo test -p beet_rsx 					--test css 		--all-features -- --snap
     cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
-# cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 test-core *args:
     cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
-    cargo test -p sweet 									 													 								{{ args }} -- {{ test-threads }}
-    cargo test -p sweet --lib --target wasm32-unknown-unknown  --all-features   		{{ args }} -- {{ test-threads }}
     cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_net	--features=server																				{{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
@@ -290,11 +284,3 @@ watch *command:
 # Cargo search but returns one line
 search *args:
     cargo search {{ args }} | head -n 1
-
-# Run a command with the sweet cli without installing it
-sweet *args:
-    cargo run -p sweet-cli -- {{ args }}
-
-# Install the sweet cli
-install-sweet *args:
-    cargo install --path crates/sweet/cli {{ args }}

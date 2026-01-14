@@ -1,11 +1,25 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(crate::test_runner))]
 #![cfg_attr(
 	feature = "nightly",
 	feature(fn_traits, unboxed_closures, never_type)
 )]
+// The test crate is needed for the test runner infrastructure
+// Note: `test` feature is already enabled by cfg(test) above, so only add if_let_guard here
+#![cfg_attr(feature = "testing", feature(if_let_guard))]
+// never_type is needed for IntoFut impl for Future<Output = !>
+// Only enable if nightly feature is not already enabling it
+#![cfg_attr(
+	all(feature = "testing", not(feature = "nightly")),
+	feature(never_type)
+)]
+// Enable test feature for non-test builds that use the testing feature (e.g., other crates)
+#![cfg_attr(all(feature = "testing", not(test)), feature(test))]
 // allow name collision until exit_ok stablized
 #![allow(unstable_name_collisions)]
+
+#[cfg(feature = "testing")]
+extern crate test;
 
 pub use utils::async_ext;
 pub use utils::time_ext;
@@ -20,18 +34,22 @@ pub mod extensions;
 pub mod fs;
 mod path_utils;
 #[cfg(feature = "testing")]
-pub mod test_utils;
+pub mod testing;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
+/// Re-export sweet_test as test for ergonomic `#[beet_core::test]` usage
+pub use beet_core_macros::sweet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
 pub use web_utils::js_runtime;
 
 mod workspace_config;
+#[cfg(feature = "testing")]
+pub use crate::testing::test_runner;
 
 pub mod prelude {
 	pub use crate::arena::*;
@@ -41,14 +59,12 @@ pub mod prelude {
 	pub use crate::bevyhow;
 	#[cfg(feature = "exchange")]
 	pub use crate::exchange::*;
-	// #[cfg(test)]
-	#[cfg(feature = "testing")]
-	pub use crate::test_utils::*;
-	// pub use crate::exchange::*;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
 	pub use crate::path_utils::*;
+	#[cfg(feature = "testing")]
+	pub use crate::testing::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use crate::utils::*;

@@ -223,7 +223,7 @@ mod test {
 	fn bundle_node() {}
 
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn reactive_app() {
 		let mut app = App::new();
 		app.add_plugins(SignalsPlugin);

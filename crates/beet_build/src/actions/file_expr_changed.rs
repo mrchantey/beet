@@ -61,7 +61,7 @@ mod tests {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn no_files() {
 		let mut app = App::new();
 		app.add_plugins(CliPlugin)
@@ -71,7 +71,7 @@ mod tests {
 		// no changed files
 		app.run_async().await.xpect_eq(AppExit::error());
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn one_file() {
 		let mut app = App::new();
 		app.world_mut()
@@ -83,7 +83,7 @@ mod tests {
 		// one changed file
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn one_file_filtered_out() {
 		let mut app = App::new();
 		app.world_mut()

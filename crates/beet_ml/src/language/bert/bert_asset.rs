@@ -252,7 +252,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	// possibly flaky tests here, getting occasional 403 on tokenizer.json
 	async fn works() {
 		pretty_env_logger::try_init().ok();

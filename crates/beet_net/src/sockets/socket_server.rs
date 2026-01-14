@@ -84,7 +84,7 @@ mod tests {
 	use crate::sockets::Message;
 	use crate::sockets::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn server_binds_and_accepts() {
 		let server = SocketServer::new_test();
 		let url = server.local_url();
@@ -110,7 +110,7 @@ mod tests {
 		// exits ok
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn handles_multiple_concurrent_connections() {
 		let server = SocketServer::new_test();
 		let url = server.local_url();
@@ -149,7 +149,7 @@ mod tests {
 	/// 3. client sends close to server
 	/// 4. server sends close back
 	///
-	#[sweet::test]
+	#[beet_core::test]
 	async fn ecs_sockets() {
 		let server = SocketServer::new_test();
 		let url = server.local_url();

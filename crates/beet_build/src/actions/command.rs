@@ -270,7 +270,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let mut app = App::new();
 		app.add_plugins(CliPlugin)
@@ -282,7 +282,7 @@ mod test {
 
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn continue_run_pass() {
 		let mut app = App::new();
 		app.add_plugins(CliPlugin)
@@ -294,7 +294,7 @@ mod test {
 			.trigger_target(GetOutcome);
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn continue_run_fail() {
 		let mut app = App::new();
 		app.add_plugins(CliPlugin)
@@ -340,7 +340,7 @@ mod test {
 			.len()
 			.xpect_eq(0);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn interrupt_timed() {
 		let mut app = App::new();
 		let entity = app

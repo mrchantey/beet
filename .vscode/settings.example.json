@@ -22,7 +22,7 @@
 		"**/target": true,
 		"**/assets/": true,
 		"**.svg": true,
-		".sweet": true,
+		".beet": true,
 		"Cargo.lock": true
 	}
 }

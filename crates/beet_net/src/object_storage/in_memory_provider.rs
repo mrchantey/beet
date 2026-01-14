@@ -178,7 +178,7 @@ impl BucketProvider for InMemoryProvider {
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let provider = InMemoryProvider::new();
 		bucket_test::run(provider).await;

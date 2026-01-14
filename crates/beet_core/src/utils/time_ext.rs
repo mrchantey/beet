@@ -104,7 +104,7 @@ pub fn timeout_sync(
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[crate::test]
 	async fn works() {
 		let now = Instant::now();
 		time_ext::sleep(Duration::from_millis(100)).await;
@@ -112,7 +112,7 @@ mod test {
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
-	#[sweet::test]
+	#[crate::test]
 	fn timeout_sync_completes() {
 		time_ext::timeout_sync(|| Ok(()), Duration::from_millis(100))
 			.unwrap()
@@ -120,7 +120,7 @@ mod test {
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
-	#[sweet::test]
+	#[crate::test]
 	fn timeout_sync_times_out() {
 		time_ext::timeout_sync(
 			|| {

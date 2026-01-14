@@ -336,13 +336,13 @@ impl<T: TableRow> TableProvider<T> for DynamoDbProvider {
 mod test {
 	use super::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn bucket() {
 		let provider = DynamoDbProvider::create().await;
 		bucket_test::run(provider).await;
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {
 		let provider = DynamoDbProvider::create().await;

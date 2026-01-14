@@ -161,7 +161,7 @@ mod tests {
 	}
 
 	#[ignore = "requires dom"]
-	#[sweet::test]
+	#[crate::test]
 	async fn yields_timestamps() {
 		doc::clear_body();
 

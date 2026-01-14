@@ -139,7 +139,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn no_input() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
@@ -161,7 +161,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(2);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn post() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -188,7 +188,7 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::MalformedRequest);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn get_sync() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {

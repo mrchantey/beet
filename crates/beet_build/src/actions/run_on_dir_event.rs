@@ -21,7 +21,7 @@ mod tests {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let tempdir = TempDir::new().unwrap();
 

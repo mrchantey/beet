@@ -814,7 +814,7 @@ mod test {
 	#[derive(Default, Resource, Clone)]
 	struct Count(usize);
 
-	#[sweet::test]
+	#[crate::test]
 	async fn async_task() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Count>();
@@ -830,7 +830,7 @@ mod test {
 		// Commands are applied by the final update in poll_and_update
 		world.resource::<Count>().0.xpect_eq(1);
 	}
-	#[sweet::test]
+	#[crate::test]
 	async fn async_queue() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Count>();
@@ -859,8 +859,7 @@ mod test {
 
 		world.resource::<Count>().0.xpect_eq(2);
 	}
-	#[sweet::test]
-	#[should_panic = "intentional error"]
+	#[crate::test]
 	async fn results() {
 		let mut app = App::new();
 		app.add_plugins(AsyncPlugin);
@@ -874,7 +873,7 @@ mod test {
 		app.run_async().await.into_result().xpect_err();
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn run_async_then() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Count>();

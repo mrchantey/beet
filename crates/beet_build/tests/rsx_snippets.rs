@@ -4,7 +4,7 @@
 //! This could also be considered the integration test for
 //! [`ResolveSnippets`]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_build::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;

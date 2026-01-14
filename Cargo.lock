@@ -1094,7 +1094,6 @@ dependencies = [
  "qrcode",
  "quote",
  "ron 0.8.1",
- "sweet",
  "syn 2.0.111",
 ]
 
@@ -1116,7 +1115,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "strum",
- "sweet",
  "thiserror 1.0.69",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1149,7 +1147,6 @@ dependencies = [
  "send_wrapper",
  "serde",
  "serde_json",
- "sweet",
  "syn 2.0.111",
  "thiserror 1.0.69",
  "toml",
@@ -1169,6 +1166,7 @@ dependencies = [
  "beet_core_macros",
  "bevy",
  "bytes",
+ "console_error_panic_hook",
  "crossterm",
  "ctrlc",
  "either",
@@ -1198,7 +1196,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sweet",
  "syn 2.0.111",
  "thiserror 1.0.69",
  "toml",
@@ -1219,7 +1216,6 @@ dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
- "sweet",
  "syn 2.0.111",
 ]
 
@@ -1239,7 +1235,6 @@ dependencies = [
  "heck 0.4.1",
  "material-colors",
  "serde",
- "sweet",
  "web-sys",
 ]
 
@@ -1260,7 +1255,6 @@ dependencies = [
  "send_wrapper",
  "serde",
  "serde_json",
- "sweet",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1279,7 +1273,6 @@ dependencies = [
  "pretty_env_logger",
  "serde",
  "serde_json",
- "sweet",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -1291,7 +1284,6 @@ dependencies = [
  "beet_core",
  "bevy",
  "extend",
- "sweet",
 ]
 
 [[package]]
@@ -1316,7 +1308,6 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "sweet",
  "thiserror 1.0.69",
  "tokenizers",
  "wasm-bindgen",
@@ -1363,7 +1354,6 @@ dependencies = [
  "serde_dynamo",
  "serde_json",
  "serde_urlencoded",
- "sweet",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -1394,7 +1384,6 @@ dependencies = [
  "ron 0.8.1",
  "rstml",
  "send_wrapper",
- "sweet",
  "syn 2.0.111",
  "syntect",
 ]
@@ -1415,7 +1404,6 @@ dependencies = [
  "heck 0.4.1",
  "serde",
  "serde_json",
- "sweet",
  "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
@@ -1441,7 +1429,6 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros",
- "sweet",
  "thiserror 1.0.69",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1455,7 +1442,6 @@ dependencies = [
  "beet_core",
  "combine 2.5.2",
  "itertools 0.14.0",
- "sweet",
  "thiserror 1.0.69",
 ]
 
@@ -1468,7 +1454,6 @@ dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
- "sweet",
  "syn 2.0.111",
 ]
 
@@ -1481,7 +1466,6 @@ dependencies = [
  "beet_design",
  "getrandom 0.3.3",
  "serde",
- "sweet",
 ]
 
 [[package]]
@@ -1497,7 +1481,6 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros",
- "sweet",
  "web-sys",
 ]
 
@@ -9115,43 +9098,6 @@ dependencies = [
  "skrifa",
  "yazi",
  "zeno",
-]
-
-[[package]]
-name = "sweet"
-version = "0.4.2"
-dependencies = [
- "beet_core",
- "bevy",
- "console_error_panic_hook",
- "extend",
- "nu-ansi-term",
- "prettyplease",
- "proc-macro2",
- "quote",
- "ron 0.8.1",
- "send_wrapper",
- "sweet",
- "sweet_macros",
- "syn 2.0.111",
-]
-
-[[package]]
-name = "sweet-cli"
-version = "0.0.8-dev.5"
-dependencies = [
- "beet",
- "sweet",
-]
-
-[[package]]
-name = "sweet_macros"
-version = "0.0.8-dev.5"
-dependencies = [
- "beet_core",
- "proc-macro2",
- "quote",
- "syn 2.0.111",
 ]
 
 [[package]]

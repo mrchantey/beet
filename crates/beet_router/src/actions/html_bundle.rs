@@ -137,7 +137,7 @@ mod test {
 		}
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn bundle_to_response_false() {
 		RouterPlugin
 			.into_world()
@@ -156,7 +156,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn bundle_to_response_true() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
@@ -173,7 +173,7 @@ mod test {
 			.xpect_eq("<div>hello world</div>");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn endpoint_tree_from_agent_descendent() {
 		#[template]
 		fn Foobar(
@@ -203,7 +203,7 @@ mod test {
 			.xpect_eq("/foo\n");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn nested_template_actions() {
 		#[template]
 		fn Inner(
@@ -237,7 +237,7 @@ mod test {
 			.xpect_eq("/nested\n");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn deeply_nested_template_actions() {
 		#[template]
 		fn Level3(
@@ -277,7 +277,7 @@ mod test {
 	}
 
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn with_template() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
@@ -294,7 +294,7 @@ mod test {
 				"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
 			);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn middleware() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)

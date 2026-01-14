@@ -78,7 +78,7 @@ pub async fn timeout<F: Future>(
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[crate::test]
 	async fn timeout_completes_before_timeout() {
 		async_ext::timeout(Duration::from_millis(100), async {
 			time_ext::sleep(Duration::from_millis(10)).await;
@@ -89,7 +89,7 @@ mod test {
 		.xpect_eq(42);
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn timeout_exceeds_timeout() {
 		async_ext::timeout(Duration::from_millis(10), async {
 			time_ext::sleep(Duration::from_millis(100)).await;

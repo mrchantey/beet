@@ -253,7 +253,7 @@ mod test {
 	use beet_net::prelude::*;
 
 	#[cfg(feature = "server")]
-	#[sweet::test(timeout_ms = 10000)]
+	#[beet_core::test(timeout_ms = 10000)]
 	async fn test_default_router() {
 		let mut world = RouterPlugin::world();
 		world.insert_resource(pkg_config!());
@@ -286,7 +286,7 @@ mod test {
 		stat("/foobar").await.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test(timeout_ms = 5000)]
+	#[beet_core::test(timeout_ms = 5000)]
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())

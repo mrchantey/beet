@@ -298,14 +298,14 @@ mod test {
 	use super::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn works() {
 		let provider = S3Provider::create().await;
 		bucket_test::run(provider).await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn infra_bucket() -> Result<()> {
 		let client = S3Provider::create().await;
@@ -324,7 +324,7 @@ mod test {
 		Ok(())
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() -> Result<()> {
 		let bucket_name: &str = "beet-test";

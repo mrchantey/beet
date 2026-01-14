@@ -419,7 +419,7 @@ mod test {
 mod test_async {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[crate::test]
 	async fn fails() {
 		let err_str = ReadDir::default()
 			.read_async(fs_ext::test_dir().join("foo"))
@@ -430,7 +430,7 @@ mod test_async {
 		err_str.contains("test_dir/foo").xpect_true();
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn dirs() {
 		let err_str = ReadDir::dirs_async(fs_ext::test_dir().join("foo"))
 			.await
@@ -445,7 +445,7 @@ mod test_async {
 			.xpect_eq(2);
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn read_dir_recursive() {
 		ReadDir::dirs_recursive_async(fs_ext::test_dir())
 			.await
@@ -454,7 +454,7 @@ mod test_async {
 			.xpect_eq(2);
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn files() {
 		ReadDir::files_async(fs_ext::test_dir())
 			.await
@@ -463,7 +463,7 @@ mod test_async {
 			.xpect_eq(3);
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn files_recursive() {
 		ReadDir::files_recursive_async(fs_ext::test_dir())
 			.await

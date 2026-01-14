@@ -34,4 +34,3 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-sweet = {workspace = true, features=["runner"]}

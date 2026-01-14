@@ -271,20 +271,20 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn text_to_text() {
 		test_utils::text_to_text(OpenAiAgent::from_env()).await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn textfile_to_text() {
 		test_utils::textfile_to_text(OpenAiAgent::from_env()).await;
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn image_to_text() {
 		test_utils::image_to_text(OpenAiAgent::from_env()).await;
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "30c a pop"]
 	async fn text_to_image() {
 		println!("testing text_to_image, this may take over a minute");

@@ -42,7 +42,7 @@ fn wasm_bindgen() -> impl Bundle {
 				path_ext::assert_exists(&exe_path)?;
 				let cmd_config = CommandConfig::new("wasm-bindgen")
 					.arg("--out-dir")
-					.arg(sweet_target_dir().to_string_lossy())
+					.arg(wasm_runner_target_dir().to_string_lossy())
 					.arg("--out-name")
 					.arg("bindgen")
 					.arg("--target")
@@ -84,7 +84,7 @@ fn init_deno() -> impl Bundle {
 				if !deno_installed {
 					bevybail!(
 						"
-🦖 Sweet uses Deno for the wasm runner 🦖
+🦖 Beet uses Deno for the wasm runner 🦖
 
 Install Deno via:
 shell: 				curl -fsSL https://deno.land/install.sh | sh
@@ -126,14 +126,14 @@ fn run_deno() -> impl Bundle {
 	)
 }
 
-fn sweet_target_dir() -> PathBuf {
+fn wasm_runner_target_dir() -> PathBuf {
 	let mut path = workspace_root();
-	path.push("target/sweet");
+	path.push("target/wasm-runner");
 	path
 }
 
 fn deno_runner_path() -> PathBuf {
-	let mut path = sweet_target_dir();
+	let mut path = wasm_runner_target_dir();
 	path.push("deno.ts");
 	path
 }
@@ -147,6 +147,6 @@ mod test {
 		deno_runner_path()
 			.to_string_lossy()
 			.replace("\\", "/")
-			.xpect_ends_with("target/sweet/deno.ts");
+			.xpect_ends_with("target/wasm-runner/deno.ts");
 	}
 }

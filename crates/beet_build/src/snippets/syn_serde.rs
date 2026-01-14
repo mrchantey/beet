@@ -129,7 +129,7 @@ mod test {
 		item: Unspan<Item>,
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	fn test_item_serde_roundtrip() {
 		let original_item: Item = syn::parse_quote!(
 			fn test_function() {
@@ -156,7 +156,7 @@ mod test {
 		serde_json::from_str::<ItemWrapper>(invalid_json).xpect_err();
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	fn test_serialize_complex_item() {
 		let complex_item: Item = syn::parse_quote! {
 			#[derive(Debug)]

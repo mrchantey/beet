@@ -167,7 +167,7 @@ mod tests {
 	}
 
 	#[ignore = "requires dom"]
-	#[sweet::test]
+	#[crate::test]
 	async fn yields_timestamps() {
 		// Ensure clean DOM (not strictly required for RAF, but keeps parity with other tests)
 		document_ext::clear_body();

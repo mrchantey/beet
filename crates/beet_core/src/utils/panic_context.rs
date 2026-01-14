@@ -180,7 +180,7 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 
 
 #[cfg(test)]
-// sweet wasm runner uses PanicContext so cant test properly
+// wasm test runner uses PanicContext so cant test properly
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
 	use crate::prelude::*;
@@ -197,7 +197,7 @@ mod tests {
 	}
 
 
-	#[sweet::test]
+	#[crate::test]
 	async fn works_async() {
 		PanicContext::catch_async(async { Ok(()) })
 			.await

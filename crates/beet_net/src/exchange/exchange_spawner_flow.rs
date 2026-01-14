@@ -88,7 +88,7 @@ mod test {
 	use beet_core::prelude::*;
 
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn flow_inserts_response() {
 		use beet_flow::prelude::*;
@@ -113,7 +113,7 @@ mod test {
 			.xpect_eq(StatusCode::ImATeapot);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn flow_outcome_pass() {
 		use beet_flow::prelude::*;
 		ServerPlugin::world()
@@ -124,7 +124,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn flow_outcome_fail() {
 		use beet_flow::prelude::*;
 		ServerPlugin::world()
@@ -135,7 +135,7 @@ mod test {
 			.xpect_eq(StatusCode::InternalError);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn agent_is_separate_from_action_root() {
 		use beet_flow::prelude::*;

@@ -142,7 +142,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let dir = "target/tests/beet_net/test-bucket-001";
 		let provider =

@@ -41,8 +41,8 @@ Beet is a rust project built on the bevy game engine
 
 ## Testing
 
-- We use the custom `sweet` test runner and matchers in all crates.
-- sweet cannot run doctests, so always specify either `--lib` or `--test` for wasm
+- We use the custom `beet_core::testing` test runner and matchers in all crates.
+- beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
 - for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders)
@@ -52,10 +52,10 @@ Beet is a rust project built on the bevy game engine
 - Do not add the `test` prefix to function names
 		-	good: `adds_numbers`
 		- bad: `test_adds_numbers`
-- Sweet uses method chaining matchers instead of `assert!`:
+- Beet uses method chaining matchers instead of `assert!`:
 	- `some().long().chain().xpect_true();`
 	- `some().long().chain().xpect_close(0.300001);`
-- Sweet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
+- Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
 
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.

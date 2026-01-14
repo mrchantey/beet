@@ -1,7 +1,7 @@
 //! An integration test for lang snippets roudtrip,
 //! and also a demostration of using BuildPlugin and ApplyDirectives together
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_build::prelude::*;
 use beet_core::prelude::*;
 use beet_rsx::prelude::*;

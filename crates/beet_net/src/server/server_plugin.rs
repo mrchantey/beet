@@ -117,7 +117,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn http_server() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();

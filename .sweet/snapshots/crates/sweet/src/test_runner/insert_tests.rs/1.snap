@@ -1,6 +1,0 @@
-bevy_ecs::hierarchy::Children
-  bevy_ecs::hierarchy::ChildOf, bevy_ecs::name::Name, beet_core::utils::file_span::FileSpan, sweet::test_runner::insert_tests::Test, sweet::test_runner::insert_tests::NonSendTestFunc
-  bevy_ecs::hierarchy::ChildOf, bevy_ecs::name::Name, beet_core::utils::file_span::FileSpan, sweet::test_runner::insert_tests::Test, sweet::test_runner::insert_tests::NonSendTestFunc
-  bevy_ecs::hierarchy::ChildOf, bevy_ecs::name::Name, beet_core::utils::file_span::FileSpan, sweet::test_runner::insert_tests::Test, sweet::test_runner::insert_tests::NonSendTestFunc
-  bevy_ecs::hierarchy::ChildOf, bevy_ecs::name::Name, beet_core::utils::file_span::FileSpan, sweet::test_runner::insert_tests::Test, sweet::test_runner::insert_tests::NonSendTestFunc
-  bevy_ecs::hierarchy::ChildOf, bevy_ecs::name::Name, beet_core::utils::file_span::FileSpan, sweet::test_runner::insert_tests::Test, sweet::test_runner::insert_tests::NonSendTestFunc

@@ -71,5 +71,4 @@ bevy = { workspace = true, features = ["bevy_scene"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-sweet = { workspace = true, features = ["runner", "tokens"] }
 send_wrapper.workspace = true

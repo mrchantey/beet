@@ -263,7 +263,7 @@ mod test {
 	use std::time::Duration;
 	use std::time::Instant;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let server = HttpServer::new_test();
 
@@ -295,7 +295,7 @@ mod test {
 				.xpect_ok();
 		}
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn stream_roundtrip() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();
@@ -325,7 +325,7 @@ mod test {
 	}
 
 	// asserts stream behavior with timestamps and delays
-	#[sweet::test]
+	#[beet_core::test]
 	async fn stream_timestamp() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();

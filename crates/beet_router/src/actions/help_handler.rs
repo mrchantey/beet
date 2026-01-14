@@ -519,7 +519,7 @@ mod test {
 	use super::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn help_shows_matching_endpoints() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -544,7 +544,7 @@ mod test {
 		response.xpect_contains("The bar command");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn help_format_http() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -566,7 +566,7 @@ mod test {
 		response.xpect_contains("Create user");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn help_with_params() {
 		#[derive(Reflect)]
 		struct TestParams {
@@ -596,7 +596,7 @@ mod test {
 		response.xpect_contains(", -f");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn no_help_passes_through() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -613,7 +613,7 @@ mod test {
 		response.xpect_eq("foo response");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn kebab_case_params_work() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -637,7 +637,7 @@ mod test {
 		response2.xpect_contains("GET");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn full_kebab_case_flow_integration() {
 		// demonstrates the complete kebab-case parameter system:
 		// 1. struct fields use snake_case

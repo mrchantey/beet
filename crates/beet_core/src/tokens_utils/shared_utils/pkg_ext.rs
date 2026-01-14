@@ -43,8 +43,6 @@ pub fn is_internal() -> bool {
 		"beet_rsx_combinator",
 		"beet_router",
 		"beet_spatial",
-		"sweet",
-		"sweet_macros",
 	];
 	let current_pkg = std::env::var("CARGO_PKG_NAME").unwrap();
 	INTERNAL_PKGS.contains(&current_pkg.as_str())

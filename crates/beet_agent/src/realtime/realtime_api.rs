@@ -44,7 +44,7 @@ mod test {
 	use crate::realtime::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		use crate::realtime::types::RealtimeSessionCreateRequest;
 

@@ -21,43 +21,43 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-    - name: 📂 Checkout
-      uses: actions/checkout@v4
-    - name: 📂 Cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        # TODO - once the beet cli is binstallable we should be able to share cache between workflows because setup will be cheap
-        key: ${{ runner.os }}-cargo-${{ github.workflow }}-${{ hashFiles('**/Cargo.lock') }}-v0
-    # - name: 🔨 Install Bevy Dependencies
-    #   if: runner.os == 'Linux'
-    #   run: sudo apt-get update; sudo apt-get install --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 mold
-    - name: 🔨📋 Install Just
-      uses: extractions/setup-just@v1
-    - name: 🔨 Install Deno
-      uses: denoland/setup-deno@v2
-      with:
-        deno-version: v2.x  
-    - name: 🔨 Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        default: true
-    - name: 🔨 Add wasm target
-      run: rustup target add wasm32-unknown-unknown
-    - name: 🔨 Install cargo binstall
-      uses: cargo-bins/cargo-binstall@main
-    - name: 🔨 Install wasm bindgen cli
-      run: cargo binstall wasm-bindgen-cli --version 0.2.104    || true
-    - name: 🔨 Install sweet cli
-      run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
-    - name: 📋 Init repo
-      run: just init-flow
-    - name: 🔎 Test
-      run: just test-flow
+      - name: 📂 Checkout
+        uses: actions/checkout@v4
+      - name: 📂 Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          # TODO - once the beet cli is binstallable we should be able to share cache between workflows because setup will be cheap
+          key: ${{ runner.os }}-cargo-${{ github.workflow }}-${{ hashFiles('**/Cargo.lock') }}-v0
+      # - name: 🔨 Install Bevy Dependencies
+      #   if: runner.os == 'Linux'
+      #   run: sudo apt-get update; sudo apt-get install --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 mold
+      - name: 🔨📋 Install Just
+        uses: extractions/setup-just@v1
+      - name: 🔨 Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: 🔨 Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          default: true
+      - name: 🔨 Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: 🔨 Install cargo binstall
+        uses: cargo-bins/cargo-binstall@main
+      - name: 🔨 Install wasm bindgen cli
+        run: cargo binstall wasm-bindgen-cli --version 0.2.104    || true
+      - name: 🔨 Install beet cli
+        run: cargo binstall beet-cli --version 0.3.0-rc.3        || true
+      - name: 📋 Init repo
+        run: just init-flow
+      - name: 🔎 Test
+        run: just test-flow

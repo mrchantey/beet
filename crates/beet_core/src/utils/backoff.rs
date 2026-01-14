@@ -683,7 +683,7 @@ mod tests {
 		(counter.load(Ordering::SeqCst) >= 3).xpect_true();
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn retry_async_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -750,7 +750,7 @@ mod tests {
 		it.next().xpect_eq(None);
 	}
 
-	#[sweet::test]
+	#[crate::test]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]
 		let mut backoff = Backoff::new(

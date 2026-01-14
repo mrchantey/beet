@@ -44,7 +44,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 mod tests {
 	use super::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn cli_server_works() {
 		App::new()

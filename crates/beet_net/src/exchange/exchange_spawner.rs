@@ -155,7 +155,7 @@ mod test {
 			.await
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	async fn works() {
 		parse(ExchangeSpawner::new_handler(|_, _| {

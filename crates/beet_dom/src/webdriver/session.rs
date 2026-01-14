@@ -293,7 +293,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		App::default()
 			.run_io_task_local(async move {

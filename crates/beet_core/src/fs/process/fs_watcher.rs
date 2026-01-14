@@ -54,6 +54,7 @@ impl FsWatcher {
 				.with_exclude("*.git*")
 				// temp until we get fine grained codegen control
 				.with_exclude("*codegen*")
+				.with_exclude("*.beet*")
 				.with_exclude("*rustc-ice-*")
 				.with_exclude("*target*"),
 			// avoid short burst refreshing
@@ -299,7 +300,7 @@ mod test {
 	use crate::prelude::*;
 
 	/// this one is notoriously flaky
-	#[sweet::test]
+	#[crate::test]
 	async fn works() {
 		let mut app = App::new();
 		let tempdir = TempDir::new().unwrap();

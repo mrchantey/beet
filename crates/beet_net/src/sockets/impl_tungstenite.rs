@@ -316,7 +316,7 @@ mod tests {
 	use beet_core::prelude::*;
 	use bytes::Bytes;
 
-	#[sweet::test]
+	#[beet_core::test]
 	fn maps_messages_roundtrip() {
 		let text = Message::text("hello");
 		let bin = Message::binary(vec![1u8, 2, 3]);

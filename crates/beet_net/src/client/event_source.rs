@@ -17,7 +17,7 @@ mod test {
 	use beet_core::prelude::*;
 	use bevy::tasks::futures_lite::StreamExt;
 
-	#[sweet::test]
+	#[beet_core::test]
 	// TODO spin up our own server for tests
 	#[ignore = "hits network"]
 	async fn works() {

@@ -31,4 +31,4 @@ strum_macros.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
-sweet = {workspace = true, features=["runner"]}
+beet_core = { workspace = true, features = ["testing"] }

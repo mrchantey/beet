@@ -214,22 +214,22 @@ fn gemini_message_request(
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn text_to_text() {
 		test_utils::text_to_text(GeminiAgent::from_env()).await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn textfile_to_text() {
 		test_utils::textfile_to_text(GeminiAgent::from_env()).await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn image_to_text() {
 		test_utils::image_to_text(GeminiAgent::from_env()).await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn text_to_image() {
 		test_utils::text_to_image(
 			GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE),

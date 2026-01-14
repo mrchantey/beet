@@ -86,7 +86,7 @@ mod test {
 	use crate::prelude::*;
 	use std::time::Duration;
 
-	#[sweet::test]
+	#[crate::test]
 	pub async fn works() {
 		lifecycle_ext::future_timeout(
 			|| async {
@@ -99,7 +99,7 @@ mod test {
 		.unwrap()
 		.xpect_eq(39);
 	}
-	#[sweet::test]
+	#[crate::test]
 	pub async fn times_out() {
 		lifecycle_ext::future_timeout(
 			|| async {

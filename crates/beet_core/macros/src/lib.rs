@@ -1,11 +1,13 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 mod action;
 mod bundle_effect;
 mod entity_target_event;
+mod macros;
 mod sendit;
 mod to_tokens;
 mod utils;
+use macros::*;
 
 #[path = "../../src/tokens_utils/shared_utils/mod.rs"]
 pub(crate) mod shared_utils;
@@ -145,4 +147,46 @@ pub fn entity_target_event(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	entity_target_event::impl_entity_target_event(input).into()
+}
+
+/// A unified macro for handling all test cases:
+/// - sync native
+/// - sync wasm
+/// - async native
+/// - async wasm
+///
+/// In the case of sync tests this simply replaces `#[beet_core::sweet_test]` with `#[test]`.
+///
+/// ## Parameters
+///
+/// - `timeout_ms`: Optional per-test timeout in milliseconds. Overrides suite-level timeout.
+///
+/// ```ignore
+/// # use beet_core::prelude::*;
+///
+/// #[beet_core::sweet_test]
+/// fn my_test() {
+/// 	assert_eq!(2 + 2, 4);
+/// }
+///
+/// #[beet_core::sweet_test]
+/// async fn my_async_test() {
+/// 	// some cross-platform async function 🥳
+/// }
+///
+/// #[beet_core::sweet_test(timeout_ms = 100)]
+/// async fn my_quick_test() {
+/// 	// this test will timeout after 100ms
+/// }
+///
+///
+/// ```
+#[proc_macro_attribute]
+pub fn sweet_test(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	parse_sweet_test(attr, input)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
 }

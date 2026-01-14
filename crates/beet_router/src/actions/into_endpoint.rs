@@ -280,13 +280,13 @@ mod test {
 			.status()
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn response() {
 		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
 	}
 
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn system() {
 		fn my_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::Ok }
 		assert(|| my_system).await.xpect_eq(StatusCode::Ok);
@@ -295,14 +295,14 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn cx_system() {
 		assert(|| |_: Json<Foo>, _: AsyncEntity| StatusCode::Ok)
 			.await
 			.xpect_eq(StatusCode::Ok);
 		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn async_system() {
 		async fn my_async_system(_: Json<Foo>, _: AsyncEntity) -> StatusCode {
 			StatusCode::Ok
@@ -313,7 +313,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn html() {
 		// just check compilation, see html_bundle for test
 		let _ = assert(|| || rsx! {<div>"hello world"</div>});

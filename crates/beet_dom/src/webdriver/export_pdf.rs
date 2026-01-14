@@ -175,7 +175,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn export_pdf_generates_valid_pdf() {
 		App::default()
 			.run_io_task_local(async move {
@@ -197,7 +197,7 @@ mod test {
 			.await;
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn export_pdf_with_custom_options() {
 		App::default()
 			.run_io_task_local(async move {

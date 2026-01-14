@@ -3,10 +3,10 @@
 # jobs = 8
 
 [target.wasm32-unknown-unknown]
-# this uses sweet for cargo run and cargo test
-runner = 'sweet run-wasm'
-# uncomment this line when developing the runner
-# runner = 'cargo run -p sweet-cli -- run-wasm'
+# wasm runner for cargo run and cargo test
+# uncomment during development
+runner = 'cargo run -p beet-cli -- run-wasm'
+#runner = 'beet run-wasm'
 rustflags = [
 	# remove in getrandom 0.3.4
 	"--cfg",

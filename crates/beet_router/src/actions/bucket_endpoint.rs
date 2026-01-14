@@ -81,7 +81,7 @@ mod test {
 	use beet_net::prelude::*;
 
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn serves_fs() {
 		let bucket = Bucket::new_test().await;
 		let body = "body { color: red; }";
@@ -98,7 +98,7 @@ mod test {
 			.xpect_eq(body);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn html() {
 		let bucket = Bucket::new_test().await;
 		let body = "<h1>Hello, world!</h1>";
@@ -120,7 +120,7 @@ mod test {
 			.xpect_eq(body);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn as_fallback() {
 		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("/index.html");
@@ -137,7 +137,7 @@ mod test {
 			.xpect_str("<div>fallback</div>");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn remove_prefix() {
 		let bucket = Bucket::new_test().await;
 		let path = RoutePath::from("bar/index.html");

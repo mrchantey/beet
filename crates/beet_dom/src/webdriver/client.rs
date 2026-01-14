@@ -241,7 +241,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	#[ignore = "smoketest"]
 	async fn firefox() {
 		let client = Client::firefox();
@@ -250,7 +250,7 @@ mod test {
 		session.kill().await.unwrap();
 		client.kill().unwrap();
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	// #[ignore = "smoketest"]
 	async fn chromium() {
 		let client = ClientProcess::new_with_opts(Client {

@@ -105,7 +105,7 @@ mod test {
 	use beet_net::exports::http;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn fallback_no_response() {
 		// request no response
 		RouterPlugin::world()
@@ -121,7 +121,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn fallback_request_consumed() {
 		// request already consumed
 		RouterPlugin::world()
@@ -142,7 +142,7 @@ mod test {
 			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn is_ssr_true() {
 		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssr))
@@ -158,7 +158,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn is_ssr_false() {
 		RouterPlugin::world()
 			.xtap(|world| world.insert_resource(RenderMode::Ssg))
@@ -174,7 +174,7 @@ mod test {
 			.xpect_eq(StatusCode::InternalError);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn contains_handler_bundle_pass() {
 		use beet_rsx::prelude::HtmlBundle;
 		// Test that the predicate passes when an upstream action spawns HtmlBundle
@@ -206,7 +206,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn contains_handler_bundle_fail() {
 		// Test that the predicate fails when no HtmlBundle child exists
 		RouterPlugin::world()

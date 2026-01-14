@@ -227,20 +227,17 @@ fn ollama_message_request(
 mod test {
 	use crate::prelude::*;
 
-	#[sweet::test]
-	#[ignore = "sweet test timeout too short for ollama"]
+	#[beet_core::test(timeout_ms = 15_000)]
 	async fn text_to_text() {
 		test_utils::text_to_text(OllamaAgent::from_env()).await;
 	}
 
-	#[sweet::test]
-	#[ignore = "sweet test timeout too short for ollama"]
+	#[beet_core::test(timeout_ms = 15_000)]
 	async fn textfile_to_text() {
 		test_utils::textfile_to_text(OllamaAgent::from_env()).await;
 	}
 
-	#[sweet::test]
-	#[ignore = "requires specific model and longer timeout"]
+	#[beet_core::test(timeout_ms = 15_000)]
 	async fn text_to_text_qwen() {
 		test_utils::text_to_text(
 			OllamaAgent::from_env()

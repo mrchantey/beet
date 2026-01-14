@@ -188,7 +188,7 @@ mod tests {
 	}
 
 	#[ignore = "requires dom"]
-	#[sweet::test]
+	#[crate::test]
 	async fn works_async() {
 		doc::clear_body();
 

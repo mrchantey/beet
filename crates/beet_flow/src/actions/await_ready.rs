@@ -123,7 +123,7 @@ mod test {
 		observed.get_index(0).unwrap().xpect_eq(Outcome::Pass);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn await_ready_waits_for_actions() {
 		let store = Store::default();
 		let mut world =

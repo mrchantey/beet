@@ -397,7 +397,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn simple() {
 		let _ = EndpointBuilder::new(|| {});
 		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
@@ -410,7 +410,7 @@ mod test {
 			.xpect_eq(StatusCode::Ok);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn dynamic_path() {
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| {
@@ -430,7 +430,7 @@ mod test {
 			.xpect_eq("bing");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn children() {
 		use beet_flow::prelude::*;
 
@@ -449,7 +449,7 @@ mod test {
 		entity.oneshot_str("/bar").await.xpect_eq("bar");
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
 		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
@@ -482,7 +482,7 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::InternalError);
 	}
-	#[sweet::test]
+	#[beet_core::test]
 	async fn middleware_allows_trailing() {
 		use beet_flow::prelude::*;
 
@@ -543,7 +543,7 @@ mod test {
 		]);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn response_exists() {
 		// Simple test to verify Response exists after endpoint
 		RouterPlugin::world()

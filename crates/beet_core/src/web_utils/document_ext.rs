@@ -243,7 +243,7 @@ mod tests {
 	}
 
 	#[ignore = "requires dom"]
-	#[sweet::test]
+	#[crate::test]
 	async fn adds_script_and_style() {
 		document_ext::clear_body();
 		let _script =

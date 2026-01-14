@@ -323,7 +323,7 @@ mod tests {
 		}
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn message_conversions() {
 		Message::from("hello")
 			.xmap(|m| matches!(m, Message::Text(s) if s == "hello"))
@@ -340,7 +340,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn socket_stream_empty() {
 		let reader = stream::empty::<Result<Message>>();
 		let mut socket = Socket::new(reader, DummyWriter::default());
@@ -349,7 +349,7 @@ mod tests {
 		next.is_none().xpect_true();
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn sending_records_messages() {
 		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
@@ -365,7 +365,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn closing_records_reason() {
 		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
@@ -380,7 +380,7 @@ mod tests {
 		writer.closed.get().unwrap().xpect_eq(frame);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn split_send_and_read() {
 		let reader = stream::iter(vec![
 			Ok(Message::text("a")),
@@ -405,7 +405,7 @@ mod tests {
 		writer.sent.len().xpect_eq(1usize);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	async fn split_close() {
 		let reader = stream::empty::<Result<Message>>();
 		let writer = DummyWriter::default();
@@ -421,7 +421,7 @@ mod tests {
 		writer.closed.get().unwrap().xpect_eq(frame);
 	}
 
-	#[sweet::test]
+	#[beet_core::test]
 	// #[ignore="hits public api"]
 	async fn echo_endpoint() {
 		let url = "wss://echo.websocket.org";

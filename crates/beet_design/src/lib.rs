@@ -1,5 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(test, test_runner(beet_core::test_runner))]
 // #![deny(missing_docs)]
 /// Color theme and utilities
 pub mod color;
