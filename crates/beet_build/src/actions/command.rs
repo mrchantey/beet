@@ -224,7 +224,7 @@ impl CommandRunner<'_, '_> {
 		info!("{} {} {}", envs_pretty, cmd, args.join(" "));
 		// 1. spawn the command
 		let mut cmd = async_process::Command::new(&cmd);
-		cmd.args(&args).envs(envs);
+		cmd.args(&args).envs(envs).kill_on_drop(true);
 		if let Some(dir) = current_dir {
 			cmd.current_dir(dir);
 		}

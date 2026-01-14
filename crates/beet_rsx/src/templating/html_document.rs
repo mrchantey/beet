@@ -155,6 +155,7 @@ pub(super) fn insert_hydration_scripts(
 		commands
 			.entity(doc)
 			// will be hoisted to correct location
+			.with_child(js_runtime_script())
 			.with_child(event_playback_script(&html_constants))
 			.with_child(load_wasm_script(&html_constants));
 	}
@@ -168,6 +169,12 @@ globalThis.{event_handler} = (id,event) => globalThis.{event_store}.push([id, ev
 "#,
 		event_store = html_constants.event_store,
 		event_handler = html_constants.event_handler,
+	))
+}
+
+fn js_runtime_script() -> impl Bundle {
+	script(include_str!(
+		"../../../../crates/beet_core/src/web_utils/js_runtime_browser.js"
 	))
 }
 
