@@ -114,21 +114,21 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[sweet::test]
 	fn timeout_sync_completes() {
-		let result =
-			time_ext::timeout_sync(|| Ok(()), Duration::from_millis(100));
-		result.unwrap().xpect(PanicResult::Ok);
+		time_ext::timeout_sync(|| Ok(()), Duration::from_millis(100))
+			.unwrap()
+			.xpect_eq(PanicResult::Ok);
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
 	#[sweet::test]
 	fn timeout_sync_times_out() {
-		let result = time_ext::timeout_sync(
+		time_ext::timeout_sync(
 			|| {
 				std::thread::sleep(Duration::from_millis(200));
 				Ok(())
 			},
 			Duration::from_millis(10),
-		);
-		result.unwrap_err();
+		)
+		.unwrap_err();
 	}
 }

@@ -33,8 +33,6 @@ bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
-# only uncomment when needed, cyclic dev deps break rust analyzer in weird ways
-# _sweet_runner = ["sweet/runner"]
 
 fs = [
 	"dep:notify",
@@ -178,7 +176,9 @@ web-sys = {workspace = true, features = [
 
 [dev-dependencies]
 beet_core = {path = ".", features=["testing", "rand"]}
-sweet.workspace = true
+# sweet.workspace = true
+# only uncomment when needed, cyclic dev deps break rust analyzer in weird ways
+sweet = { workspace = true, features = ["runner"] }
 # abs_path serde roundtrip
 serde_json.workspace = true
 
