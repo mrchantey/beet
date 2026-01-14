@@ -7,11 +7,12 @@
 #![cfg_attr(feature = "aws", feature(if_let_guard))]
 
 
+mod client;
 mod exchange;
 mod object_storage;
 mod server;
 pub mod sockets;
-mod client;
+mod status_code;
 
 pub mod prelude {
 
@@ -34,7 +35,7 @@ pub mod prelude {
 	// pub use crate::transport::*;
 
 	// reexport common types
-	pub use http::StatusCode;
+	pub use crate::status_code::StatusCode;
 	pub use http::header;
 	pub use url::Url;
 	pub use uuid::Uuid;

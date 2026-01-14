@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs"]
+default = ["serde", "fs", "http"]
 # for conditional compilation in hooks
 client = []
 server = [
@@ -87,7 +87,7 @@ serde_urlencoded = { version = "0.7", optional = true }
 
 
 # http
-http.workspace = true
+http = { workspace = true, optional = true }
 http-body-util.workspace = true
 bytes.workspace = true
 url = "2"

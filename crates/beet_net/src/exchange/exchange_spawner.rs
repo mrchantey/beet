@@ -128,7 +128,7 @@ impl ExchangeSpawner {
 			Response::new(
 				ResponseParts {
 					parts: req.parts().parts().clone(),
-					status: StatusCode::OK,
+					status: StatusCode::Ok,
 				},
 				req.body,
 			)
@@ -156,12 +156,13 @@ mod test {
 	}
 
 	#[sweet::test]
+	#[cfg(feature = "http")]
 	async fn works() {
 		parse(ExchangeSpawner::new_handler(|_, _| {
-			StatusCode::IM_A_TEAPOT.into()
+			StatusCode::Http(http::StatusCode::IM_A_TEAPOT).into()
 		}))
 		.await
 		.status()
-		.xpect_eq(StatusCode::IM_A_TEAPOT);
+		.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
 	}
 }

@@ -130,7 +130,7 @@ where
 				Ok(Err(err))
 			}
 			// successful request, handler succeeded
-			status if status.is_success() => {
+			status if status.is_ok() => {
 				res.json::<JsonResult<Res, Err>>().await?.result.xok()
 			}
 			// failed request

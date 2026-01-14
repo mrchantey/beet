@@ -45,18 +45,19 @@ mod tests {
 	use super::*;
 
 	#[sweet::test]
+	#[cfg(feature = "http")]
 	async fn cli_server_works() {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
 				CliServer,
 				ExchangeSpawner::new_handler(|_, _| {
-					StatusCode::IM_A_TEAPOT.into()
+					StatusCode::Http(http::StatusCode::IM_A_TEAPOT).into()
 				}),
 			))
 			.run_async()
 			.await
-			.xpect_eq(AppExit::Error(209.try_into().unwrap()));
+			.xpect_eq(AppExit::Error(1.try_into().unwrap()));
 	}
 
 	#[test]

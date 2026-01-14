@@ -216,7 +216,7 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 						(false, None) => {
 							world.entity_mut(agent).insert(
 								Response::from_status_body(
-									StatusCode::BAD_REQUEST,
+									StatusCode::MalformedRequest,
 									b"Origin header not found",
 									"text/plain",
 								),
@@ -232,7 +232,7 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 					if !config.origin_allowed(&origin) {
 						world.entity_mut(agent).insert(
 							Response::from_status_body(
-								StatusCode::FORBIDDEN,
+								StatusCode::Forbidden,
 								b"Origin not allowed",
 								"text/plain",
 							),
@@ -387,7 +387,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 						(false, None) => {
 							world.entity_mut(agent).insert(
 								Response::from_status_body(
-									StatusCode::BAD_REQUEST,
+									StatusCode::MalformedRequest,
 									b"Origin header not found",
 									"text/plain",
 								),
@@ -403,7 +403,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 					if !config.origin_allowed(&origin) {
 						world.entity_mut(agent).insert(
 							Response::from_status_body(
-								StatusCode::FORBIDDEN,
+								StatusCode::Forbidden,
 								b"Origin not allowed",
 								"text/plain",
 							),
@@ -477,7 +477,7 @@ mod test {
 			)
 			.await
 			.xtap(|response| {
-				response.status().xpect_eq(StatusCode::OK);
+				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.get_header("access-control-allow-origin")
 					.unwrap()
@@ -501,7 +501,7 @@ mod test {
 			)
 			.await
 			.status()
-			.xpect_eq(StatusCode::FORBIDDEN);
+			.xpect_eq(StatusCode::Forbidden);
 	}
 
 	#[sweet::test]
@@ -520,7 +520,7 @@ mod test {
 			)
 			.await
 			.xtap(|response| {
-				response.status().xpect_eq(StatusCode::OK);
+				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.get_header("access-control-allow-origin")
 					.unwrap()
@@ -544,7 +544,7 @@ mod test {
 			)
 			.await
 			.xtap(|response| {
-				response.status().xpect_eq(StatusCode::OK);
+				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.get_header("access-control-allow-origin")
 					.unwrap()
@@ -573,7 +573,7 @@ mod test {
 			)
 			.await
 			.xtap(|response| {
-				response.status().xpect_eq(StatusCode::OK);
+				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.get_header("access-control-allow-origin")
 					.unwrap()
@@ -598,7 +598,7 @@ mod test {
 			)
 			.await
 			.xtap(|response| {
-				response.status().xpect_eq(StatusCode::OK);
+				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.get_header("access-control-allow-origin")
 					.unwrap()

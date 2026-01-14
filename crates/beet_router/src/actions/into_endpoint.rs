@@ -282,34 +282,36 @@ mod test {
 	}
 
 	#[sweet::test]
-	async fn response() { assert(|| StatusCode::OK).await.xpect_eq(200); }
+	async fn response() {
+		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
+	}
 
 
 	#[sweet::test]
 	async fn system() {
-		fn my_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::OK }
-		assert(|| my_system).await.xpect_eq(200);
-		assert(|| |_: In<Json<Foo>>| StatusCode::OK)
+		fn my_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::Ok }
+		assert(|| my_system).await.xpect_eq(StatusCode::Ok);
+		assert(|| |_: In<Json<Foo>>| StatusCode::Ok)
 			.await
-			.xpect_eq(200);
-		assert(|| StatusCode::OK).await.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
+		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
 	}
 	#[sweet::test]
 	async fn cx_system() {
-		assert(|| |_: Json<Foo>, _: AsyncEntity| StatusCode::OK)
+		assert(|| |_: Json<Foo>, _: AsyncEntity| StatusCode::Ok)
 			.await
-			.xpect_eq(200);
-		assert(|| StatusCode::OK).await.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
+		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
 	}
 	#[sweet::test]
 	async fn async_system() {
 		async fn my_async_system(_: Json<Foo>, _: AsyncEntity) -> StatusCode {
-			StatusCode::OK
+			StatusCode::Ok
 		}
-		assert(|| my_async_system).await.xpect_eq(200);
-		assert(|| async |_: Json<Foo>, _: AsyncEntity| StatusCode::OK)
+		assert(|| my_async_system).await.xpect_eq(StatusCode::Ok);
+		assert(|| async |_: Json<Foo>, _: AsyncEntity| StatusCode::Ok)
 			.await
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]

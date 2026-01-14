@@ -559,7 +559,7 @@ pub struct ResponseParts {
 impl Default for ResponseParts {
 	fn default() -> Self {
 		Self {
-			status: StatusCode::OK,
+			status: StatusCode::Ok,
 			parts: Parts::default(),
 		}
 	}
@@ -575,35 +575,28 @@ impl ResponseParts {
 	}
 
 	/// Creates an OK (200) response
-	pub fn ok() -> Self { Self::new(StatusCode::OK) }
+	pub fn ok() -> Self { Self::new(StatusCode::Ok) }
 
 	/// Creates a Not Found (404) response
-	pub fn not_found() -> Self { Self::new(StatusCode::NOT_FOUND) }
+	pub fn not_found() -> Self { Self::new(StatusCode::NotFound) }
 
 	/// Creates an Internal Server Error (500) response
-	pub fn internal_error() -> Self {
-		Self::new(StatusCode::INTERNAL_SERVER_ERROR)
-	}
+	pub fn internal_error() -> Self { Self::new(StatusCode::InternalError) }
 
 	/// Creates a Bad Request (400) response
-	pub fn bad_request() -> Self { Self::new(StatusCode::BAD_REQUEST) }
+	pub fn bad_request() -> Self { Self::new(StatusCode::MalformedRequest) }
 
 	/// Returns the status code
 	pub fn status(&self) -> StatusCode { self.status }
 
-	/// Use exit code conventions to map a http status to an exit code
+	/// Use exit code conventions to map a status to an exit code
 	pub fn status_to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
-		let code = match self.status().as_u16() {
-			200..=299 => return Ok(()), // Success
-			400 => 64,                  // Bad request -> usage error
-			401 | 403 => 77,            // Auth issues -> permission denied
-			404 => 66,                  // Not found -> cannot open input
-			408 | 504 => 75,            // Timeout -> temp failure, retry
-			418 => 209,                 // Teapot -> half it just cos
-			500..=599 => 70,            // Server errors -> internal error
-			_ => 1,                     // General error
-		};
-		Err(std::num::NonZeroU8::new(code).unwrap())
+		let code: u8 = self.status().into();
+		if code == 0 {
+			Ok(())
+		} else {
+			Err(std::num::NonZeroU8::new(code).unwrap())
+		}
 	}
 
 	/// Returns a mutable reference to the inner parts
@@ -780,13 +773,14 @@ impl From<&http::request::Parts> for RequestParts {
 // Conversion: http::response::Parts -> ResponseParts
 // ============================================================================
 
+#[cfg(feature = "http")]
 impl From<http::response::Parts> for ResponseParts {
 	fn from(http_parts: http::response::Parts) -> Self {
 		let headers = header_map_to_multimap(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 
 		ResponseParts {
-			status: http_parts.status,
+			status: StatusCode::from(http_parts.status),
 			parts: Parts {
 				scheme: Scheme::None,
 				authority: String::new(),
@@ -799,13 +793,14 @@ impl From<http::response::Parts> for ResponseParts {
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<&http::response::Parts> for ResponseParts {
 	fn from(http_parts: &http::response::Parts) -> Self {
 		let headers = header_map_to_multimap(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 
 		ResponseParts {
-			status: http_parts.status,
+			status: StatusCode::from(http_parts.status),
 			parts: Parts {
 				scheme: Scheme::None,
 				authority: String::new(),
@@ -992,12 +987,15 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn parts_builder_response_parts() {
 		let parts = PartsBuilder::new()
 			.header("content-type", "text/html")
-			.build_response_parts(StatusCode::CREATED);
+			.build_response_parts(StatusCode::Http(http::StatusCode::CREATED));
 
-		parts.status().xpect_eq(StatusCode::CREATED);
+		parts
+			.status()
+			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
 		parts
 			.get_header("content-type")
 			.unwrap()
@@ -1022,13 +1020,13 @@ mod test {
 	#[test]
 	fn response_parts_default() {
 		let parts = ResponseParts::default();
-		parts.status().xpect_eq(StatusCode::OK);
+		parts.status().xpect_eq(StatusCode::Ok);
 	}
 
 	#[test]
 	fn response_parts_not_found() {
 		let parts = ResponseParts::not_found();
-		parts.status().xpect_eq(StatusCode::NOT_FOUND);
+		parts.status().xpect_eq(StatusCode::NotFound);
 	}
 
 	#[test]
@@ -1059,9 +1057,10 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn from_http_response_parts() {
 		let http_parts = http::Response::builder()
-			.status(StatusCode::CREATED)
+			.status(http::StatusCode::CREATED)
 			.header("content-type", "application/json")
 			.body(())
 			.unwrap()
@@ -1070,7 +1069,9 @@ mod test {
 
 		let parts = ResponseParts::from(http_parts);
 
-		parts.status().xpect_eq(StatusCode::CREATED);
+		parts
+			.status()
+			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
 		parts
 			.get_header("content-type")
 			.unwrap()
@@ -1178,14 +1179,15 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
 		let parts = PartsBuilder::new()
 			.header("content-type", "application/json")
-			.build_response_parts(StatusCode::CREATED);
+			.build_response_parts(StatusCode::Http(http::StatusCode::CREATED));
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
-		http_parts.status.xpect_eq(StatusCode::CREATED);
+		http_parts.status.xpect_eq(http::StatusCode::CREATED);
 	}
 
 	#[test]

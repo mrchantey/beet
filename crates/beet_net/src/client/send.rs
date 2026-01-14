@@ -66,7 +66,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -77,7 +77,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -90,7 +90,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -102,7 +102,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -114,7 +114,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 
 		Request::get(format!("{HTTPBIN}/delete"))
 			.with_method(HttpMethod::Delete)
@@ -122,7 +122,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(200);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]

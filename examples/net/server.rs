@@ -36,7 +36,7 @@ fn handler(
 		commands
 			.entity(ev.event_target())
 			.insert(Response::from_status_body(
-				StatusCode::NOT_FOUND,
+				StatusCode::NotFound,
 				format!("Path not found: {}", path),
 				"text/plain",
 			));

@@ -153,7 +153,7 @@ mod test {
 			.oneshot(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]

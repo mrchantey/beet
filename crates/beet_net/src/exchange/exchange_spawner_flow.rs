@@ -50,10 +50,8 @@ impl ExchangeSpawner {
 							// Insert default response if none exists
 							if !has_response.contains(agent) {
 								let status = match ev.event() {
-									Outcome::Pass => StatusCode::OK,
-									Outcome::Fail => {
-										StatusCode::INTERNAL_SERVER_ERROR
-									}
+									Outcome::Pass => StatusCode::Ok,
+									Outcome::Fail => StatusCode::InternalError,
 								};
 								commands
 									.entity(agent)
@@ -91,6 +89,7 @@ mod test {
 
 
 	#[sweet::test]
+	#[cfg(feature = "http")]
 	async fn flow_inserts_response() {
 		use beet_flow::prelude::*;
 		ServerPlugin::world()
@@ -102,7 +101,7 @@ mod test {
 						let action = ev.target();
 						let agent = agents.entity(action);
 						commands.entity(agent).insert(Response::from_status(
-							StatusCode::IM_A_TEAPOT,
+							StatusCode::Http(http::StatusCode::IM_A_TEAPOT),
 						));
 						commands.entity(action).trigger_target(Outcome::Pass);
 					},
@@ -111,7 +110,7 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::IM_A_TEAPOT);
+			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
 	}
 
 	#[sweet::test]
@@ -122,7 +121,7 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -133,10 +132,11 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+			.xpect_eq(StatusCode::InternalError);
 	}
 
 	#[sweet::test]
+	#[cfg(feature = "http")]
 	async fn agent_is_separate_from_action_root() {
 		use beet_flow::prelude::*;
 
@@ -151,9 +151,9 @@ mod test {
 					let agent = agents.entity(action);
 					agent.xpect_not_eq(action);
 					agent.xpect_not_eq(agents.parents.root_ancestor(action));
-					commands
-						.entity(agent)
-						.insert(Response::from_status(StatusCode::IM_A_TEAPOT));
+					commands.entity(agent).insert(Response::from_status(
+						StatusCode::Http(http::StatusCode::IM_A_TEAPOT),
+					));
 					commands.entity(action).trigger_target(Outcome::Pass);
 				},
 			)
@@ -163,6 +163,6 @@ mod test {
 			.oneshot(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::IM_A_TEAPOT);
+			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
 	}
 }

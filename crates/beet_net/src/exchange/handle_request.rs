@@ -267,7 +267,7 @@ async fn handle_request(server: AsyncEntity, request: impl Bundle) -> Response {
 
 	let response = recv.recv().await.unwrap_or_else(|_| {
 		error!("Sender was dropped, was the world dropped?");
-		Response::from_status(StatusCode::INTERNAL_SERVER_ERROR)
+		Response::from_status(StatusCode::InternalError)
 	});
 
 	// cleanup exchange entity after response is received

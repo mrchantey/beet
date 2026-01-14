@@ -124,7 +124,7 @@ impl Default for EndpointBuilder {
 	fn default() -> Self {
 		Self {
 			insert: Box::new(|entity| {
-				entity.insert(StatusCode::OK.into_endpoint_handler());
+				entity.insert(StatusCode::Ok.into_endpoint_handler());
 			}),
 			path: None,
 			params: None,
@@ -408,7 +408,7 @@ mod test {
 			.oneshot(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test]
@@ -462,26 +462,26 @@ mod test {
 			.oneshot(Request::post("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 		// method does not match - returns 500 because single endpoint failure
 		// (404 requires a router with fallback structure)
 		entity
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+			.xpect_eq(StatusCode::InternalError);
 		// path does not match
 		entity
 			.oneshot(Request::get("/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+			.xpect_eq(StatusCode::InternalError);
 		// path has extra parts
 		entity
 			.oneshot(Request::get("/foo/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+			.xpect_eq(StatusCode::InternalError);
 	}
 	#[sweet::test]
 	async fn middleware_allows_trailing() {
@@ -512,7 +512,7 @@ mod test {
 			.oneshot(Request::get("/api/users"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 
 
@@ -551,7 +551,7 @@ mod test {
 			.spawn(ExchangeSpawner::new_flow(|| {
 				(InfallibleSequence, children![
 					EndpointBuilder::get()
-						.with_handler(|| StatusCode::OK.into_response()),
+						.with_handler(|| StatusCode::Ok.into_response()),
 					OnSpawn::observe(
 						|ev: On<GetOutcome>,
 						 agents: AgentQuery,
@@ -572,6 +572,6 @@ mod test {
 			.oneshot(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 }

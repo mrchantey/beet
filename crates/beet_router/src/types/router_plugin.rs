@@ -46,13 +46,13 @@ mod test {
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 		RouterPlugin::world()
 			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Fail)))
 			.oneshot(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+			.xpect_eq(StatusCode::InternalError);
 	}
 
 	#[sweet::test]
@@ -116,6 +116,6 @@ mod test {
 			.await
 			.unwrap()
 			.status()
-			.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
 	}
 }

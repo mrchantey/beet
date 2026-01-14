@@ -131,7 +131,7 @@ pub fn default_router(
 pub fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
 		common_predicates::no_response(),
-		EndpointBuilder::new(StatusCode::NOT_FOUND).with_trailing_path()
+		EndpointBuilder::new(StatusCode::NotFound).with_trailing_path()
 	])
 }
 
@@ -278,12 +278,12 @@ mod test {
 			.await
 			.unwrap();
 		let mut stat = async |val: &str| entity.oneshot(val).await.status();
-		stat("/bingbong").await.xpect_eq(StatusCode::NOT_FOUND);
-		stat("/assets/bing").await.xpect_eq(StatusCode::NOT_FOUND);
+		stat("/bingbong").await.xpect_eq(StatusCode::NotFound);
+		stat("/assets/bing").await.xpect_eq(StatusCode::NotFound);
 		stat("/assets/branding/logo.png")
 			.await
-			.xpect_eq(StatusCode::OK);
-		stat("/foobar").await.xpect_eq(StatusCode::OK);
+			.xpect_eq(StatusCode::Ok);
+		stat("/foobar").await.xpect_eq(StatusCode::Ok);
 	}
 
 	#[sweet::test(timeout_ms = 5000)]

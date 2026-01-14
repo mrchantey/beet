@@ -44,7 +44,7 @@ where
 				.map(|val| Response::ok_body(val, "application/json"))
 				.unwrap_or_else(|_| {
 					Response::from_status_body(
-						StatusCode::INTERNAL_SERVER_ERROR,
+						StatusCode::InternalError,
 						"Failed to serialize response body",
 						"text/plain",
 					)
@@ -186,7 +186,7 @@ mod test {
 			.oneshot(Request::post("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::BAD_REQUEST);
+			.xpect_eq(StatusCode::MalformedRequest);
 	}
 	#[sweet::test]
 	async fn get_sync() {
@@ -214,6 +214,6 @@ mod test {
 			.oneshot(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::BAD_REQUEST);
+			.xpect_eq(StatusCode::MalformedRequest);
 	}
 }

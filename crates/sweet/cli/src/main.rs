@@ -42,7 +42,8 @@ fn sweet_router() -> impl Bundle {
 						Fallback,
 						children![
 							run_wasm(),
-							StatusCode::BAD_REQUEST.into_endpoint_handler(),
+							StatusCode::MalformedRequest
+								.into_endpoint_handler(),
 						]
 					)),
 			])

@@ -40,8 +40,6 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 }
 
 fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {
-	let status = res.status();
-
 	// Build ResponseParts with headers
 	let parts = {
 		let mut builder = PartsBuilder::new();
@@ -50,7 +48,7 @@ fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {
 				builder = builder.header(key.to_string(), value_str);
 			}
 		}
-		builder.build_response_parts(status)
+		builder.build_response_parts(res.status().into())
 	};
 
 	// ureq is synchronous, so just read the whole body into bytes

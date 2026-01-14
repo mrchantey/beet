@@ -3,7 +3,6 @@
 use crate::prelude::*;
 #[allow(unused)]
 use beet_core::prelude::*;
-use http::StatusCode;
 
 pub struct Html<T>(pub T);
 pub struct Css(pub String);
@@ -37,7 +36,11 @@ pub struct JsonResult<T, E> {
 
 
 impl JsonResult<(), ()> {
-	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::IM_A_TEAPOT;
+	#[cfg(feature = "http")]
+	pub const DEFAULT_ERR_STATUS: StatusCode =
+		StatusCode::Http(http::StatusCode::IM_A_TEAPOT);
+	#[cfg(not(feature = "http"))]
+	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::InternalError;
 }
 
 impl<T, E> From<Result<T, E>> for JsonResult<T, E> {

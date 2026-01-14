@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
-use http::StatusCode;
 use tracing::error;
 
 pub type HttpResult<T> = std::result::Result<T, HttpError>;
@@ -38,10 +37,10 @@ impl HttpError {
 			status_code,
 		}
 	}
-	pub fn not_found() -> Self { Self::from_status(StatusCode::NOT_FOUND) }
+	pub fn not_found() -> Self { Self::from_status(StatusCode::NotFound) }
 
 	pub fn bad_request(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::BAD_REQUEST, message)
+		Self::new(StatusCode::MalformedRequest, message)
 	}
 	pub fn internal_error(message: impl Into<String>) -> Self {
 		let message = message.into();
@@ -51,7 +50,7 @@ impl HttpError {
 		#[cfg(debug_assertions)]
 		{
 			Self::new(
-				StatusCode::INTERNAL_SERVER_ERROR,
+				StatusCode::InternalError,
 				format!(
 					"Internal Error: {}\n\nThis error will *not* be returned to the client in release builds.",
 					message
@@ -60,10 +59,7 @@ impl HttpError {
 		}
 		#[cfg(not(debug_assertions))]
 		{
-			Self::new(
-				StatusCode::INTERNAL_SERVER_ERROR,
-				format!("Internal Error"),
-			)
+			Self::new(StatusCode::InternalError, format!("Internal Error"))
 		}
 	}
 
@@ -148,7 +144,16 @@ pub mod status_code_serde {
 	where
 		S: serde::Serializer,
 	{
-		serializer.serialize_u16(status.as_u16())
+		#[cfg(feature = "http")]
+		{
+			let http_status: http::StatusCode = (*status).into();
+			serializer.serialize_u16(http_status.as_u16())
+		}
+		#[cfg(not(feature = "http"))]
+		{
+			let exit_code: u8 = (*status).into();
+			serializer.serialize_u8(exit_code)
+		}
 	}
 
 	#[cfg(feature = "serde")]
@@ -156,7 +161,17 @@ pub mod status_code_serde {
 	where
 		D: serde::Deserializer<'de>,
 	{
-		let code = u16::deserialize(deserializer)?;
-		StatusCode::from_u16(code).map_err(serde::de::Error::custom)
+		#[cfg(feature = "http")]
+		{
+			let code = u16::deserialize(deserializer)?;
+			let http_status = http::StatusCode::from_u16(code)
+				.map_err(serde::de::Error::custom)?;
+			Ok(StatusCode::from(http_status))
+		}
+		#[cfg(not(feature = "http"))]
+		{
+			let code = u8::deserialize(deserializer)?;
+			Ok(StatusCode::from(code))
+		}
 	}
 }
