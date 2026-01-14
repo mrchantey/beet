@@ -103,11 +103,23 @@ pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
 	mut params: ParamQuery<SuiteParams>,
-	mut query: Populated<(Entity, &mut Test, &ChildOf), Without<TestOutcome>>,
+	mut query: Populated<
+		(Entity, &mut Test, &ChildOf, Option<&TestCaseParams>),
+		Without<TestOutcome>,
+	>,
 ) -> Result {
-	for (entity, mut test, parent) in query.iter_mut() {
-		let params = params.get(parent.0)?;
-		let timeout = params.timeout();
+	for (entity, mut test, parent, test_params) in query.iter_mut() {
+		// Check per-test timeout first, then fall back to suite timeout
+		let timeout = if let Some(test_params) = test_params {
+			if let Some(timeout) = test_params.timeout {
+				timeout
+			} else {
+				params.get(parent.0)?.timeout()
+			}
+		} else {
+			params.get(parent.0)?.timeout()
+		};
+
 		test.tick(time.delta());
 		let elapsed = test.elapsed();
 		if elapsed >= timeout {
@@ -171,5 +183,97 @@ mod tests {
 		}))
 		.await
 		.xpect_true();
+	}
+
+	#[sweet::test]
+	async fn per_test_timeout_overrides_suite() {
+		// Suite timeout is 10ms, but per-test timeout is 1000ms
+		// Test sleeps for 50ms, so suite would timeout but per-test won't
+		let test = test_ext::new_auto(|| {
+			register_test_params(TestCaseParams::new().with_timeout_ms(1000));
+			register_async_test(async {
+				time_ext::sleep_millis(50).await;
+				Ok(())
+			});
+			Ok(())
+		});
+
+		test_runner_ext::run(Some("--timeout_ms=10"), test)
+			.await
+			.xpect_eq(TestOutcome::Pass);
+	}
+
+	#[sweet::test]
+	async fn per_test_timeout_enforced() {
+		// Per-test timeout is 10ms, test sleeps for 100ms
+		let test = test_ext::new_auto(|| {
+			register_test_params(TestCaseParams::new().with_timeout_ms(10));
+			register_async_test(async {
+				time_ext::sleep_millis(100).await;
+				unreachable!("should timeout")
+			});
+			Ok(())
+		});
+
+		test_runner_ext::run(Some("--timeout_ms=5000"), test)
+			.await
+			.as_fail()
+			.unwrap()
+			.is_timeout()
+			.xpect_true();
+	}
+
+	#[sweet::test]
+	async fn macro_timeout_enforced() {
+		// Test that per-test timeout from macro attribute works
+		let test = test_ext::new_auto(|| {
+			register_test_params(TestCaseParams::new().with_timeout_ms(10));
+			register_async_test(async {
+				time_ext::sleep_millis(100).await;
+				unreachable!("should timeout")
+			});
+			Ok(())
+		});
+
+		test_runner_ext::run(Some("--timeout_ms=5000"), test)
+			.await
+			.as_fail()
+			.unwrap()
+			.is_timeout()
+			.xpect_true();
+	}
+
+	#[sweet::test]
+	async fn macro_timeout_not_reached() {
+		// Test that per-test timeout allows test to complete if under limit
+		let test = test_ext::new_auto(|| {
+			register_test_params(TestCaseParams::new().with_timeout_ms(5000));
+			register_async_test(async {
+				time_ext::sleep_millis(10).await;
+				Ok(())
+			});
+			Ok(())
+		});
+
+		test_runner_ext::run(Some("--timeout_ms=10"), test)
+			.await
+			.xpect_eq(TestOutcome::Pass);
+	}
+
+	#[sweet::test]
+	async fn macro_timeout_sync() {
+		// Test that per-test timeout works with sync wrapper for async test
+		let test = test_ext::new_auto(|| {
+			register_test_params(TestCaseParams::new().with_timeout_ms(200));
+			register_async_test(async {
+				time_ext::sleep_millis(50).await;
+				Ok(())
+			});
+			Ok(())
+		});
+
+		test_runner_ext::run(Some("--timeout_ms=10"), test)
+			.await
+			.xpect_eq(TestOutcome::Pass);
 	}
 }

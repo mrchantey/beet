@@ -11,6 +11,7 @@ pub use suite_outcome::*;
 pub use test_outcome::*;
 pub use test_plugin::*;
 mod run_tests;
+pub(self) use register_async_test::TestRunResult;
 pub(self) use run_tests::*;
 mod filter_tests;
 pub use filter_tests::*;

@@ -22,6 +22,12 @@ fn it_passes(){
 #[sweet::test]
 async fn foo(){ .. }
 
+// per-test timeout configuration
+#[sweet::test(timeout_ms = 100)]
+async fn fast_test(){
+	// this test will timeout after 100ms
+}
+
 ```
 And then run as normal
 ```sh
@@ -63,6 +69,29 @@ cargo test -p my_crate --target wasm32-unknown-unknown
 ### `runner`
 
 Enables the sweet runner and internal dependencies. With this disabled the runner falls back to the built-in libtest runner.
+
+### Per-Test Timeouts
+
+Individual tests can specify custom timeout values that override the suite-level timeout:
+
+```rust
+#[sweet::test(timeout_ms = 100)]
+async fn quick_test() {
+	// this test will timeout after 100ms instead of the default 5000ms
+	some_async_operation().await;
+}
+
+#[sweet::test(timeout_ms = 30000)]
+async fn slow_integration_test() {
+	// this test can run for up to 30 seconds
+	long_running_operation().await;
+}
+```
+
+The suite-level timeout can be configured via CLI:
+```sh
+cargo test -- --timeout_ms=1000
+```
 
 ## Contributing
 

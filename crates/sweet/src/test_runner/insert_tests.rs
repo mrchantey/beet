@@ -69,6 +69,26 @@ fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 }
 
 
+/// Per-test parameters that can be configured via attributes
+#[derive(Debug, Clone, Component)]
+pub struct TestCaseParams {
+	/// Optional timeout override for this specific test
+	pub timeout: Option<Duration>,
+}
+
+impl Default for TestCaseParams {
+	fn default() -> Self { Self { timeout: None } }
+}
+
+impl TestCaseParams {
+	pub fn new() -> Self { Self::default() }
+
+	pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+		self.timeout = Some(Duration::from_millis(timeout_ms));
+		self
+	}
+}
+
 #[derive(Debug, Component)]
 pub struct Test {
 	/// The test description

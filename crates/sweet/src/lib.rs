@@ -34,7 +34,11 @@ pub use utils::run_libtest_pretty::test_runner;
 #[cfg(feature = "runner")]
 mod test_runner;
 #[cfg(feature = "runner")]
+pub use test_runner::TestCaseParams;
+#[cfg(feature = "runner")]
 pub use test_runner::register_async_test as handle_async_test;
+#[cfg(feature = "runner")]
+pub use test_runner::register_test_params;
 #[cfg(not(feature = "runner"))]
 pub use utils::block_on_async_test as handle_async_test;
 

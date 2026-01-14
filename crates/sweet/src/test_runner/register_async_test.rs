@@ -8,6 +8,17 @@ thread_local! {
 	/// This technique allows an opaque `fn()` provided by libtest to register
 	/// an async tests.
 	static REGISTERED_ASYNC_TEST: RefCell<Option<Pin<Box<dyn AsyncTest>>>> = RefCell::new(None);
+
+	/// A thread-local cell holding test parameters registered by the test macro.
+	static REGISTERED_TEST_PARAMS: RefCell<Option<TestCaseParams>> = RefCell::new(None);
+}
+
+/// Called by the [`sweet::test`] macro to register test parameters.
+#[track_caller]
+pub fn register_test_params(params: TestCaseParams) {
+	REGISTERED_TEST_PARAMS.with(|cell| {
+		*cell.borrow_mut() = Some(params);
+	});
 }
 
 /// Called by the [`sweet::test`] macro in the case its provided an async
@@ -28,6 +39,12 @@ pub(super) enum MaybeAsync {
 	Sync(PanicResult),
 }
 
+/// Result of running a test function, including both outcome and params
+pub(super) struct TestRunResult {
+	pub maybe_async: MaybeAsync,
+	pub params: Option<TestCaseParams>,
+}
+
 
 /// Attempts to run the provided function as a synchronous test.
 ///
@@ -36,7 +53,7 @@ pub(super) enum MaybeAsync {
 /// outside of a provided function.
 pub(super) fn try_run_async(
 	func: impl FnOnce() -> Result<(), String>,
-) -> MaybeAsync {
+) -> TestRunResult {
 	// should already be none, but just incase somebody gets clever
 	REGISTERED_ASYNC_TEST.with(|cell| {
 		// *cell.borrow_mut() = None;
@@ -46,12 +63,28 @@ pub(super) fn try_run_async(
 			);
 		}
 	});
-	let panic_outcome = PanicContext::catch(func);
-	match REGISTERED_ASYNC_TEST.with(|cell| cell.borrow_mut().take()) {
-		Some(async_test) => {
-			MaybeAsync::Async(Box::pin(PanicContext::catch_async(async_test)))
+	REGISTERED_TEST_PARAMS.with(|cell| {
+		if !cell.borrow().is_none() {
+			panic!(
+				"test params were registered outside of a test run. This is not supported"
+			);
 		}
-		None => MaybeAsync::Sync(panic_outcome),
+	});
+
+	let panic_outcome = PanicContext::catch(func);
+
+	let params = REGISTERED_TEST_PARAMS.with(|cell| cell.borrow_mut().take());
+	let maybe_async =
+		match REGISTERED_ASYNC_TEST.with(|cell| cell.borrow_mut().take()) {
+			Some(async_test) => MaybeAsync::Async(Box::pin(
+				PanicContext::catch_async(async_test),
+			)),
+			None => MaybeAsync::Sync(panic_outcome),
+		};
+
+	TestRunResult {
+		maybe_async,
+		params,
 	}
 }
 

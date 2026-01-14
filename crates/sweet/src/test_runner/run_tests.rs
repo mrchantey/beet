@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::test_runner::MaybeAsync;
+use crate::test_runner::TestRunResult;
 use beet_core::prelude::*;
 use bevy::ecs::system::NonSendMarker;
 
@@ -66,7 +67,17 @@ fn run_test(
 	should_panic: test::ShouldPanic,
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result {
-	match super::try_run_async(func) {
+	let TestRunResult {
+		maybe_async,
+		params,
+	} = super::try_run_async(func);
+
+	// Insert test params if provided
+	if let Some(params) = params {
+		commands.entity(entity).insert(params);
+	}
+
+	match maybe_async {
 		MaybeAsync::Sync(panic_result) => {
 			let outcome =
 				TestOutcome::from_panic_result(panic_result, should_panic);
