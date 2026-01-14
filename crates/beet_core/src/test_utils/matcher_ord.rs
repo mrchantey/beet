@@ -1,7 +1,7 @@
 use super::*;
 use std::fmt::Debug;
 
-#[extend::ext(name=SweetOrd)]
+#[extend::ext(name=MatcherOrd)]
 pub impl<T: PartialOrd + Debug + Copy> T {
 	/// Performs an assertion ensuring this value is less than `other`.
 	///

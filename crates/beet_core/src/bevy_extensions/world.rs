@@ -398,7 +398,7 @@ pub impl<W: IntoWorld> W {
 
 
 /// Ease-of-use extensions for `bevy::World`
-#[ext(name=CoreWorldExtSweet)]
+#[ext(name=CoreWorldExt)]
 pub impl World {
 	fn with_observer<E: Event, B: Bundle, M>(
 		mut self,

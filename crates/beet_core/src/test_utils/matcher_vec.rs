@@ -1,6 +1,6 @@
 use super::*;
 use std::fmt::Debug;
-#[extend::ext(name=SweetVec)]
+#[extend::ext(name=MatcherVec)]
 pub impl<T: Debug> Vec<T> {
 	/// Performs an assertion ensuring at least one item in the vec passes the predicate.
 	///

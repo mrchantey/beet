@@ -2,7 +2,7 @@ use super::*;
 use std::fmt::Debug;
 use std::ops::ControlFlow;
 
-#[extend::ext(name=SweetControlFlow)]
+#[extend::ext(name=MatcherControlFlow)]
 pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// Performs an assertion ensuring this value is a `ControlFlow::Continue`.
 	///

@@ -8,17 +8,17 @@ use std::fmt::Debug;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
-#[extend::ext(name=SweetDebugSnapshot)]
+#[extend::ext(name=MatcherDebugSnapshot)]
 pub impl<T: Debug> T {
 	/// Converts to formatted debug string and then creates
-	/// a snapshot, see [`SweetSnapshot::xpect_snapshot`]
+	/// a snapshot, see [`MatcherSnapshot::xpect_snapshot`]
 	#[track_caller]
 	fn xpect_debug_snapshot(&self) -> &Self {
 		self.xfmt().xpect_snapshot();
 		self
 	}
 }
-#[extend::ext(name=SweetSnapshot)]
+#[extend::ext(name=MatcherSnapshot)]
 pub impl<T, M> T
 where
 	T: StringComp<M>,

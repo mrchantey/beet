@@ -1,6 +1,6 @@
 use super::*;
 
-#[extend::ext(name=SweetOption)]
+#[extend::ext(name=MatcherOption)]
 pub impl<T> Option<T> {
 	/// Performs an assertion ensuring this value is a `Some(_)`.
 	///

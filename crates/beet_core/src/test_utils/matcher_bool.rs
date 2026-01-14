@@ -1,6 +1,6 @@
 use super::*;
 
-#[extend::ext(name=SweetBool)]
+#[extend::ext(name=MatcherBool)]
 pub impl bool {
 	/// Performs an assertion ensuring this value is equal to `true`.
 	///

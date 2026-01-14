@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-#[extend::ext(name=SweetResult)]
+#[extend::ext(name=MatcherResult)]
 pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// Performs an assertion ensuring this value is an `Ok(_)`.
 	///

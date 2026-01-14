@@ -2,7 +2,7 @@ use super::*;
 use std::fmt::Display;
 
 
-#[extend::ext(name=SweetClose)]
+#[extend::ext(name=MatcherClose)]
 pub impl<T, U> T
 where
 	T: IntoMaybeNotDisplay<U>,

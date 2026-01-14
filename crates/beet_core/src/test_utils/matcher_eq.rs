@@ -1,7 +1,7 @@
 use super::*;
 use std::fmt::Debug;
 
-#[extend::ext(name=SweetEq)]
+#[extend::ext(name=MatcherEq)]
 pub impl<T> T
 where
 	T: Debug,

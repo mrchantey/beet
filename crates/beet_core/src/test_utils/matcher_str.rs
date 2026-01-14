@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use super::*;
 
-#[extend::ext(name=SweetString)]
+#[extend::ext(name=MatcherString)]
 pub impl<T, U> T
 where
 	T: IntoMaybeNotDisplay<U>,
