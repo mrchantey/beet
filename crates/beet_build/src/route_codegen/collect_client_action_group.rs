@@ -138,7 +138,6 @@ mod test {
 	use super::Builder;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_net::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 

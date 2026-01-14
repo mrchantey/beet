@@ -57,12 +57,6 @@ pub fn parse_version(version: &str) -> http::Version {
 	}
 }
 
-/// The default HTTP version string.
-pub const DEFAULT_HTTP_VERSION: &str = "1.1";
-
-/// The default CLI version string.
-pub const DEFAULT_CLI_VERSION: &str = "0.1.0";
-
 #[cfg(all(test, feature = "http"))]
 mod test {
 	use super::*;

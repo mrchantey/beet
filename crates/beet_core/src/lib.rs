@@ -13,7 +13,8 @@ pub use utils::time_ext;
 pub mod arena;
 mod bevy_extensions;
 mod bevy_utils;
-// mod exchange;
+#[cfg(feature = "exchange")]
+mod exchange;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
@@ -38,6 +39,8 @@ pub mod prelude {
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
+	#[cfg(feature = "exchange")]
+	pub use crate::exchange::*;
 	// #[cfg(test)]
 	#[cfg(feature = "testing")]
 	pub use crate::test_utils::*;

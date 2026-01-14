@@ -9,7 +9,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::*;
 
 
 /// Parameters for configuring the help handler behavior
@@ -356,8 +355,7 @@ impl EndpointHelpFormatter for CliFormatter {
 			if let Some(short) = param.short() {
 				param_display.push_str(&format!(", -{}", short));
 			}
-			output
-				.push_str(&paint_ext::yellow(format!("{:20}", param_display)));
+			output.push_str(&paint_ext::yellow(format!("{}\t", param_display)));
 
 			// value type
 			match param.value() {
@@ -519,6 +517,7 @@ pub enum HelpFormat {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_net::prelude::*;
 
 	#[sweet::test]
 	async fn help_shows_matching_endpoints() {

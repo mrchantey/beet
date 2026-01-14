@@ -35,7 +35,7 @@
 //! # Example
 //!
 //! ```ignore
-//! # use beet_net::prelude::*;
+//! # use beet_core::prelude::*;
 //! # use bevy::prelude::*;
 //! #[derive(Debug, Reflect, Default)]
 //! #[reflect(Default)]

@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
 /// A more strict version of [`no_response`],

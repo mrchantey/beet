@@ -1,6 +1,5 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use std::collections::VecDeque;
 use std::path::Path;
 use thiserror::Error;
@@ -525,7 +524,7 @@ impl std::fmt::Display for PathPatternSegment {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_net::prelude::*;
+
 
 	/// match segments against a route path
 	fn parse(

@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[allow(unused)]
@@ -14,9 +13,10 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 	Ok(())
 }
 
-
-impl Request {
-	pub async fn send(self) -> Result<Response> {
+#[extend::ext(name=RequestClientExt)]
+pub impl Request {
+	#[allow(async_fn_in_trait)]
+	async fn send(self) -> Result<Response> {
 		#[cfg(target_arch = "wasm32")]
 		{
 			super::impl_web_sys::send_wasm(self).await

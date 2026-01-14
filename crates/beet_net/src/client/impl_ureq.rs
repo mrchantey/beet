@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 pub(super) async fn send_ureq(req: Request) -> Result<Response> {

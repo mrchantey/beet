@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::*;
 use bevy::reflect::Typed;
 
 #[derive(SystemParam)]

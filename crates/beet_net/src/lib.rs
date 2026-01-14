@@ -12,7 +12,6 @@ mod exchange;
 mod object_storage;
 mod server;
 pub mod sockets;
-mod status_code;
 
 pub mod prelude {
 
@@ -28,6 +27,7 @@ pub mod prelude {
 	/// Default port for websocket connections (geckodriver only, chromedriver uses default port): 8339
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
+	pub use crate::client::*;
 	pub use crate::exchange::*;
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
@@ -35,7 +35,6 @@ pub mod prelude {
 	// pub use crate::transport::*;
 
 	// reexport common types
-	pub use crate::status_code::StatusCode;
 	pub use http::header;
 	pub use url::Url;
 	pub use uuid::Uuid;

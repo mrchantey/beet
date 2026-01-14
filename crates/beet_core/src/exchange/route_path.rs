@@ -1,7 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
-use http::Uri;
-use http::uri::InvalidUri;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -73,15 +70,17 @@ impl AsRef<str> for RoutePath {
 	fn as_ref(&self) -> &str { self.0.to_str().unwrap_or_default() }
 }
 
-impl Into<Request> for RoutePath {
-	fn into(self) -> Request { Request::new(HttpMethod::Get, self) }
+impl From<RoutePath> for Request {
+	fn from(value: RoutePath) -> Request {
+		Request::new(HttpMethod::Get, value)
+	}
 }
+#[cfg(feature = "http")]
+impl TryInto<http::Uri> for RoutePath {
+	type Error = http::uri::InvalidUri;
 
-impl TryInto<Uri> for RoutePath {
-	type Error = InvalidUri;
-
-	fn try_into(self) -> Result<Uri, Self::Error> {
-		Uri::try_from(self.0.to_string_lossy().as_ref())
+	fn try_into(self) -> Result<http::Uri, Self::Error> {
+		http::Uri::try_from(self.0.to_string_lossy().as_ref())
 	}
 }
 
@@ -184,7 +183,6 @@ impl RoutePath {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
 
 	#[test]
 	fn route_path() {

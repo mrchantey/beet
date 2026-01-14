@@ -193,7 +193,6 @@ mod test {
 	use super::Parser;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_net::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 

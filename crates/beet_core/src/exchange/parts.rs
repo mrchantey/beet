@@ -11,7 +11,6 @@
 //! # Example
 //!
 //! ```
-//! # use beet_net::prelude::*;
 //! # use beet_core::prelude::*;
 //! // From HTTP
 //! let request = Request::get("/api/users?limit=10");
@@ -26,7 +25,6 @@
 //! ```
 
 use crate::prelude::*;
-use beet_core::prelude::*;
 
 
 /// The transport scheme used for a request or response.
@@ -144,6 +142,15 @@ pub struct Parts {
 	version: String,
 }
 
+
+
+/// The default HTTP version string.
+const DEFAULT_HTTP_VERSION: &str = "1.1";
+
+/// The default CLI version string.
+const DEFAULT_CLI_VERSION: &str = "0.1.0";
+
+
 impl Default for Parts {
 	fn default() -> Self {
 		Self {
@@ -152,7 +159,7 @@ impl Default for Parts {
 			path: Vec::new(),
 			params: default(),
 			headers: default(),
-			version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
+			version: DEFAULT_HTTP_VERSION.to_string(),
 		}
 	}
 }
@@ -384,7 +391,7 @@ impl PartsBuilder {
 			headers: self.headers,
 			version: self
 				.version
-				.unwrap_or_else(|| http_ext::DEFAULT_HTTP_VERSION.to_string()),
+				.unwrap_or_else(|| DEFAULT_HTTP_VERSION.to_string()),
 		}
 	}
 
@@ -416,7 +423,7 @@ impl PartsBuilder {
 /// on [`Parts`] are available directly:
 ///
 /// ```
-/// # use beet_net::prelude::*;
+/// # use beet_core::prelude::*;
 /// let parts = RequestParts::get("/api/users");
 /// assert_eq!(parts.path(), &["api", "users"]); // Deref to Parts
 /// assert_eq!(parts.method(), &HttpMethod::Get);
@@ -468,7 +475,7 @@ impl RequestParts {
 						path: path_segments,
 						params,
 						headers: MultiMap::<String, String>::default(),
-						version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
+						version: DEFAULT_HTTP_VERSION.to_string(),
 					},
 				};
 			}
@@ -487,7 +494,7 @@ impl RequestParts {
 				path: path_segments,
 				params,
 				headers: MultiMap::<String, String>::default(),
-				version: http_ext::DEFAULT_HTTP_VERSION.to_string(),
+				version: DEFAULT_HTTP_VERSION.to_string(),
 			},
 		}
 	}
@@ -795,6 +802,7 @@ impl From<http::response::Parts> for ResponseParts {
 	}
 }
 
+
 #[cfg(feature = "http")]
 impl From<&http::response::Parts> for ResponseParts {
 	fn from(http_parts: &http::response::Parts) -> Self {
@@ -846,9 +854,8 @@ impl From<CliArgs> for RequestParts {
 				path,
 				params,
 				headers: MultiMap::default(),
-				version: env_ext::var("CARGO_PKG_VERSION").unwrap_or_else(
-					|_| http_ext::DEFAULT_CLI_VERSION.to_string(),
-				),
+				version: env_ext::var("CARGO_PKG_VERSION")
+					.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
 			},
 		}
 	}
@@ -877,7 +884,7 @@ impl From<&CliArgs> for RequestParts {
 				path,
 				params,
 				headers: MultiMap::default(),
-				version: http_ext::DEFAULT_CLI_VERSION.to_string(),
+				version: DEFAULT_CLI_VERSION.to_string(),
 			},
 		}
 	}
@@ -1165,6 +1172,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let parts = PartsBuilder::new()
 			.path_str("/api/users")

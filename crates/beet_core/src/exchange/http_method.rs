@@ -1,4 +1,4 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use std::fmt;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]

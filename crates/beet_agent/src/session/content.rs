@@ -1,6 +1,6 @@
 use base64::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::Request;
+use beet_net::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
 use serde::Deserialize;
 use serde::Serialize;

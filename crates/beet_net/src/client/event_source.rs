@@ -1,12 +1,12 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use eventsource_stream::EventStream;
 use eventsource_stream::Eventsource;
 
-
-impl Response {
+#[extend::ext(name=ResponseClientExt)]
+pub impl Response {
 	/// Server Sent Events, checks for Ok status before parsing
-	pub async fn event_source(self) -> Result<EventStream<Body>> {
+	#[allow(async_fn_in_trait)]
+	async fn event_source(self) -> Result<EventStream<Body>> {
 		self.into_result().await?.body.eventsource().xok()
 	}
 }

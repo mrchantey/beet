@@ -1,4 +1,4 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
 use futures::Stream;

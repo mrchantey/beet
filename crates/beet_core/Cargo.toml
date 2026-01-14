@@ -23,15 +23,22 @@ required-features = ["tokens"]
 
 [features]
 default = ["serde"]
-exchange = []
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
-testing = ["ansi_paint"]
+testing = ["exchange", "ansi_paint"]
+exchange = ["dep:bytes"]
+http = ["dep:http","dep:mime_guess"]
 bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
-serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml"]
+serde = [
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ron",
+	"dep:toml",
+	"dep:serde_urlencoded",
+]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 
 fs = [
@@ -63,7 +70,12 @@ send_wrapper.workspace = true
 web-time.workspace = true
 nu-ansi-term = { workspace = true, optional = true }
 
-# async-task.workspace = true
+#💡 exchange
+bytes = {workspace = true,optional = true}
+http = {workspace = true,optional=true}
+mime_guess = {workspace = true,optional=true}
+serde_urlencoded = { version = "0.7", optional = true }
+
 
 #💡 path
 path-clean = "1"

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
+
 
 /// Run a single test in an isolated Bevy app, returning the outcome
 pub async fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use quote::ToTokens;
 
 /// Added alongside a [`SourceFile`] for easy cohersion of route meta

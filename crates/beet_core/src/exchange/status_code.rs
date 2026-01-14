@@ -2,8 +2,8 @@
 //!
 //! The [`StatusCode`] enum provides a general-purpose status representation
 //! that works across HTTP, CLI, RPC, and other transports.
+use crate::prelude::*;
 
-use beet_core::prelude::*;
 
 /// A transport-independent status code for request/response exchanges.
 ///
@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # Examples
 ///
 /// ```rust
-/// # use beet_net::prelude::*;
+/// # use beet_core::prelude::*;
 /// // Use semantic variants
 /// let ok = StatusCode::Ok;
 /// assert!(ok.is_ok());

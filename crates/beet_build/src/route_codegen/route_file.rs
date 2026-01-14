@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::RoutePath;
 use proc_macro2::Span;
 use std::path::PathBuf;
 use syn::Attribute;
@@ -165,9 +164,7 @@ mod test {
 	fn works() {
 		let mut world = BuildPlugin::world();
 
-		let group = world
-			.spawn(RouteFileCollection::test_site_pages())
-			.id();
+		let group = world.spawn(RouteFileCollection::test_site_pages()).id();
 
 		world.run_schedule(ParseSourceFiles);
 

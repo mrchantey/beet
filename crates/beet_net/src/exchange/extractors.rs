@@ -1,6 +1,5 @@
 //! Extractors are types for declaratively converting parts of an exchange
 //! into concrete types, for example [`QueryParams`]
-use crate::prelude::*;
 #[allow(unused)]
 use beet_core::prelude::*;
 
@@ -233,17 +232,6 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 }
 
 
-impl<'a> Into<Response> for &'a str {
-	fn into(self) -> Response {
-		Response::ok_body(self, "text/plain; charset=utf-8")
-	}
-}
-
-impl Into<Response> for String {
-	fn into(self) -> Response {
-		Response::ok_body(self, "text/plain; charset=utf-8")
-	}
-}
 
 impl<T> Into<Response> for Html<T>
 where

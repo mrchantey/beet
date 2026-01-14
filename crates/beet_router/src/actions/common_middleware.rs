@@ -74,7 +74,6 @@
 
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::*;
 
 /// Add no-cache headers to a response.
 ///
@@ -439,6 +438,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 mod test {
 	use super::*;
 	use crate::prelude::*;
+	use beet_net::prelude::*;
 
 	#[sweet::test]
 	async fn no_cache_headers_works() {

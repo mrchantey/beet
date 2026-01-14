@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use std::path::PathBuf;
 
 /// Helper for common route mapping
@@ -81,7 +80,6 @@ pub fn modify_route_file_tokens(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_net::prelude::*;
 
 	#[test]
 	fn works() {

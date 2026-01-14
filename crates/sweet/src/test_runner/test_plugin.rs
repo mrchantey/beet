@@ -4,7 +4,7 @@ use bevy::time::TimePlugin;
 
 
 pub fn test_runner(tests: &[&test::TestDescAndFn]) {
-	use beet_net::prelude::*;
+
 
 	App::new()
 		.init_plugin::<JsRuntimePlugin>()

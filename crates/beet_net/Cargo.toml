@@ -38,8 +38,8 @@ aws = [
 serde = [
 	"dep:serde",
 	"dep:serde_json",
-	"dep:serde_urlencoded",
 	"dep:base64",
+	"dep:serde_urlencoded",
 	"uuid/serde",
 	"beet_core/serde",
 ]
@@ -63,7 +63,7 @@ rustls-tls = [
 # _sweet_runner = ["sweet/runner"]
 
 [dependencies]
-beet_core.workspace = true
+beet_core = {workspace = true,features=["exchange","http"]}
 beet_flow = { workspace = true, optional = true }
 
 bevy.workspace = true
@@ -91,7 +91,6 @@ http = { workspace = true, optional = true }
 http-body-util.workspace = true
 bytes.workspace = true
 url = "2"
-mime_guess.workspace = true
 html-escape = "0.2"
 eventsource-stream = "0.2.3"
 # async

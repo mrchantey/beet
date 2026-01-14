@@ -14,7 +14,7 @@ keywords.workspace = true
 [features]
 # see readme for feature docs
 default = ["runner", "serde", "nightly"]
-runner = ["dep:beet_core", "dep:beet_net", "serde"]
+runner = ["dep:beet_core", "serde"]
 nightly = []
 tokens = ["dep:proc-macro2", "dep:syn", "dep:quote", "dep:prettyplease"]
 serde = ["dep:ron"]
@@ -22,7 +22,6 @@ serde = ["dep:ron"]
 [dependencies]
 #💡 internal
 beet_core = { workspace = true, optional = true, features=["testing"] }
-beet_net = { workspace = true, optional = true }
 sweet_macros.workspace = true
 #💡 misc
 extend.workspace = true

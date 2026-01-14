@@ -20,7 +20,7 @@ fs = ["beet_core/fs"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["ureq"] }
-beet_core = { workspace = true, features = ["serde"] }
+beet_core = { workspace = true, features = ["serde","exchange"] }
 
 # rig-core = { version = "0.18" }
 

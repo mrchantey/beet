@@ -7,6 +7,5 @@ mod impl_ureq;
 mod impl_web_sys;
 // pub use event_source::*;
 mod send;
-
-
-
+pub use event_source::*;
+pub use send::*;

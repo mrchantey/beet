@@ -7,8 +7,7 @@
 //! # Example
 //!
 //! ```
-//! # use beet_net::prelude::*;
-//! # use beet_net::prelude::StatusCode;
+//! # use beet_core::prelude::*;
 //! // Create an HTTP-style response
 //! let response = Response::ok().with_body("Hello, world!");
 //!
@@ -18,7 +17,6 @@
 //! ```
 
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bytes::Bytes;
 use std::convert::Infallible;
 
@@ -34,8 +32,7 @@ use std::convert::Infallible;
 /// [`ResponseParts`] and [`Parts`] are available directly:
 ///
 /// ```
-/// # use beet_net::prelude::*;
-/// # use beet_net::prelude::StatusCode;
+/// # use beet_core::prelude::*;
 /// let response = Response::ok();
 /// assert_eq!(response.status(), StatusCode::Ok);  // From ResponseParts
 /// ```
@@ -162,6 +159,7 @@ impl Response {
 	}
 
 	/// Gets a header value by name
+	#[cfg(feature = "http")]
 	pub fn header(
 		&self,
 		header: http::header::HeaderName,
@@ -175,6 +173,7 @@ impl Response {
 	/// Check whether a header exactly matches the given value.
 	/// Do not use this for checks like `Content-Type` as they may
 	/// have additional parameters like `application/json; charset=utf-8`.
+	#[cfg(feature = "http")]
 	pub fn header_matches(
 		&self,
 		header: http::header::HeaderName,
@@ -188,6 +187,7 @@ impl Response {
 	/// Check whether a header contains the given value. Use this for
 	/// checks like `Content-Type` where the value may have additional parameters
 	/// like `application/json; charset=utf-8`.
+	#[cfg(feature = "http")]
 	pub fn header_contains(
 		&self,
 		header: http::header::HeaderName,
@@ -207,6 +207,7 @@ impl Response {
 	}
 
 	/// Creates a response from http parts and body
+	#[cfg(feature = "http")]
 	pub fn from_http_parts(parts: http::response::Parts, body: Bytes) -> Self {
 		Self {
 			parts: ResponseParts::from(parts),
@@ -229,6 +230,7 @@ impl Response {
 	/// Create a response with the given body, guessing the content type
 	/// based on the file extension, defaulting to `application/octet-stream`
 	/// if the extension is not recognized.
+	#[cfg(feature = "http")]
 	pub fn ok_mime_guess(
 		body: impl Into<Body>,
 		path: impl AsRef<std::path::Path>,
@@ -259,6 +261,7 @@ impl Response {
 	}
 
 	/// Converts this response into an http::Response
+	#[cfg(feature = "http")]
 	pub async fn into_http(self) -> Result<http::Response<Bytes>> {
 		let bytes = self.body.into_bytes().await?;
 		let http_parts: http::response::Parts = self.parts.try_into()?;
@@ -307,6 +310,7 @@ impl Response {
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<http::Response<Body>> for Response {
 	fn from(res: http::Response<Body>) -> Self {
 		let (parts, body) = res.into_parts();
@@ -317,6 +321,7 @@ impl From<http::Response<Body>> for Response {
 	}
 }
 
+#[cfg(feature = "http")]
 impl From<http::Response<Bytes>> for Response {
 	fn from(res: http::Response<Bytes>) -> Self {
 		let (parts, body) = res.into_parts();
@@ -356,8 +361,10 @@ impl<T: IntoResponse<M1>, M1, E: IntoResponse<M2>, M2>
 	}
 }
 
-impl Into<Response> for BevyError {
-	fn into(self) -> Response { HttpError::from_opaque(self).into() }
+impl From<BevyError> for Response {
+	fn from(value: BevyError) -> Response {
+		HttpError::from_opaque(value).into()
+	}
 }
 
 impl IntoResponse<Self> for Bytes {
@@ -407,6 +414,18 @@ impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
 	}
 }
 
+impl<'a> From<&'a str> for Response {
+	fn from(value: &'a str) -> Response {
+		Response::ok_body(value, "text/plain; charset=utf-8")
+	}
+}
+
+impl From<String> for Response {
+	fn from(value: String) -> Response {
+		Response::ok_body(value, "text/plain; charset=utf-8")
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -443,6 +462,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn response_from_status_body() {
 		let response =
 			Response::from_status_body(StatusCode::Ok, b"data", "text/plain");
@@ -455,13 +475,13 @@ mod test {
 	#[test]
 	fn response_deref_to_parts() {
 		let response = Response::ok();
-		// Should be able to call ResponseParts methods via Deref
 		response.status().xpect_eq(StatusCode::Ok);
 	}
 
 	#[test]
-	fn response_ok_body() {
-		let response = Response::ok_body("hello", "text/plain");
+	#[cfg(feature = "http")]
+	fn response_from_str() {
+		let response: Response = "hello".into();
 		response.status().xpect_eq(StatusCode::Ok);
 		response
 			.header_contains(http::header::CONTENT_TYPE, "text/plain")

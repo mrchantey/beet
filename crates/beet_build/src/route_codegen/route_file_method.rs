@@ -1,7 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use syn::Ident;
 use syn::ItemFn;
 
@@ -112,7 +111,6 @@ impl RouteFileMethodMeta {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_net::prelude::*;
 	use beet_core::prelude::*;
 
 	#[test]

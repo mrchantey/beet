@@ -7,7 +7,6 @@
 //! # Example
 //!
 //! ```
-//! # use beet_net::prelude::*;
 //! # use beet_core::prelude::*;
 //! // Create an HTTP-style request
 //! let request = Request::get("/api/users?limit=10");
@@ -20,9 +19,11 @@
 //! assert_eq!(request.path(), &["users", "list"]);
 //! ```
 
+#[cfg(feature = "http")]
+use super::http_ext;
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bytes::Bytes;
+#[cfg(feature = "http")]
 use http::header::IntoHeaderName;
 
 /// A generalized request type that can represent HTTP requests, CLI commands,
@@ -37,7 +38,7 @@ use http::header::IntoHeaderName;
 /// [`RequestParts`] and [`Parts`] are available directly:
 ///
 /// ```
-/// # use beet_net::prelude::*;
+/// # use beet_core::prelude::*;
 /// let request = Request::get("/api/users?limit=10");
 /// assert_eq!(request.method(), &HttpMethod::Get);  // From RequestParts
 /// assert_eq!(request.path(), &["api", "users"]);   // From Parts via Deref
@@ -175,7 +176,7 @@ impl Request {
 	}
 
 	/// Sets a JSON body and content-type header
-	#[cfg(feature = "serde")]
+	#[cfg(all(feature = "serde", feature = "http"))]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,
@@ -193,6 +194,7 @@ impl Request {
 	}
 
 	/// Adds a header using http header types
+	#[cfg(feature = "http")]
 	pub fn with_header<K: IntoHeaderName>(
 		mut self,
 		key: K,
@@ -204,6 +206,7 @@ impl Request {
 	}
 
 	/// Shorthand for an `Authorization: Bearer <token>` header
+	#[cfg(feature = "http")]
 	pub fn with_auth_bearer(self, token: &str) -> Self {
 		self.with_header(
 			http::header::AUTHORIZATION,
@@ -212,6 +215,7 @@ impl Request {
 	}
 
 	/// Sets the content type header
+	#[cfg(feature = "http")]
 	pub fn with_content_type(self, content_type: &str) -> Self {
 		self.with_header(http::header::CONTENT_TYPE, content_type)
 	}
@@ -267,6 +271,7 @@ impl Request {
 	pub fn into_parts(self) -> (RequestParts, Body) { (self.parts, self.body) }
 
 	/// Creates a request from an http::Request
+	#[cfg(feature = "http")]
 	pub fn from_http<T: Into<Bytes>>(request: http::Request<T>) -> Self {
 		let (http_parts, body) = request.into_parts();
 		let has_body = http_ext::has_body(&http_parts);
@@ -293,6 +298,7 @@ impl Request {
 	}
 
 	/// Converts this request into an http::Request
+	#[cfg(feature = "http")]
 	pub async fn into_http_request(self) -> Result<http::Request<Bytes>> {
 		let bytes = self.body.into_bytes().await?;
 		let http_parts: http::request::Parts = self.parts.try_into()?;
@@ -301,6 +307,7 @@ impl Request {
 }
 
 /// Helper to convert http header name to string
+#[cfg(feature = "http")]
 fn header_name_to_string<K: IntoHeaderName>(key: K) -> String {
 	// This is a bit of a hack - we create a temporary request to extract the header name
 	let mut headers = http::HeaderMap::new();
@@ -373,6 +380,7 @@ where
 	}
 }
 
+#[cfg(feature = "http")]
 impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 	fn from(request: http::Request<T>) -> Self { Self::from_http(request) }
 }
@@ -436,6 +444,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "http")]
 	fn request_from_http() {
 		let http_request = http::Request::builder()
 			.method(http::Method::POST)
