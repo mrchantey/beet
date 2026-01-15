@@ -1,4 +1,4 @@
-//! Cross-plaform file system utilities, including
+//! Cross-platform file system utilities, including
 //! wrappers around [`std::fs`], [`async_fs`] and [`js_runtime`]
 //! with ergonomics better suited to the application layer:
 //! - outputs the file path on fs error

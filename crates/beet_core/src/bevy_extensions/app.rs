@@ -93,6 +93,33 @@ pub impl App {
 		}
 	}
 
+	/// Run the app asynchronously, particularly useful for cases like
+	/// wasm where `App::run` just succeeds immediately
+	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
+		AsyncRunner::run(std::mem::take(self))
+	}
+
+
+	/// Cross-platform exit code emitted from a running bevy app on exit.
+	/// [`App::run()`] will spawn a task and exit immediately in wasm,
+	/// losing the exit code. This approach will call `js_runtime::exit`.
+	fn run_and_exit(&mut self) {
+		// standard bevy practice take self for run method
+		let mut this = std::mem::take(self);
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			let result = async_ext::block_on(this.run_async());
+			std::process::exit(result.exit_code());
+		}
+		#[cfg(target_arch = "wasm32")]
+		{
+			crate::exports::wasm_bindgen_futures::spawn_local(async move {
+				let result = this.run_async().await;
+				js_runtime::exit(result.exit_code());
+			});
+		}
+	}
+
 
 	/// run an io task to completion, polling at 10 millisecond intervals
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O

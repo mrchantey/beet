@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use crate::prelude::*;
 
-
 pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }

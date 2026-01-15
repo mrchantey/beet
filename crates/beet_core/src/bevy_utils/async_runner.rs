@@ -13,18 +13,8 @@ fn tick_task_pools() {
 	bevy::tasks::tick_global_task_pools_on_main_thread();
 }
 
-#[extend::ext]
-pub impl App {
-	/// Run the app asynchronously, particularly useful for cases like
-	/// wasm where `App::run` just succeeds immediately
-	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
-		AsyncRunner::run(std::mem::take(self))
-	}
-}
-
-
 impl AsyncRunner {
-	async fn run(mut app: App) -> AppExit {
+	pub(crate) async fn run(mut app: App) -> AppExit {
 		app.init_plugin::<AsyncPlugin>();
 		app.init();
 

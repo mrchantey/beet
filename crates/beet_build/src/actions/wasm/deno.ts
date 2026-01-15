@@ -73,7 +73,7 @@ const _wasm = await init().catch((err: any) => {
 	Deno.exit(1);
 });
 
-/// Keep the process alive, JsRuntimePlugin will decide when to exit
+/// Keep the process alive, beet_core::runtime_ext::exit() will call js_runtime::exit() to terminate
 await loop_forever();
 
 //-- Helpers --

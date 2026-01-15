@@ -4,15 +4,13 @@ use bevy::time::TimePlugin;
 
 
 pub fn test_runner(tests: &[&test::TestDescAndFn]) {
-	App::new()
-		.init_plugin::<JsRuntimePlugin>()
-		.add_plugins((MinimalPlugins, TestPlugin))
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, TestPlugin))
 		.spawn_then((
 			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
 			tests_bundle_borrowed(tests),
 		))
-		.run()
-		.into_exit_native();
+		.run_and_exit();
 }
 
 

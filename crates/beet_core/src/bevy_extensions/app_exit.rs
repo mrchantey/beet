@@ -1,4 +1,4 @@
-use crate::bevybail;
+use crate::prelude::*;
 use bevy::app::AppExit;
 
 #[extend::ext(name=AppExitExt)]
@@ -17,12 +17,5 @@ pub impl AppExit {
 			AppExit::Success => 0,
 			AppExit::Error(code) => code.get() as i32,
 		}
-	}
-
-	/// Exit the application with the given exit code in the case
-	/// of a native context. see [`JsRuntimePlugin`] for wasm exits
-	fn into_exit_native(self) {
-		#[cfg(not(target_arch = "wasm32"))]
-		std::process::exit(self.exit_code());
 	}
 }
