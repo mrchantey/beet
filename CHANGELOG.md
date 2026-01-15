@@ -5,6 +5,7 @@
 
 ### `beet_flow`
 - `BeetFlowPlugin` -> `ControlFlowPlugin`
+- Reverted global action observers, classic case of juice-not-worth-squeeze. For a small spawn perf gain, having the same tree operate on different agents introduced a great deal of complexity. Actions now operate on a single agent, by default the root entity, bringing back per-node state and the refreshing simplicy we bevy devs cant seem to get enough of.
 
 ## 0.0.7
 
