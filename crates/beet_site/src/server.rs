@@ -46,7 +46,6 @@ fn image_generator() -> impl Bundle {
 			let message = session_ext::message(content.0);
 			let session = session_ext::user_message_session(agent, message);
 			// agents.entity(entity).spawn_child(session).await;
-			// AsyncRunner::flush_async_tasks(&mut world).await;
 			todo!("run session and await outcome");
 
 			// let out = action

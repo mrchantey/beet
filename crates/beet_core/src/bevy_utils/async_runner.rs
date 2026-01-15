@@ -24,7 +24,7 @@ pub impl App {
 
 
 impl AsyncRunner {
-	pub async fn run(mut app: App) -> AppExit {
+	async fn run(mut app: App) -> AppExit {
 		app.init_plugin::<AsyncPlugin>();
 		app.init();
 
@@ -38,7 +38,8 @@ impl AsyncRunner {
 				return exit;
 			}
 			// 3. delay next update
-			// no idea how long to sleep for
+			// TODO no idea how long the correct duration is here,
+			// does it depend on use-case?
 			time_ext::sleep_millis(1).await;
 		}
 	}
@@ -46,7 +47,7 @@ impl AsyncRunner {
 	/// Run an loop at regular updates until all tasks have completed or
 	/// an AppExit is triggered. Note that some tasks like http/socket listeners
 	/// will never complete in which case this will never return.
-	pub async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
+	async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
 		// yield required for wasm to spawn tasks
 		async_ext::yield_now().await;
 

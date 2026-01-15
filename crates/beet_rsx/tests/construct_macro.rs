@@ -10,11 +10,21 @@ fn parse(bundle: impl Bundle) -> String {
 }
 
 async fn parse_async(bundle: impl Bundle) -> String {
-	let mut world = AsyncPlugin::world();
-	world.init_resource::<Time>();
-	let entity = world.spawn(bundle).id();
-	AsyncRunner::flush_async_tasks(&mut world).await;
-	world.entity(entity).get::<Name>().unwrap().to_string()
+	let mut app = App::new();
+	app.add_plugins(AsyncPlugin);
+	app.world_mut().init_resource::<Time>();
+	let entity = app.world_mut().spawn(bundle).id();
+	let store = Store::new(None);
+	app.add_observer(
+		move |_: On<Insert, Name>,
+		      query: Query<&Name>,
+		      mut commands: Commands| {
+			store.set(query.get(entity).unwrap().clone().xsome());
+			commands.write_message(AppExit::Success);
+		},
+	);
+	app.run_async().await;
+	store.get().unwrap().to_string()
 }
 
 #[test]
@@ -76,8 +86,7 @@ fn props() {
 	#[construct]
 	#[derive(Props)]
 	fn Hello(
-		#[field(default = "pizza".into())] 
-		name: String,
+		#[field(default = "pizza".into())] name: String,
 		time: Res<Time>,
 	) -> impl Bundle {
 		let _ = time;

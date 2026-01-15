@@ -65,9 +65,8 @@ pub async fn run_and_collect_file(session: impl Bundle) -> Vec<ContentEnum> {
 	app.add_plugins((MinimalPlugins, AgentPlugin));
 	app.world_mut().spawn(session);
 
-	AsyncRunner::flush_async_tasks(app.world_mut()).await;
-
-	app.world_mut().run_system_cached(collect_output).unwrap()
+	todo!("beet_flow");
+	// app.world_mut().run_system_cached(collect_output).unwrap()
 }
 
 /// Collect all TextContent and FileContent found under the Agent entity

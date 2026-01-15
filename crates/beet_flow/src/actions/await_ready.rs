@@ -126,17 +126,20 @@ mod test {
 	#[beet_core::test]
 	async fn await_ready_waits_for_actions() {
 		let store = Store::default();
-		let mut world =
-			(MinimalPlugins, AsyncPlugin, ControlFlowPlugin).into_world();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin, ControlFlowPlugin));
 
-		world
+		app.world_mut()
 			.spawn((Sequence, children![
 				AwaitReady::default(),
 				(
 					EndWith(Outcome::Pass),
-					OnSpawn::observe(move |_: On<GetOutcome>| {
-						store.set(true);
-					})
+					OnSpawn::observe(
+						move |_: On<GetOutcome>, mut commands: Commands| {
+							store.set(true);
+							commands.write_message(AppExit::Success);
+						}
+					)
 				),
 				ReadyAction::run(async |_| {
 					beet_core::exports::futures_lite::future::yield_now().await;
@@ -148,7 +151,7 @@ mod test {
 		// Before async completes, the sequence should not have moved to second child
 		store.get().xpect_eq(false);
 
-		AsyncRunner::flush_async_tasks(&mut world).await;
+		app.run_async().await;
 
 		// After async completes, AwaitReady should pass and sequence continues
 		store.get().xpect_eq(true);
