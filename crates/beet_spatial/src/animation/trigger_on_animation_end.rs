@@ -44,7 +44,7 @@ impl<P> TriggerOnAnimationEnd<P> {
 	}
 }
 
-pub(crate) fn trigger_on_animation_end<P: ActionEvent + Clone>(
+pub(crate) fn trigger_on_animation_end<P: EntityTargetEvent + Clone>(
 	mut commands: Commands,
 	clips: When<Res<Assets<AnimationClip>>>,
 	mut query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running>>,

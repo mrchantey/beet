@@ -7,7 +7,7 @@ use bevy::tasks::ConditionalSendFuture;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct QTableLoader<State: StateSpace, Action: ActionSpace> {
 	phantom: PhantomData<(State, Action)>,
 }
@@ -31,9 +31,7 @@ impl<
 		Box::pin(async move {
 			let mut bytes = Vec::new();
 			reader.read_to_end(&mut bytes).await?;
-			let table = bevy::scene::ron::de::from_bytes::<
-				QTable<State, Action>,
-			>(&bytes)?;
+			let table = ron::de::from_bytes::<QTable<State, Action>>(&bytes)?;
 			Ok(table)
 		})
 	}

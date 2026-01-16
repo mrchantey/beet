@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "client"), allow(unused))]
 use crate::prelude::*;
+use crate::templates::Button;
 use beet::prelude::*;
 
 #[template]

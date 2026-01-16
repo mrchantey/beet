@@ -30,17 +30,15 @@ fn read_q_policy<P: QPolicy + Asset>(
 	mut agents: AgentQuery<(&P::State, &mut P::Action)>,
 	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
 ) -> Result {
-	let (_, handle) = query.get(ev.action())?;
+	let action_entity = ev.target();
+	let (_, handle) = query.get(action_entity)?;
 	let policy = assets.get(&**handle).ok_or_else(|| {
-		bevyhow!(
-			"QPolicy asset not loaded for entity {:?}",
-			ev.action()
-		)
+		bevyhow!("QPolicy asset not loaded for entity {:?}", action_entity)
 	})?;
 
-	let (state, mut action) = agents.get_mut(ev.action())?;
+	let (state, mut action) = agents.get_mut(action_entity)?;
 
 	*action = policy.greedy_policy(state).0;
-	commands.entity(ev.action()).trigger_target(Outcome::Pass);
+	commands.entity(action_entity).trigger_target(Outcome::Pass);
 	Ok(())
 }

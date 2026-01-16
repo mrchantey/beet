@@ -95,7 +95,7 @@ beet_agent = { path = "crates/beet_agent", version = "0.0.8" }
 beet = { path = "", version = "0.0.8" }
 
 #💡 local
-bevy = { version = "0.18.0-rc.2", default-features = false, features = [
+bevy = { version = "0.18", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
 	"bevy_log",
@@ -327,16 +327,6 @@ web-sys.workspace = true
 # wasm-bindgen-futures.workspace = true
 
 # 💡 Examples - agent
-[[example]]
-name = "chat"
-path = "examples/agent/chat.rs"
-required-features = ["agent","native-tls"]
-[[example]]
-name = "image"
-path = "examples/agent/image.rs"
-required-features = ["agent","native-tls"]
-
-
 # 💡 Examples - net
 
 [[example]]
@@ -355,11 +345,6 @@ path = "examples/net/server_bench.rs"
 required-features = ["server"]
 
 [[example]]
-name = "server_custom_handler"
-path = "examples/net/server_custom_handler.rs"
-required-features = ["server"]
-
-[[example]]
 name = "socket_server"
 path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
@@ -368,22 +353,6 @@ required-features = ["tungstenite"]
 name = "socket_client"
 path = "examples/net/socket_client.rs"
 required-features = ["tungstenite"]
-
-# 💡 Examples - dom
-[[example]]
-name = "csr"
-path = "examples/rsx/csr.rs"
-required-features = ["client"]
-
-[[example]]
-name = "ssr"
-path = "examples/rsx/ssr.rs"
-required-features = ["server"]
-
-[[example]]
-name = "hydration"
-path = "examples/rsx/hydration.rs"
-required-features = ["rsx"]
 
 # 💡 Examples - router
 
@@ -395,10 +364,7 @@ required-features = ["server"]
 name = "cli_router"
 path = "examples/router/cli_router.rs"
 required-features = ["launch"]
-[[example]]
-name = "router_full"
-path = "examples/router/router_full.rs"
-required-features = ["server", "native-tls"]
+
 [[example]]
 name = "router_bench"
 path = "examples/router/router_bench.rs"
@@ -406,16 +372,6 @@ required-features = ["server"]
 
 
 # 💡 Examples - flow
-
-[[example]]
-name = "bench_local"
-path = "examples/flow/bench_local.rs"
-required-features = ["flow"]
-
-[[example]]
-name = "bench_global"
-path = "examples/flow/bench_global.rs"
-required-features = ["flow"]
 
 [[example]]
 name = "hello_world"
@@ -451,22 +407,6 @@ required-features = ["flow"]
 name = "utility_ai"
 path = "examples/flow/utility_ai.rs"
 required-features = ["flow"]
-
-# 💡 Examples - app
-
-[[example]]
-name = "hello_terminal"
-path = "examples/app/hello_terminal.rs"
-required-features = ["examples"]
-
-[[package.metadata.scene]]
-name = "hello-terminal"
-thumb-text = "🌍"
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
-description = "A simple behavior that prints 'Hello' then 'World' to the console."
-app = "app"
-path = "scenes/hello-world.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 
 
 # [[example]]

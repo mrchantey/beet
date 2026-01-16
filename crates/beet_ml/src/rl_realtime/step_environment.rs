@@ -57,9 +57,10 @@ where
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	let mut step = query.get_mut(ev.action())?;
+	let action_entity = ev.target();
+	let mut step = query.get_mut(action_entity)?;
 	let (state, mut action, mut env, params, session_entity) =
-		agents.get_mut(ev.action())?;
+		agents.get_mut(action_entity)?;
 	let mut table = sessions.get_mut(**session_entity)?;
 
 	let outcome = env.step(&state, &action);
@@ -80,7 +81,7 @@ where
 	// 	action,
 	// 	outcome.reward
 	// );
-	commands.entity(ev.action()).trigger_target(Outcome::Pass);
+	commands.entity(action_entity).trigger_target(Outcome::Pass);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -99,7 +100,8 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		let on_result = observer_ext::observe_triggers::<Outcome>(app.world_mut());
+		let on_result =
+			observer_ext::observe_triggers::<Outcome>(app.world_mut());
 
 		app.add_plugins((
 			ControlFlowPlugin::default(),

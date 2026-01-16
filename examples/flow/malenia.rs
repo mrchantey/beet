@@ -103,7 +103,7 @@ fn attack_player(
 	mut query: Query<(&mut Health, &Name)>,
 	mut random_source: ResMut<RandomSource>,
 ) -> Result {
-	let (attack, attack_name) = attacks.get(ev.action())?;
+	let (attack, attack_name) = attacks.get(ev.target())?;
 	println!("🔪  \tMalenia attacks with {}", attack_name);
 
 	for (mut health, name) in query.iter_mut() {
@@ -182,10 +182,10 @@ fn provide_random_score(
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
 ) -> Result {
-	let score_provider = query.get(ev.action())?;
+	let score_provider = query.get(ev.target())?;
 
 	let rnd: f32 = random_source.random();
-	commands.entity(ev.action()).trigger_target(Score(
+	commands.entity(ev.target()).trigger_target(Score(
 		rnd * score_provider.scalar + score_provider.offset,
 	));
 	Ok(())
@@ -201,16 +201,16 @@ fn try_heal_self(
 	mut commands: Commands,
 	mut query: AgentQuery<(&mut Health, &mut HealingPotions)>,
 ) -> Result {
-	let (mut health, mut potions) = query.get_mut(ev.action())?;
+	let (mut health, mut potions) = query.get_mut(ev.target())?;
 
 	if health.0 < 50.0 && potions.0 > 0 {
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		commands.entity(ev.action()).trigger_target(Outcome::Pass);
+		commands.entity(ev.target()).trigger_target(Outcome::Pass);
 	} else {
 		// we couldnt do anything so action was a failure
-		commands.entity(ev.action()).trigger_target(Outcome::Fail);
+		commands.entity(ev.target()).trigger_target(Outcome::Fail);
 	}
 	Ok(())
 }

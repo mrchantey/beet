@@ -34,7 +34,7 @@ impl TriggerOnAnimationReady<GetOutcome> {
 /// The associated system for [`TriggerOnAnimationReady`].
 /// The defaullt [`Run`] is added in the [`AnimationFlowPlugin`],
 /// any other payload types must be added manually.
-pub fn trigger_on_animation_ready<P: ActionEvent + Clone>(
+pub fn trigger_on_animation_ready<P: EntityTargetEvent + Clone>(
 	mut commands: Commands,
 	scene_roots: Query<Entity, With<SceneRoot>>,
 	parents: Query<&ChildOf>,

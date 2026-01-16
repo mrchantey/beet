@@ -1,4 +1,4 @@
-//! A minimal server example
+//! A minimal server example using ExchangeSpawner
 use beet::prelude::*;
 
 fn main() {
@@ -8,10 +8,13 @@ fn main() {
 			LogPlugin::default(),
 			ServerPlugin::default(),
 		))
-		.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {
-			commands
-				.entity(ev.event_target())
-				.insert(Response::ok_body("hello world", "text/plain"));
+		.add_systems(Startup, |mut commands: Commands| {
+			commands.spawn((
+				HttpServer::default(),
+				ExchangeSpawner::new_handler(|_, _| {
+					Response::ok_body("hello world", "text/plain")
+				}),
+			));
 		})
 		.run();
 }

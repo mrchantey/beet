@@ -50,8 +50,7 @@ pub trait QPolicy: 'static + Send + Sync {
 		epsilon: f32,
 		rng: &mut impl Rng,
 	) -> (Self::Action, QValue) {
-		let random_num: f32 = rng.r#gen(); // generates a float between 0 and 1
-		// let random_num: f32 = rng.random(); // generates a float between 0 and 1
+		let random_num: f32 = rng.random(); // generates a float between 0 and 1
 		if random_num > epsilon {
 			// Exploitation: Take the action with the highest value given a state
 			self.greedy_policy(state)

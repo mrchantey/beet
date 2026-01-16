@@ -5,7 +5,7 @@ use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
 use bevy::tasks::ConditionalSendFuture;
 
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct BertLoader;
 
 impl AssetLoader for BertLoader {
