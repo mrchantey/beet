@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use wasm_bindgen::prelude::*;
-
+// TODO the runtime should be included in the binary,
+// deno.ts should just load wasm and loop forever, awaiting exit code
+// while wasm actually inserts a cross-runtime js script
 #[cfg(not(test))]
 #[wasm_bindgen]
 unsafe extern "C" {

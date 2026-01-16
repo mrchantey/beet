@@ -7,13 +7,14 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			CliPlugin,
+			AppExitPlugin,
 			LogPlugin::default(),
-			// #[cfg(debug_assertions)]
-			// DebugFlowPlugin::default(),
+			#[cfg(debug_assertions)]
+			DebugFlowPlugin::default(),
 		))
 		.try_set_error_handler(bevy::ecs::error::panic)
 		.add_systems(Startup, cli_routes)
-		.run_and_exit();
+		.run();
 }
 
 

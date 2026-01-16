@@ -22,7 +22,7 @@ fn main() {
 		.add_systems(Startup,|config:Res<PackageConfig>|{
 			config.xprint("config");
 		})
-		.run_and_exit();
+		.run();
 }
 
 #[cfg(feature = "client")]

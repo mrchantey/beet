@@ -11,7 +11,8 @@ pub struct BeetPlugins;
 impl Plugin for BeetPlugins {
 	fn build(&self, app: &mut App) {
 		PrettyTracing::default().init();
-		app.try_set_error_handler(bevy::ecs::error::panic);
+		app.init_plugin::<AppExitPlugin>()
+			.try_set_error_handler(bevy::ecs::error::panic);
 		// do we do console error panic hook here?
 		// console_error_panic_hook::set_once();
 

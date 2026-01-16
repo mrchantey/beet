@@ -44,6 +44,7 @@ mod test {
 
 	#[test]
 	fn bool() {
+		// false.xpect_true();
 		true.xpect_true();
 		false.xpect_false();
 	}

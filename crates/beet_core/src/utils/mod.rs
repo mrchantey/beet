@@ -7,6 +7,7 @@ mod line_col;
 #[cfg(feature = "ansi_paint")]
 pub mod paint_ext;
 mod panic_context;
+pub mod process_ext;
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
