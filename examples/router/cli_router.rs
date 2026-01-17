@@ -7,7 +7,7 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			CliPlugin::default(),
+			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			// The Router is a beet_flow pattern, triggering `GetOutcome`
@@ -25,7 +25,6 @@ fn main() {
 							|| {
 								Response::ok_body(
 									"<div>hello foo</div>",
-									// this inserts the `content-type: text/html`  header
 									"text/html",
 								)
 							},

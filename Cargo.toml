@@ -234,7 +234,7 @@ rustls-tls = [
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
 rand = ["beet_core/rand"]
-agent = ["dep:beet_agent"]
+agent = ["dep:beet_agent","net","router"]
 testing = ["beet_core/testing"]
 dom = ["css", "dep:beet_dom"]
 router = ["dep:beet_router"]
@@ -327,6 +327,13 @@ web-sys.workspace = true
 # wasm-bindgen-futures.workspace = true
 
 # 💡 Examples - agent
+
+[[example]]
+name = "chat"
+path = "examples/agent/chat.rs"
+required-features = ["agent"]
+
+
 # 💡 Examples - net
 
 [[example]]
@@ -353,23 +360,6 @@ required-features = ["tungstenite"]
 name = "socket_client"
 path = "examples/net/socket_client.rs"
 required-features = ["tungstenite"]
-
-# 💡 Examples - router
-
-[[example]]
-name = "router"
-path = "examples/router/router.rs"
-required-features = ["server"]
-[[example]]
-name = "cli_router"
-path = "examples/router/cli_router.rs"
-required-features = ["launch"]
-
-[[example]]
-name = "router_bench"
-path = "examples/router/router_bench.rs"
-required-features = ["server"]
-
 
 # 💡 Examples - flow
 
@@ -407,6 +397,22 @@ required-features = ["flow"]
 name = "utility_ai"
 path = "examples/flow/utility_ai.rs"
 required-features = ["flow"]
+
+# 💡 Examples - router
+
+[[example]]
+name = "router"
+path = "examples/router/router.rs"
+required-features = ["server"]
+[[example]]
+name = "cli_router"
+path = "examples/router/cli_router.rs"
+required-features = ["server"]
+
+[[example]]
+name = "router_bench"
+path = "examples/router/router_bench.rs"
+required-features = ["server"]
 
 
 # [[example]]
