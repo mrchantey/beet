@@ -28,9 +28,8 @@ pub(super) fn log_suite_running(
 ) -> Result {
 	for (entity, _req) in requests {
 		let logger_params = logger_params.get(entity)?;
-		#[cfg(feature = "fs")]
 		if logger_params.watch {
-			terminal::clear().ok();
+			terminal_ext::clear().ok();
 		}
 
 		if logger_params.quiet {

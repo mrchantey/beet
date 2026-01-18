@@ -28,28 +28,6 @@ pub trait OneshotRequest {
 	) -> impl Future<Output = String>;
 }
 
-/// Trait for handling oneshot requests on mutable world types
-pub trait OneshotRequestMut {
-	/// Handle a single request and return the response
-	fn oneshot(
-		&mut self,
-		req: impl Into<Request>,
-	) -> impl Future<Output = Response>;
-
-	/// Handle a single request bundle and return the response
-	fn oneshot_bundle(
-		&mut self,
-		bundle: impl Bundle,
-	) -> impl Future<Output = Response>;
-
-	/// Convenience method for testing, unwraps a 200 response string
-	fn oneshot_str(
-		&mut self,
-		req: impl Into<Request>,
-	) -> impl Future<Output = String>;
-}
-
-
 impl OneshotRequest for AsyncEntity {
 	fn oneshot(
 		&self,
@@ -83,6 +61,79 @@ impl OneshotRequest for AsyncEntity {
 	}
 }
 
+impl OneshotRequest for AsyncWorld {
+	fn oneshot(
+		&self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Response> {
+		async move {
+			let server = self
+				.with_then(|world| {
+					world
+						.query_filtered::<Entity, With<ExchangeSpawner>>()
+						.single(world)
+						.expect("Expected a single ExchangeSpawner")
+				})
+				.await;
+			self.entity(server).oneshot(req).await
+		}
+	}
+
+	fn oneshot_bundle(
+		&self,
+		bundle: impl Bundle,
+	) -> impl Future<Output = Response> {
+		async move {
+			let server = self
+				.with_then(|world| {
+					world
+						.query_filtered::<Entity, With<ExchangeSpawner>>()
+						.single(world)
+						.expect("Expected a single ExchangeSpawner")
+				})
+				.await;
+			self.entity(server).oneshot_bundle(bundle).await
+		}
+	}
+
+	fn oneshot_str(
+		&self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = String> {
+		async move {
+			let server = self
+				.with_then(|world| {
+					world
+						.query_filtered::<Entity, With<ExchangeSpawner>>()
+						.single(world)
+						.expect("Expected a single ExchangeSpawner")
+				})
+				.await;
+			self.entity(server).oneshot_str(req).await
+		}
+	}
+}
+
+/// Trait for handling oneshot requests on mutable world types
+pub trait OneshotRequestMut {
+	/// Handle a single request and return the response
+	fn oneshot(
+		&mut self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = Response>;
+
+	/// Handle a single request bundle and return the response
+	fn oneshot_bundle(
+		&mut self,
+		bundle: impl Bundle,
+	) -> impl Future<Output = Response>;
+
+	/// Convenience method for testing, unwraps a 200 response string
+	fn oneshot_str(
+		&mut self,
+		req: impl Into<Request>,
+	) -> impl Future<Output = String>;
+}
 
 impl OneshotRequestMut for EntityWorldMut<'_> {
 	fn oneshot(
@@ -156,61 +207,6 @@ impl OneshotRequestMut for World {
 		async move { self.entity_mut(entity).oneshot_str(req).await }
 	}
 }
-
-
-impl OneshotRequest for AsyncWorld {
-	fn oneshot(
-		&self,
-		req: impl Into<Request>,
-	) -> impl Future<Output = Response> {
-		async move {
-			let server = self
-				.with_then(|world| {
-					world
-						.query_filtered::<Entity, With<ExchangeSpawner>>()
-						.single(world)
-						.expect("Expected a single ExchangeSpawner")
-				})
-				.await;
-			self.entity(server).oneshot(req).await
-		}
-	}
-
-	fn oneshot_bundle(
-		&self,
-		bundle: impl Bundle,
-	) -> impl Future<Output = Response> {
-		async move {
-			let server = self
-				.with_then(|world| {
-					world
-						.query_filtered::<Entity, With<ExchangeSpawner>>()
-						.single(world)
-						.expect("Expected a single ExchangeSpawner")
-				})
-				.await;
-			self.entity(server).oneshot_bundle(bundle).await
-		}
-	}
-
-	fn oneshot_str(
-		&self,
-		req: impl Into<Request>,
-	) -> impl Future<Output = String> {
-		async move {
-			let server = self
-				.with_then(|world| {
-					world
-						.query_filtered::<Entity, With<ExchangeSpawner>>()
-						.single(world)
-						.expect("Expected a single ExchangeSpawner")
-				})
-				.await;
-			self.entity(server).oneshot_str(req).await
-		}
-	}
-}
-
 
 /// Handles a single request-response exchange by spawning an agent entity and observing completion.
 ///
