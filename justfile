@@ -204,7 +204,7 @@ test-rsx *args:
     cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
 
 test crate *args:
-    just watch cargo test -p {{ crate }} --lib -- {{ args }}
+    just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
 
 test-int crate test *args:
     just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}

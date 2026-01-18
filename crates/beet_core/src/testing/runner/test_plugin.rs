@@ -28,7 +28,7 @@ impl Plugin for TestPlugin {
 			.add_systems(
 				RunTests,
 				(
-					// log_suite_running,
+					log_suite_running,
 					filter_tests,
 					log_case_running,
 					(run_tests_series, run_non_send_tests_series),

@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 
-
+/// A borrowed view of a mesasge
 pub struct MessageView<'a> {
 	pub actor: ActorView<'a>,
 	pub message: &'a Message,

@@ -13,7 +13,8 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs", "http"]
+default = ["serde", "fs", "http", "nightly"]
+nightly = []
 # for conditional compilation in hooks
 client = []
 server = [

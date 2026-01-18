@@ -167,7 +167,7 @@ been taken by a previous route, please check for conficting endpoints.
 		},
 	)
 }
-/// A non-func type that can be converted directly into an exchange bundle.
+/// A non-func type that can be converted directly into a response bundle.
 pub struct TypeIntoEndpoint;
 impl<T, M> IntoEndpointHandler<(TypeIntoEndpoint, M)> for T
 where

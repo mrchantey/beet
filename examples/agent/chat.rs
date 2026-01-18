@@ -12,8 +12,8 @@ fn main() {
 				CliServer,
 				ExchangeSpawner::new_flow(|| {
 					(InfallibleSequence, children![
-						EndpointBuilder::get().with_handler(|| {
-							todo!("agent")
+						EndpointBuilder::new(|| {
+							todo!("agent");
 							Response::ok_body("hello world", "text/plain")
 						}),
 					])
