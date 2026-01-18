@@ -44,7 +44,8 @@ push-assets:
 
 # Run a cli command as if it was installed
 cli *args:
-    cargo run -p beet-cli -- {{ args }}
+    beet {{ args }}
+    #cargo run -p beet-cli -- {{ args }}
 
 install-cli *args:
     cargo install --path crates/beet-cli {{ args }}
@@ -167,7 +168,7 @@ test-ci *args:
 snap:
     cargo test -p beet_core 				--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
-    cargo test -p beet_net					--lib --features=server -- --snap
+    cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
     cargo test -p beet_parse 				--lib --all-features -- --snap
@@ -180,7 +181,7 @@ test-core *args:
     cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
     cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_net	--features=server																				{{ args }} -- {{ test-threads }}
+    cargo test -p beet_net	--features=server,ureq,tungstenite,native-tls,flow			{{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:

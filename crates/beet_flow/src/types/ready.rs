@@ -46,7 +46,7 @@ impl ReadyAction {
 					let observer = func.clone();
 					commands.run(async move |world| {
 						let out = observer(world.entity(entity)).await;
-						world.entity(entity).trigger(Ready).await;
+						world.entity(entity).trigger_then(Ready).await;
 						out
 					});
 				},
@@ -70,7 +70,7 @@ impl ReadyAction {
 					let observer = func.clone();
 					commands.run_local(async move |world| {
 						let out = observer(world.entity(entity)).await;
-						world.entity(entity).trigger(Ready).await;
+						world.entity(entity).trigger_then(Ready).await;
 						out
 					});
 				},

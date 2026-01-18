@@ -134,7 +134,7 @@ impl<T: Hash + Eq + Debug> MessageSpawner<T> {
 	) -> Result<&mut Self> {
 		self.world
 			.entity(self.get_entity(&key)?)
-			.trigger(TextDelta::new(text))
+			.trigger_then(TextDelta::new(text))
 			.await;
 		Ok(self)
 	}

@@ -304,6 +304,18 @@ impl Request {
 		let http_parts: http::request::Parts = self.parts.try_into()?;
 		Ok(http::Request::from_parts(http_parts, bytes))
 	}
+
+	/// Creates a response that mirrors this request,
+	/// with a [`StatusCode::Ok`]
+	pub fn mirror(self) -> Response {
+		Response::new(
+			ResponseParts {
+				parts: self.parts().parts().clone(),
+				status: StatusCode::Ok,
+			},
+			self.body,
+		)
+	}
 }
 
 /// Helper to convert http header name to string

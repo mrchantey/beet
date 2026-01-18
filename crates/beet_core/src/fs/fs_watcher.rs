@@ -132,7 +132,7 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 				}
 				(false, _) => ev,
 			};
-			world.entity(entity).trigger_target(ev).await;
+			world.entity(entity).trigger_target_then(ev).await;
 		}
 		Ok(())
 	})

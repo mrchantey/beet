@@ -179,7 +179,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
+# beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
