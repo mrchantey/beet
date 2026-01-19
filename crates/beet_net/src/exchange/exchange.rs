@@ -3,53 +3,62 @@ use async_channel::TrySendError;
 use beet_core::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
+// Placeholder, will probs be replaced by bevy Template system
+pub trait BundleFunc: 'static + Send + Sync + Clone {
+	fn bundle_func(self) -> impl Bundle;
+}
+impl<F, T> BundleFunc for F
+where
+	F: 'static + Send + Sync + Clone + FnOnce() -> T,
+	T: Bundle,
+{
+	fn bundle_func(self) -> impl Bundle { self() }
+}
 
 
 
-#[extend::ext]
-pub impl Request {
-	/// Analagous to a local ECS version of [`Request::send`], triggering ane exchange
-	/// for the provided [`ExchangeHandler`], usually an Entity listening for an
-	/// [`ExchangeStart`] event.
-	///
-	/// If the
+#[extend::ext(name=EntityWorldMutExchangeExt)]
+pub impl EntityWorldMut<'_> {
 	fn exchange(
-		self,
-		handler: impl ExchangeHandler + Send,
-	) -> impl Future<Output = Response> + Send {
-		async move {
-			let (send, recv) = async_channel::bounded(1);
-			let cx = ExchangeContext::new(self, send);
-			handler.handle(cx);
-			match recv.recv().await {
-				Ok(response) => response,
-				Err(e) => {
-					// if the receiver errors, we can assume the exchange was not handled
-					error!("Exchange sender was dropped: {}", e);
-					Response::internal_error()
-				}
-			}
+		&mut self,
+		request: Request,
+	) -> impl Send + Future<Output = Response> {
+		exchange_inner(request, |ctx| {
+			self.trigger(ctx);
+			// flush any commands created by observers, ie SpawnExchange
+			self.world_scope(World::flush);
+		})
+	}
+}
+
+#[extend::ext(name=AsyncEntityExchangeExt)]
+pub impl AsyncEntity {
+	fn exchange(
+		&self,
+		request: Request,
+	) -> impl Send + Future<Output = Response> {
+		exchange_inner(request, |ctx| {
+			self.trigger(ctx);
+			// no need to flush in async context
+		})
+	}
+}
+
+async fn exchange_inner(
+	request: Request,
+	trigger: impl FnOnce(ExchangeContext),
+) -> Response {
+	let (send, recv) = async_channel::bounded(1);
+	trigger(ExchangeContext::new(request, send));
+	match recv.recv().await {
+		Ok(response) => response,
+		Err(e) => {
+			// if the receiver errors, we can assume the exchange was not handled
+			error!("Exchange sender was dropped: {}", e);
+			Response::internal_error()
 		}
 	}
 }
-
-
-pub trait ExchangeHandler {
-	fn handle(self, start: ExchangeContext);
-}
-
-impl ExchangeHandler for &AsyncEntity {
-	fn handle(self, start: ExchangeContext) { self.trigger(start); }
-}
-
-impl ExchangeHandler for &mut EntityWorldMut<'_> {
-	fn handle(self, start: ExchangeContext) {
-		self.trigger(start);
-		// flush any commands created by observers, ie SpawnExchange
-		self.world_scope(World::flush);
-	}
-}
-
 /// An EntityEvent triggered on the entity containing the server, ie a [`HttpServer`],
 /// for each request received.
 ///
@@ -215,36 +224,38 @@ mod test {
 	#[should_panic = "dropped without being handled"]
 	async fn unhandled_panics() {
 		let mut world = World::new();
-		Request::get("foo").exchange(&mut world.spawn_empty()).await;
+		world.spawn_empty().exchange(Request::get("foo")).await;
 	}
 	#[beet_core::test]
 	#[should_panic = "ExchangeListener has already been taken"]
 	async fn double_take() {
-		let mut world = World::new();
 		let handler = |ev: On<ExchangeStart>| {
 			let req = ev.take().unwrap();
 			let res = req.request.mirror();
 			req.end.send(res)
 		};
-		let mut entity =
-			world.spawn((OnSpawn::observe(handler), OnSpawn::observe(handler)));
-		Request::get("foo").exchange(&mut entity).await;
+		World::new()
+			.spawn((OnSpawn::observe(handler), OnSpawn::observe(handler)))
+			.exchange(Request::get("foo"))
+			.await;
 	}
 
 	#[beet_core::test]
 	async fn works() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(OnSpawn::observe(|ev: On<ExchangeStart>| {
+		World::new()
+			.spawn(OnSpawn::observe(|ev: On<ExchangeStart>| {
 				let req = ev.take().unwrap();
 				let res = req.request.mirror();
 				req.end.send(res)
-			}));
+			}))
+			.exchange(Request::get("foo"))
+			.await
+			.status()
+			.is_ok()
+			.xpect_true();
 		// let start = Instant::now();
-		let res = Request::get("foo").exchange(&mut entity).await;
 		// roundtrip should be ~10us when run in isolation
 		// start.elapsed().xpect_less_than(Duration::from_micros(100));
 		// println!("Handled request in {:?}", start.elapsed());
-		res.status().is_ok().xpect_true();
 	}
 }

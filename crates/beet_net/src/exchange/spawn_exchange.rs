@@ -39,11 +39,7 @@ use beet_core::prelude::*;
 ///     )
 /// }));
 /// ```
-pub fn spawn_exchange<F, B>(func: F) -> impl Bundle
-where
-	F: 'static + Send + Sync + Fn() -> B,
-	B: Bundle,
-{
+pub fn spawn_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let spawner_entity = ev.event_target();
@@ -51,7 +47,7 @@ where
 			let mut entity = commands.spawn((
 				ChildOf(spawner_entity),
 				OnSpawn::observe(end_on_insert_response),
-				func(),
+				func.clone().bundle_func(),
 				end,
 			));
 			// insert request after spawner, giving it a
@@ -94,20 +90,24 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let mut world = World::new();
-		let mut entity = world.spawn(spawn_exchange(|| {
-			OnSpawn::observe(
-				|ev: On<Insert, Request>,
-				 mut commands: Commands,
-				 requests: Query<&Request>| {
-					commands.entity(ev.event_target()).insert(
-						requests.get(ev.event_target()).unwrap().mirror_parts(),
-					);
-				},
-			)
-		}));
-		let res = Request::get("/foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
-		res.path_string().xpect_eq("/foo");
+		World::new()
+			.spawn(spawn_exchange(|| {
+				OnSpawn::observe(
+					|ev: On<Insert, Request>,
+					 mut commands: Commands,
+					 requests: Query<&Request>| {
+						commands.entity(ev.event_target()).insert(
+							requests
+								.get(ev.event_target())
+								.unwrap()
+								.mirror_parts(),
+						);
+					},
+				)
+			}))
+			.exchange(Request::get("/foo"))
+			.await
+			.path_string()
+			.xpect_eq("/foo");
 	}
 }

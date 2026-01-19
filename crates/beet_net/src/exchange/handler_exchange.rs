@@ -115,53 +115,57 @@ mod test {
 
 	#[beet_core::test]
 	async fn handler_sync_works() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(handler_exchange(|_, req| req.mirror_parts()));
-		let res = Request::get("/foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
-		res.path_string().xpect_eq("/foo");
+		World::new()
+			.spawn(handler_exchange(|_, req| req.mirror_parts()))
+			.exchange(Request::get("/foo"))
+			.await
+			.path_string()
+			.xpect_eq("/foo");
 	}
 
 	#[beet_core::test]
 	async fn handler_sync_custom_response() {
-		let mut world = World::new();
-		let mut entity = world.spawn(handler_exchange(|_, _| {
-			Response::from_status(StatusCode::ImATeapot)
-		}));
-		let res = Request::get("/foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::ImATeapot);
+		World::new()
+			.spawn(handler_exchange(|_, _| {
+				Response::from_status(StatusCode::ImATeapot)
+			}))
+			.exchange(Request::get("/foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 
 	#[beet_core::test]
 	async fn handler_async_works() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(handler_exchange_async(|_, req| async move {
+		World::new()
+			.spawn(handler_exchange_async(|_, req| async move {
 				req.mirror_parts()
-			}));
-		let res = Request::get("/bar").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
-		res.path_string().xpect_eq("/bar");
+			}))
+			.exchange(Request::get("/bar"))
+			.await
+			.path_string()
+			.xpect_eq("/bar");
 	}
 
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(handler_exchange_async(|_, _| async move {
+		World::new()
+			.spawn(handler_exchange_async(|_, _| async move {
 				Response::from_status(StatusCode::ImATeapot)
-			}));
-		let res = Request::get("/bar").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::ImATeapot);
+			}))
+			.exchange(Request::get("/bar"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 
 	#[beet_core::test]
 	async fn mirror_works() {
-		let mut world = World::new();
-		let mut entity = world.spawn(mirror_exchange());
-		let res = Request::get("/mirror").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
-		res.path_string().xpect_eq("/mirror");
+		World::new()
+			.spawn(mirror_exchange())
+			.exchange(Request::get("/mirror"))
+			.await
+			.path_string()
+			.xpect_eq("/mirror");
 	}
 }

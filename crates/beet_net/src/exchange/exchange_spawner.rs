@@ -3,17 +3,6 @@ use beet_core::prelude::*;
 use std::sync::Arc;
 
 
-// Placeholder, will probs be replaced by bevy Template system
-pub trait BundleFunc: 'static + Send + Sync + Clone {
-	fn bundle_func(self) -> impl Bundle;
-}
-impl<F, T> BundleFunc for F
-where
-	F: 'static + Send + Sync + Clone + FnOnce() -> T,
-	T: Bundle,
-{
-	fn bundle_func(self) -> impl Bundle { self() }
-}
 
 /// The function called for each request, spawning
 /// or retrieving the entity upon which a request will be inserted,

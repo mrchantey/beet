@@ -41,11 +41,7 @@ use beet_flow::prelude::*;
 /// let mut entity = world.spawn(flow_exchange(|| EndWith(Outcome::Pass)));
 /// // Exchange will complete with StatusCode::Ok
 /// ```
-pub fn flow_exchange<F, B>(func: F) -> impl Bundle
-where
-	F: 'static + Send + Sync + Fn() -> B,
-	B: Bundle,
-{
+pub fn flow_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let spawner_entity = ev.event_target();
@@ -71,7 +67,7 @@ where
 				// When Outcome is triggered, ensure response exists and send it
 				OnSpawn::observe(outcome_handler),
 				// User's behavior tree bundle (registers observers/actions)
-				func(),
+				func.clone().bundle_func(),
 				// Trigger GetOutcome after all observers are registered
 				OnSpawn::trigger(GetOutcome),
 			));
@@ -123,60 +119,66 @@ mod test {
 
 	#[beet_core::test]
 	async fn outcome_pass() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(flow_exchange(|| EndWith(Outcome::Pass)));
-		let res = Request::get("foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
+		World::new()
+			.spawn(flow_exchange(|| EndWith(Outcome::Pass)))
+			.exchange(Request::get("foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[beet_core::test]
 	async fn outcome_fail() {
-		let mut world = World::new();
-		let mut entity =
-			world.spawn(flow_exchange(|| EndWith(Outcome::Fail)));
-		let res = Request::get("foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::InternalError);
+		World::new()
+			.spawn(flow_exchange(|| EndWith(Outcome::Fail)))
+			.exchange(Request::get("foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::InternalError);
 	}
 
 	#[beet_core::test]
 	async fn custom_response() {
-		let mut world = World::new();
-		let mut entity = world.spawn(flow_exchange(|| {
-			OnSpawn::observe(
-				|ev: On<GetOutcome>,
-				 agents: AgentQuery,
-				 mut commands: Commands| {
-					let action = ev.target();
-					let agent = agents.entity(action);
-					commands
-						.entity(agent)
-						.insert(Response::from_status(StatusCode::ImATeapot));
-					commands.entity(action).trigger_target(Outcome::Pass);
-				},
-			)
-		}));
-		let res = Request::get("foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::ImATeapot);
+		World::new()
+			.spawn(flow_exchange(|| {
+				OnSpawn::observe(
+					|ev: On<GetOutcome>,
+						agents: AgentQuery,
+						mut commands: Commands| {
+						let action = ev.target();
+						let agent = agents.entity(action);
+						commands
+							.entity(agent)
+							.insert(Response::from_status(StatusCode::ImATeapot));
+						commands.entity(action).trigger_target(Outcome::Pass);
+					},
+				)
+			}))
+			.exchange(Request::get("foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::ImATeapot);
 	}
 
 	#[beet_core::test]
 	async fn agent_is_separate_from_action_root() {
-		let mut world = World::new();
-		let mut entity = world.spawn(flow_exchange(|| {
-			OnSpawn::observe(
-				|ev: On<GetOutcome>,
-				 agents: AgentQuery,
-				 mut commands: Commands| {
-					let action = ev.target();
-					let agent = agents.entity(action);
-					// Verify agent and action are different entities
-					agent.xpect_not_eq(action);
-					commands.entity(action).trigger_target(Outcome::Pass);
-				},
-			)
-		}));
-		let res = Request::get("foo").exchange(&mut entity).await;
-		res.status().xpect_eq(StatusCode::Ok);
+		World::new()
+			.spawn(flow_exchange(|| {
+				OnSpawn::observe(
+					|ev: On<GetOutcome>,
+						agents: AgentQuery,
+						mut commands: Commands| {
+						let action = ev.target();
+						let agent = agents.entity(action);
+						// Verify agent and action are different entities
+						agent.xpect_not_eq(action);
+						commands.entity(action).trigger_target(Outcome::Pass);
+					},
+				)
+			}))
+			.exchange(Request::get("foo"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 }
