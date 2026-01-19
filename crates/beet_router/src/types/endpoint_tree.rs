@@ -90,6 +90,7 @@ impl EndpointTree {
 
 	/// Get the canonical endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
 	/// Non-canonical endpoints are excluded.
+	#[deprecated="Left-over from ExchangeSpawner pattern"]
 	pub fn endpoints_from_exchange(
 		root: In<Entity>,
 		actions: Query<&Actions>,

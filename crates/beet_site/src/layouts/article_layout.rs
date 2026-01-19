@@ -9,19 +9,20 @@ pub fn article_layout_middleware(path: impl AsRef<Path>) -> impl Bundle {
 		path_str,
 		OnSpawn::observe(
 			|ev: On<GetOutcome>,
-			 agents: AgentQuery,
+			 agent_query: AgentQuery,
 			 query: HtmlBundleQuery<Without<ResponseMarker>>,
 			 mut commands: Commands|
 			 -> Result {
 				let action = ev.target();
-				let agent = agents.entity(action);
-				let Some(html_bundle) = query.get(agent)? else {
+				let agent = agent_query.entity(action);
+				let Some(html_bundle) = query.get(action)? else {
 					commands.entity(action).trigger_target(Outcome::Pass);
 					return Ok(());
 				};
 				// nest the current HtmlBundle under a new root
+				// Note: Don't add HtmlDocument here - html_bundle_to_response will add it
+				// and run ApplyDirectives to expand templates
 				commands.spawn((
-					HtmlDocument,
 					HtmlBundle,
 					ChildOf(agent),
 					rsx! { <ArticleLayout>{html_bundle}</ArticleLayout> },

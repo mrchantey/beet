@@ -13,7 +13,7 @@ pub fn server_plugin(app: &mut App) {
 	.spawn(default_router_cli(beet_site_router, beet_site_endpoints));
 }
 
-fn beet_site_endpoints() -> impl Bundle {
+pub fn beet_site_endpoints() -> impl Bundle {
 	(InfallibleSequence, children![
 		pages_routes(),
 		docs_routes(),

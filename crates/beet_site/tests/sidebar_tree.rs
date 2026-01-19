@@ -8,11 +8,19 @@ use beet_site::prelude::*;
 async fn works() {
 	let mut world = server_plugin.into_world();
 
-	let root = world.spawn(beet_site_router()).id();
-	let endpoints = world
-		.run_system_once_with(EndpointTree::endpoints_from_exchange, root)
-		.unwrap();
-	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
+	let endpoints = EndpointTree::endpoints_from_bundle_func(
+		&mut world,
+		beet_site_endpoints,
+	)
+	.unwrap();
+	let endpoint_tree = EndpointTree::from_endpoints(
+		endpoints
+			.into_iter()
+			.enumerate()
+			.map(|(i, e)| (Entity::from_bits((i + 1) as u64), e))
+			.collect(),
+	)
+	.unwrap();
 
 	let root = world
 		.run_system_cached_with(
