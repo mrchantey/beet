@@ -1,10 +1,44 @@
+//! Simple exchange pattern for request/response handling.
+//!
+//! This module provides [`spawn_exchange`], which creates an exchange handler
+//! that spawns a new entity for each request, observes the response insertion,
+//! and completes the exchange.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The function called for each request, spawning
-/// or retrieving the entity upon which a request will be inserted,
-/// and a response will be retrieved, see [`handle_request`]
-/// see [`default_handler`] for the default implementation.
+/// Creates an exchange handler that spawns a new entity for each request.
+///
+/// The provided function is called for each incoming request to create the bundle
+/// that will handle the exchange. The handler must insert a [`Response`] component
+/// on the spawned entity to complete the exchange.
+///
+/// ## Execution Flow
+///
+/// 1. [`ExchangeStart`] is triggered on the spawner entity
+/// 2. A new entity is spawned with the provided bundle
+/// 3. [`Request`] is inserted on the entity (after the bundle, allowing observers to be ready)
+/// 4. When [`Response`] is inserted, it is taken and sent via the exchange channel
+///
+/// ## Example
+///
+/// ```no_run
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// let mut world = World::new();
+/// let mut entity = world.spawn(spawn_exchange(|| {
+///     OnSpawn::observe(
+///         |ev: On<Insert, Request>,
+///          mut commands: Commands,
+///          requests: Query<&Request>| {
+///             // Mirror the request back as the response
+///             commands.entity(ev.event_target()).insert(
+///                 requests.get(ev.event_target()).unwrap().mirror_parts(),
+///             );
+///         },
+///     )
+/// }));
+/// ```
 pub fn spawn_exchange<F, B>(func: F) -> impl Bundle
 where
 	F: 'static + Send + Sync + Fn() -> B,
@@ -59,9 +93,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	// #[beet_core::test(timeout_ms = 500)]
 	async fn works() {
-		PrettyTracing::default().init();
 		let mut world = World::new();
 		let mut entity = world.spawn(spawn_exchange(|| {
 			OnSpawn::observe(
