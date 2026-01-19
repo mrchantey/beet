@@ -49,7 +49,11 @@ pub impl Request {
 
 
 
-#[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
+#[cfg(any(
+	all(feature = "ureq", feature = "native-tls"),
+	all(feature = "reqwest", feature = "native-tls"),
+	target_arch = "wasm32"
+))]
 #[cfg(test)]
 mod test_request {
 	use crate::prelude::*;

@@ -256,6 +256,7 @@ impl BevySleep {
 
 
 #[cfg(test)]
+#[cfg(feature = "ureq")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -264,7 +265,6 @@ mod test {
 	use std::time::Instant;
 
 	#[beet_core::test]
-	#[cfg(feature = "http")]
 	async fn works() {
 		let server = HttpServer::new_test();
 

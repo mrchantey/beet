@@ -154,7 +154,14 @@ impl ExchangeContext {
 
 
 	pub fn end(&self, entity: &mut EntityWorldMut, res: Response) -> Result {
-		entity.trigger(ExchangeEnd::from);
+		let id = entity.id();
+		entity.world_scope(|world| {
+			world.trigger(ExchangeEnd {
+				entity: id,
+				start_time: self.start_time,
+				status: res.status(),
+			})
+		});
 		self.send(res)
 	}
 	pub fn end_cmd(
@@ -162,7 +169,12 @@ impl ExchangeContext {
 		entity: &mut EntityCommands,
 		res: Response,
 	) -> Result {
-		entity.trigger(ExchangeEnd::from);
+		let id = entity.id();
+		entity.commands_mut().trigger(ExchangeEnd {
+			entity: id,
+			start_time: self.start_time,
+			status: res.status(),
+		});
 		self.send(res)
 	}
 
@@ -190,11 +202,12 @@ impl ExchangeContext {
 /// This may be used as a component but its perfectly valid to use directly
 #[derive(Clone, EntityEvent)]
 pub struct ExchangeEnd {
-	entity: Entity,
+	pub entity: Entity,
+	pub start_time: Instant,
+	pub status: StatusCode,
 }
-impl From<Entity> for ExchangeEnd {
-	fn from(entity: Entity) -> Self { Self { entity } }
-}
+
+
 
 #[cfg(test)]
 mod test {

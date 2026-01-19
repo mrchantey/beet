@@ -3,26 +3,6 @@ use beet_core::prelude::*;
 #[cfg(feature = "flow")]
 use beet_flow::prelude::ControlFlowPlugin;
 
-/// Represents a http request, may contain a [`Request`] or [`Response`]
-#[derive(Default, Reflect, Component)]
-#[reflect(Component)]
-pub struct Exchange;
-
-/// Points to the [`HttpServer`] that this exchange was spawned by.
-/// We don't use [`Children`] because some server patterns have a different
-/// meaning for that, for example `beet_router` uses `beet_flow` to represent
-/// the routes, and the [`Exchange`] is an `agent`.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship(relationship_target = Exchanges)]
-#[require(Exchange)]
-pub struct ExchangeOf(pub Entity);
-
-/// List of [`Exchange`]
-#[derive(Deref, Component)]
-#[relationship_target(relationship = ExchangeOf, linked_spawn)]
-pub struct Exchanges(Vec<Entity>);
-
 /// Plugin for running bevy servers.
 /// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
 #[derive(Default)]
@@ -52,14 +32,15 @@ impl ServerPlugin {
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>().add_observer(exchange_stats);
+		app.init_plugin::<AsyncPlugin>()
+			.add_observer(exchange_stats);
 		#[cfg(feature = "flow")]
 		app.init_plugin::<ControlFlowPlugin>();
 	}
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "server", feature = "ureq", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
