@@ -39,11 +39,12 @@ where
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let func = func.clone();
 			let spawner_entity = ev.event_target();
-			let ExchangeContext { request, end } = ev.take()?;
+			let (req, cx) = ev.take()?;
 
 			commands.queue(move |world: &mut World| -> Result {
-				let response = func(world.entity_mut(spawner_entity), request);
-				end.send(response)?;
+				let res = func(world.entity_mut(spawner_entity), req);
+				let mut entity = world.entity_mut(spawner_entity);
+				cx.end(&mut entity, res)?;
 				Ok(())
 			});
 
@@ -85,20 +86,23 @@ where
 	Fut: 'static + Send + Future<Output = Response>,
 {
 	let func = Arc::new(func);
-	OnSpawn::observe(move |ev: On<ExchangeStart>| -> Result {
-		let func = func.clone();
-		let spawner_entity = ev.event_target();
-		let ExchangeContext { request, end } = ev.take()?;
+	OnSpawn::observe(
+		move |ev: On<ExchangeStart>, mut commands: AsyncCommands| -> Result {
+			let func = func.clone();
+			let spawner_entity = ev.event_target();
+			let (req, cx) = ev.take()?;
 
-		// Spawn directly on the executor - no world updates needed
-		async_ext::spawn(async move {
-			let response = func(spawner_entity, request).await;
-			end.send(response).ok();
-		})
-		.detach();
+			commands.run(async move |world| {
+				let response = func(spawner_entity, req).await;
+				let entity = world.entity(spawner_entity);
+				entity.with(move |mut entity| {
+					cx.end(&mut entity, response).ok();
+				});
+			});
 
-		Ok(())
-	})
+			Ok(())
+		},
+	)
 }
 
 /// Creates a simple mirror exchange handler that echoes requests back as responses.
@@ -137,7 +141,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn handler_async_works() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn(handler_exchange_async(|_, req| async move {
 				req.mirror_parts()
 			}))
@@ -149,7 +153,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn(handler_exchange_async(|_, _| async move {
 				Response::from_status(StatusCode::ImATeapot)
 			}))

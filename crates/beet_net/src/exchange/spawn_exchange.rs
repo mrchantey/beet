@@ -43,16 +43,16 @@ pub fn spawn_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let spawner_entity = ev.event_target();
-			let ExchangeContext { request, end } = ev.take()?;
+			let (req, cx) = ev.take()?;
 			let mut entity = commands.spawn((
 				ChildOf(spawner_entity),
 				OnSpawn::observe(end_on_insert_response),
 				func.clone().bundle_func(),
-				end,
+				cx,
 			));
 			// insert request after spawner, giving it a
 			// chance to insert observers
-			entity.insert(request);
+			entity.insert(req);
 
 			Ok(())
 		},
@@ -77,10 +77,10 @@ fn take_and_send_response(mut entity: EntityWorldMut) -> Result {
 		.take::<Response>()
 		.unwrap_or_else(|| Response::not_found());
 	entity
-		.get::<ExchangeEnd>()
+		.get::<ExchangeContext>()
 		.ok_or_else(|| bevyhow!("ExchangeEnd not found"))?
-		.send(response)?;
-	Ok(())
+		.clone()
+		.end(&mut entity, response)
 }
 
 #[cfg(test)]

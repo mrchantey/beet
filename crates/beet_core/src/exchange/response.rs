@@ -39,7 +39,7 @@ use std::convert::Infallible;
 #[derive(Debug, Component)]
 #[require(ResponseMarker = ResponseMarker{_sealed:()})]
 pub struct Response {
-	parts: ResponseParts,
+	pub parts: ResponseParts,
 	pub body: Body,
 }
 

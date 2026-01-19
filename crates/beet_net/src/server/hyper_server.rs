@@ -276,7 +276,7 @@ mod test {
 					server,
 					handler_exchange(move |mut entity, req| {
 						let count = entity.world_scope(|world: &mut World| {
-							world.query_once::<&ServerStatus>()[0]
+							world.query_once::<&ExchangeStats>()[0]
 								.request_count()
 						});
 						assert!(count < 99999);

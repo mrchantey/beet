@@ -52,62 +52,9 @@ impl ServerPlugin {
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>().add_observer(server_stats);
+		app.init_plugin::<AsyncPlugin>().add_observer(exchange_stats);
 		#[cfg(feature = "flow")]
 		app.init_plugin::<ControlFlowPlugin>();
-	}
-}
-
-
-/// Update server stats if available
-fn server_stats(
-	ev: On<ExchangeComplete>,
-	mut servers: Query<&mut ServerStatus>,
-	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
-) -> Result {
-	let entity = ev.target();
-	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
-		return Ok(());
-	};
-	let status = response.status();
-	let duration = meta.started().elapsed();
-	let path = meta.path_string();
-	let method = meta.method();
-
-	let Ok(mut stats) = servers.get_mut(exchange_of.get()) else {
-		return Ok(());
-	};
-
-	bevy::log::info!(
-		"
-Request Complete
-  path:     {}
-  method:   {}
-  duration: {}
-  status:   {}
-  index:    {}
-",
-		path,
-		method,
-		time_ext::pretty_print_duration(duration),
-		status,
-		stats.request_count()
-	);
-	stats.increment_requests();
-	Ok(())
-}
-
-
-
-#[derive(Default, Component)]
-pub struct ServerStatus {
-	request_count: u128,
-}
-impl ServerStatus {
-	pub fn request_count(&self) -> u128 { self.request_count }
-	pub(super) fn increment_requests(&mut self) -> &mut Self {
-		self.request_count += 1;
-		self
 	}
 }
 

@@ -21,8 +21,6 @@ pub trait ExchangeTarget {
 		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response>;
-
-
 }
 
 impl ExchangeTarget for &mut EntityWorldMut<'_> {
@@ -30,11 +28,25 @@ impl ExchangeTarget for &mut EntityWorldMut<'_> {
 		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response> {
-		exchange_inner(request, |ctx| {
-			self.trigger(ctx);
-			// flush any commands created by observers, ie SpawnExchange
-			self.world_scope(World::flush);
-		})
+		let entity = self.id();
+		let world = unsafe { self.world_mut() };
+		let (send, recv) = async_channel::bounded(1);
+		let ev = ExchangeStart::new(entity, request, send);
+		world.trigger(ev);
+		// flush any commands created by observers, ie SpawnExchange
+		world.flush();
+
+		// check if response was sent synchronously
+		async move {
+			match recv.try_recv() {
+				Ok(response) => response,
+				Err(_) => {
+					// poll async tasks until we get a response
+					AsyncRunner::poll_and_update(|| world.update_local(), recv)
+						.await
+				}
+			}
+		}
 	}
 }
 
@@ -43,28 +55,27 @@ impl ExchangeTarget for &AsyncEntity {
 		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response> {
-		exchange_inner(request, |ctx| {
-			self.trigger(ctx);
-			// no need to flush in async context
-		})
-	}
-}
-
-async fn exchange_inner(
-	request: Request,
-	trigger: impl FnOnce(ExchangeContext),
-) -> Response {
-	let (send, recv) = async_channel::bounded(1);
-	trigger(ExchangeContext::new(request, send));
-	match recv.recv().await {
-		Ok(response) => response,
-		Err(e) => {
-			// if the receiver errors, we can assume the exchange was not handled
-			error!("Exchange sender was dropped: {}", e);
-			Response::internal_error()
+		let entity = self.id();
+		let world = self.world().clone();
+		async move {
+			let (send, recv) = async_channel::bounded(1);
+			world.with(move |world: &mut World| {
+				let ev = ExchangeStart::new(entity, request, send);
+				world.trigger(ev);
+				world.flush();
+			});
+			match recv.recv().await {
+				Ok(response) => response,
+				Err(e) => {
+					error!("Exchange sender was dropped: {}", e);
+					Response::internal_error()
+				}
+			}
 		}
 	}
 }
+
+
 /// An EntityEvent triggered on the entity containing the server, ie a [`HttpServer`],
 /// for each request received.
 ///
@@ -78,21 +89,7 @@ async fn exchange_inner(
 pub struct ExchangeStart {
 	#[event_target]
 	target: Entity,
-	inner: Arc<Mutex<Option<ExchangeContext>>>,
-}
-
-impl Drop for ExchangeStart {
-	fn drop(&mut self) {
-		let mut inner = self.inner.lock().unwrap();
-		if let Some(exchange_inner) = inner.take() {
-			// TODO custom trigger so we can gracefully error
-			panic!(
-				"ExchangeStart for entity {:?} was dropped without being handled. \nRequest: {}",
-				self.target,
-				exchange_inner.request.path_string()
-			);
-		}
-	}
+	inner: Arc<Mutex<Option<(Request, ExchangeContext)>>>,
 }
 
 impl ExchangeStart {
@@ -106,99 +103,73 @@ impl ExchangeStart {
 	) -> Self {
 		Self {
 			target,
-			inner: Arc::new(Mutex::new(Some(ExchangeContext {
+			inner: Arc::new(Mutex::new(Some((
 				request,
-				end: ExchangeEnd {
-					start_time: Instant::now(),
-					send: on_response,
-				},
-			}))),
+				ExchangeContext::new(on_response),
+			)))),
 		}
 	}
 
-	pub fn take(&self) -> Result<ExchangeContext> {
+	pub fn take(&self) -> Result<(Request, ExchangeContext)> {
 		let mut inner = self.inner.lock().unwrap();
 		inner
 			.take()
 			.ok_or_else(|| bevyhow!("ExchangeInner has already been taken, are there multiple exchange listeners on this entity?"))
 	}
 }
+
+impl Drop for ExchangeStart {
+	fn drop(&mut self) {
+		let mut inner = self.inner.lock().unwrap();
+		if let Some((req, _)) = inner.take() {
+			// TODO custom trigger so we can gracefully error
+			panic!(
+				"ExchangeStart for entity {:?} was dropped without being handled. \nRequest: {}",
+				self.target,
+				req.path_string()
+			);
+		}
+	}
+}
+
+
 /// Inner data for an exchange start event,
 /// this is required because an EntityEvent is immutable borrow only.
+#[derive(Clone, Component)]
 pub struct ExchangeContext {
-	pub request: Request,
-	pub end: ExchangeEnd,
+	pub start_time: Instant,
+	pub on_response: Sender<Response>,
 }
 
 impl ExchangeContext {
 	/// Create a new [`ExchangeStart`],
 	/// providing the request and a channel [`Sender`]
 	/// for when the exchange is complete
-	pub fn new(request: Request, on_response: Sender<Response>) -> Self {
+	pub fn new(on_response: Sender<Response>) -> Self {
 		Self {
-			request,
-			end: ExchangeEnd {
-				start_time: Instant::now(),
-				send: on_response,
-			},
+			start_time: Instant::now(),
+			on_response,
 		}
 	}
-}
 
-/// Allow for entity.trigger
-#[cfg(feature = "nightly")]
-impl FnOnce<(Entity,)> for ExchangeContext {
-	type Output = ExchangeStart;
-	extern "rust-call" fn call_once(self, args: (Entity,)) -> Self::Output {
-		ExchangeStart {
-			target: args.0,
-			inner: Arc::new(Mutex::new(Some(self))),
-		}
+
+	pub fn end(&self, entity: &mut EntityWorldMut, res: Response) -> Result {
+		entity.trigger(ExchangeEnd::from);
+		self.send(res)
 	}
-}
-
-
-// struct MyComplexEvent {
-// 	target: Entity,
-// 	inner: MyComplexInner,
-// }
-// struct MyComplexInner {}
-
-// #[cfg(feature = "nightly")]
-// impl FnOnce<(Entity,)> for MyComplexInner {
-// 	type Output = MyComplexEvent;
-// 	extern "rust-call" fn call_once(self, args: (Entity,)) -> Self::Output {
-// 		MyComplexEvent {
-// 			target: args.0,
-// 			inner: self,
-// 		}
-// 	}
-// }
-
-/// Represents the end of an exchange, usually the
-/// point at which we exit 'bevy land', hence channels
-/// instead of bevy events.
-///
-/// This may be used as a component but its perfectly valid to use directly
-#[derive(Component)]
-pub struct ExchangeEnd {
-	start_time: Instant,
-	send: Sender<Response>,
-}
-
-impl ExchangeEnd {
-	// fn new(send: Sender<Response>) -> Self {
-	// 	Self {
-	// 		start_time: Instant::now(),
-	// 		send,
-	// 	}
-	// }
-	pub fn start_time(&self) -> Instant { self.start_time }
+	pub fn end_cmd(
+		&self,
+		entity: &mut EntityCommands,
+		res: Response,
+	) -> Result {
+		entity.trigger(ExchangeEnd::from);
+		self.send(res)
+	}
 
 	/// Send the response back to the caller,
 	/// if the receiver is dropped this is a no-op.
-	pub fn send(&self, response: Response) -> Result {
-		match self.send.try_send(response) {
+	fn send(&self, response: Response) -> Result {
+		match self.on_response.try_send(response) {
 			Ok(_) => Ok(()),
 			Err(TrySendError::Full(_)) => {
 				bevybail!("Response already sent")
@@ -211,20 +182,24 @@ impl ExchangeEnd {
 		}
 	}
 }
+
+/// Represents the end of an exchange, usually the
+/// point at which we exit 'bevy land', hence channels
+/// instead of bevy events.
+///
+/// This may be used as a component but its perfectly valid to use directly
+#[derive(Clone, EntityEvent)]
+pub struct ExchangeEnd {
+	entity: Entity,
+}
+impl From<Entity> for ExchangeEnd {
+	fn from(entity: Entity) -> Self { Self { entity } }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-
-	#[test]
-	#[should_panic = "dropped without being handled"]
-	fn unhandled_panics_raw() {
-		let mut world = World::new();
-		let (send, _) = async_channel::unbounded();
-		world
-			.spawn_empty()
-			.trigger(ExchangeContext::new(Request::get("foo"), send));
-	}
 
 	#[beet_core::test]
 	#[should_panic = "dropped without being handled"]
@@ -233,12 +208,12 @@ mod test {
 		world.spawn_empty().exchange(Request::get("foo")).await;
 	}
 	#[beet_core::test]
-	#[should_panic = "ExchangeListener has already been taken"]
+	#[should_panic = "ExchangeInner has already been taken"]
 	async fn double_take() {
 		let handler = |ev: On<ExchangeStart>| {
-			let req = ev.take().unwrap();
-			let res = req.request.mirror();
-			req.end.send(res)
+			let (req, cx) = ev.take().unwrap();
+			let res = req.mirror();
+			cx.send(res)
 		};
 		World::new()
 			.spawn((OnSpawn::observe(handler), OnSpawn::observe(handler)))
@@ -249,11 +224,14 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		World::new()
-			.spawn(OnSpawn::observe(|ev: On<ExchangeStart>| {
-				let req = ev.take().unwrap();
-				let res = req.request.mirror();
-				req.end.send(res)
-			}))
+			.spawn(OnSpawn::observe(
+				|ev: On<ExchangeStart>, mut commands: Commands| {
+					let (req, cx) = ev.take().unwrap();
+					let res = req.mirror();
+					let mut entity = commands.entity(ev.event_target());
+					cx.end_cmd(&mut entity, res)
+				},
+			))
 			.exchange(Request::get("foo"))
 			.await
 			.status()

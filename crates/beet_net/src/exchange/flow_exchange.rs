@@ -45,15 +45,15 @@ pub fn flow_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let spawner_entity = ev.event_target();
-			let ExchangeContext { request, end } = ev.take()?;
+			let (req, cx) = ev.take()?;
 
 			// Spawn the agent entity with request and exchange end
 			let agent = commands
 				.spawn((
 					Name::new("Flow Exchange Agent"),
 					ChildOf(spawner_entity),
-					request,
-					end,
+					req,
+					cx,
 				))
 				.id();
 
@@ -105,10 +105,10 @@ fn take_and_send_response(mut entity: EntityWorldMut) -> Result {
 		.take::<Response>()
 		.unwrap_or_else(|| Response::not_found());
 	entity
-		.get::<ExchangeEnd>()
+		.get::<ExchangeContext>()
 		.ok_or_else(|| bevyhow!("ExchangeEnd not found"))?
-		.send(response)?;
-	Ok(())
+		.clone()
+		.end(&mut entity, response)
 }
 
 #[cfg(test)]
@@ -143,13 +143,13 @@ mod test {
 			.spawn(flow_exchange(|| {
 				OnSpawn::observe(
 					|ev: On<GetOutcome>,
-						agents: AgentQuery,
-						mut commands: Commands| {
+					 agents: AgentQuery,
+					 mut commands: Commands| {
 						let action = ev.target();
 						let agent = agents.entity(action);
-						commands
-							.entity(agent)
-							.insert(Response::from_status(StatusCode::ImATeapot));
+						commands.entity(agent).insert(Response::from_status(
+							StatusCode::ImATeapot,
+						));
 						commands.entity(action).trigger_target(Outcome::Pass);
 					},
 				)
@@ -166,8 +166,8 @@ mod test {
 			.spawn(flow_exchange(|| {
 				OnSpawn::observe(
 					|ev: On<GetOutcome>,
-						agents: AgentQuery,
-						mut commands: Commands| {
+					 agents: AgentQuery,
+					 mut commands: Commands| {
 						let action = ev.target();
 						let agent = agents.entity(action);
 						// Verify agent and action are different entities
