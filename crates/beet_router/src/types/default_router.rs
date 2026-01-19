@@ -165,12 +165,13 @@ pub fn app_info() -> EndpointBuilder {
 				..
 			} = config.clone();
 			rsx! {
-				<div>
+				<article>
+					<h1>App Info</h1>
 					<p>Title: {title}</p>
 					<p>Description: {description}</p>
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
-				</div>
+				</article>
 			}
 		},
 	)
