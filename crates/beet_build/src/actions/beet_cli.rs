@@ -15,7 +15,7 @@ pub fn beet_cli() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
 		CliServer,
-		ExchangeSpawner::new_flow(|| {
+		flow_exchange(|| {
 			(
 				// temporarily hardcode the beet site as a component
 				beet_site_cargo_build_cmd(),

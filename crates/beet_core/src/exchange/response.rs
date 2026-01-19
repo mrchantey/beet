@@ -314,6 +314,10 @@ impl Response {
 	pub fn with_content_type(self, content_type: &str) -> Self {
 		self.with_header("content-type", content_type)
 	}
+	/// Unwrap the ok status code and get the body as text
+	pub async fn unwrap_str(self) -> String {
+		self.into_result().await.unwrap().text().await.unwrap()
+	}
 }
 
 #[cfg(feature = "http")]

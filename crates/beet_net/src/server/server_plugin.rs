@@ -126,9 +126,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					ExchangeSpawner::new_handler(|_, _| {
-						Response::ok().with_body("hello")
-					}),
+					handler_exchange(|_, _| Response::ok().with_body("hello")),
 				))
 				.run();
 		});

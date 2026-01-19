@@ -13,7 +13,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		world.entity_mut(entity).run_async_local(
 			async move |entity| -> Result {
 				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res = entity.oneshot(req).await;
+				let res = entity.exchange(req).await;
 				let (parts, body) = res.into_parts();
 				let body = body.into_string().await?;
 				let exit = match parts.status_to_exit_code() {
@@ -51,9 +51,7 @@ mod tests {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
 				CliServer,
-				ExchangeSpawner::new_handler(|_, _| {
-					StatusCode::ImATeapot.into()
-				}),
+				handler_exchange(|_, _| StatusCode::ImATeapot.into()),
 			))
 			.run_async()
 			.await

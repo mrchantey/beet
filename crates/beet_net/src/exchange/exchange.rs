@@ -16,11 +16,18 @@ where
 }
 
 
-
-#[extend::ext(name=EntityWorldMutExchangeExt)]
-pub impl EntityWorldMut<'_> {
+pub trait ExchangeTarget {
 	fn exchange(
-		&mut self,
+		self,
+		request: Request,
+	) -> impl Send + Future<Output = Response>;
+
+
+}
+
+impl ExchangeTarget for &mut EntityWorldMut<'_> {
+	fn exchange(
+		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response> {
 		exchange_inner(request, |ctx| {
@@ -31,10 +38,9 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
-#[extend::ext(name=AsyncEntityExchangeExt)]
-pub impl AsyncEntity {
+impl ExchangeTarget for &AsyncEntity {
 	fn exchange(
-		&self,
+		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response> {
 		exchange_inner(request, |ctx| {

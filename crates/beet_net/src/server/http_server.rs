@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 #[derive(Clone, Component)]
 #[component(on_add=on_add)]
-#[require(ExchangeSpawner, ServerStatus)]
+#[require(ServerStatus)]
 pub struct HttpServer {
 	/// The port the server listens on. This may be updated at runtime,
 	/// for instance if the provided port is `0` it may be updated to

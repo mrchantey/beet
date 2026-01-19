@@ -215,7 +215,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("docs")
@@ -223,7 +223,9 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/docs"))
+			.exchange(Request::get("/docs"))
+			.await
+			.unwrap_str()
 			.await
 			.xpect_eq("Success");
 	}
@@ -260,7 +262,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get().with_handler(|| (
 						BeetRoot,
@@ -269,8 +271,9 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange(Request::get("/"))
 			.await
+			.unwrap_str()
 			.xpect_contains("Partying");
 	}
 }
