@@ -44,8 +44,8 @@ push-assets:
 
 # Run a cli command as if it was installed
 cli *args:
-    beet {{ args }}
-    #cargo run -p beet-cli -- {{ args }}
+    cargo run -p beet-cli -- {{ args }}
+    # beet {{ args }}
 
 install-cli *args:
     cargo install --path crates/beet-cli {{ args }}

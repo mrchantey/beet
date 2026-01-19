@@ -43,9 +43,7 @@ where
 
 			commands.queue(move |world: &mut World| -> Result {
 				let res = func(world.entity_mut(spawner_entity), req);
-				let mut entity = world.entity_mut(spawner_entity);
-				cx.end(&mut entity, res)?;
-				Ok(())
+				cx.end_no_entity(res)
 			});
 
 			Ok(())
@@ -92,12 +90,9 @@ where
 			let spawner_entity = ev.event_target();
 			let (req, cx) = ev.take()?;
 
-			commands.run(async move |world| {
+			commands.run(async move |_| {
 				let response = func(spawner_entity, req).await;
-				let entity = world.entity(spawner_entity);
-				entity.with(move |mut entity| {
-					cx.end(&mut entity, response).ok();
-				});
+				cx.end_no_entity(response)
 			});
 
 			Ok(())

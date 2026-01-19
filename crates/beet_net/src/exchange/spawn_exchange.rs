@@ -80,7 +80,7 @@ fn take_and_send_response(mut entity: EntityWorldMut) -> Result {
 		.get::<ExchangeContext>()
 		.ok_or_else(|| bevyhow!("ExchangeEnd not found"))?
 		.clone()
-		.end(&mut entity, response)
+		.end(entity, response)
 }
 
 #[cfg(test)]

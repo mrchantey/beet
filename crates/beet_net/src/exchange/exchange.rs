@@ -167,7 +167,7 @@ impl ExchangeContext {
 	}
 
 
-	pub fn end(&self, entity: &mut EntityWorldMut, res: Response) -> Result {
+	pub fn end(&self, mut entity: EntityWorldMut, res: Response) -> Result {
 		let id = entity.id();
 		entity.world_scope(|world| {
 			world.trigger(ExchangeEnd {
@@ -176,25 +176,27 @@ impl ExchangeContext {
 				status: res.status(),
 			})
 		});
-		self.send(res)
+		entity.despawn();
+		self.end_no_entity(res)
 	}
-	pub fn end_cmd(
-		&self,
-		entity: &mut EntityCommands,
-		res: Response,
-	) -> Result {
+	/// End the exchange from an EntityCommands context,
+	/// and despawn the entity
+	pub fn end_cmd(&self, mut entity: EntityCommands, res: Response) -> Result {
 		let id = entity.id();
 		entity.commands_mut().trigger(ExchangeEnd {
 			entity: id,
 			start_time: self.start_time,
 			status: res.status(),
 		});
-		self.send(res)
+		entity.despawn();
+		self.end_no_entity(res)
 	}
 
+	/// End the exchange by just sending back the response,
+	/// without cleaning up an exchange entity or triggering [`ExchangeEnd`]
 	/// Send the response back to the caller,
 	/// if the receiver is dropped this is a no-op.
-	fn send(&self, response: Response) -> Result {
+	pub fn end_no_entity(&self, response: Response) -> Result {
 		match self.on_response.try_send(response) {
 			Ok(_) => Ok(()),
 			Err(TrySendError::Full(_)) => {
@@ -240,7 +242,7 @@ mod test {
 		let handler = |ev: On<ExchangeStart>| {
 			let (req, cx) = ev.take().unwrap();
 			let res = req.mirror();
-			cx.send(res)
+			cx.end_no_entity(res)
 		};
 		World::new()
 			.spawn((OnSpawn::observe(handler), OnSpawn::observe(handler)))
@@ -255,8 +257,8 @@ mod test {
 				|ev: On<ExchangeStart>, mut commands: Commands| {
 					let (req, cx) = ev.take().unwrap();
 					let res = req.mirror();
-					let mut entity = commands.entity(ev.event_target());
-					cx.end_cmd(&mut entity, res)
+					let entity = commands.entity(ev.event_target());
+					cx.end_cmd(entity, res)
 				},
 			))
 			.exchange(Request::get("foo"))

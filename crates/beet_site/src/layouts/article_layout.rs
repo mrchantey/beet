@@ -38,7 +38,7 @@ pub fn article_layout_middleware(path: impl AsRef<Path>) -> impl Bundle {
 pub fn ArticleLayout(query: Query<&ArticleMeta>) -> impl Bundle {
 	for _item in query.iter() {
 		//TODO we should use this to generate unique page names etc
-		println!("ArticleMeta: {:?}", _item);
+		// println!("ArticleMeta: {:?}", _item);
 	}
 
 	let meta = ArticleMeta::default();
