@@ -11,12 +11,12 @@ use serde_json::Value;
 /// The entrypoint for a router with two endoints:
 /// - `/`: Serve the routes
 /// - `/export-static`: export static html
-pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
-	let spawner2 = spawner.clone();
+pub fn default_router_cli(router: ExchangeSpawner) -> impl Bundle {
+	// let spawner2 = spawner.clone();
 	(
 		Name::new("Router CLI"),
 		CliServer,
-		ExchangeSpawner::new_flow(|| {
+		flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
 					introduction: String::from("Router CLI"),
@@ -28,10 +28,7 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 						// actually serve the routes
 						entity
 							.world()
-							.spawn_then((
-								HttpServer::default(),
-								spawner.clone(),
-							))
+							.spawn_then((HttpServer::default(), router))
 							.await;
 						// start serving, never resolve
 						std::future::pending::<()>().await;
@@ -78,7 +75,7 @@ pub fn default_router(
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
 ) -> ExchangeSpawner {
-	ExchangeSpawner::new_flow(move || {
+	flow_exchange(move || {
 		(InfallibleSequence, children![
 			(Name::new("Await Ready"), AwaitReady::default()),
 			(
@@ -268,16 +265,16 @@ mod test {
 		));
 
 		entity
-			.oneshot_str("/app-info")
+			.exchange_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 		entity
-			.oneshot("/assets/branding/logo.png")
+			.exchange("/assets/branding/logo.png")
 			.await
 			.into_result()
 			.await
 			.unwrap();
-		let mut stat = async |val: &str| entity.oneshot(val).await.status();
+		let mut stat = async |val: &str| entity.exchange(val).await.status();
 		stat("/bingbong").await.xpect_eq(StatusCode::NotFound);
 		stat("/assets/bing").await.xpect_eq(StatusCode::NotFound);
 		stat("/assets/branding/logo.png")
@@ -290,13 +287,13 @@ mod test {
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					app_info(),
 					html_bundle_to_response()
 				])
 			}))
-			.oneshot_str("/app-info")
+			.exchange_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}

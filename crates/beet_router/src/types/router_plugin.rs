@@ -42,14 +42,14 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Pass)))
-			.oneshot(Request::get("/foo"))
+			.spawn(flow_exchange(|| EndWith(Outcome::Pass)))
+			.exchange(Request::get("/foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| EndWith(Outcome::Fail)))
-			.oneshot(Request::get("/foo"))
+			.spawn(flow_exchange(|| EndWith(Outcome::Fail)))
+			.exchange(Request::get("/foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::InternalError);
@@ -58,7 +58,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_tree() {
 		let mut world = RouterPlugin::world();
-		let spawner = ExchangeSpawner::new_flow(|| {
+		let spawner = flow_exchange(|| {
 			(CacheStrategy::Static, children![
 				EndpointBuilder::get().with_handler(
 					async |_: (), action: AsyncEntity| -> Result<String> {
@@ -106,7 +106,7 @@ mod test {
 				.add_plugins((MinimalPlugins, RouterPlugin))
 				.spawn((
 					server,
-					ExchangeSpawner::new_flow(|| EndpointBuilder::get()),
+					flow_exchange(|| EndpointBuilder::get()),
 				))
 				.run();
 		});

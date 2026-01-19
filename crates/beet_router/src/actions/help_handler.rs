@@ -78,7 +78,7 @@ pub struct HelpParams {
 /// # use beet_net::prelude::*;
 /// # async {
 /// RouterPlugin::world()
-///     .spawn(ExchangeSpawner::new_flow(|| {
+///     .spawn(flow_exchange(|| {
 ///         (Fallback, children![
 ///             help_handler(HelpHandlerConfig {
 ///                 introduction: String::from("Welcome to my CLI"),
@@ -91,7 +91,7 @@ pub struct HelpParams {
 ///                 .with_handler(|| "foo"),
 ///         ])
 ///     }))
-///     .oneshot_str(Request::get("/?help=true"))
+///     .exchange_str(Request::get("/?help=true"))
 ///     .await;
 /// # };
 /// ```
@@ -522,7 +522,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_shows_matching_endpoints() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -536,7 +536,7 @@ mod test {
 			])
 		}));
 
-		let response = entity.oneshot_str(Request::get("/?help=true")).await;
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
 
 		response.clone().xpect_contains("foo");
 		response.clone().xpect_contains("The foo command");
@@ -547,7 +547,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_format_http() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::post()
@@ -558,7 +558,7 @@ mod test {
 		}));
 
 		let response = entity
-			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.exchange_str(Request::get("/?help=true&help-format=http"))
 			.await;
 
 		response.clone().xpect_contains("POST");
@@ -577,7 +577,7 @@ mod test {
 		}
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -588,7 +588,7 @@ mod test {
 			])
 		}));
 
-		let response = entity.oneshot_str(Request::get("/?help=true")).await;
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
 
 		response.clone().xpect_contains("verbose");
 		response.clone().xpect_contains("Enable verbose output");
@@ -599,7 +599,7 @@ mod test {
 	#[beet_core::test]
 	async fn no_help_passes_through() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -608,7 +608,7 @@ mod test {
 			])
 		}));
 
-		let response = entity.oneshot_str(Request::get("/foo")).await;
+		let response = entity.exchange_str(Request::get("/foo")).await;
 
 		response.xpect_eq("foo response");
 	}
@@ -616,7 +616,7 @@ mod test {
 	#[beet_core::test]
 	async fn kebab_case_params_work() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -627,12 +627,12 @@ mod test {
 
 		// test both kebab-case and underscore variants
 		let response1 = entity
-			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.exchange_str(Request::get("/?help=true&help-format=http"))
 			.await;
 		response1.clone().xpect_contains("GET");
 
 		let response2 = entity
-			.oneshot_str(Request::get("/?help=true&help_format=http"))
+			.exchange_str(Request::get("/?help=true&help_format=http"))
 			.await;
 		response2.xpect_contains("GET");
 	}
@@ -654,7 +654,7 @@ mod test {
 		}
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -667,7 +667,7 @@ mod test {
 
 		// CLI help shows kebab-case params
 		let help_response =
-			entity.oneshot_str(Request::get("/?help=true")).await;
+			entity.exchange_str(Request::get("/?help=true")).await;
 
 		help_response.clone().xpect_contains("--max-retry-count");
 		help_response
@@ -680,7 +680,7 @@ mod test {
 
 		// HTTP help also shows kebab-case
 		let http_help = entity
-			.oneshot_str(Request::get("/?help=true&help-format=http"))
+			.exchange_str(Request::get("/?help=true&help-format=http"))
 			.await;
 
 		http_help.clone().xpect_contains("max-retry-count");

@@ -272,10 +272,10 @@ mod test {
 		H: IntoEndpointHandler<M>,
 	{
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				handler().into_endpoint_handler()
 			}))
-			.oneshot(Request::get("/foo").with_json_body(&Foo(3)).unwrap())
+			.exchange(Request::get("/foo").with_json_body(&Foo(3)).unwrap())
 			.await
 			.status()
 	}

@@ -13,7 +13,7 @@ fn main() {
 			// using beet_flow patterns for control flow
 			commands.spawn((
 				HttpServer::default(),
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					// InfallibleSequence ensures all endpoints are checked
 					// even if the previous one did not match
 					(InfallibleSequence, children![

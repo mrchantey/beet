@@ -27,7 +27,7 @@ use beet_net::prelude::*;
 /// # use beet_net::prelude::*;
 ///
 /// let mut world = World::new();
-/// world.spawn(ExchangeSpawner::new_flow(|| {
+/// world.spawn(flow_exchange(|| {
 ///   (
 /// 		InfallibleSequence, children![
 ///       EndpointBuilder::get().with_path("api"),

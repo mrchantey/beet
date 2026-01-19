@@ -10,7 +10,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				CliServer,
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					(InfallibleSequence, children![
 						EndpointBuilder::new(|| {
 							todo!("agent");

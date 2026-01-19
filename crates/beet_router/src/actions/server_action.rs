@@ -142,10 +142,10 @@ mod test {
 	#[beet_core::test]
 	async fn no_input() {
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				ServerAction::new(HttpMethod::Post, || 2)
 			}))
-			.oneshot(
+			.exchange(
 				Request::post("/")
 					// no input means we need to specify unit type
 					.with_json_body(&())
@@ -164,14 +164,14 @@ mod test {
 	#[beet_core::test]
 	async fn post() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			ServerAction::new(HttpMethod::Post, |val: In<u32>| val.0 + 2)
 				.with_path("foo")
 		}));
 
 		//ok
 		entity
-			.oneshot(Request::post("/foo").with_json_body(&3).unwrap())
+			.exchange(Request::post("/foo").with_json_body(&3).unwrap())
 			.await
 			.into_result()
 			.await
@@ -183,7 +183,7 @@ mod test {
 			.xpect_eq(5);
 		// no body
 		entity
-			.oneshot(Request::post("/foo"))
+			.exchange(Request::post("/foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::MalformedRequest);
@@ -191,7 +191,7 @@ mod test {
 	#[beet_core::test]
 	async fn get_sync() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			ServerAction::new_async(HttpMethod::Get, async |val: u32, _| {
 				val + 2
 			})
@@ -199,7 +199,7 @@ mod test {
 
 		//ok
 		entity
-			.oneshot(Request::get("/?data=3"))
+			.exchange(Request::get("/?data=3"))
 			.await
 			.into_result()
 			.await
@@ -211,7 +211,7 @@ mod test {
 			.xpect_eq(5);
 		// no query param
 		entity
-			.oneshot(Request::get("/"))
+			.exchange(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::MalformedRequest);

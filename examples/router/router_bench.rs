@@ -19,7 +19,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					(InfallibleSequence, children![
 						EndpointBuilder::get().with_handler(|| {
 							Response::ok_body(

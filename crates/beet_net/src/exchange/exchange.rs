@@ -21,6 +21,19 @@ pub trait ExchangeTarget {
 		self,
 		request: Request,
 	) -> impl Send + Future<Output = Response>;
+
+	/// Exchange a request and get the response body as a string,
+	/// used for testing and debugging
+	fn exchange_str(
+		self,
+		request: impl Into<Request>,
+	) -> impl Send + Future<Output = String>
+	where
+		Self: Sized,
+	{
+		let fut = self.exchange(request.into());
+		async move { fut.await.unwrap_str().await }
+	}
 }
 
 impl ExchangeTarget for &mut EntityWorldMut<'_> {

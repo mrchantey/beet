@@ -46,7 +46,7 @@ pub async fn collect_html(
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");
 
 		let text = spawner_entity
-			.oneshot(Request::get(&path))
+			.exchange(Request::get(&path))
 			.await
 			.into_result()
 			.await
@@ -76,7 +76,7 @@ mod test {
 	#[beet_core::test]
 	async fn children() {
 		let mut world = RouterPlugin::world();
-		let spawner = ExchangeSpawner::new_flow(|| {
+		let spawner = flow_exchange(|| {
 			(InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")

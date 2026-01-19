@@ -403,8 +403,8 @@ mod test {
 		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| EndpointBuilder::get()))
-			.oneshot(Request::get("/"))
+			.spawn(flow_exchange(|| EndpointBuilder::get()))
+			.exchange(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);
@@ -413,7 +413,7 @@ mod test {
 	#[beet_core::test]
 	async fn dynamic_path() {
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				EndpointBuilder::get().with_path("/:path").with_handler(
 					async |_req: (),
 					       action: AsyncEntity|
@@ -425,7 +425,7 @@ mod test {
 					},
 				)
 			}))
-			.oneshot_str(Request::get("/bing"))
+			.exchange_str(Request::get("/bing"))
 			.await
 			.xpect_eq("bing");
 	}
@@ -435,7 +435,7 @@ mod test {
 		use beet_flow::prelude::*;
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")
@@ -445,39 +445,39 @@ mod test {
 					.with_handler(|| "bar"),
 			])
 		}));
-		entity.oneshot_str("/foo").await.xpect_eq("foo");
-		entity.oneshot_str("/bar").await.xpect_eq("bar");
+		entity.exchange_str("/foo").await.xpect_eq("foo");
+		entity.exchange_str("/bar").await.xpect_eq("bar");
 	}
 
 	#[beet_core::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			EndpointBuilder::post().with_path("foo")
 		}));
 
 		// method and path match
 		entity
-			.oneshot(Request::post("/foo"))
+			.exchange(Request::post("/foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);
 		// method does not match - returns 500 because single endpoint failure
 		// (404 requires a router with fallback structure)
 		entity
-			.oneshot(Request::get("/foo"))
+			.exchange(Request::get("/foo"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::InternalError);
 		// path does not match
 		entity
-			.oneshot(Request::get("/bar"))
+			.exchange(Request::get("/bar"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::InternalError);
 		// path has extra parts
 		entity
-			.oneshot(Request::get("/foo/bar"))
+			.exchange(Request::get("/foo/bar"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::InternalError);
@@ -487,7 +487,7 @@ mod test {
 		use beet_flow::prelude::*;
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(ExchangeSpawner::new_flow(|| {
+		let mut entity = world.spawn(flow_exchange(|| {
 			(InfallibleSequence, children![
 				EndpointBuilder::middleware(
 					"api",
@@ -508,7 +508,7 @@ mod test {
 
 		// Middleware allows trailing path segments, so this matches
 		entity
-			.oneshot(Request::get("/api/users"))
+			.exchange(Request::get("/api/users"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);
@@ -547,7 +547,7 @@ mod test {
 	async fn response_exists() {
 		// Simple test to verify Response exists after endpoint
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					EndpointBuilder::get()
 						.with_handler(|| StatusCode::Ok.into_response()),
@@ -568,7 +568,7 @@ mod test {
 					),
 				])
 			}))
-			.oneshot(Request::get("/"))
+			.exchange(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);

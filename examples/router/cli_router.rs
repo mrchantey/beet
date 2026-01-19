@@ -14,7 +14,7 @@ fn main() {
 			// and returning the Response once `Outcome` is triggered
 			commands.spawn((
 				CliServer,
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					// this sequence type will ensure all endpoints are checked
 					// even if the previous one did not match
 					(InfallibleSequence, children![

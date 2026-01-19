@@ -141,7 +141,7 @@ mod test {
 	async fn bundle_to_response_false() {
 		RouterPlugin
 			.into_world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_handler(|| rsx! {"hello world"}),
@@ -150,7 +150,7 @@ mod test {
 					// flow will silently succeed, maybe we should error?
 				])
 			}))
-			.oneshot(Request::get("/"))
+			.exchange(Request::get("/"))
 			.await
 			.status()
 			.xpect_eq(StatusCode::Ok);
@@ -159,7 +159,7 @@ mod test {
 	#[beet_core::test]
 	async fn bundle_to_response_true() {
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get().with_handler(|| (
 						BeetRoot,
@@ -168,7 +168,7 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_eq("<div>hello world</div>");
 	}
@@ -190,7 +190,7 @@ mod test {
 
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("foo")
@@ -198,7 +198,7 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/foo"))
+			.exchange_str(Request::get("/foo"))
 			.await
 			.xpect_eq("/foo\n");
 	}
@@ -224,7 +224,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("nested")
@@ -232,7 +232,7 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/nested"))
+			.exchange_str(Request::get("/nested"))
 			.await
 			.xpect_eq("/nested\n");
 	}
@@ -263,7 +263,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("deep")
@@ -271,7 +271,7 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/deep"))
+			.exchange_str(Request::get("/deep"))
 			.await
 			.xpect_eq("/deep\n");
 	}
@@ -281,14 +281,14 @@ mod test {
 	async fn with_template() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_eq(
 				"<!DOCTYPE html><html><head></head><body><div>foo: 42</div></body></html>",
@@ -298,7 +298,7 @@ mod test {
 	async fn middleware() {
 		RouterPlugin::world()
 			// .with_resource(RenderMode::Ssr)
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
@@ -329,7 +329,7 @@ mod test {
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_str("<!DOCTYPE html><html><head></head><body>middleware!<div>foo: 42</div></body></html>");
 	}
