@@ -124,7 +124,7 @@ impl Default for EndpointBuilder {
 	fn default() -> Self {
 		Self {
 			insert: Box::new(|entity| {
-				entity.insert(endpoint_action(StatusCode::Ok).bundle_func());
+				entity.insert(endpoint_action(StatusCode::Ok));
 			}),
 			path: None,
 			params: None,
@@ -203,8 +203,8 @@ impl EndpointBuilder {
 	///     .with_path("/foo")
 	///     .with_action(|req: Request| req.mirror())
 	/// ```
-	pub fn with_handler(self, handler: impl BundleFunc) -> Self {
-		self.with_handler_bundle(handler.bundle_func())
+	pub fn with_handler(self, handler: impl Bundle) -> Self {
+		self.with_handler_bundle(handler)
 	}
 	/// Convenience method that wraps the action in [`endpoint_action`].
 	///

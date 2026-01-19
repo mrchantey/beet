@@ -29,7 +29,7 @@ pub fn run_wasm() -> impl Bundle {
 		run_deno(),
 		(
 			Name::new("Ok"),
-			endpoint_action(StatusCode::Ok).bundle_func()
+			endpoint_action(StatusCode::Ok)
 		)
 	])
 }

@@ -59,7 +59,7 @@ fn main() {
 /// 100 nested sequences
 #[rustfmt::skip]
 fn nested_sequence<M>(action: impl 'static + Send + Sync + Clone + IntoEndpointAction<M>) -> impl Bundle {
-	let inner = endpoint_action(action).bundle_func();
+	let inner = endpoint_action(action);
 (Sequence, children![
 (Sequence, children![
 (Sequence, children![

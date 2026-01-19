@@ -39,8 +39,7 @@ impl BucketEndpoint {
 						let bucket = action.get_cloned::<Bucket>().await?;
 						bucket_to_response(&bucket, &path).await
 					},
-				)
-				.bundle_func(),
+				),
 			))
 	}
 }

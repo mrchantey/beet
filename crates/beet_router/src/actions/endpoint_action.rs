@@ -98,8 +98,8 @@ pub trait IntoEndpointAction<M> {
 /// ```
 pub fn endpoint_action<M>(
 	action: impl 'static + Send + Sync + Clone + IntoEndpointAction<M>,
-) -> impl BundleFunc {
-	move || action.into_endpoint_action()
+) -> impl Bundle {
+	action.into_endpoint_action()
 }
 
 /// Run the provided func, then call `into_exchange_bundle` on the output,
