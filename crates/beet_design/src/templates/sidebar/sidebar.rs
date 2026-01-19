@@ -274,6 +274,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.unwrap_str()
+			.await
 			.xpect_contains("Partying");
 	}
 }

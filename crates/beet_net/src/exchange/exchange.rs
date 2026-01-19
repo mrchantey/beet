@@ -20,14 +20,14 @@ pub trait ExchangeTarget {
 	fn exchange(
 		self,
 		request: impl Into<Request>,
-	) -> impl Send + Future<Output = Response>;
+	) -> impl MaybeSend + Future<Output = Response>;
 
 	/// Exchange a request and get the response body as a string,
 	/// used for testing and debugging
 	fn exchange_str(
 		self,
 		request: impl Into<Request>,
-	) -> impl Send + Future<Output = String>
+	) -> impl MaybeSend + Future<Output = String>
 	where
 		Self: Sized,
 	{
@@ -67,7 +67,7 @@ impl ExchangeTarget for &AsyncEntity {
 	fn exchange(
 		self,
 		request: impl Into<Request>,
-	) -> impl Send + Future<Output = Response> {
+	) -> impl MaybeSend + Future<Output = Response> {
 		let entity = self.id();
 		let world = self.world().clone();
 		let request = request.into();
