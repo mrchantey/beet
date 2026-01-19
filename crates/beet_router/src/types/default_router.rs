@@ -11,8 +11,10 @@ use serde_json::Value;
 /// The entrypoint for a router with two endoints:
 /// - `/`: Serve the routes
 /// - `/export-static`: export static html
-pub fn default_router_cli(router: ExchangeSpawner) -> impl Bundle {
-	// let spawner2 = spawner.clone();
+pub fn default_router_cli(
+	router: impl BundleFunc,
+	endpoints: impl BundleFunc,
+) -> impl Bundle {
 	(
 		Name::new("Router CLI"),
 		CliServer,
@@ -28,7 +30,10 @@ pub fn default_router_cli(router: ExchangeSpawner) -> impl Bundle {
 						// actually serve the routes
 						entity
 							.world()
-							.spawn_then((HttpServer::default(), router))
+							.spawn_then((
+								HttpServer::default(),
+								router.clone().bundle_func(),
+							))
 							.await;
 						// start serving, never resolve
 						std::future::pending::<()>().await;
@@ -42,7 +47,7 @@ pub fn default_router_cli(router: ExchangeSpawner) -> impl Bundle {
 							.insert_resource_then(RenderMode::Ssr)
 							.await;
 						let html =
-							collect_html(entity.world(), &spawner2).await?;
+							collect_html(entity.world(), endpoints).await?;
 						for (path, html) in html {
 							trace!("Exporting html to {}", path);
 							fs_ext::write(path, &html)?;
@@ -74,7 +79,7 @@ pub fn default_router(
 	endpoints: impl BundleFunc,
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
-) -> ExchangeSpawner {
+) -> impl Bundle {
 	flow_exchange(move || {
 		(InfallibleSequence, children![
 			(Name::new("Await Ready"), AwaitReady::default()),

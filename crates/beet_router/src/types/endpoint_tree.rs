@@ -51,55 +51,26 @@ pub struct EndpointTree {
 }
 
 impl EndpointTree {
-	/// Builds an [`EndpointTree`] from all canonical endpoints in the world.
-	///
-	/// This spawns trees from all [`ExchangeSpawner`]s to collect their endpoints,
-	/// then despawns those temporary trees after collection.
-	/// Non-canonical endpoints are excluded.
-	///
-	/// Returns an error if there are conflicting paths.
-	pub fn endpoints_from_world(world: &mut World) -> Vec<Endpoint> {
-		let spawned_roots = world
-			.query_once::<&ExchangeSpawner>()
-			.iter()
-			.map(|s| s.spawn(world))
-			.collect::<Vec<Entity>>();
-
-		let endpoints = world
-			.query_once::<&Endpoint>()
-			.iter()
-			.filter(|endpoint| endpoint.is_canonical())
-			.map(|endpoint| (*endpoint).clone())
-			.collect();
-		// Build the tree before cleanup (endpoints reference these entities)
-
-		// Despawn the temporary trees
-		for root in spawned_roots {
-			world.entity_mut(root).despawn();
-		}
-
-		endpoints
-	}
-
-	/// Builds a list of (Entity, Endpoint) by spawning an [`ExchangeSpawner`]
+	/// Builds a list of [`Endpoint`] by spawning a bundle func
 	/// in the given world and collecting all canonical endpoints from its descendants,
-	/// then despawning the exchange. Non-canonical endpoints are excluded.
-	pub fn endpoints_from_exchange_spawner(
+	/// then despawning the entity. Non-canonical endpoints are excluded.
+	///
+	/// This spawns the bundle directly and traverses all descendants looking for
+	/// [`Endpoint`] components, without requiring the full exchange machinery.
+	pub fn endpoints_from_bundle_func(
 		world: &mut World,
-		spawner: &ExchangeSpawner,
+		func: impl BundleFunc,
 	) -> Result<Vec<Endpoint>> {
-		let root = spawner.spawn(world);
+		// Spawn the bundle directly and collect endpoints from its descendants
+		let root = world.spawn(func.bundle_func()).id();
 
 		let endpoints = world
 			.run_system_cached_with::<_, Result<Vec<Endpoint>>, _, _>(
 				|root: In<Entity>,
-				 actions: Query<&Actions>,
 				 children: Query<&Children>,
 				 endpoints: Query<&Endpoint>| {
-					let actions = actions.get(*root)?;
-					assert_eq!(actions.len(), 1,);
 					children
-						.iter_descendants_inclusive(actions[0])
+						.iter_descendants_inclusive(*root)
 						.filter_map(|entity| {
 							endpoints
 								.get(entity)

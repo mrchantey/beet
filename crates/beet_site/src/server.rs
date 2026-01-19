@@ -10,24 +10,26 @@ pub fn server_plugin(app: &mut App) {
 		// DebugFlowPlugin::default(),
 	))
 	.world_mut()
-	.spawn(default_router_cli(beet_site_router()));
+	.spawn(default_router_cli(beet_site_router, beet_site_endpoints));
 }
 
-pub fn beet_site_router() -> ExchangeSpawner {
+fn beet_site_endpoints() -> impl Bundle {
+	(InfallibleSequence, children![
+		pages_routes(),
+		docs_routes(),
+		blog_routes(),
+		actions_routes(),
+		beet_design::mockups::mockups_routes(),
+		article_layout_middleware("docs"),
+		article_layout_middleware("blog"),
+		image_generator(),
+	])
+}
+
+pub fn beet_site_router() -> impl Bundle {
 	default_router(
 		|| EndWith(Outcome::Pass),
-		|| {
-			(InfallibleSequence, children![
-				pages_routes(),
-				docs_routes(),
-				blog_routes(),
-				actions_routes(),
-				beet_design::mockups::mockups_routes(),
-				article_layout_middleware("docs"),
-				article_layout_middleware("blog"),
-				image_generator(),
-			])
-		},
+		beet_site_endpoints,
 		|| EndWith(Outcome::Pass),
 	)
 }

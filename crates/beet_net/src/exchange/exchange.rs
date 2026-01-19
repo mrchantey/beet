@@ -19,7 +19,7 @@ where
 pub trait ExchangeTarget {
 	fn exchange(
 		self,
-		request: Request,
+		request: impl Into<Request>,
 	) -> impl Send + Future<Output = Response>;
 
 	/// Exchange a request and get the response body as a string,
@@ -31,7 +31,7 @@ pub trait ExchangeTarget {
 	where
 		Self: Sized,
 	{
-		let fut = self.exchange(request.into());
+		let fut = self.exchange(request);
 		async move { fut.await.unwrap_str().await }
 	}
 }
@@ -39,12 +39,12 @@ pub trait ExchangeTarget {
 impl ExchangeTarget for &mut EntityWorldMut<'_> {
 	fn exchange(
 		self,
-		request: Request,
-	) -> impl Send + Future<Output = Response> {
+		request: impl Into<Request>,
+	) -> impl Future<Output = Response> {
 		let entity = self.id();
 		let world = unsafe { self.world_mut() };
 		let (send, recv) = async_channel::bounded(1);
-		let ev = ExchangeStart::new(entity, request, send);
+		let ev = ExchangeStart::new(entity, request.into(), send);
 		world.trigger(ev);
 		// flush any commands created by observers, ie SpawnExchange
 		world.flush();
@@ -66,10 +66,11 @@ impl ExchangeTarget for &mut EntityWorldMut<'_> {
 impl ExchangeTarget for &AsyncEntity {
 	fn exchange(
 		self,
-		request: Request,
+		request: impl Into<Request>,
 	) -> impl Send + Future<Output = Response> {
 		let entity = self.id();
 		let world = self.world().clone();
+		let request = request.into();
 		async move {
 			let (send, recv) = async_channel::bounded(1);
 			world.with(move |world: &mut World| {

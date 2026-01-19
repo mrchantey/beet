@@ -55,25 +55,33 @@ where
 		&self,
 		entity: Entity,
 	) -> Result<&Actions> {
-		let mut current = self.children.root_ancestor(entity);
+		// Walk up ancestors looking for an entity with Actions component.
+		// This handles the case where HtmlBundle is a direct child of the agent
+		// (not via ActionOf relationship).
+		let mut current = entity;
 
-		// recursively follow template chain until we find an agent
 		loop {
+			// Check if current entity has Actions
 			if let Ok(actions) = self.agent_query.agents.get(current) {
-				// found an agent
 				return Ok(actions);
 			}
 
-			// follow the template chain
-			#[allow(unreachable_code)]
-			let Ok(template_of) = self.templates.get(current) else {
+			// Try to follow template chain first
+			// TemplateOf points to where the template was instantiated,
+			// so we continue walking up from there
+			if let Ok(template_of) = self.templates.get(current) {
+				current = template_of.get();
+			} else if let Ok(parent) = self.children.get(current) {
+				// Otherwise, walk up the parent chain
+				current = parent.get();
+			} else {
+				// No more ancestors to check
+				#[allow(unreachable_code)]
 				return bevybail!(
 					"Could not find Actions for agent descendant {:?}",
 					entity
 				);
-			};
-
-			current = self.children.root_ancestor(template_of.get());
+			}
 		}
 	}
 }

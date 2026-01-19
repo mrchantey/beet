@@ -8,7 +8,7 @@ use beet_site::prelude::*;
 async fn works() {
 	let mut world = server_plugin.into_world();
 
-	let root = beet_site_router().spawn(&mut world);
+	let root = world.spawn(beet_site_router()).id();
 	let endpoints = world
 		.run_system_once_with(EndpointTree::endpoints_from_exchange, root)
 		.unwrap();

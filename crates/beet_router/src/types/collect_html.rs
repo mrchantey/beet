@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// Collect all static HTML endpoints in the [`Router`]
 pub async fn collect_html(
 	world: &AsyncWorld,
-	exchange_spawner: &ExchangeSpawner,
+	func: impl BundleFunc,
 ) -> Result<Vec<(AbsPathBuf, String)>> {
 	let html_dir = world
 		.with_resource_then::<WorkspaceConfig, _>(|conf| {
@@ -17,19 +17,16 @@ pub async fn collect_html(
 		})
 		.await;
 
-	let exchange_spawner2 = exchange_spawner.clone();
+	let func2 = func.clone();
 	// Spawn trees from ExchangeSpawners and collect their endpoints
 	let endpoints: Vec<Endpoint> = world
 		.with_then(move |world| {
-			EndpointTree::endpoints_from_exchange_spawner(
-				world,
-				&exchange_spawner2,
-			)?
-			.into_iter()
-			// Filter for static GET/HTML endpoints
-			.filter(|endpoint| endpoint.is_static_get_html())
-			.collect::<Vec<_>>()
-			.xok::<BevyError>()
+			EndpointTree::endpoints_from_bundle_func(world, func2)?
+				.into_iter()
+				// Filter for static GET/HTML endpoints
+				.filter(|endpoint| endpoint.is_static_get_html())
+				.collect::<Vec<_>>()
+				.xok::<BevyError>()
 		})
 		.await?;
 
@@ -37,7 +34,7 @@ pub async fn collect_html(
 
 	let mut results = Vec::new();
 	// Spawn the exchange spawner to handle oneshot requests
-	let spawner_entity = world.spawn_then(exchange_spawner.clone()).await;
+	let spawner_entity = world.spawn_then(flow_exchange(func)).await;
 
 	for endpoint in endpoints {
 		let path = endpoint.path().annotated_route_path();
@@ -71,12 +68,12 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_net::prelude::*;
+	use beet_net::prelude::flow_exchange;
 
 	#[beet_core::test]
 	async fn children() {
 		let mut world = RouterPlugin::world();
-		let spawner = flow_exchange(|| {
+		let func = || {
 			(InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")
@@ -99,16 +96,14 @@ mod test {
 					.with_handler(|| "boo")
 					.with_cache_strategy(CacheStrategy::Static),
 			])
-		});
+		};
 
 		// actually spawn it for the oneshots
-		world.spawn(spawner.clone());
+		world.spawn(flow_exchange(func));
 
 		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
 		world
-			.run_async_then(async move |world| {
-				collect_html(&world, &spawner).await
-			})
+			.run_async_then(async move |world| collect_html(&world, func).await)
 			.await
 			.unwrap()
 			.xpect_eq(vec![

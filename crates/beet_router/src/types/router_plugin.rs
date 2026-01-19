@@ -58,7 +58,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_tree() {
 		let mut world = RouterPlugin::world();
-		let spawner = flow_exchange(|| {
+		let func = || {
 			(CacheStrategy::Static, children![
 				EndpointBuilder::get().with_handler(
 					async |_: (), action: AsyncEntity| -> Result<String> {
@@ -82,9 +82,9 @@ mod test {
 				]),
 				PathPartial::new("boo"),
 			])
-		});
+		};
 
-		EndpointTree::endpoints_from_exchange_spawner(&mut world, &spawner)
+		EndpointTree::endpoints_from_bundle_func(&mut world, func)
 			.unwrap()
 			.iter()
 			.map(|p| p.path().annotated_route_path())
@@ -104,10 +104,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, RouterPlugin))
-				.spawn((
-					server,
-					flow_exchange(|| EndpointBuilder::get()),
-				))
+				.spawn((server, flow_exchange(|| EndpointBuilder::get())))
 				.run();
 		});
 		time_ext::sleep_millis(10).await;
