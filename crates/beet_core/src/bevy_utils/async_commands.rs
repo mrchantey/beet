@@ -104,6 +104,8 @@ where
 				})
 				.await;
 		})
+		// TODO this means we cant clean tasks up, instead they should be stored
+		// in world so when world is dropped so are tasks
 		.detach();
 }
 fn spawn_async_task_local<Func, Fut, Out>(world: AsyncWorld, func: Func)
@@ -128,6 +130,8 @@ where
 				})
 				.await;
 		})
+		// TODO this means we cant clean tasks up, instead they should be stored
+		// in world so when world is dropped so are tasks
 		.detach();
 }
 
