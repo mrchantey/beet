@@ -94,6 +94,10 @@ impl Response {
 
 	/// Creates a Not Found (404) response
 	pub fn not_found() -> Self { Self::from_status(StatusCode::NotFound) }
+	/// Creates an Internal Server Error (500) response
+	pub fn internal_error() -> Self {
+		Self::from_status(StatusCode::InternalError)
+	}
 
 	/// Creates a Temporary Redirect (307) response with the given location
 	pub fn temporary_redirect(location: impl Into<String>) -> Self {
@@ -240,10 +244,12 @@ impl Response {
 	}
 
 	/// Returns a reference to the response parts
-	pub fn parts(&self) -> &ResponseParts { &self.parts }
+	pub fn response_parts(&self) -> &ResponseParts { &self.parts }
 
 	/// Returns a mutable reference to the response parts
-	pub fn parts_mut(&mut self) -> &mut ResponseParts { &mut self.parts }
+	pub fn response_parts_mut(&mut self) -> &mut ResponseParts {
+		&mut self.parts
+	}
 
 	/// Consumes the response and returns the parts and body
 	pub fn into_parts(self) -> (ResponseParts, Body) { (self.parts, self.body) }

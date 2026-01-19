@@ -111,7 +111,7 @@ pub fn no_cache_headers() -> impl Bundle {
 						return Ok(());
 					};
 
-					let parts = response.parts_mut();
+					let parts = response.response_parts_mut();
 					parts.insert_header(
 						"cache-control",
 						"no-cache, no-store, must-revalidate",
@@ -306,7 +306,7 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 					};
 
 					response
-						.parts_mut()
+						.response_parts_mut()
 						.insert_header("access-control-allow-origin", &origin);
 
 					Ok(())
@@ -417,7 +417,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 						.insert(ValidatedOrigin(origin.clone()));
 
 					let mut response = Response::ok();
-					let parts = response.parts_mut();
+					let parts = response.response_parts_mut();
 					parts.insert_header("access-control-max-age", "60");
 					parts.insert_header(
 						"access-control-allow-headers",

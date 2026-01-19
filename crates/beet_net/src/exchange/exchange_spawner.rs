@@ -123,17 +123,7 @@ impl ExchangeSpawner {
 	/// The caller is responsible for despawning the entity when done.
 	pub fn spawn(&self, world: &mut World) -> Entity { (self.func)(world) }
 
-	pub fn mirror() -> Self {
-		Self::new_handler(|_, req| {
-			Response::new(
-				ResponseParts {
-					parts: req.parts().parts().clone(),
-					status: StatusCode::Ok,
-				},
-				req.body,
-			)
-		})
-	}
+	pub fn mirror() -> Self { Self::new_handler(|_, req| req.mirror()) }
 }
 
 
