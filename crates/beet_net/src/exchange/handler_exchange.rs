@@ -38,11 +38,11 @@ where
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
 			let func = func.clone();
-			let spawner_entity = ev.event_target();
+			let server_entity = ev.event_target();
 			let (req, cx) = ev.take()?;
 
 			commands.queue(move |world: &mut World| -> Result {
-				let res = func(world.entity_mut(spawner_entity), req);
+				let res = func(world.entity_mut(server_entity), req);
 				cx.end_no_entity(res)
 			});
 
@@ -87,11 +87,11 @@ where
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: AsyncCommands| -> Result {
 			let func = func.clone();
-			let spawner_entity = ev.event_target();
+			let server_entity = ev.event_target();
 			let (req, cx) = ev.take()?;
 
 			commands.run(async move |_| {
-				let response = func(spawner_entity, req).await;
+				let response = func(server_entity, req).await;
 				cx.end_no_entity(response)
 			});
 

@@ -44,14 +44,14 @@ use beet_flow::prelude::*;
 pub fn flow_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
-			let spawner_entity = ev.event_target();
+			let server_entity = ev.event_target();
 			let (req, cx) = ev.take()?;
 
 			// Spawn the agent entity with request and exchange end
 			let agent = commands
 				.spawn((
 					Name::new("Flow Exchange Agent"),
-					ChildOf(spawner_entity),
+					ChildOf(server_entity),
 					req,
 					cx,
 				))

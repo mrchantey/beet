@@ -34,7 +34,7 @@ pub async fn collect_html(
 
 	let mut results = Vec::new();
 	// Spawn the exchange spawner to handle oneshot requests
-	let spawner_entity = world.spawn_then(flow_exchange(func)).await;
+	let server_entity = world.spawn_then(flow_exchange(func)).await;
 
 	for endpoint in endpoints {
 		let path = endpoint.path().annotated_route_path();
@@ -42,7 +42,7 @@ pub async fn collect_html(
 
 		let route_path = html_dir.join(&path.as_relative()).join("index.html");
 
-		let text = spawner_entity
+		let text = server_entity
 			.exchange(Request::get(&path))
 			.await
 			.into_result()
@@ -55,7 +55,7 @@ pub async fn collect_html(
 		results.push((route_path, text));
 	}
 
-	spawner_entity.despawn().await;
+	server_entity.despawn().await;
 
 	debug!("collected {} static html documents", results.len());
 	results.xok()

@@ -42,10 +42,10 @@ use beet_core::prelude::*;
 pub fn spawn_exchange(func: impl BundleFunc) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
-			let spawner_entity = ev.event_target();
+			let server_entity = ev.event_target();
 			let (req, cx) = ev.take()?;
 			let mut entity = commands.spawn((
-				ChildOf(spawner_entity),
+				ChildOf(server_entity),
 				OnSpawn::observe(end_on_insert_response),
 				func.clone().bundle_func(),
 				cx,

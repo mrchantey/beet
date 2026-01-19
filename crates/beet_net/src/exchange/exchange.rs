@@ -74,8 +74,7 @@ impl ExchangeTarget for &AsyncEntity {
 		async move {
 			let (send, recv) = async_channel::bounded(1);
 			world.with(move |world: &mut World| {
-				let ev = ExchangeStart::new(entity, request, send);
-				world.trigger(ev);
+				world.trigger(ExchangeStart::new(entity, request, send));
 				world.flush();
 			});
 			match recv.recv().await {
@@ -102,7 +101,7 @@ impl ExchangeTarget for &AsyncEntity {
 #[derive(EntityEvent)]
 pub struct ExchangeStart {
 	#[event_target]
-	target: Entity,
+	server: Entity,
 	inner: Arc<Mutex<Option<(Request, ExchangeContext)>>>,
 }
 
@@ -111,12 +110,12 @@ impl ExchangeStart {
 	/// providing the request and a channel [`Sender`]
 	/// for when the exchange is complete
 	pub fn new(
-		target: Entity,
+		server: Entity,
 		request: Request,
 		on_response: Sender<Response>,
 	) -> Self {
 		Self {
-			target,
+			server,
 			inner: Arc::new(Mutex::new(Some((
 				request,
 				ExchangeContext::new(on_response),
@@ -139,7 +138,7 @@ impl Drop for ExchangeStart {
 			// TODO custom trigger so we can gracefully error
 			panic!(
 				"ExchangeStart for entity {:?} was dropped without being handled. \nRequest: {}",
-				self.target,
+				self.server,
 				req.path_string()
 			);
 		}
@@ -174,7 +173,8 @@ impl ExchangeContext {
 				entity: id,
 				start_time: self.start_time,
 				status: res.status(),
-			})
+			});
+			world.flush();
 		});
 		entity.despawn();
 		self.end_no_entity(res)
