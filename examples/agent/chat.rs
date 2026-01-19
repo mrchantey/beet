@@ -12,10 +12,9 @@ fn main() {
 				CliServer,
 				flow_exchange(|| {
 					(InfallibleSequence, children![
-						EndpointBuilder::new(|| {
-							todo!("agent");
+						EndpointBuilder::new().with_action(|| {
 							Response::ok_body("hello world", "text/plain")
-						}),
+						})
 					])
 				}),
 			));

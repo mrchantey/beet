@@ -77,23 +77,23 @@ mod test {
 			(InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")
-					.with_handler(|| "foo")
+					.with_action(|| "foo")
 					.with_cache_strategy(CacheStrategy::Static)
 					.with_content_type(ContentType::Html),
 				EndpointBuilder::get()
 					.with_path("bar")
-					.with_handler(|| "bar")
+					.with_action(|| "bar")
 					.with_cache_strategy(CacheStrategy::Static)
 					.with_content_type(ContentType::Html),
 				// non-static
 				EndpointBuilder::get()
 					.with_path("bazz")
-					.with_handler(|| "bazz")
+					.with_action(|| "bazz")
 					.with_content_type(ContentType::Html),
 				// non-html
 				EndpointBuilder::get()
 					.with_path("boo")
-					.with_handler(|| "boo")
+					.with_action(|| "boo")
 					.with_cache_strategy(CacheStrategy::Static),
 			])
 		};

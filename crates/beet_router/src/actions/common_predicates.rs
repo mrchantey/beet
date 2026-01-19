@@ -127,11 +127,11 @@ mod test {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get().with_handler(StatusCode::Http(
+					EndpointBuilder::get().with_action(StatusCode::Http(
 						http::StatusCode::IM_A_TEAPOT
 					)),
 					common_predicates::fallback(),
-					EndpointBuilder::get().with_handler(|| -> () {
+					EndpointBuilder::get().with_action(|| -> () {
 						unreachable!();
 					}),
 				])

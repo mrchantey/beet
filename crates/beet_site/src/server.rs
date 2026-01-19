@@ -38,7 +38,7 @@ pub fn beet_site_router() -> impl Bundle {
 fn image_generator() -> impl Bundle {
 	EndpointBuilder::default()
 		.with_path("generate_image")
-		.with_handler(async |request: Request, action: AsyncEntity| -> () {
+		.with_action(async |request: Request, action: AsyncEntity| -> () {
 			// let request = world.remove_resource::<Request>().unwrap();
 			let content =
 				Json::<ContentVec>::from_request(request).await.unwrap();

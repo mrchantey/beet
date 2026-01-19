@@ -1,6 +1,7 @@
 use beet_core::prelude::*;
 use beet_dom::prelude::BeetRoot;
 use beet_flow::prelude::*;
+use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
 /// A blanket trait for both:
@@ -79,9 +80,28 @@ fn insert_and_trigger(
 /// Helper for defining methods accepting requests and returning responses.
 /// These are converted to `On<GetOutcome>` observers.
 /// In the case where a request cannot be found a 500 response is inserted.
-pub trait IntoEndpointHandler<M> {
-	fn into_endpoint_handler(self) -> impl Bundle;
+pub trait IntoEndpointAction<M> {
+	fn into_endpoint_action(self) -> impl Bundle;
 }
+
+/// Convenience function to convert an [`IntoEndpointAction`] into a [`BundleFunc`]
+/// that can be passed to [`EndpointBuilder::with_handler`](crate::prelude::EndpointBuilder::with_handler).
+///
+/// Prefer using [`EndpointBuilder::with_action`](crate::prelude::EndpointBuilder::with_action)
+/// which wraps this function for you.
+///
+/// # Example
+/// ```ignore
+/// EndpointBuilder::new()
+///     .with_path("/foo")
+///     .with_action(|req: Request| req.mirror())
+/// ```
+pub fn endpoint_action<M>(
+	action: impl 'static + Send + Sync + Clone + IntoEndpointAction<M>,
+) -> impl BundleFunc {
+	move || action.into_endpoint_action()
+}
+
 /// Run the provided func, then call `into_exchange_bundle` on the output,
 /// inserting it directly into the `exchange`.
 fn run_and_insert<Req, Res, Func, Fut, M1, M2>(func: Func) -> impl Bundle
@@ -169,11 +189,11 @@ been taken by a previous route, please check for conficting endpoints.
 }
 /// A non-func type that can be converted directly into a response bundle.
 pub struct TypeIntoEndpoint;
-impl<T, M> IntoEndpointHandler<(TypeIntoEndpoint, M)> for T
+impl<T, M> IntoEndpointAction<(TypeIntoEndpoint, M)> for T
 where
 	T: 'static + Send + Sync + Clone + IntoResponseBundle<M>,
 {
-	fn into_endpoint_handler(self) -> impl Bundle {
+	fn into_endpoint_action(self) -> impl Bundle {
 		// skip all the async shenannigans, just insert the response
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
@@ -203,14 +223,14 @@ where
 
 pub struct SystemIntoEndpoint;
 impl<System, Req, Out, M1, M2, M3>
-	IntoEndpointHandler<(SystemIntoEndpoint, Req, Out, M1, M2, M3)> for System
+	IntoEndpointAction<(SystemIntoEndpoint, Req, Out, M1, M2, M3)> for System
 where
 	System: 'static + Send + Sync + Clone + IntoSystem<Req, Out, M1>,
 	Req: 'static + Send + SystemInput,
 	for<'a> Req::Inner<'a>: 'static + Send + Sync + FromRequest<M2>,
 	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
 {
-	fn into_endpoint_handler(self) -> impl Bundle {
+	fn into_endpoint_action(self) -> impl Bundle {
 		run_and_insert(async move |req, action| {
 			match action
 				.world()
@@ -229,13 +249,13 @@ where
 }
 pub struct ActionSystemIntoEndpoint;
 impl<System, Req, Out, M2, M3>
-	IntoEndpointHandler<(ActionSystemIntoEndpoint, Req, Out, M2, M3)> for System
+	IntoEndpointAction<(ActionSystemIntoEndpoint, Req, Out, M2, M3)> for System
 where
 	System: 'static + Send + Sync + Clone + FnMut(Req, AsyncEntity) -> Out,
 	Req: 'static + Send + Sync + FromRequest<M2>,
 	Out: 'static + Send + Sync + IntoResponseBundle<M3>,
 {
-	fn into_endpoint_handler(self) -> impl Bundle {
+	fn into_endpoint_action(self) -> impl Bundle {
 		run_and_insert(async move |req: Req, action| self.clone()(req, action))
 	}
 }
@@ -243,14 +263,14 @@ where
 
 pub struct AsyncSystemIntoEndpoint;
 impl<Func, Fut, Req, Res, M1, M2>
-	IntoEndpointHandler<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
+	IntoEndpointAction<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func
 where
 	Func: 'static + Send + Sync + Clone + FnOnce(Req, AsyncEntity) -> Fut,
 	Fut: Send + Future<Output = Res>,
 	Req: Send + FromRequest<M1>,
 	Res: IntoResponseBundle<M2>,
 {
-	fn into_endpoint_handler(self) -> impl Bundle { run_and_insert(self) }
+	fn into_endpoint_action(self) -> impl Bundle { run_and_insert(self) }
 }
 
 #[cfg(test)]
@@ -269,12 +289,10 @@ mod test {
 		handler: impl 'static + Send + Sync + Clone + Fn() -> H,
 	) -> StatusCode
 	where
-		H: IntoEndpointHandler<M>,
+		H: IntoEndpointAction<M>,
 	{
 		RouterPlugin::world()
-			.spawn(flow_exchange(move || {
-				handler().into_endpoint_handler()
-			}))
+			.spawn(flow_exchange(move || handler().into_endpoint_action()))
 			.exchange(Request::get("/foo").with_json_body(&Foo(3)).unwrap())
 			.await
 			.status()

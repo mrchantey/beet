@@ -88,7 +88,7 @@ pub struct HelpParams {
 ///             }),
 ///             EndpointBuilder::get()
 ///                 .with_path("foo")
-///                 .with_handler(|| "foo"),
+///                 .with_action(|| "foo"),
 ///         ])
 ///     }))
 ///     .exchange_str(Request::get("/?help=true"))
@@ -528,11 +528,11 @@ mod test {
 				EndpointBuilder::get()
 					.with_path("foo")
 					.with_description("The foo command")
-					.with_handler(|| "foo"),
+					.with_action(|| "foo"),
 				EndpointBuilder::get()
 					.with_path("bar")
 					.with_description("The bar command")
-					.with_handler(|| "bar"),
+					.with_action(|| "bar"),
 			])
 		}));
 
@@ -553,7 +553,7 @@ mod test {
 				EndpointBuilder::post()
 					.with_path("api/users")
 					.with_description("Create user")
-					.with_handler(|| "create"),
+					.with_action(|| "create"),
 			])
 		}));
 
@@ -584,7 +584,7 @@ mod test {
 					.with_path("test")
 					.with_params::<TestParams>()
 					.with_description("Test command")
-					.with_handler(|| "test"),
+					.with_action(|| "test"),
 			])
 		}));
 
@@ -604,7 +604,7 @@ mod test {
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("foo")
-					.with_handler(|| "foo response"),
+					.with_action(|| "foo response"),
 			])
 		}));
 
@@ -621,7 +621,7 @@ mod test {
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
 					.with_path("test")
-					.with_handler(|| "test"),
+					.with_action(|| "test"),
 			])
 		}));
 
@@ -661,7 +661,7 @@ mod test {
 					.with_path("deploy")
 					.with_params::<TestParams>()
 					.with_description("Deploy application")
-					.with_handler(|| "deployed"),
+					.with_action(|| "deployed"),
 			])
 		}));
 

@@ -219,7 +219,7 @@ mod test {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("docs")
-						.with_handler(|| (BeetRoot, rsx! {<TestSidebar/>})),
+						.with_action(|| (BeetRoot, rsx! {<TestSidebar/>})),
 					html_bundle_to_response(),
 				])
 			}))
@@ -264,16 +264,14 @@ mod test {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get().with_handler(|| (
+					EndpointBuilder::get().with_action(|| (
 						BeetRoot,
 						rsx! { <TestSidebarRender /> }
 					)),
 					html_bundle_to_response(),
 				])
 			}))
-			.exchange(Request::get("/"))
-			.await
-			.unwrap_str()
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_contains("Partying");
 	}

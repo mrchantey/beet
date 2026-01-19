@@ -23,7 +23,7 @@
 //! # use beet_net::prelude::*;
 //! flow_exchange(|| {
 //!     (InfallibleSequence, children![
-//!         EndpointBuilder::get().with_handler(|| "Hello"),
+//!         EndpointBuilder::get().with_action(|| "Hello"),
 //!         common_middleware::no_cache_headers(),
 //!     ])
 //! });
@@ -44,7 +44,7 @@
 //!         // Request phase: validate origin, store in ValidatedOrigin component
 //!         common_middleware::cors_request(config.clone()),
 //!         // Endpoint handles the request
-//!         EndpointBuilder::get().with_handler(|| "Hello"),
+//!         EndpointBuilder::get().with_action(|| "Hello"),
 //!         // Response phase: add CORS headers from ValidatedOrigin
 //!         common_middleware::cors_response(config),
 //!     ])
@@ -67,7 +67,7 @@
 //!         // Handle OPTIONS preflight and return early
 //!         common_middleware::cors_preflight(config.clone()),
 //!         // Endpoint only runs if not OPTIONS
-//!         EndpointBuilder::any_method().with_handler(|| "Hello"),
+//!         EndpointBuilder::any_method().with_action(|| "Hello"),
 //!     ])
 //! });
 //! ```
@@ -88,7 +88,7 @@ use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// flow_exchange(|| {
 ///     (InfallibleSequence, children![
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::no_cache_headers(),
 ///     ])
 /// });
@@ -181,7 +181,7 @@ pub struct ValidatedOrigin(pub String);
 /// flow_exchange(|| {
 ///     (InfallibleSequence, children![
 ///         common_middleware::cors_request(config.clone()),
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::cors_response(config),
 ///     ])
 /// });
@@ -269,7 +269,7 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 /// flow_exchange(|| {
 ///     (InfallibleSequence, children![
 ///         common_middleware::cors_request(config.clone()),
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::cors_response(config),
 ///     ])
 /// });
@@ -345,7 +345,7 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 ///         // Handles OPTIONS and inserts complete response
 ///         common_middleware::cors_preflight(config.clone()),
 ///         // Only runs if not OPTIONS (no response exists yet)
-///         EndpointBuilder::any_method().with_handler(|| "Hello"),
+///         EndpointBuilder::any_method().with_action(|| "Hello"),
 ///     ])
 /// });
 /// ```
@@ -445,7 +445,7 @@ mod test {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					no_cache_headers(),
 				])
 			}))
@@ -468,7 +468,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
@@ -492,7 +492,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
@@ -511,7 +511,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
@@ -535,7 +535,7 @@ mod test {
 			.spawn(flow_exchange(move || {
 				(Fallback, children![
 					cors_preflight(config.clone()),
-					EndpointBuilder::any_method().with_handler(|| "Hello"),
+					EndpointBuilder::any_method().with_action(|| "Hello"),
 				])
 			}))
 			.exchange(
@@ -564,7 +564,7 @@ mod test {
 				(InfallibleSequence, children![
 					cors_preflight(config.clone()),
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
@@ -588,7 +588,7 @@ mod test {
 			.spawn(flow_exchange(move || {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 					no_cache_headers(),
 				])

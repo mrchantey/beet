@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use beet_net::prelude::BundleFunc;
 use beet_router::prelude::*;
 use std::fs;
 use std::path::PathBuf;
@@ -26,7 +27,10 @@ pub fn run_wasm() -> impl Bundle {
 		wasm_bindgen(),
 		init_deno(),
 		run_deno(),
-		(Name::new("Ok"), StatusCode::Ok.into_endpoint_handler())
+		(
+			Name::new("Ok"),
+			endpoint_action(StatusCode::Ok).bundle_func()
+		)
 	])
 }
 

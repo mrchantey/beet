@@ -21,7 +21,7 @@ fn main() {
 				HttpServer::default(),
 				flow_exchange(|| {
 					(InfallibleSequence, children![
-						EndpointBuilder::get().with_handler(|| {
+						EndpointBuilder::get().with_action(|| {
 							Response::ok_body(
 								r#"
 								<h1>home</h1>
@@ -41,15 +41,14 @@ fn main() {
 						// That said for a 200ms request this is unnoticable
 						EndpointBuilder::get()
 							.with_path("nested")
-							.with_handler_bundle(nested_sequence(
-								(|| Response::ok_body(
+							.with_handler_bundle(nested_sequence(|| {
+								Response::ok_body(
 									r#"
 									<h1>bench</h1>
 									<a href="/"> visit home </a>"#,
 									"text/html",
-								))
-								.into_endpoint_handler()
-							),)
+								)
+							}))
 					])
 				}),
 			));
@@ -59,7 +58,8 @@ fn main() {
 
 /// 100 nested sequences
 #[rustfmt::skip]
-fn nested_sequence(inner: impl Bundle) -> impl Bundle {
+fn nested_sequence<M>(action: impl 'static + Send + Sync + Clone + IntoEndpointAction<M>) -> impl Bundle {
+	let inner = endpoint_action(action).bundle_func();
 (Sequence, children![
 (Sequence, children![
 (Sequence, children![

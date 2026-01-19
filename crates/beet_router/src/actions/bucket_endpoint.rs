@@ -23,20 +23,24 @@ impl BucketEndpoint {
 			.with_trailing_path()
 			.with_handler_bundle((
 				bucket,
-				async move |mut path: RoutePath,
-				            action: AsyncEntity|
-				            -> Result<Response> {
-					if let Some(prefix) = &remove_prefix {
-						if let Ok(stripped) = path.strip_prefix(prefix) {
-							path = RoutePath::new(stripped);
-						} else {
-							bevybail!("prefix {prefix} not found in {path}");
+				endpoint_action(
+					async move |mut path: RoutePath,
+					            action: AsyncEntity|
+					            -> Result<Response> {
+						if let Some(prefix) = &remove_prefix {
+							if let Ok(stripped) = path.strip_prefix(prefix) {
+								path = RoutePath::new(stripped);
+							} else {
+								bevybail!(
+									"prefix {prefix} not found in {path}"
+								);
+							}
 						}
-					}
-					let bucket = action.get_cloned::<Bucket>().await?;
-					bucket_to_response(&bucket, &path).await
-				}
-				.into_endpoint_handler(),
+						let bucket = action.get_cloned::<Bucket>().await?;
+						bucket_to_response(&bucket, &path).await
+					},
+				)
+				.bundle_func(),
 			))
 	}
 }

@@ -24,7 +24,7 @@ pub fn default_router_cli(
 					introduction: String::from("Router CLI"),
 					..default()
 				}),
-				EndpointBuilder::new(
+				EndpointBuilder::new().with_path("/").with_action(
 					// dont need to be async but zst restriction for sync systems
 					async move |_: (), entity: AsyncEntity| {
 						// actually serve the routes
@@ -38,24 +38,24 @@ pub fn default_router_cli(
 						// start serving, never resolve
 						std::future::pending::<()>().await;
 					}
-				)
-				.with_path("/"),
-				EndpointBuilder::new(
-					async move |_: (), entity: AsyncEntity| -> Result {
-						entity
-							.world()
-							.insert_resource_then(RenderMode::Ssr)
-							.await;
-						let html =
-							collect_html(entity.world(), endpoints).await?;
-						for (path, html) in html {
-							trace!("Exporting html to {}", path);
-							fs_ext::write(path, &html)?;
+				),
+				EndpointBuilder::new()
+					.with_path("/export-static")
+					.with_action(
+						async move |_: (), entity: AsyncEntity| -> Result {
+							entity
+								.world()
+								.insert_resource_then(RenderMode::Ssr)
+								.await;
+							let html =
+								collect_html(entity.world(), endpoints).await?;
+							for (path, html) in html {
+								trace!("Exporting html to {}", path);
+								fs_ext::write(path, &html)?;
+							}
+							Ok(())
 						}
-						Ok(())
-					}
-				)
-				.with_path("/export-static"),
+					),
 			])
 		}),
 	)
@@ -133,7 +133,9 @@ pub fn default_router(
 pub fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
 		common_predicates::no_response(),
-		EndpointBuilder::new(StatusCode::NotFound).with_trailing_path()
+		EndpointBuilder::new()
+			.with_trailing_path()
+			.with_action(StatusCode::NotFound)
 	])
 }
 
@@ -153,7 +155,7 @@ pub fn analytics_handler() -> impl Bundle {
 
 
 pub fn app_info() -> EndpointBuilder {
-	EndpointBuilder::get().with_path("/app-info").with_handler(
+	EndpointBuilder::get().with_path("/app-info").with_action(
 		|config: Res<PackageConfig>| {
 			let PackageConfig {
 				title,
@@ -163,13 +165,12 @@ pub fn app_info() -> EndpointBuilder {
 				..
 			} = config.clone();
 			rsx! {
-				<main>
-					<h1>App Info</h1>
+				<div>
 					<p>Title: {title}</p>
 					<p>Description: {description}</p>
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
-				</main>
+				</div>
 			}
 		},
 	)

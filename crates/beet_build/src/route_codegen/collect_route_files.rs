@@ -49,11 +49,10 @@ pub fn collect_route_files(
 
 				let mut builder_tokens = match (collection.category, is_async) {
 					(RouteCollectionCategory::Pages, _) => {
-						let mut items = vec![
-							quote!(EndpointBuilder::new(#mod_ident::#func_ident)
+						let mut items = vec![quote!(EndpointBuilder::new()
 								.with_method(#method)
-								.with_content_type(ContentType::Html)),
-						];
+								.with_content_type(ContentType::Html)
+								.with_action(#mod_ident::#func_ident))];
 						// ssr check TODO very brittle
 						if path_pattern.is_static()
 							&& collection.category.cache_strategy()

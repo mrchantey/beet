@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use beet_net::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Component, Reflect)]
@@ -123,7 +124,7 @@ impl Default for EndpointBuilder {
 	fn default() -> Self {
 		Self {
 			insert: Box::new(|entity| {
-				entity.insert(StatusCode::Ok.into_endpoint_handler());
+				entity.insert(endpoint_action(StatusCode::Ok).bundle_func());
 			}),
 			path: None,
 			params: None,
@@ -139,11 +140,16 @@ impl Default for EndpointBuilder {
 }
 
 impl EndpointBuilder {
-	pub fn new<M>(
-		handler: impl 'static + Send + Sync + IntoEndpointHandler<M>,
-	) -> Self {
-		Self::default().with_handler(handler)
-	}
+	/// Create a new endpoint builder with default settings.
+	/// Use [`Self::with_handler`] to specify the action to handle the request.
+	///
+	/// # Example
+	/// ```ignore
+	/// EndpointBuilder::new()
+	///     .with_path("/foo")
+	///     .with_action(|| StatusCode::Ok)
+	/// ```
+	pub fn new() -> Self { Self::default() }
 
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
@@ -185,12 +191,37 @@ impl EndpointBuilder {
 			children![partial_path_match(), handler],
 		)
 	}
-	/// Create a new endpoint with the provided endpoint handler
-	pub fn with_handler<M>(
+	/// Set the action to handle the request.
+	///
+	/// The handler is a [`BundleFunc`] that returns a bundle to be inserted as the endpoint action.
+	/// For simple request/response handlers, prefer using [`Self::with_action`] which
+	/// automatically wraps your handler in [`endpoint_action`]:
+	///
+	/// # Example
+	/// ```ignore
+	/// EndpointBuilder::new()
+	///     .with_path("/foo")
+	///     .with_action(|req: Request| req.mirror())
+	/// ```
+	pub fn with_handler(self, handler: impl BundleFunc) -> Self {
+		self.with_handler_bundle(handler.bundle_func())
+	}
+	/// Convenience method that wraps the action in [`endpoint_action`].
+	///
+	/// This is equivalent to `.with_handler(endpoint_action(action))` and is
+	/// the recommended way to add request/response handlers.
+	///
+	/// # Example
+	/// ```ignore
+	/// EndpointBuilder::new()
+	///     .with_path("/foo")
+	///     .with_action(|req: Request| req.mirror())
+	/// ```
+	pub fn with_action<M>(
 		self,
-		handler: impl 'static + Send + Sync + IntoEndpointHandler<M>,
+		action: impl 'static + Send + Sync + Clone + IntoEndpointAction<M>,
 	) -> Self {
-		self.with_handler_bundle(handler.into_endpoint_handler())
+		self.with_handler(endpoint_action(action))
 	}
 	/// Create a new endpoint with the provided bundle, the bundle must be
 	/// a `GetOutcome` / `Outcome` action, and usually inserts a response
@@ -399,8 +430,9 @@ mod test {
 
 	#[beet_core::test]
 	async fn simple() {
-		let _ = EndpointBuilder::new(|| {});
-		let _ = EndpointBuilder::new(|| -> Result<(), String> { Ok(()) });
+		let _ = EndpointBuilder::new().with_action(|| {});
+		let _ = EndpointBuilder::new()
+			.with_action(|| -> Result<(), String> { Ok(()) });
 
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| EndpointBuilder::get()))
@@ -414,7 +446,7 @@ mod test {
 	async fn dynamic_path() {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
-				EndpointBuilder::get().with_path("/:path").with_handler(
+				EndpointBuilder::get().with_path("/:path").with_action(
 					async |_req: (),
 					       action: AsyncEntity|
 					       -> Result<Html<String>> {
@@ -439,10 +471,10 @@ mod test {
 			(InfallibleSequence, children![
 				EndpointBuilder::get()
 					.with_path("foo")
-					.with_handler(|| "foo"),
+					.with_action(|| "foo"),
 				EndpointBuilder::get()
 					.with_path("bar")
-					.with_handler(|| "bar"),
+					.with_action(|| "bar"),
 			])
 		}));
 		entity.exchange_str("/foo").await.xpect_eq("foo");
@@ -452,9 +484,8 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
-			EndpointBuilder::post().with_path("foo")
-		}));
+		let mut entity = world
+			.spawn(flow_exchange(|| EndpointBuilder::post().with_path("foo")));
 
 		// method and path match
 		entity
@@ -502,7 +533,7 @@ mod test {
 				),
 				EndpointBuilder::get()
 					.with_path("api/users")
-					.with_handler(|| "users"),
+					.with_action(|| "users"),
 			])
 		}));
 
@@ -550,7 +581,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					EndpointBuilder::get()
-						.with_handler(|| StatusCode::Ok.into_response()),
+						.with_action(|| StatusCode::Ok.into_response()),
 					OnSpawn::observe(
 						|ev: On<GetOutcome>,
 						 agents: AgentQuery,

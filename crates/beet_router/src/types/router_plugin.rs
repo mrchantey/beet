@@ -60,7 +60,7 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let func = || {
 			(CacheStrategy::Static, children![
-				EndpointBuilder::get().with_handler(
+				EndpointBuilder::get().with_action(
 					async |_: (), action: AsyncEntity| -> Result<String> {
 						let tree =
 							RouteQuery::with_async(action, |query, entity| {
@@ -73,12 +73,12 @@ mod test {
 				(EndpointBuilder::get()
 					.with_path("foo")
 					.with_cache_strategy(CacheStrategy::Static)
-					.with_handler(|| "foo")),
+					.with_action(|| "foo")),
 				(PathPartial::new("bar"), children![
 					EndpointBuilder::get()
 						.with_path("bazz")
 						.with_cache_strategy(CacheStrategy::Static)
-						.with_handler(|| "bazz")
+						.with_action(|| "bazz")
 				]),
 				PathPartial::new("boo"),
 			])

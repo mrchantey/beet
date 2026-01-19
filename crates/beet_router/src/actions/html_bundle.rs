@@ -151,8 +151,7 @@ mod test {
 			.into_world()
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get()
-						.with_handler(|| rsx! {"hello world"}),
+					EndpointBuilder::get().with_action(|| rsx! {"hello world"}),
 					// the scene is ignored because we have not inserted
 					// html_bundle_to_response. this means the control
 					// flow will silently succeed, maybe we should error?
@@ -169,7 +168,7 @@ mod test {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get().with_handler(|| (
+					EndpointBuilder::get().with_action(|| (
 						BeetRoot,
 						rsx! {<div>hello world</div>}
 					)),
@@ -202,7 +201,7 @@ mod test {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("foo")
-						.with_handler(|| (BeetRoot, rsx! {<Foobar/>})),
+						.with_action(|| (BeetRoot, rsx! {<Foobar/>})),
 					html_bundle_to_response(),
 				])
 			}))
@@ -236,7 +235,7 @@ mod test {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("nested")
-						.with_handler(|| (BeetRoot, rsx! {<Outer/>})),
+						.with_action(|| (BeetRoot, rsx! {<Outer/>})),
 					html_bundle_to_response(),
 				])
 			}))
@@ -275,7 +274,7 @@ mod test {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("deep")
-						.with_handler(|| (BeetRoot, rsx! {<Level1/>})),
+						.with_action(|| (BeetRoot, rsx! {<Level1/>})),
 					html_bundle_to_response(),
 				])
 			}))
@@ -292,7 +291,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
-						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+						.with_action(|| rsx! {<MyTemplate foo=42/>}),
 					html_bundle_to_response(),
 				])
 			}))
@@ -309,7 +308,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
-						.with_handler(|| rsx! {<MyTemplate foo=42/>}),
+						.with_action(|| rsx! {<MyTemplate foo=42/>}),
 					OnSpawn::observe(
 						|ev: On<GetOutcome>,
 							agent_query: AgentQuery,
