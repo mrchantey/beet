@@ -313,6 +313,7 @@ impl AsyncWorld {
 		}
 	}
 	/// Queues the command
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub fn with(&self, func: impl Command + FnOnce(&mut World)) {
 		let mut queue = CommandQueue::default();
 		queue.push(func);
@@ -320,6 +321,7 @@ impl AsyncWorld {
 	}
 	/// Queues the command, creating another channel that will resolve when
 	/// the task is complete, returing its output
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&mut World) -> O,
@@ -329,13 +331,16 @@ impl AsyncWorld {
 	{
 		let (out_tx, out_rx) = async_channel::bounded(1);
 		let mut queue = CommandQueue::default();
-		queue.push(move |world: &mut World| {
-			let out = func(world);
-			out_tx
-				.try_send(out)
-				// allow dropped, they didnt want the output
-				.ok();
-		});
+		queue.push(
+			#[cfg_attr(feature = "nightly", track_caller)]
+			move |world: &mut World| {
+				let out = func(world);
+				out_tx
+					.try_send(out)
+					// allow dropped, they didnt want the output
+					.ok();
+			},
+		);
 		self.send(queue);
 		async move {
 			match out_rx.recv().await {
@@ -549,6 +554,7 @@ impl AsyncEntity {
 	pub fn id(&self) -> Entity { self.entity }
 	pub fn world(&self) -> &AsyncWorld { &self.world }
 
+	#[track_caller]
 	pub fn with(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut),
@@ -560,6 +566,8 @@ impl AsyncEntity {
 		});
 		self
 	}
+
+	#[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
@@ -569,10 +577,13 @@ impl AsyncEntity {
 	{
 		let entity = self.entity;
 		self.world
-			.with_then(move |world: &mut World| {
-				let entity = world.entity_mut(entity);
-				func(entity)
-			})
+			.with_then(
+				#[cfg_attr(feature = "nightly", track_caller)]
+				move |world: &mut World| {
+					let entity = world.entity_mut(entity);
+					func(entity)
+				},
+			)
 			.await
 	}
 

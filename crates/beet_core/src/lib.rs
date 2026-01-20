@@ -2,7 +2,13 @@
 #![cfg_attr(test, test_runner(crate::test_runner))]
 #![cfg_attr(
 	feature = "nightly",
-	feature(fn_traits, unboxed_closures, never_type)
+	feature(
+		fn_traits,
+		unboxed_closures,
+		never_type,
+		async_fn_track_caller,
+		closure_track_caller
+	)
 )]
 // The test crate is needed for the test runner infrastructure
 // Note: `test` feature is already enabled by cfg(test) above, so only add if_let_guard here
