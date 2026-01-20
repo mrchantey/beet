@@ -29,85 +29,11 @@ pub trait TokenizeSelf<M = Self> {
 /// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
 /// the output is `Option<Vec<usize>>`
 pub fn short_type_path<T>() -> syn::Path {
-	let type_name = std::any::type_name::<T>();
-	let result = shorten_generic_type_name(type_name);
-	syn::parse_str::<syn::Path>(&result).expect(&format!(
-		"Failed to parse type name {result} into syn::Path"
+	let short_name = ShortName::of::<T>().to_string();
+	syn::parse_str::<syn::Path>(&short_name).expect(&format!(
+		"Failed to parse type name {short_name} into syn::Path"
 	))
 }
-// TODO use bevy utils instead
-pub fn shorten_generic_type_name(type_name: &str) -> String {
-	let mut result = String::new();
-	let mut chars = type_name.chars().peekable();
-
-	while let Some(ch) = chars.next() {
-		match ch {
-			'<' => {
-				// We hit a generic start, collect everything until the matching '>'
-				result.push(ch);
-				let mut depth = 1;
-				let mut inner_content = String::new();
-
-				while let Some(inner_ch) = chars.next() {
-					match inner_ch {
-						'<' => {
-							depth += 1;
-							inner_content.push(inner_ch);
-						}
-						'>' => {
-							depth -= 1;
-							if depth == 0 {
-								// We found the matching closing bracket
-								// Process the inner content and add it
-								if !inner_content.is_empty() {
-									let shortened_inner =
-										shorten_generic_type_name(
-											&inner_content,
-										);
-									result.push_str(&shortened_inner);
-								}
-								result.push(inner_ch);
-								break;
-							} else {
-								inner_content.push(inner_ch);
-							}
-						}
-						',' if depth == 1 => {
-							// Comma at the top level of this generic
-							if !inner_content.is_empty() {
-								let shortened_inner = shorten_generic_type_name(
-									&inner_content.trim(),
-								);
-								result.push_str(&shortened_inner);
-								inner_content.clear();
-							}
-							result.push_str(", ");
-						}
-						_ => {
-							inner_content.push(inner_ch);
-						}
-					}
-				}
-			}
-			':' => {
-				// Check if this is part of ::
-				if chars.peek() == Some(&':') {
-					chars.next(); // consume the second :
-					// Skip everything up to this point and start fresh
-					result.clear();
-				} else {
-					result.push(ch);
-				}
-			}
-			_ => {
-				result.push(ch);
-			}
-		}
-	}
-
-	result
-}
-
 
 impl<T> TokenizeSelf for SendWrapper<T>
 where

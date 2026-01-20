@@ -49,7 +49,7 @@ fn ai_agent_request() -> impl Bundle {
 				.join("\n");
 
 			let agent = OllamaAgent::from_env();
-			commands.run(async move |world| -> Result {
+			commands.run_local(async move |world| -> Result {
 				let res = agent
 					.chat_req(&vec![Value::String(prompt)])?
 					.send()

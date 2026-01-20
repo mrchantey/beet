@@ -97,11 +97,7 @@ impl FieldSchema {
 	/// Get a shortened version of the type name for display
 	fn short_type_name(&self) -> String {
 		// Extract just the final type name from the full path
-		self.type_path
-			.rsplit("::")
-			.next()
-			.unwrap_or(&self.type_path)
-			.to_string()
+		ShortName(&self.type_path).to_string()
 	}
 }
 
@@ -123,6 +119,8 @@ pub struct TypeSchema {
 impl TypeSchema {
 	/// Create a type schema from a Typed type
 	/// ## Panics
+	///
+	/// Panics if type is not a struct
 	pub fn new<T: Typed>() -> Self {
 		let type_info = T::type_info();
 		let type_path = type_info.type_path().to_string();
@@ -133,7 +131,19 @@ impl TypeSchema {
 				.iter()
 				.map(FieldSchema::from_named_field)
 				.collect(),
-			_ => Vec::new(),
+			TypeInfo::Tuple(tuple) => {
+				if tuple.field_len() == 0 {
+					// Unit type
+					Vec::new()
+				} else {
+					panic!("Tuple types not supported, found {type_info:?}")
+				}
+			}
+			type_info => {
+				panic!(
+					"Only struct and unit types allowed, found {type_info:?}"
+				)
+			}
 		};
 
 		Self {
@@ -146,11 +156,7 @@ impl TypeSchema {
 	/// Create a simple schema with just a type name (no field info)
 	pub fn simple(type_path: impl Into<String>) -> Self {
 		let type_path = type_path.into();
-		let short_name = type_path
-			.rsplit("::")
-			.next()
-			.unwrap_or(&type_path)
-			.to_string();
+		let short_name = ShortName(&type_path).to_string();
 		Self {
 			type_path,
 			short_name,
