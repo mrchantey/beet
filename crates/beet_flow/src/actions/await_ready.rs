@@ -44,11 +44,11 @@ fn await_ready_start(
 	ready_actions: Query<Entity, With<ReadyAction>>,
 ) -> Result {
 	let target = ev.target();
-	// find the root of the tree to search all descendants
-	let root = agents.parents.root_ancestor(target);
+	// find the agent of this action to scope the search to this exchange only
+	let agent = agents.entity(target);
 
 	let entities: HashSet<Entity> = children
-		.iter_descendants(root)
+		.iter_descendants(agent)
 		.filter_map(|child| ready_actions.get(child).ok())
 		.collect();
 
@@ -66,8 +66,8 @@ fn await_ready_start(
 			await_ready.num_actions
 		);
 
-		// observe Ready on the root where events bubble to
-		commands.entity(root).observe(
+		// observe Ready on the agent where events bubble to
+		commands.entity(agent).observe(
 			move |ev: On<Ready>,
 			      mut commands: Commands,
 			      mut action: Query<&mut AwaitReady>| {
