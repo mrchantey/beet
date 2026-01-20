@@ -101,7 +101,6 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
 			      mut route_query: RouteQuery,
-			      endpoints_query: Query<&Endpoint>,
 			      mut commands: Commands|
 			      -> Result {
 				let action = ev.target();
@@ -142,7 +141,6 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 					&tree,
 					&current_path,
 					&mut matching_endpoints,
-					&endpoints_query,
 				);
 
 				// determine format
@@ -188,7 +186,6 @@ fn collect_endpoints_from_tree(
 	node: &EndpointTree,
 	current_path: &Vec<String>,
 	endpoints: &mut Vec<Endpoint>,
-	endpoints_query: &Query<&Endpoint>,
 ) {
 	let node_depth = node.pattern.iter().count();
 	let current_depth = current_path.len();
@@ -196,19 +193,12 @@ fn collect_endpoints_from_tree(
 	// determine if we should include this node and/or recurse
 	if current_path.is_empty() {
 		// show all endpoints when no filter specified
-		if let Some(entity) = node.endpoint {
-			if let Ok(endpoint) = endpoints_query.get(entity) {
-				endpoints.push(endpoint.clone());
-			}
+		if let Some(endpoint) = &node.endpoint {
+			endpoints.push(endpoint.clone());
 		}
 		// always recurse when no filter
 		for child in &node.children {
-			collect_endpoints_from_tree(
-				child,
-				current_path,
-				endpoints,
-				endpoints_query,
-			);
+			collect_endpoints_from_tree(child, current_path, endpoints);
 		}
 	} else if node_depth <= current_depth {
 		// node is at or above current depth - check if it's on the path
@@ -217,20 +207,13 @@ fn collect_endpoints_from_tree(
 				// pattern matches current path
 				if path_match.exact_match() {
 					// exact match - show this endpoint and all children
-					if let Some(entity) = node.endpoint {
-						if let Ok(endpoint) = endpoints_query.get(entity) {
-							endpoints.push(endpoint.clone());
-						}
+					if let Some(endpoint) = &node.endpoint {
+						endpoints.push(endpoint.clone());
 					}
 				}
 				// recurse to children since we're on the right path
 				for child in &node.children {
-					collect_endpoints_from_tree(
-						child,
-						current_path,
-						endpoints,
-						endpoints_query,
-					);
+					collect_endpoints_from_tree(child, current_path, endpoints);
 				}
 			}
 			Err(_) => {

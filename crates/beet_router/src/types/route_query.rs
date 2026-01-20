@@ -77,7 +77,7 @@ impl RouteQuery<'_, '_> {
 		if let Ok(tree) = self.endpoint_trees.get(root) {
 			tree.clone().xok()
 		} else {
-			let endpoints = self
+			let endpoints: Vec<Endpoint> = self
 				.children
 				.iter_descendants_inclusive(root)
 				.filter_map(|child| {
@@ -85,7 +85,7 @@ impl RouteQuery<'_, '_> {
 						.get(child)
 						.ok()
 						.filter(|endpoint| endpoint.is_canonical())
-						.map(|endpoint| (child, endpoint.clone()))
+						.map(|endpoint| endpoint.clone())
 				})
 				.collect();
 			let tree = EndpointTree::from_endpoints(endpoints)?;

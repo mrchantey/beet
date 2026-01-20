@@ -13,14 +13,7 @@ async fn works() {
 		beet_site_endpoints,
 	)
 	.unwrap();
-	let endpoint_tree = EndpointTree::from_endpoints(
-		endpoints
-			.into_iter()
-			.enumerate()
-			.map(|(i, e)| (Entity::from_bits((i + 1) as u64), e))
-			.collect(),
-	)
-	.unwrap();
+	let endpoint_tree = EndpointTree::from_endpoints(endpoints).unwrap();
 
 	let root = world
 		.run_system_cached_with(
