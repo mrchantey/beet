@@ -57,7 +57,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		world.add_observer(exchange_stats);
 		world
 			.spawn((

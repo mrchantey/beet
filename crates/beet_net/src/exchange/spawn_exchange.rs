@@ -63,12 +63,19 @@ pub fn spawn_exchange(func: impl BundleFunc) -> impl Bundle {
 // this would be an exclusive observer but thats not yet supported
 fn end_on_insert_response(
 	ev: On<Insert, Response>,
-	mut commands: Commands,
+	// mut commands: Commands,
+	mut async_commands: AsyncCommands,
 ) -> Result {
 	let exchange_entity = ev.event_target();
-	commands
-		.entity(exchange_entity)
-		.queue(take_and_send_response);
+	// despawning via commands on the insert breaks, instead we do it in
+	// a task
+	async_commands.run(async move |world| {
+		world
+			.entity(exchange_entity)
+			.with_then(take_and_send_response)
+			.await
+	});
+
 	Ok(())
 }
 
@@ -90,7 +97,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn(spawn_exchange(|| {
 				OnSpawn::observe(
 					|ev: On<Insert, Request>,
@@ -109,5 +116,31 @@ mod test {
 			.await
 			.path_string()
 			.xpect_eq("/foo");
+	}
+	#[beet_core::test]
+	async fn cleans_up() {
+		let mut world = AsyncPlugin::world();
+		let server = world
+			.spawn(spawn_exchange(|| {
+				OnSpawn::observe(
+					|ev: On<Insert, Request>,
+					 mut commands: Commands,
+					 requests: Query<&Request>| {
+						commands.entity(ev.event_target()).insert(
+							requests
+								.get(ev.event_target())
+								.unwrap()
+								.mirror_parts(),
+						);
+					},
+				)
+			}))
+			.id();
+		world.entity_count().xpect_eq(2);
+		world
+			.entity_mut(server)
+			.exchange(Request::get("/foo"))
+			.await;
+		world.entity_count().xpect_eq(2);
 	}
 }
