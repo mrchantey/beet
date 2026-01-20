@@ -306,7 +306,7 @@ mod test {
 		endpoints
 			.into_iter()
 			.map(|(path, params)| {
-				Endpoint::new(path, params, None, None, None, is_canonical)
+				Endpoint::new(path, params, None, None, is_canonical)
 			})
 			.collect()
 	}

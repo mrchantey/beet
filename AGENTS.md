@@ -3,7 +3,7 @@
 
 You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-Beet is a rust project built on the bevy game engine
+Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
 
 ## Context
 
@@ -23,6 +23,7 @@ Beet is a rust project built on the bevy game engine
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+- we never mark #[deprecated] because we have no users, instead replace existing machinery
 - Fix any spelling mistakes you come across in code or docs.
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`

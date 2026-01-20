@@ -3,14 +3,7 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum ContentType {
-	Html,
-	Json,
-}
+
 
 /// Endpoints are actions that will only run if the method and path are an
 /// exact match. There should only be one of these per route match,
@@ -31,11 +24,13 @@ pub struct Endpoint {
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
 	cache_strategy: Option<CacheStrategy>,
-	/// Marks this endpoint as an HTML endpoint
-	content_type: Option<ContentType>,
 	/// Canonical endpoints are registered in the EndpointTree. Non-canonical endpoints
 	/// are fallbacks that won't conflict with canonical routes. Defaults to `true`.
 	is_canonical: bool,
+	/// Metadata describing the expected request body
+	request_body: BodyMeta,
+	/// Metadata describing the response body
+	response_body: BodyMeta,
 }
 
 
@@ -46,7 +41,6 @@ impl Endpoint {
 		params: ParamsPattern,
 		method: Option<HttpMethod>,
 		cache_strategy: Option<CacheStrategy>,
-		content_type: Option<ContentType>,
 		is_canonical: bool,
 	) -> Self {
 		Self {
@@ -54,9 +48,10 @@ impl Endpoint {
 			params,
 			method,
 			cache_strategy,
-			content_type,
 			is_canonical,
 			description: None,
+			request_body: BodyMeta::none(),
+			response_body: BodyMeta::none(),
 		}
 	}
 
@@ -67,8 +62,11 @@ impl Endpoint {
 	pub fn cache_strategy(&self) -> Option<CacheStrategy> {
 		self.cache_strategy
 	}
-	pub fn content_type(&self) -> Option<ContentType> { self.content_type }
 	pub fn is_canonical(&self) -> bool { self.is_canonical }
+	/// The request body metadata
+	pub fn request_body(&self) -> &BodyMeta { &self.request_body }
+	/// The response body metadata
+	pub fn response_body(&self) -> &BodyMeta { &self.response_body }
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
@@ -81,7 +79,8 @@ impl Endpoint {
 	}
 	/// Determines if this endpoint is a static GET endpoint returning HTML
 	pub fn is_static_get_html(&self) -> bool {
-		self.is_static_get() && self.content_type == Some(ContentType::Html)
+		self.is_static_get()
+			&& self.response_body.encoding() == BodyEncoding::Html
 	}
 }
 
@@ -100,14 +99,16 @@ pub struct EndpointBuilder {
 	method: Option<HttpMethod>,
 	/// The cache strategy for this endpoint, if any
 	cache_strategy: Option<CacheStrategy>,
-	/// Specify the content type for this endpoint
-	content_type: Option<ContentType>,
 	/// Whether to match the path exactly, defaults to true.
 	exact_path: bool,
 	/// Optional description for this endpoint
 	description: Option<String>,
 	/// Whether this endpoint is canonical (registered in EndpointTree), defaults to true
 	is_canonical: bool,
+	/// Metadata for the request body
+	request_body: BodyMeta,
+	/// Metadata for the response body
+	response_body: BodyMeta,
 	/// Additional bundles to be run before the handler
 	additional_predicates: Vec<
 		Box<
@@ -129,10 +130,11 @@ impl Default for EndpointBuilder {
 			params: None,
 			method: Some(HttpMethod::Get),
 			cache_strategy: None,
-			content_type: None,
 			exact_path: true,
 			description: None,
 			is_canonical: true,
+			request_body: BodyMeta::none(),
+			response_body: BodyMeta::none(),
 			additional_predicates: Vec::new(),
 		}
 	}
@@ -267,8 +269,15 @@ impl EndpointBuilder {
 		self
 	}
 
-	pub fn with_content_type(mut self, content_type: ContentType) -> Self {
-		self.content_type = Some(content_type);
+	/// Set the request body metadata
+	pub fn with_request_body(mut self, body: BodyMeta) -> Self {
+		self.request_body = body;
+		self
+	}
+
+	/// Set the response body metadata
+	pub fn with_response_body(mut self, body: BodyMeta) -> Self {
+		self.response_body = body;
 		self
 	}
 
@@ -325,8 +334,9 @@ impl EndpointBuilder {
 					description: self.description,
 					method: self.method,
 					cache_strategy: self.cache_strategy,
-					content_type: self.content_type,
 					is_canonical: self.is_canonical,
+					request_body: self.request_body,
+					response_body: self.response_body,
 				},
 				Sequence,
 			))
@@ -350,9 +360,6 @@ impl EndpointBuilder {
 
 				if let Some(cache_strategy) = self.cache_strategy {
 					handler_entity.insert(cache_strategy);
-				}
-				if let Some(content_type) = self.content_type {
-					handler_entity.insert(content_type);
 				}
 				if let Some(method) = self.method {
 					handler_entity.insert(method);

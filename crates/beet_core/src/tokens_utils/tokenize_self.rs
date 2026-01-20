@@ -36,7 +36,7 @@ pub fn short_type_path<T>() -> syn::Path {
 	))
 }
 // TODO use bevy utils instead
-fn shorten_generic_type_name(type_name: &str) -> String {
+pub fn shorten_generic_type_name(type_name: &str) -> String {
 	let mut result = String::new();
 	let mut chars = type_name.chars().peekable();
 

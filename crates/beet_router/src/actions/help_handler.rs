@@ -268,14 +268,15 @@ pub trait EndpointHelpFormatter {
 	/// Format the parameters/flags
 	fn format_params(&self, endpoint: &Endpoint) -> String;
 
+	/// Format the request body metadata
+	fn format_request_body(&self, body: &BodyMeta) -> String;
+
+	/// Format the response body metadata
+	fn format_response_body(&self, body: &BodyMeta) -> String;
+
 	/// Format cache strategy (if applicable)
 	fn format_cache_strategy(&self, cache: &CacheStrategy) -> String {
 		format!("Cache: {:?}", cache)
-	}
-
-	/// Format content type (if applicable)
-	fn format_content_type(&self, content_type: &ContentType) -> String {
-		format!("Content-Type: {:?}", content_type)
 	}
 }
 
@@ -301,6 +302,20 @@ impl EndpointHelpFormatter for CliFormatter {
 
 		// params
 		output.push_str(&self.format_params(endpoint));
+
+		// request body
+		let request_body_str =
+			self.format_request_body(endpoint.request_body());
+		if !request_body_str.is_empty() {
+			output.push_str(&request_body_str);
+		}
+
+		// response body
+		let response_body_str =
+			self.format_response_body(endpoint.response_body());
+		if !response_body_str.is_empty() {
+			output.push_str(&response_body_str);
+		}
 
 		output
 	}
@@ -369,6 +384,72 @@ impl EndpointHelpFormatter for CliFormatter {
 		output
 	}
 
+	fn format_request_body(&self, body: &BodyMeta) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output
+			.push_str(&format!("\n    {}", paint_ext::dimmed("Request Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available
+		if let Some(schema) = body.schema() {
+			for field in schema.fields() {
+				output.push_str(&format!(
+					"\n        {}",
+					paint_ext::yellow(field.name())
+				));
+				if field.is_required() {
+					output.push_str(&paint_ext::red(" (required)"));
+				} else {
+					output.push_str(&paint_ext::green(" (optional)"));
+				}
+			}
+		}
+
+		output
+	}
+
+	fn format_response_body(&self, body: &BodyMeta) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!(
+			"\n    {}",
+			paint_ext::dimmed("Response Body:")
+		));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available
+		if let Some(schema) = body.schema() {
+			for field in schema.fields() {
+				output.push_str(&format!(
+					"\n        {}",
+					paint_ext::yellow(field.name())
+				));
+				if field.is_required() {
+					output.push_str(&paint_ext::red(" (required)"));
+				} else {
+					output.push_str(&paint_ext::green(" (optional)"));
+				}
+			}
+		}
+
+		output
+	}
+
 	fn format_none_found(&self, path: &Vec<String>) -> String {
 		let path_str = if path.is_empty() {
 			"<empty>".to_string()
@@ -391,6 +472,7 @@ impl EndpointHelpFormatter for HttpFormatter {
 		paint_ext::bold("Available endpoints:").to_string()
 	}
 
+	#[allow(deprecated)]
 	fn format_endpoint(&self, endpoint: &Endpoint) -> String {
 		let mut output = String::new();
 
@@ -415,13 +497,21 @@ impl EndpointHelpFormatter for HttpFormatter {
 		// query params
 		output.push_str(&self.format_params(endpoint));
 
-		// content type
-		if let Some(content_type) = endpoint.content_type() {
-			output.push_str(&format!(
-				"\n    {}",
-				paint_ext::dimmed(&self.format_content_type(&content_type))
-			));
+		// request body
+		let request_body_str =
+			self.format_request_body(endpoint.request_body());
+		if !request_body_str.is_empty() {
+			output.push_str(&request_body_str);
 		}
+
+		// response body
+		let response_body_str =
+			self.format_response_body(endpoint.response_body());
+		if !response_body_str.is_empty() {
+			output.push_str(&response_body_str);
+		}
+
+
 
 		// cache strategy
 		if let Some(cache) = endpoint.cache_strategy() {
@@ -467,6 +557,69 @@ impl EndpointHelpFormatter for HttpFormatter {
 			));
 			if let Some(desc) = param.description() {
 				output.push_str(&format!(": {}", desc));
+			}
+		}
+
+		output
+	}
+
+	fn format_request_body(&self, body: &BodyMeta) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!("\n    {}", paint_ext::bold("Request Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available
+		if let Some(schema) = body.schema() {
+			for field in schema.fields() {
+				output.push_str(&format!(
+					"\n        {}",
+					paint_ext::yellow(field.name())
+				));
+				if field.is_required() {
+					output.push_str(&paint_ext::red(" (required)"));
+				} else {
+					output.push_str(&paint_ext::green(" (optional)"));
+				}
+			}
+		}
+
+		output
+	}
+
+	fn format_response_body(&self, body: &BodyMeta) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output
+			.push_str(&format!("\n    {}", paint_ext::bold("Response Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available
+		if let Some(schema) = body.schema() {
+			for field in schema.fields() {
+				output.push_str(&format!(
+					"\n        {}",
+					paint_ext::yellow(field.name())
+				));
+				if field.is_required() {
+					output.push_str(&paint_ext::red(" (required)"));
+				} else {
+					output.push_str(&paint_ext::green(" (optional)"));
+				}
 			}
 		}
 
@@ -668,5 +821,80 @@ mod test {
 
 		http_help.clone().xpect_contains("max-retry-count");
 		http_help.xpect_contains("enable-verbose-mode");
+	}
+
+	#[beet_core::test]
+	async fn help_with_body_metadata() {
+		#[derive(Reflect)]
+		struct CreateUserRequest {
+			username: String,
+			email: String,
+			age: Option<u32>,
+		}
+
+		#[derive(Reflect)]
+		struct CreateUserResponse {
+			id: u64,
+			created_at: String,
+		}
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(flow_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::post()
+					.with_path("api/users")
+					.with_description("Create a new user")
+					.with_request_body(BodyMeta::json::<CreateUserRequest>())
+					.with_response_body(BodyMeta::json::<CreateUserResponse>())
+					.with_action(|| "created"),
+			])
+		}));
+
+		// test CLI format
+		let cli_response =
+			entity.exchange_str(Request::get("/?help=true")).await;
+
+		cli_response.clone().xpect_contains("Request Body:");
+		cli_response.clone().xpect_contains("CreateUserRequest");
+		cli_response.clone().xpect_contains("username");
+		cli_response.clone().xpect_contains("email");
+		cli_response.clone().xpect_contains("Response Body:");
+		cli_response.clone().xpect_contains("CreateUserResponse");
+		cli_response.clone().xpect_contains("id");
+		cli_response.xpect_contains("created_at");
+
+		// test HTTP format
+		let http_response = entity
+			.exchange_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		http_response.clone().xpect_contains("Request Body:");
+		http_response.clone().xpect_contains("CreateUserRequest");
+		http_response.clone().xpect_contains("Response Body:");
+		http_response.xpect_contains("CreateUserResponse");
+	}
+
+	#[beet_core::test]
+	async fn help_no_body_metadata_when_none() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(flow_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("status")
+					.with_description("Get status")
+					.with_action(|| "ok"),
+			])
+		}));
+
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
+
+		// should not contain body sections when BodyMeta::none()
+		response.clone().xpect_contains("status");
+		response.clone().xpect_contains("Get status");
+		// BodyMeta::none() should not produce output
+		(!response.contains("Request Body:")).xpect_true();
+		(!response.contains("Response Body:")).xpect_true();
 	}
 }

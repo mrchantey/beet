@@ -90,17 +90,17 @@ mod test {
 					.with_path("foo")
 					.with_action(|| "foo")
 					.with_cache_strategy(CacheStrategy::Static)
-					.with_content_type(ContentType::Html),
+					.with_response_body(BodyMeta::html()),
 				EndpointBuilder::get()
 					.with_path("bar")
 					.with_action(|| "bar")
 					.with_cache_strategy(CacheStrategy::Static)
-					.with_content_type(ContentType::Html),
+					.with_response_body(BodyMeta::html()),
 				// non-static
 				EndpointBuilder::get()
 					.with_path("bazz")
 					.with_action(|| "bazz")
-					.with_content_type(ContentType::Html),
+					.with_response_body(BodyMeta::html()),
 				// non-html
 				EndpointBuilder::get()
 					.with_path("boo")
@@ -131,7 +131,7 @@ mod test {
 					.with_path("rsx-page")
 					.with_action(|| (BeetRoot, rsx! {<div>hello rsx</div>}))
 					.with_cache_strategy(CacheStrategy::Static)
-					.with_content_type(ContentType::Html),
+					.with_response_body(BodyMeta::html()),
 			])
 		};
 
