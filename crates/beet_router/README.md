@@ -18,4 +18,4 @@ For serving content the recommended approach is to use the `beet_net` server, a 
 
 `beet_router` is designed to balance performance with flexibility and developer experience.
 It is not intended for extreme traffic scenarios like a proxy servers handling 10,000 requests/second, this is something axum is designed for (they go to great length to avoid a single boxing).
-An average lambda request takes 200ms and our baseline target for a basic useful router with middleare is 200us, 0.1% of that.
+An average lambda request takes 200ms and our baseline target for a relatively large router is 1ms, 0.5% of that.

@@ -4,7 +4,8 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-const DEFAULT_MODEL: &str = "functiongemma:270m-it-fp16";
+const DEFAULT_MODEL: &str = "huihui_ai/qwen3-abliterated:14b";
+// const DEFAULT_MODEL: &str = "functiongemma:270m-it-fp16";
 
 #[derive(Component)]
 #[require(AgentRole)]
@@ -59,7 +60,7 @@ impl OllamaAgent {
 	/// Currently a no-op; reserved to keep API parity with other providers
 	pub fn with_tool(self, _tool: impl Into<CommonTool>) -> Self { self }
 
-	fn chat_req(&self, messages: &Vec<Value>) -> Result<Request> {
+	pub fn chat_req(&self, messages: &Vec<Value>) -> Result<Request> {
 		let url = format!("{}/api/chat", self.base_url);
 		Request::post(url)
 			.with_json_body(&json! {{

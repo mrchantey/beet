@@ -72,6 +72,11 @@ run-p crate example *args:
 run-b crate *args:
     just watch cargo run -p {{ crate }} --bin run-build --features=build {{ args }}
 
+#💡 Aliases
+
+chat *args:
+	cargo run --example chat --features=agent -- {{ args }}
+
 run-csr:
     cargo run --example csr --features=client
     just watch just build-csr
@@ -81,8 +86,6 @@ build-csr:
     wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
     just cli serve target/examples/csr
 
-launch *args:
-    cargo launch -w {{ args }}
 
 run-hydration:
     just watch just build-hydration

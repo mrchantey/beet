@@ -401,12 +401,12 @@ required-features = ["flow"]
 # 💡 Examples - router
 
 [[example]]
-name = "router"
-path = "examples/router/router.rs"
+name = "http_server"
+path = "examples/router/http_server.rs"
 required-features = ["server"]
 [[example]]
-name = "cli_router"
-path = "examples/router/cli_router.rs"
+name = "cli_server"
+path = "examples/router/cli_server.rs"
 required-features = ["server"]
 
 [[example]]

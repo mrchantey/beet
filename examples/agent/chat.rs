@@ -12,12 +12,16 @@ fn main() {
 				CliServer,
 				flow_exchange(|| {
 					(InfallibleSequence, children![
-						EndpointBuilder::new().with_action(|| {
-							Response::ok_body("hello world", "text/plain")
-						})
+						EndpointBuilder::new().with_handler(oneshot()),
+						EndpointBuilder::new().with_path("repl").with_action(
+							|| { Response::ok_body("repl", "text/plain") }
+						)
 					])
 				}),
 			));
 		})
 		.run();
 }
+
+
+
