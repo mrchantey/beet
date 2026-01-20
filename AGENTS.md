@@ -63,3 +63,6 @@ Beet is a rust project built on the bevy game engine
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
 - Beet is a cross-platform framework, never use println! as it is silent in wasm, all temp logging should be done either via `foo.xprint()` or `beet_core::cross_log!()` to ensure we get logs across platforms
 - In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
+- In bevy the two main causes of bugs are:
+	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
+	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.
