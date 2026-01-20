@@ -18,10 +18,10 @@ fn main() {
 					// this sequence type will ensure all endpoints are checked
 					// even if the previous one did not match
 					(InfallibleSequence, children![
-						EndpointBuilder::get().with_handler(|| {
+						EndpointBuilder::get().with_action(|| {
 							Response::ok_body("hello world", "text/plain")
 						}),
-						EndpointBuilder::get().with_path("foo").with_handler(
+						EndpointBuilder::get().with_path("foo").with_action(
 							|| {
 								Response::ok_body(
 									"<div>hello foo</div>",

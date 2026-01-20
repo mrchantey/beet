@@ -1461,8 +1461,10 @@ version = "0.0.9-dev.1"
 dependencies = [
  "beet",
  "beet_design",
+ "futures",
  "getrandom 0.3.3",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

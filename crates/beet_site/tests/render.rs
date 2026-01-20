@@ -61,6 +61,60 @@ async fn article_layout() {
 		.await
 		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
 }
+#[beet::test]
+async fn multiple_calls() {
+	let mut world = RouterPlugin::world();
+	let mut entity = world
+		.with_resource(pkg_config!())
+		// .with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router());
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+}
 
 #[beet::test]
 #[ignore = "flaky: sometimes beet_site sometimes beet"]

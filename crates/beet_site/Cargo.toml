@@ -33,4 +33,6 @@ beet_design.workspace = true
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
+serde_json.workspace = true
+futures.workspace = true
 beet = { workspace = true, features = ["testing"] }
