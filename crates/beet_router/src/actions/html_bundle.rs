@@ -120,9 +120,11 @@ pub fn html_bundle_to_response() -> impl Bundle {
 					let html = world
 						.run_system_cached_with(render_fragment, html_bundle)?;
 					world.entity_mut(agent).insert(Html(html).into_response());
+					// trigger outcome after response is inserted to ensure
+					// outcome_handler sees the ResponseMarker
+					world.entity_mut(action).trigger_target(Outcome::Pass);
 					Ok(())
 				});
-				commands.entity(action).trigger_target(Outcome::Pass);
 				Ok(())
 			},
 		),
