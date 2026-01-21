@@ -1,21 +1,23 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::RequestClientExt;
+use beet_net::prelude::*;
+use beet_router::prelude::*;
 use serde_json::Value;
 
 
 
 pub fn oneshot() -> impl Bundle {
-	(InfallibleSequence, children![
-		insert_request_context(),
-		ai_agent_request()
+	(Sequence, children![
+		request_to_context(),
+		ai_agent_request(),
+		EndpointBuilder::new().with_action(StatusCode::Ok)
 	])
 }
 
 
 
-fn insert_request_context() -> impl Bundle {
+fn request_to_context() -> impl Bundle {
 	OnSpawn::observe(
 		|ev: On<GetOutcome>,
 		 agent_query: AgentQuery<&RequestMeta>,

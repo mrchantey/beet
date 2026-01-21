@@ -76,3 +76,8 @@ required-features = ["native-tls"]
 name = "gemini-image"
 path = "tests/gemini-image.rs"
 required-features = ["native-tls"]
+
+[[test]]
+name = "openresponses"
+path = "tests/openresponses.rs"
+required-features = ["native-tls"]
