@@ -8,6 +8,8 @@ pub use bucket_endpoint::*;
 pub use help_handler::*;
 pub use html_bundle::*;
 pub use router_exchange::*;
+mod endpoint_builder;
+pub use endpoint_builder::*;
 mod endpoint;
 pub use endpoint::*;
 mod server_action;

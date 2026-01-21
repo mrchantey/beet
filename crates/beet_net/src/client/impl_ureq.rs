@@ -6,6 +6,9 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	let (parts, body) = req.into_parts();
 
 	// Build the agent with proper TLS configuration
+	// Set http_status_as_error to false so 4xx/5xx responses are not treated as errors.
+	// We want to capture the actual response (headers, body, etc) regardless of status code.
+	// Only IO/connection errors should fail the request.
 
 	#[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
 	let agent = ureq::config::Config::builder()
@@ -14,6 +17,7 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 				.provider(ureq::tls::TlsProvider::NativeTls)
 				.build(),
 		)
+		.http_status_as_error(false)
 		.build()
 		.new_agent();
 	#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
@@ -23,10 +27,14 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 				.provider(ureq::tls::TlsProvider::NativeTls)
 				.build(),
 		)
+		.http_status_as_error(false)
 		.build()
 		.new_agent();
 	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
-	let agent = ureq::config::Config::builder().build().new_agent();
+	let agent = ureq::config::Config::builder()
+		.http_status_as_error(false)
+		.build()
+		.new_agent();
 
 	// Convert to http::Request
 	let http_parts: http::request::Parts = parts.try_into()?;
