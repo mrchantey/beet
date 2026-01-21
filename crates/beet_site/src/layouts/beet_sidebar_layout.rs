@@ -8,15 +8,11 @@ pub fn BeetSidebarLayout(
 	entity: Entity,
 	world: &mut World,
 ) -> Result<impl Bundle> {
+	// Use the template entity for endpoint_tree lookup since it has
+	// a proper TemplateOf/ChildOf chain to the router
 	let endpoint_tree = world.run_system_cached_with(
-		|entity: In<Entity>,
-		 bundle_query: HtmlBundleQuery,
-		 mut route_query: RouteQuery|
-		 -> Result<EndpointTree> {
-			let actions =
-				bundle_query.actions_from_agent_descendant(*entity).unwrap();
-			assert_eq!(actions.len(), 1);
-			route_query.endpoint_tree(actions[0])
+		|entity: In<Entity>, route_query: RouteQuery| -> Result<EndpointTree> {
+			route_query.endpoint_tree(*entity)
 		},
 		entity,
 	)?;

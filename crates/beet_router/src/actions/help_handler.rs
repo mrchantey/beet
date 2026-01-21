@@ -77,8 +77,9 @@ pub struct HelpParams {
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async {
+/// // Use router_exchange to ensure EndpointTree is available for help_handler
 /// RouterPlugin::world()
-///     .spawn(flow_exchange(|| {
+///     .spawn(router_exchange(|| {
 ///         (Fallback, children![
 ///             help_handler(HelpHandlerConfig {
 ///                 introduction: String::from("Welcome to my CLI"),
@@ -100,7 +101,7 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 		Name::new("Help Handler"),
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>,
-			      mut route_query: RouteQuery,
+			      route_query: RouteQuery,
 			      mut commands: Commands|
 			      -> Result {
 				let action = ev.target();
@@ -658,7 +659,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_shows_matching_endpoints() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -683,7 +684,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_format_http() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::post()
@@ -713,7 +714,7 @@ mod test {
 		}
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -735,7 +736,7 @@ mod test {
 	#[beet_core::test]
 	async fn no_help_passes_through() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -752,7 +753,7 @@ mod test {
 	#[beet_core::test]
 	async fn kebab_case_params_work() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -790,7 +791,7 @@ mod test {
 		}
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()
@@ -839,7 +840,7 @@ mod test {
 		}
 
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::post()
@@ -878,7 +879,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_no_body_metadata_when_none() {
 		let mut world = RouterPlugin::world();
-		let mut entity = world.spawn(flow_exchange(|| {
+		let mut entity = world.spawn(router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig::default()),
 				EndpointBuilder::get()

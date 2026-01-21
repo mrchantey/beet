@@ -179,11 +179,11 @@ mod test {
 		#[template]
 		fn TestSidebar(
 			entity: Entity,
-			#[field(param)] bundle_query: HtmlBundleQuery,
-			#[field(param)] mut route_query: RouteQuery,
+			#[field(param)] route_query: RouteQuery,
 		) -> Result<TextNode> {
-			let actions = bundle_query.actions_from_agent_descendant(entity)?;
-			let endpoint_tree = route_query.endpoint_tree(actions[0])?;
+			// Use the template entity for endpoint_tree lookup since it has
+			// a proper TemplateOf/ChildOf chain to the router
+			let endpoint_tree = route_query.endpoint_tree(entity)?;
 
 			// Verify we got the endpoint tree
 			endpoint_tree.to_string().xpect_eq("/docs\n");
@@ -204,7 +204,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(flow_exchange(|| {
+			.spawn(router_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("docs")

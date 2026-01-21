@@ -60,20 +60,10 @@ mod test {
 		let mut world = RouterPlugin::world();
 		let func = || {
 			(CacheStrategy::Static, children![
-				EndpointBuilder::get().with_action(
-					async |_: (), action: AsyncEntity| -> Result<String> {
-						let tree =
-							RouteQuery::with_async(action, |query, entity| {
-								query.endpoint_tree(entity)
-							})
-							.await?;
-						tree.to_string().xok()
-					}
-				),
-				(EndpointBuilder::get()
+				EndpointBuilder::get()
 					.with_path("foo")
 					.with_cache_strategy(CacheStrategy::Static)
-					.with_action(|| "foo")),
+					.with_action(|| "foo"),
 				(PathPartial::new("bar"), children![
 					EndpointBuilder::get()
 						.with_path("bazz")
@@ -84,16 +74,24 @@ mod test {
 			])
 		};
 
-		EndpointTree::endpoints_from_bundle_func(&mut world, func)
+		// Test endpoints_from_bundle_func works
+		EndpointTree::endpoints_from_bundle_func(&mut world, func.clone())
 			.unwrap()
 			.iter()
 			.map(|p| p.path().annotated_route_path())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
-				RoutePath::new("/"),
 				RoutePath::new("/foo"),
 				RoutePath::new("/bar/bazz"),
 			]);
+
+		// Test that router_exchange spawns EndpointTree on the entity
+		let entity = world.spawn(router_exchange(func)).id();
+		world
+			.entity(entity)
+			.get::<EndpointTree>()
+			.is_some()
+			.xpect_true();
 	}
 
 	#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]

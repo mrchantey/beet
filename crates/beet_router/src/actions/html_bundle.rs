@@ -187,19 +187,17 @@ mod test {
 		#[template]
 		fn Foobar(
 			entity: Entity,
-			#[field(param)] bundle_query: HtmlBundleQuery,
-			#[field(param)] mut route_query: RouteQuery,
+			#[field(param)] route_query: RouteQuery,
 		) -> Result<TextNode> {
-			let actions =
-				bundle_query.actions_from_agent_descendant(entity).unwrap();
-			assert_eq!(actions.len(), 1);
-			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			// Use the template entity itself for endpoint_tree lookup
+			// since it has a proper TemplateOf/ChildOf chain to the router
+			let text = route_query.endpoint_tree(entity)?.to_string();
 			TextNode::new(text).xok()
 		}
 
 
 		RouterPlugin::world()
-			.spawn(flow_exchange(|| {
+			.spawn(router_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("foo")
@@ -217,13 +215,9 @@ mod test {
 		#[template]
 		fn Inner(
 			entity: Entity,
-			#[field(param)] bundle_query: HtmlBundleQuery,
-			#[field(param)] mut route_query: RouteQuery,
+			#[field(param)] route_query: RouteQuery,
 		) -> Result<TextNode> {
-			let actions =
-				bundle_query.actions_from_agent_descendant(entity).unwrap();
-			assert_eq!(actions.len(), 1);
-			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			let text = route_query.endpoint_tree(entity)?.to_string();
 			TextNode::new(text).xok()
 		}
 
@@ -233,7 +227,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(flow_exchange(|| {
+			.spawn(router_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("nested")
@@ -251,13 +245,9 @@ mod test {
 		#[template]
 		fn Level3(
 			entity: Entity,
-			#[field(param)] bundle_query: HtmlBundleQuery,
-			#[field(param)] mut route_query: RouteQuery,
+			#[field(param)] route_query: RouteQuery,
 		) -> Result<TextNode> {
-			let actions =
-				bundle_query.actions_from_agent_descendant(entity).unwrap();
-			assert_eq!(actions.len(), 1);
-			let text = route_query.endpoint_tree(actions[0])?.to_string();
+			let text = route_query.endpoint_tree(entity)?.to_string();
 			TextNode::new(text).xok()
 		}
 
@@ -272,7 +262,7 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(flow_exchange(|| {
+			.spawn(router_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("deep")

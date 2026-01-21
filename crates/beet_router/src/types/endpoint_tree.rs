@@ -27,7 +27,8 @@ use beet_net::prelude::*;
 /// # use beet_net::prelude::*;
 ///
 /// let mut world = World::new();
-/// world.spawn(flow_exchange(|| {
+/// // Use router_exchange to ensure EndpointTree is constructed on spawn
+/// world.spawn(router_exchange(|| {
 ///   (
 /// 		InfallibleSequence, children![
 ///       EndpointBuilder::get().with_path("api"),

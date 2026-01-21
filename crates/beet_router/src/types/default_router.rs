@@ -18,7 +18,7 @@ pub fn default_router_cli(
 	(
 		Name::new("Router CLI"),
 		CliServer,
-		flow_exchange(|| {
+		router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
 					introduction: String::from("Router CLI"),
@@ -80,7 +80,7 @@ pub fn default_router(
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
 ) -> impl Bundle {
-	flow_exchange(move || {
+	router_exchange(move || {
 		(InfallibleSequence, children![
 			(Name::new("Await Ready"), AwaitReady::default()),
 			(
