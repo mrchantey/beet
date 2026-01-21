@@ -13,7 +13,7 @@
 //! # async fn example() -> Result<()> {
 //! dotenv::dotenv().ok();
 //!
-//! let request_body = openresponses::request::Body::new("gpt-4o-mini")
+//! let request_body = openresponses::RequestBody::new("gpt-4o-mini")
 //!     .with_input("Hello!");
 //!
 //! let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
@@ -23,7 +23,7 @@
 //!     .await?
 //!     .into_result()
 //!     .await?
-//!     .json::<openresponses::response::Body>()
+//!     .json::<openresponses::ResponseBody>()
 //!     .await?;
 //!
 //! assert_eq!(response.object, "response");

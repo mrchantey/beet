@@ -284,8 +284,7 @@ mod test {
 
 	#[test]
 	fn deserializes_input_image() {
-		let json =
-			r#"{"type":"input_image","image_url":"https://example.com/img.png"}"#;
+		let json = r#"{"type":"input_image","image_url":"https://example.com/img.png"}"#;
 		let content: ContentPart = serde_json::from_str(json).unwrap();
 		assert!(matches!(content, ContentPart::InputImage(_)));
 	}
