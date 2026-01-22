@@ -28,7 +28,7 @@ impl Default for OpenAIProvider {
 impl OpenAIProvider {
 	/// Creates a new provider with the API key from the environment.
 	pub fn new() -> Result<Self> {
-		let api_key = std::env::var("OPENAI_API_KEY")?;
+		let api_key = env_ext::var("OPENAI_API_KEY")?;
 		Ok(Self {
 			inner: OpenResponsesProvider::new(constants::RESPONSES_URL)
 				.with_auth(api_key),
@@ -37,6 +37,8 @@ impl OpenAIProvider {
 }
 
 impl ModelProvider for OpenAIProvider {
+	fn provider_slug(&self) -> &'static str { "openai" }
+
 	fn default_small_model(&self) -> &'static str { constants::GPT_5_MINI }
 	fn default_tool_model(&self) -> &'static str { constants::GPT_5_MINI }
 	fn default_large_model(&self) -> &'static str { constants::GPT_5_2 }

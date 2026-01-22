@@ -72,13 +72,11 @@ beet_agent = { path = ".", features = ["native-tls"] }
 [[test]]
 name = "chat"
 path = "tests/chat.rs"
-required-features = ["native-tls"]
+
 [[test]]
 name = "gemini-image"
 path = "tests/gemini-image.rs"
-required-features = ["native-tls"]
 
 [[test]]
 name = "openresponses"
 path = "tests/openresponses.rs"
-required-features = ["native-tls"]

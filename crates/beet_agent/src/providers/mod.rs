@@ -47,6 +47,9 @@ pub use openresponses_provider::*;
 /// # }
 /// ```
 pub trait ModelProvider {
+	/// A short slug identifying this provider (e.g., "openai", "ollama").
+	fn provider_slug(&self) -> &'static str;
+
 	/// The recommended model from this provider for short and simple
 	/// requests and responses.
 	fn default_small_model(&self) -> &'static str;

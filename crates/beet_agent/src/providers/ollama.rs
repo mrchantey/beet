@@ -33,6 +33,8 @@ impl Default for OllamaProvider {
 }
 
 impl ModelProvider for OllamaProvider {
+	fn provider_slug(&self) -> &'static str { "ollama" }
+
 	fn default_small_model(&self) -> &'static str { constants::QWEN_3_8B }
 	fn default_tool_model(&self) -> &'static str {
 		constants::FUNCTION_GEMMA_270M_IT
