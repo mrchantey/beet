@@ -2,6 +2,41 @@
 //!
 //! This module contains types for defining and using tools (functions)
 //! that the model can call during response generation.
+//!
+//! # Tool Calling
+//!
+//! Tool-use is at the heart of modern LLM agentic capabilities. OpenResponses
+//! supports **function tools** where the model generates a function call with
+//! arguments, and the developer executes the function and returns results.
+//!
+//! # Defining Tools
+//!
+//! Use [`FunctionToolParam`] to define tools available to the model:
+//!
+//! ```no_run
+//! # use beet_agent::prelude::openresponses;
+//! let tool = openresponses::FunctionToolParam::new("search_web")
+//!     .with_description("Search the web for information")
+//!     .with_parameters(serde_json::json!({
+//!         "type": "object",
+//!         "properties": {
+//!             "query": {
+//!                 "type": "string",
+//!                 "description": "The search query"
+//!             }
+//!         },
+//!         "required": ["query"]
+//!     }));
+//! ```
+//!
+//! # Tool Choice
+//!
+//! Control when and which tools the model uses with [`ToolChoice`]:
+//!
+//! - `ToolChoice::auto()`: Let the model decide (default)
+//! - `ToolChoice::none()`: Prevent any tool calls
+//! - `ToolChoice::required()`: Force the model to call a tool
+//! - `ToolChoice::function("name")`: Force a specific function
 
 use serde::Deserialize;
 use serde::Serialize;

@@ -1,18 +1,66 @@
 //! Request types for the OpenResponses API.
 //!
-//! This module contains the request body and all related types for making
+//! This module contains the [`RequestBody`] and all related types for making
 //! requests to the `/v1/responses` endpoint.
 //!
-//! # Example
+//! # Request Structure
+//!
+//! A request consists of:
+//! - **Model**: The LLM to use (e.g., `"gpt-4o-mini"`, `"qwen3:8b"`)
+//! - **Input**: Context provided to the model—either a simple string or structured items
+//! - **Tools**: Optional function definitions the model may call
+//! - **Parameters**: Sampling settings like `temperature`, `top_p`, `max_output_tokens`
+//!
+//! # Input Types
+//!
+//! Input can be provided in two forms:
+//!
+//! 1. **Simple string**: Interpreted as a user message
+//!    ```no_run
+//!    # use beet_agent::prelude::openresponses;
+//!    let body = openresponses::RequestBody::new("gpt-4o")
+//!        .with_input("Hello!");
+//!    ```
+//!
+//! 2. **Structured items**: Array of messages, function calls, or reasoning items
+//!    ```no_run
+//!    # use beet_agent::prelude::openresponses;
+//!    let body = openresponses::RequestBody::new("gpt-4o")
+//!        .with_input_items(vec![
+//!            openresponses::request::InputItem::Message(
+//!                openresponses::request::MessageParam::system("You are helpful."),
+//!            ),
+//!            openresponses::request::InputItem::Message(
+//!                openresponses::request::MessageParam::user("Hello!"),
+//!            ),
+//!        ]);
+//!    ```
+//!
+//! # Multi-Turn Conversations
+//!
+//! Use `previous_response_id` to continue a conversation without resending the
+//! entire transcript. The server loads both input and output from the prior
+//! response and treats them as context for the new request.
+//!
+//! # Tool Calling
+//!
+//! Define functions the model can invoke:
 //!
 //! ```no_run
-//! use beet_agent::prelude::openresponses;
+//! # use beet_agent::prelude::openresponses;
+//! let tool = openresponses::FunctionToolParam::new("get_weather")
+//!     .with_description("Get current weather for a location")
+//!     .with_parameters(serde_json::json!({
+//!         "type": "object",
+//!         "properties": {
+//!             "location": { "type": "string" }
+//!         },
+//!         "required": ["location"]
+//!     }));
 //!
-//! let body = openresponses::RequestBody::new("gpt-4o-mini")
-//!     .with_input("Hello, world!")
-//!     .with_temperature(0.7);
-//!
-//! assert_eq!(body.model, "gpt-4o-mini");
+//! let body = openresponses::RequestBody::new("gpt-4o")
+//!     .with_input("What's the weather in Tokyo?")
+//!     .with_tool(tool);
 //! ```
 
 use super::*;

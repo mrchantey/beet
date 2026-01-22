@@ -1,4 +1,23 @@
 //! Common enums used across the OpenResponses API.
+//!
+//! This module defines the enumeration types shared across request and response
+//! structures, including message roles, status values, and configuration options.
+//!
+//! # Message Roles
+//!
+//! Conversations use four distinct roles:
+//! - [`MessageRole::User`]: End-user input
+//! - [`MessageRole::Assistant`]: Model-generated responses
+//! - [`MessageRole::System`]: System-level behavior instructions
+//! - [`MessageRole::Developer`]: Developer guidance (similar to system but distinct)
+//!
+//! # Status Enums
+//!
+//! Items and responses follow state machines with these statuses:
+//! - `in_progress`: Currently being processed
+//! - `completed`: Successfully finished
+//! - `incomplete`: Interrupted (e.g., max tokens reached)
+//! - `failed`: Error occurred (responses only)
 
 use serde::Deserialize;
 use serde::Serialize;

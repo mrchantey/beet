@@ -6,6 +6,7 @@
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
 use beet_agent::prelude::*;
+use beet_core::exports::futures_lite::pin;
 use beet_core::prelude::*;
 
 fn text_provider() -> impl ModelProvider {
@@ -32,7 +33,9 @@ async fn basic_text_response() {
 		.xpect_eq(openresponses::response::Status::Completed);
 	response
 		.model
-		.as_str()
+		.as_ref()
+		.map(|m| m.as_str())
+		.unwrap_or("")
 		.xpect_starts_with(provider.default_small_model());
 	response.first_text().is_some().xpect_true();
 	response.usage.is_some().xpect_true();
@@ -46,35 +49,38 @@ async fn streaming_response() {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input("Count from 1 to 5.")
 		.with_stream(true);
-	let mut stream = provider.stream(body).await.unwrap();
+	let stream = provider.stream(body).await.unwrap();
+	pin!(stream);
 
-	let mut events = Vec::new();
+	let mut event_types = Vec::new();
 	let mut final_response: Option<openresponses::ResponseBody> = None;
+	let mut accumulated_text = String::new();
 
-	while let Some(ev) = stream.next().await {
-		let ev = ev.unwrap();
-		if ev.data == "[DONE]" {
-			break;
-		}
+	while let Some(result) = stream.next().await {
+		let event = result.unwrap();
+		event_types.push(event.event_type().to_string());
 
-		let json: serde_json::Value = serde_json::from_str(&ev.data).unwrap();
-		let event_type = json["type"].as_str().unwrap_or("").to_string();
-		events.push(event_type.clone());
-
-		// Capture the final response.completed event
-		if event_type == "response.completed" {
-			final_response =
-				serde_json::from_value(json["response"].clone()).ok();
+		match event {
+			openresponses::StreamingEvent::OutputTextDelta(ev) => {
+				accumulated_text.push_str(&ev.delta);
+			}
+			openresponses::StreamingEvent::ResponseCompleted(ev) => {
+				final_response = Some(ev.response);
+			}
+			_ => {}
 		}
 	}
 
 	// Verify we received expected event types
-	events
+	event_types
 		.contains(&"response.created".to_string())
 		.xpect_true();
-	events
+	event_types
 		.contains(&"response.completed".to_string())
 		.xpect_true();
+
+	// Verify we accumulated text via deltas
+	accumulated_text.is_empty().xpect_false();
 
 	// Verify final response is valid
 	let response = final_response.unwrap();
@@ -151,8 +157,10 @@ async fn tool_calling() {
 
 	let fc = function_calls[0];
 	fc.name.xpect_eq("get_weather");
-	fc.status
-		.xpect_eq(openresponses::FunctionCallStatus::Completed);
+	// Status may be omitted by some providers
+	if let Some(status) = fc.status {
+		status.xpect_eq(openresponses::FunctionCallStatus::Completed);
+	}
 
 	// Parse and verify arguments
 	let args = fc.arguments_value().unwrap();

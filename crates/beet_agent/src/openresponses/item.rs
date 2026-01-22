@@ -2,6 +2,45 @@
 //!
 //! This module contains types representing items that can appear in
 //! a response's output array.
+//!
+//! # Items
+//!
+//! Items are the core unit of context in OpenResponses. They represent atomic
+//! units of model output and follow a state machine lifecycle:
+//!
+//! - `in_progress`: Model is currently generating this item
+//! - `completed`: Item is finalized
+//! - `incomplete`: Item was interrupted (e.g., token limit reached)
+//!
+//! # Item Types
+//!
+//! The [`OutputItem`] enum represents all possible output item types:
+//!
+//! - **Message**: Text content from the model, with optional annotations
+//! - **FunctionCall**: Tool invocation with function name and JSON arguments
+//! - **FunctionCallOutput**: Result returned after executing a function
+//! - **Reasoning**: Model's reasoning trace (for reasoning models like o1)
+//!
+//! # Extracting Content
+//!
+//! ```no_run
+//! # use beet_agent::prelude::openresponses;
+//! # fn example(output: &[openresponses::OutputItem]) {
+//! for item in output {
+//!     match item {
+//!         openresponses::OutputItem::Message(msg) => {
+//!             if let Some(text) = msg.first_text() {
+//!                 println!("Assistant: {}", text);
+//!             }
+//!         }
+//!         openresponses::OutputItem::FunctionCall(fc) => {
+//!             println!("Call {}: {}", fc.name, fc.arguments);
+//!         }
+//!         _ => {}
+//!     }
+//! }
+//! # }
+//! ```
 
 use super::content::*;
 use super::enums::*;
@@ -115,7 +154,9 @@ pub struct FunctionCall {
 	/// The arguments JSON string that was generated.
 	pub arguments: String,
 	/// The status of the function call.
-	pub status: FunctionCallStatus,
+	/// Optional for provider compatibility (some providers omit this).
+	#[serde(default)]
+	pub status: Option<FunctionCallStatus>,
 }
 
 impl FunctionCall {

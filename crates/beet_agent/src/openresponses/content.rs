@@ -2,6 +2,44 @@
 //!
 //! This module contains types representing different content formats
 //! that can appear in messages and outputs.
+//!
+//! # User vs Model Content
+//!
+//! OpenResponses distinguishes between user-provided input content and
+//! model-generated output content:
+//!
+//! - **User content**: Text, images, files, or video provided as input
+//! - **Model content**: Text outputs, refusals, or reasoning traces
+//!
+//! This asymmetry reflects the different roles—user inputs can include
+//! multiple modalities, while model outputs are typically text-based.
+//!
+//! # Content Parts
+//!
+//! Messages contain arrays of content parts, allowing mixed content:
+//!
+//! ```no_run
+//! # use beet_agent::prelude::openresponses;
+//! let parts = vec![
+//!     openresponses::ContentPart::input_text("What's in this image?"),
+//!     openresponses::ContentPart::InputImage(
+//!         openresponses::InputImage::from_url("https://example.com/photo.jpg"),
+//!     ),
+//! ];
+//! ```
+//!
+//! # Image Inputs
+//!
+//! Images can be provided as URLs or base64-encoded data:
+//!
+//! ```no_run
+//! # use beet_agent::prelude::openresponses;
+//! // From URL
+//! let img = openresponses::InputImage::from_url("https://example.com/photo.jpg");
+//!
+//! // From base64
+//! let img = openresponses::InputImage::from_base64("image/png", "iVBORw0KGgo...");
+//! ```
 
 use super::enums::*;
 use serde::Deserialize;

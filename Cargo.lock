@@ -1110,6 +1110,7 @@ dependencies = [
  "beet_router",
  "bevy",
  "dotenv",
+ "futures",
  "http 1.3.1",
  "js-sys",
  "mime_guess",
