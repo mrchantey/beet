@@ -2,12 +2,18 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+extern "C" {
+	/// Global fetch function available in both browsers and Deno
+	#[wasm_bindgen(js_name = fetch)]
+	fn global_fetch(input: &web_sys::Request) -> js_sys::Promise;
+}
 
 pub(super) async fn send_wasm(request: Request) -> Result<Response> {
 	let request: web_sys::Request = into_request(request)?;
-	let window = web_sys::window().ok_or_else(|| bevyhow!("No window"))?;
-	let promise = window.fetch_with_request(&request);
+	let promise = global_fetch(&request);
 	let res = wasm_bindgen_futures::JsFuture::from(promise)
 		.await
 		.map_jserr()?;
@@ -120,10 +126,16 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		}
 	}
 
-	let is_bytes = parts
-		.get_header("content-length")
-		.and_then(|val| val.parse::<u64>().ok())
-		.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
+	// Check if this is an SSE response which must always be streamed
+	let is_event_stream = parts
+		.get_header("content-type")
+		.map_or(false, |ct| ct.contains("text/event-stream"));
+
+	let is_bytes = !is_event_stream
+		&& parts
+			.get_header("content-length")
+			.and_then(|val| val.parse::<u64>().ok())
+			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 
 	let body: Body = if is_bytes {
 		// body is bytes

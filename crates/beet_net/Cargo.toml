@@ -45,7 +45,7 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
-ureq = ["dep:ureq"]
+ureq = ["dep:ureq", "dep:blocking"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+// use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(feature = "flow")]
 use beet_flow::prelude::ControlFlowPlugin;
@@ -32,8 +32,8 @@ impl ServerPlugin {
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>()
-			.add_observer(exchange_stats);
+		app.init_plugin::<AsyncPlugin>();
+		// .add_observer(exchange_stats);
 		#[cfg(feature = "flow")]
 		app.init_plugin::<ControlFlowPlugin>();
 	}

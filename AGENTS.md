@@ -40,6 +40,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - comments must be concise
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
+- adding `ignore` is an absolute last resort, usually reserved only for macros. `no_run` is also not ideal, but sometimes required ie for network requests
 
 ## Testing
 
