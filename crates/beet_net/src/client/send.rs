@@ -176,6 +176,29 @@ mod test_request {
 	}
 
 
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	async fn concurrent_requests_complete_independently() {
+		// This test verifies that multiple requests can run concurrently
+		// without blocking each other. Make 3 concurrent requests - if they're
+		// properly async, they'll complete concurrently (fast). If blocking,
+		// they'd complete sequentially (slow).
+		let start = Instant::now();
+
+		let req1 = Request::get("https://example.com").send();
+		let req2 = Request::get("https://example.com").send();
+		let req3 = Request::get("https://example.com").send();
+
+		let (res1, res2, res3) = futures::join!(req1, req2, req3);
+
+		res1.unwrap().status().xpect_eq(StatusCode::Ok);
+		res2.unwrap().status().xpect_eq(StatusCode::Ok);
+		res3.unwrap().status().xpect_eq(StatusCode::Ok);
+
+		// Should complete concurrently in < 3 seconds, not sequentially
+		start.elapsed().as_secs().xpect_less_than(3);
+	}
+
 	#[test]
 	#[ignore = "flaky httpbin"]
 	fn query_params() {

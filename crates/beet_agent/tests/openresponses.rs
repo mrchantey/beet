@@ -189,7 +189,7 @@ async fn image_input() {
 		openresponses::MessageRole::User,
 		vec![
 			openresponses::ContentPart::input_text(
-				"What color is this image? Answer in one word.",
+				"What color is this image? Answer in one word, either 'red' 'green' or 'blue'",
 			),
 			openresponses::ContentPart::InputImage(
 				openresponses::InputImage::from_base64("image/png", image_b64),

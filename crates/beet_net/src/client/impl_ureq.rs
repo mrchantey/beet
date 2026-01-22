@@ -44,7 +44,10 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	let body = body.into_bytes().await?.to_vec();
 	let http_req = http::Request::from_parts(http_parts, body);
 
-	let res = agent.run(http_req).map_err(BevyError::from)?;
+	// Run the blocking request on a thread pool to avoid blocking the async executor
+	let res = blocking::unblock(move || agent.run(http_req))
+		.await
+		.map_err(BevyError::from)?;
 	let res: Response = into_response(res)?;
 	Ok(res)
 }
