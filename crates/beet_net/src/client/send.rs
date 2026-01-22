@@ -62,7 +62,8 @@ mod test_request {
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
 	// TODO spin up our own server for tests
-	#[beet_core::test]
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
 	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")

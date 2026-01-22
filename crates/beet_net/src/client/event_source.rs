@@ -11,7 +11,17 @@ pub impl Response {
 	}
 }
 
-#[cfg(all(test, feature = "ureq", feature = "native-tls"))]
+
+#[cfg(all(
+	test,
+	any(
+		target_arch = "wasm32",
+		all(
+			feature = "native-tls",
+			any(feature = "reqwest", feature = "ureq")
+		)
+	)
+))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
