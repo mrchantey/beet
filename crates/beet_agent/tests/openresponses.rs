@@ -19,7 +19,7 @@ fn text_provider() -> impl ModelProvider {
 /// Basic text response - simple user message, validates ResponseResource schema.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn basic_text_response() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input(
@@ -45,7 +45,7 @@ async fn basic_text_response() {
 /// Streaming response - validates SSE streaming events and final response.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn streaming_response() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input("Count from 1 to 5.")
@@ -94,7 +94,7 @@ async fn streaming_response() {
 /// System prompt - include system role message in input.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn system_prompt() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input_items(vec![
@@ -127,7 +127,7 @@ async fn system_prompt() {
 /// Tool calling - define a function tool and verify function_call output.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn tool_calling() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 
 	let tool = openresponses::FunctionToolParam::new("get_weather")
 		.with_description("Get the current weather for a location")
@@ -176,7 +176,7 @@ async fn tool_calling() {
 /// Image input - send image URL in user content.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn image_input() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 	if provider.provider_slug() == "ollama" {
 		// Ollama image support is a wip
 		return;
@@ -216,7 +216,7 @@ async fn image_input() {
 /// Multi-turn conversation - send assistant + user messages as conversation history.
 #[beet_core::test(timeout_ms = 15_000)]
 async fn multi_turn_conversation() {
-	let mut provider = text_provider();
+	let provider = text_provider();
 
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input_items(vec![

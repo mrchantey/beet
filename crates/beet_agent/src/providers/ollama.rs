@@ -31,6 +31,8 @@ impl Default for OllamaProvider {
 	}
 }
 
+impl OllamaProvider {}
+
 impl ModelProvider for OllamaProvider {
 	fn provider_slug(&self) -> &'static str { "ollama" }
 
@@ -43,16 +45,16 @@ impl ModelProvider for OllamaProvider {
 	}
 
 	fn send(
-		&mut self,
+		&self,
 		request: openresponses::RequestBody,
-	) -> impl Future<Output = Result<openresponses::ResponseBody>> {
-		self.inner.send(request)
+	) -> BoxFuture<'_, Result<openresponses::ResponseBody>> {
+		Box::pin(self.inner.send(request))
 	}
 
 	fn stream(
-		&mut self,
+		&self,
 		request: openresponses::RequestBody,
-	) -> impl Future<Output = Result<StreamingEventStream>> {
-		self.inner.stream(request)
+	) -> BoxFuture<'_, Result<StreamingEventStream>> {
+		Box::pin(self.inner.stream(request))
 	}
 }

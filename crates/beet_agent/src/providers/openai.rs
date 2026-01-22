@@ -43,16 +43,16 @@ impl ModelProvider for OpenAIProvider {
 	fn default_large_model(&self) -> &'static str { constants::GPT_5_2 }
 
 	fn send(
-		&mut self,
+		&self,
 		request: openresponses::RequestBody,
-	) -> impl Future<Output = Result<openresponses::ResponseBody>> {
-		self.inner.send(request)
+	) -> BoxFuture<'_, Result<openresponses::ResponseBody>> {
+		Box::pin(self.inner.send(request))
 	}
 
 	fn stream(
-		&mut self,
+		&self,
 		request: openresponses::RequestBody,
-	) -> impl Future<Output = Result<StreamingEventStream>> {
-		self.inner.stream(request)
+	) -> BoxFuture<'_, Result<StreamingEventStream>> {
+		Box::pin(self.inner.stream(request))
 	}
 }

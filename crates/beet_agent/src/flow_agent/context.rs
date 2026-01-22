@@ -77,52 +77,23 @@ impl ContextRole {
 }
 
 
-/// Metadata for tracking context state across requests.
+/// Metadata for tracking context ownership.
 ///
-/// Each context entity tracks which action created it via `created_by`.
+/// Each context entity tracks which action created it via `owner`.
 /// This enables proper role determination in multi-agent conversations:
 /// - Context created by "me" (the current action) → Assistant role
 /// - Context created by others → User role (prefixed with creator's name)
-#[derive(Debug, Clone, Default, Component, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct ContextMeta {
 	/// The action entity that created this context.
 	/// Used to determine roles in multi-agent conversations.
-	pub created_by: Option<Entity>,
-	/// The response ID this context was sent with, if any.
-	/// Used for `previous_response_id` support.
-	pub sent_with_response_id: Option<String>,
-	/// The item ID from the streaming response, if this context came from a model.
-	pub item_id: Option<String>,
+	pub owner: Entity,
 }
 
 impl ContextMeta {
-	/// Creates metadata with the creating action entity.
-	pub fn from_action(action: Entity) -> Self {
-		Self {
-			created_by: Some(action),
-			sent_with_response_id: None,
-			item_id: None,
-		}
-	}
-
-	/// Creates metadata for context that was sent in a request.
-	pub fn sent(action: Entity, response_id: impl Into<String>) -> Self {
-		Self {
-			created_by: Some(action),
-			sent_with_response_id: Some(response_id.into()),
-			item_id: None,
-		}
-	}
-
-	/// Creates metadata for context received from a streaming response.
-	pub fn received(action: Entity, item_id: impl Into<String>) -> Self {
-		Self {
-			created_by: Some(action),
-			sent_with_response_id: None,
-			item_id: Some(item_id.into()),
-		}
-	}
+	/// Creates metadata with the owning action entity.
+	pub fn new(owner: Entity) -> Self { Self { owner } }
 }
 
 
@@ -408,20 +379,12 @@ impl<'w, 's> ContextQuery<'w, 's> {
 		texts
 	}
 
-	/// Get all context entities for a flow agent, filtered by whether they've been sent.
-	pub fn unsent_entities(&self, action: Entity) -> Vec<Entity> {
+	/// Get all context entities for a flow agent.
+	pub fn all_entities(&self, action: Entity) -> Vec<Entity> {
 		let mut entities = Vec::new();
 		if let Ok(context) = self.contexts.get(action) {
 			for ctx_entity in context.iter() {
-				// Check if this context has been sent
-				let is_sent = self
-					.metas
-					.get(ctx_entity)
-					.map(|meta| meta.sent_with_response_id.is_some())
-					.unwrap_or(false);
-				if !is_sent {
-					entities.push(ctx_entity);
-				}
+				entities.push(ctx_entity);
 			}
 		}
 		entities
@@ -445,10 +408,10 @@ impl<'w, 's> ContextQuery<'w, 's> {
 			for ctx_entity in context.iter() {
 				// Determine role based on who created this context
 				let meta = self.metas.get(ctx_entity).ok();
-				let created_by = meta.and_then(|m| m.created_by);
+				let owner = meta.map(|m| m.owner);
 
 				// "I created it" → Assistant, "someone else" → User
-				let effective_role = if created_by == Some(action) {
+				let effective_role = if owner == Some(action) {
 					ContextRole::Assistant
 				} else {
 					// Use the stored role, but treat other assistants as users
@@ -464,8 +427,8 @@ impl<'w, 's> ContextQuery<'w, 's> {
 				};
 
 				// Get the creator's name for prefixing (only for non-self contexts)
-				let creator_name = if created_by != Some(action) {
-					created_by.and_then(|entity| {
+				let creator_name = if owner != Some(action) {
+					owner.and_then(|entity| {
 						self.names
 							.get(entity)
 							.ok()
@@ -644,7 +607,7 @@ impl ContextSpawner {
 				ContextOf(self.agent),
 				TextContext::default(),
 				ContextRole::Assistant,
-				ContextMeta::received(self.action, &item_id),
+				ContextMeta::new(self.action),
 				ContextStreaming,
 			))
 			.await
@@ -665,7 +628,7 @@ impl ContextSpawner {
 				ContextOf(self.agent),
 				ReasoningContext::default(),
 				ContextRole::Assistant,
-				ContextMeta::received(self.action, &item_id),
+				ContextMeta::new(self.action),
 				ContextStreaming,
 			))
 			.await
@@ -692,7 +655,7 @@ impl ContextSpawner {
 					arguments: String::new(),
 				},
 				ContextRole::Assistant,
-				ContextMeta::received(self.action, &item_id),
+				ContextMeta::new(self.action),
 				ContextStreaming,
 			))
 			.await
@@ -780,7 +743,7 @@ impl ContextSpawner {
 					ContextOf(self.agent),
 					file,
 					ContextRole::Assistant,
-					ContextMeta::received(self.action, &item_id),
+					ContextMeta::new(self.action),
 					ContextStreaming,
 				))
 				.await
@@ -889,33 +852,12 @@ impl ContextSpawner {
 }
 
 
-/// Marks context entities as sent with the given response ID.
-pub async fn mark_contexts_sent(
-	world: &AsyncWorld,
-	entities: &[Entity],
-	action: Entity,
-	response_id: &str,
-) {
-	let response_id = response_id.to_string();
-	for &entity in entities {
-		let rid = response_id.clone();
-		world
-			.entity(entity)
-			.with_then(move |mut entity| {
-				if let Some(mut meta) = entity.get_mut::<ContextMeta>() {
-					meta.sent_with_response_id = Some(rid);
-				} else {
-					entity.insert(ContextMeta::sent(action, rid));
-				}
-			})
-			.await;
-	}
-}
+
 
 
 /// Spawns context entities from a non-streaming response.
 ///
-/// The `action` entity is stored in `ContextMeta::created_by` for each
+/// The `action` entity is stored in `ContextMeta::owner` for each
 /// context entity, enabling proper role determination in multi-agent conversations.
 pub async fn spawn_response_context(
 	world: &AsyncWorld,
@@ -935,7 +877,7 @@ pub async fn spawn_response_context(
 							ContextOf(agent),
 							TextContext::new(text),
 							ContextRole::Assistant,
-							ContextMeta::received(action, &msg.id),
+							ContextMeta::new(action),
 							ContextComplete,
 						))
 						.await
@@ -956,7 +898,7 @@ pub async fn spawn_response_context(
 							ContextOf(agent),
 							ReasoningContext::new(text),
 							ContextRole::Assistant,
-							ContextMeta::received(action, &reasoning.id),
+							ContextMeta::new(action),
 							ContextComplete,
 						))
 						.await
@@ -974,7 +916,7 @@ pub async fn spawn_response_context(
 							arguments: fc.arguments.clone(),
 						},
 						ContextRole::Assistant,
-						ContextMeta::received(action, &fc.id),
+						ContextMeta::new(action),
 						ContextComplete,
 					))
 					.await
@@ -993,7 +935,7 @@ pub async fn spawn_response_context(
 
 /// Spawns a user context with the given text.
 ///
-/// The `action` entity is stored in `ContextMeta::created_by` for tracking
+/// The `action` entity is stored in `ContextMeta::owner` for tracking
 /// which action created this context (typically the request_to_context action).
 pub async fn spawn_user_context(
 	world: &AsyncWorld,
@@ -1006,7 +948,7 @@ pub async fn spawn_user_context(
 			ContextOf(agent),
 			TextContext::new(text),
 			ContextRole::User,
-			ContextMeta::from_action(action),
+			ContextMeta::new(action),
 			ContextComplete,
 		))
 		.await
@@ -1016,7 +958,7 @@ pub async fn spawn_user_context(
 
 /// Spawns a system context with the given text.
 ///
-/// The `action` entity is stored in `ContextMeta::created_by` for tracking.
+/// The `action` entity is stored in `ContextMeta::owner` for tracking.
 pub async fn spawn_system_context(
 	world: &AsyncWorld,
 	agent: Entity,
@@ -1028,7 +970,7 @@ pub async fn spawn_system_context(
 			ContextOf(agent),
 			TextContext::new(text),
 			ContextRole::System,
-			ContextMeta::from_action(action),
+			ContextMeta::new(action),
 			ContextComplete,
 		))
 		.await
