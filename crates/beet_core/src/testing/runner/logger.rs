@@ -205,7 +205,7 @@ fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
 
-	let path = test.path().into_abs();
+	let path = outcome.path(test).into_abs();
 	let file = fs_ext::read_to_string(path)?;
 	let lines = file.split('\n').collect::<Vec<_>>();
 	let max_digits = lines.len().to_string().len();
@@ -297,7 +297,7 @@ fn fail_reason(outcome: &TestFail) -> String {
 
 fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
 	let prefix = paint_ext::dimmed("at");
-	let path = paint_ext::cyan(test.path().to_string());
+	let path = paint_ext::cyan(outcome.path(test).to_string());
 	let start = outcome.start(test);
 	let line_loc =
 		paint_ext::dimmed(format!(":{}:{}", start.line(), start.col()));

@@ -44,6 +44,18 @@ pub enum TestFail {
 }
 
 impl TestFail {
+	/// Gets the file path of the failure location,
+	/// or the test file path if no panic location is available.
+	pub fn path(&self, test: &Test) -> WsPathBuf {
+		match self {
+			TestFail::Panic { location, .. }
+				if let Some(location) = location =>
+			{
+				location.file().clone()
+			}
+			_ => test.path(),
+		}
+	}
 	/// Gets the start location of the failure,
 	/// or the test location
 	pub fn start(&self, test: &Test) -> LineCol {

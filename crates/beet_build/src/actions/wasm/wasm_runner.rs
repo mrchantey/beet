@@ -6,6 +6,44 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+/// Load environment variables from the workspace .env file.
+/// Returns a vec of (key, value) pairs.
+fn load_dotenv_vars() -> Vec<(String, String)> {
+	let dotenv_path = workspace_root().join(".env");
+	if !dotenv_path.exists() {
+		return Vec::new();
+	}
+
+	let Ok(content) = fs::read_to_string(&dotenv_path) else {
+		return Vec::new();
+	};
+
+	content
+		.lines()
+		.filter_map(|line| {
+			let line = line.trim();
+			// skip empty lines and comments
+			if line.is_empty() || line.starts_with('#') {
+				return None;
+			}
+			// split on first '=' only
+			let mut parts = line.splitn(2, '=');
+			let key = parts.next()?.trim();
+			let value = parts.next()?.trim();
+			// remove surrounding quotes if present
+			let value = value
+				.strip_prefix('"')
+				.and_then(|v| v.strip_suffix('"'))
+				.unwrap_or(value);
+			let value = value
+				.strip_prefix('\'')
+				.and_then(|v| v.strip_suffix('\''))
+				.unwrap_or(value);
+			Some((key.to_string(), value.to_string()))
+		})
+		.collect()
+}
+
 /// The wasm runner, runs the binary passed in at the `binary-path` positional argument
 /// using the deno runner.
 ///
@@ -26,10 +64,7 @@ pub fn run_wasm() -> impl Bundle {
 		wasm_bindgen(),
 		init_deno(),
 		run_deno(),
-		(
-			Name::new("Ok"),
-			endpoint_action(StatusCode::Ok)
-		)
+		(Name::new("Ok"), endpoint_action(StatusCode::Ok))
 	])
 }
 
@@ -116,13 +151,19 @@ fn run_deno() -> impl Bundle {
 				// `test-wasm binary-path ..actual-args`
 				let args =
 					env_ext::args().into_iter().skip(2).collect::<Vec<_>>();
-				let child = CommandConfig::new("deno")
+				let mut child = CommandConfig::new("deno")
 					.env("WORKSPACE_ROOT", env_ext::var("WORKSPACE_ROOT")?)
 					.arg("--allow-read")
 					.arg("--allow-net")
 					.arg("--allow-env")
 					.arg(deno_runner_path().to_string_lossy())
 					.args(args);
+
+				// load .env vars and pass them to the deno process
+				for (key, value) in load_dotenv_vars() {
+					child = child.env(key, value);
+				}
+
 				cmd_runner.run(ev, child)
 			},
 		),
