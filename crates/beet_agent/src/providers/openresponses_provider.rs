@@ -60,7 +60,7 @@ impl OpenResponsesProvider {
 	pub async fn stream(
 		&self,
 		request: openresponses::RequestBody,
-	) -> Result<impl Stream<Item = Result<openresponses::StreamingEvent>>> {
+	) -> Result<StreamingEventStream> {
 		if request.stream != Some(true) {
 			bevybail!(
 				"streaming must be enabled in the request to use the stream method"
@@ -73,7 +73,9 @@ impl OpenResponsesProvider {
 			.event_source_raw()
 			.await?;
 
-		OpenResponsesStream::new(raw_stream).xok()
+		let stream: StreamingEventStream =
+			Box::pin(OpenResponsesStream::new(raw_stream));
+		stream.xok()
 	}
 }
 
@@ -96,7 +98,8 @@ where
 				beet_net::exports::eventsource_stream::Event,
 				E,
 			>,
-		> + Unpin,
+		> + Unpin
+		+ Send,
 	E: std::fmt::Display,
 {
 	type Item = Result<openresponses::StreamingEvent>;

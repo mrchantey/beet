@@ -1,12 +1,20 @@
 use crate::openresponses;
 use beet_core::prelude::*;
 use futures::Stream;
+use std::pin::Pin;
 pub mod ollama;
 pub mod openai;
 mod openresponses_provider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
 pub use openresponses_provider::*;
+
+/// A boxed, pinned stream of streaming events.
+///
+/// This type alias provides ergonomic stream handling without requiring
+/// callers to manually pin the stream.
+pub type StreamingEventStream =
+	Pin<Box<dyn Stream<Item = Result<openresponses::StreamingEvent>> + Send>>;
 
 /// A trait for providers that implement the OpenResponses API.
 ///
@@ -64,17 +72,15 @@ pub trait ModelProvider {
 		request: openresponses::RequestBody,
 	) -> impl Future<Output = Result<openresponses::ResponseBody>>;
 
-	/// Sends a streaming request and returns a stream of typed events.
+	/// Sends a streaming request and returns a pinned stream of typed events.
 	///
 	/// The request must have `stream: true` set, otherwise this will error.
 	/// The returned stream yields strongly-typed [`StreamingEvent`](openresponses::StreamingEvent)
 	/// values and terminates cleanly when the `[DONE]` sentinel is received.
+	///
+	/// The stream is returned pre-pinned for ergonomic use - no `pin!()` macro needed.
 	fn stream(
 		&mut self,
 		request: openresponses::RequestBody,
-	) -> impl Future<
-		Output = Result<
-			impl Stream<Item = Result<openresponses::StreamingEvent>>,
-		>,
-	>;
+	) -> impl Future<Output = Result<StreamingEventStream>>;
 }
