@@ -11,6 +11,9 @@
 //!
 //! Common types are re-exported at the module level for convenience.
 //!
+//! Responses have several steps
+//! ![Response streaming](https://www.openresponses.org/streaming/simple-streaming.svg)
+//! 
 //! # Example
 //!
 //! ```no_run

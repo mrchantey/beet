@@ -84,6 +84,6 @@ mod test {
 		AsyncPlugin::world().spawn(flow_exchange(oneshot)).exchange_str(
 			Request::from_cli_str("whats the captial of thailand? one word, captial first letter, no fullstop")
 				.unwrap(),
-		).await.xpect_eq("Bangcock");
+		).await.xpect_eq("Bangkok");
 	}
 }

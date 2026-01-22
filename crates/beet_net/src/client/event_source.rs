@@ -11,15 +11,25 @@ pub impl Response {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ureq", feature = "native-tls"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::tasks::futures_lite::StreamExt;
 
-	#[beet_core::test]
+	// TODO demonstrate deserializing the actual event
+	// #[derive(serde::Deserialize, Debug)]
+	// struct TestEvent {
+	// 	testing: bool,
+	// 	sse_dev: String,
+	// 	msg: String,
+	// 	now: u64,
+	// }
+
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
 	// TODO spin up our own server for tests
-	#[ignore = "hits network"]
+	// #[ignore = "hits network"]
 	async fn works() {
 		let mut ev = Request::get("https://sse.dev/test")
 			.send()

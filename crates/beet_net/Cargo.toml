@@ -144,7 +144,7 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 # actually a dev-dep but we need optional
 # strictly for testing only
 tokio = { version = "1", features = [
-	# "macros",
+	"macros",
 	# "sync",
 	# "rt",
 	# "rt-multi-thread",

@@ -5,6 +5,7 @@
 mod flow_agent;
 pub mod openresponses;
 mod providers;
+mod providers_old;
 pub mod realtime;
 mod session;
 
@@ -13,6 +14,7 @@ pub mod prelude {
 	pub use crate::flow_agent::*;
 	pub use crate::openresponses;
 	pub use crate::providers::*;
+	pub use crate::providers_old::*;
 	pub use crate::realtime;
 	pub use crate::session::*;
 }

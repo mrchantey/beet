@@ -5,61 +5,49 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
-use beet_agent::prelude::openresponses;
+use beet_agent::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
+
+fn text_provider() -> impl ModelProvider {
+	dotenv::dotenv().ok();
+	OllamaProvider::default()
+}
+
 
 /// Basic text response - simple user message, validates ResponseResource schema.
 #[beet_core::test]
 async fn basic_text_response() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
-	let body = openresponses::RequestBody::new("gpt-4o-mini").with_input(
-		"Say hello in exactly 3 words. Do not include any punctuation.",
-	);
+	let body = openresponses::RequestBody::new(provider.default_small_model())
+		.with_input(
+			"Say hello in exactly 3 words. Do not include any punctuation.",
+		);
 
-	let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.into_result()
-		.await
-		.unwrap()
-		.json::<openresponses::ResponseBody>()
-		.await
-		.unwrap();
+	let response = provider.send(body).await.unwrap();
 
 	response.object.xpect_eq("response");
 	response
 		.status
 		.xpect_eq(openresponses::response::Status::Completed);
-	response.model.as_str().xpect_starts_with("gpt-4o-mini");
+	response
+		.model
+		.as_str()
+		.xpect_starts_with(provider.default_small_model());
 	response.first_text().is_some().xpect_true();
 	response.usage.is_some().xpect_true();
 }
 
 /// Streaming response - validates SSE streaming events and final response.
 #[beet_core::test]
+// #[ignore]
 async fn streaming_response() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
-	let body = openresponses::RequestBody::new("gpt-4o-mini")
+	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input("Count from 1 to 5.")
 		.with_stream(true);
-
-	let mut stream = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.event_source()
-		.await
-		.unwrap();
+	let mut stream = provider.stream(body).await.unwrap();
 
 	let mut events = Vec::new();
 	let mut final_response: Option<openresponses::ResponseBody> = None;
@@ -100,10 +88,10 @@ async fn streaming_response() {
 /// System prompt - include system role message in input.
 #[beet_core::test]
 async fn system_prompt() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
-	let body =
-		openresponses::RequestBody::new("gpt-4o-mini").with_input_items(vec![
+	let body = openresponses::RequestBody::new(provider.default_small_model())
+		.with_input_items(vec![
 			openresponses::request::InputItem::Message(
 				openresponses::request::MessageParam::system(
 					"You are a pirate. Always respond in pirate speak.",
@@ -116,19 +104,7 @@ async fn system_prompt() {
 			),
 		]);
 
-	let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.into_result()
-		.await
-		.unwrap()
-		.json::<openresponses::ResponseBody>()
-		.await
-		.unwrap();
+	let response = provider.send(body).await.unwrap();
 
 	response
 		.status
@@ -145,7 +121,7 @@ async fn system_prompt() {
 /// Tool calling - define a function tool and verify function_call output.
 #[beet_core::test]
 async fn tool_calling() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
 	let tool = openresponses::FunctionToolParam::new("get_weather")
 		.with_description("Get the current weather for a location")
@@ -160,23 +136,11 @@ async fn tool_calling() {
 			"required": ["location"]
 		}));
 
-	let body = openresponses::RequestBody::new("gpt-4o-mini")
+	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input("What's the weather like in San Francisco?")
 		.with_tool(tool);
 
-	let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.into_result()
-		.await
-		.unwrap()
-		.json::<openresponses::ResponseBody>()
-		.await
-		.unwrap();
+	let response = provider.send(body).await.unwrap();
 
 	response
 		.status
@@ -204,7 +168,7 @@ async fn tool_calling() {
 /// Image input - send image URL in user content.
 #[beet_core::test]
 async fn image_input() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
 	// A simple 1x1 green pixel PNG as base64
 	let image_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -221,24 +185,12 @@ async fn image_input() {
 		],
 	);
 
-	let body =
-		openresponses::RequestBody::new("gpt-4o-mini").with_input_items(vec![
-			openresponses::request::InputItem::Message(msg),
-		]);
+	let body = openresponses::RequestBody::new(provider.default_small_model())
+		.with_input_items(vec![openresponses::request::InputItem::Message(
+			msg,
+		)]);
 
-	let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.into_result()
-		.await
-		.unwrap()
-		.json::<openresponses::ResponseBody>()
-		.await
-		.unwrap();
+	let response = provider.send(body).await.unwrap();
 
 	response
 		.status
@@ -252,10 +204,10 @@ async fn image_input() {
 /// Multi-turn conversation - send assistant + user messages as conversation history.
 #[beet_core::test]
 async fn multi_turn_conversation() {
-	dotenv::dotenv().ok();
+	let mut provider = text_provider();
 
-	let body =
-		openresponses::RequestBody::new("gpt-4o-mini").with_input_items(vec![
+	let body = openresponses::RequestBody::new(provider.default_small_model())
+		.with_input_items(vec![
 			openresponses::request::InputItem::Message(
 				openresponses::request::MessageParam::user("My name is Alice."),
 			),
@@ -269,20 +221,7 @@ async fn multi_turn_conversation() {
 			),
 		]);
 
-	let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
-		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
-		.with_json_body(&body)
-		.unwrap()
-		.send()
-		.await
-		.unwrap()
-		.into_result()
-		.await
-		.unwrap()
-		.json::<openresponses::ResponseBody>()
-		.await
-		.unwrap();
-
+	let response = provider.send(body).await.unwrap();
 	response
 		.status
 		.xpect_eq(openresponses::response::Status::Completed);
