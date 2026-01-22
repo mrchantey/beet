@@ -82,7 +82,7 @@ mod test {
 	#[beet_core::test]
 	async fn foobar() {
 		AsyncPlugin::world().spawn(flow_exchange(oneshot)).exchange_str(
-			Request::from_cli_str("whats the captial of thailand? one word, captial first letter, no fullstop")
+			Request::from_cli_str("whats the capital of thailand? one word, captial first letter, no fullstop")
 				.unwrap(),
 		).await.xpect_eq("Bangkok");
 	}

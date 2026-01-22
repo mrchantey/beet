@@ -11,7 +11,8 @@ use beet_core::prelude::*;
 
 fn text_provider() -> impl ModelProvider {
 	dotenv::dotenv().ok();
-	OllamaProvider::default()
+	OpenAIProvider::default()
+	// OllamaProvider::default()
 }
 
 
@@ -177,8 +178,8 @@ async fn tool_calling() {
 async fn image_input() {
 	let mut provider = text_provider();
 
-	// A simple 1x1 green pixel PNG as base64
-	let image_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+	// A simple 1x1 blue pixel PNG as base64 https://png-pixel.com/
+	let image_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwADBwIAMCbHYQAAAABJRU5ErkJggg==";
 
 	let msg = openresponses::request::MessageParam::with_parts(
 		openresponses::MessageRole::User,
@@ -204,8 +205,8 @@ async fn image_input() {
 		.xpect_eq(openresponses::response::Status::Completed);
 
 	let text = response.first_text().unwrap().to_lowercase();
-	// The image is a green pixel
-	text.contains("green").xpect_true();
+	// The image is a blue pixel
+	text.xpect_contains("blue");
 }
 
 /// Multi-turn conversation - send assistant + user messages as conversation history.

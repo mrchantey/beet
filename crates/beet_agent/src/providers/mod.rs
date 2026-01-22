@@ -2,12 +2,50 @@ use crate::openresponses;
 use beet_core::prelude::*;
 use futures::Stream;
 pub mod ollama;
+pub mod openai;
+mod openresponses_provider;
 pub use ollama::OllamaProvider;
+pub use openai::OpenAIProvider;
+pub use openresponses_provider::*;
 
 /// A trait for providers that implement the OpenResponses API.
 ///
 /// This trait abstracts over different LLM providers (OpenAI, Ollama, etc.)
 /// allowing code to work with any compliant backend.
+///
+/// # Example
+///
+/// ```no_run
+/// use beet_agent::prelude::*;
+/// use beet_core::prelude::*;
+/// use beet_net::prelude::*;
+///
+/// # async fn example() -> Result<()> {
+/// let mut provider = OllamaProvider::default();
+///
+/// // Non-streaming request
+/// let body = openresponses::RequestBody::new(provider.default_small_model())
+///     .with_input("Hello!");
+/// let response = provider.send(body).await?;
+///
+/// // Streaming request
+/// let body = openresponses::RequestBody::new(provider.default_small_model())
+///     .with_input("Write a poem.")
+///     .with_stream(true);
+/// let mut stream = provider.stream(body).await?;
+///
+/// while let Some(event) = stream.next().await {
+///     match event? {
+///         openresponses::StreamingEvent::OutputTextDelta(ev) => {
+///             print!("{}", ev.delta);
+///         }
+///         openresponses::StreamingEvent::ResponseCompleted(_) => break,
+///         _ => {}
+///     }
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub trait ModelProvider {
 	/// The recommended model from this provider for short and simple
 	/// requests and responses.
