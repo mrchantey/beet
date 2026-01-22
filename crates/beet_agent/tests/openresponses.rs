@@ -40,7 +40,6 @@ async fn basic_text_response() {
 
 /// Streaming response - validates SSE streaming events and final response.
 #[beet_core::test]
-// #[ignore]
 async fn streaming_response() {
 	let mut provider = text_provider();
 

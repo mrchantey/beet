@@ -1,3 +1,16 @@
+//! Types for the ollama provider which supports the openresonses api:
+//!
+//!
+//! ```sh
+//! curl -X POST http://localhost:11434/v1/responses \
+//! -H "Content-Type: application/json" \
+//! -d '{
+//!   "model": "qwen3:8b",
+//!   "stream": true,
+//!   "input": "Write a short poem about the color blue"
+//! }'
+//! ```
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::exports::eventsource_stream::EventStream;
@@ -61,7 +74,16 @@ impl ModelProvider for OllamaProvider {
 					"streaming must be enabled in the request to use the stream method"
 				);
 			}
-			todo!("event stream parsing")
+			Request::post(&self.url)
+				// .with_auth_bearer(&env_ext::var("OLLAMA_API_KEY")?)
+				.with_json_body::<openresponses::RequestBody>(&request)
+				.unwrap()
+				.send()
+				.await?
+				.into_result()
+				.await?
+				.event_source_raw()
+				.await
 		}
 	}
 }

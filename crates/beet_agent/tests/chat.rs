@@ -24,7 +24,7 @@ async fn works() {
 		.send()
 		.await
 		.unwrap()
-		.event_source()
+		.event_source_raw()
 		.await
 		.unwrap();
 

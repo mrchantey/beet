@@ -148,7 +148,7 @@ fn openai_message_request(
 	commands.run_local(async move |queue| {
 		let mut spawner = MessageSpawner::spawn(queue.clone(), actor).await?;
 
-		let mut stream = req.send().await?.event_source().await?;
+		let mut stream = req.send().await?.event_source_raw().await?;
 
 		let mut dump = Vec::new();
 
