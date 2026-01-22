@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::*;
 use beet_router::prelude::*;
-use serde_json::Value;
 
 
 
@@ -11,11 +9,13 @@ pub fn oneshot() -> impl Bundle {
 	(Sequence, children![
 		request_to_context(),
 		ai_agent_request(),
-		EndpointBuilder::new().with_action(StatusCode::Ok)
+		context_to_response()
 	])
 }
 
-
+fn context_to_response() -> impl Bundle {
+	EndpointBuilder::new().with_action(StatusCode::Ok)
+}
 
 fn request_to_context() -> impl Bundle {
 	OnSpawn::observe(
@@ -50,15 +50,17 @@ fn ai_agent_request() -> impl Bundle {
 				.collect::<Vec<_>>()
 				.join("\n");
 
-			let agent = OllamaAgent::from_env();
 			commands.run_local(async move |world| -> Result {
-				let res = agent
-					.chat_req(&vec![Value::String(prompt)])?
-					.send()
-					.await?;
+				let mut provider = OllamaProvider::default();
 
-				let res = res.unwrap_str().await;
-				println!("Ollama response: {}", res);
+				let body = openresponses::RequestBody::new(
+					provider.default_small_model(),
+				)
+				.with_input(prompt);
+				println!("sending request.. {body:?}");
+				let response = provider.send(body).await.unwrap();
+
+				println!("Ollama response: {}", response.first_text().unwrap());
 
 				world
 					.entity(action)
@@ -79,9 +81,9 @@ mod test {
 	use super::*;
 
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 15_000)]
 	async fn foobar() {
-		AsyncPlugin::world().spawn(flow_exchange(oneshot)).exchange_str(
+		FlowAgentPlugin::world().spawn(flow_exchange(oneshot)).exchange_str(
 			Request::from_cli_str("whats the capital of thailand? one word, captial first letter, no fullstop")
 				.unwrap(),
 		).await.xpect_eq("Bangkok");

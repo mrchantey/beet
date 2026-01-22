@@ -7,7 +7,7 @@ pub mod openresponses;
 mod providers;
 mod providers_old;
 pub mod realtime;
-mod session;
+mod session_old;
 
 
 pub mod prelude {
@@ -16,9 +16,9 @@ pub mod prelude {
 	pub use crate::providers::*;
 	pub use crate::providers_old::*;
 	pub use crate::realtime;
-	pub use crate::session::*;
+	pub use crate::session_old::*;
 }
 
 
 #[cfg(test)]
-pub use crate::session::test_utils;
+pub use crate::session_old::test_utils;
