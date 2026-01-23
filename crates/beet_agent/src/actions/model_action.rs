@@ -20,6 +20,10 @@ use beet_flow::prelude::*;
 /// conversations. This allows multiple agents in the same behavior tree to
 /// have independent conversation state.
 ///
+/// When `previous_response_id` is set, context entities that have already been
+/// sent (tracked in `sent_context_entities`) are filtered out to avoid
+/// redundant transmission.
+///
 /// # Example
 ///
 /// ```ignore
@@ -54,6 +58,9 @@ pub struct ModelAction {
 	/// The previous response ID for multi-turn conversations.
 	/// This is updated automatically after each request.
 	pub previous_response_id: Option<String>,
+	/// Tracks context entities that have already been sent to the model.
+	/// Used to filter out redundant context when `previous_response_id` is set.
+	pub sent_context_entities: HashSet<Entity>,
 }
 
 impl std::fmt::Debug for ModelAction {
@@ -63,6 +70,7 @@ impl std::fmt::Debug for ModelAction {
 			.field("stream", &self.stream)
 			.field("instructions", &self.instructions)
 			.field("previous_response_id", &self.previous_response_id)
+			.field("sent_context_count", &self.sent_context_entities.len())
 			.finish_non_exhaustive()
 	}
 }
@@ -79,6 +87,7 @@ impl ModelAction {
 			stream: false,
 			instructions: None,
 			previous_response_id: None,
+			sent_context_entities: HashSet::default(),
 		}
 	}
 
@@ -93,6 +102,7 @@ impl ModelAction {
 			stream: false,
 			instructions: None,
 			previous_response_id: None,
+			sent_context_entities: HashSet::default(),
 		}
 	}
 
@@ -126,6 +136,12 @@ impl ModelAction {
 	/// Gets a reference to the provider.
 	pub fn provider(&self) -> &dyn ModelProvider { self.provider.as_ref() }
 
+	/// Takes the provider out of this action, leaving a placeholder.
+	/// Used to move the provider into an async context.
+	pub fn take_provider(&mut self) -> BoxedModelProvider {
+		std::mem::replace(&mut self.provider, Box::new(PlaceholderProvider))
+	}
+
 	/// Gets the model name.
 	pub fn model_name(&self) -> &str { &self.model }
 
@@ -150,6 +166,71 @@ impl ModelAction {
 		}
 
 		body
+	}
+	/// Collects input items from context, filtering out already-sent entities if
+	/// the model action has a previous_response_id.
+	///
+	/// Returns the input items
+	fn collect_filtered_input_items(
+		&mut self,
+		query: &ContextQuery,
+		action: Entity,
+	) -> Vec<openresponses::request::InputItem> {
+		let should_filter = self.previous_response_id.is_some();
+
+
+		// Collect input items only for context we havent sent yet
+		let input_items = query.collect_input_items(action, |entity| {
+			!should_filter || !self.sent_context_entities.contains(&entity)
+		});
+
+		self.mark_context_sent(query, action);
+
+		input_items
+	}
+	/// Mark all existing context entities as sent so they won't be resent.
+	fn mark_context_sent(&mut self, query: &ContextQuery, action: Entity) {
+		let entities = query
+			.contexts
+			.get(action)
+			.map(|cx| (*cx).clone())
+			.unwrap_or_default();
+
+		self.sent_context_entities.extend(entities);
+	}
+}
+
+/// A placeholder provider used when the real provider has been taken.
+/// All methods panic if called, as the provider should be restored before use.
+// TODO this pattern sucks, i think if we can use a Sync BoxedFuture it wont be nessecary
+struct PlaceholderProvider;
+
+impl ModelProvider for PlaceholderProvider {
+	fn provider_slug(&self) -> &'static str { "placeholder" }
+	fn default_small_model(&self) -> &'static str { "" }
+	fn default_tool_model(&self) -> &'static str { "" }
+	fn default_large_model(&self) -> &'static str { "" }
+
+	fn send(
+		&self,
+		_request: openresponses::RequestBody,
+	) -> bevy::tasks::BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		Box::pin(async {
+			bevybail!(
+				"PlaceholderProvider: provider was taken and not restored"
+			)
+		})
+	}
+
+	fn stream(
+		&self,
+		_request: openresponses::RequestBody,
+	) -> bevy::tasks::BoxedFuture<'_, Result<StreamingEventStream>> {
+		Box::pin(async {
+			bevybail!(
+				"PlaceholderProvider: provider was taken and not restored"
+			)
+		})
 	}
 }
 
@@ -176,12 +257,13 @@ pub fn model_action_request() -> impl Bundle {
 			let action = ev.target();
 
 			// ModelAction is required
-			let model_action = model_query.get_mut(action)?;
+			let mut model_action = model_query.get_mut(action)?;
 
 			let agent = agents.entity(action);
 
 			// Collect context into input items
-			let input_items = query.collect_input_items(action);
+			let input_items =
+				model_action.collect_filtered_input_items(&query, action);
 
 			if input_items.is_empty() {
 				bevybail!("No context to send to AI agent");
@@ -189,26 +271,12 @@ pub fn model_action_request() -> impl Bundle {
 
 			// Build request body
 			let body = model_action.build_request(input_items);
-			let should_stream = model_action.stream;
 
-			// Clone what we need for the async block
-			// We need to get the provider out for the async block
-			// Since we can't move the provider out, we'll need to handle this differently
-			// For now, we'll create a new provider in the async block based on the slug
-			let provider_slug =
-				model_action.provider().provider_slug().to_string();
+			// Take ownership of the provider for the async block
+			let provider = model_action.take_provider();
 
 			commands.run_local(async move |world| -> Result {
-				// Create provider based on slug
-				// This is a temporary approach until we have a provider registry
-				let provider: BoxedModelProvider = match provider_slug.as_str()
-				{
-					"ollama" => Box::new(OllamaProvider::default()),
-					"openai" => Box::new(OpenAIProvider::default()),
-					_ => bevybail!("Unknown provider: {}", provider_slug),
-				};
-
-				if should_stream {
+				if let Some(true) = body.stream {
 					// Streaming mode
 					let mut stream = provider.stream(body).await?;
 
@@ -226,21 +294,25 @@ pub fn model_action_request() -> impl Bundle {
 						}
 					}
 
-					// Update previous_response_id on the action if we got one
-					if let Some(response_id) = spawner.response_id() {
-						let response_id = response_id.to_string();
-						world
-							.entity(action)
-							.with_then(move |mut entity| {
-								if let Some(mut model_action) =
-									entity.get_mut::<ModelAction>()
-								{
+					// Update model action state
+					let response_id =
+						spawner.response_id().map(|s| s.to_string());
+					world
+						.entity(action)
+						.with_then(move |mut entity| {
+							if let Some(mut model_action) =
+								entity.get_mut::<ModelAction>()
+							{
+								// Restore the provider
+								model_action.provider = provider;
+								// Update previous_response_id
+								if let Some(id) = response_id {
 									model_action.previous_response_id =
-										Some(response_id);
+										Some(id);
 								}
-							})
-							.await;
-					}
+							}
+						})
+						.await;
 				} else {
 					// Non-streaming mode
 					let response = provider.send(body).await?;
@@ -252,13 +324,16 @@ pub fn model_action_request() -> impl Bundle {
 					)
 					.await?;
 
-					// Update previous_response_id
+					// Update model action state
 					world
 						.entity(action)
 						.with_then(move |mut entity| {
 							if let Some(mut model_action) =
 								entity.get_mut::<ModelAction>()
 							{
+								// Restore the provider
+								model_action.provider = provider;
+								// Update previous_response_id
 								model_action.previous_response_id =
 									Some(response_id);
 							}

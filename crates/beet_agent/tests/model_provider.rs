@@ -11,6 +11,7 @@ use beet_core::prelude::*;
 
 fn text_provider() -> impl ModelProvider {
 	dotenv::dotenv().ok();
+	// GeminiProvider::default()
 	OpenAIProvider::default()
 	// OllamaProvider::default()
 }
@@ -100,7 +101,7 @@ async fn system_prompt() {
 		.with_input_items(vec![
 			openresponses::request::InputItem::Message(
 				openresponses::request::MessageParam::system(
-					"You are a pirate. Always respond in pirate speak.",
+					"You are a pirate. Always respond in pirate speak, begining with 'ahoy'.",
 				),
 			),
 			openresponses::request::InputItem::Message(
@@ -115,13 +116,7 @@ async fn system_prompt() {
 	response
 		.status
 		.xpect_eq(openresponses::response::Status::Completed);
-	let text = response.first_text().unwrap().to_lowercase();
-	// Should contain pirate-y language
-	(text.contains("ahoy")
-		|| text.contains("matey")
-		|| text.contains("arr")
-		|| text.contains("ye"))
-	.xpect_true();
+	response.all_text().to_lowercase().xpect_contains("ahoy");
 }
 
 /// Tool calling - define a function tool and verify function_call output.

@@ -36,10 +36,6 @@ pub use beet_rsx as rsx;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 pub mod prelude {
-	#[cfg(all(feature = "agent", not(target_arch = "wasm32")))]
-	pub use crate::agent::prelude::MessageView;
-	#[cfg(all(feature = "agent", not(target_arch = "wasm32")))]
-	pub use crate::agent::prelude::Session;
 	#[cfg(feature = "agent")]
 	pub use crate::agent::prelude::*;
 	pub use crate::beet_plugins::*;

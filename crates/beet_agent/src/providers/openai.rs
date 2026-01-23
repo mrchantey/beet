@@ -5,12 +5,15 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::BoxedFuture;
 
-
-pub mod constants {
+impl OpenAIProvider {
+	/// GPT-5 Nano - smallest and fastest model.
 	pub const GPT_5_NANO: &str = "gpt-5-nano";
+	/// GPT-5 Mini - balanced speed and capability.
 	pub const GPT_5_MINI: &str = "gpt-5-mini";
+	/// GPT-5.2 - most capable model.
 	pub const GPT_5_2: &str = "gpt-5.2";
 
+	/// OpenAI Responses API URL.
 	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
 }
 
@@ -31,7 +34,7 @@ impl OpenAIProvider {
 	pub fn new() -> Result<Self> {
 		let api_key = env_ext::var("OPENAI_API_KEY")?;
 		Ok(Self {
-			inner: OpenResponsesProvider::new(constants::RESPONSES_URL)
+			inner: OpenResponsesProvider::new(Self::RESPONSES_URL)
 				.with_auth(api_key),
 		})
 	}
@@ -40,9 +43,9 @@ impl OpenAIProvider {
 impl ModelProvider for OpenAIProvider {
 	fn provider_slug(&self) -> &'static str { "openai" }
 
-	fn default_small_model(&self) -> &'static str { constants::GPT_5_NANO }
-	fn default_tool_model(&self) -> &'static str { constants::GPT_5_MINI }
-	fn default_large_model(&self) -> &'static str { constants::GPT_5_2 }
+	fn default_small_model(&self) -> &'static str { Self::GPT_5_NANO }
+	fn default_tool_model(&self) -> &'static str { Self::GPT_5_MINI }
+	fn default_large_model(&self) -> &'static str { Self::GPT_5_2 }
 
 	fn send(
 		&self,

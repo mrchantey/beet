@@ -30,7 +30,7 @@ pub struct ContextQuery<'w, 's> {
 
 
 impl<'w, 's> ContextQuery<'w, 's> {
-	/// Convert context entities to openresponses input items.
+	/// Convert context entities to openresponses input items, filtering by predicate.
 	///
 	/// This collects all context and converts it to the format expected by
 	/// the OpenResponses API. Role determination in multi-agent conversations:
@@ -41,11 +41,12 @@ impl<'w, 's> ContextQuery<'w, 's> {
 	pub fn collect_input_items(
 		&self,
 		action: Entity,
+		filter: impl Fn(Entity) -> bool,
 	) -> Vec<openresponses::request::InputItem> {
 		let mut items = Vec::new();
 
 		if let Ok(context) = self.contexts.get(action) {
-			for ctx_entity in context.iter() {
+			for ctx_entity in context.iter().filter(|e| filter(*e)) {
 				// Determine role based on who created this context
 				let cx_owner =
 					self.context_owners.get(ctx_entity).ok().map(|m| **m);
@@ -120,8 +121,8 @@ impl<'w, 's> ContextQuery<'w, 's> {
 							call_id: func_call.call_id.clone(),
 							name: func_call.name.clone(),
 							arguments: func_call.arguments.clone(),
-							// TODO what if status not complete?
 							status: Some(
+								// TODO this is a lie, status may not be complete
 								openresponses::FunctionCallStatus::Completed,
 							),
 						},
