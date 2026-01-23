@@ -183,7 +183,7 @@ impl StreamingContextSpawner {
 		ev: &openresponses::streaming::OutputTextDeltaEvent,
 	) -> Result {
 		let delta = ev.delta.to_string();
-		self.update_item::<TextContent>(&ev.item_id, move |mut item| {
+		self.update_item::<TextContext>(&ev.item_id, move |mut item| {
 			item.push_str(&delta);
 			Ok(())
 		})

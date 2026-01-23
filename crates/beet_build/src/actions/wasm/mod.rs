@@ -1,4 +1,4 @@
-mod wasm_build;
-pub use wasm_build::*;
-mod wasm_runner;
-pub use wasm_runner::*;
+mod build_wasm;
+pub use build_wasm::*;
+mod run_wasm;
+pub use run_wasm::*;

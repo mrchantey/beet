@@ -189,7 +189,7 @@ pub fn model_action_request() -> impl Bundle {
 
 			// Build request body
 			let body = model_action.build_request(input_items);
-			let stream = model_action.stream;
+			let should_stream = model_action.stream;
 
 			// Clone what we need for the async block
 			// We need to get the provider out for the async block
@@ -208,7 +208,7 @@ pub fn model_action_request() -> impl Bundle {
 					_ => bevybail!("Unknown provider: {}", provider_slug),
 				};
 
-				if stream {
+				if should_stream {
 					// Streaming mode
 					let mut stream = provider.stream(body).await?;
 
