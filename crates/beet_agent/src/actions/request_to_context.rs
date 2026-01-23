@@ -44,12 +44,14 @@ pub fn request_to_context() -> impl Bundle {
 
 			let agent = agent_query.entity(action);
 
-			context_spawner::spawn_user_text(
-				&mut commands,
-				agent,
-				action,
-				query,
-			);
+			if !query.is_empty() {
+				context_spawner::spawn_user_text(
+					&mut commands,
+					agent,
+					action,
+					query,
+				);
+			}
 			for path in params.get(action)?.file.iter() {
 				let ws_path = WsPathBuf::new(path);
 				context_spawner::spawn_user_file(

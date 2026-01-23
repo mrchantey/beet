@@ -47,9 +47,11 @@ impl OpenResponsesProvider {
 					"streaming must not be enabled in the request to use the send method"
 				);
 			}
+
 			self.build_request(request)?
 				.send()
 				.await?
+				// even a 404 should return a valid ResponseBody
 				.into_result()
 				.await?
 				.json::<openresponses::ResponseBody>()

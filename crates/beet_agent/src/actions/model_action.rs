@@ -275,6 +275,7 @@ pub fn model_action_request() -> impl Bundle {
 			// Take ownership of the provider for the async block
 			let provider = model_action.take_provider();
 
+
 			commands.run_local(async move |world| -> Result {
 				if let Some(true) = body.stream {
 					// Streaming mode

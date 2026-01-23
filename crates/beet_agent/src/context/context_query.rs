@@ -148,7 +148,8 @@ impl<'w, 's> ContextQuery<'w, 's> {
 
 				// Create message with effective role
 				let message =
-					if parts.len() == 1 {
+					// if false {
+						if parts.len() == 1 {
 						if let Some(text) = parts[0].as_text() {
 							match effective_role {
 							ContextRole::User => {

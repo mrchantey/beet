@@ -112,32 +112,6 @@ pub struct InputFile {
 	pub file_url: Option<String>,
 }
 
-impl InputFile {
-	/// Creates a file input from a URL.
-	pub fn from_url(url: impl Into<String>) -> Self {
-		Self {
-			filename: None,
-			file_data: None,
-			file_url: Some(url.into()),
-		}
-	}
-
-	/// Creates a file input from base64 data.
-	pub fn from_base64(data: impl Into<String>) -> Self {
-		Self {
-			filename: None,
-			file_data: Some(data.into()),
-			file_url: None,
-		}
-	}
-
-	/// Sets the filename.
-	pub fn with_filename(mut self, filename: impl Into<String>) -> Self {
-		self.filename = Some(filename.into());
-		self
-	}
-}
-
 /// A video input to the model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputVideo {

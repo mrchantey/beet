@@ -308,14 +308,64 @@ impl FileContext {
 			openresponses::ContentPart::InputImage(
 				openresponses::InputImage::new(self.to_data_url()?),
 			)
+		// } else if self.mime_type.starts_with("text/") {
+		// 	// For text files, read and include as text content
+		// 	let text = match &self.data {
+		// 		FileContextData::Url(url) => {
+		// 			// For URLs, we'd need to fetch, but for now just reference
+		// 			format!("[File: {}]", url)
+		// 		}
+		// 		FileContextData::Base64(base64) => {
+		// 			// Decode base64 to text
+		// 			let bytes = BASE64_STANDARD.decode(base64)?;
+		// 			String::from_utf8(bytes).unwrap_or_else(|_| {
+		// 				"[Binary data - cannot display as text]".to_string()
+		// 			})
+		// 		}
+		// 		FileContextData::Workspace(path) => {
+		// 			// Read file as text
+		// 			let bytes = fs_ext::read(path.into_abs())?;
+		// 			String::from_utf8(bytes).unwrap_or_else(|_| {
+		// 				"[Binary data - cannot display as text]".to_string()
+		// 			})
+		// 		}
+		// 	};
+		// 	let filename_str = self.filename.to_string_lossy();
+		// 	let content = format!("File: {}\n\n{}", filename_str, text);
+		// 	openresponses::ContentPart::input_text(&content)
 		} else {
+			// For other file types, use InputFile
 			let input_file = match &self.data {
-				FileContextData::Url(url) => {
-					openresponses::InputFile::from_url(url)
-				}
-
-				FileContextData::Base64(_) | FileContextData::Workspace(_) => {
-					openresponses::InputFile::from_base64(self.to_data_url()?)
+				FileContextData::Url(url) => openresponses::InputFile {
+					filename: self
+						.filename
+						.to_string_lossy()
+						.to_string()
+						.xsome(),
+					file_url: Some(url.clone()),
+					file_data: None,
+				},
+				FileContextData::Base64(data) => openresponses::InputFile {
+					filename: self
+						.filename
+						.to_string_lossy()
+						.to_string()
+						.xsome(),
+					file_url: None,
+					file_data: Some(data.clone()),
+				},
+				FileContextData::Workspace(path_buf) => {
+					let bytes = fs_ext::read(path_buf.into_abs())?;
+					let base64 = BASE64_STANDARD.encode(&bytes);
+					openresponses::InputFile {
+						filename: self
+							.filename
+							.to_string_lossy()
+							.to_string()
+							.xsome(),
+						file_url: None,
+						file_data: Some(base64),
+					}
 				}
 			};
 			openresponses::ContentPart::InputFile(input_file)
