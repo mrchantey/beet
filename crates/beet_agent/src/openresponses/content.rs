@@ -68,6 +68,13 @@ pub struct InputImage {
 }
 
 impl InputImage {
+	pub fn new(image_url: impl Into<String>) -> Self {
+		Self {
+			image_url: image_url.into(),
+			detail: None,
+		}
+	}
+
 	/// Creates a new image input from a URL.
 	pub fn from_url(url: impl Into<String>) -> Self {
 		Self {

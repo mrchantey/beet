@@ -284,56 +284,43 @@ impl FileContext {
 		self.filename.extension().and_then(|ext| ext.to_str())
 	}
 
-	/// Converts to a data URL for embedding.
-	pub fn to_data_url(&self) -> String {
+	/// Only for use with image, files must seperate url from base64
+	fn to_data_url(&self) -> Result<String> {
 		match &self.data {
 			FileContextData::Base64(base64) => {
 				format!("data:{};base64,{}", self.mime_type, base64)
 			}
 			FileContextData::Url(url) => url.clone(),
-			FileContextData::Workspace(_) => {
-				// For workspace files, we need to load the data and convert to base64
-				// Note: This is a synchronous operation, so it should be used carefully
-				let bytes = futures::executor::block_on(self.data.get_bytes())
-					.expect("Failed to read workspace file");
+			FileContextData::Workspace(path) => {
+				let bytes = fs_ext::read(path.into_abs())?;
 				let base64 = BASE64_STANDARD.encode(&bytes);
 				format!("data:{};base64,{}", self.mime_type, base64)
 			}
 		}
+		.xok()
 	}
-
 	/// Converts to an openresponses content part.
 	pub fn to_content_part(
 		&self,
-		is_input: bool,
-	) -> openresponses::ContentPart {
+		_is_input: bool,
+	) -> Result<openresponses::ContentPart> {
 		if self.is_image() {
-			if is_input {
-				openresponses::ContentPart::InputImage(
-					openresponses::InputImage::from_url(self.to_data_url()),
-				)
-			} else {
-				// Output images are still represented as input_image in OpenResponses
-				openresponses::ContentPart::InputImage(
-					openresponses::InputImage::from_url(self.to_data_url()),
-				)
-			}
+			openresponses::ContentPart::InputImage(
+				openresponses::InputImage::new(self.to_data_url()?),
+			)
 		} else {
-			openresponses::ContentPart::InputFile(match &self.data {
+			let input_file = match &self.data {
 				FileContextData::Url(url) => {
 					openresponses::InputFile::from_url(url)
 				}
-				FileContextData::Base64(base64) => {
-					openresponses::InputFile::from_base64(format!(
-						"data:{};base64,{}",
-						self.mime_type, base64
-					))
+
+				FileContextData::Base64(_) | FileContextData::Workspace(_) => {
+					openresponses::InputFile::from_base64(self.to_data_url()?)
 				}
-				FileContextData::Workspace(_) => {
-					openresponses::InputFile::from_url(self.to_data_url())
-				}
-			})
+			};
+			openresponses::ContentPart::InputFile(input_file)
 		}
+		.xok()
 	}
 }
 

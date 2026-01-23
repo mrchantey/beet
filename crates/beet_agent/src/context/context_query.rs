@@ -97,7 +97,7 @@ impl<'w, 's> ContextQuery<'w, 's> {
 				if let Ok(file) = self.file_contexts.get(ctx_entity) {
 					parts.push(file.to_content_part(
 						effective_role != ContextRole::Assistant,
-					));
+					)?);
 				}
 
 				if let Ok(reasoning) = self.reasoning_contexts.get(ctx_entity) {
