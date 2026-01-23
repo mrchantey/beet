@@ -6,7 +6,7 @@ pub fn server_plugin(app: &mut App) {
 	app.add_plugins((
 		MinimalPlugins,
 		RouterPlugin,
-		AgentPlugin,
+		// AgentPlugin,
 		// DebugFlowPlugin::default(),
 	))
 	.world_mut()
@@ -40,13 +40,13 @@ fn image_generator() -> impl Bundle {
 		.with_path("generate_image")
 		.with_action(async |request: Request, action: AsyncEntity| -> () {
 			// let request = world.remove_resource::<Request>().unwrap();
-			let content =
-				Json::<ContentVec>::from_request(request).await.unwrap();
-			let agent =
-				GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE);
+			// let content =
+			// 	Json::<ContentVec>::from_request(request).await.unwrap();
+			// let agent =
+			// 	GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE);
 
-			let message = session_ext::message(content.0);
-			let session = session_ext::user_message_session(agent, message);
+			// let message = session_ext::message(content.0);
+			// let session = session_ext::user_message_session(agent, message);
 			// agents.entity(entity).spawn_child(session).await;
 			todo!("run session and await outcome");
 

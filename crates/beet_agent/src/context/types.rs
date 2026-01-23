@@ -211,6 +211,19 @@ pub struct FileContext {
 }
 
 impl FileContext {
+	pub fn from_fs(path: WsPathBuf) -> Self {
+		let mime_type = mime_guess::from_path(&path)
+			.first_or_octet_stream()
+			.essence_str()
+			.to_string();
+		Self {
+			mime_type,
+			filename: path.to_path_buf(),
+			data: FileContextData::Workspace(path),
+		}
+	}
+
+
 	/// Creates file context from a URL.
 	pub fn from_url(
 		url: impl Into<String>,
@@ -278,6 +291,14 @@ impl FileContext {
 				format!("data:{};base64,{}", self.mime_type, base64)
 			}
 			FileContextData::Url(url) => url.clone(),
+			FileContextData::Workspace(_) => {
+				// For workspace files, we need to load the data and convert to base64
+				// Note: This is a synchronous operation, so it should be used carefully
+				let bytes = futures::executor::block_on(self.data.get_bytes())
+					.expect("Failed to read workspace file");
+				let base64 = BASE64_STANDARD.encode(&bytes);
+				format!("data:{};base64,{}", self.mime_type, base64)
+			}
 		}
 	}
 
@@ -308,6 +329,9 @@ impl FileContext {
 						self.mime_type, base64
 					))
 				}
+				FileContextData::Workspace(_) => {
+					openresponses::InputFile::from_url(self.to_data_url())
+				}
 			})
 		}
 	}
@@ -321,6 +345,8 @@ pub enum FileContextData {
 	Url(String),
 	/// Base64-encoded binary data.
 	Base64(String),
+	/// Path to a file on the filesystem
+	Workspace(WsPathBuf),
 }
 
 impl FileContextData {
@@ -354,6 +380,10 @@ impl FileContextData {
 						.await
 						.map(|bytes| bytes.to_vec())
 				}
+			}
+			Self::Workspace(path) => {
+				let path = path.into_abs();
+				fs_ext::read(&path)?.xok()
 			}
 		}
 	}

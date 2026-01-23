@@ -17,7 +17,7 @@ use beet_flow::prelude::*;
 ///
 /// Note: This uses the default Ollama provider. For custom providers,
 /// manually construct the behavior tree with a configured [`ModelAction`].
-pub fn oneshot() -> impl Bundle {
+pub fn simple_oneshot() -> impl Bundle {
 	(Sequence, children![
 		request_to_context(),
 		ModelAction::new(OllamaProvider::default()),
@@ -30,79 +30,12 @@ pub fn oneshot() -> impl Bundle {
 ///
 /// Note: This uses the default Ollama provider. For custom providers,
 /// manually construct the behavior tree with a configured [`ModelAction`].
-pub fn oneshot_streaming() -> impl Bundle {
+pub fn simple_oneshot_streaming() -> impl Bundle {
 	(Sequence, children![
 		request_to_context(),
 		ModelAction::new(OllamaProvider::default()).streaming(),
 		context_to_response()
 	])
-}
-
-
-/// Loads request data into context.
-///
-/// This action reads the request from `RequestMeta` and spawns it as
-/// user context for the AI model to process.
-pub fn request_to_context() -> impl Bundle {
-	OnSpawn::observe(
-		|ev: On<GetOutcome>,
-		 agent_query: AgentQuery<&RequestMeta>,
-		 mut commands: AsyncCommands|
-		 -> Result {
-			let action = ev.target();
-			let req_meta = agent_query.get(action)?;
-			let query = req_meta.path().join(" ");
-
-			let agent = agent_query.entity(action);
-
-			commands.run_local(async move |world| -> Result {
-				context_spawner::spawn_user_context(
-					&world, agent, action, query,
-				)
-				.await;
-				world
-					.entity(action)
-					.trigger_target_then(Outcome::Pass)
-					.await;
-				Ok(())
-			});
-			Ok(())
-		},
-	)
-}
-
-
-/// Converts context to a response.
-///
-/// This action collects assistant responses from context and assembles
-/// them into a `Response` on the agent entity.
-pub fn context_to_response() -> impl Bundle {
-	OnSpawn::observe(
-		|ev: On<GetOutcome>,
-		 contexts: Query<(&ContextRole, &TextContext)>,
-		 agents: AgentQuery<&ThreadContext>,
-		 mut commands: Commands|
-		 -> Result {
-			let action = ev.target();
-			let items = agents.get(action)?;
-			let agent = agents.entity(action);
-
-			let mut response_parts = Vec::new();
-			for (role, text) in
-				items.iter().filter_map(|entity| contexts.get(entity).ok())
-			{
-				if role == &ContextRole::Assistant {
-					response_parts.push(text.0.clone());
-				}
-			}
-			let response_text = response_parts.join("\n");
-			commands
-				.entity(agent)
-				.insert(Response::ok().with_body(response_text));
-			commands.entity(action).trigger_target(Outcome::Pass);
-			Ok(())
-		},
-	)
 }
 
 
@@ -116,7 +49,7 @@ mod test {
 	#[beet_core::test(timeout_ms = 15_000)]
 	async fn non_streaming() {
 		FlowAgentPlugin::world()
-			.spawn(flow_exchange(oneshot))
+			.spawn(flow_exchange(simple_oneshot))
 			.exchange_str(
 				Request::from_cli_str(
 					"whats the capital of thailand? one word, capital first letter, no fullstop",
@@ -130,7 +63,7 @@ mod test {
 	#[beet_core::test(timeout_ms = 15_000)]
 	async fn streaming() {
 		FlowAgentPlugin::world()
-			.spawn(flow_exchange(oneshot_streaming))
+			.spawn(flow_exchange(simple_oneshot_streaming))
 			.exchange_str(
 				Request::from_cli_str(
 					"whats the capital of japan? one word, capital first letter, no fullstop",

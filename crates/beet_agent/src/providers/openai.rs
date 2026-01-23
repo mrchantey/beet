@@ -5,7 +5,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::BoxedFuture;
 
-impl OpenAIProvider {
+impl OpenAiProvider {
 	/// GPT-5 Nano - smallest and fastest model.
 	pub const GPT_5_NANO: &str = "gpt-5-nano";
 	/// GPT-5 Mini - balanced speed and capability.
@@ -21,15 +21,15 @@ impl OpenAIProvider {
 ///
 /// OpenAI API key must be set via the `OPENAI_API_KEY` environment variable.
 /// By default, connects to `https://api.openai.com/v1`.
-pub struct OpenAIProvider {
+pub struct OpenAiProvider {
 	inner: OpenResponsesProvider,
 }
 
-impl Default for OpenAIProvider {
+impl Default for OpenAiProvider {
 	fn default() -> Self { Self::new().unwrap() }
 }
 
-impl OpenAIProvider {
+impl OpenAiProvider {
 	/// Creates a new provider with the API key from the environment.
 	pub fn new() -> Result<Self> {
 		let api_key = env_ext::var("OPENAI_API_KEY")?;
@@ -40,7 +40,7 @@ impl OpenAIProvider {
 	}
 }
 
-impl ModelProvider for OpenAIProvider {
+impl ModelProvider for OpenAiProvider {
 	fn provider_slug(&self) -> &'static str { "openai" }
 
 	fn default_small_model(&self) -> &'static str { Self::GPT_5_NANO }

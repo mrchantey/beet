@@ -5,7 +5,7 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			RouterPlugin::default(),
+			FlowAgentPlugin::default(),
 			DebugFlowPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
@@ -14,7 +14,7 @@ fn main() {
 				flow_exchange(|| {
 					(InfallibleSequence, children![
 						EndpointBuilder::new()
-							.with_path("/*any")
+							.with_path("/*any?")
 							.with_handler(oneshot()),
 					])
 				}),
@@ -27,7 +27,7 @@ fn oneshot() -> impl Bundle {
 		(Name::new("Request to context"), request_to_context()),
 		(
 			Name::new("Model Action"),
-			ModelAction::new(OllamaProvider::default())
+			ModelAction::new(OpenAiProvider::default()) // ModelAction::new(OllamaProvider::default())
 		),
 		(Name::new("Context to response"), context_to_response())
 	])

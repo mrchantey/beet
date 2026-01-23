@@ -241,7 +241,7 @@ fn watch() -> impl Bundle {
 	Reflect,
 	Component,
 )]
-pub struct StageParams {
+struct StageParams {
 	#[deref]
 	#[reflect(
 		default="stage",

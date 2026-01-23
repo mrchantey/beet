@@ -11,8 +11,8 @@ use beet_core::prelude::*;
 
 fn text_provider() -> impl ModelProvider {
 	dotenv::dotenv().ok();
-	// GeminiProvider::default()
-	OpenAIProvider::default()
+	GeminiProvider::default()
+	// OpenAIProvider::default()
 	// OllamaProvider::default()
 }
 

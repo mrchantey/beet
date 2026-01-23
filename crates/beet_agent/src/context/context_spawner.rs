@@ -73,32 +73,47 @@ fn spawn_response_item(
 
 
 /// Spawns a user context with the given text.
-///
-/// The `action` entity is stored in `ContextMeta::owner` for tracking
-/// which action created this context (typically the request_to_context action).
-pub async fn spawn_user_context(
-	world: &AsyncWorld,
+pub fn spawn_user_text(
+	commands: &mut Commands,
 	agent: Entity,
 	action: Entity,
 	text: impl Into<String>,
 ) -> Entity {
-	world
-		.spawn_then((
+	spawn_user_context(commands, agent, action, TextContext::new(text))
+}
+/// Spawns a user context with the given text.
+pub fn spawn_user_file(
+	commands: &mut Commands,
+	agent: Entity,
+	action: Entity,
+	path: WsPathBuf,
+) -> Entity {
+	spawn_user_context(commands, agent, action, FileContext::from_fs(path))
+}
+
+fn spawn_user_context(
+	commands: &mut Commands,
+	agent: Entity,
+	action: Entity,
+	bundle: impl Bundle,
+) -> Entity {
+	commands
+		.spawn((
 			ThreadContextOf(agent),
 			OwnedContextOf(action),
-			TextContext::new(text),
 			ContextRole::User,
 			ContextComplete,
+			bundle,
 		))
-		.await
 		.id()
 }
+
 
 
 /// Spawns a system context with the given text.
 ///
 /// The `action` entity is stored in `ContextMeta::owner` for tracking.
-pub async fn spawn_system_context(
+pub async fn spawn_system_text(
 	world: &AsyncWorld,
 	agent: Entity,
 	action: Entity,

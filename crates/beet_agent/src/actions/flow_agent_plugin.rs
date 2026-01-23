@@ -5,5 +5,8 @@ use beet_router::prelude::*;
 pub struct FlowAgentPlugin;
 
 impl Plugin for FlowAgentPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin::<RouterPlugin>(); }
+	fn build(&self, app: &mut App) {
+		dotenv::dotenv().ok();
+		app.init_plugin::<RouterPlugin>();
+	}
 }

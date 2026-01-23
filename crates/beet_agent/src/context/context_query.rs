@@ -42,7 +42,7 @@ impl<'w, 's> ContextQuery<'w, 's> {
 		&self,
 		action: Entity,
 		filter: impl Fn(Entity) -> bool,
-	) -> Vec<openresponses::request::InputItem> {
+	) -> Result<Vec<openresponses::request::InputItem>> {
 		let mut items = Vec::new();
 
 		if let Ok(context) = self.contexts.get(action) {
@@ -188,6 +188,6 @@ impl<'w, 's> ContextQuery<'w, 's> {
 			}
 		}
 
-		items
+		items.xok()
 	}
 }

@@ -175,18 +175,18 @@ impl ModelAction {
 		&mut self,
 		query: &ContextQuery,
 		action: Entity,
-	) -> Vec<openresponses::request::InputItem> {
+	) -> Result<Vec<openresponses::request::InputItem>> {
 		let should_filter = self.previous_response_id.is_some();
 
 
 		// Collect input items only for context we havent sent yet
 		let input_items = query.collect_input_items(action, |entity| {
 			!should_filter || !self.sent_context_entities.contains(&entity)
-		});
+		})?;
 
 		self.mark_context_sent(query, action);
 
-		input_items
+		input_items.xok()
 	}
 	/// Mark all existing context entities as sent so they won't be resent.
 	fn mark_context_sent(&mut self, query: &ContextQuery, action: Entity) {
@@ -263,7 +263,7 @@ pub fn model_action_request() -> impl Bundle {
 
 			// Collect context into input items
 			let input_items =
-				model_action.collect_filtered_input_items(&query, action);
+				model_action.collect_filtered_input_items(&query, action)?;
 
 			if input_items.is_empty() {
 				bevybail!("No context to send to AI agent");

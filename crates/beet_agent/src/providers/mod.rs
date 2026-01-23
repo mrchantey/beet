@@ -9,7 +9,7 @@ pub mod openai;
 mod openresponses_provider;
 pub use gemini::GeminiProvider;
 pub use ollama::OllamaProvider;
-pub use openai::OpenAIProvider;
+pub use openai::OpenAiProvider;
 pub use openresponses_provider::*;
 
 /// A boxed, pinned stream of streaming events.
