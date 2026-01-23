@@ -3,6 +3,7 @@
 //! Ollama provides local LLM inference with OpenResponses-compatible streaming.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::tasks::BoxedFuture;
 
 
 pub mod constants {
@@ -47,14 +48,14 @@ impl ModelProvider for OllamaProvider {
 	fn send(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<openresponses::ResponseBody>> {
+	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
 		Box::pin(self.inner.send(request))
 	}
 
 	fn stream(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<StreamingEventStream>> {
+	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		Box::pin(self.inner.stream(request))
 	}
 }

@@ -3,9 +3,11 @@
 //! OpenAI provides cloud-based LLM inference with OpenResponses-compatible streaming.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::tasks::BoxedFuture;
 
 
 pub mod constants {
+	pub const GPT_5_NANO: &str = "gpt-5-nano";
 	pub const GPT_5_MINI: &str = "gpt-5-mini";
 	pub const GPT_5_2: &str = "gpt-5.2";
 
@@ -38,21 +40,21 @@ impl OpenAIProvider {
 impl ModelProvider for OpenAIProvider {
 	fn provider_slug(&self) -> &'static str { "openai" }
 
-	fn default_small_model(&self) -> &'static str { constants::GPT_5_MINI }
+	fn default_small_model(&self) -> &'static str { constants::GPT_5_NANO }
 	fn default_tool_model(&self) -> &'static str { constants::GPT_5_MINI }
 	fn default_large_model(&self) -> &'static str { constants::GPT_5_2 }
 
 	fn send(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<openresponses::ResponseBody>> {
+	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
 		Box::pin(self.inner.send(request))
 	}
 
 	fn stream(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<StreamingEventStream>> {
+	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		Box::pin(self.inner.stream(request))
 	}
 }

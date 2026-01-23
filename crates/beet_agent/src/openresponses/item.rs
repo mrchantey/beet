@@ -204,6 +204,32 @@ pub struct ReasoningItem {
 	pub encrypted_content: Option<String>,
 }
 
+impl ReasoningItem {
+	/// Returns the summary if available, otherwise the full text.
+	pub fn summary_or_text(&self) -> String {
+		if !self.summary.is_empty() {
+			self.all_summary()
+		} else {
+			self.all_text()
+		}
+	}
+
+
+	pub fn all_text(&self) -> String {
+		self.content
+			.iter()
+			.map(|text| text.text.as_str())
+			.collect::<Vec<_>>()
+			.join("")
+	}
+	pub fn all_summary(&self) -> String {
+		self.summary
+			.iter()
+			.map(|text| text.text.as_str())
+			.collect::<Vec<_>>()
+			.join("")
+	}
+}
 
 #[cfg(test)]
 mod test {

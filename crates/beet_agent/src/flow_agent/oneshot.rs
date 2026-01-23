@@ -56,7 +56,10 @@ pub fn request_to_context() -> impl Bundle {
 			let agent = agent_query.entity(action);
 
 			commands.run_local(async move |world| -> Result {
-				spawn_user_context(&world, agent, action, query).await;
+				context_spawner::spawn_user_context(
+					&world, agent, action, query,
+				)
+				.await;
 				world
 					.entity(action)
 					.trigger_target_then(Outcome::Pass)
@@ -169,7 +172,7 @@ mod test {
 
 				// Create the initial user context (a question for the first model)
 				// We use Entity::PLACEHOLDER as the action since this is user input
-				spawn_user_context(
+				context_spawner::spawn_user_context(
 					&world,
 					agent,
 					Entity::PLACEHOLDER,
@@ -247,9 +250,9 @@ mod test {
 
 				// Query context entities associated with this agent
 				let mut query = world.query::<(
-					&ContextOf,
+					&ThreadContextOf,
 					Option<&TextContext>,
-					Option<&ContextMeta>,
+					Option<&OwnedContextOf>,
 				)>();
 
 				for (context_of, text, meta) in query.iter(world) {
@@ -258,7 +261,7 @@ mod test {
 					}
 
 					// Determine role based on who created this context
-					let owner = meta.map(|m| m.owner);
+					let owner = meta.map(|m| m.get());
 					let effective_role = if owner == Some(action) {
 						openresponses::MessageRole::Assistant
 					} else {
@@ -314,13 +317,14 @@ mod test {
 				.with_stream(true);
 
 		let mut stream = provider.stream(body).await?;
-		let mut spawner = ContextSpawner::new(world.clone(), agent, action);
+		let mut spawner =
+			StreamingContextSpawner::new(world.clone(), agent, action);
 
 		while let Some(event) = stream.next().await {
 			let event = event?;
-			let done = spawner.handle_event(&event).await?;
-			if done {
-				break;
+			match spawner.handle_event(&event).await? {
+				std::ops::ControlFlow::Continue(_) => {}
+				std::ops::ControlFlow::Break(_) => break,
 			}
 		}
 

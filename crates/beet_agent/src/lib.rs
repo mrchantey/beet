@@ -2,6 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
+mod context;
 mod flow_agent;
 pub mod openresponses;
 mod providers;
@@ -11,6 +12,7 @@ mod session_old;
 
 
 pub mod prelude {
+	pub use crate::context::*;
 	pub use crate::flow_agent::*;
 	pub use crate::openresponses;
 	pub use crate::providers::*;

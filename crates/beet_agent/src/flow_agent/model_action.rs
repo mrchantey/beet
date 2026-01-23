@@ -181,7 +181,7 @@ pub fn model_action_request() -> impl Bundle {
 			let agent = agents.entity(action);
 
 			// Collect context into input items
-			let input_items = query.to_input_items(action);
+			let input_items = query.collect_input_items(action);
 
 			if input_items.is_empty() {
 				bevybail!("No context to send to AI agent");
@@ -212,14 +212,17 @@ pub fn model_action_request() -> impl Bundle {
 					// Streaming mode
 					let mut stream = provider.stream(body).await?;
 
-					let mut spawner =
-						ContextSpawner::new(world.clone(), agent, action);
+					let mut spawner = StreamingContextSpawner::new(
+						world.clone(),
+						agent,
+						action,
+					);
 
 					while let Some(event) = stream.next().await {
 						let event = event?;
-						let done = spawner.handle_event(&event).await?;
-						if done {
-							break;
+						match spawner.handle_event(&event).await? {
+							std::ops::ControlFlow::Continue(_) => {}
+							std::ops::ControlFlow::Break(_) => break,
 						}
 					}
 
@@ -242,12 +245,14 @@ pub fn model_action_request() -> impl Bundle {
 					// Non-streaming mode
 					let response = provider.send(body).await?;
 
+					let response_id = response.id.clone();
 					// Spawn context entities from the response
-					spawn_response_context(&world, agent, action, &response)
-						.await?;
+					context_spawner::spawn_response_context(
+						&world, agent, action, response,
+					)
+					.await?;
 
 					// Update previous_response_id
-					let response_id = response.id.clone();
 					world
 						.entity(action)
 						.with_then(move |mut entity| {

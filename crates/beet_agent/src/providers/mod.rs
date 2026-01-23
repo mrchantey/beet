@@ -1,7 +1,7 @@
 use crate::openresponses;
 use beet_core::prelude::*;
+use bevy::tasks::BoxedFuture;
 use futures::Stream;
-use std::future::Future;
 use std::pin::Pin;
 pub mod ollama;
 pub mod openai;
@@ -16,9 +16,6 @@ pub use openresponses_provider::*;
 /// callers to manually pin the stream.
 pub type StreamingEventStream =
 	Pin<Box<dyn Stream<Item = Result<openresponses::StreamingEvent>> + Send>>;
-
-/// A boxed future for async operations.
-pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// A trait for providers that implement the OpenResponses API.
 ///
@@ -76,7 +73,7 @@ pub trait ModelProvider: 'static + Send + Sync {
 	fn send(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<openresponses::ResponseBody>>;
+	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>>;
 
 	/// Sends a streaming request and returns a pinned stream of typed events.
 	///
@@ -88,7 +85,7 @@ pub trait ModelProvider: 'static + Send + Sync {
 	fn stream(
 		&self,
 		request: openresponses::RequestBody,
-	) -> BoxFuture<'_, Result<StreamingEventStream>>;
+	) -> BoxedFuture<'_, Result<StreamingEventStream>>;
 }
 
 /// Alias for a boxed, sendable model provider.
