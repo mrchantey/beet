@@ -38,3 +38,11 @@ fn beet_test_sync() {}
 
 #[beet_core::test]
 async fn beet_test_async() { time_ext::sleep_millis(10).await; }
+
+#[beet_core::test(timeout_ms = 10_000)]
+#[ignore="very slow"]
+// #[beet_core::test]
+async fn timeout_respected() {
+	// default timeout is 5 seconds
+	time_ext::sleep_secs(6).await;
+}

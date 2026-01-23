@@ -194,8 +194,8 @@ mod test {
 		now: u64,
 	}
 
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30_000))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
 	async fn raw_works() {
 		let mut ev = Request::get("https://sse.dev/test")
 			.send()
@@ -216,8 +216,8 @@ mod test {
 		}
 	}
 
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30_000))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
 	async fn typed_works() {
 		let mut ev = Request::get("https://sse.dev/test")
 			.send()

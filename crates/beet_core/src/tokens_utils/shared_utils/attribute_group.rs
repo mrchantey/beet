@@ -104,6 +104,16 @@ pub struct AttributeItem {
 	pub value: Option<TokenStream>,
 }
 
+impl quote::ToTokens for AttributeItem {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		self.key.to_tokens(tokens);
+		if let Some(value) = &self.value {
+			<syn::Token![=]>::default().to_tokens(tokens);
+			value.to_tokens(tokens);
+		}
+	}
+}
+
 
 impl AttributeItem {
 	pub fn parse(input: ParseStream) -> syn::Result<Self> {

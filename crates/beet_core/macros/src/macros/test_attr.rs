@@ -44,10 +44,17 @@ pub fn parse_test_attr(
 
 	Ok(match (is_async, is_tokio) {
 		(true, true) => {
+			let non_tokio_attrs = attrs.attributes.iter().filter(|attr| {
+				// filter out existing tokio attributes
+				attr.name()
+					.map(|name| name.to_string() != "tokio")
+					.unwrap_or(true)
+			});
+
 			// a bit weird, wasm impl is recursive but without tokio marker
 			quote! {
 				#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
-				#[cfg_attr(target_arch = "wasm32", #beet_core::test)]
+				#[cfg_attr(target_arch = "wasm32", #beet_core::test(#(#non_tokio_attrs),*))]
 				#func
 			}
 		}
