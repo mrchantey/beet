@@ -7,6 +7,7 @@ mod context;
 pub mod openresponses;
 mod providers;
 pub mod realtime;
+mod tools;
 
 
 pub mod prelude {
@@ -15,4 +16,5 @@ pub mod prelude {
 	pub use crate::openresponses;
 	pub use crate::providers::*;
 	pub use crate::realtime;
+	pub use crate::tools::*;
 }

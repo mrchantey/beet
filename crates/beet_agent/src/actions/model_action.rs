@@ -289,6 +289,7 @@ pub fn model_action_request() -> impl Bundle {
 
 					while let Some(event) = stream.next().await {
 						let event = event?;
+						// println!("Stream event: {:#?}", event);
 						match spawner.handle_event(&event).await? {
 							std::ops::ControlFlow::Continue(_) => {}
 							std::ops::ControlFlow::Break(_) => break,

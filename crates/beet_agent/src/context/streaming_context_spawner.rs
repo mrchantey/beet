@@ -79,7 +79,7 @@ impl StreamingContextSpawner {
 			}
 			// Ignore other events
 			ev => {
-				warn!("Unhandled streaming event: {:?}", ev);
+				trace!("Unhandled streaming event: {:?}", ev);
 			}
 		}
 

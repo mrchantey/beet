@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// Creates a router exchange that constructs the [`EndpointTree`] immediately on spawn.
 ///
 /// Unlike using [`flow_exchange`] directly, this function ensures that the endpoint tree
-/// is built and validated statically when the router is spawned. 
+/// is built and validated statically when the router is spawned.
 /// This provides early detection of routing conflicts and ensures
 /// the tree is available for all operations that need it.
 ///
@@ -30,24 +30,28 @@ use beet_net::prelude::*;
 /// }));
 /// ```
 pub fn router_exchange(func: impl BundleFunc) -> impl Bundle {
-	let func2 = func.clone();
+	(insert_endpoint_tree(func.clone()), flow_exchange(func))
+}
+
+pub fn router_exchange_stream(func: impl BundleFunc) -> impl Bundle {
 	(
-		// insert EndpointTree using the BundleFunc on spawn
-		OnSpawn::new(move |entity| {
-			let id = entity.id();
-			entity.world_scope(|world| {
-				let endpoints = EndpointTree::endpoints_from_bundle_func(
-					world,
-					func2.clone(),
-				)
-				.unwrap_or_exit();
-				let tree =
-					EndpointTree::from_endpoints(endpoints).unwrap_or_exit();
-				world.entity_mut(id).insert(tree);
-			});
-		}),
-		flow_exchange(func),
+		insert_endpoint_tree(func.clone()),
+		flow_exchange_stream(func),
 	)
+}
+
+/// insert EndpointTree using the BundleFunc on spawn
+fn insert_endpoint_tree(func: impl BundleFunc) -> impl Bundle {
+	OnSpawn::new(move |entity| {
+		let id = entity.id();
+		entity.world_scope(|world| {
+			let endpoints =
+				EndpointTree::endpoints_from_bundle_func(world, func.clone())
+					.unwrap_or_exit();
+			let tree = EndpointTree::from_endpoints(endpoints).unwrap_or_exit();
+			world.entity_mut(id).insert(tree);
+		});
+	})
 }
 
 #[cfg(test)]
@@ -60,19 +64,15 @@ mod test {
 	#[beet_core::test]
 	async fn endpoint_tree_inserted_on_spawn() {
 		let mut world = RouterPlugin::world();
-		let entity = world
-			.spawn(router_exchange(|| {
-				(InfallibleSequence, children![
-					EndpointBuilder::get().with_path("foo"),
-					EndpointBuilder::get().with_path("bar"),
-				])
-			}));
+		let entity = world.spawn(router_exchange(|| {
+			(InfallibleSequence, children![
+				EndpointBuilder::get().with_path("foo"),
+				EndpointBuilder::get().with_path("bar"),
+			])
+		}));
 
 		// EndpointTree should be present immediately after spawn
-		entity
-			.get::<EndpointTree>()
-			.is_some()
-			.xpect_true();
+		entity.get::<EndpointTree>().is_some().xpect_true();
 
 		// Verify the tree has the expected endpoints
 		let tree = entity.get::<EndpointTree>().unwrap();
