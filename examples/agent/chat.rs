@@ -39,6 +39,7 @@ fn oneshot() -> impl Bundle {
 			// ModelAction::new(OpenAiProvider::default()),
 			ModelAction::new(OllamaProvider::default()).streaming()
 		),
-		(Name::new("Context to response"), context_to_response())
+		// not nessecary with streaming
+		// (Name::new("Context to response"), context_to_response())
 	])
 }
