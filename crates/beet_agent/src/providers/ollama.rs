@@ -52,6 +52,7 @@ impl ModelProvider for OllamaProvider {
 		&self,
 		request: openresponses::RequestBody,
 	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.send(request))
 	}
 
@@ -59,6 +60,7 @@ impl ModelProvider for OllamaProvider {
 		&self,
 		request: openresponses::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
+		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.stream(request))
 	}
 }
