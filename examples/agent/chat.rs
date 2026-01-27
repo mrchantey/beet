@@ -12,7 +12,7 @@ fn main() {
 			commands.spawn((
 				CliServer,
 				router_exchange_stream(|| {
-					(Fallback, children![
+					(tools(), Fallback, children![
 						help_handler(HelpHandlerConfig {
 							introduction: String::from(
 								"Welcome to the chat CLI"
@@ -36,10 +36,36 @@ fn oneshot() -> impl Bundle {
 		(Name::new("Request to context"), request_to_context()),
 		(
 			Name::new("Model Action"),
-			// ModelAction::new(OpenAiProvider::default()),
-			ModelAction::new(OllamaProvider::default()).streaming()
+			ModelAction::new(OpenAiProvider::default()).streaming(),
+			// ModelAction::new(OllamaProvider::default()).streaming()
 		),
 		// not nessecary with streaming
 		// (Name::new("Context to response"), context_to_response())
 	])
+}
+
+fn tools() -> impl Bundle {
+	#[derive(Reflect)]
+	struct AddReq {
+		a: u32,
+		b: u32,
+	}
+	#[derive(Reflect)]
+	struct AddRes {
+		a: u32,
+	}
+
+
+
+	related![
+		Tools[tool_exchange(|| (InfallibleSequence, children![
+			EndpointBuilder::new()
+				.with_path("/add")
+				.with_params::<ModelRequestParams>()
+				.with_description("Add two numbers together")
+				.with_request_body(BodyMeta::json::<AddReq>())
+				.with_response_body(BodyMeta::json::<AddRes>())
+				.with_action(|| {})
+		]))]
+	]
 }

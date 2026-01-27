@@ -150,9 +150,11 @@ impl ModelAction {
 	pub fn build_request(
 		&self,
 		input_items: Vec<openresponses::request::InputItem>,
+		tools: Vec<openresponses::FunctionToolParam>,
 	) -> openresponses::RequestBody {
 		let mut body = openresponses::RequestBody::new(&self.model)
-			.with_input_items(input_items);
+			.with_input_items(input_items)
+			.with_tools(tools);
 
 		if let Some(prev_id) = &self.previous_response_id {
 			body = body.with_previous_response_id(prev_id);
@@ -250,7 +252,8 @@ fn on_add_model_action(mut world: DeferredWorld, cx: HookContext) {
 pub fn model_action_request() -> impl Bundle {
 	OnSpawn::observe(
 		|ev: On<GetOutcome>,
-		 query: ContextQuery,
+		 context_query: ContextQuery,
+		 tool_query: ToolQuery,
 		 mut model_query: Query<&mut ModelAction>,
 		 agents: AgentQuery,
 		 mut commands: AsyncCommands|
@@ -263,15 +266,17 @@ pub fn model_action_request() -> impl Bundle {
 			let agent = agents.entity(action);
 
 			// Collect context into input items
-			let input_items =
-				model_action.collect_filtered_input_items(&query, action)?;
+			let input_items = model_action
+				.collect_filtered_input_items(&context_query, action)?;
 
 			if input_items.is_empty() {
 				bevybail!("No context to send to AI agent");
 			}
 
+			let tools = tool_query.collect_tools(action)?;
+
 			// Build request body
-			let body = model_action.build_request(input_items);
+			let body = model_action.build_request(input_items, tools);
 
 			// Take ownership of the provider for the async block
 			let provider = model_action.take_provider();

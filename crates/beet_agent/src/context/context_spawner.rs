@@ -38,6 +38,10 @@ pub async fn spawn_response_context(
 							action,
 							FunctionCallContext::from(item),
 						);
+						todo!(
+							"actually call the tool: {item:?}\ncx:{:?}",
+							FunctionCallContext::from(item)
+						);
 					}
 					openresponses::OutputItem::FunctionCallOutput(item) => {
 						spawn_response_item(

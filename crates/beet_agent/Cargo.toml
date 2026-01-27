@@ -67,16 +67,3 @@ beet_core = { workspace = true, features = ["testing"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_agent = { path = ".", features = ["native-tls"] }
-
-
-[[test]]
-name = "chat"
-path = "tests/chat.rs"
-
-[[test]]
-name = "gemini-image"
-path = "tests/gemini-image.rs"
-
-[[test]]
-name = "openresponses"
-path = "tests/openresponses.rs"

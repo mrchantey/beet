@@ -62,14 +62,16 @@ impl ToolQuery<'_, '_> {
 	///
 	/// Returns a list of `ToolMeta` representing all tools available to the agent.
 	/// Tool names are prefixed with the tool set entity ID to ensure uniqueness.
-	pub fn collect_tools(&self, action: Entity) -> Result<Vec<ToolMeta>> {
+	pub fn collect_tools(
+		&self,
+		action: Entity,
+	) -> Result<Vec<openresponses::FunctionToolParam>> {
 		let mut tools = Vec::new();
 
 		if let Ok(tool_sets) = self.tools.get(action) {
 			for tool_set_entity in tool_sets.iter() {
-				if let Ok(tree) = self.endpoint_trees.get(tool_set_entity) {
-					self.collect_tools_from_tree(tree, tool_set_entity, &mut tools);
-				}
+				let tree = self.endpoint_trees.get(tool_set_entity)?;
+				self.collect_tools_from_tree(tree, tool_set_entity, &mut tools);
 			}
 		}
 
@@ -81,28 +83,18 @@ impl ToolQuery<'_, '_> {
 		&self,
 		tree: &EndpointTree,
 		tool_set_entity: Entity,
-		tools: &mut Vec<ToolMeta>,
+		tools: &mut Vec<openresponses::FunctionToolParam>,
 	) {
 		if let Some(endpoint) = &tree.endpoint {
-			tools.push(ToolMeta::from_endpoint(endpoint, tool_set_entity));
+			tools.push(
+				ToolMeta::from_endpoint(endpoint, tool_set_entity)
+					.to_function_tool_param(),
+			);
 		}
 
 		for child in &tree.children {
 			self.collect_tools_from_tree(child, tool_set_entity, tools);
 		}
-	}
-
-	/// Converts collected tools to `FunctionToolParam` for the model API.
-	pub fn to_function_tool_params(
-		&self,
-		action: Entity,
-	) -> Result<Vec<openresponses::FunctionToolParam>> {
-		let tools = self.collect_tools(action)?;
-		tools
-			.iter()
-			.map(|t| t.to_function_tool_param())
-			.collect::<Vec<_>>()
-			.xok()
 	}
 
 	/// Finds a tool set entity by parsing a tool name.

@@ -235,6 +235,11 @@ impl RequestBody {
 		self
 	}
 
+	pub fn with_tools(mut self, tools: Vec<FunctionToolParam>) -> Self {
+		self.tools.get_or_insert_with(Vec::new).extend(tools);
+		self
+	}
+
 	/// Sets the tool choice behavior.
 	pub fn with_tool_choice(mut self, choice: ToolChoice) -> Self {
 		self.tool_choice = Some(choice);
