@@ -1,27 +1,9 @@
-//! Integration tests for the OpenResponses API.
-//!
-//! These tests validate compliance with the OpenResponses specification
-//! by making real API calls.
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-
 use beet_agent::prelude::*;
 use beet_core::exports::futures_lite::pin;
 use beet_core::prelude::*;
 
-fn text_provider() -> impl ModelProvider {
-	dotenv::dotenv().ok();
-	GeminiProvider::default()
-	// OpenAIProvider::default()
-	// OllamaProvider::default()
-}
-
-
 /// Basic text response - simple user message, validates ResponseResource schema.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn basic_text_response() {
-	let provider = text_provider();
-
+pub async fn basic_text_response(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input(
 			"Say hello in exactly 3 words. Do not include any punctuation.",
@@ -44,10 +26,7 @@ async fn basic_text_response() {
 }
 
 /// Streaming response - validates SSE streaming events and final response.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn streaming_response() {
-	let provider = text_provider();
-
+pub async fn streaming_response(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input("Count from 1 to 5.")
 		.with_stream(true);
@@ -93,10 +72,7 @@ async fn streaming_response() {
 }
 
 /// System prompt - include system role message in input.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn system_prompt() {
-	let provider = text_provider();
-
+pub async fn system_prompt(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input_items(vec![
 			openresponses::request::InputItem::Message(
@@ -120,10 +96,7 @@ async fn system_prompt() {
 }
 
 /// Tool calling - define a function tool and verify function_call output.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn tool_calling() {
-	let provider = text_provider();
-
+pub async fn tool_calling(provider: impl ModelProvider) {
 	let tool = openresponses::FunctionToolParam::new("get_weather")
 		.with_description("Get the current weather for a location")
 		.with_parameters(serde_json::json!({
@@ -169,9 +142,7 @@ async fn tool_calling() {
 }
 
 /// Image input - send image URL in user content.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn image_input() {
-	let provider = text_provider();
+pub async fn image_input(provider: impl ModelProvider) {
 	if provider.provider_slug() == "ollama" {
 		// Ollama image support is a wip
 		return;
@@ -209,10 +180,7 @@ async fn image_input() {
 }
 
 /// Multi-turn conversation - send assistant + user messages as conversation history.
-#[beet_core::test(timeout_ms = 15_000)]
-async fn multi_turn_conversation() {
-	let provider = text_provider();
-
+pub async fn multi_turn_conversation(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
 		.with_input_items(vec![
 			openresponses::request::InputItem::Message(
