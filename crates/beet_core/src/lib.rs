@@ -119,6 +119,7 @@ pub mod prelude {
 	pub use crate::abs_file;
 	pub use crate::cross_log;
 	pub use crate::cross_log_error;
+	pub use crate::cross_log_noline;
 	pub use crate::dir;
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;

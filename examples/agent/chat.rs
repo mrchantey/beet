@@ -11,7 +11,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				CliServer,
-				router_exchange(|| {
+				router_exchange_stream(|| {
 					(Fallback, children![
 						help_handler(HelpHandlerConfig {
 							introduction: String::from(

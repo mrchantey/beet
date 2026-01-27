@@ -1,3 +1,4 @@
+use beet_core::prelude::*;
 use beet_ml::prelude::*;
 use bevy::scene::ron;
 use std::fs::File;
@@ -5,7 +6,6 @@ use std::fs::{
 	self,
 };
 use std::io::Write;
-use beet_core::prelude::*;
 
 fn main() -> Result {
 	let map = FrozenLakeMap::default_four_by_four();

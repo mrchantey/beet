@@ -75,10 +75,7 @@ pub fn echo_pingtime(ev: On<MessageRecv>) {
 			};
 			let now = SystemTime::now();
 			let rtt = now.duration_since(ping_time.timestamp).unwrap();
-			info!(
-				"Round Trip Time: {}",
-				time_ext::pretty_print_duration(rtt)
-			);
+			info!("Round Trip Time: {}", time_ext::pretty_print_duration(rtt));
 		}
 		_ => {}
 	}

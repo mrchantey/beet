@@ -419,9 +419,9 @@ pub async fn dynamo_fs_selector<T: TableRow>(
 #[cfg(test)]
 pub mod table_test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use beet_core::prelude::*;
 
 	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 	pub struct MyObject {

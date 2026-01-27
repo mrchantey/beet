@@ -61,15 +61,12 @@ fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 			pat => {
 				let pat_clone = pat.clone();
 				// insert type
-				*first_param =
-					Pat::Type(parse_quote! {#pat_clone:On<#ident>});
+				*first_param = Pat::Type(parse_quote! {#pat_clone:On<#ident>});
 			}
 		},
 		None => {
 			// If no parameters, add one with discard name
-			closure
-				.inputs
-				.push(Pat::Type(parse_quote!(_:On<#ident>)));
+			closure.inputs.push(Pat::Type(parse_quote!(_:On<#ident>)));
 		}
 	};
 }

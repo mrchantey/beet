@@ -2,13 +2,13 @@
 //! If you think that a missing action should be built-in, please open an issue.
 mod interrupt_on;
 pub use interrupt_on::*;
+mod await_ready;
 mod exit_on_end;
 mod exit_on_fail;
 mod infallible_sequence;
-mod await_ready;
 mod trigger_deferred;
-pub use infallible_sequence::*;
 pub use await_ready::*;
+pub use infallible_sequence::*;
 pub use trigger_deferred::*;
 mod end_with;
 pub use end_with::*;

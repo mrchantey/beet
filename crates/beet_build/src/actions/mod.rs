@@ -19,6 +19,6 @@ pub use launch_config::*;
 mod sync_buckets;
 pub use sync_buckets::*;
 mod cli_plugin;
-pub use cli_plugin::*;
 pub use beet_cli::*;
+pub use cli_plugin::*;
 mod beet_cli;

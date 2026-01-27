@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 pub mod frozen_lake_assets {
 	pub const TILE: &str = "kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0";

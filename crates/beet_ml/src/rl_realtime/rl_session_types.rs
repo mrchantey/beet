@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy::ecs::component::Mutable;
 use beet_core::prelude::*;
+use bevy::ecs::component::Mutable;
 use bevy::reflect::Reflect;
 
 

@@ -1,5 +1,3 @@
-
-
 /// Attempt to downcast an any type into a string
 pub fn try_downcast_str(value: &dyn std::any::Any) -> Option<String> {
 	if let Some(str) = value.downcast_ref::<&str>() {

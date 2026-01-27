@@ -40,8 +40,8 @@ pub use self::spawn_frozen_lake::*;
 mod translate_grid;
 pub use self::translate_grid::*;
 use crate::prelude::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 pub struct FrozenLakePlugin;
 

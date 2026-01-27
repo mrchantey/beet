@@ -33,8 +33,7 @@ fn parse(input: ItemFn, attr: TokenStream) -> Result<TokenStream> {
 	let impl_on_add = impl_on_add(&input, &opts, &fields)?;
 
 	let imports = if pkg_ext::is_internal() {
-		quote! {
-		}
+		quote! {}
 	} else {
 		quote! {
 			use beet::prelude::*;

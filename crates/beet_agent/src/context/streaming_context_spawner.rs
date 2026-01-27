@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::BodyStream;
 use bevy::ecs::component::Mutable;
 use std::ops::ControlFlow;
 
@@ -7,6 +8,9 @@ use std::ops::ControlFlow;
 ///
 /// This handles the incremental creation and updating of context entities
 /// as streaming events arrive from the model.
+///
+/// When a [`BodyStream`] is provided, text deltas are also written to it,
+/// enabling real-time streaming output to HTTP responses.
 pub struct StreamingContextSpawner {
 	/// The async world handle for spawning entities.
 	world: AsyncWorld,
@@ -20,6 +24,8 @@ pub struct StreamingContextSpawner {
 	completed_items: HashSet<String>,
 	/// The response ID from the model.
 	response_id: Option<String>,
+	/// Optional body stream for writing text deltas to HTTP responses.
+	body_stream: Option<BodyStream>,
 }
 
 impl StreamingContextSpawner {
@@ -35,7 +41,17 @@ impl StreamingContextSpawner {
 			item_map: HashMap::default(),
 			completed_items: HashSet::default(),
 			response_id: None,
+			body_stream: None,
 		}
+	}
+
+	/// Sets the body stream for writing text deltas to HTTP responses.
+	///
+	/// When set, text deltas will be written to this stream in addition to
+	/// updating the context entities.
+	pub fn with_body_stream(mut self, body_stream: BodyStream) -> Self {
+		self.body_stream = Some(body_stream);
+		self
 	}
 
 	/// Handles a streaming event, updating context entities as needed.
@@ -178,11 +194,19 @@ impl StreamingContextSpawner {
 
 
 	/// Appends text to an existing text context.
+	///
+	/// Also writes to the body stream if one is configured.
 	async fn update_text(
 		&mut self,
 		ev: &openresponses::streaming::OutputTextDeltaEvent,
 	) -> Result {
 		let delta = ev.delta.to_string();
+
+		// Write to body stream if available
+		if let Some(stream) = &self.body_stream {
+			stream.send_text(&delta).await?;
+		}
+
 		self.update_item::<TextContext>(&ev.item_id, move |mut item| {
 			item.push_str(&delta);
 			Ok(())

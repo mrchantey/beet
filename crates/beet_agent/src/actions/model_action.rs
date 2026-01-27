@@ -7,6 +7,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use beet_net::prelude::BodyStream;
 
 
 /// A component that configures an action entity to interact with an AI model.
@@ -287,9 +288,15 @@ pub fn model_action_request() -> impl Bundle {
 						action,
 					);
 
+					// Get BodyStream from agent if available (for HTTP streaming)
+					if let Ok(body_stream) =
+						world.entity(agent).get_cloned::<BodyStream>().await
+					{
+						spawner = spawner.with_body_stream(body_stream);
+					}
+
 					while let Some(event) = stream.next().await {
 						let event = event?;
-						// println!("Stream event: {:#?}", event);
 						match spawner.handle_event(&event).await? {
 							std::ops::ControlFlow::Continue(_) => {}
 							std::ops::ControlFlow::Break(_) => break,

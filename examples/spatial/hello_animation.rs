@@ -54,21 +54,29 @@ fn setup(
 			Repeat::default(),
 			children![
 				(
-					Name::new("Idle"), 
+					Name::new("Idle"),
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(idle_clip, idle_index, Outcome::Pass)
-						.with_transition_duration(transition_duration)
+					TriggerOnAnimationEnd::new(
+						idle_clip,
+						idle_index,
+						Outcome::Pass
+					)
+					.with_transition_duration(transition_duration)
 				),
 				(
 					Name::new("Walking"),
 					PlayAnimation::new(walk_index)
 						.repeat(RepeatAnimation::Count(8))
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(walk_clip, walk_index, Outcome::Pass)
-						.with_transition_duration(transition_duration)
+					TriggerOnAnimationEnd::new(
+						walk_clip,
+						walk_index,
+						Outcome::Pass
+					)
+					.with_transition_duration(transition_duration)
 				)
 			]
-		)]
+		)],
 	));
 }

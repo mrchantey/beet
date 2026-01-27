@@ -199,8 +199,8 @@ impl CodegenFile {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use quote::ToTokens;
 	use beet_core::prelude::*;
+	use quote::ToTokens;
 	use syn::ItemFn;
 
 	#[test]
