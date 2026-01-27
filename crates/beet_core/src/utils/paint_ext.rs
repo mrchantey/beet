@@ -5,6 +5,7 @@ use nu_ansi_term::Color;
 use nu_ansi_term::Style;
 
 
+
 static ENABLED: std::sync::atomic::AtomicBool =
 	std::sync::atomic::AtomicBool::new(true);
 

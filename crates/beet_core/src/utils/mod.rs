@@ -2,6 +2,7 @@ pub mod async_ext;
 mod backoff;
 mod cli_args;
 mod clone_func;
+pub mod display_ext;
 mod file_span;
 mod line_col;
 #[cfg(feature = "ansi_paint")]

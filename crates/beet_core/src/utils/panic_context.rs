@@ -114,7 +114,7 @@ impl PanicContext {
 			if IN_SCOPE.with(|in_scope| in_scope.get()) {
 				// in a catch scope, capture context
 				CONTEXT.with(|cx| {
-					let payload = downcast_str(info.payload());
+					let payload = display_ext::try_downcast_str(info.payload());
 					let location =
 						info.location().map(FileSpan::new_from_location);
 					cx.set(Some(PanicContext { payload, location }));
@@ -125,16 +125,6 @@ impl PanicContext {
 				return;
 			}
 		}));
-	}
-}
-/// Attempt to downcast a panic payload into a string
-fn downcast_str(payload: &dyn std::any::Any) -> Option<String> {
-	if let Some(str) = payload.downcast_ref::<&str>() {
-		Some(str.to_string())
-	} else if let Some(str) = payload.downcast_ref::<String>() {
-		Some(str.clone())
-	} else {
-		None
 	}
 }
 

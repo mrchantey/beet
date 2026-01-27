@@ -82,28 +82,54 @@ fn append_async_queues(world: &mut World) -> Result {
 	Ok(())
 }
 
+async fn run_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func) -> Result
+where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: AsyncTaskOut,
+{
+	use futures_lite::future::FutureExt;
+
+	let world2 = world.clone();
+	let world3 = world.clone();
+	// 1. increment task count
+	world3
+		.with_resource_then::<AsyncChannel, _>(|mut channel| {
+			channel.increment_tasks();
+		})
+		.await;
+	// 2. run the function, catching panics
+	let result = std::panic::AssertUnwindSafe(func(world))
+		.catch_unwind()
+		.await;
+	// 3. decrement task count
+	world3
+		.with_resource_then::<AsyncChannel, _>(|mut channel| {
+			channel.decrement_tasks();
+		})
+		.await;
+
+	// 4. handle result
+	match result {
+		Ok(output) => output.apply(world2),
+		Err(panic) => {
+			let msg = display_ext::try_downcast_str(&panic)
+				.unwrap_or_else(|| "unknown panic".to_string());
+			cross_log!("Async task panicked: {}", msg);
+		}
+	}
+
+	Ok(())
+}
+
 fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + MaybeSend + Future<Output = Out>,
 	Out: AsyncTaskOut,
 {
-	let world2 = world.clone();
-	let world3 = world.clone();
 	IoTaskPool::get()
-		.spawn(async move {
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.increment_tasks();
-				})
-				.await;
-			func(world).await.apply(world2);
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.decrement_tasks();
-				})
-				.await;
-		})
+		.spawn(run_async_task(world, func))
 		// TODO this means we cant clean tasks up, instead they should be stored
 		// in world so when world is dropped so are tasks
 		.detach();
@@ -114,22 +140,8 @@ where
 	Fut: 'static + Future<Output = Out>,
 	Out: AsyncTaskOut,
 {
-	let world2 = world.clone();
-	let world3 = world.clone();
 	IoTaskPool::get()
-		.spawn_local(async move {
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.increment_tasks();
-				})
-				.await;
-			func(world).await.apply(world2);
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.decrement_tasks();
-				})
-				.await;
-		})
+		.spawn_local(run_async_task(world, func))
 		// TODO this means we cant clean tasks up, instead they should be stored
 		// in world so when world is dropped so are tasks
 		.detach();
@@ -908,5 +920,33 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Count>();
 		world.run_async_then(async |_| 32).await.xpect_eq(32);
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	#[crate::test]
+	async fn panic_handling() {
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Count>();
+
+		// Spawn a task that panics
+		world
+			.run_async_local_then(async |_world| {
+				if true {
+					panic!("test panic");
+				}
+			})
+			.await;
+
+		// Give the task time to execute and panic
+		time_ext::sleep(Duration::from_millis(10)).await;
+
+		// The world should still be usable after the panic
+		world
+			.run_async_local_then(async |world| {
+				world.with_resource::<Count>(|mut count| count.0 += 1);
+			})
+			.await;
+
+		world.resource::<Count>().0.xpect_eq(1);
 	}
 }
