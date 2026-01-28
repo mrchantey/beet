@@ -38,10 +38,7 @@ pub async fn spawn_response_context(
 							action,
 							FunctionCallContext::from(item),
 						);
-						todo!(
-							"actually call the tool: {item:?}\ncx:{:?}",
-							FunctionCallContext::from(item)
-						);
+						// Tool calls are handled by the call_tool action
 					}
 					openresponses::OutputItem::FunctionCallOutput(item) => {
 						spawn_response_item(

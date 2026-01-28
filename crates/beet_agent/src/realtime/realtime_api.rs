@@ -45,6 +45,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
+	#[ignore = "actually hits api"]
 	async fn works() {
 		use crate::realtime::types::RealtimeSessionCreateRequest;
 

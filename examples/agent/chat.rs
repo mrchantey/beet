@@ -32,15 +32,27 @@ fn main() {
 		.run();
 }
 fn oneshot() -> impl Bundle {
+	let provider = OpenAiProvider::default();
+	// let provider = OllamaProvider::default();
+
 	(Name::new("Oneshot"), Sequence, children![
 		(Name::new("Request to context"), request_to_context()),
 		(
-			Name::new("Model Action"),
-			ModelAction::new(OpenAiProvider::default()).streaming(),
-			// ModelAction::new(OllamaProvider::default()).streaming()
-		),
-		// not nessecary with streaming
-		// (Name::new("Context to response"), context_to_response())
+			Name::new("Model Action Loop"),
+			RepeatWhileNewContext::default(),
+			Sequence,
+			children![
+				(
+					Name::new("Model Action"),
+					ModelAction::new(provider).streaming()
+				),
+				(Name::new("Call Tool"), call_tool()),
+			]
+		) // (
+		  // 	Name::new("Model Action"),
+		  // ),
+		  // not nessecary with streaming
+		  // (Name::new("Context to response"), context_to_response())
 	])
 }
 

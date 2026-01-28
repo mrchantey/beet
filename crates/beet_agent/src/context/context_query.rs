@@ -41,12 +41,12 @@ impl<'w, 's> ContextQuery<'w, 's> {
 	pub fn collect_input_items(
 		&self,
 		action: Entity,
-		filter: impl Fn(Entity) -> bool,
+		filter: impl Fn(&Entity) -> bool,
 	) -> Result<Vec<openresponses::request::InputItem>> {
 		let mut items = Vec::new();
 
 		if let Ok(context) = self.contexts.get(action) {
-			for ctx_entity in context.iter().filter(|e| filter(*e)) {
+			for ctx_entity in context.iter().filter(filter) {
 				// Determine role based on who created this context
 				let cx_owner =
 					self.context_owners.get(ctx_entity).ok().map(|m| **m);

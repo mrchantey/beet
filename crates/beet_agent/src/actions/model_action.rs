@@ -61,7 +61,7 @@ pub struct ModelAction {
 	pub previous_response_id: Option<String>,
 	/// Tracks context entities that have already been sent to the model.
 	/// Used to filter out redundant context when `previous_response_id` is set.
-	pub sent_context_entities: HashSet<Entity>,
+	sent_context_entities: HashSet<Entity>,
 }
 
 impl std::fmt::Debug for ModelAction {
@@ -90,6 +90,10 @@ impl ModelAction {
 			previous_response_id: None,
 			sent_context_entities: HashSet::default(),
 		}
+	}
+
+	pub fn sent_context_entities(&self) -> &HashSet<Entity> {
+		&self.sent_context_entities
 	}
 
 	/// Creates a new model action with a specific model name.
@@ -179,12 +183,15 @@ impl ModelAction {
 		query: &ContextQuery,
 		action: Entity,
 	) -> Result<Vec<openresponses::request::InputItem>> {
-		let should_filter = self.previous_response_id.is_some();
+		let some_context_cached = self.previous_response_id.is_some();
 
 
 		// Collect input items only for context we havent sent yet
 		let input_items = query.collect_input_items(action, |entity| {
-			!should_filter || !self.sent_context_entities.contains(&entity)
+			// pass if this provider isnt caching at all
+			!some_context_cached ||
+			// pass if this entity is missing from sent context
+			!self.sent_context_entities.contains(entity)
 		})?;
 
 		self.mark_context_sent(query, action);
@@ -274,7 +281,6 @@ pub fn model_action_request() -> impl Bundle {
 			}
 
 			let tools = tool_query.collect_tools(action)?;
-			println!("tools: {tools:#?}");
 
 			// Build request body
 			let body = model_action.build_request(input_items, tools);

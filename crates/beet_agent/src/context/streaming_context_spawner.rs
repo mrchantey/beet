@@ -62,7 +62,7 @@ impl StreamingContextSpawner {
 		event: &openresponses::StreamingEvent,
 	) -> Result<ControlFlow<()>> {
 		use openresponses::StreamingEvent::*;
-		info!("Handling streaming event: {:#?}", event);
+		// info!("Handling streaming event: {:#?}", event);
 		match event {
 			ResponseCreated(ev) => {
 				self.spawn_response(&ev.response).await?;

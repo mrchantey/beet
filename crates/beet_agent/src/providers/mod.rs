@@ -1,5 +1,7 @@
 mod gemini;
+mod mock_provider;
 mod model_provider;
+pub use mock_provider::*;
 pub use model_provider::*;
 pub mod ollama;
 pub mod openai;
