@@ -37,6 +37,14 @@ pub impl World {
 		self.insert_resource(resource);
 		self
 	}
+	fn run_local(&mut self) -> AppExit {
+		loop {
+			self.update_local();
+			if let Some(exit) = self.should_exit() {
+				return exit;
+			}
+		}
+	}
 
 	/// The world equivelent of [`App::update`].
 	///
