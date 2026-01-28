@@ -44,7 +44,7 @@ fn setup(
 		children![(
 			RunOnAssetReady::new(qtable.clone()),
 			Sequence::default(),
-			Repeat::default(),
+			Retrigger::default(),
 			Name::new("Run Frozen Lake Agent"),
 			children![
 				(

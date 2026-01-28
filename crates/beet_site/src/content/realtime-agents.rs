@@ -3,7 +3,7 @@ fn SayHello(name: String) -> impl Bundle {
 	(
 		Name::new("My Behavior"),
 		Sequence,
-		RunOnSpawn,
+		TriggerDeferred::get_outcome(),
 		children![
 			(
 				Name::new("Hello"),

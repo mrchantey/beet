@@ -3,7 +3,7 @@ use beet_flow::prelude::*;
 
 
 pub fn repl() -> impl Bundle {
-	(Sequence, Repeat::default(), children![
+	(Sequence, Retrigger::default(), children![
 		user_input(),
 		// user says,
 		// agent says

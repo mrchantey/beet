@@ -51,7 +51,7 @@ fn setup(
 			Name::new("Behavior"),
 			TriggerOnAnimationReady::run(),
 			Sequence::default(),
-			Repeat::default(),
+			Retrigger::default(),
 			children![
 				(
 					Name::new("Idle"),

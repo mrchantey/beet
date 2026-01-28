@@ -1,41 +1,41 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Reattaches the [`RunOnSpawn`] component whenever [`End`] is called.
-/// Using [`RunOnSpawn`] means this does **not** directly trigger observers, which avoids infinite loops.
+/// Reattaches the [`TriggerDeferred::get_outcome()`] component whenever [`End`] is called.
+/// Using [`TriggerDeferred::get_outcome()`] means this does **not** directly trigger observers, which avoids infinite loops.
 ///
-/// Note that [`Repeat`] requires [`PreventPropagateEnd`] so results must be bubbled up manually
+/// Note that [`Retrigger`] requires [`PreventPropagateEnd`] so results must be bubbled up manually
 /// if the [`Self::if_result_matches`] option is unused.
 ///
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Example
-/// Repeat the action twice, then bubble up the failure
+/// Retrigger the action twice, then bubble up the failure
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # let mut world = ControlFlowPlugin::world();
 /// world
-/// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
+/// .spawn((Retrigger::if_success(), SucceedTimes::new(2)))
 /// .trigger_target(GetOutcome);
 /// ```
-#[action(repeat)]
+#[action(retrigger)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(PreventPropagateEnd)]
-pub struct Repeat {
-	/// Optional predicate to only repeat if the result matches.
+pub struct Retrigger {
+	/// Optional predicate to only retrigger if the result matches.
 	pub if_result_matches: Option<Outcome>,
 }
 
-impl Repeat {
-	/// Repeats the action if the result is [`Outcome::Pass`].
+impl Retrigger {
+	/// Retriggers the action if the result is [`Outcome::Pass`].
 	pub fn if_success() -> Self {
 		Self {
 			if_result_matches: Some(Outcome::Pass),
 		}
 	}
-	/// Repeats the action if the result is [`Outcome::Fail`].
+	/// Retriggers the action if the result is [`Outcome::Fail`].
 	pub fn if_failure() -> Self {
 		Self {
 			if_result_matches: Some(Outcome::Fail),
@@ -43,7 +43,7 @@ impl Repeat {
 	}
 }
 
-impl Default for Repeat {
+impl Default for Retrigger {
 	fn default() -> Self {
 		Self {
 			if_result_matches: None,
@@ -51,16 +51,16 @@ impl Default for Repeat {
 	}
 }
 
-fn repeat(
+fn retrigger(
 	ev: On<Outcome>,
-	query: Query<&Repeat>,
+	query: Query<&Retrigger>,
 	mut commands: Commands,
 ) -> Result {
 	let target = ev.target();
-	let repeat = query.get(target)?;
-	if let Some(check) = &repeat.if_result_matches {
+	let retrigger = query.get(target)?;
+	if let Some(check) = &retrigger.if_result_matches {
 		if *ev != *check {
-			// repeat is completed, propagate the result to the parent if it exists
+			// retrigger is completed, propagate the result to the parent if it exists
 			ChildEnd::trigger(commands, target, ev.event().clone());
 			return Ok(());
 		}
@@ -78,12 +78,12 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[test]
-	fn repeat_always() {
+	fn retrigger_always() {
 		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn((Repeat::default(), SucceedTimes::new(2)))
+			.spawn((Retrigger::default(), SucceedTimes::new(2)))
 			.trigger_target(GetOutcome)
 			.flush();
 
@@ -93,19 +93,19 @@ mod test {
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(3);
 		world.run_schedule(Update);
-		// even though child failed, it keeps repeating
+		// even though child failed, it keeps retriggering
 		on_result.get().len().xpect_eq(4);
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(5);
 	}
 
 	#[test]
-	fn repeat_if() {
+	fn retrigger_if() {
 		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
-			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
+			.spawn((Retrigger::if_success(), SucceedTimes::new(2)))
 			.trigger_target(GetOutcome)
 			.flush();
 
@@ -115,20 +115,20 @@ mod test {
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(3);
 		world.run_schedule(Update);
-		// it stopped repeating
+		// it stopped retriggering
 		on_result.get().len().xpect_eq(3);
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(3);
 	}
 
 	#[test]
-	fn repeat_child() {
+	fn retrigger_child() {
 		let mut world = ControlFlowPlugin::world();
 		let on_result = collect_on_result(&mut world);
 
 		world
 			.spawn((Sequence, children![(
-				Repeat::if_success(),
+				Retrigger::if_success(),
 				SucceedTimes::new(2)
 			)]))
 			.trigger_target(GetOutcome)
@@ -142,7 +142,7 @@ mod test {
 		world.run_schedule(Update);
 		on_result.get().len().xpect_eq(7);
 		world.run_schedule(Update);
-		// last one, it stopped repeating
+		// last one, it stopped retriggering
 		on_result.get().len().xpect_eq(7);
 	}
 }

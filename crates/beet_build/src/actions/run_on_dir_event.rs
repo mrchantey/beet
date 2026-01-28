@@ -1,7 +1,7 @@
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
 
-/// Listens for file watch events and retriggers the associated action,
+/// Listens for file watch events and triggers the associated action,
 /// cancelling any children with [`Running`], [`ChildHandle`] etc.
 #[action(run_on_dir_event)]
 #[derive(Component)]
@@ -10,8 +10,8 @@ use beet_flow::prelude::*;
 // #[require(FsWatcher)]
 pub struct RunOnDirEvent;
 
-// we dont care about which events, just retrigger th
 fn run_on_dir_event(ev: On<DirEvent>, mut commands: Commands) {
+	// we dont care about the DirEvent payloads, just trigger th the action
 	commands.entity(ev.target()).trigger_target(GetOutcome);
 }
 
