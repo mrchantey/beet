@@ -38,36 +38,6 @@ pub impl World {
 		self
 	}
 
-	fn await_event<E: Event, B: Bundle>(
-		&mut self,
-	) -> impl Future<Output = &mut Self> {
-		// TODO cleaner but we get messy accessed threadlocal panic
-		// async move {
-		// 	self.run_async_then(async |world| {
-		// 		world.await_event::<E, B>().await;
-		// 	})
-		// 	.await;
-		// 	self
-		// }
-
-
-		let (send, recv) = async_channel::bounded(1);
-		self.add_observer(move |ev: On<E, B>, mut commands: Commands| {
-			send.try_send(()).ok();
-			commands.entity(ev.observer()).despawn();
-		});
-		async move {
-			AsyncRunner::poll_and_update(
-				|| {
-					self.update_local();
-				},
-				recv,
-			)
-			.await;
-			self
-		}
-	}
-
 	/// The world equivelent of [`App::update`].
 	///
 	/// In multi_threaded mode, this temporarily sets all schedules to use
