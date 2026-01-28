@@ -274,6 +274,7 @@ pub fn model_action_request() -> impl Bundle {
 			}
 
 			let tools = tool_query.collect_tools(action)?;
+			println!("tools: {tools:#?}");
 
 			// Build request body
 			let body = model_action.build_request(input_items, tools);

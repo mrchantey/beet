@@ -122,7 +122,6 @@ impl<'w, 's> ContextQuery<'w, 's> {
 							name: func_call.name.clone(),
 							arguments: func_call.arguments.clone(),
 							status: Some(
-								// TODO this is a lie, status may not be complete
 								openresponses::FunctionCallStatus::Completed,
 							),
 						},

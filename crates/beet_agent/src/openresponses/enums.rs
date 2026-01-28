@@ -48,7 +48,8 @@ pub enum MessageStatus {
 	Incomplete,
 }
 
-/// Status of a function call.
+/// Status of a function call, ie have all params been provided.
+/// Not to be confused with the status of a function call output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FunctionCallStatus {

@@ -52,13 +52,16 @@ pub fn tool_exchange(func: impl BundleFunc) -> impl Bundle {
 #[derive(SystemParam)]
 pub struct ToolQuery<'w, 's> {
 	/// Query for the Tools relationship on agents
-	pub tools: AgentQuery<'w, 's, &'static Tools>,
+	agents: AgentQuery<'w, 's>,
+	tools: Query<'w, 's, &'static Tools>,
+	parents: Query<'w, 's, &'static ChildOf>,
 	/// Query for EndpointTree on tool entities
-	pub endpoint_trees: Query<'w, 's, &'static EndpointTree>,
+	endpoint_trees: Query<'w, 's, &'static EndpointTree>,
 }
 
 impl ToolQuery<'_, '_> {
-	/// Collects all tool definitions for the given action entity.
+	/// Collects all tool definitions for the given action entity, its ancestors
+	/// and the agent.
 	///
 	/// Returns a list of `ToolMeta` representing all tools available to the agent.
 	/// Tool names are prefixed with the tool set entity ID to ensure uniqueness.
@@ -68,11 +71,19 @@ impl ToolQuery<'_, '_> {
 	) -> Result<Vec<openresponses::FunctionToolParam>> {
 		let mut tools = Vec::new();
 
-		if let Ok(tool_sets) = self.tools.get(action) {
-			for tool_set_entity in tool_sets.iter() {
-				let tree = self.endpoint_trees.get(tool_set_entity)?;
-				self.collect_tools_from_tree(tree, tool_set_entity, &mut tools);
+		let mut visited = HashSet::<Entity>::default();
+		let agent = self.agents.entity(action);
+		for tool in std::iter::once(agent)
+			.chain(self.parents.iter_ancestors_inclusive(action))
+			.filter_map(|entity| self.tools.get(entity).ok())
+			.flat_map(|tools| tools.iter())
+		{
+			if visited.contains(&tool) {
+				continue;
 			}
+			let tree = self.endpoint_trees.get(tool)?;
+			self.collect_tools_from_tree(tree, tool, &mut tools);
+			visited.insert(tool);
 		}
 
 		tools.xok()
