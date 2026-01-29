@@ -1,10 +1,10 @@
-mod body_meta;
+mod body_type;
 #[cfg(feature = "server")]
 mod default_router;
 mod endpoint_tree;
 mod param_pattern;
 mod route_query;
-pub use body_meta::*;
+pub use body_type::*;
 pub use collect_html::*;
 #[cfg(feature = "server")]
 pub use default_router::*;

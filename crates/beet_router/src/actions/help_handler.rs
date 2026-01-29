@@ -9,6 +9,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use bevy::reflect::TypeInfo;
 
 
 /// Parameters for configuring the help handler behavior
@@ -270,10 +271,10 @@ pub trait EndpointHelpFormatter {
 	fn format_params(&self, endpoint: &Endpoint) -> String;
 
 	/// Format the request body metadata
-	fn format_request_body(&self, body: &BodyMeta) -> String;
+	fn format_request_body(&self, body: &BodyType) -> String;
 
 	/// Format the response body metadata
-	fn format_response_body(&self, body: &BodyMeta) -> String;
+	fn format_response_body(&self, body: &BodyType) -> String;
 
 	/// Format cache strategy (if applicable)
 	fn format_cache_strategy(&self, cache: &CacheStrategy) -> String {
@@ -385,7 +386,7 @@ impl EndpointHelpFormatter for CliFormatter {
 		output
 	}
 
-	fn format_request_body(&self, body: &BodyMeta) -> String {
+	fn format_request_body(&self, body: &BodyType) -> String {
 		if body.is_none() {
 			return String::new();
 		}
@@ -399,25 +400,15 @@ impl EndpointHelpFormatter for CliFormatter {
 			paint_ext::dimmed(&format!("({})", body.encoding()))
 		));
 
-		// show fields if available
-		if let Some(schema) = body.schema() {
-			for field in schema.fields() {
-				output.push_str(&format!(
-					"\n        {}",
-					paint_ext::yellow(field.name())
-				));
-				if field.is_required() {
-					output.push_str(&paint_ext::red(" (required)"));
-				} else {
-					output.push_str(&paint_ext::green(" (optional)"));
-				}
-			}
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
 		}
 
 		output
 	}
 
-	fn format_response_body(&self, body: &BodyMeta) -> String {
+	fn format_response_body(&self, body: &BodyType) -> String {
 		if body.is_none() {
 			return String::new();
 		}
@@ -433,19 +424,9 @@ impl EndpointHelpFormatter for CliFormatter {
 			paint_ext::dimmed(&format!("({})", body.encoding()))
 		));
 
-		// show fields if available
-		if let Some(schema) = body.schema() {
-			for field in schema.fields() {
-				output.push_str(&format!(
-					"\n        {}",
-					paint_ext::yellow(field.name())
-				));
-				if field.is_required() {
-					output.push_str(&paint_ext::red(" (required)"));
-				} else {
-					output.push_str(&paint_ext::green(" (optional)"));
-				}
-			}
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
 		}
 
 		output
@@ -462,6 +443,27 @@ impl EndpointHelpFormatter for CliFormatter {
 			path_str
 		))
 		.to_string()
+	}
+}
+
+/// Formats struct fields from TypeInfo for display in help output.
+fn format_type_info_fields(output: &mut String, type_info: &TypeInfo) {
+	if let TypeInfo::Struct(struct_info) = type_info {
+		for field in struct_info.iter() {
+			let field_name = field.name();
+			let type_path = field.type_path();
+			let is_required = !type_path.starts_with("core::option::Option<");
+
+			output.push_str(&format!(
+				"\n        {}",
+				paint_ext::yellow(field_name)
+			));
+			if is_required {
+				output.push_str(&paint_ext::red(" (required)"));
+			} else {
+				output.push_str(&paint_ext::green(" (optional)"));
+			}
+		}
 	}
 }
 
@@ -564,7 +566,7 @@ impl EndpointHelpFormatter for HttpFormatter {
 		output
 	}
 
-	fn format_request_body(&self, body: &BodyMeta) -> String {
+	fn format_request_body(&self, body: &BodyType) -> String {
 		if body.is_none() {
 			return String::new();
 		}
@@ -577,25 +579,15 @@ impl EndpointHelpFormatter for HttpFormatter {
 			paint_ext::dimmed(&format!("({})", body.encoding()))
 		));
 
-		// show fields if available
-		if let Some(schema) = body.schema() {
-			for field in schema.fields() {
-				output.push_str(&format!(
-					"\n        {}",
-					paint_ext::yellow(field.name())
-				));
-				if field.is_required() {
-					output.push_str(&paint_ext::red(" (required)"));
-				} else {
-					output.push_str(&paint_ext::green(" (optional)"));
-				}
-			}
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
 		}
 
 		output
 	}
 
-	fn format_response_body(&self, body: &BodyMeta) -> String {
+	fn format_response_body(&self, body: &BodyType) -> String {
 		if body.is_none() {
 			return String::new();
 		}
@@ -609,19 +601,9 @@ impl EndpointHelpFormatter for HttpFormatter {
 			paint_ext::dimmed(&format!("({})", body.encoding()))
 		));
 
-		// show fields if available
-		if let Some(schema) = body.schema() {
-			for field in schema.fields() {
-				output.push_str(&format!(
-					"\n        {}",
-					paint_ext::yellow(field.name())
-				));
-				if field.is_required() {
-					output.push_str(&paint_ext::red(" (required)"));
-				} else {
-					output.push_str(&paint_ext::green(" (optional)"));
-				}
-			}
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
 		}
 
 		output
@@ -846,8 +828,8 @@ mod test {
 				EndpointBuilder::post()
 					.with_path("api/users")
 					.with_description("Create a new user")
-					.with_request_body(BodyMeta::json::<CreateUserRequest>())
-					.with_response_body(BodyMeta::json::<CreateUserResponse>())
+					.with_request_body(BodyType::json::<CreateUserRequest>())
+					.with_response_body(BodyType::json::<CreateUserResponse>())
 					.with_action(|| "created"),
 			])
 		}));
@@ -891,10 +873,10 @@ mod test {
 
 		let response = entity.exchange_str(Request::get("/?help=true")).await;
 
-		// should not contain body sections when BodyMeta::none()
+		// should not contain body sections when BodyType::none()
 		response.clone().xpect_contains("status");
 		response.clone().xpect_contains("Get status");
-		// BodyMeta::none() should not produce output
+		// BodyType::none() should not produce output
 		(!response.contains("Request Body:")).xpect_true();
 		(!response.contains("Response Body:")).xpect_true();
 	}

@@ -51,7 +51,7 @@ pub fn collect_route_files(
 					(RouteCollectionCategory::Pages, _) => {
 						let mut items = vec![quote!(EndpointBuilder::new()
 								.with_method(#method)
-								.with_response_body(BodyMeta::html())
+								.with_response_body(BodyType::html())
 								.with_action(#mod_ident::#func_ident))];
 						// ssr check TODO very brittle
 						if path_pattern.is_static()
@@ -68,13 +68,13 @@ pub fn collect_route_files(
 					(RouteCollectionCategory::Actions, true) => {
 						vec![
 							quote!(ServerAction::new_async #annoying_generics(#method, #mod_ident::#func_ident)
-								.with_response_body(BodyMeta::json::<()>())),
+								.with_response_body(BodyType::json::<()>())),
 						]
 					}
 					(RouteCollectionCategory::Actions, false) => {
 						vec![
 							quote!(ServerAction::new #annoying_generics(#method, #mod_ident::#func_ident)
-								.with_response_body(BodyMeta::json::<()>())),
+								.with_response_body(BodyType::json::<()>())),
 						]
 					}
 				};

@@ -79,8 +79,8 @@ fn tools() -> impl Bundle {
 				.with_path("/add")
 				.with_params::<ModelRequestParams>()
 				.with_description("Add two numbers together")
-				.with_request_body(BodyMeta::json::<AddReq>())
-				.with_response_body(BodyMeta::json::<AddRes>())
+				.with_request_body(BodyType::json::<AddReq>())
+				.with_response_body(BodyType::json::<AddRes>())
 				.with_action(|| {
 					// panic!("here");
 				})
@@ -98,7 +98,7 @@ fn tools() -> impl Bundle {
 // 		.with_path("/get-secret")
 // 		.with_params::<ModelRequestParams>()
 // 		.with_description("Get the secret answer")
-// 		.with_request_body(BodyMeta::json::<()>())
-// 		.with_response_body(BodyMeta::json::<SecretRes>())
+// 		.with_request_body(BodyType::json::<()>())
+// 		.with_response_body(BodyType::json::<SecretRes>())
 // 		.with_action(|| {})
 // }

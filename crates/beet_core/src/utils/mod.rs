@@ -10,6 +10,8 @@ pub mod paint_ext;
 mod panic_context;
 pub mod process_ext;
 pub mod terminal_ext;
+#[cfg(feature = "serde")]
+pub mod type_info_to_json_schema;
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;

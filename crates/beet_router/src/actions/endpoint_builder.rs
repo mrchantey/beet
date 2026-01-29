@@ -25,9 +25,9 @@ pub struct EndpointBuilder {
 	/// Whether this endpoint is canonical (registered in EndpointTree), defaults to true
 	is_canonical: bool,
 	/// Metadata for the request body
-	request_body: BodyMeta,
+	request_body: BodyType,
 	/// Metadata for the response body
-	response_body: BodyMeta,
+	response_body: BodyType,
 	/// Additional bundles to be run before the handler
 	additional_predicates: Vec<
 		Box<
@@ -52,8 +52,8 @@ impl Default for EndpointBuilder {
 			exact_path: true,
 			description: None,
 			is_canonical: true,
-			request_body: BodyMeta::none(),
-			response_body: BodyMeta::none(),
+			request_body: BodyType::none(),
+			response_body: BodyType::none(),
 			additional_predicates: Vec::new(),
 		}
 	}
@@ -189,13 +189,13 @@ impl EndpointBuilder {
 	}
 
 	/// Set the request body metadata
-	pub fn with_request_body(mut self, body: BodyMeta) -> Self {
+	pub fn with_request_body(mut self, body: BodyType) -> Self {
 		self.request_body = body;
 		self
 	}
 
 	/// Set the response body metadata
-	pub fn with_response_body(mut self, body: BodyMeta) -> Self {
+	pub fn with_response_body(mut self, body: BodyType) -> Self {
 		self.response_body = body;
 		self
 	}

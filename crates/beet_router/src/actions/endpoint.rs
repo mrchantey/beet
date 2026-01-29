@@ -9,8 +9,7 @@ use beet_core::prelude::*;
 /// Usually this is not added directly, instead via the [`Endpoint::build`] constructor.
 /// Endpoints should only run if there are no trailing path segments,
 /// unlike middleware which may run for multiple child paths. See [`check_exact_path`]
-#[derive(Debug, Clone, Component, PartialEq, Eq, Reflect)]
-#[reflect(Component)]
+#[derive(Debug, Clone, Component, PartialEq, Eq)]
 pub struct Endpoint {
 	/// An optional description for this endpoint
 	pub description: Option<String>,
@@ -25,9 +24,9 @@ pub struct Endpoint {
 	/// are fallbacks that won't conflict with canonical routes. Defaults to `true`.
 	pub is_canonical: bool,
 	/// Metadata describing the expected request body
-	pub request_body: BodyMeta,
+	pub request_body: BodyType,
 	/// Metadata describing the response body
-	pub response_body: BodyMeta,
+	pub response_body: BodyType,
 }
 
 
@@ -47,8 +46,8 @@ impl Endpoint {
 			cache_strategy,
 			is_canonical,
 			description: None,
-			request_body: BodyMeta::none(),
-			response_body: BodyMeta::none(),
+			request_body: BodyType::none(),
+			response_body: BodyType::none(),
 		}
 	}
 
@@ -61,9 +60,9 @@ impl Endpoint {
 	}
 	pub fn is_canonical(&self) -> bool { self.is_canonical }
 	/// The request body metadata
-	pub fn request_body(&self) -> &BodyMeta { &self.request_body }
+	pub fn request_body(&self) -> &BodyType { &self.request_body }
 	/// The response body metadata
-	pub fn response_body(&self) -> &BodyMeta { &self.response_body }
+	pub fn response_body(&self) -> &BodyType { &self.response_body }
 
 	/// Determines if this endpoint is a static GET endpoint
 	pub fn is_static_get(&self) -> bool {
@@ -76,7 +75,6 @@ impl Endpoint {
 	}
 	/// Determines if this endpoint is a static GET endpoint returning HTML
 	pub fn is_static_get_html(&self) -> bool {
-		self.is_static_get()
-			&& self.response_body.encoding() == BodyEncoding::Html
+		self.is_static_get() && self.response_body.is_html()
 	}
 }

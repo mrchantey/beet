@@ -5,6 +5,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_core::utils::type_info_to_json_schema::type_info_to_json_schema;
 use beet_flow::prelude::AgentQuery;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -34,8 +35,8 @@ use beet_router::prelude::*;
 ///         tool_exchange((Sequence, children![
 ///             EndpointBuilder::post()
 ///                 .with_path("add")
-///                 .with_request_body(BodyMeta::json::<AddRequest>())
-///                 .with_response_body(BodyMeta::json::<AddResponse>())
+///                 .with_request_body(BodyType::json::<AddRequest>())
+///                 .with_response_body(BodyType::json::<AddResponse>())
 ///                 .with_description("Add two numbers")
 ///                 .with_action(|Json(req): Json<AddRequest>| {
 ///                     Json(AddResponse { result: req.a + req.b })
@@ -167,77 +168,13 @@ impl ToolQuery<'_, '_> {
 			param = param.with_description(desc);
 		}
 
-		if let Some(schema) = endpoint.request_body().schema() {
-			let json_schema = body_meta_to_json_schema(schema);
+		if let Some(type_info) = endpoint.request_body().type_info() {
+			let json_schema = type_info_to_json_schema(type_info);
 			param = param.with_parameters(json_schema);
 		}
 
 		param
 	}
-}
-
-/// Converts a `TypeSchema` from `BodyMeta` to a JSON Schema object.
-fn body_meta_to_json_schema(schema: &TypeSchema) -> serde_json::Value {
-	let mut properties = serde_json::Map::new();
-	let mut required = Vec::new();
-
-	for field in schema.fields() {
-		let field_schema = field_to_json_schema(field);
-		properties.insert(field.name().to_string(), field_schema);
-
-		if field.is_required() {
-			required.push(serde_json::Value::String(field.name().to_string()));
-		}
-	}
-
-	let mut obj = serde_json::Map::new();
-	obj.insert(
-		"type".to_string(),
-		serde_json::Value::String("object".to_string()),
-	);
-	obj.insert(
-		"properties".to_string(),
-		serde_json::Value::Object(properties),
-	);
-
-	if !required.is_empty() {
-		obj.insert("required".to_string(), serde_json::Value::Array(required));
-	}
-
-	serde_json::Value::Object(obj)
-}
-
-/// Converts a `FieldSchema` to a JSON Schema property.
-fn field_to_json_schema(field: &FieldSchema) -> serde_json::Value {
-	let type_path = field.type_path();
-
-	// Map common Rust types to JSON Schema types
-	let json_type = if type_path.contains("String") || type_path.contains("str")
-	{
-		"string"
-	} else if type_path.contains("i8")
-		|| type_path.contains("i16")
-		|| type_path.contains("i32")
-		|| type_path.contains("i64")
-		|| type_path.contains("u8")
-		|| type_path.contains("u16")
-		|| type_path.contains("u32")
-		|| type_path.contains("u64")
-		|| type_path.contains("isize")
-		|| type_path.contains("usize")
-	{
-		"integer"
-	} else if type_path.contains("f32") || type_path.contains("f64") {
-		"number"
-	} else if type_path.contains("bool") {
-		"boolean"
-	} else if type_path.contains("Vec<") || type_path.contains("[") {
-		"array"
-	} else {
-		"object"
-	};
-
-	serde_json::json!({ "type": json_type })
 }
 
 
@@ -299,7 +236,7 @@ mod test {
 				EndpointBuilder::post()
 					.with_path("test")
 					.with_description("A test tool")
-					.with_request_body(BodyMeta::json::<TestRequest>())
+					.with_request_body(BodyType::json::<TestRequest>())
 					.with_action(|| "ok"),
 			])
 		}));

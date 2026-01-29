@@ -12,10 +12,10 @@ use beet_core::prelude::*;
 /// # let mut world = ControlFlowPlugin::world();
 /// // will fail on the fourth run
 /// world
-/// 	.spawn(Sequence,children![
+/// 	.spawn((Sequence, children![
 ///     SucceedTimes::new(3),
 ///     LoopTimes::new(100)
-///   ])
+///   ]))
 /// 	.trigger_target(GetOutcome);
 /// ```
 #[action(loop_times)]

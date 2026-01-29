@@ -21,8 +21,8 @@
 //!         tool_exchange((Sequence, children![
 //!             EndpointBuilder::post()
 //!                 .with_path("add")
-//!                 .with_request_body(BodyMeta::json::<AddRequest>())
-//!                 .with_response_body(BodyMeta::json::<AddResponse>())
+//!                 .with_request_body(BodyType::json::<AddRequest>())
+//!                 .with_response_body(BodyType::json::<AddResponse>())
 //!                 .with_description("Add two numbers together")
 //!                 .with_action(|Json(req): Json<AddRequest>| {
 //!                     Json(AddResponse { result: req.a + req.b })
