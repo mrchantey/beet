@@ -1,3 +1,8 @@
+//! An example of a chat CLI
+//! ```sh
+//! cargo run --example chat --features=agent,native-tls whats 1+1. use the tool.
+//!	```
+
 use beet::prelude::*;
 
 fn main() {
@@ -6,7 +11,7 @@ fn main() {
 			MinimalPlugins,
 			LogPlugin::default(),
 			FlowAgentPlugin::default(),
-			DebugFlowPlugin::default(),
+			DebugFlowPlugin::with_all(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
@@ -37,22 +42,21 @@ fn oneshot() -> impl Bundle {
 
 	(Name::new("Oneshot"), Sequence, children![
 		(Name::new("Request to context"), request_to_context()),
-		(
-			Name::new("Model Action Loop"),
-			RepeatWhileNewContext::default(),
-			Sequence,
-			children![
-				(
-					Name::new("Model Action"),
-					ModelAction::new(provider).streaming()
-				),
-				(Name::new("Call Tool"), call_tool()),
-			]
-		) // (
-		  // 	Name::new("Model Action"),
-		  // ),
-		  // not nessecary with streaming
-		  // (Name::new("Context to response"), context_to_response())
+		(Name::new("Model Action Loop"), Sequence, children![
+			(
+				Name::new("Model Action"),
+				ModelAction::new(provider).streaming()
+			),
+			(Name::new("Call Tool"), call_tool()),
+			(
+				Name::new("Loop While New Context"),
+				LoopWhileNewContext::default()
+			),
+		]) // (
+		   // 	Name::new("Model Action"),
+		   // ),
+		   // not nessecary with streaming
+		   // (Name::new("Context to response"), context_to_response())
 	])
 }
 
@@ -77,7 +81,24 @@ fn tools() -> impl Bundle {
 				.with_description("Add two numbers together")
 				.with_request_body(BodyMeta::json::<AddReq>())
 				.with_response_body(BodyMeta::json::<AddRes>())
-				.with_action(|| {})
+				.with_action(|| {
+					// panic!("here");
+				})
 		]))]
 	]
 }
+
+// fn secret_tool() -> impl Bundle {
+// 	#[derive(Reflect)]
+// 	struct SecretRes {
+// 		text: String,
+// 	}
+
+// 	EndpointBuilder::new()
+// 		.with_path("/get-secret")
+// 		.with_params::<ModelRequestParams>()
+// 		.with_description("Get the secret answer")
+// 		.with_request_body(BodyMeta::json::<()>())
+// 		.with_response_body(BodyMeta::json::<SecretRes>())
+// 		.with_action(|| {})
+// }
