@@ -24,7 +24,7 @@
 //!     // regular assertions work as expected
 //!     assert!(1 + 1 == 2);
 //!     // type-specific matchers are also available
-//!     "sweet as".xpect_contains("sweet");
+//!     "foobar".xpect_contains("foo");
 //! }
 //! ```
 //!
