@@ -45,6 +45,7 @@ push-assets:
 # Run a cli command as if it was installed
 cli *args:
     cargo run -p beet-cli -- {{ args }}
+    # beet {{ args }}
 
 install-cli *args:
     cargo install --path crates/beet-cli {{ args }}
@@ -71,6 +72,11 @@ run-p crate example *args:
 run-b crate *args:
     just watch cargo run -p {{ crate }} --bin run-build --features=build {{ args }}
 
+#💡 Aliases
+
+chat *args:
+	cargo run --example chat --features=agent -- {{ args }}
+
 run-csr:
     cargo run --example csr --features=client
     just watch just build-csr
@@ -80,8 +86,6 @@ build-csr:
     wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
     just cli serve target/examples/csr
 
-launch *args:
-    cargo launch -w {{ args }}
 
 run-hydration:
     just watch just build-hydration
@@ -167,7 +171,7 @@ test-ci *args:
 snap:
     cargo test -p beet_core 				--lib --all-features -- --snap
     cargo test -p beet_core_macros 	--lib --all-features -- --snap
-    cargo test -p beet_net					--lib --features=server -- --snap
+    cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
     cargo test -p beet_build 				--lib --all-features -- --snap
     cargo test -p beet_design 			--lib --all-features -- --snap
     cargo test -p beet_parse 				--lib --all-features -- --snap
@@ -180,7 +184,7 @@ test-core *args:
     cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
     cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_net	--features=server																				{{ args }} -- {{ test-threads }}
+    cargo test -p beet_net	--features=server,ureq,tungstenite,native-tls,flow			{{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:
@@ -204,7 +208,7 @@ test-rsx *args:
     cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
 
 test crate *args:
-    just watch cargo test -p {{ crate }} --lib -- {{ args }}
+    just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
 
 test-int crate test *args:
     just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}
@@ -227,8 +231,8 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
     just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{ args }}
 
-test-agent:
-    just cli agent 											\
+test-clanker:
+    just cli clanker 										\
     --oneshot --image										\
     -f=assets/tests/agents/prompt.txt		\
     --out-dir=assets/tests/agents/out

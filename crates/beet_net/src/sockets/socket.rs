@@ -50,7 +50,7 @@ impl Socket {
 				while let Some(message) = recv.next().await {
 					match message {
 						Ok(msg) => {
-							entity.trigger_target(MessageRecv(msg)).await;
+							entity.trigger_target_then(MessageRecv(msg)).await;
 						}
 						Err(err) => {
 							// socket receive errors break connection but are non-fatal

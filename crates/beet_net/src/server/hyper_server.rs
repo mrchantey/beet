@@ -54,7 +54,7 @@ pub(super) fn start_hyper_server(
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = world.entity(entity).oneshot(req).await;
+						let res = world.entity(entity).exchange(req).await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
@@ -256,6 +256,7 @@ impl BevySleep {
 
 
 #[cfg(test)]
+#[cfg(feature = "ureq")]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -273,9 +274,9 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					ExchangeSpawner::new_handler(move |mut entity, req| {
+					handler_exchange(move |mut entity, req| {
 						let count = entity.world_scope(|world: &mut World| {
-							world.query_once::<&ServerStatus>()[0]
+							world.query_once::<&ExchangeStats>()[0]
 								.request_count()
 						});
 						assert!(count < 99999);
@@ -302,7 +303,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((server, ExchangeSpawner::mirror()))
+				.spawn_then((server, mirror_exchange()))
 				.run();
 		});
 		time_ext::sleep_millis(50).await;
@@ -333,7 +334,7 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
-					ExchangeSpawner::new_handler(move |_, req| {
+					handler_exchange(move |_, req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
 							req.body,

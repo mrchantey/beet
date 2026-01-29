@@ -83,8 +83,8 @@ struct MyAction;
 #[cfg(test)]
 mod test {
 	use super::parse;
-	use quote::quote;
 	use beet_core::prelude::*;
+	use quote::quote;
 	use syn::DeriveInput;
 
 	#[test]

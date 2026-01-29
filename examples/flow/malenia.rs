@@ -47,7 +47,7 @@ fn run_app() {
 			Health::default(),
 			HealingPotions(2),
 			Fallback::default(),
-			Repeat::default(),
+			Retrigger::default(),
 		))
 		.with_children(|root| {
 			// In the Fallback pattern we 'try' actions until one succeeds, ie try to heal self

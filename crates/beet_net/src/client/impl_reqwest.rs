@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use reqwest::Client;
 use reqwest::RequestBuilder;
@@ -85,7 +84,7 @@ async fn into_response(res: reqwest::Response) -> Result<Response> {
 				builder = builder.header(key.to_string(), value_str);
 			}
 		}
-		builder.build_response_parts(status)
+		builder.build_response_parts(status.into())
 	};
 
 	let is_bytes = res

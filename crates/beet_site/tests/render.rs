@@ -9,7 +9,7 @@ async fn home() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
-		.oneshot_str("/")
+		.exchange_str("/")
 		.await
 		.xnot()
 		.xpect_contains("fn Counter(initial: u32)");
@@ -21,7 +21,7 @@ async fn help() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
-		.oneshot_str("/?help")
+		.exchange_str("/?help")
 		.await
 		.xnot()
 		.xpect_contains("Welcome to Beet!");
@@ -30,7 +30,7 @@ async fn help() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssg)
 		.spawn(beet_site_router())
-		.oneshot_str("/?help")
+		.exchange_str("/?help")
 		.await
 		.xnot()
 		.xpect_contains("Welcome to Beet!");
@@ -42,7 +42,7 @@ async fn docs() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
-		.oneshot_str("/docs")
+		.exchange_str("/docs")
 		.await
 		.xpect_contains("docs")
 		// nav should be scoped style, ie nav[beet-style-id..]
@@ -57,7 +57,61 @@ async fn article_layout() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
-		.oneshot_str("/blog/post-1")
+		.exchange_str("/blog/post-1")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+}
+#[beet::test]
+async fn multiple_calls() {
+	let mut world = RouterPlugin::world();
+	let mut entity = world
+		.with_resource(pkg_config!())
+		// .with_resource(RenderMode::Ssr)
+		.spawn(beet_site_router());
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange(
+			Request::post("/analytics")
+				.with_json_body(&serde_json::json! {{"foo":"bar"}})
+				.unwrap(),
+		)
+		.await
+		.into_result()
+		.await
+		.xpect_ok();
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange_str("/")
+		.await
+		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
+	entity
+		.exchange_str("/")
 		.await
 		.xpect_contains(r#"<meta charset="UTF-8"/>"#);
 }
@@ -69,7 +123,7 @@ async fn correct_title() {
 		.with_resource(pkg_config!())
 		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
-		.oneshot_str("/blog/post-1")
+		.exchange_str("/blog/post-1")
 		.await
 		.xpect_contains(r#"<title>Beet</title>"#);
 }

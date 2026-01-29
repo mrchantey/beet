@@ -181,7 +181,7 @@ mod test {
 			world.init_resource::<RenderMode>();
 			world.spawn((
 				server,
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					(InfallibleSequence, children![
 						ServerAction::new(
 							HttpMethod::Get,

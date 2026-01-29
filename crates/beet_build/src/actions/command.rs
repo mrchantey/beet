@@ -359,7 +359,10 @@ mod test {
 			time_ext::sleep_millis(2).await;
 			// passing early interrupts child process
 			// uncomment this line to fail the test
-			world.entity(entity).trigger_target(Outcome::Pass).await;
+			world
+				.entity(entity)
+				.trigger_target_then(Outcome::Pass)
+				.await;
 
 			// wait to ensure process didnt fail
 			time_ext::sleep_millis(20).await;

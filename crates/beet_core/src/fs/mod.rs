@@ -1,6 +1,5 @@
 #[cfg(feature = "rand")]
 mod tempdir;
-pub mod terminal;
 #[cfg(feature = "rand")]
 pub use tempdir::*;
 mod command_ext;

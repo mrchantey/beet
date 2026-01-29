@@ -69,7 +69,7 @@ fn setup(
 			Name::new("Behavior"),
 			TriggerOnAnimationReady::run(),
 			Sequence::default(),
-			Repeat::default(),
+			Retrigger::default(),
 			children![
 				(
 					Name::new("Idle"),
@@ -78,8 +78,12 @@ fn setup(
 					),
 					PlayAnimation::new(idle_index)
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(idle_clip, idle_index, Outcome::Pass)
-						.with_transition_duration(transition_duration),
+					TriggerOnAnimationEnd::new(
+						idle_clip,
+						idle_index,
+						Outcome::Pass
+					)
+					.with_transition_duration(transition_duration),
 				),
 				(
 					Name::new("Seek"),

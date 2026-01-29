@@ -1,11 +1,13 @@
 # Agent Instructions
 
+
 You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-Beet is a rust project built on the bevy game engine
+Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
 
 ## Context
 
+- There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
 - This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility, instead prioritizing refactors and cleaning up dead or experimental code.
 - You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
 - when told to run a command, run that command before doing anything else, including searching the codebase
@@ -18,10 +20,10 @@ Beet is a rust project built on the bevy game engine
 
 ## Conventions
 
-- Do not be lazy, if asked to fix a bug and you encounter another issue, fix that too.
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+- we never mark #[deprecated] because we have no users, instead replace existing machinery
 - Fix any spelling mistakes you come across in code or docs.
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
@@ -38,11 +40,12 @@ Beet is a rust project built on the bevy game engine
 - comments must be concise
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
+- adding `ignore` is an absolute last resort, usually reserved only for macros. `no_run` is also not ideal, but sometimes required ie for network requests
 
 ## Testing
 
 - We use the custom `beet_core::testing` test runner and matchers in all crates.
-- beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
+- wasm tests: beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
 - for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare
 - Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders)
@@ -62,3 +65,6 @@ Beet is a rust project built on the bevy game engine
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
 - Beet is a cross-platform framework, never use println! as it is silent in wasm, all temp logging should be done either via `foo.xprint()` or `beet_core::cross_log!()` to ensure we get logs across platforms
 - In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
+- In bevy the two main causes of bugs are:
+	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
+	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.

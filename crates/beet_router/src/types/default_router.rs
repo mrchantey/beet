@@ -11,18 +11,20 @@ use serde_json::Value;
 /// The entrypoint for a router with two endoints:
 /// - `/`: Serve the routes
 /// - `/export-static`: export static html
-pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
-	let spawner2 = spawner.clone();
+pub fn default_router_cli(
+	router: impl BundleFunc,
+	endpoints: impl BundleFunc,
+) -> impl Bundle {
 	(
 		Name::new("Router CLI"),
 		CliServer,
-		ExchangeSpawner::new_flow(|| {
+		router_exchange(|| {
 			(Fallback, children![
 				help_handler(HelpHandlerConfig {
 					introduction: String::from("Router CLI"),
 					..default()
 				}),
-				EndpointBuilder::new(
+				EndpointBuilder::new().with_path("/").with_action(
 					// dont need to be async but zst restriction for sync systems
 					async move |_: (), entity: AsyncEntity| {
 						// actually serve the routes
@@ -30,30 +32,30 @@ pub fn default_router_cli(spawner: ExchangeSpawner) -> impl Bundle {
 							.world()
 							.spawn_then((
 								HttpServer::default(),
-								spawner.clone(),
+								router.clone().bundle_func(),
 							))
 							.await;
 						// start serving, never resolve
 						std::future::pending::<()>().await;
 					}
-				)
-				.with_path("/"),
-				EndpointBuilder::new(
-					async move |_: (), entity: AsyncEntity| -> Result {
-						entity
-							.world()
-							.insert_resource_then(RenderMode::Ssr)
-							.await;
-						let html =
-							collect_html(entity.world(), &spawner2).await?;
-						for (path, html) in html {
-							trace!("Exporting html to {}", path);
-							fs_ext::write(path, &html)?;
+				),
+				EndpointBuilder::new()
+					.with_path("/export-static")
+					.with_action(
+						async move |_: (), entity: AsyncEntity| -> Result {
+							entity
+								.world()
+								.insert_resource_then(RenderMode::Ssr)
+								.await;
+							let html =
+								collect_html(entity.world(), endpoints).await?;
+							for (path, html) in html {
+								trace!("Exporting html to {}", path);
+								fs_ext::write(path, &html)?;
+							}
+							Ok(())
 						}
-						Ok(())
-					}
-				)
-				.with_path("/export-static"),
+					),
 			])
 		}),
 	)
@@ -77,8 +79,8 @@ pub fn default_router(
 	endpoints: impl BundleFunc,
 	// runs after `endpoints` and default endpoints
 	response_middleware: impl BundleFunc,
-) -> ExchangeSpawner {
-	ExchangeSpawner::new_flow(move || {
+) -> impl Bundle {
+	router_exchange(move || {
 		(InfallibleSequence, children![
 			(Name::new("Await Ready"), AwaitReady::default()),
 			(
@@ -131,7 +133,9 @@ pub fn default_router(
 pub fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
 		common_predicates::no_response(),
-		EndpointBuilder::new(StatusCode::NotFound).with_trailing_path()
+		EndpointBuilder::new()
+			.with_trailing_path()
+			.with_action(StatusCode::NotFound)
 	])
 }
 
@@ -151,7 +155,7 @@ pub fn analytics_handler() -> impl Bundle {
 
 
 pub fn app_info() -> EndpointBuilder {
-	EndpointBuilder::get().with_path("/app-info").with_handler(
+	EndpointBuilder::get().with_path("/app-info").with_action(
 		|config: Res<PackageConfig>| {
 			let PackageConfig {
 				title,
@@ -161,13 +165,13 @@ pub fn app_info() -> EndpointBuilder {
 				..
 			} = config.clone();
 			rsx! {
-				<main>
+				<article>
 					<h1>App Info</h1>
 					<p>Title: {title}</p>
 					<p>Description: {description}</p>
 					<p>Version: {version}</p>
 					<p>Stage: {stage}</p>
-				</main>
+				</article>
 			}
 		},
 	)
@@ -268,16 +272,16 @@ mod test {
 		));
 
 		entity
-			.oneshot_str("/app-info")
+			.exchange_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 		entity
-			.oneshot("/assets/branding/logo.png")
+			.exchange("/assets/branding/logo.png")
 			.await
 			.into_result()
 			.await
 			.unwrap();
-		let mut stat = async |val: &str| entity.oneshot(val).await.status();
+		let mut stat = async |val: &str| entity.exchange(val).await.status();
 		stat("/bingbong").await.xpect_eq(StatusCode::NotFound);
 		stat("/assets/bing").await.xpect_eq(StatusCode::NotFound);
 		stat("/assets/branding/logo.png")
@@ -290,13 +294,13 @@ mod test {
 	async fn test_app_info() {
 		RouterPlugin::world()
 			.with_resource(pkg_config!())
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					app_info(),
 					html_bundle_to_response()
 				])
 			}))
-			.oneshot_str("/app-info")
+			.exchange_str("/app-info")
 			.await
 			.xpect_contains("<h1>App Info</h1><p>Title: beet_router</p>");
 	}

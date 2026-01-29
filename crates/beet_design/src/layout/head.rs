@@ -69,3 +69,55 @@ pub fn Head(
 		</head>
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_dom::prelude::BeetRoot;
+
+	#[test]
+	fn head_template_renders() {
+		let mut app = App::new();
+		app.add_plugins(ApplyDirectivesPlugin);
+		app.insert_resource(pkg_config!());
+
+		let entity = app
+			.world_mut()
+			.spawn((BeetRoot, rsx! {
+				<Head />
+			}))
+			.id();
+		app.update();
+
+		let html = app
+			.world_mut()
+			.run_system_cached_with(render_fragment, entity)
+			.unwrap();
+		html.xpect_contains(r#"<meta charset="UTF-8"#);
+	}
+
+	#[test]
+	fn head_template_with_slot() {
+		let mut app = App::new();
+		app.add_plugins(ApplyDirectivesPlugin);
+		app.insert_resource(pkg_config!());
+
+		let entity = app
+			.world_mut()
+			.spawn((BeetRoot, rsx! {
+				<Head>
+					<link rel="icon" href="/favicon.ico"/>
+				</Head>
+			}))
+			.id();
+		app.update();
+
+		let html = app
+			.world_mut()
+			.run_system_cached_with(render_fragment, entity)
+			.unwrap();
+		html.xpect_contains(r#"<meta charset="UTF-8"#)
+			.xpect_contains(r#"<link rel="icon" href="/favicon.ico"#);
+	}
+}

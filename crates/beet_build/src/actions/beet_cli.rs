@@ -15,7 +15,7 @@ pub fn beet_cli() -> impl Bundle {
 	(
 		Name::new("Cli Router"),
 		CliServer,
-		ExchangeSpawner::new_flow(|| {
+		flow_exchange(|| {
 			(
 				// temporarily hardcode the beet site as a component
 				beet_site_cargo_build_cmd(),
@@ -26,9 +26,10 @@ pub fn beet_cli() -> impl Bundle {
 						match_root: true,
 						..default()
 					}),
-					EndpointBuilder::new(|| { StatusCode::ImATeapot })
+					EndpointBuilder::new()
 						.with_path("teapot")
-						.with_description("I'm a teapot"),
+						.with_description("I'm a teapot")
+						.with_action(|| { StatusCode::ImATeapot }),
 					EndpointBuilder::default()
 						.with_path("run-wasm/*binary-path")
 						.with_description("Run a wasm binary")
@@ -240,7 +241,7 @@ fn watch() -> impl Bundle {
 	Reflect,
 	Component,
 )]
-pub struct StageParams {
+struct StageParams {
 	#[deref]
 	#[reflect(
 		default="stage",

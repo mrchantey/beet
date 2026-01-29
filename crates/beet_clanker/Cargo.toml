@@ -1,0 +1,69 @@
+[package]
+name = "beet_clanker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "ECS agentic workflow patterns"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+default = ["fs"]
+rustls-tls = ["beet_net/rustls-tls"]
+native-tls = ["beet_net/native-tls"]
+fs = ["beet_core/fs"]
+
+[dependencies]
+beet_net = { workspace = true, features = ["ureq","flow"] }
+beet_core = { workspace = true, features = ["serde","exchange"] }
+beet_flow.workspace = true
+beet_router.workspace = true
+
+futures.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+bevy.workspace = true
+dotenv.workspace = true
+serde.workspace = true
+base64.workspace = true
+mime_guess.workspace = true
+async-lock.workspace = true
+serde_json.workspace = true
+serde_with = "3.12"
+http.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+web-sys = { workspace = true, features = [
+	# WebRtc
+	'Window',
+	'Navigator',
+	'MediaDevices',
+	'MediaStream',
+	'MediaStreamConstraints',
+	'RtcPeerConnection',
+	'RtcDataChannel',
+	'RtcDataChannelInit',
+	'RtcSessionDescriptionInit',
+	'RtcSdpType',
+	'RtcTrackEvent',
+	'HtmlAudioElement',
+	'RtcRtpSender',
+	'MediaStreamTrack',
+] }
+
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+beet_clanker = { path = ".", features = ["native-tls"] }

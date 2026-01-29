@@ -2,7 +2,13 @@
 #![cfg_attr(test, test_runner(crate::test_runner))]
 #![cfg_attr(
 	feature = "nightly",
-	feature(fn_traits, unboxed_closures, never_type)
+	feature(
+		fn_traits,
+		unboxed_closures,
+		never_type,
+		async_fn_track_caller,
+		closure_track_caller
+	)
 )]
 // The test crate is needed for the test runner infrastructure
 // Note: `test` feature is already enabled by cfg(test) above, so only add if_let_guard here
@@ -41,7 +47,7 @@ pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
-/// Re-export sweet_test as test for ergonomic `#[beet_core::test]` usage
+// Re-export for ergonomic `#[beet_core::test]` usage
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
@@ -113,6 +119,7 @@ pub mod prelude {
 	pub use crate::abs_file;
 	pub use crate::cross_log;
 	pub use crate::cross_log_error;
+	pub use crate::cross_log_noline;
 	pub use crate::dir;
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;

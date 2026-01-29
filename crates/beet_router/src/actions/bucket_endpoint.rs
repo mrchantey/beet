@@ -23,20 +23,23 @@ impl BucketEndpoint {
 			.with_trailing_path()
 			.with_handler_bundle((
 				bucket,
-				async move |mut path: RoutePath,
-				            action: AsyncEntity|
-				            -> Result<Response> {
-					if let Some(prefix) = &remove_prefix {
-						if let Ok(stripped) = path.strip_prefix(prefix) {
-							path = RoutePath::new(stripped);
-						} else {
-							bevybail!("prefix {prefix} not found in {path}");
+				endpoint_action(
+					async move |mut path: RoutePath,
+					            action: AsyncEntity|
+					            -> Result<Response> {
+						if let Some(prefix) = &remove_prefix {
+							if let Ok(stripped) = path.strip_prefix(prefix) {
+								path = RoutePath::new(stripped);
+							} else {
+								bevybail!(
+									"prefix {prefix} not found in {path}"
+								);
+							}
 						}
-					}
-					let bucket = action.get_cloned::<Bucket>().await?;
-					bucket_to_response(&bucket, &path).await
-				}
-				.into_endpoint_handler(),
+						let bucket = action.get_cloned::<Bucket>().await?;
+						bucket_to_response(&bucket, &path).await
+					},
+				),
 			))
 	}
 }
@@ -126,13 +129,13 @@ mod test {
 		let path = RoutePath::from("/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		ServerPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				(Sequence, children![
 					common_predicates::fallback(),
 					BucketEndpoint::new(bucket.clone(), None),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_str("<div>fallback</div>");
 	}
@@ -143,7 +146,7 @@ mod test {
 		let path = RoutePath::from("bar/index.html");
 		bucket.insert(&path, "<div>fallback</div>").await.unwrap();
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				(PathPartial::new("foo"), Sequence, children![
 					common_predicates::fallback(),
 					BucketEndpoint::new(
@@ -152,7 +155,7 @@ mod test {
 					),
 				])
 			}))
-			.oneshot_str("/foo/bar")
+			.exchange_str("/foo/bar")
 			.await
 			.xpect_str("<div>fallback</div>");
 	}

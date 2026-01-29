@@ -6,26 +6,32 @@ use crate::testing::utils::*;
 
 #[derive(Clone, Reflect, Component, Default)]
 #[reflect(Default)]
-pub(super) struct LoggerParams {
+pub struct RunnerParams {
+	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode
+	pub watch: bool,
 	/// Do not log test outcomes as they complete
-	no_incremental: bool,
+	pub no_incremental: bool,
 	/// Log each test name before running it
-	log_runs: bool,
+	pub log_runs: bool,
 	/// Log each skipped test
-	log_skipped: bool,
+	pub log_skipped: bool,
 	/// Disable ANSII colored output
-	no_color: bool,
+	pub no_color: bool,
 	/// Suppress all logger output
-	quiet: bool,
+	pub quiet: bool,
 }
 
 #[allow(unused)]
 pub(super) fn log_suite_running(
 	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
-	mut logger_params: ParamQuery<LoggerParams>,
+	mut logger_params: ParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, _req) in requests {
 		let logger_params = logger_params.get(entity)?;
+		if logger_params.watch {
+			terminal_ext::clear().ok();
+		}
+
 		if logger_params.quiet {
 			continue;
 		}
@@ -48,7 +54,7 @@ pub(super) fn log_suite_running(
 pub(super) fn log_case_running(
 	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-	mut params: ParamQuery<LoggerParams>,
+	mut params: ParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -72,7 +78,7 @@ pub(super) fn log_case_running(
 pub(super) fn log_case_outcomes(
 	requests: Populated<(Entity, &Children), With<RequestMeta>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
-	mut params: ParamQuery<LoggerParams>,
+	mut params: ParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -127,7 +133,7 @@ pub(super) fn log_suite_outcome(
 		(Entity, &RequestMeta, &SuiteOutcome, &Children),
 		Added<SuiteOutcome>,
 	>,
-	mut params: ParamQuery<LoggerParams>,
+	mut params: ParamQuery<RunnerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
 ) -> Result {
 	for (entity, req, outcome, children) in requests {
@@ -199,7 +205,7 @@ fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
 
-	let path = test.path().into_abs();
+	let path = outcome.path(test).into_abs();
 	let file = fs_ext::read_to_string(path)?;
 	let lines = file.split('\n').collect::<Vec<_>>();
 	let max_digits = lines.len().to_string().len();
@@ -291,7 +297,7 @@ fn fail_reason(outcome: &TestFail) -> String {
 
 fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
 	let prefix = paint_ext::dimmed("at");
-	let path = paint_ext::cyan(test.path().to_string());
+	let path = paint_ext::cyan(outcome.path(test).to_string());
 	let start = outcome.start(test);
 	let line_loc =
 		paint_ext::dimmed(format!(":{}:{}", start.line(), start.col()));

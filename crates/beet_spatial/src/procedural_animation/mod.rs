@@ -7,8 +7,8 @@ mod serde_curve;
 pub use self::serde_curve::*;
 mod set_curve_on_run;
 pub use self::set_curve_on_run::*;
-use beet_flow::prelude::*;
 use beet_core::prelude::*;
+use beet_flow::prelude::*;
 
 /// Add all systems and types for procedural animation actions:
 /// - [`PlayProceduralAnimation`]

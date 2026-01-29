@@ -21,9 +21,9 @@
 //! # use beet_core::prelude::*;
 //! # use beet_flow::prelude::*;
 //! # use beet_net::prelude::*;
-//! ExchangeSpawner::new_flow(|| {
+//! flow_exchange(|| {
 //!     (InfallibleSequence, children![
-//!         EndpointBuilder::get().with_handler(|| "Hello"),
+//!         EndpointBuilder::get().with_action(|| "Hello"),
 //!         common_middleware::no_cache_headers(),
 //!     ])
 //! });
@@ -39,12 +39,12 @@
 //! # use beet_flow::prelude::*;
 //! # use beet_net::prelude::*;
 //! let config = CorsConfig::new(true, vec![]);
-//! ExchangeSpawner::new_flow(move || {
+//! flow_exchange(move || {
 //!     (InfallibleSequence, children![
 //!         // Request phase: validate origin, store in ValidatedOrigin component
 //!         common_middleware::cors_request(config.clone()),
 //!         // Endpoint handles the request
-//!         EndpointBuilder::get().with_handler(|| "Hello"),
+//!         EndpointBuilder::get().with_action(|| "Hello"),
 //!         // Response phase: add CORS headers from ValidatedOrigin
 //!         common_middleware::cors_response(config),
 //!     ])
@@ -62,12 +62,12 @@
 //! # use beet_flow::prelude::*;
 //! # use beet_net::prelude::*;
 //! let config = CorsConfig::new(true, vec![]);
-//! ExchangeSpawner::new_flow(move || {
+//! flow_exchange(move || {
 //!     (Fallback, children![
 //!         // Handle OPTIONS preflight and return early
 //!         common_middleware::cors_preflight(config.clone()),
 //!         // Endpoint only runs if not OPTIONS
-//!         EndpointBuilder::any_method().with_handler(|| "Hello"),
+//!         EndpointBuilder::any_method().with_action(|| "Hello"),
 //!     ])
 //! });
 //! ```
@@ -86,9 +86,9 @@ use beet_flow::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
-/// ExchangeSpawner::new_flow(|| {
+/// flow_exchange(|| {
 ///     (InfallibleSequence, children![
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::no_cache_headers(),
 ///     ])
 /// });
@@ -111,7 +111,7 @@ pub fn no_cache_headers() -> impl Bundle {
 						return Ok(());
 					};
 
-					let parts = response.parts_mut();
+					let parts = response.response_parts_mut();
 					parts.insert_header(
 						"cache-control",
 						"no-cache, no-store, must-revalidate",
@@ -178,10 +178,10 @@ pub struct ValidatedOrigin(pub String);
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// let config = CorsConfig::new(false, vec!["https://example.com"]);
-/// ExchangeSpawner::new_flow(|| {
+/// flow_exchange(|| {
 ///     (InfallibleSequence, children![
 ///         common_middleware::cors_request(config.clone()),
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::cors_response(config),
 ///     ])
 /// });
@@ -266,10 +266,10 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// let config = CorsConfig::new(true, vec![]);
-/// ExchangeSpawner::new_flow(|| {
+/// flow_exchange(|| {
 ///     (InfallibleSequence, children![
 ///         common_middleware::cors_request(config.clone()),
-///         EndpointBuilder::get().with_handler(|| "Hello"),
+///         EndpointBuilder::get().with_action(|| "Hello"),
 ///         common_middleware::cors_response(config),
 ///     ])
 /// });
@@ -306,7 +306,7 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 					};
 
 					response
-						.parts_mut()
+						.response_parts_mut()
 						.insert_header("access-control-allow-origin", &origin);
 
 					Ok(())
@@ -340,12 +340,12 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 /// # use beet_flow::prelude::*;
 /// # use beet_net::prelude::*;
 /// let config = CorsConfig::new(true, vec![]);
-/// ExchangeSpawner::new_flow(move || {
+/// flow_exchange(move || {
 ///     (Fallback, children![
 ///         // Handles OPTIONS and inserts complete response
 ///         common_middleware::cors_preflight(config.clone()),
 ///         // Only runs if not OPTIONS (no response exists yet)
-///         EndpointBuilder::any_method().with_handler(|| "Hello"),
+///         EndpointBuilder::any_method().with_action(|| "Hello"),
 ///     ])
 /// });
 /// ```
@@ -417,7 +417,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 						.insert(ValidatedOrigin(origin.clone()));
 
 					let mut response = Response::ok();
-					let parts = response.parts_mut();
+					let parts = response.response_parts_mut();
 					parts.insert_header("access-control-max-age", "60");
 					parts.insert_header(
 						"access-control-allow-headers",
@@ -443,13 +443,13 @@ mod test {
 	#[beet_core::test]
 	async fn no_cache_headers_works() {
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					no_cache_headers(),
 				])
 			}))
-			.oneshot(Request::get("/"))
+			.exchange(Request::get("/"))
 			.await
 			.xtap(|response| {
 				response
@@ -465,14 +465,14 @@ mod test {
 	async fn cors_allows_origin() {
 		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::get("/").with_header("origin", "https://allowed.com"),
 			)
 			.await
@@ -489,14 +489,14 @@ mod test {
 	async fn cors_blocks_origin() {
 		let config = CorsConfig::new(false, vec![]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::get("/").with_header("origin", "https://blocked.com"),
 			)
 			.await
@@ -508,14 +508,14 @@ mod test {
 	async fn cors_allows_any() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::get("/").with_header("origin", "https://anything.com"),
 			)
 			.await
@@ -532,13 +532,13 @@ mod test {
 	async fn cors_preflight_works() {
 		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				(Fallback, children![
 					cors_preflight(config.clone()),
-					EndpointBuilder::any_method().with_handler(|| "Hello"),
+					EndpointBuilder::any_method().with_action(|| "Hello"),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::options("/")
 					.with_header("origin", "https://allowed.com"),
 			)
@@ -560,15 +560,15 @@ mod test {
 	async fn cors_preflight_non_options_passthrough() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				(InfallibleSequence, children![
 					cors_preflight(config.clone()),
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::get("/").with_header("origin", "https://example.com"),
 			)
 			.await
@@ -585,15 +585,15 @@ mod test {
 	async fn multiple_middleware_chain() {
 		let config = CorsConfig::new(true, vec![]);
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(move || {
+			.spawn(flow_exchange(move || {
 				(InfallibleSequence, children![
 					cors_request(config.clone()),
-					EndpointBuilder::get().with_handler(|| "Hello"),
+					EndpointBuilder::get().with_action(|| "Hello"),
 					cors_response(config),
 					no_cache_headers(),
 				])
 			}))
-			.oneshot(
+			.exchange(
 				Request::get("/").with_header("origin", "https://example.com"),
 			)
 			.await

@@ -11,7 +11,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
-				ExchangeSpawner::new_handler(|_, _| {
+				handler_exchange(|_, _| {
 					Response::ok_body("hello world", "text/plain")
 				}),
 			));

@@ -13,7 +13,8 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs", "http"]
+default = ["serde", "fs", "http", "nightly"]
+nightly = []
 # for conditional compilation in hooks
 client = []
 server = [
@@ -44,7 +45,7 @@ serde = [
 	"beet_core/serde",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
-ureq = ["dep:ureq"]
+ureq = ["dep:ureq", "dep:blocking"]
 tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
@@ -143,7 +144,7 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 # actually a dev-dep but we need optional
 # strictly for testing only
 tokio = { version = "1", features = [
-	# "macros",
+	"macros",
 	# "sync",
 	# "rt",
 	# "rt-multi-thread",
@@ -178,7 +179,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
+# beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

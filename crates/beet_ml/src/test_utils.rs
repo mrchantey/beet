@@ -1,5 +1,5 @@
-use bevy::asset::LoadState;
 use beet_core::prelude::*;
+use bevy::asset::LoadState;
 
 pub fn workspace_asset_plugin() -> AssetPlugin {
 	AssetPlugin {

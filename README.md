@@ -108,7 +108,7 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                              | Status | Description                                      |
 | -------------------------------------------------- | ------ | ------------------------------------------------ |
-| [`beet_agent`](crates/beet_agent/Cargo.toml)       | 🐉      | ECS agentic workflow patterns                    |
+| [`beet_clanker`](crates/beet_clanker/Cargo.toml)       | 🐉      | Structured context and tool calling for llms  |
 | [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
 | [`emby`](crates/emby/Cargo.toml)                   | 🐉      | the beetmash ambassador                          |
 

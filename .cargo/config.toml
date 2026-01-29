@@ -6,7 +6,8 @@
 # wasm runner for cargo run and cargo test
 # uncomment during development
 runner = 'cargo run -p beet-cli -- run-wasm'
-#runner = 'beet run-wasm'
+# runner = 'beet run-wasm'
+
 rustflags = [
 	# remove in getrandom 0.3.4
 	"--cfg",

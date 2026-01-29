@@ -82,28 +82,56 @@ fn append_async_queues(world: &mut World) -> Result {
 	Ok(())
 }
 
+async fn run_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func) -> Result
+where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: AsyncTaskOut,
+{
+	use futures_lite::future::FutureExt;
+
+	let world2 = world.clone();
+	let world3 = world.clone();
+	// 1. increment task count
+	world3
+		.with_resource_then::<AsyncChannel, _>(|mut channel| {
+			channel.increment_tasks();
+		})
+		.await;
+	// 2. run the function, catching panics
+	let result = std::panic::AssertUnwindSafe(func(world))
+		.catch_unwind()
+		.await;
+	// 3. decrement task count
+	world3
+		.with_resource_then::<AsyncChannel, _>(|mut channel| {
+			channel.decrement_tasks();
+		})
+		.await;
+
+	// 4. handle result
+	match result {
+		Ok(output) => output.apply(world2),
+		Err(panic) => {
+			let msg = display_ext::try_downcast_str(&panic)
+				.unwrap_or_else(|| "unknown panic".to_string());
+			cross_log!("Async task panicked: {}", msg);
+		}
+	}
+
+	Ok(())
+}
+
 fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + MaybeSend + Future<Output = Out>,
 	Out: AsyncTaskOut,
 {
-	let world2 = world.clone();
-	let world3 = world.clone();
 	IoTaskPool::get()
-		.spawn(async move {
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.increment_tasks();
-				})
-				.await;
-			func(world).await.apply(world2);
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.decrement_tasks();
-				})
-				.await;
-		})
+		.spawn(run_async_task(world, func))
+		// TODO this means we cant clean tasks up, instead they should be stored
+		// in world so when world is dropped so are tasks
 		.detach();
 }
 fn spawn_async_task_local<Func, Fut, Out>(world: AsyncWorld, func: Func)
@@ -112,22 +140,10 @@ where
 	Fut: 'static + Future<Output = Out>,
 	Out: AsyncTaskOut,
 {
-	let world2 = world.clone();
-	let world3 = world.clone();
 	IoTaskPool::get()
-		.spawn_local(async move {
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.increment_tasks();
-				})
-				.await;
-			func(world).await.apply(world2);
-			world3
-				.with_resource_then::<AsyncChannel, _>(|mut channel| {
-					channel.decrement_tasks();
-				})
-				.await;
-		})
+		.spawn_local(run_async_task(world, func))
+		// TODO this means we cant clean tasks up, instead they should be stored
+		// in world so when world is dropped so are tasks
 		.detach();
 }
 
@@ -309,6 +325,7 @@ impl AsyncWorld {
 		}
 	}
 	/// Queues the command
+	// #[cfg_attr(feature = "nightly", track_caller)]
 	pub fn with(&self, func: impl Command + FnOnce(&mut World)) {
 		let mut queue = CommandQueue::default();
 		queue.push(func);
@@ -316,6 +333,7 @@ impl AsyncWorld {
 	}
 	/// Queues the command, creating another channel that will resolve when
 	/// the task is complete, returing its output
+	// #[cfg_attr(feature = "nightly", track_caller)]
 	pub fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&mut World) -> O,
@@ -325,13 +343,16 @@ impl AsyncWorld {
 	{
 		let (out_tx, out_rx) = async_channel::bounded(1);
 		let mut queue = CommandQueue::default();
-		queue.push(move |world: &mut World| {
-			let out = func(world);
-			out_tx
-				.try_send(out)
-				// allow dropped, they didnt want the output
-				.ok();
-		});
+		queue.push(
+			// #[cfg_attr(feature = "nightly", track_caller)]
+			move |world: &mut World| {
+				let out = func(world);
+				out_tx
+					.try_send(out)
+					// allow dropped, they didnt want the output
+					.ok();
+			},
+		);
 		self.send(queue);
 		async move {
 			match out_rx.recv().await {
@@ -545,6 +566,7 @@ impl AsyncEntity {
 	pub fn id(&self) -> Entity { self.entity }
 	pub fn world(&self) -> &AsyncWorld { &self.world }
 
+	// #[track_caller]
 	pub fn with(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut),
@@ -556,6 +578,8 @@ impl AsyncEntity {
 		});
 		self
 	}
+
+	// #[cfg_attr(feature = "nightly", track_caller)]
 	pub async fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
@@ -565,10 +589,13 @@ impl AsyncEntity {
 	{
 		let entity = self.entity;
 		self.world
-			.with_then(move |world: &mut World| {
-				let entity = world.entity_mut(entity);
-				func(entity)
-			})
+			.with_then(
+				// #[cfg_attr(feature = "nightly", track_caller)]
+				move |world: &mut World| {
+					let entity = world.entity_mut(entity);
+					func(entity)
+				},
+			)
 			.await
 	}
 
@@ -638,7 +665,16 @@ impl AsyncEntity {
 			.await
 	}
 
-	pub async fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		&self,
+		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
+	) -> &Self {
+		self.with(move |mut entity| {
+			entity.trigger(ev);
+		});
+		self
+	}
+	pub async fn trigger_then<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
 	) -> &Self {
@@ -648,7 +684,7 @@ impl AsyncEntity {
 		.await;
 		self
 	}
-	pub async fn trigger_target<M>(
+	pub async fn trigger_target_then<M>(
 		&self,
 		event: impl IntoEntityTargetEvent<M>,
 	) -> &Self {
@@ -884,5 +920,34 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Count>();
 		world.run_async_then(async |_| 32).await.xpect_eq(32);
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	#[crate::test]
+	#[ignore = "not working.."]
+	async fn panic_handling() {
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Count>();
+
+		// Spawn a task that panics
+		world
+			.run_async_local_then(async |_world| {
+				if true {
+					panic!("test panic");
+				}
+			})
+			.await;
+
+		// Give the task time to execute and panic
+		time_ext::sleep(Duration::from_millis(10)).await;
+
+		// The world should still be usable after the panic
+		world
+			.run_async_local_then(async |world| {
+				world.with_resource::<Count>(|mut count| count.0 += 1);
+			})
+			.await;
+
+		world.resource::<Count>().0.xpect_eq(1);
 	}
 }

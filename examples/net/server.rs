@@ -12,18 +12,18 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
-				ExchangeSpawner::new_flow(|| {
+				flow_exchange(|| {
 					// Use InfallibleSequence to run all endpoints
 					(InfallibleSequence, children![
-						EndpointBuilder::get().with_handler(home),
+						EndpointBuilder::get().with_action(home),
 						EndpointBuilder::get()
 							.with_path("foo")
-							.with_handler(foo),
+							.with_action(foo),
 						// Catch-all for not found
 						EndpointBuilder::get()
 							.with_predicate(common_predicates::no_response())
 							.with_trailing_path()
-							.with_handler(not_found),
+							.with_action(not_found),
 					])
 				}),
 			));

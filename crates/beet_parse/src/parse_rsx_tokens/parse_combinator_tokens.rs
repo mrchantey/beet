@@ -290,8 +290,7 @@ mod test {
 	use proc_macro2::TokenStream;
 
 	fn parse(str: &str) -> TokenStream {
-		ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!()))
-			.unwrap()
+		ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!())).unwrap()
 	}
 
 	#[test]
@@ -300,11 +299,8 @@ mod test {
 	fn fragment() {
 		"<br/><br/>"
 			.xmap(|str| {
-				ParseRsxTokens::combinator_to_rsx(
-					str,
-					WsPathBuf::new(file!()),
-				)
-				.unwrap()
+				ParseRsxTokens::combinator_to_rsx(str, WsPathBuf::new(file!()))
+					.unwrap()
 			})
 			.xpect_snapshot();
 	}

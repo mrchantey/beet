@@ -145,9 +145,9 @@ impl ParseMarkdown {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use beet_core::prelude::*;
 
 	const MARKDOWN: &str = r#"
 +++

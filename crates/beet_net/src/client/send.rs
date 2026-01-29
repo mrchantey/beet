@@ -49,7 +49,11 @@ pub impl Request {
 
 
 
-#[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
+#[cfg(any(
+	all(feature = "ureq", feature = "native-tls"),
+	all(feature = "reqwest", feature = "native-tls"),
+	target_arch = "wasm32"
+))]
 #[cfg(test)]
 mod test_request {
 	use crate::prelude::*;
@@ -58,7 +62,8 @@ mod test_request {
 	const HTTPBIN: &str = "https://postman-echo.com";
 	// const HTTPBIN: &str = "https://httpbin.org";
 	// TODO spin up our own server for tests
-	#[beet_core::test]
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
 	// #[ignore = "flaky example.com"]
 	async fn works() {
 		Request::get("https://example.com")
@@ -170,6 +175,29 @@ mod test_request {
 			.xpect_true();
 	}
 
+
+	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
+	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	async fn concurrent_requests_complete_independently() {
+		// This test verifies that multiple requests can run concurrently
+		// without blocking each other. Make 3 concurrent requests - if they're
+		// properly async, they'll complete concurrently (fast). If blocking,
+		// they'd complete sequentially (slow).
+		let start = Instant::now();
+
+		let req1 = Request::get("https://example.com").send();
+		let req2 = Request::get("https://example.com").send();
+		let req3 = Request::get("https://example.com").send();
+
+		let (res1, res2, res3) = futures::join!(req1, req2, req3);
+
+		res1.unwrap().status().xpect_eq(StatusCode::Ok);
+		res2.unwrap().status().xpect_eq(StatusCode::Ok);
+		res3.unwrap().status().xpect_eq(StatusCode::Ok);
+
+		// Should complete concurrently in < 3 seconds, not sequentially
+		start.elapsed().as_secs().xpect_less_than(3);
+	}
 
 	#[test]
 	#[ignore = "flaky httpbin"]

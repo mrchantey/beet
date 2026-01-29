@@ -13,6 +13,20 @@
 import init from "./bindgen.js";
 import { dirname } from "https://deno.land/std/path/mod.ts";
 import { ensureDirSync, existsSync } from "https://deno.land/std/fs/mod.ts";
+import { load } from "jsr:@std/dotenv";
+
+// Load .env file from workspace root and export vars to process environment
+const workspaceRoot = Deno.env.get("WORKSPACE_ROOT");
+if (workspaceRoot) {
+	try {
+		await load({
+			envPath: `${workspaceRoot}/.env`,
+			export: true,
+		});
+	} catch (_) {
+		// .env file may not exist, that's ok
+	}
+}
 
 globalThis.cwd = () => {
 	return do_try(() => Deno.cwd());

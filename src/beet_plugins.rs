@@ -37,17 +37,19 @@ impl Plugin for BeetRunner {
 	#[allow(unused, unreachable_code)]
 	fn build(&self, app: &mut App) {
 		// order matters, last flag wins
-		#[cfg(feature = "launch")]
-		app.set_runner(LaunchConfig::runner);
-
-		#[cfg(feature = "server")]
-		app.set_runner(ServerPlugin::maybe_tokio_runner);
-
+		// client runner should be set first so server can override it
+		// (server needs special shutdown handling to avoid TLS panics)
 		#[cfg(feature = "client")]
 		app.init_plugin::<TaskPoolPlugin>();
 
 		#[cfg(feature = "client")]
 		app.set_runner(ReactiveApp::runner);
+
+		#[cfg(feature = "launch")]
+		app.set_runner(LaunchConfig::runner);
+
+		#[cfg(feature = "server")]
+		app.set_runner(ServerPlugin::maybe_tokio_runner);
 
 		app.add_systems(Startup, print_config);
 		#[cfg(not(any(
@@ -64,12 +66,13 @@ impl Plugin for BeetRunner {
 
 #[allow(unused)]
 fn print_config(pkg_config: Res<PackageConfig>) {
+	// Order matches runner priority (last wins, so check in reverse)
+	#[cfg(feature = "client")]
+	let binary = "Client";
 	#[cfg(feature = "launch")]
 	let binary = "Launch";
 	#[cfg(feature = "server")]
 	let binary = "Server";
-	#[cfg(feature = "client")]
-	let binary = "Client";
 
 	#[cfg(any(feature = "launch", feature = "server", feature = "client"))]
 	info!(

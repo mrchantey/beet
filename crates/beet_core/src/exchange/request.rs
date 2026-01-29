@@ -96,7 +96,7 @@ impl RequestMeta {
 	pub fn started(&self) -> Instant { self.started }
 
 	/// Returns a reference to the request parts
-	pub fn parts(&self) -> &RequestParts { &self.parts }
+	pub fn request_parts(&self) -> &RequestParts { &self.parts }
 }
 
 impl std::ops::Deref for RequestMeta {
@@ -262,10 +262,10 @@ impl Request {
 	}
 
 	/// Returns a reference to the request parts
-	pub fn parts(&self) -> &RequestParts { &self.parts }
+	pub fn request_parts(&self) -> &RequestParts { &self.parts }
 
 	/// Returns a mutable reference to the request parts
-	pub fn parts_mut(&mut self) -> &mut RequestParts { &mut self.parts }
+	pub fn request_parts_mut(&mut self) -> &mut RequestParts { &mut self.parts }
 
 	/// Consumes the request and returns the parts and body
 	pub fn into_parts(self) -> (RequestParts, Body) { (self.parts, self.body) }
@@ -303,6 +303,29 @@ impl Request {
 		let bytes = self.body.into_bytes().await?;
 		let http_parts: http::request::Parts = self.parts.try_into()?;
 		Ok(http::Request::from_parts(http_parts, bytes))
+	}
+
+	/// Creates a response that mirrors this request,
+	/// with a [`StatusCode::Ok`]
+	pub fn mirror(self) -> Response {
+		Response::new(
+			ResponseParts {
+				parts: self.request_parts().parts().clone(),
+				status: StatusCode::Ok,
+			},
+			self.body,
+		)
+	}
+	/// Creates a response that mirrors this request's parts,
+	/// with an empty body
+	pub fn mirror_parts(&self) -> Response {
+		Response::new(
+			ResponseParts {
+				parts: self.request_parts().parts().clone(),
+				status: StatusCode::Ok,
+			},
+			default(),
+		)
 	}
 }
 

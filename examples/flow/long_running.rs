@@ -45,7 +45,7 @@ fn main() {
 							Name::new("Patrol Sequence"),
 							Sequence,
 							// the patrol sequence will repeat indefinitely
-							Repeat::default(),
+							Retrigger::default(),
 						))
 						.with_child((
 							// patrol the left flank for a bit

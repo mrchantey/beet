@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::types::ArticleMeta;
 use beet_core::prelude::*;
 use heck::ToTitleCase;
 use serde::Deserialize;
@@ -115,18 +114,11 @@ impl CollectSidebarNode {
 
 	pub fn collect(
 		In((this, endpoint_tree)): In<(Self, EndpointTree)>,
-		articles: Query<&ArticleMeta>,
 	) -> SidebarNode {
-		this.map_node(&endpoint_tree, &articles)
+		this.map_node(&endpoint_tree)
 	}
 
-	pub fn map_node(
-		&self,
-		node: &EndpointTree,
-		articles: &Query<&ArticleMeta>,
-	) -> SidebarNode {
-		// get the article meta for this endpoint
-		let meta = node.endpoint.and_then(|e| articles.get(e).ok());
+	pub fn map_node(&self, node: &EndpointTree) -> SidebarNode {
 		let has_endpoint = node.endpoint.is_some();
 		let route_path = node.pattern.annotated_route_path();
 		let children = node
@@ -136,7 +128,7 @@ impl CollectSidebarNode {
 				self.include_filter
 					.passes(&child.pattern.annotated_route_path().0)
 			})
-			.map(|child| self.map_node(child, articles))
+			.map(|child| self.map_node(child))
 			.collect();
 
 		// Helper to get a display name from a RoutePath
@@ -159,9 +151,7 @@ impl CollectSidebarNode {
 		} else {
 			None
 		};
-		let display_name = meta
-			.and_then(|m| m.sidebar_label().map(|label| label.to_string()))
-			.unwrap_or_else(|| pretty_route_name(&route_path));
+		let display_name = pretty_route_name(&route_path);
 
 		SidebarNode {
 			display_name,
@@ -189,12 +179,11 @@ mod test {
 		#[template]
 		fn TestSidebar(
 			entity: Entity,
-			#[field(param)] bundle_query: HtmlBundleQuery,
-			#[field(param)] mut route_query: RouteQuery,
-			#[field(param)] articles: Query<&ArticleMeta>,
+			#[field(param)] route_query: RouteQuery,
 		) -> Result<TextNode> {
-			let actions = bundle_query.actions_from_agent_descendant(entity)?;
-			let endpoint_tree = route_query.endpoint_tree(actions[0])?;
+			// Use the template entity for endpoint_tree lookup since it has
+			// a proper TemplateOf/ChildOf chain to the router
+			let endpoint_tree = route_query.endpoint_tree(entity)?;
 
 			// Verify we got the endpoint tree
 			endpoint_tree.to_string().xpect_eq("/docs\n");
@@ -203,7 +192,7 @@ mod test {
 				include_filter: GlobFilter::default(),
 				expanded_filter: GlobFilter::default().with_include("/docs/"),
 			}
-			.map_node(&endpoint_tree, &articles);
+			.map_node(&endpoint_tree);
 
 			// Verify the sidebar node was created
 			// The root of the tree has display name "Root", with /docs as a child
@@ -215,15 +204,17 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(router_exchange(|| {
 				(Sequence, children![
 					EndpointBuilder::get()
 						.with_path("docs")
-						.with_handler(|| (BeetRoot, rsx! {<TestSidebar/>})),
+						.with_action(|| (BeetRoot, rsx! {<TestSidebar/>})),
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/docs"))
+			.exchange(Request::get("/docs"))
+			.await
+			.unwrap_str()
 			.await
 			.xpect_eq("Success");
 	}
@@ -260,16 +251,16 @@ mod test {
 		}
 
 		RouterPlugin::world()
-			.spawn(ExchangeSpawner::new_flow(|| {
+			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get().with_handler(|| (
+					EndpointBuilder::get().with_action(|| (
 						BeetRoot,
 						rsx! { <TestSidebarRender /> }
 					)),
 					html_bundle_to_response(),
 				])
 			}))
-			.oneshot_str(Request::get("/"))
+			.exchange_str(Request::get("/"))
 			.await
 			.xpect_contains("Partying");
 	}

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A 'server' that accepts the cli arguments and environment variables as a request,
-/// exiting with the output.
+/// logging the response body to stdout.
 #[derive(Component)]
 #[component(on_add=on_add)]
 pub struct CliServer;
@@ -13,22 +13,18 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		world.entity_mut(entity).run_async_local(
 			async move |entity| -> Result {
 				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res = entity.oneshot(req).await;
-				let (parts, body) = res.into_parts();
-				let body = body.into_string().await?;
+				let res = entity.exchange(req).await;
+				let (parts, mut body) = res.into_parts();
+
+				// stream body to stdout
+				while let Some(chunk) = body.next().await? {
+					let chunk_str = String::from_utf8_lossy(&chunk);
+					cross_log_noline!("{}", chunk_str);
+				}
 				let exit = match parts.status_to_exit_code() {
-					Ok(()) => {
-						body.xprint_display();
-						AppExit::Success
-					}
+					Ok(()) => AppExit::Success,
 					Err(code) => {
-						let body = if body.is_empty() {
-							body
-						} else {
-							format!("Body:\n{}", body)
-						};
-						error!("Command failed\nStatus code: {code}\n{}", body);
-						// TODO map http status to
+						error!("Command failed\nStatus code: {code}");
 						AppExit::Error(code)
 					}
 				};
@@ -51,9 +47,7 @@ mod tests {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
 				CliServer,
-				ExchangeSpawner::new_handler(|_, _| {
-					StatusCode::ImATeapot.into()
-				}),
+				handler_exchange(|_, _| StatusCode::ImATeapot.into()),
 			))
 			.run_async()
 			.await

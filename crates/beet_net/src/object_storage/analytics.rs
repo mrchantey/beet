@@ -104,9 +104,9 @@ impl TableRow for AnalyticsEvent {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use serde_json::Value;
 	use serde_json::json;
-	use beet_core::prelude::*;
 
 	fn event() -> Value {
 		json! ({

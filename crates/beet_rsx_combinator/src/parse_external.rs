@@ -85,9 +85,9 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 	use combine::Parser;
 	use combine::combinator::parser;
-	use beet_core::prelude::*;
 
 	#[test]
 	pub fn test_rsx_code_block_to_html() {

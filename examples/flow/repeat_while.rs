@@ -52,7 +52,7 @@ fn main() {
 		Name::new("root"),
 		Sequence,
 		// Repeat while children return Pass
-		Repeat::if_success(),
+		Retrigger::if_success(),
 		children![
 			(
 				Name::new("fails on third run"),

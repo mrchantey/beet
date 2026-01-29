@@ -1,27 +1,7 @@
-use crate::prelude::*;
+// use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(feature = "flow")]
 use beet_flow::prelude::ControlFlowPlugin;
-
-/// Represents a http request, may contain a [`Request`] or [`Response`]
-#[derive(Default, Reflect, Component)]
-#[reflect(Component)]
-pub struct Exchange;
-
-/// Points to the [`HttpServer`] that this exchange was spawned by.
-/// We don't use [`Children`] because some server patterns have a different
-/// meaning for that, for example `beet_router` uses `beet_flow` to represent
-/// the routes, and the [`Exchange`] is an `agent`.
-#[derive(Deref, Reflect, Component)]
-#[reflect(Component)]
-#[relationship(relationship_target = Exchanges)]
-#[require(Exchange)]
-pub struct ExchangeOf(pub Entity);
-
-/// List of [`Exchange`]
-#[derive(Deref, Component)]
-#[relationship_target(relationship = ExchangeOf, linked_spawn)]
-pub struct Exchanges(Vec<Entity>);
 
 /// Plugin for running bevy servers.
 /// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
@@ -52,67 +32,15 @@ impl ServerPlugin {
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>().add_observer(server_stats);
+		app.init_plugin::<AsyncPlugin>();
+		// .add_observer(exchange_stats);
 		#[cfg(feature = "flow")]
 		app.init_plugin::<ControlFlowPlugin>();
 	}
 }
 
-
-/// Update server stats if available
-fn server_stats(
-	ev: On<ExchangeComplete>,
-	mut servers: Query<&mut ServerStatus>,
-	exchange: Query<(&RequestMeta, &Response, &ExchangeOf)>,
-) -> Result {
-	let entity = ev.target();
-	let Ok((meta, response, exchange_of)) = exchange.get(entity) else {
-		return Ok(());
-	};
-	let status = response.status();
-	let duration = meta.started().elapsed();
-	let path = meta.path_string();
-	let method = meta.method();
-
-	let Ok(mut stats) = servers.get_mut(exchange_of.get()) else {
-		return Ok(());
-	};
-
-	bevy::log::info!(
-		"
-Request Complete
-  path:     {}
-  method:   {}
-  duration: {}
-  status:   {}
-  index:    {}
-",
-		path,
-		method,
-		time_ext::pretty_print_duration(duration),
-		status,
-		stats.request_count()
-	);
-	stats.increment_requests();
-	Ok(())
-}
-
-
-
-#[derive(Default, Component)]
-pub struct ServerStatus {
-	request_count: u128,
-}
-impl ServerStatus {
-	pub fn request_count(&self) -> u128 { self.request_count }
-	pub(super) fn increment_requests(&mut self) -> &mut Self {
-		self.request_count += 1;
-		self
-	}
-}
-
 #[cfg(test)]
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "server", feature = "ureq", not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -126,9 +54,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					ExchangeSpawner::new_handler(|_, _| {
-						Response::ok().with_body("hello")
-					}),
+					handler_exchange(|_, _| Response::ok().with_body("hello")),
 				))
 				.run();
 		});

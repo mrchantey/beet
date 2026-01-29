@@ -1053,12 +1053,12 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "beet"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-executor",
  "beet",
- "beet_agent",
  "beet_build",
+ "beet_clanker",
  "beet_core",
  "beet_design",
  "beet_dom",
@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet",
  "beet_core",
@@ -1098,32 +1098,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_agent"
-version = "0.0.8"
-dependencies = [
- "async-lock",
- "base64 0.22.1",
- "beet_agent",
- "beet_core",
- "beet_net",
- "bevy",
- "dotenv",
- "http 1.3.1",
- "js-sys",
- "mime_guess",
- "serde",
- "serde_json",
- "serde_with",
- "strum",
- "thiserror 1.0.69",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "beet_build"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-process",
  "beet_core",
@@ -1154,8 +1130,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_clanker"
+version = "0.0.9-dev.4"
+dependencies = [
+ "async-lock",
+ "base64 0.22.1",
+ "beet_clanker",
+ "beet_core",
+ "beet_flow",
+ "beet_net",
+ "beet_router",
+ "bevy",
+ "dotenv",
+ "futures",
+ "http 1.3.1",
+ "js-sys",
+ "mime_guess",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "strum",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "beet_core"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1167,7 +1170,6 @@ dependencies = [
  "bevy",
  "bytes",
  "console_error_panic_hook",
- "crossterm",
  "ctrlc",
  "either",
  "extend",
@@ -1210,7 +1212,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "proc-macro2",
@@ -1221,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1240,7 +1242,7 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-process",
  "base64 0.22.1",
@@ -1262,7 +1264,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1279,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "bevy",
@@ -1288,7 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1317,7 +1319,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1332,7 +1334,6 @@ dependencies = [
  "base64 0.22.1",
  "beet_core",
  "beet_flow",
- "beet_net",
  "bevy",
  "blocking",
  "bytes",
@@ -1368,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1390,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "beet_core",
@@ -1411,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "beet_core",
@@ -1437,7 +1438,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "combine 2.5.2",
@@ -1447,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_parse",
@@ -1459,17 +1460,19 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet",
  "beet_design",
+ "futures",
  "getrandom 0.3.3",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.8"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -3561,31 +3564,6 @@ name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
-
-[[package]]
-name = "crossterm"
-version = "0.28.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "829d955a0bb380ef178a640b91779e3987da38c9aea133b20614cfed8cdea9c6"
-dependencies = [
- "bitflags 2.9.4",
- "crossterm_winapi",
- "mio",
- "parking_lot",
- "rustix 0.38.44",
- "signal-hook",
- "signal-hook-mio",
- "winapi",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
-dependencies = [
- "winapi",
-]
 
 [[package]]
 name = "crunchy"
@@ -6098,9 +6076,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.176"
+version = "0.2.180"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58f929b4d672ea937a23a1ab494143d968337a5f47e56d0815df1e0890ddf174"
+checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -8821,27 +8799,6 @@ name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
-
-[[package]]
-name = "signal-hook"
-version = "0.3.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d881a16cf4426aa584979d30bd82cb33429027e42122b169753d6ef1085ed6e2"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
-
-[[package]]
-name = "signal-hook-mio"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34db1a06d485c9142248b7a054f034b349b212551f3dfd19c94d45a754a217cd"
-dependencies = [
- "libc",
- "mio",
- "signal-hook",
-]
 
 [[package]]
 name = "signal-hook-registry"
