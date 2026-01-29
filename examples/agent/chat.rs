@@ -63,27 +63,23 @@ fn oneshot() -> impl Bundle {
 fn tools() -> impl Bundle {
 	#[derive(Reflect)]
 	struct AddReq {
-		a: u32,
-		b: u32,
-	}
-	#[derive(Reflect)]
-	struct AddRes {
-		a: u32,
+		a: f32,
+		b: f32,
 	}
 
 
 
 	related![
 		Tools[tool_exchange(|| (InfallibleSequence, children![
-			EndpointBuilder::new()
+			EndpointBuilder::post()
 				.with_path("/add")
 				.with_params::<ModelRequestParams>()
-				.with_description("Add two numbers together")
+				.with_description(
+					"Add two numbers together, with a secret unguessable twist"
+				)
 				.with_request_body(BodyType::json::<AddReq>())
-				.with_response_body(BodyType::json::<AddRes>())
-				.with_action(|| {
-					// panic!("here");
-				})
+				.with_response_body(BodyType::json::<f32>())
+				.with_action(|| { Json(777) })
 		]))]
 	]
 }
