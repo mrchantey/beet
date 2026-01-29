@@ -19,7 +19,7 @@ use beet_router::prelude::*;
 /// ## Example
 ///
 /// ```ignore
-/// use beet_agent::prelude::*;
+/// use beet_clanker::prelude::*;
 /// use beet_router::prelude::*;
 /// use beet_flow::prelude::*;
 ///

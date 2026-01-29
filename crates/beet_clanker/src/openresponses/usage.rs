@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```no_run
-//! # use beet_agent::prelude::openresponses;
+//! # use beet_clanker::prelude::openresponses;
 //! # fn example(response: openresponses::ResponseBody) {
 //! if let Some(usage) = &response.usage {
 //!     println!("Input: {} tokens", usage.input_tokens);

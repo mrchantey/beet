@@ -19,7 +19,7 @@
 //! Messages contain arrays of content parts, allowing mixed content:
 //!
 //! ```no_run
-//! # use beet_agent::prelude::openresponses;
+//! # use beet_clanker::prelude::openresponses;
 //! let parts = vec![
 //!     openresponses::ContentPart::input_text("What's in this image?"),
 //!     openresponses::ContentPart::InputImage(
@@ -33,7 +33,7 @@
 //! Images can be provided as URLs or base64-encoded data:
 //!
 //! ```no_run
-//! # use beet_agent::prelude::openresponses;
+//! # use beet_clanker::prelude::openresponses;
 //! // From URL
 //! let img = openresponses::InputImage::from_url("https://example.com/photo.jpg");
 //!

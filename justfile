@@ -231,8 +231,8 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
     just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{ args }}
 
-test-agent:
-    just cli agent 											\
+test-clanker:
+    just cli clanker 										\
     --oneshot --image										\
     -f=assets/tests/agents/prompt.txt		\
     --out-dir=assets/tests/agents/out

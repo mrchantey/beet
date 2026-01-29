@@ -1,14 +1,14 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
-use beet_agent::prelude::*;
+use beet_clanker::prelude::*;
 
 #[path = "utils/model_provider.rs"]
 mod model_provider;
 
 fn provider() -> impl ModelProvider {
 	dotenv::dotenv().ok();
-	OpenAiProvider::default()
+	GeminiProvider::default()
 }
 
 #[beet_core::test(timeout_ms = 15_000)]

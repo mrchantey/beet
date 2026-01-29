@@ -1,7 +1,14 @@
+//! # Clanker Chat
+//!
 //! An example of a chat CLI
+//!
+//! If the clanker read the tool call it should mention the hidden number 777.
 //! ```sh
 //! cargo run --example chat --features=agent,native-tls whats 1+1. use the tool.
 //!	```
+//!
+//! Note that I get about a 50/50 success that it read the tool call.
+//!
 
 use beet::prelude::*;
 

@@ -24,7 +24,7 @@
 //! # Extracting Content
 //!
 //! ```no_run
-//! # use beet_agent::prelude::openresponses;
+//! # use beet_clanker::prelude::openresponses;
 //! # fn example(output: &[openresponses::OutputItem]) {
 //! for item in output {
 //!     match item {

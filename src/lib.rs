@@ -2,8 +2,8 @@
 #![doc = include_str!("../README.md")]
 mod beet_plugins;
 
-#[cfg(feature = "agent")]
-pub use beet_agent as agent;
+#[cfg(feature = "clanker")]
+pub use beet_clanker as clanker;
 #[cfg(feature = "build")]
 pub use beet_build as build;
 pub use beet_core as core;
@@ -36,8 +36,8 @@ pub use beet_rsx as rsx;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 pub mod prelude {
-	#[cfg(feature = "agent")]
-	pub use crate::agent::prelude::*;
+	#[cfg(feature = "clanker")]
+	pub use crate::clanker::prelude::*;
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;

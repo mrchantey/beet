@@ -14,7 +14,7 @@ use beet_net::prelude::ExchangeTarget;
 /// ## Example
 ///
 /// ```
-/// use beet_agent::prelude::*;
+/// use beet_clanker::prelude::*;
 /// use beet_flow::prelude::*;
 ///
 /// // Typical usage in a tool-calling loop

@@ -1,5 +1,5 @@
 [package]
-name = "beet_agent"
+name = "beet_clanker"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -66,4 +66,4 @@ web-sys = { workspace = true, features = [
 beet_core = { workspace = true, features = ["testing"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet_agent = { path = ".", features = ["native-tls"] }
+beet_clanker = { path = ".", features = ["native-tls"] }

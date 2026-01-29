@@ -1057,8 +1057,8 @@ version = "0.0.9-dev.4"
 dependencies = [
  "async-executor",
  "beet",
- "beet_agent",
  "beet_build",
+ "beet_clanker",
  "beet_core",
  "beet_design",
  "beet_dom",
@@ -1098,33 +1098,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_agent"
-version = "0.0.9-dev.4"
-dependencies = [
- "async-lock",
- "base64 0.22.1",
- "beet_agent",
- "beet_core",
- "beet_flow",
- "beet_net",
- "beet_router",
- "bevy",
- "dotenv",
- "futures",
- "http 1.3.1",
- "js-sys",
- "mime_guess",
- "serde",
- "serde_json",
- "serde_with",
- "strum",
- "thiserror 1.0.69",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "beet_build"
 version = "0.0.9-dev.4"
 dependencies = [
@@ -1154,6 +1127,33 @@ dependencies = [
  "thiserror 1.0.69",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "beet_clanker"
+version = "0.0.9-dev.4"
+dependencies = [
+ "async-lock",
+ "base64 0.22.1",
+ "beet_clanker",
+ "beet_core",
+ "beet_flow",
+ "beet_net",
+ "beet_router",
+ "bevy",
+ "dotenv",
+ "futures",
+ "http 1.3.1",
+ "js-sys",
+ "mime_guess",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "strum",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

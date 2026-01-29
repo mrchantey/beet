@@ -1,4 +1,4 @@
-Implement the Open Responses API in `crates/beet_agent/src/flow_agent/openresponses` using sensible Rust conventions:
+Implement the Open Responses API in `crates/beet_clanker/src/flow_agent/openresponses` using sensible Rust conventions:
 
 - Separate code by files with all public items exposed via `mod.rs`
 - Use beautiful Rust conventions, docs, and doc examples instead of relying on openapi auto-generation, which typically results in language-specific antipatterns
@@ -6,11 +6,11 @@ Implement the Open Responses API in `crates/beet_agent/src/flow_agent/openrespon
 
 ## Testing
 
-- Create the six integration tests in `crates/beet_agent/tests/openresponses.rs`
+- Create the six integration tests in `crates/beet_clanker/tests/openresponses.rs`
 An example integration test may look something like this (the exact API may differ):
 
 ```rust
-use beet_agent::prelude::*;
+use beet_clanker::prelude::*;
 use beet_net::prelude::*;
 
 #[beet_core::test]

@@ -29,7 +29,7 @@ fn next_id(prefix: &str) -> String {
 /// ## Example
 ///
 /// ```ignore
-/// use beet_agent::prelude::*;
+/// use beet_clanker::prelude::*;
 ///
 /// let provider = MockModelProvider::default();
 ///

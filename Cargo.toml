@@ -55,7 +55,7 @@ members = [
 
 	## 💡 RSX
 	"crates/beet_net",
-	"crates/beet_agent",
+	"crates/beet_clanker",
 	"crates/beet_build",
 	"crates/beet_design",
 	"crates/beet_dom",
@@ -90,7 +90,7 @@ beet_design = { path = "crates/beet_design", version = "0.0.9-dev.4" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.4" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.4" }
 beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.4" }
-beet_agent = { path = "crates/beet_agent", version = "0.0.9-dev.4" }
+beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.4" }
 
 beet = { path = "", version = "0.0.9-dev.4" }
 
@@ -224,17 +224,17 @@ client = [
 
 #💡 fine-grained
 native-tls = [
-	"beet_agent?/native-tls",
+	"beet_clanker?/native-tls",
 	"beet_net?/native-tls",
 ]
 rustls-tls = [
-	"beet_agent?/rustls-tls",
+	"beet_clanker?/rustls-tls",
 	"beet_net?/rustls-tls",
 ]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
 rand = ["beet_core/rand"]
-agent = ["dep:beet_agent","net","router"]
+clanker = ["dep:beet_clanker","net","router"]
 testing = ["beet_core/testing"]
 dom = ["css", "dep:beet_dom"]
 router = ["dep:beet_router"]
@@ -265,7 +265,7 @@ bevy_default = [
 	"beet_spatial?/bevy_default",
 ]
 #💡 utils
-fs = ["beet_agent?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
+fs = ["beet_clanker?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 
@@ -289,7 +289,7 @@ beet_rsx = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
-beet_agent = { workspace = true, optional = true }
+beet_clanker = { workspace = true, optional = true }
 
 #💡 flow
 beet_flow = { workspace = true, optional = true }
@@ -330,8 +330,8 @@ web-sys.workspace = true
 
 [[example]]
 name = "chat"
-path = "examples/agent/chat.rs"
-required-features = ["agent"]
+path = "examples/clanker/chat.rs"
+required-features = ["clanker"]
 
 
 # 💡 Examples - net

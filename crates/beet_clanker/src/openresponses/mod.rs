@@ -44,7 +44,7 @@
 //! # Example: Non-Streaming Request
 //!
 //! ```no_run
-//! use beet_agent::prelude::*;
+//! use beet_clanker::prelude::*;
 //! use beet_core::prelude::*;
 //! use beet_net::prelude::*;
 //!
@@ -73,7 +73,7 @@
 //! # Example: Streaming Request
 //!
 //! ```no_run
-//! use beet_agent::prelude::*;
+//! use beet_clanker::prelude::*;
 //! use beet_core::prelude::*;
 //!
 //! # async fn example() -> Result<()> {

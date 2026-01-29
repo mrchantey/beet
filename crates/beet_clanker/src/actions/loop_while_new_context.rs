@@ -19,7 +19,7 @@ use beet_flow::prelude::*;
 /// ## Example
 ///
 /// ```
-/// # use beet_agent::prelude::*;
+/// # use beet_clanker::prelude::*;
 /// # use beet_flow::prelude::*;
 /// # use beet_core::prelude::*;
 /// # let mut world = FlowAgentPlugin::world();
