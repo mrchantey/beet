@@ -124,6 +124,7 @@ pub struct Parts {
 	/// The authority (host:port) for HTTP, or application name for CLI
 	authority: String,
 	/// The path segments (split by `/` for HTTP, positional args for CLI)
+	// TODO path and params belong in request only
 	path: Vec<String>,
 	/// Query parameters (HTTP) or flags/options (CLI)
 	///
@@ -135,6 +136,7 @@ pub struct Parts {
 	/// - The keys are stored here verbatim with no parsing,
 	///  but `beet_router` will convert keys to `kebab-case` before deserializing
 	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
+	// TODO path and params belong in request only
 	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
 	headers: MultiMap<String, String>,
