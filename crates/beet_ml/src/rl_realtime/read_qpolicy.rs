@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 /// Read the QPolicy from the asset and update the agent's action.
 /// ## Tags
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 #[action(read_q_policy::<P>)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]

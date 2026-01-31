@@ -27,6 +27,16 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	let agent = ureq::config::Config::builder()
 		.tls_config(
 			ureq::tls::TlsConfig::builder()
+				.provider(ureq::tls::TlsProvider::Rustls)
+				.build(),
+		)
+		.http_status_as_error(false)
+		.build()
+		.new_agent();
+	#[cfg(all(feature = "rustls-tls", feature = "native-tls"))]
+	let agent = ureq::config::Config::builder()
+		.tls_config(
+			ureq::tls::TlsConfig::builder()
 				.provider(ureq::tls::TlsProvider::NativeTls)
 				.build(),
 		)

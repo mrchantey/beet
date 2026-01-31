@@ -1,3 +1,4 @@
+//! Log action names when they run.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

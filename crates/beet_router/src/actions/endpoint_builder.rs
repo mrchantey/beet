@@ -3,32 +3,43 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use bevy::ecs::relationship::RelatedSpawner;
 
-/// High level helper for building a correct [`Endpoint`] structure.
-/// The flexibility of `beet_router` makes it challenging to build a correct
-/// structure manually.
+/// Fluent builder for constructing [`Endpoint`] entities.
+///
+/// The flexibility of `beet_router` makes manually constructing endpoint
+/// hierarchies error-prone. This builder handles the complexity of setting
+/// up path matching, method checks, predicates, and handlers.
+///
+/// # Example
+///
+/// ```ignore
+/// # use beet_router::prelude::*;
+/// EndpointBuilder::get()
+///     .with_path("/users/:id")
+///     .with_action(|req: Request| req.mirror())
+/// ```
 #[derive(BundleEffect)]
 pub struct EndpointBuilder {
-	/// The action to handle the request, by default always returns a 200 OK
+	/// The action to handle the request, by default always returns a 200 OK.
 	insert: Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
-	/// The path to match, or None for any path
+	/// The path to match, or `None` for any path.
 	path: Option<PathPartial>,
-	/// The params to match, or None for any params
+	/// The params to match, or `None` for any params.
 	params: Option<ParamsPartial>,
-	/// The method to match, or None for any method. Defaults to GET
+	/// The HTTP method to match, or `None` for any method. Defaults to GET.
 	method: Option<HttpMethod>,
-	/// The cache strategy for this endpoint, if any
+	/// The cache strategy for this endpoint, if any.
 	cache_strategy: Option<CacheStrategy>,
-	/// Whether to match the path exactly, defaults to true.
+	/// Whether to match the path exactly. Defaults to `true`.
 	exact_path: bool,
-	/// Optional description for this endpoint
+	/// Optional description for this endpoint.
 	description: Option<String>,
-	/// Whether this endpoint is canonical (registered in EndpointTree), defaults to true
+	/// Whether this endpoint is canonical (registered in [`EndpointTree`]). Defaults to `true`.
 	is_canonical: bool,
-	/// Metadata for the request body
+	/// Metadata for the request body.
 	request_body: BodyType,
-	/// Metadata for the response body
+	/// Metadata for the response body.
 	response_body: BodyType,
-	/// Additional bundles to be run before the handler
+	/// Additional predicates to run before the handler.
 	additional_predicates: Vec<
 		Box<
 			dyn 'static
@@ -71,8 +82,11 @@ impl EndpointBuilder {
 	/// ```
 	pub fn new() -> Self { Self::default() }
 
+	/// Creates a GET endpoint builder.
 	pub fn get() -> Self { Self::default().with_method(HttpMethod::Get) }
+	/// Creates a POST endpoint builder.
 	pub fn post() -> Self { Self::default().with_method(HttpMethod::Post) }
+	/// Creates an endpoint builder that matches any HTTP method.
 	pub fn any_method() -> Self { Self::default().with_any_method() }
 
 	/// Create middleware that accepts trailing path segments and any HTTP method.
@@ -153,19 +167,23 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Sets the path pattern for this endpoint.
 	pub fn with_path(mut self, path: impl AsRef<str>) -> Self {
 		self.path = Some(PathPartial::new(path.as_ref()));
 		self
 	}
 
+	/// Sets the parameter pattern from a typed struct.
 	pub fn with_params<T: bevy_reflect::Typed>(mut self) -> Self {
 		self.params = Some(ParamsPartial::new::<T>());
 		self
 	}
+	/// Sets the HTTP method this endpoint matches.
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
 		self.method = Some(method);
 		self
 	}
+	/// Allows this endpoint to match any HTTP method.
 	pub fn with_any_method(mut self) -> Self {
 		self.method = None;
 		self
@@ -183,6 +201,7 @@ impl EndpointBuilder {
 		self
 	}
 
+	/// Sets the cache strategy for this endpoint.
 	pub fn with_cache_strategy(mut self, strategy: CacheStrategy) -> Self {
 		self.cache_strategy = Some(strategy);
 		self

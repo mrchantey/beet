@@ -1,18 +1,72 @@
+//! Method-chaining utilities for any type.
+//!
+//! This module provides extension traits that enable fluent method chaining
+//! on any type, similar to the [`tap`](https://crates.io/crates/tap) crate.
+//!
+//! # Overview
+//!
+//! - [`Xtend`] - Core utilities for mapping, tapping, and wrapping any type
+//! - [`XtendIter`] - Iterator-like operations that collect immediately
+//! - [`XtendVec`] - Chainable vector operations
+//! - [`XtendString`] - Chainable string operations
+//! - [`XtendBool`] - Boolean-conditional mapping
+
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Utilities for method-chaining on any type.
-/// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
+/// Method-chaining utilities for any type.
+///
+/// This trait provides functional-style operations that enable fluent method
+/// chains without breaking the flow for common operations like wrapping in
+/// `Result` or `Option`, or applying transformations.
+///
+/// # Examples
+///
+/// Mapping inline:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let doubled = 5.xmap(|n| n * 2);
+/// assert_eq!(doubled, 10);
+/// ```
+///
+/// Wrapping in Result:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use bevy::prelude::*;
+/// fn compute() -> Result<i32> {
+///     42.xok()
+/// }
+/// ```
+///
+/// Tapping for side effects:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let value = vec![1, 2, 3]
+///     .xtap(|v| assert_eq!(v.len(), 3))
+///     .into_iter()
+///     .sum::<i32>();
+/// assert_eq!(value, 6);
+/// ```
 pub trait Xtend: Sized {
-	/// Similar to [`Iterator::map`] but for any type, not just iterators,
-	/// allowing for method chaining.
+	/// Applies a function to `self` and returns the result.
+	///
+	/// Similar to [`Iterator::map`] but works on any type, enabling method chaining.
 	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
-	/// Similar to [`Iterator::inspect`] but for any type, not just iterators.
+
+	/// Applies a function to `&mut self` for side effects, then returns `self`.
+	///
+	/// Similar to [`Iterator::inspect`] but works on any type.
 	fn xtap(mut self, func: impl FnOnce(&mut Self)) -> Self {
 		func(&mut self);
 		self
 	}
-	/// just print the value and return it, debug formatted
+
+	/// Prints the debug-formatted value with a prefix and returns `self`.
+	///
+	/// Uses [`cross_log!`](crate::cross_log) for cross-platform output.
 	fn xprint(self, prefix: impl AsRef<str>) -> Self
 	where
 		Self: std::fmt::Debug,
@@ -20,7 +74,8 @@ pub trait Xtend: Sized {
 		crate::cross_log!("{}: {:#?}", prefix.as_ref(), self);
 		self
 	}
-	/// just print the value and return it
+
+	/// Prints the display-formatted value and returns `self`.
 	fn xprint_display(self) -> Self
 	where
 		Self: std::fmt::Display,
@@ -28,7 +83,8 @@ pub trait Xtend: Sized {
 		crate::cross_log!("{}", self);
 		self
 	}
-	/// just print the value and return it, debug
+
+	/// Prints the debug-formatted value and returns `self`.
 	fn xprint_debug(self) -> Self
 	where
 		Self: std::fmt::Debug,
@@ -36,52 +92,61 @@ pub trait Xtend: Sized {
 		crate::cross_log!("{:?}", self);
 		self
 	}
-	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.
+
+	/// Applies a function to `&mut self` for side effects, then returns `&mut self`.
 	fn xtap_mut(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
 		func(self);
 		self
 	}
 
-	/// Convenience wrapper for `&self` in method chaining contexts.
+	/// Returns a reference to `self` for use in method chains.
 	fn xref(&self) -> &Self { self }
-	/// Convenience wrapper for `&mut self` in method chaining contexts.
+
+	/// Returns a mutable reference to `self` for use in method chains.
 	fn xmut(&mut self) -> &mut Self { self }
-	/// A message-chaining friendly way wrap this type in a [`Result::Ok`]
+
+	/// Wraps `self` in [`Ok`].
 	///
-	/// ## Example
+	/// # Examples
 	///
-	/// ```rust
+	/// ```
 	/// # use bevy::prelude::*;
 	/// # use beet_core::prelude::*;
-	/// fn foo()-> Result<u32> {
-	///   7.xok()
+	/// fn foo() -> Result<u32> {
+	///     7.xok()
 	/// }
 	/// ```
 	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
-	/// Wraps the value in an [`Option::Some`]
-	/// ## Example
+
+	/// Wraps `self` in [`Some`].
 	///
-	/// ```rust
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// assert_eq!("foo".xsome(), Some("foo"));
 	/// ```
 	fn xsome(self) -> Option<Self> { Some(self) }
 
-	/// Convenience wrapper for [`Into::into`].
-	/// ```rust
+	/// Converts `self` using [`Into::into`].
+	///
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// assert_eq!(7_u32.xinto::<u64>(), 7);
 	/// ```
 	fn xinto<T: From<Self>>(self) -> T { T::from(self) }
 
-	/// Return a `String` containing the formatted `Debug` representation of the value.
+	/// Returns a pretty-printed `Debug` representation.
 	fn xfmt(&self) -> String
 	where
 		Self: std::fmt::Debug,
 	{
 		format!("{:#?}", self)
 	}
-	/// Return a `String` containing the `Debug` representation of the value.
+
+	/// Returns a compact `Debug` representation.
 	fn xfmt_debug(&self) -> String
 	where
 		Self: std::fmt::Debug,
@@ -89,8 +154,7 @@ pub trait Xtend: Sized {
 		format!("{:?}", self)
 	}
 
-
-	/// Return a `String` containing the `Display` representation of the value.
+	/// Returns a `Display` representation.
 	fn xfmt_display(&self) -> String
 	where
 		Self: std::fmt::Display,
@@ -98,18 +162,23 @@ pub trait Xtend: Sized {
 		format!("{}", self)
 	}
 }
+
 impl<T: Sized> Xtend for T {}
 
 
-/// Utilities for method-chaining on any type.
-/// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
+/// Iterator-like operations that collect immediately into a [`Vec`].
+///
+/// These methods combine iteration and collection into single operations
+/// for more concise code when you need a collected result anyway.
 pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
-	/// Similar to [`IntoIterator::into_iter().map(func).collect()`]
+	/// Maps each item and collects into a [`Vec`].
+	///
+	/// Equivalent to `.into_iter().map(func).collect()`.
 	fn xmap_each<O>(self, func: impl FnMut(T) -> O) -> Vec<O> {
 		self.into_iter().map(func).collect()
 	}
-	/// Similar to [`IntoIterator::into_iter().map(func).collect()`]
-	/// but flattens the results.
+
+	/// Maps each item with a fallible function, short-circuiting on error.
 	fn xtry_map<O, E>(
 		self,
 		mut func: impl FnMut(T) -> Result<O, E>,
@@ -123,8 +192,8 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		}
 		Ok(out)
 	}
-	/// Similar to [`IntoIterator::into_iter().filter_map(func).collect()`]
-	/// but flattens the results.
+
+	/// Filter-maps each item with a fallible function, short-circuiting on error.
 	fn xtry_filter_map<O, E>(
 		self,
 		mut func: impl FnMut(T) -> Result<Option<O>, E>,
@@ -140,10 +209,12 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		Ok(out)
 	}
 
-	/// Similar to [`Iterator::find_map`] but where the mapping can fail.
+	/// Finds the first successful result or returns the first error.
 	///
-	/// In the case of no Ok, the first error will be returned, otherwise
-	/// a "No items found" is returned.
+	/// Similar to [`Iterator::find_map`] but for fallible operations.
+	/// Returns `Ok` on the first successful result, otherwise returns
+	/// the first error encountered (or a "No items found" error if all
+	/// returned `None`-equivalent values).
 	fn xtry_find_map<O, E>(
 		self,
 		mut func: impl FnMut(T) -> Result<O, E>,
@@ -166,24 +237,29 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 	}
 }
 
+/// Extension methods for boolean values.
 #[extend::ext(name=XtendBool)]
 pub impl bool {
-	/// Runs the function if `self` is true
+	/// Runs the function if `self` is true, returning `Some(result)`.
 	fn xmap_true<O>(&self, func: impl FnOnce() -> O) -> Option<O> {
 		if *self { Some(func()) } else { None }
 	}
-	/// Runs the function if `self` is false
+
+	/// Runs the function if `self` is false, returning `Some(result)`.
 	fn xmap_false<O>(&self, func: impl FnOnce() -> O) -> Option<O> {
 		if !*self { Some(func()) } else { None }
 	}
 }
+
 impl<T: Sized, I: IntoIterator<Item = T>> XtendIter<T> for I {}
 
 
+/// Chainable operations for vectors.
 pub trait XtendVec<T> {
-	/// Similar to [`Vec::extend`] but returns [`Self`]
+	/// Extends `self` with items from an iterator and returns `self`.
 	fn xtend<I: IntoIterator<Item = T>>(self, iter: I) -> Self;
-	/// Similar to [`Vec::push`] but returns [`Self`]
+
+	/// Pushes an item and returns `self`.
 	fn xpush(self, item: T) -> Self;
 }
 
@@ -202,8 +278,9 @@ where
 	}
 }
 
+/// Chainable operations for strings.
 pub trait XtendString {
-	/// Similar to [`String::push_str`] but returns [`Self`]
+	/// Appends a string and returns `self`.
 	fn xtend(self, item: impl AsRef<str>) -> Self;
 }
 

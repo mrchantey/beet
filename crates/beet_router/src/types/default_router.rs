@@ -11,6 +11,7 @@ use serde_json::Value;
 /// The entrypoint for a router with two endoints:
 /// - `/`: Serve the routes
 /// - `/export-static`: export static html
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub fn default_router_cli(
 	router: impl BundleFunc,
 	endpoints: impl BundleFunc,

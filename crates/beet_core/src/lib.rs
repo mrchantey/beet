@@ -1,3 +1,27 @@
+//! Core utilities and types for the beet framework.
+//!
+//! This crate provides foundational building blocks used across all beet crates,
+//! including cross-platform abstractions, extension traits, and common patterns.
+//!
+//! # Modules
+//!
+//! - [`arena`] - Global arenas for storing objects with copyable handles
+//! - [`extensions`] - Extension traits for standard library types
+//! - [`utils`] - General utilities including async helpers and method chaining
+//! - [`testing`] - Custom test runner and matchers (requires `testing` feature)
+//! - [`fs`] - File system utilities (native only, requires `fs` feature)
+//!
+//! # Feature Flags
+//!
+//! - `serde` - Serialization support (enabled by default)
+//! - `testing` - Test runner and matcher utilities
+//! - `exchange` - HTTP request/response types
+//! - `fs` - File system watching and utilities (native only)
+//! - `tokens` - Proc-macro token utilities
+//! - `rand` - Random number generation
+//! - `nightly` - Nightly Rust features like `Fn` trait implementations
+
+// #![warn(missing_docs)]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
 #![cfg_attr(
@@ -57,6 +81,13 @@ mod workspace_config;
 #[cfg(feature = "testing")]
 pub use crate::testing::test_runner;
 
+/// Re-exports of commonly used types and traits.
+///
+/// This prelude is designed to be glob-imported for convenience:
+///
+/// ```ignore
+/// use beet_core::prelude::*;
+/// ```
 pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
@@ -125,6 +156,10 @@ pub mod prelude {
 	pub use rand::Rng;
 }
 
+/// Re-exports of external crates used by beet.
+///
+/// These exports allow downstream crates to use the same versions of
+/// dependencies without adding them to their own `Cargo.toml`.
 pub mod exports {
 	pub use itertools::Itertools;
 	// original exports

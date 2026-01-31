@@ -1,6 +1,25 @@
+//! HTTP server component for handling incoming requests.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// HTTP server that listens for incoming requests and routes them to handlers.
+///
+/// When spawned, this component automatically starts a server on the specified port.
+/// The underlying implementation depends on compile-time feature flags:
+/// - `lambda`: Uses AWS Lambda runtime
+/// - Default: Uses Hyper HTTP server
+///
+/// # Example
+///
+/// ```ignore
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// let mut world = World::new();
+/// world.spawn((
+///     HttpServer::default(),
+///     HandlerExchange::new(|req| req.mirror()),
+/// ));
+/// ```
 #[derive(Clone, Component)]
 #[component(on_add=on_add)]
 #[require(ExchangeStats)]
@@ -21,6 +40,7 @@ impl Default for HttpServer {
 }
 
 impl HttpServer {
+	/// Creates a new server configured to listen on the specified port.
 	pub fn new(port: u16) -> Self { Self { port } }
 }
 
@@ -41,8 +61,10 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 
 impl HttpServer {
-	/// Create a new Server with an incrementing port to avoid
-	/// collisions in tests
+	/// Creates a new server with an auto-incrementing port for testing.
+	///
+	/// Each call returns a server on a different port, starting from
+	/// [`DEFAULT_SERVER_TEST_PORT`], to avoid collisions in parallel tests.
 	pub fn new_test() -> Self {
 		use std::sync::atomic::AtomicU16;
 		use std::sync::atomic::Ordering;
@@ -53,6 +75,7 @@ impl HttpServer {
 		}
 	}
 
+	/// Returns the local URL for connecting to this server.
 	pub fn local_url(&self) -> String {
 		format!("http://127.0.0.1:{}", self.port)
 	}

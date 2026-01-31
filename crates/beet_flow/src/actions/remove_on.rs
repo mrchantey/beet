@@ -1,23 +1,32 @@
+//! Remove components when events are triggered.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::marker::PhantomData;
 
 
-/// This action will remove the specified bundle when the specified event is triggered.
-/// It is designed to work for both [`GetOutcome`] and [`Outcome`] events.
-/// This action also has a corresponding [`InsertOn`] action.
-/// ## Example
-/// Removes the `Name` bundle when the `Outcome` event is triggered.
+/// Removes a bundle when a specified event is triggered.
+///
+/// This action works with any [`EntityTargetEvent`], commonly [`GetOutcome`]
+/// or [`Outcome`]. The bundle type is removed from the target entity when
+/// the event fires.
+///
+/// See also [`InsertOn`] for the inverse operation.
+///
+/// # Example
+///
+/// Remove [`Name`] when [`Outcome`] is triggered:
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
-///		.spawn((
-/// 		Name::new("bill"),
-/// 		EndWith(Outcome::Pass),
-/// 		RemoveOn::<Outcome, Name>::default()
-/// 	))
-///		.trigger_target(GetOutcome);
+/// # let mut world = World::new();
+/// world
+///     .spawn((
+///         Name::new("bill"),
+///         EndWith(Outcome::Pass),
+///         RemoveOn::<Outcome, Name>::default()
+///     ))
+///     .trigger_target(GetOutcome);
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -38,7 +47,7 @@ impl<E: EntityTargetEvent, B: Bundle> Default for RemoveOn<E, B> {
 }
 
 impl<E: EntityTargetEvent, B: Bundle> RemoveOn<E, B> {
-	/// Specify the target entity for this action.
+	/// Creates a new [`RemoveOn`] with a custom target entity.
 	pub fn new_with_target(target_entity: TargetEntity) -> Self {
 		Self {
 			target_entity,

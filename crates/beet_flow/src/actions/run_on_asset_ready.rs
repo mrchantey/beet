@@ -1,4 +1,7 @@
-//! Actions related to the loading and handling of bevy assets.
+//! Run actions when assets finish loading.
+//!
+//! This module provides [`RunOnAssetReady`] for triggering actions when
+//! a specific asset has loaded with all its dependencies.
 
 use std::marker::PhantomData;
 

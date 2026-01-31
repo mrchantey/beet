@@ -127,17 +127,23 @@ pub fn no_cache_headers() -> impl Bundle {
 	)
 }
 
-/// Configuration for CORS middleware
+/// Configuration for CORS middleware.
+///
+/// Specifies which origins are allowed to make cross-origin requests.
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct CorsConfig {
+	/// Whether to allow requests from any origin.
 	pub allow_any_origin: bool,
+	/// List of specific allowed origins when `allow_any_origin` is `false`.
 	allowed_origins: Vec<String>,
 }
 
 impl CorsConfig {
+	/// The wildcard origin value for Access-Control-Allow-Origin.
 	pub const ANY_ORIGIN: &'static str = "*";
 
+	/// Creates a new CORS configuration.
 	pub fn new(
 		allow_any_origin: bool,
 		allowed_origins: Vec<&'static str>,
@@ -151,6 +157,7 @@ impl CorsConfig {
 		}
 	}
 
+	/// Returns `true` if the given origin is allowed by this configuration.
 	pub fn origin_allowed(&self, origin: &str) -> bool {
 		self.allow_any_origin
 			|| self.allowed_origins.iter().any(|o| o == origin)

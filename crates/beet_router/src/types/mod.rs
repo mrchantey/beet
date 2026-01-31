@@ -1,3 +1,14 @@
+//! Core types for the beet_router system.
+//!
+//! This module provides the foundational types for routing:
+//!
+//! - [`PathPattern`]: URL path matching patterns with wildcards and parameters
+//! - [`ParamsPattern`]: Query and path parameter definitions
+//! - [`EndpointTree`]: Hierarchical route organization
+//! - [`RouteQuery`]: Request routing and matching
+//! - [`BodyType`]: Request/response body type metadata
+//! - [`RouterPlugin`]: Bevy plugin for router integration
+
 mod body_type;
 #[cfg(feature = "server")]
 mod default_router;

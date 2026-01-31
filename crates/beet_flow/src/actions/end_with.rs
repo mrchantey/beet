@@ -1,20 +1,38 @@
+//! Immediate return actions for constant values.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Immediately return a provided value when [`Run`] is called,
-/// regardless of the world state.
-/// This is conceptually similar to a `const` variable, although
-/// the value can technically can be updated by some external system.
+/// Immediately returns a constant value when triggered.
+///
+/// This action responds to any [`RunEvent`] by triggering the corresponding
+/// [`EndEvent`] with the stored value. It is conceptually similar to a `const`
+/// variable, though the value could be modified by external systems.
+///
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
-/// ## Example
-/// returns `Outcome::Pass` when triggered.
+///
+/// # Example
+///
+/// Returns [`Outcome::Pass`] when [`GetOutcome`] is triggered:
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
-/// 	.spawn(EndWith(Outcome::Pass))
-/// 	.trigger_target(GetOutcome);
+/// # let mut world = World::new();
+/// world
+///     .spawn(EndWith(Outcome::Pass))
+///     .trigger_target(GetOutcome);
+/// ```
+///
+/// Can also return scores for utility AI:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = World::new();
+/// world
+///     .spawn(EndWith(Score::PASS))
+///     .trigger_target(GetScore);
 /// ```
 #[action(end_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]

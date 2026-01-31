@@ -1,3 +1,4 @@
+//! Log custom messages when actions run.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;

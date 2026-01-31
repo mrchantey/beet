@@ -1,3 +1,4 @@
+//! Utility AI action that selects the highest-scoring child.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::cmp::Ordering;

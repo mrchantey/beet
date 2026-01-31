@@ -1,3 +1,4 @@
+//! Duration-based action completion.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

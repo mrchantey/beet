@@ -44,6 +44,7 @@
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(if_let_guard, exit_status_error)]
+#![warn(missing_docs)]
 #[allow(unused)]
 use crate::prelude::*;
 

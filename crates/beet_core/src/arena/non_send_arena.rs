@@ -1,3 +1,8 @@
+//! Thread-local arena for storing non-`Send` objects.
+//!
+//! This module provides arena storage for types that cannot be sent across
+//! thread boundaries, such as types containing `Rc` or raw pointers.
+
 use std::any::Any;
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -5,37 +10,64 @@ use std::cell::RefMut;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// A thread-local arena for storing non-Send objects
+/// Entry in the arena that tracks reference count.
+struct NonSendArenaEntry {
+	object: Box<dyn Any>,
+	ref_count: usize,
+}
+
+/// A thread-local arena for storing non-`Send` objects.
+///
+/// Unlike [`Arena`](super::Arena), this arena uses thread-local storage and
+/// does not require `Send` bounds on stored types. Objects are only accessible
+/// from the thread that created them.
+///
+/// # Examples
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use std::rc::Rc;
+/// NonSendArena::clear();
+///
+/// // Rc is not Send, but can be stored here
+/// let handle = NonSendArena::insert(Rc::new(42));
+/// assert_eq!(*handle.get(), Rc::new(42));
+/// drop(handle); // automatically cleaned up
+/// ```
 pub struct NonSendArena;
+
 impl NonSendArena {
 	thread_local! {
 		static ARENA: LazyLock<NonSendArenaMap> = LazyLock::new(|| NonSendArenaMap::new());
 	}
+
+	/// Provides access to the thread-local arena.
 	pub fn with<F, R>(
 		&'static self,
 		func: impl FnOnce(&LazyLock<NonSendArenaMap>) -> R,
 	) -> R {
 		Self::ARENA.with(func)
 	}
-	/// Insert the object into the arena and return a handle to it
+
+	/// Inserts an object into the arena and returns a reference-counted handle.
 	pub fn insert<T: 'static>(object: T) -> NonSendRcArenaHandle<T> {
 		Self::ARENA.with(|arena| arena.insert(object))
 	}
-	/// Get the number of objects stored in the arena
+
+	/// Returns the number of objects stored in the arena.
 	pub fn len() -> usize { Self::ARENA.with(|arena| arena.len()) }
-	/// Remove all objects from the arena, invalidating all handles
+
+	/// Removes all objects from the arena, invalidating all handles.
 	pub fn clear() { Self::ARENA.with(|arena| arena.clear()) }
-	/// Check if the arena is empty
+
+	/// Returns `true` if the arena contains no objects.
 	pub fn is_empty() -> bool { Self::ARENA.with(|arena| arena.is_empty()) }
 }
 
-/// Entry in the arena that tracks reference count
-struct NonSendArenaEntry {
-	object: Box<dyn Any>,
-	ref_count: usize,
-}
-
-/// Arena that stores heterogeneous non-Send objects with automatic cleanup
+/// The underlying storage for [`NonSendArena`].
+///
+/// Stores heterogeneous non-`Send` objects with automatic cleanup via
+/// reference counting.
 pub struct NonSendArenaMap {
 	objects: RefCell<HashMap<usize, NonSendArenaEntry>>,
 	next_id: RefCell<usize>,
@@ -49,7 +81,7 @@ impl NonSendArenaMap {
 		}
 	}
 
-	/// Store an object and return a handle to it
+	/// Stores an object and returns a handle to it.
 	pub fn insert<T: 'static>(&self, object: T) -> NonSendRcArenaHandle<T> {
 		let mut objects = self.objects.borrow_mut();
 		let mut next_id = self.next_id.borrow_mut();
@@ -71,7 +103,7 @@ impl NonSendArenaMap {
 		}
 	}
 
-	/// Increment reference count for a handle
+	/// Increments the reference count for a handle.
 	fn inc_ref(&self, id: usize) -> bool {
 		let mut objects = self.objects.borrow_mut();
 		if let Some(entry) = objects.get_mut(&id) {
@@ -82,7 +114,7 @@ impl NonSendArenaMap {
 		}
 	}
 
-	/// Decrement reference count and remove if it reaches zero
+	/// Decrements the reference count and removes if it reaches zero.
 	fn dec_ref(&self, id: usize) {
 		let mut objects = self.objects.borrow_mut();
 		if let Some(entry) = objects.get_mut(&id) {
@@ -93,7 +125,7 @@ impl NonSendArenaMap {
 		}
 	}
 
-	/// Get a reference to an object by its handle
+	/// Returns a reference to an object by its handle.
 	pub fn get<H: NonSendHandle>(
 		&self,
 		handle: &H,
@@ -113,7 +145,7 @@ impl NonSendArenaMap {
 		}
 	}
 
-	/// Get a mutable reference to an object by its handle
+	/// Returns a mutable reference to an object by its handle.
 	pub fn get_mut<H: NonSendHandle>(
 		&self,
 		handle: &H,
@@ -127,14 +159,12 @@ impl NonSendArenaMap {
 		.ok()
 	}
 
-	/// Manually remove an object from the arena (consumes all handles)
+	/// Manually removes an object from the arena.
 	pub fn remove<H: NonSendHandle>(
 		&self,
 		handle: &H,
 	) -> Option<H::ObjectType> {
 		let mut objects = self.objects.borrow_mut();
-		// Don't call drop on the handle since we're consuming it
-		// std::mem::forget(handle);
 
 		objects
 			.remove(&handle.id())
@@ -142,16 +172,16 @@ impl NonSendArenaMap {
 			.map(|boxed| *boxed)
 	}
 
-	/// Get the number of objects stored
+	/// Returns the number of objects stored.
 	pub fn len(&self) -> usize { self.objects.borrow().len() }
 
-	/// Check if the arena is empty
+	/// Returns `true` if the arena is empty.
 	pub fn is_empty(&self) -> bool { self.objects.borrow().is_empty() }
 
-	/// Clear all objects from the arena
+	/// Clears all objects from the arena.
 	pub fn clear(&self) { self.objects.borrow_mut().clear(); }
 
-	/// Get reference count for debugging
+	/// Returns the reference count for debugging.
 	pub fn ref_count(&self, id: usize) -> Option<usize> {
 		self.objects.borrow().get(&id).map(|entry| entry.ref_count)
 	}
@@ -162,50 +192,69 @@ Object does not exist in the NonSendArena.
 It may have been manually removed by another handle, or created in a different thread.
 "#;
 
-
+/// Trait for handles that provide access to objects in the non-send arena.
 pub trait NonSendHandle: Sized {
+	/// The type of object this handle refers to.
 	type ObjectType: 'static;
+
+	/// Returns the internal ID of this handle.
 	fn id(&self) -> usize;
+
+	/// Returns a reference to the arena this handle belongs to.
 	fn get_arena(&self) -> &NonSendArenaMap;
 
-	/// Get a reference to the object in the arena
-	/// ## Panics
+	/// Returns a reference to the object in the arena.
+	///
+	/// # Panics
+	///
 	/// Panics if the object has been manually removed.
 	fn get(&self) -> Ref<'_, Self::ObjectType> {
 		self.get_arena().get(self).expect(PANIC_MSG)
 	}
 
-	/// Get a mutable reference to the object in the arena
-	/// ## Panics
+	/// Returns a mutable reference to the object in the arena.
+	///
+	/// # Panics
+	///
 	/// Panics if the object has been manually removed.
 	fn get_mut(&self) -> RefMut<'_, Self::ObjectType> {
 		self.get_arena().get_mut(self).expect(PANIC_MSG)
 	}
 
-	/// Manually remove the object from the arena.
-	/// This will invalidate all other handles.
-	/// ## Panics
+	/// Removes the object from the arena and returns it.
+	///
+	/// This invalidates all other handles to the same object.
+	///
+	/// # Panics
+	///
 	/// Panics if the object has already been manually removed.
 	fn remove(self) -> Self::ObjectType {
 		self.get_arena().remove(&self).expect(PANIC_MSG)
 	}
+
+	/// Returns the current reference count for this handle's object.
 	fn ref_count(&self) -> usize {
 		self.get_arena().ref_count(self.id()).expect(PANIC_MSG)
 	}
 }
+
 impl<T: 'static> NonSendHandle for NonSendRcArenaHandle<T> {
 	type ObjectType = T;
 	fn id(&self) -> usize { self.id }
 	fn get_arena(&self) -> &NonSendArenaMap { unsafe { &*self.arena } }
 }
+
 impl<T: 'static> NonSendHandle for NonSendArenaHandle<T> {
 	type ObjectType = T;
 	fn id(&self) -> usize { self.id }
 	fn get_arena(&self) -> &NonSendArenaMap { unsafe { &*self.arena } }
 }
 
-// Handle that provides type-safe access to objects in the arena
-// Automatically manages reference counting
+/// A reference-counted handle to an object in the non-send arena.
+///
+/// When all clones of this handle are dropped, the object is automatically
+/// removed from the arena. Use [`forget`](Self::forget) to convert to a
+/// non-reference-counted handle if automatic cleanup is not desired.
 pub struct NonSendRcArenaHandle<T: 'static> {
 	id: usize,
 	arena: *const NonSendArenaMap,
@@ -213,6 +262,11 @@ pub struct NonSendRcArenaHandle<T: 'static> {
 }
 
 impl<T> NonSendRcArenaHandle<T> {
+	/// Converts this handle to a non-reference-counted version.
+	///
+	/// The returned handle will not automatically clean up the object when
+	/// dropped. Use this when you need to manually control the object's
+	/// lifetime.
 	pub fn forget(self) -> NonSendArenaHandle<T> {
 		let id = self.id;
 		let handle = NonSendArenaHandle {
@@ -235,8 +289,6 @@ impl<T: 'static> Clone for NonSendRcArenaHandle<T> {
 				_phantom: std::marker::PhantomData,
 			}
 		} else {
-			// Handle is invalid, but we still need to return something
-			// This shouldn't happen in normal usage
 			panic!("Attempted to clone invalid handle");
 		}
 	}
@@ -249,7 +301,10 @@ impl<T: 'static> Drop for NonSendRcArenaHandle<T> {
 	}
 }
 
-/// A `Copy` version of the `RcArenaHandle` that doesn't automatically clean up.
+/// A copyable handle to an object in the non-send arena.
+///
+/// Unlike [`NonSendRcArenaHandle`], this handle does not automatically clean up
+/// the object when dropped. The object must be manually removed or will leak.
 #[derive(Clone, Copy)]
 pub struct NonSendArenaHandle<T> {
 	id: usize,
@@ -263,7 +318,7 @@ mod tests {
 
 	use super::*;
 	use crate::prelude::*;
-	// Example non-Send type for demonstration
+
 	#[derive(Debug)]
 	struct NonSendCounter {
 		value: Rc<RefCell<i32>>,
@@ -285,21 +340,8 @@ mod tests {
 		fn get_name(&self) -> &str { &self.name }
 	}
 
-	impl Drop for NonSendCounter {
-		fn drop(&mut self) {
-			// println!("NonSendCounter '{}' is being dropped", self.name);
-		}
-	}
-
 	#[test]
-	fn handle_is_send() {
-		// Check if the handle is Send
-		// fn assert_send<T: Send>() {}
-		// assert_send::<RcArenaHandle<NonSendCounter>>();
-		// assert_send::<ArenaHandle<NonSendCounter>>();
-	}
-	#[test]
-	fn test_automatic_cleanup() {
+	fn automatic_cleanup() {
 		NonSendArena::clear();
 
 		// Create a handle and clone it
@@ -335,7 +377,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_multiple_objects_cleanup() {
+	fn multiple_objects_cleanup() {
 		NonSendArena::clear();
 
 		let handle1 =
@@ -346,29 +388,24 @@ mod tests {
 
 		NonSendArena::len().xpect_eq(3);
 
-		// Clone one handle
 		let handle1_clone = handle1.clone();
 		handle1.ref_count().xpect_eq(2);
 
-		// Drop original handle1
 		drop(handle1);
-		NonSendArena::len().xpect_eq(3); // Should still be there due to clone
+		NonSendArena::len().xpect_eq(3);
 
-		// Drop handle2 - should remove that object
 		drop(handle2);
 		NonSendArena::len().xpect_eq(2);
 
-		// Drop handle3 - should remove that object
 		drop(handle3);
 		NonSendArena::len().xpect_eq(1);
 
-		// Drop the clone - should remove the last object
 		drop(handle1_clone);
 		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
-	fn test_manual_remove_with_clones() {
+	fn manual_remove_with_clones() {
 		NonSendArena::clear();
 
 		let handle1 =
@@ -378,22 +415,15 @@ mod tests {
 		NonSendArena::len().xpect_eq(1);
 		handle1.ref_count().xpect_eq(2);
 
-		// Manual remove should consume all handles and remove the object
 		let removed = handle1.remove();
 		removed.get_name().xpect_eq("test");
-		NonSendArena::len().xpect_eq(0);
-
-		// handle2 should now be invalid and panic when accessed
-		// We can't test this directly since it would panic the test
-		// but we can verify the object is gone from the arena
 		NonSendArena::len().xpect_eq(0);
 	}
 
 	#[test]
-	fn test_basic_arena_operations() {
+	fn basic_arena_operations() {
 		NonSendArena::clear();
 
-		// Store different types
 		let counter_handle =
 			NonSendArena::insert(NonSendCounter::new("test".to_string(), 42));
 		let string_handle = NonSendArena::insert("Hello, World!".to_string());
@@ -434,7 +464,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_forget_functionality() {
+	fn forget_functionality() {
 		NonSendArena::clear();
 
 		let forgotten_handle;
@@ -479,7 +509,7 @@ mod tests {
 
 	#[test]
 	#[should_panic]
-	fn test_panic_on_invalid_handle_access() {
+	fn panic_on_invalid_handle_access() {
 		NonSendArena::clear();
 
 		let handle1 =
@@ -496,7 +526,7 @@ mod tests {
 
 	#[test]
 	#[should_panic]
-	fn test_panic_on_invalid_handle_get_mut() {
+	fn panic_on_invalid_handle_get_mut() {
 		NonSendArena::clear();
 
 		let handle1 =
@@ -513,7 +543,7 @@ mod tests {
 
 	#[test]
 	#[should_panic]
-	fn test_panic_on_invalid_handle_remove() {
+	fn panic_on_invalid_handle_remove() {
 		NonSendArena::clear();
 
 		let handle1 =

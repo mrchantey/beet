@@ -20,6 +20,7 @@ impl Clone for Bucket {
 }
 
 impl Bucket {
+	/// Creates a new bucket with the given provider and name.
 	pub fn new(provider: impl BucketProvider, name: impl Into<String>) -> Self {
 		Self {
 			name: name.into(),
@@ -264,10 +265,16 @@ impl Bucket {
 	pub async fn region(&self) -> Option<String> { self.provider.region() }
 }
 
+/// Trait for bucket storage backends (S3, filesystem, memory, etc.).
+///
+/// Implementations provide the actual storage operations for [`Bucket`].
+/// The trait requires `Clone` via [`Self::box_clone`] for use with Bevy's
+/// component system.
 pub trait BucketProvider: 'static + Send + Sync {
+	/// Returns a boxed clone of this provider.
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
 
-	/// Get provider region
+	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
 	/// Check if bucket exists
 	fn bucket_exists(&self, bucket_name: &str)

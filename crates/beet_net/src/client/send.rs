@@ -1,5 +1,10 @@
+//! HTTP request sending functionality.
+//!
+//! This module provides the [`RequestClientExt`] extension trait that adds
+//! a `send()` method to [`Request`] for executing HTTP requests.
 use beet_core::prelude::*;
 
+/// Validates that appropriate TLS features are enabled for HTTPS requests.
 #[allow(unused)]
 pub(super) fn check_https_features(_req: &Request) -> Result {
 	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
@@ -13,8 +18,24 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 	Ok(())
 }
 
+/// Extension trait for sending HTTP requests.
+///
+/// This trait provides a unified `send()` method that works across platforms,
+/// automatically selecting the appropriate HTTP backend based on target and features.
 #[extend::ext(name=RequestClientExt)]
 pub impl Request {
+	/// Sends this request and returns the response.
+	///
+	/// # Platform Behavior
+	///
+	/// - **WASM**: Uses `web-sys` fetch API
+	/// - **Native + `ureq`**: Uses blocking ureq, wrapped in unblock + async
+	/// - **Native + `reqwest`**: Uses async reqwest client
+	///
+	/// # Errors
+	///
+	/// Returns an error if the request fails due to network issues,
+	/// invalid URLs, or missing TLS features for HTTPS requests.
 	#[allow(async_fn_in_trait)]
 	async fn send(self) -> Result<Response> {
 		#[cfg(target_arch = "wasm32")]

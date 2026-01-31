@@ -1,21 +1,28 @@
+//! Analytics event tracking and storage.
+//!
+//! This module provides infrastructure for recording and storing user
+//! interaction events, typically from web clients.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+/// Plugin that sets up analytics event handling and storage.
 pub fn analytics_plugin(app: &mut App) {
 	app.add_systems(PostStartup, spawn_analytics_event_store)
 		.add_observer(handle_analytics_events);
 }
 
+/// Resource containing the analytics event store.
 // TODO deprecate after beet_router refactor, this should
 // be TableStore component on the endpoint
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct AnalyticsEventStore {
+	/// The underlying table store for analytics events.
 	pub store: TableStore<AnalyticsEvent>,
 }
-/// Spawn the analytics event store resource, using the
+/// Spawns the analytics event store resource using the configured backend.
 fn spawn_analytics_event_store(
 	mut commands: AsyncCommands,
 	ws_config: When<Res<WorkspaceConfig>>,
@@ -46,21 +53,31 @@ fn handle_analytics_events(
 }
 
 /// An event to be recorded, usually representing a user interaction on the site.
-///
 #[derive(Debug, Clone, Serialize, Deserialize, Event)]
 pub struct AnalyticsEvent {
+	/// Unique identifier for this event.
 	pub id: Uuid,
-	/// The performance.now() timestamp from the client when the event was recorded
+	/// The `performance.now()` timestamp from the client when the event was recorded.
 	pub client_timestamp: u64,
+	/// The type of event (e.g., "click", "page_view", "client_error").
 	pub event_type: String,
+	/// Event-specific data, flattened into the serialized output.
 	#[serde(flatten)]
 	pub event_data: Value,
+	/// Session-specific data, flattened into the serialized output.
 	#[serde(flatten)]
 	pub session_data: Value,
 }
 
 
 impl AnalyticsEvent {
+	/// Parses an analytics event from a JSON payload.
+	///
+	/// # Errors
+	///
+	/// Returns an error if:
+	/// - `event_data` or `session_data` contains an `id` field (reserved)
+	/// - `event_data` and `session_data` have conflicting field names
 	pub fn parse(payload: Value) -> Result<Self> {
 		// these fields are serde flattened, ensure they wont overwrite primary key
 		if !payload["event_data"]["id"].is_null() {

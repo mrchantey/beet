@@ -1,7 +1,23 @@
+//! Convert action failures to application exit codes.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Convert an [`Outcome::Fail`] into an [`AppExit::error`]
+/// Converts an [`Outcome::Fail`] into an [`AppExit::error()`].
+///
+/// Unlike [`ExitOnEnd`], this only triggers an exit on failure.
+/// [`Outcome::Pass`] is ignored.
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = World::new();
+/// # world.insert_resource(Messages::<AppExit>::default());
+/// world
+///     .spawn((EndWith(Outcome::Fail), ExitOnFail))
+///     .trigger_target(GetOutcome);
+/// ```
 #[action(exit_on_fail)]
 #[derive(Debug, Component)]
 pub struct ExitOnFail;

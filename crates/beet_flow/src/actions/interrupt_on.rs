@@ -1,17 +1,38 @@
+//! Interrupt handling for running actions.
+//!
+//! This module provides automatic interruption of running actions when new
+//! events are triggered. The [`NoInterrupt`] component can be used to prevent
+//! automatic interruption.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Mark a behavior as uninterruptible, the `Running` component
-/// will only be removed if [`End`] is called on it,
-/// either directly or via event propagation.
+/// Prevents automatic interruption of this action.
+///
+/// By default, when a new [`RunEvent`] is triggered on an action, all running
+/// descendant actions have their [`Running`] component removed. Adding this
+/// component prevents that automatic removal.
+///
+/// Note that [`NoInterrupt`] only prevents interruption from *parent* events.
+/// Direct triggers on the entity itself will still remove [`Running`].
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = ControlFlowPlugin::world();
+/// // This child will keep running even if parent is re-triggered
+/// world.spawn(children![(NoInterrupt, Running)]);
+/// ```
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct NoInterrupt;
 
 
-/// removes [`Running`] from children when [`T`] is called, unless they have a [`NoInterrupt`].
-/// Unlike [`interrupt_on_end`], this does not remove the `Running` component
-/// from the action entity, as it may have been *just added*.
+/// Removes [`Running`] from children when a [`RunEvent`] is triggered.
+///
+/// This does not remove [`Running`] from the action entity itself, as it may
+/// have just been added. Actions with [`NoInterrupt`] are skipped.
 pub(crate) fn interrupt_on_run<T: RunEvent>(
 	ev: On<T>,
 	mut commands: Commands,
@@ -27,8 +48,10 @@ pub(crate) fn interrupt_on_run<T: RunEvent>(
 }
 
 
-/// Removes [`Running`] from the entity when [`End`] is triggered.
-/// Also removes [`Running`] from children unless they have a [`NoInterrupt`].
+/// Removes [`Running`] from the entity and its children when an [`EndEvent`] is triggered.
+///
+/// The [`Running`] component is always removed from the event target. For children,
+/// removal is skipped if they have [`NoInterrupt`].
 pub(crate) fn interrupt_on_end<T: EndEvent>(
 	ev: On<T>,
 	mut commands: Commands,

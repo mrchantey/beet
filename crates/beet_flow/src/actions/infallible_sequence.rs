@@ -1,3 +1,4 @@
+//! Sequence that always succeeds regardless of child results.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

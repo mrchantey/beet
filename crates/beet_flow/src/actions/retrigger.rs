@@ -1,3 +1,4 @@
+//! Re-triggering actions based on their results.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

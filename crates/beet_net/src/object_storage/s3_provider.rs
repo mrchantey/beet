@@ -307,11 +307,11 @@ mod test {
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
-	async fn infra_bucket() -> Result<()> {
+	async fn infra_bucket() {
 		let client = S3Provider::create().await;
 
 		let bucket = Bucket::new(client, "beet-site-bucket-dev".to_string());
-		bucket.bucket_try_create().await?;
+		bucket.bucket_try_create().await.unwrap();
 		bucket.bucket_exists().await.xpect_ok();
 
 		// READ - Download and verify the file
@@ -321,24 +321,22 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_starts_with("<!DOCTYPE html>");
-		Ok(())
 	}
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
-	async fn s3_public_url() -> Result<()> {
+	async fn s3_public_url() {
 		let bucket_name: &str = "beet-test";
 
 		let client = S3Provider::create().await;
 		let test_key = RoutePath::from("test-file.txt");
 		Bucket::new(client, bucket_name.to_string())
 			.public_url(&test_key)
-			.await?
+			.await
+			.unwrap()
 			.unwrap()
 			.xpect_eq(format!(
 				"https://{bucket_name}.s3.us-west-2.amazonaws.com{test_key}"
 			));
-
-		Ok(())
 	}
 }

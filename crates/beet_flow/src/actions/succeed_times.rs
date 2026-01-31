@@ -1,3 +1,4 @@
+//! Debugging utility for actions that succeed a limited number of times.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

@@ -1,21 +1,32 @@
 # `beet_router`
 
-Beet Router is an ergonomic router for web frameworks.
-Its a bit like an ECS alternative to `tower`, using `bevy` ecs and `beet_flow` for control flow.
+ Ergonomic IO agnostic router using Bevy ECS and behavior trees.
 
+ `beet_router` provides a flexible routing system that uses the ECS pattern
+ for request handling. Routes are defined as entity hierarchies where
+ middleware, predicates, and handlers compose naturally.
 
-The main purpose of a router is control flow, deciding what to run and when.
-The recommended pattern is a behavior tree `GetOutcome` / `Outcome` but the flexible nature of ECS allows users to define their own patterns,
-while still using common extractors, middleware etc.
+ # Features
 
-## Servers
+ - **ECS-based routing**: Routes are entities with components
+ - **Behavior tree control flow**: Uses `beet_flow` for request routing decisions
+ - **Composable middleware**: Middleware as components that can be mixed freely
+ - **Type-safe extractors**: Extract typed data from requests
 
-`beet_router` can be used without a server which is useful for testing.
-For serving content the recommended approach is to use the `beet_net` server, a 100% bevy server built on `hyper`.
+ # Example
 
+ ```ignore
+ use beet_router::prelude::*;
+ use beet_core::prelude::*;
 
-## Goals
+ let mut world = World::new();
+ world.spawn(
+     Endpoint::get("/hello")
+         .body("Hello, World!")
+ );
+ ```
+# Axum Comparison
 
 `beet_router` is designed to balance performance with flexibility and developer experience.
-It is not intended for extreme traffic scenarios like a proxy servers handling 10,000 requests/second, this is something axum is designed for (they go to great length to avoid a single boxing).
+It is not intended for extreme traffic scenarios like a proxy servers handling 10,000 requests/second, this is something axum is designed for.
 An average lambda request takes 200ms and our baseline target for a relatively large router is 1ms, 0.5% of that.

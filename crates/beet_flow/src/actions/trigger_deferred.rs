@@ -1,3 +1,4 @@
+//! Deferred event triggering for scene serialization.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

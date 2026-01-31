@@ -7,7 +7,7 @@ use std::f32::consts::TAU;
 /// Translates the agent up and down in a sine wave.
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 /// ## Example
 /// Hovers up and down every two seconds, at a height of 0.1 meters.
 /// ```

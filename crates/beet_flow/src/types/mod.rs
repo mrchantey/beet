@@ -1,4 +1,10 @@
 //! General purpose types used by actions in beet_flow.
+//!
+//! This module provides the foundational types for the control flow system:
+//! - [`Outcome`] and [`GetOutcome`]: The primary request/response event pair
+//! - [`Score`] and [`GetScore`]: Utility AI scoring events
+//! - [`Running`]: Marker for long-running actions
+//! - [`AgentQuery`]: Resolves the agent entity for an action
 mod debug_flow_plugin;
 mod outcome;
 mod ready;
@@ -22,25 +28,3 @@ mod agent;
 pub use agent::*;
 mod target_entity;
 pub use target_entity::*;
-
-
-/// > A no-op struct used for documentation purposes
-///
-/// Actions are entities that respond to being run by
-/// eventually returning either an [`Outcome::Pass`] or [`Outcome::Fail`].
-/// A common example of an [`Action`] is an entity with a [`Sequence`] component.
-///
-/// ```rust
-/// # use bevy::prelude::*;
-/// # use beet_flow::prelude::*;
-/// # let mut world = World::new();
-/// let my_action = world.spawn(Sequence);
-/// ```
-pub struct Action;
-
-/// > A no-op struct used for documentation purposes
-/// It is common for actions to have a single 'target' entity,
-/// for example each node in a behavior tree will do work on
-/// the entity with the [`Transform`]. Use [`AgentQuery`] to
-/// resolve the agent for a given action.
-pub struct Agent;

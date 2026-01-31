@@ -33,6 +33,9 @@ pub fn router_exchange(func: impl BundleFunc) -> impl Bundle {
 	(insert_endpoint_tree(func.clone()), flow_exchange(func))
 }
 
+/// Creates a streaming router exchange that constructs the [`EndpointTree`] immediately.
+///
+/// Like [`router_exchange`], but uses [`flow_exchange_stream`] for SSE streaming responses.
 pub fn router_exchange_stream(func: impl BundleFunc) -> impl Bundle {
 	(
 		insert_endpoint_tree(func.clone()),

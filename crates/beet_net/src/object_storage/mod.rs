@@ -1,3 +1,26 @@
+//! Object storage abstraction for S3, filesystem, and in-memory backends.
+//!
+//! This module provides a unified API for storing and retrieving binary data
+//! across different storage backends:
+//!
+//! - [`InMemoryProvider`]: Ephemeral storage for testing
+//! - [`FsBucketProvider`]: Local filesystem storage (native only)
+//! - [`LocalStorageProvider`]: Browser localStorage (WASM only)
+//! - [`S3Provider`]: AWS S3 storage (requires `aws` feature)
+//! - [`DynamoProvider`]: AWS DynamoDB storage (requires `aws` feature)
+//!
+//! # Example
+//!
+//! ```
+//! # use beet_net::prelude::*;
+//! # use beet_core::prelude::*;
+//! # async fn run() -> Result<()> {
+//! let bucket = temp_bucket();
+//! bucket.insert(&RoutePath::from("/hello.txt"), "world").await?;
+//! let data = bucket.get(&RoutePath::from("/hello.txt")).await?;
+//! # Ok(())
+//! # }
+//! ```
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;

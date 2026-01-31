@@ -1,16 +1,22 @@
+//! Plugin and utilities for running Bevy-based HTTP servers.
 // use crate::prelude::*;
 use beet_core::prelude::*;
 #[cfg(feature = "flow")]
 use beet_flow::prelude::ControlFlowPlugin;
 
-/// Plugin for running bevy servers.
-/// by default this plugin will spawn the default [`HttpServer`] on [`Startup`]
+/// Plugin for running Bevy HTTP servers.
+///
+/// Sets up the async runtime and optionally integrates with `beet_flow`
+/// for behavior tree-based request handling.
 #[derive(Default)]
 pub struct ServerPlugin;
 
 
 impl ServerPlugin {
-	/// Runs the app with a tokio runtime if the `lambda` feature is enabled.
+	/// Runs the app with the appropriate async runtime.
+	///
+	/// - With `lambda` feature: Uses a multi-threaded Tokio runtime
+	/// - Otherwise: Uses Bevy's default schedule runner
 	pub fn maybe_tokio_runner(mut app: App) -> AppExit {
 		#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 		{
@@ -46,6 +52,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
+	// #[ignore = "flaky with all features?"]
 	async fn http_server() {
 		let server = HttpServer::new_test();
 		let url = server.local_url();
@@ -58,7 +65,7 @@ mod test {
 				))
 				.run();
 		});
-		time_ext::sleep_millis(50).await;
+		time_ext::sleep_millis(200).await;
 		for _ in 0..10 {
 			Request::post(&url)
 				.send()

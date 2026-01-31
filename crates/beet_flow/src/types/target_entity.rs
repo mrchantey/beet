@@ -1,22 +1,42 @@
+//! Target entity specification for action operations.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// General purpose type for specifying the target for an action to perform
-/// an operation on, for example [`InsertOn`] and [`RemoveOn`].
+/// Specifies which entity an action should operate on.
+///
+/// Many actions need a target entity for their operations, such as inserting
+/// or removing components. This enum provides a flexible way to specify that
+/// target relative to the action entity.
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = World::new();
+/// // Insert Running on the agent when GetOutcome is triggered
+/// world.spawn(InsertOn::<GetOutcome, Running>::new_with_target(
+///     Running,
+///     TargetEntity::Agent,
+/// ));
+/// ```
 #[derive(Debug, Default, Clone, Component, Reflect, PartialEq, Eq, Hash)]
 #[reflect(Default, Component)]
 pub enum TargetEntity {
-	/// Use the event target entity (the action itself)
+	/// Use the event target entity (the action itself).
 	#[default]
 	Action,
-	/// Use the agent entity resolved via [`AgentQuery`]
+	/// Use the agent entity resolved via [`AgentQuery`].
 	Agent,
-	/// Specify some other entity to target
+	/// Specify an explicit entity to target.
 	Other(Entity),
 }
 
 impl TargetEntity {
-	/// Get the target entity for the given action using an [`AgentQuery`] to resolve agent.
+	/// Resolves the target entity for the given action.
+	///
+	/// Uses the provided [`AgentQuery`] to resolve the agent when
+	/// [`TargetEntity::Agent`] is specified.
 	pub fn get(&self, action: Entity, agent_query: &AgentQuery) -> Entity {
 		match self {
 			TargetEntity::Action => action,

@@ -1,27 +1,43 @@
+//! Async readiness signaling for action initialization.
+//!
+//! This module provides a mechanism for actions to signal when they have
+//! completed async initialization. This is useful for dynamically spawned
+//! trees that require setup before execution.
 use beet_core::prelude::*;
 
-/// Event triggered to indicate that an entity is preparing to become ready.
+/// Event triggered to request that an entity begin its ready process.
+///
+/// Actions with async initialization should listen for this event and
+/// trigger [`Ready`] when initialization completes.
 #[derive(Debug, Component, EntityEvent)]
 pub struct GetReady(pub Entity);
 
-// impl RunEvent for GetReady {
-// 	type End = Ready;
-// }
-
-
-/// Triggered by an entity in response to [`GetReady`]
+/// Event triggered by an entity to signal it has completed initialization.
+///
+/// This event auto-propagates up the hierarchy, allowing parent actions
+/// to await readiness of all descendants.
 #[derive(Debug, Component, EntityEvent)]
 #[entity_event(auto_propagate)]
 pub struct Ready(pub Entity);
 
 
-// impl EndEvent for Ready {
-// 	type Run = GetReady;
-// }
-
-/// Marker to indicate this entity should be included in the
-/// list of entities a parent must await a [`Ready`] signal from.
-/// See
+/// Marker component for actions that require async initialization.
+///
+/// Actions marked with this component will be discovered by [`AwaitReady`]
+/// and triggered with [`GetReady`]. The action must respond with [`Ready`]
+/// when initialization completes.
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = World::new();
+/// // Create an action that loads data asynchronously
+/// world.spawn(ReadyAction::run(async |entity| {
+///     // Perform async initialization...
+/// }));
+/// ```
 #[derive(Debug, Component)]
 pub struct ReadyAction {
 	sealed: PhantomData<()>,
@@ -29,8 +45,22 @@ pub struct ReadyAction {
 
 
 impl ReadyAction {
-	/// Runs the provided method when [`GetReady`] is triggered, and triggers
-	/// [`Ready`] upon completion regardless of the outcome.
+	/// Creates a [`ReadyAction`] that runs an async function on [`GetReady`].
+	///
+	/// The provided function receives an [`AsyncEntity`] and should perform
+	/// any async initialization. [`Ready`] is automatically triggered when
+	/// the future completes, regardless of the outcome.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// # let mut world = World::new();
+	/// world.spawn(ReadyAction::run(async |entity| {
+	///     // Load assets, connect to services, etc.
+	/// }));
+	/// ```
 	pub fn run<Fut, Out>(
 		func: impl 'static + Send + Sync + Clone + FnOnce(AsyncEntity) -> Fut,
 	) -> (Self, OnSpawn)
@@ -53,8 +83,10 @@ impl ReadyAction {
 			),
 		)
 	}
-	/// Runs the provided method when [`GetReady`] is triggered, and triggers
-	/// [`Ready`] upon completion regardless of the outcome.
+	/// Creates a [`ReadyAction`] that runs a `!Send` async function on [`GetReady`].
+	///
+	/// Similar to [`Self::run`], but the future does not need to be [`Send`].
+	/// Useful for WASM or when working with non-thread-safe resources.
 	pub fn run_local<Fut, Out>(
 		func: impl 'static + Send + Sync + Clone + FnOnce(AsyncEntity) -> Fut,
 	) -> (Self, OnSpawn)

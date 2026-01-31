@@ -1,3 +1,8 @@
+//! Debug logging plugin for action lifecycle events.
+//!
+//! This module provides [`DebugFlowPlugin`] which logs action execution
+//! for debugging and visualization purposes. It emits [`OnLogMessage`]
+//! events that can be consumed by UI systems.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::color::palettes::tailwind;
@@ -5,19 +10,39 @@ use std::borrow::Cow;
 
 
 
-/// A plugin that logs lifecycle events for action entities.
-/// If they have a [`Name`] that will be used instead of the entity id.
-/// It emits [OnLogMessage] events, and also
-/// will print to stdout if [`Self::log_to_stdout`] is true.
+/// Plugin that logs lifecycle events for action entities.
+///
+/// Logs entity names (or IDs if unnamed) when actions run, complete, or are
+/// actively running. Emits [`OnLogMessage`] events and optionally prints
+/// to stdout.
+///
+/// # Configurations
+///
+/// - [`DebugFlowPlugin::with_run`]: Log only when actions start (default)
+/// - [`DebugFlowPlugin::with_result`]: Log starts and completions
+/// - [`DebugFlowPlugin::with_all`]: Log everything including running state
+/// - [`DebugFlowPlugin::with_none`]: Manual configuration
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// App::new()
+///     .add_plugins((
+///         ControlFlowPlugin::default(),
+///         DebugFlowPlugin::with_result(),
+///     ));
+/// ```
 #[derive(Debug, Clone)]
 pub struct DebugFlowPlugin {
-	/// Log whenever [`Run`] is triggered.
+	/// Log whenever [`GetOutcome`] is triggered.
 	pub log_run: bool,
 	/// Log whenever [`Running`] entities are updated.
 	pub log_running: bool,
-	/// Log whenever [`End`] is triggered.
+	/// Log whenever [`Outcome`] is triggered.
 	pub log_end: bool,
-	/// Log all messages to stdout
+	/// Print all messages to stdout.
 	pub log_to_stdout: bool,
 }
 impl Default for DebugFlowPlugin {
@@ -25,9 +50,11 @@ impl Default for DebugFlowPlugin {
 }
 
 impl DebugFlowPlugin {
-	/// Include:
-	/// - [`log_on_run`](Self::log_on_run)
-	/// - [`log_to_stdout`](Self::log_to_stdout)
+	/// Logs only when actions start running.
+	///
+	/// Includes:
+	/// - Run events
+	/// - stdout output
 	pub fn with_run() -> Self {
 		Self {
 			log_run: true,
@@ -36,10 +63,13 @@ impl DebugFlowPlugin {
 			log_to_stdout: true,
 		}
 	}
-	/// Include:
-	/// - [`log_on_run`](Self::log_on_run)
-	/// - [`log_on_run_result`](Self::log_on_result)
-	/// - [`log_to_stdout`](Self::log_to_stdout)
+
+	/// Logs when actions start and when they complete with a result.
+	///
+	/// Includes:
+	/// - Run events
+	/// - Result events
+	/// - stdout output
 	pub fn with_result() -> Self {
 		Self {
 			log_run: true,
@@ -48,11 +78,14 @@ impl DebugFlowPlugin {
 			log_to_stdout: true,
 		}
 	}
-	/// Include:
-	/// - [`log_on_run`](Self::log_on_run)
-	/// - [`log_running`](Self::log_running)
-	/// - [`log_on_run_result`](Self::log_on_result)
-	/// - [`log_to_stdout`](Self::log_to_stdout)
+
+	/// Logs all lifecycle events.
+	///
+	/// Includes:
+	/// - Run events
+	/// - Running state updates
+	/// - Result events
+	/// - stdout output
 	pub fn with_all() -> Self {
 		Self {
 			log_run: true,
@@ -61,17 +94,22 @@ impl DebugFlowPlugin {
 			log_to_stdout: true,
 		}
 	}
-	/// Exclude all, add each manually and handle stdout
-	/// ```rust
-	///	# use beet_core::prelude::*;
-	///	# use beet_flow::prelude::*;
-	/// fn my_log_func(_ev: MessageReader<OnLogMessage>) {
+
+	/// Disables all logging for manual configuration.
 	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// fn my_log_func(_ev: MessageReader<OnLogMessage>) {
+	///     // Handle log messages...
 	/// }
+	///
 	/// App::new()
-	/// 	.add_plugins(DebugFlowPlugin::with_none())
-	/// 	.add_systems(Update, my_log_func)
-	/// 	.init_resource::<DebugOnRun>();
+	///     .add_plugins(DebugFlowPlugin::with_none())
+	///     .add_systems(Update, my_log_func)
+	///     .init_resource::<DebugOnRun>();
 	/// ```
 	pub fn with_none() -> Self {
 		Self {
@@ -121,26 +159,27 @@ impl Plugin for DebugFlowPlugin {
 	}
 }
 
-/// A helper event for logging messages.
-/// This must use the [`MessageReader`] pattern instead of observers
-/// because the 'stack' nature of observers results in a reverse order.
+/// Message event for logging action lifecycle information.
+///
+/// This must use the [`MessageReader`] pattern instead of observers because
+/// observers run in stack order which would reverse log output.
 #[derive(Debug, Message)]
 pub struct OnLogMessage {
-	/// The message to log
+	/// The message text to display.
 	pub msg: Cow<'static, str>,
-	/// The color of the message text
+	/// The color for rendering this message.
 	pub color: Color,
 }
 
 impl OnLogMessage {
-	/// The color of messages describing flow state.
+	/// Color for control flow state messages.
 	pub const FLOW_COLOR: Srgba = tailwind::NEUTRAL_200;
-	/// The color of messages sent by the user.
+	/// Color for user input messages.
 	pub const USER_COLOR: Srgba = tailwind::CYAN_200;
-	/// The color of messages sent by agents in the game.
+	/// Color for game/AI agent messages.
 	pub const GAME_COLOR: Srgba = tailwind::YELLOW_200;
 
-	/// Create a new log message.
+	/// Creates a new log message with the given text and color.
 	pub fn new(
 		msg: impl Into<Cow<'static, str>>,
 		color: impl Into<Color>,
@@ -150,7 +189,8 @@ impl OnLogMessage {
 			color: color.into(),
 		}
 	}
-	/// Create a new log message, with a [`Name`] query.
+
+	/// Creates a log message using an entity's [`Name`] if available.
 	pub fn new_with_query(
 		entity: Entity,
 		query: &Query<&Name>,
@@ -159,8 +199,8 @@ impl OnLogMessage {
 	) -> Self {
 		Self::new_with_optional(entity, query.get(entity).ok(), prefix, color)
 	}
-	/// Create a new log message, with an [`Option<Name>`],
-	/// falling back to the [`Entity`] if `None`.
+
+	/// Creates a log message with an optional [`Name`], falling back to entity ID.
 	pub fn new_with_optional(
 		entity: Entity,
 		name: Option<&Name>,
@@ -172,24 +212,28 @@ impl OnLogMessage {
 			.unwrap_or_else(|| format!("{prefix}: {entity}"));
 		Self::new(msg, color)
 	}
-	/// Immediately log to stdout, useful for initial messages
+
+	/// Immediately logs to stdout and returns self for chaining.
 	pub fn and_log(self) -> Self {
 		println!("{}", self.msg);
 		self
 	}
-	/// Log to stdout
+
+	/// Logs the message to stdout.
 	pub fn log(&self) {
 		println!("{}", self.msg);
 	}
 }
 
-/// An event triggered to represent user input, useful for
-/// retrieving user text input.
+/// Event representing user text input.
+///
+/// Useful for capturing and displaying user commands or chat messages
+/// in the log stream.
 #[derive(Debug, Default, Clone, Deref, DerefMut, Event, Reflect)]
 pub struct UserMessage(pub String);
 
 impl UserMessage {
-	/// Create a new user message.
+	/// Creates a new user message with the given text.
 	pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
 }
 
@@ -209,19 +253,22 @@ fn log_user_message(
 }
 
 
-/// Resource to enable logging for [log_on_run]
+/// Resource that enables logging for [`GetOutcome`] events.
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct DebugOnRun;
-/// Resource to enable logging for [log_on_run_result]
+
+/// Resource that enables logging for [`Outcome`] events.
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct DebugOutcome;
-/// Resource to enable logging for [log_running]
+
+/// Resource that enables logging for [`Running`] state updates.
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct DebugRunning;
-/// Resource to enable logging for [log_to_stdout]
+
+/// Resource that enables stdout output for log messages.
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct DebugToStdOut;

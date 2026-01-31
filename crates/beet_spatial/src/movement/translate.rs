@@ -6,7 +6,7 @@ use beet_flow::prelude::*;
 /// multiplied by [`Time::delta_secs`]
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 /// ## Example
 /// Translates to the right at 1 unit per second.
 /// ```

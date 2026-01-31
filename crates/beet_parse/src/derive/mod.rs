@@ -1,3 +1,12 @@
+//! Derive macro utilities for code generation.
+//!
+//! This module provides utilities for implementing derive macros and
+//! generating code from Rust types, including:
+//!
+//! - [`TemplateMacro`]: Template instantiation from macro input
+//! - [`ConstructMacro`]: Component construction macros
+//! - [`DeriveProps`]: Props derivation for component types
+//! - [`DeriveBuildable`]: Builder pattern derivation
 mod template_macro;
 pub use template_macro::*;
 mod construct_macro;

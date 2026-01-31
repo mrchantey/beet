@@ -1,9 +1,22 @@
+//! Exchange statistics tracking and logging.
+//!
+//! This module provides [`ExchangeStats`] for tracking request counts and
+//! the [`exchange_stats`] observer for logging exchange completion.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 
 
-/// Update server stats if available
+/// Observer that logs exchange completion and updates statistics.
+///
+/// This observer should be added to the world to enable request logging.
+/// It logs the request path, method, status, duration, and request index.
+///
+/// # Example
+///
+/// ```ignore
+/// world.add_observer(exchange_stats);
+/// ```
 pub fn exchange_stats(
 	ev: On<ExchangeEnd>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
@@ -37,12 +50,20 @@ pub fn exchange_stats(
 
 
 
+/// Component for tracking exchange statistics on a server entity.
+///
+/// Add this to server entities to track the number of requests processed.
+/// The [`exchange_stats`] observer will automatically update these stats.
 #[derive(Default, Component)]
 pub struct ExchangeStats {
 	request_count: u128,
 }
+
 impl ExchangeStats {
+	/// Returns the total number of requests processed.
 	pub fn request_count(&self) -> u128 { self.request_count }
+
+	/// Increments the request counter.
 	pub(super) fn increment_requests(&mut self) -> &mut Self {
 		self.request_count += 1;
 		self

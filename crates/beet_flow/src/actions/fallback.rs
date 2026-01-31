@@ -1,3 +1,4 @@
+//! Fallback (selector) control flow action.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

@@ -1,22 +1,41 @@
+//! Timer tracking for action execution duration.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::fmt::Debug;
 
-/// Tracks the last time a `Run` and `End` was triggered on this entity.
-/// This action is required by [`ContinueRun`] so is rarely added manually.
-/// Note that even when not running the timers will still tick, which
-/// allows for 'Run if inactive for duration' etc.
-/// For an example usage see [`EndInDuration`].
+/// Tracks elapsed time since last run and end events for an action.
+///
+/// This component is automatically added by [`ContinueRun`] and tracks two
+/// independent timers:
+/// - `last_run`: Time since the action was last started, ie the last [`GetOutcome`] event.
+/// - `last_end`: Time since the action last completed, ie the last [`Outcome`] event.
+///
+/// Both timers tick continuously, even when the action is not running. This
+/// allows patterns like "run if inactive for duration" to be implemented.
+///
+/// # Example
+///
+/// For duration-based endings, see [`EndInDuration`]:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # let mut world = World::new();
+/// world.spawn((
+///     Running,
+///     EndInDuration::pass(Duration::from_secs(2)),
+/// ));
+/// ```
 #[derive(Default, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RunTimer {
-	/// Last time the node was last started, or time since level load if never started.
+	/// Time since the action was last started, reset when [`Running`] is added.
 	pub last_run: Stopwatch,
-	/// Last time the node was last stopped, or time since level load if never stopped.
+	/// Time since the action last completed, reset when [`Running`] is removed.
 	pub last_end: Stopwatch,
 }
 
-/// Ticks all [`RunTimer`] timers in the [`PreTickSet`].
+/// Ticks all [`RunTimer`] components in the [`PreTickSet`].
 pub(crate) fn tick_run_timers(
 	time: When<Res<Time>>,
 	mut timers: Populated<&mut RunTimer>,
@@ -27,6 +46,7 @@ pub(crate) fn tick_run_timers(
 	}
 }
 
+/// Resets `last_run` when [`Running`] is added.
 pub(crate) fn reset_run_time_started(
 	ev: On<Add, Running>,
 	mut query: Populated<&mut RunTimer>,
@@ -34,6 +54,8 @@ pub(crate) fn reset_run_time_started(
 	query.get_mut(ev.event().event_target())?.last_run.reset();
 	Ok(())
 }
+
+/// Resets `last_end` when [`Running`] is removed.
 pub(crate) fn reset_run_timer_stopped(
 	ev: On<Remove, Running>,
 	mut query: Populated<&mut RunTimer>,

@@ -1,3 +1,20 @@
+//! Generalized request/response exchange patterns for Bevy entities.
+//!
+//! This module provides infrastructure for handling IO agnostic request/response
+//! exchanges within the Bevy ECS. It enables entities to act as "servers" that
+//! receive requests and produce responses through the observer pattern.
+//!
+//! ## Core Concepts
+//!
+//! - [`ExchangeStart`]: Event triggered when a request arrives at an entity
+//! - [`ExchangeContext`]: Contains the response sender and timing information
+//! - [`ExchangeEnd`]: Event triggered when an exchange completes
+//!
+//! ## Exchange Patterns
+//!
+//! - [`SpawnExchange`]: Spawns a child entity for each exchange
+//! - [`HandlerExchange`]: Routes requests to handler functions
+//! - [`FlowExchange`]: Integrates with beet_flow for behavior tree responses
 mod exchange;
 mod exchange_stats;
 mod extractors;

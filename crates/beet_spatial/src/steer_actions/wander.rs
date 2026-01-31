@@ -6,7 +6,7 @@ use beet_flow::prelude::*;
 /// to create somewhat cohesive movement, see [wander_impulse]
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

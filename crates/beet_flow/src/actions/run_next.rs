@@ -1,3 +1,4 @@
+//! Chain actions together in a state machine pattern.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

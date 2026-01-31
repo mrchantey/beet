@@ -1,3 +1,26 @@
+//! WebSocket client and server implementations.
+//!
+//! This module provides cross-platform WebSocket support:
+//!
+//! - **Client**: [`Socket::connect`] for establishing connections
+//! - **Server**: [`SocketServer`] for accepting incoming connections
+//!
+//! ## Platform Support
+//!
+//! - **WASM**: Uses `web-sys` WebSocket API
+//! - **Native**: Uses `tungstenite` (requires `tungstenite` feature)
+//!
+//! ## Example
+//!
+//! ```ignore
+//! # use beet_net::sockets::*;
+//! # use beet_core::prelude::*;
+//! # async fn run() -> Result<()> {
+//! let mut socket = Socket::connect("wss://echo.websocket.org").await?;
+//! socket.send(Message::text("hello")).await?;
+//! # Ok(())
+//! # }
+//! ```
 pub mod common_handlers;
 mod socket;
 pub use socket::Message;

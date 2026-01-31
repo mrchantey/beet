@@ -1,24 +1,27 @@
 use crate::prelude::*;
 
-/// A small, copyable handle around a function stored in a global Arena that records
+/// A copyable handle around a function stored in a global [`Arena`] that records
 /// each call's output.
 ///
 /// Each `FuncStore` contains:
-/// - `func`: the function you want to call, stored in a [`Store`]
+/// - `func`: the function to call, stored in a [`Store`]
 /// - `called`: a `Store<Vec<O>>` where every call's output is pushed in order
 ///
-/// The handle itself is `Copy` and `Clone`, so you can pass it around cheaply. All
-/// handles refer to the same underlying function and calls vector; mutating through one
-/// handle is visible to all others.
+/// The handle itself is `Copy` and `Clone`, so you can pass it around cheaply.
+/// All handles refer to the same underlying function and calls vector; mutating
+/// through one handle is visible to all others.
 ///
-/// Warning
-/// This handle owns two [`Store`] values (`func` and `called`) which allocate inside the
-/// global Arena. In long-running applications, call `remove()` on both stores when the
-/// function is no longer needed to avoid leaking the allocation.
+/// # Warning
 ///
-/// Examples
+/// This handle owns two [`Store`] values (`func` and `called`) which allocate
+/// inside the global [`Arena`]. In long-running applications, call `remove()`
+/// on both stores when the function is no longer needed to avoid leaking memory.
+///
+/// # Examples
+///
 /// Basic usage:
-/// ```rust
+///
+/// ```
 /// # use beet_core::prelude::*;
 /// let adder = FuncStore::new(|n: u32| n + 1);
 /// adder.call(1);
@@ -30,8 +33,9 @@ use crate::prelude::*;
 /// adder.func.remove();
 /// ```
 ///
-/// Call with default input using `call0`:
-/// ```rust
+/// Using `call0` with default input:
+///
+/// ```
 /// # use beet_core::prelude::*;
 /// let make_ten = FuncStore::new(|n: u32| n + 10);
 /// make_ten.call0(); // uses u32::default() == 0
@@ -79,12 +83,13 @@ where
 	O: 'static + Send,
 	F: 'static + Send + Fn(I) -> O,
 {
-	/// Inserts the function into the Arena and returns a `FuncStore` handle to it.
+	/// Creates a new `FuncStore` by inserting the function into the [`Arena`].
 	///
 	/// All copies of the handle refer to the same function and `called` vector.
 	///
-	/// Examples
-	/// ```rust
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// let fs = FuncStore::<u32, u32, _>::new(|n| n * 2);
 	/// fs.call(3);
@@ -103,8 +108,9 @@ where
 
 	/// Calls the stored function with `input` and pushes the output to `called`.
 	///
-	/// Examples
-	/// ```rust
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// let doubler = FuncStore::new(|n: u32| n * 2);
 	/// doubler.call(4);
@@ -129,8 +135,9 @@ where
 	///
 	/// Useful for nullary-style functions expressed with a defaultable input type.
 	///
-	/// Examples
-	/// ```rust
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// let make_five = FuncStore::new(|n: u32| n + 5);
 	/// make_five.call0(); // uses u32::default() == 0
@@ -152,11 +159,12 @@ where
 {
 	/// Calls the stored function with `input`, records the output, and returns it.
 	///
-	/// This avoids borrowing from the internal vector and is convenient when you want
-	/// both the side-effect (recording) and the value.
+	/// This avoids borrowing from the internal vector and is convenient when you
+	/// need both the side-effect (recording) and the return value.
 	///
-	/// Examples
-	/// ```rust
+	/// # Examples
+	///
+	/// ```
 	/// # use beet_core::prelude::*;
 	/// let triple = FuncStore::new(|n: u32| n * 3);
 	/// let got = triple.call_and_get(3);
@@ -174,8 +182,9 @@ where
 }
 
 
-/// When the `nightly` feature is enabled, `FuncStore` can be called like a regular
-/// function/closure. Each invocation records the output just like [`FuncStore::call`].
+/// When the `nightly` feature is enabled, `FuncStore` can be called like a
+/// regular function/closure. Each invocation records the output just like
+/// [`FuncStore::call`].
 #[cfg(feature = "nightly")]
 impl<I, O, F> FnOnce<(I,)> for FuncStore<I, O, F>
 where

@@ -1,3 +1,4 @@
+//! Parallel execution of child actions.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

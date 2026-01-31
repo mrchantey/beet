@@ -1,19 +1,28 @@
+//! Insert components when events are triggered.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 
 
-/// This action will insert the provided bundle when the specified event is triggered.
-/// It is designed to work for both [`GetOutcome`] and [`Outcome`] events.
-/// This action also has a corresponding [`RemoveOn`] action.
-/// ## Example
-/// Inserts the `Running` bundle when the `GetOutcome` event is triggered.
+/// Inserts a bundle when a specified event is triggered.
+///
+/// This action works with any [`EntityTargetEvent`], commonly [`GetOutcome`]
+/// or [`Outcome`]. The bundle is cloned and inserted on the target entity
+/// when the event fires.
+///
+/// See also [`RemoveOn`] for the inverse operation.
+///
+/// # Example
+///
+/// Insert [`Running`] when [`GetOutcome`] is triggered:
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
-///		.spawn(InsertOn::<GetOutcome, Running>::default())
-///		.trigger_target(GetOutcome);
+/// # let mut world = World::new();
+/// world
+///     .spawn(InsertOn::<GetOutcome, Running>::default())
+///     .trigger_target(GetOutcome);
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]
@@ -27,6 +36,7 @@ pub struct InsertOn<E: EntityTargetEvent, B: Bundle + Clone> {
 }
 
 impl<E: EntityTargetEvent> InsertOn<E, OnSpawnClone> {
+	/// Creates an [`InsertOn`] that calls a function to produce the bundle.
 	pub fn new_func<B: Bundle>(
 		bundle: impl 'static + Send + Sync + Clone + FnOnce() -> B,
 	) -> Self {
@@ -40,7 +50,7 @@ impl<E: EntityTargetEvent> InsertOn<E, OnSpawnClone> {
 	}
 }
 impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
-	/// Specify the bundle to be inserted
+	/// Creates a new [`InsertOn`] with the specified bundle.
 	pub fn new(bundle: B) -> Self {
 		Self {
 			bundle,
@@ -48,7 +58,7 @@ impl<E: EntityTargetEvent, B: Bundle + Clone> InsertOn<E, B> {
 			target_entity: TargetEntity::default(),
 		}
 	}
-	/// Specify the bundle to be inserted and the target entity.
+	/// Creates a new [`InsertOn`] with the specified bundle and target entity.
 	pub fn new_with_target(bundle: B, target_entity: TargetEntity) -> Self {
 		Self {
 			bundle,

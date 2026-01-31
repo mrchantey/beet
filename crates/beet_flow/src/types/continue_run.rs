@@ -1,45 +1,75 @@
-//! Components required for long running actions.
+//! Components for managing long-running action state.
+//!
+//! Actions that execute over multiple frames need the [`Running`] marker
+//! component to indicate they are actively processing. The [`ContinueRun`]
+//! component automates adding and removing this marker based on lifecycle events.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 
-/// This will add the [`Running`] component to the behavior when [`GetOutcome`] is triggered,
-/// and remove it when [`Outcome`] is triggered.
+/// Automatically manages the [`Running`] component based on lifecycle events.
 ///
-/// This should be added as `#[require(ContinueRun)]` for any long running action,
-/// ie any action that has a [`With<Running>`] query filter.
-/// It should not added to behaviors directly, because its easy to forget.
-/// For usage see the [`Running`] component.
+/// When added to an action, this component:
+/// - Inserts [`Running`] when [`GetOutcome`] is triggered
+/// - Removes [`Running`] when [`Outcome`] is triggered
+///
+/// This should be added via `#[require(ContinueRun)]` on any action that
+/// queries for [`Running`] rather than being added to entities directly.
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// #[derive(Component)]
+/// #[require(ContinueRun)]
+/// struct MyLongRunningAction;
+///
+/// fn my_system(
+///     query: Query<Entity, With<Running>>,
+/// ) {
+///     for entity in query.iter() {
+///         // Process running actions...
+///     }
+/// }
+/// ```
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(RunTimer,InsertOn<GetOutcome,Running>,RemoveOn<Outcome,Running>)]
 pub struct ContinueRun;
 
 
-/// A marker component added to an [ActionEntity] indicate this action is currently running.
-/// ## Example
-/// This is the `Translate` action found in `beet_spatial`.
+/// Marker component indicating an action is currently executing.
+///
+/// This component is typically managed by [`ContinueRun`] rather than being
+/// added manually. It is used to query for active long-running actions and
+/// is stored as [`SparseSet`](bevy::ecs::component::StorageType::SparseSet)
+/// since it is frequently added and removed.
+///
+/// # Example
+///
+/// The `Translate` action found in `beet_spatial` demonstrates typical usage:
+///
 /// ```
-///	# use beet_core::prelude::*;
-///	# use beet_flow::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
 ///
 /// #[derive(Component)]
 /// #[require(ContinueRun)]
 /// struct Translate(pub Vec3);
 ///
 /// fn translate(
-/// 	time: Res<Time>,
-/// 	action: Query<(Entity, &Running, &Translate)>,
-/// 	mut transforms: Query<&mut Transform>,
-/// ){
-/// 	for (entity, _running, translate) in action.iter(){
-/// 		if let Ok(mut transform) = transforms.get_mut(entity) {
-/// 			transform.translation += translate.0 * time.delta_secs();
-/// 		}
-/// 	}
+///     time: Res<Time>,
+///     action: Query<(Entity, &Translate),With<Running>>,
+///     mut transforms: AgentQuery<&mut Transform>,
+/// )-> Result {
+///     for (entity, translate) in action.iter() {
+///         let mut transform = transforms.get_mut(entity)?;
+///         transform.translation += translate.0 * time.delta_secs();
+///     }
+///   Ok(())
 /// }
 /// ```
-/// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Debug, Default, Clone, Copy, Component, PartialEq, Eq, Reflect)]
 #[component(storage = "SparseSet")]
 #[reflect(Component)]

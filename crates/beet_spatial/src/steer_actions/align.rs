@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 /// This is done by updating the [`Velocity`] component.
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

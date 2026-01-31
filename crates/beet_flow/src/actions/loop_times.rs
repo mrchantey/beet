@@ -1,3 +1,4 @@
+//! Looping control flow for repeated action execution.
 use crate::prelude::*;
 use beet_core::prelude::*;
 

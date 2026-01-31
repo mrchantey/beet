@@ -5,7 +5,7 @@ use beet_flow::prelude::*;
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateOrigin](ActionTag::MutateOrigin)
+/// - [MutateAgent](ActionTag::MutateAgent)
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

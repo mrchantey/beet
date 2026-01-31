@@ -1,11 +1,27 @@
-//! Extractors are types for declaratively converting parts of an exchange
-//! into concrete types, for example [`QueryParams`]
+//! Extractors for declaratively converting parts of an exchange into concrete types.
+//!
+//! Extractors simplify request handling by automatically parsing and validating
+//! parts of the request (query params, body, headers) into typed Rust values.
+//!
+//! ## Available Extractors
+//!
+//! - [`QueryParams`]: Parse URL query parameters into a struct
+//! - [`JsonQueryParams`]: Parse complex types encoded as JSON in query params
+//! - [`Json`]: Parse JSON request body
+//! - [`Html`], [`Css`], [`Javascript`], [`Png`]: Response type wrappers
 #[allow(unused)]
 use beet_core::prelude::*;
 
+/// Wrapper for HTML content responses.
 pub struct Html<T>(pub T);
+
+/// Wrapper for CSS content responses.
 pub struct Css(pub String);
+
+/// Wrapper for JavaScript content responses.
 pub struct Javascript(pub String);
+
+/// Wrapper for PNG image responses.
 pub struct Png(pub String);
 
 
@@ -22,21 +38,26 @@ impl Into<Png> for String {
 	fn into(self) -> Png { Png(self) }
 }
 
-/// When a server action fails and the error should be returned, its also good
-/// practice to return a status code indicating the issue.
+/// A result type that includes an HTTP status code for error responses.
+///
+/// When a server action fails and the error should be returned to the client,
+/// this type allows specifying both the error value and the HTTP status code.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JsonResult<T, E> {
+	/// The inner result value.
 	pub result: Result<T, E>,
-	/// The status code to return in case of an error,
-	/// defaults to 418 (I'm a teapot).
+	/// The status code to return in case of an error.
+	/// Defaults to 418 (I'm a teapot).
 	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub err_status: StatusCode,
 }
 
 
 impl JsonResult<(), ()> {
+	/// Default error status code when the `http` feature is enabled.
 	#[cfg(feature = "http")]
 	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::ImATeapot;
+	/// Default error status code when the `http` feature is disabled.
 	#[cfg(not(feature = "http"))]
 	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::InternalError;
 }
@@ -51,9 +72,13 @@ impl<T, E> From<Result<T, E>> for JsonResult<T, E> {
 }
 
 impl<T, E> JsonResult<T, E> {
+	/// Creates a new [`JsonResult`] from a result.
 	pub fn new(val: Result<T, E>) -> Self { Self::from(val) }
-	/// Convenience function for system piping
+
+	/// Convenience function for system piping.
 	pub fn pipe(val: In<Result<T, E>>) -> Self { Self::from(val.0) }
+
+	/// Creates a pipe function with a custom error status code.
 	pub fn pipe_with_status(
 		status: StatusCode,
 	) -> impl Fn(In<Result<T, E>>) -> Self {
@@ -88,13 +113,18 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 	}
 }
 
+/// Wrapper for JSON request/response bodies.
+///
+/// Use this to automatically serialize/deserialize JSON in handlers.
 #[derive(Deref, DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Json<T>(pub T);
 
 impl<T> Json<T> {
+	/// Creates a new JSON wrapper.
 	pub fn new(val: T) -> Self { Self(val) }
-	/// Convenience function for system piping
+
+	/// Convenience function for system piping.
 	pub fn pipe(val: In<T>) -> Json<T> { Json(val.0) }
 }
 
@@ -130,13 +160,14 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 }
 
 
-/// [`QueryParams`] is a limited format, for example enums and tuples are not allowed,
-/// this struct accepts any value by first serializing it as JSON,
-/// then encode it as a URL-encoded string, for use as a query param value.
+/// Query params wrapper that supports complex types via JSON encoding.
+///
+/// [`QueryParams`] is limited (no enums or tuples). This type accepts any
+/// serializable value by first converting to JSON, then URL-encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct JsonQueryParams<T>(pub T);
 
-/// The query params representation of the [`JsonQueryParams`].
+/// Internal representation for JSON query params.
 #[cfg(feature = "serde")]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct JsonQueryParamsInner {
@@ -145,6 +176,7 @@ struct JsonQueryParamsInner {
 
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize> JsonQueryParams<T> {
+	/// Serializes a value to a URL-encoded query string.
 	pub fn to_query_string(value: &T) -> Result<String> {
 		let data = serde_json::to_string(value)?;
 		serde_urlencoded::to_string(&JsonQueryParamsInner { data })?.xok()
@@ -153,6 +185,7 @@ impl<T: serde::Serialize> JsonQueryParams<T> {
 
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
+	/// Deserializes a value from a URL-encoded query string.
 	pub fn from_query_string(query: &str) -> Result<T> {
 		let inner = serde_urlencoded::from_str::<JsonQueryParamsInner>(query)?;
 		serde_json::from_str::<T>(&inner.data)?.xok()
@@ -197,16 +230,15 @@ pub struct QueryParams<T>(pub T);
 
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize> QueryParams<T> {
-	/// Parses as serde_json and encodes the data as a URL-encoded string,
-	/// for use as a query param value.
+	/// Encodes the params as a URL-encoded query string.
 	pub fn encode(&self) -> Result<String> {
 		serde_urlencoded::to_string(&self.0)?.xok()
 	}
 }
+
 #[cfg(feature = "serde")]
 impl<T: serde::de::DeserializeOwned> QueryParams<T> {
-	/// Decodes a URL-encoded string into a serde_json value,
-	/// then deserializes it into the specified type.
+	/// Decodes a URL-encoded query string into the specified type.
 	pub fn decode(value: &str) -> Result<T> {
 		serde_urlencoded::from_str::<T>(value)?.xok()
 	}
@@ -256,12 +288,6 @@ impl Into<Response> for Javascript {
 
 impl Into<Response> for Png {
 	fn into(self) -> Response { Response::ok_body(self.0, "image/png") }
-}
-
-
-// this would be DeriveAppState
-pub struct RouteApp {
-	// pub create_app: Box<dyn Clone + Fn() -> App>,
 }
 
 #[cfg(test)]

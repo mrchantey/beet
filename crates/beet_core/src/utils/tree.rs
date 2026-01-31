@@ -1,12 +1,28 @@
 use std::fmt;
 
-/// Very simple general purpose tree structure.
+/// A simple general-purpose tree structure.
+///
+/// Each node contains a value and a list of child nodes, forming a recursive
+/// tree structure. This type is useful for representing hierarchical data.
+///
+/// # Examples
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let tree = Tree::new("root").with_children(vec![
+///     Tree::new("child1"),
+///     Tree::new("child2"),
+/// ]);
+///
+/// assert_eq!(tree.value, "root");
+/// assert_eq!(tree.children.len(), 2);
+/// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Tree<T> {
-	/// The value of this node.
+	/// The value stored at this node.
 	pub value: T,
-	/// The children of this node.
+	/// The child nodes of this node.
 	pub children: Vec<Tree<T>>,
 }
 
@@ -17,6 +33,9 @@ impl<T> IntoIterator for Tree<T> {
 	fn into_iter(self) -> Self::IntoIter { TreeIterDfs { stack: vec![self] } }
 }
 
+/// Depth-first iterator over a [`Tree`].
+///
+/// Visits nodes in pre-order (parent before children, left to right).
 pub struct TreeIterDfs<T> {
 	stack: Vec<Tree<T>>,
 }
@@ -38,6 +57,7 @@ impl<T> Iterator for TreeIterDfs<T> {
 }
 
 impl<T> Tree<Vec<T>> {
+	/// Formats the tree as an indented string where each node's vector is comma-separated.
 	pub fn iter_to_string_indented(&self) -> String
 	where
 		T: fmt::Display,
@@ -66,23 +86,29 @@ impl<T> Tree<Vec<T>> {
 }
 
 impl<T> Tree<T> {
+	/// Creates a new tree node with the given value and no children.
 	pub fn new(value: T) -> Self {
 		Self {
 			value,
 			children: Default::default(),
 		}
 	}
+	/// Creates a new tree node with the given value and children.
 	pub fn new_with_children(value: T, children: Vec<Tree<T>>) -> Self {
 		Self { value, children }
 	}
+
+	/// Sets the children of this node, consuming and returning `self`.
 	pub fn with_children(mut self, children: Vec<Tree<T>>) -> Self {
 		self.children = children;
 		self
 	}
 
-	/// Iterates over the children of this node and applies the function to each child,
-	/// returning the first child that matches the predicate.
-	/// If no child matches, it creates a new child with the default value of T and returns it.
+	/// Finds or inserts a child node matching the predicate.
+	///
+	/// Searches the immediate children for one where `func` returns `true`.
+	/// If found, returns a mutable reference to that child. Otherwise, inserts
+	/// a new child with `T::default()` and returns a reference to it.
 	pub fn find_or_insert<'a>(
 		&'a mut self,
 		func: impl Fn(&T) -> bool,
@@ -103,6 +129,7 @@ impl<T> Tree<T> {
 
 
 
+	/// Recursively sorts all children by their values.
 	pub fn sort_recursive(&mut self)
 	where
 		T: Ord,
@@ -113,6 +140,7 @@ impl<T> Tree<T> {
 		}
 	}
 
+	/// Formats the tree as an indented string with each node on its own line.
 	pub fn to_string_indented(&self) -> String
 	where
 		T: fmt::Display,

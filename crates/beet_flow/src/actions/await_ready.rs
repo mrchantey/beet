@@ -1,16 +1,21 @@
+//! Async readiness synchronization for behavior tree initialization.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Waits for all [`ReadyAction`] descendants to complete before triggering [`Outcome::Pass`].
+/// Waits for all [`ReadyAction`] descendants to complete before passing.
 ///
-/// On [`GetOutcome`], this action finds all [`ReadyAction`] descendants from the root
-/// of the behavior tree and triggers [`GetReady`] on each. Once all have responded with
-/// [`Ready`], it triggers [`Outcome::Pass`].
+/// On [`GetOutcome`], this action finds all [`ReadyAction`] descendants from
+/// the agent entity and triggers [`GetReady`] on each. Once all have responded
+/// with [`Ready`], it triggers [`Outcome::Pass`].
 ///
-/// This is useful for dynamically spawned trees that have async initialization.
-/// Use [`EndInDuration`] as a sibling for timeout behavior.
+/// This is useful for dynamically spawned behavior trees that have async
+/// initialization requirements (e.g., loading assets, connecting to services).
 ///
-/// ## Example
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+///
+/// # Example
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_flow::prelude::*;
@@ -23,15 +28,18 @@ use beet_core::prelude::*;
 ///     ]
 /// ));
 /// ```
+///
+/// For timeout behavior, combine with [`EndInDuration`] in a
+/// [`Fallback`] pattern.
 #[action(await_ready_start)]
 #[derive(Debug, Default, Component)]
 #[require(ContinueRun)]
 pub struct AwaitReady {
-	/// The number of [`ReadyAction`] descendants that have triggered [`Ready`].
+	/// Number of [`ReadyAction`] descendants that have triggered [`Ready`].
 	num_ready: u32,
-	/// The number of descendants with a [`ReadyAction`] component.
+	/// Total number of descendants with a [`ReadyAction`] component.
 	num_actions: u32,
-	/// Entities we're waiting for Ready signals from.
+	/// Entities still awaiting [`Ready`] signals.
 	pending: HashSet<Entity>,
 }
 
