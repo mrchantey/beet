@@ -9,11 +9,8 @@ fn main() {
 			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			// The Router uses ExchangeSpawner to handle requests
-			// using beet_flow patterns for control flow
 			commands.spawn((
 				HttpServer::new(5000),
-				// HttpServer::default(),
 				flow_exchange(|| {
 					// InfallibleSequence ensures all endpoints are checked
 					// even if the previous one did not match
@@ -25,7 +22,6 @@ fn main() {
 							|| {
 								Response::ok_body(
 									"<div>hello foo</div>",
-									// this inserts the `content-type: text/html` header
 									"text/html",
 								)
 							},

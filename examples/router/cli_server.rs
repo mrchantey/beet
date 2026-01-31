@@ -1,7 +1,6 @@
 //! A basic example of using the beet router
 use beet::prelude::*;
 
-
 fn main() {
 	App::new()
 		.add_plugins((
@@ -10,12 +9,10 @@ fn main() {
 			RouterPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			// The Router is a beet_flow pattern, triggering `GetOutcome`
-			// and returning the Response once `Outcome` is triggered
 			commands.spawn((
 				CliServer,
 				flow_exchange(|| {
-					// this sequence type will ensure all endpoints are checked
+					// InfallibleSequence ensures all endpoints are checked
 					// even if the previous one did not match
 					(InfallibleSequence, children![
 						EndpointBuilder::get().with_action(|| {
