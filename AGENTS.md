@@ -68,3 +68,4 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - In bevy the two main causes of bugs are:
 	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
 	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.
+- when a bug is found in actual usage of a feature, like in examples or `beet_site`, it is not enough to just fix the bug. we need to isolate it, understand it and add tests to avoid regression

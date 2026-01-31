@@ -26,7 +26,7 @@ pub fn default_router_cli(
 				}),
 				EndpointBuilder::new().with_path("/").with_action(
 					// dont need to be async but zst restriction for sync systems
-					async move |_: (), entity: AsyncEntity| {
+					async move |_: (), entity: AsyncEntity| -> () {
 						// actually serve the routes
 						entity
 							.world()

@@ -20,6 +20,10 @@ impl Default for HttpServer {
 	}
 }
 
+impl HttpServer {
+	pub fn new(port: u16) -> Self { Self { port } }
+}
+
 // using commands allows a ServerHandler to be inserted, instead of running immediately
 // and using the one inserted via Required.
 #[allow(unused)]

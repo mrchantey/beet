@@ -38,7 +38,7 @@ pub async fn collect_html(
 	// Wrap endpoints with html_bundle_to_response() so RSX bundles
 	// are converted to Response before the exchange completes.
 	let server_entity = world
-		.spawn_then(flow_exchange(move || {
+		.spawn_then(router_exchange(move || {
 			(InfallibleSequence, children![
 				func.clone().bundle_func(),
 				html_bundle_to_response(),
@@ -79,6 +79,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_dom::prelude::BeetRoot;
 	use beet_flow::prelude::*;
+	use beet_net::prelude::*;
 	use beet_rsx::prelude::*;
 
 	#[beet_core::test]
@@ -144,5 +145,34 @@ mod test {
 				ws_path.join("rsx-page/index.html"),
 				"<div>hello rsx</div>".to_string(),
 			)]);
+	}
+
+	/// Test that collect_html works without a RouterPlugin ancestor
+	/// This mimics the export-static command usage
+	#[beet_core::test]
+	async fn without_router_ancestor() {
+		let mut app = App::new();
+		app.add_plugins((AsyncPlugin, ServerPlugin))
+			.insert_resource(WorkspaceConfig::default());
+		let mut world = std::mem::take(app.world_mut());
+
+		let func = || {
+			(InfallibleSequence, children![
+				EndpointBuilder::get()
+					.with_path("standalone")
+					.with_action(|| "standalone page")
+					.with_cache_strategy(CacheStrategy::Static)
+					.with_response_body(BodyType::html()),
+			])
+		};
+
+		let ws_path = WorkspaceConfig::default().html_dir.into_abs();
+		let result: Result<Vec<(AbsPathBuf, String)>> = world
+			.run_async_then(async move |world| collect_html(&world, func).await)
+			.await;
+		result.unwrap().xpect_eq(vec![(
+			ws_path.join("standalone/index.html"),
+			"standalone page".to_string(),
+		)]);
 	}
 }

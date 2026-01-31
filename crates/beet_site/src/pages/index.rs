@@ -21,11 +21,11 @@ pub fn get() -> impl IntoHtml {
 							variant=ButtonVariant::Outlined
 							href="https://github.com/mrchantey/beet"
 							>Github</Link>
-						// <Link
-						// 	style:cascade
-						// 	variant=ButtonVariant::Primary
-						// 	href=routes::docs::index()
-						// 	>Get Started</Link>
+						<Link
+							style:cascade
+							variant=ButtonVariant::Primary
+							href=routes::blog::index()
+							>Blog</Link>
 					</footer>
 				</Card>
 				<iframe src="https://www.youtube.com/embed/a-Sx0aEhDhc" title="Unifying the Fuller Stack with ECS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>

@@ -12,3 +12,4 @@ title = "The Full Moon Harvest"
 - [#5 - Declarative State](/blog/post-5)
 - [#6 - Folk Technology](/blog/post-6)
 - [#7 - Malleable Application Framework](/blog/post-7)
+- [#8 - It's all been done before](/blog/post-8)
