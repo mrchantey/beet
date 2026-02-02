@@ -38,6 +38,9 @@ pub use route_file::*;
 pub use route_file_collection::*;
 pub use route_file_method::*;
 
+pub use collect_client_action_group::CollectClientActions;
+pub use modify_route_file_tokens::ModifyRoutePath;
+
 // Crate-internal systems and helpers
 pub(crate) use collect_client_action::*;
 pub(crate) use collect_client_action_group::*;

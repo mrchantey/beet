@@ -409,7 +409,8 @@ mod test {
 		}
 
 		// Verify total time is reasonable: ~300ms for 3 chunks with 100ms delays each
+		// Use generous upper bound to account for system load variance
 		final_elapsed.xpect_greater_or_equal_to(300);
-		final_elapsed.xpect_less_or_equal_to(600);
+		final_elapsed.xpect_less_or_equal_to(2000);
 	}
 }

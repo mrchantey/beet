@@ -21,7 +21,7 @@ use syn::parse_quote;
 /// route path construction.
 #[derive(Debug, Clone, Default, Component, Reflect)]
 #[reflect(Component)]
-pub(crate) struct StaticRouteTree;
+pub struct StaticRouteTree;
 
 /// Generates a tree of route path functions from [`RouteFileMethod`] entities.
 ///

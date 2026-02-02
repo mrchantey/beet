@@ -60,26 +60,36 @@ unsafe extern "C" {
 #[cfg(test)]
 #[wasm_bindgen]
 unsafe extern "C" {
+	/// Get the current working directory (test variant).
 	#[wasm_bindgen(js_name = "test_cwd")]
 	pub fn cwd() -> String;
+	/// Exit the runtime with a code (test variant).
 	#[wasm_bindgen(js_name = "test_exit")]
 	pub fn exit(code: i32);
+	/// Run a function catching panics (test variant).
 	#[wasm_bindgen(catch, js_name = "test_catch_no_abort_inner")]
 	fn catch_no_abort_inner(
 		f: &mut dyn FnMut() -> Result<(), String>,
 	) -> Result<(), JsValue>;
+	/// Read a file from the filesystem (test variant).
 	#[wasm_bindgen(js_name = "test_read_file")]
 	pub fn read_file(path: &str) -> Option<Vec<u8>>;
+	/// Check if a path exists (test variant).
 	#[wasm_bindgen(js_name = "test_exists")]
 	pub fn exists(path: &str) -> bool;
+	/// Ensure a directory exists (test variant).
 	#[wasm_bindgen(js_name = "test_create_dir_all")]
 	pub fn create_dir_all(path: &str);
+	/// Write a file to the filesystem (test variant).
 	#[wasm_bindgen(js_name = "test_write_file")]
 	pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
+	/// Get all command line arguments (test variant).
 	#[wasm_bindgen(js_name = "test_env_args")]
 	pub fn env_args() -> js_sys::Array;
+	/// Get a single environment variable (test variant).
 	#[wasm_bindgen(js_name = "test_env_var")]
 	pub fn env_var(key: &str) -> Option<String>;
+	/// Get all environment variables (test variant).
 	#[wasm_bindgen(js_name = "test_env_all")]
 	pub fn env_all() -> js_sys::Array;
 }

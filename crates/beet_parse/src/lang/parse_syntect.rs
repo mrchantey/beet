@@ -10,59 +10,6 @@ use syntect::html::append_highlighted_html_for_styled_line;
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 
-/// Parse the output of pulldown-cmark into a `CodeNode`:
-///
-/// The following markdown:
-/// ```markdown
-/// 	```rust
-/// 	let foo = bar;
-/// 	```
-/// ```
-/// Will produce the following html:
-/// ```html
-/// <pre><code class="language-rust">let foo = bar;</code></pre>
-pub fn collect_md_code_nodes(
-	mut commands: Commands,
-	query: Query<(Entity, &NodeTag, &Children), Added<ElementNode>>,
-	mut inner_text: Query<&mut InnerText>,
-	find_attr: FindAttribute,
-) {
-	for (entity, tag, children) in query.iter() {
-		if **tag != "pre" {
-			continue;
-		}
-
-		if children.len() != 1 {
-			continue;
-		}
-		let Some(&child) = children.first() else {
-			continue;
-		};
-
-		let lang = find_attr
-			.classes(child)
-			.into_iter()
-			.find(|c| c.starts_with("language-"))
-			.map(|c| c.trim_start_matches("language-").to_string());
-
-		let theme = find_attr
-			.find(entity, "theme")
-			.and_then(|(_, value)| value.map(|v| v.as_str().to_string()));
-
-		commands.entity(entity).insert(CodeNode { lang, theme });
-
-		if let Ok(mut text) = inner_text.get_mut(child) {
-			let text = std::mem::take(&mut text.0);
-			// pulldown-cmark escapes code html, we undo this to avoid double escaping
-			// by syntect
-			let unescaped = EscapeHtml::unescape(&text);
-			commands.entity(entity).insert(InnerText(unescaped));
-			commands.entity(child).despawn();
-		}
-	}
-}
-
-
 /// Configuration for syntax highlighting with syntect.
 #[derive(Debug, Resource)]
 pub struct SyntectConfig {

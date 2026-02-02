@@ -15,7 +15,7 @@ use syn::Item;
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
 #[require(CodegenFile)]
-pub(crate) struct CollectClientActions {
+pub struct CollectClientActions {
 	/// Whether to collapse single-child functions into their parent module.
 	///
 	/// When `true`, a module with only one function will be replaced by just

@@ -967,14 +967,16 @@ mod test {
 	async fn async_task() {
 		let mut app = test_app();
 		let world = app.world_mut();
-		world.run_async(|world| async move {
-			world.insert_resource(Count(0));
-			world
-				.with_resource_then::<Count, _>(|mut count| {
-					count.0 += 1;
-				})
-				.await;
-		});
+		world
+			.run_async_then(|world| async move {
+				world.insert_resource(Count(0));
+				world
+					.with_resource_then::<Count, _>(|mut count| {
+						count.0 += 1;
+					})
+					.await;
+			})
+			.await;
 		world
 			.run_async_local_then(|world| async move {
 				world.resource::<Count>().await

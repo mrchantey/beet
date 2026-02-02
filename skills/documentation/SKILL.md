@@ -33,11 +33,11 @@ For each crate do the following:
 
 We will start from the basic dependencies and work upwards. Skip those marked completed. Do not ask to continue to the next one, just do it.
 
-- [ ] beet_core
-- [ ] beet_flow
-- [ ] beet_net
-- [ ] beet_router
-- [ ] beet_parse
+- [x] beet_core
+- [x] beet_flow
+- [x] beet_net
+- [x] beet_router
+- [x] beet_parse
 - [x] beet_build
 - [x] beet_dom
 
