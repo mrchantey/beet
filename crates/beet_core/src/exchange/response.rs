@@ -172,7 +172,7 @@ impl Response {
 		header: http::header::HeaderName,
 	) -> Result<Option<&str>> {
 		match self.parts.get_header(header.as_str()) {
-			Some(value) => Ok(Some(value.as_str())),
+			Some(value) => Ok(Some(value)),
 			None => Ok(None),
 		}
 	}

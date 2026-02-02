@@ -221,6 +221,7 @@ client = [
 	"beet_dom/client",
 	"beet_design/client",
 ]
+beet_net_server = ["net","beet_net/flow","beet_net/server"]
 
 #💡 fine-grained
 native-tls = [
@@ -337,14 +338,14 @@ required-features = ["clanker"]
 # 💡 Examples - net
 
 [[example]]
-name = "server"
-path = "examples/net/server.rs"
-required-features = ["server"]
-
-[[example]]
 name = "server_minimal"
 path = "examples/net/server_minimal.rs"
-required-features = ["server"]
+required-features = ["beet_net_server"]
+
+[[example]]
+name = "server_templating"
+path = "examples/net/server_templating.rs"
+required-features = ["beet_net_server"]
 
 [[example]]
 name = "server_bench"

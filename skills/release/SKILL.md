@@ -1,8 +1,8 @@
+Prepare the speficied crates for release, one by one. For each crate follow the below procedure. 
 
-Prepare the speficied crates for release, for each crate follow the below procedure.
+**Do not actually release the crate.**
 
 ## 1. Documentation
-do
 Gain an understanding of the intended usage of the crate. Do not comb through every single source file, just check the high level types and ensure they are well documented. Ensure the `README.md` is up to date and of high quality. The `lib.rs` should include the readme as crate level docs.
 
 ## 2. Testing

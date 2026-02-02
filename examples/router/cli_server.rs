@@ -1,4 +1,12 @@
-//! A basic example of using the beet router
+//! CLI router server example.
+//!
+//! Demonstrates using `beet_router` with a CLI interface for testing routes
+//! without starting an HTTP server.
+//!
+//! Run with:
+//! ```sh
+//! cargo run --example cli_server --features server
+//! ```
 use beet::prelude::*;
 
 fn main() {

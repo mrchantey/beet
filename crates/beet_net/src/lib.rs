@@ -1,28 +1,4 @@
-//! Cross-platform networking utilities for Beet applications.
-//!
-//! This crate provides general purpose primitives for communicating between systems,
-//! with a focus on cross-platform compatibility (native and WASM).
-//!
-//! ## Modules
-//!
-//! - [`client`]: HTTP client for sending requests (works on native and WASM)
-//! - [`exchange`]: Request/response exchange patterns for Bevy entities
-//! - [`object_storage`]: Bucket-based storage abstraction (S3, filesystem, etc.)
-//! - [`server`]: HTTP server implementations (native only)
-//! - [`sockets`]: WebSocket client and server
-//!
-//! ## Features
-//!
-//! - `server`: Enable HTTP server functionality (requires native target)
-//! - `lambda`: Enable AWS Lambda server support
-//! - `aws`: Enable AWS S3 and DynamoDB providers
-//! - `flow`: Enable beet_flow integration for exchange patterns
-//! - `reqwest`: Use reqwest as the HTTP client backend
-//! - `ureq`: Use ureq as the HTTP client backend (blocking)
-//! - `tungstenite`: Enable native WebSocket support
-//! - `rustls-tls`: Use rustls for TLS
-//! - `native-tls`: Use native TLS implementation
-//!
+#![doc = include_str!("../README.md")]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(feature = "aws", feature(if_let_guard))]

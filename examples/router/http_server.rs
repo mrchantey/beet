@@ -1,4 +1,17 @@
-//! A basic example of using the beet router
+//! HTTP router server example.
+//!
+//! Demonstrates a basic HTTP server using `beet_router` for request routing.
+//!
+//! Run with:
+//! ```sh
+//! cargo run --example http_server --features server
+//! ```
+//!
+//! Test with:
+//! ```sh
+//! curl http://localhost:5000
+//! curl http://localhost:5000/foo
+//! ```
 use beet::prelude::*;
 
 fn main() {

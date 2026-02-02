@@ -2,7 +2,7 @@
 name = "beet_net"
 version.workspace = true
 edition.workspace = true
-description = "Cross-platform networking utilities"
+description = "Very bevy networking utilities"
 documentation.workspace = true
 readme.workspace = true
 homepage.workspace = true

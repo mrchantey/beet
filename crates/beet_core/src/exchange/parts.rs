@@ -217,8 +217,10 @@ impl Parts {
 	pub fn headers(&self) -> &MultiMap<String, String> { &self.headers }
 
 	/// Gets the first value for a parameter
-	pub fn get_param(&self, key: &str) -> Option<&String> {
-		self.params.get_vec(key).and_then(|vals| vals.first())
+	pub fn get_param(&self, key: &str) -> Option<&str> {
+		self.params
+			.get_vec(key)
+			.and_then(|vals| vals.first().map(|s| s.as_str()))
 	}
 
 	/// Gets all values for a parameter
@@ -227,8 +229,10 @@ impl Parts {
 	}
 
 	/// Gets the first value for a header
-	pub fn get_header(&self, key: &str) -> Option<&String> {
-		self.headers.get_vec(key).and_then(|vals| vals.first())
+	pub fn get_header(&self, key: &str) -> Option<&str> {
+		self.headers
+			.get_vec(key)
+			.and_then(|vals| vals.first().map(|s| s.as_str()))
 	}
 
 	/// Gets all values for a header

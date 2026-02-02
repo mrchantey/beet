@@ -46,7 +46,12 @@ impl Plugin for ServerPlugin {
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "server", feature = "ureq", not(target_arch = "wasm32")))]
+#[cfg(all(
+	feature = "server",
+	feature = "ureq",
+	not(feature = "lambda"),
+	not(target_arch = "wasm32")
+))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

@@ -1,11 +1,24 @@
-//! Benches a large amount of nested branches
-//! In practice this is quite a large tree,
-//! a well formed router should break much earlier.
-//! That said for a 200ms request this is unnoticable
+//! Router benchmark example.
 //!
-//! short path: 			30us
-//! 100 nested paths: 130us
+//! Benches a large amount of nested branches to measure routing overhead.
+//! In practice this is quite a large tree; a well formed router should
+//! break much earlier. For a typical 200ms request this is unnoticeable.
 //!
+//! Results:
+//! - short path: ~30us
+//! - 100 nested paths: ~130us
+//!
+//! Run with:
+//! ```sh
+//! cargo run --example router_bench --features server
+//! ```
+//!
+//! Test with:
+//! ```sh
+//! curl http://localhost:8337
+//! curl http://localhost:8337/nested
+//! curl http://localhost:8337/status
+//! ```
 #![recursion_limit = "1024"]
 use beet::prelude::*;
 
