@@ -416,11 +416,6 @@ path = "examples/router/http_router.rs"
 required-features = ["server_app"]
 
 [[example]]
-name = "cli_router"
-path = "examples/router/cli_router.rs"
-required-features = ["server_app"]
-
-[[example]]
 name = "router_bench"
 path = "examples/router/router_bench.rs"
 required-features = ["server_app"]

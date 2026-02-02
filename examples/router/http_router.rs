@@ -24,9 +24,11 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
+				// CliServer,
 				HttpServer::default(),
 				flow_exchange(|| {
 					(InfallibleSequence, children![
+						log_stats(),
 						home(),
 						treasure(),
 						not_found()
@@ -35,6 +37,21 @@ fn main() {
 			));
 		})
 		.run();
+}
+
+fn log_stats() -> impl Bundle {
+	OnSpawn::observe(
+		|ev: On<GetOutcome>,
+		 mut commands: Commands,
+		 query: RouteQuery|
+		 -> Result {
+			let action = ev.target();
+			let request = query.request_meta(action)?;
+			println!("{}: {}", request.method(), request.path_string());
+			commands.entity(action).trigger_target(Outcome::Pass);
+			Ok(())
+		},
+	)
 }
 
 fn home() -> impl Bundle {
