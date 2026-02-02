@@ -1,32 +1,51 @@
 # `beet_router`
 
- Ergonomic IO agnostic router using Bevy ECS and behavior trees.
+IO agnostic routing utilities.
 
- `beet_router` provides a flexible routing system that uses the ECS pattern
- for request handling. Routes are defined as entity hierarchies where
- middleware, predicates, and handlers compose naturally.
+This crate provides a flexible routing system that uses the ECS pattern for request handling. Routes are defined as control flow hierarchies of middleware, predicates,handlers, and middleware.
 
- # Features
+# Features
 
- - **ECS-based routing**: Routes are entities with components
- - **Behavior tree control flow**: Uses `beet_flow` for request routing decisions
- - **Composable middleware**: Middleware as components that can be mixed freely
- - **Type-safe extractors**: Extract typed data from requests
+- **ECS-based routing**: Routes are entities with components
+- **IO agnostic**: Suitable for http routes, cli commands or clanker tool calls
+- **Behavior tree control flow**: Uses `beet_flow` for request routing decisions
+- **Composable middleware**: Middleware as components that can be mixed freely
+- **Type-safe extractors**: Extract typed data from requests
 
- # Example
+# Example
 
- ```ignore
- use beet_router::prelude::*;
- use beet_core::prelude::*;
+```rust,ignore
+use beet::prelude::*;
 
- let mut world = World::new();
- world.spawn(
-     Endpoint::get("/hello")
-         .body("Hello, World!")
- );
- ```
+fn main() {
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			RouterPlugin::default(),
+		))
+		.add_systems(Startup, |mut commands: Commands| {
+			commands.spawn((
+				// swap out the server to route cli subcommands!
+				// CliServer::default(),
+				HttpServer::new(5000),
+				flow_exchange(|| {
+					(InfallibleSequence, children![
+						EndpointBuilder::get()
+							.with_action(|| { Response::ok_body("hello world", "text/plain")}),
+						EndpointBuilder::get()
+							.with_path("foo")
+							.with_action(|| { Response::ok_body("hello foo", "text/plain")}),
+						),
+					])
+				}),
+			));
+		})
+		.run();
+}
+```
+
 # Axum Comparison
 
-`beet_router` is designed to balance performance with flexibility and developer experience.
-It is not intended for extreme traffic scenarios like a proxy servers handling 10,000 requests/second, this is something axum is designed for.
-An average lambda request takes 200ms and our baseline target for a relatively large router is 1ms, 0.5% of that.
+`axum` is one of the fastest http routers in the world, intended for extreme traffic scenarios like a proxy servers handling 10,000 requests/second.
+
+`beet_router` is designed for application level routing, balancing performance with flexibility. It is also agnostic to the IO, for instance it can also be used for cli subcommands.

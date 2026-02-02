@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 
 /// A 'server' that accepts the cli arguments and environment variables as a request,
 /// logging the response body to stdout.
-#[derive(Component)]
+#[derive(Default, Component)]
 #[component(on_add=on_add)]
 pub struct CliServer;
 

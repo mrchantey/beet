@@ -285,7 +285,7 @@ mod test {
 				))
 				.run();
 		});
-		time_ext::sleep_millis(50).await;
+		time_ext::sleep_millis(100).await;
 		for _ in 0..10 {
 			Request::post(&url)
 				.send()
@@ -306,7 +306,7 @@ mod test {
 				.spawn_then((server, mirror_exchange()))
 				.run();
 		});
-		time_ext::sleep_millis(50).await;
+		time_ext::sleep_millis(100).await;
 		Request::post(url)
 			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
 				Ok(Bytes::from("foo")),
@@ -358,7 +358,7 @@ mod test {
 				))
 				.run();
 		});
-		time_ext::sleep_millis(50).await;
+		time_ext::sleep_millis(100).await;
 
 		let start_time = Instant::now();
 
