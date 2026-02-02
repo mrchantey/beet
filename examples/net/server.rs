@@ -1,19 +1,26 @@
-//! A basic HTTP server using `handler_exchange`
-//! to respond to all requests.
+//! # Basic Server
 //!
-//! Demonstrates application state and query params.
+//! This example demonstrates creating a baisc server in Beet
+//! using the [`handler_exchange`], which is the least opinionated exchange pattern
+//! but can only process a single request at a time.
+//! For concurrent request handling see [`spawn_exchange`].
 //!
-//! Run with:
+//!
+//! ## Running the Example
+//!
 //! ```sh
 //! cargo run --example server --features http_server
 //! # or with CliServer
 //! cargo run --example server --features http_server -- --name=billy
 //! ```
 //!
-//! Test with:
+//! Then test it with:
 //! ```sh
+//! curl http://localhost:8337
 //! curl http://localhost:8337?name=billy
 //! ```
+//!
+//! Try refreshing multiple times to see the visitor count increment!
 //!
 use beet::prelude::*;
 
@@ -38,8 +45,25 @@ fn main() {
 #[derive(Default, Component)]
 struct Count(u32);
 
+/// Handler function that processes all incoming requests.
+///
+/// ## Parameters
+///
+/// - `entity`: Mutable access to the server entity, allowing us to read/write components
+/// - `request`: The incoming request with method, path, headers, and body
+///
+/// ## Returns
+///
+/// A [`Response`] that will be sent back to the client.
 fn handler(mut entity: EntityWorldMut, request: Request) -> Response {
+	// only accept `/` routes
+	if !request.path().is_empty() {
+		println!("Not Found: {}", request.path_string());
+		return Response::not_found();
+	}
+
 	let name = request.get_param("name").unwrap_or("world");
+
 	let mut count = entity.get_mut::<Count>().unwrap();
 	count.0 += 1;
 

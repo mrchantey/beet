@@ -9,16 +9,8 @@ use beet_core::prelude::*;
 use std::sync::Arc;
 
 /// Creates an exchange handler that processes requests directly with a synchronous function.
-///
-/// Unlike [`spawn_exchange`], this pattern does not insert/remove [`Request`] and [`Response`]
-/// components. Instead, the handler function receives the request directly and returns
-/// a response, which is sent immediately via the exchange channel.
-///
-/// ## Execution Flow
-///
-/// 1. [`ExchangeStart`] is triggered on the spawner entity
-/// 2. The handler function is called with [`EntityWorldMut`] and [`Request`]
-/// 3. The returned [`Response`] is sent via the exchange channel
+/// This is the least opinionated exchange pattern but can only process a single request
+/// at a time. For concurrent request handling see [`spawn_exchange`].
 ///
 /// ## Example
 ///
@@ -31,6 +23,14 @@ use std::sync::Arc;
 ///     request.mirror()
 /// }));
 /// ```
+///
+///
+/// ## Execution Flow
+///
+/// 1. [`ExchangeStart`] is triggered on the spawner entity
+/// 2. The handler function is called with [`EntityWorldMut`] and [`Request`]
+/// 3. The returned [`Response`] is sent via the exchange channel
+
 pub fn handler_exchange<F>(func: F) -> impl Bundle
 where
 	F: 'static + Send + Sync + Clone + Fn(EntityWorldMut, Request) -> Response,

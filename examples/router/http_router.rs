@@ -1,17 +1,25 @@
-//! HTTP router example with a pirate theme.
+//! # HTTP Router
 //!
-//! Demonstrates a basic HTTP router using `beet_router` for request routing.
+//! 🚧 Mind Your Step! 🚧
+//! `beet_router` is under construction, sharp edges ahoy.
 //!
-//! Run with:
+//! This example builds on the templating example,
+//! demonstrating proper routing and control flow using `beet_router`.
+//!
+//! `beet_router` uses the control flow primitives from `beet_flow` for routing,
+//! see the flow examples for more detailed usage.
+//!
+//! ## Running the Example
+//!
 //! ```sh
 //! cargo run --example http_router --features server_app
 //! ```
 //!
-//! Test with:
+//! Then test it with:
 //! ```sh
 //! curl http://localhost:5000
-//! curl http://localhost:5000/treasure
-//! curl http://localhost:5000/plank
+//! curl http://localhost:5000/mashed-beets
+//! curl http://localhost:5000/foobar
 //! ```
 use beet::prelude::*;
 
@@ -20,18 +28,19 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			LogPlugin::default(),
-			RouterPlugin::default(),
+			RouterPlugin::default(), // provides routing infrastructure
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
-				// CliServer,
 				HttpServer::default(),
+				Count::default(),
+				// flow_exchange runs control flow on each request
 				flow_exchange(|| {
 					(InfallibleSequence, children![
-						log_stats(),
-						home(),
-						treasure(),
-						not_found()
+						log_stats(),    // runs first, logs request then passes
+						home(),         // matches GET /
+						mashed_beets(), // matches GET /treasure
+						not_found()     // only runs if no response yet
 					])
 				}),
 			));
@@ -39,6 +48,12 @@ fn main() {
 		.run();
 }
 
+/// Logging middleware using an observer.
+///
+/// This runs before each action in the flow, logging the request details
+/// then passing control to the next action with [`Outcome::Pass`].
+///
+/// This pattern is useful for cross-cutting concerns like logging, metrics, or auth.
 fn log_stats() -> impl Bundle {
 	OnSpawn::observe(
 		|ev: On<GetOutcome>,
@@ -48,19 +63,27 @@ fn log_stats() -> impl Bundle {
 			let action = ev.target();
 			let request = query.request_meta(action)?;
 			println!("{}: {}", request.method(), request.path_string());
+			// pass to next action in the sequence
 			commands.entity(action).trigger_target(Outcome::Pass);
 			Ok(())
 		},
 	)
 }
 
+/// Home endpoint handling GET requests to `/`.
+///
+/// [`EndpointBuilder::get()`] creates an endpoint that:
+/// - Matches GET requests only
+/// - Matches the root path `/` by default
+/// - Runs the provided action function when matched
 fn home() -> impl Bundle {
 	EndpointBuilder::get().with_action(|| {
 		Response::ok_body(
 			render(
 				r#"
-<h1>Beet cooking tips!</h1>
-<p>Welcome to the pirate's cove, ye scallywag!</p>
+<h1>🛖 The Food Hut 🛖</h1>
+<p>The <i>number one</i> place for delicious food recipes.</p>
+<br/>
 <p>Visit a link or check out a <a href="/foobar">broken link</a>
 "#,
 			),
@@ -68,16 +91,16 @@ fn home() -> impl Bundle {
 		)
 	})
 }
-/// # `/treasure` endpoint
-fn treasure() -> impl Bundle {
+/// Mashed Beets page.
+fn mashed_beets() -> impl Bundle {
 	EndpointBuilder::get()
-		.with_path("treasure")
+		.with_path("mashed-beets")
 		.with_action(|| {
 			Response::ok_body(
 				render(
 					r#"
-<h1>Treasure Map</h1>
-<p>X marks the spot where the booty be buried, matey!</p>
+<h1>Mashed Beets</h1>
+<p>Take a bunch of beets and beat them until they're mashed.</p>
 "#,
 				),
 				"text/html",
@@ -85,22 +108,23 @@ fn treasure() -> impl Bundle {
 		})
 }
 
-/// # Not Found Handler
+/// 404 handler that only runs when no previous endpoint matched.
 ///
-/// This handler is an example of custom routing logic,
-/// using control flow primitives to only run this endpoint if no response already.
+/// This demonstrates advanced control flow by combining:
+/// 1. A predicate that checks if a response exists yet
+/// 2. A non-canonical endpoint that accepts any remaining path
 ///
-/// It will only run if, after all endpoints have ran there is still no response.
-/// If there is a response the predicate will fail, short-circuting the sequence.
+/// The sequence short-circuits if `no_response()` fails, meaning this
+/// only runs when no previous endpoint has generated a response.
 ///
-/// Fun fact: [`EndpointBuilder`] exists to create control flow structures like this.
 fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
-		// only passes if no response is present,
-		// indicating no previous endpoint has ran
+		// predicate: only passes if no response exists
 		common_predicates::no_response(),
 		EndpointBuilder::new()
+			// dont include in endpoint trees etc
 			.non_canonical()
+			// match any path
 			.with_trailing_path()
 			.with_action(|req: In<Request>| {
 				let path = req.path_string();
@@ -109,7 +133,7 @@ fn not_found() -> impl Bundle {
 					render(&format!(
 						r#"
 <h1>Not Found</h1>
-<p>Arrr! The page at <a href="{path}">{path}</a> has been sent to Davy Jones' locker.</p>"#
+<p>The page at <a href="{path}">{path}</a> could not be found.</p>"#
 					)),
 					"text/html",
 				)
@@ -117,9 +141,19 @@ fn not_found() -> impl Bundle {
 	])
 }
 
-/// # Template Rendering
-/// Very basic templating system that renders a page with navigation and content.
-/// This is loaded on every request, so you can change the html without reload!
+fn nav_items() -> &'static [(&'static str, &'static str)] {
+	&[("Home", "/"), ("Mashed Beets", "/mashed-beets")]
+}
+
+/// ╔═══════════════════════════════════════════╗
+/// ║   Basic Templating Engine                 ║
+/// ╚═══════════════════════════════════════════╝
+
+/// Template rendering function that wraps content in a layout.
+///
+/// Loads the layout from disk and injects head, navigation, and main content.
+/// Since this loads from disk on every request, you can edit the HTML files
+/// without restarting the server!
 fn render(main_content: &str) -> String {
 	use std::fs::read_to_string;
 
@@ -130,7 +164,9 @@ fn render(main_content: &str) -> String {
 		.replace("{{ main }}", &main_content)
 }
 
-
+/// Generates the `<head>` content for pages.
+///
+/// Includes JavaScript for theme switching functionality.
 fn head() -> String {
 	use std::fs::read_to_string;
 
@@ -140,9 +176,9 @@ fn head() -> String {
 	format!(r#"<script>{theme_switcher}</script>"#)
 }
 
+/// Generates navigation HTML from a list of nav items.
 fn nav() -> String {
-	let nav_items = [("Home", "/"), ("Treasure", "/treasure")];
-	nav_items
+	nav_items()
 		.iter()
 		.map(|(label, path)| {
 			format!(r#"<li><a href="{}">{}</a></li>"#, path, label)
