@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="color-scheme" content="light dark" />
+		<title>Beet Server</title>
+		<link
+			rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+		/>
+		<style>
+			nav ul {
+				width: 100%;
+				margin-bottom: 2rem;
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+			}
+			nav ul li:last-child {
+				margin-left: auto;
+			}
+			main {
+				max-width: 800px;
+				margin: 0 auto;
+				padding: 2rem 1rem;
+			}
+		</style>
+		{{ head }}
+	</head>
+	<body>
+		<header class="container">
+			<nav>
+				<ul>
+					{{ nav }}
+					<li>
+						<details class="dropdown">
+							<summary role="button" class="secondary">Theme</summary>
+							<ul>
+								<li><a href="#" data-theme-switcher="auto">Auto</a></li>
+								<li><a href="#" data-theme-switcher="light">Light</a></li>
+								<li><a href="#" data-theme-switcher="dark">Dark</a></li>
+							</ul>
+						</details>
+					</li>
+				</ul>
+			</nav>
+		</header>
+		<main class="container">{{ main }}</main>
+	</body>
+</html>

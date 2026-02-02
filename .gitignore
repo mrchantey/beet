@@ -1,5 +1,5 @@
 assets
-!examples/assets/**/*
+!examples/assets
 target
 rustc-ice*
 .rustc_info.json
