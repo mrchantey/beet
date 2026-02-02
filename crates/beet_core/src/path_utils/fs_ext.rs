@@ -311,6 +311,7 @@ pub fn write_if_diff(
 }
 
 #[cfg(test)]
+/// Returns the path to a directory containing some files for testing.
 pub fn test_dir() -> PathBuf {
 	fs_ext::workspace_root().join(Path::new("tests/test_dir"))
 }

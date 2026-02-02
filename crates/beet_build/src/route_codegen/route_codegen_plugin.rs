@@ -1,9 +1,11 @@
 use super::*;
 use beet_core::prelude::*;
 
+/// Schedule label for route code generation systems.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct RouteCodegen;
 
+/// Plugin that registers route code generation systems.
 #[derive(Debug, Default, Clone)]
 pub struct RouteCodegenPlugin;
 

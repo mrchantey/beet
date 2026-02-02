@@ -52,6 +52,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 impl SocketServer {
+	/// Creates a new socket server bound to the specified port.
 	pub fn new(port: u16) -> Self { Self { port } }
 
 	/// Create a new Server with an incrementing port to avoid
@@ -66,6 +67,7 @@ impl SocketServer {
 
 	/// The host and path without the protocol, ie `127.0.0.1:3000`
 	pub fn local_address(&self) -> String { format!("127.0.0.1:{}", self.port) }
+	/// Returns the full WebSocket URL for local connections, e.g. `ws://127.0.0.1:8339`.
 	pub fn local_url(&self) -> String {
 		format!("ws://{}", self.local_address())
 	}

@@ -5,6 +5,9 @@ use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
 
+/// Plugin providing router infrastructure for HTTP request handling.
+///
+/// Initializes async runtime, server plugin, control flow, and default resources.
 #[derive(Default)]
 pub struct RouterPlugin;
 
@@ -21,6 +24,7 @@ impl Plugin for RouterPlugin {
 }
 
 
+/// Controls how HTML routes are rendered.
 #[derive(Debug, Default, Copy, Clone, Resource, PartialEq, Eq)]
 pub enum RenderMode {
 	/// Static html routes will be skipped, using the [`bucket_handler`] fallback

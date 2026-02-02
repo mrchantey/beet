@@ -8,6 +8,7 @@ use syn::Ident;
 
 const BOUNDED_MAX: usize = 12;
 
+/// Generates tokens for a related component set, handling both bounded and unbounded cases.
 pub fn unbounded_related<T: TypePath>(
 	related: Vec<TokenStream>,
 ) -> Result<TokenStream> {

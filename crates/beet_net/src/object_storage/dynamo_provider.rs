@@ -9,13 +9,20 @@ use aws_sdk_dynamodb::types::TableStatus;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
+/// AWS DynamoDB provider implementing the bucket storage interface.
+///
+/// Wraps an [`aws_sdk_dynamodb::Client`] and implements [`BucketProvider`] for
+/// storing and retrieving objects in DynamoDB tables. Each "bucket" maps to a
+/// DynamoDB table with a simple `id` (string) primary key.
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct DynamoDbProvider(pub Client);
 
 impl DynamoDbProvider {
+	/// Creates a new DynamoDB client with the default region: `us-west-2`.
 	pub async fn create() -> Self {
 		Self::create_with_region("us-west-2").await
 	}
+	/// Creates a new DynamoDB client with a specific region, e.g. `us-west-2`.
 	pub async fn create_with_region(region: &str) -> Self {
 		let region = Region::new(region.to_string());
 		let config = aws_config::from_env()

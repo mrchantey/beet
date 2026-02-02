@@ -31,16 +31,22 @@ pub(super) type RstmlCustomNode = rstml::Infallible;
 #[require(SnippetRoot)]
 pub struct RstmlTokens(SendWrapper<TokenStream>);
 impl RstmlTokens {
+	/// Creates a new `RstmlTokens` from a token stream.
 	pub fn new(tokens: TokenStream) -> Self { Self(SendWrapper::new(tokens)) }
+	/// Consumes self and returns the inner token stream.
 	pub fn take(self) -> TokenStream { self.0.take() }
 }
 
+/// Diagnostics collected during RSX token parsing.
 #[derive(Debug, Deref, DerefMut, Component)]
 pub struct TokensDiagnostics(pub SendWrapper<Vec<Diagnostic>>);
 
 impl TokensDiagnostics {
+	/// Creates a new `TokensDiagnostics` from a vector of diagnostics.
 	pub fn new(value: Vec<Diagnostic>) -> Self { Self(SendWrapper::new(value)) }
+	/// Consumes self and returns the inner diagnostics vector.
 	pub fn take(self) -> Vec<Diagnostic> { self.0.take() }
+	/// Converts all diagnostics into token streams for emission.
 	pub fn into_tokens(self) -> Vec<TokenStream> {
 		self.take()
 			.into_iter()
@@ -50,6 +56,7 @@ impl TokensDiagnostics {
 }
 
 
+/// Creates an rstml parser configured with the given HTML constants.
 pub fn create_rstml_parser(
 	constants: &HtmlConstants,
 ) -> Parser<RstmlCustomNode> {

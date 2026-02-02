@@ -19,15 +19,21 @@ static SERVER_URL: LazyLock<Mutex<Url>> = LazyLock::new(|| {
 });
 
 
+/// A client-side request builder for invoking server actions.
+///
+/// Provides a type-safe way to call server endpoints with automatic
+/// serialization of request bodies and deserialization of responses.
 pub struct ServerActionRequest<Req = ()> {
 	/// The base url of the server, defaults to [`ServerActionRequest::get_server_url`].
 	pub base_url: Url,
 	/// The path to the action, appended to the base url.
 	pub route_path: RoutePath,
+	/// The HTTP method for this request.
 	pub method: HttpMethod,
 	/// The status code to check when calling [`Self::send_fallible`],
 	/// determining if the body should be treated as the [`Err`] type.
 	pub error_status: StatusCode,
+	/// The request body to serialize, if any.
 	pub req_body: Option<Req>,
 }
 
@@ -44,6 +50,7 @@ impl Default for ServerActionRequest {
 }
 
 impl ServerActionRequest<()> {
+	/// Creates a new server action request with the given method and path.
 	pub fn new(method: HttpMethod, route_path: impl Into<RoutePath>) -> Self {
 		Self {
 			method,
@@ -56,11 +63,14 @@ impl ServerActionRequest<()> {
 }
 
 impl ServerActionRequest {
+	/// Returns the current server URL used for requests.
 	pub fn get_server_url() -> Url { SERVER_URL.lock().unwrap().clone() }
+	/// Sets the global server URL used for all subsequent requests.
 	pub fn set_server_url(url: Url) { *SERVER_URL.lock().unwrap() = url; }
 }
 
 impl<Req> ServerActionRequest<Req> {
+	/// Sets the request body and returns a new request with the updated type.
 	pub fn with_body<Req2>(self, body: Req2) -> ServerActionRequest<Req2> {
 		ServerActionRequest {
 			base_url: self.base_url,
@@ -70,11 +80,13 @@ impl<Req> ServerActionRequest<Req> {
 			req_body: Some(body),
 		}
 	}
+	/// Sets the status code that indicates an error response for [`Self::send_fallible`].
 	pub fn with_error_status(mut self, status: StatusCode) -> Self {
 		self.error_status = status;
 		self
 	}
 
+	/// Sets the base URL for this request, overriding the global server URL.
 	pub fn with_base_url(mut self, url: Url) -> Self {
 		self.base_url = url;
 		self
@@ -85,6 +97,7 @@ impl<Req> ServerActionRequest<Req>
 where
 	Req: Serialize,
 {
+	/// Converts this server action request into a [`Request`].
 	pub fn into_request(self) -> Result<Request> {
 		let url = format!(
 			"{}{}",
@@ -104,6 +117,7 @@ where
 		.xok()
 	}
 
+	/// Sends the request and deserializes the response as the given type.
 	pub async fn send<Res>(self) -> Result<Res>
 	where
 		Res: DeserializeOwned,
@@ -116,6 +130,7 @@ where
 			.json()
 			.await
 	}
+	/// Sends the request and handles fallible responses with separate Ok/Err types.
 	pub async fn send_fallible<Res, Err>(self) -> Result<Result<Res, Err>>
 	where
 		Res: DeserializeOwned,

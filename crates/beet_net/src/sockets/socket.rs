@@ -63,6 +63,9 @@ impl Socket {
 			.trigger_target(SocketReady);
 	}
 
+	/// Connects to a WebSocket server at the given URL.
+	///
+	/// Returns a connected [`Socket`] that can be used to send and receive messages.
 	#[allow(unused_variables)]
 	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
 		#[cfg(target_arch = "wasm32")]
@@ -80,6 +83,7 @@ impl Socket {
 			)
 		}
 	}
+	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.
 	pub fn insert_on_connect(url: impl AsRef<str>) -> OnSpawn {
 		let url = url.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |entity| -> Result {
@@ -139,6 +143,10 @@ impl Stream for Socket {
 	}
 }
 
+/// Trait for WebSocket message streams.
+///
+/// Implemented automatically for any type that is `'static + MaybeSend` and
+/// implements `Stream<Item = Result<Message>>`.
 pub trait SocketReader:
 	'static + MaybeSend + Stream<Item = Result<Message>>
 {
@@ -170,6 +178,7 @@ impl Stream for SocketRead {
 /// Platform-specific implementations live in their respective modules and are
 /// boxed into `Socket`.
 pub trait SocketWriter: 'static + MaybeSend {
+	/// Returns a boxed clone of this writer for sharing across tasks.
 	fn clone_boxed(&self) -> Box<dyn SocketWriter>;
 
 	/// Send a message to the socket peer.
@@ -229,7 +238,9 @@ pub enum Message {
 #[event(auto_propagate)]
 pub struct MessageSend(pub Message);
 impl MessageSend {
+	/// Consumes self and returns the inner [`Message`].
 	pub fn take(self) -> Message { self.0 }
+	/// Returns a reference to the inner [`Message`].
 	pub fn inner(&self) -> &Message { &self.0 }
 }
 
@@ -238,7 +249,9 @@ impl MessageSend {
 #[event(auto_propagate)]
 pub struct MessageRecv(pub Message);
 impl MessageRecv {
+	/// Consumes self and returns the inner [`Message`].
 	pub fn take(self) -> Message { self.0 }
+	/// Returns a reference to the inner [`Message`].
 	pub fn inner(&self) -> &Message { &self.0 }
 }
 

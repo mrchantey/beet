@@ -10,11 +10,14 @@ use syn::Expr;
 use syn::Ident;
 
 
+/// Configuration for tokenizing RSX templates into token streams.
 pub struct TokenizeTemplate {
+	/// Whether to wrap inner content in additional scaffolding.
 	pub wrap_inner: bool,
 }
 
 impl TokenizeTemplate {
+	/// Tokenizes a template element from the RSX tree.
 	pub fn tokenize(
 		&self,
 		world: &World,

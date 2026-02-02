@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-
+/// Endpoint builder for serving static files from a [`Bucket`] storage provider.
 pub struct BucketEndpoint;
 
 impl BucketEndpoint {

@@ -6,17 +6,16 @@ use quote::quote_spanned;
 use send_wrapper::SendWrapper;
 use std::sync::LazyLock;
 
-// Collect elements to provide semantic highlight based on element tag.
-// No differences between open tag and closed tag.
-// Also multiple tags with same name can be present,
-// because we need to mark each of them.
+/// Collects RSX element tags with their spans for semantic highlighting.
+///
+/// Tracks both open and closed tags, allowing multiple tags with the same name
+/// to be present since each occurrence needs to be marked separately.
 #[derive(Default, Deref, DerefMut, Component)]
 pub struct CollectedElements(Vec<(String, SendWrapper<Span>)>);
 
 
 impl CollectedElements {
-	// TODO this is from the rstml example, havent yet looked into how to properly
-	// implement it
+	/// Converts collected elements into documentation tokens for semantic highlighting.
 	pub fn into_docs(&self) -> Result<Vec<TokenStream>> {
 		// Mark some of elements as type,
 		// and other as elements as fn in crate::docs,

@@ -37,6 +37,10 @@ impl Default for HelpHandlerConfig {
 	}
 }
 
+/// Query parameters for requesting help documentation.
+///
+/// When `help` is true, the help handler will render documentation
+/// instead of executing the normal endpoint logic.
 #[derive(
 	Debug,
 	Clone,
@@ -256,6 +260,7 @@ pub trait EndpointHelpFormatter {
 		output
 	}
 
+	/// Formats output when no endpoints match the path.
 	fn format_none_found(&self, path: &Vec<String>) -> String;
 
 	/// Format the header section

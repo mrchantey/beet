@@ -27,11 +27,11 @@ For each crate do the following:
 2. add docs until `cargo check` passes with all features.
 3. Run doc tests with all features:
 - `timeout 1m cargo test -p beet_core --doc --all-features | tail 30`
+4. mark the crate as done in this file: `skills/rust/beet-doc.md`
 
 ## Crates
 
 We will start from the basic dependencies and work upwards. Skip those marked completed. Do not ask to continue to the next one, just do it.
-
 
 - [ ] beet_core
 - [ ] beet_flow

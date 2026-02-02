@@ -3,6 +3,10 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 
 
+/// Filesystem-backed bucket provider for local storage.
+///
+/// Stores objects as files on the local filesystem, with each bucket
+/// represented as a subdirectory under the configured root path.
 #[derive(Debug, Clone)]
 pub struct FsBucketProvider {
 	/// The root path for the filesystem bucket provider,

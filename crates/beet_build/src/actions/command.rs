@@ -5,7 +5,9 @@ use std::path::PathBuf;
 /// Emitted for each stdout/stderr line. `is_err` is true for stderr.
 #[derive(EntityTargetEvent)]
 pub struct StdOutLine {
+	/// The text content of the line.
 	pub line: String,
+	/// True if this line should be routed to stderr, false for stdout.
 	pub is_err: bool,
 }
 
@@ -100,6 +102,7 @@ impl CommandConfig {
 	}
 
 
+	/// Creates a command configuration from a command and arguments.
 	pub fn from_parts(
 		cmd: impl AsRef<str>,
 		args: impl IntoIterator<Item = impl AsRef<str>>,
@@ -111,11 +114,13 @@ impl CommandConfig {
 		}
 	}
 
+	/// Adds a single argument to the command.
 	pub fn arg(mut self, arg: impl AsRef<str>) -> Self {
 		self.args.push(arg.as_ref().to_string());
 		self
 	}
 
+	/// Adds multiple arguments to the command.
 	pub fn args(
 		mut self,
 		args: impl IntoIterator<Item = impl AsRef<str>>,
@@ -125,6 +130,7 @@ impl CommandConfig {
 		self
 	}
 
+	/// Creates a new command configuration with the given command.
 	pub fn new(cmd: impl Into<String>) -> Self {
 		Self {
 			cmd: cmd.into(),
@@ -132,16 +138,19 @@ impl CommandConfig {
 		}
 	}
 
+	/// Sets the command to run.
 	pub fn command(mut self, cmd: impl Into<String>) -> Self {
 		self.cmd = cmd.into();
 		self
 	}
 
+	/// Sets the current working directory for the command.
 	pub fn current_dir(mut self, dir: impl Into<PathBuf>) -> Self {
 		self.current_dir = Some(dir.into());
 		self
 	}
 
+	/// Adds an environment variable to the command.
 	pub fn env(
 		mut self,
 		key: impl Into<String>,
@@ -151,6 +160,7 @@ impl CommandConfig {
 		self
 	}
 
+	/// Creates a command configuration from a [`CargoBuildCmd`].
 	pub fn from_cargo(cargo: &CargoBuildCmd) -> Self {
 		Self {
 			cmd: "cargo".into(),
@@ -158,6 +168,7 @@ impl CommandConfig {
 			..default()
 		}
 	}
+	/// Converts this configuration into an action bundle.
 	pub fn into_action(self) -> impl Bundle {
 		OnSpawn::observe(
 			move |ev: On<GetOutcome>, mut cmd_runner: CommandRunner| {

@@ -1,3 +1,13 @@
+//! Build actions for CLI commands, server management, and code generation.
+//!
+//! This module provides the core build-time actions including:
+//! - CLI command execution and argument parsing
+//! - Development server management
+//! - Source file watching and hot reloading
+//! - WASM compilation
+//! - Lambda deployment
+//! - Bucket synchronization
+
 mod file_expr_changed;
 pub use file_expr_changed::*;
 mod server;

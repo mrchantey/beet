@@ -10,9 +10,12 @@
 //! - [`html_bundle`]: HTML response construction utilities
 
 mod bucket_endpoint;
+/// Common middleware components like CORS, logging, and authentication.
 pub mod common_middleware;
+/// Route matching predicates for filtering requests by method, path, etc.
 pub mod common_predicates;
 mod help_handler;
+/// Utilities for constructing HTML response bundles from RSX templates.
 pub mod html_bundle;
 mod router_exchange;
 pub use bucket_endpoint::*;

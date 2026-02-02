@@ -19,6 +19,7 @@ impl<'a> std::ops::Deref for NodeField<'a> {
 
 
 impl<'a> NodeField<'a> {
+	/// Parses node fields from a function's parameters.
 	pub fn parse_item_fn(input: &ItemFn) -> Result<Vec<NodeField<'_>>> {
 		NamedField::parse_item_fn(input)?
 			.into_iter()
@@ -28,6 +29,7 @@ impl<'a> NodeField<'a> {
 			})
 			.collect()
 	}
+	/// Parses node fields from a derive input's struct fields.
 	pub fn parse_derive_input(
 		input: &DeriveInput,
 	) -> Result<Vec<NodeField<'_>>> {

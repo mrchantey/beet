@@ -54,7 +54,9 @@ use syn::Expr;
 pub struct NodeExpr(pub SendWrapper<Expr>);
 
 impl NodeExpr {
+	/// Creates a new node expression from a syn expression.
 	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
+	/// Creates a new node expression from a block.
 	pub fn new_block(value: syn::Block) -> Self {
 		Self::new(syn::Expr::Block(syn::ExprBlock {
 			block: value,
@@ -62,6 +64,7 @@ impl NodeExpr {
 			label: None,
 		}))
 	}
+	/// Creates a new node expression from an identifier.
 	pub fn new_ident(ident: syn::Ident) -> Self {
 		Self::new(syn::Expr::Path(syn::ExprPath {
 			attrs: Vec::new(),
@@ -71,8 +74,9 @@ impl NodeExpr {
 	}
 
 
+	/// Returns a reference to the inner expression.
 	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
-	/// ensure blocks have `#[allow(unused_braces)]`
+	/// Returns the inner expression with `#[allow(unused_braces)]` added to blocks.
 	pub fn inner_parsed(&self) -> Expr {
 		match self.borrow().clone() {
 			syn::Expr::Block(mut block) => {
@@ -85,6 +89,7 @@ impl NodeExpr {
 		}
 	}
 
+	/// Generates tokens that convert this expression into a bundle.
 	pub fn bundle_tokens(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
 		quote! {#parsed.into_bundle()}
@@ -97,6 +102,7 @@ impl NodeExpr {
 		quote! { OnSpawnDeferred::insert(#parsed.into_bundle()) }
 	}
 
+	/// Merges multiple expressions into a single deferred insert.
 	pub fn merge_deferred(items: &Vec<Self>) -> TokenStream {
 		let components = items.iter().map(|item| {
 			let parsed = item.inner_parsed();

@@ -7,6 +7,10 @@ use syn::ItemFn;
 use syn::Result;
 use syn::ReturnType;
 
+/// Transforms a function into a template struct with props.
+///
+/// This macro generates a struct from the function's parameters and
+/// implements the necessary traits for RSX template rendering.
 pub fn template_macro(input: ItemFn) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }

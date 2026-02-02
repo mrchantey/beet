@@ -9,6 +9,7 @@ use beet_rsx::prelude::*;
 #[derive(Component)]
 pub struct ServerProcess;
 
+/// Builds the server binary with the `server-local` feature.
 #[construct]
 pub fn BuildServer() -> impl Bundle {
 	(
@@ -32,6 +33,7 @@ pub fn BuildServer() -> impl Bundle {
 	)
 }
 
+/// Runs the compiled server binary.
 #[construct]
 pub fn RunServer() -> impl Bundle {
 	(
@@ -90,6 +92,7 @@ pub fn ExportStaticContent() -> impl Bundle {
 	)
 }
 
+/// Kills any running server processes by removing their [`ChildHandle`] components.
 #[construct]
 pub fn KillServer() -> impl Bundle {
 	(

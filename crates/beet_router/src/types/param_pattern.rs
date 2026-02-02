@@ -24,6 +24,7 @@ use heck::ToKebabCase;
 )]
 #[reflect(Component)]
 pub struct ParamsPartial {
+	/// The parameter metadata items for this partial.
 	pub items: Vec<ParamMeta>,
 }
 
@@ -181,7 +182,7 @@ impl std::fmt::Display for ParamMeta {
 
 
 impl ParamMeta {
-	/// Create a new `ParamMeta`
+	/// Creates a new `ParamMeta` with the given name and value type.
 	pub fn new(name: impl Into<String>, value: ParamValue) -> Self {
 		Self {
 			value,
@@ -191,6 +192,7 @@ impl ParamMeta {
 		}
 	}
 
+	/// Creates a `ParamMeta` from a reflected struct field.
 	pub fn from_field(field: &bevy::reflect::NamedField) -> Self {
 		let value = ParamValue::from_type_path(field.type_path());
 		let required = match value {
@@ -216,15 +218,18 @@ impl ParamMeta {
 		self.options.description.as_deref()
 	}
 
+	/// Marks this param as required.
 	pub fn required(mut self) -> Self {
 		self.required = true;
 		self
 	}
 
+	/// Sets a single-character short flag for this param.
 	pub fn with_short(mut self, short: char) -> Self {
 		self.options.short = Some(short);
 		self
 	}
+	/// Sets a description for this param.
 	pub fn with_description(mut self, description: impl Into<String>) -> Self {
 		self.options.description = Some(description.into());
 		self
@@ -271,6 +276,7 @@ impl ParamValue {
 	}
 }
 
+/// Additional options for parameter metadata.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub struct ParamOptions {
 	/// A description of the route param, usually the
@@ -291,6 +297,7 @@ impl Default for ParamOptions {
 }
 
 impl ParamOptions {
+	/// Creates options with only a description.
 	pub fn desc(description: impl Into<String>) -> Self {
 		Self {
 			description: Some(description.into()),
@@ -298,6 +305,7 @@ impl ParamOptions {
 		}
 	}
 
+	/// Creates options with both a description and short flag.
 	pub fn desc_and_short(description: impl Into<String>, short: char) -> Self {
 		Self {
 			description: Some(description.into()),
@@ -305,6 +313,7 @@ impl ParamOptions {
 		}
 	}
 
+	/// Creates options with only a short flag.
 	pub fn short(short: char) -> Self {
 		Self {
 			description: None,

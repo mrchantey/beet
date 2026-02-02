@@ -3,6 +3,7 @@ use beet_flow::prelude::*;
 use beet_net::prelude::*;
 use beet_rsx::prelude::*;
 
+/// Pushes local assets to the configured S3 assets bucket.
 #[construct]
 pub fn PushAssets() -> impl Bundle {
 	(
@@ -21,6 +22,7 @@ pub fn PushAssets() -> impl Bundle {
 	)
 }
 
+/// Pulls assets from the configured S3 assets bucket to the local assets directory.
 #[construct]
 pub fn PullAssets() -> impl Bundle {
 	(
@@ -40,6 +42,7 @@ pub fn PullAssets() -> impl Bundle {
 }
 
 
+/// Pushes generated HTML files to the configured S3 HTML bucket.
 #[construct]
 pub fn PushHtml() -> impl Bundle {
 	(

@@ -8,6 +8,10 @@ use syn::ItemFn;
 use syn::Result;
 use syn::ReturnType;
 
+/// Transforms a function into a construct macro for entity spawning.
+///
+/// This macro generates code that creates entities with the function's
+/// return type as components.
 pub fn construct_macro(input: ItemFn, attr: TokenStream) -> TokenStream {
 	parse(input, attr).unwrap_or_else(|err| err.into_compile_error())
 }

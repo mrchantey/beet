@@ -1,3 +1,11 @@
+//! RSX snippet parsing and source file management.
+//!
+//! This module handles:
+//! - Loading and parsing source files (Rust, Markdown)
+//! - Extracting RSX snippets from source code
+//! - Computing file expression hashes for change detection
+//! - Exporting snippets for client-side hydration
+
 mod import_file_inner_text;
 mod import_rsx_snippets_md;
 pub use import_rsx_snippets_md::*;

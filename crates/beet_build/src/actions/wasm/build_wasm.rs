@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_flow::prelude::*;
 
+/// Creates a bundle that builds the application for WebAssembly, running cargo build, wasm-bindgen, and wasm-opt.
 pub fn build_wasm() -> impl Bundle {
 	(Name::new("Build Wasm"), Sequence, children![
 		cargo_build_wasm(),

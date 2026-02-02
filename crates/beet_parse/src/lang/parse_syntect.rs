@@ -63,9 +63,12 @@ pub fn collect_md_code_nodes(
 }
 
 
+/// Configuration for syntax highlighting with syntect.
 #[derive(Debug, Resource)]
 pub struct SyntectConfig {
+	/// The syntax definitions for parsing code.
 	pub syntax_set: SyntaxSet,
+	/// The available color themes for highlighting.
 	pub theme_set: ThemeSet,
 	/// The default theme to use for highlighting.
 	pub theme: String,
@@ -75,6 +78,7 @@ pub struct SyntectConfig {
 	pub styling: SyntectStyling,
 }
 
+/// The method used to apply syntax highlighting styles.
 #[derive(Debug, Default)]
 pub enum SyntectStyling {
 	/// Use inline styles for styling.
@@ -199,6 +203,7 @@ impl SyntectConfig {
 }
 
 
+/// Parses and highlights code nodes using syntect, inserting the result as inner HTML.
 pub fn parse_syntect(
 	config: Res<SyntectConfig>,
 	mut commands: Commands,

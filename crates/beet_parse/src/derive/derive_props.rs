@@ -7,6 +7,10 @@ use syn::DeriveInput;
 use syn::Ident;
 use syn::Result;
 
+/// Generates props implementation for a struct.
+///
+/// Creates the necessary trait implementations for using the struct
+/// as props in RSX templates.
 pub fn parse_derive_props(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }

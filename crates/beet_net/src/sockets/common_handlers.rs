@@ -42,6 +42,7 @@ pub fn echo_close(ev: On<MessageRecv>, mut commands: Commands) {
 
 
 
+/// A timestamp payload for WebSocket ping/pong round-trip time measurement.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PingTime {
 	timestamp: SystemTime,
@@ -56,6 +57,7 @@ impl Default for PingTime {
 }
 
 impl PingTime {
+	/// Converts this ping time into a WebSocket [`Message::Ping`].
 	pub fn into_message(&self) -> Message {
 		let ping_time = serde_json::to_vec(&self).unwrap();
 		Message::Ping(ping_time.into())

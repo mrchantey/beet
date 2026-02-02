@@ -1,8 +1,13 @@
+//! Time utilities for cross-platform duration handling and async sleep.
+
 use crate::prelude::*;
 use std::time::Duration;
 use std::time::SystemTime;
 
-
+/// Formats a duration as a human-readable string with appropriate units.
+///
+/// Automatically selects the most appropriate unit (minutes, seconds,
+/// milliseconds, microseconds, or nanoseconds) based on the duration's magnitude.
 pub fn pretty_print_duration(dur: Duration) -> String {
 	let total_secs = dur.as_secs();
 	let minutes = total_secs / 60;
@@ -25,6 +30,7 @@ pub fn pretty_print_duration(dur: Duration) -> String {
 	}
 }
 
+/// Returns the current time as milliseconds since the Unix epoch.
 pub fn now_millis() -> u128 {
 	SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
@@ -32,12 +38,15 @@ pub fn now_millis() -> u128 {
 		.as_millis()
 }
 
+/// Sleeps for the specified number of seconds.
 pub async fn sleep_secs(secs: u64) { sleep(Duration::from_secs(secs)).await; }
 
+/// Sleeps for the specified number of milliseconds.
 pub async fn sleep_millis(millis: u64) {
 	sleep(Duration::from_millis(millis)).await;
 }
 
+/// Sleeps for the specified number of microseconds.
 pub async fn sleep_micros(micros: u64) {
 	sleep(Duration::from_micros(micros)).await;
 }

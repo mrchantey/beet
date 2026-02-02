@@ -8,6 +8,10 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
+/// AWS S3 bucket provider using the official AWS SDK.
+///
+/// Wraps an [`aws_sdk_s3::Client`] and implements [`BucketProvider`] for
+/// storing and retrieving objects in S3 buckets.
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
 

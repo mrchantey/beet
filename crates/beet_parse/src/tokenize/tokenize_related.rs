@@ -39,6 +39,7 @@ impl<'w, 's, T> TokenizeRelated<'w, 's, T>
 where
 	T: Component + RelationshipTarget + TypePath,
 {
+	/// Attempts to push related entity tokens to the items vector if the relationship exists.
 	pub fn try_push_related(
 		&self,
 		items: &mut Vec<TokenStream>,

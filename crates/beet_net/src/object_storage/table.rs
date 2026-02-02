@@ -326,10 +326,12 @@ pub struct TableItem<T> {
 	pub id: Uuid,
 	/// Duration since Unix epoch
 	pub created: SystemTime,
+	/// The user-provided data payload.
 	pub data: T,
 }
 
 impl<T> TableItem<T> {
+	/// Creates a new table item with an auto-generated UUID v7 and current timestamp.
 	pub fn new(data: T) -> Self {
 		Self {
 			id: Uuid::now_v7(),
@@ -352,7 +354,9 @@ impl<T: TableContent> TableRow for TableItem<T> {
 pub trait TableProvider<T: TableRow>:
 	BucketProvider + 'static + Send + Sync
 {
+	/// Returns a boxed clone of this provider for type erasure.
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
+	/// Inserts a row into the table, serializing it as JSON.
 	fn insert_row(
 		&self,
 		bucket_name: &str,
@@ -368,6 +372,7 @@ pub trait TableProvider<T: TableRow>:
 			}
 		}
 	}
+	/// Retrieves a row by its UUID, deserializing from JSON.
 	fn get_row(
 		&self,
 		bucket_name: &str,

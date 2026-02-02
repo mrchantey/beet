@@ -64,6 +64,7 @@ pub struct PathPartial {
 impl PathPartial {
 	/// Create a new `PathPartial` with the given path which is split into segments.
 	pub fn new(path: impl AsRef<Path>) -> Self { Self::parse(path).unwrap() }
+	/// Parses a path string into a [`PathPartial`].
 	pub fn parse(path: impl AsRef<Path>) -> Result<Self> {
 		Self {
 			segments: PathPattern::new(path)?.segments,
@@ -71,6 +72,7 @@ impl PathPartial {
 		.xok()
 	}
 
+	/// Creates a [`PathPartial`] from pre-parsed segments.
 	pub fn from_segments(segments: Vec<PathPatternSegment>) -> Self {
 		Self { segments }
 	}
@@ -135,6 +137,7 @@ impl PathPattern {
 		Self::collect(*entity, &query)
 	}
 
+	/// Collects a [`PathPattern`] by traversing ancestor [`PathPartial`] components.
 	pub fn collect(entity: Entity, query: &RouteQuery) -> Result<PathPattern> {
 		query
 			.parents
@@ -236,6 +239,7 @@ pub struct PathPatternSegment {
 /// containing the remaining unmatched path parts and a map of dynamic segments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathMatch {
+	/// Path segments that were not consumed by the pattern.
 	pub remaining_path: VecDeque<String>,
 	/// Dynamic segment values. For duplicate and greedy segments, each matched path segment
 	/// is stored as a separate value.
@@ -246,20 +250,30 @@ impl PathMatch {
 	pub fn exact_match(&self) -> bool { self.remaining_path.is_empty() }
 }
 
+/// Result type for route matching operations.
 pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 
+/// Errors that can occur when matching a route pattern against a path.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
 	/// A static segment did not match its corresponding [`RoutePath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]
-	InvalidStatic { segment: String, path: String },
+	InvalidStatic {
+		/// The expected static segment.
+		segment: String,
+		/// The actual path part that didn't match.
+		path: String,
+	},
 	/// A segment expected at least one path part but the path was empty.
 	#[error(
 		"a segment '{segment}' expected at least one path segment, but it was empty"
 	)]
-	EmptyPath { segment: PathPatternSegment },
+	EmptyPath {
+		/// The segment that expected a path part.
+		segment: PathPatternSegment,
+	},
 }
 
 impl PathPatternSegment {

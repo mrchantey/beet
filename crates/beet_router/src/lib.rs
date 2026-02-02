@@ -2,7 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![feature(if_let_guard)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 mod actions;
 mod types;

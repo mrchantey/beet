@@ -19,9 +19,12 @@ use serde::de::DeserializeOwned;
 pub struct ServerAction;
 
 
+/// Trait for converting handler return types into HTTP responses.
 pub trait IntoServerActionOut<M> {
+	/// Converts this value into an HTTP [`Response`].
 	fn into_action_response(self) -> Response;
 }
+/// Marker for converting [`Result<T, E>`] where both `T` and `E` are serializable.
 pub struct SerdeResultIntoServerActionOut;
 impl<T, E> IntoServerActionOut<(SerdeResultIntoServerActionOut, E)>
 	for Result<T, E>
@@ -33,6 +36,7 @@ where
 		JsonResult::new(self).into_response()
 	}
 }
+/// Marker for converting [`Result<T, BevyError>`] into a response.
 pub struct BevyResultIntoServerActionOut;
 impl<T> IntoServerActionOut<Self> for Result<T, BevyError>
 where
@@ -54,6 +58,7 @@ where
 		.into_response()
 	}
 }
+/// Marker for converting any serializable type directly into a JSON response.
 pub struct TypeIntoServerActionOut;
 impl<T> IntoServerActionOut<(TypeIntoServerActionOut,)> for T
 where
@@ -65,6 +70,7 @@ where
 
 
 impl ServerAction {
+	/// Creates a synchronous server action endpoint from a Bevy system.
 	pub fn new<T, Input, Out, M1, M2>(
 		method: HttpMethod,
 		handler: T,
@@ -104,6 +110,7 @@ impl ServerAction {
 		}
 	}
 
+	/// Creates an asynchronous server action endpoint from an async function.
 	pub fn new_async<T, Input, Fut, Out, M2>(
 		method: HttpMethod,
 		handler: T,

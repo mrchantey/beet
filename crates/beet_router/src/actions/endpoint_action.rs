@@ -10,9 +10,12 @@ trait IntoResponseBundle<M> {
 	fn into_response_bundle(self) -> impl Bundle;
 }
 
+/// Trait for types that can be converted to an HTML response bundle.
+///
 /// Used to constrain a subtype of [`Bundle`] that we can assume
 /// the user would like converted to html.
 pub trait IntoHtml {
+	/// Converts this value into a bundle that renders as HTML.
 	fn into_html_bundle(self) -> impl Bundle;
 }
 impl IntoHtml for RsxRoot {
@@ -41,6 +44,7 @@ where
 }
 
 
+/// Marker for converting [`IntoHtml`] types into response bundles.
 pub struct HtmlIntoResponseBundle;
 impl<B> IntoResponseBundle<HtmlIntoResponseBundle> for B
 where
@@ -49,6 +53,7 @@ where
 	fn into_response_bundle(self) -> impl Bundle { self.into_html_bundle() }
 }
 
+/// Marker for converting [`IntoResponse`] types into response bundles.
 pub struct ResponseIntoBundle;
 impl<R, M> IntoResponseBundle<(ResponseIntoBundle, M)> for R
 where
@@ -80,6 +85,7 @@ fn insert_and_trigger(
 /// These are converted to `On<GetOutcome>` observers.
 /// In the case where a request cannot be found a 500 response is inserted.
 pub trait IntoEndpointAction<M> {
+	/// Converts this handler into a bundle that can be spawned as an endpoint observer.
 	fn into_endpoint_action(self) -> impl Bundle;
 }
 
@@ -187,6 +193,7 @@ been taken by a previous route, please check for conficting endpoints.
 	)
 }
 /// A non-func type that can be converted directly into a response bundle.
+/// Marker for converting static types directly into endpoint actions.
 pub struct TypeIntoEndpoint;
 impl<T, M> IntoEndpointAction<(TypeIntoEndpoint, M)> for T
 where
@@ -220,6 +227,7 @@ where
 }
 
 
+/// Marker for converting Bevy systems into endpoint actions.
 pub struct SystemIntoEndpoint;
 impl<System, Req, Out, M1, M2, M3>
 	IntoEndpointAction<(SystemIntoEndpoint, Req, Out, M1, M2, M3)> for System
@@ -246,6 +254,7 @@ where
 		})
 	}
 }
+/// Marker for converting action systems (with [`AsyncEntity`] context) into endpoint actions.
 pub struct ActionSystemIntoEndpoint;
 impl<System, Req, Out, M2, M3>
 	IntoEndpointAction<(ActionSystemIntoEndpoint, Req, Out, M2, M3)> for System
@@ -260,6 +269,7 @@ where
 }
 
 
+/// Marker for converting async functions into endpoint actions.
 pub struct AsyncSystemIntoEndpoint;
 impl<Func, Fut, Req, Res, M1, M2>
 	IntoEndpointAction<(AsyncSystemIntoEndpoint, Req, Res, M1, M2)> for Func

@@ -5,6 +5,9 @@ use quote::quote;
 use syn::DeriveInput;
 use syn::Result;
 
+/// Generates builder pattern implementation for a struct.
+///
+/// Creates `with_*` methods for each field and implements the `Buildable` trait.
 pub fn parse_derive_buildable(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }

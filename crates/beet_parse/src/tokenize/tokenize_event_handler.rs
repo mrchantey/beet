@@ -16,6 +16,7 @@ pub fn is_event(key: &str, value: &Expr) -> bool {
 	key.starts_with("on") && !matches!(value, Expr::Lit(_))
 }
 
+/// Transforms an event handler attribute into the appropriate observer pattern tokens.
 pub fn tokenize_event_handler(
 	key_str: &str,
 	key_span: Span,

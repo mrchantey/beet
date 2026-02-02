@@ -77,6 +77,10 @@ where
 	}
 }
 
+/// Extension trait for [`Response`] that provides Server-Sent Events (SSE) streaming.
+///
+/// This trait adds methods to convert an HTTP response into various SSE stream types,
+/// supporting raw event access, custom mapping, and automatic JSON deserialization.
 #[extend::ext(name = ResponseSseExt)]
 pub impl Response {
 	/// Returns a raw SSE event stream, checking for Ok status before parsing.

@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 use beet_flow::prelude::*;
 use beet_rsx::prelude::*;
 
+/// Executes an SST (Serverless Stack) CLI command with the configured stage.
 #[construct]
 pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
 	OnSpawn::observe(

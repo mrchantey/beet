@@ -131,6 +131,7 @@ pub fn default_router(
 	})
 }
 
+/// Creates a "not found" fallback endpoint that returns a 404 status.
 pub fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
 		common_predicates::no_response(),
@@ -140,6 +141,7 @@ pub fn not_found() -> impl Bundle {
 	])
 }
 
+/// Creates an endpoint that handles analytics event submissions at `/analytics`.
 pub fn analytics_handler() -> impl Bundle {
 	ServerAction::new::<_, _, Result<(), BevyError>, _, _>(
 		HttpMethod::Post,
@@ -155,6 +157,7 @@ pub fn analytics_handler() -> impl Bundle {
 }
 
 
+/// Creates an endpoint that displays application info at `/app-info`.
 pub fn app_info() -> EndpointBuilder {
 	EndpointBuilder::get().with_path("/app-info").with_action(
 		|config: Res<PackageConfig>| {
@@ -178,6 +181,7 @@ pub fn app_info() -> EndpointBuilder {
 	)
 }
 
+/// Creates a bucket endpoint for serving static assets from the configured assets directory.
 pub fn assets_bucket() -> impl Bundle {
 	(
 		Name::new("Assets Bucket"),

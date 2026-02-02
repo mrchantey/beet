@@ -15,6 +15,7 @@ pub struct LambdaConfig {
 	pub iam_role: Option<String>,
 }
 
+/// Compiles the application for AWS Lambda deployment using cargo-lambda.
 #[construct]
 pub fn CompileLambda(entity: Entity) -> impl Bundle {
 	(

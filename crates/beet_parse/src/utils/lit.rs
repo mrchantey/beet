@@ -53,6 +53,7 @@ pub fn insert_lit(entity: &mut EntityCommands, lit: &syn::Lit) {
 	}
 }
 
+/// Extracts a string value from an expression if it's a string literal.
 pub fn expr_str(expr: syn::Expr) -> Option<String> {
 	if let syn::Expr::Lit(expr_lit) = expr {
 		if let syn::Lit::Str(lit_str) = &expr_lit.lit {

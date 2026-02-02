@@ -23,6 +23,7 @@ pub struct InMemoryProvider(
 );
 
 impl InMemoryProvider {
+	/// Creates a new empty in-memory provider.
 	pub fn new() -> Self { Self::default() }
 }
 

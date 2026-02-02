@@ -10,6 +10,7 @@ use syn::Expr;
 
 
 
+/// Tokenizes a struct component from the RSX tree into a token stream.
 pub fn tokenize_struct(
 	world: &World,
 	entity_components: &mut Vec<TokenStream>,

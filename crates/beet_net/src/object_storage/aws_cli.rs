@@ -115,7 +115,9 @@ impl AwsCli {
 /// Represents a single include/exclude directive. Order matters for the AWS CLI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum S3Filter {
+	/// Excludes files matching the given glob pattern.
 	Exclude(String),
+	/// Includes files matching the given glob pattern.
 	Include(String),
 }
 
@@ -150,18 +152,29 @@ impl S3Filter {
 /// - `additional_args`   -> appended verbatim at the end
 #[derive(Debug, Clone)]
 pub struct S3Sync {
+	/// The AWS CLI configuration.
 	pub cli: AwsCli,
+	/// Source path (local directory or S3 URI).
 	pub src: String,
+	/// Destination path (S3 URI or local directory).
 	pub dst: String,
-	// flags
+	/// Delete files in destination that don't exist in source.
 	pub delete: bool,
+	/// Compare only file sizes, not timestamps.
 	pub size_only: bool,
+	/// Show what would be synced without actually syncing.
 	pub dry_run: bool,
+	/// Suppress progress output.
 	pub no_progress: bool,
+	/// Use exact timestamps instead of modified time heuristics.
 	pub exact_timestamps: bool,
+	/// Follow symbolic links when syncing from local.
 	pub follow_symlinks: bool,
+	/// Access control list for uploaded objects.
 	pub acl: Option<String>,
+	/// Include/exclude filters applied in order.
 	pub filters: Vec<S3Filter>,
+	/// Additional arguments appended verbatim.
 	pub additional_args: Vec<String>,
 }
 
@@ -248,31 +261,38 @@ impl S3Sync {
 	}
 
 	/// Execute the configured sync.
+	/// Execute the configured sync.
 	pub async fn send(&self) -> Result {
 		let argv = self.cli.build_s3_sync_args(&self.src, &self.dst, self);
 		self.cli.run_argv(argv).await
 	}
 
+	/// Sets whether to delete destination files not in source.
 	pub fn delete(mut self, value: bool) -> Self {
 		self.delete = value;
 		self
 	}
+	/// Sets whether to compare only file sizes.
 	pub fn size_only(mut self, value: bool) -> Self {
 		self.size_only = value;
 		self
 	}
+	/// Sets whether to perform a dry run without actual changes.
 	pub fn dry_run(mut self, value: bool) -> Self {
 		self.dry_run = value;
 		self
 	}
+	/// Sets whether to suppress progress output.
 	pub fn no_progress(mut self, value: bool) -> Self {
 		self.no_progress = value;
 		self
 	}
+	/// Sets whether to use exact timestamp comparison.
 	pub fn exact_timestamps(mut self, value: bool) -> Self {
 		self.exact_timestamps = value;
 		self
 	}
+	/// Sets whether to follow symbolic links.
 	pub fn follow_symlinks(mut self, value: bool) -> Self {
 		self.follow_symlinks = value;
 		self

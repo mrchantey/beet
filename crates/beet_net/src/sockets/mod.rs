@@ -21,6 +21,7 @@
 //! # Ok(())
 //! # }
 //! ```
+/// Common WebSocket message handlers for ping/pong and other utilities.
 pub mod common_handlers;
 mod socket;
 pub use socket::Message;

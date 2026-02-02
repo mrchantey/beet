@@ -40,6 +40,7 @@ pub fn AddWorkspaceSourceFiles() -> impl Bundle {
 
 
 
+/// Creates a bundle that imports source files from the workspace configuration.
 pub fn import_source_files() -> impl Bundle {
 	(Name::new("Import Source Files"), Sequence, children![
 		launch_sequence(),
@@ -47,6 +48,7 @@ pub fn import_source_files() -> impl Bundle {
 	])
 }
 
+/// Creates a bundle that imports and parses source files in sequence.
 pub fn import_and_parse_source_files() -> impl Bundle {
 	(
 		Name::new("Import and Parse Source Files"),

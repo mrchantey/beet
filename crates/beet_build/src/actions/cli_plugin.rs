@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
 
+/// Plugin providing CLI infrastructure for beet build commands.
 #[derive(Default)]
 pub struct CliPlugin;
 

@@ -54,12 +54,14 @@ mod route_codegen;
 mod snippets;
 mod utils;
 
+/// Re-exports of commonly used build types and utilities.
 pub mod prelude {
 	pub use crate::actions::*;
 	pub use crate::route_codegen::*;
 	pub use crate::snippets::*;
 	pub use crate::utils::*;
 }
+/// Re-exports of external crates used by beet_build.
 pub mod exports {
 	pub use proc_macro2;
 	pub use proc_macro2_diagnostics;

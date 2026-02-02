@@ -11,6 +11,7 @@ use beet_dom::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ModifyRsxTree;
 
+/// Plugin for parsing RSX tokens into the Bevy ECS tree structure.
 #[derive(Debug, Default, Clone)]
 pub struct ParseRsxTokensPlugin;
 
