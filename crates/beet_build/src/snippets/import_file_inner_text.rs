@@ -1,13 +1,24 @@
+//! File content import for inner text nodes.
+//!
+//! This module handles importing file contents for elements with `src` attributes,
+//! such as `<style src="foo.css"/>`, replacing the [`FileInnerText`] component
+//! with an [`InnerText`] containing the file contents.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
 
 
-/// We cant use `include_str!` via static analysis so manually
-/// import the file contents and replace the `FileInnerText`
-/// with an `InnerText` containing the file contents.
-pub fn import_file_inner_text(
+/// Imports file contents for [`FileInnerText`] components.
+///
+/// Since `include_str!` cannot be used via static analysis, this system
+/// manually reads the file contents and replaces [`FileInnerText`] with
+/// [`InnerText`] containing the file contents.
+///
+/// This also establishes file watching relationships so that changes to
+/// the imported file trigger updates to the parent source file.
+pub(crate) fn import_file_inner_text(
 	mut commands: Commands,
 	query: Populated<(Entity, &FileInnerText), Added<FileInnerText>>,
 	parents: Query<&ChildOf>,

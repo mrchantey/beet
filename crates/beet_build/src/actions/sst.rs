@@ -5,6 +5,7 @@ use beet_rsx::prelude::*;
 
 /// Executes an SST (Serverless Stack) CLI command with the configured stage.
 #[construct]
+#[allow(missing_docs)]
 pub fn SstCommand(cmd: SstSubcommand) -> impl Bundle {
 	OnSpawn::observe(
 		move |ev: On<GetOutcome>,

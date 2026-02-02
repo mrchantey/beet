@@ -1,3 +1,8 @@
+//! Combinator route tokenization for Markdown and RSX files.
+//!
+//! This module handles converting parsed combinator tokens (from `.md` and `.rsx` files)
+//! into generated Rust code that can be used as route handlers.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
@@ -6,14 +11,22 @@ use syn::ItemFn;
 
 
 
-/// Added to the root of route files that have been parsed into a tree via
+/// Marker component for route files that have been parsed into a tree via
 /// [`CombinatorTokens`], ie `.md` and `.rsx` files.
+///
+/// This component indicates that the associated [`CodegenFile`] should be
+/// populated with a generated `get()` function containing the tokenized RSX.
 #[derive(Debug, Clone, Component)]
-pub struct CombinatorRouteCodegen;
+pub(crate) struct CombinatorRouteCodegen;
 
-/// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
-/// tokenize it and append to the [`CodegenFile`].
-pub fn tokenize_combinator_route(world: &mut World) -> Result {
+/// Tokenizes combinator routes and appends them to their [`CodegenFile`].
+///
+/// After a [`CombinatorTokens`] has been parsed into a tree, this system:
+/// 1. Finds the [`StaticRoot`] child of the route file
+/// 2. Temporarily converts it to an [`InstanceRoot`] for tokenization
+/// 3. Generates a `pub fn get() -> impl IntoHtml` function
+/// 4. Appends the function to the [`CodegenFile`]
+pub(crate) fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query = world
 		.query_filtered::<(Entity,&ChildOf), (With<CodegenFile>, Changed<CombinatorRouteCodegen>)>(
 		);

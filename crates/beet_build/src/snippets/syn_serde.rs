@@ -1,3 +1,9 @@
+//! Serialization helpers for syn types.
+//!
+//! This module provides serde implementations for wrapping syn types
+//! (like [`Type`], [`Item`], [`Expr`]) in [`Unspan`] wrappers,
+//! enabling serialization of AST nodes.
+
 use beet_core::prelude::Unspan;
 use quote::ToTokens;
 use serde::Deserialize;
@@ -8,13 +14,16 @@ use syn::Expr;
 use syn::Item;
 use syn::Type;
 
-/// Macro to generate serialization and deserialization helpers for syn types
+/// Macro to generate serialization and deserialization helpers for syn types.
 macro_rules! syn_serde_mod {
 	($mod_name:ident, $ty:ty) => {
 		/// Serialization and deserialization helpers,
 		/// for option see the [`option`] submodule.
+		#[allow(unused)]
 		pub mod $mod_name {
 			use super::*;
+
+			/// Serializes an [`Unspan`]-wrapped syn type to a string.
 			pub fn serialize<S>(
 				val: &Unspan<$ty>,
 				serializer: S,
@@ -25,6 +34,8 @@ macro_rules! syn_serde_mod {
 				let val_str = val.to_token_stream().to_string();
 				val_str.serialize(serializer)
 			}
+
+			/// Deserializes a string into an [`Unspan`]-wrapped syn type.
 			pub fn deserialize<'de, D>(
 				deserializer: D,
 			) -> Result<Unspan<$ty>, D::Error>
@@ -35,8 +46,13 @@ macro_rules! syn_serde_mod {
 				Unspan::<$ty>::parse_str(&val_str)
 					.map_err(|e| serde::de::Error::custom(e.to_string()))
 			}
+
+			/// Serialization helpers for optional syn types.
+			#[allow(unused)]
 			pub mod option {
 				use super::*;
+
+				/// Serializes an optional [`Unspan`]-wrapped syn type.
 				pub fn serialize<S>(
 					val: &Option<Unspan<$ty>>,
 					serializer: S,
@@ -52,6 +68,8 @@ macro_rules! syn_serde_mod {
 						None => serializer.serialize_none(),
 					}
 				}
+
+				/// Deserializes an optional [`Unspan`]-wrapped syn type.
 				pub fn deserialize<'de, D>(
 					deserializer: D,
 				) -> Result<Option<Unspan<$ty>>, D::Error>
@@ -75,10 +93,12 @@ syn_serde_mod!(syn_type_serde, Type);
 syn_serde_mod!(syn_item_serde, Item);
 syn_serde_mod!(syn_expr_serde, Expr);
 
-/// Serialization and deserialization helpers for Vec<Unspan<syn::Item>>
+/// Serialization and deserialization helpers for `Vec<Unspan<syn::Item>>`.
+#[allow(unused)]
 pub mod syn_item_vec_serde {
 	use super::*;
 
+	/// Serializes a vector of [`Unspan`]-wrapped items.
 	pub fn serialize<S>(
 		items: &[Unspan<Item>],
 		serializer: S,
@@ -93,6 +113,7 @@ pub mod syn_item_vec_serde {
 		string_items.serialize(serializer)
 	}
 
+	/// Deserializes a vector of [`Unspan`]-wrapped items.
 	pub fn deserialize<'de, D>(
 		deserializer: D,
 	) -> Result<Vec<Unspan<Item>>, D::Error>

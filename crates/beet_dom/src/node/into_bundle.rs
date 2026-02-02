@@ -1,3 +1,8 @@
+//! Bundle conversion traits for RSX expressions.
+//!
+//! This module provides the [`IntoBundle`] trait which enables converting
+//! various types into Bevy bundles for use in RSX templates.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::spawn::SpawnIter;
@@ -18,12 +23,15 @@ pub trait IntoBundle<M> {
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
 	fn into_bundle(self) -> impl Bundle;
 }
+
+/// Marker type for bundle implementations.
 pub struct BundleMarker;
 
 impl<T: Bundle> IntoBundle<BundleMarker> for T {
 	fn into_bundle(self) -> impl Bundle { self }
 }
 
+/// Extension trait for converting any bundle type to a type-erased form.
 #[extend::ext(name = AnyBundleExt)]
 pub impl<T, M> T
 where
@@ -51,6 +59,7 @@ where
 	}
 }
 
+/// Extension trait for converting cloneable bundle types to a type-erased form.
 #[extend::ext(name=AnyBundleCloneExt)]
 pub impl<T, M> T
 where
@@ -64,6 +73,7 @@ where
 }
 
 
+/// Marker type for observer bundle implementations.
 pub struct ObserverMarker;
 
 impl<T, E, B: Bundle, M> IntoBundle<(ObserverMarker, E, B, M)> for T

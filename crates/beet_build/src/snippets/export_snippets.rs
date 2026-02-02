@@ -1,14 +1,25 @@
+//! Snippet export system for saving parsed RSX snippets to disk.
+//!
+//! This module handles exporting [`StaticRoot`] entities and their descendants
+//! to RON scene files that can be loaded at runtime for client-side hydration.
+
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
 
-pub fn export_snippets(world: &mut World) -> Result {
+/// Exports all changed snippets to disk.
+///
+/// This function determines the export strategy and writes snippet scene files
+/// to the configured snippets directory.
+pub(crate) fn export_snippets(world: &mut World) -> Result {
 	// #[cfg(not(test))]
 	// export_all_snippets(world)?;
 	// #[cfg(test)]
 	export_snippets_incrementally(world)?;
 	Ok(())
 }
+
+/// Exports all snippets to a single scene file.
 #[allow(unused)]
 fn export_all_snippets(world: &mut World) -> Result {
 	// temp hack: just put them all in one big file
@@ -23,6 +34,7 @@ fn export_all_snippets(world: &mut World) -> Result {
 	Ok(())
 }
 
+/// Exports snippets incrementally, one file per changed snippet root.
 fn export_snippets_incrementally(world: &mut World) -> Result {
 	// currently disabled until full roundtrip is stablized
 	// doesnt work because rsx snippets are somehow relating to each other?
@@ -57,14 +69,19 @@ fn export_snippets_incrementally(world: &mut World) -> Result {
 	Ok(())
 }
 
+/// Information about a file's snippets to be exported.
 struct FileSnippets {
+	/// The root entity of the snippet.
 	root: Entity,
+	/// The output path for the exported scene file.
 	path: AbsPathBuf,
+	/// All entities that are part of this snippet (root + descendants).
 	entities: Vec<Entity>,
 }
 
-/// Collect all changed [`StaticRoot`]s, returning the output path
-/// and all entities that are part of the snippet.
+/// Collects all changed [`StaticRoot`] entities and their export information.
+///
+/// Returns the output path and all entities that are part of each snippet.
 #[cfg_attr(not(test), allow(unused))]
 fn collect_changed_snippet_files(
 	config: Res<WorkspaceConfig>,

@@ -1,3 +1,4 @@
+/// Utilities for HTML entity escaping and unescaping.
 pub struct EscapeHtml;
 
 impl EscapeHtml {

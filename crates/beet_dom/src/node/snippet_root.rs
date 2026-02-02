@@ -83,6 +83,9 @@ impl SnippetRoot {
 		}
 	}
 
+	/// Creates a new [`SnippetRoot`] from a token stream.
+	///
+	/// Extracts the start position from the token stream's span.
 	#[cfg(feature = "tokens")]
 	pub fn new_from_tokens(
 		file: WsPathBuf,

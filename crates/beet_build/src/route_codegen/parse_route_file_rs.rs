@@ -1,11 +1,21 @@
+//! Rust source file parsing for route extraction.
+//!
+//! This module handles parsing Rust source files to extract public functions
+//! that match HTTP method names (get, post, put, delete, etc.) and creating
+//! corresponding [`RouteFileMethod`] entities.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::str::FromStr;
 use syn::Visibility;
 
 
-
-pub fn parse_route_file_rs(
+/// Parses Rust source files to extract route handler functions.
+///
+/// This system scans each `.rs` file in a [`RouteFileCollection`] for public
+/// functions whose names match HTTP methods (get, post, etc.) and spawns
+/// [`RouteFileMethod`] entities for each one.
+pub(crate) fn parse_route_file_rs(
 	mut commands: Commands,
 	query: Populated<
 		(Entity, &SourceFile, &RouteSourceFile),

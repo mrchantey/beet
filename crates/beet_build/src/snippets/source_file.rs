@@ -1,3 +1,9 @@
+//! Source file management for the build system.
+//!
+//! This module handles the representation and lifecycle of source files
+//! that are tracked by the build system, including responding to file
+//! system events.
+
 use crate::prelude::*;
 use beet_core::exports::notify::EventKind;
 use beet_core::exports::notify::event::CreateKind;
@@ -6,30 +12,39 @@ use beet_core::exports::notify::event::RemoveKind;
 use beet_core::prelude::*;
 use std::path::Path;
 
-/// Adde to an entity used to represent an file included
-/// in the [`WorkspaceConfig`]. These are loaded for different
-/// purposes by [`SnippetsPlugin`] and [`RouteCodegenSequence`].
+/// Represents a source file included in the [`WorkspaceConfig`].
+///
+/// These entities are loaded for different purposes by the snippets system
+/// and the route codegen system.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Component, Deref)]
 #[require(FileExprHash)]
 pub struct SourceFile {
-	/// The path to this source file
+	/// The absolute path to this source file.
 	path: AbsPathBuf,
 }
 
 impl SourceFile {
+	/// Creates a new source file reference from an absolute path.
 	pub fn new(path: AbsPathBuf) -> Self { Self { path } }
+
+	/// Returns a reference to the source file's path.
 	pub fn path(&self) -> &AbsPathBuf { &self.path }
 }
+
 impl AsRef<Path> for SourceFile {
 	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
 
-/// Parent of every [`SourceFile`] entity that exists outside of a [`RouteFileCollection`].
+/// Parent entity for all [`SourceFile`] entities that exist outside
+/// of a [`RouteFileCollection`].
 #[derive(Component)]
 pub struct NonCollectionSourceFiles;
 
-/// A [`SourceFile`] watched by another [`SourceFile`]
+/// A [`SourceFile`] watched by another [`SourceFile`], for example
+/// a file with an `include_str!()`;
+///
+/// This relationship enables cascading updates when dependent files change.
 #[derive(Deref, Component)]
 #[relationship(relationship_target = WatchedFiles)]
 // TODO many-many relations
@@ -37,14 +52,20 @@ pub struct FileWatchedBy(pub Entity);
 
 
 /// A collection of [`SourceFile`] entities that this [`SourceFile`] is watching.
-/// If any child changes this should also change.
+///
+/// If any child file changes, the parent should also be marked as changed.
 #[derive(Deref, Component)]
 #[relationship_target(relationship = FileWatchedBy, linked_spawn)]
 pub struct WatchedFiles(Vec<Entity>);
 
 
-/// Update [`SourceFile`] entities based on file watch events,
-/// including marking as [`Changed`] on modification.
+/// Updates [`SourceFile`] entities based on file system watch events.
+///
+/// This observer handles:
+/// - **Create**: Spawns new [`SourceFile`] entities
+/// - **Remove**: Despawns matching [`SourceFile`] entities
+/// - **Modify**: Marks files as changed and resets their children
+/// - **Rename**: Handles both the "from" and "to" sides of renames
 pub fn parse_dir_watch_events(
 	ev: On<DirEvent>,
 	mut commands: Commands,
@@ -108,10 +129,12 @@ pub fn parse_dir_watch_events(
 }
 
 
-/// Runs for any [`SourceFile`] that changes:
-/// - mark it as [`Added`]
-/// - remove all [`Children`]
-/// If it has a [`FileWatchedBy`] component, also run for that parent
+/// Resets a [`SourceFile`] when it changes.
+///
+/// This function:
+/// - Marks the file as added (triggering re-processing)
+/// - Removes all children entities
+/// - Recursively resets any parent files that watch this file
 fn reset_file(
 	In(entity): In<Entity>,
 	mut commands: Commands,

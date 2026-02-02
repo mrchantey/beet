@@ -24,7 +24,9 @@ Do not discard comments, todos unless certain they are no longer relevent
 For each crate do the following:
 
 1. add `#![deny(missing_docs)`
-2. add docs until `cargo check` passes with all features.
+2. add docs until `cargo check` passes with all features, both native and wasm:
+	- `cargo check -p beet_core --all-features`
+	- `cargo check -p beet_core --all-features --target wasm32-unknown-unknown`
 3. Run doc tests with all features:
 - `timeout 1m cargo test -p beet_core --doc --all-features | tail 30`
 4. mark the crate as done in this file: `skills/rust/beet-doc.md`
@@ -38,8 +40,8 @@ We will start from the basic dependencies and work upwards. Skip those marked co
 - [ ] beet_net
 - [ ] beet_router
 - [ ] beet_parse
-- [ ] beet_build
-- [ ] beet_dom
+- [x] beet_build
+- [x] beet_dom
 
 
 Finally we can verify all changes by running: `just test-all`

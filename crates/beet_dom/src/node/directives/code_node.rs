@@ -1,3 +1,8 @@
+//! Code node directive for syntax highlighting.
+//!
+//! This module provides the [`CodeNode`] component for marking elements
+//! that should have syntax highlighting applied.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -30,6 +35,10 @@ impl CodeNode {
 
 
 
+/// Extracts code node directives from element attributes.
+///
+/// This system finds elements with `node:code` attributes and replaces
+/// them with [`CodeNode`] components.
 pub fn extract_code_nodes(
 	mut commands: Commands,
 	query: Populated<Entity, Added<ElementNode>>,

@@ -1,4 +1,9 @@
-use super::HashNonSnippetRust;
+//! File expression hashing for change detection.
+//!
+//! This module provides hashing of non-literal expressions in source files
+//! to detect when codegen needs to be regenerated.
+
+use super::hash_non_snippet_rust::HashNonSnippetRust;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
@@ -9,22 +14,33 @@ use std::hash::Hasher;
 
 /// A hash of all non-literal expressions in a file containing rust code,
 /// including `.rs`, `.mdx` and `.rsx` files.
+///
+/// This hash is used for change detection to determine when codegen
+/// needs to be regenerated. Changes to literal values (which can be
+/// updated via snippets) do not affect this hash.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Deref)]
 pub struct FileExprHash(u64);
 
 impl FileExprHash {
+	/// Creates a new file expression hash from a raw hash value.
 	pub fn new(hash: u64) -> Self { Self(hash) }
 
+	/// Returns the raw hash value.
 	pub fn hash(&self) -> u64 { self.0 }
 }
 
 
 
-/// Idents used for template macros.
+/// Configuration for which macro identifiers to treat as template macros.
+///
+/// Template macro contents are hashed separately by [`update_file_expr_hash`]
+/// rather than by [`HashNonSnippetRust`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct TemplateMacros {
+	/// The identifier for the RSX/RSTML template macro (default: "rsx").
 	pub rstml: String,
 }
+
 impl Default for TemplateMacros {
 	fn default() -> Self {
 		Self {
@@ -34,8 +50,17 @@ impl Default for TemplateMacros {
 }
 
 
-/// Update the [`FileExprHash`] component for all template files if it changed.
-/// Use change detection to trigger extra work based on the hash change.
+/// Updates the [`FileExprHash`] component for all template files when they change.
+///
+/// This system computes a hash of:
+/// - All non-template Rust code in the file
+/// - Snippet root locations
+/// - Template tags and their attributes
+/// - Block node expressions
+/// - Attribute expressions (excluding literal values)
+///
+/// Use change detection on [`FileExprHash`] to trigger additional work
+/// when the file's expressions have meaningfully changed.
 pub fn update_file_expr_hash(
 	// even though our tokens are Unspan, we're interactig with ParseRsxTokens
 	// which also handles !Send tokens, so we must ensure main thread.

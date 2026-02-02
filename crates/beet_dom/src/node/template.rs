@@ -1,16 +1,24 @@
+//! Template traits and types for component-like patterns.
+//!
+//! This module provides traits for defining template props and builders,
+//! enabling a component-like pattern similar to web frameworks.
+
 use beet_core::prelude::*;
 
 
-/// Trait for template props.
+/// Trait for template props that can be constructed via a builder.
 pub trait Props {
-	/// The builder used by.
+	/// The builder type used to construct these props.
 	type Builder: PropsBuilder<Props = Self>;
+	/// Marker type for required props.
 	type Required;
 }
 
-// TODO From<Self::Component>
+/// Trait for building template props.
 pub trait PropsBuilder: Default {
+	/// The props type this builder produces.
 	type Props: Props<Builder = Self>;
+	/// Builds the props from the builder state.
 	fn build(self) -> Self::Props;
 }
 
@@ -23,6 +31,7 @@ pub trait PropsBuilder: Default {
 pub struct TemplateOf(Entity);
 
 impl TemplateOf {
+	/// Creates a new template relationship pointing to the given entity.
 	pub fn new(value: Entity) -> Self { Self(value) }
 }
 

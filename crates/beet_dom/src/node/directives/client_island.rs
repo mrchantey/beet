@@ -1,3 +1,8 @@
+//! Client island types for partial hydration.
+//!
+//! This module provides components for defining client-side islands,
+//! which are portions of the DOM that are hydrated on the client.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::component::Immutable;
@@ -29,10 +34,12 @@ impl Default for ClientIslandRegistry {
 
 
 impl ClientIslandRegistry {
+	/// Adds a component type to the client island allow list.
 	pub fn add<T: Component>(&mut self) -> &mut Self {
 		self.0 = self.0.clone().allow::<T>();
 		self
 	}
+	/// Returns a clone of the scene filter.
 	pub fn filter(&self) -> SceneFilter { self.0.clone() }
 }
 

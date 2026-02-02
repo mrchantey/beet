@@ -1,3 +1,8 @@
+//! Language-specific node types and directives.
+//!
+//! This module provides components for language-specific elements like
+//! scripts, styles, and code blocks that require special processing.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::hash::Hash;
@@ -45,6 +50,7 @@ impl std::fmt::Display for LangSnippetHash {
 }
 
 
+/// Marker component for `<script>` elements.
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]
@@ -52,6 +58,7 @@ impl std::fmt::Display for LangSnippetHash {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ScriptElement;
 
+/// Marker component for `<style>` elements.
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]

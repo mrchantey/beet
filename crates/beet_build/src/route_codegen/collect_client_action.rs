@@ -1,3 +1,8 @@
+//! Client action parsing for server action code generation.
+//!
+//! This module handles parsing server-side route functions and generating
+//! equivalent client-side functions that can call them via HTTP requests.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use quote::quote;
@@ -12,13 +17,21 @@ use syn::TypePath;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 
-/// For a given [`RouteFileMethod::item_fn`],
-/// create an equivelent client side function to call it.
+/// Parser for creating client-side action functions from server-side route methods.
 ///
+/// For a given [`RouteFileMethod`], this creates an equivalent client-side function
+/// that sends HTTP requests to call the server action.
 #[derive(Default)]
-pub struct ParseClientAction;
+pub(crate) struct ParseClientAction;
 
 impl ParseClientAction {
+	/// Generates a client-side function for calling the given server action.
+	///
+	/// The generated function will:
+	/// - Have the same name and documentation as the server function
+	/// - Accept the same input parameters (extracted from `In<T>`)
+	/// - Return a `Result` wrapping the server's return type
+	/// - Send an HTTP request to the corresponding route
 	pub fn client_func(&self, action: &RouteFileMethod) -> ItemFn {
 		let parsed_inputs = Self::parse_inputs(&action.item);
 		// let (return_type, error_type) = Self::parse_output(item);

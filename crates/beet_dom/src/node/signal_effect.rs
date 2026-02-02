@@ -1,3 +1,8 @@
+//! Signal effect types for reactive DOM updates.
+//!
+//! This module provides the [`SignalEffect`] component which enables reactive
+//! updates when signal values change.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemId;
@@ -25,6 +30,7 @@ pub struct SignalEffect {
 }
 
 impl SignalEffect {
+	/// Creates a new signal effect with the given function and system ID.
 	pub fn new<Func, Out>(func: Func, system_id: SystemId) -> Self
 	where
 		Func: 'static + Send + Sync + Clone + FnOnce() -> Out,
@@ -37,13 +43,17 @@ impl SignalEffect {
 			effect_subscriber,
 		}
 	}
+	/// Returns the system ID for this effect.
 	pub fn system_id(&self) -> SystemId { self.system_id }
+
+	/// Returns the effect subscriber function.
 	pub fn effect_subscriber(&self) -> Arc<dyn 'static + Send + Sync + Fn()> {
 		self.effect_subscriber.clone()
 	}
 }
 
 
+/// Marker type for primitive getter to bundle conversion.
 pub struct PrimitiveGetterIntoBundle;
 
 /// we dont want to blanket impl ToString because collision
@@ -140,6 +150,7 @@ fn handle_result(result: In<Result>) {
 
 /// for bundles and vecs of bundles
 trait BundleLike<M1, M2>: IntoBundle<M1> {}
+/// Marker type for bundle to bundle-like conversion.
 pub struct BundleIntoBundleLike;
 impl<T, M> BundleLike<M, BundleIntoBundleLike> for T where
 	T: IntoBundle<M> + Bundle

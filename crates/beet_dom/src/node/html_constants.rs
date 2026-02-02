@@ -90,14 +90,18 @@ impl HtmlConstants {
 	}
 
 	/// Returns the attribute key for the style id
+	/// Returns the attribute key for the style id with the given hash.
 	pub fn style_id_attribute(&self, id: u64) -> String {
 		format!("{}-{}", self.style_id_key, id)
 	}
-	/// Added by the [parse_lightning] step, and replaced by the apply_style_id step
+	/// Returns the placeholder style id attribute key.
+	///
+	/// Added by the parse_lightning step, and replaced by the apply_style_id step.
 	pub fn style_id_attribute_placeholder(&self) -> String {
 		format!("{}-PLACEHOLDER", self.style_id_key)
 	}
 
+	/// Returns the URL path to the WASM binary file.
 	pub fn wasm_bin_url(&self) -> String {
 		format!(
 			"/{}/{}_bg.wasm",
@@ -105,6 +109,7 @@ impl HtmlConstants {
 			self.wasm_name
 		)
 	}
+	/// Returns the URL path to the WASM JavaScript glue file.
 	pub fn wasm_js_url(&self) -> String {
 		format!("/{}/{}.js", self.wasm_dir.to_string_lossy(), self.wasm_name)
 	}

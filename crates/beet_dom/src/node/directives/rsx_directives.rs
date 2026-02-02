@@ -1,3 +1,8 @@
+//! RSX directives for slot-based content distribution.
+//!
+//! This module provides slot directives for template-based content
+//! distribution, similar to web component slots.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -41,12 +46,15 @@ impl TemplateDirective for SlotChild {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum SlotTarget {
+	/// Default slot for unnamed content.
 	#[default]
 	Default,
+	/// Named slot for targeted content distribution.
 	Named(String),
 }
 
 impl SlotTarget {
+	/// Creates a named slot target.
 	pub fn named(name: impl Into<String>) -> Self {
 		SlotTarget::Named(name.into())
 	}

@@ -1,3 +1,8 @@
+//! RSX snippet extraction from Rust source files.
+//!
+//! This module handles parsing Rust files to extract `rsx!` macro invocations
+//! and spawn them as [`RstmlTokens`] entities for further processing.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
@@ -5,9 +10,12 @@ use beet_parse::prelude::*;
 use syn::visit::Visit;
 
 
-/// For a given rust file, extract tokens from `rsx!` macros and insert them
-/// as [`RstmlTokens`].
-pub fn import_rsx_snippets_rs(
+/// Extracts RSX snippets from Rust source files.
+///
+/// For each Rust file with the `.rs` extension, this system parses the file
+/// and extracts tokens from `rsx!` macro invocations, spawning them as
+/// child entities with [`RstmlTokens`] components.
+pub(crate) fn import_rsx_snippets_rs(
 	// even though our tokens are Unspan, they will be parsed by ParseRsxTokens
 	// which also handles !Send tokens, so we must ensure main thread.
 	_: TempNonSendMarker,
@@ -35,14 +43,17 @@ pub fn import_rsx_snippets_rs(
 	Ok(())
 }
 
-/// Spawn an [`RstmlTokens`] for each `rsx!` macro in the file.
+/// Visitor that spawns an [`RstmlTokens`] entity for each `rsx!` macro in a file.
 struct RsxSynVisitor<'a, 'w, 's> {
+	/// The parent source file entity.
 	source_file: Entity,
+	/// Commands for spawning child entities.
 	commands: &'a mut Commands<'w, 's>,
-	/// Used for creating [`FileSpan`] in several places.
+	/// Workspace-relative path used for creating [`FileSpan`] in several places.
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
 	file: &'a WsPathBuf,
+	/// Configuration for which macro names to recognize.
 	macros: &'a TemplateMacros,
 }
 

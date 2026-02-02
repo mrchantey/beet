@@ -1,3 +1,8 @@
+//! Markdown parsing utilities for RSX conversion.
+//!
+//! This module provides functions for converting Markdown content into RSX-compatible
+//! HTML strings, and extracting frontmatter metadata from Markdown files.
+
 use beet_core::prelude::*;
 use pulldown_cmark::CowStr;
 use pulldown_cmark::Event;
@@ -9,16 +14,21 @@ use pulldown_cmark::TagEnd;
 use syn::Block;
 
 
-/// Collection of functions for parsing markdown
-pub struct ParseMarkdown;
+/// Collection of functions for parsing markdown content.
+///
+/// Provides utilities for:
+/// - Converting Markdown to RSX-compatible HTML strings
+/// - Extracting and parsing frontmatter metadata
+pub(crate) struct ParseMarkdown;
 
 impl ParseMarkdown {
+	/// Returns the pulldown-cmark options used for parsing.
 	fn options() -> Options {
 		Options::ENABLE_TABLES
 				| Options::ENABLE_FOOTNOTES
 				| Options::ENABLE_STRIKETHROUGH
 				| Options::ENABLE_TASKLISTS
-				// replaces ' with ’ etc, if users want this they should do a find and
+				// replaces ' with ' etc, if users want this they should do a find and
 				// replace at a higher level
 				// | Options::ENABLE_SMART_PUNCTUATION
 				| Options::ENABLE_HEADING_ATTRIBUTES
@@ -33,8 +43,9 @@ impl ParseMarkdown {
 				| Options::ENABLE_WIKILINKS
 	}
 
-	/// Parse a given string of markdown into an rsx string,
-	/// often parsed by [`StringToWebTokens`]
+	/// Parses a Markdown string into an RSX-compatible HTML string.
+	///
+	/// The output is suitable for parsing by the RSX combinator system.
 	pub fn markdown_to_rsx_str(markdown: &str) -> String {
 		let parser = Parser::new_ext(&markdown, Self::options());
 
@@ -46,8 +57,12 @@ impl ParseMarkdown {
 			.to_string()
 	}
 
-	/// returns the content of the first frontmatter block discovered,
-	/// wrapped in parentheses as a requirement of the `ron` parser
+	/// Extracts frontmatter from Markdown and returns it as a syn [`Block`].
+	///
+	/// Supports TOML frontmatter (delimited by `+++`). YAML frontmatter
+	/// (delimited by `---`) is not yet supported.
+	///
+	/// Returns `Ok(None)` if no frontmatter is present.
 	pub fn markdown_to_frontmatter_tokens<'a>(
 		markdown: &'a str,
 	) -> Result<Option<Block>> {
@@ -76,6 +91,7 @@ impl ParseMarkdown {
 		Ok(tokens)
 	}
 
+	/// Extracts the raw frontmatter string and its style from Markdown.
 	fn extract_frontmatter_string<'a>(
 		markdown: &'a str,
 	) -> Option<(CowStr<'a>, MetadataBlockKind)> {
@@ -106,7 +122,7 @@ impl ParseMarkdown {
 	}
 
 
-	/// a custom parser for the frontmatter
+	/// Converts YAML frontmatter to RON format.
 	#[allow(unused)]
 	fn yaml_frontmatter_to_ron(yaml: &str) -> Result<String> {
 		let lines = yaml

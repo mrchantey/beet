@@ -1,3 +1,8 @@
+//! Web-specific DOM node types.
+//!
+//! This module provides HTML-specific node types including doctype,
+//! comment, and element nodes.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -32,6 +37,7 @@ impl CommentNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ElementNode {
+	/// Whether this element is self-closing (e.g., `<br/>`).
 	pub self_closing: bool,
 }
 impl ElementNode {

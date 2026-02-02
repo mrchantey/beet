@@ -1,3 +1,8 @@
+//! PDF export functionality for WebDriver pages.
+//!
+//! This module provides types and methods for exporting web pages
+//! as PDF documents with configurable options.
+
 use crate::prelude::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
@@ -42,9 +47,13 @@ impl Default for PdfOptions {
 /// Page margins for PDF export (in cm).
 #[derive(Debug, Clone)]
 pub struct PdfMargin {
+	/// Top margin in cm.
 	pub top: f64,
+	/// Bottom margin in cm.
 	pub bottom: f64,
+	/// Left margin in cm.
 	pub left: f64,
+	/// Right margin in cm.
 	pub right: f64,
 }
 
@@ -76,14 +85,18 @@ impl PdfMargin {
 /// Page orientation for PDF export.
 #[derive(Debug, Clone)]
 pub enum PdfOrientation {
+	/// Portrait orientation (taller than wide).
 	Portrait,
+	/// Landscape orientation (wider than tall).
 	Landscape,
 }
 
 /// Page size for PDF export (in cm).
 #[derive(Debug, Clone)]
 pub struct PdfPageSize {
+	/// Page width in cm.
 	pub width: f64,
+	/// Page height in cm.
 	pub height: f64,
 }
 

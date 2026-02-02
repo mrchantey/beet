@@ -1,3 +1,8 @@
+//! WebDriver client for browser automation.
+//!
+//! This module provides the [`Client`] type for connecting to WebDriver
+//! instances and creating browser sessions.
+
 use crate::prelude::*;
 use async_process::Child;
 use async_process::Command;
@@ -8,6 +13,7 @@ use serde_json::json;
 use std::borrow::Cow;
 use std::time::Duration;
 
+/// WebDriver client configuration for browser automation.
 #[derive(Debug, Clone)]
 pub struct Client {
 	host: Cow<'static, str>,
@@ -20,13 +26,19 @@ pub struct Client {
 	log_level: LogLevel,
 }
 
+/// Log level configuration for the WebDriver process.
 #[derive(Debug, Default, Clone)]
 pub enum LogLevel {
+	/// Info level logging.
 	#[default]
 	Info,
+	/// Debug level logging.
 	Debug,
+	/// Warning level logging.
 	Warn,
+	/// Error level logging.
 	Error,
+	/// Disable logging.
 	Off,
 }
 
@@ -42,16 +54,21 @@ impl Default for Client {
 	}
 }
 
-/// Specify the browser driver process to use, defaults to chromedriver
+/// Specifies the browser driver process to use.
 #[derive(Debug, Default, Clone)]
 pub enum Provider {
+	/// Chrome/Chromium via chromedriver.
 	#[default]
 	Chromedriver,
+	/// Firefox via geckodriver.
 	Geckodriver,
 }
 
+/// Options for creating a new WebDriver session.
 pub struct NewSessionOptions {
+	/// Whether to run the browser in headless mode.
 	headless: bool,
+	/// Whether to disable GPU acceleration.
 	disable_gpu: bool,
 }
 
@@ -65,12 +82,14 @@ impl Default for NewSessionOptions {
 }
 
 impl Client {
+	/// Creates a client configured for Chromium.
 	pub fn chromium() -> Self {
 		Self {
 			provider: Provider::Chromedriver,
 			..default()
 		}
 	}
+	/// Creates a client configured for Firefox.
 	pub fn firefox() -> Self {
 		Self {
 			provider: Provider::Geckodriver,
@@ -78,12 +97,15 @@ impl Client {
 		}
 	}
 
+	/// Returns the base URL for the WebDriver server.
 	pub fn base_url(&self) -> String {
 		format!("{}:{}", self.host, self.driver_port)
 	}
+	/// Returns a full URL for the given path on the WebDriver server.
 	pub fn url(&self, path: &str) -> String {
 		format!("{}:{}/{}", self.host, self.driver_port, path)
 	}
+	/// Creates a new browser session with default options.
 	pub async fn new_session(&self) -> Result<Session> {
 		Self::new_session_with_opts(self, default()).await
 	}
@@ -164,6 +186,10 @@ impl Client {
 }
 
 
+/// A WebDriver client with an owned driver process.
+///
+/// This struct manages the lifecycle of the WebDriver process,
+/// killing it when dropped.
 pub struct ClientProcess {
 	client: Client,
 	process: Child,
@@ -175,7 +201,10 @@ impl std::ops::Deref for ClientProcess {
 }
 
 impl ClientProcess {
+	/// Creates a new client process with default options.
 	pub fn new() -> Result<Self> { Self::new_with_opts(default()) }
+
+	/// Creates a new client process with the given options.
 	pub fn new_with_opts(opts: Client) -> Result<Self> {
 		let process = match opts.provider {
 			Provider::Chromedriver => Self::spawn_chromedriver(&opts),
@@ -229,6 +258,7 @@ impl ClientProcess {
 			.xok()
 	}
 
+	/// Kills the WebDriver process.
 	pub fn kill(mut self) -> Result<()> {
 		self.process.kill()?;
 		Ok(())

@@ -1,12 +1,22 @@
+//! RSX snippet extraction from Markdown source files.
+//!
+//! This module handles parsing Markdown and MDX files to extract RSX content
+//! and spawn them as [`CombinatorTokens`] entities for further processing.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 use beet_parse::prelude::*;
 use quote::ToTokens;
 
-/// For a given markdown file, parse to valid rsx combinator syntax and insert
-/// as [`CombinatorToNodeTokens`].
-pub fn import_rsx_snippets_md(
+/// Extracts RSX snippets from Markdown source files.
+///
+/// For each Markdown file (`.md` or `.mdx` extension), this system:
+/// 1. Parses the Markdown content to valid RSX combinator syntax
+/// 2. Spawns a child entity with [`CombinatorTokens`]
+/// 3. If a [`MetaType`] is specified in an ancestor, extracts and parses
+///    frontmatter metadata as a child [`NodeExpr`]
+pub(crate) fn import_rsx_snippets_md(
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 	parents: Query<&ChildOf>,

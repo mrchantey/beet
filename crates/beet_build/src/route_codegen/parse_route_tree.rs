@@ -1,3 +1,8 @@
+//! Static route tree generation for type-safe routing.
+//!
+//! This module generates a module hierarchy of path functions from route files,
+//! enabling type-safe route path construction at compile time.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
@@ -9,42 +14,40 @@ use syn::Item;
 use syn::ItemFn;
 use syn::parse_quote;
 
-/// Marks an entity for generating a static route tree for
-/// every route in this entities root, allowing this file
-/// to be nested under a `mod.rs`:
+/// Marks an entity for generating a static route tree.
+///
+/// When added to an entity, causes a `routes` module to be generated containing
+/// path functions for every route in the entity's root. This enables type-safe
+/// route path construction.
 #[derive(Debug, Clone, Default, Component, Reflect)]
 #[reflect(Component)]
-pub struct StaticRouteTree;
+pub(crate) struct StaticRouteTree;
 
-/// Create a tree of routes from a list of [`FuncTokens`],
-/// that can then be converted to an [`ItemMod`] to be used in the router.
+/// Generates a tree of route path functions from [`RouteFileMethod`] entities.
 ///
-/// ## Example
-/// This is an example output for the following input files
+/// This system creates a `routes` module containing functions that return
+/// route paths, enabling type-safe route path construction.
 ///
+/// # Example Output
+///
+/// For the following input files:
 /// - `index.rs`
 /// - `foo/bar/index.rs`
 /// - `foo/bar/bazz.rs`
 ///
-/// ```
-/// mod paths{
-/// 	pub fn index()->&'static str{
-/// 		"/"
-/// 	}
-/// 	// foo has no index file
-/// 	mod foo{
-/// 	 	mod bar{
-///  			pub fn index()->&'static str{
-/// 				"/foo/bar"
-/// 			}
-/// 			pub fn bazz()->&'static str{
-/// 				"/foo/bar/bazz"
-/// 			}
-/// 		}
-/// 	}
+/// Generates:
+/// ```ignore
+/// mod routes {
+///     pub fn index() -> &'static str { "/" }
+///     mod foo {
+///         mod bar {
+///             pub fn index() -> &'static str { "/foo/bar" }
+///             pub fn bazz() -> &'static str { "/foo/bar/bazz" }
+///         }
+///     }
 /// }
 /// ```
-pub fn parse_route_tree(
+pub(crate) fn parse_route_tree(
 	mut query: Populated<
 		(Entity, &mut CodegenFile),
 		(Added<CodegenFile>, With<StaticRouteTree>),
@@ -78,24 +81,29 @@ pub fn parse_route_tree(
 	}
 }
 
+/// Internal parser for building the route tree module structure.
 #[derive(Clone)]
 struct Parser<'w, 's, 'a> {
+	/// Query for accessing route file methods.
 	query: Query<'w, 's, &'a RouteFileMethod>,
 }
 
 impl<'a> Parser<'_, '_, 'a> {
+	/// Gets a route file method by entity, panicking if not found.
 	fn get(&self, entity: Entity) -> &RouteFileMethod {
 		self.query.get(entity).expect(
 			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
 		)
 	}
 
+	/// Builds the top-level routes module from the tree.
 	fn routes_mod_tree(&self, tree: &RouteFileMethodTree) -> Item {
 		self.mod_tree_recursive(tree, true)
 	}
 
-	/// Create a tree [`syn::Item`], if it has children then wrap in a module
-	/// of the same name as the node.
+	/// Recursively creates tree [`syn::Item`] nodes.
+	///
+	/// If a node has children, wraps them in a module of the same name.
 	fn mod_tree_recursive(
 		&self,
 		tree: &RouteFileMethodTree,
@@ -125,6 +133,10 @@ impl<'a> Parser<'_, '_, 'a> {
 		}
 	}
 
+	/// Generates a path function for a tree node.
+	///
+	/// For static paths, returns a function returning `&'static str`.
+	/// For dynamic paths, returns a function with parameters for each dynamic segment.
 	fn tree_path_func(&self, tree: &RouteFileMethodTree) -> Option<ItemFn> {
 		// just use the first method, each func should have the same route path
 		let Some(route) = &tree.funcs.iter().next() else {

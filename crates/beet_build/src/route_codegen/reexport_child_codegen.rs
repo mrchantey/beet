@@ -1,9 +1,17 @@
+//! Child codegen re-export utilities.
+//!
+//! This module handles re-exporting child [`CodegenFile`] modules from their
+//! parent codegen files.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use syn::ItemMod;
 
-/// Add a `pub mod #name;` for any child [`CodegenFile`] of a [`CodegenFile`]
-pub fn reexport_child_codegen(
+/// Adds `pub mod #name;` for any child [`CodegenFile`] of a [`CodegenFile`].
+///
+/// This system ensures that nested codegen files are properly re-exported
+/// from their parent module, creating a proper module hierarchy.
+pub(crate) fn reexport_child_codegen(
 	mut query: ParamSet<(
 		Populated<(Entity, &Children), Added<CodegenFile>>,
 		Query<&mut CodegenFile>,

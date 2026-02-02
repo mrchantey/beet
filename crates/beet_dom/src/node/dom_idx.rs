@@ -37,7 +37,9 @@ impl std::fmt::Display for DomIdx {
 }
 
 impl DomIdx {
+	/// Creates a new DOM index with the given value.
 	pub fn new(idx: u32) -> Self { Self(idx) }
+	/// Returns the inner index value.
 	pub fn inner(&self) -> u32 { self.0 }
 }
 

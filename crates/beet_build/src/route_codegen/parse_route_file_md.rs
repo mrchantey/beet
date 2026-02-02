@@ -1,9 +1,21 @@
+//! Markdown source file parsing for route extraction.
+//!
+//! This module handles parsing Markdown (`.md`) and MDX (`.mdx`) source files
+//! to create route handlers. Unlike Rust files which can have multiple handlers,
+//! Markdown files always produce a single GET handler.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 
 
-pub fn parse_route_file_md(
+/// Parses Markdown source files to create route handlers.
+///
+/// This system processes each `.md` or `.mdx` file in a [`RouteFileCollection`]:
+/// 1. Creates a [`RouteFileMethod`] with HTTP GET method
+/// 2. Spawns a [`CombinatorRouteCodegen`] entity for the file-specific codegen
+/// 3. Updates the [`RouteSourceFile::mod_path`] to point to the generated `.rs` file
+pub(crate) fn parse_route_file_md(
 	mut query: Populated<
 		(Entity, &SourceFile, &mut RouteSourceFile),
 		Added<SourceFile>,

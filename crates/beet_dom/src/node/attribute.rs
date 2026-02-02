@@ -1,3 +1,8 @@
+//! Attribute types for DOM elements.
+//!
+//! This module provides components for representing HTML attributes,
+//! including the attribute-element relationship and query helpers.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
@@ -11,6 +16,7 @@ use bevy::ecs::system::SystemParam;
 pub struct AttributeOf(pub Entity);
 
 impl AttributeOf {
+	/// Creates a new attribute relationship pointing to the given entity.
 	pub fn new(value: Entity) -> Self { Self(value) }
 }
 
@@ -24,6 +30,7 @@ pub struct Attributes(Vec<Entity>);
 
 impl Attributes {
 	/// returns the entity and value of the first attribute with the given key
+	/// Returns the entity and value of the first attribute with the given key.
 	pub fn find<'a>(
 		&self,
 		attrs: &'a Query<(Entity, &AttributeKey, Option<&TextNode>)>,
@@ -52,6 +59,7 @@ pub struct FindAttribute<'w, 's> {
 }
 
 impl FindAttribute<'_, '_> {
+	/// Returns all attributes for the given entity.
 	pub fn all<'a>(
 		&'a self,
 		entity: Entity,
@@ -64,6 +72,7 @@ impl FindAttribute<'_, '_> {
 		})
 	}
 
+	/// Returns all event attributes for the given entity.
 	pub fn events<'a>(
 		&'a self,
 		entity: Entity,
@@ -78,6 +87,7 @@ impl FindAttribute<'_, '_> {
 		})
 	}
 
+	/// Finds an attribute by key on the given entity.
 	pub fn find(
 		&self,
 		entity: Entity,
@@ -88,6 +98,7 @@ impl FindAttribute<'_, '_> {
 			.ok()
 			.and_then(|(_, attrs)| attrs.find(&self.attributes, key))
 	}
+	/// Finds an attribute value by key on the given entity.
 	pub fn find_value(
 		&self,
 		entity: Entity,
@@ -125,6 +136,7 @@ impl FindAttribute<'_, '_> {
 pub struct AttributeKey(pub String);
 
 impl AttributeKey {
+	/// Creates a new attribute key with the given name.
 	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
 	/// If key starts with 'on' its considered an event
 	pub fn is_event(&self) -> bool { self.0.starts_with("on") }

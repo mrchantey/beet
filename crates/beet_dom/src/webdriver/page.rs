@@ -1,3 +1,8 @@
+//! WebDriver page abstraction for browser interaction.
+//!
+//! This module provides the [`Page`] type which wraps a browser session
+//! and provides high-level methods for navigation and interaction.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
@@ -144,6 +149,7 @@ impl Page {
 		}
 	}
 
+	/// Kills the browser session associated with this page.
 	pub async fn kill(self) -> Result<()> { self.session.kill().await }
 }
 

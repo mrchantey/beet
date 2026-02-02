@@ -6,22 +6,24 @@
 //! - Computing file expression hashes for change detection
 //! - Exporting snippets for client-side hydration
 
+mod export_snippets;
+mod file_expr_hash;
+mod hash_non_snippet_rust;
 mod import_file_inner_text;
 mod import_rsx_snippets_md;
-pub use import_rsx_snippets_md::*;
 mod import_rsx_snippets_rs;
-pub use import_file_inner_text::*;
-pub use import_rsx_snippets_rs::*;
-mod source_file;
-pub use source_file::*;
-mod hash_non_snippet_rust;
-use hash_non_snippet_rust::*;
-mod file_expr_hash;
-pub use file_expr_hash::*;
 mod parse_markdown;
+mod source_file;
 mod syn_serde;
-pub use parse_markdown::*;
-pub use syn_serde::*;
+
+pub use file_expr_hash::*;
+pub use source_file::*;
+
+pub(crate) use export_snippets::*;
+pub(crate) use import_file_inner_text::*;
+pub(crate) use import_rsx_snippets_md::*;
+pub(crate) use import_rsx_snippets_rs::*;
+pub(crate) use parse_markdown::*;
+
+/// Error types for snippet operations.
 pub mod error;
-mod export_snippets;
-pub use export_snippets::*;

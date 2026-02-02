@@ -1,23 +1,36 @@
+//! Route file method tree structure for organizing routes hierarchically.
+//!
+//! This module provides a tree data structure for organizing [`RouteFileMethod`]
+//! entities by their route paths, enabling hierarchical code generation.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
 
+/// A tree structure organizing [`RouteFileMethod`] entities by route path segments.
+///
+/// This structure is used to generate hierarchical module structures for client
+/// actions, where each path segment becomes a nested module.
 #[derive(Debug, Clone)]
-pub struct RouteFileMethodTree {
-	/// The route path for this part of the tree. It may be
-	/// a parent or leaf node.
+pub(crate) struct RouteFileMethodTree {
+	/// The route path segment for this part of the tree.
+	///
+	/// May be a parent or leaf node.
 	pub name: PathPatternSegment,
-	/// A list of entities with a [`RouteFileMethod`] component
-	/// that are associated with this route. These usually
-	/// originate from a single file but may come from sepearate collections
-	/// if they share the same route path.
+	/// Entities with a [`RouteFileMethod`] component associated with this route.
+	///
+	/// These usually originate from a single file but may come from separate
+	/// collections if they share the same route path.
 	pub funcs: Vec<Entity>,
-	/// Children mapped by their [`RouteTreeBuilder::name`].
-	/// If this is empty then the route is a leaf node.
+	/// Children mapped by their path segment name.
+	///
+	/// If this is empty, the route is a leaf node.
 	pub children: Vec<RouteFileMethodTree>,
 }
 
+#[allow(unused)]
 impl RouteFileMethodTree {
+	/// Creates a new tree node with the given path segment.
 	pub fn new(segment: impl Into<PathPatternSegment>) -> Self {
 		Self {
 			name: segment.into(),
@@ -26,8 +39,9 @@ impl RouteFileMethodTree {
 		}
 	}
 
-	/// usually for debugging, just output all paths
-	/// and the route names, collapsing methods with the same path.
+	/// Converts the tree to a path tree for debugging.
+	///
+	/// Outputs all paths and route names, collapsing methods with the same path.
 	#[allow(dead_code)]
 	pub fn into_path_tree(&self) -> Tree<String> {
 		let children = self
@@ -42,11 +56,12 @@ impl RouteFileMethodTree {
 		}
 	}
 
-	/// Returns true if all children of this node have no children
+	/// Returns `true` if all children of this node have no children.
 	pub fn all_children_are_leaf_nodes(&self) -> bool {
 		self.children.iter().all(|child| child.children.is_empty())
 	}
 
+	/// Flattens the tree into a vector of all entities.
 	pub fn flatten(self) -> Vec<Entity> {
 		let mut out = Vec::new();
 		out.extend(self.funcs.into_iter());
@@ -56,6 +71,10 @@ impl RouteFileMethodTree {
 		out
 	}
 
+	/// Builds a tree from a list of route file methods.
+	///
+	/// Each method's path is decomposed into segments, and the tree is built
+	/// by inserting each method at the appropriate depth.
 	pub fn from_methods(funcs: Vec<(Entity, &RouteFileMethod)>) -> Self {
 		let mut this = RouteFileMethodTree::new("routes");
 		for func in funcs {

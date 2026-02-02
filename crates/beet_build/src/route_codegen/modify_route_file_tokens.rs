@@ -1,8 +1,16 @@
+//! Route path modification utilities.
+//!
+//! This module provides components for modifying route paths at build time,
+//! such as prepending base paths or performing string replacements.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Helper for common route mapping
+/// Configuration for modifying route paths.
+///
+/// Allows prepending base paths and performing string replacements on
+/// route paths before they are used in codegen.
 #[derive(Debug, Clone, PartialEq, Reflect, Component)]
 #[reflect(Component)]
 pub struct ModifyRoutePath {
@@ -11,7 +19,7 @@ pub struct ModifyRoutePath {
 	/// List of strings to replace in the route path
 	pub replace_route: Vec<ReplaceRoute>,
 }
-/// Replace some part of the route path with another string
+/// Defines a string replacement to apply to route paths.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct ReplaceRoute {
 	/// The string to replace
@@ -30,11 +38,14 @@ impl Default for ModifyRoutePath {
 }
 
 
+#[allow(unused)]
 impl ModifyRoutePath {
+	/// Sets the base route to prepend to all route paths.
 	pub fn base_route(mut self, base_route: impl Into<PathBuf>) -> Self {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
 	}
+	/// Adds a string replacement to apply to route paths.
 	pub fn replace_route(
 		mut self,
 		from: impl ToString,
@@ -48,7 +59,11 @@ impl ModifyRoutePath {
 	}
 }
 
-pub fn modify_route_file_tokens(
+/// Applies route path modifications to [`RouteFileMethod`] entities.
+///
+/// This system finds any [`ModifyRoutePath`] component in the ancestors of each
+/// route file method and applies the configured modifications to the route path.
+pub(crate) fn modify_route_file_tokens(
 	parents: Query<&ChildOf>,
 	modifiers: Query<&ModifyRoutePath>,
 	mut query: Populated<

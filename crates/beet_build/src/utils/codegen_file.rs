@@ -1,10 +1,15 @@
+//! Code generation file utilities.
+//!
+//! This module provides the [`CodegenFile`] component for representing
+//! and building generated code files with proper imports and structure.
+
 use beet_core::prelude::*;
 use heck::ToSnakeCase;
 use quote::ToTokens;
 use syn::Expr;
 use syn::Item;
 
-/// Call [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`]
+/// Calls [`CodegenFile::build_and_write`] for every [`Changed<CodegenFile>`].
 pub fn export_codegen(
 	query: Populated<&CodegenFile, Changed<CodegenFile>>,
 ) -> bevy::prelude::Result {
@@ -16,27 +21,34 @@ pub fn export_codegen(
 	Ok(())
 }
 
-/// Every codegen file is created via this struct. It contains
-/// several utilities and standards for quality of life.
+/// Represents a generated code file with its configuration and contents.
+///
+/// Every codegen file is created via this struct, which provides utilities
+/// for building well-formatted Rust code files with proper imports and
+/// structure.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Default, Component)]
 pub struct CodegenFile {
 	/// The output codegen file location.
 	output: AbsPathBuf,
-	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
-	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
+	/// Package name alias for the current crate.
+	///
+	/// Since [`std::any::type_name`] resolves to a named crate (used with
+	/// [`TemplateSerde`]), we need to alias the current crate to match any
+	/// internal types. Setting this option adds `use crate as pkg_name;`
 	/// to the top of the file.
 	pkg_name: Option<String>,
-	/// All of the imports that must be included both globally and inside each
-	/// inline module.
+	/// Imports to include at the top of the file.
+	///
 	/// These will not be erased when the file is regenerated.
-	// it'd be nice to store these as a Vec<Item> but bevy reflect doesnt
-	// support custom serialization at this stage
+	// Would be nice to store as Vec<Item> but bevy reflect doesn't support
+	// custom serialization at this stage
 	imports: Vec<String>,
-	/// List of all root level items to be included in the file.
+	/// Root level items to be included in the file.
+	///
 	/// These are usually appended to as this struct is passed around.
-	// it'd be nice to store these as a Vec<Item> but bevy reflect doesnt
-	// support custom serialization at this stage
+	// Would be nice to store as Vec<Item> but bevy reflect doesn't support
+	// custom serialization at this stage
 	items: Vec<String>,
 }
 
@@ -60,7 +72,7 @@ impl Default for CodegenFile {
 }
 
 impl CodegenFile {
-	/// Create a new [`CodegenFile`] with the most common options.
+	/// Creates a new [`CodegenFile`] with the most common options.
 	pub fn new(output: AbsPathBuf) -> Self {
 		Self {
 			output,
@@ -68,13 +80,15 @@ impl CodegenFile {
 		}
 	}
 
-	/// Get the output path for this codegen file.
+	/// Returns the output path for this codegen file.
 	pub fn output(&self) -> &AbsPathBuf { &self.output }
-	/// Get the package name alias, if set.
+
+	/// Returns the package name alias, if set.
 	pub fn pkg_name(&self) -> Option<&String> { self.pkg_name.as_ref() }
 
-	/// Get the snake_case name of this codegen file,
-	/// if its a 'mod.rs' then the parent directory is used.
+	/// Returns the snake_case name of this codegen file.
+	///
+	/// If the file is a `mod.rs`, returns the parent directory name instead.
 	pub fn name(&self) -> String {
 		match self
 			.output
@@ -97,8 +111,9 @@ impl CodegenFile {
 		.to_snake_case()
 	}
 
-	/// Clone the metadata of this codegen file, but change the output path
-	/// and clears the items.
+	/// Clones the metadata of this codegen file with a new output path.
+	///
+	/// The items list is cleared in the clone.
 	pub fn clone_info(&self, output: AbsPathBuf) -> Self {
 		Self {
 			output,
@@ -108,17 +123,21 @@ impl CodegenFile {
 		}
 	}
 
+	/// Sets the package name alias for this codegen file.
 	pub fn with_pkg_name(mut self, pkg_name: impl Into<String>) -> Self {
 		self.pkg_name = Some(pkg_name.into());
 		self
 	}
 
+	/// Adds an import item to this codegen file.
 	pub fn with_import(mut self, item: Item) -> Self {
 		self.imports.push(item.into_token_stream().to_string());
 		self
 	}
-	/// Set the imports for this codegen file, replacing the default and a
-	/// previously set imports.
+
+	/// Sets the imports for this codegen file.
+	///
+	/// This replaces any default or previously set imports.
 	pub fn set_imports(mut self, items: Vec<Item>) -> Self {
 		self.imports = items
 			.iter()
@@ -127,24 +146,30 @@ impl CodegenFile {
 		self
 	}
 
-
+	/// Returns the output directory path.
 	pub fn output_dir(&self) -> Result<AbsPathBuf> {
 		self.output
 			.parent()
 			.ok_or_else(|| bevyhow!("Output path must have a parent directory"))
 	}
+
+	/// Clears all items from this codegen file.
 	pub fn clear_items(&mut self) { self.items.clear(); }
 
+	/// Adds an item to this codegen file.
 	pub fn add_item<T: Into<Item>>(&mut self, item: T) {
 		self.items.push(item.into().into_token_stream().to_string());
 	}
 
+	/// Converts the imports to syn tokens.
 	fn imports_to_tokens(&self) -> Result<Vec<Item>, syn::Error> {
 		self.imports
 			.iter()
 			.map(|s| syn::parse_str::<Item>(s))
 			.collect::<Result<_, _>>()
 	}
+
+	/// Converts the items to syn tokens.
 	fn items_to_tokens(&self) -> Result<Vec<Item>, syn::Error> {
 		self.items
 			.iter()
@@ -152,6 +177,7 @@ impl CodegenFile {
 			.collect::<Result<_, _>>()
 	}
 
+	/// Builds the output file as a syn [`File`].
 	pub fn build_output(&self) -> Result<syn::File> {
 		let imports = self.imports_to_tokens()?;
 		let crate_alias = self.crate_alias()?;
@@ -167,8 +193,7 @@ impl CodegenFile {
 		})
 	}
 
-	/// Builds the output file and writes it to the specified path
-	/// if it has changed.
+	/// Builds the output file and writes it to the specified path if changed.
 	pub fn build_and_write(&self) -> Result<()> {
 		let output_tokens = self.build_output()?;
 		// ideally we'd use rustfmt instead
@@ -179,8 +204,9 @@ impl CodegenFile {
 		Ok(())
 	}
 
-	// this is legacy from when client islands use std::any::type_name
-	// we can remove it after scenes-as-islands
+	/// Generates the crate alias item if a package name is set.
+	// This is legacy from when client islands use `std::any::type_name`.
+	// Can be removed after scenes-as-islands.
 	fn crate_alias(&self) -> Result<Option<syn::Item>> {
 		if let Some(pkg_name) = &self.pkg_name {
 			let pkg_name: Expr = syn::parse_str(pkg_name)?;

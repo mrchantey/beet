@@ -1,23 +1,27 @@
-//! This module is responsible for codegen and live reloading.
+//! Build-time code generation and live reloading for beet applications.
 //!
-//! There are several steps involved:
+//! This crate provides the infrastructure for parsing source files, extracting RSX snippets,
+//! and generating route code. It supports both Rust (`.rs`) and Markdown (`.md`, `.mdx`) files.
+//!
+//! # Architecture
+//!
+//! The build process involves several stages:
+//!
 //! ## Source Files
-//! - Startup - For every file specified in the [`WorkspaceConfig`], load a [`SourceFile`]
-//! - EventKind::Create - create a new corresponding [`SourceFile`]
-//! - EventKind::Remove - remove every matching [`SourceFile`]
-//! - EventKind::Modify - find the root source file and mark it as [`Changed`], despawning all children
+//! - **Startup**: For every file specified in the [`WorkspaceConfig`], load a [`SourceFile`]
+//! - **Create**: When a file is created, spawn a corresponding [`SourceFile`] entity
+//! - **Remove**: When a file is removed, despawn matching [`SourceFile`] entities
+//! - **Modify**: When a file changes, mark it as changed and despawn all children
 //!
-//! ## Rsx Snippets
+//! ## RSX Snippets
 //!
-//! Load [`RsxSnippets`] for each [`SourceFile`],
+//! Load [`RsxSnippetOf`](beet_dom::prelude::SnippetRoot) for each [`SourceFile`].
 //!
-//! ## RouteCodegen
+//! ## Route Codegen
 //!
-//! - Reparent any [`SourceFile`] to its matching [`RouteFileCollection`] if any
+//! Reparent any [`SourceFile`] to its matching [`RouteFileCollection`] if any.
 //!
-//! Higher level parsing than beet_parse, and downstream from beet_rsx and beet_build.
-//!
-//! ```ignore
+//! ```text
 //! // source files that do not appear in a route collection
 //! SourceFileRoot
 //! ├── (SourceFile(foo.rs), FileExprHash)
@@ -25,7 +29,7 @@
 //! └── (SourceFile(foo.md), FileExprHash)
 //!     └── (StaticRoot, RsxSnippetOf, CombinatorTokens)
 //!
-//! // route collections are a seperate tree
+//! // route collections are a separate tree
 //! RouteFileCollection
 //! ├── (SourceFileRef(foo.rs), CodegenFile RouteFile)
 //! │   │   // an entity for each route in a file (get, post, etc)
@@ -37,14 +41,11 @@
 //!     │   // generate the rust code for markdown files
 //!     └── (SourceFileRef(foo.md), CodegenFile, CombinatorRouteCodegen)
 //! ```
-//!
-//!
-//!
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(if_let_guard, exit_status_error)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #[allow(unused)]
 use crate::prelude::*;
 
@@ -61,6 +62,7 @@ pub mod prelude {
 	pub use crate::snippets::*;
 	pub use crate::utils::*;
 }
+
 /// Re-exports of external crates used by beet_build.
 pub mod exports {
 	pub use proc_macro2;

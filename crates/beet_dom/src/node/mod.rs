@@ -1,18 +1,25 @@
-//! beet_parse uses a self-tokenizing pattern so need the actual types, for this reason
-//! we put them here, upstream of beet_rsx to resolve beet_parse -> beet_rsx_macros -> beet_rsx
+//! DOM node types for beet applications.
+//!
+//! This module contains the core types for representing HTML DOM structures
+//! in the Bevy ECS, including elements, attributes, text nodes, and templates.
+
 mod escape_html;
 mod event_observer;
 mod signal_effect;
 pub use event_observer::*;
 pub use signal_effect::*;
+/// Types for snippet root nodes and their components.
 pub mod snippet_root;
 pub use snippet_root::*;
+/// Expression index tracking for template nodes.
 pub mod expr_idx;
+/// Template node types and traits.
 pub mod template;
 pub use expr_idx::*;
 pub use template::*;
 mod into_bundle;
 pub use into_bundle::*;
+/// RSX node types (fragments, templates, text, etc.).
 pub mod rsx_nodes;
 pub use escape_html::*;
 pub use rsx_nodes::*;
@@ -35,7 +42,9 @@ pub struct NodeTypesPlugin;
 
 use beet_core::prelude::*;
 
-// a group of all groups of components
+/// A tuple of all RSX component type groups for registration.
+///
+/// This includes root components, RSX nodes, web nodes, and all directive types.
 pub type RsxComponents = (
 	RootComponents,
 	RsxNodes,

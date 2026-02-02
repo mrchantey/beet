@@ -1,15 +1,25 @@
+//! Client action group collection for generating client-side action modules.
+//!
+//! This module handles collecting all client actions from a [`RouteFileCollection`]
+//! and generating a module tree structure for the client-side code.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use proc_macro2::Span;
 use syn::Item;
 
-/// Added as a child of any [`RouteFileCollection`] with a [`RouteFileCategory::Action`],
-/// meaning a client actions codegen will be created.
+/// Configuration for collecting client actions from a [`RouteFileCollection`].
+///
+/// Added as a child of any [`RouteFileCollection`] with [`RouteCollectionCategory::Actions`],
+/// causing client action codegen to be generated.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
 #[require(CodegenFile)]
-pub struct CollectClientActions {
-	/// Collapse single child functions into their parent mod
+pub(crate) struct CollectClientActions {
+	/// Whether to collapse single-child functions into their parent module.
+	///
+	/// When `true`, a module with only one function will be replaced by just
+	/// that function with the module's name.
 	pub collapse_nodes: bool,
 }
 
@@ -21,7 +31,11 @@ impl Default for CollectClientActions {
 	}
 }
 
-pub fn collect_client_action_group(
+/// Collects client actions from a [`RouteFileCollection`] and generates module code.
+///
+/// This system builds a tree structure from all [`RouteFileMethod`] entities
+/// and generates corresponding client-side functions organized into modules.
+pub(crate) fn collect_client_action_group(
 	mut query: Populated<
 		(&mut CodegenFile, &CollectClientActions, &ChildOf),
 		Added<CodegenFile>,
@@ -50,8 +64,11 @@ pub fn collect_client_action_group(
 }
 
 
+/// Internal builder for generating the client action module tree.
 struct Builder<'w, 's, 'a, 'b> {
+	/// Configuration for how to collect actions.
 	collect: &'a CollectClientActions,
+	/// Query for accessing route file methods.
 	query: Query<'w, 's, &'b RouteFileMethod>,
 }
 

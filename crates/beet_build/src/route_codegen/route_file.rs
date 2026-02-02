@@ -1,3 +1,9 @@
+//! Route file representation for the build system.
+//!
+//! This module defines the [`RouteSourceFile`] component that represents
+//! a source file belonging to a [`RouteFileCollection`], along with systems
+//! for creating and managing route files.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use proc_macro2::Span;
@@ -9,19 +15,22 @@ use syn::parse_quote;
 
 
 /// A file that belongs to a [`RouteFileCollection`], spawned as its child.
-/// The number of child [`RouteFileMethod`] depends on the file type:
-/// - `foo.md`: 1
-/// - `foo.rs`: 0 or more
+///
+/// The number of child [`RouteFileMethod`] entities depends on the file type:
+/// - `foo.md`: 1 (always a GET handler)
+/// - `foo.rs`: 0 or more (one per public route function)
 /// - `foo.rsx`: 0 or more
 #[derive(Debug, Component)]
 pub struct RouteSourceFile {
 	/// The local path to the rust file containing the routes.
+	///
 	/// By default this is the [`SourceFile`] relative to the
 	/// [`CodegenFile::output_dir`] but may be modified with `bypass_change_detection`,
-	/// for example [`parse_route_file_md`]
-	/// will change the path to point to the newly generated `.rs` codegen file.
+	/// for example [`parse_route_file_md`] will change the path to point to
+	/// the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
-	/// The [`SourceFile`] relative to [`RouteFileCollection::src`],
+	/// The [`SourceFile`] relative to [`RouteFileCollection::src`].
+	///
 	/// Used for per-file codegen.
 	pub source_file_collection_rel: PathBuf,
 	/// The route path for the file, derived from the file path
@@ -30,13 +39,16 @@ pub struct RouteSourceFile {
 }
 
 impl RouteSourceFile {
-	/// The identifier for the module import in the generated code.
+	/// Returns the identifier for the module import in the generated code.
 	pub fn mod_ident(&self) -> syn::Ident {
 		let path = path_to_ident(&self.route_path.to_string_lossy());
 		Ident::new(&path, Span::call_site())
 	}
-	/// The module import for the generated code.
-	/// For Actions this will only export in non-wasm builds
+
+	/// Returns the module import item for the generated code.
+	///
+	/// For [`RouteCollectionCategory::Actions`], this will only export
+	/// in non-wasm builds via `#[cfg(feature = "server")]`.
 	pub fn item_mod(&self, category: RouteCollectionCategory) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
@@ -57,9 +69,11 @@ impl RouteSourceFile {
 	}
 }
 
-/// Reset every [`CodegenFile`] ancestor of a changed [`FileExprHash`],
-/// includiing both [`RouteFileCollection`] and [`StaticRouteTree`]
-pub fn reset_codegen_files(
+/// Resets every [`CodegenFile`] ancestor of a changed [`FileExprHash`].
+///
+/// This includes both [`RouteFileCollection`] and [`StaticRouteTree`] ancestors,
+/// ensuring that codegen is regenerated when source files change.
+pub(crate) fn reset_codegen_files(
 	changed_exprs: Populated<Entity, Changed<FileExprHash>>,
 	mut parent_codegen: Query<&mut CodegenFile>,
 	parents: Query<&ChildOf>,
@@ -75,7 +89,7 @@ pub fn reset_codegen_files(
 	}
 }
 
-/// Add a [`RouteSourceFile`] to any newly created [`SourceFile`]
+/// Adds a [`RouteSourceFile`] to any newly created [`SourceFile`]
 /// that is a child of a [`RouteFileCollection`].
 pub(super) fn create_route_files(
 	mut commands: Commands,
@@ -118,8 +132,13 @@ pub(super) fn create_route_files(
 	}
 	Ok(())
 }
-/// Accepts a file path and outputs a reasonable identifier with
-/// best effort uniqueness.
+
+/// Converts a file path to a valid Rust identifier.
+///
+/// This function ensures the identifier is valid by:
+/// - Replacing invalid characters with underscores
+/// - Ensuring the first character is alphabetic or underscore
+/// - Handling edge cases like empty strings
 fn path_to_ident(path: &str) -> String {
 	let mut ident = String::new();
 	let mut chars = path.chars();

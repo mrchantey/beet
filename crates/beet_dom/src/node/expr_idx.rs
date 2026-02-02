@@ -1,3 +1,9 @@
+//! Expression index types for tracking nodes in template macros.
+//!
+//! This module provides [`ExprIdx`] for uniquely identifying expressions
+//! within a template macro, enabling correlation between static analysis
+//! and runtime instances.
+
 use beet_core::prelude::*;
 
 /// The index in which an expression appears in a template macro, assigned
@@ -14,6 +20,7 @@ use beet_core::prelude::*;
 pub struct ExprIdx(pub u32);
 
 impl ExprIdx {
+	/// Creates a new expression index with the given value.
 	pub fn new(index: u32) -> Self { Self(index) }
 }
 
@@ -23,12 +30,17 @@ impl std::fmt::Display for ExprIdx {
 	}
 }
 
+/// Builder for assigning sequential [`ExprIdx`] values.
 #[derive(Default)]
 pub struct ExprIdxBuilder {
 	current: u32,
 }
+
 impl ExprIdxBuilder {
+	/// Creates a new builder starting at index 0.
 	pub fn new() -> Self { Self::default() }
+
+	/// Returns the next expression index and increments the counter.
 	pub fn next(&mut self) -> ExprIdx {
 		let idx = self.current;
 		self.current += 1;

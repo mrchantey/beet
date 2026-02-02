@@ -1,34 +1,47 @@
+//! Route file collection configuration for grouping related route files.
+//!
+//! This module defines the [`RouteFileCollection`] component that groups
+//! source files together for route codegen, such as all pages or all actions.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use quote::ToTokens;
 
-/// Added alongside a [`SourceFile`] for easy cohersion of route meta
+/// Added alongside a [`SourceFile`] for easy coercion of route metadata.
 #[derive(Debug, PartialEq, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct MetaType(String);
 
 impl MetaType {
+	/// Creates a new meta type from a syn type.
 	pub fn new(ty: syn::Type) -> Self {
 		Self(ty.into_token_stream().to_string())
 	}
+
+	/// Returns the inner syn type.
 	pub fn inner(&self) -> syn::Type {
 		syn::parse_str(&self.0).expect("MetaType contained invalid syn::Type")
 	}
 }
 
-/// Definition for a group of route files that should be collected together,
-/// including pages and actions.
+/// Defines a group of route files that should be collected together.
+///
+/// This includes configuration for pages and actions, specifying the source
+/// directory and filters for which files to include.
 #[derive(Debug, PartialEq, Clone, Reflect, Component)]
 #[reflect(Component)]
 #[require(CodegenFile)]
 pub struct RouteFileCollection {
-	/// The directory where the files are located.
+	/// The directory where the source files are located.
 	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
 	pub filter: GlobFilter,
+	/// The category of routes in this collection.
 	pub category: RouteCollectionCategory,
 }
+
 impl RouteFileCollection {
+	/// Creates a new route file collection from a source directory.
 	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
 			src,
@@ -36,16 +49,18 @@ impl RouteFileCollection {
 		}
 	}
 
+	/// Sets the glob filter for this collection.
 	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
 		self.filter = filter;
 		self
 	}
 
+	/// Returns `true` if the given path passes the collection's filter.
 	pub fn passes_filter(&self, path: &AbsPathBuf) -> bool {
 		path.starts_with(&self.src) && self.filter.passes(path)
 	}
 
-	/// Get the
+	/// Reads all files matching this collection's filter.
 	fn read_files(&self) -> Result<Vec<AbsPathBuf>> {
 		let mut files = Vec::new();
 		for file in ReadDir::files_recursive(&self.src)? {
@@ -58,8 +73,9 @@ impl RouteFileCollection {
 	}
 }
 
-/// Create a [`SourceFile`] for each file in a [`RouteFileCollection`].
-pub fn import_route_file_collection(
+/// Creates a [`SourceFile`] for each file in a [`RouteFileCollection`].
+#[allow(unused)]
+pub(crate) fn import_route_file_collection(
 	mut commands: Commands,
 	collections: Query<
 		(Entity, &RouteFileCollection),
@@ -76,9 +92,11 @@ pub fn import_route_file_collection(
 }
 
 
-/// Whenever a [`SourceFile`] is created, reparent to a corresponding [`RouteFileCollection`],
-/// if any.
-pub fn reparent_route_collection_source_files(
+/// Reparents [`SourceFile`] entities to their corresponding [`RouteFileCollection`].
+///
+/// Whenever a [`SourceFile`] is created, this system checks if it belongs to
+/// any route file collection and reparents it accordingly.
+pub(crate) fn reparent_route_collection_source_files(
 	mut commands: Commands,
 	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
 	collections: Query<(Entity, &RouteFileCollection)>,
@@ -124,24 +142,28 @@ impl Default for RouteFileCollection {
 	}
 }
 
+/// Categorizes route files by their purpose.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Reflect)]
 pub enum RouteCollectionCategory {
-	/// Files contain public functions named after the http methods,
+	/// Files contain public functions named after HTTP methods,
 	/// and will be included in the route tree.
 	#[default]
 	Pages,
-	/// Files contain arbitary routes,
+	/// Files contain arbitrary routes,
 	/// and will be excluded from the route tree.
 	Actions,
 }
 
 impl RouteCollectionCategory {
+	/// Returns `true` if routes in this category should be included in the route tree.
 	pub fn include_in_route_tree(&self) -> bool {
 		match self {
 			Self::Pages => true,
 			Self::Actions => false,
 		}
 	}
+
+	/// Returns the cache strategy for routes in this category.
 	pub fn cache_strategy(&self) -> CacheStrategy {
 		match self {
 			Self::Pages => CacheStrategy::Static,
@@ -151,6 +173,7 @@ impl RouteCollectionCategory {
 }
 
 impl RouteFileCollection {
+	/// Creates a test site route file collection for testing.
 	#[cfg(test)]
 	pub fn test_site() -> impl Bundle {
 		(
@@ -161,6 +184,8 @@ impl RouteFileCollection {
 			.with_pkg_name("test_site"),
 		)
 	}
+
+	/// Creates a test site pages collection for testing.
 	#[cfg(test)]
 	pub fn test_site_pages() -> impl Bundle {
 		(
@@ -180,6 +205,8 @@ impl RouteFileCollection {
 			)],
 		)
 	}
+
+	/// Creates a test site docs collection for testing.
 	#[cfg(test)]
 	pub fn test_site_docs() -> impl Bundle {
 		(

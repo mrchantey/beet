@@ -1,3 +1,8 @@
+//! Route file collection for codegen.
+//!
+//! This module handles collecting route files from a [`RouteFileCollection`]
+//! and generating the corresponding endpoint builder code.
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_parse::prelude::unbounded_related;
@@ -7,9 +12,14 @@ use quote::quote;
 use syn::parse_quote;
 
 
-/// Call [`CodegenFile::add_item`] for every [`RouteFileMethod`] in the
-/// [`RouteFile`] children.
-pub fn collect_route_files(
+/// Collects route files and generates endpoint builder code.
+///
+/// For each [`RouteFileCollection`], this system:
+/// 1. Iterates over all child [`RouteSourceFile`] entities
+/// 2. Generates module imports for each route file
+/// 3. Creates endpoint builders for each [`RouteFileMethod`]
+/// 4. Outputs a function that returns a bundle of all routes
+pub(crate) fn collect_route_files(
 	mut query: Populated<
 		(&mut CodegenFile, &RouteFileCollection, &Children),
 		Added<CodegenFile>,

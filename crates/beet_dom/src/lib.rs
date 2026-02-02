@@ -12,7 +12,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![allow(async_fn_in_trait)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 mod node;
 mod utils;

@@ -1,3 +1,8 @@
+//! RSX node types for representing DOM structures.
+//!
+//! This module provides the core node types used in RSX templates,
+//! including tags, fragments, templates, and text nodes.
+
 use beet_core::prelude::*;
 
 /// Specify types for variadic functions like TokenizeComponent
@@ -93,7 +98,9 @@ pub struct BlockNode;
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "bevy_text", require(bevy::prelude::TextSpan))]
 pub struct TextNode(pub String);
+
 impl TextNode {
+	/// Creates a new text node with the given value.
 	pub fn new(val: impl Into<String>) -> Self { Self(val.into()) }
 }
 
@@ -117,9 +124,10 @@ impl TextNode {
 pub struct NumberNode(pub f64);
 
 impl NumberNode {
+	/// Creates a new number node with the given value.
 	pub fn new(value: impl Into<f64>) -> Self { Self(value.into()) }
 }
-/// A boolean [`TextNode`] with a f64 value, the two values are automatically kept in sync.
+/// A boolean [`TextNode`] with a bool value, the two values are automatically kept in sync.
 #[derive(
 	Debug,
 	Default,
@@ -140,7 +148,9 @@ impl NumberNode {
 #[cfg_attr(feature = "bevy_text", require(bevy::prelude::TextSpan))]
 #[require(TextNode)]
 pub struct BoolNode(pub bool);
+
 impl BoolNode {
+	/// Creates a new boolean node with the given value.
 	pub fn new(value: impl Into<bool>) -> Self { Self(value.into()) }
 }
 
