@@ -10,7 +10,6 @@ created="2025-09-06"
 <br/>
 <br/>
 
-
 It's been a very good year, but for this reflection I'd like to share my journey of seemingly relentless deviations from The Way of the ECS.
 
 ## Simple Is Hard

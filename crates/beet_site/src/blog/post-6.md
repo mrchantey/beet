@@ -7,6 +7,9 @@ created="2025-12-04"
 
 <iframe src="https://www.youtube.com/embed/NFjdN8KGkg8" title="Full Moon Harvest #6 | Folk Technology" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
+<br/>
+<br/>
+
 Last week I was lucky enough to attend the first DevOps Days in my hometown of Wollongong, Australia. DevOps Days has a very cool format, employing tools like five-minute Ignite Talks and group discussions called Open Spaces to ensure all voices have an opportunity to be heard. It is designed to foster a marketplace of ideas and the experience reminded me of my love for folk festivals. The same principles of abundance that bring these events to life can and should shape how we design software.
 
 ## Scarcity vs abundance
