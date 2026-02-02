@@ -7,10 +7,6 @@ mod to_tokens;
 mod utils;
 use macros::*;
 
-#[path = "../../src/tokens_utils/shared_utils/mod.rs"]
-pub(crate) mod shared_utils;
-
-
 
 
 /// Implements `TokenizeSelf` for a struct or enum.

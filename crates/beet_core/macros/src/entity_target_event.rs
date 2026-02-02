@@ -1,4 +1,4 @@
-use crate::shared_utils::AttributeGroup;
+use beet_core_shared::AttributeGroup;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn;

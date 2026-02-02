@@ -10,7 +10,7 @@ pub fn get() -> impl IntoHtml {
 				<div class="container">
 				<h1>Beet</h1>
 				// <img style="width:10em" src="/assets/branding/logo.png"/>
-				<p><b>"A malleable application framework"</b></p>
+				<p><b>"A personal application framework"</b></p>
 				<Card style:cascade class="hero">
 				<span style="display: flex; align-items: center; justify-content: center;padding:0;">"🚧 Mind your step! 🚧"</span>
 				<p>"Beet is under construction, if this project is of interest please come and say hi in the"<a href="https://discord.gg/DcURUQCXtx">Beetmash Discord Server</a>.</p>

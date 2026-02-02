@@ -1,4 +1,4 @@
-use crate::shared_utils::pkg_ext;
+use beet_core_shared::pkg_ext;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;

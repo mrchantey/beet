@@ -1,24 +1,18 @@
 [package]
-name = "beet_core_macros"
+name = "beet_core_shared"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 readme.workspace = true
-description = "Macros for beet_core"
+description = "Shared utilities for beet_core and beet_core_macros"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-
-[lib]
-proc-macro = true
-
 [dependencies]
-beet_core_shared.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
-proc-macro2-diagnostics.workspace = true

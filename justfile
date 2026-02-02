@@ -181,9 +181,10 @@ snap:
     cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
 test-core *args:
+    cargo test -p beet_core_shared 				--all-features 													 	{{ args }} -- {{ test-threads }}
+    cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
-    cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
     cargo test -p beet_net	--features=server,ureq,tungstenite,native-tls,flow			{{ args }} -- {{ test-threads }}
     cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 

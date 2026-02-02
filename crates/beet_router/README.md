@@ -2,15 +2,15 @@
 
 IO agnostic routing utilities.
 
-This crate provides a flexible routing system that uses the ECS pattern for request handling. Routes are defined as control flow hierarchies of middleware, predicates,handlers, and middleware.
+This crate provides a flexible routing system that uses the ECS pattern for request handling. Routes are defined as control flow hierarchies of predicates, handlers, and middleware.
+
+The `Request` / `Response` pattern is generalized and not tied to `http`, making it suitable for other IO like `stdio`. See [this blog post](https://beetstack.dev/blog/post-8) for more about this agnostic philosophy.
 
 # Features
 
-- **ECS-based routing**: Routes are entities with components
 - **IO agnostic**: Suitable for http routes, cli commands or clanker tool calls
-- **Behavior tree control flow**: Uses `beet_flow` for request routing decisions
-- **Composable middleware**: Middleware as components that can be mixed freely
-- **Type-safe extractors**: Extract typed data from requests
+- **ECS-based routing**: Route trees as entity hierarchies
+- **Extensible control flow**: Modular control flow enables highly extensible routing decisions
 
 # Example
 
@@ -25,9 +25,9 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
-				// swap out the server to route cli subcommands!
-				// CliServer::default(),
-				HttpServer::new(5000),
+				// swap out the server to route http requests!
+				CliServer::default(),
+				// HttpServer::default(),
 				flow_exchange(|| {
 					(InfallibleSequence, children![
 						EndpointBuilder::get()

@@ -13,12 +13,10 @@
 //!
 //! This module requires the `tokens` feature flag.
 
-mod shared_utils;
+pub use beet_core_shared::*;
 mod tokenize_components;
 mod tokenize_self;
 mod unspan;
-
-pub use shared_utils::*;
 pub use tokenize_components::*;
 pub use tokenize_self::*;
 pub use unspan::*;

@@ -2,15 +2,16 @@
 
 Very bevy networking utilities.
 
-This crate provides cross-platform networking and communication primitives for bevy applications.
+This crate provides cross-platform IO agnostic networking and communication primitives for bevy applications.
 
-## Modules
+The `Request` / `Response` pattern is generalized and not tied to `http`, making it suitable for other IO like `stdio`. See [this blog post](https://beetstack.dev/blog/post-8) for more about this agnostic philosophy.
 
-- **client**: HTTP client for sending requests (ureq, reqwest and WASM backends)
-- **exchange**: Request/response exchange patterns for Bevy entities
-- **object_storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
-- **server**: HTTP server implementations
-- **sockets**: WebSocket client and server
+## Features
+
+- **IO agnostic servers**: server implementations for cli arguments or http  requests
+- **Cross-plaform clients**: HTTP clients for sending requests (ureq, reqwest and WASM backends)
+- **Object_storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
+- **Sockets**: WebSocket client and server
 
 ## Example
 
@@ -20,16 +21,18 @@ use beet_core::prelude::*;
 
 // Create a simple server with a handler
 App::new()
-    .add_plugins((MinimalPlugins, ServerPlugin))
-    .add_systems(Startup, |mut commands: Commands| {
-        commands.spawn((
-            HttpServer::default(),
-            handler_exchange(|_, _| {
-                Response::ok_body("hello world", "text/plain")
-            }),
-        ));
-    })
-    .run();
+  .add_plugins((MinimalPlugins, ServerPlugin))
+  .add_systems(Startup, |mut commands: Commands| {
+    commands.spawn((
+			// swap out the server to handle http requests!
+			CliServer::default(),
+      // HttpServer::default(),
+      handler_exchange(|_, _| {
+        Response::ok_body("hello world", "text/plain")
+      }),
+    ));
+  })
+  .run();
 ```
 
 ## Features

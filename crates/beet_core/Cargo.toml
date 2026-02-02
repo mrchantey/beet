@@ -51,6 +51,7 @@ fs = [
 ]
 tokens = [
 	"serde",
+	"dep:beet_core_shared",
 	"dep:syn",
 	"dep:quote",
 	"dep:proc-macro2",
@@ -62,6 +63,7 @@ tokens = [
 
 [dependencies]
 beet_core_macros.workspace = true
+beet_core_shared = { workspace = true, optional = true }
 bevy.workspace = true
 
 #💡 utils
