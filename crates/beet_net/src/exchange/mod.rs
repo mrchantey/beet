@@ -1,6 +1,6 @@
 //! Generalized request/response exchange patterns for Bevy entities.
 //!
-//! This module provides infrastructure for handling IO agnostic request/response
+//! This module provides infrastructure for handling transport agnostic request/response
 //! exchanges within the Bevy ECS. It enables entities to act as "servers" that
 //! receive requests and produce responses through the observer pattern.
 //!

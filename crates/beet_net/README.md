@@ -1,14 +1,12 @@
 # `beet_net`
 
-Very bevy networking utilities.
+Transport agnostic networking for bevy applications.
 
-This crate provides cross-platform IO agnostic networking and communication primitives for bevy applications.
-
-The `Request` / `Response` pattern is generalized and not tied to `http`, making it suitable for other IO like `stdio`. See [this blog post](https://beetstack.dev/blog/post-8) for more about this agnostic philosophy.
+The `Request` / `Response` pattern is generalized and not tied to any transport, with implementations in `http` and `stdio`. See [this blog post](https://beetstack.dev/blog/post-8) for more about the agnostic philosophy.
 
 ## Features
 
-- **IO agnostic servers**: server implementations for cli arguments or http  requests
+- **Transport agnostic servers**: server implementations for cli arguments or http requests
 - **Cross-plaform clients**: HTTP clients for sending requests (ureq, reqwest and WASM backends)
 - **Object_storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
 - **Sockets**: WebSocket client and server

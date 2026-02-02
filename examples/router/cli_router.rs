@@ -5,7 +5,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example cli_router --features server -- foo
+//! cargo run --example cli_router --features server_app -- foo
 //! ```
 use beet::prelude::*;
 

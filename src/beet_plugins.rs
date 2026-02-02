@@ -22,7 +22,7 @@ impl Plugin for BeetPlugins {
 		app.init_plugin::<BuildPlugin>();
 
 		// it causin too many problems
-		// #[cfg(feature = "server")]
+		// #[cfg(feature = "server_app")]
 		// app.init_plugin::<LoadSnippetsPlugin>();
 		app.init_plugin::<BeetRunner>();
 	}
@@ -48,17 +48,17 @@ impl Plugin for BeetRunner {
 		#[cfg(feature = "launch")]
 		app.set_runner(LaunchConfig::runner);
 
-		#[cfg(feature = "server")]
+		#[cfg(feature = "server_app")]
 		app.set_runner(ServerPlugin::maybe_tokio_runner);
 
 		app.add_systems(Startup, print_config);
 		#[cfg(not(any(
 			feature = "launch",
-			feature = "server",
+			feature = "server_app",
 			feature = "client"
 		)))]
 		panic!(
-			"No runner feature enabled. Please enable one of: launch, server, client."
+			"No runner feature enabled. Please enable one of: launch, server_app, client."
 		);
 	}
 }
@@ -71,10 +71,10 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	let binary = "Client";
 	#[cfg(feature = "launch")]
 	let binary = "Launch";
-	#[cfg(feature = "server")]
+	#[cfg(feature = "server_app")]
 	let binary = "Server";
 
-	#[cfg(any(feature = "launch", feature = "server", feature = "client"))]
+	#[cfg(any(feature = "launch", feature = "server_app", feature = "client"))]
 	info!(
 		"\n🌱 Running Beet\nbinary: {binary}\n{}build: {}",
 		*pkg_config,

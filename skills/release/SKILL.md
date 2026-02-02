@@ -23,4 +23,4 @@ For each example:
 - check the implementation is up to date.
 - ensure the example is well and consistenly documented, include the command to run the example, specifying features.
 - run the example to verify it works, ie:
-	- `timeout 1m cargo run --example server --features=server | tail 30` (then simultaneously run a `curl`, waiting for it to be live)
+	- `timeout 1m cargo run --example server --features=http_server | tail 30` (then simultaneously run a `curl`, waiting for it to be live)

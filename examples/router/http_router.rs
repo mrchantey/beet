@@ -4,7 +4,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example http_router --features server
+//! cargo run --example http_router --features server_app
 //! ```
 //!
 //! Test with:

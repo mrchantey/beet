@@ -4,7 +4,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example server_bench --features server
+//! cargo run --example server_bench --features server_app
 //! ```
 use beet::prelude::*;
 

@@ -10,7 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example router_bench --features server
+//! cargo run --example router_bench --features server_app
 //! ```
 //!
 //! Test with:

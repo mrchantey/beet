@@ -2,12 +2,12 @@
 	// 💡💡💡 Example Settings 💡💡💡
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"rust-analyzer.cargo.features": [
-		"beet/server",
+		"beet/server_app",
 		"beet/client",
 		"beet/launch",
 		"beet/lambda",
 		"beet/css",
-		"beet/aws"
+		"beet/aws",
 	],
 	"deno.enable": true,
 	"deno.disablePaths": ["target"],
@@ -16,13 +16,13 @@
 		"**/.git": true,
 		".gitattributes": true,
 		"LICENSE-APACHE.txt": true,
-		"LICENSE-MIT.txt": true
+		"LICENSE-MIT.txt": true,
 	},
 	"search.exclude": {
 		"**/target": true,
 		"**/assets/": true,
 		"**.svg": true,
 		".beet": true,
-		"Cargo.lock": true
-	}
+		"Cargo.lock": true,
+	},
 }

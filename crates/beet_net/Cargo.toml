@@ -2,7 +2,7 @@
 name = "beet_net"
 version.workspace = true
 edition.workspace = true
-description = "Very bevy networking utilities"
+description = "Transport agnostic networking for bevy applications."
 documentation.workspace = true
 readme = "README.md"
 homepage.workspace = true

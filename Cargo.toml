@@ -211,7 +211,7 @@ default = ["flow"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
-server = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
+server_app = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
 client = [
 	"rsx",
 	"design",
@@ -223,7 +223,7 @@ client = [
 	"beet_dom/client",
 	"beet_design/client",
 ]
-beet_net_server = ["net", "beet_net/server"]
+http_server = ["net", "beet_net/server"]
 
 #💡 fine-grained
 native-tls = [
@@ -312,7 +312,7 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 beet = { path = ".", features = ["flow"] }
-# beet = { path = "", features = ["launch", "server", "client", "rand"] }
+# beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 serde.workspace = true
@@ -344,12 +344,12 @@ required-features = ["clanker"]
 [[example]]
 name = "server"
 path = "examples/net/server.rs"
-required-features = ["beet_net_server"]
+required-features = ["http_server"]
 
 [[example]]
 name = "templating"
 path = "examples/net/templating.rs"
-required-features = ["beet_net_server"]
+required-features = ["http_server"]
 
 [[example]]
 name = "client"
@@ -359,7 +359,7 @@ required-features = ["net", "ureq", "native-tls"]
 [[example]]
 name = "server_bench"
 path = "examples/net/server_bench.rs"
-required-features = ["server"]
+required-features = ["server_app"]
 
 [[example]]
 name = "socket_server"
@@ -413,17 +413,17 @@ required-features = ["flow"]
 [[example]]
 name = "http_router"
 path = "examples/router/http_router.rs"
-required-features = ["server"]
+required-features = ["server_app"]
 
 [[example]]
 name = "cli_router"
 path = "examples/router/cli_router.rs"
-required-features = ["server"]
+required-features = ["server_app"]
 
 [[example]]
 name = "router_bench"
 path = "examples/router/router_bench.rs"
-required-features = ["server"]
+required-features = ["server_app"]
 
 
 # [[example]]

@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is a framework for building technologies that can people can share, access and make their own like other forms of folk culture like music and story. Beet uses the Entity Component System architecture of Bevy, a modular game engine, to provide a common agnostic paradigm for state and behavior across domains like web, games and robotics.
+Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a"<a href="https://bevy.org">"Bevy App"</a>", and all structure and behavior is written in Entity Component System architecture.
 
 > 🚧 Mind your step! 🚧
 >
@@ -38,8 +38,7 @@ General patterns and tools for application development.
 | Crate                                        | Status | Description                                    |
 | -------------------------------------------- | ------ | ---------------------------------------------- |
 | [`beet_core`](crates/beet_core/Cargo.toml)   | 🦢      | Core utilities and types for other beet crates |
-| [`beet_net`](crates/beet_net/Cargo.toml)     | 🐣      | Very bevy networking utilities.
-            |
+| [`beet_net`](crates/beet_net/Cargo.toml)     | 🐣      | Transport agnostic networking for bevy applications.|
 
 
 ## Control Flow
@@ -98,7 +97,7 @@ fn Counter(initial: i32) -> impl Bundle {
 | [`beet_parse`](crates/beet_parse/Cargo.toml)                   | 🐉      | Parsers for various text and token formats          |
 | [`beet_rsx`](crates/beet_rsx/Cargo.toml)                       | 🐉      | An Astro inspired templating system built with bevy |
 | [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🐉      | JSX-like parser combinator for Rust                 |
-| [`beet_router`](crates/beet_router/Cargo.toml)                 | 🐉      | IO agnostic routing utilities                     |
+| [`beet_router`](crates/beet_router/Cargo.toml)                 | 🐉      | Transport agnostic routing for bevy applications                     |
 | [`beet_build`](crates/beet_build/Cargo.toml)                   | 🐉      | Codegen and compilation tooling for beet            |
 | [`beet_design`](crates/beet_design/Cargo.toml)                 | 🐉      | Design system and components for beet rsx           |
 | [`beet-cli`](crates/beet-cli/Cargo.toml)                       | 🐉      | Tools for building and deploying beet apps          |

@@ -5,13 +5,16 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example server --features beet_net_server
+//! cargo run --example server --features http_server
+//! # or with CliServer
+//! cargo run --example server --features http_server -- --name=billy
 //! ```
 //!
 //! Test with:
 //! ```sh
 //! curl http://localhost:8337?name=billy
 //! ```
+//!
 use beet::prelude::*;
 
 fn main() {
@@ -23,6 +26,7 @@ fn main() {
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
+				// CliServer::default(),
 				HttpServer::default(),
 				Count::default(),
 				handler_exchange(handler),

@@ -91,7 +91,7 @@ run-hydration:
     just watch just build-hydration
 
 run-ssr:
-    just watch cargo run --example ssr --features=server
+    just watch cargo run --example ssr --features=server_app
 
 build-hydration:
     cargo run --example hydration --features=css

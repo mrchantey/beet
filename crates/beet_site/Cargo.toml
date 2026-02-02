@@ -17,7 +17,7 @@ keywords.workspace = true
 [features]
 default = ["launch", "server", "client"]
 launch = ["beet/launch"]
-server = ["server-client","beet/server", "beet_design/mockups", "beet_design/server"]
+server = ["server-client","beet/server_app", "beet_design/mockups", "beet_design/server"]
 server-local = ["server", "beet/native-tls"]
 server-lambda = ["server", "beet/aws", "beet/lambda"]
 client = ["server-client", "beet/client", "beet_design/mockups"]

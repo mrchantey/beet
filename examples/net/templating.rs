@@ -6,7 +6,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example server_templating --features beet_net_server
+//! cargo run --example server_templating --features http_server
 //! ```
 //!
 //! Test with:
