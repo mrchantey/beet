@@ -40,6 +40,7 @@ pub use route_file_method::*;
 
 pub use collect_client_action_group::CollectClientActions;
 pub use modify_route_file_tokens::ModifyRoutePath;
+pub use parse_route_tree::StaticRouteTree;
 
 // Crate-internal systems and helpers
 pub(crate) use collect_client_action::*;

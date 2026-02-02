@@ -269,6 +269,8 @@ bevy_default = [
 fs = ["beet_clanker?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
 net = ["dep:beet_net"]
 tungstenite = ["net", "beet_net?/tungstenite"]
+ureq = ["net", "beet_net?/ureq"]
+reqwest = ["net", "beet_net?/reqwest"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -338,14 +340,19 @@ required-features = ["clanker"]
 # 💡 Examples - net
 
 [[example]]
-name = "server_minimal"
-path = "examples/net/server_minimal.rs"
+name = "server"
+path = "examples/net/server.rs"
 required-features = ["beet_net_server"]
 
 [[example]]
-name = "server_templating"
-path = "examples/net/server_templating.rs"
+name = "templating"
+path = "examples/net/templating.rs"
 required-features = ["beet_net_server"]
+
+[[example]]
+name = "client"
+path = "examples/net/client.rs"
+required-features = ["net", "ureq", "native-tls"]
 
 [[example]]
 name = "server_bench"
@@ -402,12 +409,13 @@ required-features = ["flow"]
 # 💡 Examples - router
 
 [[example]]
-name = "http_server"
-path = "examples/router/http_server.rs"
+name = "http_router"
+path = "examples/router/http_router.rs"
 required-features = ["server"]
+
 [[example]]
-name = "cli_server"
-path = "examples/router/cli_server.rs"
+name = "cli_router"
+path = "examples/router/cli_router.rs"
 required-features = ["server"]
 
 [[example]]

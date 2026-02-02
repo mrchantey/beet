@@ -2,7 +2,7 @@
 
 Very bevy networking utilities.
 
-This crate provides cross-platform networking and communincation primitives for bevy applications.
+This crate provides cross-platform networking and communication primitives for bevy applications.
 
 ## Modules
 
