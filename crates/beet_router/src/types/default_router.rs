@@ -131,16 +131,6 @@ pub fn default_router(
 	})
 }
 
-/// Creates a "not found" fallback endpoint that returns a 404 status.
-pub fn not_found() -> impl Bundle {
-	(Name::new("Not Found"), Sequence, children![
-		common_predicates::no_response(),
-		EndpointBuilder::new()
-			.with_trailing_path()
-			.with_action(StatusCode::NotFound)
-	])
-}
-
 /// Creates an endpoint that handles analytics event submissions at `/analytics`.
 pub fn analytics_handler() -> impl Bundle {
 	ServerAction::new::<_, _, Result<(), BevyError>, _, _>(

@@ -68,7 +68,7 @@ fn home() -> impl Bundle {
 		)
 	})
 }
-
+/// # `/treasure` endpoint
 fn treasure() -> impl Bundle {
 	EndpointBuilder::get()
 		.with_path("treasure")
@@ -93,7 +93,7 @@ fn treasure() -> impl Bundle {
 /// It will only run if, after all endpoints have ran there is still no response.
 /// If there is a response the predicate will fail, short-circuting the sequence.
 ///
-/// [`EndpointBuilder`] exists to create control flow structures like this.
+/// Fun fact: [`EndpointBuilder`] exists to create control flow structures like this.
 fn not_found() -> impl Bundle {
 	(Name::new("Not Found"), Sequence, children![
 		// only passes if no response is present,
@@ -117,8 +117,9 @@ fn not_found() -> impl Bundle {
 	])
 }
 
-// renders a page with navigation and content.
-// This is loaded on every request, so you can change the html without reload!
+/// # Template Rendering
+/// Very basic templating system that renders a page with navigation and content.
+/// This is loaded on every request, so you can change the html without reload!
 fn render(main_content: &str) -> String {
 	use std::fs::read_to_string;
 
@@ -128,6 +129,7 @@ fn render(main_content: &str) -> String {
 		.replace("{{ nav }}", &nav())
 		.replace("{{ main }}", &main_content)
 }
+
 
 fn head() -> String {
 	use std::fs::read_to_string;
