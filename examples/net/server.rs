@@ -1,8 +1,8 @@
 //! # Basic Server
 //!
-//! This example demonstrates creating a baisc server in Beet
+//! This example demonstrates creating a basic server in Beet
 //! using the [`handler_exchange`], which is the least opinionated exchange pattern
-//! but can only process a single request at a time.
+//! and can only process a single request at a time.
 //! For concurrent request handling see [`spawn_exchange`].
 //!
 //!
@@ -46,25 +46,25 @@ fn main() {
 struct Count(u32);
 
 /// Handler function that processes all incoming requests.
-///
-/// ## Parameters
-///
-/// - `entity`: Mutable access to the server entity, allowing us to read/write components
-/// - `request`: The incoming request with method, path, headers, and body
-///
-/// ## Returns
-///
-/// A [`Response`] that will be sent back to the client.
-fn handler(mut entity: EntityWorldMut, request: Request) -> Response {
+fn handler(mut server: EntityWorldMut, request: Request) -> Response {
 	// only accept `/` routes
 	if !request.path().is_empty() {
-		println!("Not Found: {}", request.path_string());
-		return Response::not_found();
+		let message = format!("Not Found: {}", request.path_string());
+		println!(
+			"{}: {} - Not Found",
+			request.method(),
+			request.path_string()
+		);
+		return Response::from_status_body(
+			StatusCode::NotFound,
+			message,
+			"text/plain",
+		);
 	}
 
 	let name = request.get_param("name").unwrap_or("world");
 
-	let mut count = entity.get_mut::<Count>().unwrap();
+	let mut count = server.get_mut::<Count>().unwrap();
 	count.0 += 1;
 
 	let message = format!(
