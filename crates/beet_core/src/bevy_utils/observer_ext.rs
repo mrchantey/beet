@@ -1,5 +1,13 @@
+//! Observer extension functions for testing.
+//!
+//! This module provides helper functions for observing and collecting
+//! triggered events during tests.
+
 use crate::prelude::*;
 
+/// Observes all triggers of type `E` and collects them into a [`Store`].
+///
+/// This is useful for testing that events are triggered correctly.
 pub fn observe_triggers<E: Event + Clone + Send + 'static>(
 	world: &mut World,
 ) -> Store<Vec<E>> {
@@ -10,6 +18,9 @@ pub fn observe_triggers<E: Event + Clone + Send + 'static>(
 	store
 }
 
+/// Observes all entity triggers of type `E` and collects target entity names into a [`Store`].
+///
+/// This is useful for testing that events target the correct entities.
 pub fn observe_trigger_names<E: EntityEvent + Send + 'static>(
 	world: &mut World,
 ) -> Store<Vec<String>> {

@@ -1,7 +1,13 @@
+//! Result assertion matchers.
+//!
+//! This module provides assertion methods for [`Result`] types, including
+//! checks for `Ok` and `Err` variants.
+
 use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
+/// Extension trait adding assertion methods to [`Result<T, E>`].
 #[extend::ext(name=MatcherResult)]
 pub impl<T: Debug, E: Debug> Result<T, E> {
 	/// Performs an assertion ensuring this value is an `Ok(_)`.

@@ -1,6 +1,13 @@
+//! String assertion matchers.
+//!
+//! This module provides assertion methods for string types, including
+//! equality checks, substring containment, and prefix/suffix matching.
+
 use std::fmt::Display;
 
 use crate::prelude::*;
+
+/// Extension trait adding string assertion methods.
 #[extend::ext(name=MatcherString)]
 pub impl<T, U> T
 where

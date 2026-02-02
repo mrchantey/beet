@@ -1,3 +1,21 @@
+//! HTTP body types for request and response handling.
+//!
+//! This module provides the [`Body`] type, which represents the body of an
+//! HTTP request or response. It supports both in-memory bytes and streaming
+//! content.
+//!
+//! # Example
+//!
+//! ```
+//! # use beet_core::prelude::*;
+//! // Create from bytes
+//! let body: Body = "Hello, world!".into();
+//!
+//! // Create from a stream
+//! let stream = futures::stream::once(async { Ok(bytes::Bytes::from("data")) });
+//! let body = Body::stream(stream);
+//! ```
+
 use crate::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
@@ -8,19 +26,25 @@ use std::pin::Pin;
 
 #[cfg(target_arch = "wasm32")]
 type DynBytesStream = dyn Stream<Item = Result<Bytes>>;
-/// crates like Axum require Stream to be Send
+/// Crates like Axum require Stream to be Send.
+// TODO we dont use axum anymore, can we make stream non-send?
 #[cfg(not(target_arch = "wasm32"))]
 type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send + Sync;
 
 
-
+/// The body of an HTTP request or response.
+///
+/// Bodies can be either in-memory [`Bytes`] or a streaming source.
+/// The type implements [`Stream`] for async iteration.
 pub enum Body {
+	/// In-memory bytes content.
 	Bytes(Bytes),
-	// SendWrapper for usage in bevy components
+	/// A streaming body wrapped in [`SendWrapper`] for use in Bevy components.
 	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
 }
 
 impl Body {
+	/// Creates a streaming body from the given stream.
 	pub fn stream(
 		stream: impl 'static + Stream<Item = Result<Bytes>> + Send + Sync,
 	) -> Self {
@@ -82,9 +106,14 @@ impl Into<Body> for Vec<u8> {
 
 
 impl Body {
+	/// Maximum buffer size for parsing streaming bodies.
+	///
 	/// Any body with a content length greater than this will be parsed as a stream.
 	pub const MAX_BUFFER_SIZE: usize = 1 * 1024 * 1024; // 1 MB
 
+	/// Consumes the body and returns the full content as bytes.
+	///
+	/// For streaming bodies, this collects all chunks into a single buffer.
 	pub async fn into_bytes(mut self) -> Result<Bytes> {
 		match self {
 			Body::Bytes(bytes) => Ok(bytes),
@@ -97,11 +126,14 @@ impl Body {
 			}
 		}
 	}
-	/// Stringify the raw bytes into utf8 format
+
+	/// Consumes the body and returns the content as a UTF-8 string.
 	pub async fn into_string(self) -> Result<String> {
 		let bytes = self.into_bytes().await?;
 		String::from_utf8(bytes.to_vec())?.xok()
 	}
+
+	/// Consumes the body and deserializes the content as JSON.
 	#[cfg(feature = "serde")]
 	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		let bytes = self.into_bytes().await?;
@@ -109,6 +141,9 @@ impl Body {
 			.map_err(|e| bevyhow!("Failed to deserialize body\n {}", e))
 	}
 
+	/// Attempts to extract bytes without consuming a stream.
+	///
+	/// Returns `None` if this is a streaming body.
 	// temp antipattern while migrating beet_router
 	pub fn try_into_bytes(self) -> Option<Bytes> {
 		match self {
@@ -117,8 +152,10 @@ impl Body {
 		}
 	}
 
-
-
+	/// Returns the next chunk of data from the body.
+	///
+	/// For byte bodies, returns the entire content on the first call if not empty, then `None`.
+	/// For streaming bodies, returns chunks as they become available.
 	pub async fn next(&mut self) -> Result<Option<Bytes>> {
 		match self {
 			Body::Bytes(bytes) if !bytes.is_empty() => {
@@ -132,6 +169,10 @@ impl Body {
 		}
 	}
 
+	/// Compares two bodies for byte equality.
+	///
+	/// Only returns `true` if both bodies are byte-based and contain the same data.
+	/// Streaming bodies are never considered equal.
 	pub fn bytes_eq(&self, other: &Self) -> bool {
 		match (self, other) {
 			(Body::Bytes(a), Body::Bytes(b)) => a == b,

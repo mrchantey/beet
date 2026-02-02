@@ -10,9 +10,9 @@ created="2026-02-01"
 
 My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually dont go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my faviorite songs as a ten-year-old.
 
-> "Chill out, what ya yellin' for? 
+> *Chill out, what ya yellin' for?*
 >
-> Lay back, it's all been done before"
+> *Lay back, it's all been done before*
 >
 > — Avril Lavigne, Complicated
 

@@ -13,12 +13,14 @@ pub struct Unspan<T>(T);
 
 
 impl<T: ToTokens + Parse> Unspan<T> {
+	/// Creates a new [`Unspan`] by parsing the token stream representation.
 	pub fn new(value: &T) -> Self {
 		let value = value.to_token_stream().to_string();
 		let value =
 			syn::parse_str(&value).expect("Failed to parse token stream");
 		Self(value)
 	}
+	/// Parses an [`Unspan`] from a string.
 	pub fn parse_str(value: &str) -> syn::Result<Self> {
 		let value = syn::parse_str(value)?;
 		Ok(Self(value))

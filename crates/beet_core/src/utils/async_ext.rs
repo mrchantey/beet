@@ -1,3 +1,5 @@
+//! Async utilities and future helpers.
+
 use bevy::tasks::IoTaskPool;
 use bevy::tasks::Task;
 pub use futures::future::try_join_all;
@@ -7,9 +9,11 @@ use std::time::Duration;
 
 use crate::prelude::*;
 
+/// Blocks the current thread on a future until it completes.
 pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }
+/// Yields execution back to the async runtime.
 pub fn yield_now() -> YieldNow { futures_lite::future::yield_now() }
 
 /// A 'static + Send, making it suitable for use-cases like tokio::spawn
@@ -45,6 +49,7 @@ where
 	IoTaskPool::get().spawn(fut)
 }
 
+/// Error returned when an async operation times out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeoutError;
 

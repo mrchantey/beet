@@ -23,6 +23,7 @@ pub struct CargoBuildCmd {
 	pub doc: bool,
 	/// Build for the target triple
 	pub target: Option<String>,
+	/// Format for compiler messages: human, short, json, etc.
 	pub message_format: Option<String>,
 	/// Use verbose output (-vv very verbose/build.rs output)
 	pub verbose: u8,
@@ -107,6 +108,7 @@ impl Default for CargoBuildCmd {
 }
 
 impl CargoBuildCmd {
+	/// Creates a new cargo command with the specified subcommand.
 	pub fn new(cmd: impl Into<String>) -> Self {
 		Self {
 			cmd: cmd.into(),
@@ -114,39 +116,49 @@ impl CargoBuildCmd {
 		}
 	}
 
+	/// Sets the cargo subcommand (build, run, test, etc.).
 	pub fn cmd(mut self, cmd: impl Into<String>) -> Self {
 		self.cmd = cmd.into();
 		self
 	}
 
+	/// Enables release mode with optimizations.
 	pub fn release(mut self) -> Self {
 		self.release = true;
 		self
 	}
 
+	/// Sets the package to build.
 	pub fn package(mut self, package: impl Into<String>) -> Self {
 		self.package = Some(package.into());
 		self
 	}
 
+	/// Disables the default feature set.
 	pub fn no_default_features(mut self) -> Self {
 		self.no_default_features = true;
 		self
 	}
+
+	/// Sets the target triple for cross-compilation.
 	pub fn target(mut self, target: impl Into<String>) -> Self {
 		self.target = Some(target.into());
 		self
 	}
+
+	/// Adds an argument to pass after `--`.
 	pub fn trailing_arg(mut self, arg: impl Into<String>) -> Self {
 		self.trailing_args.push(arg.into());
 		self
 	}
 
+	/// Adds a feature to activate.
 	pub fn feature(mut self, feature: impl Into<String>) -> Self {
 		self.push_feature(feature);
 		self
 	}
 
+	/// Adds a feature to activate, returning `&mut Self`.
 	pub fn push_feature(&mut self, feature: impl Into<String>) -> &mut Self {
 		let feature = feature.into();
 		if let Some(features) = &mut self.features {

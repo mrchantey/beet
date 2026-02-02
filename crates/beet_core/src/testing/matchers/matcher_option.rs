@@ -1,5 +1,10 @@
+//! Option assertion matchers.
+//!
+//! This module provides assertion methods for [`Option`] values.
+
 use crate::prelude::*;
 
+/// Extension trait adding assertion methods to [`Option<T>`].
 #[extend::ext(name=MatcherOption)]
 pub impl<T> Option<T> {
 	/// Performs an assertion ensuring this value is a `Some(_)`.

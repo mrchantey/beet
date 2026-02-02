@@ -1,9 +1,12 @@
+//! Extension methods for Bevy's [`AppExit`] and cross-platform exit handling.
+
 use crate::prelude::*;
 use bevy::app::AppExit;
 use bevy::ecs::schedule::common_conditions;
 
-/// Exits the process upon an [`AppExit`] message,
-/// using [`process_ext::exit`] for cross-platform compatibility
+/// Plugin that exits the process upon an [`AppExit`] message.
+///
+/// Uses [`process_ext::exit`] for cross-platform compatibility.
 #[derive(Default)]
 pub struct AppExitPlugin;
 
@@ -22,8 +25,10 @@ fn cross_exit(mut app_ext: MessageReader<AppExit>) {
 	}
 }
 
+/// Extension trait adding utility methods to [`AppExit`].
 #[extend::ext(name=AppExitExt)]
 pub impl AppExit {
+	/// Converts this [`AppExit`] into a [`Result`].
 	fn into_result(self) -> Result {
 		match self {
 			AppExit::Success => Ok(()),
@@ -33,6 +38,7 @@ pub impl AppExit {
 		}
 	}
 
+	/// Returns the exit code for this [`AppExit`].
 	fn exit_code(&self) -> i32 {
 		match self {
 			AppExit::Success => 0,

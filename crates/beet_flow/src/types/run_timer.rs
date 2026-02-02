@@ -73,8 +73,8 @@ mod test {
 	#[test]
 	pub fn works() {
 		let mut app = App::new();
-		app.add_plugins(ControlFlowPlugin::default());
-		app.insert_time();
+		app.add_plugins(ControlFlowPlugin::default())
+			.init_resource::<Time>();
 
 		let entity = app.world_mut().spawn(Running).id();
 

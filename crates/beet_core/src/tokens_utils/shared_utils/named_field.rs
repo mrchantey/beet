@@ -19,10 +19,12 @@ use syn::Type;
 use syn::parse_quote;
 
 /// A wrapper around a struct [`syn::Field`] or function input [`PatType`]
-/// that provides additional functionality
+/// that provides additional functionality.
 #[derive(Debug)]
 pub struct NamedField<'a> {
+	/// The mutability modifier, if present (e.g., `mut` in `mut foo: Bar`).
 	pub mutability: Option<&'a syn::token::Mut>,
+	/// The attributes attached to this field.
 	pub attrs: &'a Vec<Attribute>,
 	/// The `Bar` in `foo: Bar`
 	pub ty: &'a Type,
@@ -53,6 +55,7 @@ impl<'a> NamedField<'a> {
 			.collect()
 	}
 
+	/// Parses all typed function arguments from an [`ItemFn`].
 	pub fn parse_item_fn(input: &'a ItemFn) -> Result<Vec<NamedField<'a>>> {
 		input
 			.sig
@@ -68,6 +71,7 @@ impl<'a> NamedField<'a> {
 			.map(Self::parse_pat_ty)
 			.collect::<Result<Vec<_>>>()
 	}
+	/// Parses all named fields from a [`DeriveInput`] struct.
 	pub fn parse_derive_input(
 		input: &'a DeriveInput,
 	) -> Result<Vec<NamedField<'a>>> {
@@ -94,6 +98,7 @@ impl<'a> NamedField<'a> {
 		.collect::<Result<Vec<_>>>()
 	}
 
+	/// Creates a new [`NamedField`] from its components.
 	pub fn new(
 		attrs: &'a Vec<Attribute>,
 		ident: &'a Ident,
@@ -114,6 +119,7 @@ impl<'a> NamedField<'a> {
 		})
 	}
 
+	/// Parses a [`NamedField`] from a function argument pattern type.
 	pub fn parse_pat_ty(inner: &'a PatType) -> Result<Self> {
 		let Pat::Ident(PatIdent {
 			ident, mutability, ..
@@ -127,6 +133,7 @@ impl<'a> NamedField<'a> {
 		// Note: mutability is available here if needed for future use
 		Self::new(&inner.attrs, ident, &inner.ty, mutability.as_ref())
 	}
+	/// Parses a [`NamedField`] from a struct field.
 	pub fn parse_field(inner: &'a Field) -> Result<Self> {
 		let ident = inner.ident.as_ref().ok_or_else(|| {
 			Error::new_spanned(inner, "Only named fields are supported")

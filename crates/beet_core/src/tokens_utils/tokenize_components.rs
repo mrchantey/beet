@@ -1,9 +1,13 @@
+//! Tokenization utilities for ECS components.
+
 use crate::prelude::*;
 use beet_core_macros::ToTokens;
 use proc_macro2::TokenStream;
 use variadics_please::all_tuples;
 
+/// Trait for tokenizing components from an entity.
 pub trait TokenizeComponents {
+	/// Tokenizes the component if present on the entity, appending to the items vector.
 	fn tokenize_if_present(
 		world: &World,
 		items: &mut Vec<TokenStream>,
@@ -56,10 +60,12 @@ macro_rules! impl_tokenize_components_tuple {
 
 all_tuples!(impl_tokenize_components_tuple, 1, 15, T, t);
 
+/// Stores a proc-macro span associated with a component type.
 #[derive(Debug, Clone, Component, ToTokens)]
 pub struct SpanOf<C> {
+	/// The wrapped span value.
 	pub value: send_wrapper::SendWrapper<proc_macro2::Span>,
-	pub phantom: std::marker::PhantomData<C>,
+	_phantom: std::marker::PhantomData<C>,
 }
 
 
@@ -69,12 +75,14 @@ impl<C> std::ops::Deref for SpanOf<C> {
 }
 
 impl<C> SpanOf<C> {
+	/// Creates a new [`SpanOf`] wrapping the given span.
 	pub fn new(value: proc_macro2::Span) -> Self {
 		Self {
 			value: send_wrapper::SendWrapper::new(value),
-			phantom: std::marker::PhantomData,
+			_phantom: std::marker::PhantomData,
 		}
 	}
+	/// Consumes the wrapper and returns the inner span.
 	pub fn take(self) -> proc_macro2::Span { self.value.take() }
 }
 

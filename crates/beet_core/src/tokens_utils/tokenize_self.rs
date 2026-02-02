@@ -96,6 +96,7 @@ where
 		tokens.extend(quote! { vec![#(#items),*] });
 	}
 }
+/// Marker type for [`TokenizeSelf`] implementations on reference vectors.
 pub struct TokenizeSelfRefMarker;
 
 impl<T> TokenizeSelf<TokenizeSelfRefMarker> for Vec<&T>

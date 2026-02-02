@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 
+/// Configuration parameters for a test suite.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Default)]
 pub struct SuiteParams {
@@ -39,6 +40,7 @@ impl SuiteOutcome {
 		self.num_pass + self.num_skip + self.num_fail
 	}
 
+	/// Creates a new outcome by tallying pass/skip/fail counts from the given tests.
 	pub fn new(tests: &[(&Test, &TestOutcome)]) -> Self {
 		let mut num_pass = 0;
 		let mut num_skip = 0;

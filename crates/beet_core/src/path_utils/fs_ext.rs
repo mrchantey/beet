@@ -57,6 +57,7 @@ pub fn copy_recursive(
 }
 
 
+/// Checks if a path exists on the filesystem.
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();
 	#[cfg(target_arch = "wasm32")]
@@ -68,6 +69,7 @@ pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	}
 }
 
+/// Async version of [`exists`].
 pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
@@ -85,6 +87,7 @@ pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 }
 
 
+/// Creates a directory and all parent directories if they don't exist.
 pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 	let path = path.as_ref();
 	#[cfg(target_arch = "wasm32")]
@@ -93,6 +96,7 @@ pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 	return fs::create_dir_all(path).map_err(|err| FsError::io(path, err));
 }
 
+/// Async version of [`create_dir_all`].
 pub async fn create_dir_all_async(path: impl AsRef<Path>) -> FsResult<()> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
@@ -124,6 +128,7 @@ pub fn remove(path: impl AsRef<Path>) -> FsResult {
 	}
 }
 
+/// Async version of [`remove`].
 pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
@@ -160,6 +165,7 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 /// - Insufficient permissions to access the current directory
 pub fn workspace_root() -> PathBuf { crate::prelude::workspace_root() }
 
+/// Reads a file as bytes.
 pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	#[cfg(target_arch = "wasm32")]
 	return js_runtime::read_file(&path.as_ref().to_string_lossy())
@@ -167,6 +173,7 @@ pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	#[cfg(not(target_arch = "wasm32"))]
 	return std::fs::read(&path).map_err(|e| FsError::io(path, e));
 }
+/// Async version of [`read`].
 pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
@@ -180,11 +187,13 @@ pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
 	}
 }
 
+/// Reads a file as a UTF-8 string.
 pub fn read_to_string(path: impl AsRef<Path>) -> FsResult<String> {
 	fs_ext::read(path.as_ref()).and_then(|bytes| {
 		String::from_utf8(bytes).map_err(|e| FsError::other(path.as_ref(), e))
 	})
 }
+/// Async version of [`read_to_string`].
 pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
 	{
@@ -201,12 +210,14 @@ pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 
 
 
+/// Computes a hash of a file's contents.
 pub fn hash_file(path: impl AsRef<Path>) -> FsResult<u64> {
 	let bytes = fs_ext::read(path)?;
 	let hash = fs_ext::hash_bytes(&bytes);
 	Ok(hash)
 }
 
+/// Computes a hash of a byte slice.
 pub fn hash_bytes(bytes: &[u8]) -> u64 {
 	let mut hasher = std::hash::DefaultHasher::new();
 	use std::hash::Hash;
@@ -214,6 +225,7 @@ pub fn hash_bytes(bytes: &[u8]) -> u64 {
 	bytes.hash(&mut hasher);
 	hasher.finish()
 }
+/// Computes a hash of a string.
 pub fn hash_string(str: &str) -> u64 {
 	let bytes = str.as_bytes();
 	fs_ext::hash_bytes(bytes)

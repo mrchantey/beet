@@ -74,7 +74,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(ControlFlowPlugin::default()).insert_time();
+		app.add_plugins(ControlFlowPlugin::default()).init_resource::<Time>();
 
 		let on_result =
 			observer_ext::observe_triggers::<Outcome>(app.world_mut());

@@ -33,7 +33,7 @@ where
 		(
 			Name::new(format!("Run Schedule - {:?}", T::default())),
 			OnSpawn::observe(|ev: On<GetOutcome>, mut commands: Commands| {
-				commands.run_system_cached(T::run());
+				commands.run_system_cached(T::as_system());
 				commands.entity(ev.target()).trigger_target(Outcome::Pass);
 			}),
 		)

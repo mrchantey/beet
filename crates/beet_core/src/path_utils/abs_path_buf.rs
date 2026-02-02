@@ -84,10 +84,12 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
+	/// Returns the parent directory, or [`None`] if at the root.
 	pub fn parent(&self) -> Option<Self> {
 		self.0.parent().map(Self::new_unchecked)
 	}
 
+	/// Replaces the file extension with the given value.
 	pub fn with_extension(mut self, ext: &str) -> Self {
 		self.0.set_extension(ext);
 		self
@@ -136,6 +138,7 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
+	/// Converts this absolute path to a workspace-relative path.
 	pub fn into_ws_path(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
 		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())?;

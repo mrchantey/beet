@@ -157,6 +157,7 @@ where
 		self.inner.entry(key).or_default().push(value);
 	}
 
+	/// Inserts multiple values for a key, appending to any existing values.
 	pub fn insert_vec(&mut self, key: K, values: Vec<V>) {
 		self.inner.entry(key).or_default().extend(values);
 	}

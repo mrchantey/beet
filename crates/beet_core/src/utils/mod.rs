@@ -17,12 +17,14 @@
 //! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 //! - [`cross_log!`](crate::cross_log) - Cross-platform logging (works in wasm)
 
+/// Async utilities and future helpers.
 pub mod async_ext;
 mod backoff;
 mod bevyhow;
 mod cli_args;
 mod clone_func;
 mod cross_log;
+/// Display formatting utilities.
 pub mod display_ext;
 mod file_span;
 mod glob_filter;
@@ -30,10 +32,12 @@ mod line_col;
 #[cfg(feature = "ansi_paint")]
 pub mod paint_ext;
 mod panic_context;
+/// Process and command execution utilities.
 pub mod process_ext;
 #[cfg(feature = "rand")]
 mod random_source;
 pub mod terminal_ext;
+/// Time and duration utilities.
 pub mod time_ext;
 mod tree;
 #[cfg(feature = "serde")]

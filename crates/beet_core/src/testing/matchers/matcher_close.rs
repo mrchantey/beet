@@ -1,7 +1,13 @@
+//! Approximate equality assertion matchers.
+//!
+//! This module provides assertion methods for comparing floating-point
+//! values within a tolerance using the [`CloseTo`] trait.
+
 use crate::prelude::*;
 use std::fmt::Display;
 
 
+/// Extension trait adding approximate equality assertion methods.
 #[extend::ext(name=MatcherClose)]
 pub impl<T, U> T
 where
@@ -78,3 +84,4 @@ mod test {
 		0.0_f64.xpect_close_within(0.5, 1.);
 	}
 }
+

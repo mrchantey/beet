@@ -1,29 +1,49 @@
+//! HTTP method types for request handling.
+//!
+//! This module provides [`HttpMethod`], a high-level enum for HTTP methods,
+//! and [`MethodFilter`] for specifying which methods a route should respond to.
+//!
+//! # Why Not `http::Method`?
+//!
+//! The standard [`http::Method`] type is a low-level representation that is
+//! case-sensitive and doesn't implement useful traits like `Copy` or `serde`.
+//! This module provides a safer, more ergonomic alternative.
+
 use crate::prelude::*;
 use std::fmt;
 
+/// Caching strategy for route responses.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum CacheStrategy {
 	/// An endpoint that may produce different responses for the same path and method,
-	/// and should not be cached
+	/// and should not be cached.
 	#[default]
 	Dynamic,
 	/// An endpoint that always returns the same response for a given
-	/// path and method, making it suitable for ssg and caching.
+	/// path and method, making it suitable for SSG and caching.
 	Static,
 }
 
 
-/// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
-/// and quite error prone in this high level context. For example
-/// `http::method::from_str("get") != http::Method::GET` due to
-/// case sensitivity.
-/// Instead we use an enum which is safer and allows implementing `Copy`, `serde`, etc.
+/// A high-level representation of HTTP methods.
 ///
-/// Additionally the naming convention follows Rusty conventions rather
-/// than HTTP conventions, ie `Get` instead of `GET`.
+/// This enum provides a safer alternative to [`http::Method`] with:
+/// - Case-insensitive parsing
+/// - `Copy` semantics
+/// - Serde support
+/// - Rusty naming conventions (`Get` instead of `GET`)
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let method: HttpMethod = "POST".parse().unwrap();
+/// assert_eq!(method, HttpMethod::Post);
+/// assert!(method.has_body());
+/// ```
 #[derive(
 	Debug,
 	Default,
@@ -41,15 +61,24 @@ pub enum CacheStrategy {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {
+	/// GET request for retrieving resources.
 	#[default]
 	Get,
+	/// POST request for creating resources.
 	Post,
+	/// PUT request for replacing resources.
 	Put,
+	/// PATCH request for partial updates.
 	Patch,
+	/// DELETE request for removing resources.
 	Delete,
+	/// OPTIONS request for CORS preflight.
 	Options,
+	/// HEAD request for metadata only.
 	Head,
+	/// TRACE request for debugging.
 	Trace,
+	/// CONNECT request for tunneling.
 	Connect,
 }
 
@@ -59,6 +88,8 @@ impl HttpMethod {
 		"get", "post", "put", "delete", "head", "options", "connect", "trace",
 		"patch",
 	];
+
+	/// All HTTP methods.
 	pub const ALL: [HttpMethod; 9] = [
 		HttpMethod::Get,
 		HttpMethod::Post,
@@ -71,14 +102,19 @@ impl HttpMethod {
 		HttpMethod::Patch,
 	];
 
-	/// Whether this method is one of the HTTP methods that typically
-	/// has a request body, such as `POST`, `PUT`, or `PATCH`.
+	/// Returns whether this method typically has a request body.
+	///
+	/// Returns `true` for `POST`, `PUT`, and `PATCH`.
 	pub fn has_body(&self) -> bool {
 		matches!(self, HttpMethod::Post | HttpMethod::Put | HttpMethod::Patch)
 	}
+
+	/// Returns the method name in lowercase.
 	pub fn to_string_lowercase(&self) -> String {
 		self.to_string().to_ascii_lowercase()
 	}
+
+	/// Converts to the [`http::Method`] type.
 	#[cfg(feature = "http")]
 	pub fn into_http(self) -> http::Method { self.into() }
 }
@@ -161,7 +197,19 @@ impl std::str::FromStr for HttpMethod {
 }
 
 
-/// Specify which HTTP methods a route should respond to
+/// Specifies which HTTP methods a route should respond to.
+///
+/// # Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// // Single method
+/// let filter: MethodFilter = HttpMethod::Get.into();
+///
+/// // Multiple methods
+/// let methods = vec![HttpMethod::Get, HttpMethod::Post];
+/// let filter = MethodFilter::new(methods);
+/// ```
 #[derive(
 	Debug, Clone, PartialEq, Eq, Hash, Component, Reflect, Deref, DerefMut,
 )]
@@ -184,8 +232,10 @@ impl Into<MethodFilter> for Vec<HttpMethod> {
 }
 
 impl MethodFilter {
-	pub fn new(methods: Vec<HttpMethod>) -> Self { methods.into() }
+	/// Creates a new [`MethodFilter`] with the given methods.
+	pub fn new(methods: Vec<HttpMethod>) -> Self { Self { methods } }
 
+	/// Merges another filter into this one, deduplicating methods.
 	pub fn merge(mut self, other: MethodFilter) -> MethodFilter {
 		self.extend(other.methods);
 		self.sort();

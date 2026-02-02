@@ -1,10 +1,21 @@
+//! Async app runner for Bevy.
+//!
+//! This module provides the [`AsyncRunner`] which allows running a Bevy [`App`]
+//! asynchronously to completion, useful for environments like wasm where
+//! `App::run` returns immediately.
+
 use crate::prelude::*;
 use async_channel::Receiver;
 use async_channel::TryRecvError;
 
+/// Runner for executing Bevy apps asynchronously.
+///
+/// This is particularly useful in wasm environments where `App::run`
+/// returns immediately without actually running the app.
 pub struct AsyncRunner;
 
-/// Tick global task pools to progress local tasks.
+/// Ticks global task pools to progress local tasks.
+///
 /// This is required because `spawn_local` tasks can only be polled by the
 /// thread that owns the LocalExecutor.
 #[inline]
@@ -14,6 +25,7 @@ fn tick_task_pools() {
 }
 
 impl AsyncRunner {
+	/// Runs an app asynchronously until an [`AppExit`] is triggered.
 	pub(crate) async fn run(mut app: App) -> AppExit {
 		app.init_plugin::<AsyncPlugin>();
 		app.init();
@@ -34,9 +46,10 @@ impl AsyncRunner {
 		}
 	}
 
-	/// Run an loop at regular updates until all tasks have completed or
-	/// an AppExit is triggered. Note that some tasks like http/socket listeners
-	/// will never complete in which case this will never return.
+	/// Runs an update loop until all tasks have completed or an AppExit is triggered.
+	///
+	/// Note that some tasks like http/socket listeners will never complete,
+	/// in which case this will never return.
 	async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
 		// yield required for wasm to spawn tasks
 		async_ext::yield_now().await;
@@ -58,7 +71,9 @@ impl AsyncRunner {
 			time_ext::sleep_millis(1).await;
 		}
 	}
-	/// Update the world in 1ms increments until recv has a value.
+
+	/// Updates the world in 1ms increments until recv has a value.
+	///
 	/// Ticks task pools after yielding to ensure spawned local tasks make progress.
 	/// Runs one final update after receiving the result to process any pending commands.
 	pub async fn poll_and_update<T>(

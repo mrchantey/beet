@@ -69,8 +69,8 @@ mod test {
 	pub fn works() {
 		let mut app = App::new();
 
-		app.add_systems(Update, integrate_force);
-		app.insert_time();
+		app.add_systems(Update, integrate_force)
+			.init_resource::<Time>();
 
 		let velocity_entity = app
 			.world_mut()

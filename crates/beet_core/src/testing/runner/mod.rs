@@ -1,3 +1,8 @@
+//! Test runner infrastructure for beet.
+//!
+//! This module provides a custom test runner that integrates with Bevy's
+//! async runtime and provides enhanced test output formatting.
+
 mod exit_on_suite_outcome;
 mod insert_tests;
 mod register_test;
@@ -17,4 +22,5 @@ mod filter_tests;
 pub use filter_tests::*;
 mod logger;
 pub(self) use logger::*;
+/// Extensions for the test runner configuration.
 pub mod test_runner_ext;

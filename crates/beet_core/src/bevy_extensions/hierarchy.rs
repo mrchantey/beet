@@ -1,3 +1,5 @@
+//! Extension methods for hierarchy queries.
+
 use crate::prelude::*;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
@@ -10,6 +12,7 @@ use std::iter::Chain;
 
 
 
+/// Extension trait adding hierarchy traversal methods to [`Query`].
 #[extend::ext(name=HierarchyQueryExtExt)]
 pub impl<
 	'w,
@@ -71,13 +74,16 @@ pub impl<
 
 
 
-/// An [`Iterator`] of [`Entity`]s over the direct descendants of an [`Entity`].
+/// An [`Iterator`] over the direct descendants of an [`Entity`].
+///
+/// Unlike [`DescendantIter`], this only yields immediate children,
+/// not the entire subtree.
 pub struct DirectDescendantIter {
 	vec: Vec<Entity>,
 }
 
 impl DirectDescendantIter {
-	/// Returns a new [`DDirectescendantIter`].
+	/// Creates a new [`DirectDescendantIter`] for the given entity.
 	pub fn new<'w, 's, D: QueryData, F: QueryFilter, S: RelationshipTarget>(
 		children_query: &'w Query<'w, 's, D, F>,
 		entity: Entity,

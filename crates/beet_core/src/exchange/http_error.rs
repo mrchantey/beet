@@ -1,27 +1,40 @@
+//! HTTP error type for request/response handling.
+//!
+//! This module provides [`HttpError`], an error type designed for HTTP-style
+//! request handling that includes a status code and message.
+//!
+//! # Security
+//!
+//! In release builds, internal error details are logged but an opaque error
+//! is returned to clients to prevent information leakage.
+
 use crate::prelude::*;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use tracing::error;
 
+/// Result type alias using [`HttpError`].
 pub type HttpResult<T> = std::result::Result<T, HttpError>;
 
 
-/// A non-200 response from a http request.
-/// The message *will be* returned to the client so ensure that no sensitive information is included.
-/// By default non http [`BevyError`] messages will be logged and an opaque error will be returned to the client
-/// in release builds
+/// A non-200 response from an HTTP request.
+///
+/// The message *will be* returned to the client, so ensure that no sensitive
+/// information is included. By default, non-HTTP [`BevyError`] messages will be
+/// logged and an opaque error will be returned to the client in release builds.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HttpError {
-	/// The HTTP status code
+	/// The HTTP status code.
 	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub status_code: StatusCode,
-	/// The error message
+	/// The error message.
 	pub message: String,
 }
 
 
 impl HttpError {
+	/// Creates an [`HttpError`] with the given status code and an empty message.
 	pub fn from_status(status_code: StatusCode) -> Self {
 		Self {
 			status_code,
@@ -29,18 +42,26 @@ impl HttpError {
 		}
 	}
 
-	/// Creates a new [`AppError`] with the given status code and message.
+	/// Creates a new [`HttpError`] with the given status code and message.
 	pub fn new(status_code: StatusCode, message: impl Into<String>) -> Self {
 		Self {
 			message: message.into(),
 			status_code,
 		}
 	}
+
+	/// Creates a 404 Not Found error.
 	pub fn not_found() -> Self { Self::from_status(StatusCode::NotFound) }
 
+	/// Creates a 400 Bad Request error with the given message.
 	pub fn bad_request(message: impl Into<String>) -> Self {
 		Self::new(StatusCode::MalformedRequest, message)
 	}
+
+	/// Creates a 500 Internal Server Error.
+	///
+	/// In debug builds, the full error message is included.
+	/// In release builds, the error is logged but an opaque message is returned.
 	pub fn internal_error(message: impl Into<String>) -> Self {
 		let message = message.into();
 		// we are about to lose the internal bevy message, so log it
@@ -62,9 +83,11 @@ impl HttpError {
 		}
 	}
 
-	/// Unwraps the `BevyError` into a `HttpError` if thats what it is,
-	/// otherwise logs the error and returns an opaque internal server error
-	/// in release builds.
+	/// Converts a [`BevyError`] into an [`HttpError`].
+	///
+	/// If the error is already an [`HttpError`], it is returned directly.
+	/// Otherwise, the error is logged and an opaque internal server error
+	/// is returned in release builds.
 	pub fn from_opaque(error: impl Into<BevyError>) -> Self {
 		let error = error.into();
 		if let Some(inner) = error.downcast_ref::<HttpError>() {
@@ -132,10 +155,13 @@ impl From<HttpError> for Response {
 }
 
 
+/// Serde support for [`StatusCode`].
 #[cfg(feature = "serde")]
 pub mod status_code_serde {
 	use super::*;
 	use serde::Deserialize;
+
+	/// Serializes a [`StatusCode`] to a numeric value.
 	pub fn serialize<S>(
 		status: &StatusCode,
 		serializer: S,
@@ -155,6 +181,7 @@ pub mod status_code_serde {
 		}
 	}
 
+	/// Deserializes a [`StatusCode`] from a numeric value.
 	#[cfg(feature = "serde")]
 	pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
 	where

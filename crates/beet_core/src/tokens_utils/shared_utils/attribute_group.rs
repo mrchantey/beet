@@ -15,12 +15,14 @@ use syn::punctuated::Punctuated;
 /// These cannot be ref types because they are parsed.
 #[derive(Debug)]
 pub struct AttributeGroup {
+	/// The parsed attribute items.
 	pub attributes: Vec<AttributeItem>,
 }
 
 
 
 impl AttributeGroup {
+	/// Parses attributes with the given name from a list of syn attributes.
 	pub fn parse(attrs: &[syn::Attribute], name: &str) -> Result<Self> {
 		let attributes = attrs
 			.iter()
@@ -70,6 +72,7 @@ impl AttributeGroup {
 		})
 	}
 
+	/// Returns all attributes with the given name.
 	pub fn get_many(&self, name: &str) -> Vec<&AttributeItem> {
 		self.attributes
 			.iter()
@@ -79,6 +82,7 @@ impl AttributeGroup {
 			.collect()
 	}
 
+	/// Returns `true` if an attribute with the given name exists.
 	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
 	/// Returns the value if the attribute is present and has a value.
@@ -86,6 +90,7 @@ impl AttributeGroup {
 		self.get(name).map(|attr| attr.value.as_ref()).flatten()
 	}
 
+	/// Returns the parsed value of an attribute if present.
 	pub fn get_value_parsed<T: Parse>(&self, name: &str) -> Result<Option<T>> {
 		if let Some(attr) = self.get(name) {
 			attr.value_parsed()
@@ -100,7 +105,9 @@ impl AttributeGroup {
 ///
 #[derive(Debug)]
 pub struct AttributeItem {
+	/// The attribute key (name).
 	pub key: Member,
+	/// The optional value after `=`.
 	pub value: Option<TokenStream>,
 }
 
@@ -116,6 +123,7 @@ impl quote::ToTokens for AttributeItem {
 
 
 impl AttributeItem {
+	/// Parses an attribute item from the input stream.
 	pub fn parse(input: ParseStream) -> syn::Result<Self> {
 		let key: syn::Member = input.parse()?;
 		let value = if input.peek(syn::Token![=]) {
@@ -127,6 +135,7 @@ impl AttributeItem {
 		Ok(Self { key, value })
 	}
 
+	/// Returns the identifier name if the key is a named member.
 	pub fn name(&self) -> Option<&Ident> {
 		match &self.key {
 			Member::Named(ident) => Some(ident),

@@ -32,6 +32,7 @@ use rand_chacha::ChaCha8Rng;
 pub struct RandomSource(pub ChaCha8Rng);
 
 impl RandomSource {
+	/// Creates a new [`RandomSource`] with the given seed for reproducible randomness.
 	pub fn from_seed(seed: u64) -> Self {
 		let rng = ChaCha8Rng::seed_from_u64(seed);
 		Self(rng)

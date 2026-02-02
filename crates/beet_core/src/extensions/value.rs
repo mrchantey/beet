@@ -1,10 +1,14 @@
+//! Extension trait for [`serde_json::Value`] with ergonomic accessors.
+
 use bevy::ecs::error::BevyError;
 use bevy::ecs::error::Result;
 use extend::ext;
 use serde_json::Value;
 
+/// Extension methods for [`Value`] providing typed field access with error messages.
 #[ext]
 pub impl Value {
+	/// Sets a field on a JSON object, returning an error if not an object.
 	fn set_field(&mut self, field: &str, value: Value) -> Result<&mut Self> {
 		if let Some(obj) = self.as_object_mut() {
 			obj.insert(field.to_string(), value);

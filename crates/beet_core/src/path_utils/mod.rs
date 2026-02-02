@@ -18,6 +18,7 @@
 //! - [`path_ext`] - Extension traits for [`Path`](std::path::Path)
 
 mod abs_path_buf;
+/// Cross-platform environment variable access.
 pub mod env_ext;
 mod fs_error;
 pub mod fs_ext;

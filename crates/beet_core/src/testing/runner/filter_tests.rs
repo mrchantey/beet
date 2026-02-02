@@ -1,3 +1,5 @@
+//! Test filtering based on glob patterns.
+
 use crate::prelude::*;
 use crate::testing::runner::*;
 
@@ -8,6 +10,7 @@ use crate::testing::runner::*;
 #[derive(Debug, Clone, Reflect, Component, Default)]
 #[reflect(Default)]
 pub struct FilterParams {
+	/// Glob pattern filter for test selection.
 	pub filter: GlobFilter,
 	/// By default the glob filter will wrap
 	/// all patterns in wildcards, so `*foo*` will match `/foo.rs`.
@@ -34,6 +37,7 @@ impl FilterParams {
 	}
 }
 
+/// Filters tests based on request parameters, marking non-matching tests as skipped.
 pub fn filter_tests(
 	mut commands: Commands,
 	requests: Populated<(&RequestMeta, &Children), Added<RequestMeta>>,

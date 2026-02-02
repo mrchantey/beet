@@ -17,6 +17,7 @@ pub fn new_auto(
 	}
 }
 
+/// Creates a test with a static function, using caller location for metadata.
 #[track_caller]
 pub fn new_auto_static(func: fn() -> Result<(), String>) -> TestDescAndFn {
 	let desc = new_auto_desc();
@@ -27,6 +28,7 @@ pub fn new_auto_static(func: fn() -> Result<(), String>) -> TestDescAndFn {
 }
 
 
+/// Creates a test descriptor using the caller's location for metadata.
 #[track_caller]
 pub fn new_auto_desc() -> TestDesc {
 	let caller = Location::caller();
@@ -54,6 +56,7 @@ pub fn new_auto_desc() -> TestDesc {
 	}
 }
 
+/// Creates a test with the given name, file, and function.
 pub fn new(
 	name: &str,
 	file: &'static str,
@@ -87,6 +90,7 @@ pub fn clone_static(test: &TestDescAndFn) -> TestDescAndFn {
 }
 
 
+/// Extracts the static test function from a descriptor.
 #[deprecated]
 pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
 	match test.testfn {
@@ -95,6 +99,7 @@ pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
 	}
 }
 
+/// Runs a test function and returns its result.
 pub fn run(test: TestFn) -> Result<(), String> {
 	match test {
 		TestFn::StaticTestFn(func) => func(),
@@ -113,6 +118,7 @@ use test::ShouldPanic;
 use test::TestDesc;
 use test::TestType;
 
+/// Returns `true` if two test descriptors have the same source location.
 pub fn is_equal_location(a: &TestDesc, b: &TestDesc) -> bool {
 	a.source_file == b.source_file && a.start_line == b.start_line
 }

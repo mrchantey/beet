@@ -103,7 +103,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
-			.insert_time();
+			.init_resource::<Time>();
 
 		let agent = app
 			.world_mut()

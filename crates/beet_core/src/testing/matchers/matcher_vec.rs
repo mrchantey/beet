@@ -1,5 +1,12 @@
+//! Vec assertion matchers.
+//!
+//! This module provides assertion methods for [`Vec`] types, including
+//! predicate matching and emptiness checks.
+
 use crate::prelude::*;
 use std::fmt::Debug;
+
+/// Extension trait adding assertion methods to [`Vec<T>`].
 #[extend::ext(name=MatcherVec)]
 pub impl<T: Debug> Vec<T> {
 	/// Performs an assertion ensuring at least one item in the vec passes the predicate.

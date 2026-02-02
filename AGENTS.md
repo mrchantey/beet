@@ -41,6 +41,14 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
 - adding `ignore` is an absolute last resort, usually reserved only for macros. `no_run` is also not ideal, but sometimes required ie for network requests
+- avoid type suffixes where possible, but use if no gramatical alternative:
+	- good: `// Similar to a Bevy [`Event`]...`
+	- bad: `// Similar to Bevy [`Event`]s...`
+	- good: `// A [`Clone`] version of...`
+	- bad: `// A [`Clone`]able version of...`
+- prefer concise conventions vs to-the-letter gramatical correctness:
+	- good: `does foo, ie bar`
+	- bad: `does foo, i.e., bar`
 
 ## Testing
 

@@ -1,8 +1,12 @@
+//! Cross-platform environment variable access.
+
 use crate::prelude::*;
 use thiserror::Error;
 
+/// Error returned when an environment variable operation fails.
 #[derive(Debug, Error)]
 pub enum EnvError {
+	/// The requested environment variable was not found.
 	#[error("Environment variable not found: {0}")]
 	NotFound(String),
 }

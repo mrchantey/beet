@@ -21,7 +21,8 @@
 //! - `rand` - Random number generation
 //! - `nightly` - Nightly Rust features like `Fn` trait implementations
 
-// #![warn(missing_docs)]
+// TODO: Switch back to deny once all docs are complete
+#![warn(missing_docs)]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
 #![cfg_attr(

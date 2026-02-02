@@ -39,7 +39,9 @@ use std::convert::Infallible;
 #[derive(Debug, Component)]
 #[require(ResponseMarker = ResponseMarker{_sealed:()})]
 pub struct Response {
+	/// The response metadata including status code and headers.
 	pub parts: ResponseParts,
+	/// The response body, which may be bytes or a stream.
 	pub body: Body,
 }
 
@@ -85,6 +87,7 @@ impl std::ops::DerefMut for Response {
 }
 
 impl Response {
+	/// Creates a new response with the given parts and body.
 	pub fn new(parts: ResponseParts, body: Body) -> Self {
 		Self { parts, body }
 	}
@@ -353,10 +356,13 @@ impl From<StatusCode> for Response {
 	fn from(status: StatusCode) -> Self { Response::from_status(status) }
 }
 
-/// Allows for blanket implementation of `Into<Response>`,
-/// including `Result<T,E>` where `T` and `E` both implement `IntoResponse`
-/// and Option<T> where `T` implements `IntoResponse`, and [`None`] is not found.
+/// Converts a type into a [`Response`].
+///
+/// This trait enables blanket implementations for common types:
+/// - `Result<T, E>` where both `T` and `E` implement `IntoResponse`
+/// - `Option<T>` where `T` implements `IntoResponse` ([`None`] becomes 404)
 pub trait IntoResponse<M> {
+	/// Converts this type into a response.
 	fn into_response(self) -> Response;
 }
 

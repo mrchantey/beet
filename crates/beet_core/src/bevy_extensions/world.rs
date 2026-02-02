@@ -1,3 +1,5 @@
+//! Extension methods for Bevy's [`World`].
+
 use crate::prelude::*;
 use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
@@ -11,16 +13,18 @@ use bevy::prelude::*;
 use extend::ext;
 use std::marker::PhantomData;
 
-/// system version
+/// System that logs component names for an entity.
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
 	world.log_component_names(*entity);
 }
 
 
-/// common trait for 'App' and 'World'
+/// Trait for types that can provide a reference to a [`World`].
 pub trait IntoWorld {
+	/// Returns a reference to the world.
 	#[allow(unused)]
 	fn into_world(&self) -> &World;
+	/// Returns a mutable reference to the world.
 	fn into_world_mut(&mut self) -> &mut World;
 }
 impl IntoWorld for World {
@@ -31,12 +35,17 @@ impl IntoWorld for App {
 	fn into_world(&self) -> &World { self.world() }
 	fn into_world_mut(&mut self) -> &mut World { self.world_mut() }
 }
+
+/// Extension trait adding utility methods to [`World`].
 #[ext(name=WorldExt)]
 pub impl World {
+	/// Inserts a resource and returns self for chaining.
 	fn with_resource<T: Resource>(&mut self, resource: T) -> &mut Self {
 		self.insert_resource(resource);
 		self
 	}
+
+	/// Runs the world's main schedule in a loop until an [`AppExit`] is triggered.
 	fn run_local(&mut self) -> AppExit {
 		loop {
 			self.update_local();
@@ -46,7 +55,7 @@ pub impl World {
 		}
 	}
 
-	/// The world equivelent of [`App::update`].
+	/// The world equivalent of [`App::update`].
 	///
 	/// In multi_threaded mode, this temporarily sets all schedules to use
 	/// single-threaded execution to avoid deadlocks when called from within
@@ -67,7 +76,8 @@ pub impl World {
 		}
 	}
 
-	/// Force all schedules in the world to use single-threaded execution.
+	/// Forces all schedules in the world to use single-threaded execution.
+	///
 	/// This is necessary when running schedules from within async tasks
 	/// to avoid deadlocks with bevy's parallel schedule executor.
 	#[cfg(feature = "multi_threaded")]
@@ -80,7 +90,8 @@ pub impl World {
 			}
 		});
 	}
-	/// The world equivelent of [`App::should_exit`]
+
+	/// The world equivalent of [`App::should_exit`].
 	fn should_exit(&self) -> Option<AppExit> {
 		let mut reader = MessageCursor::default();
 
@@ -101,6 +112,10 @@ pub impl World {
 }
 
 
+/// A collected query result that owns its data.
+///
+/// This is useful for one-off queries where caching the [`QueryState`] is not needed.
+/// For repeated queries, prefer using [`World::query`] directly.
 pub struct QueryOnce<D: QueryData, F: QueryFilter = ()> {
 	items: Vec<D::Item<'static, 'static>>,
 	_phantom: PhantomData<F>,
@@ -116,6 +131,7 @@ impl<D: QueryData, F: QueryFilter> std::ops::DerefMut for QueryOnce<D, F> {
 }
 
 impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
+	/// Creates a new [`QueryOnce`] by running a query and collecting the results.
 	pub fn new<T: IntoWorld>(world: &mut T) -> Self {
 		let world = world.into_world_mut();
 		let mut query = world.query_filtered::<D, F>();
@@ -153,9 +169,10 @@ impl<'a, D: QueryData, F: QueryFilter> IntoIterator
 	fn into_iter(self) -> Self::IntoIter { self.items.iter_mut() }
 }
 
+/// Extension trait adding entity inspection and query utilities to [`World`] and [`App`].
 #[ext(name=IntoWorldMutExt)]
-/// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
+	/// Returns the names of all components on the given entity.
 	fn component_names(&self, entity: Entity) -> Vec<String> {
 		let world = self.into_world();
 		world
@@ -165,6 +182,8 @@ pub impl<W: IntoWorld> W {
 			})
 			.unwrap_or_default()
 	}
+
+	/// Returns the component names for all direct relations of the given entity.
 	fn direct_component_names_related<R: RelationshipTarget>(
 		&self,
 		entity: Entity,
@@ -187,7 +206,7 @@ pub impl<W: IntoWorld> W {
 			.unwrap_or_default()
 	}
 
-	/// Try to get the short name of a component, otherwise return the full name.
+	/// Returns the short name of a component if available, otherwise the full name.
 	fn pretty_name(&self, component: &ComponentInfo) -> String {
 		let id = component.type_id();
 		if let Some(id) = id {
@@ -203,6 +222,7 @@ pub impl<W: IntoWorld> W {
 	}
 
 
+	/// Logs the component names for an entity and its descendants.
 	fn log_component_names(&self, entity: Entity) {
 		let names = self.component_names_related::<Children>(entity);
 		let str = names.iter_to_string_indented();
@@ -210,6 +230,7 @@ pub impl<W: IntoWorld> W {
 		// bevy::log::info!("Component names for {entity}: \n{str}");
 	}
 
+	/// Returns the component names for an entity and all its descendants as a tree.
 	fn component_names_related<R: RelationshipTarget>(
 		&self,
 		entity: Entity,
@@ -251,29 +272,33 @@ pub impl<W: IntoWorld> W {
 
 
 
-	/// Shorthand for creating a query and immediatly collecting it into a Vec.
-	/// This is less efficient than caching the [`QueryState`] so should only be
-	/// used for one-off queries, otherwise [`World::query`] should be preferred.
+	/// Creates a query and immediately collects results into a [`QueryOnce`].
+	///
+	/// Less efficient than caching [`QueryState`], so prefer [`World::query`]
+	/// for repeated queries.
 	fn query_once<D: QueryData>(&mut self) -> QueryOnce<D, ()> {
 		QueryOnce::new(self)
 	}
 
-	/// Shorthand for creating a query and immediatly collecting it into a Vec.
-	/// This is less efficient than caching the [`QueryState`] so should only be
-	/// used for one-off queries, otherwise [`World::query_filtered`] should be preferred.
+	/// Creates a filtered query and immediately collects results into a [`QueryOnce`].
+	///
+	/// Less efficient than caching [`QueryState`], so prefer [`World::query_filtered`]
+	/// for repeated queries.
 	fn query_filtered_once<D: QueryData, F: QueryFilter>(
 		&mut self,
 	) -> QueryOnce<D, F> {
 		QueryOnce::new(self)
 	}
 
+	/// Returns all entities in the world.
 	fn all_entities(&mut self) -> Vec<Entity> {
 		let world = self.into_world_mut();
 		world.query::<Entity>().iter(world).collect()
 	}
 
-	/// Shorthand for removing all components of a given type.
-	fn remove<C: Component>(&mut self) -> Vec<C> {
+	/// Removes all components of the given type from all entities
+	/// and returns their values.
+	fn take_all<C: Component>(&mut self) -> Vec<C> {
 		let world = self.into_world_mut();
 		world
 			.query_filtered::<Entity, With<C>>()
@@ -284,14 +309,15 @@ pub impl<W: IntoWorld> W {
 			.collect()
 	}
 
-	/// Shorthand for building a serialized scene from the current world.
+	/// Builds a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&mut self) -> String {
 		self.build_scene_with_builder(|builder| {
 			builder.deny_resource::<Time<Real>>()
 		})
 	}
-	/// Shorthand for building a serialized scene from the current world.
+
+	/// Builds a serialized scene with a custom builder configuration.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene_with_builder(
 		&mut self,
@@ -308,6 +334,7 @@ pub impl<W: IntoWorld> W {
 		self.build_scene_with(dyn_scene)
 	}
 
+	/// Serializes a [`DynamicScene`] to a RON string.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene_with(&self, scene: DynamicScene) -> String {
 		use bevy::scene::serde::SceneSerializer;
@@ -325,10 +352,14 @@ pub impl<W: IntoWorld> W {
 				.expect("failed to serialize scene");
 		scene
 	}
+
+	/// Loads a scene from a serialized RON string.
 	#[cfg(feature = "bevy_scene")]
 	fn load_scene(&mut self, scene: impl AsRef<str>) -> Result {
 		self.load_scene_with(scene, &mut Default::default())
 	}
+
+	/// Loads a scene from a serialized RON string with a custom entity map.
 	#[cfg(feature = "bevy_scene")]
 	fn load_scene_with(
 		&mut self,
@@ -355,7 +386,7 @@ pub impl<W: IntoWorld> W {
 	}
 
 
-	/// copied from world.trigger_ref_with_caller
+	/// Triggers an event with a reference, using the given caller location.
 	#[track_caller]
 	fn trigger_ref_with_caller_pub<'a, E: Event>(
 		&mut self,
@@ -375,9 +406,10 @@ pub impl<W: IntoWorld> W {
 
 
 
-/// Ease-of-use extensions for `bevy::World`
+/// Extension trait adding observer and trigger helpers to [`World`].
 #[ext(name=CoreWorldExt)]
 pub impl World {
+	/// Returns self with an observer spawned.
 	fn with_observer<E: Event, B: Bundle, M>(
 		mut self,
 		system: impl IntoObserverSystem<E, B, M>,
@@ -385,6 +417,8 @@ pub impl World {
 		self.spawn(Observer::new(system));
 		self
 	}
+
+	/// Spawns an observer and returns self for chaining.
 	fn observing<E: Event, B: Bundle, M>(
 		&mut self,
 		system: impl IntoObserverSystem<E, B, M>,
@@ -393,7 +427,8 @@ pub impl World {
 		self
 	}
 
-	// TODO deprecated, bevy 0.16 fixes this
+	/// Flushes, triggers the event, then flushes again.
+	// TODO deprecated, bevy 0.16 fixes this?
 	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
 		&mut self,
 		event: E,
@@ -405,12 +440,10 @@ pub impl World {
 	}
 }
 
+/// Extension trait adding trigger helpers to [`EntityWorldMut`].
 #[extend::ext]
 pub impl<'w> EntityWorldMut<'w> {
-	/// 1. Flushes
-	/// 2. Triggers the given event for this entity, which will run any observers watching for it.
-	/// 3. Flushes
-	// #[deprecated = "world flushes automatically now"]
+	/// Flushes, triggers the event, then flushes again.
 	fn flush_trigger<'a, E: Event<Trigger<'a>: Default>>(
 		&mut self,
 		event: E,

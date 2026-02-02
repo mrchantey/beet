@@ -1,10 +1,12 @@
+//! Utilities for spawning and managing shell commands.
+
 use crate::prelude::*;
 use std::process::Child;
 use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
 
-
+/// Utility functions for creating and spawning shell commands.
 pub struct CommandExt;
 
 impl CommandExt {
@@ -60,6 +62,7 @@ impl CommandExt {
 		Ok(child)
 	}
 
+	/// Spawns a command and blocks until completion, inheriting stdio.
 	pub fn spawn_command_blocking(args: &Vec<&str>) -> Result {
 		let _ = Self::get_command(args)
 			.stdout(Stdio::inherit())
@@ -68,6 +71,7 @@ impl CommandExt {
 		Ok(())
 	}
 
+	/// Spawns a command, captures its output, and returns it as [`CommandOutput`].
 	pub fn spawn_command_hold_stdio(args: &Vec<&str>) -> Result<CommandOutput> {
 		let out = Self::get_command(args).output()?;
 		Ok(out.into())
@@ -79,6 +83,7 @@ impl CommandExt {
 		cmd
 	}
 
+	/// Spawns a command through the system shell and blocks until completion.
 	pub fn spawn_command_with_shell_blocking(args: &Vec<&str>) -> Result {
 		let _ = Self::get_command_with_shell(args)
 			.stdout(Stdio::inherit())
@@ -102,9 +107,13 @@ impl CommandExt {
 	}
 }
 
+/// Captured output from a spawned command.
 pub struct CommandOutput {
+	/// Whether the command exited successfully.
 	pub success: bool,
+	/// The captured standard output.
 	pub stdout: String,
+	/// The captured standard error.
 	pub stderr: String,
 }
 

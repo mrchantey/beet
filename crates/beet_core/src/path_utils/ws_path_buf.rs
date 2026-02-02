@@ -64,6 +64,7 @@ impl WsPathBuf {
 		Ok(Self::new(path))
 	}
 
+	/// Consumes the wrapper and returns the inner [`PathBuf`].
 	pub fn take(self) -> PathBuf { self.0 }
 
 	/// Create a new [`WsPathBuf`] from joining this one with
@@ -73,6 +74,7 @@ impl WsPathBuf {
 		Self::new(path)
 	}
 
+	/// Returns the parent directory as a new [`WsPathBuf`].
 	pub fn parent(&self) -> Result<WsPathBuf> {
 		match self.0.parent() {
 			Some(parent) => Ok(WsPathBuf::new(parent)),

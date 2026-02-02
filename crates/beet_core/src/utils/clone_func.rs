@@ -8,9 +8,11 @@ where
 	In: 'static,
 	Out: 'static,
 {
+	/// Creates a new [`CloneFunc`] from a cloneable function.
 	pub fn new(func: impl CloneFuncTrait<In, Out>) -> Self {
 		Self(Box::new(func))
 	}
+	/// Calls the wrapped function with the given input.
 	pub fn call_func(&self, input: In) -> Out { self.0.call_func(input) }
 }
 
@@ -22,8 +24,11 @@ where
 	fn clone(&self) -> Self { Self(self.0.clone_func_box_clone()) }
 }
 
+/// Trait for cloneable function objects.
 pub trait CloneFuncTrait<In, Out>: 'static + Send + Sync {
+	/// Clones the function into a boxed trait object.
 	fn clone_func_box_clone(&self) -> Box<dyn CloneFuncTrait<In, Out>>;
+	/// Calls the function with the given input.
 	fn call_func(&self, input: In) -> Out;
 }
 

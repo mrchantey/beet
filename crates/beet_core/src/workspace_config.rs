@@ -1,3 +1,9 @@
+//! Workspace and package configuration types.
+//!
+//! This module provides configuration types for beet packages and workspaces,
+//! including compile-time package metadata via [`pkg_config!`] and runtime
+//! workspace settings via [`WorkspaceConfig`].
+
 // use crate::prelude::*;
 use crate::prelude::*;
 use heck::ToKebabCase;
@@ -5,38 +11,41 @@ use std::path::Path;
 use std::str::FromStr;
 
 /// Settings for the package, usually set via `pkg_config!()`.
+///
 /// This resource is required for all beet applications and should be consistent
 /// across launch, server and client binaries.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct PackageConfig {
-	/// The pretty name of the package
+	/// The pretty name of the package.
 	pub title: String,
-	/// The name of the package set via `CARGO_PKG_NAME`
+	/// The name of the package set via `CARGO_PKG_NAME`.
 	pub binary_name: String,
-	/// The version of the package set via `CARGO_PKG_VERSION`
+	/// The version of the package set via `CARGO_PKG_VERSION`.
 	pub version: String,
-	/// The description of the package set via `CARGO_PKG_DESCRIPTION`
+	/// The description of the package set via `CARGO_PKG_DESCRIPTION`.
 	pub description: String,
-	/// The homepage URL of the package, set via `CARGO_PKG_HOMEPAGE`
+	/// The homepage URL of the package, set via `CARGO_PKG_HOMEPAGE`.
 	pub homepage: String,
-	/// The repository URL of the package, set via `CARGO_PKG_REPOSITORY` if available
+	/// The repository URL of the package, set via `CARGO_PKG_REPOSITORY` if available.
 	pub repository: Option<String>,
-	/// The infrastructure stage for this build,
-	/// defaults to `dev` in debug builds and `prod` in release builds
+	/// The infrastructure stage for this build.
+	///
+	/// Defaults to `dev` in debug builds and `prod` in release builds.
 	pub stage: String,
-	/// How services should be accessed
+	/// How services should be accessed.
 	pub service_access: ServiceAccess,
 }
 
-/// Options for how services should be accessed, for instance
-/// a bucket that should use the local file system during development
-/// but an s3 bucket when deployed.
+/// Options for how services should be accessed.
+///
+/// For instance, a bucket that should use the local file system during
+/// development but an s3 bucket when deployed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Reflect)]
 pub enum ServiceAccess {
-	/// Services should be accessed via filesystem and local servers
+	/// Services should be accessed via filesystem and local servers.
 	Local,
-	/// Services should be accessed via remote cloud services
+	/// Services should be accessed via remote cloud services.
 	Remote,
 }
 impl FromStr for ServiceAccess {
@@ -62,26 +71,38 @@ impl std::fmt::Display for ServiceAccess {
 }
 
 impl PackageConfig {
+	/// Returns the binary name.
 	pub fn binary_name(&self) -> &str { &self.binary_name }
+
+	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
+
+	/// Returns the description.
 	pub fn description(&self) -> &str { &self.description }
+
+	/// Returns the repository URL if available.
 	pub fn repository(&self) -> Option<&str> { self.repository.as_deref() }
+
+	/// Returns the infrastructure stage.
 	pub fn stage(&self) -> &str { &self.stage }
 
-	/// The cloud resource name for the server lambda function
+	/// The cloud resource name for the server lambda function.
 	pub fn router_lambda_name(&self) -> String { self.resource_name("router") }
-	/// The cloud resource name for the static html bucket
+
+	/// The cloud resource name for the static html bucket.
 	pub fn html_bucket_name(&self) -> String { self.resource_name("html") }
-	/// The cloud resource name for the assets bucket
+
+	/// The cloud resource name for the assets bucket.
 	pub fn assets_bucket_name(&self) -> String { self.resource_name("assets") }
-	/// The cloud resource name for the analytics store
+
+	/// The cloud resource name for the analytics store.
 	pub fn analytics_bucket_name(&self) -> String {
 		self.resource_name("analytics")
 	}
 
 
 	/// Returns a vec of environment variables to be propagated
-	/// from the parent process in compilation commands
+	/// from the parent process in compilation commands.
 	#[rustfmt::skip]
 	pub fn envs(&self)->Vec<(String,String)>{
 		vec![
@@ -94,10 +115,11 @@ impl PackageConfig {
 	}
 
 
-	/// Prefixes the binary name and suffixes the stage to the provided name,
-	/// for example `lambda` becomes `my-site-lambda-dev`
-	/// this binary-resource-stage convention must match sst config
-	/// sst.config.ts -> new sst.aws.Function(`..`, {name: `THIS_FIELD` }),
+	/// Prefixes the binary name and suffixes the stage to the provided name.
+	///
+	/// For example `lambda` becomes `my-site-lambda-dev`.
+	/// This binary-resource-stage convention must match sst config:
+	/// `sst.config.ts -> new sst.aws.Function(.., {name: THIS_FIELD })`.
 	pub fn resource_name(&self, descriptor: &str) -> String {
 		let binary_name = self.binary_name.to_kebab_case();
 		let stage = self.stage.as_str();
@@ -123,8 +145,11 @@ impl std::fmt::Display for PackageConfig {
 }
 
 /// Macro to create a `PackageConfig` from compile time environment variables set by Cargo.
+///
 /// This saves boilerplate for various `env!` environment variables.
-/// ## Example
+///
+/// # Example
+///
 /// ```
 /// # use beet_core::prelude::*;
 /// let mut world = World::new();
@@ -159,24 +184,26 @@ macro_rules! pkg_config {
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct WorkspaceConfig {
-	/// Filter for extracting snippets,
-	/// excludes 'target' and 'node_modules' directories by default
+	/// Filter for extracting snippets.
+	///
+	/// Excludes 'target' and 'node_modules' directories by default.
 	pub snippet_filter: GlobFilter,
 	/// Files to watch, triggering a compile-and-run of the binary with
 	/// the `launch` feature on change.
 	pub launch_filter: GlobFilter,
 	/// Location of the `launch.ron` file to save the launch scene to.
-	/// See [`LaunchConfig::launch_file`] to direct the cli to this location.
+	///
+	/// See `LaunchConfig::launch_file` to direct the cli to this location.
 	pub launch_file: WsPathBuf,
-	/// The root directory for matching [`Self::snippet_filter`] and [`Self::launch_filter`]
+	/// The root directory for matching [`Self::snippet_filter`] and [`Self::launch_filter`].
 	pub root_dir: WsPathBuf,
-	/// The output location for the generated template scene file
+	/// The output location for the generated template scene file.
 	pub snippets_dir: WsPathBuf,
-	/// Location of the html directory, defaults to 'target/client'
+	/// Location of the html directory, defaults to 'target/client'.
 	pub html_dir: WsPathBuf,
-	/// Location of the assets directory, defaults to 'assets'
+	/// Location of the assets directory, defaults to 'assets'.
 	pub assets_dir: WsPathBuf,
-	/// Location of the analytics test directory, defaults to 'target/analytics'
+	/// Location of the analytics test directory, defaults to 'target/analytics'.
 	pub analytics_dir: WsPathBuf,
 	/// Directory for temp static files like client islands.
 	pub client_islands_path: WsPathBuf,
@@ -213,16 +240,19 @@ impl Default for WorkspaceConfig {
 }
 
 impl WorkspaceConfig {
+	/// Creates a [`WorkspaceConfig`] for the test site directory.
 	pub fn test_site() -> Self {
 		let mut this = Self::default();
 		this.root_dir = WsPathBuf::new("tests/test_site");
 		this
 	}
 
+	/// Returns the snippets directory.
 	pub fn snippets_dir(&self) -> &WsPathBuf { &self.snippets_dir }
 
-	/// Create a file path in the format of `path/to/file:line:col.rs`,
-	/// using [`Self::snippets_dir`] as the base.
+	/// Creates a file path in the format of `path/to/file:line:col.rs`.
+	///
+	/// Uses [`Self::snippets_dir`] as the base.
 	pub fn rsx_snippet_path(
 		&self,
 		path: impl AsRef<Path>,
@@ -235,10 +265,11 @@ impl WorkspaceConfig {
 		self.snippets_dir.join(path)
 	}
 
-	/// Create a file path in the format of `path/to/file.ron`,
-	/// we need the index because some files may have multiple LangSnippets
-	/// and we dont always have the span.
-	/// using [`Self::snippets_dir`] as the base.
+	/// Creates a file path in the format of `path/to/file.ron`.
+	///
+	/// We need the index because some files may have multiple LangSnippets
+	/// and we don't always have the span.
+	/// Uses [`Self::snippets_dir`] as the base.
 	pub fn lang_snippet_path(&self, path: &WsPathBuf, index: u64) -> WsPathBuf {
 		let mut path = path.clone();
 		let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
@@ -247,9 +278,12 @@ impl WorkspaceConfig {
 		self.snippets_dir.join(path)
 	}
 
+	/// Returns `true` if the path passes the snippet filter.
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.snippet_filter.passes(path)
 	}
+
+	/// Returns all files in the root directory that pass the snippet filter.
 	pub fn get_files(&self) -> Result<Vec<AbsPathBuf>, FsError> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())?
 			.into_iter()

@@ -129,18 +129,27 @@ impl PanicContext {
 }
 
 
+/// Result of running code that may panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PanicResult {
+	/// The operation completed successfully.
 	Ok,
+	/// The operation returned an error.
 	Err(String),
+	/// The operation panicked.
 	Panic {
+		/// The panic payload if it could be downcast to string.
 		payload: Option<String>,
+		/// The source location of the panic, if available.
 		location: Option<FileSpan>,
 	},
 }
 impl PanicResult {
+	/// Returns `true` if the result is [`PanicResult::Ok`].
 	pub fn is_ok(&self) -> bool { matches!(self, PanicResult::Ok) }
+	/// Returns `true` if the result is [`PanicResult::Err`].
 	pub fn is_err(&self) -> bool { matches!(self, PanicResult::Err(_)) }
+	/// Returns `true` if the result is [`PanicResult::Panic`].
 	pub fn is_panic(&self) -> bool { matches!(self, PanicResult::Panic { .. }) }
 }
 

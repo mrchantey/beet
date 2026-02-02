@@ -1,3 +1,8 @@
+//! Test insertion utilities for the test runner.
+//!
+//! This module provides functions for converting test descriptors into
+//! Bevy entities that can be run by the test runner.
+
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
@@ -6,9 +11,11 @@ use test::TestDesc;
 use test::TestDescAndFn;
 
 
-/// Insert the provided tests into the [`World`] by cloning.
-/// ## Panics
-/// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`]
+/// Inserts the provided tests into the [`World`] by cloning.
+///
+/// # Panics
+///
+/// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`].
 pub fn tests_bundle_borrowed(tests: &[&TestDescAndFn]) -> impl Bundle {
 	let tests = tests
 		.iter()
@@ -56,7 +63,7 @@ fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
 		OnSpawn::new(move |entity| try_skip(entity, &desc)),
 	)
 }
-/// handle the skip cases that are statically known (before filtering)
+/// Handles the skip cases that are statically known (before filtering).
 fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 	if desc.no_run {
 		entity.insert(TestOutcome::Skip(TestSkip::NoRun));
@@ -70,10 +77,10 @@ fn try_skip(entity: &mut EntityWorldMut, desc: &TestDesc) {
 }
 
 
-/// Per-test parameters that can be configured via attributes
+/// Per-test parameters that can be configured via attributes.
 #[derive(Debug, Clone, Component)]
 pub struct TestCaseParams {
-	/// Optional timeout override for this specific test
+	/// Optional timeout override for this specific test.
 	pub timeout: Option<Duration>,
 }
 
@@ -82,19 +89,22 @@ impl Default for TestCaseParams {
 }
 
 impl TestCaseParams {
+	/// Creates a new [`TestCaseParams`] with default values.
 	pub fn new() -> Self { Self::default() }
 
+	/// Sets a timeout in milliseconds for this test.
 	pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
 		self.timeout = Some(Duration::from_millis(timeout_ms));
 		self
 	}
 }
 
+/// Component representing a test case.
 #[derive(Debug, Component)]
 pub struct Test {
-	/// The test description
+	/// The test description.
 	desc: TestDesc,
-	/// Counts the time elapsed since the test started
+	/// Counts the time elapsed since the test started.
 	timer: Stopwatch,
 }
 
@@ -104,20 +114,27 @@ impl std::ops::Deref for Test {
 }
 
 impl Test {
+	/// Creates a new [`Test`] from a test description.
 	pub fn new(desc: TestDesc) -> Self {
 		Self {
 			desc,
 			timer: default(),
 		}
 	}
+
+	/// Returns the test description.
 	pub fn desc(&self) -> &TestDesc { &self.desc }
+
 	/// Returns true if the test should not be run,
-	/// ie if `ignore` or `no_run` flag
+	/// ie if `ignore` or `no_run` flag is set.
 	pub fn do_not_run(&self) -> bool {
 		self.desc.ignore || self.desc.no_run || self.desc.compile_fail
 	}
 
+	/// Advances the test timer by the given delta.
 	pub fn tick(&mut self, delta: Duration) { self.timer.tick(delta); }
+
+	/// Returns the elapsed time since the test started.
 	pub fn elapsed(&self) -> Duration { self.timer.elapsed() }
 }
 
@@ -127,24 +144,34 @@ impl TestDescExt for Test {
 }
 
 
+/// Component wrapping a static test function.
 #[derive(Debug, Copy, Clone, Component)]
 pub struct TestFunc(fn() -> Result<(), String>);
 
 impl TestFunc {
+	/// Creates a new [`TestFunc`] from a function pointer.
 	pub fn new(func: fn() -> Result<(), String>) -> Self { Self(func) }
+
+	/// Runs the test function and returns the result.
 	pub fn run(&self) -> Result<(), String> { self.0() }
 }
 
-/// The [`test::TestFn::DynTestFn`] is [`Send`] but not [`Sync`]
-/// this type is for running these tests on the main thread.
+/// Component wrapping a dynamic test function.
+///
+/// The [`test::TestFn::DynTestFn`] is [`Send`] but not [`Sync`].
+/// This type is for running these tests on the main thread.
 #[derive(Component)]
 pub struct NonSendTestFunc(
 	SendWrapper<Box<dyn 'static + FnOnce() -> Result<(), String>>>,
 );
+
 impl NonSendTestFunc {
+	/// Creates a new [`NonSendTestFunc`] from a boxed function.
 	pub fn new(func: impl 'static + FnOnce() -> Result<(), String>) -> Self {
 		Self(SendWrapper::new(Box::new(func)))
 	}
+
+	/// Runs the test function and returns the result.
 	pub fn run(self) -> Result<(), String> { self.0.take()() }
 }
 

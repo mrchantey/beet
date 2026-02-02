@@ -1,11 +1,13 @@
 use crate::prelude::*;
 
 
-/// Parses Cli args into request style path and query
+/// Parses CLI args into request-style path and query parameters.
 // TODO deprecate, just use Parts directly
 #[derive(Debug, Clone)]
 pub struct CliArgs {
+	/// Positional arguments forming the path.
 	pub path: Vec<String>,
+	/// Named arguments as key-value pairs.
 	pub query: HashMap<String, Vec<String>>,
 }
 
@@ -16,6 +18,7 @@ impl CliArgs {
 		env_ext::args().join(" ").xmap(|val| Self::parse(&val))
 	}
 
+	/// Parses CLI arguments from a string.
 	pub fn parse(args: &str) -> Self {
 		let args = Self::group_quotations(args);
 		let mut path = Vec::new();
@@ -149,6 +152,7 @@ impl CliArgs {
 		result
 	}
 
+	/// Converts the parsed arguments back into a path string with query params.
 	pub fn into_path_string(&self) -> String {
 		let mut path_str = format!("/{}", self.path.join("/"));
 

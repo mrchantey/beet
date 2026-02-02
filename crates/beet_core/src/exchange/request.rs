@@ -47,6 +47,7 @@ use http::header::IntoHeaderName;
 #[component(on_add = on_add)]
 pub struct Request {
 	parts: RequestParts,
+	/// The request body, which may be bytes or a stream.
 	pub body: Body,
 }
 
@@ -84,6 +85,7 @@ pub struct RequestMeta {
 }
 
 impl RequestMeta {
+	/// Creates a new [`RequestMeta`] with the given parts and current timestamp.
 	pub fn new(parts: RequestParts) -> Self {
 		Self {
 			parts,
@@ -91,8 +93,10 @@ impl RequestMeta {
 		}
 	}
 
+	/// Returns the HTTP method of the request.
 	pub fn method(&self) -> HttpMethod { *self.parts.method() }
 
+	/// Returns the instant when the request was received.
 	pub fn started(&self) -> Instant { self.started }
 
 	/// Returns a reference to the request parts
@@ -292,6 +296,8 @@ impl Request {
 			body: default(),
 		})
 	}
+
+	/// Creates a request by parsing a CLI-style string.
 	pub fn from_cli_str(args: &str) -> Result<Self> {
 		let cli_args = CliArgs::parse(args);
 		Self::from_cli_args(cli_args)
@@ -355,13 +361,19 @@ impl From<CliArgs> for Request {
 	}
 }
 
-/// Types which consume a request, requiring its body which may be a stream
+/// Types that can be extracted from a [`Request`], consuming its body.
+///
+/// Implement this trait for types that need access to the request body,
+/// which may be a stream. For types that only need request metadata,
+/// implement [`FromRequestMeta`] instead.
 pub trait FromRequest<M>: Sized {
+	/// Extracts the type from the request asynchronously.
 	fn from_request(
 		request: Request,
 	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>>;
 }
 
+/// Marker type for [`FromRequest`] implementations via [`TryFrom`].
 pub struct TryFromRequestMarker;
 
 impl<T, E, M> FromRequest<(E, M, TryFromRequestMarker)> for T
@@ -378,8 +390,13 @@ where
 	}
 }
 
-/// Types which consume a request by reference, not requiring its body
+/// Types that can be extracted from request metadata without consuming the body.
+///
+/// Implement this trait for types that only need access to request headers,
+/// path, query parameters, etc. For types that need the body, implement
+/// [`FromRequest`] instead.
 pub trait FromRequestMeta<M>: Sized {
+	/// Extracts the type from the request metadata.
 	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response>;
 }
 
@@ -389,6 +406,7 @@ impl FromRequestMeta<Self> for () {
 	}
 }
 
+/// Marker type for [`FromRequest`] implementations via [`FromRequestMeta`].
 pub struct FromRequestMetaMarker;
 
 impl<T, M> FromRequest<(FromRequestMetaMarker, M)> for T

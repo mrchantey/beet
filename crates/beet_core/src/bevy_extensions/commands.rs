@@ -1,14 +1,18 @@
+//! Extension methods for Bevy's [`Commands`].
+
 use crate::prelude::*;
 
-
+/// Extension trait adding utility methods to [`Commands`].
 #[extend::ext(name=CommandsExt)]
 pub impl Commands<'_, '_> {
+	/// Logs the names of all components on the given entity.
 	fn log_component_names(&mut self, entity: Entity) {
 		self.queue(move |world: &mut World| {
 			world.log_component_names(entity);
 		});
 	}
 
+	/// Loads a scene from a serialized string.
 	#[cfg(feature = "bevy_scene")]
 	fn load_scene(&mut self, scene: impl Into<String>) {
 		let scene = scene.into();
@@ -29,6 +33,7 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
+	/// Runs a system once with the given input.
 	fn run_system_once_with<I, M, S>(
 		&mut self,
 		system: S,

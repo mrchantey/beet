@@ -1,29 +1,43 @@
+//! System parameter for extracting typed values from request parameters.
+//!
+//! This module provides [`ParamQuery`], a system parameter that extracts and
+//! caches typed values from request parameters.
+
 use crate::prelude::*;
 use bevy::reflect::Typed;
 
 
-/// A system param for extracting types from request params,
+/// A system parameter for extracting types from request params,
 /// and caching them by inserting as components alongside the request.
-/// ## Note
+///
+/// # Note
 ///
 /// This query should not be used in route handlers, as it accepts
-/// an agent entity, not an action entity, instead see [`RouteParamQuery`]
+/// an agent entity, not an action entity. Instead see `RouteParamQuery`.
 #[derive(SystemParam)]
 pub struct ParamQuery<'w, 's, T: Component> {
+	/// Commands for inserting cached components.
 	pub commands: Commands<'w, 's>,
+	/// Query for accessing request metadata and cached params.
 	pub agents: Query<'w, 's, (&'static RequestMeta, Option<&'static T>)>,
 }
 
 impl<T: Clone + Component> ParamQuery<'_, '_, T> {
-	/// Attempt to extract the param from the request, inserting it into the
-	/// request entity if it is missing.
+	/// Attempts to extract the param from the request.
+	///
+	/// If the param has already been extracted, returns the cached value.
+	/// Otherwise, parses it from the request and caches it as a component.
 	pub fn get(&mut self, agent: Entity) -> Result<T>
 	where
 		T: Sized + Clone + FromReflect + Typed + Component,
 	{
 		self.get_custom(agent, |request| request.params().parse_reflect::<T>())
 	}
-	/// Attempt to extract the param from the request using a custom function
+
+	/// Attempts to extract the param from the request using a custom function.
+	///
+	/// If the param has already been extracted, returns the cached value.
+	/// Otherwise, calls the provided function and caches the result.
 	pub fn get_custom<F>(&mut self, agent: Entity, func: F) -> Result<T>
 	where
 		F: FnOnce(&RequestMeta) -> Result<T>,

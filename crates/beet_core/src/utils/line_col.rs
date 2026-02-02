@@ -22,6 +22,7 @@ impl Default for LineCol {
 }
 
 impl LineCol {
+	/// Creates a new [`LineCol`] with the given line and column.
 	pub fn new(line: u32, col: u32) -> Self {
 		// id like to assert this but it seems rust-analyzer uses 0 based line numbers?
 
@@ -37,7 +38,9 @@ impl LineCol {
 		}
 	}
 
+	/// Returns the line number.
 	pub fn line(&self) -> u32 { self.line }
+	/// Returns the column number.
 	pub fn col(&self) -> u32 { self.col }
 
 	/// Find the start of the first element and the end of the last element,

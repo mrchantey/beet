@@ -1,14 +1,36 @@
+//! Glob-based path filtering.
+//!
+//! This module provides [`GlobFilter`], a type for filtering paths using
+//! include and exclude glob patterns. It's commonly used for file watching
+//! and path matching operations.
+//!
+//! # Example
+//!
+//! ```
+//! # use beet_core::prelude::*;
+//! let filter = GlobFilter::default()
+//!     .with_include("**/*.rs")
+//!     .with_exclude("*target*");
+//!
+//! assert!(filter.passes("src/lib.rs"));
+//! assert!(!filter.passes("target/debug/lib.rs"));
+//! ```
+
 use bevy::prelude::*;
 use std::path::Path;
 
-/// glob for watch patterns
+/// A glob-based path filter with include and exclude patterns.
+///
+/// To pass a path must:
+/// 1. Not match any exclude patterns
+/// 2. Match at least one include pattern (or include patterns are empty)
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
-	/// glob for watch patterns, leave empty to include all
+	/// Glob patterns for paths to include. Leave empty to include all.
 	include: Vec<GlobPattern>,
-	/// glob for ignore patterns
+	/// Glob patterns for paths to exclude.
 	exclude: Vec<GlobPattern>,
 }
 
@@ -31,7 +53,9 @@ impl std::fmt::Display for GlobFilter {
 }
 
 impl GlobFilter {
-	/// For use by clap parsers to verify a pattern before inserting
+	/// Parses and validates a glob pattern string.
+	///
+	/// For use by clap parsers to verify a pattern before inserting.
 	pub fn parse_glob_pattern(s: &str) -> Result<String, String> {
 		// Validate it's a valid pattern
 		glob::Pattern::new(s)
@@ -39,8 +63,9 @@ impl GlobFilter {
 		Ok(s.to_string())
 	}
 
-	/// Wrap each pattern with wildcards if they dont already have them,
-	/// turning `foo/bar` into `*foo/bar*` which matches any path that contains `foo/bar`.
+	/// Wraps each pattern with wildcards if they don't already have them.
+	///
+	/// Turns `foo/bar` into `*foo/bar*` which matches any path that contains `foo/bar`.
 	pub fn wrap_all_with_wildcard(&mut self) -> &mut Self {
 		self.include = self
 			.include
@@ -67,15 +92,19 @@ impl GlobFilter {
 		GlobPattern(wrapped)
 	}
 
+	/// Sets the include patterns, replacing any existing ones.
 	pub fn set_include(mut self, items: Vec<&str>) -> Self {
 		self.include = items.iter().map(|w| GlobPattern::new(w)).collect();
 		self
 	}
 
+	/// Sets the exclude patterns, replacing any existing ones.
 	pub fn set_exclude(mut self, items: Vec<&str>) -> Self {
 		self.exclude = items.iter().map(|i| GlobPattern::new(i)).collect();
 		self
 	}
+
+	/// Extends the include patterns with additional items.
 	pub fn extend_include<T: AsRef<str>>(
 		mut self,
 		items: impl IntoIterator<Item = T>,
@@ -85,6 +114,7 @@ impl GlobFilter {
 		self
 	}
 
+	/// Extends the exclude patterns with additional items.
 	pub fn extend_exclude<T: AsRef<str>>(
 		mut self,
 		items: impl IntoIterator<Item = T>,
@@ -94,38 +124,47 @@ impl GlobFilter {
 		self
 	}
 
+	/// Adds an include pattern and returns `&mut Self`.
 	pub fn include(&mut self, pattern: &str) -> &mut Self {
 		self.include.push(GlobPattern::new(pattern));
 		self
 	}
 
+	/// Adds an exclude pattern and returns `&mut Self`.
 	pub fn exclude(&mut self, pattern: &str) -> &mut Self {
 		self.exclude.push(GlobPattern::new(pattern));
 		self
 	}
 
+	/// Adds an include pattern and returns `Self`.
 	pub fn with_include(mut self, pattern: &str) -> Self {
 		self.include.push(GlobPattern::new(pattern));
 		self
 	}
 
+	/// Adds an exclude pattern and returns `Self`.
 	pub fn with_exclude(mut self, pattern: &str) -> Self {
 		self.exclude.push(GlobPattern::new(pattern));
 		self
 	}
 
+	/// Returns `true` if there are no include or exclude patterns.
 	pub fn is_empty(&self) -> bool {
 		self.include.is_empty() && self.exclude.is_empty()
 	}
 
-	/// To pass a path must
-	/// 1. not be present in the exclude patterns
-	/// 2. be present in the include patterns or the include patterns are empty
-	/// Currently converts to string with forward slashes
+	/// Checks if a path passes the filter.
+	///
+	/// To pass a path must:
+	/// 1. Not be present in the exclude patterns
+	/// 2. Be present in the include patterns or the include patterns are empty
+	///
+	/// Currently converts paths to strings with forward slashes.
 	pub fn passes(&self, path: impl AsRef<Path>) -> bool {
 		self.passes_include(&path) && self.passes_exclude(&path)
 	}
 
+	/// Checks if a path passes the include filter.
 	pub fn passes_include(&self, path: impl AsRef<Path>) -> bool {
 		self.include.is_empty()
 			|| self
@@ -134,6 +173,7 @@ impl GlobFilter {
 				.any(|watch| watch.matches_path(path.as_ref()))
 	}
 
+	/// Checks if a path passes the exclude filter.
 	pub fn passes_exclude(&self, path: impl AsRef<Path>) -> bool {
 		!self
 			.exclude
@@ -143,39 +183,47 @@ impl GlobFilter {
 }
 
 
-/// A validated glob pattern that stores the pattern as a String
+/// A validated glob pattern that stores the pattern as a String.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobPattern(String);
 
 impl GlobPattern {
-	/// Create a new GlobPattern, validating it's a valid glob pattern
-	/// Panics if the pattern is invalid
+	/// Creates a new [`GlobPattern`], validating it's a valid glob pattern.
+	///
+	/// # Panics
+	///
+	/// Panics if the pattern is invalid.
 	pub fn new(pattern: &str) -> Self {
 		// Validate it's a valid pattern
 		glob::Pattern::new(pattern).expect("Invalid glob pattern");
 		Self(pattern.to_string())
 	}
 
-	/// Get the pattern as a string slice
+	/// Returns the pattern as a string slice.
 	pub fn as_str(&self) -> &str { &self.0 }
 
-	/// Convert to glob::Pattern
-	/// Panics if the stored pattern is invalid (should never happen)
+	/// Converts to a [`glob::Pattern`].
+	///
+	/// # Panics
+	///
+	/// Panics if the stored pattern is invalid (should never happen).
 	pub fn to_pattern(&self) -> glob::Pattern {
 		glob::Pattern::new(&self.0)
 			.expect("Invalid glob pattern stored in GlobPattern")
 	}
 
-	/// Convert from glob::Pattern
+	/// Creates a [`GlobPattern`] from a [`glob::Pattern`].
 	pub fn from_pattern(pattern: &glob::Pattern) -> Self {
 		Self(pattern.as_str().to_string())
 	}
 
+	/// Checks if the pattern matches the given text.
 	pub fn matches(&self, text: &str) -> bool {
 		self.to_pattern().matches(text)
 	}
 
+	/// Checks if the pattern matches the given path.
 	pub fn matches_path(&self, path: impl AsRef<Path>) -> bool {
 		self.to_pattern().matches_path(path.as_ref())
 	}

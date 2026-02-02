@@ -15,6 +15,7 @@ pub fn relative(path: &impl AsRef<Path>) -> FsResult<&Path> {
 }
 
 
+/// Joins a base path with a relative path, stripping any leading `/` from the relative path.
 pub fn join_relative(base: impl AsRef<Path>, rel: impl AsRef<Path>) -> PathBuf {
 	let base = base.as_ref();
 	let rel = rel.as_ref();
@@ -131,21 +132,25 @@ pub fn create_relative(
 	})
 }
 
+/// Converts backslashes to forward slashes in a path.
 pub fn to_forward_slash(path: impl AsRef<Path>) -> PathBuf {
 	path.as_ref().to_string_lossy().replace("\\", "/").into()
 }
 
+/// Returns the file stem (name without extension), or an error if none.
 pub fn file_stem(path: &impl AsRef<Path>) -> FsResult<&OsStr> {
 	let path = path.as_ref();
 	path.file_stem()
 		.ok_or_else(|| FsError::other(path, "No file stem"))
 }
+/// Returns the file name, or an error if none.
 pub fn file_name(path: &impl AsRef<Path>) -> FsResult<&OsStr> {
 	let path = path.as_ref();
 	path.file_name()
 		.ok_or_else(|| FsError::other(path, "No file name"))
 }
 
+/// Returns `true` if the path is a directory or has the given extension.
 pub fn is_dir_or_extension(path: &impl AsRef<Path>, ext: &str) -> bool {
 	let path = path.as_ref();
 	match path.extension() {

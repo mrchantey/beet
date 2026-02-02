@@ -1,7 +1,12 @@
+//! Control flow assertion matchers.
+//!
+//! This module provides assertion methods for [`ControlFlow`] values.
+
 use crate::prelude::*;
 use std::fmt::Debug;
 use std::ops::ControlFlow;
 
+/// Extension trait adding assertion methods to [`ControlFlow<B, C>`].
 #[extend::ext(name=MatcherControlFlow)]
 pub impl<B: Debug, C: Debug> ControlFlow<B, C> {
 	/// Performs an assertion ensuring this value is a `ControlFlow::Continue`.

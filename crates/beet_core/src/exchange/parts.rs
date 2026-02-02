@@ -564,7 +564,9 @@ impl std::ops::DerefMut for RequestParts {
 /// on [`Parts`] are available directly.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseParts {
+	/// The HTTP status code of the response.
 	pub status: StatusCode,
+	/// The shared parts (headers, etc.).
 	pub parts: Parts,
 }
 

@@ -40,8 +40,10 @@ pub trait TestDescExt {
 		}
 	}
 
+	/// Returns the source file path as a workspace-relative path.
 	fn path(&self) -> WsPathBuf { WsPathBuf::new(self.desc().source_file) }
 
+	/// Returns the start location (line and column) of the test.
 	fn start(&self) -> LineCol {
 		LineCol {
 			line: self.desc().start_line as u32,
@@ -49,6 +51,7 @@ pub trait TestDescExt {
 		}
 	}
 
+	/// Returns the end location (line and column) of the test.
 	fn end(&self) -> LineCol {
 		LineCol {
 			line: self.desc().end_line as u32,
@@ -65,6 +68,7 @@ pub trait TestDescExt {
 		}
 	}
 
+	/// Returns a formatted string with short file path, location, and test name.
 	fn short_file_and_name(&self) -> String {
 		format!(
 			"{}:{}:{} · {}",

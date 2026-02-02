@@ -1,3 +1,16 @@
+//! On-spawn effects for Bevy entities.
+//!
+//! This module provides bundle effects that run when an entity is spawned,
+//! allowing for deferred initialization, dynamic bundle insertion, and
+//! entity relationship setup.
+//!
+//! # Key Types
+//!
+//! - [`OnSpawn`] - Type-erased effect that runs immediately when spawned
+//! - [`OnSpawnTyped`] - Generic version that preserves the closure type
+//! - [`OnSpawnDeferred`] - Effect that runs when explicitly flushed
+//! - [`OnSpawnClone`] - Cloneable version of [`OnSpawn`]
+
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
 use bevy::ecs::error::ErrorContext;
@@ -19,18 +32,25 @@ where
 }
 
 
-/// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
+/// A type-erased [`BundleEffect`] that runs a function when the entity is spawned.
+///
+/// This is the most flexible spawn effect, accepting any boxed closure.
+/// For a typed version, see [`OnSpawnTyped`].
 #[derive(BundleEffect)]
 pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
-/// Allow for Bundles and Results to be returned from methods
+/// Trait for allowing bundles and results to be returned from methods.
 pub trait ApplyToEntity<M>: 'static + Send + Sync {
+	/// Applies this value to the entity.
 	fn apply(self, entity: &mut EntityWorldMut);
 }
 
+/// Marker type for bundle implementations of [`ApplyToEntity`].
 pub struct BundleApplyToEntityMarker;
+
+/// Marker type for result implementations of [`ApplyToEntity`].
 pub struct ResultApplyToEntityMarker;
 
 impl<T: Bundle> ApplyToEntity<BundleApplyToEntityMarker> for T {
@@ -55,19 +75,21 @@ impl<T: Bundle> ApplyToEntity<ResultApplyToEntityMarker> for Result<T> {
 	}
 }
 impl OnSpawn {
-	/// Create a new [`OnSpawn`] effect.
+	/// Creates a new [`OnSpawn`] effect.
 	pub fn new(
 		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
 	) -> Self {
 		Self(Box::new(func))
 	}
-	/// Insert this bundle into the entity on spawn.
+
+	/// Inserts a bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {
 		Self::new(move |entity| {
 			entity.insert(bundle);
 		})
 	}
-	/// Insert the bundle if it is `Some`
+
+	/// Inserts the bundle if it is `Some`.
 	pub fn insert_option(bundle: Option<impl Bundle>) -> Self {
 		Self::new(move |entity| {
 			if let Some(bundle) = bundle {
@@ -76,7 +98,7 @@ impl OnSpawn {
 		})
 	}
 
-	/// Run the system and insert the resulting bundle into the entity on spawn.
+	/// Runs the system and inserts the resulting bundle into the entity on spawn.
 	pub fn run_insert<
 		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
 		M1,
@@ -93,18 +115,21 @@ impl OnSpawn {
 		})
 	}
 
-	/// Insert the resource into the world when the entity is spawned.
+	/// Inserts the resource into the world when the entity is spawned.
 	pub fn insert_resource(resource: impl Resource) -> Self {
 		Self::new(move |entity| {
 			entity.world_scope(move |world| world.insert_resource(resource));
 		})
 	}
 
+	/// Triggers an entity target event on spawn.
 	pub fn trigger<M>(event: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
 			entity.trigger_target(event);
 		})
 	}
+
+	/// Triggers an entity target event on spawn if the event is `Some`.
 	pub fn trigger_option<M>(
 		event: Option<impl IntoEntityTargetEvent<M>>,
 	) -> Self {
@@ -115,6 +140,7 @@ impl OnSpawn {
 		})
 	}
 
+	/// Registers an observer on the entity on spawn.
 	pub fn observe<E: Event, B: Bundle, M>(
 		observer: impl 'static + Send + Sync + IntoObserverSystem<E, B, M>,
 	) -> Self {
@@ -126,7 +152,7 @@ impl OnSpawn {
 
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
-	/// Create a new [`OnSpawn`] effect.
+	/// Creates a new [`OnSpawn`] effect that runs an async function.
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
@@ -142,7 +168,8 @@ impl OnSpawn {
 			});
 		}))
 	}
-	/// Create a new [`OnSpawn`] effect.
+
+	/// Creates a new [`OnSpawn`] effect that runs an async function on the local thread.
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
@@ -162,33 +189,39 @@ impl OnSpawn {
 }
 
 
-/// A [`BundleEffect`] that runs a function when the entity is spawned.
+/// A [`BundleEffect`] that runs a typed function when the entity is spawned.
+///
+/// Unlike [`OnSpawn`], this preserves the closure type for better type inference.
 #[derive(Clone, BundleEffect)]
 pub struct OnSpawnTyped<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(
 	pub F,
 );
 
 impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawnTyped<F> {
-	/// Create a new [`OnSpawn`] effect.
+	/// Creates a new [`OnSpawnTyped`] effect.
 	pub fn new(func: F) -> Self { Self(func) }
 
 	fn effect(self, entity: &mut EntityWorldMut) { self.0(entity); }
 }
 
+/// A component that runs a deferred function when explicitly flushed.
+///
+/// Unlike [`OnSpawn`], this does not run immediately when spawned.
+/// Instead, it must be flushed by running the [`OnSpawnDeferred::flush`] system.
 #[derive(Component)]
 pub struct OnSpawnDeferred(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result>,
 );
 
 impl OnSpawnDeferred {
-	/// Create a new [`OnSpawnDeferred`] effect.
+	/// Creates a new [`OnSpawnDeferred`] effect.
 	pub fn new(
 		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
 	) -> Self {
 		Self(Box::new(func))
 	}
 
-	/// Run the function for the parent of this entity
+	/// Runs the function for the parent of this entity.
 	pub fn parent<R: Relationship>(
 		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
 	) -> Self {
@@ -203,7 +236,7 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	/// Insert this bundle into the entity on spawn.
+	/// Inserts this bundle into the entity when flushed.
 	pub fn insert(bundle: impl Bundle) -> Self {
 		Self::new(move |entity| {
 			entity.insert(bundle);
@@ -211,7 +244,7 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	/// When flushed, insert this bundle into the parent of the entity.
+	/// When flushed, inserts this bundle into the parent of the entity.
 	pub fn insert_parent<R: Relationship>(bundle: impl Bundle) -> Self {
 		Self::parent::<R>(move |entity| {
 			entity.insert(bundle);
@@ -219,6 +252,7 @@ impl OnSpawnDeferred {
 		})
 	}
 
+	/// Triggers an entity target event when flushed.
 	pub fn trigger_target<M>(ev: impl IntoEntityTargetEvent<M>) -> Self {
 		Self::new(move |entity| {
 			entity.trigger_target(ev);
@@ -226,7 +260,7 @@ impl OnSpawnDeferred {
 		})
 	}
 
-	/// Run all [`OnSpawnDeferred`]
+	/// System that runs all [`OnSpawnDeferred`] components.
 	pub fn flush(
 		mut commands: Commands,
 		mut query: Query<(Entity, &mut Self)>,
@@ -241,6 +275,7 @@ impl OnSpawnDeferred {
 		}
 	}
 
+	/// Converts this into a command for the given entity.
 	pub fn into_command(
 		self,
 		entity: Entity,
@@ -252,15 +287,18 @@ impl OnSpawnDeferred {
 	}
 
 
-	/// Call the deferred function.
+	/// Calls the deferred function.
 	pub fn call(self, entity: &mut EntityWorldMut) -> Result {
 		(self.0)(entity)
 	}
-	/// Convenience for getting the method from inside a system,
-	/// this component should be removed when this is called
+
+	/// Takes the method from this component.
+	///
+	/// This component should be removed when this is called.
 	///
 	/// # Panics
-	/// If the method has already been taken
+	///
+	/// Panics if the method has already been taken.
 	pub fn take(&mut self) -> Self {
 		Self::new(std::mem::replace(
 			&mut self.0,
@@ -271,14 +309,17 @@ impl OnSpawnDeferred {
 	}
 }
 
-/// A [`Clone`] version of [`OnSpawn`]
+/// A [`Clone`]able version of [`OnSpawn`].
+///
+/// Uses a trait object that implements [`Clone`] to allow the effect to be cloned.
 #[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
 impl OnSpawnClone {
-	/// Create a new [`OnSpawnCloneable`] effect.
+	/// Creates a new [`OnSpawnClone`] effect.
 	pub fn new(func: impl CloneEntityFunc) -> Self { Self(Box::new(func)) }
-	/// Immediately inserts the bundle returned from this method
+
+	/// Creates an effect that immediately inserts the bundle returned from the closure.
 	pub fn insert<F, O>(func: F) -> Self
 	where
 		F: 'static + Send + Sync + Clone + FnOnce() -> O,
@@ -296,9 +337,13 @@ impl Clone for OnSpawnClone {
 	fn clone(&self) -> Self { Self(self.0.box_clone()) }
 }
 
+/// Trait for cloneable entity functions.
+///
+/// This is used by [`OnSpawnClone`] to allow cloning of the inner closure.
 pub trait CloneEntityFunc:
 	'static + Send + Sync + Fn(&mut EntityWorldMut)
 {
+	/// Creates a boxed clone of this function.
 	fn box_clone(&self) -> Box<dyn CloneEntityFunc>;
 }
 impl<T> CloneEntityFunc for T

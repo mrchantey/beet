@@ -1,3 +1,21 @@
+//! Entity target events for Bevy.
+//!
+//! This module provides [`EntityTargetTrigger`] and related types for triggering
+//! events that target specific entities and optionally propagate through entity
+//! hierarchies.
+//!
+//! # Overview
+//!
+//! Unlike standard Bevy [`EntityEvent`]s which store the target entity on the event
+//! itself, [`EntityTargetEvent`]s store the target on the [`Trigger`] struct. This
+//! allows for cleaner event definitions and easier propagation through hierarchies.
+//!
+//! # Key Types
+//!
+//! - [`EntityTargetTrigger`] - A trigger that propagates through entity hierarchies
+//! - [`EntityTargetEvent`] - Trait for events using [`EntityTargetTrigger`]
+//! - [`IntoEntityTargetEvent`] - Conversion trait for entity-like events
+
 use std::fmt;
 
 use crate::prelude::*;
@@ -8,13 +26,15 @@ use bevy::ecs::observer::CachedObservers;
 use bevy::ecs::observer::TriggerContext;
 use bevy::ecs::system::IntoObserverSystem;
 
-/// Copied verbatim from [`PropagateEntityTrigger`] but storing the `event_target` on the [`Trigger`] not the [`Event`].
-/// An [`EntityEvent`] [`Trigger`] that behaves like [`EntityTrigger`], but "propagates" the event
-/// using an [`Entity`] [`Traversal`]. At each step in the propagation, the [`EntityTrigger`] logic will
-/// be run, until [`EntityTargetTrigger::propagate`] is false, or there are no entities left to traverse.
+/// An [`EntityEvent`] [`Trigger`] that stores the `event_target` on the [`Trigger`].
 ///
-/// This is used by the [`EntityEvent`] derive when `#[entity_event(propagate)]` is enabled. It is usable by every
-/// [`EntityEvent`] type.
+/// This behaves like [`EntityTrigger`], but "propagates" the event using an
+/// [`Entity`] [`Traversal`]. At each step in the propagation, the trigger logic
+/// will run until [`EntityTargetTrigger::propagate`] is false or there are no
+/// entities left to traverse.
+///
+/// This is used by the [`EntityEvent`] derive when `#[entity_event(propagate)]`
+/// is enabled. It is usable by every [`EntityEvent`] type.
 ///
 /// If `AUTO_PROPAGATE` is `true`, [`EntityTargetTrigger::propagate`] will default to `true`.
 pub struct EntityTargetTrigger<
@@ -24,11 +44,12 @@ pub struct EntityTargetTrigger<
 > {
 	/// The original [`Entity`] the [`Event`] was _first_ triggered for.
 	pub original_event_target: Entity,
-	/// [`Entity`] the [`Event`] is _currently_ triggered for.
+	/// The [`Entity`] the [`Event`] is _currently_ triggered for.
 	pub event_target: Entity,
 
-	/// Whether or not to continue propagating using the `T` [`Traversal`]. If this is false,
-	/// The [`Traversal`] will stop on the current entity.
+	/// Whether or not to continue propagating using the `T` [`Traversal`].
+	///
+	/// If this is false, the [`Traversal`] will stop on the current entity.
 	pub propagate: bool,
 
 	_marker: PhantomData<(E, T)>,
@@ -124,6 +145,7 @@ unsafe impl<
 }
 
 /// A trait for events that use [`EntityTargetTrigger`] as their trigger type.
+///
 /// This provides access to `.target()` on the observer's `On<E>` parameter.
 pub trait EntityTargetEvent:
 	'static
@@ -145,20 +167,25 @@ impl<T> EntityTargetEvent for T where
 {
 }
 
-/// An encompasing trait that includes all entity-like events:
+/// A trait for converting values into entity target events.
+///
+/// This encompasses all entity-like events:
 /// - [`EntityEvent`]
 /// - [`EntityTargetEvent`]
 pub trait IntoEntityTargetEvent<M>: 'static + Send + Sync {
+	/// The event type.
 	type Event: for<'a> Event<Trigger<'a> = Self::Trigger>;
+	/// The trigger type.
 	type Trigger: 'static + Send + Sync + Trigger<Self::Event>;
 
+	/// Converts this value into an entity target event and trigger.
 	fn into_entity_target_event(
 		self,
 		entity: Entity,
 	) -> (Self::Event, Self::Trigger);
 }
 
-/// parity with the vanilla `commands.entity().trigger(..)`
+/// Marker type for [`FnOnce`] implementations of [`IntoEntityTargetEvent`].
 pub struct FnOnceIntoEntityTargetMarker;
 
 impl<F, E, T> IntoEntityTargetEvent<(E, T, FnOnceIntoEntityTargetMarker)> for F
@@ -178,6 +205,7 @@ where
 	}
 }
 
+/// Marker type for [`TriggerFromTarget`] implementations of [`IntoEntityTargetEvent`].
 pub struct TriggerFromTargetIntoEntityTargetMarker;
 
 
@@ -200,7 +228,9 @@ where
 
 
 
+/// A trait for creating triggers from a target entity.
 pub trait TriggerFromTarget {
+	/// Creates a trigger for the given target entity.
 	fn trigger_from_target(entity: Entity) -> Self;
 }
 
@@ -210,8 +240,10 @@ impl<const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>> TriggerFromTarget
 	fn trigger_from_target(entity: Entity) -> Self { Self::new(entity) }
 }
 
+/// Extension trait for triggering entity target events on [`EntityWorldMut`].
 #[extend::ext(name=EntityWorldMutActionEventExt)]
 pub impl EntityWorldMut<'_> {
+	/// Triggers an entity target event for this entity.
 	#[track_caller]
 	fn trigger_target<M>(
 		&mut self,
@@ -225,27 +257,28 @@ pub impl EntityWorldMut<'_> {
 		self
 	}
 
-	/// Call [`World::flush`]
+	/// Flushes the world's command queue.
 	fn flush(&mut self) -> &mut Self {
 		self.world_scope(|world| {
 			world.flush();
 		});
 		self
 	}
-	/// Creates an [`Observer`] watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
-	/// targets this entity.
+
+	/// Creates an [`Observer`] watching for an [`Event`] of type `E` targeting this entity.
+	///
+	/// Unlike the built-in `observe` method which is restricted to [`EntityEvent`],
+	/// this method works with any [`Event`] type.
 	///
 	/// # Panics
 	///
-	/// If the entity has been despawned while this `EntityWorldMut` is still alive.
-	///
+	/// Panics if the entity has been despawned while this `EntityWorldMut` is still alive.
 	/// Panics if the given system is an exclusive system.
 	// we need this because `observe` is restricted to [`EntityEvent`]
 	fn observe_any<E: Event, B: Bundle, M>(
 		&mut self,
 		observer: impl IntoObserverSystem<E, B, M>,
 	) -> &mut Self {
-		// self.assert_not_despawned();
 		let bundle = Observer::new(observer).with_entity(self.id());
 		self.world_scope(move |world| {
 			world.spawn(bundle);
@@ -257,8 +290,10 @@ pub impl EntityWorldMut<'_> {
 
 
 
+/// Extension trait for triggering entity target events on [`EntityCommands`].
 #[extend::ext(name=EntityCommandsActionEventExt)]
 pub impl EntityCommands<'_> {
+	/// Triggers an entity target event for this entity.
 	#[track_caller]
 	fn trigger_target<M>(
 		&mut self,
@@ -279,10 +314,10 @@ pub impl EntityCommands<'_> {
 		self
 	}
 
-	/// An [`EntityCommand`] that creates an [`Observer`](crate::observer::Observer)
-	/// watching for an [`EntityEvent`] of type `E` whose [`EntityEvent::event_target`]
-	/// targets this entity.
-	// we need this because `observe` is restricted to [`EntityEvent`]
+	/// Creates an [`Observer`] watching for an [`Event`] of type `E` targeting this entity.
+	///
+	/// Unlike the built-in `observe` method which is restricted to [`EntityEvent`],
+	/// this method works with any [`Event`] type.
 	#[track_caller]
 	fn observe_any<E: Event, B: Bundle, M>(
 		&mut self,
@@ -295,13 +330,18 @@ pub impl EntityCommands<'_> {
 	}
 }
 
+/// Extension trait for accessing target information on [`On`] for entity target events.
 #[extend::ext(name=OnEntityTargetEventExt)]
 pub impl<'w, 't, const AUTO_PROPAGATE: bool, E: Event, T: Traversal<E>>
 	On<'w, 't, E>
 where
 	E: for<'a> Event<Trigger<'a> = EntityTargetTrigger<AUTO_PROPAGATE, E, T>>,
 {
+	/// Returns the current target entity of the event,
+	/// which may not be the original in the case of propagation.
 	fn target(&self) -> Entity { self.trigger().event_target }
+
+	/// Returns the original target entity that the event was first triggered for.
 	fn original_target(&self) -> Entity { self.trigger().original_event_target }
 }
 #[cfg(test)]

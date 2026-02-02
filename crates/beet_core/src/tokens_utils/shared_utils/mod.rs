@@ -3,6 +3,7 @@
 // for both crates.
 #![allow(unused)]
 mod attribute_group;
+/// Package configuration extensions for Cargo.toml parsing.
 pub mod pkg_ext;
 pub use attribute_group::*;
 mod named_field;

@@ -1,6 +1,12 @@
+//! Ordering assertion matchers.
+//!
+//! This module provides assertion methods for comparing values using
+//! ordering relations (less than, greater than, etc.).
+
 use crate::prelude::*;
 use std::fmt::Debug;
 
+/// Extension trait adding ordering assertion methods to [`PartialOrd`] types.
 #[extend::ext(name=MatcherOrd)]
 pub impl<T: PartialOrd + Debug + Copy> T {
 	/// Performs an assertion ensuring this value is less than `other`.

@@ -7,11 +7,16 @@ impl<F> AsyncTest for F where F: 'static + Future<Output = Result<(), String>> {
 
 
 
+/// Converts a type into an async test future.
 pub trait IntoFut<M> {
+	/// Converts this type into an async test future.
 	fn into_fut(self) -> impl AsyncTest;
 }
+/// Marker for futures that return `Result<(), String>`.
 pub struct ReturnsResult;
+/// Marker for futures that return `()`.
 pub struct ReturnsUnit;
+/// Marker for futures that return `!` (never type).
 pub struct ReturnsNever;
 
 impl<T> IntoFut<ReturnsResult> for T

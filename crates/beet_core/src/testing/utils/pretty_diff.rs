@@ -63,6 +63,7 @@ where
 	}
 }
 
+/// Generates an inline diff string highlighting differences between two strings.
 pub fn inline_diff(expected: &str, received: &str) -> String {
 	let mut output = String::new();
 	write_inline_diff(&mut output, expected, received)

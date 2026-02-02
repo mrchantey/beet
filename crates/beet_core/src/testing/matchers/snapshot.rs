@@ -1,3 +1,33 @@
+//! Snapshot testing utilities.
+//!
+//! This module provides snapshot testing capabilities through the
+//! [`xpect_snapshot`](MatcherSnapshot::xpect_snapshot) method, which compares
+//! values against stored snapshots.
+//!
+//! # Usage
+//!
+//! ```ignore
+//! # use beet_core::prelude::*;
+//! // Compare a string to a snapshot
+//! "hello world".xpect_snapshot();
+//!
+//! // Compare debug output to a snapshot
+//! my_struct.xpect_debug_snapshot();
+//! ```
+//!
+//! # Updating Snapshots
+//!
+//! Run tests with `--snap` flag to save new or update existing snapshots:
+//!
+//! ```sh
+//! cargo test -- --snap
+//! ```
+//!
+//! # Storage
+//!
+//! Snapshots are stored in `.beet/snapshots/<source_file>/<index>.snap`,
+//! where index is the position of the snapshot call in the source file.
+
 use crate::prelude::*;
 use core::panic::Location;
 #[cfg(feature = "tokens")]
@@ -8,25 +38,32 @@ use std::fmt::Debug;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
+/// Extension trait for snapshot testing of [`Debug`] types.
 #[extend::ext(name=MatcherDebugSnapshot)]
 pub impl<T: Debug> T {
 	/// Converts to formatted debug string and then creates
-	/// a snapshot, see [`MatcherSnapshot::xpect_snapshot`]
+	/// a snapshot, see [`MatcherSnapshot::xpect_snapshot`].
 	#[track_caller]
 	fn xpect_debug_snapshot(&self) -> &Self {
 		self.xfmt().xpect_snapshot();
 		self
 	}
 }
+
+/// Extension trait for snapshot testing.
 #[extend::ext(name=MatcherSnapshot)]
 pub impl<T, M> T
 where
 	T: StringComp<M>,
 {
 	/// Compares the value to a snapshot, saving it if the `--snap` flag is used.
+	///
 	/// Multiple snapshots per file are supported and indexed by their position.
+	///
 	/// # Panics
-	/// If the snapshot file cannot be read or written.
+	///
+	/// Panics if the snapshot file cannot be read or written, or if the
+	/// snapshot doesn't match the received value.
 	#[track_caller]
 	fn xpect_snapshot(&self) -> &Self {
 		let received = self.to_comp_string();
@@ -278,10 +315,13 @@ fn parse_snapshot(
 	}
 }
 
+/// Trait for types that can be converted to strings for snapshot comparison.
 pub trait StringComp<M> {
+	/// Converts this value to a string for comparison.
 	fn to_comp_string(&self) -> String;
 }
 
+/// Marker type for [`ToTokens`] implementations of [`StringComp`].
 pub struct ToTokensStringCompMarker;
 
 // we dont blanket ToTokens because collision with String
@@ -327,8 +367,8 @@ macro_rules! impl_string_comp_for_primitives {
 
 impl_string_comp_for_primitives!(&str, String, std::borrow::Cow<'static, str>);
 
-/// Attempt to parse the tokens with prettyplease,
-/// otherwise return the tokens as a string.
+/// Attempts to parse the tokens with prettyplease,
+/// otherwise returns the tokens as a string.
 #[cfg(feature = "tokens")]
 pub fn pretty_parse(tokens: TokenStream) -> String {
 	use syn::File;

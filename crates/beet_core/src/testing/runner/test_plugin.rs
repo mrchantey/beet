@@ -1,8 +1,10 @@
+//! Test runner plugin and schedule for beet.
+
 use super::*;
 use crate::prelude::*;
 use bevy::time::TimePlugin;
 
-
+/// Entry point for the custom test runner, invoked by the test harness.
 pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
@@ -14,6 +16,7 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 }
 
 
+/// Bevy plugin that sets up the test runner infrastructure.
 #[derive(Default)]
 pub struct TestPlugin;
 
@@ -44,5 +47,6 @@ impl Plugin for TestPlugin {
 }
 
 
+/// Schedule that runs test execution systems.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ScheduleLabel)]
 pub struct RunTests;

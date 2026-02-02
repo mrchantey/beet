@@ -1,4 +1,10 @@
+//! Boolean assertion matchers.
+//!
+//! This module provides assertion methods for boolean values.
+
 use crate::prelude::*;
+
+/// Extension trait adding assertion methods to [`bool`].
 #[extend::ext(name=MatcherBool)]
 pub impl bool {
 	/// Performs an assertion ensuring this value is equal to `true`.

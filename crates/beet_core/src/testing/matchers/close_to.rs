@@ -1,11 +1,28 @@
+//! Floating-point approximate equality utilities.
+//!
+//! This module provides the [`CloseTo`] trait for comparing floating-point
+//! values with a configurable tolerance, useful for testing numerical results.
+
 use bevy::prelude::*;
 
+/// Default delta tolerance for f32 comparisons.
 pub const DEFAULT_DELTA_F32: f32 = 0.1;
+
+/// Default delta tolerance for f64 comparisons.
 pub const DEFAULT_DELTA_F64: f64 = 0.1;
 
+/// Trait for approximate equality comparisons.
+///
+/// This is primarily used by [`xpect_close`](super::MatcherClose::xpect_close)
+/// to compare floating-point values within a tolerance.
 pub trait CloseTo: Sized {
+	/// Returns the default delta tolerance for this type.
 	fn default_delta() -> Self;
+
+	/// Checks if two values are approximately equal within the given epsilon.
 	fn is_close_with_delta(&self, b: &Self, epsilon: &Self) -> bool;
+
+	/// Checks if two values are approximately equal using the default delta.
 	fn is_close(&self, b: &Self) -> bool {
 		Self::is_close_with_delta(self, b, &Self::default_delta())
 	}
@@ -24,14 +41,17 @@ impl CloseTo for f64 {
 	}
 }
 
+/// Checks if two f32 values are within delta of each other.
 pub fn is_close_f32(a: f32, b: f32, delta: f32) -> bool {
 	abs_diff(a, b) < delta
 }
 
+/// Checks if two f64 values are within delta of each other.
 pub fn is_close_f64(a: f64, b: f64, delta: f64) -> bool {
 	abs_diff(a, b) < delta
 }
 
+/// Returns the absolute difference between two values.
 pub fn abs_diff<T>(a: T, b: T) -> T
 where
 	T: PartialOrd + std::ops::Sub<Output = T>,
