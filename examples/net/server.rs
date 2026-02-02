@@ -43,7 +43,15 @@ fn handler(mut entity: EntityWorldMut, request: Request) -> Response {
 	let mut count = entity.get_mut::<Count>().unwrap();
 	count.0 += 1;
 
-	let message = format!("hello {}, you are visitor number {}", name, count.0);
+	let message = format!(
+		r#"
+hello {}
+you are visitor number {}
+
+pass the 'name' parameter to receive a warm personal greeting.
+"#,
+		name, count.0
+	);
 
 	println!("{}: {}", request.method(), request.path_string());
 	Response::ok_body(message, "text/plain")
