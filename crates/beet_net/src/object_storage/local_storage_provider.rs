@@ -9,6 +9,7 @@ use js_sys::wasm_bindgen::JsCast;
 pub struct LocalStorageProvider;
 
 impl LocalStorageProvider {
+	/// Creates a new localStorage-backed bucket provider.
 	pub fn new() -> Self { Self }
 
 	fn bucket_prefix(bucket_name: &str) -> String {

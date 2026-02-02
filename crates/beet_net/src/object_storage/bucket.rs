@@ -381,11 +381,13 @@ pub async fn s3_fs_selector(
 
 
 
+/// Test utilities for bucket providers.
 #[cfg(test)]
 pub mod bucket_test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// Runs the standard bucket provider test suite.
 	pub async fn run(provider: impl BucketProvider) {
 		let bucket = Bucket::new(provider, "beet-test-bucket");
 		let path = RoutePath::from("/test_path");

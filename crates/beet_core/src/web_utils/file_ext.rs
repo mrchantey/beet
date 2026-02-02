@@ -1,3 +1,8 @@
+//! File upload and download utilities for browser environments.
+//!
+//! This module provides async helpers for triggering native file pickers
+//! and programmatic file downloads using Blob URLs.
+
 use crate::web_utils::HtmlEventListener;
 use crate::web_utils::document_ext;
 use js_sys::Array;
@@ -12,6 +17,14 @@ use web_sys::HtmlInputElement;
 use web_sys::Url;
 
 
+/// Downloads binary data as a file with the given filename.
+///
+/// Creates a Blob with MIME type `application/octet-stream` and triggers
+/// a browser download.
+///
+/// # Errors
+///
+/// Returns a [`JsValue`] error if Blob creation or download fails.
 //https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
 pub fn download_binary(bytes: &[u8], filename: &str) -> Result<(), JsValue> {
 	let bytes: JsValue = Uint8Array::from(bytes).into();
@@ -20,6 +33,14 @@ pub fn download_binary(bytes: &[u8], filename: &str) -> Result<(), JsValue> {
 	let blob = Blob::new_with_u8_array_sequence_and_options(&bytes, &opts)?;
 	download_blob(blob, filename)
 }
+
+/// Downloads text content as a file with the given filename.
+///
+/// Creates a Blob with MIME type `text/plain` and triggers a browser download.
+///
+/// # Errors
+///
+/// Returns a [`JsValue`] error if Blob creation or download fails.
 pub fn download_text(text: &str, filename: &str) -> Result<(), JsValue> {
 	let arr = Array::new();
 	arr.push(&JsValue::from_str(text));
@@ -73,11 +94,22 @@ pub async fn upload_file(accept: Option<&str>) -> Result<File, JsValue> {
 	Ok(file)
 }
 
+/// Opens a file picker and returns the selected file's text content.
+///
+/// # Errors
+///
+/// Returns a [`JsValue`] error if no file is selected or reading fails.
 pub async fn upload_text(accept: Option<&str>) -> Result<String, JsValue> {
 	let file = upload_file(accept).await?;
 	let text = JsFuture::from(file.text()).await?;
 	Ok(text.as_string().unwrap())
 }
+
+/// Opens a file picker and returns the selected file's binary content.
+///
+/// # Errors
+///
+/// Returns a [`JsValue`] error if no file is selected or reading fails.
 pub async fn upload_bytes(accept: Option<&str>) -> Result<Vec<u8>, JsValue> {
 	let file = upload_file(accept).await?;
 	let bytes = JsFuture::from(file.array_buffer()).await?;

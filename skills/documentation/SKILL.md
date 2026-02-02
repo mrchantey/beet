@@ -13,12 +13,10 @@ While we are passing through source files we should also consider two secondary 
 
 ## Conventions
 
-**QUALITY NOT QUANTITY**
-LLMs love writing text, but if its overly verbose or explaining the obvious, this has a negative value. Ensure only whats needed is used, ie `MyStruct::new` *usually* does not need an example, just a one-liner doc. General usage should be in the top level `MyStruct` docs
-Many modules will need module-level documentation. try not to duplicate struct and module level docs. the module level should contain very high level concepts and most modules dont need examples.
-
-Do not discard comments, todos unless certain they are no longer relevent
-
+- **QUALITY NOT QUANTITY**: LLMs love writing text, but if its overly verbose or explaining the obvious, this has a negative value. Ensure only whats needed is used, ie `MyStruct::new` *usually* does not need an example, just a one-liner doc. General usage should be in the top level `MyStruct` docs
+- Many modules will need module-level documentation. try not to duplicate struct docs in the module level. The module level should contain very high level concepts and most modules dont need examples.
+- Do not discard comments, todos unless certain they are no longer relevent
+- 
 ## Process
 
 For each crate do the following:

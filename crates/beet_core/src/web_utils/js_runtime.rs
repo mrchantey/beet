@@ -1,3 +1,14 @@
+//! Runtime bindings for Deno and browser JavaScript environments.
+//!
+//! This module provides FFI bindings to JavaScript runtime APIs for file I/O,
+//! environment variables, and panic handling. These functions are implemented
+//! in the host JavaScript environment (e.g., Deno) and called from wasm.
+//!
+//! # Platform Support
+//!
+//! These bindings are designed for use with the beet Deno test runner. Browser
+//! environments may not implement all functions.
+
 use crate::prelude::*;
 use wasm_bindgen::prelude::*;
 // TODO the runtime should be included in the binary,
@@ -73,17 +84,13 @@ unsafe extern "C" {
 	pub fn env_all() -> js_sys::Array;
 }
 
-#[deprecated]
-pub fn panic_to_error(
-	func: impl FnOnce() -> Result<(), String>,
-) -> Result<(), JsValue> {
-	let mut opt = Some(func);
-	catch_no_abort_inner(&mut || opt.take().expect("function already called")())
-}
-
-
-/// Run the function returning an opaque `()` error in the case of a panic.
-/// This has a relatively symmetrical api to `panic::catch_unwind`
+/// Runs a function and catches panics without aborting the wasm module.
+///
+/// This provides a wasm-compatible alternative to [`std::panic::catch_unwind`],
+/// executing the function in JavaScript to catch panics gracefully.
+///
+/// Returns `Ok(Ok(()))` on success, `Ok(Err(msg))` if the function returned
+/// an error string, or `Err(())` if a panic occurred.
 pub fn catch_no_abort(
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result<Result<(), String>, ()> {

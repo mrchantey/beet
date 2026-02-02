@@ -1,7 +1,15 @@
+//! Timer utilities for WebAssembly environments.
+//!
+//! Provides wrappers around JavaScript's `setTimeout` for scheduling
+//! delayed callbacks in wasm.
+
 use std::time::Duration;
 use wasm_bindgen::prelude::*;
 use web_sys::window;
 
+/// Handle to a scheduled timeout that cancels on drop.
+///
+/// When dropped, the associated timeout is cleared via `clearTimeout`.
 pub struct TimeoutHandle {
 	_closure: Closure<dyn Fn()>,
 	handle: i32,
@@ -15,6 +23,10 @@ impl Drop for TimeoutHandle {
 	}
 }
 
+/// Schedules a callback to run after `ms` milliseconds.
+///
+/// The closure is leaked (forgotten) so the callback remains valid.
+/// Use this for fire-and-forget timeouts where cancellation is not needed.
 pub fn set_timeout_ms<F>(ms: u64, f: F)
 where
 	F: Fn() + 'static,
@@ -22,7 +34,10 @@ where
 	set_timeout(Duration::from_millis(ms), f)
 }
 
-
+/// Schedules a callback to run after the specified duration.
+///
+/// The closure is leaked (forgotten) so the callback remains valid.
+/// Use this for fire-and-forget timeouts where cancellation is not needed.
 pub fn set_timeout<F>(duration: Duration, f: F)
 where
 	F: Fn() + 'static,

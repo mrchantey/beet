@@ -1,3 +1,8 @@
+//! Async lifecycle utilities for WebAssembly environments.
+//!
+//! This module provides helpers for running async operations with timeouts
+//! and managing resource lifetimes in wasm.
+
 use crate::prelude::*;
 use js_sys::Array;
 use js_sys::Promise;
@@ -32,6 +37,12 @@ where
 
 
 
+/// Runs a future with a timeout, returning an error if the timeout expires.
+///
+/// # Errors
+///
+/// Returns a [`BevyhowError`](crate::prelude::BevyhowError) with message "Timeout"
+/// if the future does not complete within the specified duration.
 pub async fn future_timeout<F, Fut, O>(fut: F, duration: Duration) -> Result<O>
 where
 	F: 'static + FnOnce() -> Fut,

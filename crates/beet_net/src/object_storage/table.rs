@@ -421,6 +421,7 @@ pub async fn dynamo_fs_selector<T: TableRow>(
 	}
 }
 
+/// Test utilities for table providers.
 #[cfg(test)]
 pub mod table_test {
 	use crate::prelude::*;
@@ -428,12 +429,14 @@ pub mod table_test {
 	use serde::Deserialize;
 	use serde::Serialize;
 
+	/// Test object for table provider tests.
 	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 	pub struct MyObject {
 		some_key: String,
 		some_vec: Vec<MyObject>,
 	}
 
+	/// Runs the standard table provider test suite.
 	pub async fn run(provider: impl TableProvider<TableItem<MyObject>>) {
 		let table = TableStore::new(provider, "beet-test-table");
 		let body = TableItem::new(MyObject {
