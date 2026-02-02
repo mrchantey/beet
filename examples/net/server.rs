@@ -62,8 +62,10 @@ fn handler(mut server: EntityWorldMut, request: Request) -> Response {
 		);
 	}
 
+	// increment visitor count
 	let name = request.get_param("name").unwrap_or("world");
 
+	// increment visitor count
 	let mut count = server.get_mut::<Count>().unwrap();
 	count.0 += 1;
 

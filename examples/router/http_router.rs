@@ -71,11 +71,6 @@ fn log_stats() -> impl Bundle {
 }
 
 /// Home endpoint handling GET requests to `/`.
-///
-/// [`EndpointBuilder::get()`] creates an endpoint that:
-/// - Matches GET requests only
-/// - Matches the root path `/` by default
-/// - Runs the provided action function when matched
 fn home() -> impl Bundle {
 	EndpointBuilder::get().with_action(|| {
 		Response::ok_body(

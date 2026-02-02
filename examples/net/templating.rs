@@ -40,13 +40,8 @@ fn main() {
 #[derive(Default, Component)]
 struct Count(u32);
 
-/// Routes requests based on the path.
-///
-/// This is a simple router implementation that matches the request path
-/// and calls the appropriate route handler function.
-fn router(mut entity: EntityWorldMut, request: Request) -> Response {
-	// this will also increment for browser requests like /favicon.ico
-	entity.get_mut::<Count>().unwrap().0 += 1;
+/// A simple router implementation that matches the request path
+fn router(entity: EntityWorldMut, request: Request) -> Response {
 	println!("{}: {}", request.method(), request.path_string());
 
 	let route = match request.path_string().as_str() {
@@ -60,17 +55,19 @@ fn router(mut entity: EntityWorldMut, request: Request) -> Response {
 
 
 /// Home page.
-fn home(entity: EntityWorldMut, _: Request) -> Response {
-	let count = entity.get::<Count>().unwrap().0;
+fn home(mut entity: EntityWorldMut, _: Request) -> Response {
+	let mut count = entity.get_mut::<Count>().unwrap();
+	count.0 += 1;
 	Response::ok_body(
 		render(&format!(
 			r#"
 <h1>🌱 The Garden Bed 🌱</h1>
 <p>The <i>number one</i> place for great gardening information.</p>
 <br/>
-<p>Greetings visitor {count}</p>
+<p>Greetings visitor {}</p>
 <p>Visit a link or check out a <a href="/foobar">broken link</a>
 "#,
+			count.0
 		)),
 		"text/html",
 	)
