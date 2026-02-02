@@ -25,109 +25,88 @@ fn main() {
 			ServerPlugin::default(),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				HttpServer::default(),
-				flow_exchange(|| {
-					// Fallback will end on the first matching child.
-					(Fallback, children![home(), foo(), not_found()])
-				}),
-			));
+			commands.spawn((HttpServer::default(), handler_exchange(handler)));
 		})
 		.run();
 }
 
-
-fn home() -> impl Bundle {
-	(
-		Name::new("Home"),
-		endpoint(|req| {
-			if req.path().is_empty() {
-				Some(Response::ok_body(
-					layout(
-						"<h1>Hello from Beet!</h1><p>This is a simple server example.</p><p>Try visiting <a href=\"/foo\">/foo</a> for another page.</p>",
-					),
-					"text/html",
-				))
-			} else {
-				None
-			}
-		}),
-	)
-}
-
-fn foo() -> impl Bundle {
-	(
-		Name::new("Foo"),
-		endpoint(|req| {
-			if req.path_string() == "/foo" {
-				Some(Response::ok_body(
-					layout("<h1>Hello Foo!</h1><a href='/'>Back home</a>"),
-					"text/html",
-				))
-			} else {
-				None
-			}
-		}),
-	)
-}
-
-fn not_found() -> impl Bundle {
-	(
-		Name::new("NotFound"),
-		endpoint(|req| {
-			let path = req.path_string();
-			Some(Response::from_status_body(
-				StatusCode::NotFound,
-				layout(&format!("<h1>Whoops! '{path}' not found</h1>")),
-				"text/html",
-			))
-		}),
-	)
+fn handler(_: EntityWorldMut, request: Request) -> Response {
+	let route = match request.path_string().as_str() {
+		"/" => home,
+		"/planting-trees" => planting_trees,
+		_ => not_found,
+	};
+	route(request)
 }
 
 
-// basic endpoint control flow, this is usally done by beet_router.
-fn endpoint<F>(handler: F) -> impl Bundle
-where
-	F: 'static + Send + Sync + Clone + Fn(&mut Request) -> Option<Response>,
-{
-	OnSpawn::observe(
-		move |ev: On<GetOutcome>,
-		      mut commands: Commands,
-		      mut agent_query: AgentQuery<&mut Request>| {
-			let action = ev.target();
-			let agent = agent_query.entity(action);
-			let mut request = agent_query.get_mut(action).unwrap();
-			if let Some(response) = handler(&mut request) {
-				commands.entity(agent).insert(response);
-				commands.entity(action).trigger_target(Outcome::Pass);
-			} else {
-				commands.entity(action).trigger_target(Outcome::Fail);
-			}
-		},
-	)
-}
 
-// basic html templating
-fn layout(body: &str) -> String {
-	format!(
-		r#"
-<!DOCTYPE html>
-<html>
-		<head>
-				<title>Beet Server</title>
-				<style>
-						body {{
-								font-family: system-ui, sans-serif;
-								background-color: black;
-								color: white;
-						}}
-				</style>
-		</head>
-		<body>
-				{body}
-		</body>
-</html>
+fn home(_: Request) -> Response {
+	Response::ok_body(
+		render(
+			r#"
+<h1>Unbeetable Gardening Tips</h1>
+<p>The number one place for great gardening information.</p>
+<p>Visit a link or check out a <a href="/foobar">broken link</a>
 "#,
+		),
+		"text/html",
 	)
+}
+fn planting_trees(_: Request) -> Response {
+	Response::ok_body(
+		render(
+			r#"
+<h1>Planting Trees</h1>
+<p>Do it, just do it. Dont ask questions. Go and buy a tree and plant it somewhere.</p>
+"#,
+		),
+		"text/html",
+	)
+}
+
+fn not_found(_: Request) -> Response {
+	Response::from_status_body(
+		StatusCode::NotFound,
+		render(
+			r#"
+<h1>Not Found</h1>
+<p>The path could not be found.</p>
+"#,
+		),
+		"text/html",
+	)
+}
+
+
+
+// renders a page with navigation and content.
+// This is loaded on every request, so you can change the html without reload!
+fn render(main_content: &str) -> String {
+	use std::fs::read_to_string;
+
+	read_to_string("examples/assets/layouts/default-layout.html")
+		.unwrap()
+		.replace("{{ head }}", &head())
+		.replace("{{ nav }}", &nav())
+		.replace("{{ main }}", &main_content)
+}
+
+fn head() -> String {
+	use std::fs::read_to_string;
+
+	let theme_switcher =
+		read_to_string("examples/assets/js/minimal-theme-switcher.js").unwrap();
+
+	format!(r#"<script>{theme_switcher}</script>"#)
+}
+
+fn nav() -> String {
+	let nav_items = [("Home", "/"), ("Planting Trees", "/planting-trees")];
+	nav_items
+		.iter()
+		.map(|(label, path)| {
+			format!(r#"<li><a href="{}">{}</a></li>"#, path, label)
+		})
+		.collect::<String>()
 }

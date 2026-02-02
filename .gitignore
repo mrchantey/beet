@@ -1,4 +1,5 @@
 assets
+!examples/assets/**/*
 target
 rustc-ice*
 .rustc_info.json
@@ -8,7 +9,6 @@ rustc-ice*
 dump.*
 plan.md
 file.pdf
-
 launch.ron
 
 tests/assert.rs

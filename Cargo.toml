@@ -223,7 +223,7 @@ client = [
 	"beet_dom/client",
 	"beet_design/client",
 ]
-beet_net_server = ["net","beet_net/flow","beet_net/server"]
+beet_net_server = ["net", "beet_net/server"]
 
 #💡 fine-grained
 native-tls = [

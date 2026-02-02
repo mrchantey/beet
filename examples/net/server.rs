@@ -25,18 +25,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				Count::default(),
-				handler_exchange(|mut entity, request| {
-					let name = request.get_param("name").unwrap_or("world");
-					let mut count = entity.get_mut::<Count>().unwrap();
-					count.0 += 1;
-
-					let message = format!(
-						"hello {}, you are visitor number {}",
-						name, count.0
-					);
-
-					Response::ok_body(message, "text/plain")
-				}),
+				handler_exchange(handler),
 			));
 		})
 		.run();
@@ -44,3 +33,14 @@ fn main() {
 
 #[derive(Default, Component)]
 struct Count(u32);
+
+fn handler(mut entity: EntityWorldMut, request: Request) -> Response {
+	let name = request.get_param("name").unwrap_or("world");
+	let mut count = entity.get_mut::<Count>().unwrap();
+	count.0 += 1;
+
+	let message = format!("hello {}, you are visitor number {}", name, count.0);
+
+	println!("{}: {}", request.method(), request.path_string());
+	Response::ok_body(message, "text/plain")
+}
