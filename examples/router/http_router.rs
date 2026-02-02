@@ -1,10 +1,10 @@
-//! HTTP router server example.
+//! HTTP router example.
 //!
-//! Demonstrates a basic HTTP server using `beet_router` for request routing.
+//! Demonstrates a basic HTTP router using `beet_router` for request routing.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example http_server --features server
+//! cargo run --example http_router --features server
 //! ```
 //!
 //! Test with:
@@ -25,8 +25,6 @@ fn main() {
 			commands.spawn((
 				HttpServer::new(5000),
 				flow_exchange(|| {
-					// InfallibleSequence ensures all endpoints are checked
-					// even if the previous one did not match
 					(InfallibleSequence, children![
 						EndpointBuilder::get().with_action(|| {
 							Response::ok_body("hello world", "text/plain")

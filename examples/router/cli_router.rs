@@ -1,11 +1,11 @@
-//! CLI router server example.
+//! CLI router example.
 //!
 //! Demonstrates using `beet_router` with a CLI interface for testing routes
 //! without starting an HTTP server.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example cli_server --features server
+//! cargo run --example cli_router --features server -- foo
 //! ```
 use beet::prelude::*;
 
@@ -20,8 +20,6 @@ fn main() {
 			commands.spawn((
 				CliServer,
 				flow_exchange(|| {
-					// InfallibleSequence ensures all endpoints are checked
-					// even if the previous one did not match
 					(InfallibleSequence, children![
 						EndpointBuilder::get().with_action(|| {
 							Response::ok_body("hello world", "text/plain")
