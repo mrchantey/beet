@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 mod action;
 mod bundle_effect;
 mod entity_target_event;
@@ -13,12 +11,7 @@ use macros::*;
 pub(crate) mod shared_utils;
 
 
-// for compatibility with beet_core in tests like
-// named_field.rs
-#[cfg(test)]
-pub(crate) mod prelude {
-	pub use beet_core::prelude::*;
-}
+
 
 /// Implements `TokenizeSelf` for a struct or enum.
 /// All fields must also implement `TokenizeSelf`.

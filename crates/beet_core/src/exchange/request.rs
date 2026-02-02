@@ -11,7 +11,7 @@
 //! // Create an HTTP-style request
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
-//! assert_eq!(request.get_param("limit"), Some(&"10".to_string()));
+//! assert_eq!(request.get_param("limit"), Some("10"));
 //!
 //! // Create from CLI args
 //! let cli = CliArgs::parse("users list --limit 10");

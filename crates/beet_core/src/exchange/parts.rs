@@ -15,13 +15,13 @@
 //! // From HTTP
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
-//! assert_eq!(request.get_param("limit"), Some(&"10".to_string()));
+//! assert_eq!(request.get_param("limit"), Some("10"));
 //!
 //! // From CLI: `myapp users list --limit 10`
 //! let cli = CliArgs::parse("users list --limit 10");
 //! let parts = RequestParts::from(cli);
 //! assert_eq!(parts.path(), &["users", "list"]);
-//! assert_eq!(parts.get_param("limit"), Some(&"10".to_string()));
+//! assert_eq!(parts.get_param("limit"), Some("10"));
 //! ```
 
 use crate::prelude::*;

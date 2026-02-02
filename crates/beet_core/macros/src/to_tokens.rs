@@ -229,7 +229,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::parse;
-	use beet_core::prelude::*;
 	use syn::DeriveInput;
 
 	#[test]
@@ -240,8 +239,11 @@ mod test {
 				field2: String,
 			}
 		};
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl beet_core :: prelude :: TokenizeSelf for MyNamedStruct { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let field1 = self . field1 . self_token_stream () ; let field2 = self . field2 . self_token_stream () ; tokens . extend (quote :: quote ! { MyNamedStruct { field1 : # field1 , field2 : # field2 } }) ; } }";
+		assert_eq!(expected, result);
 	}
+
 	#[test]
 	fn named_struct_constructor() {
 		let input: DeriveInput = syn::parse_quote! {
@@ -251,7 +253,9 @@ mod test {
 				field2: String,
 			}
 		};
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl beet_core :: prelude :: TokenizeSelf for MyNamedStruct { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let field1 = self . field1 . self_token_stream () ; let field2 = self . field2 . self_token_stream () ; tokens . extend (quote :: quote ! { Self :: new (# field1 , # field2) }) ; } }";
+		assert_eq!(expected, result);
 	}
 
 	#[test]
@@ -260,8 +264,11 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl beet_core :: prelude :: TokenizeSelf for MyTupleStruct { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let field0 = self . 0 . self_token_stream () ; let field1 = self . 1 . self_token_stream () ; tokens . extend (quote :: quote ! { MyTupleStruct (# field0 , # field1) }) ; } }";
+		assert_eq!(expected, result);
 	}
+
 	#[test]
 	fn tuple_struct_constructor() {
 		let input: DeriveInput = syn::parse_quote! {
@@ -269,7 +276,9 @@ mod test {
 			struct MyTupleStruct(u32, String);
 		};
 
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl beet_core :: prelude :: TokenizeSelf for MyTupleStruct { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let field0 = self . 0 . self_token_stream () ; let field1 = self . 1 . self_token_stream () ; tokens . extend (quote :: quote ! { Self :: new (# field0 , # field1) }) ; } }";
+		assert_eq!(expected, result);
 	}
 
 	#[test]
@@ -282,14 +291,19 @@ mod test {
 			}
 		};
 
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl beet_core :: prelude :: TokenizeSelf for MyEnum { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; match self { Self :: A => { tokens . extend (quote :: quote ! { MyEnum :: A }) ; } , Self :: B (field0) => { let field0 = field0 . self_token_stream () ; tokens . extend (quote :: quote ! { MyEnum :: B (# field0) }) ; } , Self :: C { value } => { let value = value . self_token_stream () ; tokens . extend (quote :: quote ! { MyEnum :: C { value : # value } }) ; } } } }";
+		assert_eq!(expected, result);
 	}
+
 	#[test]
 	fn generics() {
 		let input: DeriveInput = syn::parse_quote! {
 			struct MyGenericStruct<U:Clone>{}
 		};
 
-		parse(input).unwrap().xpect_snapshot();
+		let result = parse(input).unwrap().to_string();
+		let expected = "impl < U : Clone > beet_core :: prelude :: TokenizeSelf for MyGenericStruct < U > where U : beet_core :: prelude :: TokenizeSelf { fn self_tokens (& self , tokens : & mut beet_core :: exports :: proc_macro2 :: TokenStream) { use beet_core :: exports :: quote ; use beet_core :: exports :: proc_macro2 ; let generic0 = short_type_path :: < U > () ; tokens . extend (quote :: quote ! { MyGenericStruct :: < # generic0 > { } }) ; } }";
+		assert_eq!(expected, result);
 	}
 }

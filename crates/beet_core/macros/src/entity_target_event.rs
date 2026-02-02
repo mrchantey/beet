@@ -49,12 +49,15 @@ fn parse_entity_target_event(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	#[test]
 	fn works() {
-		parse_entity_target_event(syn::parse_quote! {struct MyEvent;})
-			.unwrap()
-			.xpect_snapshot();
+		let result =
+			parse_entity_target_event(syn::parse_quote! {struct MyEvent;})
+				.unwrap()
+				.to_string();
+
+		let expected = "impl Event for MyEvent { type Trigger < 'a > = EntityTargetTrigger < false , Self , & 'static ChildOf > ; }";
+		assert_eq!(expected, result);
 	}
 }

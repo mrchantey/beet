@@ -251,10 +251,10 @@ impl<'a> NamedField<'a> {
 }
 
 
+// cant use beet_core as shared with beet_core_macros
 #[cfg(test)]
 mod test {
 	use super::NamedField;
-	use crate::prelude::*;
 	use syn::FnArg;
 	use syn::Type;
 
@@ -265,9 +265,8 @@ mod test {
 			pub foo: Option<u32>
 		};
 		let named = NamedField::parse_field(&field).unwrap();
-		named.is_optional().xpect_true();
-		named.attrs.len().xpect_eq(1);
-		// true.xpect_false();
+		assert!(named.is_optional());
+		assert_eq!(named.attrs.len(), 1);
 	}
 	#[test]
 	fn pat_ty() {
@@ -280,9 +279,9 @@ mod test {
 		};
 
 		let named = NamedField::parse_pat_ty(&field).unwrap();
-		named.is_optional().xpect_true();
+		assert!(named.is_optional());
 		let ty: Type = syn::parse_quote! { Foo<Bar> };
-		named.inner_ty.xpect_eq(ty);
-		named.attrs.len().xpect_eq(1);
+		assert_eq!(*named.inner_ty, ty);
+		assert_eq!(named.attrs.len(), 1);
 	}
 }

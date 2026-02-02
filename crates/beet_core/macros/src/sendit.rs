@@ -73,7 +73,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 	use quote::quote;
 
 	#[test]
@@ -88,38 +87,38 @@ mod test {
 		}
 		};
 
-		parse(input).unwrap().to_string().xpect_eq(
-			quote! {
-				#[derive(Clone)]
-				pub struct FooSendit<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;
+		let result = parse(input).unwrap().to_string();
+		let expected = quote! {
+			#[derive(Clone)]
+			pub struct FooSendit<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;
 
-				impl<T: ToString> FooSendit<T> where T: std::fmt::Display {
-					pub fn new(value: Foo<T>) -> Self {
-						Self(beet::exports::SendWrapper::new(value))
-					}
-					pub fn inner(self) -> Foo<T> {
-						self.0.take()
-					}
+			impl<T: ToString> FooSendit<T> where T: std::fmt::Display {
+				pub fn new(value: Foo<T>) -> Self {
+					Self(beet::exports::SendWrapper::new(value))
 				}
-				impl<T: ToString> std::ops::Deref for FooSendit<T> where T: std::fmt::Display {
-					type Target = Foo<T>;
-					fn deref(&self) -> &Self::Target {
-						&self.0
-					}
-				}
-				impl<T: ToString> std::ops::DerefMut for FooSendit<T> where T: std::fmt::Display {
-					fn deref_mut(&mut self) -> &mut Self::Target {
-						&mut self.0
-					}
-				}
-
-				impl<T: ToString> Foo<T> where T: std::fmt::Display {
-					pub fn sendit(self) -> FooSendit<T> {
-						FooSendit::new(self)
-					}
+				pub fn inner(self) -> Foo<T> {
+					self.0.take()
 				}
 			}
-			.to_string(),
-		);
+			impl<T: ToString> std::ops::Deref for FooSendit<T> where T: std::fmt::Display {
+				type Target = Foo<T>;
+				fn deref(&self) -> &Self::Target {
+					&self.0
+				}
+			}
+			impl<T: ToString> std::ops::DerefMut for FooSendit<T> where T: std::fmt::Display {
+				fn deref_mut(&mut self) -> &mut Self::Target {
+					&mut self.0
+				}
+			}
+
+			impl<T: ToString> Foo<T> where T: std::fmt::Display {
+				pub fn sendit(self) -> FooSendit<T> {
+					FooSendit::new(self)
+				}
+			}
+		}
+		.to_string();
+		assert_eq!(expected, result);
 	}
 }

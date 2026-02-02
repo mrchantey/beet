@@ -83,7 +83,6 @@ struct MyAction;
 #[cfg(test)]
 mod test {
 	use super::parse;
-	use beet_core::prelude::*;
 	use quote::quote;
 	use syn::DeriveInput;
 
@@ -93,14 +92,18 @@ mod test {
 			#[derive(Component)]
 			struct Foo;
 		};
-		parse(
+		let result = parse(
 			// equivelent to [action(bar,baz)]
 			quote!(bar, bazz),
 			input,
 		)
 		.unwrap()
-		.xpect_snapshot();
+		.to_string();
+
+		let expected = "# [allow (non_snake_case)] fn OnAddFoo (mut world : beet_core :: prelude :: DeferredWorld , cx : beet_core :: prelude :: HookContext ,) { world . commands () . entity (cx . entity) . observe_any (bar) . observe_any (bazz) ; } # [derive (Component)] # [component (on_add = OnAddFoo)] struct Foo ;";
+		assert_eq!(expected, result);
 	}
+
 	#[test]
 	fn generics() {
 		let input: DeriveInput = syn::parse_quote! {
@@ -108,12 +111,15 @@ mod test {
 			struct Foo<T>;
 		};
 
-		parse(
+		let result = parse(
 			// equivelent to [action(bar,baz::<T>)]
 			quote!(bar, bazz::<T>),
 			input,
 		)
 		.unwrap()
-		.xpect_snapshot();
+		.to_string();
+
+		let expected = "# [allow (non_snake_case)] fn OnAddFoo < T > (mut world : beet_core :: prelude :: DeferredWorld , cx : beet_core :: prelude :: HookContext ,) { world . commands () . entity (cx . entity) . observe_any (bar) . observe_any (bazz :: < T >) ; } # [derive (Component)] # [component (on_add = OnAddFoo :: < T >)] struct Foo < T > ;";
+		assert_eq!(expected, result);
 	}
 }
