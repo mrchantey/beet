@@ -1070,6 +1070,7 @@ dependencies = [
  "beet_router",
  "beet_rsx",
  "beet_spatial",
+ "beet_stack",
  "bevy",
  "console_error_panic_hook",
  "futures",
@@ -1494,6 +1495,14 @@ dependencies = [
  "strum",
  "strum_macros",
  "web-sys",
+]
+
+[[package]]
+name = "beet_stack"
+version = "0.0.9-rc.1.0"
+dependencies = [
+ "beet_core",
+ "bevy",
 ]
 
 [[package]]

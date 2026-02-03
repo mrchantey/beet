@@ -65,6 +65,7 @@ members = [
 	"crates/beet_rsx_combinator",
 	"crates/beet_rsx/macros",
 	"crates/beet_rsx",
+	"crates/beet_stack",
 
 	## 💡 Beet
 	"crates/beet_site",
@@ -93,6 +94,7 @@ beet_net = { path = "crates/beet_net", version = "0.0.9-rc.1.0" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-rc.1.0" }
 beet_dom = { path = "crates/beet_dom", version = "0.0.9-rc.1.0" }
 beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-rc.1.0" }
+beet_stack = { path = "crates/beet_stack", version = "0.0.9-rc.1.0" }
 
 beet = { path = "", version = "0.0.9-rc.1.0" }
 
@@ -256,6 +258,7 @@ aws = ["beet_net?/aws"]
 
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 build = ["parse", "dep:beet_build"]
+stack = ["dep:beet_stack"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
@@ -295,6 +298,7 @@ beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_clanker = { workspace = true, optional = true }
+beet_stack = { workspace = true, optional = true }
 
 #💡 flow
 beet_flow = { workspace = true, optional = true }
