@@ -1,22 +1,16 @@
 # Beet Stack
 
-Interface agnostic content and tooling conventions.
+An opinionated semantic layer between applications and interfaces like UI or humanoid robots.
 
-## Overview
+The `Stack/Card` convention is based on `hypercard` which pioneered many concepts in user-modifiable software. 
+Stacks represent something like a directory and cards represent something like a document (content), but also with behavior (tools).
 
-Beet Stack provides unopinionated primitives for describing interactive content that can be interacted with across different interfaces.
 
-## Features
-
-- **Content**: Semantic markup types with optional rendering parameters
-- **Tools**: Generalized `Request/Response` pattern for program interaction
-- **Semantics**: Unopinionated types like `Card`, `Stack`, `Link`, `Paragraph`
-- **Layout**: Uses `bevy_ui` as backend for rendered interfaces
-
-## Supported Interfaces
+## Supported Interfaces (wip)
 
 - `stdio`: Event-driven command-line interface
 - `ratatui`: Terminal user interfaces
 - `dom`: Web-based interfaces
 - `wgpu`: Bevy's native ui rendering
 - `clanker`: LLM tool calls and context trees
+- `embedded`: Microcontrollers like the ESP32

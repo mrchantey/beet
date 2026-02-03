@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![deny(missing_docs)]
+#![feature(associated_type_defaults)]
 #![doc = include_str!("../README.md")]
 mod content;
 mod tools;

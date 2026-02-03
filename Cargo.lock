@@ -1503,6 +1503,7 @@ version = "0.0.9-rc.1.0"
 dependencies = [
  "beet_core",
  "bevy",
+ "serde_json",
 ]
 
 [[package]]

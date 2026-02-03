@@ -2,7 +2,7 @@
 name = "beet_stack"
 version.workspace = true
 edition.workspace = true
-description = "Interface agnostic content and tooling conventions"
+description = "An opinionated semantic layer between applications and interfaces"
 documentation.workspace = true
 readme = "README.md"
 homepage.workspace = true
@@ -17,6 +17,7 @@ categories.workspace = true
 [dependencies]
 beet_core.workspace = true
 bevy.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

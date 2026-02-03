@@ -126,6 +126,11 @@ where
 			})
 			.unwrap_or(root)
 	}
+	/// Returns `true` if the agent matches the query filter.
+	pub fn contains(&self, entity: Entity) -> bool {
+		let agent = self.entity(entity);
+		self.query.contains(agent)
+	}
 
 	/// Returns the query item for the agent of the given action.
 	pub fn get(
@@ -136,11 +141,6 @@ where
 		self.query.get(agent)
 	}
 
-	/// Returns `true` if the agent matches the query filter.
-	pub fn contains(&self, entity: Entity) -> bool {
-		let agent = self.entity(entity);
-		self.query.contains(agent)
-	}
 
 	/// Returns the mutable query item for the agent of the given action.
 	pub fn get_mut(
