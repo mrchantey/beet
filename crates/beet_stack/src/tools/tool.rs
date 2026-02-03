@@ -15,5 +15,3 @@ use beet_core::prelude::*;
 )]
 #[reflect(Component)]
 pub struct Tool;
-
-
