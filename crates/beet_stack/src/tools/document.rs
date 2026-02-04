@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::query::QueryEntityError;
-use bevy::ecs::query::ROQueryItem;
+
 
 /// In-memory representation of a document.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Component)]
@@ -70,7 +69,7 @@ pub enum FieldPath {
 #[derive(SystemParam)]
 pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
-	doc_query: Query<'w, 's, &'static Document>,
+	doc_query: Query<'w, 's, &'static mut Document>,
 	app_doc_query: Query<'w, 's, Entity, With<AppDocument>>,
 	card_query: Query<'w, 's, &'static Card>,
 	commands: Commands<'w, 's>,
@@ -79,8 +78,8 @@ pub struct DocumentQuery<'w, 's> {
 impl<'w, 's> DocumentQuery<'w, 's> {
 	/// Get the entity for the given [`DocumentPath`],
 	/// which may or may not contain an initialized document.
-	pub fn document_entity(
-		&mut self,
+	fn resolve_entity(
+		&self,
 		entity: Entity,
 		path: &DocumentPath,
 	) -> Result<Entity> {
@@ -96,49 +95,83 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				.app_doc_query
 				.iter()
 				.next()
-				.unwrap_or_else(|| self.commands.spawn(AppDocument).id()),
+				.ok_or_else(|| bevyhow!("no app document found"))?,
 			DocumentPath::Entity(entity) => *entity,
 		}
 		.xok()
 	}
 
-	/// Returns the query item for the agent of the given action.
-	pub fn get(
+	/// Get the entity for the given [`DocumentPath`],
+	/// spawning the app document if needed.
+	pub fn document_entity(
 		&mut self,
 		entity: Entity,
 		path: &DocumentPath,
-	) -> Result<ROQueryItem<'_, 's, &Document>> {
-		let agent = self.document_entity(entity, path)?;
-		self.doc_query.get(agent)?.xok()
+	) -> Entity {
+		match path {
+			DocumentPath::Card => self
+				.ancestors
+				.iter_ancestors(entity)
+				.find(|entity| self.card_query.get(*entity).is_ok())
+				.unwrap_or(entity),
+			DocumentPath::App => self
+				.app_doc_query
+				.iter()
+				.next()
+				.unwrap_or_else(|| self.commands.spawn(AppDocument).id()),
+			DocumentPath::Entity(entity) => *entity,
+		}
+	}
+
+	/// Returns the query item for the document.
+	pub fn get(
+		&self,
+		entity: Entity,
+		path: &DocumentPath,
+	) -> Result<&Document> {
+		let doc_entity = self.resolve_entity(entity, path)?;
+		self.doc_query.get(doc_entity)?.xok()
 	}
 
 
-	/// Returns the mutable query item for the agent of the given action.
-	/// Returns the mutable query item for the agent of the given action.
+	/// Returns the mutable query item for the document.
 	pub fn get_mut(
 		&mut self,
 		entity: Entity,
 		path: &DocumentPath,
-	) -> Result<ROQueryItem<'_, 's, &mut Document>> {
-		let agent = self.document_entity(entity, path)?;
-		self.doc_query.get_mut(agent)?.xok()
+	) -> Result<Mut<'_, Document>> {
+		let doc_entity = self.resolve_entity(entity, path)?;
+		self.doc_query.get_mut(doc_entity)?.xok()
 	}
 
+	/// Execute a function on a document asynchronously.
 	pub async fn with_async<O>(
+		&mut self,
 		entity: AsyncEntity,
 		document: &DocumentPath,
-		func: impl FnOnce(&mut Document) -> O,
-	) -> Result<O> {
+		func: impl 'static + Send + Sync + Fn(&mut Document) -> O,
+	) -> Result<O>
+	where
+		O: 'static + Send + Sync,
+	{
 		let id = entity.id();
-		entity.world().with_then(|world| {
-			world.run_system_cached_with(
-				|In((entity, doc_path)): In<(Entity, DocumentPath)>,
-					mut doc_query: DocumentQuery| {
-					let doc_mut = doc_query.get_mut(entity, &doc_path)?;
-					func(doc_mut).xok()
-				},
-				(id, document.clone()),
-			)
-		})
+		let doc_path = document.clone();
+		entity
+			.world()
+			.with_then(move |world| {
+				world.run_system_cached_with(
+					move |In((entity, doc_path)): In<(
+						Entity,
+						DocumentPath,
+					)>,
+					      mut doc_query: DocumentQuery| {
+						let mut doc_mut =
+							doc_query.get_mut(entity, &doc_path)?;
+						func(&mut doc_mut).xok()
+					},
+					(id, doc_path),
+				)
+			})
+			.await?
 	}
 }
