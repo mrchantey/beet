@@ -2,9 +2,132 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
+/// Document-related errors.
+#[derive(Debug, thiserror::Error)]
+pub enum DocumentError {
+	#[error("expected array, found {current:#?}\nAt path {path:?}")]
+	ExpectedArray {
+		current: serde_json::Value,
+		path: Vec<FieldPath>,
+	},
+	#[error("array index {index} out of bounds\nAt path {path:?}")]
+	ArrayIndexOutOfBounds { index: usize, path: Vec<FieldPath> },
+	#[error("expected object, found {current:#?}\nat path {path:?}")]
+	ExpectedObject {
+		current: serde_json::Value,
+		path: Vec<FieldPath>,
+	},
+	#[error("object key '{key}' not found\nAt path {path:?}")]
+	ObjectKeyNotFound { key: String, path: Vec<FieldPath> },
+	#[error("Failed to deserialize: '{error}'\nAt path {path:?}")]
+	FailedToDeserialize { error: String, path: Vec<FieldPath> },
+}
+
 /// In-memory representation of a document.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Component)]
 pub struct Document(serde_json::Value);
+
+impl Document {
+	/// Get a field from the document by path, deserializing to type T.
+	pub fn get_field<T>(&self, path: &[FieldPath]) -> Result<T, DocumentError>
+	where
+		T: serde::de::DeserializeOwned,
+	{
+		let value = self.get_field_ref(path)?;
+		serde_json::from_value(value.clone()).map_err(|err| {
+			DocumentError::FailedToDeserialize {
+				error: err.to_string(),
+				path: path.to_vec(),
+			}
+		})
+	}
+	/// Get a field from the document by path, deserializing to type T.
+	pub fn get_field_ref(
+		&self,
+		path: &[FieldPath],
+	) -> Result<&serde_json::Value, DocumentError> {
+		let mut current = &self.0;
+
+		for segment in path {
+			match segment {
+				FieldPath::ArrayIndex(idx) => {
+					current = current
+						.as_array()
+						.ok_or_else(|| DocumentError::ExpectedArray {
+							current: current.clone(),
+							path: path.to_vec(),
+						})?
+						.get(*idx)
+						.ok_or_else(|| {
+							DocumentError::ArrayIndexOutOfBounds {
+								index: *idx,
+								path: path.to_vec(),
+							}
+						})?;
+				}
+				FieldPath::ObjectKey(key) => {
+					current = current
+						.as_object()
+						.ok_or_else(|| DocumentError::ExpectedObject {
+							current: current.clone(),
+							path: path.to_vec(),
+						})?
+						.get(key)
+						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
+							key: key.clone(),
+							path: path.to_vec(),
+						})?;
+				}
+			}
+		}
+		current.xok()
+	}
+
+	/// Get a mutable field from the document by path.
+	#[allow(unused)]
+	pub fn get_field_mut(
+		&mut self,
+		path: &[FieldPath],
+	) -> Result<&mut serde_json::Value, DocumentError> {
+		let mut current = &mut self.0;
+
+		for segment in path {
+			match segment {
+				FieldPath::ArrayIndex(idx) => {
+					todo!("fix compile errors");
+					current = current
+						.as_array_mut()
+						.ok_or_else(|| DocumentError::ExpectedArray {
+							current: current.clone(),
+							path: path.to_vec(),
+						})?
+						.get_mut(*idx)
+						.ok_or_else(|| {
+							DocumentError::ArrayIndexOutOfBounds {
+								index: *idx,
+								path: path.to_vec(),
+							}
+						})?;
+				}
+				FieldPath::ObjectKey(key) => {
+					todo!("fix compile errors");
+					current = current
+						.as_object_mut()
+						.ok_or_else(|| DocumentError::ExpectedObject {
+							current: current.clone(),
+							path: path.to_vec(),
+						})?
+						.get_mut(key)
+						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
+							key: key.clone(),
+							path: path.to_vec(),
+						})?;
+				}
+			}
+		}
+		current.xok()
+	}
+}
 
 /// Marker component for the global application-level document.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Component)]

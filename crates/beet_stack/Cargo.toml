@@ -17,6 +17,8 @@ categories.workspace = true
 [dependencies]
 beet_core.workspace = true
 bevy.workspace = true
+thiserror.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 extend.workspace = true
 

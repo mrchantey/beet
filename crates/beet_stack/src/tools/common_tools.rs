@@ -3,20 +3,9 @@ use beet_core::prelude::*;
 
 
 /// A tool that increments a specified field when triggered, returning the new value.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct Increment {
-	/// Path to the field to increment.
-	pub field: FieldRef,
+pub fn increment(field: FieldRef) -> impl Bundle {
+	let _a = move |cx: In<ToolContext>, mut query: DocumentQuery| -> Result {
+		let _doc = query.get_mut(cx.tool, &field.document)?;
+		Ok(())
+	};
 }

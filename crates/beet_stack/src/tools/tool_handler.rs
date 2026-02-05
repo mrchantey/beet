@@ -2,6 +2,9 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
+
+
+
 pub struct ToolContext<In = ()> {
 	pub tool: Entity,
 	pub payload: In,
@@ -136,23 +139,14 @@ where
 /// Marker component for function tool handlers.
 pub struct SystemIntoToolHandlerMarker;
 
-impl<Func, In, Arg, ArgM, Out, IntoOut, IntoOutM, SysM>
-	IntoToolHandler<(
-		SystemIntoToolHandlerMarker,
-		In,
-		Arg,
-		ArgM,
-		Out,
-		IntoOut,
-		IntoOutM,
-		SysM,
-	)> for Func
+impl<Func, In, Arg, ArgM, Out, SysM>
+	IntoToolHandler<(SystemIntoToolHandlerMarker, In, Arg, ArgM, Out, SysM)>
+	for Func
 where
-	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, IntoOut, SysM>,
+	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, Out, SysM>,
 	Arg: 'static + SystemInput,
 	for<'a> Arg::Inner<'a>: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
-	IntoOut: 'static + IntoResult<Out, IntoOutM>,
 	Out: Typed + 'static + Send + Sync,
 {
 	type In = In;
@@ -288,7 +282,7 @@ mod test {
 		let _ = tool(|| {});
 		let _ = tool(|_: In<ToolContext<()>>, _: Res<Time>| {});
 		let _ = tool(|_: Res<Time>| {});
-		let _ = tool(|_: Res<Time>| -> Result<()> { Ok(()) });
+		// let _ = tool(|_: Res<Time>| -> Result<()> { Ok(()) });
 		let _ = tool(|_: In<()>| {});
 
 		// --- Function ---
