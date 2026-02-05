@@ -2,6 +2,67 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
+pub struct ToolContext<In> {
+	pub tool: Entity,
+	pub payload: In,
+}
+
+impl<In> ToolContext<In> {
+	pub fn new(tool: Entity, payload: In) -> Self { Self { tool, payload } }
+}
+
+pub trait FromToolContext<In, M> {
+	fn from_tool_context(ctx: ToolContext<In>) -> Self;
+}
+
+pub struct PayloadFromToolContextMarker;
+
+impl<In> FromToolContext<In, PayloadFromToolContextMarker> for In
+where
+	// as ToolContext is not Typed we avoid multiple impls
+	In: Typed,
+{
+	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx.payload }
+}
+
+impl<In> FromToolContext<In, Self> for ToolContext<In> {
+	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx }
+}
+
+pub struct AsyncToolContext<In> {
+	pub tool: AsyncEntity,
+	pub payload: In,
+}
+
+impl<In> AsyncToolContext<In> {
+	pub fn new(tool: AsyncEntity, payload: In) -> Self {
+		Self { tool, payload }
+	}
+}
+
+pub trait FromAsyncToolContext<In, M> {
+	fn from_async_tool_context(ctx: AsyncToolContext<In>) -> Self;
+}
+
+pub struct PayloadFromAsyncToolContextMarker;
+
+impl<In> FromAsyncToolContext<In, Self> for AsyncToolContext<In> {
+	fn from_async_tool_context(ctx: AsyncToolContext<In>) -> Self { ctx }
+}
+
+impl<T, In, M> FromAsyncToolContext<In, (In, M)> for T
+where
+	T: FromToolContext<In, M>,
+{
+	fn from_async_tool_context(cx: AsyncToolContext<In>) -> Self {
+		T::from_tool_context(ToolContext {
+			tool: cx.tool.id(),
+			payload: cx.payload,
+		})
+	}
+}
+
+
 
 /// A tool handler, like a function, has an input and output.
 /// This trait creates the handler, which must listen for a
@@ -20,10 +81,11 @@ pub trait IntoToolHandler<M>: 'static + Send + Sync + Clone {
 pub struct FunctionIntoToolHandlerMarker;
 
 
-impl<Func, In, Out> IntoToolHandler<(FunctionIntoToolHandlerMarker, In, Out)>
-	for Func
+impl<Func, In, Out, Arg, ArgM>
+	IntoToolHandler<(FunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)> for Func
 where
-	Func: 'static + Send + Sync + Clone + Fn(In) -> Out,
+	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Out,
+	Arg: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
 	Out: Typed,
 {
@@ -39,7 +101,8 @@ where
 				let tool = ev.tool();
 				let payload = ev.take_payload()?;
 				let on_out = ev.take_out_handler()?;
-				let output = self.clone()(payload);
+				let arg = Arg::from_tool_context(ToolContext { tool, payload });
+				let output = self.clone()(arg);
 				on_out.call(commands, tool, output)?;
 				Ok(())
 			},
@@ -52,10 +115,12 @@ where
 pub struct AsyncFunctionIntoToolHandlerMarker;
 
 
-impl<Func, In, Fut, Out>
-	IntoToolHandler<(AsyncFunctionIntoToolHandlerMarker, In, Out)> for Func
+impl<Func, In, Fut, Out, Arg, ArgM>
+	IntoToolHandler<(AsyncFunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)>
+	for Func
 where
-	Func: 'static + Send + Sync + Clone + Fn(In) -> Fut,
+	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Fut,
+	Arg: 'static + Send + Sync + FromAsyncToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
 	Fut: 'static + Send + Future<Output = Out>,
 	Out: Typed,
@@ -72,9 +137,13 @@ where
 				let tool = ev.tool();
 				let payload = ev.take_payload()?;
 				let on_out = ev.take_out_handler()?;
+				let arg = Arg::from_async_tool_context(AsyncToolContext {
+					tool: commands.channel.world().entity(tool),
+					payload,
+				});
 				let this = self.clone();
 				commands.run(async move |world| -> Result {
-					let output = this(payload).await;
+					let output = this(arg).await;
 					world
 						.with_then(move |world: &mut World| -> Result {
 							let commands = world.commands();
@@ -105,7 +174,29 @@ mod test {
 			.send_blocking::<(i32, i32), i32>((2, 2))
 			.unwrap()
 			.xpect_eq(4);
+	}
+	#[test]
+	fn tool_context() {
+		let mut world = World::new();
+		let entity = world
+			.spawn(tool(|cx: ToolContext<()>| -> Entity { cx.tool }))
+			.id();
+		world
+			.entity_mut(entity)
+			.send_blocking::<(), Entity>(())
+			.unwrap()
+			.xpect_eq(entity);
 
+		// compile checks
+		let _ = tool(|_: ()| {});
+		let _ = tool(|_: u32| {});
+		let _ = tool(|_: ToolContext<()>| {});
+		let _ = tool(async |_: AsyncToolContext<()>| {});
+		let _ = tool(async |_: ()| {});
+		let _ = tool(async |_: u32| {});
+	}
+	#[test]
+	fn async_function() {
 		AsyncPlugin::world()
 			.spawn(add_tool_async())
 			.send_blocking::<(i32, i32), i32>((2, 2))
