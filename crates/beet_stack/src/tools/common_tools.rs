@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::Typed;
 
 
 
@@ -43,7 +44,7 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 				query.with_field(cx.tool, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current + 1;
-					*value = serde_json::json!(new_value);
+					*value = Value::I64(new_value);
 					new_value
 				})
 			},
@@ -72,7 +73,7 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 				query.with_field(cx.tool, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current - 1;
-					*value = serde_json::json!(new_value);
+					*value = Value::I64(new_value);
 					new_value
 				})
 			},
@@ -96,7 +97,7 @@ pub fn add(field: FieldRef) -> impl Bundle {
 				query.with_field(cx.tool, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current + amount;
-					*value = serde_json::json!(new_value);
+					*value = Value::I64(new_value);
 					new_value
 				})
 			},
@@ -104,48 +105,44 @@ pub fn add(field: FieldRef) -> impl Bundle {
 	)
 }
 
-/// A tool that sets a field to a specific JSON value.
+/// A tool that sets a field to a specific [`Value`].
 ///
-/// Takes a `serde_json::Value` as input and stores it in the specified field.
+/// Takes a [`Value`] as input and stores it in the specified field.
 pub fn set_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		tool(
-			|cx: In<ToolContext<String>>,
+			|In(cx): In<ToolContext<Value>>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<()> {
-				let new_value: serde_json::Value =
-					serde_json::from_str(&cx.payload).map_err(|err| {
-						bevyhow!("Failed to parse JSON: {err}")
-					})?;
 				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
-					*value = new_value.clone();
+				query.with_field(cx.tool, field, move |value| {
+					*value = cx.payload;
 				})
 			},
 		),
 	)
 }
 
-/// A tool that sets a field to a specific value, with type serialization.
+/// A tool that sets a field to a specific typed value.
 ///
-/// Takes a JSON string as input, deserializes it, and stores it in the specified field.
-pub fn set_field_typed(field: FieldRef) -> impl Bundle {
+/// Takes a generic type `T` that can be converted to/from reflection.
+pub fn set_field_typed<T>(field: FieldRef) -> impl Bundle
+where
+	T: 'static + Send + Sync + FromReflect + Typed,
+{
 	(
 		field,
 		tool(
-			|cx: In<ToolContext<String>>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<()> {
-				let new_value: serde_json::Value =
-					serde_json::from_str(&cx.payload).map_err(|err| {
-						bevyhow!("Failed to parse JSON: {err}")
-					})?;
+			move |cx: In<ToolContext<T>>,
+			      mut query: DocumentQuery,
+			      fields: Query<&FieldRef>|
+			      -> Result<()> {
 				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
-					*value = new_value.clone();
+				let new_value = Value::from_reflect(&cx.payload)?;
+				query.with_field(cx.tool, field, move |value| {
+					*value = new_value;
 				})
 			},
 		),
@@ -154,7 +151,7 @@ pub fn set_field_typed(field: FieldRef) -> impl Bundle {
 
 /// A tool that retrieves a field value from a document.
 ///
-/// Returns the `serde_json::Value` directly.
+/// Returns the [`Value`].
 pub fn get_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
@@ -162,33 +159,34 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
-			 -> Result<String> {
+			 -> Result<Value> {
 				let field = fields.get(cx.tool)?;
 				let doc = query.get(cx.tool, &field.document)?;
-				let value = doc.get_field_ref(&field.field_path)?;
-				serde_json::to_string(value)
-					.map_err(|err| bevyhow!("Failed to serialize JSON: {err}"))
+				doc.get_field_ref(&field.field_path)
+					.map(|v| v.clone())?
+					.xok()
 			},
 		),
 	)
 }
 
-/// A tool that retrieves a field value from a document with type serialization.
+/// A tool that retrieves a field value from a document with type conversion.
 ///
-/// Returns the JSON value as a string.
-pub fn get_field_typed(field: FieldRef) -> impl Bundle {
+/// Returns the value as a typed `T`.
+pub fn get_field_typed<T>(field: FieldRef) -> impl Bundle
+where
+	T: 'static + Send + Sync + FromReflect + Typed,
+{
 	(
 		field,
 		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
-			 -> Result<String> {
+			 -> Result<T> {
 				let field = fields.get(cx.tool)?;
 				let doc = query.get(cx.tool, &field.document)?;
-				let value = doc.get_field_ref(&field.field_path)?;
-				serde_json::to_string(value)
-					.map_err(|err| bevyhow!("Failed to serialize JSON: {err}"))
+				doc.get_field::<T>(&field.field_path)?.xok()
 			},
 		),
 	)
@@ -256,7 +254,7 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"count": 5})),
+				Document::new(val!({ "count": 5i64 })),
 				decrement(count_field()),
 			))
 			.id();
@@ -274,7 +272,7 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"count": 10})),
+				Document::new(val!({ "count": 10i64 })),
 				add(count_field()),
 			))
 			.id();
@@ -300,7 +298,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>(r#""Hello""#.to_string())
+			.send_blocking::<Value, ()>(val!("Hello"))
 			.unwrap();
 
 		world
@@ -319,14 +317,14 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"status": "pending"})),
+				Document::new(val!({ "status": "pending" })),
 				set_field(field),
 			))
 			.id();
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>(r#""complete""#.to_string())
+			.send_blocking::<Value, ()>(val!("complete"))
 			.unwrap();
 
 		world
@@ -342,11 +340,11 @@ mod test {
 	fn set_field_typed_creates_new_field() {
 		let mut world = World::new();
 		let field = FieldRef::new(DocumentPath::Card, "message");
-		let entity = world.spawn((Card, set_field_typed(field))).id();
+		let entity = world.spawn((Card, set_field_typed::<String>(field))).id();
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>(r#""Hello""#.to_string())
+			.send_blocking::<String, ()>("Hello".to_string())
 			.unwrap();
 
 		world
@@ -365,14 +363,14 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"status": "pending"})),
-				set_field_typed(field),
+				Document::new(val!({ "status": "pending" })),
+				set_field_typed::<String>(field),
 			))
 			.id();
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>(r#""complete""#.to_string())
+			.send_blocking::<String, ()>("complete".to_string())
 			.unwrap();
 
 		world
@@ -391,17 +389,17 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"data": 42})),
+				Document::new(val!({ "data": 42i64 })),
 				get_field(field),
 			))
 			.id();
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), String>(())
+			.send_blocking::<(), Value>(())
 			.unwrap();
 
-		result.xpect_eq("42");
+		result.xpect_eq(val!(42i64));
 	}
 
 	#[test]
@@ -414,17 +412,17 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"user": {"name": "Alice"}})),
+				Document::new(val!({ "user": { "name": "Alice" } })),
 				get_field(field),
 			))
 			.id();
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), String>(())
+			.send_blocking::<(), Value>(())
 			.unwrap();
 
-		result.xpect_eq(r#""Alice""#);
+		result.xpect_eq(val!("Alice"));
 	}
 
 	#[test]
@@ -434,17 +432,17 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"data": 42})),
-				get_field_typed(field),
+				Document::new(val!({ "data": 42i64 })),
+				get_field_typed::<i64>(field),
 			))
 			.id();
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), String>(())
+			.send_blocking::<(), i64>(())
 			.unwrap();
 
-		result.xpect_eq("42");
+		result.xpect_eq(42);
 	}
 
 	#[test]
@@ -457,8 +455,8 @@ mod test {
 		let entity = world
 			.spawn((
 				Card,
-				Document::new(serde_json::json!({"user": {"name": "Alice"}})),
-				get_field_typed(field),
+				Document::new(val!({ "user": { "name": "Alice" } })),
+				get_field_typed::<String>(field),
 			))
 			.id();
 
@@ -467,6 +465,6 @@ mod test {
 			.send_blocking::<(), String>(())
 			.unwrap();
 
-		result.xpect_eq(r#""Alice""#);
+		result.xpect_eq("Alice");
 	}
 }

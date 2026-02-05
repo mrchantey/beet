@@ -12,4 +12,10 @@ pub mod prelude {
 	pub use crate::content::*;
 	pub use crate::document::*;
 	pub use crate::tools::*;
+	pub use crate::val;
+	// reexport for val!
+}
+/// A module for re-exporting items from other crates.
+pub mod exports {
+	pub use beet_core::prelude::HashMap;
 }
