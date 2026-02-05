@@ -246,6 +246,8 @@ pub enum DocumentError {
 	},
 }
 
+
+
 /// Specifies behavior when a field is missing from a document.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OnMissingField {

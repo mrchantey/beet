@@ -4,10 +4,12 @@
 #![feature(associated_type_defaults, closure_track_caller)]
 #![doc = include_str!("../README.md")]
 mod content;
+mod document;
 mod tools;
 
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
 	pub use crate::content::*;
+	pub use crate::document::*;
 	pub use crate::tools::*;
 }
