@@ -1,51 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Errors that can occur when working with documents.
-#[derive(Debug, thiserror::Error)]
-pub enum DocumentError {
-	/// Expected an array but found a different type at the given path.
-	#[error("expected array, found {current:#?}\nAt path {path:?}")]
-	ExpectedArray {
-		/// The actual value that was found.
-		current: serde_json::Value,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-	/// Array index was out of bounds.
-	#[error("array index {index} out of bounds\nAt path {path:?}")]
-	ArrayIndexOutOfBounds {
-		/// The index that was out of bounds.
-		index: usize,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-	/// Expected an object but found a different type at the given path.
-	#[error("expected object, found {current:#?}\nat path {path:?}")]
-	ExpectedObject {
-		/// The actual value that was found.
-		current: serde_json::Value,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-	/// Object key was not found at the given path.
-	#[error("object key '{key}' not found\nAt path {path:?}")]
-	ObjectKeyNotFound {
-		/// The key that was not found.
-		key: String,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-	/// Failed to deserialize value to the requested type.
-	#[error("Failed to deserialize: '{error}'\nAt path {path:?}")]
-	FailedToDeserialize {
-		/// The deserialization error message.
-		error: String,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-}
-
 /// In-memory JSON document that can be attached to entities.
 ///
 /// Documents provide structured storage for cards and other entities,
@@ -76,9 +31,10 @@ impl Document {
 	/// ## Errors
 	///
 	/// Errors if an array or object is expected, and the actual type is not the expected, nor empty.
-	fn try_init_field(
+	fn try_init_field_with(
 		&mut self,
 		path: &[FieldPath],
+		init_value: &serde_json::Value,
 	) -> Result<&mut serde_json::Value> {
 		let mut current = &mut self.0;
 
@@ -119,7 +75,7 @@ impl Document {
 					})?;
 					current = object
 						.entry(key.clone())
-						.or_insert(serde_json::Value::Null);
+						.or_insert_with(|| init_value.clone());
 				}
 			}
 		}
@@ -202,40 +158,41 @@ impl Document {
 		let mut current = &mut self.0;
 
 		for segment in path {
-			// clone values before borrow to avoid borrow checker issues
-			// TODO unacceptable, Value may be massive
-			let current_clone = current.clone();
-			let path_clone = path.to_vec();
-
 			match segment {
 				FieldPath::ArrayIndex(idx) => {
 					let idx_val = *idx;
-					current = current
-						.as_array_mut()
-						.ok_or_else(|| DocumentError::ExpectedArray {
-							current: current_clone.clone(),
-							path: path_clone.clone(),
-						})?
-						.get_mut(idx_val)
-						.ok_or_else(|| {
-							DocumentError::ArrayIndexOutOfBounds {
-								index: idx_val,
-								path: path_clone,
-							}
-						})?;
+					// Check type first before attempting mutation
+					if !current.is_array() {
+						return Err(DocumentError::ExpectedArray {
+							current: current.clone(),
+							path: path.to_vec(),
+						});
+					}
+					let array = current.as_array_mut().unwrap();
+					if idx_val >= array.len() {
+						return Err(DocumentError::ArrayIndexOutOfBounds {
+							index: idx_val,
+							path: path.to_vec(),
+						});
+					}
+					current = &mut array[idx_val];
 				}
 				FieldPath::ObjectKey(key) => {
-					current = current
-						.as_object_mut()
-						.ok_or_else(|| DocumentError::ExpectedObject {
-							current: current_clone.clone(),
-							path: path_clone.clone(),
-						})?
-						.get_mut(key)
-						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
+					// Check type first before attempting mutation
+					if !current.is_object() {
+						return Err(DocumentError::ExpectedObject {
+							current: current.clone(),
+							path: path.to_vec(),
+						});
+					}
+					let object = current.as_object_mut().unwrap();
+					if !object.contains_key(key) {
+						return Err(DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
-							path: path_clone,
-						})?;
+							path: path.to_vec(),
+						});
+					}
+					current = object.get_mut(key).unwrap();
 				}
 			}
 		}
@@ -243,37 +200,94 @@ impl Document {
 	}
 }
 
+
+/// Errors that can occur when working with documents.
+#[derive(Debug, thiserror::Error)]
+pub enum DocumentError {
+	/// Expected an array but found a different type at the given path.
+	#[error("expected array, found {current:#?}\nAt path {path:?}")]
+	ExpectedArray {
+		/// The actual value that was found.
+		current: serde_json::Value,
+		/// The path where the error occurred.
+		path: Vec<FieldPath>,
+	},
+	/// Array index was out of bounds.
+	#[error("array index {index} out of bounds\nAt path {path:?}")]
+	ArrayIndexOutOfBounds {
+		/// The index that was out of bounds.
+		index: usize,
+		/// The path where the error occurred.
+		path: Vec<FieldPath>,
+	},
+	/// Expected an object but found a different type at the given path.
+	#[error("expected object, found {current:#?}\nat path {path:?}")]
+	ExpectedObject {
+		/// The actual value that was found.
+		current: serde_json::Value,
+		/// The path where the error occurred.
+		path: Vec<FieldPath>,
+	},
+	/// Object key was not found at the given path.
+	#[error("object key '{key}' not found\nAt path {path:?}")]
+	ObjectKeyNotFound {
+		/// The key that was not found.
+		key: String,
+		/// The path where the error occurred.
+		path: Vec<FieldPath>,
+	},
+	/// Failed to deserialize value to the requested type.
+	#[error("Failed to deserialize: '{error}'\nAt path {path:?}")]
+	FailedToDeserialize {
+		/// The deserialization error message.
+		error: String,
+		/// The path where the error occurred.
+		path: Vec<FieldPath>,
+	},
+}
+
+/// Specifies behavior when a field is missing from a document.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum OnMissingField {
+	/// Initialize the field with the provided value if it doesn't exist.
+	Init {
+		/// The value to initialize the field with.
+		value: serde_json::Value,
+	},
+	/// Emit an error if the field doesn't exist.
+	EmitError,
+}
+
+impl Default for OnMissingField {
+	fn default() -> Self {
+		Self::Init {
+			value: serde_json::Value::Null,
+		}
+	}
+}
+
 /// A reference to a specific field in a document.
 ///
 /// Used by content and tools to interact with document fields. By default,
-/// fields are initialized if missing, unless [`error_on_missing`](FieldRef::error_on_missing)
-/// is set.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
+/// fields are initialized with `null` if missing, unless configured otherwise
+/// via [`on_missing`](FieldRef::on_missing).
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
 pub struct FieldRef {
 	/// The path to the document
 	pub document: DocumentPath,
 	/// The path to the field within the document
 	pub field_path: Vec<FieldPath>,
-	/// By default fields are initialized with a default value
-	/// if missing, otherwise an error is triggered.
-	pub error_on_missing: bool,
+	/// Behavior when the field is missing from the document.
+	#[reflect(ignore)]
+	pub on_missing: OnMissingField,
 }
 
 
 impl FieldRef {
 	/// Create a new field reference with the given document path and field path.
+	///
+	/// By default, missing fields are initialized with `null`.
 	pub fn new(
 		document: DocumentPath,
 		field_path: impl IntoFieldPathVec,
@@ -281,13 +295,25 @@ impl FieldRef {
 		Self {
 			document,
 			field_path: field_path.into_field_path_vec(),
-			error_on_missing: false,
+			on_missing: OnMissingField::default(),
 		}
 	}
 
 	/// Set this field reference to error if the field is missing instead of initializing it.
 	pub fn error_on_missing(mut self) -> Self {
-		self.error_on_missing = true;
+		self.on_missing = OnMissingField::EmitError;
+		self
+	}
+
+	/// Set the behavior when the field is missing.
+	pub fn on_missing(mut self, on_missing: OnMissingField) -> Self {
+		self.on_missing = on_missing;
+		self
+	}
+
+	/// Set the field to initialize with a specific value if missing.
+	pub fn init_with(mut self, value: serde_json::Value) -> Self {
+		self.on_missing = OnMissingField::Init { value };
 		self
 	}
 }
@@ -417,8 +443,8 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 
 	/// Execute a function with a mutable reference to a field.
 	///
-	/// If the document or field doesn't exist and [`FieldRef::error_on_missing`] is false,
-	/// they will be initialized. Otherwise an error is returned.
+	/// If the document or field doesn't exist and [`FieldRef::on_missing`] is set to initialize,
+	/// they will be initialized with the specified value. Otherwise an error is returned.
 	pub fn with_field<Out>(
 		&mut self,
 		subject: Entity,
@@ -431,8 +457,10 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			let value = if let Ok(value) = doc.get_field_mut(&field.field_path)
 			{
 				value
-			} else if !field.error_on_missing {
-				doc.try_init_field(&field.field_path)?
+			} else if let OnMissingField::Init { value: init_value } =
+				&field.on_missing
+			{
+				doc.try_init_field_with(&field.field_path, init_value)?
 			} else {
 				return Err(DocumentError::ObjectKeyNotFound {
 					path: field.field_path.clone(),
@@ -441,10 +469,13 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				.into());
 			};
 			Ok(func(value))
-		} else if !field.error_on_missing {
+		} else if let OnMissingField::Init { value: init_value } =
+			&field.on_missing
+		{
 			// create the document and run the method with it
 			let mut doc = Document::default();
-			let value = doc.try_init_field(&field.field_path)?;
+			let value =
+				doc.try_init_field_with(&field.field_path, init_value)?;
 			let out = func(value);
 			self.commands.entity(doc_entity).insert(doc);
 			Ok(out)
@@ -574,10 +605,13 @@ mod test {
 		let mut doc = Document::default();
 
 		let value = doc
-			.try_init_field(&[
-				FieldPath::ObjectKey("nested".to_string()),
-				FieldPath::ObjectKey("value".to_string()),
-			])
+			.try_init_field_with(
+				&[
+					FieldPath::ObjectKey("nested".to_string()),
+					FieldPath::ObjectKey("value".to_string()),
+				],
+				&serde_json::Value::Null,
+			)
 			.unwrap();
 
 		*value = serde_json::json!("initialized");
@@ -595,10 +629,13 @@ mod test {
 		let mut doc = Document::default();
 
 		let value = doc
-			.try_init_field(&[
-				FieldPath::ObjectKey("items".to_string()),
-				FieldPath::ArrayIndex(2),
-			])
+			.try_init_field_with(
+				&[
+					FieldPath::ObjectKey("items".to_string()),
+					FieldPath::ArrayIndex(2),
+				],
+				&serde_json::Value::Null,
+			)
 			.unwrap();
 
 		*value = serde_json::json!(42);
@@ -644,14 +681,16 @@ mod test {
 		field
 			.field_path
 			.xpect_eq(vec![FieldPath::ObjectKey("test".to_string())]);
-		field.error_on_missing.xpect_false();
+		field.on_missing.xpect_eq(OnMissingField::Init {
+			value: serde_json::Value::Null,
+		});
 	}
 
 	#[test]
 	fn field_ref_error_on_missing() {
 		let field =
 			FieldRef::new(DocumentPath::Card, "test").error_on_missing();
-		field.error_on_missing.xpect_true();
+		field.on_missing.xpect_eq(OnMissingField::EmitError);
 	}
 
 	#[test]
