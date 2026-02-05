@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
-pub struct ToolContext<In> {
+pub struct ToolContext<In = ()> {
 	pub tool: Entity,
 	pub payload: In,
 }
@@ -62,7 +62,22 @@ where
 	}
 }
 
-
+/// Helper to allow both T and Result<T> as tool outputs.
+trait IntoResult<Out, M> {
+	fn into_result(self) -> Result<Out>;
+}
+impl<Out> IntoResult<Out, Self> for Out
+where
+	Out: Typed,
+{
+	fn into_result(self) -> Result<Out> { self.xok() }
+}
+impl<Out> IntoResult<Out, Self> for Result<Out>
+where
+	Out: Typed,
+{
+	fn into_result(self) -> Result<Out> { self }
+}
 
 /// A tool handler, like a function, has an input and output.
 /// This trait creates the handler, which must listen for a
@@ -80,12 +95,21 @@ pub trait IntoToolHandler<M>: 'static + Send + Sync + Clone {
 /// Marker component for function tool handlers.
 pub struct FunctionIntoToolHandlerMarker;
 
-impl<Func, In, Out, Arg, ArgM>
-	IntoToolHandler<(FunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)> for Func
+impl<Func, In, Arg, ArgM, Out, IntoOut, IntoOutM>
+	IntoToolHandler<(
+		FunctionIntoToolHandlerMarker,
+		In,
+		Arg,
+		ArgM,
+		Out,
+		IntoOut,
+		IntoOutM,
+	)> for Func
 where
-	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Out,
+	Func: 'static + Send + Sync + Clone + Fn(Arg) -> IntoOut,
 	Arg: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
+	IntoOut: IntoResult<Out, IntoOutM>,
 	Out: Typed,
 {
 	type In = In;
@@ -101,7 +125,7 @@ where
 				let payload = ev.take_payload()?;
 				let on_out = ev.take_out_handler()?;
 				let arg = Arg::from_tool_context(ToolContext { tool, payload });
-				let output = self.clone()(arg);
+				let output = self.clone()(arg).into_result()?;
 				on_out.call(commands, tool, output)?;
 				Ok(())
 			},
@@ -112,14 +136,23 @@ where
 /// Marker component for function tool handlers.
 pub struct SystemIntoToolHandlerMarker;
 
-impl<Func, In, Out, Arg, ArgM, SysM>
-	IntoToolHandler<(SystemIntoToolHandlerMarker, In, Out, Arg, ArgM, SysM)>
-	for Func
+impl<Func, In, Arg, ArgM, Out, IntoOut, IntoOutM, SysM>
+	IntoToolHandler<(
+		SystemIntoToolHandlerMarker,
+		In,
+		Arg,
+		ArgM,
+		Out,
+		IntoOut,
+		IntoOutM,
+		SysM,
+	)> for Func
 where
-	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, Out, SysM>,
+	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, IntoOut, SysM>,
 	Arg: 'static + SystemInput,
 	for<'a> Arg::Inner<'a>: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
+	IntoOut: 'static + IntoResult<Out, IntoOutM>,
 	Out: Typed + 'static + Send + Sync,
 {
 	type In = In;
@@ -140,7 +173,7 @@ where
 						tool,
 						payload,
 					});
-					let output = world.run_system_cached_with(this, arg)?;
+					let output = world.run_system_cached_with(this, arg)?.into_result()?;
 					on_out.call(world.commands(), tool, output)?;
 					world.flush();
 					Ok(())
@@ -154,14 +187,22 @@ where
 /// Marker component for function tool handlers.
 pub struct AsyncFunctionIntoToolHandlerMarker;
 
-impl<Func, In, Fut, Out, Arg, ArgM>
-	IntoToolHandler<(AsyncFunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)>
-	for Func
+impl<Func, In, Fut, Arg, Out, IntoOut, IntoOutM, ArgM>
+	IntoToolHandler<(
+		AsyncFunctionIntoToolHandlerMarker,
+		In,
+		Arg,
+		Out,
+		IntoOut,
+		IntoOutM,
+		ArgM,
+	)> for Func
 where
 	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Fut,
 	Arg: 'static + Send + Sync + FromAsyncToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
-	Fut: 'static + Send + Future<Output = Out>,
+	Fut: 'static + Send + Future<Output = IntoOut>,
+	IntoOut: 'static + IntoResult<Out, IntoOutM>,
 	Out: Typed,
 {
 	type In = In;
@@ -182,7 +223,7 @@ where
 				});
 				let this = self.clone();
 				commands.run(async move |world| -> Result {
-					let output = this(arg).await;
+					let output = this(arg).await.into_result()?;
 					world
 						.with_then(move |world: &mut World| -> Result {
 							let commands = world.commands();
@@ -227,16 +268,25 @@ mod test {
 			.xpect_eq(entity);
 
 		// compile checks
+
+		// --- System ---
 		let _ = tool(|| {});
-		// let _ = tool(|_: ()| {});
 		let _ = tool(|_: In<ToolContext<()>>, _: Res<Time>| {});
 		let _ = tool(|_: Res<Time>| {});
+		let _ = tool(|_: Res<Time>| -> Result { Ok(()) });
 		let _ = tool(|_: In<()>| {});
+
+		// --- Function ---
+		// let _ = tool(|_: ()| {}); // ambiguous
 		let _ = tool(|_: u32| {});
+		let _ = tool(|_: u32| -> Result { Ok(()) });
 		let _ = tool(|_: ToolContext<()>| {});
-		// let _ = tool(async |_: ()| {});
+
+		// --- AsyncFunction ---
+		// let _ = tool(async |_: ()| {}); // ambiguous
 		let _ = tool(async |_: AsyncToolContext<()>| {});
 		let _ = tool(async |_: u32| {});
+		let _ = tool(async |_: u32| -> Result { Ok(()) });
 	}
 	#[test]
 	fn async_function() {
