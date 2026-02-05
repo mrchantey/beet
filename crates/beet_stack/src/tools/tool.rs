@@ -33,9 +33,16 @@ pub struct ToolMeta {
 }
 
 impl ToolMeta {
+	/// Get the input type information for this tool.
 	pub fn input(&self) -> &'static TypeInfo { self.input }
+	/// Get the output type information for this tool.
 	pub fn output(&self) -> &'static TypeInfo { self.output }
 
+	/// Assert that the provided types match this tool's input/output types.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if types don't match.
 	pub fn assert_match<In: Typed, Out: Typed>(&self) -> Result {
 		let expected_input = self.input().type_path();
 		let expected_output = self.output().type_path();
@@ -152,23 +159,36 @@ impl<Out> ToolOut<Out> {
 	}
 }
 
+/// Handles the output of a tool call.
+///
+/// Determines how the tool's output is delivered back to the caller.
 pub enum ToolOutHandler<Out> {
 	/// The tool was called by another entity which
 	/// does not need to track individual calls,
 	/// and instead will listen for a [`ToolOut`]
 	/// event triggered on this caller.
-	Observer { caller: Entity },
-	/// The tool caller is listening on a channel
-	Channel { sender: Sender<Out> },
+	Observer {
+		/// The entity that will receive the [`ToolOut`] event.
+		caller: Entity,
+	},
+	/// The tool caller is listening on a channel.
+	Channel {
+		/// The sender side of the channel for delivering results.
+		sender: Sender<Out>,
+	},
 	/// The tool caller provided a callback to call on completion.
 	Function {
+		/// The boxed function to call with the output.
 		handler: Box<dyn 'static + Send + Sync + FnOnce(Out) -> Result>,
 	},
 }
 
 impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
+	/// Create a handler that triggers a [`ToolOut`] event on the caller.
 	pub fn observer(caller: Entity) -> Self { Self::Observer { caller } }
+	/// Create a handler that sends output through a channel.
 	pub fn channel(sender: Sender<Out>) -> Self { Self::Channel { sender } }
+	/// Create a handler from a function.
 	pub fn function(
 		handler: impl 'static + Send + Sync + FnOnce(Out) -> Result,
 	) -> Self {
@@ -177,6 +197,11 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 		}
 	}
 
+	/// Call this handler with the tool output.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if the handler fails.
 	pub fn call(
 		self,
 		mut commands: Commands,
@@ -203,6 +228,11 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 /// Extension trait for calling tools on entities.
 #[extend::ext(name=EntityWorldMutToolExt)]
 pub impl EntityWorldMut<'_> {
+	/// Send a tool call and block until the result is ready.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if the tool call fails or types don't match.
 	fn send_blocking<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
@@ -213,6 +243,11 @@ pub impl EntityWorldMut<'_> {
 		async_ext::block_on(self.send(input))
 	}
 
+	/// Send a tool call asynchronously.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if the tool call fails or types don't match.
 	fn send<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,

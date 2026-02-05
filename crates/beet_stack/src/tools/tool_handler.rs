@@ -7,19 +7,26 @@ use bevy::reflect::Typed;
 
 
 
+/// Context passed to tool handlers containing the tool entity and input payload.
 pub struct ToolContext<In = ()> {
+	/// The tool entity being called.
 	pub tool: Entity,
+	/// The input payload for this tool call.
 	pub payload: In,
 }
 
 impl<In> ToolContext<In> {
+	/// Create a new tool context with the given tool and payload.
 	pub fn new(tool: Entity, payload: In) -> Self { Self { tool, payload } }
 }
 
+/// Convert from a [`ToolContext`] into a tool handler parameter.
 pub trait FromToolContext<In, M> {
+	/// Convert the tool context into this type.
 	fn from_tool_context(ctx: ToolContext<In>) -> Self;
 }
 
+/// Marker type for extracting just the payload from a [`ToolContext`].
 pub struct PayloadFromToolContextMarker;
 
 impl<In> FromToolContext<In, PayloadFromToolContextMarker> for In
@@ -34,21 +41,28 @@ impl<In> FromToolContext<In, Self> for ToolContext<In> {
 	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx }
 }
 
+/// Async context passed to async tool handlers.
 pub struct AsyncToolContext<In> {
+	/// The async tool entity being called.
 	pub tool: AsyncEntity,
+	/// The input payload for this tool call.
 	pub payload: In,
 }
 
 impl<In> AsyncToolContext<In> {
+	/// Create a new async tool context.
 	pub fn new(tool: AsyncEntity, payload: In) -> Self {
 		Self { tool, payload }
 	}
 }
 
+/// Convert from an [`AsyncToolContext`] into an async tool handler parameter.
 pub trait FromAsyncToolContext<In, M> {
+	/// Convert the async tool context into this type.
 	fn from_async_tool_context(ctx: AsyncToolContext<In>) -> Self;
 }
 
+/// Marker type for extracting the payload from an [`AsyncToolContext`].
 pub struct PayloadFromAsyncToolContextMarker;
 
 impl<In> FromAsyncToolContext<In, Self> for AsyncToolContext<In> {
@@ -71,6 +85,7 @@ where
 /// Trait for converting tool handler outputs into the final output type.
 /// This handles the conversion at the output level to avoid Bevy's IntoSystem ambiguity.
 pub trait IntoToolOutput<Out, M> {
+	/// Convert this type into a tool output result.
 	fn into_tool_output(self) -> Result<Out>;
 }
 
