@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::exports::async_channel::Sender;
 use beet_core::exports::async_channel::TryRecvError;
@@ -6,59 +7,18 @@ use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
 
-/// A tool handler, like a function, has an input and output.
-/// This trait creates the handler, which must listen for a
-/// [`ToolIn`] event, and at some point trigger a [`ToolOut`]
-///
-pub trait IntoToolHandler<M>: 'static + Send + Sync + Clone {
-	/// The type of the input payload for the tool call.
-	type In: Typed + 'static + Send + Sync;
-	/// The type of the output payload for the tool call.
-	type Out: Typed;
-	/// Create the tool handler, this must be an Observer.
-	fn into_handler(self) -> impl Bundle;
-}
-
-/// Marker component for function tool handlers.
-pub struct FunctionIntoToolHandlerMarker;
-
-
-impl<Func, In, Out> IntoToolHandler<(FunctionIntoToolHandlerMarker, In, Out)>
-	for Func
-where
-	Func: 'static + Send + Sync + Clone + Fn(In) -> Out,
-	In: Typed + 'static + Send + Sync,
-	Out: Typed,
-{
-	type In = In;
-	type Out = Out;
-
-	fn into_handler(self) -> impl Bundle {
-		OnSpawn::observe(
-			move |mut ev: On<ToolCall<Self::In, Self::Out>>| -> Result {
-				let ev = ev.event_mut();
-				let payload = ev.take_payload()?;
-				let output = self.clone()(payload);
-				ev.call_on_out(output)?;
-				Ok(())
-			},
-		)
-	}
-}
-
 /// Create a tool from a handler implementing [`IntoToolHandler`],
 /// adding an associated [`ToolMeta`] which is required for tool calling.
 pub fn tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
 {
-	(
-		ToolMeta {
-			input: H::In::type_info(),
-			output: H::Out::type_info(),
-		},
-		handler.into_handler(),
-	)
+	let meta = ToolMeta {
+		input: H::In::type_info(),
+		output: H::Out::type_info(),
+	};
+
+	(meta, handler.into_handler())
 }
 
 /// Metadata for a tool, containing the input and output types.
@@ -104,30 +64,30 @@ impl ToolMeta {
 /// An event emitted on the tool when it is called, containing the tool, payload and a
 /// method to call [`on_out`].
 #[derive(EntityEvent)]
-pub struct ToolCall<In = (), Out = ()> {
+pub struct ToolIn<In = (), Out = ()> {
 	/// The entity containing an observer to react
 	/// to the tool call. This is the [`EntityEvent::event_target`].
 	#[event_target]
 	tool: Entity,
 	/// The payload of the tool input, which may only be consumed once
 	payload: Option<In>,
-	/// Called by the tool on done. This must only be called once.
-	on_out: Option<Box<dyn 'static + Send + Sync + FnOnce(Out) -> Result>>,
+	/// Called by the tool on done, which may only be consumed once.
+	out_handler: Option<ToolOutHandler<Out>>,
 }
 
-impl<In, Out> ToolCall<In, Out> {
+impl<In, Out> ToolIn<In, Out> {
 	/// Create a new [`ToolIn`] event with the given caller, tool, and payload.
-	pub fn new(
-		tool: Entity,
-		payload: In,
-		on_out: impl 'static + Send + Sync + FnOnce(Out) -> Result,
-	) -> Self {
+	pub fn new(tool: Entity, payload: In, on_out: ToolOutHandler<Out>) -> Self {
 		Self {
 			tool,
 			payload: Some(payload),
-			on_out: Some(Box::new(on_out)),
+			out_handler: Some(on_out),
 		}
 	}
+	/// Get the tool entity for this event, aka [`Self::event_target`]
+	pub fn tool(&self) -> Entity { self.tool }
+
+
 	/// Take the payload from this event. This must only be done once.
 	///
 	/// # Errors
@@ -144,11 +104,51 @@ impl<In, Out> ToolCall<In, Out> {
 	/// # Errors
 	///
 	/// Errors if the [`on_out`] method has already been called.
-	pub fn call_on_out(&mut self, output: Out) -> Result {
-		let on_out = self
-			.on_out.take()
-			.ok_or_else(|| bevyhow!("ToolCall on_out already called. This may be a bug in the IntoToolHandler implementation."))?;
-		on_out(output)
+	pub fn take_out_handler(&mut self) -> Result<ToolOutHandler<Out>> {
+		self
+			.out_handler.take()
+			.ok_or_else(|| bevyhow!("ToolCall on_out already called. This may be a bug in the IntoToolHandler implementation."))
+	}
+}
+
+/// An event emitted on the tool when it is called, containing the tool, payload and a
+/// method to call [`on_out`].
+#[derive(EntityEvent)]
+pub struct ToolOut<Out = ()> {
+	/// The entity containing the tool handler that sent this [`ToolOut`] event.
+	tool: Entity,
+	/// The entity that originally sent the tool call,
+	/// This is the [`EntityEvent::event_target`].
+	#[event_target]
+	caller: Entity,
+	/// The payload of the tool input, which may only be consumed once
+	payload: Option<Out>,
+}
+
+impl<Out> ToolOut<Out> {
+	/// Create a new [`ToolIn`] event with the given caller, tool, and payload.
+	pub fn new(tool: Entity, caller: Entity, payload: Out) -> Self {
+		Self {
+			tool,
+			caller,
+			payload: Some(payload),
+		}
+	}
+
+	/// Get the tool entity for this event
+	pub fn tool(&self) -> Entity { self.tool }
+	/// Get the tool caller entity for this event, aka [`Self::event_target`]
+	pub fn caller(&self) -> Entity { self.caller }
+
+	/// Take the payload from this event. This must only be done once.
+	///
+	/// # Errors
+	///
+	/// Errors if the payload has already been taken.
+	pub fn take_payload(&mut self) -> Result<Out> {
+		self.payload
+			.take()
+			.ok_or_else(|| bevyhow!("ToolOut payload already taken. Are there multiple handlers on the same entity?"))
 	}
 }
 
@@ -156,12 +156,49 @@ pub enum ToolOutHandler<Out> {
 	/// The tool was called by another entity which
 	/// does not need to track individual calls,
 	/// and instead will listen for a [`ToolOut`]
-	/// event.
-	Observer(Entity),
+	/// event triggered on this caller.
+	Observer { caller: Entity },
 	/// The tool caller is listening on a channel
-	Channel(Sender<Out>),
+	Channel { sender: Sender<Out> },
+	/// The tool caller provided a callback to call on completion.
+	Function {
+		handler: Box<dyn 'static + Send + Sync + FnOnce(Out) -> Result>,
+	},
 }
 
+impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
+	pub fn observer(caller: Entity) -> Self { Self::Observer { caller } }
+	pub fn channel(sender: Sender<Out>) -> Self { Self::Channel { sender } }
+	pub fn function(
+		handler: impl 'static + Send + Sync + FnOnce(Out) -> Result,
+	) -> Self {
+		Self::Function {
+			handler: Box::new(handler),
+		}
+	}
+
+	pub fn call(
+		self,
+		mut commands: Commands,
+		tool: Entity,
+		payload: Out,
+	) -> Result {
+		match self {
+			ToolOutHandler::Observer { caller } => {
+				commands.trigger(ToolOut::new(tool, caller, payload));
+				Ok(())
+			}
+			ToolOutHandler::Channel { sender } => {
+				sender.try_send(payload).map_err(|err| {
+					bevyhow!(
+						"Failed to send tool output through channel: {err:?}"
+					)
+				})
+			}
+			ToolOutHandler::Function { handler } => handler(payload),
+		}
+	}
+}
 
 /// Extension trait for calling tools on entities.
 #[extend::ext(name=EntityWorldMutToolExt)]
@@ -184,22 +221,14 @@ pub impl EntityWorldMut<'_> {
 		input: In,
 	) -> impl Future<Output = Result<Out>> {
 		async move {
-			let meta = self.get::<ToolMeta>().ok_or_else(|| {
-				bevyhow!(
-					"Entity does not have ToolMeta, cannot send tool call."
-				)
-			})?;
-			meta.assert_match::<In, Out>()?;
-
-			let entity = self.id();
-			// SAFETY: While it is possible to change the entity location,
+			let (send, recv) = async_channel::bounded(1);
+			let handler = ToolOutHandler::channel(send);
+			trigger_for_entity(self, input, handler)?;
+			// SAFETY: While it is possible an update will change the entity location,
 			// we no longer use the EntityWorldMut.
 			let world = unsafe { self.world_mut() };
-			let (send, recv) = async_channel::bounded(1);
-			world.trigger(ToolCall::new(entity, input, move |output| {
-				send.try_send(output)?.xok()
-			}));
 
+			world.flush();
 			// check if response was sent synchronously
 			let out: Out = match recv.try_recv() {
 				Ok(response) => response,
@@ -218,26 +247,76 @@ pub impl EntityWorldMut<'_> {
 }
 
 
+/// Extension trait for calling tools on entities.
+#[extend::ext(name=EntityCommandsToolExt)]
+pub impl EntityCommands<'_> {
+	/// Triggers an entity target event for this entity, using
+	/// the provided [`ToolOutHandler`] for the output.
+	///
+	/// ## Errors
+	///
+	/// Errors if there is a type mismatch between this entity's [`ToolMeta`]
+	/// and this tool call.
+	fn send<
+		In: 'static + Send + Sync + Typed,
+		Out: 'static + Send + Sync + Typed,
+	>(
+		&mut self,
+		input: In,
+		out_handler: ToolOutHandler<Out>,
+	) {
+		self.queue(|mut entity: EntityWorldMut| -> Result {
+			trigger_for_entity(&mut entity, input, out_handler)
+		});
+	}
+}
+
+fn trigger_for_entity<In: Typed, Out: Typed>(
+	entity: &mut EntityWorldMut,
+	input: In,
+	out_handler: ToolOutHandler<Out>,
+) -> Result {
+	let id = entity.id();
+	let meta = entity.get::<ToolMeta>().ok_or_else(|| {
+		bevyhow!("Entity does not have ToolMeta, cannot send tool call.")
+	})?;
+	meta.assert_match::<In, Out>()?;
+	// SAFETY: While it is possible to change the entity location,
+	// we no longer use the EntityWorldMut.
+	let world = unsafe { entity.world_mut() };
+	world.trigger(ToolIn::new(id, input, out_handler));
+	Ok(())
+}
 
 #[cfg(test)]
 mod test {
 	use super::*;
 
-	fn add_tool((a, b): (i32, i32)) -> i32 { a + b }
+	fn add_tool_handler((a, b): (i32, i32)) -> i32 { a + b }
+	fn add_tool() -> impl Bundle { tool(add_tool_handler) }
+
 
 	#[test]
 	fn works() {
 		World::new()
-			.spawn(tool(add_tool))
+			.spawn(add_tool())
 			.send_blocking::<(i32, i32), i32>((2, 2))
 			.unwrap()
 			.xpect_eq(4);
 	}
 	#[test]
+	#[should_panic = "No Tool"]
+	fn no_tool() {
+		World::new()
+			.spawn_empty()
+			.send_blocking::<(), ()>(())
+			.unwrap();
+	}
+	#[test]
 	#[should_panic = "Input mismatch"]
 	fn input_mismatch() {
 		World::new()
-			.spawn(tool(add_tool))
+			.spawn(add_tool())
 			.send_blocking::<bool, i32>(true)
 			.unwrap();
 	}
@@ -245,7 +324,7 @@ mod test {
 	#[should_panic = "Output mismatch"]
 	fn output_mismatch() {
 		World::new()
-			.spawn(tool(add_tool))
+			.spawn(add_tool())
 			.send_blocking::<(i32, i32), bool>((2, 2))
 			.unwrap();
 	}
