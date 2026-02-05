@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::system::IsFunctionSystem;
+use bevy::ecs::system::SystemParamFunction;
 use bevy::reflect::Typed;
 
 
@@ -65,21 +67,27 @@ where
 	}
 }
 
-/// Helper to allow both T and Result<T> as tool outputs.
-trait IntoResult<Out, M> {
-	fn into_result(self) -> Result<Out>;
+
+/// Trait for converting tool handler outputs into the final output type.
+/// This handles the conversion at the output level to avoid Bevy's IntoSystem ambiguity.
+pub trait IntoToolOutput<Out, M> {
+	fn into_tool_output(self) -> Result<Out>;
 }
-impl<Out> IntoResult<Out, Self> for Out
+
+/// Marker for converting [`Result<T>`] into tool output.
+pub struct ResultIntoToolOutput;
+impl<Out> IntoToolOutput<Out, ResultIntoToolOutput> for Result<Out> {
+	fn into_tool_output(self) -> Result<Out> { self }
+}
+
+/// Marker for converting any [`Typed`] value directly into tool output.
+/// Uses a tuple marker to give it lower priority than the `Result` impl.
+pub struct TypeIntoToolOutput;
+impl<Out> IntoToolOutput<Out, (TypeIntoToolOutput,)> for Out
 where
 	Out: Typed,
 {
-	fn into_result(self) -> Result<Out> { self.xok() }
-}
-impl<Out> IntoResult<Out, Self> for Result<Out>
-where
-	Out: Typed,
-{
-	fn into_result(self) -> Result<Out> { self }
+	fn into_tool_output(self) -> Result<Out> { self.xok() }
 }
 
 /// A tool handler, like a function, has an input and output.
@@ -112,7 +120,7 @@ where
 	Func: 'static + Send + Sync + Clone + Fn(Arg) -> IntoOut,
 	Arg: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
-	IntoOut: IntoResult<Out, IntoOutM>,
+	IntoOut: IntoToolOutput<Out, IntoOutM>,
 	Out: Typed,
 {
 	type In = In;
@@ -128,7 +136,7 @@ where
 				let payload = ev.take_payload()?;
 				let on_out = ev.take_out_handler()?;
 				let arg = Arg::from_tool_context(ToolContext { tool, payload });
-				let output = self.clone()(arg).into_result()?;
+				let output = self.clone()(arg).into_tool_output()?;
 				on_out.call(commands, tool, output)?;
 				Ok(())
 			},
@@ -136,18 +144,52 @@ where
 	}
 }
 
-/// Marker component for function tool handlers.
+/// Marker component for system tool handlers.
+///
+/// This impl uses `SystemParamFunction::Out` to get the **actual** return type
+/// of the function directly, bypassing Bevy's `IntoSystem` ambiguity.
+///
+/// ## Background
+///
+/// Bevy's `IntoSystem` trait has an internal `IntoResult` conversion that creates
+/// ambiguity when a system returns `Result<T, BevyError>`:
+/// - `impl<T> IntoResult<T> for T` (identity)
+/// - `impl<T> IntoResult<T> for Result<T, BevyError>` (unwrap)
+///
+/// This means `IntoSystem<(), Out, _>` for a closure returning `Result<()>` could
+/// resolve `Out` as either `Result<()>` or `()`.
+///
+/// ## Solution
+///
+/// By constraining `Func: SystemParamFunction<FnMarker, Out = IntoOut>`, we bind
+/// `IntoOut` to the function's **literal return type** before any `IntoResult`
+/// conversion. Then we explicitly use `IntoSystem<Arg, IntoOut, (IsFunctionSystem, FnMarker)>`
+/// with the now-constrained `IntoOut`, avoiding the ambiguity.
 pub struct SystemIntoToolHandlerMarker;
 
-impl<Func, In, Arg, ArgM, Out, SysM>
-	IntoToolHandler<(SystemIntoToolHandlerMarker, In, Arg, ArgM, Out, SysM)>
-	for Func
+impl<Func, In, Arg, ArgM, Out, IntoOut, IntoOutM, FnMarker>
+	IntoToolHandler<(
+		SystemIntoToolHandlerMarker,
+		In,
+		Arg,
+		ArgM,
+		Out,
+		IntoOut,
+		IntoOutM,
+		FnMarker,
+	)> for Func
 where
-	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, Out, SysM>,
+	Func: 'static + Send + Sync + Clone,
+	FnMarker: 'static,
+	// Use SystemParamFunction to get the ACTUAL return type, bypassing IntoResult ambiguity
+	Func: SystemParamFunction<FnMarker, Out = IntoOut>,
+	// We still need IntoSystem to run the system - note the marker is (IsFunctionSystem, FnMarker)
+	Func: IntoSystem<Arg, IntoOut, (IsFunctionSystem, FnMarker)>,
 	Arg: 'static + SystemInput,
 	for<'a> Arg::Inner<'a>: FromToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
-	Out: Typed + 'static + Send + Sync,
+	IntoOut: 'static + Send + Sync + IntoToolOutput<Out, IntoOutM>,
+	Out: Typed,
 {
 	type In = In;
 	type Out = Out;
@@ -167,7 +209,9 @@ where
 						tool,
 						payload,
 					});
-					let output = world.run_system_cached_with(this, arg)?.into_result()?;
+					let raw_output: IntoOut =
+						world.run_system_cached_with::<_, IntoOut, _, _>(this, arg)?;
+					let output = raw_output.into_tool_output()?;
 					on_out.call(world.commands(), tool, output)?;
 					world.flush();
 					Ok(())
@@ -178,7 +222,7 @@ where
 	}
 }
 
-/// Marker component for function tool handlers.
+/// Marker component for async function tool handlers.
 pub struct AsyncFunctionIntoToolHandlerMarker;
 
 impl<Func, In, Fut, Arg, Out, IntoOut, IntoOutM, ArgM>
@@ -196,7 +240,7 @@ where
 	Arg: 'static + Send + Sync + FromAsyncToolContext<In, ArgM>,
 	In: Typed + 'static + Send + Sync,
 	Fut: 'static + Send + Future<Output = IntoOut>,
-	IntoOut: 'static + IntoResult<Out, IntoOutM>,
+	IntoOut: 'static + IntoToolOutput<Out, IntoOutM>,
 	Out: Typed,
 {
 	type In = In;
@@ -217,7 +261,7 @@ where
 				});
 				let this = self.clone();
 				commands.run(async move |world| -> Result {
-					let output = this(arg).await.into_result()?;
+					let output = this(arg).await.into_tool_output()?;
 					world
 						.with_then(move |world: &mut World| -> Result {
 							let commands = world.commands();
@@ -282,7 +326,7 @@ mod test {
 		let _ = tool(|| {});
 		let _ = tool(|_: In<ToolContext<()>>, _: Res<Time>| {});
 		let _ = tool(|_: Res<Time>| {});
-		// let _ = tool(|_: Res<Time>| -> Result<()> { Ok(()) });
+		let _ = tool(|_: Res<Time>| -> Result<()> { Ok(()) });
 		let _ = tool(|_: In<()>| {});
 
 		// --- Function ---
