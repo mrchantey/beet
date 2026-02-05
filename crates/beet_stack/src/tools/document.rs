@@ -1,3 +1,4 @@
+// #![allow(unused)]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -28,6 +29,20 @@ pub enum DocumentError {
 pub struct Document(serde_json::Value);
 
 impl Document {
+	///
+	/// Initialize a nested field in a document unless there is a type clash.
+	/// Arrays and objects are initialized with fields and items, as required by the path.
+	/// An array or object will only be initialized if the current value is [`None`] or [`Null`].
+	///
+	/// ## Errors
+	/// Errors if an array or object is expected, and the actual type is not the expected, nor empty.
+	fn try_init_field(
+		&mut self,
+		_path: &[FieldPath],
+	) -> Result<&mut serde_json::Value> {
+		todo!("agent")
+	}
+
 	/// Get a field from the document by path, deserializing to type T.
 	pub fn get_field<T>(&self, path: &[FieldPath]) -> Result<T, DocumentError>
 	where
@@ -84,7 +99,6 @@ impl Document {
 	}
 
 	/// Get a mutable field from the document by path.
-	#[allow(unused)]
 	pub fn get_field_mut(
 		&mut self,
 		path: &[FieldPath],
@@ -94,7 +108,7 @@ impl Document {
 		for segment in path {
 			match segment {
 				FieldPath::ArrayIndex(idx) => {
-					todo!("fix compile errors");
+					todo!("agent: fix compile errors");
 					current = current
 						.as_array_mut()
 						.ok_or_else(|| DocumentError::ExpectedArray {
@@ -110,7 +124,7 @@ impl Document {
 						})?;
 				}
 				FieldPath::ObjectKey(key) => {
-					todo!("fix compile errors");
+					todo!("agent: fix compile errors");
 					current = current
 						.as_object_mut()
 						.ok_or_else(|| DocumentError::ExpectedObject {
@@ -128,11 +142,6 @@ impl Document {
 		current.xok()
 	}
 }
-
-/// Marker component for the global application-level document.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Component)]
-pub struct AppDocument;
-
 
 /// A reference to a specific field For tools that interact with documents,
 #[derive(
@@ -159,7 +168,23 @@ pub struct FieldRef {
 }
 
 
+impl FieldRef {
+	pub fn new(
+		document: DocumentPath,
+		field_path: impl IntoFieldPathVec,
+	) -> Self {
+		Self {
+			document,
+			field_path: field_path.into_field_path_vec(),
+			error_on_missing: false,
+		}
+	}
 
+	pub fn error_on_missing(mut self) -> Self {
+		self.error_on_missing = true;
+		self
+	}
+}
 
 /// Specify the document to operate on, either the global application-level document,
 /// or another by id.
@@ -170,8 +195,8 @@ pub enum DocumentPath {
 	/// The document for this card.
 	#[default]
 	Card,
-	/// The global application-level document
-	App,
+	/// The root entity.
+	Root,
 	/// A specific document by entity id
 	Entity(Entity),
 }
@@ -188,12 +213,50 @@ pub enum FieldPath {
 }
 
 
+pub trait IntoFieldPathVec {
+	fn into_field_path_vec(self) -> Vec<FieldPath>;
+}
+impl IntoFieldPathVec for Vec<FieldPath> {
+	fn into_field_path_vec(self) -> Vec<FieldPath> { self }
+}
+impl IntoFieldPathVec for Vec<String> {
+	fn into_field_path_vec(self) -> Vec<FieldPath> {
+		self.into_iter().map(FieldPath::ObjectKey).collect()
+	}
+}
+impl IntoFieldPathVec for Vec<&str> {
+	fn into_field_path_vec(self) -> Vec<FieldPath> {
+		self.into_iter()
+			.map(|s| FieldPath::ObjectKey(s.to_string()))
+			.collect()
+	}
+}
+
+impl IntoFieldPathVec for Vec<usize> {
+	fn into_field_path_vec(self) -> Vec<FieldPath> {
+		self.into_iter().map(FieldPath::ArrayIndex).collect()
+	}
+}
+
+impl IntoFieldPathVec for &[FieldPath] {
+	fn into_field_path_vec(self) -> Vec<FieldPath> { self.to_vec() }
+}
+impl IntoFieldPathVec for &str {
+	fn into_field_path_vec(self) -> Vec<FieldPath> {
+		vec![FieldPath::ObjectKey(self.to_string())]
+	}
+}
+impl IntoFieldPathVec for String {
+	fn into_field_path_vec(self) -> Vec<FieldPath> {
+		vec![FieldPath::ObjectKey(self)]
+	}
+}
+
 /// System parameter for ergonomic interaction with documents.
 #[derive(SystemParam)]
 pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	doc_query: Query<'w, 's, &'static mut Document>,
-	app_doc_query: Query<'w, 's, Entity, With<AppDocument>>,
 	card_query: Query<'w, 's, &'static Card>,
 	commands: Commands<'w, 's>,
 }
@@ -202,57 +265,28 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	/// Get the entity for the given [`DocumentPath`],
 	/// which may or may not contain an initialized document.
 	fn resolve_entity(
-		&self,
-		entity: Entity,
-		path: &DocumentPath,
-	) -> Result<Entity> {
-		match path {
-			DocumentPath::Card => self
-				.ancestors
-				.iter_ancestors(entity)
-				.find(|entity| self.card_query.get(*entity).is_ok())
-				.ok_or_else(|| {
-					bevyhow!("no card ancestor found for entity {}", entity)
-				})?,
-			DocumentPath::App => self
-				.app_doc_query
-				.iter()
-				.next()
-				.ok_or_else(|| bevyhow!("no app document found"))?,
-			DocumentPath::Entity(entity) => *entity,
-		}
-		.xok()
-	}
-
-	/// Get the entity for the given [`DocumentPath`],
-	/// spawning the app document if needed.
-	pub fn document_entity(
 		&mut self,
-		entity: Entity,
+		subject: Entity,
 		path: &DocumentPath,
 	) -> Entity {
 		match path {
+			DocumentPath::Root => self.ancestors.root_ancestor(subject),
 			DocumentPath::Card => self
 				.ancestors
-				.iter_ancestors(entity)
+				.iter_ancestors(subject)
 				.find(|entity| self.card_query.get(*entity).is_ok())
-				.unwrap_or(entity),
-			DocumentPath::App => self
-				.app_doc_query
-				.iter()
-				.next()
-				.unwrap_or_else(|| self.commands.spawn(AppDocument).id()),
+				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
 			DocumentPath::Entity(entity) => *entity,
 		}
 	}
 
 	/// Returns the query item for the document.
 	pub fn get(
-		&self,
+		&mut self,
 		entity: Entity,
 		path: &DocumentPath,
 	) -> Result<&Document> {
-		let doc_entity = self.resolve_entity(entity, path)?;
+		let doc_entity = self.resolve_entity(entity, path);
 		self.doc_query.get(doc_entity)?.xok()
 	}
 
@@ -260,39 +294,77 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	/// Returns the mutable query item for the document.
 	pub fn get_mut(
 		&mut self,
-		entity: Entity,
+		subject: Entity,
 		path: &DocumentPath,
 	) -> Result<Mut<'_, Document>> {
-		let doc_entity = self.resolve_entity(entity, path)?;
+		let doc_entity = self.resolve_entity(subject, path);
 		self.doc_query.get_mut(doc_entity)?.xok()
+	}
+
+
+	/// If the field is marked ``
+	pub fn with_field<Out>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+		func: impl Fn(&mut serde_json::Value) -> Out,
+	) -> Result<Out> {
+		let doc_entity = self.resolve_entity(subject, &field.document);
+
+		let get_or_init_field =
+			|doc: &mut Document| -> Result<&mut serde_json::Value> {
+				todo!("agent: fix compile errors");
+				match (
+					doc.get_field_mut(&field.field_path),
+					field.error_on_missing,
+				) {
+					(Ok(value), _) => value.xok(),
+					(Err(err), false) => doc.try_init_field(&field.field_path),
+					(Err(err), true) => Err(err.into()),
+				}
+			};
+
+		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
+			let value = get_or_init_field(&mut doc)?;
+			Ok(func(value))
+		} else if !field.error_on_missing {
+			// create the document and run the method with it
+			let mut doc = Document::default();
+			let value = get_or_init_field(&mut doc)?;
+			let out = func(value);
+			self.commands.entity(doc_entity).insert(doc);
+			Ok(out)
+		} else {
+			Err(DocumentError::ObjectKeyNotFound {
+				path: field.field_path.clone(),
+				key: format!("{:?}", field.field_path),
+			}
+			.into())
+		}
 	}
 
 	/// Execute a function on a document asynchronously.
 	pub async fn with_async<O>(
 		&mut self,
 		entity: AsyncEntity,
-		document: &DocumentPath,
+		path: &DocumentPath,
 		func: impl 'static + Send + Sync + Fn(&mut Document) -> O,
 	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
 		let id = entity.id();
-		let doc_path = document.clone();
+		let path = path.clone();
 		entity
 			.world()
 			.with_then(move |world| {
 				world.run_system_cached_with(
-					move |In((entity, doc_path)): In<(
-						Entity,
-						DocumentPath,
-					)>,
-					      mut doc_query: DocumentQuery| {
-						let mut doc_mut =
-							doc_query.get_mut(entity, &doc_path)?;
-						func(&mut doc_mut).xok()
+					move |In((entity, path)): In<(Entity, DocumentPath)>,
+					      mut query: DocumentQuery| {
+						let mut doc = query.get_mut(entity, &path)?;
+						func(&mut doc).xok()
 					},
-					(id, doc_path),
+					(id, path),
 				)
 			})
 			.await?

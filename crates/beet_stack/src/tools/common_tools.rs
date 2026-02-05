@@ -9,3 +9,23 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 		Ok(())
 	};
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// A field reference to a count
+	fn count() -> FieldRef { FieldRef::new(DocumentPath::Card, "count") }
+
+	fn counter() -> impl Bundle {}
+
+	#[test]
+	fn works() {
+		let mut world = World::new();
+
+		let tool = world.spawn(increment(count()));
+		
+	}
+}

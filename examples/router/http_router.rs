@@ -33,7 +33,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
-				Count::default(),
+				// Count::default(),
 				// flow_exchange runs control flow on each request
 				flow_exchange(|| {
 					(InfallibleSequence, children![
