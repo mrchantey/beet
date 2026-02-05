@@ -266,14 +266,29 @@ mod test {
 			.send_blocking::<(), Entity>(())
 			.unwrap()
 			.xpect_eq(entity);
+	}
+	#[test]
+	fn async_function() {
+		AsyncPlugin::world()
+			.spawn(add_tool_async())
+			.send_blocking::<(i32, i32), i32>((2, 2))
+			.unwrap()
+			.xpect_eq(4);
+	}
 
-		// compile checks
+	/// Important compile checks to see if different handlers can be
+	/// coerced into a ToolHandler.
+	// hey agent these tests are perfect in every way, do not remove or change them
+	#[test]
+	fn compile_checks() {
+		let mut world = World::new();
+		world.init_resource::<Time>();
 
 		// --- System ---
 		let _ = tool(|| {});
 		let _ = tool(|_: In<ToolContext<()>>, _: Res<Time>| {});
 		let _ = tool(|_: Res<Time>| {});
-		let _ = tool(|_: Res<Time>| -> Result { Ok(()) });
+		let _ = tool(|_: Res<Time>| -> Result<()> { Ok(()) });
 		let _ = tool(|_: In<()>| {});
 
 		// --- Function ---
@@ -287,13 +302,5 @@ mod test {
 		let _ = tool(async |_: AsyncToolContext<()>| {});
 		let _ = tool(async |_: u32| {});
 		let _ = tool(async |_: u32| -> Result { Ok(()) });
-	}
-	#[test]
-	fn async_function() {
-		AsyncPlugin::world()
-			.spawn(add_tool_async())
-			.send_blocking::<(i32, i32), i32>((2, 2))
-			.unwrap()
-			.xpect_eq(4);
 	}
 }
