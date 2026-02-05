@@ -80,7 +80,6 @@ pub trait IntoToolHandler<M>: 'static + Send + Sync + Clone {
 /// Marker component for function tool handlers.
 pub struct FunctionIntoToolHandlerMarker;
 
-
 impl<Func, In, Out, Arg, ArgM>
 	IntoToolHandler<(FunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)> for Func
 where
@@ -110,10 +109,50 @@ where
 	}
 }
 
+/// Marker component for function tool handlers.
+pub struct SystemIntoToolHandlerMarker;
+
+impl<Func, In, Out, Arg, ArgM, SysM>
+	IntoToolHandler<(SystemIntoToolHandlerMarker, In, Out, Arg, ArgM, SysM)>
+	for Func
+where
+	Func: 'static + Send + Sync + Clone + IntoSystem<Arg, Out, SysM>,
+	Arg: 'static + SystemInput,
+	for<'a> Arg::Inner<'a>: FromToolContext<In, ArgM>,
+	In: Typed + 'static + Send + Sync,
+	Out: Typed + 'static + Send + Sync,
+{
+	type In = In;
+	type Out = Out;
+
+	fn into_handler(self) -> impl Bundle {
+		OnSpawn::observe(
+			move |mut ev: On<ToolIn<Self::In, Self::Out>>,
+			      mut commands: Commands|
+			      -> Result {
+				let ev = ev.event_mut();
+				let tool = ev.tool();
+				let payload = ev.take_payload()?;
+				let on_out = ev.take_out_handler()?;
+				let this = self.clone();
+				commands.queue(move |world: &mut World| -> Result {
+					let arg = <Arg::Inner<'_> as FromToolContext<In, ArgM>>::from_tool_context(ToolContext {
+						tool,
+						payload,
+					});
+					let output = world.run_system_cached_with(this, arg)?;
+					on_out.call(world.commands(), tool, output)?;
+					world.flush();
+					Ok(())
+				});
+				Ok(())
+			},
+		)
+	}
+}
 
 /// Marker component for function tool handlers.
 pub struct AsyncFunctionIntoToolHandlerMarker;
-
 
 impl<Func, In, Fut, Out, Arg, ArgM>
 	IntoToolHandler<(AsyncFunctionIntoToolHandlerMarker, In, Out, Arg, ArgM)>
@@ -188,11 +227,15 @@ mod test {
 			.xpect_eq(entity);
 
 		// compile checks
-		let _ = tool(|_: ()| {});
+		let _ = tool(|| {});
+		// let _ = tool(|_: ()| {});
+		let _ = tool(|_: In<ToolContext<()>>, _: Res<Time>| {});
+		let _ = tool(|_: Res<Time>| {});
+		let _ = tool(|_: In<()>| {});
 		let _ = tool(|_: u32| {});
 		let _ = tool(|_: ToolContext<()>| {});
+		// let _ = tool(async |_: ()| {});
 		let _ = tool(async |_: AsyncToolContext<()>| {});
-		let _ = tool(async |_: ()| {});
 		let _ = tool(async |_: u32| {});
 	}
 	#[test]

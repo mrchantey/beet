@@ -212,7 +212,7 @@ pub impl EntityWorldMut<'_> {
 	) -> Result<Out> {
 		async_ext::block_on(self.send(input))
 	}
-	/// Triggers an entity target event for this entity.
+
 	fn send<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
