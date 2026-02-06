@@ -15,11 +15,7 @@ pub struct DocumentQuery<'w, 's> {
 
 impl<'w, 's> DocumentQuery<'w, 's> {
 	/// Resolve a [`DocumentPath`] to the actual entity that owns the document.
-	fn resolve_entity(
-		&mut self,
-		subject: Entity,
-		path: &DocumentPath,
-	) -> Entity {
+	pub fn entity(&mut self, subject: Entity, path: &DocumentPath) -> Entity {
 		match path {
 			DocumentPath::Root => self.ancestors.root_ancestor(subject),
 			DocumentPath::Card => self
@@ -37,7 +33,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		entity: Entity,
 		path: &DocumentPath,
 	) -> Result<&Document> {
-		let doc_entity = self.resolve_entity(entity, path);
+		let doc_entity = self.entity(entity, path);
 		self.doc_query.get(doc_entity)?.xok()
 	}
 
@@ -48,7 +44,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		subject: Entity,
 		path: &DocumentPath,
 	) -> Result<Mut<'_, Document>> {
-		let doc_entity = self.resolve_entity(subject, path);
+		let doc_entity = self.entity(subject, path);
 		self.doc_query.get_mut(doc_entity)?.xok()
 	}
 
@@ -63,7 +59,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		field: &FieldRef,
 		func: impl FnOnce(&mut Value) -> Out,
 	) -> Result<Out> {
-		let doc_entity = self.resolve_entity(subject, &field.document);
+		let doc_entity = self.entity(subject, &field.document);
 
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
 			let value = if let Ok(value) = doc.get_field_mut(&field.field_path)

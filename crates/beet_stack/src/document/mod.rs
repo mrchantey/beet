@@ -1,8 +1,12 @@
 mod document;
+mod document_plugin;
 mod document_query;
+mod document_sync;
 mod field;
 mod value;
 pub use document::*;
+pub use document_plugin::*;
 pub use document_query::*;
+pub use document_sync::*;
 pub use field::*;
 pub use value::*;

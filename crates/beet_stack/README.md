@@ -1,12 +1,28 @@
 # Beet Stack
 
-An opinionated semantic layer between applications and interfaces like UI or humanoid robots.
+An opinionated, interface-agnostic application representation, inspired by `hypercard` which pioneered many concepts in user-modifiable software. 
 
-The `Stack/Card` convention is based on `hypercard` which pioneered many concepts in user-modifiable software. 
-Stacks represent something like a directory and cards represent something like a document (content), but also with behavior (tools).
+### Stack
 
+A stack is something like a directory, containing one or more cards.
 
-## Supported Interfaces (wip)
+### Card
+
+A card is something like a file, a single unit of representation in an interface, these are usually only represented one at a time. 
+
+Cards may contain Content, Tools, and nested Stacks.
+
+### Content
+
+Static or dynamic information to be presented to the user, like text or images.
+
+### Tools
+
+Tools are affordances surfaced in an interface, every tool has an input and output type, and a name based on its location in the tree.
+
+### Interfaces
+
+Interfaces are ways of representing a card, presenting its content and tools for interaction.
 
 - `stdio`: Event-driven command-line interface
 - `ratatui`: Terminal user interfaces

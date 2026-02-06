@@ -68,6 +68,51 @@ pub enum Value {
 	Null,
 }
 
+
+impl ToString for Value {
+	fn to_string(&self) -> String {
+		match self {
+			Value::Null => "null".to_string(),
+			Value::Bool(b) => b.to_string(),
+			Value::I64(n) => n.to_string(),
+			Value::U64(n) => n.to_string(),
+			Value::F64(f) => f.to_string(),
+			Value::String(s) => s.clone(),
+			Value::Bytes(bytes) => {
+				format!(
+					"[{}]",
+					bytes
+						.iter()
+						.map(|b| b.to_string())
+						.collect::<Vec<_>>()
+						.join(", ")
+				)
+			}
+			Value::List(list) => {
+				format!(
+					"[{}]",
+					list.iter()
+						.map(|v| v.to_string())
+						.collect::<Vec<_>>()
+						.join(", ")
+				)
+			}
+			Value::Map(map) => {
+				let mut entries: Vec<_> = map.iter().collect();
+				entries.sort_by_key(|(k, _)| *k);
+				format!(
+					"{{{}}}",
+					entries
+						.iter()
+						.map(|(k, v)| format!("{}: {}", k, v.to_string()))
+						.collect::<Vec<_>>()
+						.join(", ")
+				)
+			}
+		}
+	}
+}
+
 impl std::hash::Hash for Value {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 		core::mem::discriminant(self).hash(state);
