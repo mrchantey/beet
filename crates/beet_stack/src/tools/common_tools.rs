@@ -12,7 +12,7 @@ use bevy::reflect::Typed;
 /// 3. Writes the new value back
 /// 4. Returns the new value
 ///
-/// If the field doesn't exist, it will be initialized to 1.
+/// If the field doesn't exist or is not an i64, it will be initialized to 1.
 ///
 /// # Example
 ///
@@ -60,7 +60,7 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 /// 3. Writes the new value back
 /// 4. Returns the new value
 ///
-/// If the field doesn't exist, it will be initialized to -1.
+/// If the field doesn't exist or is not an i64, it will be initialized to -1.
 pub fn decrement(field: FieldRef) -> impl Bundle {
 	(
 		field,
@@ -84,6 +84,7 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 /// A tool that adds a value to a numeric field in a document.
 ///
 /// Takes the amount to add as input and returns the new value.
+/// If the field doesn't exist or is not an i64, it will be initialized to the provided value.
 pub fn add(field: FieldRef) -> impl Bundle {
 	(
 		field,

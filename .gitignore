@@ -1,6 +1,7 @@
 assets
 !examples/assets
 Cargo.toml.full
+Cargo.toml.basic
 target
 rustc-ice*
 .rustc_info.json

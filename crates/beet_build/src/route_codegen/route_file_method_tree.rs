@@ -5,7 +5,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_router::prelude::*;
 
 /// A tree structure organizing [`RouteFileMethod`] entities by route path segments.
 ///

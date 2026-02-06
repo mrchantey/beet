@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use heck::ToKebabCase;
@@ -118,23 +117,24 @@ impl ParamsPattern {
 	/// [`Self::collect`] represented as a bevy system
 	pub fn collect_system(
 		entity: In<Entity>,
-		query: RouteQuery,
+		ancestors: Query<&ChildOf>,
+		params_partials: Query<&ParamsPartial>,
 	) -> Result<ParamsPattern> {
-		Self::collect(*entity, &query)
+		Self::collect(*entity, ancestors, params_partials)
 	}
 
 	/// Collects a [`ParamsPattern`] for a provided entity.
 	/// Only the provided entity and its parents are checked, any sibling
 	/// middleware params should also be specified at the [`Endpoint`].
-	pub fn collect(
+	fn collect(
 		entity: Entity,
-		query: &RouteQuery,
+		ancestors: Query<&ChildOf>,
+		params_partials: Query<&ParamsPartial>,
 	) -> Result<ParamsPattern> {
-		query
-			.parents
+		ancestors
 			// get every PathFilter in ancestors
 			.iter_ancestors_inclusive(entity)
-			.filter_map(|entity| query.params_partials.get(entity).ok())
+			.filter_map(|entity| params_partials.get(entity).ok())
 			.flat_map(|partial| partial.items.clone())
 			.collect::<Vec<_>>()
 			.xmap(ParamsPattern::from_metas)
@@ -326,7 +326,7 @@ impl ParamOptions {
 		#[allow(unused_mut)]
 		let mut opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
 		// Override description from docs if not specified
-		#[cfg(feature = "reflect_documentation")]
+		#[cfg(feature = "bevy_reflect_documentation")]
 		if opts.description == None {
 			opts.description = field.docs().map(|docs| docs.into());
 		}
