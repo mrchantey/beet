@@ -5,12 +5,16 @@
 #![doc = include_str!("../README.md")]
 mod content;
 mod document;
+mod interfaces;
 mod tools;
+mod stack;
 
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
 	pub use crate::content::*;
+	pub use crate::stack::*;
 	pub use crate::document::*;
+	pub use crate::interfaces::*;
 	pub use crate::tools::*;
 	pub use crate::val;
 	// reexport for val!
