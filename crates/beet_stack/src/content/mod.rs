@@ -55,9 +55,10 @@
 //!
 //! [`Document`]: crate::document::Document
 //! [`FieldRef`]: crate::document::FieldRef
-//! [`text!`]: crate::text
+//! [`content!`]: crate::content
+pub mod content_macro;
 mod render_markdown;
 mod text;
-mod text_macro;
+pub use content_macro::*;
 pub use render_markdown::*;
 pub use text::*;

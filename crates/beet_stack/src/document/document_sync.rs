@@ -24,16 +24,11 @@
 //!
 //! let mut world = DocumentPlugin::world();
 //!
-//! // Create a card with a document
-//! let card = world
-//!     .spawn((Card, Document::new(val!({ "score": 100i64 }))))
-//!     .id();
-//!
-//! // Spawn text that references the field
+//! // Create a card with a document and text child
 //! world.spawn((
-//!     ChildOf(card),
-//!     TextContent::default(),
-//!     FieldRef::new("score"),
+//!     Card,
+//!     Document::new(val!({ "score": 100i64 })),
+//!     children![(TextContent::default(), FieldRef::new("score"))],
 //! ));
 //!
 //! // After update, TextContent contains "100"
@@ -260,14 +255,10 @@ mod test {
 	fn handles_null_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((Card, Document::new(val!({ "nullable": null }))))
-			.id();
-
 		world.spawn((
-			ChildOf(card),
-			TextContent::new("initial"),
-			FieldRef::new("nullable"),
+			Card,
+			Document::new(val!({ "nullable": null })),
+			children![(TextContent::new("initial"), FieldRef::new("nullable"))],
 		));
 
 		world.update_local();
@@ -280,14 +271,10 @@ mod test {
 	fn handles_array_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((Card, Document::new(val!({ "items": [1i64, 2i64, 3i64] }))))
-			.id();
-
 		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("items"),
+			Card,
+			Document::new(val!({ "items": [1i64, 2i64, 3i64] })),
+			children![(TextContent::default(), FieldRef::new("items"))],
 		));
 
 		world.update_local();
@@ -300,15 +287,9 @@ mod test {
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((Card, Document::new(val!({ "flag": true }))))
-			.id();
-
-		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("flag"),
-		));
+		world.spawn((Card, Document::new(val!({ "flag": true })), children![
+			(TextContent::default(), FieldRef::new("flag"))
+		]));
 
 		world.update_local();
 

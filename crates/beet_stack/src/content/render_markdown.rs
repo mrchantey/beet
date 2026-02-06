@@ -352,13 +352,12 @@ mod test {
 	#[test]
 	fn mixed_structure() {
 		let mut world = World::new();
-		let root = world.spawn_empty().id();
-		world.spawn((Title, TextContent::new("Welcome"), ChildOf(root)));
-		world.spawn((
-			Paragraph,
-			TextContent::new("This is the intro."),
-			ChildOf(root),
-		));
+		let root = world
+			.spawn(children![
+				(Title, TextContent::new("Welcome")),
+				(Paragraph, TextContent::new("This is the intro."))
+			])
+			.id();
 
 		let result = render_markdown(&mut world, root).unwrap();
 		result.xpect_eq("# Welcome\n\nThis is the intro.\n\n");
@@ -367,20 +366,16 @@ mod test {
 	#[test]
 	fn respects_card_boundary() {
 		let mut world = World::new();
-		let card = world.spawn(Card).id();
-		world.spawn((
-			Paragraph,
-			TextContent::new("Inside card"),
-			ChildOf(card),
-		));
-
-		// Nested card should not be rendered
-		let nested_card = world.spawn((Card, ChildOf(card))).id();
-		world.spawn((
-			Paragraph,
-			TextContent::new("Inside nested card"),
-			ChildOf(nested_card),
-		));
+		let card = world
+			.spawn((Card, children![
+				(Paragraph, TextContent::new("Inside card")),
+				// Nested card should not be rendered
+				(Card, children![(
+					Paragraph,
+					TextContent::new("Inside nested card")
+				)])
+			]))
+			.id();
 
 		let result = render_markdown(&mut world, card).unwrap();
 		result.xpect_eq("Inside card\n\n");

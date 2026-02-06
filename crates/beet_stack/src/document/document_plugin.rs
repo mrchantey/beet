@@ -17,22 +17,17 @@ use beet_core::prelude::*;
 ///
 /// let mut world = DocumentPlugin::world();
 ///
-/// // Create a card with a document
-/// let card = world
-///     .spawn((Card, Document::new(val!({ "name": "Alice" }))))
-///     .id();
-///
-/// // Spawn text that references the document field
-/// let entity = world.spawn((
-///     ChildOf(card),
-///     TextContent::default(),
-///     FieldRef::new("name"),
-/// )).id();
+/// // Create a card with a document and text child
+/// world.spawn((
+///     Card,
+///     Document::new(val!({ "name": "Alice" })),
+///     children![(TextContent::default(), FieldRef::new("name"))],
+/// ));
 ///
 /// // After update, TextContent will contain "Alice"
 /// world.update_local();
 ///
-/// let value = world.entity(entity).get::<TextContent>().unwrap().as_str();
+/// let value = world.query_once::<&TextContent>()[0].as_str();
 /// assert_eq!(value, "Alice");
 /// ```
 #[derive(Default)]
@@ -73,16 +68,11 @@ mod test {
 	fn text_field_syncs_on_insert() {
 		let mut world = DocumentPlugin::world();
 
-		// Create card with document
-		let card = world
-			.spawn((Card, Document::new(val!({ "greeting": "Hello" }))))
-			.id();
-
-		// Spawn text content with field ref as child
+		// Create card with document and text child
 		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("greeting"),
+			Card,
+			Document::new(val!({ "greeting": "Hello" })),
+			children![(TextContent::default(), FieldRef::new("greeting"))],
 		));
 
 		// Run update to trigger sync
@@ -97,17 +87,13 @@ mod test {
 	fn text_field_syncs_on_document_change() {
 		let mut world = DocumentPlugin::world();
 
-		// Create card with document
+		// Create card with document and text child
 		let card = world
-			.spawn((Card, Document::new(val!({ "count": 0i64 }))))
+			.spawn((Card, Document::new(val!({ "count": 0i64 })), children![(
+				TextContent::default(),
+				FieldRef::new("count")
+			)]))
 			.id();
-
-		// Spawn text content with field ref
-		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("count"),
-		));
 
 		world.update_local();
 
@@ -130,14 +116,13 @@ mod test {
 	fn text_field_with_nested_path() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((Card, Document::new(val!({ "user": { "name": "Bob" } }))))
-			.id();
-
 		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new(vec!["user", "name"]),
+			Card,
+			Document::new(val!({ "user": { "name": "Bob" } })),
+			children![(
+				TextContent::default(),
+				FieldRef::new(vec!["user", "name"])
+			)],
 		));
 
 		world.update_local();
@@ -150,26 +135,16 @@ mod test {
 	fn multiple_text_fields_same_document() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((
-				Card,
-				Document::new(val!({
-					"first": "Alice",
-					"second": "Bob"
-				})),
-			))
-			.id();
-
 		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("first"),
-		));
-
-		world.spawn((
-			ChildOf(card),
-			TextContent::default(),
-			FieldRef::new("second"),
+			Card,
+			Document::new(val!({
+				"first": "Alice",
+				"second": "Bob"
+			})),
+			children![
+				(TextContent::default(), FieldRef::new("first")),
+				(TextContent::default(), FieldRef::new("second"))
+			],
 		));
 
 		world.update_local();
