@@ -4,9 +4,12 @@
 //! a voice assistant or humanoid robot may consume this content.
 use beet_core::prelude::*;
 
+
 /// A generic container for a string of text. This should
 /// always have an associated semantic marker type,
-/// like [`Title`] or [`Paragraph`]
+/// like [`Title`] or [`Paragraph`]. If the entity contains
+/// a [`FieldRef`], the text will be automatically synchronized
+/// with the content of the [`FieldRef`].
 #[derive(
 	Debug,
 	Default,
