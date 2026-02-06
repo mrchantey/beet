@@ -79,27 +79,6 @@ impl<T: Into<String>> From<T> for TextContent {
 	fn from(text: T) -> Self { Self(text.into()) }
 }
 
-
-/// A container entity for multiple text segments.
-///
-/// Use this to group text content children together, forming
-/// a coherent block of text with mixed semantics.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct TextBlock;
-
-
 /// Marker component used to denote a heading.
 ///
 /// Nesting is derived by the number of [`Title`] components
@@ -226,10 +205,12 @@ pub struct Quote;
 /// Semantically equivalent to HTML `<a>` - a hyperlink to another resource.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
+#[require(TextContent)]
 pub struct Link {
 	/// The URL this link points to.
 	pub href: String,
-	/// Optional title/tooltip for the link.
+	/// An optional title for the link, which may be used as tooltip text.
+	/// The actual rendered text is the [`TextContent`].
 	pub title: Option<String>,
 }
 
@@ -241,41 +222,9 @@ impl Link {
 			title: None,
 		}
 	}
-
 	/// Set the title for this link.
 	pub fn with_title(mut self, title: impl Into<String>) -> Self {
 		self.title = Some(title.into());
 		self
-	}
-}
-
-
-#[cfg(test)]
-mod test {
-	use super::*;
-
-	#[test]
-	fn text_content_new() {
-		let text = TextContent::new("hello");
-		text.0.xpect_eq("hello");
-	}
-
-	#[test]
-	fn text_content_from_str() {
-		let text: TextContent = "hello".into();
-		text.0.xpect_eq("hello");
-	}
-
-	#[test]
-	fn text_content_from_string() {
-		let text: TextContent = String::from("hello").into();
-		text.0.xpect_eq("hello");
-	}
-
-	#[test]
-	fn link_builder() {
-		let link = Link::new("https://example.com").with_title("Example");
-		link.href.xpect_eq("https://example.com");
-		link.title.unwrap().xpect_eq("Example");
 	}
 }

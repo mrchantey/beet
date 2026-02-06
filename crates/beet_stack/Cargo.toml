@@ -19,6 +19,7 @@ beet_core.workspace = true
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
+variadics_please.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

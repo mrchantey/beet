@@ -24,7 +24,7 @@
 //!
 //! ## Composable Structure
 //!
-//! Use the [`text!`] macro to compose text blocks with mixed static content,
+//! Use the [`content!`] macro to compose content segments with mixed static content,
 //! semantic markers, and dynamic field bindings.
 //!
 //! # Quick Start
@@ -34,14 +34,14 @@
 //! use beet_core::prelude::*;
 //!
 //! // Static text with semantic markers
-//! let greeting = text![
+//! let greeting = content![
 //!     "Hello, ",
 //!     (Important, "world"),
 //!     "!"
 //! ];
 //!
 //! // Dynamic text bound to a document field
-//! let counter = text![
+//! let counter = content![
 //!     "Count: ",
 //!     FieldRef::new("count").init_with(Value::I64(0))
 //! ];
@@ -49,7 +49,7 @@
 //! // Render to markdown
 //! let mut world = DocumentPlugin::world();
 //! let entity = world.spawn(greeting).id();
-//! let markdown = world.render_markdown(entity).unwrap();
+//! let markdown = render_markdown(&mut world, entity).unwrap();
 //! // Result: "Hello, **world**!"
 //! ```
 //!
@@ -61,4 +61,3 @@ mod text;
 mod text_macro;
 pub use render_markdown::*;
 pub use text::*;
-pub use text_macro::IntoTextSegment;

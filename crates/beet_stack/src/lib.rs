@@ -11,11 +11,12 @@ mod tools;
 
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
+	pub use crate::content;
+	pub use crate::content::content_macro::into_content_bundle;
 	pub use crate::content::*;
 	pub use crate::document::*;
 	pub use crate::interfaces::*;
 	pub use crate::stack::*;
-	pub use crate::text;
 	pub use crate::tools::*;
 	pub use crate::val;
 }

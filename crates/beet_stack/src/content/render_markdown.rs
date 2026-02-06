@@ -1,7 +1,7 @@
 //! Render semantic text content to markdown format.
 //!
 //! This module provides functionality to convert the semantic text representation
-//! (using [`TextBlock`], [`TextContent`], and semantic markers) into markdown strings.
+//! (using [`TextContent`] and semantic markers) into markdown strings.
 //!
 //! # Example
 //!
@@ -11,13 +11,13 @@
 //!
 //! let mut world = DocumentPlugin::world();
 //!
-//! let entity = world.spawn(text![
+//! let entity = world.spawn(content![
 //!     "Hello ",
 //!     (Important, "world"),
 //!     "!"
 //! ]).id();
 //!
-//! let markdown = render_markdown(&world, entity).unwrap();
+//! let markdown = render_markdown(&mut world, entity).unwrap();
 //! assert_eq!(markdown, "Hello **world**!");
 //! ```
 
@@ -27,83 +27,113 @@ use beet_core::prelude::*;
 
 /// Renders an entity's text content tree to markdown.
 ///
-/// This function traverses the entity and its children, converting
-/// semantic markers to their markdown equivalents:
+/// This function traverses the entity and its descendants within the card
+/// boundary, converting semantic markers to their markdown equivalents:
 ///
+/// - [`Title`] → `# text` (heading level based on nesting)
+/// - [`Paragraph`] → `text\n\n` (paragraph with trailing newlines)
 /// - [`Important`] → `**text**` (bold)
 /// - [`Emphasize`] → `*text*` (italic)
 /// - [`Code`] → `` `text` `` (inline code)
 /// - [`Quote`] → `"text"` (quoted)
-/// - [`Link`] → `[text](url)` or `[text](url "title")`
+/// - [`Link`] → `[text](url)`
 ///
 /// # Arguments
 ///
 /// * `world` - The world containing the entities
-/// * `entity` - The root entity to render (typically a [`TextBlock`])
+/// * `entity` - The root entity to render
 ///
 /// # Returns
 ///
 /// A markdown string representing the text content, or an error if
 /// the entity structure is invalid.
-pub fn render_markdown(world: &World, entity: Entity) -> Result<String> {
-	let mut output = String::new();
-	render_entity(world, entity, &mut output)?;
-	Ok(output)
+pub fn render_markdown(world: &mut World, entity: Entity) -> Result<String> {
+	world.run_system_cached_with(render_markdown_system, entity)?
 }
 
-fn render_entity(world: &World, entity: Entity, output: &mut String) -> Result {
-	let entity_ref = world.entity(entity);
+/// System that renders an entity tree to markdown using CardQuery.
+fn render_markdown_system(
+	In(entity): In<Entity>,
+	card_query: CardQuery,
+	text_query: Query<&TextContent>,
+	title_query: Query<(), With<Title>>,
+	paragraph_query: Query<(), With<Paragraph>>,
+	important_query: Query<(), With<Important>>,
+	emphasize_query: Query<(), With<Emphasize>>,
+	code_query: Query<(), With<Code>>,
+	quote_query: Query<(), With<Quote>>,
+	link_query: Query<&Link>,
+	ancestors: Query<&ChildOf>,
+) -> Result<String> {
+	let mut output = String::new();
 
-	// Check if this entity has text content
-	if let Some(text) = entity_ref.get::<TextContent>() {
-		let content = text.as_str();
+	// Use CardQuery DFS to traverse entities within the card boundary
+	for current in card_query.iter_dfs_from(entity) {
+		// Calculate title nesting level by counting Title ancestors
+		let title_level = if title_query.contains(current) {
+			ancestors
+				.iter_ancestors(current)
+				.filter(|&ancestor| title_query.contains(ancestor))
+				.count() + 1
+		} else {
+			0
+		};
 
-		// Apply semantic wrappers based on marker components
-		let has_important = entity_ref.contains::<Important>();
-		let has_emphasize = entity_ref.contains::<Emphasize>();
-		let has_code = entity_ref.contains::<Code>();
-		let has_quote = entity_ref.contains::<Quote>();
-		let link = entity_ref.get::<Link>();
+		// Check if this entity has text content
+		if let Ok(text) = text_query.get(current) {
+			let content = text.as_str();
 
-		// Build the wrapped content
-		let mut wrapped = content.to_string();
+			// Apply semantic wrappers based on marker components
+			let has_important = important_query.contains(current);
+			let has_emphasize = emphasize_query.contains(current);
+			let has_code = code_query.contains(current);
+			let has_quote = quote_query.contains(current);
+			let link = link_query.get(current).ok();
+			let is_title = title_query.contains(current);
+			let is_paragraph = paragraph_query.contains(current);
 
-		// Apply wrappers from innermost to outermost
-		if has_code {
-			wrapped = format!("`{}`", wrapped);
+			// Build the wrapped content
+			let mut wrapped = content.to_string();
+
+			// Apply wrappers from innermost to outermost
+			if has_code {
+				wrapped = format!("`{}`", wrapped);
+			}
+
+			if has_emphasize {
+				wrapped = format!("*{}*", wrapped);
+			}
+
+			if has_important {
+				wrapped = format!("**{}**", wrapped);
+			}
+
+			if has_quote {
+				wrapped = format!("\"{}\"", wrapped);
+			}
+
+			if let Some(link) = link {
+				let title = link
+					.title
+					.as_ref()
+					.map(|t| format!(" \"{}\"", t))
+					.unwrap_or_default();
+				wrapped = format!("[{}]({}{})", wrapped, link.href, title);
+			}
+
+			// Handle structural elements
+			if is_title {
+				let hashes = "#".repeat(title_level.min(6));
+				wrapped = format!("{} {}\n\n", hashes, wrapped);
+			} else if is_paragraph {
+				wrapped = format!("{}\n\n", wrapped);
+			}
+
+			output.push_str(&wrapped);
 		}
-
-		if has_emphasize {
-			wrapped = format!("*{}*", wrapped);
-		}
-
-		if has_important {
-			wrapped = format!("**{}**", wrapped);
-		}
-
-		if has_quote {
-			wrapped = format!("\"{}\"", wrapped);
-		}
-
-		if let Some(link) = link {
-			wrapped = if let Some(title) = &link.title {
-				format!("[{}]({} \"{}\")", wrapped, link.href, title)
-			} else {
-				format!("[{}]({})", wrapped, link.href)
-			};
-		}
-
-		output.push_str(&wrapped);
 	}
 
-	// Process children
-	if let Some(children) = entity_ref.get::<Children>() {
-		for child in children.iter() {
-			render_entity(world, child, output)?;
-		}
-	}
-
-	Ok(())
+	output.xok()
 }
 
 
@@ -113,7 +143,7 @@ pub impl World {
 	/// Renders an entity's text content tree to markdown.
 	///
 	/// See [`render_markdown`] for details.
-	fn render_markdown(&self, entity: Entity) -> Result<String> {
+	fn render_markdown(&mut self, entity: Entity) -> Result<String> {
 		render_markdown(self, entity)
 	}
 }
@@ -126,18 +156,18 @@ mod test {
 	#[test]
 	fn plain_text() {
 		let mut world = World::new();
-		let entity = world.spawn(text!["hello world"]).id();
+		let entity = world.spawn(content!["hello world"]).id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("hello world");
 	}
 
 	#[test]
 	fn multiple_segments() {
 		let mut world = World::new();
-		let entity = world.spawn(text!["hello", " ", "world"]).id();
+		let entity = world.spawn(content!["hello", " ", "world"]).id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("hello world");
 	}
 
@@ -145,10 +175,10 @@ mod test {
 	fn important_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(text!["hello ", (Important, "bold"), " text"])
+			.spawn(content!["hello ", (Important, "bold"), " text"])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("hello **bold** text");
 	}
 
@@ -156,10 +186,10 @@ mod test {
 	fn emphasized_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(text!["hello ", (Emphasize, "italic"), " text"])
+			.spawn(content!["hello ", (Emphasize, "italic"), " text"])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("hello *italic* text");
 	}
 
@@ -167,19 +197,19 @@ mod test {
 	fn code_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(text!["use ", (Code, "println!"), " macro"])
+			.spawn(content!["use ", (Code, "println!"), " macro"])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("use `println!` macro");
 	}
 
 	#[test]
 	fn quoted_text() {
 		let mut world = World::new();
-		let entity = world.spawn(text!["he said ", (Quote, "hello")]).id();
+		let entity = world.spawn(content!["he said ", (Quote, "hello")]).id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("he said \"hello\"");
 	}
 
@@ -187,13 +217,13 @@ mod test {
 	fn link_without_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((TextBlock, children![(
+			.spawn(children![(
 				TextContent::new("click here"),
 				Link::new("https://example.com")
-			)]))
+			)])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("[click here](https://example.com)");
 	}
 
@@ -201,24 +231,25 @@ mod test {
 	fn link_with_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((TextBlock, children![(
+			.spawn(children![(
 				TextContent::new("example"),
 				Link::new("https://example.com").with_title("Example Site")
-			)]))
+			)])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("[example](https://example.com \"Example Site\")");
 	}
+
 
 	#[test]
 	fn combined_markers() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(text![(Important, Emphasize, "bold italic")])
+			.spawn(content![(Important, Emphasize, "bold italic")])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		// Important wraps Emphasize
 		result.xpect_eq("***bold italic***");
 	}
@@ -227,7 +258,7 @@ mod test {
 	fn complex_composition() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(text![
+			.spawn(content![
 				"Welcome to ",
 				(Important, "beet"),
 				", the ",
@@ -236,16 +267,16 @@ mod test {
 			])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("Welcome to **beet**, the *best* framework!");
 	}
 
 	#[test]
 	fn extension_trait() {
 		let mut world = World::new();
-		let entity = world.spawn(text!["test"]).id();
+		let entity = world.spawn(content!["test"]).id();
 
-		let result = world.render_markdown(entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("test");
 	}
 
@@ -253,14 +284,14 @@ mod test {
 	fn important_link() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((TextBlock, children![(
+			.spawn(children![(
 				Important,
 				TextContent::new("important link"),
 				Link::new("https://example.com")
-			)]))
+			)])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		result.xpect_eq("[**important link**](https://example.com)");
 	}
 
@@ -268,19 +299,90 @@ mod test {
 	fn all_markers_combined() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((TextBlock, children![(
+			.spawn(children![(
 				Important,
 				Emphasize,
 				Code,
 				Quote,
 				TextContent::new("text"),
 				Link::new("https://example.com")
-			)]))
+			)])
 			.id();
 
-		let result = render_markdown(&world, entity).unwrap();
+		let result = render_markdown(&mut world, entity).unwrap();
 		// Order: code -> emphasize -> important -> quote -> link
 		// Result: code wraps text, emphasize wraps code, important wraps emphasize
 		result.xpect_eq("[\"***`text`***\"](https://example.com)");
+	}
+
+	#[test]
+	fn title_renders_as_heading() {
+		let mut world = World::new();
+		let entity = world.spawn((Title, TextContent::new("Hello World"))).id();
+
+		let result = render_markdown(&mut world, entity).unwrap();
+		result.xpect_eq("# Hello World\n\n");
+	}
+
+	#[test]
+	fn nested_title_increments_level() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Title, TextContent::new("Outer"), children![(
+				Title,
+				TextContent::new("Inner")
+			)]))
+			.id();
+
+		let result = render_markdown(&mut world, entity).unwrap();
+		result.xpect_eq("# Outer\n\n## Inner\n\n");
+	}
+
+	#[test]
+	fn paragraph_renders_with_newlines() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Paragraph, TextContent::new("A paragraph of text.")))
+			.id();
+
+		let result = render_markdown(&mut world, entity).unwrap();
+		result.xpect_eq("A paragraph of text.\n\n");
+	}
+
+	#[test]
+	fn mixed_structure() {
+		let mut world = World::new();
+		let root = world.spawn_empty().id();
+		world.spawn((Title, TextContent::new("Welcome"), ChildOf(root)));
+		world.spawn((
+			Paragraph,
+			TextContent::new("This is the intro."),
+			ChildOf(root),
+		));
+
+		let result = render_markdown(&mut world, root).unwrap();
+		result.xpect_eq("# Welcome\n\nThis is the intro.\n\n");
+	}
+
+	#[test]
+	fn respects_card_boundary() {
+		let mut world = World::new();
+		let card = world.spawn(Card).id();
+		world.spawn((
+			Paragraph,
+			TextContent::new("Inside card"),
+			ChildOf(card),
+		));
+
+		// Nested card should not be rendered
+		let nested_card = world.spawn((Card, ChildOf(card))).id();
+		world.spawn((
+			Paragraph,
+			TextContent::new("Inside nested card"),
+			ChildOf(nested_card),
+		));
+
+		let result = render_markdown(&mut world, card).unwrap();
+		result.xpect_eq("Inside card\n\n");
 	}
 }

@@ -50,7 +50,6 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Value>()
 			// Register content types
 			.register_type::<TextContent>()
-			.register_type::<TextBlock>()
 			.register_type::<Title>()
 			.register_type::<Paragraph>()
 			.register_type::<Important>()
@@ -189,11 +188,11 @@ mod test {
 	fn text_block_with_field_ref() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((Card, Document::new(val!({ "name": "World" }))))
-			.id();
-
-		world.spawn((ChildOf(card), text!["Hello, ", FieldRef::new("name")]));
+		world.spawn((
+			Card,
+			Document::new(val!({ "name": "World" })),
+			children![(content!["Hello, ", FieldRef::new("name")])],
+		));
 
 		world.update_local();
 
