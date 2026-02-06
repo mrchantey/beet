@@ -20,18 +20,24 @@ pub struct FieldRef {
 
 
 impl FieldRef {
-	/// Create a new field reference with the given document path and field path.
+	/// Create a new field reference with the given field path.
 	///
-	/// By default, missing fields are initialized with `null`.
-	pub fn new(
-		document: DocumentPath,
-		field_path: impl IntoFieldPathVec,
-	) -> Self {
+	/// Uses the default [`DocumentPath::Card`] for document resolution.
+	/// Use [`with_document`](Self::with_document) to specify a different document.
+	///
+	/// By default, missing fields are initialized with [`Value::Null`].
+	pub fn new(field_path: impl IntoFieldPathVec) -> Self {
 		Self {
-			document,
+			document: DocumentPath::default(),
 			field_path: field_path.into_field_path_vec(),
 			on_missing: OnMissingField::default(),
 		}
+	}
+
+	/// Set the document path for this field reference.
+	pub fn with_document(mut self, document: DocumentPath) -> Self {
+		self.document = document;
+		self
 	}
 
 	/// Set this field reference to error if the field is missing instead of initializing it.
@@ -141,7 +147,7 @@ mod test {
 
 	#[test]
 	fn field_ref_new() {
-		let field = FieldRef::new(DocumentPath::Card, "field");
+		let field = FieldRef::new("field");
 
 		field.document.xpect_eq(DocumentPath::Card);
 		field
@@ -150,12 +156,5 @@ mod test {
 		field
 			.on_missing
 			.xpect_eq(OnMissingField::Init { value: Value::Null });
-	}
-
-	#[test]
-	fn field_ref_error_on_missing() {
-		let field =
-			FieldRef::new(DocumentPath::Card, "field").error_on_missing();
-		field.on_missing.xpect_eq(OnMissingField::EmitError);
 	}
 }

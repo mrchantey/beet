@@ -21,7 +21,7 @@ use bevy::reflect::Typed;
 /// use beet_core::prelude::*;
 ///
 /// let mut world = World::new();
-/// let field = FieldRef::new(DocumentPath::Card, "counter");
+/// let field = FieldRef::new("counter");
 /// let entity = world.spawn(increment(field)).id();
 ///
 /// // First call initializes to 1
@@ -198,7 +198,7 @@ where
 mod test {
 	use super::*;
 
-	fn count_field() -> FieldRef { FieldRef::new(DocumentPath::Card, "count") }
+	fn count_field() -> FieldRef { FieldRef::new("count") }
 
 	#[test]
 	fn increment_initializes_to_one() {
@@ -293,7 +293,7 @@ mod test {
 	#[test]
 	fn set_field_creates_new_field() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "message");
+		let field = FieldRef::new("message");
 		let entity = world.spawn((Card, set_field(field))).id();
 
 		world
@@ -313,7 +313,7 @@ mod test {
 	#[test]
 	fn set_field_updates_existing() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "status");
+		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
 				Card,
@@ -339,7 +339,7 @@ mod test {
 	#[test]
 	fn set_field_typed_creates_new_field() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "message");
+		let field = FieldRef::new("message");
 		let entity = world.spawn((Card, set_field_typed::<String>(field))).id();
 
 		world
@@ -359,7 +359,7 @@ mod test {
 	#[test]
 	fn set_field_typed_updates_existing() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "status");
+		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
 				Card,
@@ -385,7 +385,7 @@ mod test {
 	#[test]
 	fn get_field_retrieves_value() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "data");
+		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
 				Card,
@@ -405,10 +405,7 @@ mod test {
 	#[test]
 	fn get_field_nested() {
 		let mut world = World::new();
-		let field = FieldRef::new(
-			DocumentPath::Card,
-			vec!["user", "name"].into_field_path_vec(),
-		);
+		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
 				Card,
@@ -428,7 +425,7 @@ mod test {
 	#[test]
 	fn get_field_typed_retrieves_value() {
 		let mut world = World::new();
-		let field = FieldRef::new(DocumentPath::Card, "data");
+		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
 				Card,
@@ -448,10 +445,7 @@ mod test {
 	#[test]
 	fn get_field_typed_nested() {
 		let mut world = World::new();
-		let field = FieldRef::new(
-			DocumentPath::Card,
-			vec!["user", "name"].into_field_path_vec(),
-		);
+		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
 				Card,

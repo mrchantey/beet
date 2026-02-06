@@ -192,7 +192,7 @@ mod test {
 			.spawn((Card, Document::new(val!({ "count": 5i64 }))))
 			.id();
 
-		let field = FieldRef::new(DocumentPath::Card, "count");
+		let field = FieldRef::new("count");
 
 		world
 			.run_system_cached_with(
@@ -229,7 +229,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn(Card).id();
 
-		let field = FieldRef::new(DocumentPath::Card, "new_field");
+		let field = FieldRef::new("new_field");
 
 		world
 			.run_system_cached_with(
