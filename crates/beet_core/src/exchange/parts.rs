@@ -843,7 +843,7 @@ impl From<CliArgs> for RequestParts {
 		// Convert query HashMap to MultiMap before consuming cli
 		// We need to capture flags (keys with empty value vectors) as well
 		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
+		for (key, values) in &cli.params {
 			if values.is_empty() {
 				// Flag without value - insert with empty string to mark presence
 				params.insert(key.clone(), String::new());
@@ -874,7 +874,7 @@ impl From<&CliArgs> for RequestParts {
 		let path = cli.path.clone();
 
 		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
+		for (key, values) in &cli.params {
 			if values.is_empty() {
 				params.insert(key.clone(), String::new());
 			} else {

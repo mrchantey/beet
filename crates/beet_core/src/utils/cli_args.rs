@@ -8,7 +8,7 @@ pub struct CliArgs {
 	/// Positional arguments forming the path.
 	pub path: Vec<String>,
 	/// Named arguments as key-value pairs.
-	pub query: HashMap<String, Vec<String>>,
+	pub params: HashMap<String, Vec<String>>,
 }
 
 
@@ -77,7 +77,7 @@ impl CliArgs {
 			query.entry(key).or_default();
 		}
 
-		Self { path, query }
+		Self { path, params: query }
 	}
 
 	/// Groups arguments respecting quotations (single and double quotes).
@@ -156,9 +156,9 @@ impl CliArgs {
 	pub fn into_path_string(&self) -> String {
 		let mut path_str = format!("/{}", self.path.join("/"));
 
-		if !self.query.is_empty() {
+		if !self.params.is_empty() {
 			let mut first = true;
-			for (key, values) in &self.query {
+			for (key, values) in &self.params {
 				for value in values {
 					if first {
 						path_str.push('?');
@@ -184,7 +184,7 @@ mod tests {
 		let cli = CliArgs::parse("");
 
 		cli.path.xpect_empty();
-		cli.query.is_empty().xpect_true();
+		cli.params.is_empty().xpect_true();
 	}
 
 	#[test]
@@ -193,7 +193,7 @@ mod tests {
 
 		cli.path.len().xpect_eq(1);
 		cli.path[0].xpect_eq("foo");
-		cli.query.is_empty().xpect_true();
+		cli.params.is_empty().xpect_true();
 	}
 
 	#[test]
@@ -205,7 +205,7 @@ mod tests {
 			"bar".to_string(),
 			"baz".to_string(),
 		]);
-		cli.query.is_empty().xpect_true();
+		cli.params.is_empty().xpect_true();
 	}
 
 	#[test]
@@ -213,8 +213,8 @@ mod tests {
 		let cli = CliArgs::parse("--key=value");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value".to_string()]);
@@ -225,8 +225,8 @@ mod tests {
 		let cli = CliArgs::parse("--verbose");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query.get("verbose").unwrap().xpect_empty();
+		cli.params.len().xpect_eq(1);
+		cli.params.get("verbose").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -234,10 +234,10 @@ mod tests {
 		let cli = CliArgs::parse("--a=1 --b=2 --c=3");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(3);
-		cli.query.get("a").unwrap().xpect_eq(vec!["1".to_string()]);
-		cli.query.get("b").unwrap().xpect_eq(vec!["2".to_string()]);
-		cli.query.get("c").unwrap().xpect_eq(vec!["3".to_string()]);
+		cli.params.len().xpect_eq(3);
+		cli.params.get("a").unwrap().xpect_eq(vec!["1".to_string()]);
+		cli.params.get("b").unwrap().xpect_eq(vec!["2".to_string()]);
+		cli.params.get("c").unwrap().xpect_eq(vec!["3".to_string()]);
 	}
 
 	#[test]
@@ -245,8 +245,8 @@ mod tests {
 		let cli = CliArgs::parse("--key=val1 --key=val2 --key=val3");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query.get("key").unwrap().xpect_eq(vec![
+		cli.params.len().xpect_eq(1);
+		cli.params.get("key").unwrap().xpect_eq(vec![
 			"val1".to_string(),
 			"val2".to_string(),
 			"val3".to_string(),
@@ -259,8 +259,8 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value".to_string()]);
@@ -274,13 +274,13 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path2".to_string()]);
-		cli.query.len().xpect_eq(2);
-		cli.query.get("key").unwrap().xpect_eq(vec![
+		cli.params.len().xpect_eq(2);
+		cli.params.get("key").unwrap().xpect_eq(vec![
 			"val1".to_string(),
 			"val2".to_string(),
 			"val3".to_string(),
 		]);
-		cli.query
+		cli.params
 			.get("other")
 			.unwrap()
 			.xpect_eq(vec!["one".to_string()]);
@@ -291,8 +291,8 @@ mod tests {
 		let cli = CliArgs::parse("--key=");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query.get("key").unwrap().xpect_eq(vec!["".to_string()]);
+		cli.params.len().xpect_eq(1);
+		cli.params.get("key").unwrap().xpect_eq(vec!["".to_string()]);
 	}
 
 	#[test]
@@ -300,8 +300,8 @@ mod tests {
 		let cli = CliArgs::parse("--key=val=ue");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["val=ue".to_string()]);
@@ -312,8 +312,8 @@ mod tests {
 		let cli = CliArgs::parse("--foo bar");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("foo")
 			.unwrap()
 			.xpect_eq(vec!["bar".to_string()]);
@@ -324,8 +324,8 @@ mod tests {
 		let cli = CliArgs::parse("-f=bar");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("f")
 			.unwrap()
 			.xpect_eq(vec!["bar".to_string()]);
@@ -336,8 +336,8 @@ mod tests {
 		let cli = CliArgs::parse("-f bar");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("f")
 			.unwrap()
 			.xpect_eq(vec!["bar".to_string()]);
@@ -348,12 +348,12 @@ mod tests {
 		let cli = CliArgs::parse("--foo bar --baz=qux");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(2);
-		cli.query
+		cli.params.len().xpect_eq(2);
+		cli.params
 			.get("foo")
 			.unwrap()
 			.xpect_eq(vec!["bar".to_string()]);
-		cli.query
+		cli.params
 			.get("baz")
 			.unwrap()
 			.xpect_eq(vec!["qux".to_string()]);
@@ -365,8 +365,8 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path2".to_string()]);
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value".to_string()]);
@@ -377,9 +377,9 @@ mod tests {
 		let cli = CliArgs::parse("--verbose -- nested");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(2);
-		cli.query.get("verbose").unwrap().xpect_empty();
-		cli.query
+		cli.params.len().xpect_eq(2);
+		cli.params.get("verbose").unwrap().xpect_empty();
+		cli.params
 			.get("nested-args")
 			.unwrap()
 			.xpect_eq(vec!["nested".to_string()]);
@@ -390,10 +390,10 @@ mod tests {
 		let cli = CliArgs::parse("--verbose --debug --trace");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(3);
-		cli.query.get("verbose").unwrap().xpect_empty();
-		cli.query.get("debug").unwrap().xpect_empty();
-		cli.query.get("trace").unwrap().xpect_empty();
+		cli.params.len().xpect_eq(3);
+		cli.params.get("verbose").unwrap().xpect_empty();
+		cli.params.get("debug").unwrap().xpect_empty();
+		cli.params.get("trace").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -401,12 +401,12 @@ mod tests {
 		let cli = CliArgs::parse("path1 --key=value --flag");
 
 		cli.path.xpect_eq(vec!["path1".to_string()]);
-		cli.query.len().xpect_eq(2);
-		cli.query
+		cli.params.len().xpect_eq(2);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value".to_string()]);
-		cli.query.get("flag").unwrap().xpect_empty();
+		cli.params.get("flag").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -414,8 +414,8 @@ mod tests {
 		let cli = CliArgs::parse("-v");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query.get("v").unwrap().xpect_empty();
+		cli.params.len().xpect_eq(1);
+		cli.params.get("v").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -423,14 +423,14 @@ mod tests {
 		let cli = CliArgs::parse("-v --verbose -f bar --foo=baz");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(4);
-		cli.query.get("v").unwrap().xpect_empty();
-		cli.query.get("verbose").unwrap().xpect_empty();
-		cli.query
+		cli.params.len().xpect_eq(4);
+		cli.params.get("v").unwrap().xpect_empty();
+		cli.params.get("verbose").unwrap().xpect_empty();
+		cli.params
 			.get("f")
 			.unwrap()
 			.xpect_eq(vec!["bar".to_string()]);
-		cli.query
+		cli.params
 			.get("foo")
 			.unwrap()
 			.xpect_eq(vec!["baz".to_string()]);
@@ -442,8 +442,8 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path3".to_string()]);
-		cli.query.len().xpect_eq(1);
-		cli.query
+		cli.params.len().xpect_eq(1);
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["path2".to_string()]);
@@ -455,8 +455,8 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
-		cli.query.len().xpect_eq(1);
-		cli.query.get("nested-args").unwrap().xpect_eq(vec![
+		cli.params.len().xpect_eq(1);
+		cli.params.get("nested-args").unwrap().xpect_eq(vec![
 			"nested1".to_string(),
 			"nested2".to_string(),
 			"--flag".to_string(),
@@ -468,12 +468,12 @@ mod tests {
 		let cli = CliArgs::parse("foo --name=bob -- arg1 arg2");
 
 		cli.path.xpect_eq(vec!["foo".to_string()]);
-		cli.query.len().xpect_eq(2);
-		cli.query
+		cli.params.len().xpect_eq(2);
+		cli.params
 			.get("name")
 			.unwrap()
 			.xpect_eq(vec!["bob".to_string()]);
-		cli.query
+		cli.params
 			.get("nested-args")
 			.unwrap()
 			.xpect_eq(vec!["arg1".to_string(), "arg2".to_string()]);
@@ -484,8 +484,8 @@ mod tests {
 		let cli = CliArgs::parse("-- foo bar baz");
 
 		cli.path.xpect_empty();
-		cli.query.len().xpect_eq(1);
-		cli.query.get("nested-args").unwrap().xpect_eq(vec![
+		cli.params.len().xpect_eq(1);
+		cli.params.get("nested-args").unwrap().xpect_eq(vec![
 			"foo".to_string(),
 			"bar".to_string(),
 			"baz".to_string(),
@@ -558,7 +558,7 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
-		cli.query
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value".to_string()]);
@@ -707,7 +707,7 @@ mod tests {
 	#[test]
 	fn parse_with_quoted_query_value() {
 		let cli = CliArgs::parse("--message='hello world'");
-		cli.query
+		cli.params
 			.get("message")
 			.unwrap()
 			.xpect_eq(vec!["hello world".to_string()]);
@@ -716,7 +716,7 @@ mod tests {
 	#[test]
 	fn parse_with_quoted_equals_value() {
 		let cli = CliArgs::parse("--text=\"foo bar\"");
-		cli.query
+		cli.params
 			.get("text")
 			.unwrap()
 			.xpect_eq(vec!["foo bar".to_string()]);
@@ -725,7 +725,7 @@ mod tests {
 	#[test]
 	fn parse_with_quoted_whitespace_value() {
 		let cli = CliArgs::parse("--name 'Jane Doe'");
-		cli.query
+		cli.params
 			.get("name")
 			.unwrap()
 			.xpect_eq(vec!["Jane Doe".to_string()]);
@@ -784,7 +784,7 @@ mod tests {
 		let cli = CliArgs::parse("foo 'bar baz' --key='value with spaces'");
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar baz".to_string()]);
-		cli.query
+		cli.params
 			.get("key")
 			.unwrap()
 			.xpect_eq(vec!["value with spaces".to_string()]);
@@ -797,12 +797,12 @@ mod tests {
 		);
 		cli.path
 			.xpect_eq(vec!["build".to_string(), "src/main.rs".to_string()]);
-		cli.query.len().xpect_eq(2);
-		cli.query
+		cli.params.len().xpect_eq(2);
+		cli.params
 			.get("msg")
 			.unwrap()
 			.xpect_eq(vec!["Initial commit".to_string()]);
-		cli.query
+		cli.params
 			.get("author")
 			.unwrap()
 			.xpect_eq(vec!["John Doe".to_string()]);
