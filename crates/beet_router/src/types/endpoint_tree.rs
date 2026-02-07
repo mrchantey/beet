@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::Actions;
 use beet_net::prelude::*;
 
 /// Collects all canonical endpoints in an application and arranges them into a tree structure.
@@ -87,30 +86,6 @@ impl EndpointTree {
 
 		world.despawn(root);
 		endpoints.xok()
-	}
-
-	/// Get the canonical endpoints and entities for an already spawned root [`ExchangeSpawner::spawn`]
-	/// Non-canonical endpoints are excluded.
-	#[deprecated = "Left-over from ExchangeSpawner pattern"]
-	pub fn endpoints_from_exchange(
-		root: In<Entity>,
-		actions: Query<&Actions>,
-		children: Query<&Children>,
-		endpoints: Query<&Endpoint>,
-	) -> Result<Vec<(Entity, Endpoint)>> {
-		let actions = actions.get(*root)?;
-		assert_eq!(actions.len(), 1,);
-		children
-			.iter_descendants_inclusive(actions[0])
-			.filter_map(|entity| {
-				endpoints
-					.get(entity)
-					.ok()
-					.filter(|endpoint| endpoint.is_canonical())
-					.map(|endpoint| (entity, (*endpoint).clone()))
-			})
-			.collect::<Vec<_>>()
-			.xok()
 	}
 
 	/// Builds an [`EndpointTree`] from a list of (Entity, Endpoint).

@@ -15,7 +15,7 @@ categories.workspace = true
 [features]
 
 [dependencies]
-beet_core.workspace = true
+beet_core = { workspace = true, features = ["exchange"] }
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true

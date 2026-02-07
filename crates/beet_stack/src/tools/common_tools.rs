@@ -35,6 +35,7 @@ use bevy::reflect::Typed;
 pub fn increment(field: FieldRef) -> impl Bundle {
 	(
 		field,
+		PathPartial::new("increment"),
 		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
@@ -64,6 +65,7 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 pub fn decrement(field: FieldRef) -> impl Bundle {
 	(
 		field,
+		PathPartial::new("decrement"),
 		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
@@ -88,6 +90,7 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 pub fn add(field: FieldRef) -> impl Bundle {
 	(
 		field,
+		PathPartial::new("add"),
 		tool(
 			|cx: In<ToolContext<i64>>,
 			 mut query: DocumentQuery,
@@ -112,6 +115,7 @@ pub fn add(field: FieldRef) -> impl Bundle {
 pub fn set_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
+		PathPartial::new("set-field"),
 		tool(
 			|In(cx): In<ToolContext<Value>>,
 			 mut query: DocumentQuery,
@@ -135,6 +139,7 @@ where
 {
 	(
 		field,
+		PathPartial::new("set-field-typed"),
 		tool(
 			move |cx: In<ToolContext<T>>,
 			      mut query: DocumentQuery,
@@ -156,6 +161,7 @@ where
 pub fn get_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
+		PathPartial::new("get-field"),
 		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
@@ -180,6 +186,7 @@ where
 {
 	(
 		field,
+		PathPartial::new("get-field-typed"),
 		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
