@@ -45,12 +45,7 @@
 //!     "Count: ",
 //!     FieldRef::new("count").init_with(Value::I64(0))
 //! ];
-//!
-//! // Render to markdown
-//! let mut world = DocumentPlugin::world();
-//! let entity = world.spawn(greeting).id();
-//! let markdown = render_markdown(&mut world, entity).unwrap();
-//! // Result: "Hello, **world**!"
+
 //! ```
 //!
 //! [`Document`]: crate::document::Document
