@@ -77,10 +77,13 @@ impl PathPartial {
 }
 
 /// A completed sequence of [`PathPatternSegment`] for some point in the route tree.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(PathPatternSegments::_from_raw))]
+#[reflect(Component)]
 pub struct PathPattern {
 	/// The complete sequence of segments
 	segments: Vec<PathPatternSegment>,

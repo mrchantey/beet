@@ -100,7 +100,7 @@ impl OnSpawn {
 
 	/// Runs the system and inserts the resulting bundle into the entity on spawn.
 	pub fn run_insert<
-		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
+		System: 'static + Send + Sync + IntoSystem<In<Entity>, Out, M1>,
 		M1,
 		Out: ApplyToEntity<M2>,
 		M2,
@@ -108,8 +108,11 @@ impl OnSpawn {
 		system: System,
 	) -> Self {
 		Self::new(move |entity| {
+			let id = entity.id();
 			entity
-				.world_scope(move |world| world.run_system_once(system))
+				.world_scope(move |world| {
+					world.run_system_once_with(system, id)
+				})
 				.unwrap()
 				.apply(entity);
 		})

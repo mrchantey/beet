@@ -120,16 +120,16 @@ impl ParamsPattern {
 		ancestors: Query<&ChildOf>,
 		params_partials: Query<&ParamsPartial>,
 	) -> Result<ParamsPattern> {
-		Self::collect(*entity, ancestors, params_partials)
+		Self::collect(*entity, &ancestors, &params_partials)
 	}
 
 	/// Collects a [`ParamsPattern`] for a provided entity.
 	/// Only the provided entity and its parents are checked, any sibling
 	/// middleware params should also be specified at the [`Endpoint`].
-	fn collect(
+	pub fn collect(
 		entity: Entity,
-		ancestors: Query<&ChildOf>,
-		params_partials: Query<&ParamsPartial>,
+		ancestors: &Query<&ChildOf>,
+		params_partials: &Query<&ParamsPartial>,
 	) -> Result<ParamsPattern> {
 		ancestors
 			// get every PathFilter in ancestors

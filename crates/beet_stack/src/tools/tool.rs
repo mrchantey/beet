@@ -21,6 +21,25 @@ where
 	(meta, handler.into_handler())
 }
 
+/// Observer that listens for new tools and inserts their path and params patterns.
+/// Any [`PathPartial`] or [`ParamsPartial`] will be collected so long as they are
+/// spawned at the same time as the tool, even if they come after it in the tuple.
+/// This is because, unlike OnAdd component hooks, observers run after the entire
+/// tree is spawned.
+pub fn insert_tool_path_and_params(
+	ev: On<Insert, ToolMeta>,
+	ancestors: Query<&ChildOf>,
+	paths: Query<&PathPartial>,
+	params: Query<&ParamsPartial>,
+	mut commands: Commands,
+) -> Result {
+	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
+	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
+	commands.entity(ev.entity).insert((path, params));
+	Ok(())
+}
+
+
 /// Metadata for a tool, containing the input and output types.
 /// Every tool must have a [`ToolMeta`], calling a tool with
 /// types that dont match will result in an error.
@@ -328,7 +347,9 @@ mod test {
 	use super::*;
 
 	fn add_tool_handler((a, b): (i32, i32)) -> i32 { a + b }
-	fn add_tool() -> impl Bundle { tool(add_tool_handler) }
+	fn add_tool() -> impl Bundle {
+		(PathPartial::new("add"), tool(add_tool_handler))
+	}
 
 
 	#[test]
@@ -362,5 +383,58 @@ mod test {
 			.spawn(add_tool())
 			.send_blocking::<(i32, i32), bool>((2, 2))
 			.unwrap();
+	}
+
+	#[test]
+	fn path_pattern() {
+		let mut world = ToolPlugin::world();
+		world.add_observer(insert_tool_path_and_params);
+		world
+			.spawn(add_tool())
+			.get::<PathPattern>()
+			.unwrap()
+			.annotated_route_path()
+			.to_string()
+			.xpect_eq("/add");
+		let root = world.spawn(PathPartial::new(":foo")).id();
+		world
+			.spawn((ChildOf(root), add_tool()))
+			.get::<PathPattern>()
+			.unwrap()
+			.annotated_route_path()
+			.to_string()
+			.xpect_eq("/:foo/add");
+	}
+
+	#[test]
+	fn params_pattern() {
+		#[derive(Reflect)]
+		struct MyParams {
+			foo: u32,
+		}
+
+		let mut world = ToolPlugin::world();
+		world
+			.spawn(add_tool())
+			.get::<ParamsPattern>()
+			.unwrap()
+			.xpect_empty();
+
+		// params inserted after tool
+		world
+			.spawn((add_tool(), ParamsPartial::new::<MyParams>()))
+			.get::<ParamsPattern>()
+			.unwrap()[0]
+			.name()
+			.xpect_eq("foo");
+
+		// ancestor
+		let root = world.spawn(ParamsPartial::new::<MyParams>()).id();
+		world
+			.spawn((ChildOf(root), add_tool()))
+			.get::<ParamsPattern>()
+			.unwrap()[0]
+			.name()
+			.xpect_eq("foo");
 	}
 }
