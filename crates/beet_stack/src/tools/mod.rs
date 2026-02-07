@@ -1,5 +1,5 @@
-// mod tool_tree;
-// pub use tool_tree::*;
+mod tool_tree;
+pub use tool_tree::*;
 mod tool_handler;
 pub use tool_handler::*;
 mod tool;
@@ -8,3 +8,5 @@ mod tool_plugin;
 pub use tool_plugin::*;
 mod common_tools;
 pub use common_tools::*;
+mod help_tool;
+pub use help_tool::*;

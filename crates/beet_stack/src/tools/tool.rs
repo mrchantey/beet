@@ -43,7 +43,7 @@ pub fn insert_tool_path_and_params(
 /// Metadata for a tool, containing the input and output types.
 /// Every tool must have a [`ToolMeta`], calling a tool with
 /// types that dont match will result in an error.
-#[derive(Component)]
+#[derive(Clone, Debug, Component)]
 pub struct ToolMeta {
 	/// The reflected type information for the tool input.
 	input: &'static TypeInfo,
@@ -52,6 +52,14 @@ pub struct ToolMeta {
 }
 
 impl ToolMeta {
+	/// Create a [`ToolMeta`] from input and output type parameters.
+	pub fn of<In: Typed, Out: Typed>() -> Self {
+		Self {
+			input: In::type_info(),
+			output: Out::type_info(),
+		}
+	}
+
 	/// Get the input type information for this tool.
 	pub fn input(&self) -> &'static TypeInfo { self.input }
 	/// Get the output type information for this tool.
