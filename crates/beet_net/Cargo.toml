@@ -44,9 +44,13 @@ serde = [
 	"uuid/serde",
 	"beet_core/serde",
 ]
+http = [
+	"dep:http",
+	"dep:eventsource-stream",
+]
 reqwest = ["dep:reqwest","dep:tokio"]
 ureq = ["dep:ureq", "dep:blocking"]
-tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
+tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking"]
 native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",
@@ -73,8 +77,6 @@ async-channel.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-heck.workspace = true
-tracing-subscriber.workspace = true
 send_wrapper.workspace = true
 uuid = {workspace = true, features = ["v7"]}
 async-lock.workspace = true
@@ -88,11 +90,9 @@ serde_urlencoded = { version = "0.7", optional = true }
 
 # http
 http = { workspace = true, optional = true }
-http-body-util.workspace = true
+eventsource-stream = { version = "0.2.3", optional = true }
 bytes.workspace = true
 url = "2"
-html-escape = "0.2"
-eventsource-stream = "0.2.3"
 # async
 futures.workspace = true
 
@@ -107,7 +107,6 @@ async-tungstenite = { version = "0.31", optional = true, default-features = fals
 "async-std-runtime",
 "futures-03-sink"
 ] }
-async-lock = {workspace = true, optional = true }
 blocking = { version = "1.6", optional = true }
 async-native-tls = { version = "0.5", optional = true }
 

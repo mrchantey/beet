@@ -1144,7 +1144,6 @@ dependencies = [
 name = "beet_clanker"
 version = "0.0.9-rc.1.0"
 dependencies = [
- "async-lock",
  "base64 0.22.1",
  "beet_clanker",
  "beet_core",
@@ -1154,7 +1153,6 @@ dependencies = [
  "bevy",
  "dotenv",
  "futures",
- "http 1.3.1",
  "js-sys",
  "mime_guess",
  "serde",
@@ -1271,11 +1269,9 @@ dependencies = [
  "beet_dom",
  "beet_net",
  "bevy",
- "bytes",
  "console_error_panic_hook",
  "extend",
  "js-sys",
- "send_wrapper",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -1292,8 +1288,6 @@ dependencies = [
  "beet_ml",
  "beet_spatial",
  "bevy",
- "log",
- "pretty_env_logger",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -1362,8 +1356,6 @@ dependencies = [
  "eventsource-stream",
  "extend",
  "futures",
- "heck 0.4.1",
- "html-escape",
  "http 1.3.1",
  "http-body-util",
  "hyper 1.8.1",
@@ -1379,7 +1371,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "ureq 3.2.0",
  "url",
  "uuid",
@@ -1414,21 +1405,14 @@ dependencies = [
 name = "beet_router"
 version = "0.0.9-rc.1.0"
 dependencies = [
- "async-channel 2.5.0",
  "beet_core",
  "beet_dom",
  "beet_flow",
  "beet_net",
  "beet_rsx",
  "bevy",
- "extend",
- "futures",
- "heck 0.4.1",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1443,14 +1427,10 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "extend",
- "http 1.3.1",
  "js-sys",
- "prettyplease",
  "ron 0.8.1",
  "send_wrapper",
  "serde",
- "strum",
- "strum_macros",
  "thiserror 1.0.69",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1500,8 +1480,6 @@ dependencies = [
  "bevy",
  "extend",
  "log",
- "pretty_env_logger",
- "serde",
  "strum",
  "strum_macros",
  "web-sys",
@@ -5332,15 +5310,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest",
-]
-
-[[package]]
-name = "html-escape"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
-dependencies = [
- "utf8-width",
 ]
 
 [[package]]
@@ -9962,12 +9931,6 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
-name = "utf8-width"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1292c0d970b54115d14f2492fe0170adf21d68a1de108eebc51c1df4f346a091"
 
 [[package]]
 name = "utf8_iter"

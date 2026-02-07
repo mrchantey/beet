@@ -38,20 +38,9 @@ beet_rsx.workspace = true
 
 bevy.workspace = true
 
-# utils
-extend.workspace = true
-thiserror.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-heck.workspace = true
-
 # serde
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-
-# async
-futures.workspace = true
-async-channel.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

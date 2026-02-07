@@ -38,6 +38,7 @@ pub mod prelude {
 	pub use crate::sockets;
 
 	// Re-export common types from dependencies
+	#[cfg(feature = "http")]
 	pub use http::header;
 	pub use url::Url;
 	pub use uuid::Uuid;
@@ -48,8 +49,11 @@ pub mod prelude {
 /// Re-exports of dependency crates for downstream use.
 pub mod exports {
 	pub use bevy::tasks::futures_lite;
+	#[cfg(feature = "http")]
 	pub use eventsource_stream;
+	#[cfg(feature = "http")]
 	pub use http;
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use http_body_util;
 	pub use url;
 }
