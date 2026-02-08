@@ -47,7 +47,6 @@ pub fn render_markdown() -> impl Bundle {
 
 /// System that renders an entity tree to markdown using CardQuery.
 fn render_markdown_system(
-	// In(entity): In<Entity>,
 	In(cx): In<ToolContext>,
 	card_query: CardQuery,
 	text_query: Query<&TextContent>,
@@ -64,50 +63,29 @@ fn render_markdown_system(
 
 	// Use CardQuery DFS to traverse entities within the card boundary
 	for current in card_query.iter_dfs(cx.tool) {
-		// Calculate title nesting level by counting Title ancestors
-		let title_level = if title_query.contains(current) {
-			ancestors
-				.iter_ancestors(current)
-				.filter(|&ancestor| title_query.contains(ancestor))
-				.count() + 1
-		} else {
-			0
-		};
-
 		// Check if this entity has text content
 		if let Ok(text) = text_query.get(current) {
-			let content = text.as_str();
-
-			// Apply semantic wrappers based on marker components
-			let has_important = important_query.contains(current);
-			let has_emphasize = emphasize_query.contains(current);
-			let has_code = code_query.contains(current);
-			let has_quote = quote_query.contains(current);
-			let link = link_query.get(current).ok();
-			let is_title = title_query.contains(current);
-			let is_paragraph = paragraph_query.contains(current);
-
 			// Build the wrapped content
-			let mut wrapped = content.to_string();
+			let mut wrapped = text.as_str().to_string();
 
 			// Apply wrappers from innermost to outermost
-			if has_code {
+			if code_query.contains(current) {
 				wrapped = format!("`{}`", wrapped);
 			}
 
-			if has_emphasize {
+			if emphasize_query.contains(current) {
 				wrapped = format!("*{}*", wrapped);
 			}
 
-			if has_important {
+			if important_query.contains(current) {
 				wrapped = format!("**{}**", wrapped);
 			}
 
-			if has_quote {
+			if quote_query.contains(current) {
 				wrapped = format!("\"{}\"", wrapped);
 			}
 
-			if let Some(link) = link {
+			if let Ok(link) = link_query.get(current) {
 				let title = link
 					.title
 					.as_ref()
@@ -116,11 +94,17 @@ fn render_markdown_system(
 				wrapped = format!("[{}]({}{})", wrapped, link.href, title);
 			}
 
-			// Handle structural elements
-			if is_title {
+			// Select and handle a structural element, if any
+			if title_query.contains(current) {
+				// Calculate title nesting level by counting Title ancestors
+				let title_level = ancestors
+					.iter_ancestors_inclusive(current)
+					.filter(|&ancestor| title_query.contains(ancestor))
+					.count();
+
 				let hashes = "#".repeat(title_level.min(6));
 				wrapped = format!("{} {}\n\n", hashes, wrapped);
-			} else if is_paragraph {
+			} else if paragraph_query.contains(current) {
 				wrapped = format!("{}\n\n", wrapped);
 			}
 

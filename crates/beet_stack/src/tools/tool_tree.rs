@@ -1,40 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A single tool node in the tree, representing a registered tool at a specific path.
-#[derive(Debug, Clone)]
-pub struct ToolNode {
-	/// The entity containing this tool.
-	pub entity: Entity,
-	/// Metadata about the tool's input/output types.
-	pub meta: ToolMeta,
-	/// The parameter pattern for this tool.
-	pub params: ParamsPattern,
-	/// The full path pattern for this tool.
-	pub path: PathPattern,
-	/// Optional HTTP method restriction.
-	pub method: Option<HttpMethod>,
-}
-
-impl ToolNode {
-	/// Create a [`ToolNode`] from query results.
-	pub fn from_query(
-		entity: Entity,
-		meta: &ToolMeta,
-		path: &PathPattern,
-		params: &ParamsPattern,
-		method: Option<&HttpMethod>,
-	) -> Self {
-		Self {
-			entity,
-			meta: meta.clone(),
-			params: params.clone(),
-			path: path.clone(),
-			method: method.cloned(),
-		}
-	}
-}
-
 /// Collects all tools in an entity hierarchy and arranges them into a validated tree.
 ///
 /// Inserted on the root ancestor whenever a tool's [`PathPattern`] is set.
@@ -335,6 +301,40 @@ pub fn insert_tool_tree(
 	Ok(())
 }
 
+
+/// A single tool node in the tree, representing a registered tool at a specific path.
+#[derive(Debug, Clone)]
+pub struct ToolNode {
+	/// The entity containing this tool.
+	pub entity: Entity,
+	/// Metadata about the tool's input/output types.
+	pub meta: ToolMeta,
+	/// The parameter pattern for this tool.
+	pub params: ParamsPattern,
+	/// The full path pattern for this tool.
+	pub path: PathPattern,
+	/// Optional HTTP method restriction.
+	pub method: Option<HttpMethod>,
+}
+
+impl ToolNode {
+	/// Create a [`ToolNode`] from query results.
+	pub fn from_query(
+		entity: Entity,
+		meta: &ToolMeta,
+		path: &PathPattern,
+		params: &ParamsPattern,
+		method: Option<&HttpMethod>,
+	) -> Self {
+		Self {
+			entity,
+			meta: meta.clone(),
+			params: params.clone(),
+			path: path.clone(),
+			method: method.cloned(),
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {
