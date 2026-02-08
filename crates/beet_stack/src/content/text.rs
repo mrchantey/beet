@@ -79,6 +79,14 @@ impl<T: Into<String>> From<T> for TextContent {
 	fn from(text: T) -> Self { Self(text.into()) }
 }
 
+/// Helper method added to types that are often
+/// constructed alongside a [`TextContent`]
+pub trait WithText: Default {
+	fn with_text(text: impl Into<String>) -> (Self, TextContent) {
+		(Self::default(), TextContent::new(text))
+	}
+}
+
 /// Marker component used to denote a heading.
 ///
 /// Nesting is derived by the number of [`Title`] components
@@ -99,6 +107,9 @@ impl<T: Into<String>> From<T> for TextContent {
 #[require(TextContent)]
 pub struct Title;
 
+impl WithText for Title {}
+impl WithText for Paragraph {}
+
 
 /// Marker component to denote a paragraph of text.
 #[derive(
@@ -117,6 +128,11 @@ pub struct Title;
 #[require(TextContent)]
 pub struct Paragraph;
 
+impl Paragraph {
+	pub fn text(text: impl Into<String>) -> (Self, TextContent) {
+		(Paragraph, TextContent::new(text))
+	}
+}
 
 /// Marker component for important/strong text.
 ///

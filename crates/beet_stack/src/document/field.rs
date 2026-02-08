@@ -46,6 +46,11 @@ impl FieldRef {
 		self
 	}
 
+	/// Create a tuple of this field reference and an empty text content.
+	pub fn as_text(&self) -> (Self, TextContent) {
+		(self.clone(), TextContent::default())
+	}
+
 	/// Set the behavior when the field is missing.
 	pub fn on_missing(mut self, on_missing: OnMissingField) -> Self {
 		self.on_missing = on_missing;

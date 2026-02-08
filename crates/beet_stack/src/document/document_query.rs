@@ -48,6 +48,32 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		self.doc_query.get_mut(doc_entity)?.xok()
 	}
 
+	/// Execute a function on a document asynchronously.
+	pub async fn with_async<O>(
+		&mut self,
+		entity: AsyncEntity,
+		path: &DocumentPath,
+		func: impl 'static + Send + Sync + Fn(&mut Document) -> O,
+	) -> Result<O>
+	where
+		O: 'static + Send + Sync,
+	{
+		let id = entity.id();
+		let path = path.clone();
+		entity
+			.world()
+			.with_then(move |world| {
+				world.run_system_cached_with(
+					move |In((entity, path)): In<(Entity, DocumentPath)>,
+					      mut query: DocumentQuery| {
+						let mut doc = query.get_mut(entity, &path)?;
+						func(&mut doc).xok()
+					},
+					(id, path),
+				)
+			})
+			.await?
+	}
 
 	/// Execute a function with a mutable reference to a field.
 	///
@@ -94,33 +120,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			}
 			.into())
 		}
-	}
-
-	/// Execute a function on a document asynchronously.
-	pub async fn with_async<O>(
-		&mut self,
-		entity: AsyncEntity,
-		path: &DocumentPath,
-		func: impl 'static + Send + Sync + Fn(&mut Document) -> O,
-	) -> Result<O>
-	where
-		O: 'static + Send + Sync,
-	{
-		let id = entity.id();
-		let path = path.clone();
-		entity
-			.world()
-			.with_then(move |world| {
-				world.run_system_cached_with(
-					move |In((entity, path)): In<(Entity, DocumentPath)>,
-					      mut query: DocumentQuery| {
-						let mut doc = query.get_mut(entity, &path)?;
-						func(&mut doc).xok()
-					},
-					(id, path),
-				)
-			})
-			.await?
 	}
 }
 

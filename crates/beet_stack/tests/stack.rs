@@ -6,11 +6,15 @@ use beet_stack::prelude::*;
 
 
 fn counter() -> impl Bundle {
-	let value = FieldRef::new("count").init_with(Value::I64(0));
+	let count = FieldRef::new("count").init_with(Value::I64(0));
 
 	(Card, PathPartial::new("counter"), children![
+		(Title::with_text("Counter"), children![
+			Paragraph::with_text("The count is "),
+			count.as_text()
+		]),
 		render_markdown(),
-		increment(value)
+		increment(count)
 	])
 }
 
