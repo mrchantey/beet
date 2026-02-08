@@ -5,7 +5,7 @@
 #![doc = include_str!("../README.md")]
 mod content;
 mod document;
-mod interfaces;
+mod interface;
 mod stack;
 mod tools;
 
@@ -14,7 +14,7 @@ pub mod prelude {
 	pub use crate::content;
 	pub use crate::content::*;
 	pub use crate::document::*;
-	pub use crate::interfaces::*;
+	pub use crate::interface::*;
 	pub use crate::stack::*;
 	pub use crate::tools::*;
 	pub use crate::val;
