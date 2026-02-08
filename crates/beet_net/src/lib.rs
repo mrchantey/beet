@@ -40,7 +40,6 @@ pub mod prelude {
 	// Re-export common types from dependencies
 	#[cfg(feature = "http")]
 	pub use http::header;
-	pub use url::Url;
 	pub use uuid::Uuid;
 
 	pub use bevy::tasks::futures_lite::StreamExt;
@@ -55,5 +54,4 @@ pub mod exports {
 	pub use http;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use http_body_util;
-	pub use url;
 }

@@ -1413,6 +1413,7 @@ dependencies = [
  "bevy",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]

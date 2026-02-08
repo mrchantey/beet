@@ -184,6 +184,7 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
+url = "2"
 
 #💡 web
 js-sys = "0.3"

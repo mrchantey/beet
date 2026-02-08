@@ -50,7 +50,7 @@ http = [
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
 ureq = ["dep:ureq", "dep:blocking"]
-tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking"]
+tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
 native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",
@@ -80,6 +80,9 @@ tracing.workspace = true
 send_wrapper.workspace = true
 uuid = {workspace = true, features = ["v7"]}
 async-lock.workspace = true
+bytes.workspace = true
+# async
+futures.workspace = true
 
 # serde
 base64 = { workspace = true, optional = true }
@@ -91,10 +94,7 @@ serde_urlencoded = { version = "0.7", optional = true }
 # http
 http = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
-bytes.workspace = true
-url = "2"
-# async
-futures.workspace = true
+url = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }
