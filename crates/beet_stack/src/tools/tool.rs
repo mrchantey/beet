@@ -11,12 +11,7 @@ pub fn tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
 {
-	let meta = ToolMeta {
-		input: TypeMeta::of::<H::In>(),
-		output: TypeMeta::of::<H::Out>(),
-	};
-
-	(meta, handler.into_handler())
+	(ToolMeta::of::<H::In, H::Out>(), handler.into_handler())
 }
 
 /// Observer that listens for new tools and inserts their path and params patterns.
@@ -36,7 +31,6 @@ pub fn insert_tool_path_and_params(
 	commands.entity(ev.entity).insert((path, params));
 	Ok(())
 }
-
 
 /// Metadata for a tool, containing the input and output types.
 /// Every tool must have a [`ToolMeta`], calling a tool with
@@ -121,8 +115,6 @@ impl ToolMeta {
 		}
 	}
 }
-
-
 
 /// An event emitted on the tool when it is called, containing the tool, payload and a
 /// method to call [`on_out`].
@@ -308,7 +300,7 @@ pub impl EntityWorldMut<'_> {
 		async move {
 			let (send, recv) = async_channel::bounded(1);
 			let handler = ToolOutHandler::channel(send);
-			trigger_for_entity(&mut self, input, handler)?;
+			trigger_checked(&mut self, input, handler)?;
 
 			let world = self.into_world_mut();
 
@@ -346,12 +338,14 @@ pub impl EntityCommands<'_> {
 		out_handler: ToolOutHandler<Out>,
 	) {
 		self.queue(|mut entity: EntityWorldMut| -> Result {
-			trigger_for_entity(&mut entity, input, out_handler)
+			trigger_checked(&mut entity, input, out_handler)
 		});
 	}
 }
 
-fn trigger_for_entity<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
+/// Perform a tool call on the given entity,
+/// checking that the input and output types match the entity's [`ToolMeta`].
+fn trigger_checked<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 	entity: &mut EntityWorldMut,
 	input: In,
 	out_handler: ToolOutHandler<Out>,

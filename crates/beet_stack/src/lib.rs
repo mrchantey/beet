@@ -5,6 +5,7 @@
 #![doc = include_str!("../README.md")]
 mod content;
 mod document;
+#[cfg(feature = "interface")]
 mod interface;
 mod stack;
 mod tools;
@@ -14,6 +15,7 @@ pub mod prelude {
 	pub use crate::content;
 	pub use crate::content::*;
 	pub use crate::document::*;
+	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
 	pub use crate::stack::*;
 	pub use crate::tools::*;

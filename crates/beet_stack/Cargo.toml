@@ -13,15 +13,28 @@ categories.workspace = true
 
 
 [features]
+default = ["interface"]
+interface = ["dep:serde","beet_core/exchange"]
 
 [dependencies]
-beet_core = { workspace = true, features = ["exchange"] }
+beet_core = { workspace = true }
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 variadics_please.workspace = true
 
+serde = {workspace = true, optional=true}
+
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
 
+
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+
+
+
+
+[[test]]
+name = "stack"
+path = "tests/stack.rs"
+required-features = ["interface"]
