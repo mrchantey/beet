@@ -1,17 +1,23 @@
 use beet_core::prelude::*;
 
-/// The deserialized form of a [`Request`]
-pub struct InterfaceToolIn<Payload, Params> {
-	pub payload: Payload,
-	/// The parameters of the tool call
-	pub params: Params,
-	/// The dynamic path segments of this route,
-	/// according to its [`PathPattern`]
-	pub path_segments: MultiMap<String, String>,
+
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct Interface {
+	current_card: Entity,
 }
 
+impl Interface {
+	pub fn new(card: Entity) -> Self { Self { current_card: card } }
 
-
+	/// Create a new [`Interface`] pointing to the entity it was inserted on.
+	pub fn new_this() -> impl Bundle {
+		OnSpawn::new(|entity| {
+			let id = entity.id();
+			entity.insert(Interface::new(id));
+		})
+	}
+}
 
 
 #[cfg(test)]
@@ -19,17 +25,39 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	fn my_tool() -> impl Bundle {
-		(PathPartial::new("add"), tool(|req: Request| req.mirror()))
+	fn my_interface() -> impl Bundle {
+		(
+			Interface::new_this(),
+			tool(
+				|req: In<ToolContext<Request>>,
+				 trees: Query<&ToolTree>,
+				 interfaces: Query<&Interface>|
+				 -> Result<ToolTree> {
+					let _interface = interfaces.get(req.tool)?;
+					let tree = trees.get(req.tool)?;
+					
+					
+					Ok(tree.clone())
+				},
+			),
+			children![(
+				PathPartial::new("add"),
+				tool(|(a, b): (u32, u32)| a + b)
+			)],
+		)
 	}
 
 
 	#[test]
 	fn works() {
-		World::new()
-			.spawn(my_tool())
-			.call_blocking::<_, Response>(Request::get("foo"))
+		ToolPlugin::world()
+			.spawn(my_interface())
+			.call_blocking::<_, ToolTree>(Request::get("foo"))
 			.unwrap()
-			.xpect_eq(Response::ok());
+			// 0 is the root, with no tool.
+			.flatten()[1]
+			.annotated_route_path()
+			.to_string()
+			.xpect_eq("/add");
 	}
 }

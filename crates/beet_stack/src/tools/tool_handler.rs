@@ -26,6 +26,8 @@ impl<In> std::ops::Deref for ToolContext<In> {
 impl<In> ToolContext<In> {
 	/// Create a new tool context with the given tool and payload.
 	pub fn new(tool: Entity, payload: In) -> Self { Self { tool, payload } }
+
+	pub fn take(self) -> In { self.payload }
 }
 
 /// Convert from a [`ToolContext`] into a tool handler parameter.

@@ -106,13 +106,13 @@ impl ToolMeta {
 		let received_output = TypeMeta::of::<Out>();
 		if expected_input != received_input {
 			bevybail!(
-				"Input mismatch.\nExpected: {}\nReceived: {}.",
+				"Tool Call Input mismatch.\nExpected: {}\nReceived: {}.",
 				expected_input,
 				received_input,
 			);
 		} else if expected_output != received_output {
 			bevybail!(
-				"Output mismatch.\nExpected: {}\nReceived: {}.",
+				"Tool Call Output mismatch.\nExpected: {}\nReceived: {}.",
 				expected_output,
 				received_output,
 			);
