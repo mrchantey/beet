@@ -14,7 +14,7 @@ categories.workspace = true
 
 [features]
 default = ["interface"]
-interface = ["dep:serde","beet_core/exchange"]
+interface = ["dep:serde","dep:serde_json","dep:postcard","beet_core/exchange"]
 
 [dependencies]
 beet_core = { workspace = true }
@@ -24,6 +24,8 @@ thiserror.workspace = true
 variadics_please.workspace = true
 
 serde = {workspace = true, optional=true}
+serde_json = {workspace = true, optional=true}
+postcard = {workspace = true, optional=true}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

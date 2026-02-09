@@ -345,6 +345,10 @@ pub impl EntityCommands<'_> {
 
 /// Perform a tool call on the given entity,
 /// checking that the input and output types match the entity's [`ToolMeta`].
+///
+/// If the entity has an [`ExchangeToolMarker`], calls with
+/// `Request`/`Response` types are also accepted and routed
+/// through the exchange handler.
 fn trigger_checked<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 	entity: &mut EntityWorldMut,
 	input: In,
@@ -353,7 +357,31 @@ fn trigger_checked<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 	let meta = entity.get::<ToolMeta>().ok_or_else(|| {
 		bevyhow!("No ToolMeta on entity, cannot send tool call.")
 	})?;
-	meta.assert_match::<In, Out>()?;
+
+	let is_exchange_call = TypeMeta::of::<In>() == TypeMeta::of::<Request>()
+		&& TypeMeta::of::<Out>() == TypeMeta::of::<Response>();
+
+	if is_exchange_call {
+		// allow Request/Response calls only if the entity has an exchange handler
+		#[cfg(feature = "interface")]
+		{
+			if !entity.contains::<ExchangeToolMarker>() {
+				bevybail!(
+					"Tool does not support Request/Response calls. \
+					 Use exchange_tool() to enable serialized exchange."
+				);
+			}
+		}
+		#[cfg(not(feature = "interface"))]
+		{
+			bevybail!(
+				"Request/Response exchange calls require the 'interface' feature."
+			);
+		}
+	} else {
+		meta.assert_match::<In, Out>()?;
+	}
+
 	entity.trigger(|entity| ToolIn::new(entity, input, out_handler));
 	Ok(())
 }
