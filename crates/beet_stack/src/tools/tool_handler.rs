@@ -18,6 +18,11 @@ pub struct ToolContext<In = ()> {
 	pub payload: In,
 }
 
+impl<In> std::ops::Deref for ToolContext<In> {
+	type Target = In;
+	fn deref(&self) -> &Self::Target { &self.payload }
+}
+
 impl<In> ToolContext<In> {
 	/// Create a new tool context with the given tool and payload.
 	pub fn new(tool: Entity, payload: In) -> Self { Self { tool, payload } }
@@ -50,6 +55,11 @@ pub struct AsyncToolContext<In> {
 	pub tool: AsyncEntity,
 	/// The input payload for this tool call.
 	pub payload: In,
+}
+
+impl<In> std::ops::Deref for AsyncToolContext<In> {
+	type Target = In;
+	fn deref(&self) -> &Self::Target { &self.payload }
 }
 
 impl<In> AsyncToolContext<In> {

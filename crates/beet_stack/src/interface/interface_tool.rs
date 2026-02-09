@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The deserialized form of a [`Request`]
@@ -10,5 +9,3 @@ pub struct InterfaceToolIn<Payload, Params> {
 	/// according to its [`PathPattern`]
 	pub path_segments: MultiMap<String, String>,
 }
-
-

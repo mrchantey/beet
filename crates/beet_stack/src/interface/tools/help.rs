@@ -34,7 +34,7 @@ use beet_core::prelude::*;
 ///
 /// let output = world
 ///     .entity_mut(help_entity)
-///     .send_blocking::<(), String>(())
+///     .call_blocking::<(), String>(())
 ///     .unwrap();
 ///
 /// assert!(output.contains("increment"));

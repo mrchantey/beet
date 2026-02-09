@@ -25,11 +25,11 @@ use bevy::reflect::Typed;
 /// let entity = world.spawn(increment(field)).id();
 ///
 /// // First call initializes to 1
-/// let result = world.entity_mut(entity).send_blocking::<(), i64>(()).unwrap();
+/// let result = world.entity_mut(entity).call_blocking::<(), i64>(()).unwrap();
 /// assert_eq!(result, 1);
 ///
 /// // Second call increments to 2
-/// let result = world.entity_mut(entity).send_blocking::<(), i64>(()).unwrap();
+/// let result = world.entity_mut(entity).call_blocking::<(), i64>(()).unwrap();
 /// assert_eq!(result, 2);
 /// ```
 pub fn increment(field: FieldRef) -> impl Bundle {

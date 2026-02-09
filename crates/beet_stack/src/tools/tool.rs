@@ -159,7 +159,7 @@ impl<In, Out> ToolIn<In, Out> {
 	pub fn take_payload(&mut self) -> Result<In> {
 		self.payload
 			.take()
-			.ok_or_else(|| bevyhow!("ToolCall payload already taken. Are there multiple handlers on the same entity?"))
+			.ok_or_else(|| bevyhow!("Tool call payload already taken. Are there multiple handlers on the same entity?"))
 	}
 
 	/// Call the on_out callback with the given output. This must only be done once.
@@ -170,7 +170,7 @@ impl<In, Out> ToolIn<In, Out> {
 	pub fn take_out_handler(&mut self) -> Result<ToolOutHandler<Out>> {
 		self
 			.out_handler.take()
-			.ok_or_else(|| bevyhow!("ToolCall on_out already called. This may be a bug in the IntoToolHandler implementation."))
+			.ok_or_else(|| bevyhow!("Tool call on_out already called. This may be a bug in the IntoToolHandler implementation."))
 	}
 }
 
@@ -322,7 +322,7 @@ pub impl EntityWorldMut<'_> {
 						.await
 				}
 				Err(TryRecvError::Closed) => {
-					bevybail!("ToolCall response channel closed unexpectedly.")
+					bevybail!("Tool call response channel closed unexpectedly.")
 				}
 			};
 			out.xok()
