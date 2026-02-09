@@ -3,8 +3,6 @@ use beet_core::exports::async_channel;
 use beet_core::exports::async_channel::Sender;
 use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
-use bevy::reflect::TypeInfo;
-use bevy::reflect::Typed;
 
 
 /// Create a tool from a handler implementing [`IntoToolHandler`],
@@ -14,8 +12,8 @@ where
 	H: IntoToolHandler<M>,
 {
 	let meta = ToolMeta {
-		input: H::In::type_info(),
-		output: H::Out::type_info(),
+		input: TypeMeta::of::<H::In>(),
+		output: TypeMeta::of::<H::Out>(),
 	};
 
 	(meta, handler.into_handler())
@@ -45,45 +43,76 @@ pub fn insert_tool_path_and_params(
 /// types that dont match will result in an error.
 #[derive(Clone, Debug, Component)]
 pub struct ToolMeta {
-	/// The reflected type information for the tool input.
-	input: &'static TypeInfo,
-	/// The reflected type information for the tool output.
-	output: &'static TypeInfo,
+	/// Type metadata for the tool input.
+	input: TypeMeta,
+	/// Type metadata for the tool output.
+	output: TypeMeta,
+}
+
+
+/// Lightweight type metadata using [`TypeId`](std::any::TypeId) for comparison
+/// and [`type_name`](std::any::type_name) for display.
+#[derive(Debug, Copy, Clone)]
+pub struct TypeMeta {
+	type_name: &'static str,
+	type_id: std::any::TypeId,
+}
+
+impl TypeMeta {
+	/// Create a [`TypeMeta`] for the given type.
+	pub fn of<T: 'static>() -> Self {
+		Self {
+			type_name: std::any::type_name::<T>(),
+			type_id: std::any::TypeId::of::<T>(),
+		}
+	}
+	/// The full type name, ie `core::option::Option<i32>`.
+	pub fn type_name(&self) -> &'static str { self.type_name }
+}
+
+impl std::fmt::Display for TypeMeta {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.type_name)
+	}
+}
+
+impl PartialEq for TypeMeta {
+	fn eq(&self, other: &Self) -> bool { self.type_id == other.type_id }
 }
 
 impl ToolMeta {
 	/// Create a [`ToolMeta`] from input and output type parameters.
-	pub fn of<In: Typed, Out: Typed>() -> Self {
+	pub fn of<In: 'static, Out: 'static>() -> Self {
 		Self {
-			input: In::type_info(),
-			output: Out::type_info(),
+			input: TypeMeta::of::<In>(),
+			output: TypeMeta::of::<Out>(),
 		}
 	}
 
-	/// Get the input type information for this tool.
-	pub fn input(&self) -> &'static TypeInfo { self.input }
-	/// Get the output type information for this tool.
-	pub fn output(&self) -> &'static TypeInfo { self.output }
+	/// Get the input type metadata for this tool.
+	pub fn input(&self) -> TypeMeta { self.input }
+	/// Get the output type metadata for this tool.
+	pub fn output(&self) -> TypeMeta { self.output }
 
 	/// Assert that the provided types match this tool's input/output types.
 	///
 	/// ## Errors
 	///
 	/// Returns an error if types don't match.
-	pub fn assert_match<In: Typed, Out: Typed>(&self) -> Result {
-		let expected_input = self.input().type_path();
-		let expected_output = self.output().type_path();
-		let received_input = In::type_info().type_path();
-		let received_output = Out::type_info().type_path();
+	pub fn assert_match<In: 'static, Out: 'static>(&self) -> Result {
+		let expected_input = self.input();
+		let expected_output = self.output();
+		let received_input = TypeMeta::of::<In>();
+		let received_output = TypeMeta::of::<Out>();
 		if expected_input != received_input {
 			bevybail!(
-				"Tool input type mismatch.\nExpected: {}\nReceived: {}.",
+				"Input mismatch.\nExpected: {}\nReceived: {}.",
 				expected_input,
 				received_input,
 			);
 		} else if expected_output != received_output {
 			bevybail!(
-				"Tool output type mismatch.\nExpected: {}\nReceived: {}.",
+				"Output mismatch.\nExpected: {}\nReceived: {}.",
 				expected_output,
 				received_output,
 			);
@@ -260,10 +289,7 @@ pub impl EntityWorldMut<'_> {
 	/// ## Errors
 	///
 	/// Returns an error if the tool call fails or types don't match.
-	fn call_blocking<
-		In: 'static + Send + Sync + Typed,
-		Out: 'static + Send + Sync + Typed,
-	>(
+	fn call_blocking<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: In,
 	) -> Result<Out> {
@@ -275,10 +301,7 @@ pub impl EntityWorldMut<'_> {
 	/// ## Errors
 	///
 	/// Returns an error if the tool call fails or types don't match.
-	fn call<
-		In: 'static + Send + Sync + Typed,
-		Out: 'static + Send + Sync + Typed,
-	>(
+	fn call<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		mut self,
 		input: In,
 	) -> impl Future<Output = Result<Out>> {
@@ -317,10 +340,7 @@ pub impl EntityCommands<'_> {
 	///
 	/// Errors if there is a type mismatch between this entity's [`ToolMeta`]
 	/// and this tool call.
-	fn call<
-		In: 'static + Send + Sync + Typed,
-		Out: 'static + Send + Sync + Typed,
-	>(
+	fn call<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&mut self,
 		input: In,
 		out_handler: ToolOutHandler<Out>,
@@ -331,13 +351,13 @@ pub impl EntityCommands<'_> {
 	}
 }
 
-fn trigger_for_entity<In: Typed, Out: Typed>(
+fn trigger_for_entity<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 	entity: &mut EntityWorldMut,
 	input: In,
 	out_handler: ToolOutHandler<Out>,
 ) -> Result {
 	let meta = entity.get::<ToolMeta>().ok_or_else(|| {
-		bevyhow!("Entity does not have ToolMeta, cannot send tool call.")
+		bevyhow!("No ToolMeta on entity, cannot send tool call.")
 	})?;
 	meta.assert_match::<In, Out>()?;
 	entity.trigger(|entity| ToolIn::new(entity, input, out_handler));

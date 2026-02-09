@@ -239,8 +239,8 @@ impl std::fmt::Display for ToolTree {
 		) -> std::fmt::Result {
 			if let Some(tool) = &node.tool {
 				let path = node.pattern.annotated_route_path();
-				let input = tool.meta.input().type_path();
-				let output = tool.meta.output().type_path();
+				let input = tool.meta.input().type_name();
+				let output = tool.meta.output().type_name();
 				write!(f, "  {}", path)?;
 				if let Some(method) = &tool.method {
 					write!(f, " [{}]", method)?;

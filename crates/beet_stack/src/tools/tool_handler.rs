@@ -6,7 +6,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
-use bevy::reflect::Typed;
 
 
 
@@ -35,8 +34,8 @@ pub struct PayloadFromToolContextMarker;
 
 impl<In> FromToolContext<In, PayloadFromToolContextMarker> for In
 where
-	// as ToolContext is not Typed we avoid multiple impls
-	In: Typed,
+	// as ToolContext is not Reflect we avoid multiple impls
+	In: bevy::reflect::Typed,
 {
 	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx.payload }
 }
@@ -99,11 +98,11 @@ impl<Out> IntoToolOutput<Out, ResultIntoToolOutput> for Result<Out> {
 	fn into_tool_output(self) -> Result<Out> { self }
 }
 
-/// Marker for converting any [`Typed`] value directly into tool output.
+/// Marker for converting any [`Reflect`] value directly into tool output.
 pub struct TypeIntoToolOutput;
 impl<Out> IntoToolOutput<Out, TypeIntoToolOutput> for Out
 where
-	Out: Typed,
+	Out: bevy::reflect::Typed,
 {
 	fn into_tool_output(self) -> Result<Out> { self.xok() }
 }
@@ -114,9 +113,9 @@ where
 ///
 pub trait IntoToolHandler<M>: 'static + Send + Sync + Clone {
 	/// The type of the input payload for the tool call.
-	type In: Typed + 'static + Send + Sync;
+	type In: 'static + Send + Sync;
 	/// The type of the output payload for the tool call.
-	type Out: Typed;
+	type Out: 'static + Send + Sync;
 	/// Create the tool handler, this must be an Observer.
 	fn into_handler(self) -> impl Bundle;
 }
@@ -137,9 +136,9 @@ impl<Func, In, Arg, ArgM, Out, IntoOut, IntoOutM>
 where
 	Func: 'static + Send + Sync + Clone + Fn(Arg) -> IntoOut,
 	Arg: FromToolContext<In, ArgM>,
-	In: Typed + 'static + Send + Sync,
+	In: 'static + Send + Sync,
 	IntoOut: IntoToolOutput<Out, IntoOutM>,
-	Out: Typed,
+	Out: 'static + Send + Sync,
 {
 	type In = In;
 	type Out = Out;
@@ -205,9 +204,9 @@ where
 	Func: IntoSystem<Arg, IntoOut, (IsFunctionSystem, FnMarker)>,
 	Arg: 'static + SystemInput,
 	for<'a> Arg::Inner<'a>: FromToolContext<In, ArgM>,
-	In: Typed + 'static + Send + Sync,
+	In: 'static + Send + Sync,
 	IntoOut: 'static + Send + Sync + IntoToolOutput<Out, IntoOutM>,
-	Out: Typed,
+	Out: 'static + Send + Sync,
 {
 	type In = In;
 	type Out = Out;
@@ -256,10 +255,10 @@ impl<Func, In, Fut, Arg, Out, IntoOut, IntoOutM, ArgM>
 where
 	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Fut,
 	Arg: 'static + Send + Sync + FromAsyncToolContext<In, ArgM>,
-	In: Typed + 'static + Send + Sync,
+	In: 'static + Send + Sync,
 	Fut: 'static + Send + Future<Output = IntoOut>,
 	IntoOut: 'static + IntoToolOutput<Out, IntoOutM>,
-	Out: Typed,
+	Out: 'static + Send + Sync,
 {
 	type In = In;
 	type Out = Out;

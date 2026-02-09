@@ -94,8 +94,8 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 	output.push('\n');
 
 	// input/output types, skip trivial `()` types
-	let input = node.meta.input().type_path();
-	let output_type = node.meta.output().type_path();
+	let input = node.meta.input().type_name();
+	let output_type = node.meta.output().type_name();
 	if input != "()" {
 		output.push_str(&format!("    input:  {}\n", input));
 	}
