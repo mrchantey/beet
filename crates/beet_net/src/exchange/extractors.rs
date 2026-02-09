@@ -323,10 +323,8 @@ mod test {
 
 	#[test]
 	fn parts_has_body() {
-		let parts = PartsBuilder::new()
-			.path_str("/test")
-			.header("content-length", "5")
-			.build_request_parts(HttpMethod::Post);
+		let mut parts = RequestParts::post("/test");
+		parts.insert_header("content-length", "5");
 
 		parts.has_body().xpect_true();
 

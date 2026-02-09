@@ -107,106 +107,7 @@ const DEFAULT_HTTP_VERSION: &str = "1.1";
 const DEFAULT_CLI_VERSION: &str = "0.1.0";
 
 
-/// Builder for constructing [`RequestParts`] or [`ResponseParts`].
-#[derive(Debug, Clone, Default)]
-pub struct PartsBuilder {
-	scheme: Scheme,
-	authority: String,
-	path: Vec<String>,
-	params: MultiMap<String, String>,
-	headers: MultiMap<String, String>,
-	version: Option<String>,
-}
 
-impl PartsBuilder {
-	/// Creates a new builder with default values
-	pub fn new() -> Self { Self::default() }
-
-	/// Sets the scheme
-	pub fn scheme(mut self, scheme: Scheme) -> Self {
-		self.scheme = scheme;
-		self
-	}
-
-	/// Sets the authority
-	pub fn authority(mut self, authority: impl Into<String>) -> Self {
-		self.authority = authority.into();
-		self
-	}
-
-	/// Sets the path from segments
-	pub fn path(mut self, path: Vec<String>) -> Self {
-		self.path = path;
-		self
-	}
-
-	/// Sets the path from a string, splitting by `/`
-	pub fn path_str(mut self, path: &str) -> Self {
-		self.path = split_path(path);
-		self
-	}
-
-	/// Adds a parameter
-	pub fn param(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.params.insert(key.into(), value.into());
-		self
-	}
-
-	/// Adds a flag parameter (parameter with no value)
-	pub fn flag(mut self, key: impl Into<String>) -> Self {
-		let key = key.into();
-		if !self.params.contains_key(&key) {
-			self.params.insert(key, String::new());
-		}
-		self
-	}
-
-	/// Adds a header
-	pub fn header(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.headers.insert(key.into(), value.into());
-		self
-	}
-
-	/// Sets the version
-	pub fn version(mut self, version: impl Into<String>) -> Self {
-		self.version = Some(version.into());
-		self
-	}
-
-	/// Builds [`RequestParts`] with the given method
-	pub fn build_request_parts(self, method: HttpMethod) -> RequestParts {
-		RequestParts {
-			method,
-			scheme: self.scheme,
-			authority: self.authority,
-			path: self.path,
-			params: self.params,
-			headers: self.headers,
-			version: self
-				.version
-				.unwrap_or_else(|| DEFAULT_HTTP_VERSION.to_string()),
-		}
-	}
-
-	/// Builds [`ResponseParts`] with the given status
-	pub fn build_response_parts(self, status: StatusCode) -> ResponseParts {
-		ResponseParts {
-			status,
-			headers: self.headers,
-			version: self
-				.version
-				.unwrap_or_else(|| DEFAULT_HTTP_VERSION.to_string()),
-		}
-	}
-}
 
 
 /// Request-specific parts including HTTP method, scheme, path, params, headers, and version.
@@ -898,14 +799,13 @@ mod test {
 	}
 
 	#[test]
-	fn parts_builder_request() {
-		let parts = PartsBuilder::new()
-			.scheme(Scheme::Http)
-			.authority("example.com")
-			.path_str("/api/users/123")
-			.param("limit", "10")
-			.header("content-type", "application/json")
-			.build_request_parts(HttpMethod::Get);
+	#[cfg(feature = "http")]
+	fn request_parts_with_headers_and_params() {
+		let mut parts = RequestParts::new(
+			HttpMethod::Get,
+			"http://example.com/api/users/123?limit=10",
+		);
+		parts.insert_header("content-type", "application/json");
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -922,11 +822,8 @@ mod test {
 	}
 
 	#[test]
-	fn parts_builder_request_parts() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("page", "1")
-			.build_request_parts(HttpMethod::Post);
+	fn request_parts_with_params() {
+		let parts = RequestParts::new(HttpMethod::Post, "/api/users?page=1");
 
 		(*parts.method()).xpect_eq(HttpMethod::Post);
 		parts
@@ -937,10 +834,9 @@ mod test {
 
 	#[test]
 	#[cfg(feature = "http")]
-	fn parts_builder_response_parts() {
-		let parts = PartsBuilder::new()
-			.header("content-type", "text/html")
-			.build_response_parts(StatusCode::Ok);
+	fn response_parts_with_headers() {
+		let mut parts = ResponseParts::new(StatusCode::Ok);
+		parts.insert_header("content-type", "text/html");
 
 		parts.status().xpect_eq(StatusCode::Ok);
 		parts
@@ -1051,9 +947,7 @@ mod test {
 
 	#[test]
 	fn path_string() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users/123")
-			.build_request_parts(HttpMethod::Get);
+		let parts = RequestParts::get("/api/users/123");
 		parts.path_string().xpect_eq("/api/users/123");
 
 		let empty_parts = RequestParts::default();
@@ -1062,10 +956,7 @@ mod test {
 
 	#[test]
 	fn query_string() {
-		let parts = PartsBuilder::new()
-			.param("limit", "10")
-			.param("offset", "20")
-			.build_request_parts(HttpMethod::Get);
+		let parts = RequestParts::get("/?limit=10&offset=20");
 		let query = parts.query_string();
 		// Order may vary, so check both params are present
 		(&query).xpect_contains("limit=10");
@@ -1074,10 +965,7 @@ mod test {
 
 	#[test]
 	fn uri_construction() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("page", "1")
-			.build_request_parts(HttpMethod::Get);
+		let parts = RequestParts::get("/api/users?page=1");
 		let uri = parts.uri();
 		(&uri).xpect_starts_with("/api/users?");
 		(&uri).xpect_contains("page=1");
@@ -1085,9 +973,7 @@ mod test {
 
 	#[test]
 	fn path_segments() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users/123")
-			.build_request_parts(HttpMethod::Get);
+		let parts = RequestParts::get("/api/users/123");
 
 		parts.first_segment().unwrap().xpect_eq("api");
 		parts.last_segment().unwrap().xpect_eq("123");
@@ -1116,25 +1002,21 @@ mod test {
 	#[test]
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("limit", "10")
-			.header("content-type", "application/json")
-			.build_request_parts(HttpMethod::Post);
+		let mut parts = RequestParts::post("/api/users?limit=10");
+		parts.insert_header("content-type", "application/json");
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
 		http_parts.method.xpect_eq(http::Method::POST);
 		http_parts.uri.path().xpect_eq("/api/users");
-		http_parts.uri.query().unwrap().xpect_eq("limit=10");
 	}
 
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
-		let parts = PartsBuilder::new()
-			.header("content-type", "application/json")
-			.build_response_parts(StatusCode::Http(http::StatusCode::CREATED));
+		let mut parts =
+			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
+		parts.insert_header("content-type", "application/json");
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
