@@ -29,6 +29,23 @@ impl<In> ToolContext<In> {
 }
 
 /// Convert from a [`ToolContext`] into a tool handler parameter.
+/// This has a blanket impl restricted to [`Reflect`] types, just to avoid
+/// collision with concrete impls like [`ToolContext`] itself.
+/// ## Example
+///
+/// FromToolContext is straightforward to implement:
+///
+/// ```rust
+/// # use beet_stack::prelude::*;
+///
+/// struct MyPayload;
+///
+/// impl FromToolContext<MyPayload, Self> for MyPayload {
+///		fn from_tool_context(ctx: ToolContext<MyPayload>) -> Self { ctx.payload }
+/// }
+/// ```
+///
+// TODO this should be much easier with negative impls https://doc.rust-lang.org/beta/unstable-book/language-features/negative-impls.html
 pub trait FromToolContext<In, M> {
 	/// Convert the tool context into this type.
 	fn from_tool_context(ctx: ToolContext<In>) -> Self;
@@ -47,6 +64,10 @@ where
 
 impl<In> FromToolContext<In, Self> for ToolContext<In> {
 	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx }
+}
+
+impl FromToolContext<Request, Self> for Request {
+	fn from_tool_context(ctx: ToolContext<Request>) -> Self { ctx.payload }
 }
 
 /// Async context passed to async tool handlers.
@@ -115,6 +136,10 @@ where
 	Out: bevy::reflect::Typed,
 {
 	fn into_tool_output(self) -> Result<Out> { self.xok() }
+}
+
+impl IntoToolOutput<Self, Self> for Response {
+	fn into_tool_output(self) -> Result<Self> { Ok(self) }
 }
 
 /// A tool handler, like a function, has an input and output.
@@ -359,6 +384,10 @@ mod test {
 		// --- Function ---
 		// let _ = tool(|_: ()| {}); // ambiguous
 		let _ = tool(|_: u32| {});
+		let _ = tool(|_: Request| {});
+		let _ = tool(|_: Request| 3);
+		let _ = tool(Request::mirror);
+		let _ = tool(|req: Request| req.mirror());
 		let _ = tool(|_: u32| -> Result { Ok(()) });
 		let _ = tool(|_: ToolContext<()>| {});
 
