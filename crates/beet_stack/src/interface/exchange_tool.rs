@@ -47,9 +47,7 @@ use beet_core::prelude::*;
 ///     .call_blocking::<Request, Response>(request)
 ///     .unwrap();
 ///
-/// 
-/// 
-/// let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+/// let result: i32 = response.deserialize_blocking().unwrap();
 /// assert_eq!(result, 30);
 /// ```
 pub fn exchange_tool<H, M>(handler: H) -> impl Bundle
@@ -152,7 +150,6 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::async_ext;
 	use beet_core::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
@@ -200,7 +197,7 @@ mod test {
 			.get_header("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(30);
 	}
 
@@ -210,13 +207,13 @@ mod test {
 	fn json_default_content_type() {
 		let request = Request::post("/add").with_body(r#"{"a":1,"b":2}"#);
 
-		let response = World::new()
+		World::new()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
-			.unwrap();
-
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
-		result.xpect_eq(3);
+			.unwrap()
+			.deserialize_blocking::<u32>()
+			.unwrap()
+			.xpect_eq(3);
 	}
 
 	// -- postcard binary round-trip --
@@ -236,7 +233,7 @@ mod test {
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(12);
 	}
 
@@ -249,7 +246,7 @@ mod test {
 			.call_blocking::<Request, Response>(Request::get("/"))
 			.unwrap();
 
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(42);
 	}
 
@@ -312,13 +309,13 @@ mod test {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 5 }).unwrap();
 
-		let response = World::new()
+		World::new()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
-			.unwrap();
-
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
-		result.xpect_eq(15);
+			.unwrap()
+			.deserialize_blocking::<i32>()
+			.unwrap()
+			.xpect_eq(15);
 	}
 
 	#[test]
@@ -326,13 +323,13 @@ mod test {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 3, b: 9 }).unwrap();
 
-		let response = World::new()
+		World::new()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
-			.unwrap();
-
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
-		result.xpect_eq(12);
+			.unwrap()
+			.deserialize_blocking::<i32>()
+			.unwrap()
+			.xpect_eq(12);
 	}
 
 	// -- with_json_str convenience --
@@ -341,12 +338,12 @@ mod test {
 	fn json_str_request() {
 		let request = Request::with_json_str("/add", r#"{"a":100,"b":200}"#);
 
-		let response = World::new()
+		World::new()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
-			.unwrap();
-
-		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
-		result.xpect_eq(300);
+			.unwrap()
+			.deserialize_blocking::<i32>()
+			.unwrap()
+			.xpect_eq(300);
 	}
 }

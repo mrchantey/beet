@@ -218,6 +218,22 @@ impl Response {
 		self.body.into_format(format).await
 	}
 
+	/// Deserializes the response body using the format indicated by
+	/// the `content-type` header, blocking the current thread.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let response = Response::with_json(&42u32).unwrap();
+	/// let value: u32 = response.deserialize_blocking().unwrap();
+	/// assert_eq!(value, 42);
+	/// ```
+	#[cfg(feature = "serde")]
+	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		async_ext::block_on(self.deserialize())
+	}
+
 	/// Creates a response with status, body, and content type
 	pub fn from_status_body(
 		status: StatusCode,

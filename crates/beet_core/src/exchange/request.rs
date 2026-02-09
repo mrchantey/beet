@@ -262,6 +262,42 @@ impl Request {
 		self
 	}
 
+	/// Deserializes the request body using the format indicated by
+	/// the `content-type` header, defaulting to JSON.
+	///
+	/// ```no_run
+	/// # use beet_core::prelude::*;
+	/// # async {
+	/// let request = Request::with_json("/test", &42u32).unwrap();
+	/// let value: u32 = request.deserialize().await.unwrap();
+	/// assert_eq!(value, 42);
+	/// # };
+	/// ```
+	#[cfg(feature = "serde")]
+	pub async fn deserialize<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		let format =
+			ExchangeFormat::from_content_type(self.get_header("content-type"))?;
+		self.body.into_format(format).await
+	}
+
+	/// Deserializes the request body using the format indicated by
+	/// the `content-type` header, blocking the current thread.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json("/test", &42u32).unwrap();
+	/// let value: u32 = request.deserialize_blocking().unwrap();
+	/// assert_eq!(value, 42);
+	/// ```
+	#[cfg(feature = "serde")]
+	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		async_ext::block_on(self.deserialize())
+	}
+
 	/// Adds a header using http header types
 	#[cfg(feature = "http")]
 	pub fn with_header<K: IntoHeaderName>(
