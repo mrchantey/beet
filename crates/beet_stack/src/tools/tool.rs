@@ -255,27 +255,27 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 /// Extension trait for calling tools on entities.
 #[extend::ext(name=EntityWorldMutToolExt)]
 pub impl EntityWorldMut<'_> {
-	/// Send a tool call and block until the result is ready.
+	/// Make a tool call and block until the result is ready.
 	///
 	/// ## Errors
 	///
 	/// Returns an error if the tool call fails or types don't match.
-	fn send_blocking<
+	fn call_blocking<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
 	>(
 		self,
 		input: In,
 	) -> Result<Out> {
-		async_ext::block_on(self.send(input))
+		async_ext::block_on(self.call(input))
 	}
 
-	/// Send a tool call asynchronously.
+	/// Make a tool call asynchronously.
 	///
 	/// ## Errors
 	///
 	/// Returns an error if the tool call fails or types don't match.
-	fn send<
+	fn call<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
 	>(
@@ -311,14 +311,13 @@ pub impl EntityWorldMut<'_> {
 /// Extension trait for calling tools on entities.
 #[extend::ext(name=EntityCommandsToolExt)]
 pub impl EntityCommands<'_> {
-	/// Triggers an entity target event for this entity, using
-	/// the provided [`ToolOutHandler`] for the output.
+	/// Make a tool call with the provided input value and output handler.
 	///
 	/// ## Errors
 	///
 	/// Errors if there is a type mismatch between this entity's [`ToolMeta`]
 	/// and this tool call.
-	fn send<
+	fn call<
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
 	>(
@@ -359,7 +358,7 @@ mod test {
 	fn works() {
 		World::new()
 			.spawn(add_tool())
-			.send_blocking::<(i32, i32), i32>((2, 2))
+			.call_blocking::<(i32, i32), i32>((2, 2))
 			.unwrap()
 			.xpect_eq(4);
 	}
@@ -368,7 +367,7 @@ mod test {
 	fn no_tool() {
 		World::new()
 			.spawn_empty()
-			.send_blocking::<(), ()>(())
+			.call_blocking::<(), ()>(())
 			.unwrap();
 	}
 	#[test]
@@ -376,7 +375,7 @@ mod test {
 	fn input_mismatch() {
 		World::new()
 			.spawn(add_tool())
-			.send_blocking::<bool, i32>(true)
+			.call_blocking::<bool, i32>(true)
 			.unwrap();
 	}
 	#[test]
@@ -384,7 +383,7 @@ mod test {
 	fn output_mismatch() {
 		World::new()
 			.spawn(add_tool())
-			.send_blocking::<(i32, i32), bool>((2, 2))
+			.call_blocking::<(i32, i32), bool>((2, 2))
 			.unwrap();
 	}
 

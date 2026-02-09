@@ -124,7 +124,7 @@ mod test {
 	fn plain_text() {
 		World::new()
 			.spawn((render_markdown(), content!["hello world"]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello world");
 	}
@@ -133,7 +133,7 @@ mod test {
 	fn multiple_segments() {
 		World::new()
 			.spawn((render_markdown(), content!["hello", " ", "world"]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello world");
 	}
@@ -146,7 +146,7 @@ mod test {
 				(Important, "bold"),
 				" text"
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello **bold** text");
 	}
@@ -159,7 +159,7 @@ mod test {
 				(Emphasize, "italic"),
 				" text"
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello *italic* text");
 	}
@@ -172,7 +172,7 @@ mod test {
 				(Code, "println!"),
 				" macro"
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("use `println!` macro");
 	}
@@ -181,7 +181,7 @@ mod test {
 	fn quoted_text() {
 		World::new()
 			.spawn((render_markdown(), content!["he said ", (Quote, "hello")]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("he said \"hello\"");
 	}
@@ -193,7 +193,7 @@ mod test {
 				TextContent::new("click here"),
 				Link::new("https://example.com")
 			)]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[click here](https://example.com)");
 	}
@@ -205,7 +205,7 @@ mod test {
 				TextContent::new("example"),
 				Link::new("https://example.com").with_title("Example Site")
 			)]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[example](https://example.com \"Example Site\")");
 	}
@@ -219,7 +219,7 @@ mod test {
 				Emphasize,
 				"bold italic"
 			)]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("***bold italic***");
 	}
@@ -234,7 +234,7 @@ mod test {
 				(Emphasize, "best"),
 				" framework!"
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("Welcome to **beet**, the *best* framework!");
 	}
@@ -243,7 +243,7 @@ mod test {
 	fn extension_trait() {
 		World::new()
 			.spawn((render_markdown(), content!["test"]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("test");
 	}
@@ -256,7 +256,7 @@ mod test {
 				TextContent::new("important link"),
 				Link::new("https://example.com")
 			)]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[**important link**](https://example.com)");
 	}
@@ -272,7 +272,7 @@ mod test {
 				TextContent::new("text"),
 				Link::new("https://example.com")
 			)]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[\"***`text`***\"](https://example.com)");
 	}
@@ -281,7 +281,7 @@ mod test {
 	fn title_renders_as_heading() {
 		World::new()
 			.spawn((render_markdown(), Title, TextContent::new("Hello World")))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("# Hello World\n\n");
 	}
@@ -295,7 +295,7 @@ mod test {
 				TextContent::new("Outer"),
 				children![(Title, TextContent::new("Inner"))],
 			))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("# Outer\n\n## Inner\n\n");
 	}
@@ -308,7 +308,7 @@ mod test {
 				Paragraph,
 				TextContent::new("A paragraph of text."),
 			))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("A paragraph of text.\n\n");
 	}
@@ -320,7 +320,7 @@ mod test {
 				(Title, TextContent::new("Welcome")),
 				(Paragraph, TextContent::new("This is the intro."))
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("# Welcome\n\nThis is the intro.\n\n");
 	}
@@ -336,7 +336,7 @@ mod test {
 					TextContent::new("Inside nested card")
 				)])
 			]))
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("Inside card\n\n");
 	}

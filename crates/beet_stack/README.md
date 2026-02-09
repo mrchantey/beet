@@ -18,14 +18,15 @@ Static or dynamic information to be presented to the user, like text or images.
 
 ### Tools
 
-Tools are affordances surfaced in an interface, every tool has an input and output type, and a name based on its location in the tree.
+Tools are affordances surfaced in an interface, every tool has an input and output type.
 
-### Interfaces
+### Interfaces (wip)
 
 Interfaces are ways of representing a card, presenting its content and tools for interaction.
 
 - `stdio`: Event-driven command-line interface
 - `ratatui`: Terminal user interfaces
+- `http`: A http server interface
 - `dom`: Web-based interfaces
 - `wgpu`: Bevy's native ui rendering
 - `clanker`: LLM tool calls and context trees

@@ -1,3 +1,7 @@
+//! Definitions for tool handlers.
+//!
+//! These may be functions, async functions or systems.
+//! Observer types are not used as they cannot easily return a value.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
@@ -303,7 +307,7 @@ mod test {
 	fn function() {
 		World::new()
 			.spawn(add_tool())
-			.send_blocking::<(i32, i32), i32>((2, 2))
+			.call_blocking::<(i32, i32), i32>((2, 2))
 			.unwrap()
 			.xpect_eq(4);
 	}
@@ -315,7 +319,7 @@ mod test {
 			.id();
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), Entity>(())
+			.call_blocking::<(), Entity>(())
 			.unwrap()
 			.xpect_eq(entity);
 	}
@@ -323,7 +327,7 @@ mod test {
 	fn async_function() {
 		AsyncPlugin::world()
 			.spawn(add_tool_async())
-			.send_blocking::<(i32, i32), i32>((2, 2))
+			.call_blocking::<(i32, i32), i32>((2, 2))
 			.unwrap()
 			.xpect_eq(4);
 	}

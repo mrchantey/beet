@@ -73,7 +73,7 @@ fn help_lists_all_tools() {
 
 	let output = world
 		.entity_mut(help_entity)
-		.send_blocking::<(), String>(())
+		.call_blocking::<(), String>(())
 		.unwrap();
 
 	output.contains("Available tools").xpect_true();
@@ -95,13 +95,13 @@ fn dispatch_increment_via_cli_path() {
 
 	world
 		.entity_mut(tool_entity)
-		.send_blocking::<(), i64>(())
+		.call_blocking::<(), i64>(())
 		.unwrap()
 		.xpect_eq(1);
 
 	world
 		.entity_mut(tool_entity)
-		.send_blocking::<(), i64>(())
+		.call_blocking::<(), i64>(())
 		.unwrap()
 		.xpect_eq(2);
 }
@@ -118,13 +118,13 @@ fn dispatch_add_via_cli_path() {
 
 	world
 		.entity_mut(tool_entity)
-		.send_blocking::<i64, i64>(5)
+		.call_blocking::<i64, i64>(5)
 		.unwrap()
 		.xpect_eq(5);
 
 	world
 		.entity_mut(tool_entity)
-		.send_blocking::<i64, i64>(3)
+		.call_blocking::<i64, i64>(3)
 		.unwrap()
 		.xpect_eq(8);
 }
@@ -139,7 +139,7 @@ fn dispatch_help_via_cli_path() {
 	let node = tree.find(&cli.path).unwrap();
 	let output = world
 		.entity_mut(node.entity)
-		.send_blocking::<(), String>(())
+		.call_blocking::<(), String>(())
 		.unwrap();
 
 	output.contains("Available tools").xpect_true();

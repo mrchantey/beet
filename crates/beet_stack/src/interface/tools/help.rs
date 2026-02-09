@@ -137,7 +137,7 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap();
 
 		output.contains("Available tools").xpect_true();
@@ -169,7 +169,7 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap();
 
 		output.contains("counter/increment").xpect_true();
@@ -192,7 +192,7 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap();
 
 		// add takes i64 input and returns i64
@@ -214,7 +214,7 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap();
 
 		output.contains("(none)").xpect_true();

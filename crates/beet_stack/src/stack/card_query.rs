@@ -8,8 +8,8 @@
 //!
 //! Given an entity, CardQuery:
 //! 1. Traverses up to find the containing [`Card`], or root if no card exists
-//! 2. Iterates descendants within that card, stopping at and excluding 
-//! [`Stack`] or [`Card`] boundaries (unless it's the card root itself)
+//! 2. Iterates descendants within that card, stopping at and excluding
+//! [`Card`] boundaries (unless it's the card root itself)
 //!
 //! # Example
 //!
@@ -38,7 +38,6 @@ pub struct CardQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	cards: Query<'w, 's, (), With<Card>>,
-	stacks: Query<'w, 's, (), With<Stack>>,
 }
 
 impl<'w, 's> CardQuery<'w, 's> {
@@ -53,9 +52,9 @@ impl<'w, 's> CardQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity is a boundary (Card or Stack).
+	/// Returns true if the entity is a Card boundary.
 	fn is_boundary(&self, entity: Entity) -> bool {
-		self.cards.contains(entity) || self.stacks.contains(entity)
+		self.cards.contains(entity)
 	}
 
 	/// Creates a depth-first iterator over entities within the card.
@@ -308,7 +307,7 @@ mod test {
 
 		let card = world.spawn(Card).id();
 		let child = world.spawn(ChildOf(card)).id();
-		let stack = world.spawn((Stack, ChildOf(child))).id();
+		let stack = world.spawn((Card, ChildOf(child))).id();
 		let _stack_child = world.spawn(ChildOf(stack)).id();
 
 		let expected = vec![card, child];

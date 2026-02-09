@@ -215,7 +215,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(1);
 	}
@@ -227,19 +227,19 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(1);
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(2);
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(3);
 	}
@@ -251,7 +251,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(-1);
 	}
@@ -269,7 +269,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap()
 			.xpect_eq(4);
 	}
@@ -287,13 +287,13 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<i64, i64>(5)
+			.call_blocking::<i64, i64>(5)
 			.unwrap()
 			.xpect_eq(15);
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<i64, i64>(3)
+			.call_blocking::<i64, i64>(3)
 			.unwrap()
 			.xpect_eq(18);
 	}
@@ -306,7 +306,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<Value, ()>(val!("Hello"))
+			.call_blocking::<Value, ()>(val!("Hello"))
 			.unwrap();
 
 		world
@@ -332,7 +332,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<Value, ()>(val!("complete"))
+			.call_blocking::<Value, ()>(val!("complete"))
 			.unwrap();
 
 		world
@@ -352,7 +352,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>("Hello".to_string())
+			.call_blocking::<String, ()>("Hello".to_string())
 			.unwrap();
 
 		world
@@ -378,7 +378,7 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.send_blocking::<String, ()>("complete".to_string())
+			.call_blocking::<String, ()>("complete".to_string())
 			.unwrap();
 
 		world
@@ -404,7 +404,7 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), Value>(())
+			.call_blocking::<(), Value>(())
 			.unwrap();
 
 		result.xpect_eq(val!(42i64));
@@ -424,7 +424,7 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), Value>(())
+			.call_blocking::<(), Value>(())
 			.unwrap();
 
 		result.xpect_eq(val!("Alice"));
@@ -444,7 +444,7 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), i64>(())
+			.call_blocking::<(), i64>(())
 			.unwrap();
 
 		result.xpect_eq(42);
@@ -464,7 +464,7 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.send_blocking::<(), String>(())
+			.call_blocking::<(), String>(())
 			.unwrap();
 
 		result.xpect_eq("Alice");
