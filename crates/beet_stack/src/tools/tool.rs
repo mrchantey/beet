@@ -155,7 +155,7 @@ pub struct ToolOut<Out = ()> {
 	/// This is the [`EntityEvent::event_target`].
 	#[event_target]
 	caller: Entity,
-	/// The payload of the tool input, which may only be consumed once
+	/// The payload of the tool output, which may only be consumed once
 	payload: Option<Out>,
 }
 
@@ -264,7 +264,7 @@ pub impl EntityWorldMut<'_> {
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
 	>(
-		&mut self,
+		self,
 		input: In,
 	) -> Result<Out> {
 		async_ext::block_on(self.send(input))
@@ -279,16 +279,15 @@ pub impl EntityWorldMut<'_> {
 		In: 'static + Send + Sync + Typed,
 		Out: 'static + Send + Sync + Typed,
 	>(
-		&mut self,
+		mut self,
 		input: In,
 	) -> impl Future<Output = Result<Out>> {
 		async move {
 			let (send, recv) = async_channel::bounded(1);
 			let handler = ToolOutHandler::channel(send);
-			trigger_for_entity(self, input, handler)?;
-			// SAFETY: While it is possible an update will change the entity location,
-			// we no longer use the EntityWorldMut.
-			let world = unsafe { self.world_mut() };
+			trigger_for_entity(&mut self, input, handler)?;
+
+			let world = self.into_world_mut();
 
 			world.flush();
 			// check if response was sent synchronously
@@ -338,15 +337,11 @@ fn trigger_for_entity<In: Typed, Out: Typed>(
 	input: In,
 	out_handler: ToolOutHandler<Out>,
 ) -> Result {
-	let id = entity.id();
 	let meta = entity.get::<ToolMeta>().ok_or_else(|| {
 		bevyhow!("Entity does not have ToolMeta, cannot send tool call.")
 	})?;
 	meta.assert_match::<In, Out>()?;
-	// SAFETY: While it is possible to change the entity location,
-	// we no longer use the EntityWorldMut.
-	let world = unsafe { entity.world_mut() };
-	world.trigger(ToolIn::new(id, input, out_handler));
+	entity.trigger(|entity| ToolIn::new(entity, input, out_handler));
 	Ok(())
 }
 

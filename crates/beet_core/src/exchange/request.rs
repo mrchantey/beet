@@ -35,13 +35,13 @@ use http::header::IntoHeaderName;
 /// # Deref
 ///
 /// `Request` implements `Deref<Target = RequestParts>`, so all methods on
-/// [`RequestParts`] and [`Parts`] are available directly:
+/// [`RequestParts`] are available directly:
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// let request = Request::get("/api/users?limit=10");
-/// assert_eq!(request.method(), &HttpMethod::Get);  // From RequestParts
-/// assert_eq!(request.path(), &["api", "users"]);   // From Parts via Deref
+/// assert_eq!(request.method(), &HttpMethod::Get);
+/// assert_eq!(request.path(), &["api", "users"]);
 /// ```
 #[derive(Debug, Component)]
 #[component(on_add = on_add)]
@@ -205,7 +205,7 @@ impl Request {
 		value: &str,
 	) -> Self {
 		let key_str = header_name_to_string(key);
-		self.parts.parts_mut().insert_header(key_str, value);
+		self.parts.insert_header(key_str, value);
 		self
 	}
 
@@ -241,7 +241,7 @@ impl Request {
 
 	/// Insert a query parameter into the request
 	pub fn with_query_param(mut self, key: &str, value: &str) -> Self {
-		self.parts.parts_mut().insert_param(key, value);
+		self.parts.insert_param(key, value);
 		self
 	}
 
@@ -255,7 +255,7 @@ impl Request {
 				Some((key, value)) => (key.to_string(), value.to_string()),
 				None => (pair.to_string(), String::new()),
 			};
-			self.parts.parts_mut().insert_param(key, value);
+			self.parts.insert_param(key, value);
 		}
 		self
 	}
@@ -311,27 +311,19 @@ impl Request {
 		Ok(http::Request::from_parts(http_parts, bytes))
 	}
 
-	/// Creates a response that mirrors this request,
+	/// Creates a response that mirrors this request's headers and body,
 	/// with a [`StatusCode::Ok`]
 	pub fn mirror(self) -> Response {
-		Response::new(
-			ResponseParts {
-				parts: self.request_parts().parts().clone(),
-				status: StatusCode::Ok,
-			},
-			self.body,
-		)
+		let mut res_parts = ResponseParts::ok();
+		res_parts.headers = self.parts.headers().clone();
+		Response::new(res_parts, self.body)
 	}
-	/// Creates a response that mirrors this request's parts,
+	/// Creates a response that mirrors this request's headers,
 	/// with an empty body
 	pub fn mirror_parts(&self) -> Response {
-		Response::new(
-			ResponseParts {
-				parts: self.request_parts().parts().clone(),
-				status: StatusCode::Ok,
-			},
-			default(),
-		)
+		let mut res_parts = ResponseParts::ok();
+		res_parts.headers = self.parts.headers().clone();
+		Response::new(res_parts, default())
 	}
 }
 

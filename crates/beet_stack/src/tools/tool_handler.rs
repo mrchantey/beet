@@ -96,9 +96,8 @@ impl<Out> IntoToolOutput<Out, ResultIntoToolOutput> for Result<Out> {
 }
 
 /// Marker for converting any [`Typed`] value directly into tool output.
-/// Uses a tuple marker to give it lower priority than the `Result` impl.
 pub struct TypeIntoToolOutput;
-impl<Out> IntoToolOutput<Out, (TypeIntoToolOutput,)> for Out
+impl<Out> IntoToolOutput<Out, TypeIntoToolOutput> for Out
 where
 	Out: Typed,
 {

@@ -550,10 +550,12 @@ mod test {
 		segments: &str,
 		route_path: &str,
 	) -> Result<PathMatch, RouteMatchError> {
-		let builder = PartsBuilder::new().path_str(route_path).build();
+		let parts = PartsBuilder::new()
+			.path_str(route_path)
+			.build_request_parts(HttpMethod::Get);
 		PathPattern::new(segments)
 			.unwrap()
-			.parse_path(&builder.path())
+			.parse_path(&parts.path())
 	}
 
 	#[test]

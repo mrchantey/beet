@@ -29,7 +29,7 @@ use std::convert::Infallible;
 /// # Deref
 ///
 /// `Response` implements `Deref<Target = ResponseParts>`, so all methods on
-/// [`ResponseParts`] and [`Parts`] are available directly:
+/// [`ResponseParts`] are available directly:
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -110,7 +110,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.parts_mut().insert_header("location", location.into());
+		parts.insert_header("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -125,7 +125,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.parts_mut().insert_header("location", location.into());
+		parts.insert_header("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -156,9 +156,7 @@ impl Response {
 		content_type: &str,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
-		parts
-			.parts_mut()
-			.insert_header("content-type", content_type);
+		parts.insert_header("content-type", content_type);
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
@@ -225,9 +223,7 @@ impl Response {
 	/// Create a response with the given body and content type
 	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
 		let mut parts = ResponseParts::ok();
-		parts
-			.parts_mut()
-			.insert_header("content-type", content_type);
+		parts.insert_header("content-type", content_type);
 		Self {
 			parts,
 			body: body.into(),
@@ -309,7 +305,7 @@ impl Response {
 
 	/// Adds a header to the response
 	pub fn with_header(mut self, key: &str, value: &str) -> Self {
-		self.parts.parts_mut().insert_header(key, value);
+		self.parts.insert_header(key, value);
 		self
 	}
 
