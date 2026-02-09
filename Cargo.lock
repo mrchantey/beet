@@ -1072,7 +1072,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "beet"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-executor",
  "beet",
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet",
  "beet_core",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-process",
  "beet_core",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "beet_clanker"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "base64 0.22.1",
  "beet_clanker",
@@ -1176,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1206,6 +1206,7 @@ dependencies = [
  "nu-ansi-term",
  "path-clean",
  "pathdiff",
+ "postcard",
  "prettyplease",
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -1231,7 +1232,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core_shared",
  "proc-macro2",
@@ -1242,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_shared"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1251,7 +1252,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1270,7 +1271,7 @@ dependencies = [
 
 [[package]]
 name = "beet_dom"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-process",
  "base64 0.22.1",
@@ -1290,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1305,7 +1306,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "bevy",
@@ -1314,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1343,7 +1344,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1390,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1412,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_dom",
@@ -1427,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "async-channel 2.5.0",
  "beet_core",
@@ -1449,7 +1450,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "combine 2.5.2",
@@ -1459,7 +1460,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_parse",
@@ -1471,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet",
  "beet_design",
@@ -1483,7 +1484,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "beet_flow",
@@ -1497,14 +1498,12 @@ dependencies = [
 
 [[package]]
 name = "beet_stack"
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.10"
 dependencies = [
  "beet_core",
  "bevy",
  "extend",
- "postcard",
  "serde",
- "serde_json",
  "thiserror 1.0.69",
  "variadics_please",
 ]

@@ -28,6 +28,30 @@ use beet_core::prelude::*;
 ///     .unwrap();
 /// assert_eq!(result, 4);
 /// ```
+///
+/// ## Using with Request/Response exchange pattern
+///
+/// Exchange tools also support serialized request/response calls,
+/// using the `content-type` header for format negotiation:
+///
+/// ```
+/// # use beet_stack::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use serde::{Serialize, Deserialize};
+/// #[derive(Debug, Serialize, Deserialize, Reflect)]
+/// struct AddInput { a: i32, b: i32 }
+///
+/// let request = Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
+/// let response = World::new()
+///     .spawn(exchange_tool(|input: AddInput| -> i32 { input.a + input.b }))
+///     .call_blocking::<Request, Response>(request)
+///     .unwrap();
+///
+/// 
+/// 
+/// let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+/// assert_eq!(result, 30);
+/// ```
 pub fn exchange_tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
@@ -39,77 +63,6 @@ where
 		exchange_tool_handler::<H::In, H::Out>(),
 		handler.into_handler(),
 	)
-}
-
-/// The serialization format used for exchange tool request/response bodies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExchangeFormat {
-	/// JSON serialization via `serde_json` (`application/json`).
-	Json,
-	/// Binary serialization via `postcard` (`application/x-postcard`).
-	Postcard,
-}
-
-impl ExchangeFormat {
-	/// Determine the format from a `content-type` header value,
-	/// defaulting to JSON if absent, and erroring if unrecognized.
-	///
-	/// ## Errors
-	///
-	/// Errors if unrecognized format provided.
-	pub fn from_content_type(content_type: Option<&str>) -> Result<Self> {
-		match content_type {
-			Some(ct) if ct.contains("application/x-postcard") => Self::Postcard,
-			Some(ct) if ct.contains("application/json") => Self::Json,
-			Some(other) => bevybail!(
-				"Unrecognized content-type for exchange tool: {other}. \
-				 Supported types: application/json, application/x-postcard."
-			),
-			None => Self::Json,
-		}
-		.xok()
-	}
-
-	/// The MIME content-type string for this format.
-	pub fn content_type_str(&self) -> &'static str {
-		match self {
-			Self::Json => "application/json",
-			Self::Postcard => "application/x-postcard",
-		}
-	}
-
-	/// Deserialize bytes into `T` using this format.
-	///
-	/// Empty bytes are treated as JSON `null` for the JSON format,
-	/// enabling unit-type inputs on GET requests with no body.
-	pub fn deserialize<T: serde::de::DeserializeOwned>(
-		&self,
-		bytes: &[u8],
-	) -> Result<T> {
-		match self {
-			Self::Json => {
-				let slice = if bytes.is_empty() { b"null" } else { bytes };
-				serde_json::from_slice(slice).map_err(|err| {
-					bevyhow!("Failed to deserialize JSON body: {err}")
-				})
-			}
-			Self::Postcard => postcard::from_bytes(bytes).map_err(|err| {
-				bevyhow!("Failed to deserialize postcard body: {err}")
-			}),
-		}
-	}
-
-	/// Serialize `T` into bytes using this format.
-	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
-		match self {
-			Self::Json => serde_json::to_vec(value).map_err(|err| {
-				bevyhow!("Failed to serialize JSON response: {err}")
-			}),
-			Self::Postcard => postcard::to_allocvec(value).map_err(|err| {
-				bevyhow!("Failed to serialize postcard response: {err}")
-			}),
-		}
-	}
 }
 
 /// Marker component indicating this tool supports [`Request`]/[`Response`]
@@ -199,6 +152,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::async_ext;
 	use beet_core::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
@@ -233,9 +187,8 @@ mod test {
 
 	#[test]
 	fn json_request_response() {
-		let request = Request::post("/add")
-			.with_header("content-type", "application/json")
-			.with_body(r#"{"a":10,"b":20}"#);
+		let request =
+			Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
 
 		let response = World::new()
 			.spawn(add_exchange_tool())
@@ -247,9 +200,7 @@ mod test {
 			.get_header("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
-		// response body is the serialized i32
-		let body = response.body.try_into_bytes().unwrap();
-		let result: i32 = serde_json::from_slice(&body).unwrap();
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
 		result.xpect_eq(30);
 	}
 
@@ -264,8 +215,7 @@ mod test {
 			.call_blocking::<Request, Response>(request)
 			.unwrap();
 
-		let body = response.body.try_into_bytes().unwrap();
-		let result: i32 = serde_json::from_slice(&body).unwrap();
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
 		result.xpect_eq(3);
 	}
 
@@ -273,12 +223,8 @@ mod test {
 
 	#[test]
 	fn postcard_request_response() {
-		let input = AddInput { a: 5, b: 7 };
-		let encoded = postcard::to_allocvec(&input).unwrap();
-
-		let request = Request::post("/add")
-			.with_body(encoded)
-			.with_header("content-type", "application/x-postcard");
+		let request =
+			Request::with_postcard("/add", &AddInput { a: 5, b: 7 }).unwrap();
 
 		let response = World::new()
 			.spawn(add_exchange_tool())
@@ -290,8 +236,7 @@ mod test {
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 
-		let body = response.body.try_into_bytes().unwrap();
-		let result: i32 = postcard::from_bytes(&body).unwrap();
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
 		result.xpect_eq(12);
 	}
 
@@ -304,8 +249,7 @@ mod test {
 			.call_blocking::<Request, Response>(Request::get("/"))
 			.unwrap();
 
-		let body = response.body.try_into_bytes().unwrap();
-		let result: i32 = serde_json::from_slice(&body).unwrap();
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
 		result.xpect_eq(42);
 	}
 
@@ -359,5 +303,50 @@ mod test {
 		let output: AddInput =
 			ExchangeFormat::Postcard.deserialize(&bytes).unwrap();
 		output.xpect_eq(input);
+	}
+
+	// -- Response::deserialize round-trip --
+
+	#[test]
+	fn response_deserialize_json_roundtrip() {
+		let request =
+			Request::with_json("/add", &AddInput { a: 10, b: 5 }).unwrap();
+
+		let response = World::new()
+			.spawn(add_exchange_tool())
+			.call_blocking::<Request, Response>(request)
+			.unwrap();
+
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		result.xpect_eq(15);
+	}
+
+	#[test]
+	fn response_deserialize_postcard_roundtrip() {
+		let request =
+			Request::with_postcard("/add", &AddInput { a: 3, b: 9 }).unwrap();
+
+		let response = World::new()
+			.spawn(add_exchange_tool())
+			.call_blocking::<Request, Response>(request)
+			.unwrap();
+
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		result.xpect_eq(12);
+	}
+
+	// -- with_json_str convenience --
+
+	#[test]
+	fn json_str_request() {
+		let request = Request::with_json_str("/add", r#"{"a":100,"b":200}"#);
+
+		let response = World::new()
+			.spawn(add_exchange_tool())
+			.call_blocking::<Request, Response>(request)
+			.unwrap();
+
+		let result: i32 = async_ext::block_on(response.deserialize()).unwrap();
+		result.xpect_eq(300);
 	}
 }

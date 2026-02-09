@@ -283,13 +283,7 @@ pub fn insert_tool_tree(
 	let root = ancestors.root_ancestor(ev.entity);
 	let nodes: Vec<ToolNode> = children_query
 		.iter_descendants_inclusive(root)
-		.filter_map(|entity| {
-			tools.get(entity).ok().map(
-				|(entity, meta, path, params, method)| {
-					ToolNode::from_query(entity, meta, path, params, method)
-				},
-			)
-		})
+		.filter_map(|entity| tools.get(entity).ok().map(ToolNode::from_query))
 		.collect();
 
 	if nodes.is_empty() {
@@ -317,14 +311,19 @@ pub struct ToolNode {
 	pub method: Option<HttpMethod>,
 }
 
+/// The query tuple type used to collect tool components for [`ToolNode::from_query`].
+pub type ToolQueryItem<'a> = (
+	Entity,
+	&'a ToolMeta,
+	&'a PathPattern,
+	&'a ParamsPattern,
+	Option<&'a HttpMethod>,
+);
+
 impl ToolNode {
-	/// Create a [`ToolNode`] from query results.
+	/// Create a [`ToolNode`] from the full query result tuple.
 	pub fn from_query(
-		entity: Entity,
-		meta: &ToolMeta,
-		path: &PathPattern,
-		params: &ParamsPattern,
-		method: Option<&HttpMethod>,
+		(entity, meta, path, params, method): ToolQueryItem,
 	) -> Self {
 		Self {
 			entity,

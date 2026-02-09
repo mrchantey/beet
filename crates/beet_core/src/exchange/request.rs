@@ -179,8 +179,73 @@ impl Request {
 		self
 	}
 
-	/// Sets a JSON body and content-type header
-	#[cfg(all(feature = "serde", feature = "http"))]
+	/// Creates a POST request with a JSON-serialized body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
+	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json<T: serde::Serialize>(
+		path: impl AsRef<str>,
+		value: &T,
+	) -> Result<Self> {
+		let body = Body::from_json(value)?;
+		let mut request =
+			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+		request
+			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request.xok()
+	}
+
+	/// Creates a POST request with a postcard-serialized body and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard<T: serde::Serialize>(
+		path: impl AsRef<str>,
+		value: &T,
+	) -> Result<Self> {
+		let body = Body::from_postcard(value)?;
+		let mut request =
+			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+		request.insert_header(
+			"content-type",
+			ExchangeFormat::POSTCARD_CONTENT_TYPE,
+		);
+		request.xok()
+	}
+
+	/// Creates a POST request with a raw JSON string body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
+	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
+		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
+		request
+			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request
+	}
+
+	/// Creates a POST request with raw postcard bytes and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard_bytes(
+		path: impl AsRef<str>,
+		bytes: impl AsRef<[u8]>,
+	) -> Self {
+		let mut request = Self::post(path).with_body(bytes);
+		request.insert_header(
+			"content-type",
+			ExchangeFormat::POSTCARD_CONTENT_TYPE,
+		);
+		request
+	}
+
+	/// Sets a JSON body and content-type header on an existing request.
+	#[cfg(all(feature = "json", feature = "http"))]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,
@@ -526,5 +591,86 @@ mod test {
 		(*parts.method()).xpect_eq(HttpMethod::Post);
 		body.bytes_eq(&Body::Bytes(Bytes::from("data")))
 			.xpect_true();
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn request_with_json() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			name: String,
+		}
+
+		let payload = Payload { name: "Ada".into() };
+		let request = Request::with_json("/api/users", &payload).unwrap();
+
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request.path_string().xpect_eq("/api/users");
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn request_with_json_str() {
+		let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		String::from_utf8(body_bytes.to_vec())
+			.unwrap()
+			.xpect_eq(r#"{"name":"Ada"}"#);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn request_with_postcard() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			val: u32,
+		}
+
+		let payload = Payload { val: 42 };
+		let request = Request::with_postcard("/api/data", &payload).unwrap();
+
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn request_with_postcard_bytes() {
+		let raw = vec![0x01, 0x02, 0x03];
+		let request = Request::with_postcard_bytes("/api/data", &raw);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		body_bytes.to_vec().xpect_eq(raw);
 	}
 }

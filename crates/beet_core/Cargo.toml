@@ -22,19 +22,20 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["serde"]
+default = ["serde", "json"]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["exchange", "ansi_paint"]
 exchange = ["dep:bytes"]
 http = ["dep:http","dep:mime_guess"]
+json = ["serde", "dep:serde_json"]
+postcard = ["serde", "dep:postcard"]
 bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = [
 	"dep:serde",
-	"dep:serde_json",
 	"dep:ron",
 	"dep:toml",
 	"dep:serde_urlencoded",
@@ -86,6 +87,7 @@ either = "1"
 #💡 serde
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 
@@ -186,6 +188,6 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["testing", "rand"]}
+beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}
 # abs_path serde roundtrip
 serde_json.workspace = true

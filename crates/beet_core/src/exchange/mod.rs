@@ -1,12 +1,14 @@
 mod body;
+mod exchange_format;
 mod parts;
 mod request;
 mod response;
+pub use body::*;
+pub use exchange_format::*;
 pub use response::*;
 mod param_pattern;
 pub use param_pattern::*;
 mod path_pattern;
-pub use body::*;
 pub use parts::*;
 pub use path_pattern::*;
 pub use request::*;
