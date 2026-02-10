@@ -139,11 +139,9 @@ impl ExchangeFormat {
 #[cfg(feature = "serde")]
 mod test {
 	use super::*;
-	use serde::Deserialize;
-	use serde::Serialize;
 
 	#[cfg(any(feature = "json", feature = "postcard"))]
-	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 	struct Pair {
 		a: i32,
 		b: i32,

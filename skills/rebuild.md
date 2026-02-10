@@ -35,6 +35,11 @@ To verify note:
 - rust stable wont help, custom test runners is nightly only
 This is definitely an issue with some change in the codebase, likely due to these recent refactors involving json, postcard, and possibly the introduction of the `exchange_format.rs`
 
-You may clear as often as needed, continue investigating to find the root cause of this compiler issue
+You may clear as often as needed, continue investigating to find the root cause of this compiler issue.
 
 once this issue is cleared, continue to verify the rest of the codebase with `just test-all` (naturally with tail)
+
+
+**TO BE CLEAR**
+- do not mess with compiler flags or versions, we've exhausted this
+- only investigate by changing stuff in the codebase. for instance, commenting out everything in `beet_core/src/lib.rs` resolves the issue, so maybe start there and binary search until you find the culprit
