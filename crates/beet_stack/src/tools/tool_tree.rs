@@ -31,7 +31,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, Component)]
 pub struct ToolTree {
 	/// The path pattern for this tree node.
-	pub pattern: PathPattern,
+	pub path: PathPattern,
 	/// The params pattern for this tree node.
 	pub params: ParamsPattern,
 	/// The tool at this exact path, if any.
@@ -150,10 +150,10 @@ impl ToolTree {
 				})
 				.collect();
 
-			children.sort_by(|a, b| a.pattern.cmp(&b.pattern));
+			children.sort_by(|a, b| a.path.cmp(&b.path));
 
 			ToolTree {
-				pattern,
+				path: pattern,
 				params: node.params.clone().unwrap_or(params),
 				tool: node.tool.clone(),
 				children,
@@ -174,7 +174,7 @@ impl ToolTree {
 		let mut patterns = Vec::new();
 		fn inner(patterns: &mut Vec<PathPattern>, node: &ToolTree) {
 			if node.tool.is_some() {
-				patterns.push(node.pattern.clone());
+				patterns.push(node.path.clone());
 			}
 			for child in &node.children {
 				inner(patterns, child);
@@ -239,7 +239,7 @@ impl std::fmt::Display for ToolTree {
 			f: &mut std::fmt::Formatter<'_>,
 		) -> std::fmt::Result {
 			if let Some(tool) = &node.tool {
-				let path = node.pattern.annotated_route_path();
+				let path = node.path.annotated_route_path();
 				let input = tool.meta.input().type_name();
 				let output = tool.meta.output().type_name();
 				write!(f, "  {}", path)?;

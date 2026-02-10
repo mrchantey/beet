@@ -4,6 +4,8 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct Interface {
+	/// The card currently being accessed by the interface,
+	/// defaulting to the root.
 	current_card: Entity,
 }
 
@@ -41,8 +43,12 @@ pub fn markdown_interface() -> impl Bundle {
 			let tree = card_query.tool_tree(interface.current_card)?;
 
 			if cx.has_param("help") {
+				// TODO filter by partial matches, ie tree.filter_path(req.path());
+				// any path pattern match for those routes that doesnt error
+				// and then print help for all matches
 			} else {
 				let tool = tree.find_exact(req.path())?;
+				// either run the tool or return the markdown as a string.
 			}
 
 
