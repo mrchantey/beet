@@ -89,7 +89,7 @@ pub fn markdown_interface() -> impl Bundle {
 			 -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
-				let request = ev.take_payload()?;
+				let request = ev.take_input()?;
 				let out_handler = ev.take_out_handler()?;
 
 				commands.run(async move |mut world: AsyncWorld| -> Result {

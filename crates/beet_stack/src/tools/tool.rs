@@ -148,7 +148,7 @@ pub struct ToolIn<In = (), Out = ()> {
 	#[event_target]
 	tool: Entity,
 	/// The payload of the tool input, which may only be consumed once
-	payload: Option<In>,
+	input: Option<In>,
 	/// Called by the tool on done, which may only be consumed once.
 	out_handler: Option<ToolOutHandler<Out>>,
 }
@@ -158,7 +158,7 @@ impl<In, Out> ToolIn<In, Out> {
 	pub fn new(tool: Entity, payload: In, on_out: ToolOutHandler<Out>) -> Self {
 		Self {
 			tool,
-			payload: Some(payload),
+			input: Some(payload),
 			out_handler: Some(on_out),
 		}
 	}
@@ -171,8 +171,8 @@ impl<In, Out> ToolIn<In, Out> {
 	/// # Errors
 	///
 	/// Errors if the payload has already been taken.
-	pub fn take_payload(&mut self) -> Result<In> {
-		self.payload
+	pub fn take_input(&mut self) -> Result<In> {
+		self.input
 			.take()
 			.ok_or_else(|| bevyhow!("Tool call payload already taken. Are there multiple handlers on the same entity?"))
 	}
@@ -200,16 +200,16 @@ pub struct ToolOut<Out = ()> {
 	#[event_target]
 	caller: Entity,
 	/// The payload of the tool output, which may only be consumed once
-	payload: Option<Out>,
+	output: Option<Out>,
 }
 
 impl<Out> ToolOut<Out> {
 	/// Create a new [`ToolIn`] event with the given caller, tool, and payload.
-	pub fn new(tool: Entity, caller: Entity, payload: Out) -> Self {
+	pub fn new(tool: Entity, caller: Entity, output: Out) -> Self {
 		Self {
 			tool,
 			caller,
-			payload: Some(payload),
+			output: Some(output),
 		}
 	}
 
@@ -223,8 +223,8 @@ impl<Out> ToolOut<Out> {
 	/// # Errors
 	///
 	/// Errors if the payload has already been taken.
-	pub fn take_payload(&mut self) -> Result<Out> {
-		self.payload
+	pub fn take_output(&mut self) -> Result<Out> {
+		self.output
 			.take()
 			.ok_or_else(|| bevyhow!("ToolOut payload already taken. Are there multiple handlers on the same entity?"))
 	}
@@ -277,21 +277,21 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 		self,
 		mut commands: Commands,
 		tool: Entity,
-		payload: Out,
+		output: Out,
 	) -> Result {
 		match self {
 			ToolOutHandler::Observer { caller } => {
-				commands.trigger(ToolOut::new(tool, caller, payload));
+				commands.trigger(ToolOut::new(tool, caller, output));
 				Ok(())
 			}
 			ToolOutHandler::Channel { sender } => {
-				sender.try_send(payload).map_err(|err| {
+				sender.try_send(output).map_err(|err| {
 					bevyhow!(
 						"Failed to send tool output through channel: {err:?}"
 					)
 				})
 			}
-			ToolOutHandler::Function { handler } => handler(payload),
+			ToolOutHandler::Function { handler } => handler(output),
 		}
 	}
 	/// Call this handler asynchronously with the tool output.
@@ -303,21 +303,21 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 		self,
 		world: &mut AsyncWorld,
 		tool: Entity,
-		payload: Out,
+		output: Out,
 	) -> Result {
 		match self {
 			ToolOutHandler::Observer { caller } => {
-				world.trigger(ToolOut::new(tool, caller, payload));
+				world.trigger(ToolOut::new(tool, caller, output));
 				Ok(())
 			}
 			ToolOutHandler::Channel { sender } => {
-				sender.try_send(payload).map_err(|err| {
+				sender.try_send(output).map_err(|err| {
 					bevyhow!(
 						"Failed to send tool output through channel: {err:?}"
 					)
 				})
 			}
-			ToolOutHandler::Function { handler } => handler(payload),
+			ToolOutHandler::Function { handler } => handler(output),
 		}
 	}
 }
@@ -424,6 +424,8 @@ pub impl EntityWorldMut<'_> {
 		let meta = self.get::<ToolMeta>().ok_or_else(|| {
 			bevyhow!("No ToolMeta on entity, cannot send tool call.")
 		})?;
+
+		// TODO this is such an antipattern, exchange tool must be seperated
 		let is_exchange_call = TypeMeta::of::<In>()
 			== TypeMeta::of::<Request>()
 			&& TypeMeta::of::<Out>() == TypeMeta::of::<Response>();

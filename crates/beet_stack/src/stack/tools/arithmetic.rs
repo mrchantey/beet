@@ -92,15 +92,14 @@ pub fn add(field: FieldRef) -> impl Bundle {
 		field,
 		PathPartial::new("add"),
 		tool(
-			|cx: In<ToolContext<i64>>,
+			|In(ToolContext { tool, input }): In<ToolContext<i64>>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
-				let amount = cx.payload;
-				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
+				let field = fields.get(tool)?;
+				query.with_field(tool, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
-					let new_value = current + amount;
+					let new_value = current + input;
 					*value = Value::I64(new_value);
 					new_value
 				})
@@ -123,7 +122,7 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 			 -> Result<()> {
 				let field = fields.get(cx.tool)?;
 				query.with_field(cx.tool, field, move |value| {
-					*value = cx.payload;
+					*value = cx.input;
 				})
 			},
 		),
@@ -146,7 +145,7 @@ where
 			      fields: Query<&FieldRef>|
 			      -> Result<()> {
 				let field = fields.get(cx.tool)?;
-				let new_value = Value::from_reflect(&cx.payload)?;
+				let new_value = Value::from_reflect(&cx.input)?;
 				query.with_field(cx.tool, field, move |value| {
 					*value = new_value;
 				})

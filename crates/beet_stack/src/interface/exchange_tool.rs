@@ -86,7 +86,7 @@ where
 			      -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
-				let request = ev.take_payload()?;
+				let request = ev.take_input()?;
 				let outer_handler = ev.take_out_handler()?;
 
 				// determine serialization format from request content-type

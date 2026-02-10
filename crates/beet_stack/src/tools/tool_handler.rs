@@ -15,19 +15,19 @@ pub struct ToolContext<In = ()> {
 	/// The tool entity being called.
 	pub tool: Entity,
 	/// The input payload for this tool call.
-	pub payload: In,
+	pub input: In,
 }
 
 impl<In> std::ops::Deref for ToolContext<In> {
 	type Target = In;
-	fn deref(&self) -> &Self::Target { &self.payload }
+	fn deref(&self) -> &Self::Target { &self.input }
 }
 
 impl<In> ToolContext<In> {
 	/// Create a new tool context with the given tool and payload.
-	pub fn new(tool: Entity, payload: In) -> Self { Self { tool, payload } }
+	pub fn new(tool: Entity, input: In) -> Self { Self { tool, input } }
 
-	pub fn take(self) -> In { self.payload }
+	pub fn take(self) -> In { self.input }
 }
 
 /// Convert from a [`ToolContext`] into a tool handler parameter.
@@ -61,7 +61,7 @@ where
 	// as ToolContext is not Reflect we avoid multiple impls
 	In: bevy::reflect::Typed,
 {
-	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx.payload }
+	fn from_tool_context(ctx: ToolContext<In>) -> Self { ctx.input }
 }
 
 impl<In> FromToolContext<In, Self> for ToolContext<In> {
@@ -69,7 +69,7 @@ impl<In> FromToolContext<In, Self> for ToolContext<In> {
 }
 
 impl FromToolContext<Request, Self> for Request {
-	fn from_tool_context(ctx: ToolContext<Request>) -> Self { ctx.payload }
+	fn from_tool_context(ctx: ToolContext<Request>) -> Self { ctx.input }
 }
 
 /// Async context passed to async tool handlers.
@@ -77,19 +77,17 @@ pub struct AsyncToolContext<In> {
 	/// The async tool entity being called.
 	pub tool: AsyncEntity,
 	/// The input payload for this tool call.
-	pub payload: In,
+	pub input: In,
 }
 
 impl<In> std::ops::Deref for AsyncToolContext<In> {
 	type Target = In;
-	fn deref(&self) -> &Self::Target { &self.payload }
+	fn deref(&self) -> &Self::Target { &self.input }
 }
 
 impl<In> AsyncToolContext<In> {
 	/// Create a new async tool context.
-	pub fn new(tool: AsyncEntity, payload: In) -> Self {
-		Self { tool, payload }
-	}
+	pub fn new(tool: AsyncEntity, input: In) -> Self { Self { tool, input } }
 }
 
 /// Convert from an [`AsyncToolContext`] into an async tool handler parameter.
@@ -112,7 +110,7 @@ where
 	fn from_async_tool_context(cx: AsyncToolContext<In>) -> Self {
 		T::from_tool_context(ToolContext {
 			tool: cx.tool.id(),
-			payload: cx.payload,
+			input: cx.input,
 		})
 	}
 }
@@ -187,9 +185,9 @@ where
 			      -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
-				let payload = ev.take_payload()?;
+				let input = ev.take_input()?;
 				let on_out = ev.take_out_handler()?;
-				let arg = Arg::from_tool_context(ToolContext { tool, payload });
+				let arg = Arg::from_tool_context(ToolContext { tool, input });
 				let output = self.clone()(arg).into_tool_output()?;
 				on_out.call(commands, tool, output)?;
 				Ok(())
@@ -255,13 +253,13 @@ where
 			      -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
-				let payload = ev.take_payload()?;
+				let input = ev.take_input()?;
 				let on_out = ev.take_out_handler()?;
 				let this = self.clone();
 				commands.queue(move |world: &mut World| -> Result {
 					let arg = <Arg::Inner<'_> as FromToolContext<In, ArgM>>::from_tool_context(ToolContext {
 						tool,
-						payload,
+						input,
 					});
 					let raw_output: IntoOut =
 						world.run_system_cached_with::<_, IntoOut, _, _>(this, arg)?;
@@ -307,11 +305,11 @@ where
 			      -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
-				let payload = ev.take_payload()?;
+				let input = ev.take_input()?;
 				let on_out = ev.take_out_handler()?;
 				let arg = Arg::from_async_tool_context(AsyncToolContext {
 					tool: commands.channel.world().entity(tool),
-					payload,
+					input,
 				});
 				let this = self.clone();
 				commands.run(async move |world| -> Result {
