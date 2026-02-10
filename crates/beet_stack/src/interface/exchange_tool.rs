@@ -41,7 +41,7 @@ use beet_core::prelude::*;
 /// #[derive(Debug, Serialize, Deserialize, Reflect)]
 /// struct AddInput { a: i32, b: i32 }
 ///
-/// let request = Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
+/// let request = Request::with_json("/", &AddInput { a: 10, b: 20 }).unwrap();
 /// let response = AsyncPlugin::world()
 ///     .spawn(exchange_tool(|input: AddInput| -> i32 { input.a + input.b }))
 ///     .call_blocking::<Request, Response>(request)

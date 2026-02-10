@@ -14,7 +14,8 @@ categories.workspace = true
 
 [features]
 default = ["interface"]
-interface = ["dep:serde","beet_core/json","beet_core/postcard"]
+interface = ["serde"]
+serde = ["dep:serde","beet_core/json","beet_core/postcard"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["exchange"] }

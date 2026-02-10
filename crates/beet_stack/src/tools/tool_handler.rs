@@ -43,7 +43,7 @@ impl<In> ToolContext<In> {
 /// struct MyPayload;
 ///
 /// impl FromToolContext<MyPayload, Self> for MyPayload {
-///		fn from_tool_context(ctx: ToolContext<MyPayload>) -> Self { ctx.payload }
+///		fn from_tool_context(ctx: ToolContext<MyPayload>) -> Self { ctx.input }
 /// }
 /// ```
 ///

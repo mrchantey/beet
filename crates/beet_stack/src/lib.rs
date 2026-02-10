@@ -4,6 +4,7 @@
 #![feature(associated_type_defaults, closure_track_caller)]
 #![doc = include_str!("../README.md")]
 mod content;
+mod control_flow;
 mod document;
 #[cfg(feature = "interface")]
 mod interface;
@@ -15,6 +16,7 @@ mod tools;
 pub mod prelude {
 	pub use crate::content;
 	pub use crate::content::*;
+	pub use crate::control_flow::*;
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
