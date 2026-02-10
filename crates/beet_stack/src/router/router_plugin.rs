@@ -91,11 +91,11 @@ pub fn insert_route_tree(
 			Option<&HttpMethod>,
 			Has<ExchangeToolMarker>,
 		),
-		// With<ExchangeToolMarker>,
+		Without<RouteHidden>,
 	>,
 	cards: Query<
 		(Entity, &PathPattern, &ParamsPattern),
-		(With<Card>, Without<ToolMeta>),
+		(With<Card>, Without<ToolMeta>, Without<RouteHidden>),
 	>,
 	mut commands: Commands,
 ) -> Result {

@@ -6,7 +6,6 @@
 //! and [`help`] rather than duplicating their logic.
 
 use crate::prelude::*;
-use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 
 /// An interface for interacting with a card-based application.
@@ -27,240 +26,163 @@ use beet_core::prelude::*;
 /// ```
 ///
 /// Help is handled by the interface itself, not added to each route.
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct Interface {
-	/// The card currently being accessed by the interface,
-	/// defaulting to the root.
-	current_card: Entity,
-}
+pub struct Interface {}
 
-impl Interface {
-	/// Create a new [`Interface`] pointing to the given card entity.
-	pub fn new(card: Entity) -> Self { Self { current_card: card } }
-
-	/// Returns the current card entity.
-	pub fn current_card(&self) -> Entity { self.current_card }
-
-	/// Sets the current card entity.
-	pub fn set_current_card(&mut self, card: Entity) {
-		self.current_card = card;
-	}
-
-	/// Create a new [`Interface`] pointing to the entity it was inserted on.
-	pub fn new_this() -> impl Bundle {
-		OnSpawn::new(|entity| {
-			let id = entity.id();
-			entity.insert(Interface::new(id));
-		})
-	}
-}
-
+impl Interface {}
 
 /// Create an interface from a handler, inserting an [`Interface`]
 /// pointing to itself as the current card.
-pub fn interface<H, M>(handler: H) -> impl Bundle
-where
-	H: IntoToolHandler<M, In = Request, Out = Response>,
-{
-	(Interface::new_this(), direct_tool(handler))
-}
-
-
-/// Creates a standard markdown interface that handles routing,
-/// help, and card navigation asynchronously.
-///
-/// This interface handles requests as follows:
-/// 1. If the request has a `help` param, renders help for the current card
-/// 2. If the path matches a card, renders its markdown and updates
-///    [`Interface::current_card`]
-/// 3. If the path matches an exchange tool, calls it and returns the response
-/// 4. If no path matches, returns help for the nearest matching ancestor
-///
-/// Paths are resolved relative to the current card.
-pub fn markdown_interface() -> impl Bundle {
+pub fn interface() -> impl Bundle {
 	(
-		Interface::new_this(),
-		ToolMeta::of::<Request, Response>(),
+		Interface::default(),
 		ExchangeToolMarker,
-		OnSpawn::observe(
-			|mut ev: On<ToolIn<Request, Response>>,
-			 mut commands: AsyncCommands|
-			 -> Result {
-				let ev = ev.event_mut();
-				let tool = ev.tool();
-				let request = ev.take_input()?;
-				let out_handler = ev.take_out_handler()?;
-
-				commands.run(async move |mut world: AsyncWorld| -> Result {
-					let response = route_request(&world, tool, request).await?;
-					out_handler.call_async(&mut world, tool, response)?;
-					Ok(())
-				});
-				Ok(())
-			},
-		),
+		RouteHidden,
+		direct_tool(async |request: AsyncToolContext<Request>| -> Response {
+			match fallback::<Request, Response>(request).await {
+				Ok(Pass(res)) => res,
+				Ok(Fail(_req)) => Response::not_found(),
+				// if the returned error is a HttpError its status code will be used.
+				Err(err) => HttpError::from_opaque(err).into_response(),
+			}
+		}),
 	)
 }
 
-/// The result of routing a request against the interface.
-enum InterfaceAction {
-	/// Render markdown for a card and update current_card.
-	NavigateCard { card_entity: Entity },
-	/// Forward the request to an exchange tool.
-	CallTool {
-		tool_entity: Entity,
-		request: Request,
-	},
-	/// Render the current card (empty path).
-	RenderCurrent { card_entity: Entity },
-	/// Show help text.
-	Help(String),
+/// Creates a standard markdown interface with help, routing, and
+/// fallback handlers as a child fallback chain.
+pub fn markdown_interface() -> impl Bundle {
+	(
+		interface(),
+		OnSpawn::insert(children![
+			(
+				Name::new("Help Tool"),
+				RouteHidden,
+				direct_tool(help_handler)
+			),
+			(Name::new("Router"), RouteHidden, direct_tool(route_handler)),
+			(
+				Name::new("Contextual Found"),
+				RouteHidden,
+				direct_tool(nearest_ancestor_help_handler)
+			)
+		]),
+	)
 }
 
-/// Routes a request through the interface, returning a [`Response`].
-async fn route_request(
-	world: &AsyncWorld,
-	interface_entity: Entity,
-	request: Request,
-) -> Result<Response> {
-	// Determine what action to take based on the request
-	let action: InterfaceAction = world
-		.entity(interface_entity)
-		.with_then(move |entity| -> Result<InterfaceAction> {
-			resolve_action(&entity, request)
+/// Walks up [`ChildOf`] relations to find the root ancestor entity.
+fn walk_to_root(world: &World, entity: Entity) -> Entity {
+	let mut current = entity;
+	while let Some(child_of) = world.entity(current).get::<ChildOf>() {
+		current = child_of.parent();
+	}
+	current
+}
+
+/// Gets the [`RouteTree`] from the root ancestor of the given entity.
+fn root_route_tree(world: &World, entity: Entity) -> Result<&RouteTree> {
+	let root = walk_to_root(world, entity);
+	world
+		.entity(root)
+		.get::<RouteTree>()
+		.ok_or_else(|| bevyhow!("No RouteTree found on root ancestor"))
+}
+
+async fn help_handler(
+	cx: AsyncToolContext<Request>,
+) -> Result<Outcome<Response, Request>> {
+	if cx.has_param("help") {
+		let tool_entity = cx.tool.id();
+		let help_text = cx
+			.tool
+			.world()
+			.with_then(move |world: &mut World| -> Result<String> {
+				let tree = root_route_tree(world, tool_entity)?;
+				format_route_help(tree).xok()
+			})
+			.await?;
+
+		Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
+	} else {
+		Fail(cx.input).xok()
+	}
+}
+
+async fn route_handler(
+	cx: AsyncToolContext<Request>,
+) -> Result<Outcome<Response, Request>> {
+	let path = cx.input.path().clone();
+	let tool_entity = cx.tool.id();
+
+	// Empty path: render the root card as markdown
+	if path.is_empty() {
+		let markdown = cx
+			.tool
+			.world()
+			.with_then(move |world: &mut World| {
+				let root = walk_to_root(world, tool_entity);
+				render_markdown_for(root, world)
+			})
+			.await;
+		return Pass(Response::ok_body(markdown, "text/plain")).xok();
+	}
+
+	// Look up the path in the root ancestor's route tree
+	let node = cx
+		.tool
+		.world()
+		.with_then(move |world: &mut World| -> Result<Option<RouteNode>> {
+			let tree = root_route_tree(world, tool_entity)?;
+			tree.find(&path).cloned().xok()
 		})
 		.await?;
 
-	match action {
-		InterfaceAction::NavigateCard { card_entity } => {
-			// Update current_card, then render markdown
-			let markdown = world
-				.with_then(move |world: &mut World| {
-					world
-						.entity_mut(interface_entity)
-						.get_mut::<Interface>()
-						.unwrap()
-						.set_current_card(card_entity);
-					render_markdown_for(card_entity, world)
-				})
-				.await;
-			Response::ok().with_body(markdown).xok()
-		}
-		InterfaceAction::CallTool {
-			tool_entity,
-			request,
-		} => {
-			// Trigger the tool and await the response via a channel.
-			// The outer poll_and_update (from call_blocking) drives
-			// world updates, so we only need to trigger + await here.
-			let (send, recv) = async_channel::bounded::<Response>(1);
-			world
-				.with_then(move |world: &mut World| -> Result {
-					let handler = ToolOutHandler::channel(send);
-					let mut entity = world.entity_mut(tool_entity);
-					entity.trigger(|entity| {
-						ToolIn::new(entity, request, handler)
-					});
-					entity.flush();
-					Ok(())
-				})
-				.await?;
-
-			let response = recv
-				.recv()
-				.await
-				.map_err(|_| bevyhow!("Tool response channel closed"))?;
-			response.xok()
-		}
-		InterfaceAction::RenderCurrent { card_entity } => {
-			let markdown = world
+	match node {
+		Some(RouteNode::Card(card_node)) => {
+			let card_entity = card_node.entity;
+			let markdown = cx
+				.tool
+				.world()
 				.with_then(move |world: &mut World| {
 					render_markdown_for(card_entity, world)
 				})
 				.await;
-			Response::ok().with_body(markdown).xok()
+			Pass(Response::ok_body(markdown, "text/plain"))
 		}
-		InterfaceAction::Help(text) => Response::ok().with_body(text).xok(),
+		Some(RouteNode::Tool(tool_node)) => Pass(
+			cx.tool
+				.world()
+				.entity(tool_node.entity)
+				.call::<Request, Response>(cx.input)
+				.await?,
+		),
+		None => Fail(cx.input),
 	}
+	.xok()
 }
 
-/// Determines the [`InterfaceAction`] for a request by inspecting the
-/// route tree and interface state. Runs synchronously with entity access.
-fn resolve_action(
-	entity: &EntityWorldMut,
-	request: Request,
-) -> Result<InterfaceAction> {
-	let interface = entity
-		.get::<Interface>()
-		.ok_or_else(|| bevyhow!("No Interface component on entity"))?;
-	let current_card = interface.current_card();
+async fn nearest_ancestor_help_handler(
+	cx: AsyncToolContext<Request>,
+) -> Result<Outcome<Response, Request>> {
+	let path = cx.input.path().clone();
+	let tool_entity = cx.tool.id();
+	let help_text = cx
+		.tool
+		.world()
+		.with_then(move |world: &mut World| -> Result<String> {
+			let tree = root_route_tree(world, tool_entity)?;
+			nearest_ancestor_help(tree, &path).xok()
+		})
+		.await?;
 
-	// Find root ancestor by walking up ChildOf relationships
-	let world = entity.world();
-	let root = {
-		let mut current = entity.id();
-		while let Some(child_of) = world.entity(current).get::<ChildOf>() {
-			current = child_of.parent();
-		}
-		current
-	};
-
-	let tree = world
-		.entity(root)
-		.get::<RouteTree>()
-		.ok_or_else(|| bevyhow!("No RouteTree found on root ancestor"))?;
-
-	// Handle help requests
-	if request.has_param("help") {
-		let help_text = format_route_help(tree);
-		return InterfaceAction::Help(help_text).xok();
-	}
-
-	let path = request.route_path();
-	let segments = path.segments();
-
-	// Empty path -> render current card
-	if segments.is_empty() {
-		return InterfaceAction::RenderCurrent {
-			card_entity: current_card,
-		}
-		.xok();
-	}
-
-	// Try to find a matching route
-	if let Some(route_node) = tree.find(&segments) {
-		return match route_node {
-			RouteNode::Card(card_node) => InterfaceAction::NavigateCard {
-				card_entity: card_node.entity,
-			}
-			.xok(),
-			RouteNode::Tool(tool_node) => {
-				if tool_node.is_exchange {
-					InterfaceAction::CallTool {
-						tool_entity: tool_node.entity,
-						request,
-					}
-					.xok()
-				} else {
-					bevybail!(
-						"Tool at /{} is not an exchange tool and cannot be called via the interface",
-						segments.join("/")
-					)
-				}
-			}
-		};
-	}
-
-	// Route not found - find nearest matching ancestor and show its help
-	let help_text = nearest_ancestor_help(tree, &segments);
-	InterfaceAction::Help(help_text).xok()
+	Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
 }
 
 /// Walks the path segments from longest to shortest prefix, returning
 /// help for the first ancestor that matches a card. Falls back to
 /// root help if nothing matches.
-fn nearest_ancestor_help(tree: &RouteTree, segments: &[&str]) -> String {
+fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
 	// Try progressively shorter prefixes
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
@@ -294,7 +216,7 @@ mod test {
 
 	fn my_interface() -> impl Bundle {
 		(
-			Interface::new_this(),
+			Interface::default(),
 			direct_tool(
 				|req: In<ToolContext<Request>>,
 				 trees: Query<&RouteTree>,
@@ -326,32 +248,6 @@ mod test {
 			.annotated_route_path()
 			.to_string()
 			.xpect_eq("/add");
-	}
-
-	#[test]
-	fn interface_tracks_current_card() {
-		let mut world = StackPlugin::world();
-		let root = world.spawn((Interface::new_this(), Card)).flush();
-
-		let interface = world.entity(root).get::<Interface>().unwrap();
-		interface.current_card().xpect_eq(root);
-	}
-
-	#[test]
-	fn interface_card_navigation() {
-		let mut world = StackPlugin::world();
-		let root = world.spawn((Interface::new_this(), Card)).flush();
-
-		let child_card = world.spawn((ChildOf(root), card("about"))).flush();
-
-		let mut binding = world.entity_mut(root);
-		let mut interface = binding.get_mut::<Interface>().unwrap();
-		interface.set_current_card(child_card);
-		drop(interface);
-		drop(binding);
-
-		let interface = world.entity(root).get::<Interface>().unwrap();
-		interface.current_card().xpect_eq(child_card);
 	}
 
 	#[beet_core::test]

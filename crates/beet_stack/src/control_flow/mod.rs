@@ -10,11 +10,11 @@ use beet_core::prelude::*;
 /// ```rust
 /// # use beet_stack::prelude::*;
 ///
-/// fn foo() -> Outcome {
+/// fn short() -> Outcome {
 /// 	Pass(())
 /// }
 /// // is the same as
-/// fn foo() -> Outcome<(),()> {
+/// fn explicit() -> Outcome<(),()> {
 /// 	Outcome::Pass(())
 /// }
 /// ```

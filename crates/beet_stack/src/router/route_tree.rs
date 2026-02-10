@@ -1,6 +1,15 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Marker component that excludes an entity from the [`RouteTree`].
+///
+/// Internal tools like fallback chain handlers should not appear
+/// as routable endpoints. Adding this component prevents them from
+/// being collected during route tree construction.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct RouteHidden;
+
 /// Collects all routes (tools and cards) in an entity hierarchy and
 /// arranges them into a validated tree.
 ///
