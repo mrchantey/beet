@@ -1,30 +1,47 @@
 use beet_core::prelude::*;
 
-// /// A collection of cards organized as a stack.
-// ///
-// /// A stack is the primary organizational unit for content in beet_stack.
-// /// Similar to how a website has pages, a stack contains multiple cards.
-// /// The stack itself is also a card, by default presenting its cards as
-// /// navigation items, but it can have additional content and cards
-// /// just like other cards.
-// ///
-// /// # Example Structure
-// ///
-// /// ```text
-// /// Stack (root)
-// ///   ├─ Card (page 1)
-// ///   ├─ Card (page 2)
-// ///   └─ Card (page 3)
-// /// ```
-// #[derive(Component)]
-// pub struct Stack;
-
-/// A single content container within a [`Stack`].
+/// A single content container, similar to pages in a website or cards
+/// in HyperCard. Each card is a route, with the exact rendering behavior
+/// determined by the interface.
 ///
-/// Cards are the fundamental content units in beet_stack, similar to pages
-/// in a website or cards in HyperCard. Each card contains content and tools.
+/// Cards may contain content, tools, and nested cards. The root entity
+/// is automatically considered a card.
 ///
-/// Cards can also have associated [`Document`](crate::Document) components for
-/// structured data storage.
+/// Use the [`card`] function to create a card with a path:
+/// ```
+/// use beet_stack::prelude::*;
+/// use beet_core::prelude::*;
+///
+/// let mut world = StackPlugin::world();
+/// let root = world.spawn((Card, children![
+///     card("about"),
+///     card("settings"),
+/// ])).flush();
+///
+/// let tree = world.entity(root).get::<RouteTree>().unwrap();
+/// tree.find_card(&["about"]).xpect_some();
+/// tree.find_card(&["settings"]).xpect_some();
+/// ```
 #[derive(Component)]
 pub struct Card;
+
+/// Creates a card bundle with a [`PathPartial`] for routing.
+///
+/// This is the preferred way to create a card with a route path,
+/// combining [`Card`] with a [`PathPartial`].
+///
+/// # Example
+///
+/// ```
+/// use beet_stack::prelude::*;
+/// use beet_core::prelude::*;
+///
+/// let mut world = StackPlugin::world();
+/// let root = world.spawn((Card, children![
+///     card("about"),
+/// ])).flush();
+///
+/// let tree = world.entity(root).get::<RouteTree>().unwrap();
+/// tree.find_card(&["about"]).xpect_some();
+/// ```
+pub fn card(path: &str) -> impl Bundle { (Card, PathPartial::new(path)) }

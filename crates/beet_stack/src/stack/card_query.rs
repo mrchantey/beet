@@ -37,17 +37,17 @@ use std::collections::VecDeque;
 pub struct CardQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
-	tool_trees: Query<'w, 's, &'static ToolTree>,
+	route_trees: Query<'w, 's, &'static RouteTree>,
 	cards: Query<'w, 's, (), With<Card>>,
 }
 
 impl<'w, 's> CardQuery<'w, 's> {
-	/// Finds the tool tree for the given entity, if it exists.
+	/// Finds the route tree for the given entity, if it exists.
 	/// This is done by first traversing to the root ancestor,
-	/// which is where tool trees should exist.
-	pub fn tool_tree(&self, entity: Entity) -> Result<&ToolTree> {
+	/// which is where route trees should exist.
+	pub fn route_tree(&self, entity: Entity) -> Result<&RouteTree> {
 		let root = self.ancestors.root_ancestor(entity);
-		self.tool_trees.get(root)
+		Ok(self.route_trees.get(root)?)
 	}
 
 	/// Finds the card root for the given entity.

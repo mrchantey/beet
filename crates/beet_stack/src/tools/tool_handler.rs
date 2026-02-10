@@ -351,7 +351,7 @@ mod test {
 	fn tool_context() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(tool(|cx: ToolContext<()>| -> Entity { cx.tool }))
+			.spawn(direct_tool(|cx: ToolContext<()>| -> Entity { cx.tool }))
 			.id();
 		world
 			.entity_mut(entity)
@@ -386,12 +386,12 @@ mod test {
 		// --- Function ---
 		// let _ = tool(|_: ()| {}); // ambiguous
 		let _ = tool(|_: u32| {});
-		let _ = tool(|_: Request| {});
-		let _ = tool(|_: Request| 3);
-		let _ = tool(Request::mirror);
-		let _ = tool(|req: Request| req.mirror());
+		let _ = direct_tool(|_: Request| {});
+		let _ = direct_tool(|_: Request| 3);
+		let _ = direct_tool(Request::mirror);
+		let _ = direct_tool(|req: Request| req.mirror());
 		let _ = tool(|_: u32| -> Result { Ok(()) });
-		let _ = tool(|_: ToolContext<()>| {});
+		let _ = direct_tool(|_: ToolContext<()>| {});
 
 		// --- AsyncFunction ---
 		// let _ = tool(async |_: ()| {}); // ambiguous

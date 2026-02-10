@@ -42,22 +42,33 @@ fn test_stack() -> (World, Entity) {
 }
 
 #[test]
-fn tool_tree_built_on_spawn() {
+fn route_tree_built_on_spawn() {
 	let (world, root) = test_stack();
-	let tree = world.entity(root).get::<ToolTree>().unwrap();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
 	// help, render-markdown, counter/increment, counter/render-markdown,
-	// calculator/add, calculator/render-markdown
-	tree.flatten().len().xpect_eq(6);
+	// calculator/add, calculator/render-markdown,
+	// plus card routes: counter, calculator
+	tree.flatten_tool_nodes().len().xpect_eq(6);
 }
 
 #[test]
 fn find_tool_by_path() {
 	let (world, root) = test_stack();
-	let tree = world.entity(root).get::<ToolTree>().unwrap();
-	tree.find_exact(&["counter", "increment"]).xpect_some();
-	tree.find_exact(&["calculator", "add"]).xpect_some();
-	tree.find_exact(&["help"]).xpect_some();
-	tree.find_exact(&["nonexistent"]).xpect_none();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
+	tree.find_tool(&["counter", "increment"]).xpect_some();
+	tree.find_tool(&["calculator", "add"]).xpect_some();
+	tree.find_tool(&["help"]).xpect_some();
+	tree.find(&["nonexistent"]).xpect_none();
+}
+
+#[test]
+fn find_card_by_path() {
+	let (world, root) = test_stack();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
+	tree.find_card(&["counter"]).xpect_some();
+	tree.find_card(&["calculator"]).xpect_some();
+	// tools are not cards
+	tree.find_card(&["help"]).xpect_none();
 }
 
 #[test]
@@ -65,11 +76,11 @@ fn help_lists_all_tools() {
 	let (mut world, root) = test_stack();
 	let help_entity = world
 		.entity(root)
-		.get::<ToolTree>()
+		.get::<RouteTree>()
 		.unwrap()
-		.find_exact(&["help"])
+		.find(&["help"])
 		.unwrap()
-		.entity;
+		.entity();
 
 	let output = world
 		.entity_mut(help_entity)
@@ -88,9 +99,9 @@ fn dispatch_increment_via_cli_path() {
 	let (mut world, root) = test_stack();
 	let cli = CliArgs::parse("counter increment");
 
-	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
+	let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 
-	let node = tree.find_exact(&cli.path).unwrap();
+	let node = tree.find_tool(&cli.path).unwrap();
 	let tool_entity = node.entity;
 
 	world
@@ -111,9 +122,9 @@ fn dispatch_add_via_cli_path() {
 	let (mut world, root) = test_stack();
 	let cli = CliArgs::parse("calculator add");
 
-	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
+	let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 
-	let node = tree.find_exact(&cli.path).unwrap();
+	let node = tree.find_tool(&cli.path).unwrap();
 	let tool_entity = node.entity;
 
 	world
@@ -134,9 +145,9 @@ fn dispatch_help_via_cli_path() {
 	let (mut world, root) = test_stack();
 	let cli = CliArgs::parse("help");
 
-	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
+	let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 
-	let node = tree.find_exact(&cli.path).unwrap();
+	let node = tree.find_tool(&cli.path).unwrap();
 	let output = world
 		.entity_mut(node.entity)
 		.call_blocking::<(), String>(())
@@ -151,6 +162,41 @@ fn cli_path_not_found() {
 	let (world, root) = test_stack();
 	let cli = CliArgs::parse("nonexistent command");
 
-	let tree = world.entity(root).get::<ToolTree>().unwrap();
-	tree.find_exact(&cli.path).xpect_none();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
+	tree.find(&cli.path).xpect_none();
+}
+
+#[test]
+fn cards_are_routes() {
+	let (world, root) = test_stack();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
+
+	// cards should appear as routes: root + counter + calculator
+	let card_nodes = tree.flatten_card_nodes();
+	card_nodes.len().xpect_eq(3);
+
+	// and be findable
+	let counter_card = tree.find_card(&["counter"]).unwrap();
+	world
+		.entity(counter_card.entity)
+		.contains::<Card>()
+		.xpect_true();
+}
+
+#[test]
+fn route_node_entity_is_queryable() {
+	let (world, root) = test_stack();
+	let tree = world.entity(root).get::<RouteTree>().unwrap();
+
+	let tool_node = tree.find(&["counter", "increment"]).unwrap();
+	world
+		.entity(tool_node.entity())
+		.contains::<ToolMeta>()
+		.xpect_true();
+
+	let card_node = tree.find(&["counter"]).unwrap();
+	world
+		.entity(card_node.entity())
+		.contains::<Card>()
+		.xpect_true();
 }

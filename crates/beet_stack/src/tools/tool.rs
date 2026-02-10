@@ -4,33 +4,56 @@ use beet_core::exports::async_channel::Sender;
 use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
 
+/// Marker component indicating this tool supports [`Request`]/[`Response`]
+/// calls via automatic serialization. Added by [`exchange_tool`] or
+/// automatically by [`tool`] when the `interface` feature is enabled.
+#[derive(Debug, Component)]
+pub struct ExchangeToolMarker;
+
 
 /// Create a tool from a handler implementing [`IntoToolHandler`],
 /// adding an associated [`ToolMeta`] which is required for tool calling.
+///
+/// When the `interface` feature is enabled, this automatically adds
+/// exchange support for [`Request`]/[`Response`] calls via serialization.
+/// Use [`direct_tool`] if you need a tool without exchange support.
+#[cfg(feature = "interface")]
 pub fn tool<H, M>(handler: H) -> impl Bundle
+where
+	H: IntoToolHandler<M>,
+	H::In: serde::de::DeserializeOwned,
+	H::Out: serde::Serialize,
+{
+	exchange_tool(handler)
+}
+
+/// Create a tool from a handler implementing [`IntoToolHandler`],
+/// adding an associated [`ToolMeta`] which is required for tool calling.
+///
+/// Without the `interface` feature, this creates a direct tool
+/// without exchange support.
+#[cfg(not(feature = "interface"))]
+pub fn tool<H, M>(handler: H) -> impl Bundle
+where
+	H: IntoToolHandler<M>,
+{
+	direct_tool(handler)
+}
+
+/// Create a tool without exchange support, regardless of feature flags.
+///
+/// This is the base tool constructor that only adds [`ToolMeta`] and
+/// the handler. Use this when the handler's input/output types do not
+/// implement [`Serialize`](serde::Serialize)/[`Deserialize`](serde::de::DeserializeOwned),
+/// or when exchange support is not needed.
+pub fn direct_tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
 {
 	(ToolMeta::of::<H::In, H::Out>(), handler.into_handler())
 }
 
-/// Observer that listens for new tools and inserts their path and params patterns.
-/// Any [`PathPartial`] or [`ParamsPartial`] will be collected so long as they are
-/// spawned at the same time as the tool, even if they come after it in the tuple.
-/// This is because, unlike OnAdd component hooks, observers run after the entire
-/// tree is spawned.
-pub fn insert_tool_path_and_params(
-	ev: On<Insert, ToolMeta>,
-	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
-	params: Query<&ParamsPartial>,
-	mut commands: Commands,
-) -> Result {
-	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
-	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
-	commands.entity(ev.entity).insert((path, params));
-	Ok(())
-}
+
 
 /// Metadata for a tool, containing the input and output types.
 /// Every tool must have a [`ToolMeta`], calling a tool with
@@ -431,8 +454,7 @@ mod test {
 
 	#[test]
 	fn path_pattern() {
-		let mut world = ToolPlugin::world();
-		world.add_observer(insert_tool_path_and_params);
+		let mut world = RouterPlugin::world();
 		world
 			.spawn(add_tool())
 			.get::<PathPattern>()
@@ -457,7 +479,7 @@ mod test {
 			foo: u32,
 		}
 
-		let mut world = ToolPlugin::world();
+		let mut world = RouterPlugin::world();
 		world
 			.spawn(add_tool())
 			.get::<ParamsPattern>()

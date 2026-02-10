@@ -42,7 +42,7 @@ use beet_core::prelude::*;
 /// struct AddInput { a: i32, b: i32 }
 ///
 /// let request = Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
-/// let response = World::new()
+/// let response = AsyncPlugin::world()
 ///     .spawn(exchange_tool(|input: AddInput| -> i32 { input.a + input.b }))
 ///     .call_blocking::<Request, Response>(request)
 ///     .unwrap();
@@ -63,19 +63,15 @@ where
 	)
 }
 
-/// Marker component indicating this tool supports [`Request`]/[`Response`]
-/// calls via automatic serialization. Added by [`exchange_tool`].
-#[derive(Debug, Component)]
-pub struct ExchangeToolMarker;
-
 /// Creates the observer bundle that bridges `Request`/`Response` tool calls
 /// to the inner typed `In`/`Out` handler.
 ///
 /// When a [`ToolIn<Request, Response>`] event fires on the entity:
-/// 1. The request's `content-type` header determines the [`ExchangeFormat`]
-/// 2. The request body is deserialized to `In`
-/// 3. A [`ToolIn<In, Out>`] is triggered with a wrapping [`ToolOutHandler`]
-/// 4. The wrapping handler serializes `Out` into a [`Response`] body
+/// 1. The request body is consumed asynchronously to support streaming
+/// 2. The request's `content-type` header determines the [`ExchangeFormat`]
+/// 3. The body bytes are deserialized to `In`
+/// 4. A [`ToolIn<In, Out>`] is triggered with a wrapping [`ToolOutHandler`]
+/// 5. The wrapping handler serializes `Out` into a [`Response`] body
 ///    and forwards it to the original `Response` out handler
 fn exchange_tool_handler<In, Out>() -> impl Bundle
 where
@@ -86,7 +82,7 @@ where
 		ExchangeToolMarker,
 		OnSpawn::observe(
 			move |mut ev: On<ToolIn<Request, Response>>,
-			      mut commands: Commands|
+			      mut commands: AsyncCommands|
 			      -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
@@ -98,46 +94,49 @@ where
 					request.get_header("content-type"),
 				)?;
 
-				// deserialize request body to In
-				let body_bytes =
-					request.body.try_into_bytes().ok_or_else(|| {
-						bevyhow!(
-							"Exchange tool does not support streaming request bodies"
-						)
-					})?;
-				let input: In = format.deserialize(&body_bytes)?;
+				commands.run(async move |world| -> Result {
+					// consume body asynchronously to support streaming
+					let body_bytes = request.body.into_bytes().await?;
+					let input: In = format.deserialize(&body_bytes)?;
 
-				// create a wrapping out handler that serializes Out -> Response
-				// then forwards to the original Response handler
-				let wrapping_handler =
-					ToolOutHandler::<Out>::function(move |output: Out| {
-						let body_bytes = format.serialize(&output)?;
-						let response = Response::ok()
-							.with_content_type(format.content_type_str())
-							.with_body(body_bytes);
-						match outer_handler {
-							ToolOutHandler::Channel { sender } => {
-								sender.try_send(response).map_err(|err| {
-									bevyhow!(
-										"Failed to send exchange response: {err:?}"
+					// create a wrapping out handler that serializes Out -> Response
+					// then forwards to the original Response handler
+					let wrapping_handler =
+						ToolOutHandler::<Out>::function(move |output: Out| {
+							let body_bytes = format.serialize(&output)?;
+							let response = Response::ok()
+								.with_content_type(format.content_type_str())
+								.with_body(body_bytes);
+							match outer_handler {
+								ToolOutHandler::Channel { sender } => {
+									sender.try_send(response).map_err(|err| {
+										bevyhow!(
+											"Failed to send exchange response: {err:?}"
+										)
+									})
+								}
+								ToolOutHandler::Function { handler } => {
+									handler(response)
+								}
+								ToolOutHandler::Observer { .. } => {
+									bevybail!(
+										"Exchange tool does not support Observer out handlers directly. \
+										 Use entity.call() or entity.call_blocking() instead."
 									)
-								})
+								}
 							}
-							ToolOutHandler::Function { handler } => {
-								handler(response)
-							}
-							ToolOutHandler::Observer { .. } => {
-								bevybail!(
-									"Exchange tool does not support Observer out handlers directly. \
-									 Use entity.call() or entity.call_blocking() instead."
-								)
-							}
-						}
-					});
+						});
 
-				// trigger the inner typed handler via deferred command
-				commands.entity(tool).trigger(|entity| {
-					ToolIn::new(entity, input, wrapping_handler)
+					// trigger the inner typed handler
+					world
+						.with_then(move |world: &mut World| -> Result {
+							world.commands().entity(tool).trigger(|entity| {
+								ToolIn::new(entity, input, wrapping_handler)
+							});
+							world.flush();
+							Ok(())
+						})
+						.await
 				});
 				Ok(())
 			},
@@ -185,7 +184,7 @@ mod test {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
 
-		let response = World::new()
+		let response = AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap();
@@ -205,7 +204,7 @@ mod test {
 	fn json_default_content_type() {
 		let request = Request::post("/add").with_body(r#"{"a":1,"b":2}"#);
 
-		World::new()
+		AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap()
@@ -221,7 +220,7 @@ mod test {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 5, b: 7 }).unwrap();
 
-		let response = World::new()
+		let response = AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap();
@@ -239,7 +238,7 @@ mod test {
 
 	#[test]
 	fn unit_input_empty_body() {
-		let response = World::new()
+		let response = AsyncPlugin::world()
 			.spawn(exchange_tool(|| -> i32 { 42 }))
 			.call_blocking::<Request, Response>(Request::get("/"))
 			.unwrap();
@@ -253,7 +252,7 @@ mod test {
 	#[test]
 	#[should_panic = "does not support Request/Response"]
 	fn non_exchange_tool_rejects_request() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn(tool(|(a, b): (i32, i32)| -> i32 { a + b }))
 			.call_blocking::<Request, Response>(Request::get("/"))
 			.unwrap();
@@ -307,7 +306,7 @@ mod test {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 5 }).unwrap();
 
-		World::new()
+		AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap()
@@ -321,7 +320,7 @@ mod test {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 3, b: 9 }).unwrap();
 
-		World::new()
+		AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap()
@@ -336,7 +335,7 @@ mod test {
 	fn json_str_request() {
 		let request = Request::with_json_str("/add", r#"{"a":100,"b":200}"#);
 
-		World::new()
+		AsyncPlugin::world()
 			.spawn(add_exchange_tool())
 			.call_blocking::<Request, Response>(request)
 			.unwrap()

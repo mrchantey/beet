@@ -10,7 +10,7 @@ pub fn stdio_server() -> impl Bundle {
 	(
 		Name::new("stdio server"),
 		Interface::new_this(),
-		tool(handler),
+		direct_tool(handler),
 	)
 }
 

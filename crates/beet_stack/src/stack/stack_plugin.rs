@@ -8,6 +8,6 @@ pub struct StackPlugin;
 impl Plugin for StackPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<DocumentPlugin>()
-			.init_plugin::<ToolPlugin>();
+			.init_plugin::<RouterPlugin>();
 	}
 }

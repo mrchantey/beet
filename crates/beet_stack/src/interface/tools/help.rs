@@ -1,6 +1,6 @@
 //! A tool that renders help documentation for all registered tools.
 //!
-//! Traverses to the root ancestor, reads the [`ToolTree`], and formats
+//! Traverses to the root ancestor, reads the [`RouteTree`], and formats
 //! it as a human-readable help string.
 
 use crate::prelude::*;
@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 
 /// Creates a help tool accessible at `/help`.
 ///
-/// Reads the [`ToolTree`] from the root ancestor and formats all
+/// Reads the [`RouteTree`] from the root ancestor and formats all
 /// registered tools as a help string showing paths, input/output
 /// types, and parameters.
 ///
@@ -26,11 +26,11 @@ use beet_core::prelude::*;
 ///
 /// let help_entity = world
 ///     .entity(root)
-///     .get::<ToolTree>()
+///     .get::<RouteTree>()
 ///     .unwrap()
 ///     .find(&["help"])
 ///     .unwrap()
-///     .entity;
+///     .entity();
 ///
 /// let output = world
 ///     .entity_mut(help_entity)
@@ -41,26 +41,26 @@ use beet_core::prelude::*;
 /// ```
 pub fn help() -> impl Bundle { (PathPartial::new("help"), tool(help_system)) }
 
-/// System that reads the [`ToolTree`] from the root ancestor and formats it.
+/// System that reads the [`RouteTree`] from the root ancestor and formats it.
 fn help_system(
 	cx: In<ToolContext>,
 	ancestors: Query<&ChildOf>,
-	trees: Query<&ToolTree>,
+	trees: Query<&RouteTree>,
 ) -> Result<String> {
 	let root = ancestors.root_ancestor(cx.tool);
 	let tree = trees.get(root).map_err(|_| {
-		bevyhow!("No ToolTree found on root ancestor, cannot render help")
+		bevyhow!("No RouteTree found on root ancestor, cannot render help")
 	})?;
 	format_help(tree).xok()
 }
 
-/// Format a [`ToolTree`] as a help string, excluding the help tool itself.
-fn format_help(tree: &ToolTree) -> String {
+/// Format a [`RouteTree`] as a help string, excluding the help tool itself.
+fn format_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
 	output.push_str("Available tools:\n\n");
 
 	let nodes: Vec<&ToolNode> = tree
-		.flatten_nodes()
+		.flatten_tool_nodes()
 		.into_iter()
 		.filter(|node| {
 			!node
@@ -129,11 +129,11 @@ mod test {
 
 		let help_entity = world
 			.entity(root)
-			.get::<ToolTree>()
+			.get::<RouteTree>()
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity;
+			.entity();
 
 		let output = world
 			.entity_mut(help_entity)
@@ -161,11 +161,11 @@ mod test {
 
 		let help_entity = world
 			.entity(root)
-			.get::<ToolTree>()
+			.get::<RouteTree>()
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity;
+			.entity();
 
 		let output = world
 			.entity_mut(help_entity)
@@ -184,11 +184,11 @@ mod test {
 
 		let help_entity = world
 			.entity(root)
-			.get::<ToolTree>()
+			.get::<RouteTree>()
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity;
+			.entity();
 
 		let output = world
 			.entity_mut(help_entity)
@@ -206,11 +206,11 @@ mod test {
 
 		let help_entity = world
 			.entity(root)
-			.get::<ToolTree>()
+			.get::<RouteTree>()
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity;
+			.entity();
 
 		let output = world
 			.entity_mut(help_entity)
@@ -218,5 +218,35 @@ mod test {
 			.unwrap();
 
 		output.contains("(none)").xpect_true();
+	}
+
+	#[test]
+	fn help_excludes_card_routes() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((Card, children![
+				help(),
+				card("about"),
+				increment(FieldRef::new("count")),
+			]))
+			.flush();
+
+		let help_entity = world
+			.entity(root)
+			.get::<RouteTree>()
+			.unwrap()
+			.find(&["help"])
+			.unwrap()
+			.entity();
+
+		let output = world
+			.entity_mut(help_entity)
+			.call_blocking::<(), String>(())
+			.unwrap();
+
+		// cards should not appear in help output
+		output.contains("about").xpect_false();
+		// tools should still appear
+		output.contains("increment").xpect_true();
 	}
 }

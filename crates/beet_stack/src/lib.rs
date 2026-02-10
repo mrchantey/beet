@@ -7,6 +7,7 @@ mod content;
 mod document;
 #[cfg(feature = "interface")]
 mod interface;
+mod router;
 mod stack;
 mod tools;
 
@@ -17,6 +18,7 @@ pub mod prelude {
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
+	pub use crate::router::*;
 	pub use crate::stack::*;
 	pub use crate::tools::*;
 	pub use crate::val;

@@ -14,10 +14,10 @@ categories.workspace = true
 
 [features]
 default = ["interface"]
-interface = ["dep:serde","beet_core/exchange","beet_core/json","beet_core/postcard"]
+interface = ["dep:serde","beet_core/json","beet_core/postcard"]
 
 [dependencies]
-beet_core = { workspace = true }
+beet_core = { workspace = true, features = ["exchange"] }
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
