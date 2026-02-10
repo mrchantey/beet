@@ -337,6 +337,13 @@ web-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
 
+# 💡 Examples - stack
+
+[[example]]
+name = "repl"
+path = "examples/stack/repl.rs"
+required-features = ["stack"]
+
 # 💡 Examples - agent
 
 [[example]]

@@ -1,7 +1,7 @@
-//! A tool that renders help documentation for all registered tools.
+//! A tool that renders help documentation for registered routes.
 //!
 //! Traverses to the root ancestor, reads the [`RouteTree`], and formats
-//! it as a human-readable help string.
+//! it as a human-readable help string showing cards and tools.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -9,8 +9,7 @@ use beet_core::prelude::*;
 /// Creates a help tool accessible at `/help`.
 ///
 /// Reads the [`RouteTree`] from the root ancestor and formats all
-/// registered tools as a help string showing paths, input/output
-/// types, and parameters.
+/// registered routes (both cards and tools) as a help string.
 ///
 /// # Example
 ///
@@ -51,39 +50,69 @@ fn help_system(
 	let tree = trees.get(root).map_err(|_| {
 		bevyhow!("No RouteTree found on root ancestor, cannot render help")
 	})?;
-	format_help(tree).xok()
+	format_route_help(tree).xok()
 }
 
-/// Format a [`RouteTree`] as a help string, excluding the help tool itself.
-fn format_help(tree: &RouteTree) -> String {
+/// Format a [`RouteTree`] as a help string, listing both cards and tools.
+///
+/// The help tool itself is excluded from the listing.
+/// This is the primary entry point for rendering help text and is
+/// reused by the interface tool for contextual help.
+pub fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
-	output.push_str("Available tools:\n\n");
+	output.push_str("Available routes:\n\n");
 
-	let nodes: Vec<&ToolNode> = tree
-		.flatten_tool_nodes()
+	let nodes = tree.flatten_nodes();
+
+	let filtered: Vec<&RouteNode> = nodes
 		.into_iter()
 		.filter(|node| {
 			!node
-				.path
+				.path()
 				.annotated_route_path()
 				.to_string()
 				.ends_with("/help")
 		})
 		.collect();
 
-	if nodes.is_empty() {
+	if filtered.is_empty() {
 		output.push_str("  (none)\n");
 		return output;
 	}
 
-	for node in nodes {
-		format_tool_node(&mut output, node);
+	for node in filtered {
+		format_route_node(&mut output, node);
 	}
 
 	output
 }
 
-/// Format a single [`ToolNode`] into the output string.
+/// Format a single [`RouteNode`] (card or tool) into the output string.
+fn format_route_node(output: &mut String, node: &RouteNode) {
+	match node {
+		RouteNode::Card(card) => {
+			format_card_node(output, card);
+		}
+		RouteNode::Tool(tool) => {
+			format_tool_node(output, tool);
+		}
+	}
+}
+
+/// Format a [`CardNode`] into the output string.
+fn format_card_node(output: &mut String, card: &CardNode) {
+	let path = card.path.annotated_route_path();
+	output.push_str(&format!("  {} [card]\n", path));
+
+	// params
+	for param in card.params.iter() {
+		output.push_str(&format!("    {}\n", param));
+	}
+
+	output.push('\n');
+}
+
+/// Format a [`ToolNode`] into the output string.
 fn format_tool_node(output: &mut String, node: &ToolNode) {
 	let path = node.path.annotated_route_path();
 	output.push_str(&format!("  {}", path));
@@ -140,7 +169,7 @@ mod test {
 			.call_blocking::<(), String>(())
 			.unwrap();
 
-		output.contains("Available tools").xpect_true();
+		output.contains("Available routes").xpect_true();
 		output.contains("increment").xpect_true();
 		output.contains("decrement").xpect_true();
 		// help itself should be excluded from the listing
@@ -217,11 +246,14 @@ mod test {
 			.call_blocking::<(), String>(())
 			.unwrap();
 
-		output.contains("(none)").xpect_true();
+		// The root card appears (it has an implicit "/" path),
+		// but no tools besides help (which is filtered out)
+		output.contains("[card]").xpect_true();
+		output.contains("Available routes").xpect_true();
 	}
 
 	#[test]
-	fn help_excludes_card_routes() {
+	fn help_includes_cards() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((Card, children![
@@ -244,8 +276,9 @@ mod test {
 			.call_blocking::<(), String>(())
 			.unwrap();
 
-		// cards should not appear in help output
-		output.contains("about").xpect_false();
+		// cards should appear with a [card] marker
+		output.contains("about").xpect_true();
+		output.contains("[card]").xpect_true();
 		// tools should still appear
 		output.contains("increment").xpect_true();
 	}

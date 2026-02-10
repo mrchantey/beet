@@ -2,6 +2,10 @@
 //!
 //! This module provides functionality to convert the semantic text representation
 //! (using [`TextContent`] and semantic markers) into markdown strings.
+//!
+//! The core rendering logic is exposed via [`render_markdown_for`] so it can
+//! be called from other systems (ie the interface tool) without needing
+//! to go through a tool call.
 //! ```
 
 use crate::prelude::*;
@@ -45,7 +49,20 @@ pub fn render_markdown() -> impl Bundle {
 	)
 }
 
+/// Renders an entity's text content tree to markdown using direct world access.
+///
+/// This is the reusable entry point for markdown rendering. It runs the
+/// rendering system via [`World::run_system_cached_with`], so it can be
+/// called from any context that has `&mut World`.
+pub fn render_markdown_for(entity: Entity, world: &mut World) -> String {
+	world
+		.run_system_cached_with(render_markdown_for_entity, entity)
+		.unwrap_or_default()
+}
+
 /// System that renders an entity tree to markdown using CardQuery.
+/// Used by the [`render_markdown`] tool, which renders relative to
+/// its own entity (via card root resolution).
 fn render_markdown_system(
 	In(cx): In<ToolContext>,
 	card_query: CardQuery,
@@ -59,49 +76,115 @@ fn render_markdown_system(
 	link_query: Query<&Link>,
 	ancestors: Query<&ChildOf>,
 ) -> Result<String> {
+	render_markdown_inner(
+		cx.tool,
+		true,
+		&card_query,
+		&text_query,
+		&title_query,
+		&paragraph_query,
+		&important_query,
+		&emphasize_query,
+		&code_query,
+		&quote_query,
+		&link_query,
+		&ancestors,
+	)
+	.xok()
+}
+
+/// System that renders a specific entity to markdown, starting from
+/// that entity directly rather than resolving the card root first.
+/// Used by [`render_markdown_for`].
+fn render_markdown_for_entity(
+	In(entity): In<Entity>,
+	card_query: CardQuery,
+	text_query: Query<&TextContent>,
+	title_query: Query<(), With<Title>>,
+	paragraph_query: Query<(), With<Paragraph>>,
+	important_query: Query<(), With<Important>>,
+	emphasize_query: Query<(), With<Emphasize>>,
+	code_query: Query<(), With<Code>>,
+	quote_query: Query<(), With<Quote>>,
+	link_query: Query<&Link>,
+	ancestors: Query<&ChildOf>,
+) -> String {
+	render_markdown_inner(
+		entity,
+		false,
+		&card_query,
+		&text_query,
+		&title_query,
+		&paragraph_query,
+		&important_query,
+		&emphasize_query,
+		&code_query,
+		&quote_query,
+		&link_query,
+		&ancestors,
+	)
+}
+
+/// Core markdown rendering logic shared by the tool and the standalone
+/// function.
+///
+/// When `resolve_card_root` is true, the iterator starts from the card
+/// root of `entity` (tool behavior). When false, it starts directly
+/// from `entity` (standalone behavior).
+fn render_markdown_inner(
+	entity: Entity,
+	resolve_card_root: bool,
+	card_query: &CardQuery,
+	text_query: &Query<&TextContent>,
+	title_query: &Query<(), With<Title>>,
+	paragraph_query: &Query<(), With<Paragraph>>,
+	important_query: &Query<(), With<Important>>,
+	emphasize_query: &Query<(), With<Emphasize>>,
+	code_query: &Query<(), With<Code>>,
+	quote_query: &Query<(), With<Quote>>,
+	link_query: &Query<&Link>,
+	ancestors: &Query<&ChildOf>,
+) -> String {
 	let mut output = String::new();
 
-	// Use CardQuery DFS to traverse entities within the card boundary
-	for current in card_query.iter_dfs(cx.tool) {
-		// Check if this entity has text content
+	let iter: Box<dyn Iterator<Item = Entity>> = if resolve_card_root {
+		Box::new(card_query.iter_dfs(entity))
+	} else {
+		Box::new(card_query.iter_dfs_from(entity))
+	};
+
+	for current in iter {
 		if let Ok(text) = text_query.get(current) {
-			// Build the wrapped content
 			let mut wrapped = text.as_str().to_string();
 
-			// Apply wrappers from innermost to outermost
+			// Apply inline wrappers from innermost to outermost
 			if code_query.contains(current) {
 				wrapped = format!("`{}`", wrapped);
 			}
-
 			if emphasize_query.contains(current) {
 				wrapped = format!("*{}*", wrapped);
 			}
-
 			if important_query.contains(current) {
 				wrapped = format!("**{}**", wrapped);
 			}
-
 			if quote_query.contains(current) {
 				wrapped = format!("\"{}\"", wrapped);
 			}
-
 			if let Ok(link) = link_query.get(current) {
 				let title = link
 					.title
 					.as_ref()
-					.map(|t| format!(" \"{}\"", t))
+					.map(|title| format!(" \"{}\"", title))
 					.unwrap_or_default();
 				wrapped = format!("[{}]({}{})", wrapped, link.href, title);
 			}
 
-			// Select and handle a structural element, if any
+			// Structural elements
 			if title_query.contains(current) {
-				// Calculate title nesting level by counting Title ancestors
 				let title_level = ancestors
 					.iter_ancestors_inclusive(current)
 					.filter(|&ancestor| title_query.contains(ancestor))
 					.count();
-
 				let hashes = "#".repeat(title_level.min(6));
 				wrapped = format!("{} {}\n\n", hashes, wrapped);
 			} else if paragraph_query.contains(current) {
@@ -112,7 +195,7 @@ fn render_markdown_system(
 		}
 	}
 
-	output.xok()
+	output
 }
 
 
@@ -339,5 +422,30 @@ mod test {
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("Inside card\n\n");
+	}
+
+	#[test]
+	fn render_markdown_for_works() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Card, content!["hello ", (Important, "world")]))
+			.id();
+
+		let result = render_markdown_for(entity, &mut world);
+		result.xpect_eq("hello **world**");
+	}
+
+	#[test]
+	fn render_markdown_for_respects_card_boundary() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Card, children![
+				(Paragraph, TextContent::new("visible")),
+				(Card, children![(Paragraph, TextContent::new("hidden"))])
+			]))
+			.id();
+
+		let result = render_markdown_for(entity, &mut world);
+		result.xpect_eq("visible\n\n");
 	}
 }

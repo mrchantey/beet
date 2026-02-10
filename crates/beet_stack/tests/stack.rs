@@ -87,7 +87,7 @@ fn help_lists_all_tools() {
 		.call_blocking::<(), String>(())
 		.unwrap();
 
-	output.contains("Available tools").xpect_true();
+	output.contains("Available routes").xpect_true();
 	output.contains("counter/increment").xpect_true();
 	output.contains("calculator/add").xpect_true();
 	// help itself should not appear in its own output
@@ -153,7 +153,7 @@ fn dispatch_help_via_cli_path() {
 		.call_blocking::<(), String>(())
 		.unwrap();
 
-	output.contains("Available tools").xpect_true();
+	output.contains("Available routes").xpect_true();
 	output.contains("increment").xpect_true();
 }
 

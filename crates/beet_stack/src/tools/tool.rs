@@ -294,6 +294,32 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 			ToolOutHandler::Function { handler } => handler(payload),
 		}
 	}
+	/// Call this handler asynchronously with the tool output.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if the handler fails.
+	pub fn call_async(
+		self,
+		world: &mut AsyncWorld,
+		tool: Entity,
+		payload: Out,
+	) -> Result {
+		match self {
+			ToolOutHandler::Observer { caller } => {
+				world.trigger(ToolOut::new(tool, caller, payload));
+				Ok(())
+			}
+			ToolOutHandler::Channel { sender } => {
+				sender.try_send(payload).map_err(|err| {
+					bevyhow!(
+						"Failed to send tool output through channel: {err:?}"
+					)
+				})
+			}
+			ToolOutHandler::Function { handler } => handler(payload),
+		}
+	}
 }
 
 /// Extension trait for calling tools on entities.
