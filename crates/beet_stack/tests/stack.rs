@@ -54,10 +54,10 @@ fn tool_tree_built_on_spawn() {
 fn find_tool_by_path() {
 	let (world, root) = test_stack();
 	let tree = world.entity(root).get::<ToolTree>().unwrap();
-	tree.find(&["counter", "increment"]).xpect_some();
-	tree.find(&["calculator", "add"]).xpect_some();
-	tree.find(&["help"]).xpect_some();
-	tree.find(&["nonexistent"]).xpect_none();
+	tree.find_exact(&["counter", "increment"]).xpect_some();
+	tree.find_exact(&["calculator", "add"]).xpect_some();
+	tree.find_exact(&["help"]).xpect_some();
+	tree.find_exact(&["nonexistent"]).xpect_none();
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn help_lists_all_tools() {
 		.entity(root)
 		.get::<ToolTree>()
 		.unwrap()
-		.find(&["help"])
+		.find_exact(&["help"])
 		.unwrap()
 		.entity;
 
@@ -90,7 +90,7 @@ fn dispatch_increment_via_cli_path() {
 
 	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
 
-	let node = tree.find(&cli.path).unwrap();
+	let node = tree.find_exact(&cli.path).unwrap();
 	let tool_entity = node.entity;
 
 	world
@@ -113,7 +113,7 @@ fn dispatch_add_via_cli_path() {
 
 	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
 
-	let node = tree.find(&cli.path).unwrap();
+	let node = tree.find_exact(&cli.path).unwrap();
 	let tool_entity = node.entity;
 
 	world
@@ -136,7 +136,7 @@ fn dispatch_help_via_cli_path() {
 
 	let tree = world.entity(root).get::<ToolTree>().unwrap().clone();
 
-	let node = tree.find(&cli.path).unwrap();
+	let node = tree.find_exact(&cli.path).unwrap();
 	let output = world
 		.entity_mut(node.entity)
 		.call_blocking::<(), String>(())
@@ -152,5 +152,5 @@ fn cli_path_not_found() {
 	let cli = CliArgs::parse("nonexistent command");
 
 	let tree = world.entity(root).get::<ToolTree>().unwrap();
-	tree.find(&cli.path).xpect_none();
+	tree.find_exact(&cli.path).xpect_none();
 }

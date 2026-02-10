@@ -169,6 +169,7 @@ impl ToolTree {
 	}
 
 	/// Returns all tool paths in the tree as a flat list.
+	/// Nodes with no matching tool are skipped.
 	pub fn flatten(&self) -> Vec<PathPattern> {
 		let mut patterns = Vec::new();
 		fn inner(patterns: &mut Vec<PathPattern>, node: &ToolTree) {
@@ -202,7 +203,7 @@ impl ToolTree {
 	///
 	/// Walks the tree looking for an exact match against
 	/// the provided path.
-	pub fn find(&self, path: &[impl AsRef<str>]) -> Option<&ToolNode> {
+	pub fn find_exact(&self, path: &[impl AsRef<str>]) -> Option<&ToolNode> {
 		let path_vec: Vec<String> =
 			path.iter().map(|s| s.as_ref().to_string()).collect();
 
