@@ -370,11 +370,6 @@ path = "examples/net/client.rs"
 required-features = ["net", "ureq", "native-tls"]
 
 [[example]]
-name = "server_bench"
-path = "examples/net/server_bench.rs"
-required-features = ["server_app"]
-
-[[example]]
 name = "socket_server"
 path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
@@ -427,12 +422,6 @@ required-features = ["flow"]
 name = "http_router"
 path = "examples/router/http_router.rs"
 required-features = ["server_app"]
-
-[[example]]
-name = "router_bench"
-path = "examples/router/router_bench.rs"
-required-features = ["server_app"]
-
 
 # [[example]]
 # name = "app_ml"
@@ -644,4 +633,26 @@ harness = false
 [[bench]]
 name = "entity_spawn"
 path = "tests/benches/entity_spawn.rs"
+harness = false
+
+[[bench]]
+name = "server_bench"
+path = "tests/benches/beet_net/server_bench.rs"
+harness = false
+required-features = ["server_app"]
+
+[[bench]]
+name = "router_bench"
+path = "tests/benches/beet_router/router_bench.rs"
+harness = false
+required-features = ["server_app"]
+
+[[bench]]
+name = "bench_observer_global"
+path = "tests/benches/bench_observer_global.rs"
+harness = false
+
+[[bench]]
+name = "bench_observer_local"
+path = "tests/benches/bench_observer_local.rs"
 harness = false

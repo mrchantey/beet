@@ -322,6 +322,31 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 	}
 }
 
+#[extend::ext(name=AsyncEntityToolExt)]
+pub impl AsyncEntity {
+	/// Make a tool call asynchronously.
+	/// ## Errors
+	///
+	/// Errors if the entity has no [`ToolMeta`] or the [`ToolMeta`] does
+	/// not match the provided types.
+	///
+	fn call<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
+		self,
+		input: In,
+	) -> impl Future<Output = Result<Out>> {
+		async move {
+			let (send, recv) = async_channel::bounded::<Out>(1);
+			let handler = ToolOutHandler::channel(send);
+
+			self.with_then(move |mut entity| {
+				entity.call_with_handler(input, handler)
+			})
+			.await?;
+
+			recv.recv().await?.xok()
+		}
+	}
+}
 /// Extension trait for calling tools on entities.
 #[extend::ext(name=EntityWorldMutToolExt)]
 pub impl EntityWorldMut<'_> {
@@ -329,7 +354,9 @@ pub impl EntityWorldMut<'_> {
 	///
 	/// ## Errors
 	///
-	/// Returns an error if the tool call fails or types don't match.
+	/// Errors if the tool call fails.
+	/// Errors if the entity has no [`ToolMeta`] or the [`ToolMeta`] does
+	/// not match the provided types.
 	fn call_blocking<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: In,
@@ -337,11 +364,13 @@ pub impl EntityWorldMut<'_> {
 		async_ext::block_on(self.call(input))
 	}
 
-	/// Make a tool call asynchronously.
+	/// Make a tool call asynchronously, updating the world until it concludes.
 	///
 	/// ## Errors
 	///
-	/// Returns an error if the tool call fails or types don't match.
+	/// Errors if the tool call fails.
+	/// Errors if the entity has no [`ToolMeta`] or the [`ToolMeta`] does
+	/// not match the provided types.
 	fn call<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		mut self,
 		input: In,
@@ -349,7 +378,7 @@ pub impl EntityWorldMut<'_> {
 		async move {
 			let (send, recv) = async_channel::bounded(1);
 			let handler = ToolOutHandler::channel(send);
-			trigger_checked(&mut self, input, handler)?;
+			self.call_with_handler(input, handler)?;
 
 			let world = self.into_world_mut();
 
@@ -369,6 +398,61 @@ pub impl EntityWorldMut<'_> {
 			out.xok()
 		}
 	}
+	/// Perform a tool call on the given entity,
+	/// checking that the input and output types match the entity's [`ToolMeta`].
+	///
+	/// If the entity has an [`ExchangeToolMarker`], calls with
+	/// `Request`/`Response` types are also accepted and routed
+	/// through the exchange handler.
+	///
+	/// ## Note
+	///
+	/// This call returns immediately and does not update the world.
+	///
+	/// ## Errors
+	///
+	/// Errors if the entity has no [`ToolMeta`] or the [`ToolMeta`] does
+	/// not match the provided types.
+	fn call_with_handler<
+		In: 'static + Send + Sync,
+		Out: 'static + Send + Sync,
+	>(
+		&mut self,
+		input: In,
+		out_handler: ToolOutHandler<Out>,
+	) -> Result {
+		let meta = self.get::<ToolMeta>().ok_or_else(|| {
+			bevyhow!("No ToolMeta on entity, cannot send tool call.")
+		})?;
+		let is_exchange_call = TypeMeta::of::<In>()
+			== TypeMeta::of::<Request>()
+			&& TypeMeta::of::<Out>() == TypeMeta::of::<Response>();
+
+		if is_exchange_call {
+			// allow Request/Response calls only if the entity has an exchange handler
+			#[cfg(feature = "interface")]
+			{
+				if !self.contains::<ExchangeToolMarker>() {
+					bevybail!(
+						"Tool does not support Request/Response calls. \
+						 Use exchange_tool() to enable serialized exchange."
+					);
+				}
+			}
+			#[cfg(not(feature = "interface"))]
+			{
+				bevybail!(
+					"Request/Response exchange calls require the 'interface' feature."
+				);
+			}
+		} else {
+			meta.assert_match::<In, Out>()?;
+		}
+		// meta.assert_match::<In, Out>()?;
+
+		self.trigger(|entity| ToolIn::new(entity, input, out_handler));
+		Ok(())
+	}
 }
 
 
@@ -387,52 +471,9 @@ pub impl EntityCommands<'_> {
 		out_handler: ToolOutHandler<Out>,
 	) {
 		self.queue(|mut entity: EntityWorldMut| -> Result {
-			trigger_checked(&mut entity, input, out_handler)
+			entity.call_with_handler(input, out_handler)
 		});
 	}
-}
-
-/// Perform a tool call on the given entity,
-/// checking that the input and output types match the entity's [`ToolMeta`].
-///
-/// If the entity has an [`ExchangeToolMarker`], calls with
-/// `Request`/`Response` types are also accepted and routed
-/// through the exchange handler.
-fn trigger_checked<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
-	entity: &mut EntityWorldMut,
-	input: In,
-	out_handler: ToolOutHandler<Out>,
-) -> Result {
-	let meta = entity.get::<ToolMeta>().ok_or_else(|| {
-		bevyhow!("No ToolMeta on entity, cannot send tool call.")
-	})?;
-
-	let is_exchange_call = TypeMeta::of::<In>() == TypeMeta::of::<Request>()
-		&& TypeMeta::of::<Out>() == TypeMeta::of::<Response>();
-
-	if is_exchange_call {
-		// allow Request/Response calls only if the entity has an exchange handler
-		#[cfg(feature = "interface")]
-		{
-			if !entity.contains::<ExchangeToolMarker>() {
-				bevybail!(
-					"Tool does not support Request/Response calls. \
-					 Use exchange_tool() to enable serialized exchange."
-				);
-			}
-		}
-		#[cfg(not(feature = "interface"))]
-		{
-			bevybail!(
-				"Request/Response exchange calls require the 'interface' feature."
-			);
-		}
-	} else {
-		meta.assert_match::<In, Out>()?;
-	}
-
-	entity.trigger(|entity| ToolIn::new(entity, input, out_handler));
-	Ok(())
 }
 
 #[cfg(test)]

@@ -101,7 +101,7 @@ where
 
 					// create a wrapping out handler that serializes Out -> Response
 					// then forwards to the original Response handler
-					let wrapping_handler =
+					let inner_handler =
 						ToolOutHandler::<Out>::function(move |output: Out| {
 							let body_bytes = format.serialize(&output)?;
 							let response = Response::ok()
@@ -131,7 +131,7 @@ where
 					world
 						.with_then(move |world: &mut World| -> Result {
 							world.commands().entity(tool).trigger(|entity| {
-								ToolIn::new(entity, input, wrapping_handler)
+								ToolIn::new(entity, input, inner_handler)
 							});
 							world.flush();
 							Ok(())

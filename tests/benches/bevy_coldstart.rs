@@ -1,6 +1,6 @@
 //! # Results
 //!
-//! `cargo run --release --bin bevy_app_coldstart`
+//! `cargo bench --bench bevy_coldstart`
 //!
 //! ## Without `bevy/multi_threaded` feature enabled
 //!
