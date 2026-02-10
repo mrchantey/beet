@@ -696,7 +696,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[beet_core_macros::test]
+	#[crate::test]
 	async fn response_deserialize_json() {
 		use serde::Deserialize;
 		use serde::Serialize;
@@ -713,7 +713,7 @@ mod test {
 	}
 
 	#[cfg(feature = "postcard")]
-	#[beet_core_macros::test]
+	#[crate::test]
 	async fn response_deserialize_postcard() {
 		use serde::Deserialize;
 		use serde::Serialize;

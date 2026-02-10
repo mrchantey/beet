@@ -20,18 +20,36 @@ impl Interface {
 }
 
 
-/// Create an interface tool from a handler, enabling both typed `In`/`Out`
-/// calls and serialized [`Request`]/[`Response`] calls via [`exchange_tool`].
-pub fn interface_tool<H, M>(handler: H) -> impl Bundle
+/// Create an interface from a handler, inserting an [`Interface`]
+/// pointing to itself as the current card.
+pub fn interface<H, M>(handler: H) -> impl Bundle
 where
-	H: IntoToolHandler<M>,
-	H::In: serde::de::DeserializeOwned,
-	H::Out: serde::Serialize,
+	H: IntoToolHandler<M, In = Request, Out = Response>,
 {
-	exchange_tool(handler)
+	(Interface::new_this(), tool(handler))
 }
 
 
+
+pub fn markdown_interface() -> impl Bundle {
+	interface(
+		|In(cx): In<ToolContext<Request>>,
+		 interfaces: Query<&Interface>,
+		 card_query: CardQuery|
+		 -> Result<Response> {
+			let interface = interfaces.get(cx.tool)?;
+			let tree = card_query.tool_tree(interface.current_card)?;
+
+			if cx.has_param("help") {
+			} else {
+				let tool = tree.find_exact(req.path())?;
+			}
+
+
+			Ok(())
+		},
+	)
+}
 
 
 

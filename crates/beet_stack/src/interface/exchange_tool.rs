@@ -172,9 +172,7 @@ mod test {
 	#[test]
 	fn typed_call() {
 		World::new()
-			.spawn(exchange_tool(|input: AddInput| -> i32 {
-				input.a + input.b
-			}))
+			.spawn(add_exchange_tool())
 			.call_blocking::<AddInput, i32>(AddInput { a: 3, b: 4 })
 			.unwrap()
 			.xpect_eq(7);

@@ -67,7 +67,7 @@ rustls-tls = [
 
 
 [dependencies]
-beet_core = {workspace = true,features=["exchange","http"]}
+beet_core = {workspace = true,features=["exchange","http","json"]}
 beet_flow = { workspace = true, optional = true }
 
 bevy.workspace = true
