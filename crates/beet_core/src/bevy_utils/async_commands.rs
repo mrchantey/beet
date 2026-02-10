@@ -687,7 +687,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -705,7 +705,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await

@@ -82,14 +82,17 @@ pub fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,
-	tools: Query<(
-		Entity,
-		&ToolMeta,
-		&PathPattern,
-		&ParamsPattern,
-		Option<&HttpMethod>,
-		Has<ExchangeToolMarker>,
-	)>,
+	tools: Query<
+		(
+			Entity,
+			&ToolMeta,
+			&PathPattern,
+			&ParamsPattern,
+			Option<&HttpMethod>,
+			Has<ExchangeToolMarker>,
+		),
+		// With<ExchangeToolMarker>,
+	>,
 	cards: Query<
 		(Entity, &PathPattern, &ParamsPattern),
 		(With<Card>, Without<ToolMeta>),

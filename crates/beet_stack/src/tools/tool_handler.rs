@@ -73,7 +73,7 @@ impl FromToolContext<Request, Self> for Request {
 }
 
 /// Async context passed to async tool handlers.
-pub struct AsyncToolContext<In> {
+pub struct AsyncToolContext<In = ()> {
 	/// The async tool entity being called.
 	pub tool: AsyncEntity,
 	/// The input payload for this tool call.

@@ -51,7 +51,7 @@ mod tests {
 	fn no_children() {
 		StackPlugin::world()
 			.spawn(tool(fallback::<(), ()>))
-			.call_blocking::<(), Outcome<(), ()>>(())
+			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
 	}
@@ -62,7 +62,7 @@ mod tests {
 				PathPartial::new("foo"),
 				tool(|| { Outcome::FAIL })
 			)]))
-			.call_blocking::<(), Outcome<(), ()>>(())
+			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
 	}
@@ -73,7 +73,7 @@ mod tests {
 				PathPartial::new("foo"),
 				tool(|| { Outcome::PASS })
 			)]))
-			.call_blocking::<(), Outcome<(), ()>>(())
+			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::PASS);
 	}
@@ -86,7 +86,7 @@ mod tests {
 				(PathPartial::new("bazz"), tool(|| { Outcome::PASS })),
 				(PathPartial::new("boo"), tool(|| { Outcome::FAIL }),),
 			]))
-			.call_blocking::<(), Outcome<(), ()>>(())
+			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::PASS);
 	}

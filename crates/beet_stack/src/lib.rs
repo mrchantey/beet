@@ -16,6 +16,8 @@ mod tools;
 pub mod prelude {
 	pub use crate::content;
 	pub use crate::content::*;
+	pub use crate::control_flow::Outcome::Fail;
+	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
