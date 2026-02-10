@@ -22,7 +22,7 @@ required-features = ["tokens"]
 
 
 [features]
-default = ["serde", "json"]
+# default = ["json"]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["exchange", "ansi_paint"]
@@ -188,4 +188,5 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}
+beet_core = {path = ".", features=["testing","serde"] }
+# beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}

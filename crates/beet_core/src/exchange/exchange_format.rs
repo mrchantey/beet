@@ -66,8 +66,7 @@ impl ExchangeFormat {
 			Self::Json => {
 				#[cfg(feature = "json")]
 				{
-					let slice =
-						if bytes.is_empty() { b"null" } else { bytes };
+					let slice = if bytes.is_empty() { b"null" } else { bytes };
 					serde_json::from_slice(slice).map_err(|err| {
 						bevyhow!("Failed to deserialize JSON body: {err}")
 					})
@@ -100,10 +99,7 @@ impl ExchangeFormat {
 
 	/// Serialize `T` into bytes using this format.
 	#[cfg(feature = "serde")]
-	pub fn serialize<T: serde::Serialize>(
-		&self,
-		value: &T,
-	) -> Result<Vec<u8>> {
+	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
 		match self {
 			Self::Json => {
 				#[cfg(feature = "json")]
@@ -140,11 +136,13 @@ impl ExchangeFormat {
 }
 
 #[cfg(test)]
+#[cfg(feature = "serde")]
 mod test {
 	use super::*;
 	use serde::Deserialize;
 	use serde::Serialize;
 
+	#[allow(unused)]
 	#[derive(Debug, PartialEq, Serialize, Deserialize)]
 	struct Pair {
 		a: i32,
