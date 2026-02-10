@@ -142,7 +142,7 @@ mod test {
 	use serde::Deserialize;
 	use serde::Serialize;
 
-	#[allow(unused)]
+	#[cfg(any(feature = "json", feature = "postcard"))]
 	#[derive(Debug, PartialEq, Serialize, Deserialize)]
 	struct Pair {
 		a: i32,
