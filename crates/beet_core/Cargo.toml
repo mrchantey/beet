@@ -189,5 +189,3 @@ web-sys = {workspace = true, features = [
 
 [dev-dependencies]
 beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}
-# abs_path serde roundtrip
-serde_json.workspace = true
