@@ -37,7 +37,8 @@ pub(crate) fn exit_from_response(parts: &ResponseParts) -> AppExit {
 /// with the appropriate exit code.
 ///
 /// Typically combined with a [`markdown_interface`] and some child
-/// tools to build a CLI application:
+/// cards/tools to build a CLI application. Use `card("")` to define
+/// the root content displayed when no arguments are provided:
 ///
 /// ```no_run
 /// # use beet_core::prelude::*;
@@ -51,6 +52,7 @@ pub(crate) fn exit_from_response(parts: &ResponseParts) -> AppExit {
 ///         markdown_interface(),
 ///         cli_server(),
 ///         children![
+///             (card(""), Paragraph::with_text("welcome!")),
 ///             increment(FieldRef::new("count")),
 ///             card("about"),
 ///         ],
@@ -165,5 +167,55 @@ mod test {
 		let parts = stream_response_to_stdout(res).await.unwrap();
 		// not-found still returns 200 with help text from the interface
 		parts.status().xpect_eq(StatusCode::Ok);
+	}
+
+	#[beet_core::test]
+	async fn renders_root_card_on_empty_args() {
+		let mut world = StackPlugin::world();
+
+		let root = world
+			.spawn((Card, markdown_interface(), children![
+				(card(""), Title::with_text("My Server"), children![
+					Paragraph::with_text("welcome!")
+				]),
+				card("about"),
+			]))
+			.flush();
+
+		let res = world
+			.entity_mut(root)
+			.call::<Request, Response>(Request::from_cli_str("").unwrap())
+			.await
+			.unwrap();
+
+		let body = res.unwrap_str().await;
+		body.contains("My Server").xpect_true();
+		body.contains("welcome!").xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn scoped_help_for_subcommand() {
+		let mut world = StackPlugin::world();
+
+		let root = world
+			.spawn((Card, markdown_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.flush();
+
+		let res = world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap();
+
+		let body = res.unwrap_str().await;
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
 	}
 }

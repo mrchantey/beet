@@ -403,6 +403,32 @@ impl RouteTree {
 	pub fn find_card(&self, path: &[impl AsRef<str>]) -> Option<&CardNode> {
 		self.find(path).and_then(|node| node.as_card())
 	}
+
+	/// Find the subtree rooted at the given path prefix.
+	///
+	/// Walks the tree children matching each segment of `prefix` in
+	/// turn, returning the [`RouteTree`] node at that position. This
+	/// is useful for scoping help output to a specific path prefix.
+	///
+	/// Returns `None` if no tree node matches the prefix.
+	pub fn find_subtree(
+		&self,
+		prefix: &[impl AsRef<str>],
+	) -> Option<&RouteTree> {
+		let mut current = self;
+		for segment in prefix {
+			let seg = segment.as_ref();
+			current = current.children.iter().find(|child| {
+				child
+					.path
+					.iter()
+					.last()
+					.map(|last| last.is_static() && last.name() == seg)
+					.unwrap_or(false)
+			})?;
+		}
+		Some(current)
+	}
 }
 
 impl std::fmt::Display for RouteTree {
@@ -672,5 +698,43 @@ mod test {
 		// 2 tools + 1 root card = 3 routes
 		tree.flatten().len().xpect_eq(3);
 		tree.flatten_tool_nodes().len().xpect_eq(2);
+	}
+
+	#[test]
+	fn find_subtree_returns_scoped_nodes() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((Card, children![
+				(card("counter"), children![
+					tool_at("increment"),
+					tool_at("decrement"),
+				]),
+				tool_at("other"),
+			]))
+			.flush();
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		let subtree = tree.find_subtree(&["counter"]).unwrap();
+		// subtree contains the counter card + 2 tools
+		subtree.flatten_nodes().len().xpect_eq(3);
+		subtree.flatten_tool_nodes().len().xpect_eq(2);
+		// sibling tool should not appear in subtree
+		subtree
+			.flatten_nodes()
+			.iter()
+			.any(|node| {
+				node.path()
+					.annotated_route_path()
+					.to_string()
+					.contains("other")
+			})
+			.xpect_false();
+	}
+
+	#[test]
+	fn find_subtree_returns_none_for_missing_prefix() {
+		let mut world = StackPlugin::world();
+		let root = world.spawn((Card, children![tool_at("foo")])).flush();
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		tree.find_subtree(&["nonexistent"]).xpect_none();
 	}
 }

@@ -57,7 +57,9 @@ fn help_system(
 ///
 /// The help tool itself is excluded from the listing.
 /// This is the primary entry point for rendering help text and is
-/// reused by the interface tool for contextual help.
+/// reused by the interface tool for contextual help. Can be called on
+/// a subtree from [`RouteTree::find_subtree`] to scope output to a
+/// specific path prefix.
 pub fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
 	output.push_str("Available routes:\n\n");

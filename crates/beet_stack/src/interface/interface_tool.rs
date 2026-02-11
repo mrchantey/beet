@@ -4,6 +4,15 @@
 //! handles request routing, card navigation, tool invocation, and help
 //! rendering. It delegates to shared functions in [`render_markdown`]
 //! and [`help`] rather than duplicating their logic.
+//!
+//! ## Routing Behavior
+//!
+//! - **Empty path**: renders the `card("")` child if present, otherwise
+//!   falls back to rendering the root entity directly.
+//! - **`--help`**: scoped to the requested path prefix, ie
+//!   `counter --help` only shows routes under `/counter`.
+//! - **Not found**: shows help scoped to the nearest ancestor card,
+//!   ie `counter nonsense` shows help for `/counter`.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -52,6 +61,15 @@ pub fn interface() -> impl Bundle {
 
 /// Creates a standard markdown interface with help, routing, and
 /// fallback handlers as a child fallback chain.
+///
+/// The handler chain runs in order:
+/// 1. **Help** — if `--help` is present, render help scoped to the
+///    request path prefix.
+/// 2. **Router** — look up the path in the [`RouteTree`]. Cards are
+///    rendered as markdown, tools are called directly. An empty path
+///    resolves to `card("")` when present.
+/// 3. **Contextual Not Found** — show help for the nearest ancestor
+///    card of the unmatched path.
 pub fn markdown_interface() -> impl Bundle {
 	(
 		interface(),
@@ -93,13 +111,21 @@ async fn help_handler(
 	cx: AsyncToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
+		let path = cx.input.path().clone();
 		let tool_entity = cx.tool.id();
 		let help_text = cx
 			.tool
 			.world()
 			.with_then(move |world: &mut World| -> Result<String> {
 				let tree = root_route_tree(world, tool_entity)?;
-				format_route_help(tree).xok()
+				// Scope help to the requested path prefix
+				if path.is_empty() {
+					format_route_help(tree).xok()
+				} else if let Some(subtree) = tree.find_subtree(&path) {
+					format_route_help(subtree).xok()
+				} else {
+					nearest_ancestor_help(tree, &path).xok()
+				}
 			})
 			.await?;
 
@@ -113,27 +139,19 @@ async fn route_handler(
 	cx: AsyncToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
+	let is_empty_path = path.is_empty();
 	let tool_entity = cx.tool.id();
 	let world = cx.tool.world();
 
-	// Empty path: render the root card as markdown
-	if path.is_empty() {
-		let markdown = world
-			.with_then(move |world: &mut World| {
-				let root = walk_to_root(world, tool_entity);
-				render_markdown_for(root, world)
-			})
-			.await;
-		return Pass(Response::ok_body(markdown, "text/plain")).xok();
-	}
-
-	// Look up the path in the root ancestor's route tree
+	// Look up the path in the root ancestor's route tree.
+	// Use `.ok()` so a missing RouteTree returns None instead of error,
+	// allowing the empty-path fallback below to render the root entity.
 	let node = world
-		.with_then(move |world: &mut World| -> Result<Option<RouteNode>> {
-			let tree = root_route_tree(world, tool_entity)?;
-			tree.find(&path).cloned().xok()
+		.with_then(move |world: &mut World| -> Option<RouteNode> {
+			let tree = root_route_tree(world, tool_entity).ok()?;
+			tree.find(&path).cloned()
 		})
-		.await?;
+		.await;
 
 	match node {
 		Some(RouteNode::Card(card_node)) => {
@@ -151,6 +169,16 @@ async fn route_handler(
 				.call::<Request, Response>(cx.input)
 				.await?,
 		),
+		// Empty path with no card("") in tree: render the root entity
+		None if is_empty_path => {
+			let markdown = world
+				.with_then(move |world: &mut World| {
+					let root = walk_to_root(world, tool_entity);
+					render_markdown_for(root, world)
+				})
+				.await;
+			Pass(Response::ok_body(markdown, "text/plain"))
+		}
 		None => Fail(cx.input),
 	}
 	.xok()
@@ -181,7 +209,6 @@ fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
 		if let Some(RouteNode::Card(_)) = tree.find(prefix) {
-			// Found a card ancestor - build a subtree-scoped help message
 			let prefix_str = prefix.join("/");
 			let mut output = String::new();
 			output.push_str(&format!(
@@ -189,9 +216,9 @@ fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
 				segments.join("/"),
 				prefix_str,
 			));
-			// Append the full tree help (filtered routes would be better
-			// but the current RouteTree API doesn't expose subtrees)
-			output.push_str(&format_route_help(tree));
+			// Scope help to the matching ancestor subtree
+			let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
+			output.push_str(&format_route_help(help_tree));
 			return output;
 		}
 	}
@@ -335,5 +362,67 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(30);
+	}
+
+	#[beet_core::test]
+	async fn renders_root_card_child() {
+		let body = StackPlugin::world()
+			.spawn((Card, markdown_interface(), children![
+				(card(""), Title::with_text("My Server"), children![
+					Paragraph::with_text("welcome!")
+				]),
+				card("about"),
+			]))
+			.call::<Request, Response>(Request::get(""))
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		body.contains("My Server").xpect_true();
+		body.contains("welcome!").xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn help_scoped_to_prefix() {
+		let body = StackPlugin::world()
+			.spawn((Card, markdown_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		// Should show routes under counter
+		body.contains("increment").xpect_true();
+		// Should not show sibling routes
+		body.contains("about").xpect_false();
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_scoped_ancestor_help() {
+		let body = StackPlugin::world()
+			.spawn((Card, markdown_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("counter nonsense").unwrap(),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		body.contains("not found").xpect_true();
+		// Should show routes under counter, not the full tree
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
 	}
 }
