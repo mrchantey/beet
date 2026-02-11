@@ -22,7 +22,6 @@
 //! curl http://localhost:5000/foobar
 //! ```
 use beet::prelude::*;
-
 fn main() {
 	App::new()
 		.add_plugins((

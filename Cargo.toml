@@ -211,7 +211,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["flow"]
+# default = ["stack"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
@@ -340,8 +340,13 @@ web-sys.workspace = true
 # 💡 Examples - stack
 
 [[example]]
-name = "repl"
-path = "examples/stack/repl.rs"
+name = "cli_server"
+path = "examples/stack/cli_server.rs"
+required-features = ["stack"]
+
+[[example]]
+name = "repl_server"
+path = "examples/stack/repl_server.rs"
 required-features = ["stack"]
 
 # 💡 Examples - agent

@@ -65,6 +65,17 @@ pub mod prelude {
 	pub use crate::rsx::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
+	// TODO deprecate the original versions of these
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Card;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Code;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Link;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Outcome;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::RouterPlugin;
 	#[cfg(feature = "stack")]
 	pub use crate::stack::prelude::*;
 }
