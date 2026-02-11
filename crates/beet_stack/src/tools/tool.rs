@@ -331,7 +331,7 @@ pub impl AsyncEntity {
 	/// not match the provided types.
 	///
 	fn call<In: 'static + Send + Sync, Out: 'static + Send + Sync>(
-		self,
+		&self,
 		input: In,
 	) -> impl Future<Output = Result<Out>> {
 		async move {

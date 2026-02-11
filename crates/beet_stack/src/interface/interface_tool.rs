@@ -63,7 +63,7 @@ pub fn markdown_interface() -> impl Bundle {
 			),
 			(Name::new("Router"), RouteHidden, direct_tool(route_handler)),
 			(
-				Name::new("Contextual Found"),
+				Name::new("Contextual Not Found"),
 				RouteHidden,
 				direct_tool(nearest_ancestor_help_handler)
 			)
@@ -114,12 +114,11 @@ async fn route_handler(
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let tool_entity = cx.tool.id();
+	let world = cx.tool.world();
 
 	// Empty path: render the root card as markdown
 	if path.is_empty() {
-		let markdown = cx
-			.tool
-			.world()
+		let markdown = world
 			.with_then(move |world: &mut World| {
 				let root = walk_to_root(world, tool_entity);
 				render_markdown_for(root, world)
@@ -129,9 +128,7 @@ async fn route_handler(
 	}
 
 	// Look up the path in the root ancestor's route tree
-	let node = cx
-		.tool
-		.world()
+	let node = world
 		.with_then(move |world: &mut World| -> Result<Option<RouteNode>> {
 			let tree = root_route_tree(world, tool_entity)?;
 			tree.find(&path).cloned().xok()
@@ -141,9 +138,7 @@ async fn route_handler(
 	match node {
 		Some(RouteNode::Card(card_node)) => {
 			let card_entity = card_node.entity;
-			let markdown = cx
-				.tool
-				.world()
+			let markdown = world
 				.with_then(move |world: &mut World| {
 					render_markdown_for(card_entity, world)
 				})
@@ -151,8 +146,7 @@ async fn route_handler(
 			Pass(Response::ok_body(markdown, "text/plain"))
 		}
 		Some(RouteNode::Tool(tool_node)) => Pass(
-			cx.tool
-				.world()
+			world
 				.entity(tool_node.entity)
 				.call::<Request, Response>(cx.input)
 				.await?,
