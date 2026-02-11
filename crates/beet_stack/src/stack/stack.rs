@@ -27,8 +27,10 @@ pub struct Card;
 
 /// Creates a card bundle with a [`PathPartial`] for routing.
 ///
-/// This is the preferred way to create a card with a route path,
-/// combining [`Card`] with a [`PathPartial`].
+/// Creates a routable card by combining [`Card`] with a [`PathPartial`].
+///
+/// For root content, use a plain [`Card`] with no [`PathPartial`]
+/// instead — it naturally matches the empty path.
 ///
 /// # Example
 ///

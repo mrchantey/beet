@@ -37,8 +37,8 @@ pub(crate) fn exit_from_response(parts: &ResponseParts) -> AppExit {
 /// with the appropriate exit code.
 ///
 /// Typically combined with a [`markdown_interface`] and some child
-/// cards/tools to build a CLI application. Use `card("")` to define
-/// the root content displayed when no arguments are provided:
+/// cards/tools to build a CLI application. A [`Card`] with no
+/// [`PathPartial`] matches the empty path, serving as root content:
 ///
 /// ```no_run
 /// # use beet_core::prelude::*;
@@ -48,11 +48,10 @@ pub(crate) fn exit_from_response(parts: &ResponseParts) -> AppExit {
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
 ///     app.world_mut().spawn((
-///         Card,
 ///         markdown_interface(),
 ///         cli_server(),
 ///         children![
-///             (card(""), Paragraph::with_text("welcome!")),
+///             (Card, Paragraph::with_text("welcome!")),
 ///             increment(FieldRef::new("count")),
 ///             card("about"),
 ///         ],
@@ -108,7 +107,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![
+			.spawn((markdown_interface(), children![
 				increment(FieldRef::new("count")),
 				card("about"),
 			]))
@@ -129,9 +128,9 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![increment(
-				FieldRef::new("count")
-			)]))
+			.spawn((markdown_interface(), children![increment(FieldRef::new(
+				"count"
+			))]))
 			.flush();
 
 		let res = world
@@ -151,9 +150,9 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![increment(
-				FieldRef::new("count")
-			)]))
+			.spawn((markdown_interface(), children![increment(FieldRef::new(
+				"count"
+			))]))
 			.flush();
 
 		let res = world
@@ -174,8 +173,8 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![
-				(card(""), Title::with_text("My Server"), children![
+			.spawn((markdown_interface(), children![
+				(Card, Title::with_text("My Server"), children![
 					Paragraph::with_text("welcome!")
 				]),
 				card("about"),
@@ -198,7 +197,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![
+			.spawn((markdown_interface(), children![
 				(card("counter"), children![increment(FieldRef::new(
 					"count"
 				)),]),

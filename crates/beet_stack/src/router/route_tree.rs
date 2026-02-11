@@ -410,6 +410,9 @@ impl RouteTree {
 	/// turn, returning the [`RouteTree`] node at that position. This
 	/// is useful for scoping help output to a specific path prefix.
 	///
+	/// Static segments are matched first. If no static match is found,
+	/// a dynamic segment at the same level is used as a fallback.
+	///
 	/// Returns `None` if no tree node matches the prefix.
 	pub fn find_subtree(
 		&self,
@@ -418,14 +421,27 @@ impl RouteTree {
 		let mut current = self;
 		for segment in prefix {
 			let seg = segment.as_ref();
-			current = current.children.iter().find(|child| {
+			// try static match first
+			let matched = current.children.iter().find(|child| {
 				child
 					.path
 					.iter()
 					.last()
 					.map(|last| last.is_static() && last.name() == seg)
 					.unwrap_or(false)
-			})?;
+			});
+			// fall back to dynamic match
+			let matched = matched.or_else(|| {
+				current.children.iter().find(|child| {
+					child
+						.path
+						.iter()
+						.last()
+						.map(|last| !last.is_static())
+						.unwrap_or(false)
+				})
+			});
+			current = matched?;
 		}
 		Some(current)
 	}
@@ -736,5 +752,29 @@ mod test {
 		let root = world.spawn((Card, children![tool_at("foo")])).flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.find_subtree(&["nonexistent"]).xpect_none();
+	}
+
+	#[test]
+	fn find_subtree_falls_back_to_dynamic_segment() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((Card, children![(
+				PathPartial::new(":id"),
+				Card,
+				children![tool_at("details"),]
+			)]))
+			.flush();
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		// no static "42" child exists, should fall back to :id
+		let subtree = tree.find_subtree(&["42"]).unwrap();
+		subtree.flatten_tool_nodes().len().xpect_eq(1);
+		subtree
+			.flatten_tool_nodes()
+			.first()
+			.unwrap()
+			.path
+			.annotated_route_path()
+			.to_string()
+			.xpect_contains("details");
 	}
 }

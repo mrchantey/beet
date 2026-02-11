@@ -13,40 +13,19 @@
 //! Then type commands interactively:
 //! ```text
 //! > --help
-//! > increment
 //! > about
+//! > counter --help
+//! > counter increment
 //! > exit
 //! ```
 use beet::prelude::*;
+mod my_stack;
 
 fn main() -> AppExit {
-	let mut app = App::new();
-	app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
-	app.world_mut().spawn((
-		Card,
-		markdown_interface(),
-		repl_server(),
-		children![about(), counter()],
-	));
-	app.run()
-}
-
-
-fn about() -> impl Bundle {
-	(card("about"), Title::with_text("About"), children![
-		Paragraph::with_text("howdy doody!")
-	])
-}
-
-
-fn counter() -> impl Bundle {
-	let field_ref = FieldRef::new("count").init_with(0);
-
-	(card("counter"), Title::with_text("Counter"), children![
-		increment(field_ref.clone()),
-		(Paragraph, children![
-			TextContent::new("The count is "),
-			field_ref.as_text()
-		])
-	])
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin))
+		.add_systems(Startup, |mut commands: Commands| {
+			commands.spawn((repl_server(), my_stack::my_stack()));
+		})
+		.run()
 }

@@ -1,0 +1,36 @@
+use beet::prelude::*;
+
+
+/// An interface agnostic stack used to demonstrate
+/// the behavior of various servers.
+pub fn my_stack() -> impl Bundle {
+	(markdown_interface(), children![root(), about(), counter()])
+}
+
+
+
+fn root() -> impl Bundle {
+	(Card, Title::with_text("My Stack"), children![
+		Paragraph::with_text("welcome to the coolest stack!")
+	])
+}
+
+
+fn about() -> impl Bundle {
+	(card("about"), Title::with_text("About"), children![
+		Paragraph::with_text("howdy doody!")
+	])
+}
+
+
+fn counter() -> impl Bundle {
+	let field_ref = FieldRef::new("count").init_with(0);
+
+	(card("counter"), Title::with_text("Counter"), children![
+		increment(field_ref.clone()),
+		(Paragraph, children![
+			TextContent::new("The count is "),
+			field_ref.as_text()
+		])
+	])
+}

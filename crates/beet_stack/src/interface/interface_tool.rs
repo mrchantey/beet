@@ -7,8 +7,8 @@
 //!
 //! ## Routing Behavior
 //!
-//! - **Empty path**: renders the `card("")` child if present, otherwise
-//!   falls back to rendering the root entity directly.
+//! - **Root card**: a [`Card`] with no [`PathPartial`] matches the
+//!   empty path, serving as the root content.
 //! - **`--help`**: scoped to the requested path prefix, ie
 //!   `counter --help` only shows routes under `/counter`.
 //! - **Not found**: shows help scoped to the nearest ancestor card,
@@ -66,8 +66,8 @@ pub fn interface() -> impl Bundle {
 /// 1. **Help** — if `--help` is present, render help scoped to the
 ///    request path prefix.
 /// 2. **Router** — look up the path in the [`RouteTree`]. Cards are
-///    rendered as markdown, tools are called directly. An empty path
-///    resolves to `card("")` when present.
+///    rendered as markdown, tools are called directly. A [`Card`] with
+///    no [`PathPartial`] naturally matches the empty path.
 /// 3. **Contextual Not Found** — show help for the nearest ancestor
 ///    card of the unmatched path.
 pub fn markdown_interface() -> impl Bundle {
@@ -139,13 +139,9 @@ async fn route_handler(
 	cx: AsyncToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
-	let is_empty_path = path.is_empty();
 	let tool_entity = cx.tool.id();
 	let world = cx.tool.world();
 
-	// Look up the path in the root ancestor's route tree.
-	// Use `.ok()` so a missing RouteTree returns None instead of error,
-	// allowing the empty-path fallback below to render the root entity.
 	let node = world
 		.with_then(move |world: &mut World| -> Option<RouteNode> {
 			let tree = root_route_tree(world, tool_entity).ok()?;
@@ -169,16 +165,6 @@ async fn route_handler(
 				.call::<Request, Response>(cx.input)
 				.await?,
 		),
-		// Empty path with no card("") in tree: render the root entity
-		None if is_empty_path => {
-			let markdown = world
-				.with_then(move |world: &mut World| {
-					let root = walk_to_root(world, tool_entity);
-					render_markdown_for(root, world)
-				})
-				.await;
-			Pass(Response::ok_body(markdown, "text/plain"))
-		}
 		None => Fail(cx.input),
 	}
 	.xok()
@@ -276,7 +262,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![
+			.spawn((markdown_interface(), children![
 				increment(FieldRef::new("count")),
 				card("about"),
 			]))
@@ -297,7 +283,7 @@ mod test {
 	#[beet_core::test]
 	async fn markdown_interface_renders_card() {
 		StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![(
+			.spawn((markdown_interface(), children![(
 				card("about"),
 				Paragraph,
 				TextContent::new("About page"),
@@ -312,14 +298,13 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn markdown_interface_renders_current_on_empty_path() {
+	async fn markdown_interface_renders_root_card_on_empty_path() {
 		StackPlugin::world()
-			.spawn((
+			.spawn((markdown_interface(), children![(
 				Card,
-				markdown_interface(),
 				Paragraph,
 				TextContent::new("Root content"),
-			))
+			)]))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap()
@@ -331,9 +316,9 @@ mod test {
 	#[beet_core::test]
 	async fn markdown_interface_not_found_shows_ancestor_help() {
 		StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![increment(
-				FieldRef::new("count")
-			),]))
+			.spawn((markdown_interface(), children![increment(FieldRef::new(
+				"count"
+			)),]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent").unwrap(),
 			)
@@ -348,7 +333,7 @@ mod test {
 	#[beet_core::test]
 	async fn markdown_interface_calls_exchange_tool() {
 		StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![(
+			.spawn((markdown_interface(), children![(
 				PathPartial::new("add"),
 				exchange_tool(|input: (i32, i32)| -> i32 { input.0 + input.1 }),
 			)]))
@@ -367,8 +352,8 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_card_child() {
 		let body = StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![
-				(card(""), Title::with_text("My Server"), children![
+			.spawn((markdown_interface(), children![
+				(Card, Title::with_text("My Server"), children![
 					Paragraph::with_text("welcome!")
 				]),
 				card("about"),
@@ -385,7 +370,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_scoped_to_prefix() {
 		let body = StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![
+			.spawn((markdown_interface(), children![
 				(card("counter"), children![increment(FieldRef::new(
 					"count"
 				)),]),
@@ -407,7 +392,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		let body = StackPlugin::world()
-			.spawn((Card, markdown_interface(), children![
+			.spawn((markdown_interface(), children![
 				(card("counter"), children![increment(FieldRef::new(
 					"count"
 				)),]),
