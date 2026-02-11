@@ -26,7 +26,27 @@ fn main() -> AppExit {
 		Card,
 		markdown_interface(),
 		repl_server(),
-		children![increment(FieldRef::new("count")), card("about"),],
+		children![about(), counter()],
 	));
 	app.run()
+}
+
+
+fn about() -> impl Bundle {
+	(card("about"), Title::with_text("About"), children![
+		Paragraph::with_text("howdy doody!")
+	])
+}
+
+
+fn counter() -> impl Bundle {
+	let field_ref = FieldRef::new("count").init_with(0);
+
+	(card("counter"), Title::with_text("Counter"), children![
+		increment(field_ref.clone()),
+		(Paragraph, children![
+			TextContent::new("The count is "),
+			field_ref.as_text()
+		])
+	])
 }

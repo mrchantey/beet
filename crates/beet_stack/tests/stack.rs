@@ -11,7 +11,7 @@ fn counter() -> impl Bundle {
 	(Card, PathPartial::new("counter"), children![
 		(Title::with_text("Counter"), children![
 			Paragraph::with_text("The count is "),
-			count.as_text()
+			count.clone().as_text()
 		]),
 		render_markdown(),
 		increment(count)

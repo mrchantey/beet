@@ -47,8 +47,15 @@ impl FieldRef {
 	}
 
 	/// Create a tuple of this field reference and an empty text content.
-	pub fn as_text(&self) -> (Self, TextContent) {
-		(self.clone(), TextContent::default())
+	pub fn as_text(self) -> (Self, TextContent) {
+		let text_content = match self.on_missing {
+			OnMissingField::Init { ref value } => {
+				TextContent::new(value.to_string())
+			}
+			_ => TextContent::default(),
+		};
+
+		(self, text_content)
 	}
 
 	/// Set the behavior when the field is missing.
@@ -58,8 +65,10 @@ impl FieldRef {
 	}
 
 	/// Set the field to initialize with a specific value if missing.
-	pub fn init_with(mut self, value: Value) -> Self {
-		self.on_missing = OnMissingField::Init { value };
+	pub fn init_with(mut self, value: impl Into<Value>) -> Self {
+		self.on_missing = OnMissingField::Init {
+			value: value.into(),
+		};
 		self
 	}
 }

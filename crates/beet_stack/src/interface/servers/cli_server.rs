@@ -39,8 +39,9 @@ pub(crate) fn exit_from_response(parts: &ResponseParts) -> AppExit {
 /// Typically combined with a [`markdown_interface`] and some child
 /// tools to build a CLI application:
 ///
-/// ```rust,no_run
-/// use beet::prelude::*;
+/// ```no_run
+/// # use beet_core::prelude::*;
+/// # use beet_stack::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();

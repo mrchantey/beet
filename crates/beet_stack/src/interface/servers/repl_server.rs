@@ -20,8 +20,9 @@ use beet_core::prelude::*;
 /// Typically combined with a [`markdown_interface`] and child tools
 /// to build an interactive CLI application:
 ///
-/// ```rust,no_run
-/// use beet::prelude::*;
+/// ```no_run
+/// # use beet_core::prelude::*;
+/// # use beet_stack::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();
@@ -41,28 +42,10 @@ use beet_core::prelude::*;
 pub fn repl_server() -> impl Bundle {
 	OnSpawn::new(|entity| {
 		entity.run_async(async |entity| -> Result {
-			let (tx, rx) = async_channel::unbounded::<String>();
-
-			// Background thread reads stdin without blocking the executor
-			std::thread::spawn(move || {
-				let stdin = std::io::stdin();
-				loop {
-					let mut line = String::new();
-					match stdin.read_line(&mut line) {
-						Ok(0) => break, // EOF
-						Ok(_) => {
-							if tx.send_blocking(line).is_err() {
-								break;
-							}
-						}
-						Err(_) => break,
-					}
-				}
-			});
-
 			cross_log_noline!("> ");
+			let stdin = stdin_lines();
 
-			while let Ok(line) = rx.recv().await {
+			while let Ok(line) = stdin.recv().await {
 				let trimmed = line.trim();
 				if trimmed.is_empty() {
 					cross_log_noline!("> ");
@@ -89,6 +72,30 @@ pub fn repl_server() -> impl Bundle {
 		});
 	})
 }
+
+fn stdin_lines() -> async_channel::Receiver<String> {
+	let (tx, rx) = async_channel::unbounded::<String>();
+
+	// Background thread reads stdin without blocking the executor
+	std::thread::spawn(move || {
+		let stdin = std::io::stdin();
+		loop {
+			let mut line = String::new();
+			match stdin.read_line(&mut line) {
+				Ok(0) => break, // EOF
+				Ok(_) => {
+					if tx.send_blocking(line).is_err() {
+						break;
+					}
+				}
+				Err(_) => break,
+			}
+		}
+	});
+	rx
+}
+
+
 
 #[cfg(test)]
 mod test {

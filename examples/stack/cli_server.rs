@@ -25,7 +25,7 @@ fn main() {
 		Card,
 		markdown_interface(),
 		cli_server(),
-		children![counter(), about(),],
+		children![about(), counter(),],
 	));
 	async_ext::block_on(app.run_async());
 }
@@ -38,4 +38,13 @@ fn about() -> impl Bundle {
 }
 
 
-fn counter() -> impl Bundle { increment(FieldRef::new("count")) }
+fn counter() -> impl Bundle {
+	let field_ref = FieldRef::new("count");
+
+	(
+		card("counter"),
+		Title::with_text("Counter"),
+		increment(field_ref.clone()),
+		children![Paragraph::with_text("The count is "), field_ref.as_text()],
+	)
+}
