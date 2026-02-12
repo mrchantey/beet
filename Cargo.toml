@@ -187,6 +187,11 @@ http = "1"
 http-body-util = "0.1"
 url = "2"
 
+#💡 tui
+# git until 0.11 released
+bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
+ratatui = { version = "0.30", default-features = false }
+
 #💡 web
 js-sys = "0.3"
 wasm-bindgen = "=0.2.106"
@@ -211,7 +216,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["stack"]
+# default = ["stack"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
@@ -261,6 +266,7 @@ aws = ["beet_net?/aws"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 build = ["parse", "dep:beet_build"]
 stack = ["dep:beet_stack"]
+tui = ["stack", "beet_stack/tui"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
@@ -338,6 +344,11 @@ web-sys.workspace = true
 # wasm-bindgen-futures.workspace = true
 
 # 💡 Examples - stack
+
+[[example]]
+name = "tui_server"
+path = "examples/stack/tui_server.rs"
+required-features = ["tui"]
 
 [[example]]
 name = "cli_server"

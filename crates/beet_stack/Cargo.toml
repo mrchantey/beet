@@ -13,9 +13,10 @@ categories.workspace = true
 
 
 [features]
-default = ["interface"]
+default = ["interface", "tui"]
 interface = ["serde"]
 serde = ["dep:serde","beet_core/json","beet_core/postcard"]
+tui = ["interface", "dep:bevy_ratatui", "dep:ratatui"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["exchange"] }
@@ -25,6 +26,8 @@ thiserror.workspace = true
 variadics_please.workspace = true
 
 serde = {workspace = true, optional=true}
+bevy_ratatui = {workspace = true, optional=true}
+ratatui = {workspace = true, optional=true, features=["crossterm"]}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

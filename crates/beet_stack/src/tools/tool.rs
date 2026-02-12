@@ -85,6 +85,8 @@ impl TypeMeta {
 	}
 	/// The full type name, ie `core::option::Option<i32>`.
 	pub fn type_name(&self) -> &'static str { self.type_name }
+	/// The [`TypeId`](std::any::TypeId) for this type.
+	pub fn type_id(&self) -> std::any::TypeId { self.type_id }
 }
 
 impl std::fmt::Display for TypeMeta {
