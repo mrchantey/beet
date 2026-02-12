@@ -6,53 +6,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Creates a help tool accessible at `/help`.
-///
-/// Reads the [`RouteTree`] from the root ancestor and formats all
-/// registered routes (both cards and tools) as a help string.
-///
-/// # Example
-///
-/// ```
-/// use beet_stack::prelude::*;
-/// use beet_core::prelude::*;
-///
-/// let mut world = StackPlugin::world();
-/// let root = world.spawn((Card, children![
-///     help(),
-///     increment(FieldRef::new("count")),
-/// ])).flush();
-///
-/// let help_entity = world
-///     .entity(root)
-///     .get::<RouteTree>()
-///     .unwrap()
-///     .find(&["help"])
-///     .unwrap()
-///     .entity();
-///
-/// let output = world
-///     .entity_mut(help_entity)
-///     .call_blocking::<(), String>(())
-///     .unwrap();
-///
-/// assert!(output.contains("increment"));
-/// ```
-pub fn help() -> impl Bundle { (PathPartial::new("help"), tool(help_system)) }
-
-/// System that reads the [`RouteTree`] from the root ancestor and formats it.
-fn help_system(
-	cx: In<ToolContext>,
-	ancestors: Query<&ChildOf>,
-	trees: Query<&RouteTree>,
-) -> Result<String> {
-	let root = ancestors.root_ancestor(cx.tool);
-	let tree = trees.get(root).map_err(|_| {
-		bevyhow!("No RouteTree found on root ancestor, cannot render help")
-	})?;
-	format_route_help(tree).xok()
-}
-
 /// Format a [`RouteTree`] as a help string, listing both cards and tools.
 ///
 /// The help tool itself is excluded from the listing.
@@ -125,10 +78,10 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 	output.push('\n');
 
 	// input/output types, skip trivial `()` types
-	let input = node.meta.input().type_name();
+	let input_type = node.meta.input().type_name();
 	let output_type = node.meta.output().type_name();
-	if input != "()" {
-		output.push_str(&format!("    input:  {}\n", input));
+	if input_type != "()" {
+		output.push_str(&format!("    input:  {}\n", input_type));
 	}
 	if output_type != "()" {
 		output.push_str(&format!("    output: {}\n", output_type));
@@ -146,6 +99,21 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// adds help as a tool located at `/help`
+	/// usually this is handled as an interface tool, added via ?help
+	fn help() -> impl Bundle { (PathPartial::new("help"), tool(help_system)) }
+	fn help_system(
+		cx: In<ToolContext>,
+		ancestors: Query<&ChildOf>,
+		trees: Query<&RouteTree>,
+	) -> Result<String> {
+		let root = ancestors.root_ancestor(cx.tool);
+		let tree = trees.get(root).map_err(|_| {
+			bevyhow!("No RouteTree found on root ancestor, cannot render help")
+		})?;
+		format_route_help(tree).xok()
+	}
 
 	#[test]
 	fn help_lists_tools() {
