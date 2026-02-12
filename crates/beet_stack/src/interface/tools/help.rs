@@ -6,6 +6,83 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Checks for the `--help` param and renders scoped help text.
+pub(crate) async fn help_handler(
+	cx: AsyncToolContext<Request>,
+) -> Result<Outcome<Response, Request>> {
+	if cx.has_param("help") {
+		let path = cx.input.path().clone();
+		let tool_entity = cx.tool.id();
+		let help_text = cx
+			.tool
+			.world()
+			.with_then(move |world: &mut World| -> Result<String> {
+				let tree = root_route_tree(world, tool_entity)?;
+				// Scope help to the requested path prefix
+				if path.is_empty() {
+					format_route_help(tree).xok()
+				} else if let Some(subtree) = tree.find_subtree(&path) {
+					format_route_help(subtree).xok()
+				} else {
+					nearest_ancestor_help(tree, &path).xok()
+				}
+			})
+			.await?;
+
+		Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
+	} else {
+		Fail(cx.input).xok()
+	}
+}
+
+/// Fallback handler that shows help scoped to the nearest ancestor card
+/// of an unmatched path.
+pub(crate) async fn nearest_ancestor_help_handler(
+	cx: AsyncToolContext<Request>,
+) -> Result<Outcome<Response, Request>> {
+	let path = cx.input.path().clone();
+	let tool_entity = cx.tool.id();
+	let help_text = cx
+		.tool
+		.world()
+		.with_then(move |world: &mut World| -> Result<String> {
+			let tree = root_route_tree(world, tool_entity)?;
+			nearest_ancestor_help(tree, &path).xok()
+		})
+		.await?;
+
+	Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
+}
+
+/// Walks the path segments from longest to shortest prefix, returning
+/// help for the first ancestor that matches a card. Falls back to
+/// root help if nothing matches.
+fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
+	// Try progressively shorter prefixes
+	for length in (1..segments.len()).rev() {
+		let prefix = &segments[..length];
+		if let Some(RouteNode::Card(_)) = tree.find(prefix) {
+			let prefix_str = prefix.join("/");
+			let mut output = String::new();
+			output.push_str(&format!(
+				"Route /{} not found. Showing help for /{}:\n\n",
+				segments.join("/"),
+				prefix_str,
+			));
+			// Scope help to the matching ancestor subtree
+			let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
+			output.push_str(&format_route_help(help_tree));
+			return output;
+		}
+	}
+
+	// Nothing matched at all - show root help with a not-found preamble
+	let mut output = String::new();
+	output.push_str(&format!("Route /{} not found.\n\n", segments.join("/"),));
+	output.push_str(&format_route_help(tree));
+	output
+}
+
 /// Format a [`RouteTree`] as a help string, listing both cards and tools.
 ///
 /// The help tool itself is excluded from the listing.
@@ -251,5 +328,89 @@ mod test {
 		output.contains("[card]").xpect_true();
 		// tools should still appear
 		output.contains("increment").xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn markdown_interface_renders_help() {
+		let mut world = StackPlugin::world();
+
+		let root = world
+			.spawn((markdown_interface(), children![
+				increment(FieldRef::new("count")),
+				card("about"),
+			]))
+			.flush();
+
+		let body = world
+			.entity_mut(root)
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		body.contains("Available routes").xpect_true();
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn help_scoped_to_prefix() {
+		let body = StackPlugin::world()
+			.spawn((markdown_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		// Should show routes under counter
+		body.contains("increment").xpect_true();
+		// Should not show sibling routes
+		body.contains("about").xpect_false();
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_ancestor_help() {
+		StackPlugin::world()
+			.spawn((markdown_interface(), children![increment(FieldRef::new(
+				"count"
+			)),]))
+			.call::<Request, Response>(
+				Request::from_cli_str("nonexistent").unwrap(),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("not found")
+			.xpect_contains("Available routes");
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_scoped_ancestor_help() {
+		let body = StackPlugin::world()
+			.spawn((markdown_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("counter nonsense").unwrap(),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await;
+		body.contains("not found").xpect_true();
+		// Should show routes under counter, not the full tree
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
 	}
 }

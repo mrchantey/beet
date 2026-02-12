@@ -9,10 +9,16 @@ use beet_core::prelude::*;
 
 /// A REPL (read-eval-print loop) server [`Bundle`].
 ///
-/// On spawn, starts a background thread that reads lines from stdin.
+/// On spawn, parses process CLI arguments and dispatches them as an
+/// initial [`Request`]. When no arguments are provided, the empty path
+/// renders the root card. After the initial display, starts a
+/// background thread that reads lines from stdin.
 /// Each non-empty line is parsed as CLI-style arguments into a
 /// [`Request`], dispatched through the owning entity's tool pipeline,
 /// and the response body is streamed to stdout.
+///
+/// Includes a [`History`] component for tracking the current path,
+/// enabling relative navigation via `--navigate=<direction>`.
 ///
 /// Typing `exit` or `quit` terminates the loop and writes
 /// [`AppExit::Success`]. An EOF on stdin also exits cleanly.
@@ -40,37 +46,50 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn repl_server() -> impl Bundle {
-	OnSpawn::new(|entity| {
-		entity.run_async(async |entity| -> Result {
-			cross_log_noline!("> ");
-			let stdin = stdin_lines();
-
-			while let Ok(line) = stdin.recv().await {
-				let trimmed = line.trim();
-				if trimmed.is_empty() {
-					cross_log_noline!("> ");
-					continue;
-				}
-				if trimmed == "exit" || trimmed == "quit" {
-					break;
-				}
-
-				let req = Request::from_cli_str(trimmed)?;
-				let res: Response = entity.call(req).await?;
-				let parts = stream_response_to_stdout(res).await?;
+	(
+		History::default(),
+		OnSpawn::new(|entity| {
+			entity.run_async(async |entity| -> Result {
+				// Dispatch CLI args as the initial request, rendering the
+				// root card when no args are provided.
+				let initial_req = Request::from_cli_args(CliArgs::parse_env())?;
+				let initial_res: Response = entity.call(initial_req).await?;
+				let parts = stream_response_to_stdout(initial_res).await?;
 				cross_log!("");
-
 				if let Err(code) = parts.status_to_exit_code() {
-					error!("Command failed\nStatus code: {code}");
+					error!("Initial command failed\nStatus code: {code}");
 				}
 
 				cross_log_noline!("> ");
-			}
+				let stdin = stdin_lines();
 
-			entity.world().write_message(AppExit::Success);
-			Ok(())
-		});
-	})
+				while let Ok(line) = stdin.recv().await {
+					let trimmed = line.trim();
+					if trimmed.is_empty() {
+						cross_log_noline!("> ");
+						continue;
+					}
+					if trimmed == "exit" || trimmed == "quit" {
+						break;
+					}
+
+					let req = Request::from_cli_str(trimmed)?;
+					let res: Response = entity.call(req).await?;
+					let parts = stream_response_to_stdout(res).await?;
+					cross_log!("");
+
+					if let Err(code) = parts.status_to_exit_code() {
+						error!("Command failed\nStatus code: {code}");
+					}
+
+					cross_log_noline!("> ");
+				}
+
+				entity.world().write_message(AppExit::Success);
+				Ok(())
+			});
+		}),
+	)
 }
 
 fn stdin_lines() -> async_channel::Receiver<String> {

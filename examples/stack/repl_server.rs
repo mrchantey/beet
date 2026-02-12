@@ -16,6 +16,8 @@
 //! > about
 //! > counter --help
 //! > counter increment
+//! > --navigate=first-child
+//! > about --navigate=next-sibling
 //! > exit
 //! ```
 use beet::prelude::*;

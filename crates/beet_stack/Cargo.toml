@@ -39,6 +39,6 @@ beet_core = { workspace = true, features = ["testing"] }
 
 
 [[test]]
-name = "stack"
-path = "tests/stack.rs"
+name = "interface"
+path = "tests/interface.rs"
 required-features = ["interface"]

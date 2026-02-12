@@ -1,5 +1,7 @@
 //! A TUI server that renders a terminal interface for browsing cards
 //! and invoking tools, using [`bevy_ratatui`] for rendering.
+mod tui_draw;
+mod tui_input;
 mod tui_plugin;
 pub use tui_plugin::*;
 mod tui_server;

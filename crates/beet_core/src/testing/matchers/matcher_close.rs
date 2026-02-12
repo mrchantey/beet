@@ -84,4 +84,3 @@ mod test {
 		0.0_f64.xpect_close_within(0.5, 1.);
 	}
 }
-

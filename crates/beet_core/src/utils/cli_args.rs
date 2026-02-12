@@ -77,7 +77,10 @@ impl CliArgs {
 			query.entry(key).or_default();
 		}
 
-		Self { path, params: query }
+		Self {
+			path,
+			params: query,
+		}
 	}
 
 	/// Groups arguments respecting quotations (single and double quotes).
@@ -292,7 +295,10 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params.get("key").unwrap().xpect_eq(vec!["".to_string()]);
+		cli.params
+			.get("key")
+			.unwrap()
+			.xpect_eq(vec!["".to_string()]);
 	}
 
 	#[test]

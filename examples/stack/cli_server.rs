@@ -24,6 +24,11 @@
 //!
 //! # not-found shows help for nearest ancestor
 //! cargo run --example cli_server --features stack -- counter nonsense
+//!
+//! # directional navigation
+//! cargo run --example cli_server --features stack -- --navigate=first-child
+//! cargo run --example cli_server --features stack -- about --navigate=next-sibling
+//! cargo run --example cli_server --features stack -- about --navigate=parent
 //! ```
 use beet::prelude::*;
 mod my_stack;
