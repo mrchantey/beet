@@ -234,8 +234,8 @@ mod test_request {
 	#[ignore = "flaky httpbin"]
 	async fn query_params_work() {
 		Request::get(format!("{HTTPBIN}/get"))
-			.with_query_param("foo", "bar")
-			.with_query_param("baz", "qux")
+			.with_param("foo", "bar")
+			.with_param("baz", "qux")
 			.send()
 			.await
 			.unwrap()

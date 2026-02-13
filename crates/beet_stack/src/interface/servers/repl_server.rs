@@ -48,48 +48,54 @@ use beet_core::prelude::*;
 pub fn repl_server() -> impl Bundle {
 	(
 		History::default(),
-		OnSpawn::new(|entity| {
-			entity.run_async(async |entity| -> Result {
-				// Dispatch CLI args as the initial request, rendering the
-				// root card when no args are provided.
-				let initial_req = Request::from_cli_args(CliArgs::parse_env())?;
-				let initial_res: Response = entity.call(initial_req).await?;
-				let parts = stream_response_to_stdout(initial_res).await?;
-				cross_log!("");
-				if let Err(code) = parts.status_to_exit_code() {
-					error!("Initial command failed\nStatus code: {code}");
+		OnSpawn::new_async(async |entity| -> Result {
+			// Dispatch CLI args as the initial request, rendering the
+			// root card when no args are provided.
+			call(&entity, Request::from_cli_args(CliArgs::parse_env())?)
+				.await?;
+
+			cross_log_noline!("> ");
+			let stdin = stdin_lines();
+
+			while let Ok(line) = stdin.recv().await {
+				let trimmed = line.trim();
+				if trimmed == "exit" || trimmed == "quit" {
+					break;
 				}
+
+				call(&entity, Request::from_cli_str(trimmed)?).await?;
 
 				cross_log_noline!("> ");
-				let stdin = stdin_lines();
+			}
 
-				while let Ok(line) = stdin.recv().await {
-					let trimmed = line.trim();
-					if trimmed.is_empty() {
-						cross_log_noline!("> ");
-						continue;
-					}
-					if trimmed == "exit" || trimmed == "quit" {
-						break;
-					}
-
-					let req = Request::from_cli_str(trimmed)?;
-					let res: Response = entity.call(req).await?;
-					let parts = stream_response_to_stdout(res).await?;
-					cross_log!("");
-
-					if let Err(code) = parts.status_to_exit_code() {
-						error!("Command failed\nStatus code: {code}");
-					}
-
-					cross_log_noline!("> ");
-				}
-
-				entity.world().write_message(AppExit::Success);
-				Ok(())
-			});
+			entity.world().write_message(AppExit::Success);
+			Ok(())
 		}),
 	)
+}
+
+async fn call(entity: &AsyncEntity, request: Request) -> Result {
+	// the repl server always prints help after rendering
+	let help_req = if !request.has_param("help") {
+		Some(Request::from_parts(
+			request.parts().clone().with_flag("help"),
+			default(),
+		))
+	} else {
+		None
+	};
+
+	let response: Response = entity.call(request).await?;
+	let parts = stream_response_to_stdout(response).await?;
+	cross_log!("");
+	if parts.status().is_err() {
+		error!("command failed\nStatus: {}", parts.status());
+	}
+	if let Some(help_req) = help_req {
+		cross_log!("");
+		Box::pin(call(entity, help_req)).await?;
+	}
+	Ok(())
 }
 
 fn stdin_lines() -> async_channel::Receiver<String> {

@@ -21,13 +21,13 @@
 //! > exit
 //! ```
 use beet::prelude::*;
-mod my_stack;
+mod demo_stack;
 
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((repl_server(), my_stack::my_stack()));
+			commands.spawn((repl_server(), demo_stack::stack()));
 		})
 		.run()
 }

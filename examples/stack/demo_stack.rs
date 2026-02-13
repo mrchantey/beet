@@ -3,7 +3,7 @@ use beet::prelude::*;
 
 /// An interface agnostic stack used to demonstrate
 /// the behavior of various servers.
-pub fn my_stack() -> impl Bundle {
+pub fn stack() -> impl Bundle {
 	(markdown_interface(), children![root(), about(), counter()])
 }
 
@@ -18,7 +18,7 @@ fn root() -> impl Bundle {
 
 fn about() -> impl Bundle {
 	(card("about"), Title::with_text("About"), children![
-		Paragraph::with_text("howdy doody!")
+		Paragraph::with_text(r#"My stack is"#)
 	])
 }
 

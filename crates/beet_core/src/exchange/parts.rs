@@ -271,6 +271,27 @@ impl RequestParts {
 		&mut self.headers
 	}
 
+	/// Adds a parameter and returns self for chaining
+	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
+		self.params.insert_key(key.into());
+		self
+	}
+
+	/// Adds a parameter and returns self for chaining
+	pub fn with_param(
+		mut self,
+		key: impl Into<String>,
+		value: impl Into<String>,
+	) -> Self {
+		self.params.insert(key.into(), value.into());
+		self
+	}
+
+	/// Adds a flag parameter
+	pub fn insert_flag(&mut self, key: impl Into<String>) {
+		self.params.insert_key(key.into());
+	}
+
 	/// Adds a parameter
 	pub fn insert_param(
 		&mut self,

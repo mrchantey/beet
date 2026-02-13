@@ -93,6 +93,9 @@ impl RequestMeta {
 		}
 	}
 
+	/// Returns a reference to the request parts
+	pub fn parts(&self) -> &RequestParts { &self.parts }
+
 	/// Returns the HTTP method of the request.
 	pub fn method(&self) -> HttpMethod { *self.parts.method() }
 
@@ -116,6 +119,9 @@ impl Request {
 			body: default(),
 		}
 	}
+
+	/// Returns a reference to the request parts
+	pub fn parts(&self) -> &RequestParts { &self.parts }
 
 	/// Creates a request from parts and body
 	pub fn from_parts(parts: RequestParts, body: Body) -> Self {
@@ -337,11 +343,11 @@ impl Request {
 	) -> Result<Self> {
 		let key = serde_urlencoded::to_string(key)?;
 		let value = serde_urlencoded::to_string(value)?;
-		self.with_query_param(&key, &value).xok()
+		self.with_param(&key, &value).xok()
 	}
 
 	/// Insert a query parameter into the request
-	pub fn with_query_param(mut self, key: &str, value: &str) -> Self {
+	pub fn with_param(mut self, key: &str, value: &str) -> Self {
 		self.parts.insert_param(key, value);
 		self
 	}
@@ -599,8 +605,8 @@ mod test {
 	#[test]
 	fn request_with_query_param() {
 		let request = Request::get("/api/users")
-			.with_query_param("limit", "10")
-			.with_query_param("offset", "20");
+			.with_param("limit", "10")
+			.with_param("offset", "20");
 
 		request.get_param("limit").unwrap().xpect_eq("10");
 		request.get_param("offset").unwrap().xpect_eq("20");

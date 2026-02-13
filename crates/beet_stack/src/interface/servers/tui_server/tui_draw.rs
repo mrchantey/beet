@@ -141,6 +141,12 @@ fn render_tui(
 	tool_map: &TuiToolMap,
 	tool_nodes: &[ToolNode],
 ) {
+	/// Minimum terminal width (columns) to auto-show the card tree panel.
+	const TREE_AUTO_SHOW_WIDTH: u16 = 80;
+	/// Width of the tree panel in columns.
+	const TREE_PANEL_WIDTH: u16 = 24;
+
+
 	let area = frame.area();
 
 	// Vertical split: content area + command palette

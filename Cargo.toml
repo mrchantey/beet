@@ -346,18 +346,18 @@ web-sys.workspace = true
 # 💡 Examples - stack
 
 [[example]]
-name = "tui_server"
-path = "examples/stack/tui_server.rs"
+name = "tui"
+path = "examples/stack/tui.rs"
 required-features = ["tui"]
 
 [[example]]
-name = "cli_server"
-path = "examples/stack/cli_server.rs"
+name = "cli"
+path = "examples/stack/cli.rs"
 required-features = ["stack"]
 
 [[example]]
-name = "repl_server"
-path = "examples/stack/repl_server.rs"
+name = "repl"
+path = "examples/stack/repl.rs"
 required-features = ["stack"]
 
 # 💡 Examples - agent

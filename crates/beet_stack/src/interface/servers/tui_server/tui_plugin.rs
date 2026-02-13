@@ -11,11 +11,6 @@ use ratatui::widgets::ListState;
 use std::any::TypeId;
 use std::sync::Arc;
 
-/// Minimum terminal width (columns) to auto-show the card tree panel.
-pub(super) const TREE_AUTO_SHOW_WIDTH: u16 = 80;
-/// Width of the tree panel in columns.
-pub(super) const TREE_PANEL_WIDTH: u16 = 24;
-
 /// A rendering function for a tool input widget.
 ///
 /// Parameters: `(frame, area, current_input_value, is_focused)`

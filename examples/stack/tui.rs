@@ -7,7 +7,7 @@
 //! ## Running the Example
 //!
 //! ```sh
-//! cargo run --example tui_server --features tui
+//! cargo run --example tui --features tui
 //! ```
 //!
 //! ## Controls
@@ -27,20 +27,20 @@
 //! counter increment
 //! ```
 use beet::prelude::*;
-mod my_stack;
+mod demo_stack;
 
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((
 			MinimalPlugins.set(bevy::app::ScheduleRunnerPlugin::run_loop(
-				std::time::Duration::from_secs_f32(1. / 60.),
+				Duration::from_secs_f32(1. / 60.),
 			)),
 			LogPlugin::default(),
 			StackPlugin,
 			TuiPlugin,
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((tui_server(), my_stack::my_stack()));
+			commands.spawn((tui_server(), demo_stack::stack()));
 		})
 		.run()
 }
