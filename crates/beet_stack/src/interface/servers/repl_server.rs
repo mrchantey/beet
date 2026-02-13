@@ -76,6 +76,7 @@ pub fn repl_server() -> impl Bundle {
 
 async fn call(entity: &AsyncEntity, request: Request) -> Result {
 	// the repl server always prints help after rendering
+	// unless its already a help call
 	let help_req = if !request.has_param("help") {
 		Some(Request::from_parts(
 			request.parts().clone().with_flag("help"),
@@ -120,54 +121,4 @@ fn stdin_lines() -> async_channel::Receiver<String> {
 	rx
 }
 
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-
-	#[beet_core::test]
-	async fn dispatches_tool_request() {
-		let mut world = StackPlugin::world();
-
-		let root = world
-			.spawn((Card, default_interface(), children![increment(
-				FieldRef::new("count")
-			)]))
-			.flush();
-
-		let res = world
-			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("increment").unwrap(),
-			)
-			.await
-			.unwrap();
-
-		let parts = stream_response_to_stdout(res).await.unwrap();
-		parts.status().xpect_eq(StatusCode::Ok);
-	}
-
-	#[beet_core::test]
-	async fn help_flag_returns_route_list() {
-		let mut world = StackPlugin::world();
-
-		let root = world
-			.spawn((Card, default_interface(), children![
-				increment(FieldRef::new("count")),
-				card("about"),
-			]))
-			.flush();
-
-		let body = world
-			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
-			.await
-			.unwrap()
-			.unwrap_str()
-			.await;
-
-		body.contains("Available routes").xpect_true();
-	}
-}
+// nothing really to test, its all just stdio

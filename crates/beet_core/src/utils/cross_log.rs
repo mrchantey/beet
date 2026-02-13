@@ -1,4 +1,5 @@
-/// cross-platform way of logging a formatted value, using println! for native logging
+/// cross-platform way of logging a formatted value,
+/// using [`print!`] and [`stdout::flush`] for native logging
 #[macro_export]
 macro_rules! cross_log_noline {
     ($($t:tt)*) => ({
@@ -17,28 +18,32 @@ macro_rules! cross_log_noline {
 #[macro_export]
 macro_rules! cross_log {
     ($($t:tt)*) => ({
-        #[cfg(target_arch = "wasm32")]
-		$crate::exports::web_sys::console::log_1(&(format!($($t)*).into()));
-        #[cfg(not(target_arch = "wasm32"))]
-        println!($($t)*);
+      #[cfg(target_arch = "wasm32")]
+      	$crate::exports::web_sys::console::log_1(&(format!($($t)*).into()));
+      #[cfg(not(target_arch = "wasm32"))]
+      	println!($($t)*);
     })
 }
 /// cross-platform way of error logging a formatted value
 #[macro_export]
 macro_rules! cross_log_error {
     ($($t:tt)*) => ({
-        #[cfg(target_arch = "wasm32")]
-		$crate::exports::web_sys::console::error_1(&(format!($($t)*).into()));
-        #[cfg(not(target_arch = "wasm32"))]
+      #[cfg(target_arch = "wasm32")]
+        $crate::exports::web_sys::console::error_1(&(format!($($t)*).into()));
+      #[cfg(not(target_arch = "wasm32"))]
         eprintln!($($t)*);
     })
 }
 
-
-/// cross-platform way of logging a breakpoint with line number
+/// cross-platform way of logging a breakpoint with its span
 #[macro_export]
 macro_rules! breakpoint {
 	() => {{
-		$crate::cross_log!("breakpoint at line {}", line!());
+		$crate::cross_log!(
+			"breakpoint at {}:{}:{}",
+			file!(),
+			line!(),
+			column!()
+		);
 	}};
 }

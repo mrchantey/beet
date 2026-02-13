@@ -1,4 +1,6 @@
 assets
+agent/tui_server
+
 !examples/assets
 Cargo.toml.full
 Cargo.toml.basic

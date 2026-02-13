@@ -32,11 +32,7 @@ mod demo_stack;
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((
-			MinimalPlugins.set(bevy::app::ScheduleRunnerPlugin::run_loop(
-				Duration::from_secs_f32(1. / 60.),
-			)),
-			LogPlugin::default(),
-			StackPlugin,
+			// LogPlugin::default(),
 			TuiPlugin,
 		))
 		.add_systems(Startup, |mut commands: Commands| {

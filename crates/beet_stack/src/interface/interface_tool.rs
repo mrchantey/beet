@@ -145,4 +145,34 @@ mod test {
 			.to_string()
 			.xpect_eq("/add");
 	}
+
+	#[beet_core::test]
+	async fn dispatches_tool_request() {
+		StackPlugin::world()
+			.spawn((Card, default_interface(), children![increment(
+				FieldRef::new("count")
+			)]))
+			.call::<Request, Response>(
+				Request::from_cli_str("increment").unwrap(),
+			)
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::Ok);
+	}
+
+	#[beet_core::test]
+	async fn help_flag_returns_route_list() {
+		StackPlugin::world()
+			.spawn((Card, default_interface(), children![
+				increment(FieldRef::new("count")),
+				card("about"),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("Available routes");
+	}
 }
