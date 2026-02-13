@@ -4,7 +4,7 @@ use beet::prelude::*;
 /// An interface agnostic stack used to demonstrate
 /// the behavior of various servers.
 pub fn stack() -> impl Bundle {
-	(markdown_interface(), children![root(), about(), counter()])
+	(default_interface(), children![root(), about(), counter()])
 }
 
 

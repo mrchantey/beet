@@ -3,7 +3,7 @@
 
 //! Integration tests for the markdown interface.
 //!
-//! All tests dispatch through [`markdown_interface`] using [`Request`]
+//! All tests dispatch through [`default_interface`] using [`Request`]
 //! and [`Response`], verifying end-to-end behavior of the interface
 //! tool chain: help, navigate, routing, and not-found fallback.
 
@@ -37,7 +37,7 @@ fn calculator() -> impl Bundle {
 fn test_interface() -> (World, Entity) {
 	let mut world = StackPlugin::world();
 	let root = world
-		.spawn((markdown_interface(), children![
+		.spawn((default_interface(), children![
 			counter(),
 			calculator(),
 			(card("about"), Paragraph::with_text("About page")),
@@ -53,8 +53,9 @@ async fn dispatch(world: &mut World, root: Entity, cli: &str) -> String {
 		.call::<Request, Response>(Request::from_cli_str(cli).unwrap())
 		.await
 		.unwrap()
-		.unwrap_str()
+		.text()
 		.await
+		.unwrap()
 }
 
 #[beet_core::test]
@@ -129,7 +130,7 @@ async fn navigate_first_child() {
 async fn navigate_parent_from_card() {
 	let mut world = StackPlugin::world();
 	let root = world
-		.spawn((markdown_interface(), children![
+		.spawn((default_interface(), children![
 			(Card, Title::with_text("Root")),
 			(card("child"), Paragraph::with_text("Child page")),
 		]))
@@ -143,7 +144,7 @@ async fn navigate_parent_from_card() {
 async fn navigate_next_sibling() {
 	let mut world = StackPlugin::world();
 	let root = world
-		.spawn((markdown_interface(), children![
+		.spawn((default_interface(), children![
 			(card("alpha"), Paragraph::with_text("Alpha")),
 			(card("beta"), Paragraph::with_text("Beta")),
 		]))

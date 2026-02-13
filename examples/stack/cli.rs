@@ -2,7 +2,7 @@
 //!
 //! Demonstrates a single-shot CLI application using [`cli_server`].
 //! The app parses process arguments, dispatches them through a
-//! [`markdown_interface`], and prints the response to stdout.
+//! [`default_interface`], and prints the response to stdout.
 //!
 //! A [`Card`] with no [`PathPartial`] matches the empty path,
 //! serving as the root content when no arguments are provided.

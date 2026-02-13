@@ -37,7 +37,7 @@ pub(crate) async fn help_handler(
 
 /// Fallback handler that shows help scoped to the nearest ancestor card
 /// of an unmatched path.
-pub(crate) async fn nearest_ancestor_help_handler(
+pub(crate) async fn contextual_not_found_handler(
 	cx: AsyncToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
@@ -51,7 +51,12 @@ pub(crate) async fn nearest_ancestor_help_handler(
 		})
 		.await?;
 
-	Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
+	Outcome::Pass(Response::from_status_body(
+		StatusCode::NotFound,
+		help_text,
+		"text/plain",
+	))
+	.xok()
 }
 
 /// Walks the path segments from longest to shortest prefix, returning
@@ -331,11 +336,11 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn markdown_interface_renders_help() {
+	async fn default_interface_renders_help() {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((markdown_interface(), children![
+			.spawn((default_interface(), children![
 				increment(FieldRef::new("count")),
 				card("about"),
 			]))
@@ -356,7 +361,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_scoped_to_prefix() {
 		let body = StackPlugin::world()
-			.spawn((markdown_interface(), children![
+			.spawn((default_interface(), children![
 				(card("counter"), children![increment(FieldRef::new(
 					"count"
 				)),]),
@@ -378,7 +383,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		StackPlugin::world()
-			.spawn((markdown_interface(), children![increment(FieldRef::new(
+			.spawn((default_interface(), children![increment(FieldRef::new(
 				"count"
 			)),]))
 			.call::<Request, Response>(
@@ -386,16 +391,17 @@ mod test {
 			)
 			.await
 			.unwrap()
-			.unwrap_str()
+			.text()
 			.await
+			.unwrap()
 			.xpect_contains("not found")
 			.xpect_contains("Available routes");
 	}
 
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
-		let body = StackPlugin::world()
-			.spawn((markdown_interface(), children![
+		StackPlugin::world()
+			.spawn((default_interface(), children![
 				(card("counter"), children![increment(FieldRef::new(
 					"count"
 				)),]),
@@ -406,11 +412,12 @@ mod test {
 			)
 			.await
 			.unwrap()
-			.unwrap_str()
-			.await;
-		body.contains("not found").xpect_true();
-		// Should show routes under counter, not the full tree
-		body.contains("increment").xpect_true();
-		body.contains("about").xpect_false();
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("not found")
+			.xpect_contains("increment")
+			.xnot()
+			.xpect_contains("about");
 	}
 }

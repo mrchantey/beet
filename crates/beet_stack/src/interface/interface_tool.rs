@@ -1,6 +1,6 @@
 //! An interface routes requests to cards and tools.
 //!
-//! This module provides [`markdown_interface`], an async interface that
+//! This module provides [`default_interface`], an async interface that
 //! handles request routing, card navigation, tool invocation, and help
 //! rendering. It delegates to shared functions in [`render_markdown`]
 //! and [`help`] rather than duplicating their logic.
@@ -50,8 +50,16 @@ pub fn interface() -> impl Bundle {
 		RouteHidden,
 		direct_tool(async |request: AsyncToolContext<Request>| -> Response {
 			match fallback::<Request, Response>(request).await {
+				// a response matched, which may be an opinionated not found response
 				Ok(Pass(res)) => res,
-				Ok(Fail(_req)) => Response::not_found(),
+				// usually an interface should render an opinionated not found response
+				// as the final fallback, in this case they didnt so we'll return
+				// a simple plaintext one.
+				Ok(Fail(req)) => Response::from_status_body(
+					StatusCode::NotFound,
+					format!("Resource not found: {}", req.path_string()),
+					"text/plain",
+				),
 				// if the returned error is a HttpError its status code will be used.
 				Err(err) => HttpError::from_opaque(err).into_response(),
 			}
@@ -72,7 +80,7 @@ pub fn interface() -> impl Bundle {
 ///    no [`PathPartial`] naturally matches the empty path.
 /// 4. **Contextual Not Found** — show help for the nearest ancestor
 ///    card of the unmatched path.
-pub fn markdown_interface() -> impl Bundle {
+pub fn default_interface() -> impl Bundle {
 	(
 		interface(),
 		OnSpawn::insert(children![
@@ -90,7 +98,7 @@ pub fn markdown_interface() -> impl Bundle {
 			(
 				Name::new("Contextual Not Found"),
 				RouteHidden,
-				direct_tool(nearest_ancestor_help_handler)
+				direct_tool(contextual_not_found_handler)
 			)
 		]),
 	)

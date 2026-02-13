@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// body back for display in the terminal.
 ///
 /// Requires [`TuiPlugin`] to be added to the app. Typically combined
-/// with a [`markdown_interface`] and child tools/cards:
+/// with a [`default_interface`] and child tools/cards:
 ///
 /// ```no_run
 /// # use beet_core::prelude::*;
@@ -33,7 +33,7 @@ use beet_core::prelude::*;
 ///     ));
 ///     app.world_mut().spawn((
 ///         tui_server(),
-///         markdown_interface(),
+///         default_interface(),
 ///         children![
 ///             increment(FieldRef::new("count")),
 ///             card("about"),

@@ -492,7 +492,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_card() {
 		StackPlugin::world()
-			.spawn((markdown_interface(), children![(
+			.spawn((default_interface(), children![(
 				card("about"),
 				Paragraph,
 				TextContent::new("About page"),
@@ -509,7 +509,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_card_on_empty_path() {
 		StackPlugin::world()
-			.spawn((markdown_interface(), children![(
+			.spawn((default_interface(), children![(
 				Card,
 				Paragraph,
 				TextContent::new("Root content"),
@@ -525,7 +525,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_card_child() {
 		let body = StackPlugin::world()
-			.spawn((markdown_interface(), children![
+			.spawn((default_interface(), children![
 				(Card, Title::with_text("My Server"), children![
 					Paragraph::with_text("welcome!")
 				]),
@@ -543,7 +543,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_calls_exchange_tool() {
 		StackPlugin::world()
-			.spawn((markdown_interface(), children![(
+			.spawn((default_interface(), children![(
 				PathPartial::new("add"),
 				exchange_tool(|input: (i32, i32)| -> i32 { input.0 + input.1 }),
 			)]))

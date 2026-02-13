@@ -23,7 +23,7 @@ use beet_core::prelude::*;
 /// Typing `exit` or `quit` terminates the loop and writes
 /// [`AppExit::Success`]. An EOF on stdin also exits cleanly.
 ///
-/// Typically combined with a [`markdown_interface`] and child tools
+/// Typically combined with a [`default_interface`] and child tools
 /// to build an interactive CLI application:
 ///
 /// ```no_run
@@ -35,7 +35,7 @@ use beet_core::prelude::*;
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
 ///     app.world_mut().spawn((
 ///         Card,
-///         markdown_interface(),
+///         default_interface(),
 ///         repl_server(),
 ///         children![
 ///             increment(FieldRef::new("count")),
@@ -132,7 +132,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![increment(
+			.spawn((Card, default_interface(), children![increment(
 				FieldRef::new("count")
 			)]))
 			.flush();
@@ -154,7 +154,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((Card, markdown_interface(), children![
+			.spawn((Card, default_interface(), children![
 				increment(FieldRef::new("count")),
 				card("about"),
 			]))

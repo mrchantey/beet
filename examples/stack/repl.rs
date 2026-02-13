@@ -2,7 +2,7 @@
 //!
 //! Demonstrates an interactive REPL application using [`repl_server`].
 //! The app reads lines from stdin, dispatches each through a
-//! [`markdown_interface`], and prints the response to stdout.
+//! [`default_interface`], and prints the response to stdout.
 //!
 //! ## Running the Example
 //!
