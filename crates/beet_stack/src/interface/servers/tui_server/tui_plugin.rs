@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use bevy::input::keyboard::KeyboardInput;
 use bevy_ratatui::RatatuiPlugins;
 
 use crate::stack::StackPlugin;
@@ -17,7 +18,7 @@ pub struct TuiPlugin;
 
 impl Plugin for TuiPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<StackPlugin>().add_plugins((
+		app.add_plugins((
 			MinimalPlugins.set(bevy::app::ScheduleRunnerPlugin::run_loop(
 				Duration::from_secs_f32(1. / 60.),
 			)),
@@ -26,8 +27,9 @@ impl Plugin for TuiPlugin {
 				enable_mouse_capture: true,
 				enable_input_forwarding: true,
 			},
-		));
-		// .add_systems(PreUpdate, super::tui_input::tui_input_system)
+		))
+		.init_plugin::<StackPlugin>()
+		.add_systems(PostUpdate, (super::draw_system, exit_system));
 		// .add_systems(
 		// 	Update,
 		// 	(
@@ -37,5 +39,25 @@ impl Plugin for TuiPlugin {
 		// 	)
 		// 		.chain(),
 		// );
+	}
+}
+
+
+
+fn exit_system(
+	mut messages: MessageReader<KeyboardInput>,
+	mut commands: Commands,
+) {
+	use bevy::input::keyboard::Key;
+	for message in messages.read() {
+		match &message.logical_key {
+			Key::Character(val) if val == "q" => {
+				commands.write_message(AppExit::Success);
+			}
+			Key::Escape => {
+				commands.write_message(AppExit::Success);
+			}
+			_ => {}
+		}
 	}
 }
