@@ -46,32 +46,28 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn repl_server() -> impl Bundle {
-	(
-		History::default(),
-		OnSpawn::new_async(async |entity| -> Result {
-			// Dispatch CLI args as the initial request, rendering the
-			// root card when no args are provided.
-			call(&entity, Request::from_cli_args(CliArgs::parse_env())?)
-				.await?;
+	OnSpawn::new_async(async |entity| -> Result {
+		// Dispatch CLI args as the initial request, rendering the
+		// root card when no args are provided.
+		call(&entity, Request::from_cli_args(CliArgs::parse_env())?).await?;
 
-			cross_log_noline!("> ");
-			let stdin = stdin_lines();
+		cross_log_noline!("> ");
+		let stdin = stdin_lines();
 
-			while let Ok(line) = stdin.recv().await {
-				let trimmed = line.trim();
-				if trimmed == "exit" || trimmed == "quit" {
-					break;
-				}
-
-				call(&entity, Request::from_cli_str(trimmed)?).await?;
-
-				cross_log_noline!("> ");
+		while let Ok(line) = stdin.recv().await {
+			let trimmed = line.trim();
+			if trimmed == "exit" || trimmed == "quit" {
+				break;
 			}
 
-			entity.world().write_message(AppExit::Success);
-			Ok(())
-		}),
-	)
+			call(&entity, Request::from_cli_str(trimmed)?).await?;
+
+			cross_log_noline!("> ");
+		}
+
+		entity.world().write_message(AppExit::Success);
+		Ok(())
+	})
 }
 
 async fn call(entity: &AsyncEntity, request: Request) -> Result {

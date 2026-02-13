@@ -3,24 +3,9 @@
 //! The [`navigate_handler`] checks for a `--navigate` param and
 //! resolves the target path relative to the current request path,
 //! then renders the target card or calls the target tool directly.
-//!
-//! [`History`] tracks the current path for stateful servers like
-//! the REPL, enabling relative navigation across requests.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-
-/// Tracks the current navigation path for stateful servers.
-///
-/// Inserted on the server entity so that subsequent requests
-/// can resolve relative navigation without the user repeating
-/// the full path.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct History {
-	/// The path segments of the currently viewed route.
-	pub current_path: Vec<String>,
-}
 
 /// The direction to navigate relative to the current path.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
@@ -88,34 +73,21 @@ pub(crate) async fn navigate_handler(
 	let world = cx.tool.world();
 
 	let resolved = world
-		.with_then(
-			move |world: &mut World| -> Result<Option<(Vec<String>, RouteNode)>> {
-				let tree = root_route_tree(world, tool_entity)?;
-				let target_path =
-					resolve_navigation(tree, &current_path, direction)?;
-				tree.find(&target_path)
-					.cloned()
-					.map(|node| (target_path, node))
-					.xok()
-			},
-		)
+		.with_then(move |world: &mut World| -> Result<Option<RouteNode>> {
+			let tree = root_route_tree(world, tool_entity)?;
+			let target_path =
+				resolve_navigation(tree, &current_path, direction)?;
+			tree.find(&target_path).cloned().xok()
+		})
 		.await?;
 
-	let Some((target_path, node)) = resolved else {
+	let Some(node) = resolved else {
 		return Pass(Response::ok_body(
 			"Navigation target not found",
 			"text/plain",
 		))
 		.xok();
 	};
-
-	// Update History on ancestor if present
-	let path_for_history = target_path.clone();
-	world
-		.with_then(move |world: &mut World| {
-			update_ancestor_history(world, tool_entity, path_for_history);
-		})
-		.await;
 
 	match node {
 		RouteNode::Card(card_node) => {
@@ -127,40 +99,14 @@ pub(crate) async fn navigate_handler(
 				.await;
 			Pass(Response::ok_body(markdown, "text/plain"))
 		}
-		RouteNode::Tool(tool_node) => Pass(
-			world
-				.entity(tool_node.entity)
-				.call::<Request, Response>(cx.input)
-				.await?,
-		),
+		RouteNode::Tool(_) => Pass(Response::from_status_body(
+			StatusCode::MalformedRequest,
+			"Cannot navigate to a tool",
+			"text/plain",
+		)),
 	}
 	.xok()
 }
-
-/// Walks up [`ChildOf`] relations from `entity` to find the first
-/// ancestor with a [`History`] component and updates its path.
-fn update_ancestor_history(
-	world: &mut World,
-	entity: Entity,
-	path: Vec<String>,
-) {
-	let mut current = entity;
-	loop {
-		if world.entity(current).contains::<History>() {
-			world
-				.entity_mut(current)
-				.get_mut::<History>()
-				.unwrap()
-				.current_path = path;
-			return;
-		}
-		match world.entity(current).get::<ChildOf>() {
-			Some(child_of) => current = child_of.parent(),
-			None => return,
-		}
-	}
-}
-
 
 /// Resolve a navigation direction against a [`RouteTree`] from the
 /// given current path, returning the target path segments.

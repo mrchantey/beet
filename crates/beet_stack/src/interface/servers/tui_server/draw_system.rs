@@ -1,9 +1,15 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy_ratatui::*;
 use ratatui::prelude::*;
 use ratatui::widgets;
 
-pub(super) fn draw_system(mut context: ResMut<RatatuiContext>) -> Result {
+pub(super) fn draw_system(
+	mut context: ResMut<RatatuiContext>,
+	query: Query<Entity, With<CurrentCard>>,
+) -> Result {
+	let card = query.single()?;
+
 	context.draw(render)?;
 
 	Ok(())

@@ -83,6 +83,7 @@ pub fn interface() -> impl Bundle {
 pub fn default_interface() -> impl Bundle {
 	(
 		interface(),
+		StatefulInterface::default(),
 		OnSpawn::insert(children![
 			(
 				Name::new("Help Tool"),

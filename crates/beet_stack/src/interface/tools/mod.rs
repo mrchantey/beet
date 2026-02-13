@@ -1,5 +1,7 @@
 mod help;
+mod route_handler;
 pub use help::*;
+pub use route_handler::*;
 mod navigate;
 pub use navigate::*;
 mod render_markdown;
