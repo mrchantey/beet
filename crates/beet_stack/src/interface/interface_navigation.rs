@@ -22,10 +22,13 @@ pub(super) fn visit_root(
 	let root = match tree.node() {
 		Some(RouteNode::Card(CardNode { entity, .. })) => *entity,
 		Some(RouteNode::Tool(tool)) => {
-			bevybail!("Tui Server root node must be a card, found {:?}", tool)
+			bevybail!(
+				"Stateful Interface root route must be a card, found {:?}",
+				tool
+			)
 		}
 		None => {
-			bevybail!("Tui Server must have a root node")
+			bevybail!("Stateful Interface must have a root route")
 		}
 	};
 	commands.entity(root).insert(CurrentCard);

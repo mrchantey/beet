@@ -47,9 +47,9 @@
 use beet_core::prelude::*;
 
 
-/// A generic container for a string of text. This should
-/// always have an associated semantic marker type,
-/// like [`Title`] or [`Paragraph`]. If the entity contains
+/// A generic container for a string of text.
+/// These are often children of a semantic component like a [`Paragraph`]
+/// If the entity contains
 /// a [`FieldRef`], the text will be automatically synchronized
 /// with the content of the [`FieldRef`].
 #[derive(

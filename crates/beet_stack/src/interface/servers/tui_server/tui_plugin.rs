@@ -1,8 +1,8 @@
+use crate::interface::visit_root;
+use crate::stack::StackPlugin;
 use beet_core::prelude::*;
 use bevy::input::keyboard::KeyboardInput;
 use bevy_ratatui::RatatuiPlugins;
-
-use crate::stack::StackPlugin;
 
 
 /// Top level Bevy plugin that sets up [`bevy_ratatui`], inserts TUI resources,
@@ -29,7 +29,9 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<StackPlugin>()
-		.add_systems(PostUpdate, (super::draw_system, exit_system));
+		.add_systems(PostStartup, visit_root)
+		.add_systems(PostUpdate, (super::draw_system, exit_system))
+		.add_observer(super::diff_view);
 		// .add_systems(
 		// 	Update,
 		// 	(
