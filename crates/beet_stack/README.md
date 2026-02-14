@@ -2,13 +2,9 @@
 
 An opinionated, interface-agnostic application framework inspired by the HyperCard stack/card metaphore.
 
-## Architecture
-
-Beet Stack splits applications into **Cards** and **Tools**, unified under a **RouteTree**.
-
 ### Cards
 
-Cards are navigable content units, similar to pages in a website or cards in HyperCard. Each card is a route, with the exact rendering behavior determined by the interface. The root entity is automatically considered a card.
+Cards are navigable content units, similar to pages in a website or files in a filesystem. Each card is a route, with the exact rendering behavior determined by the interface.
 
 Cards may contain content, tools, and nested cards.
 
@@ -16,32 +12,35 @@ Cards may contain content, tools, and nested cards.
 use beet_stack::prelude::*;
 use beet_core::prelude::*;
 
-// Create a card with a route path
-let about_page = card("about");
-
-// Cards can be nested
-let root = (Card, children![
+let root = (
+	card(""), 
+	children![
     card("about"),
     card("settings"),
-]);
+	]
+);
 ```
 
 ### Tools
 
-Tools are callable actions with specified input/output types. Every tool is a route in the `RouteTree`.
+Tools are callable entities with specified input/output types.
 
 ```rust
 use beet_stack::prelude::*;
 use beet_core::prelude::*;
 
-// Simple tool
-let my_tool = tool(|(a, b): (i32, i32)| -> i32 { a + b });
+fn add_tool() -> impl Bundle{
+	tool(|(a, b): (i32, i32)| -> i32 { a + b })
+}
 
-// Tool with a route path
-let named_tool = (PathPartial::new("add"), tool(|(a, b): (i32, i32)| -> i32 { a + b }));
+
+let output: i32 = World::new()
+	.spawn(add_tool)
+	.call_blocking((1, 2))
+	.unwrap();
+
+assert_eq!(output, 3);
 ```
-
-When the `interface` feature is enabled, `tool()` automatically adds exchange support for `Request`/`Response` serialization. Use `direct_tool()` for handlers with non-serializable types.
 
 ### RouteTree
 

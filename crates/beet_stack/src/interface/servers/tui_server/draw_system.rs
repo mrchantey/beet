@@ -5,6 +5,10 @@ use bevy_ratatui::*;
 use ratatui::prelude::*;
 use ratatui::widgets;
 
+
+// pub struct TuiWidget(Box<dyn widgets::StatefulWidgetRef>);
+
+
 pub(super) fn draw_system(
 	mut context: ResMut<RatatuiContext>,
 	query: Query<Entity, With<CurrentCard>>,
@@ -75,16 +79,6 @@ impl DiffQuery<'_, '_> {
 		Ok(())
 	}
 }
-
-#[derive(Copy, Clone)]
-struct DiffState {
-	interface_entity: Entity,
-	view_entity: Entity,
-	title: bool,
-	paragraph: bool,
-	emphasize: bool,
-}
-
 
 fn render(frame: &mut Frame) {
 	let title = Line::from("Ratatui Simple Template")
