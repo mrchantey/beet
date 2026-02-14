@@ -30,17 +30,17 @@ impl Plugin for TuiPlugin {
 		))
 		.init_plugin::<StackPlugin>()
 		.add_systems(PostStartup, visit_root)
-		.add_systems(PostUpdate, (super::draw_system, exit_system))
-		.add_observer(super::diff_view);
-		// .add_systems(
-		// 	Update,
-		// 	(
-		// 		super::tui_draw::tui_poll_responses,
-		// 		super::tui_draw::tui_sync_tree,
-		// 		super::tui_draw::tui_draw_system,
-		// 	)
-		// 		.chain(),
-		// );
+		.add_systems(
+			PostUpdate,
+			(
+				super::ensure_scroll_state,
+				super::sync_tui_widgets,
+				super::handle_scroll_input,
+				super::draw_system,
+			)
+				.chain(),
+		)
+		.add_systems(PostUpdate, exit_system);
 	}
 }
 

@@ -52,9 +52,12 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Code>()
 			.register_type::<Quote>()
 			.register_type::<Link>()
+			// Register layout types
+			.register_type::<TitleLevel>()
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
+			.add_observer(crate::content::calculate_title_level)
 			.add_systems(PreUpdate, update_text_fields);
 	}
 }

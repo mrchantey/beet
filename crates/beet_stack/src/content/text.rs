@@ -6,9 +6,29 @@
 //!
 //! # Core Components
 //!
-//! - [`TextContent`] - The actual text string
-//! - [`TextBlock`] - Container for grouped text segments
-//! - [`FieldRef`] - Dynamic binding to document fields
+//! - [`TextContent`] - The actual text string, always a child of a structural component
+//! - [`FieldRef`](crate::document::FieldRef) - Dynamic binding to document fields
+//!
+//! # Text Structure
+//!
+//! Following the Bevy TextSpan pattern, text content is always a direct child
+//! of its structural parent ([`Title`], [`Paragraph`], [`Link`]). Children
+//! with [`TextContent`] extend the parent's text in sequence. Each child may
+//! carry semantic markers like [`Important`] or [`Emphasize`].
+//!
+//! ```
+//! use beet_stack::prelude::*;
+//! use beet_core::prelude::*;
+//!
+//! // Simple title with text as a child
+//! let title = Title::with_text("Hello World");
+//!
+//! // Paragraph with mixed static and dynamic content
+//! let paragraph = (Paragraph, children![
+//!     TextContent::new("The count is "),
+//!     (Important, TextContent::new("42")),
+//! ]);
+//! ```
 //!
 //! # Semantic Markers
 //!
@@ -23,35 +43,21 @@
 //! - [`Title`] - Heading text (nesting derived from ancestors)
 //! - [`Paragraph`] - Paragraph of text
 //!
-//! # Example
+//! # Text Traversal
 //!
-//! ```ignore
-//! use beet_stack::prelude::*;
-//! use beet_core::prelude::*;
-//!
-//! // Create a text block with mixed content
-//! let block = text![
-//!     "Welcome to ",
-//!     (Important, "beet"),
-//!     ", the ",
-//!     (Emphasize, "semantic"),
-//!     " framework!"
-//! ];
-//!
-//! // Dynamic text bound to a document field
-//! let dynamic = text![
-//!     "Score: ",
-//!     FieldRef::new("score").init_with(Value::I64(0))
-//! ];
-//! ```
+//! Use [`TextQuery`] to collect text from structural elements
+//! without manually walking the child tree. It handles inline
+//! markers ([`Important`], [`Emphasize`], etc.) and respects
+//! structural boundaries.
 use beet_core::prelude::*;
 
 
-/// A generic container for a string of text.
-/// These are often children of a semantic component like a [`Paragraph`]
-/// If the entity contains
-/// a [`FieldRef`], the text will be automatically synchronized
-/// with the content of the [`FieldRef`].
+/// A string of text, always used as a direct child of a structural
+/// component like [`Title`] or [`Paragraph`].
+///
+/// If the entity also contains a
+/// [`FieldRef`](crate::document::FieldRef), the text will be
+/// automatically synchronized with the referenced field value.
 #[derive(
 	Debug,
 	Default,
@@ -79,39 +85,25 @@ impl<T: Into<String>> From<T> for TextContent {
 	fn from(text: T) -> Self { Self(text.into()) }
 }
 
-/// Helper method added to types that are often
-/// constructed alongside a [`TextContent`]
-pub trait WithText: Default {
-	fn with_text(text: impl Into<String>) -> (Self, TextContent) {
-		(Self::default(), TextContent::new(text))
+/// Helper for types commonly constructed with a [`TextContent`] child.
+///
+/// Spawns the text as a child entity, following the TextSpan pattern
+/// where content is always a direct child of its structural parent.
+pub trait WithText: Default + Bundle + Clone {
+	/// Create this component with a [`TextContent`] child.
+	fn with_text(text: impl Into<String>) -> impl Bundle {
+		(Self::default(), children![TextContent::new(text)])
 	}
 }
-
-/// Marker component used to denote a heading.
-///
-/// Nesting is derived by the number of [`Title`] components
-/// in ancestors.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[require(TextContent)]
-pub struct Title;
 
 impl WithText for Title {}
 impl WithText for Paragraph {}
 
-
-/// Marker component to denote a paragraph of text.
+/// Marker component used to denote a heading.
+///
+/// Text content is provided via [`TextContent`] children.
+/// Nesting level is calculated and stored in [`TitleLevel`]
+/// via an observer on insert.
 #[derive(
 	Debug,
 	Default,
@@ -125,14 +117,49 @@ impl WithText for Paragraph {}
 	Component,
 )]
 #[reflect(Component)]
-#[require(TextContent)]
-pub struct Paragraph;
+#[require(TitleLevel)]
+pub struct Title;
 
-impl Paragraph {
-	pub fn text(text: impl Into<String>) -> (Self, TextContent) {
-		(Paragraph, TextContent::new(text))
-	}
-}
+
+/// The computed nesting level of a [`Title`].
+///
+/// Level 0 is the main/root title. Each ancestor [`Title`]
+/// (including via sibling parents) increments the level.
+/// Calculated automatically via an observer on [`Title`] insert.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+pub struct TitleLevel(pub u8);
+
+
+/// Marker component to denote a paragraph of text.
+///
+/// Text content is provided via [`TextContent`] children.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+pub struct Paragraph;
 
 /// Marker component for important/strong text.
 ///

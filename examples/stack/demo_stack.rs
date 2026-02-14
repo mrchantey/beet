@@ -10,15 +10,17 @@ pub fn stack() -> impl Bundle {
 
 
 fn root() -> impl Bundle {
-	(Card, Title::with_text("My Stack"), children![
-		Paragraph::with_text("welcome to the coolest stack!")
+	(Card, children![
+		Title::with_text("My Stack"),
+		Paragraph::with_text("welcome to the coolest stack!"),
 	])
 }
 
 
 fn about() -> impl Bundle {
-	(card("about"), Title::with_text("About"), children![
-		Paragraph::with_text(r#"My stack is"#)
+	(card("about"), children![
+		Title::with_text("About"),
+		Paragraph::with_text(r#"My stack is"#),
 	])
 }
 
@@ -26,7 +28,8 @@ fn about() -> impl Bundle {
 fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").init_with(0);
 
-	(card("counter"), Title::with_text("Counter"), children![
+	(card("counter"), children![
+		Title::with_text("Counter"),
 		increment(field_ref.clone()),
 		(Paragraph, children![
 			TextContent::new("The count is "),

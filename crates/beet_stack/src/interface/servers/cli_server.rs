@@ -26,7 +26,7 @@ use beet_core::prelude::*;
 ///         default_interface(),
 ///         cli_server(),
 ///         children![
-///             (Card, Paragraph::with_text("welcome!")),
+///             (Card, children![Paragraph::with_text("welcome!")]),
 ///             increment(FieldRef::new("count")),
 ///             card("about"),
 ///         ],
@@ -121,8 +121,9 @@ mod test {
 	async fn renders_root_card_on_empty_args() {
 		StackPlugin::world()
 			.spawn((default_interface(), children![
-				(Card, Title::with_text("My Server"), children![
-					Paragraph::with_text("welcome!")
+				(Card, children![
+					Title::with_text("My Server"),
+					Paragraph::with_text("welcome!"),
 				]),
 				card("about"),
 			]))

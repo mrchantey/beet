@@ -1,4 +1,5 @@
 assets
+agent/ratatui
 agent/tui_server
 
 !examples/assets
@@ -11,7 +12,6 @@ rustc-ice*
 .cache
 .vscode/settings.json
 dump.*
-plan.md
 file.pdf
 launch.ron
 

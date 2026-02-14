@@ -52,8 +52,7 @@ mod test {
 		StackPlugin::world()
 			.spawn((default_interface(), children![(
 				card("about"),
-				Paragraph,
-				TextContent::new("About page"),
+				Paragraph::with_text("About page"),
 			)]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -69,8 +68,7 @@ mod test {
 		StackPlugin::world()
 			.spawn((default_interface(), children![(
 				Card,
-				Paragraph,
-				TextContent::new("Root content"),
+				Paragraph::with_text("Root content"),
 			)]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -84,8 +82,9 @@ mod test {
 	async fn route_renders_root_card_child() {
 		let body = StackPlugin::world()
 			.spawn((default_interface(), children![
-				(Card, Title::with_text("My Server"), children![
-					Paragraph::with_text("welcome!")
+				(Card, children![
+					Title::with_text("My Server"),
+					Paragraph::with_text("welcome!"),
 				]),
 				card("about"),
 			]))
