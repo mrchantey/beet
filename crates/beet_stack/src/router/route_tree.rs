@@ -584,7 +584,7 @@ mod test {
 		let nodes = vec![
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
@@ -592,7 +592,7 @@ mod test {
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
@@ -611,7 +611,7 @@ mod test {
 		let nodes = vec![
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
@@ -619,7 +619,7 @@ mod test {
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
@@ -638,7 +638,7 @@ mod test {
 		let nodes = vec![
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
@@ -646,7 +646,7 @@ mod test {
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), ()>(),
+				meta: ToolMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,

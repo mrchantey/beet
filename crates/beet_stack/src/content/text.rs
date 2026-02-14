@@ -12,7 +12,7 @@
 //! # Text Structure
 //!
 //! Following the Bevy TextSpan pattern, text content is always a direct child
-//! of its structural parent ([`Title`], [`Paragraph`], [`Link`]). Children
+//! of its structural parent ([`Heading1`], [`Paragraph`], [`Link`]). Children
 //! with [`TextContent`] extend the parent's text in sequence. Each child may
 //! carry semantic markers like [`Important`] or [`Emphasize`].
 //!
@@ -20,8 +20,8 @@
 //! use beet_stack::prelude::*;
 //! use beet_core::prelude::*;
 //!
-//! // Simple title with text as a child
-//! let title = Title::with_text("Hello World");
+//! // Simple heading with text as a child
+//! let heading = Heading1::with_text("Hello World");
 //!
 //! // Paragraph with mixed static and dynamic content
 //! let paragraph = (Paragraph, children![
@@ -40,8 +40,10 @@
 //!
 //! # Structural Components
 //!
-//! - [`Title`] - Heading text (nesting derived from ancestors)
+//! - [`Heading1`]..=[`Heading6`] - Heading text at explicit levels
 //! - [`Paragraph`] - Paragraph of text
+//!
+//! Both headings and paragraphs are [`DisplayBlock`] elements.
 //!
 //! # Text Traversal
 //!
@@ -49,11 +51,12 @@
 //! without manually walking the child tree. It handles inline
 //! markers ([`Important`], [`Emphasize`], etc.) and respects
 //! structural boundaries.
+use crate::content::DisplayBlock;
 use beet_core::prelude::*;
 
 
 /// A string of text, always used as a direct child of a structural
-/// component like [`Title`] or [`Paragraph`].
+/// component like [`Heading1`] or [`Paragraph`].
 ///
 /// If the entity also contains a
 /// [`FieldRef`](crate::document::FieldRef), the text will be
@@ -96,14 +99,54 @@ pub trait WithText: Default + Bundle + Clone {
 	}
 }
 
-impl WithText for Title {}
+impl WithText for Heading1 {}
+impl WithText for Heading2 {}
+impl WithText for Heading3 {}
+impl WithText for Heading4 {}
+impl WithText for Heading5 {}
+impl WithText for Heading6 {}
 impl WithText for Paragraph {}
 
-/// Marker component used to denote a heading.
+
+/// The heading level of a structural element.
+///
+/// Cannot be constructed directly; instead use [`Heading1`]..=[`Heading6`]
+/// which require `Heading` at the appropriate level via the `#[require]`
+/// attribute.
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+)]
+#[reflect(Component)]
+pub struct Heading {
+	level: u8,
+}
+
+impl Heading {
+	/// The heading level (1–6).
+	pub fn level(&self) -> u8 { self.level }
+
+	/// Level-1 heading, equivalent to HTML `<h1>`.
+	fn new_level_one() -> Self { Self { level: 1 } }
+	/// Level-2 heading, equivalent to HTML `<h2>`.
+	fn new_level_two() -> Self { Self { level: 2 } }
+	/// Level-3 heading, equivalent to HTML `<h3>`.
+	fn new_level_three() -> Self { Self { level: 3 } }
+	/// Level-4 heading, equivalent to HTML `<h4>`.
+	fn new_level_four() -> Self { Self { level: 4 } }
+	/// Level-5 heading, equivalent to HTML `<h5>`.
+	fn new_level_five() -> Self { Self { level: 5 } }
+	/// Level-6 heading, equivalent to HTML `<h6>`.
+	fn new_level_six() -> Self { Self { level: 6 } }
+}
+
+impl Default for Heading {
+	fn default() -> Self { Self::new_level_one() }
+}
+
+
+/// Level-1 heading, equivalent to HTML `<h1>`.
 ///
 /// Text content is provided via [`TextContent`] children.
-/// Nesting level is calculated and stored in [`TitleLevel`]
-/// via an observer on insert.
 #[derive(
 	Debug,
 	Default,
@@ -117,20 +160,16 @@ impl WithText for Paragraph {}
 	Component,
 )]
 #[reflect(Component)]
-#[require(TitleLevel)]
-pub struct Title;
+#[require(Heading = Heading::new_level_one(), DisplayBlock)]
+pub struct Heading1;
 
-
-/// The computed nesting level of a [`Title`].
+/// Level-2 heading, equivalent to HTML `<h2>`.
 ///
-/// Level 0 is the main/root title. Each ancestor [`Title`]
-/// (including via sibling parents) increments the level.
-/// Calculated automatically via an observer on [`Title`] insert.
+/// Text content is provided via [`TextContent`] children.
 #[derive(
 	Debug,
 	Default,
 	Clone,
-	Copy,
 	PartialEq,
 	Eq,
 	PartialOrd,
@@ -140,7 +179,84 @@ pub struct Title;
 	Component,
 )]
 #[reflect(Component)]
-pub struct TitleLevel(pub u8);
+#[require(Heading = Heading::new_level_two(), DisplayBlock)]
+pub struct Heading2;
+
+/// Level-3 heading, equivalent to HTML `<h3>`.
+///
+/// Text content is provided via [`TextContent`] children.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[require(Heading = Heading::new_level_three(), DisplayBlock)]
+pub struct Heading3;
+
+/// Level-4 heading, equivalent to HTML `<h4>`.
+///
+/// Text content is provided via [`TextContent`] children.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[require(Heading = Heading::new_level_four(), DisplayBlock)]
+pub struct Heading4;
+
+/// Level-5 heading, equivalent to HTML `<h5>`.
+///
+/// Text content is provided via [`TextContent`] children.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[require(Heading = Heading::new_level_five(), DisplayBlock)]
+pub struct Heading5;
+
+/// Level-6 heading, equivalent to HTML `<h6>`.
+///
+/// Text content is provided via [`TextContent`] children.
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[require(Heading = Heading::new_level_six(), DisplayBlock)]
+pub struct Heading6;
 
 
 /// Marker component to denote a paragraph of text.
@@ -159,6 +275,7 @@ pub struct TitleLevel(pub u8);
 	Component,
 )]
 #[reflect(Component)]
+#[require(DisplayBlock)]
 pub struct Paragraph;
 
 /// Marker component for important/strong text.

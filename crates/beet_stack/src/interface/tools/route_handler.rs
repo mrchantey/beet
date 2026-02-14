@@ -83,7 +83,7 @@ mod test {
 		let body = StackPlugin::world()
 			.spawn((default_interface(), children![
 				(Card, children![
-					Title::with_text("My Server"),
+					Heading1::with_text("My Server"),
 					Paragraph::with_text("welcome!"),
 				]),
 				card("about"),

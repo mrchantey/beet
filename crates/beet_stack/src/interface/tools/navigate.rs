@@ -285,7 +285,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_interface(), children![
-				(Card, children![Title::with_text("Root")]),
+				(Card, children![Heading1::with_text("Root")]),
 				(card("about"), Paragraph::with_text("About page")),
 			]))
 			.flush();

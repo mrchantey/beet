@@ -57,7 +57,7 @@ where
 	H::Out: serde::Serialize,
 {
 	(
-		ToolMeta::of::<H::In, H::Out>(),
+		ToolMeta::of::<H, H::In, H::Out>(),
 		exchange_tool_handler::<H::In, H::Out>(),
 		handler.into_handler(),
 	)

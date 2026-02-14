@@ -45,19 +45,23 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Value>()
 			// Register content types
 			.register_type::<TextContent>()
-			.register_type::<Title>()
+			.register_type::<Heading>()
+			.register_type::<Heading1>()
+			.register_type::<Heading2>()
+			.register_type::<Heading3>()
+			.register_type::<Heading4>()
+			.register_type::<Heading5>()
+			.register_type::<Heading6>()
 			.register_type::<Paragraph>()
+			.register_type::<DisplayBlock>()
 			.register_type::<Important>()
 			.register_type::<Emphasize>()
 			.register_type::<Code>()
 			.register_type::<Quote>()
 			.register_type::<Link>()
-			// Register layout types
-			.register_type::<TitleLevel>()
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
-			.add_observer(crate::content::calculate_title_level)
 			.add_systems(PreUpdate, update_text_fields);
 	}
 }

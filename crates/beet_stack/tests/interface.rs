@@ -15,7 +15,7 @@ fn counter() -> impl Bundle {
 	let count = FieldRef::new("count").init_with(Value::I64(0));
 
 	(Card, PathPartial::new("counter"), children![
-		Title::with_text("Counter"),
+		Heading1::with_text("Counter"),
 		(Paragraph, children![
 			TextContent::new("The count is "),
 			count.clone().as_text()
@@ -132,7 +132,7 @@ async fn navigate_parent_from_card() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_interface(), children![
-			(Card, children![Title::with_text("Root")]),
+			(Card, children![Heading1::with_text("Root")]),
 			(card("child"), Paragraph::with_text("Child page")),
 		]))
 		.flush();

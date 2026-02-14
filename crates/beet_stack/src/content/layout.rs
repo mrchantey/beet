@@ -4,7 +4,35 @@
 //! rendering backends (ratatui, bevy_ui, DOM). Units are limited
 //! to [`Em`] and [`Percent`] to stay agnostic to integer-based (TUI)
 //! and float-based (DOM) rendering.
+//!
+//! # Structural Elements
+//!
+//! [`DisplayBlock`] marks an entity as a structural content element,
+//! ie a [`Heading`](super::Heading) or [`Paragraph`](super::Paragraph).
+//! Systems that need to distinguish structure from inline content
+//! should query for `DisplayBlock` rather than individual types.
 use beet_core::prelude::*;
+
+/// Marker component for structural content elements.
+///
+/// Entities with this component represent a discrete block of content
+/// (heading, paragraph, etc.) as opposed to inline spans. Required
+/// by [`Heading`](super::Heading) and [`Paragraph`](super::Paragraph).
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+pub struct DisplayBlock;
 
 /// Layout direction for flex containers.
 #[derive(

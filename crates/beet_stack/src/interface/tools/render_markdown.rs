@@ -16,7 +16,7 @@ use beet_core::prelude::*;
 /// This tool traverses the entity and its descendants within the card
 /// boundary, converting semantic markers to their markdown equivalents:
 ///
-/// - [`Title`] → `# text` (heading level based on nesting)
+/// - [`Heading1`]..=[`Heading6`] → `#`..=`######` (heading level)
 /// - [`Paragraph`] → `text\n\n` (paragraph with trailing newlines)
 /// - [`Important`] → `**text**` (bold)
 /// - [`Emphasize`] → `*text*` (italic)
@@ -111,16 +111,17 @@ impl RenderMarkdown<'_, '_> {
 		};
 
 		for current in iter {
-			let is_title = self.text_query.is_title(current);
+			let is_heading = self.text_query.is_heading(current);
 			let is_paragraph =
-				!is_title && self.text_query.is_structural(current);
+				!is_heading && self.text_query.is_structural(current);
 
-			if is_title || is_paragraph {
+			if is_heading || is_paragraph {
 				let inner_text = self.collect_inline_text(current);
 				if !inner_text.is_empty() {
-					if is_title {
+					if is_heading {
 						let level =
-							self.text_query.title_level(current) as usize + 1;
+							self.text_query.heading_level(current).unwrap_or(1)
+								as usize;
 						let hashes = "#".repeat(level.min(6));
 						output.push_str(&format!(
 							"{} {}\n\n",
@@ -368,20 +369,20 @@ mod test {
 	}
 
 	#[test]
-	fn title_renders_as_heading() {
+	fn heading_renders_as_heading() {
 		World::new()
-			.spawn((render_markdown(), Title::with_text("Hello World")))
+			.spawn((render_markdown(), Heading1::with_text("Hello World")))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("# Hello World\n\n");
 	}
 
 	#[test]
-	fn nested_title_increments_level() {
+	fn heading2_renders_as_h2() {
 		World::new()
-			.spawn((render_markdown(), Title, children![
-				TextContent::new("Outer"),
-				Title::with_text("Inner"),
+			.spawn((render_markdown(), children![
+				Heading1::with_text("Outer"),
+				Heading2::with_text("Inner"),
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -404,7 +405,7 @@ mod test {
 	fn mixed_structure() {
 		World::new()
 			.spawn((render_markdown(), children![
-				Title::with_text("Welcome"),
+				Heading1::with_text("Welcome"),
 				Paragraph::with_text("This is the intro.")
 			]))
 			.call_blocking::<(), String>(())

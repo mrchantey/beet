@@ -50,16 +50,18 @@ pub fn direct_tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
 {
-	(ToolMeta::of::<H::In, H::Out>(), handler.into_handler())
+	(ToolMeta::of::<H, H::In, H::Out>(), handler.into_handler())
 }
 
 
 
-/// Metadata for a tool, containing the input and output types.
+/// Metadata for a tool, containing the handler name and input/output types.
 /// Every tool must have a [`ToolMeta`], calling a tool with
 /// types that dont match will result in an error.
 #[derive(Clone, Debug, Component)]
 pub struct ToolMeta {
+	/// The full type name of the handler, ie `my_crate::my_tool_handler`.
+	name: &'static str,
 	/// Type metadata for the tool input.
 	input: TypeMeta,
 	/// Type metadata for the tool output.
@@ -100,14 +102,20 @@ impl PartialEq for TypeMeta {
 }
 
 impl ToolMeta {
-	/// Create a [`ToolMeta`] from input and output type parameters.
-	pub fn of<In: 'static, Out: 'static>() -> Self {
+	/// Create a [`ToolMeta`] from handler, input and output type parameters.
+	///
+	/// `H` is the handler type whose [`type_name`](std::any::type_name)
+	/// is stored for display purposes (ie button labels).
+	pub fn of<H: 'static, In: 'static, Out: 'static>() -> Self {
 		Self {
+			name: std::any::type_name::<H>(),
 			input: TypeMeta::of::<In>(),
 			output: TypeMeta::of::<Out>(),
 		}
 	}
 
+	/// The full type name of the handler function or type.
+	pub fn name(&self) -> &'static str { self.name }
 	/// Get the input type metadata for this tool.
 	pub fn input(&self) -> TypeMeta { self.input }
 	/// Get the output type metadata for this tool.
