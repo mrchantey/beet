@@ -17,6 +17,7 @@ use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
+use ratatui::text::Text;
 use ratatui::widgets;
 use ratatui::widgets::Widget;
 use variadics_please::all_tuples;
@@ -38,7 +39,8 @@ pub(super) fn draw_system<D: Renderable>(world: &mut World) -> Result {
 				let mut area = frame.area();
 				let buffer = frame.buffer_mut();
 				for &entity in &entities {
-					D::render(&mut area, buffer, world, entity)?;
+					let mut entity_mut = world.entity_mut(entity);
+					D::render(&mut area, buffer, &mut entity_mut)?;
 				}
 				Ok(())
 			})
@@ -60,7 +62,7 @@ fn bevy_draw(
 
 /// Collects plain text from a structural element's direct children,
 /// skipping nested structural elements.
-fn collect_text<'a>(world: &'a World, parent: Entity) -> Line<'a> {
+fn collect_text<'a>(world: &'a World, parent: Entity) -> Text<'a> {
 	let Some(children) = world.entity(parent).get::<Children>() else {
 		return default();
 	};
@@ -77,7 +79,8 @@ fn collect_text<'a>(world: &'a World, parent: Entity) -> Line<'a> {
 		}
 	}
 	let line: Line<'a> = spans.into();
-	line.style(styled_entity(world.entity(parent)))
+	// we use Text for its wrapping capabilities
+	Text::from(line).style(styled_entity(world.entity(parent)))
 }
 
 fn styled_entity(entity: EntityRef) -> Style {
@@ -107,8 +110,7 @@ pub(super) trait Renderable: 'static + Send + Sync {
 	fn render(
 		area: &mut Rect,
 		buf: &mut Buffer,
-		world: &World,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 	) -> Result;
 }
 
@@ -116,15 +118,28 @@ impl Renderable for Heading {
 	fn render(
 		area: &mut Rect,
 		buf: &mut Buffer,
-		world: &World,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 	) -> Result {
-		let Some(heading) = world.entity(entity).get::<Heading>() else {
+		let Some(heading) = entity.get::<Heading>() else {
 			return Ok(());
 		};
-		let text = collect_text(world, entity).bold();
+		let world = entity.world();
+		let entity_id = entity.id();
+		let mut text = collect_text(world, entity_id).bold();
 		// let line = ratatui::prelude::Line::from(text).bold();
-		let _level = heading.level();
+		// TODO use design tokens, ie primary color, to render heading level
+		let level = heading.level();
+		if level == 1 {
+			// h1: centered with gap above
+			text = text.centered();
+			area.y = area.y.saturating_add(1);
+		} else {
+			// h2-6: indent based on level
+			text.lines.first_mut().map(|line| {
+				line.spans.insert(0, Span::raw(" ".repeat(level as usize)));
+				line
+			});
+		}
 		render_text_consuming(area, buf, text);
 		Ok(())
 	}
@@ -154,13 +169,14 @@ impl Renderable for Paragraph {
 	fn render(
 		area: &mut Rect,
 		buf: &mut Buffer,
-		world: &World,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 	) -> Result {
-		if !world.entity(entity).contains::<Paragraph>() {
+		if !entity.contains::<Paragraph>() {
 			return Ok(());
 		}
-		let text = collect_text(world, entity);
+		let world = entity.world();
+		let entity_id = entity.id();
+		let text = collect_text(world, entity_id);
 		render_text_consuming(area, buf, text);
 		Ok(())
 	}
@@ -172,10 +188,9 @@ macro_rules! impl_renderable_tuple {
 			fn render(
 				area: &mut Rect,
 				buf: &mut Buffer,
-				world: &World,
-				entity: Entity,
+				entity: &mut EntityWorldMut,
 			) -> Result {
-				$(<$T as Renderable>::render(area, buf, world, entity)?;)*
+				$(<$T as Renderable>::render(area, buf, entity)?;)*
 				Ok(())
 			}
 		}
@@ -199,7 +214,8 @@ mod test {
 		let mut area = Rect::new(0, 0, 80, 24);
 		let mut buf = Buffer::empty(area);
 
-		Heading::render(&mut area, &mut buf, &world, entity).unwrap();
+		let mut entity_mut = world.entity_mut(entity);
+		Heading::render(&mut area, &mut buf, &mut entity_mut).unwrap();
 
 		let rendered: String =
 			buf.content().iter().map(|cell| cell.symbol()).collect();
@@ -216,7 +232,8 @@ mod test {
 		let mut area = Rect::new(0, 0, 80, 24);
 		let mut buf = Buffer::empty(area);
 
-		Paragraph::render(&mut area, &mut buf, &world, entity).unwrap();
+		let mut entity_mut = world.entity_mut(entity);
+		Paragraph::render(&mut area, &mut buf, &mut entity_mut).unwrap();
 
 		let rendered: String =
 			buf.content().iter().map(|cell| cell.symbol()).collect();
@@ -233,7 +250,8 @@ mod test {
 		let mut area = Rect::new(0, 0, 80, 24);
 		let mut buf = Buffer::empty(area);
 
-		<(Heading,)>::render(&mut area, &mut buf, &world, entity).unwrap();
+		let mut entity_mut = world.entity_mut(entity);
+		<(Heading,)>::render(&mut area, &mut buf, &mut entity_mut).unwrap();
 
 		let rendered: String =
 			buf.content().iter().map(|cell| cell.symbol()).collect();
@@ -249,7 +267,8 @@ mod test {
 		let mut buf = Buffer::empty(area);
 
 		// Should not panic, just skip
-		<(Heading, Paragraph)>::render(&mut area, &mut buf, &world, entity)
+		let mut entity_mut = world.entity_mut(entity);
+		<(Heading, Paragraph)>::render(&mut area, &mut buf, &mut entity_mut)
 			.unwrap();
 	}
 }
