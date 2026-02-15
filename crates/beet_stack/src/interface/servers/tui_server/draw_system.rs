@@ -1,42 +1,22 @@
-//! TUI rendering via typed [`TuiWidget<T>`] components.
+//! Composable TUI rendering via the [`Renderable`] trait.
 //!
-//! Each semantic content type gets its own concrete `TuiWidget<W>` that
-//! is inserted/removed via generic lifecycle observers and rebuilt when
-//! the underlying [`TextContent`] changes.
+//! Each semantic content type ([`Heading`], [`Paragraph`]) implements
+//! [`Renderable`] to check if an entity has its component and render
+//! it directly to the ratatui buffer. Multiple types compose via
+//! tuples, analogous to [`TokenizeComponents`](beet_core::prelude::TokenizeComponents).
 //!
-//! The [`draw_system`] walks the card tree via [`CardQuery`] DFS and
-//! composes [`Line`] from child [`TuiWidget<Span>`] entities, rendering
-//! structural elements (headings, paragraphs) directly without
-//! intermediate buffers.
-use super::widgets::Hyperlink;
+//! The [`draw_system`] is an exclusive system that walks the card
+//! tree via DFS and calls [`Renderable::render`] for each entity.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use ratatui::prelude::Stylize;
-use ratatui::text::Line;
-use ratatui::text::Span;
-use ratatui::text::Text as RatText;
+use bevy_ratatui::RatatuiContext;
+use ratatui::Frame;
+use ratatui::buffer::Buffer;
+use ratatui::prelude::Rect;
+use ratatui::style::Stylize;
 use ratatui::widgets;
-
-
-// ---------------------------------------------------------------------------
-// TuiWidget<T> component
-// ---------------------------------------------------------------------------
-
-/// Typed rendering binding attached to content entities.
-///
-/// Each ratatui widget type gets its own ECS component, enabling
-/// independent queries and targeted rebuilds.
-#[derive(Component)]
-pub struct TuiWidget<T: Send + Sync + 'static>(pub T);
-
-impl<T: Send + Sync + 'static> TuiWidget<T> {
-	/// Wrap a widget value in a [`TuiWidget`].
-	pub fn new(widget: T) -> Self { Self(widget) }
-}
-
-impl<T: Default + Send + Sync + 'static> Default for TuiWidget<T> {
-	fn default() -> Self { Self(T::default()) }
-}
+use ratatui::widgets::Widget;
+use variadics_please::all_tuples;
 
 
 // ---------------------------------------------------------------------------
@@ -52,186 +32,44 @@ pub struct TuiScrollState {
 
 
 // ---------------------------------------------------------------------------
-// Generic widget lifecycle
-// ---------------------------------------------------------------------------
-
-/// Bind the lifecycle of `TuiWidget<W>` to semantic component `S`.
-///
-/// Inserts a default `TuiWidget<W>` when `S` is added to an entity
-/// and removes it when `S` is removed.
-pub(super) fn widget_lifecycle_plugin<
-	S: Component,
-	W: Default + Send + Sync + 'static,
->(
-	app: &mut App,
-) {
-	app.add_observer(insert_widget::<S, W>)
-		.add_observer(remove_widget::<S, W>);
-}
-
-/// Observer: insert a default [`TuiWidget<W>`] when `S` is added.
-fn insert_widget<S: Component, W: Default + Send + Sync + 'static>(
-	ev: On<Insert, S>,
-	mut commands: Commands,
-) {
-	commands.entity(ev.entity).insert(TuiWidget::<W>::default());
-}
-
-/// Observer: remove [`TuiWidget<W>`] when `S` is removed.
-fn remove_widget<S: Component, W: Default + Send + Sync + 'static>(
-	ev: On<Remove, S>,
-	mut commands: Commands,
-) {
-	commands.entity(ev.entity).remove::<TuiWidget<W>>();
-}
-
-
-// ---------------------------------------------------------------------------
-// Span rebuild
-// ---------------------------------------------------------------------------
-
-/// Rebuild individual span widgets when their [`TextContent`] changes,
-/// applying inline semantic markers as ratatui styles.
-pub(super) fn rebuild_tui_span(
-	query: Query<(Entity, &TextContent), Changed<TextContent>>,
-	important: Query<(), With<Important>>,
-	emphasize: Query<(), With<Emphasize>>,
-	code: Query<(), With<Code>>,
-	links: Query<(), With<Link>>,
-	mut commands: Commands,
-) {
-	for (entity, text) in &query {
-		let mut span = Span::raw(text.as_str().to_owned());
-
-		if important.contains(entity) {
-			span = span.bold();
-		}
-		if emphasize.contains(entity) {
-			span = span.italic();
-		}
-		if code.contains(entity) {
-			span = span.dim();
-		}
-		if links.contains(entity) {
-			span = span.underlined();
-		}
-
-		commands.entity(entity).insert(TuiWidget::new(span));
-	}
-}
-
-
-// ---------------------------------------------------------------------------
-// Hyperlink rebuild
-// ---------------------------------------------------------------------------
-
-/// Rebuild hyperlink widgets when [`TextContent`] or [`Link`] changes.
-pub(super) fn rebuild_tui_hyperlink(
-	query: Query<
-		(Entity, &TextContent, &Link),
-		Or<(Changed<TextContent>, Changed<Link>)>,
-	>,
-	mut commands: Commands,
-) {
-	for (entity, text, link) in &query {
-		let widget =
-			Hyperlink::new(text.as_str().to_owned(), link.href.clone());
-		commands.entity(entity).insert(TuiWidget::new(widget));
-	}
-}
-
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-/// Collect child [`TuiWidget<Span>`] values from a structural element's
-/// direct children, preserving child order.
-fn collect_child_spans(
-	parent: Entity,
-	children_query: &Query<&Children>,
-	spans: &Query<&TuiWidget<Span<'static>>>,
-) -> Vec<Span<'static>> {
-	let Ok(children) = children_query.get(parent) else {
-		return Vec::new();
-	};
-	children
-		.iter()
-		.filter_map(|child| spans.get(child).ok())
-		.map(|widget| widget.0.clone())
-		.collect()
-}
-
-
-// ---------------------------------------------------------------------------
 // Draw system
 // ---------------------------------------------------------------------------
 
 /// Renders the current card's content tree into the terminal each frame.
 ///
-/// Walks the card tree via [`CardQuery`] DFS. For each structural
-/// element ([`Heading`], [`Paragraph`]), collects child
-/// [`TuiWidget<Span>`] values and composes them into [`Line`].
-/// The resulting lines are rendered as a single [`widgets::Paragraph`]
-/// inside a bordered block titled with the card's main heading.
-pub(super) fn draw_system(
-	mut context: ResMut<bevy_ratatui::RatatuiContext>,
-	card: Query<Entity, With<CurrentCard>>,
-	card_query: CardQuery,
-	text_query: TextQuery,
-	headings: Query<&Heading>,
-	paragraphs: Query<(), With<Paragraph>>,
-	spans: Query<&TuiWidget<Span<'static>>>,
-	children_query: Query<&Children>,
+/// Walks the card tree via DFS and calls [`Renderable::render`] for each
+/// entity, composing multiple renderable types via the `D` type parameter.
+pub(super) fn draw_system<D: Renderable>(world: &mut World) -> Result {
+	let card_entity = world
+		.query_filtered::<Entity, With<CurrentCard>>()
+		.single(world)?;
+
+	let entities = card_dfs(world, card_entity);
+
+	world.resource_scope(
+		|world: &mut World, mut context: Mut<RatatuiContext>| {
+			bevy_draw(&mut context, |frame| {
+				let mut area = frame.area();
+				let buffer = frame.buffer_mut();
+				for &entity in &entities {
+					D::render(&mut area, buffer, world, entity)?;
+				}
+				Ok(())
+			})
+		},
+	)
+}
+
+/// [`BevyError`] compatible version of [`RatatuiContext::draw`].
+fn bevy_draw(
+	cx: &mut RatatuiContext,
+	func: impl FnOnce(&mut Frame) -> Result,
 ) -> Result {
-	let card_entity = card.single()?;
-
-	context.draw(|frame| {
-		let area = frame.area();
-
-		let block_title = text_query
-			.main_heading(card_entity)
-			.map(|(_, title)| format!(" {} ", title))
-			.unwrap_or_default();
-
-		let block = widgets::Block::bordered()
-			.title(Line::from(block_title).bold().centered());
-		let inner_area = block.inner(area);
-		frame.render_widget(block, area);
-
-		let mut lines: Vec<Line<'static>> = Vec::new();
-
-		for entity in card_query.iter_dfs(card_entity) {
-			if let Ok(heading) = headings.get(entity) {
-				let child_spans =
-					collect_child_spans(entity, &children_query, &spans);
-				if child_spans.is_empty() {
-					continue;
-				}
-				let line = Line::from(child_spans).bold();
-				lines.push(if heading.level() == 1 {
-					line.centered()
-				} else {
-					line
-				});
-			} else if paragraphs.contains(entity) {
-				let child_spans =
-					collect_child_spans(entity, &children_query, &spans);
-				if !child_spans.is_empty() {
-					lines.push(Line::from(child_spans));
-				}
-			}
-		}
-
-		if lines.is_empty() {
-			return;
-		}
-
-		let paragraph = widgets::Paragraph::new(RatText::from(lines))
-			.wrap(widgets::Wrap { trim: true });
-		frame.render_widget(paragraph, inner_area);
+	let mut result = Ok(());
+	cx.draw(|frame| {
+		result = func(frame);
 	})?;
-	Ok(())
+	result
 }
 
 
@@ -264,5 +102,221 @@ pub(super) fn handle_scroll_input(
 			}
 			_ => {}
 		}
+	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// DFS traversal within card boundaries, stopping at nested [`Card`] entities.
+fn card_dfs(world: &World, root: Entity) -> Vec<Entity> {
+	let mut result = Vec::new();
+	let mut stack = vec![root];
+	while let Some(entity) = stack.pop() {
+		result.push(entity);
+		if let Some(children) = world.entity(entity).get::<Children>() {
+			for child in children.iter().rev() {
+				// Stop at Card boundaries, but not the root itself
+				if child != root && world.entity(child).contains::<Card>() {
+					continue;
+				}
+				stack.push(child);
+			}
+		}
+	}
+	result
+}
+
+/// Collects plain text from a structural element's direct children,
+/// skipping nested structural elements.
+fn collect_text(world: &World, parent: Entity) -> String {
+	let Some(children) = world.entity(parent).get::<Children>() else {
+		return String::new();
+	};
+	let mut result = String::new();
+	for child in children.iter() {
+		let child_ref = world.entity(child);
+		if child_ref.contains::<DisplayBlock>() {
+			continue;
+		}
+		if let Some(text) = child_ref.get::<TextContent>() {
+			result.push_str(text.as_str());
+		}
+	}
+	result
+}
+
+
+// ---------------------------------------------------------------------------
+// Renderable trait
+// ---------------------------------------------------------------------------
+
+/// Trait for rendering content components to the terminal.
+///
+/// Each component type implements this to check if an entity has its
+/// component and render it directly to the ratatui buffer. Compose
+/// multiple types via tuples, analogous to
+/// [`TokenizeComponents`](beet_core::prelude::TokenizeComponents).
+pub(super) trait Renderable: 'static + Send + Sync {
+	/// Render this component on the entity if present.
+	fn render(
+		area: &mut Rect,
+		buf: &mut Buffer,
+		world: &World,
+		entity: Entity,
+	) -> Result;
+}
+
+
+// ---------------------------------------------------------------------------
+// Renderable implementations
+// ---------------------------------------------------------------------------
+
+impl Renderable for Heading {
+	fn render(
+		area: &mut Rect,
+		buf: &mut Buffer,
+		world: &World,
+		entity: Entity,
+	) -> Result {
+		let Some(heading) = world.entity(entity).get::<Heading>() else {
+			return Ok(());
+		};
+		let text = collect_text(world, entity);
+		let line = ratatui::prelude::Line::from(text).bold();
+		let _level = heading.level();
+		render_text_consuming(area, buf, line);
+		Ok(())
+	}
+}
+
+fn render_text_consuming<'a>(
+	area: &mut Rect,
+	buf: &mut Buffer,
+	text: impl Into<ratatui::prelude::Text<'a>>,
+) {
+	let text = text.into();
+	// return if empty
+	if text.iter().len() == 0 {
+		return;
+	}
+	let paragraph =
+		widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
+	let len = paragraph.line_count(area.width);
+	// 1. render
+	paragraph.render(*area, buf);
+	// 2. consume lines
+	area.y = area.y.saturating_add(len as u16);
+	area.height = area.height.saturating_sub(len as u16);
+}
+
+impl Renderable for Paragraph {
+	fn render(
+		area: &mut Rect,
+		buf: &mut Buffer,
+		world: &World,
+		entity: Entity,
+	) -> Result {
+		if !world.entity(entity).contains::<Paragraph>() {
+			return Ok(());
+		}
+		let text = collect_text(world, entity);
+		render_text_consuming(area, buf, text);
+		Ok(())
+	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Tuple composition
+// ---------------------------------------------------------------------------
+
+macro_rules! impl_renderable_tuple {
+	($(($T:ident, $t:ident)),*) => {
+		impl<$($T: Renderable),*> Renderable for ($($T,)*) {
+			fn render(
+				area: &mut Rect,
+				buf: &mut Buffer,
+				world: &World,
+				entity: Entity,
+			) -> Result {
+				$(<$T as Renderable>::render(area, buf, world, entity)?;)*
+				Ok(())
+			}
+		}
+	}
+}
+
+all_tuples!(impl_renderable_tuple, 1, 15, T, t);
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn heading_renders_text() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Heading1, children![(TextContent::new("Hello World"),)]))
+			.id();
+
+		let mut area = Rect::new(0, 0, 80, 24);
+		let mut buf = Buffer::empty(area);
+
+		Heading::render(&mut area, &mut buf, &world, entity).unwrap();
+
+		let rendered: String =
+			buf.content().iter().map(|cell| cell.symbol()).collect();
+		rendered.xpect_contains("Hello World");
+	}
+
+	#[test]
+	fn paragraph_renders_text() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Paragraph, children![(TextContent::new("body text"),)]))
+			.id();
+
+		let mut area = Rect::new(0, 0, 80, 24);
+		let mut buf = Buffer::empty(area);
+
+		Paragraph::render(&mut area, &mut buf, &world, entity).unwrap();
+
+		let rendered: String =
+			buf.content().iter().map(|cell| cell.symbol()).collect();
+		rendered.xpect_contains("body text");
+	}
+
+	#[test]
+	fn tuple_renderable_calls_all() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Heading1, children![(TextContent::new("Title"),)]))
+			.id();
+
+		let mut area = Rect::new(0, 0, 80, 24);
+		let mut buf = Buffer::empty(area);
+
+		<(Heading,)>::render(&mut area, &mut buf, &world, entity).unwrap();
+
+		let rendered: String =
+			buf.content().iter().map(|cell| cell.symbol()).collect();
+		rendered.xpect_contains("Title");
+	}
+
+	#[test]
+	fn skips_entity_without_component() {
+		let mut world = World::new();
+		let entity = world.spawn(TextContent::new("not a heading")).id();
+
+		let mut area = Rect::new(0, 0, 80, 24);
+		let mut buf = Buffer::empty(area);
+
+		// Should not panic, just skip
+		<(Heading, Paragraph)>::render(&mut area, &mut buf, &world, entity)
+			.unwrap();
 	}
 }

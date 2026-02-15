@@ -27,7 +27,7 @@ variadics_please.workspace = true
 
 serde = {workspace = true, optional=true}
 bevy_ratatui = {workspace = true, optional=true}
-ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-widget-ref"]}
+ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-widget-ref","unstable-rendered-line-info"]}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
