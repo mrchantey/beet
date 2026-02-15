@@ -1,4 +1,5 @@
 use crate::interface::visit_root;
+use crate::prelude::widgets::handle_scroll_input;
 use crate::prelude::*;
 use crate::stack::PropagateChanges;
 use crate::stack::StackPlugin;
@@ -37,7 +38,7 @@ impl Plugin for TuiPlugin {
 		app.add_systems(
 			PostUpdate,
 			(
-				super::handle_scroll_input,
+				handle_scroll_input,
 				super::draw_system::<(Heading, Paragraph)>,
 			)
 				.chain()

@@ -79,6 +79,20 @@ impl<'w, 's> CardQuery<'w, 's> {
 		}
 	}
 
+	pub fn iter_dfs_exclusive(
+		world: &mut World,
+		entity: Entity,
+	) -> Vec<Entity> {
+		world
+			.run_system_once_with(
+				|entity: In<Entity>, query: CardQuery| {
+					query.iter_dfs(*entity).collect::<Vec<_>>()
+				},
+				entity,
+			)
+			.unwrap()
+	}
+
 	/// Creates a breadth-first iterator over entities within the card.
 	///
 	/// Starts from the given entity's card root and traverses descendants,

@@ -3,6 +3,8 @@
 //! Wraps ratatui's [`Scrollbar`] and [`ScrollbarState`] into a
 //! simple helper that handles layout splitting and conditional
 //! visibility.
+use crate::prelude::*;
+use beet_core::prelude::*;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
@@ -12,6 +14,15 @@ use ratatui::widgets::ScrollbarOrientation;
 use ratatui::widgets::ScrollbarState;
 use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
+
+/// Per-card scroll position, inserted alongside [`CurrentCard`].
+#[derive(Default, Component)]
+pub struct TuiScrollState {
+	/// Current vertical scroll offset (in lines).
+	pub offset: u16,
+}
+
+
 
 /// Renders inner content with an optional vertical scrollbar.
 ///
@@ -57,6 +68,35 @@ impl<W: Widget> Widget for ScrollableArea<W> {
 				.render(chunks[1], buf, &mut state);
 		} else {
 			self.widget.render(area, buf);
+		}
+	}
+}
+
+
+/// Handle scroll input events for the TUI.
+pub(crate) fn handle_scroll_input(
+	mut messages: MessageReader<bevy::input::keyboard::KeyboardInput>,
+	mut scroll_query: Query<&mut TuiScrollState, With<CurrentCard>>,
+) {
+	use bevy::input::keyboard::Key;
+	for message in messages.read() {
+		let Ok(mut scroll) = scroll_query.single_mut() else {
+			return;
+		};
+		match &message.logical_key {
+			Key::Character(val) if val == "j" => {
+				scroll.offset = scroll.offset.saturating_add(1);
+			}
+			Key::Character(val) if val == "k" => {
+				scroll.offset = scroll.offset.saturating_sub(1);
+			}
+			Key::ArrowDown => {
+				scroll.offset = scroll.offset.saturating_add(1);
+			}
+			Key::ArrowUp => {
+				scroll.offset = scroll.offset.saturating_sub(1);
+			}
+			_ => {}
 		}
 	}
 }

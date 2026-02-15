@@ -12,7 +12,11 @@ pub fn stack() -> impl Bundle {
 fn root() -> impl Bundle {
 	(Card, children![
 		Heading1::with_text("My Stack"),
-		Paragraph::with_text("welcome to the coolest stack!"),
+		(Paragraph, Emphasize, children![
+			TextContent::new("Welcome to the "),
+			(Important, TextContent::new("coolest")),
+			TextContent::new(" stack in the world!"),
+		]),
 	])
 }
 

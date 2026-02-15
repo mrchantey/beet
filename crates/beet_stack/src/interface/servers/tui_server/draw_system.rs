@@ -13,27 +13,13 @@ use bevy_ratatui::RatatuiContext;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::prelude::Rect;
+use ratatui::style::Style;
 use ratatui::style::Stylize;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::widgets;
 use ratatui::widgets::Widget;
 use variadics_please::all_tuples;
-
-
-// ---------------------------------------------------------------------------
-// Scroll state
-// ---------------------------------------------------------------------------
-
-/// Per-card scroll position, inserted alongside [`CurrentCard`].
-#[derive(Default, Component)]
-pub struct TuiScrollState {
-	/// Current vertical scroll offset (in lines).
-	pub offset: u16,
-}
-
-
-// ---------------------------------------------------------------------------
-// Draw system
-// ---------------------------------------------------------------------------
 
 /// Renders the current card's content tree into the terminal each frame.
 ///
@@ -44,7 +30,7 @@ pub(super) fn draw_system<D: Renderable>(world: &mut World) -> Result {
 		.query_filtered::<Entity, With<CurrentCard>>()
 		.single(world)?;
 
-	let entities = card_dfs(world, card_entity);
+	let entities = CardQuery::iter_dfs_exclusive(world, card_entity);
 
 	world.resource_scope(
 		|world: &mut World, mut context: Mut<RatatuiContext>| {
@@ -72,86 +58,43 @@ fn bevy_draw(
 	result
 }
 
-
-// ---------------------------------------------------------------------------
-// Input: scroll handling
-// ---------------------------------------------------------------------------
-
-/// Handle scroll input events for the TUI.
-pub(super) fn handle_scroll_input(
-	mut messages: MessageReader<bevy::input::keyboard::KeyboardInput>,
-	mut scroll_query: Query<&mut TuiScrollState, With<CurrentCard>>,
-) {
-	use bevy::input::keyboard::Key;
-	for message in messages.read() {
-		let Ok(mut scroll) = scroll_query.single_mut() else {
-			return;
-		};
-		match &message.logical_key {
-			Key::Character(val) if val == "j" => {
-				scroll.offset = scroll.offset.saturating_add(1);
-			}
-			Key::Character(val) if val == "k" => {
-				scroll.offset = scroll.offset.saturating_sub(1);
-			}
-			Key::ArrowDown => {
-				scroll.offset = scroll.offset.saturating_add(1);
-			}
-			Key::ArrowUp => {
-				scroll.offset = scroll.offset.saturating_sub(1);
-			}
-			_ => {}
-		}
-	}
-}
-
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// DFS traversal within card boundaries, stopping at nested [`Card`] entities.
-fn card_dfs(world: &World, root: Entity) -> Vec<Entity> {
-	let mut result = Vec::new();
-	let mut stack = vec![root];
-	while let Some(entity) = stack.pop() {
-		result.push(entity);
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter().rev() {
-				// Stop at Card boundaries, but not the root itself
-				if child != root && world.entity(child).contains::<Card>() {
-					continue;
-				}
-				stack.push(child);
-			}
-		}
-	}
-	result
-}
-
 /// Collects plain text from a structural element's direct children,
 /// skipping nested structural elements.
-fn collect_text(world: &World, parent: Entity) -> String {
+fn collect_text<'a>(world: &'a World, parent: Entity) -> Line<'a> {
 	let Some(children) = world.entity(parent).get::<Children>() else {
-		return String::new();
+		return default();
 	};
-	let mut result = String::new();
+	let mut spans = Vec::new();
 	for child in children.iter() {
 		let child_ref = world.entity(child);
 		if child_ref.contains::<DisplayBlock>() {
 			continue;
 		}
 		if let Some(text) = child_ref.get::<TextContent>() {
-			result.push_str(text.as_str());
+			let span =
+				Span::from(text.as_str()).style(styled_entity(child_ref));
+			spans.push(span);
 		}
 	}
-	result
+	let line: Line<'a> = spans.into();
+	line.style(styled_entity(world.entity(parent)))
 }
 
+fn styled_entity(entity: EntityRef) -> Style {
+	let mut style = Style::new();
 
-// ---------------------------------------------------------------------------
-// Renderable trait
-// ---------------------------------------------------------------------------
+	if entity.contains::<Emphasize>() {
+		style = style.italic();
+	};
+	if entity.contains::<Important>() {
+		style = style.bold();
+	}
+	if entity.contains::<Code>() {
+		// TODO design tokens
+		style = style.bg(ratatui::style::Color::DarkGray);
+	}
+	style
+}
 
 /// Trait for rendering content components to the terminal.
 ///
@@ -169,11 +112,6 @@ pub(super) trait Renderable: 'static + Send + Sync {
 	) -> Result;
 }
 
-
-// ---------------------------------------------------------------------------
-// Renderable implementations
-// ---------------------------------------------------------------------------
-
 impl Renderable for Heading {
 	fn render(
 		area: &mut Rect,
@@ -184,10 +122,10 @@ impl Renderable for Heading {
 		let Some(heading) = world.entity(entity).get::<Heading>() else {
 			return Ok(());
 		};
-		let text = collect_text(world, entity);
-		let line = ratatui::prelude::Line::from(text).bold();
+		let text = collect_text(world, entity).bold();
+		// let line = ratatui::prelude::Line::from(text).bold();
 		let _level = heading.level();
-		render_text_consuming(area, buf, line);
+		render_text_consuming(area, buf, text);
 		Ok(())
 	}
 }
@@ -227,11 +165,6 @@ impl Renderable for Paragraph {
 		Ok(())
 	}
 }
-
-
-// ---------------------------------------------------------------------------
-// Tuple composition
-// ---------------------------------------------------------------------------
 
 macro_rules! impl_renderable_tuple {
 	($(($T:ident, $t:ident)),*) => {
