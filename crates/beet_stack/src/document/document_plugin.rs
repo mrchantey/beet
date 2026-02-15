@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 ///
 /// This plugin:
 /// - Links [`FieldRef`] components to their associated documents
-/// - Automatically updates [`TextContent`] when documents change
+/// - Automatically updates [`TextNode`] when documents change
 ///
 /// # Example
 ///
@@ -21,13 +21,13 @@ use beet_core::prelude::*;
 /// world.spawn((
 ///     Card,
 ///     Document::new(val!({ "name": "Alice" })),
-///     children![(TextContent::default(), FieldRef::new("name"))],
+///     children![(TextNode::default(), FieldRef::new("name"))],
 /// ));
 ///
-/// // After update, TextContent will contain "Alice"
+/// // After update, TextNode will contain "Alice"
 /// world.update_local();
 ///
-/// let value = world.query_once::<&TextContent>()[0].as_str();
+/// let value = world.query_once::<&TextNode>()[0].as_str();
 /// assert_eq!(value, "Alice");
 /// ```
 #[derive(Default)]
@@ -44,7 +44,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<FieldPath>()
 			.register_type::<Value>()
 			// Register content types
-			.register_type::<TextContent>()
+			.register_type::<TextNode>()
 			.register_type::<Heading>()
 			.register_type::<Heading1>()
 			.register_type::<Heading2>()
@@ -79,14 +79,14 @@ mod test {
 		world.spawn((
 			Card,
 			Document::new(val!({ "greeting": "Hello" })),
-			children![(TextContent::default(), FieldRef::new("greeting"))],
+			children![(TextNode::default(), FieldRef::new("greeting"))],
 		));
 
 		// Run update to trigger sync
 		world.update_local();
 
 		// Verify text was updated
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("Hello");
 	}
 
@@ -97,7 +97,7 @@ mod test {
 		// Create card with document and text child
 		let card = world
 			.spawn((Card, Document::new(val!({ "count": 0i64 })), children![(
-				TextContent::default(),
+				TextNode::default(),
 				FieldRef::new("count")
 			)]))
 			.id();
@@ -105,7 +105,7 @@ mod test {
 		world.update_local();
 
 		// Initial value
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("0");
 
 		// Update the document
@@ -115,7 +115,7 @@ mod test {
 		world.update_local();
 
 		// Value should be updated
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("42");
 	}
 
@@ -127,14 +127,14 @@ mod test {
 			Card,
 			Document::new(val!({ "user": { "name": "Bob" } })),
 			children![(
-				TextContent::default(),
+				TextNode::default(),
 				FieldRef::new(vec!["user", "name"])
 			)],
 		));
 
 		world.update_local();
 
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("Bob");
 	}
 
@@ -149,15 +149,15 @@ mod test {
 				"second": "Bob"
 			})),
 			children![
-				(TextContent::default(), FieldRef::new("first")),
-				(TextContent::default(), FieldRef::new("second"))
+				(TextNode::default(), FieldRef::new("first")),
+				(TextNode::default(), FieldRef::new("second"))
 			],
 		));
 
 		world.update_local();
 
 		let texts: Vec<_> = world
-			.query_once::<&TextContent>()
+			.query_once::<&TextNode>()
 			.iter()
 			.map(|t| t.0.clone())
 			.collect();
@@ -180,7 +180,7 @@ mod test {
 
 		// Find the text content with field ref
 		let texts: Vec<_> = world
-			.query_once::<(&TextContent, Option<&FieldRef>)>()
+			.query_once::<(&TextNode, Option<&FieldRef>)>()
 			.iter()
 			.map(|(t, f)| (t.0.clone(), f.is_some()))
 			.collect();

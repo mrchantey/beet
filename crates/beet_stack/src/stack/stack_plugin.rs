@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 
 /// System set for propagating content changes through the entity hierarchy.
 ///
-/// Runs in [`PostUpdate`] and ensures that child [`TextContent`](crate::content::TextContent)
+/// Runs in [`PostUpdate`] and ensures that child [`TextNode`](crate::content::TextNode)
 /// mutations are reflected on parent [`Text`](crate::content::Text) markers
 /// before downstream systems (eg TUI rebuild) observe them.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]

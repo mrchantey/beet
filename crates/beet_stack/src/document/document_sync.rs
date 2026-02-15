@@ -1,6 +1,6 @@
 //! Document synchronization for text content fields.
 //!
-//! This module provides the machinery for keeping [`TextContent`] components
+//! This module provides the machinery for keeping [`TextNode`] components
 //! in sync with their associated [`Document`] fields through [`FieldRef`].
 //!
 //! # Architecture
@@ -14,7 +14,7 @@
 //!    references that depend on it.
 //!
 //! 3. When a [`Document`] changes, the `update_text_fields` system iterates
-//!    through all related [`FieldRef`] entities and updates their [`TextContent`].
+//!    through all related [`FieldRef`] entities and updates their [`TextNode`].
 //!
 //! # Example
 //!
@@ -28,10 +28,10 @@
 //! world.spawn((
 //!     Card,
 //!     Document::new(val!({ "score": 100i64 })),
-//!     children![(TextContent::default(), FieldRef::new("score"))],
+//!     children![(TextNode::default(), FieldRef::new("score"))],
 //! ));
 //!
-//! // After update, TextContent contains "100"
+//! // After update, TextNode contains "100"
 //! world.update_local();
 //! ```
 
@@ -90,12 +90,12 @@ pub(super) fn unlink_field_from_document(
 }
 
 
-/// System that updates [`TextContent`] when their associated [`Document`] changes.
+/// System that updates [`TextNode`] when their associated [`Document`] changes.
 ///
 /// Runs in `PreUpdate` to ensure text is synchronized before user systems run.
 pub(super) fn update_text_fields(
 	query: Populated<(&Document, &Fields), Changed<Document>>,
-	mut text_fields: Query<(&FieldRef, &mut TextContent)>,
+	mut text_fields: Query<(&FieldRef, &mut TextNode)>,
 ) -> Result {
 	for (doc, doc_fields) in query {
 		for field in doc_fields.iter() {
@@ -121,7 +121,7 @@ mod test {
 			.spawn((Card, Document::new(val!({ "x": "value" }))))
 			.id();
 		let text = world
-			.spawn((ChildOf(card), TextContent::default(), FieldRef::new("x")))
+			.spawn((ChildOf(card), TextNode::default(), FieldRef::new("x")))
 			.id();
 
 		world.update_local();
@@ -147,7 +147,7 @@ mod test {
 			.spawn((Card, Document::new(val!({ "x": "value" }))))
 			.id();
 		let text = world
-			.spawn((ChildOf(card), TextContent::default(), FieldRef::new("x")))
+			.spawn((ChildOf(card), TextNode::default(), FieldRef::new("x")))
 			.id();
 
 		world.update_local();
@@ -174,7 +174,7 @@ mod test {
 		let text = world
 			.spawn((
 				ChildOf(child),
-				TextContent::default(),
+				TextNode::default(),
 				FieldRef::new("root_val").with_document(DocumentPath::Root),
 			))
 			.id();
@@ -186,7 +186,7 @@ mod test {
 		field_of.document.xpect_eq(root);
 
 		// Text should be updated
-		let content = world.entity(text).get::<TextContent>().unwrap();
+		let content = world.entity(text).get::<TextNode>().unwrap();
 		content.0.xpect_eq("from_root");
 	}
 
@@ -209,7 +209,7 @@ mod test {
 		let text = world
 			.spawn((
 				ChildOf(child),
-				TextContent::default(),
+				TextNode::default(),
 				FieldRef::new("card_val"), // Default is DocumentPath::Card
 			))
 			.id();
@@ -220,7 +220,7 @@ mod test {
 		let field_of = world.entity(text).get::<FieldOf>().unwrap();
 		field_of.document.xpect_eq(card);
 
-		let content = world.entity(text).get::<TextContent>().unwrap();
+		let content = world.entity(text).get::<TextNode>().unwrap();
 		content.0.xpect_eq("from_card");
 	}
 
@@ -236,7 +236,7 @@ mod test {
 		// Unrelated entity with text
 		let text = world
 			.spawn((
-				TextContent::default(),
+				TextNode::default(),
 				FieldRef::new("explicit")
 					.with_document(DocumentPath::Entity(target)),
 			))
@@ -247,7 +247,7 @@ mod test {
 		let field_of = world.entity(text).get::<FieldOf>().unwrap();
 		field_of.document.xpect_eq(target);
 
-		let content = world.entity(text).get::<TextContent>().unwrap();
+		let content = world.entity(text).get::<TextNode>().unwrap();
 		content.0.xpect_eq("target_doc");
 	}
 
@@ -258,12 +258,12 @@ mod test {
 		world.spawn((
 			Card,
 			Document::new(val!({ "nullable": null })),
-			children![(TextContent::new("initial"), FieldRef::new("nullable"))],
+			children![(TextNode::new("initial"), FieldRef::new("nullable"))],
 		));
 
 		world.update_local();
 
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("null");
 	}
 
@@ -274,12 +274,12 @@ mod test {
 		world.spawn((
 			Card,
 			Document::new(val!({ "items": [1i64, 2i64, 3i64] })),
-			children![(TextContent::default(), FieldRef::new("items"))],
+			children![(TextNode::default(), FieldRef::new("items"))],
 		));
 
 		world.update_local();
 
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("[1, 2, 3]");
 	}
 
@@ -288,12 +288,12 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((Card, Document::new(val!({ "flag": true })), children![
-			(TextContent::default(), FieldRef::new("flag"))
+			(TextNode::default(), FieldRef::new("flag"))
 		]));
 
 		world.update_local();
 
-		let text = world.query_once::<&TextContent>()[0].clone();
+		let text = world.query_once::<&TextNode>()[0].clone();
 		text.0.xpect_eq("true");
 	}
 }

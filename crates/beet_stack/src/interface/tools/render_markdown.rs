@@ -1,7 +1,7 @@
 //! Render semantic text content to markdown format.
 //!
 //! This module provides functionality to convert the semantic text representation
-//! (using [`TextContent`] and semantic markers) into markdown strings.
+//! (using [`TextNode`] and semantic markers) into markdown strings.
 //!
 //! The core rendering logic is exposed via [`render_markdown_for`] so it can
 //! be called from other systems (ie the interface tool) without needing
@@ -86,7 +86,7 @@ fn render_markdown_for_entity(
 pub struct RenderMarkdown<'w, 's> {
 	card_query: CardQuery<'w, 's>,
 	text_query: TextQuery<'w, 's>,
-	text_content: Query<'w, 's, &'static TextContent>,
+	text_content: Query<'w, 's, &'static TextNode>,
 	important: Query<'w, 's, (), With<Important>>,
 	emphasize: Query<'w, 's, (), With<Emphasize>>,
 	code: Query<'w, 's, (), With<Code>>,
@@ -281,7 +281,7 @@ mod test {
 	fn link_without_title() {
 		World::new()
 			.spawn((render_markdown(), children![(
-				TextContent::new("click here"),
+				TextNode::new("click here"),
 				Link::new("https://example.com")
 			)]))
 			.call_blocking::<(), String>(())
@@ -293,7 +293,7 @@ mod test {
 	fn link_with_title() {
 		World::new()
 			.spawn((render_markdown(), children![(
-				TextContent::new("example"),
+				TextNode::new("example"),
 				Link::new("https://example.com").with_title("Example Site")
 			)]))
 			.call_blocking::<(), String>(())
@@ -344,7 +344,7 @@ mod test {
 		World::new()
 			.spawn((render_markdown(), children![(
 				Important,
-				TextContent::new("important link"),
+				TextNode::new("important link"),
 				Link::new("https://example.com")
 			)]))
 			.call_blocking::<(), String>(())
@@ -360,7 +360,7 @@ mod test {
 				Emphasize,
 				Code,
 				Quote,
-				TextContent::new("text"),
+				TextNode::new("text"),
 				Link::new("https://example.com")
 			)]))
 			.call_blocking::<(), String>(())

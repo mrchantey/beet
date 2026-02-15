@@ -1566,6 +1566,7 @@ dependencies = [
  "bevy",
  "bevy_ratatui",
  "extend",
+ "pulldown-cmark",
  "ratatui",
  "serde",
  "thiserror 1.0.69",

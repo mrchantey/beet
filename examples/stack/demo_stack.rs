@@ -13,9 +13,9 @@ fn root() -> impl Bundle {
 	(Card, children![
 		Heading1::with_text("My Stack"),
 		(Paragraph, Emphasize, children![
-			TextContent::new("Welcome to the "),
-			(Important, TextContent::new("coolest")),
-			TextContent::new(" stack in the world!"),
+			TextNode::new("Welcome to the "),
+			(Important, TextNode::new("coolest")),
+			TextNode::new(" stack in the world!"),
 		]),
 	])
 }
@@ -36,7 +36,7 @@ fn counter() -> impl Bundle {
 		Heading1::with_text("Counter"),
 		increment(field_ref.clone()),
 		(Paragraph, children![
-			TextContent::new("The count is "),
+			TextNode::new("The count is "),
 			field_ref.as_text()
 		])
 	])

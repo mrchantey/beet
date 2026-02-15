@@ -72,7 +72,7 @@ fn collect_text<'a>(world: &'a World, parent: Entity) -> Text<'a> {
 		if child_ref.contains::<DisplayBlock>() {
 			continue;
 		}
-		if let Some(text) = child_ref.get::<TextContent>() {
+		if let Some(text) = child_ref.get::<TextNode>() {
 			let span =
 				Span::from(text.as_str()).style(styled_entity(child_ref));
 			spans.push(span);
@@ -208,7 +208,7 @@ mod test {
 	fn heading_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Heading1, children![(TextContent::new("Hello World"),)]))
+			.spawn((Heading1, children![(TextNode::new("Hello World"),)]))
 			.id();
 
 		let mut area = Rect::new(0, 0, 80, 24);
@@ -226,7 +226,7 @@ mod test {
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Paragraph, children![(TextContent::new("body text"),)]))
+			.spawn((Paragraph, children![(TextNode::new("body text"),)]))
 			.id();
 
 		let mut area = Rect::new(0, 0, 80, 24);
@@ -244,7 +244,7 @@ mod test {
 	fn tuple_renderable_calls_all() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Heading1, children![(TextContent::new("Title"),)]))
+			.spawn((Heading1, children![(TextNode::new("Title"),)]))
 			.id();
 
 		let mut area = Rect::new(0, 0, 80, 24);
@@ -261,7 +261,7 @@ mod test {
 	#[test]
 	fn skips_entity_without_component() {
 		let mut world = World::new();
-		let entity = world.spawn(TextContent::new("not a heading")).id();
+		let entity = world.spawn(TextNode::new("not a heading")).id();
 
 		let mut area = Rect::new(0, 0, 80, 24);
 		let mut buf = Buffer::empty(area);

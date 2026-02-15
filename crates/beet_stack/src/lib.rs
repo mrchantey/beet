@@ -8,6 +8,7 @@ mod control_flow;
 mod document;
 #[cfg(feature = "interface")]
 mod interface;
+mod parsers;
 mod router;
 mod stack;
 mod tools;
@@ -22,6 +23,7 @@ pub mod prelude {
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
+	pub use crate::parsers::*;
 	pub use crate::router::*;
 	pub use crate::stack::*;
 	pub use crate::tools::*;

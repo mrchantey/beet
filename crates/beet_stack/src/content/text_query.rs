@@ -1,7 +1,7 @@
 //! Text traversal system parameter.
 //!
 //! Provides [`TextQuery`] for collecting text from structural elements
-//! ([`Heading`], [`Paragraph`]) by walking their [`TextContent`] children.
+//! ([`Heading`], [`Paragraph`]) by walking their [`TextNode`] children.
 //! Handles inline markers ([`Important`], [`Emphasize`], etc.) and
 //! respects structural boundaries.
 use crate::prelude::*;
@@ -9,19 +9,19 @@ use beet_core::prelude::*;
 
 /// System parameter for traversing text content within structural elements.
 ///
-/// Collects [`TextContent`] from children of a structural parent,
+/// Collects [`TextNode`] from children of a structural parent,
 /// respecting inline markers and structural boundaries.
 #[derive(SystemParam)]
 pub struct TextQuery<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
-	text: Query<'w, 's, &'static TextContent>,
+	text: Query<'w, 's, &'static TextNode>,
 	display_blocks: Query<'w, 's, (), With<DisplayBlock>>,
 	headings: Query<'w, 's, &'static Heading>,
 }
 
 impl TextQuery<'_, '_> {
 	/// Returns the plain text of a structural element by concatenating
-	/// all [`TextContent`] children in order, ignoring inline markers.
+	/// all [`TextNode`] children in order, ignoring inline markers.
 	/// Skips nested structural elements.
 	pub fn collect_text(&self, parent: Entity) -> String {
 		let mut result = String::new();
@@ -38,13 +38,13 @@ impl TextQuery<'_, '_> {
 		result
 	}
 
-	/// Returns the entity and [`TextContent`] pairs that are direct
+	/// Returns the entity and [`TextNode`] pairs that are direct
 	/// children of a structural element, skipping nested structural
 	/// elements.
 	pub fn collect_text_entities(
 		&self,
 		parent: Entity,
-	) -> Vec<(Entity, &TextContent)> {
+	) -> Vec<(Entity, &TextNode)> {
 		let mut result = Vec::new();
 		if let Ok(children) = self.children.get(parent) {
 			for child in children.iter() {

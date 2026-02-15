@@ -19,7 +19,7 @@
 //!
 //! ## Static and Dynamic Content
 //!
-//! Content can be either static ([`TextContent`] with a string) or dynamic
+//! Content can be either static ([`TextNode`] with a string) or dynamic
 //! (bound to a [`FieldRef`] that syncs with a [`Document`]).
 //!
 //! ## Composable Structure

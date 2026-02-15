@@ -17,7 +17,7 @@ fn counter() -> impl Bundle {
 	(Card, PathPartial::new("counter"), children![
 		Heading1::with_text("Counter"),
 		(Paragraph, children![
-			TextContent::new("The count is "),
+			TextNode::new("The count is "),
 			count.clone().as_text()
 		]),
 		render_markdown(),

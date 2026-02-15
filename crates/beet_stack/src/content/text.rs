@@ -6,14 +6,14 @@
 //!
 //! # Core Components
 //!
-//! - [`TextContent`] - The actual text string, always a child of a structural component
+//! - [`TextNode`] - The actual text string, always a child of a structural component
 //! - [`FieldRef`](crate::document::FieldRef) - Dynamic binding to document fields
 //!
 //! # Text Structure
 //!
 //! Following the Bevy TextSpan pattern, text content is always a direct child
 //! of its structural parent ([`Heading1`], [`Paragraph`], [`Link`]). Children
-//! with [`TextContent`] extend the parent's text in sequence. Each child may
+//! with [`TextNode`] extend the parent's text in sequence. Each child may
 //! carry semantic markers like [`Important`] or [`Emphasize`].
 //!
 //! ```
@@ -25,8 +25,8 @@
 //!
 //! // Paragraph with mixed static and dynamic content
 //! let paragraph = (Paragraph, children![
-//!     TextContent::new("The count is "),
-//!     (Important, TextContent::new("42")),
+//!     TextNode::new("The count is "),
+//!     (Important, TextNode::new("42")),
 //! ]);
 //! ```
 //!
@@ -58,7 +58,7 @@ use beet_core::prelude::*;
 /// Marker component for entities that contain text children.
 ///
 /// Required by [`Heading`] and [`Paragraph`]. When any child
-/// [`TextContent`] changes, the [`mark_text_changed`] system
+/// [`TextNode`] changes, the [`mark_text_changed`] system
 /// propagates the change to this component, so rebuild systems
 /// can simply query `Changed<Text>`.
 #[derive(
@@ -77,14 +77,14 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub struct Text;
 
-/// Propagates [`TextContent`] changes to the parent [`Text`] component.
+/// Propagates [`TextNode`] changes to the parent [`Text`] component.
 ///
-/// When a child [`TextContent`] is modified, this system marks the
+/// When a child [`TextNode`] is modified, this system marks the
 /// parent's [`Text`] component as changed so downstream systems can
 /// react via `Changed<Text>`.
 pub fn mark_text_changed(
 	mut text: Query<&mut Text>,
-	content: Query<&ChildOf, Changed<TextContent>>,
+	content: Query<&ChildOf, Changed<TextNode>>,
 ) {
 	for child_of in &content {
 		if let Ok(mut marker) = text.get_mut(child_of.parent()) {
@@ -113,9 +113,9 @@ pub fn mark_text_changed(
 	Component,
 )]
 #[reflect(Component)]
-pub struct TextContent(pub String);
+pub struct TextNode(pub String);
 
-impl TextContent {
+impl TextNode {
 	/// Create a new text content with the given string.
 	pub fn new(text: impl Into<String>) -> Self { Self(text.into()) }
 
@@ -123,18 +123,18 @@ impl TextContent {
 	pub fn as_str(&self) -> &str { &self.0 }
 }
 
-impl<T: Into<String>> From<T> for TextContent {
+impl<T: Into<String>> From<T> for TextNode {
 	fn from(text: T) -> Self { Self(text.into()) }
 }
 
-/// Helper for types commonly constructed with a [`TextContent`] child.
+/// Helper for types commonly constructed with a [`TextNode`] child.
 ///
 /// Spawns the text as a child entity, following the TextSpan pattern
 /// where content is always a direct child of its structural parent.
 pub trait WithText: Default + Bundle + Clone {
-	/// Create this component with a [`TextContent`] child.
+	/// Create this component with a [`TextNode`] child.
 	fn with_text(text: impl Into<String>) -> impl Bundle {
-		(Self::default(), children![TextContent::new(text)])
+		(Self::default(), children![TextNode::new(text)])
 	}
 }
 
@@ -186,7 +186,7 @@ impl Default for Heading {
 
 /// Level-1 heading, equivalent to HTML `<h1>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -205,7 +205,7 @@ pub struct Heading1;
 
 /// Level-2 heading, equivalent to HTML `<h2>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -224,7 +224,7 @@ pub struct Heading2;
 
 /// Level-3 heading, equivalent to HTML `<h3>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -243,7 +243,7 @@ pub struct Heading3;
 
 /// Level-4 heading, equivalent to HTML `<h4>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -262,7 +262,7 @@ pub struct Heading4;
 
 /// Level-5 heading, equivalent to HTML `<h5>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -281,7 +281,7 @@ pub struct Heading5;
 
 /// Level-6 heading, equivalent to HTML `<h6>`.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -301,7 +301,7 @@ pub struct Heading6;
 
 /// Marker component to denote a paragraph of text.
 ///
-/// Text content is provided via [`TextContent`] children.
+/// Text content is provided via [`TextNode`] children.
 #[derive(
 	Debug,
 	Default,
@@ -405,12 +405,12 @@ pub struct Quote;
 /// Semantically equivalent to HTML `<a>` - a hyperlink to another resource.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(TextContent)]
+#[require(TextNode)]
 pub struct Link {
 	/// The URL this link points to.
 	pub href: String,
 	/// An optional title for the link, which may be used as tooltip text.
-	/// The actual rendered text is the [`TextContent`].
+	/// The actual rendered text is the [`TextNode`].
 	pub title: Option<String>,
 }
 

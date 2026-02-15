@@ -47,12 +47,12 @@ impl FieldRef {
 	}
 
 	/// Create a tuple of this field reference and an empty text content.
-	pub fn as_text(self) -> (Self, TextContent) {
+	pub fn as_text(self) -> (Self, TextNode) {
 		let text_content = match self.on_missing {
 			OnMissingField::Init { ref value } => {
-				TextContent::new(value.to_string())
+				TextNode::new(value.to_string())
 			}
-			_ => TextContent::default(),
+			_ => TextNode::default(),
 		};
 
 		(self, text_content)

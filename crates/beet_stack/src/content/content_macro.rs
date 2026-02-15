@@ -3,24 +3,24 @@ use beet_core::prelude::*;
 use variadics_please::all_tuples;
 
 /// Trait for types that can be converted into a bundle, including
-/// primitives which are converted to a [`TextContent`].
+/// primitives which are converted to a [`TextNode`].
 trait IntoBundle<M> {
 	/// Convert into a bundle suitable for spawning as a content segment.
 	fn into_bundle(self) -> impl Bundle;
 }
 
-// String-like types get wrapped in TextContent
+// String-like types get wrapped in TextNode
 impl IntoBundle<Self> for &str {
-	fn into_bundle(self) -> impl Bundle { TextContent::new(self) }
+	fn into_bundle(self) -> impl Bundle { TextNode::new(self) }
 }
 
 impl IntoBundle<Self> for String {
-	fn into_bundle(self) -> impl Bundle { TextContent::new(self) }
+	fn into_bundle(self) -> impl Bundle { TextNode::new(self) }
 }
 
 
 // Specific impls for common bundle types to avoid overlapping with tuple impl
-impl IntoBundle<Self> for TextContent {
+impl IntoBundle<Self> for TextNode {
 	fn into_bundle(self) -> impl Bundle { self }
 }
 
@@ -41,7 +41,7 @@ impl IntoBundle<Self> for Quote {
 }
 
 impl IntoBundle<Self> for FieldRef {
-	fn into_bundle(self) -> impl Bundle { (self, TextContent::default()) }
+	fn into_bundle(self) -> impl Bundle { (self, TextNode::default()) }
 }
 
 pub struct TupleIntoBundleMarker;
@@ -75,7 +75,7 @@ all_tuples!(
 
 
 /// Convenience method for defining bundles with string types as well,
-/// which are automatically converted to a TextContent.
+/// which are automatically converted to a [`TextNode`].
 #[macro_export]
 macro_rules! content {
 	// Single expression - return directly without children! wrapper
@@ -110,7 +110,7 @@ mod test {
 		world.entity(entity).get::<Children>().xpect_none();
 		world
 			.entity(entity)
-			.get::<TextContent>()
+			.get::<TextNode>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("hello");
@@ -127,7 +127,7 @@ mod test {
 		let texts: Vec<_> = children
 			.iter()
 			.map(|child| {
-				world.entity(child).get::<TextContent>().unwrap().0.clone()
+				world.entity(child).get::<TextNode>().unwrap().0.clone()
 			})
 			.collect();
 
@@ -149,7 +149,7 @@ mod test {
 		world.entity(second).contains::<Important>().xpect_true();
 		world
 			.entity(second)
-			.get::<TextContent>()
+			.get::<TextNode>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("bold");
@@ -214,7 +214,7 @@ mod test {
 		// Single expression - no children wrapper
 		world.entity(entity).contains::<Important>().xpect_true();
 		world.entity(entity).contains::<FieldRef>().xpect_true();
-		world.entity(entity).contains::<TextContent>().xpect_true();
+		world.entity(entity).contains::<TextNode>().xpect_true();
 	}
 
 	#[test]
@@ -229,7 +229,7 @@ mod test {
 		world.entity(entity).contains::<Emphasize>().xpect_true();
 		world
 			.entity(entity)
-			.get::<TextContent>()
+			.get::<TextNode>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("bold italic");
@@ -248,7 +248,7 @@ mod test {
 		world.entity(entity).contains::<Code>().xpect_true();
 		world
 			.entity(entity)
-			.get::<TextContent>()
+			.get::<TextNode>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("all three");
@@ -267,7 +267,7 @@ mod test {
 		world.entity(entity).contains::<Quote>().xpect_true();
 		world
 			.entity(entity)
-			.get::<TextContent>()
+			.get::<TextNode>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("all four");
