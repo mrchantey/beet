@@ -1,12 +1,9 @@
-beet_stack iterations are coming along nicely chicken.
+# THE GREAT DISCOVERY
 
-- refactor `collect_text_entities` to actually return a Vec<(Entity,&TextContent)>, thats more useful.
+`draw_system.rs` we're currently trying to cache created Widgets as entities in the tree.
+this will never work because widgets are themselves trees, ie the ratatui::Paragraph,
+so we end up with this weird duplicate tree situation.
 
+## THE GREAT SOLUTION
 
-
-
-
-- all this `		// Calculate content height` stuff for the scrollbar looks unnescecary, look closely at `agents/ratatui/examples/apps/scrollbar/src/main.rs`, i dont see them doing all that weirdness it should be simple and mostly abstracted into `widgets/scrollbar.rs`
-- regarding scrollbar the page is not rendering correctly for a variety of reasons, double check the scrollbar logic is consistent with the demo.
-
-- in general the draw system should not be so imperative, lean into structure and widgets, then compose together. see `agents/ratatui/examples/apps/widget-ref-container/src/main.rs` for an example of a generic container
+lets give up on this caching. now we'll create a 

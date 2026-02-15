@@ -38,16 +38,20 @@ impl TextQuery<'_, '_> {
 		result
 	}
 
-	/// Returns the entities that are direct [`TextContent`] children
-	/// of a structural element, skipping nested structural elements.
-	pub fn collect_text_entities(&self, parent: Entity) -> Vec<Entity> {
+	/// Returns the entity and [`TextContent`] pairs that are direct
+	/// children of a structural element, skipping nested structural
+	/// elements.
+	pub fn collect_text_entities(
+		&self,
+		parent: Entity,
+	) -> Vec<(Entity, &TextContent)> {
 		let mut result = Vec::new();
 		if let Ok(children) = self.children.get(parent) {
 			for child in children.iter() {
 				if self.is_structural(child) {
 					continue;
-				} else if self.text.contains(child) {
-					result.push(child);
+				} else if let Ok(text) = self.text.get(child) {
+					result.push((child, text));
 				}
 			}
 		}

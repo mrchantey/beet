@@ -1,8 +1,13 @@
 use crate::interface::visit_root;
+use crate::prelude::*;
+use crate::stack::PropagateChanges;
 use crate::stack::StackPlugin;
 use beet_core::prelude::*;
 use bevy::input::keyboard::KeyboardInput;
 use bevy_ratatui::RatatuiPlugins;
+use ratatui::text::Span;
+
+use super::widgets::Hyperlink;
 
 
 /// Top level Bevy plugin that sets up [`bevy_ratatui`], inserts TUI resources,
@@ -29,16 +34,22 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<StackPlugin>()
-		.add_systems(PostStartup, visit_root)
-		.add_systems(
+		.add_systems(PostStartup, visit_root);
+
+		// Lifecycle: bind TuiWidget<Span> to TextContent, TuiWidget<Hyperlink> to Link
+		super::widget_lifecycle_plugin::<TextContent, Span<'static>>(app);
+		super::widget_lifecycle_plugin::<Link, Hyperlink>(app);
+
+		// Systems: rebuild widgets then handle input and draw, all after PropagateChanges
+		app.add_systems(
 			PostUpdate,
 			(
-				super::ensure_scroll_state,
-				super::sync_tui_widgets,
+				(super::rebuild_tui_span, super::rebuild_tui_hyperlink),
 				super::handle_scroll_input,
 				super::draw_system,
 			)
-				.chain(),
+				.chain()
+				.after(PropagateChanges),
 		)
 		.add_systems(PostUpdate, exit_system);
 	}

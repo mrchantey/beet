@@ -1,65 +1,41 @@
-//! TUI rendering by attaching a Widget to select parts of a Card tree.
+//! TUI rendering via typed [`TuiWidget<T>`] components.
 //!
-//! [`RenderTui`] is the central system parameter that walks the card tree,
-//! builds styled [`Line`] content from semantic components, and renders
-//! into a scrollable view wrapped in a [`Block`].
+//! Each semantic content type gets its own concrete `TuiWidget<W>` that
+//! is inserted/removed via generic lifecycle observers and rebuilt when
+//! the underlying [`TextContent`] changes.
 //!
-//! Diffing is handled by [`sync_tui_widgets`] which rebuilds
-//! [`TuiWidget`] whenever [`TextContent`] changes on structural elements.
-use super::widgets::ScrollableArea;
+//! The [`draw_system`] walks the card tree via [`CardQuery`] DFS and
+//! composes [`Line`] from child [`TuiWidget<Span>`] entities, rendering
+//! structural elements (headings, paragraphs) directly without
+//! intermediate buffers.
+use super::widgets::Hyperlink;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use ratatui::buffer::Buffer as RatBuffer;
-use ratatui::prelude::Rect as RatRect;
 use ratatui::prelude::Stylize;
-use ratatui::prelude::Widget;
 use ratatui::text::Line;
 use ratatui::text::Span;
-use ratatui::text::Text;
+use ratatui::text::Text as RatText;
 use ratatui::widgets;
-use ratatui::widgets::WidgetRef;
 
 
 // ---------------------------------------------------------------------------
-// OwnedWidget wrapper
+// TuiWidget<T> component
 // ---------------------------------------------------------------------------
 
-/// Wrapper that makes any `Widget + Clone` type usable as a [`WidgetRef`]
-/// by cloning on each render. This bridges the gap between ratatui's
-/// consuming `Widget::render(self, ..)` and the by-reference
-/// `WidgetRef::render_ref(&self, ..)`.
-struct OwnedWidget<W>(W);
+/// Typed rendering binding attached to content entities.
+///
+/// Each ratatui widget type gets its own ECS component, enabling
+/// independent queries and targeted rebuilds.
+#[derive(Component)]
+pub struct TuiWidget<T: Send + Sync + 'static>(pub T);
 
-impl<W: Widget + Clone> WidgetRef for OwnedWidget<W> {
-	fn render_ref(&self, area: RatRect, buf: &mut RatBuffer) {
-		self.0.clone().render(area, buf);
-	}
+impl<T: Send + Sync + 'static> TuiWidget<T> {
+	/// Wrap a widget value in a [`TuiWidget`].
+	pub fn new(widget: T) -> Self { Self(widget) }
 }
 
-// SAFETY: We only store Send + Sync inner widgets.
-unsafe impl<W: Send> Send for OwnedWidget<W> {}
-unsafe impl<W: Sync> Sync for OwnedWidget<W> {}
-
-
-// ---------------------------------------------------------------------------
-// TuiWidget component
-// ---------------------------------------------------------------------------
-
-/// Rendering binding attached to content entities.
-///
-/// Stores a boxed [`WidgetRef`] so any ratatui widget type can be
-/// used, not just [`widgets::Paragraph`].
-#[derive(Component)]
-pub struct TuiWidget(pub Box<dyn WidgetRef + Send + Sync>);
-
-impl TuiWidget {
-	/// Create a new [`TuiWidget`] from any `Widget + Clone + Send + Sync`.
-	///
-	/// Wraps the widget in an [`OwnedWidget`] adapter so it can be
-	/// rendered by reference via [`WidgetRef`].
-	pub fn new(widget: impl Widget + Clone + Send + Sync + 'static) -> Self {
-		Self(Box::new(OwnedWidget(widget)))
-	}
+impl<T: Default + Send + Sync + 'static> Default for TuiWidget<T> {
+	fn default() -> Self { Self(T::default()) }
 }
 
 
@@ -76,217 +52,114 @@ pub struct TuiScrollState {
 
 
 // ---------------------------------------------------------------------------
-// RenderTui SystemParam
+// Generic widget lifecycle
 // ---------------------------------------------------------------------------
 
-/// System parameter for building TUI widgets from the semantic content tree.
+/// Bind the lifecycle of `TuiWidget<W>` to semantic component `S`.
 ///
-/// Uses [`CardQuery`] for scoped traversal and [`TextQuery`] for
-/// collecting text from structural elements.
-#[derive(SystemParam)]
-pub(super) struct RenderTui<'w, 's> {
-	text_query: TextQuery<'w, 's>,
-	text_content: Query<'w, 's, &'static TextContent>,
-	headings: Query<'w, 's, &'static Heading>,
-	important: Query<'w, 's, (), With<Important>>,
-	emphasize: Query<'w, 's, (), With<Emphasize>>,
-	code: Query<'w, 's, (), With<Code>>,
-	links: Query<'w, 's, &'static Link>,
+/// Inserts a default `TuiWidget<W>` when `S` is added to an entity
+/// and removes it when `S` is removed.
+pub(super) fn widget_lifecycle_plugin<
+	S: Component,
+	W: Default + Send + Sync + 'static,
+>(
+	app: &mut App,
+) {
+	app.add_observer(insert_widget::<S, W>)
+		.add_observer(remove_widget::<S, W>);
 }
 
-impl RenderTui<'_, '_> {
-	/// Build a [`TuiWidget`] for a [`Heading`] entity.
-	fn build_heading(&self, entity: Entity) -> TuiWidget {
-		let level = self
-			.headings
-			.get(entity)
-			.map(|heading| heading.level())
-			.unwrap_or(1);
-		let spans = self.collect_styled_spans(entity);
-		let line = if spans.is_empty() {
-			Line::default()
-		} else {
-			Line::from(spans).bold()
-		};
-		// Level-1 headings are centered, deeper headings left-aligned
-		let line = if level == 1 { line.centered() } else { line };
-		TuiWidget::new(widgets::Paragraph::new(line))
-	}
-
-	/// Build a [`TuiWidget`] for a [`Paragraph`] entity.
-	fn build_paragraph(&self, entity: Entity) -> TuiWidget {
-		let spans = self.collect_styled_spans(entity);
-		TuiWidget::new(
-			widgets::Paragraph::new(Line::from(spans))
-				.wrap(widgets::Wrap { trim: true }),
-		)
-	}
-
-	/// Collect styled [`Span`] from the children of a structural element,
-	/// applying inline markers.
-	fn collect_styled_spans(&self, parent: Entity) -> Vec<Span<'static>> {
-		let mut spans = Vec::new();
-		let entities = self.text_query.collect_text_entities(parent);
-
-		for child in entities {
-			let Ok(text) = self.text_content.get(child) else {
-				continue;
-			};
-			let mut span = Span::raw(text.as_str().to_owned());
-
-			if self.important.contains(child) {
-				span = span.bold();
-			}
-			if self.emphasize.contains(child) {
-				span = span.italic();
-			}
-			if self.code.contains(child) {
-				span = span.dim();
-			}
-			if self.links.contains(child) {
-				span = span.underlined();
-			}
-
-			spans.push(span);
-		}
-		spans
-	}
-}
-
-
-// ---------------------------------------------------------------------------
-// System: sync TuiWidget when text content changes
-// ---------------------------------------------------------------------------
-
-/// Rebuilds [`TuiWidget`] for [`DisplayBlock`] elements when their
-/// text content changes. This is the single diffing location for
-/// TUI widget updates.
-pub(super) fn sync_tui_widgets(
-	render: RenderTui,
-	changed_text: Query<&ChildOf, Changed<TextContent>>,
-	display_blocks: Query<Entity, With<DisplayBlock>>,
-	headings: Query<(), With<Heading>>,
-	children_query: Query<&Children>,
-	text_content: Query<(), With<TextContent>>,
+/// Observer: insert a default [`TuiWidget<W>`] when `S` is added.
+fn insert_widget<S: Component, W: Default + Send + Sync + 'static>(
+	ev: On<Insert, S>,
 	mut commands: Commands,
 ) {
-	// Collect structural parents whose text children changed
-	let mut dirty = Vec::new();
-	for child_of in &changed_text {
-		let parent = child_of.parent();
-		if !dirty.contains(&parent) {
-			dirty.push(parent);
-		}
-	}
-
-	// Also rebuild display blocks that have text children but no
-	// TuiWidget yet (first run)
-	for entity in &display_blocks {
-		if !dirty.contains(&entity) {
-			if let Ok(children) = children_query.get(entity) {
-				for child in children.iter() {
-					if text_content.contains(child) {
-						dirty.push(entity);
-						break;
-					}
-				}
-			}
-		}
-	}
-
-	for entity in dirty {
-		let widget = if headings.contains(entity) {
-			render.build_heading(entity)
-		} else {
-			render.build_paragraph(entity)
-		};
-		commands.entity(entity).insert(widget);
-	}
+	commands.entity(ev.entity).insert(TuiWidget::<W>::default());
 }
 
-
-// ---------------------------------------------------------------------------
-// System: ensure scroll state exists on CurrentCard
-// ---------------------------------------------------------------------------
-
-/// Inserts [`TuiScrollState`] on the current card if missing.
-pub(super) fn ensure_scroll_state(
-	card: Query<Entity, (With<CurrentCard>, Without<TuiScrollState>)>,
+/// Observer: remove [`TuiWidget<W>`] when `S` is removed.
+fn remove_widget<S: Component, W: Default + Send + Sync + 'static>(
+	ev: On<Remove, S>,
 	mut commands: Commands,
 ) {
-	for entity in &card {
-		commands.entity(entity).insert(TuiScrollState::default());
+	commands.entity(ev.entity).remove::<TuiWidget<W>>();
+}
+
+
+// ---------------------------------------------------------------------------
+// Span rebuild
+// ---------------------------------------------------------------------------
+
+/// Rebuild individual span widgets when their [`TextContent`] changes,
+/// applying inline semantic markers as ratatui styles.
+pub(super) fn rebuild_tui_span(
+	query: Query<(Entity, &TextContent), Changed<TextContent>>,
+	important: Query<(), With<Important>>,
+	emphasize: Query<(), With<Emphasize>>,
+	code: Query<(), With<Code>>,
+	links: Query<(), With<Link>>,
+	mut commands: Commands,
+) {
+	for (entity, text) in &query {
+		let mut span = Span::raw(text.as_str().to_owned());
+
+		if important.contains(entity) {
+			span = span.bold();
+		}
+		if emphasize.contains(entity) {
+			span = span.italic();
+		}
+		if code.contains(entity) {
+			span = span.dim();
+		}
+		if links.contains(entity) {
+			span = span.underlined();
+		}
+
+		commands.entity(entity).insert(TuiWidget::new(span));
 	}
 }
 
 
 // ---------------------------------------------------------------------------
-// Collect renderable content into a composed Text widget
+// Hyperlink rebuild
 // ---------------------------------------------------------------------------
 
-/// Collects [`TuiWidget`] entities and tool buttons into a single
-/// [`Text`] block for rendering.
-fn collect_content_text(
-	card_entity: Entity,
-	card_query: &CardQuery,
-	text_query: &TextQuery,
-	widget_query: &Query<&TuiWidget>,
-	tool_query: &Query<&ToolMeta>,
-) -> (String, Text<'static>) {
-	let mut block_title = String::new();
-	let mut lines: Vec<Line<'static>> = Vec::new();
-
-	// Use main_heading helper to extract block title
-	if let Some((_heading_entity, title_text)) =
-		text_query.main_heading(card_entity)
-	{
-		block_title = format!(" {} ", title_text);
+/// Rebuild hyperlink widgets when [`TextContent`] or [`Link`] changes.
+pub(super) fn rebuild_tui_hyperlink(
+	query: Query<
+		(Entity, &TextContent, &Link),
+		Or<(Changed<TextContent>, Changed<Link>)>,
+	>,
+	mut commands: Commands,
+) {
+	for (entity, text, link) in &query {
+		let widget =
+			Hyperlink::new(text.as_str().to_owned(), link.href.clone());
+		commands.entity(entity).insert(TuiWidget::new(widget));
 	}
+}
 
-	// Render a temporary buffer per widget to extract lines
-	for entity in card_query.iter_dfs(card_entity) {
-		if let Ok(tui_widget) = widget_query.get(entity) {
-			let temp_area = RatRect::new(0, 0, 200, 50);
-			let mut temp_buf = RatBuffer::empty(temp_area);
-			tui_widget.0.render_ref(temp_area, &mut temp_buf);
 
-			// Read lines from the buffer
-			for row in 0..temp_area.height {
-				let mut line_str = String::new();
-				for col in 0..temp_area.width {
-					let cell = &temp_buf[(col, row)];
-					line_str.push_str(cell.symbol());
-				}
-				let trimmed = line_str.trim_end().to_string();
-				if !trimmed.is_empty() {
-					lines.push(Line::from(trimmed));
-				}
-			}
-		}
-	}
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
 
-	// Collect tool buttons using the handler name from ToolMeta
-	let mut buttons: Vec<String> = Vec::new();
-	for entity in card_query.iter_dfs(card_entity) {
-		if let Ok(meta) = tool_query.get(entity) {
-			if meta.input().type_id() == std::any::TypeId::of::<()>() {
-				// Extract the short name from the full type path
-				let full_name = meta.name();
-				let short_name =
-					full_name.rsplit("::").next().unwrap_or(full_name);
-				buttons.push(short_name.to_string());
-			}
-		}
-	}
-
-	if !buttons.is_empty() {
-		lines.push(Line::default());
-		for label in &buttons {
-			lines.push(Line::from(format!("[ {} ]", label)).centered());
-		}
-	}
-
-	(block_title, Text::from(lines))
+/// Collect child [`TuiWidget<Span>`] values from a structural element's
+/// direct children, preserving child order.
+fn collect_child_spans(
+	parent: Entity,
+	children_query: &Query<&Children>,
+	spans: &Query<&TuiWidget<Span<'static>>>,
+) -> Vec<Span<'static>> {
+	let Ok(children) = children_query.get(parent) else {
+		return Vec::new();
+	};
+	children
+		.iter()
+		.filter_map(|child| spans.get(child).ok())
+		.map(|widget| widget.0.clone())
+		.collect()
 }
 
 
@@ -296,49 +169,67 @@ fn collect_content_text(
 
 /// Renders the current card's content tree into the terminal each frame.
 ///
-/// Collects widgets via [`CardQuery`], wraps them in a [`Block`] with
-/// the card's main heading, and renders with scrollbar support via
-/// [`ScrollableArea`].
+/// Walks the card tree via [`CardQuery`] DFS. For each structural
+/// element ([`Heading`], [`Paragraph`]), collects child
+/// [`TuiWidget<Span>`] values and composes them into [`Line`].
+/// The resulting lines are rendered as a single [`widgets::Paragraph`]
+/// inside a bordered block titled with the card's main heading.
 pub(super) fn draw_system(
 	mut context: ResMut<bevy_ratatui::RatatuiContext>,
-	card: Query<(Entity, Option<&TuiScrollState>), With<CurrentCard>>,
+	card: Query<Entity, With<CurrentCard>>,
 	card_query: CardQuery,
 	text_query: TextQuery,
-	widget_query: Query<&TuiWidget>,
-	tool_query: Query<&ToolMeta>,
+	headings: Query<&Heading>,
+	paragraphs: Query<(), With<Paragraph>>,
+	spans: Query<&TuiWidget<Span<'static>>>,
+	children_query: Query<&Children>,
 ) -> Result {
-	let (card_entity, scroll_state) = card.single()?;
-	let scroll_offset = scroll_state.map(|ss| ss.offset).unwrap_or(0);
+	let card_entity = card.single()?;
 
 	context.draw(|frame| {
 		let area = frame.area();
 
-		let (block_title, content_text) = collect_content_text(
-			card_entity,
-			&card_query,
-			&text_query,
-			&widget_query,
-			&tool_query,
-		);
+		let block_title = text_query
+			.main_heading(card_entity)
+			.map(|(_, title)| format!(" {} ", title))
+			.unwrap_or_default();
 
 		let block = widgets::Block::bordered()
 			.title(Line::from(block_title).bold().centered());
 		let inner_area = block.inner(area);
 		frame.render_widget(block, area);
 
-		if content_text.lines.is_empty() {
+		let mut lines: Vec<Line<'static>> = Vec::new();
+
+		for entity in card_query.iter_dfs(card_entity) {
+			if let Ok(heading) = headings.get(entity) {
+				let child_spans =
+					collect_child_spans(entity, &children_query, &spans);
+				if child_spans.is_empty() {
+					continue;
+				}
+				let line = Line::from(child_spans).bold();
+				lines.push(if heading.level() == 1 {
+					line.centered()
+				} else {
+					line
+				});
+			} else if paragraphs.contains(entity) {
+				let child_spans =
+					collect_child_spans(entity, &children_query, &spans);
+				if !child_spans.is_empty() {
+					lines.push(Line::from(child_spans));
+				}
+			}
+		}
+
+		if lines.is_empty() {
 			return;
 		}
 
-		let total_lines = content_text.lines.len();
-
-		let paragraph = widgets::Paragraph::new(content_text)
-			.wrap(widgets::Wrap { trim: true })
-			.scroll((scroll_offset, 0));
-
-		let scrollable =
-			ScrollableArea::new(paragraph, total_lines, scroll_offset as usize);
-		frame.render_widget(scrollable, inner_area);
+		let paragraph = widgets::Paragraph::new(RatText::from(lines))
+			.wrap(widgets::Wrap { trim: true });
+		frame.render_widget(paragraph, inner_area);
 	})?;
 	Ok(())
 }

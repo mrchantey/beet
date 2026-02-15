@@ -7,6 +7,7 @@ use ratatui::text::Text;
 /// A terminal hyperlink using OSC 8 escape sequences.
 ///
 /// Renders clickable links in supported terminals.
+#[derive(Clone, Default)]
 pub struct Hyperlink {
 	text: Text<'static>,
 	url: String,
@@ -14,10 +15,7 @@ pub struct Hyperlink {
 
 impl Hyperlink {
 	/// Create a hyperlink with the given display text and URL.
-	pub fn new(
-		text: impl Into<Text<'static>>,
-		url: impl Into<String>,
-	) -> Self {
+	pub fn new(text: impl Into<Text<'static>>, url: impl Into<String>) -> Self {
 		Self {
 			text: text.into(),
 			url: url.into(),
@@ -41,5 +39,11 @@ impl Widget for &Hyperlink {
 				buffer[(col, area.y)].set_symbol(hyperlink.as_str());
 			}
 		}
+	}
+}
+
+impl Widget for Hyperlink {
+	fn render(self, area: Rect, buffer: &mut Buffer) {
+		(&self).render(area, buffer);
 	}
 }
