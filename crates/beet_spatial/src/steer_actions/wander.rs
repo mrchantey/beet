@@ -101,7 +101,7 @@ mod test {
 			ControlFlowPlugin::default(),
 			BeetSpatialPlugins::default(),
 		))
-.init_resource::<Time>();
+		.init_resource::<Time>();
 
 		let agent = app
 			.world_mut()

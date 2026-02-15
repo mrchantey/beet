@@ -76,16 +76,13 @@ fn into_request(request: Request) -> Result<reqwest::Request> {
 async fn into_response(res: reqwest::Response) -> Result<Response> {
 	let status = res.status();
 
-	// Copy headers to our ResponseParts using PartsBuilder
-	let parts = {
-		let mut builder = PartsBuilder::new();
-		for (key, value) in res.headers().iter() {
-			if let Ok(value_str) = value.to_str() {
-				builder = builder.header(key.to_string(), value_str);
-			}
+	// Copy headers to our ResponseParts
+	let mut parts = ResponseParts::new(status.into());
+	for (key, value) in res.headers().iter() {
+		if let Ok(value_str) = value.to_str() {
+			parts.insert_header(key.to_string(), value_str);
 		}
-		builder.build_response_parts(status.into())
-	};
+	}
 
 	let is_bytes = res
 		.headers()

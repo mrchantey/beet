@@ -1,5 +1,10 @@
 assets
+agent/ratatui
+agent/tui_server
+
 !examples/assets
+Cargo.toml.full
+Cargo.toml.basic
 target
 rustc-ice*
 .rustc_info.json
@@ -7,7 +12,6 @@ rustc-ice*
 .cache
 .vscode/settings.json
 dump.*
-plan.md
 file.pdf
 launch.ron
 

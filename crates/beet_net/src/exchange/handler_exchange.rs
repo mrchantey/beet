@@ -118,8 +118,8 @@ mod test {
 			.spawn(handler_exchange(|_, req| req.mirror_parts()))
 			.exchange(Request::get("/foo"))
 			.await
-			.path_string()
-			.xpect_eq("/foo");
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[beet_core::test]
@@ -142,8 +142,8 @@ mod test {
 			}))
 			.exchange(Request::get("/bar"))
 			.await
-			.path_string()
-			.xpect_eq("/bar");
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 
 	#[beet_core::test]
@@ -164,7 +164,7 @@ mod test {
 			.spawn(mirror_exchange())
 			.exchange(Request::get("/mirror"))
 			.await
-			.path_string()
-			.xpect_eq("/mirror");
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 }

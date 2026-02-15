@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 use std::sync::Mutex;
+use url::Url;
 
 /// the url for the server.
 /// On native builds this defaults to `http://127.0.0.1:3000`.
@@ -161,6 +162,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_net::prelude::*;
+	use url::Url;
 
 
 	#[test]

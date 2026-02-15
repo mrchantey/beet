@@ -60,7 +60,7 @@ pub fn parse_version(version: &str) -> http::Version {
 #[cfg(all(test, feature = "http"))]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
+	use crate::prelude::*;
 
 	#[test]
 	fn has_body_with_content_length() {

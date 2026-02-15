@@ -29,7 +29,7 @@ use std::convert::Infallible;
 /// # Deref
 ///
 /// `Response` implements `Deref<Target = ResponseParts>`, so all methods on
-/// [`ResponseParts`] and [`Parts`] are available directly:
+/// [`ResponseParts`] are available directly:
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -110,7 +110,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.parts_mut().insert_header("location", location.into());
+		parts.insert_header("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -125,7 +125,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.parts_mut().insert_header("location", location.into());
+		parts.insert_header("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -149,6 +149,91 @@ impl Response {
 		self
 	}
 
+	/// Creates an OK response with a JSON-serialized body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
+	/// assert_eq!(response.status(), StatusCode::Ok);
+	/// assert_eq!(response.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json<T: serde::Serialize>(value: &T) -> Result<Self> {
+		let body = Body::from_json(value)?;
+		Self::ok()
+			.with_body(body)
+			.with_content_type(ExchangeFormat::JSON_CONTENT_TYPE)
+			.xok()
+	}
+
+	/// Creates an OK response with a postcard-serialized body and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
+		let body = Body::from_postcard(value)?;
+		Self::ok()
+			.with_body(body)
+			.with_content_type(ExchangeFormat::POSTCARD_CONTENT_TYPE)
+			.xok()
+	}
+
+	/// Creates an OK response with a raw JSON string body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let response = Response::with_json_str(r#"{"foo": 42}"#);
+	/// assert_eq!(response.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json_str(json: impl AsRef<str>) -> Self {
+		Self::ok()
+			.with_body(json.as_ref())
+			.with_content_type(ExchangeFormat::JSON_CONTENT_TYPE)
+	}
+
+	/// Creates an OK response with raw postcard bytes and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard_bytes(bytes: impl AsRef<[u8]>) -> Self {
+		Self::ok()
+			.with_body(Bytes::copy_from_slice(bytes.as_ref()))
+			.with_content_type(ExchangeFormat::POSTCARD_CONTENT_TYPE)
+	}
+
+	/// Deserializes the response body using the format indicated by
+	/// the `content-type` header, defaulting to JSON.
+	///
+	/// ```no_run
+	/// # use beet_core::prelude::*;
+	/// # async {
+	/// let response = Response::with_json(&42u32).unwrap();
+	/// let value: u32 = response.deserialize().await.unwrap();
+	/// assert_eq!(value, 42);
+	/// # };
+	/// ```
+	#[cfg(feature = "serde")]
+	pub async fn deserialize<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		let format =
+			ExchangeFormat::from_content_type(self.get_header("content-type"))?;
+		self.body.into_format(format).await
+	}
+
+	/// Deserializes the response body using the format indicated by
+	/// the `content-type` header, blocking the current thread.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let response = Response::with_json(&42u32).unwrap();
+	/// let value: u32 = response.deserialize_blocking().unwrap();
+	/// assert_eq!(value, 42);
+	/// ```
+	#[cfg(feature = "serde")]
+	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		async_ext::block_on(self.deserialize())
+	}
+
 	/// Creates a response with status, body, and content type
 	pub fn from_status_body(
 		status: StatusCode,
@@ -156,9 +241,7 @@ impl Response {
 		content_type: &str,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
-		parts
-			.parts_mut()
-			.insert_header("content-type", content_type);
+		parts.insert_header("content-type", content_type);
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
@@ -225,9 +308,7 @@ impl Response {
 	/// Create a response with the given body and content type
 	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
 		let mut parts = ResponseParts::ok();
-		parts
-			.parts_mut()
-			.insert_header("content-type", content_type);
+		parts.insert_header("content-type", content_type);
 		Self {
 			parts,
 			body: body.into(),
@@ -264,7 +345,7 @@ impl Response {
 	pub async fn text(self) -> Result<String> { self.body.into_string().await }
 
 	/// Consumes the response body and parses it as JSON
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		self.body.into_json().await
 	}
@@ -309,7 +390,7 @@ impl Response {
 
 	/// Adds a header to the response
 	pub fn with_header(mut self, key: &str, value: &str) -> Self {
-		self.parts.parts_mut().insert_header(key, value);
+		self.parts.insert_header(key, value);
 		self
 	}
 
@@ -534,6 +615,118 @@ mod test {
 	fn response_with_header() {
 		let response = Response::ok().with_header("x-custom", "value");
 		response.get_header("x-custom").unwrap().xpect_eq("value");
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn response_with_json() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			foo: u32,
+		}
+
+		let payload = Payload { foo: 42 };
+		let response = Response::with_json(&payload).unwrap();
+		response.status().xpect_eq(StatusCode::Ok);
+		response
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = response.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn response_with_json_str() {
+		let response = Response::with_json_str(r#"{"foo":42}"#);
+		response.status().xpect_eq(StatusCode::Ok);
+		response
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = response.body.try_into_bytes().unwrap();
+		String::from_utf8(body_bytes.to_vec())
+			.unwrap()
+			.xpect_eq(r#"{"foo":42}"#);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn response_with_postcard() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			val: u32,
+		}
+
+		let payload = Payload { val: 99 };
+		let response = Response::with_postcard(&payload).unwrap();
+		response.status().xpect_eq(StatusCode::Ok);
+		response
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = response.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn response_with_postcard_bytes() {
+		let raw = vec![0x01, 0x02, 0x03];
+		let response = Response::with_postcard_bytes(&raw);
+		response
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = response.body.try_into_bytes().unwrap();
+		body_bytes.to_vec().xpect_eq(raw);
+	}
+
+	#[cfg(feature = "json")]
+	#[crate::test]
+	async fn response_deserialize_json() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			foo: u32,
+		}
+
+		let payload = Payload { foo: 30 };
+		let response = Response::with_json(&payload).unwrap();
+		let roundtrip: Payload = response.deserialize().await.unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[crate::test]
+	async fn response_deserialize_postcard() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			val: u32,
+		}
+
+		let payload = Payload { val: 77 };
+		let response = Response::with_postcard(&payload).unwrap();
+		let roundtrip: Payload = response.deserialize().await.unwrap();
+		roundtrip.xpect_eq(payload);
 	}
 
 	#[test]

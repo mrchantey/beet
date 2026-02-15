@@ -16,6 +16,7 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
+						// "stack",
 						// "server"
 						// "client",
 						// "launch",
@@ -31,10 +32,10 @@
 						// "ml",
 						// "cuda",
 						// "rand"
-					]
-				}
-			}
-		}
+					],
+				},
+			},
+		},
 	},
 	"diagnostics": {},
 	"file_scan_exclusions": [
@@ -47,6 +48,6 @@
 		// "**/target",
 		// "**/*.log",
 		// "**/Cargo.lock",
-		"rustc-ice**"
-	]
+		"rustc-ice**",
+	],
 }

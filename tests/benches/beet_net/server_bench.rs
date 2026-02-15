@@ -1,10 +1,10 @@
-//! Server benchmark example.
+//! Server benchmark.
 //!
 //! Measures roundtrip latency for HTTP requests to a minimal server.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example server_bench --features server_app
+//! cargo bench --bench server_bench --features server_app
 //! ```
 use beet::prelude::*;
 

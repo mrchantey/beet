@@ -35,13 +35,13 @@ use http::header::IntoHeaderName;
 /// # Deref
 ///
 /// `Request` implements `Deref<Target = RequestParts>`, so all methods on
-/// [`RequestParts`] and [`Parts`] are available directly:
+/// [`RequestParts`] are available directly:
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// let request = Request::get("/api/users?limit=10");
-/// assert_eq!(request.method(), &HttpMethod::Get);  // From RequestParts
-/// assert_eq!(request.path(), &["api", "users"]);   // From Parts via Deref
+/// assert_eq!(request.method(), &HttpMethod::Get);
+/// assert_eq!(request.path(), &["api", "users"]);
 /// ```
 #[derive(Debug, Component)]
 #[component(on_add = on_add)]
@@ -93,6 +93,9 @@ impl RequestMeta {
 		}
 	}
 
+	/// Returns a reference to the request parts
+	pub fn parts(&self) -> &RequestParts { &self.parts }
+
 	/// Returns the HTTP method of the request.
 	pub fn method(&self) -> HttpMethod { *self.parts.method() }
 
@@ -116,6 +119,9 @@ impl Request {
 			body: default(),
 		}
 	}
+
+	/// Returns a reference to the request parts
+	pub fn parts(&self) -> &RequestParts { &self.parts }
 
 	/// Creates a request from parts and body
 	pub fn from_parts(parts: RequestParts, body: Body) -> Self {
@@ -179,8 +185,73 @@ impl Request {
 		self
 	}
 
-	/// Sets a JSON body and content-type header
-	#[cfg(all(feature = "serde", feature = "http"))]
+	/// Creates a POST request with a JSON-serialized body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
+	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json<T: serde::Serialize>(
+		path: impl AsRef<str>,
+		value: &T,
+	) -> Result<Self> {
+		let body = Body::from_json(value)?;
+		let mut request =
+			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+		request
+			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request.xok()
+	}
+
+	/// Creates a POST request with a postcard-serialized body and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard<T: serde::Serialize>(
+		path: impl AsRef<str>,
+		value: &T,
+	) -> Result<Self> {
+		let body = Body::from_postcard(value)?;
+		let mut request =
+			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+		request.insert_header(
+			"content-type",
+			ExchangeFormat::POSTCARD_CONTENT_TYPE,
+		);
+		request.xok()
+	}
+
+	/// Creates a POST request with a raw JSON string body and `content-type` header.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
+	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// ```
+	#[cfg(feature = "json")]
+	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
+		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
+		request
+			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request
+	}
+
+	/// Creates a POST request with raw postcard bytes and `content-type` header.
+	#[cfg(feature = "postcard")]
+	pub fn with_postcard_bytes(
+		path: impl AsRef<str>,
+		bytes: impl AsRef<[u8]>,
+	) -> Self {
+		let mut request = Self::post(path).with_body(bytes);
+		request.insert_header(
+			"content-type",
+			ExchangeFormat::POSTCARD_CONTENT_TYPE,
+		);
+		request
+	}
+
+	/// Sets a JSON body and content-type header on an existing request.
+	#[cfg(all(feature = "json", feature = "http"))]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,
@@ -197,6 +268,42 @@ impl Request {
 		self
 	}
 
+	/// Deserializes the request body using the format indicated by
+	/// the `content-type` header, defaulting to JSON.
+	///
+	/// ```no_run
+	/// # use beet_core::prelude::*;
+	/// # async {
+	/// let request = Request::with_json("/test", &42u32).unwrap();
+	/// let value: u32 = request.deserialize().await.unwrap();
+	/// assert_eq!(value, 42);
+	/// # };
+	/// ```
+	#[cfg(feature = "serde")]
+	pub async fn deserialize<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		let format =
+			ExchangeFormat::from_content_type(self.get_header("content-type"))?;
+		self.body.into_format(format).await
+	}
+
+	/// Deserializes the request body using the format indicated by
+	/// the `content-type` header, blocking the current thread.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let request = Request::with_json("/test", &42u32).unwrap();
+	/// let value: u32 = request.deserialize_blocking().unwrap();
+	/// assert_eq!(value, 42);
+	/// ```
+	#[cfg(feature = "serde")]
+	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		async_ext::block_on(self.deserialize())
+	}
+
 	/// Adds a header using http header types
 	#[cfg(feature = "http")]
 	pub fn with_header<K: IntoHeaderName>(
@@ -205,7 +312,7 @@ impl Request {
 		value: &str,
 	) -> Self {
 		let key_str = header_name_to_string(key);
-		self.parts.parts_mut().insert_header(key_str, value);
+		self.parts.insert_header(key_str, value);
 		self
 	}
 
@@ -236,12 +343,12 @@ impl Request {
 	) -> Result<Self> {
 		let key = serde_urlencoded::to_string(key)?;
 		let value = serde_urlencoded::to_string(value)?;
-		self.with_query_param(&key, &value).xok()
+		self.with_param(&key, &value).xok()
 	}
 
 	/// Insert a query parameter into the request
-	pub fn with_query_param(mut self, key: &str, value: &str) -> Self {
-		self.parts.parts_mut().insert_param(key, value);
+	pub fn with_param(mut self, key: &str, value: &str) -> Self {
+		self.parts.insert_param(key, value);
 		self
 	}
 
@@ -255,7 +362,7 @@ impl Request {
 				Some((key, value)) => (key.to_string(), value.to_string()),
 				None => (pair.to_string(), String::new()),
 			};
-			self.parts.parts_mut().insert_param(key, value);
+			self.parts.insert_param(key, value);
 		}
 		self
 	}
@@ -311,27 +418,19 @@ impl Request {
 		Ok(http::Request::from_parts(http_parts, bytes))
 	}
 
-	/// Creates a response that mirrors this request,
+	/// Creates a response that mirrors this request's headers and body,
 	/// with a [`StatusCode::Ok`]
 	pub fn mirror(self) -> Response {
-		Response::new(
-			ResponseParts {
-				parts: self.request_parts().parts().clone(),
-				status: StatusCode::Ok,
-			},
-			self.body,
-		)
+		let mut res_parts = ResponseParts::ok();
+		res_parts.headers = self.parts.headers().clone();
+		Response::new(res_parts, self.body)
 	}
-	/// Creates a response that mirrors this request's parts,
+	/// Creates a response that mirrors this request's headers,
 	/// with an empty body
 	pub fn mirror_parts(&self) -> Response {
-		Response::new(
-			ResponseParts {
-				parts: self.request_parts().parts().clone(),
-				status: StatusCode::Ok,
-			},
-			default(),
-		)
+		let mut res_parts = ResponseParts::ok();
+		res_parts.headers = self.parts.headers().clone();
+		Response::new(res_parts, default())
 	}
 }
 
@@ -506,8 +605,8 @@ mod test {
 	#[test]
 	fn request_with_query_param() {
 		let request = Request::get("/api/users")
-			.with_query_param("limit", "10")
-			.with_query_param("offset", "20");
+			.with_param("limit", "10")
+			.with_param("offset", "20");
 
 		request.get_param("limit").unwrap().xpect_eq("10");
 		request.get_param("offset").unwrap().xpect_eq("20");
@@ -534,5 +633,86 @@ mod test {
 		(*parts.method()).xpect_eq(HttpMethod::Post);
 		body.bytes_eq(&Body::Bytes(Bytes::from("data")))
 			.xpect_true();
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn request_with_json() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			name: String,
+		}
+
+		let payload = Payload { name: "Ada".into() };
+		let request = Request::with_json("/api/users", &payload).unwrap();
+
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request.path_string().xpect_eq("/api/users");
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "json")]
+	#[test]
+	fn request_with_json_str() {
+		let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		String::from_utf8(body_bytes.to_vec())
+			.unwrap()
+			.xpect_eq(r#"{"name":"Ada"}"#);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn request_with_postcard() {
+		use serde::Deserialize;
+		use serde::Serialize;
+
+		#[derive(Debug, PartialEq, Serialize, Deserialize)]
+		struct Payload {
+			val: u32,
+		}
+
+		let payload = Payload { val: 42 };
+		let request = Request::with_postcard("/api/data", &payload).unwrap();
+
+		(*request.method()).xpect_eq(HttpMethod::Post);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
+		roundtrip.xpect_eq(payload);
+	}
+
+	#[cfg(feature = "postcard")]
+	#[test]
+	fn request_with_postcard_bytes() {
+		let raw = vec![0x01, 0x02, 0x03];
+		let request = Request::with_postcard_bytes("/api/data", &raw);
+		request
+			.get_header("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+
+		let body_bytes = request.body.try_into_bytes().unwrap();
+		body_bytes.to_vec().xpect_eq(raw);
 	}
 }

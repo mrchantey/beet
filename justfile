@@ -286,3 +286,7 @@ watch *command:
 # Cargo search but returns one line
 search *args:
     cargo search {{ args }} | head -n 1
+
+
+nightly date:
+	rustup default nightly-{{ date }}

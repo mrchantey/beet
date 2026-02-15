@@ -1,6 +1,6 @@
 //! Generic request/response parts for routing.
 //!
-//! This module provides [`Parts`], [`RequestParts`], and [`ResponseParts`] types
+//! This module provides [`RequestParts`] and [`ResponseParts`] types
 //! that abstract over different transport mechanisms (HTTP, CLI, REPL, etc.).
 //!
 //! These types allow the same routing infrastructure to handle:
@@ -100,31 +100,34 @@ impl From<Option<&http::uri::Scheme>> for Scheme {
 	}
 }
 
-/// Common parts shared between requests and responses.
+/// The default HTTP version string.
+const DEFAULT_HTTP_VERSION: &str = "1.1";
+
+/// The default CLI version string.
+const DEFAULT_CLI_VERSION: &str = "0.1.0";
+
+
+
+
+
+/// Request-specific parts including HTTP method, scheme, path, params, headers, and version.
 ///
-/// This type abstracts the commonalities between different transport mechanisms:
-/// - For HTTP: scheme, host, path segments, query params, headers
-/// - For CLI: command path segments, flags/options, environment variables
+/// # Example
 ///
-/// # Path Representation
-///
-/// The path is stored as a vector of segments:
-/// - HTTP `/api/users/123` -> `["api", "users", "123"]`
-/// - CLI `users list --verbose` -> `["users", "list"]`
-///
-/// # Parameters
-///
-/// Query parameters (HTTP) and flags/options (CLI) are unified:
-/// - HTTP `?limit=10&offset=20` -> `{"limit": ["10"], "offset": ["20"]}`
-/// - CLI `--limit 10 --offset 20` -> `{"limit": ["10"], "offset": ["20"]}`
+/// ```
+/// # use beet_core::prelude::*;
+/// let parts = RequestParts::get("/api/users");
+/// assert_eq!(parts.path(), &["api", "users"]);
+/// assert_eq!(parts.method(), &HttpMethod::Get);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parts {
+pub struct RequestParts {
+	method: HttpMethod,
 	/// The scheme of the request (http, https, cli, etc.)
 	scheme: Scheme,
 	/// The authority (host:port) for HTTP, or application name for CLI
 	authority: String,
 	/// The path segments (split by `/` for HTTP, positional args for CLI)
-	// TODO path and params belong in request only
 	path: Vec<String>,
 	/// Query parameters (HTTP) or flags/options (CLI)
 	///
@@ -136,7 +139,6 @@ pub struct Parts {
 	/// - The keys are stored here verbatim with no parsing,
 	///  but `beet_router` will convert keys to `kebab-case` before deserializing
 	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
-	// TODO path and params belong in request only
 	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
 	headers: MultiMap<String, String>,
@@ -144,18 +146,10 @@ pub struct Parts {
 	version: String,
 }
 
-
-
-/// The default HTTP version string.
-const DEFAULT_HTTP_VERSION: &str = "1.1";
-
-/// The default CLI version string.
-const DEFAULT_CLI_VERSION: &str = "0.1.0";
-
-
-impl Default for Parts {
+impl Default for RequestParts {
 	fn default() -> Self {
 		Self {
+			method: HttpMethod::Get,
 			scheme: Scheme::None,
 			authority: String::new(),
 			path: Vec::new(),
@@ -166,9 +160,91 @@ impl Default for Parts {
 	}
 }
 
-impl Parts {
-	/// Creates a new empty `Parts` with default values
-	pub fn new() -> Self { Self::default() }
+impl RequestParts {
+	/// Creates a new `RequestParts` with the given method and path or URI.
+	///
+	/// The input can be:
+	/// - A path like `/api/users`
+	/// - A full URI like `https://example.com/api/users`
+	/// - A CLI-style path like `users list`
+	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
+		let path_str = path.as_ref();
+
+		// Check if this is a full URI with scheme (http://, https://, etc.)
+		if path_str.contains("://") {
+			// Parse as full URI
+			#[cfg(feature = "http")]
+			if let Ok(uri) = path_str.parse::<http::Uri>() {
+				let scheme = Scheme::from(uri.scheme());
+				let authority = uri
+					.authority()
+					.map(|auth| auth.to_string())
+					.unwrap_or_default();
+				let path_segments = split_path(uri.path());
+				let params =
+					uri.query().map(parse_query_string).unwrap_or_default();
+
+				return Self {
+					method,
+					scheme,
+					authority,
+					path: path_segments,
+					params,
+					headers: MultiMap::<String, String>::default(),
+					version: DEFAULT_HTTP_VERSION.to_string(),
+				};
+			}
+		}
+
+		// Otherwise treat as path (may include query string)
+		let (path_only, query_str) = split_path_and_query(path_str);
+		let path_segments = split_path(path_only);
+		let params = query_str.map(parse_query_string).unwrap_or_default();
+
+		Self {
+			method,
+			scheme: Scheme::None,
+			authority: String::new(),
+			path: path_segments,
+			params,
+			headers: MultiMap::<String, String>::default(),
+			version: DEFAULT_HTTP_VERSION.to_string(),
+		}
+	}
+
+	/// Creates a GET request for the given path
+	pub fn get(path: impl AsRef<str>) -> Self {
+		Self::new(HttpMethod::Get, path)
+	}
+
+	/// Creates a POST request for the given path
+	pub fn post(path: impl AsRef<str>) -> Self {
+		Self::new(HttpMethod::Post, path)
+	}
+
+	/// Creates a PUT request for the given path
+	pub fn put(path: impl AsRef<str>) -> Self {
+		Self::new(HttpMethod::Put, path)
+	}
+
+	/// Creates a DELETE request for the given path
+	pub fn delete(path: impl AsRef<str>) -> Self {
+		Self::new(HttpMethod::Delete, path)
+	}
+
+	/// Creates a PATCH request for the given path
+	pub fn patch(path: impl AsRef<str>) -> Self {
+		Self::new(HttpMethod::Patch, path)
+	}
+
+	/// Returns the HTTP method
+	pub fn method(&self) -> &HttpMethod { &self.method }
+
+	/// Sets the method
+	pub fn with_method(mut self, method: HttpMethod) -> Self {
+		self.method = method;
+		self
+	}
 
 	/// Returns the scheme
 	pub fn scheme(&self) -> &Scheme { &self.scheme }
@@ -193,6 +269,27 @@ impl Parts {
 	/// Returns a mutable reference to the headers
 	pub fn headers_mut(&mut self) -> &mut MultiMap<String, String> {
 		&mut self.headers
+	}
+
+	/// Adds a parameter and returns self for chaining
+	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
+		self.params.insert_key(key.into());
+		self
+	}
+
+	/// Adds a parameter and returns self for chaining
+	pub fn with_param(
+		mut self,
+		key: impl Into<String>,
+		value: impl Into<String>,
+	) -> Self {
+		self.params.insert(key.into(), value.into());
+		self
+	}
+
+	/// Adds a flag parameter
+	pub fn insert_flag(&mut self, key: impl Into<String>) {
+		self.params.insert_key(key.into());
 	}
 
 	/// Adds a parameter
@@ -313,272 +410,24 @@ impl Parts {
 	}
 }
 
-/// Builder for constructing [`Parts`], [`RequestParts`], or [`ResponseParts`].
-#[derive(Debug, Clone, Default)]
-pub struct PartsBuilder {
-	scheme: Scheme,
-	authority: String,
-	path: Vec<String>,
-	params: MultiMap<String, String>,
-	headers: MultiMap<String, String>,
-	version: Option<String>,
-}
 
-impl PartsBuilder {
-	/// Creates a new builder with default values
-	pub fn new() -> Self { Self::default() }
-
-	/// Sets the scheme
-	pub fn scheme(mut self, scheme: Scheme) -> Self {
-		self.scheme = scheme;
-		self
-	}
-
-	/// Sets the authority
-	pub fn authority(mut self, authority: impl Into<String>) -> Self {
-		self.authority = authority.into();
-		self
-	}
-
-	/// Sets the path from segments
-	pub fn path(mut self, path: Vec<String>) -> Self {
-		self.path = path;
-		self
-	}
-
-	/// Sets the path from a string, splitting by `/`
-	pub fn path_str(mut self, path: &str) -> Self {
-		self.path = split_path(path);
-		self
-	}
-
-	/// Adds a parameter
-	pub fn param(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.params.insert(key.into(), value.into());
-		self
-	}
-
-	/// Adds a flag parameter (parameter with no value)
-	pub fn flag(mut self, key: impl Into<String>) -> Self {
-		let key = key.into();
-		if !self.params.contains_key(&key) {
-			self.params.insert(key, String::new());
-		}
-		self
-	}
-
-	/// Adds a header
-	pub fn header(
-		mut self,
-		key: impl Into<String>,
-		value: impl Into<String>,
-	) -> Self {
-		self.headers.insert(key.into(), value.into());
-		self
-	}
-
-	/// Sets the version
-	pub fn version(mut self, version: impl Into<String>) -> Self {
-		self.version = Some(version.into());
-		self
-	}
-
-	/// Builds the [`Parts`]
-	pub fn build(self) -> Parts {
-		Parts {
-			scheme: self.scheme,
-			authority: self.authority,
-			path: self.path,
-			params: self.params,
-			headers: self.headers,
-			version: self
-				.version
-				.unwrap_or_else(|| DEFAULT_HTTP_VERSION.to_string()),
-		}
-	}
-
-	/// Builds [`RequestParts`] with the given method
-	pub fn build_request_parts(self, method: HttpMethod) -> RequestParts {
-		RequestParts {
-			method,
-			parts: self.build(),
-		}
-	}
-
-	/// Builds [`ResponseParts`] with the given status
-	pub fn build_response_parts(self, status: StatusCode) -> ResponseParts {
-		ResponseParts {
-			status,
-			parts: self.build(),
-		}
-	}
-}
-
-/// Request-specific parts including HTTP method.
-///
-/// This wraps [`Parts`] with request-specific data like the HTTP method.
-/// For CLI commands, the method defaults to [`HttpMethod::Get`].
-///
-/// # Deref
-///
-/// `RequestParts` implements `Deref<Target = Parts>`, so all methods
-/// on [`Parts`] are available directly:
-///
-/// ```
-/// # use beet_core::prelude::*;
-/// let parts = RequestParts::get("/api/users");
-/// assert_eq!(parts.path(), &["api", "users"]); // Deref to Parts
-/// assert_eq!(parts.method(), &HttpMethod::Get);
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RequestParts {
-	method: HttpMethod,
-	parts: Parts,
-}
-
-impl Default for RequestParts {
-	fn default() -> Self {
-		Self {
-			method: HttpMethod::Get,
-			parts: Parts::default(),
-		}
-	}
-}
-
-impl RequestParts {
-	/// Creates a new `RequestParts` with the given method and path or URI.
-	///
-	/// The input can be:
-	/// - A path like `/api/users`
-	/// - A full URI like `https://example.com/api/users`
-	/// - A CLI-style path like `users list`
-	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
-		let path_str = path.as_ref();
-
-		// Check if this is a full URI with scheme (http://, https://, etc.)
-		if path_str.contains("://") {
-			// Parse as full URI
-			#[cfg(feature = "http")]
-			if let Ok(uri) = path_str.parse::<http::Uri>() {
-				let scheme = Scheme::from(uri.scheme());
-				let authority = uri
-					.authority()
-					.map(|auth| auth.to_string())
-					.unwrap_or_default();
-				let path_segments = split_path(uri.path());
-				let params =
-					uri.query().map(parse_query_string).unwrap_or_default();
-
-				return Self {
-					method,
-					parts: Parts {
-						scheme,
-						authority,
-						path: path_segments,
-						params,
-						headers: MultiMap::<String, String>::default(),
-						version: DEFAULT_HTTP_VERSION.to_string(),
-					},
-				};
-			}
-		}
-
-		// Otherwise treat as path (may include query string)
-		let (path_only, query_str) = split_path_and_query(path_str);
-		let path_segments = split_path(path_only);
-		let params = query_str.map(parse_query_string).unwrap_or_default();
-
-		Self {
-			method,
-			parts: Parts {
-				scheme: Scheme::None,
-				authority: String::new(),
-				path: path_segments,
-				params,
-				headers: MultiMap::<String, String>::default(),
-				version: DEFAULT_HTTP_VERSION.to_string(),
-			},
-		}
-	}
-
-	/// Creates a GET request for the given path
-	pub fn get(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Get, path)
-	}
-
-	/// Creates a POST request for the given path
-	pub fn post(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Post, path)
-	}
-
-	/// Creates a PUT request for the given path
-	pub fn put(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Put, path)
-	}
-
-	/// Creates a DELETE request for the given path
-	pub fn delete(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Delete, path)
-	}
-
-	/// Creates a PATCH request for the given path
-	pub fn patch(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Patch, path)
-	}
-
-	/// Returns the HTTP method
-	pub fn method(&self) -> &HttpMethod { &self.method }
-
-	/// Returns a reference to the inner parts
-	pub fn parts(&self) -> &Parts { &self.parts }
-
-	/// Returns a mutable reference to the inner parts
-	pub fn parts_mut(&mut self) -> &mut Parts { &mut self.parts }
-
-	/// Consumes self and returns the inner parts
-	pub fn into_parts(self) -> Parts { self.parts }
-
-	/// Sets the method
-	pub fn with_method(mut self, method: HttpMethod) -> Self {
-		self.method = method;
-		self
-	}
-}
-
-impl std::ops::Deref for RequestParts {
-	type Target = Parts;
-	fn deref(&self) -> &Self::Target { &self.parts }
-}
-
-impl std::ops::DerefMut for RequestParts {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
-}
-
-/// Response-specific parts including HTTP status code.
-///
-/// This wraps [`Parts`] with response-specific data like the status code.
-///
-/// # Deref
-///
-/// `ResponseParts` implements `Deref<Target = Parts>`, so all methods
-/// on [`Parts`] are available directly.
+/// Response-specific parts including HTTP status code, headers, and version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseParts {
 	/// The HTTP status code of the response.
 	pub status: StatusCode,
-	/// The shared parts (headers, etc.).
-	pub parts: Parts,
+	/// HTTP headers
+	pub headers: MultiMap<String, String>,
+	/// The HTTP version
+	pub version: String,
 }
 
 impl Default for ResponseParts {
 	fn default() -> Self {
 		Self {
 			status: StatusCode::Ok,
-			parts: Parts::default(),
+			headers: default(),
+			version: DEFAULT_HTTP_VERSION.to_string(),
 		}
 	}
 }
@@ -588,7 +437,8 @@ impl ResponseParts {
 	pub fn new(status: StatusCode) -> Self {
 		Self {
 			status,
-			parts: Parts::default(),
+			headers: default(),
+			version: DEFAULT_HTTP_VERSION.to_string(),
 		}
 	}
 
@@ -612,26 +462,48 @@ impl ResponseParts {
 		self.status().to_exit_code()
 	}
 
-	/// Returns a mutable reference to the inner parts
-	pub fn parts_mut(&mut self) -> &mut Parts { &mut self.parts }
+	/// Returns the version string
+	pub fn version(&self) -> &str { &self.version }
 
-	/// Consumes self and returns the inner parts
-	pub fn into_parts(self) -> Parts { self.parts }
+	/// Returns all headers
+	pub fn headers(&self) -> &MultiMap<String, String> { &self.headers }
+
+	/// Returns a mutable reference to the headers
+	pub fn headers_mut(&mut self) -> &mut MultiMap<String, String> {
+		&mut self.headers
+	}
+
+	/// Adds a header
+	pub fn insert_header(
+		&mut self,
+		key: impl Into<String>,
+		value: impl Into<String>,
+	) {
+		self.headers.insert(key.into(), value.into());
+	}
+
+	/// Gets the first value for a header
+	pub fn get_header(&self, key: &str) -> Option<&str> {
+		self.headers
+			.get_vec(key)
+			.and_then(|vals| vals.first().map(|s| s.as_str()))
+	}
+
+	/// Gets all values for a header
+	pub fn get_headers(&self, key: &str) -> Option<&Vec<String>> {
+		self.headers.get_vec(key)
+	}
+
+	/// Checks if a header exists
+	pub fn has_header(&self, key: &str) -> bool {
+		self.headers.contains_key(key)
+	}
 
 	/// Sets the status code
 	pub fn with_status(mut self, status: StatusCode) -> Self {
 		self.status = status;
 		self
 	}
-}
-
-impl std::ops::Deref for ResponseParts {
-	type Target = Parts;
-	fn deref(&self) -> &Self::Target { &self.parts }
-}
-
-impl std::ops::DerefMut for ResponseParts {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
 }
 
 // ============================================================================
@@ -744,14 +616,12 @@ impl From<http::request::Parts> for RequestParts {
 
 		RequestParts {
 			method,
-			parts: Parts {
-				scheme,
-				authority,
-				path,
-				params,
-				headers,
-				version,
-			},
+			scheme,
+			authority,
+			path,
+			params,
+			headers,
+			version,
 		}
 	}
 }
@@ -774,14 +644,12 @@ impl From<&http::request::Parts> for RequestParts {
 
 		RequestParts {
 			method,
-			parts: Parts {
-				scheme,
-				authority,
-				path,
-				params,
-				headers,
-				version,
-			},
+			scheme,
+			authority,
+			path,
+			params,
+			headers,
+			version,
 		}
 	}
 }
@@ -798,14 +666,8 @@ impl From<http::response::Parts> for ResponseParts {
 
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
-			parts: Parts {
-				scheme: Scheme::None,
-				authority: String::new(),
-				path: Vec::new(),
-				params: MultiMap::default(),
-				headers,
-				version,
-			},
+			headers,
+			version,
 		}
 	}
 }
@@ -819,14 +681,8 @@ impl From<&http::response::Parts> for ResponseParts {
 
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
-			parts: Parts {
-				scheme: Scheme::None,
-				authority: String::new(),
-				path: Vec::new(),
-				params: MultiMap::default(),
-				headers,
-				version,
-			},
+			headers,
+			version,
 		}
 	}
 }
@@ -843,7 +699,7 @@ impl From<CliArgs> for RequestParts {
 		// Convert query HashMap to MultiMap before consuming cli
 		// We need to capture flags (keys with empty value vectors) as well
 		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
+		for (key, values) in &cli.params {
 			if values.is_empty() {
 				// Flag without value - insert with empty string to mark presence
 				params.insert(key.clone(), String::new());
@@ -856,15 +712,13 @@ impl From<CliArgs> for RequestParts {
 
 		RequestParts {
 			method: HttpMethod::Get, // CLI defaults to GET-like semantics
-			parts: Parts {
-				scheme: Scheme::Cli,
-				authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
-				path,
-				params,
-				headers: MultiMap::default(),
-				version: env_ext::var("CARGO_PKG_VERSION")
-					.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
-			},
+			scheme: Scheme::Cli,
+			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
+			path,
+			params,
+			headers: MultiMap::default(),
+			version: env_ext::var("CARGO_PKG_VERSION")
+				.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
 		}
 	}
 }
@@ -874,7 +728,7 @@ impl From<&CliArgs> for RequestParts {
 		let path = cli.path.clone();
 
 		let mut params = MultiMap::default();
-		for (key, values) in &cli.query {
+		for (key, values) in &cli.params {
 			if values.is_empty() {
 				params.insert(key.clone(), String::new());
 			} else {
@@ -886,14 +740,12 @@ impl From<&CliArgs> for RequestParts {
 
 		RequestParts {
 			method: HttpMethod::Get,
-			parts: Parts {
-				scheme: Scheme::Cli,
-				authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
-				path,
-				params,
-				headers: MultiMap::default(),
-				version: DEFAULT_CLI_VERSION.to_string(),
-			},
+			scheme: Scheme::Cli,
+			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
+			path,
+			params,
+			headers: MultiMap::default(),
+			version: DEFAULT_CLI_VERSION.to_string(),
 		}
 	}
 }
@@ -910,15 +762,15 @@ impl TryFrom<RequestParts> for http::request::Parts {
 		let method: http::Method = parts.method.into();
 
 		// Build URI from path and params
-		let uri_str = parts.parts.uri();
+		let uri_str = parts.uri();
 
 		let mut builder = http::Request::builder()
 			.method(method)
 			.uri(&uri_str)
-			.version(http_ext::parse_version(&parts.parts.version));
+			.version(http_ext::parse_version(&parts.version));
 
 		// Add headers
-		if let Ok(header_map) = multimap_to_header_map(&parts.parts.headers) {
+		if let Ok(header_map) = multimap_to_header_map(&parts.headers) {
 			for (key, value) in header_map.iter() {
 				builder = builder.header(key, value);
 			}
@@ -936,10 +788,10 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 	fn try_from(parts: ResponseParts) -> Result<Self, Self::Error> {
 		let mut builder = http::Response::builder()
 			.status(parts.status)
-			.version(http_ext::parse_version(&parts.parts.version));
+			.version(http_ext::parse_version(&parts.version));
 
 		// Add headers
-		if let Ok(header_map) = multimap_to_header_map(&parts.parts.headers) {
+		if let Ok(header_map) = multimap_to_header_map(&parts.headers) {
 			for (key, value) in header_map.iter() {
 				builder = builder.header(key, value);
 			}
@@ -959,8 +811,8 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn parts_default() {
-		let parts = Parts::default();
+	fn request_parts_default() {
+		let parts = RequestParts::default();
 		parts.path().xpect_empty();
 		parts.uri().xpect_eq("/");
 		parts.scheme().clone().xpect_eq(Scheme::None);
@@ -968,14 +820,13 @@ mod test {
 	}
 
 	#[test]
-	fn parts_builder() {
-		let parts = PartsBuilder::new()
-			.scheme(Scheme::Http)
-			.authority("example.com")
-			.path_str("/api/users/123")
-			.param("limit", "10")
-			.header("content-type", "application/json")
-			.build();
+	#[cfg(feature = "http")]
+	fn request_parts_with_headers_and_params() {
+		let mut parts = RequestParts::new(
+			HttpMethod::Get,
+			"http://example.com/api/users/123?limit=10",
+		);
+		parts.insert_header("content-type", "application/json");
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -992,11 +843,8 @@ mod test {
 	}
 
 	#[test]
-	fn parts_builder_request_parts() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("page", "1")
-			.build_request_parts(HttpMethod::Post);
+	fn request_parts_with_params() {
+		let parts = RequestParts::new(HttpMethod::Post, "/api/users?page=1");
 
 		(*parts.method()).xpect_eq(HttpMethod::Post);
 		parts
@@ -1007,10 +855,9 @@ mod test {
 
 	#[test]
 	#[cfg(feature = "http")]
-	fn parts_builder_response_parts() {
-		let parts = PartsBuilder::new()
-			.header("content-type", "text/html")
-			.build_response_parts(StatusCode::Ok);
+	fn response_parts_with_headers() {
+		let mut parts = ResponseParts::new(StatusCode::Ok);
+		parts.insert_header("content-type", "text/html");
 
 		parts.status().xpect_eq(StatusCode::Ok);
 		parts
@@ -1121,19 +968,16 @@ mod test {
 
 	#[test]
 	fn path_string() {
-		let parts = PartsBuilder::new().path_str("/api/users/123").build();
+		let parts = RequestParts::get("/api/users/123");
 		parts.path_string().xpect_eq("/api/users/123");
 
-		let empty_parts = Parts::default();
+		let empty_parts = RequestParts::default();
 		empty_parts.path_string().xpect_eq("/");
 	}
 
 	#[test]
 	fn query_string() {
-		let parts = PartsBuilder::new()
-			.param("limit", "10")
-			.param("offset", "20")
-			.build();
+		let parts = RequestParts::get("/?limit=10&offset=20");
 		let query = parts.query_string();
 		// Order may vary, so check both params are present
 		(&query).xpect_contains("limit=10");
@@ -1142,10 +986,7 @@ mod test {
 
 	#[test]
 	fn uri_construction() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("page", "1")
-			.build();
+		let parts = RequestParts::get("/api/users?page=1");
 		let uri = parts.uri();
 		(&uri).xpect_starts_with("/api/users?");
 		(&uri).xpect_contains("page=1");
@@ -1153,7 +994,7 @@ mod test {
 
 	#[test]
 	fn path_segments() {
-		let parts = PartsBuilder::new().path_str("/api/users/123").build();
+		let parts = RequestParts::get("/api/users/123");
 
 		parts.first_segment().unwrap().xpect_eq("api");
 		parts.last_segment().unwrap().xpect_eq("123");
@@ -1182,25 +1023,21 @@ mod test {
 	#[test]
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
-		let parts = PartsBuilder::new()
-			.path_str("/api/users")
-			.param("limit", "10")
-			.header("content-type", "application/json")
-			.build_request_parts(HttpMethod::Post);
+		let mut parts = RequestParts::post("/api/users?limit=10");
+		parts.insert_header("content-type", "application/json");
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
 		http_parts.method.xpect_eq(http::Method::POST);
 		http_parts.uri.path().xpect_eq("/api/users");
-		http_parts.uri.query().unwrap().xpect_eq("limit=10");
 	}
 
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
-		let parts = PartsBuilder::new()
-			.header("content-type", "application/json")
-			.build_response_parts(StatusCode::Http(http::StatusCode::CREATED));
+		let mut parts =
+			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
+		parts.insert_header("content-type", "application/json");
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -1208,33 +1045,29 @@ mod test {
 	}
 
 	#[test]
-	fn request_parts_deref() {
+	fn request_parts_access() {
 		let parts = RequestParts::get("/api/users");
-		// Access Parts methods via Deref
+		// Access RequestParts methods directly
 		parts.path().len().xpect_eq(2);
 		parts.path_string().xpect_eq("/api/users");
 	}
 
 	#[test]
-	fn response_parts_deref() {
+	fn response_parts_headers() {
 		let mut parts = ResponseParts::ok();
-		// Access Parts methods via DerefMut
-		parts
-			.parts_mut()
-			.headers
-			.insert("x-custom".to_string(), "value".to_string());
+		parts.insert_header("x-custom", "value");
 		parts.get_header("x-custom").unwrap().xpect_eq("value");
 	}
 
 	#[test]
 	fn has_body_detection() {
-		let mut parts = Parts::default();
+		let mut parts = RequestParts::default();
 		parts.has_body().xpect_false();
 
 		parts.insert_header("content-length", "5");
 		parts.has_body().xpect_true();
 
-		let mut parts2 = Parts::default();
+		let mut parts2 = RequestParts::default();
 		parts2.insert_header("transfer-encoding", "chunked");
 		parts2.has_body().xpect_true();
 	}

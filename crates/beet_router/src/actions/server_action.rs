@@ -19,9 +19,9 @@ use serde::de::DeserializeOwned;
 pub struct ServerAction;
 
 
-/// Trait for converting handler return types into HTTP responses.
+/// Trait for converting handler return types into responses.
 pub trait IntoServerActionOut<M> {
-	/// Converts this value into an HTTP [`Response`].
+	/// Converts this value into a [`Response`].
 	fn into_action_response(self) -> Response;
 }
 /// Marker for converting [`Result<T, E>`] where both `T` and `E` are serializable.

@@ -128,7 +128,7 @@ where
 	}
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl From<serde_json::Error> for HttpError {
 	fn from(err: serde_json::Error) -> HttpError { Self::from_opaque(err) }
 }

@@ -65,12 +65,8 @@ pub fn flow_exchange_stream(func: impl BundleFunc) -> impl Bundle {
 /// Sets `Content-Type: text/event-stream` and `Cache-Control: no-cache`.
 pub fn flow_exchange_sse(func: impl BundleFunc) -> impl Bundle {
 	flow_exchange_stream_with(func, |res| {
-		res.parts
-			.parts_mut()
-			.insert_header("content-type", "text/event-stream");
-		res.parts
-			.parts_mut()
-			.insert_header("cache-control", "no-cache");
+		res.parts.insert_header("content-type", "text/event-stream");
+		res.parts.insert_header("cache-control", "no-cache");
 	})
 }
 

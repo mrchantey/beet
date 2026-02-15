@@ -122,7 +122,7 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		if arr.length() == 2 {
 			let key = arr.get(0).as_string().unwrap_or_default();
 			let value = arr.get(1).as_string().unwrap_or_default();
-			parts.parts_mut().insert_header(key.to_lowercase(), value);
+			parts.insert_header(key.to_lowercase(), value);
 		}
 	}
 
