@@ -19,9 +19,9 @@
 //! - TUI — via [`TuiRenderer`] (requires `tui` feature)
 mod card_walker;
 pub use card_walker::*;
-mod markdown_renderer;
-pub use markdown_renderer::*;
+mod render_markdown;
+pub use render_markdown::*;
 #[cfg(feature = "tui")]
-mod tui_renderer;
+mod render_tui;
 #[cfg(feature = "tui")]
-pub use tui_renderer::*;
+pub use render_tui::*;
