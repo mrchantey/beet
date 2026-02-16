@@ -4,12 +4,6 @@ use beet_core::exports::async_channel::Sender;
 use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
 
-/// Marker component indicating this tool supports [`Request`]/[`Response`]
-/// calls via automatic serialization. Added by [`exchange_tool`] or
-/// automatically by [`tool`] when the `interface` feature is enabled.
-#[derive(Debug, Component)]
-pub struct ExchangeToolMarker;
-
 
 /// Create a tool from a handler implementing [`IntoToolHandler`],
 /// adding an associated [`ToolMeta`] which is required for tool calling.
@@ -68,7 +62,12 @@ pub struct ToolMeta {
 	output: TypeMeta,
 }
 
-
+impl ToolMeta {
+	pub fn is_exchange(&self) -> bool {
+		self.input.type_id() == std::any::TypeId::of::<Request>()
+			&& self.output.type_id() == std::any::TypeId::of::<Response>()
+	}
+}
 /// Lightweight type metadata using [`TypeId`](std::any::TypeId) for comparison
 /// and [`type_name`](std::any::type_name) for display.
 #[derive(Debug, Copy, Clone)]
@@ -431,36 +430,19 @@ pub impl EntityWorldMut<'_> {
 		input: In,
 		out_handler: ToolOutHandler<Out>,
 	) -> Result {
-		let meta = self.get::<ToolMeta>().ok_or_else(|| {
-			bevyhow!("No ToolMeta on entity, cannot send tool call.")
-		})?;
-
-		// TODO this is such an antipattern, exchange tool must be seperated
-		let is_exchange_call = TypeMeta::of::<In>()
-			== TypeMeta::of::<Request>()
-			&& TypeMeta::of::<Out>() == TypeMeta::of::<Response>();
-
-		if is_exchange_call {
-			// allow Request/Response calls only if the entity has an exchange handler
-			#[cfg(feature = "interface")]
-			{
-				if !self.contains::<ExchangeToolMarker>() {
-					bevybail!(
-						"Tool does not support Request/Response calls. \
-						 Use exchange_tool() to enable serialized exchange."
-					);
-				}
-			}
-			#[cfg(not(feature = "interface"))]
-			{
-				bevybail!(
-					"Request/Response exchange calls require the 'interface' feature."
-				);
-			}
+		use std::any::TypeId;
+		if TypeId::of::<In>() == TypeId::of::<Request>()
+			&& TypeId::of::<Out>() == TypeId::of::<Response>()
+			&& self.contains::<ExchangeToolHandler>()
+		{
+			// Its an exchange request and this is an exchange tool, this also counts as a match
 		} else {
-			meta.assert_match::<In, Out>()?;
+			self.get::<ToolMeta>()
+				.ok_or_else(|| {
+					bevyhow!("No ToolMeta on entity, cannot send tool call.")
+				})?
+				.assert_match::<In, Out>()?;
 		}
-		// meta.assert_match::<In, Out>()?;
 
 		self.trigger(|entity| ToolIn::new(entity, input, out_handler));
 		Ok(())

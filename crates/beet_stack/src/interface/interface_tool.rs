@@ -44,10 +44,14 @@ impl Interface {}
 /// Create an interface from a handler, inserting an [`Interface`]
 /// pointing to itself as the current card.
 pub fn interface() -> impl Bundle {
+	(Interface::default(), RouteHidden, exchange_fallback())
+}
+/// A Request/Response tool that will try each children until an
+/// Ontcome::Response is reached, or else returns a NotFound.
+/// Errors are converted to a response.
+pub fn exchange_fallback() -> impl Bundle {
 	(
-		Interface::default(),
-		ExchangeToolMarker,
-		RouteHidden,
+		// Name::new("Exchange Fallback"),
 		direct_tool(async |request: AsyncToolContext<Request>| -> Response {
 			match fallback::<Request, Response>(request).await {
 				// a response matched, which may be an opinionated not found response
@@ -60,7 +64,7 @@ pub fn interface() -> impl Bundle {
 					format!("Resource not found: {}", req.path_string()),
 					"text/plain",
 				),
-				// if the returned error is a HttpError its status code will be used.
+				// if the returned error is a HttpError, its status code will be used.
 				Err(err) => HttpError::from_opaque(err).into_response(),
 			}
 		}),
@@ -95,7 +99,7 @@ pub fn default_interface() -> impl Bundle {
 				RouteHidden,
 				direct_tool(navigate_handler)
 			),
-			(Name::new("Router"), RouteHidden, direct_tool(route_handler)),
+			try_router(),
 			(
 				Name::new("Contextual Not Found"),
 				RouteHidden,
@@ -150,12 +154,10 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_tool_request() {
 		StackPlugin::world()
-			.spawn((Card, default_interface(), children![increment(
-				FieldRef::new("count")
-			)]))
-			.call::<Request, Response>(
-				Request::from_cli_str("increment").unwrap(),
-			)
+			.spawn((default_interface(), children![increment(FieldRef::new(
+				"count"
+			))]))
+			.call::<Request, Response>(Request::get("increment"))
 			.await
 			.unwrap()
 			.status()

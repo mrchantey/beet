@@ -63,6 +63,11 @@ where
 	)
 }
 
+/// Marker component for the exchange tool handler, which bridges Request/Response
+/// calls to the inner typed handler.
+#[derive(Component)]
+pub struct ExchangeToolHandler;
+
 /// Creates the observer bundle that bridges `Request`/`Response` tool calls
 /// to the inner typed `In`/`Out` handler.
 ///
@@ -79,7 +84,7 @@ where
 	Out: 'static + Send + Sync + serde::Serialize,
 {
 	(
-		ExchangeToolMarker,
+		ExchangeToolHandler,
 		OnSpawn::observe(
 			move |mut ev: On<ToolIn<Request, Response>>,
 			      mut commands: AsyncCommands|

@@ -133,9 +133,6 @@ pub struct ToolNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
-	/// Whether this tool also accepts opaque [`Request`]/[`Response`] calls,
-	/// ie created via [`exchange_tool`] or via `tool()` with the `interface` feature.
-	pub is_exchange: bool,
 }
 
 /// The query tuple type used to collect tool components for [`ToolNode::from_query`].
@@ -145,13 +142,12 @@ pub type ToolQueryItem<'a> = (
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
-	bool,
 );
 
 impl ToolNode {
 	/// Create a [`ToolNode`] from the full query result tuple.
 	pub fn from_query(
-		(entity, meta, path, params, method, is_exchange): ToolQueryItem,
+		(entity, meta, path, params, method): ToolQueryItem,
 	) -> Self {
 		Self {
 			entity,
@@ -159,7 +155,6 @@ impl ToolNode {
 			params: params.clone(),
 			path: path.clone(),
 			method: method.cloned(),
-			is_exchange,
 		}
 	}
 }
@@ -588,7 +583,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -596,7 +590,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 		];
 		RouteTree::from_nodes(nodes)
@@ -615,7 +608,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -623,7 +615,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 		];
 		RouteTree::from_nodes(nodes)
@@ -642,7 +633,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 			RouteNode::Tool(ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -650,7 +640,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
-				is_exchange: false,
 			}),
 		];
 		let tree = RouteTree::from_nodes(nodes).unwrap();

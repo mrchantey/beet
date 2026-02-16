@@ -88,6 +88,16 @@ impl OnSpawn {
 			entity.insert(bundle);
 		})
 	}
+	/// Inserts a bundle into the entities children on spawn,
+	/// avoiding bevy's duplicate component gotya with children!
+	pub fn insert_child(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world.spawn((bundle, ChildOf(id)));
+			});
+		})
+	}
 
 	/// Inserts the bundle if it is `Some`.
 	pub fn insert_option(bundle: Option<impl Bundle>) -> Self {

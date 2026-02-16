@@ -89,7 +89,6 @@ pub fn insert_route_tree(
 			&PathPattern,
 			&ParamsPattern,
 			Option<&HttpMethod>,
-			Has<ExchangeToolMarker>,
 		),
 		Without<RouteHidden>,
 	>,
