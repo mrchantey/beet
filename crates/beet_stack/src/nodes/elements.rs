@@ -27,8 +27,10 @@
 //! - [`MathInline`] - inline math
 //! - [`HtmlInline`] - raw inline HTML pass-through
 use super::DisplayBlock;
+use super::DisplayInline;
 use super::TextAlignment;
 use super::node::Node;
+use super::node::NodeKind;
 use beet_core::prelude::*;
 
 
@@ -54,7 +56,7 @@ use beet_core::prelude::*;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<BlockQuote>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::BlockQuote))]
 pub struct BlockQuote;
 
 
@@ -65,7 +67,7 @@ pub struct BlockQuote;
 /// optional `language` field enables syntax highlighting.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<CodeBlock>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::CodeBlock))]
 pub struct CodeBlock {
 	/// The language tag from the opening fence, if any.
 	pub language: Option<String>,
@@ -92,7 +94,7 @@ impl CodeBlock {
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<ListMarker>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::ListMarker))]
 pub struct ListMarker {
 	/// Whether the list is ordered (numbered).
 	pub ordered: bool,
@@ -136,7 +138,7 @@ impl ListMarker {
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<ListItem>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::ListItem))]
 pub struct ListItem;
 
 
@@ -158,7 +160,7 @@ pub struct ListItem;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<ThematicBreak>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::ThematicBreak))]
 pub struct ThematicBreak;
 
 
@@ -168,7 +170,7 @@ pub struct ThematicBreak;
 /// following the same parent-child text pattern as other content.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(Node = Node::new::<Image>())]
+#[require(Node = Node::new(NodeKind::Image))]
 pub struct Image {
 	/// The image source URL or path.
 	pub src: String,
@@ -198,7 +200,7 @@ impl Image {
 /// Column alignments are stored here for renderers to reference.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<Table>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::Table))]
 pub struct Table {
 	/// Per-column alignment, indexed by column position.
 	pub alignments: Vec<TextAlignment>,
@@ -222,7 +224,7 @@ pub struct Table {
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<TableHead>())]
+#[require(Node = Node::new(NodeKind::TableHead))]
 pub struct TableHead;
 
 
@@ -243,7 +245,7 @@ pub struct TableHead;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<TableRow>())]
+#[require(Node = Node::new(NodeKind::TableRow))]
 pub struct TableRow;
 
 
@@ -255,7 +257,7 @@ pub struct TableRow;
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<TableCell>())]
+#[require(Node = Node::new(NodeKind::TableCell))]
 pub struct TableCell {
 	/// Whether this cell is a header cell (`<th>` vs `<td>`).
 	pub header: bool,
@@ -270,7 +272,7 @@ pub struct TableCell {
 /// footnote content (typically [`Paragraph`](super::Paragraph)).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<FootnoteDefinition>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::FootnoteDefinition))]
 pub struct FootnoteDefinition {
 	/// The footnote label, matching the [`FootnoteRef::label`].
 	pub label: String,
@@ -295,7 +297,7 @@ pub struct FootnoteDefinition {
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<DefinitionList>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::DefinitionList))]
 pub struct DefinitionList;
 
 
@@ -315,7 +317,7 @@ pub struct DefinitionList;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<DefinitionTitle>())]
+#[require(Node = Node::new(NodeKind::DefinitionTitle))]
 pub struct DefinitionTitle;
 
 
@@ -335,7 +337,7 @@ pub struct DefinitionTitle;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<DefinitionDetails>())]
+#[require(Node = Node::new(NodeKind::DefinitionDetails))]
 pub struct DefinitionDetails;
 
 
@@ -345,7 +347,7 @@ pub struct DefinitionDetails;
 /// deserialize this into structured data as needed.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(Node = Node::new::<MetadataBlock>())]
+#[require(Node = Node::new(NodeKind::MetadataBlock))]
 pub struct MetadataBlock {
 	/// Whether the metadata is YAML or TOML.
 	pub kind: MetadataKind,
@@ -370,7 +372,7 @@ pub enum MetadataKind {
 /// Non-HTML renderers may choose to ignore or sanitize this.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<HtmlBlock>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::HtmlBlock))]
 pub struct HtmlBlock(pub String);
 
 
@@ -392,7 +394,7 @@ pub struct HtmlBlock(pub String);
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<MathDisplay>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::MathDisplay))]
 pub struct MathDisplay;
 
 
@@ -418,6 +420,7 @@ pub struct MathDisplay;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::Strikethrough), DisplayInline)]
 pub struct Strikethrough;
 
 
@@ -438,6 +441,7 @@ pub struct Strikethrough;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::Superscript), DisplayInline)]
 pub struct Superscript;
 
 
@@ -458,6 +462,7 @@ pub struct Superscript;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::Subscript), DisplayInline)]
 pub struct Subscript;
 
 
@@ -479,6 +484,7 @@ pub struct Subscript;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::HardBreak))]
 pub struct HardBreak;
 
 
@@ -500,6 +506,7 @@ pub struct HardBreak;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::SoftBreak))]
 pub struct SoftBreak;
 
 
@@ -509,6 +516,7 @@ pub struct SoftBreak;
 /// matching label.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::FootnoteRef))]
 pub struct FootnoteRef {
 	/// The footnote label that links to a [`FootnoteDefinition`].
 	pub label: String,
@@ -533,6 +541,7 @@ pub struct FootnoteRef {
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::MathInline), DisplayInline)]
 pub struct MathInline;
 
 
@@ -541,4 +550,5 @@ pub struct MathInline;
 /// Non-HTML renderers may ignore or sanitize this content.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
+#[require(Node = Node::new(NodeKind::HtmlInline))]
 pub struct HtmlInline(pub String);

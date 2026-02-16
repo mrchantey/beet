@@ -8,50 +8,49 @@
 //!
 //! # Module Structure
 //!
-//! - [`node`] - Core [`Node`] component with type invariance enforcement
+//! - [`node`] - Core [`Node`] component with [`NodeKind`] dispatch enum
 //! - [`text`] - [`TextNode`], [`Heading`], [`Paragraph`], and semantic markers
 //! - [`elements`] - Block and inline content elements (lists, tables, images, etc.)
 //! - [`form`] - Interactive form controls (buttons, checkboxes)
 //! - [`layout`] - Display and layout primitives ([`DisplayBlock`], [`TextAlignment`])
-//! - [`content_macro`] - The [`content!`] macro for ergonomic content composition
+//! - [`style`] - [`InlineModifier`] bitflags, [`InlineStyle`], and [`VisitContext`]
+//! - [`content_macro`] - The [`content!`] macro for simple bundle composition
 //!
 //! # Node Invariance
 //!
 //! Every node type requires a [`Node`] component that records its
-//! concrete [`TypeId`](std::any::TypeId). Nodes are invariant — they
-//! must not change type after creation. If a different node type is
-//! needed, the entity must be despawned and a new one spawned.
+//! concrete [`NodeKind`]. Nodes are invariant — they must not change
+//! type after creation. If a different node type is needed, the
+//! entity must be despawned and a new one spawned.
 //!
-//! # Quick Start
+//! # Inline Container Pattern
+//!
+//! Inline marker components ([`Important`], [`Emphasize`], [`Code`],
+//! [`Link`], etc.) and [`TextNode`] are mutually exclusive on the
+//! same entity, following the HTML model. Inline markers are
+//! containers whose children include [`TextNode`] entities:
 //!
 //! ```
 //! use beet_stack::prelude::*;
 //! use beet_core::prelude::*;
 //!
-//! // Static text with semantic markers
-//! let greeting = content![
-//!     "Hello, ",
-//!     (Important, "world"),
-//!     "!"
-//! ];
+//! // Correct: Important is a container with TextNode child
+//! let bold = (Important, children![TextNode::new("bold")]);
 //!
-//! // Dynamic text bound to a document field
-//! let counter = content![
-//!     "Count: ",
-//!     FieldRef::new("count").init_with(Value::I64(0))
-//! ];
+//! // For ergonomic markdown-based content, use the markdown! macro:
+//! // let root = markdown!(world, "Hello **world**!");
 //! ```
-//!
-//! [`content!`]: crate::content
 pub mod content_macro;
 mod elements;
 mod form;
 mod layout;
 pub(crate) mod node;
+mod style;
 mod text;
 pub use content_macro::*;
 pub use elements::*;
 pub use form::*;
 pub use layout::*;
 pub use node::*;
+pub use style::*;
 pub use text::*;

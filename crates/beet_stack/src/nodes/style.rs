@@ -1,0 +1,367 @@
+//! Inline text styling and shared visitor context.
+//!
+//! [`InlineModifier`] is a compact bitflag representation of inline
+//! formatting markers ([`Important`](super::Important),
+//! [`Emphasize`](super::Emphasize), etc.). [`InlineStyle`] pairs
+//! modifiers with an optional [`Link`](super::Link) to fully
+//! describe the inline formatting of a [`TextNode`](super::TextNode).
+//!
+//! [`VisitContext`] holds traversal state shared between renderers,
+//! including the inline style stack, code block state, list nesting,
+//! and heading level. The [`CardWalker`](crate::renderers::CardWalker)
+//! maintains this context and passes it to
+//! [`CardVisitor`](crate::renderers::CardVisitor) methods so
+//! renderers only track their own rendering-specific state.
+//!
+//! Merging two styles is a simple bitwise OR for the modifiers,
+//! which makes style stack operations efficient and avoids the
+//! error-prone field-by-field approach.
+use super::*;
+use beet_core::prelude::*;
+use bitflags::bitflags;
+use std::fmt;
+
+bitflags! {
+	/// Inline text formatting modifiers.
+	///
+	/// Each flag corresponds to an inline marker component:
+	///
+	/// | Flag            | Component                            |
+	/// |-----------------|--------------------------------------|
+	/// | `BOLD`          | [`Important`](super::Important)      |
+	/// | `ITALIC`        | [`Emphasize`](super::Emphasize)      |
+	/// | `CODE`          | [`Code`](super::Code)                |
+	/// | `QUOTE`         | [`Quote`](super::Quote)              |
+	/// | `STRIKETHROUGH` | [`Strikethrough`](super::Strikethrough) |
+	/// | `SUPERSCRIPT`   | [`Superscript`](super::Superscript)  |
+	/// | `SUBSCRIPT`     | [`Subscript`](super::Subscript)      |
+	/// | `MATH_INLINE`   | [`MathInline`](super::MathInline)    |
+	#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+	pub struct InlineModifier: u16 {
+		/// Strong importance, ie HTML `<strong>`.
+		const BOLD          = 0b0000_0000_0001;
+		/// Stress emphasis, ie HTML `<em>`.
+		const ITALIC        = 0b0000_0000_0010;
+		/// Inline code fragment, ie HTML `<code>`.
+		const CODE          = 0b0000_0000_0100;
+		/// Inline quotation, ie HTML `<q>`.
+		const QUOTE         = 0b0000_0000_1000;
+		/// Struck-through text, ie HTML `<del>`.
+		const STRIKETHROUGH = 0b0000_0001_0000;
+		/// Superscript text, ie HTML `<sup>`.
+		const SUPERSCRIPT   = 0b0000_0010_0000;
+		/// Subscript text, ie HTML `<sub>`.
+		const SUBSCRIPT     = 0b0000_0100_0000;
+		/// Inline math, ie `$...$`.
+		const MATH_INLINE   = 0b0000_1000_0000;
+	}
+}
+
+impl fmt::Debug for InlineModifier {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if self.is_empty() {
+			return write!(f, "NONE");
+		}
+		bitflags::parser::to_writer(self, f)
+	}
+}
+
+/// Complete inline formatting for a text span.
+///
+/// Combines [`InlineModifier`] bitflags with an optional [`Link`]
+/// to fully describe how a [`TextNode`](super::TextNode) should be
+/// rendered.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct InlineStyle {
+	/// Bitflag modifiers (bold, italic, code, etc.).
+	pub modifiers: InlineModifier,
+	/// The entity carries a [`Link`] component.
+	pub link: Option<Link>,
+}
+
+impl InlineStyle {
+	/// No formatting applied.
+	pub fn plain() -> Self { Self::default() }
+
+	/// Returns true if no inline formatting is applied.
+	pub fn is_plain(&self) -> bool {
+		self.modifiers.is_empty() && self.link.is_none()
+	}
+
+	/// Check whether the given modifier flag is set.
+	pub fn contains(&self, modifier: InlineModifier) -> bool {
+		self.modifiers.contains(modifier)
+	}
+
+	/// Merge two styles, combining modifier flags with bitwise OR
+	/// and preferring `other`'s link if present.
+	///
+	/// Used to inherit inline markers from ancestor containers
+	/// (eg an [`Important`](super::Important) parent entity) onto
+	/// descendant [`TextNode`](super::TextNode) entities via the
+	/// style stack.
+	pub fn merge(&self, other: &Self) -> Self {
+		Self {
+			modifiers: self.modifiers | other.modifiers,
+			link: other.link.clone().or_else(|| self.link.clone()),
+		}
+	}
+}
+
+impl From<InlineModifier> for InlineStyle {
+	fn from(modifiers: InlineModifier) -> Self {
+		Self {
+			modifiers,
+			link: None,
+		}
+	}
+}
+
+
+// ---------------------------------------------------------------------------
+// List context
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of a single list level during traversal.
+///
+/// Shared between renderers via [`VisitContext`] so they don't each
+/// need to maintain their own list stack.
+#[derive(Debug, Clone)]
+pub struct ListCtx {
+	/// Whether this is an ordered (numbered) list.
+	pub ordered: bool,
+	/// Starting number for ordered list.
+	pub start: u64,
+	/// Current item index within the list (0-based).
+	pub current_index: u64,
+}
+
+impl ListCtx {
+	/// The display number for the current item in an ordered list.
+	pub fn current_number(&self) -> u64 { self.start + self.current_index }
+}
+
+
+// ---------------------------------------------------------------------------
+// Visit context
+// ---------------------------------------------------------------------------
+
+/// Shared traversal state passed to [`CardVisitor`](crate::renderers::CardVisitor) methods.
+///
+/// Maintained by [`CardWalker`](crate::renderers::CardWalker) during
+/// depth-first traversal. Renderers read this context instead of
+/// tracking visitor-level state themselves.
+///
+/// # Style Stack
+///
+/// When the walker enters an inline container (eg [`Important`](super::Important)
+/// without a [`TextNode`](super::TextNode)), it pushes that container's
+/// style onto the stack. [`effective_style`](Self::effective_style)
+/// merges all stack entries to produce the current inline formatting.
+#[derive(Debug, Default, Clone)]
+pub struct VisitContext {
+	/// Stack of inline styles from ancestor containers.
+	style_stack: Vec<InlineStyle>,
+	/// Whether the walker is inside a [`CodeBlock`](super::CodeBlock).
+	pub in_code_block: bool,
+	/// Nested list context stack.
+	list_stack: Vec<ListCtx>,
+	/// Current heading level, or 0 if not inside a heading.
+	heading_level: u8,
+}
+
+impl VisitContext {
+	/// Push an inline style onto the stack when entering a container.
+	pub fn push_style(&mut self, style: InlineStyle) {
+		self.style_stack.push(style);
+	}
+
+	/// Pop the top inline style when leaving a container.
+	pub fn pop_style(&mut self) { self.style_stack.pop(); }
+
+	/// Compute the effective inline style by merging all stack entries.
+	pub fn effective_style(&self) -> InlineStyle {
+		let mut result = InlineStyle::plain();
+		for entry in &self.style_stack {
+			result = result.merge(entry);
+		}
+		result
+	}
+
+	/// Push a new list context when entering a list.
+	pub fn push_list(&mut self, ordered: bool, start: u64) {
+		self.list_stack.push(ListCtx {
+			ordered,
+			start,
+			current_index: 0,
+		});
+	}
+
+	/// Pop the current list context when leaving a list.
+	pub fn pop_list(&mut self) { self.list_stack.pop(); }
+
+	/// The current (innermost) list context, if inside a list.
+	pub fn current_list(&self) -> Option<&ListCtx> { self.list_stack.last() }
+
+	/// Mutable access to the current list context, eg to increment
+	/// the item index.
+	pub fn current_list_mut(&mut self) -> Option<&mut ListCtx> {
+		self.list_stack.last_mut()
+	}
+
+	/// Current list nesting depth.
+	pub fn list_depth(&self) -> usize { self.list_stack.len() }
+
+	/// Set the heading level when entering a heading.
+	pub fn set_heading_level(&mut self, level: u8) {
+		self.heading_level = level;
+	}
+
+	/// Clear the heading level when leaving a heading.
+	pub fn clear_heading_level(&mut self) { self.heading_level = 0; }
+
+	/// Current heading level, or 0 if not inside a heading.
+	pub fn heading_level(&self) -> u8 { self.heading_level }
+}
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn plain_style() {
+		let style = InlineStyle::plain();
+		style.is_plain().xpect_true();
+		style.modifiers.is_empty().xpect_true();
+	}
+
+	#[test]
+	fn single_modifier() {
+		let style = InlineStyle::from(InlineModifier::BOLD);
+		style.is_plain().xpect_false();
+		style.contains(InlineModifier::BOLD).xpect_true();
+		style.contains(InlineModifier::ITALIC).xpect_false();
+	}
+
+	#[test]
+	fn combined_modifiers() {
+		let mods = InlineModifier::BOLD | InlineModifier::ITALIC;
+		let style = InlineStyle::from(mods);
+		style.contains(InlineModifier::BOLD).xpect_true();
+		style.contains(InlineModifier::ITALIC).xpect_true();
+		style.contains(InlineModifier::CODE).xpect_false();
+	}
+
+	#[test]
+	fn merge_combines_flags() {
+		let base =
+			InlineStyle::from(InlineModifier::BOLD | InlineModifier::CODE);
+		let overlay = InlineStyle::from(InlineModifier::ITALIC);
+		let merged = base.merge(&overlay);
+		merged.contains(InlineModifier::BOLD).xpect_true();
+		merged.contains(InlineModifier::ITALIC).xpect_true();
+		merged.contains(InlineModifier::CODE).xpect_true();
+	}
+
+	#[test]
+	fn merge_prefers_other_link() {
+		let base = InlineStyle {
+			modifiers: InlineModifier::empty(),
+			link: Some(Link::new("https://a.com")),
+		};
+		let overlay = InlineStyle {
+			modifiers: InlineModifier::empty(),
+			link: Some(Link::new("https://b.com")),
+		};
+		let merged = base.merge(&overlay);
+		merged.link.unwrap().href.xpect_eq("https://b.com");
+	}
+
+	#[test]
+	fn merge_falls_back_to_base_link() {
+		let base = InlineStyle {
+			modifiers: InlineModifier::empty(),
+			link: Some(Link::new("https://a.com")),
+		};
+		let overlay = InlineStyle::plain();
+		let merged = base.merge(&overlay);
+		merged.link.unwrap().href.xpect_eq("https://a.com");
+	}
+
+	#[test]
+	fn modifier_debug_empty() {
+		let mods = InlineModifier::empty();
+		format!("{mods:?}").xpect_eq("NONE");
+	}
+
+	#[test]
+	fn modifier_debug_flags() {
+		let mods = InlineModifier::BOLD | InlineModifier::ITALIC;
+		let dbg = format!("{mods:?}");
+		dbg.as_str().xpect_contains("BOLD");
+		dbg.as_str().xpect_contains("ITALIC");
+	}
+
+	#[test]
+	fn visit_context_style_stack() {
+		let mut ctx = VisitContext::default();
+		ctx.effective_style().is_plain().xpect_true();
+
+		ctx.push_style(InlineModifier::BOLD.into());
+		ctx.effective_style()
+			.contains(InlineModifier::BOLD)
+			.xpect_true();
+
+		ctx.push_style(InlineModifier::ITALIC.into());
+		let eff = ctx.effective_style();
+		eff.contains(InlineModifier::BOLD).xpect_true();
+		eff.contains(InlineModifier::ITALIC).xpect_true();
+
+		ctx.pop_style();
+		ctx.effective_style()
+			.contains(InlineModifier::ITALIC)
+			.xpect_false();
+		ctx.effective_style()
+			.contains(InlineModifier::BOLD)
+			.xpect_true();
+
+		ctx.pop_style();
+		ctx.effective_style().is_plain().xpect_true();
+	}
+
+	#[test]
+	fn visit_context_list_stack() {
+		let mut ctx = VisitContext::default();
+		ctx.current_list().xpect_none();
+		ctx.list_depth().xpect_eq(0);
+
+		ctx.push_list(false, 1);
+		ctx.list_depth().xpect_eq(1);
+		ctx.current_list().unwrap().ordered.xpect_false();
+
+		ctx.push_list(true, 5);
+		ctx.list_depth().xpect_eq(2);
+		ctx.current_list().unwrap().ordered.xpect_true();
+		ctx.current_list().unwrap().current_number().xpect_eq(5);
+
+		ctx.current_list_mut().unwrap().current_index += 1;
+		ctx.current_list().unwrap().current_number().xpect_eq(6);
+
+		ctx.pop_list();
+		ctx.list_depth().xpect_eq(1);
+		ctx.current_list().unwrap().ordered.xpect_false();
+	}
+
+	#[test]
+	fn visit_context_heading_level() {
+		let mut ctx = VisitContext::default();
+		ctx.heading_level().xpect_eq(0);
+
+		ctx.set_heading_level(2);
+		ctx.heading_level().xpect_eq(2);
+
+		ctx.clear_heading_level();
+		ctx.heading_level().xpect_eq(0);
+	}
+}

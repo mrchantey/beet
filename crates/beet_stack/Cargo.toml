@@ -25,6 +25,7 @@ bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 variadics_please.workspace = true
+bitflags = "2"
 
 serde = {workspace = true, optional=true}
 bevy_ratatui = {workspace = true, optional=true}

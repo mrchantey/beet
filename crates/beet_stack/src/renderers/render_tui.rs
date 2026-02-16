@@ -41,6 +41,9 @@ use std::ops::ControlFlow;
 /// vertical space from `area` as each block-level element is
 /// rendered. Inline formatting from [`InlineStyle`] is translated
 /// to ratatui [`Style`] modifiers.
+///
+/// Traversal state like heading level, code block flag, and list
+/// nesting is read from [`VisitContext`] rather than tracked locally.
 pub struct TuiRenderer<'buf> {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
@@ -50,20 +53,8 @@ pub struct TuiRenderer<'buf> {
 	style_stack: Vec<Style>,
 	/// Current accumulated spans for the active line/block.
 	spans: Vec<Span<'static>>,
-	/// Whether we are inside a code block.
-	in_code_block: bool,
-	/// Tracks list nesting: `(ordered, start, current_index)`.
-	list_stack: Vec<ListCtx>,
 	/// Whether we are inside a list item collecting text.
 	in_list_item: bool,
-	/// Current heading level (0 = not in a heading).
-	heading_level: u8,
-}
-
-struct ListCtx {
-	ordered: bool,
-	start: u64,
-	current_index: u64,
 }
 
 impl<'buf> TuiRenderer<'buf> {
@@ -74,29 +65,26 @@ impl<'buf> TuiRenderer<'buf> {
 			buf,
 			style_stack: Vec::new(),
 			spans: Vec::new(),
-			in_code_block: false,
-			list_stack: Vec::new(),
 			in_list_item: false,
-			heading_level: 0,
 		}
 	}
 
 	/// Returns the remaining drawable area after rendering.
 	pub fn remaining_area(&self) -> Rect { self.area }
 
-	/// Convert [`InlineStyle`] markers to a ratatui [`Style`].
+	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
 	fn style_from_inline(style: &InlineStyle) -> Style {
 		let mut result = Style::new();
-		if style.important {
+		if style.contains(InlineModifier::BOLD) {
 			result = result.bold();
 		}
-		if style.emphasize {
+		if style.contains(InlineModifier::ITALIC) {
 			result = result.italic();
 		}
-		if style.code {
+		if style.contains(InlineModifier::CODE) {
 			result = result.bg(Color::DarkGray);
 		}
-		if style.strikethrough {
+		if style.contains(InlineModifier::STRIKETHROUGH) {
 			result = result.crossed_out();
 		}
 		if style.link.is_some() {
@@ -155,11 +143,12 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_heading(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		heading: &Heading,
 	) -> ControlFlow<()> {
-		self.heading_level = heading.level();
 		let mut style = Style::new().bold();
+		println!("Visiting heading level {}", heading.level());
 		if heading.level() == 1 {
 			// h1: add a gap above
 			self.area.y = self.area.y.saturating_add(1);
@@ -172,12 +161,20 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_paragraph(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_paragraph(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.style_stack.push(Style::new());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_block_quote(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_block_quote(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		// Indent the area for block quotes
 		let indent: u16 = 2;
 		if self.area.width > indent {
@@ -197,34 +194,35 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_code_block(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		_code_block: &CodeBlock,
 	) -> ControlFlow<()> {
-		self.in_code_block = true;
 		self.style_stack.push(Style::new().bg(Color::DarkGray));
 		ControlFlow::Continue(())
 	}
 
 	fn visit_list(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
-		list_marker: &ListMarker,
+		_list_marker: &ListMarker,
 	) -> ControlFlow<()> {
-		self.list_stack.push(ListCtx {
-			ordered: list_marker.ordered,
-			start: list_marker.start.unwrap_or(1),
-			current_index: 0,
-		});
+		// List stack is managed by VisitContext
 		ControlFlow::Continue(())
 	}
 
-	fn visit_list_item(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_list_item(
+		&mut self,
+		ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.in_list_item = true;
 
-		// Emit the bullet/number prefix
-		let bullet = if let Some(ctx) = self.list_stack.last() {
-			if ctx.ordered {
-				let num = ctx.start + ctx.current_index;
+		// Emit the bullet/number prefix from the context's list stack
+		let bullet = if let Some(list) = ctx.current_list() {
+			if list.ordered {
+				let num = list.current_number();
 				format!("{num}. ")
 			} else {
 				"• ".to_string()
@@ -240,6 +238,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_table(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		_table: &Table,
 	) -> ControlFlow<()> {
@@ -247,16 +246,28 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_head(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_head(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().bold());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_row(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_row(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_cell(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_cell(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		// Add a separator between cells
 		if !self.spans.is_empty() {
 			self.spans
@@ -265,7 +276,11 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_thematic_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_thematic_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.flush_spans();
 		self.render_hr();
 		ControlFlow::Continue(())
@@ -273,6 +288,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_image(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		image: &Image,
 	) -> ControlFlow<()> {
@@ -288,6 +304,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_footnote_definition(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
@@ -298,14 +315,18 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_math_display(&mut self, _entity: Entity) -> ControlFlow<()> {
-		self.in_code_block = true;
+	fn visit_math_display(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().fg(Color::Magenta));
 		ControlFlow::Continue(())
 	}
 
 	fn visit_html_block(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
@@ -321,6 +342,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_button(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		label: Option<&TextNode>,
 	) -> ControlFlow<()> {
@@ -341,14 +363,15 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_text(
 		&mut self,
+		ctx: &VisitContext,
 		_entity: Entity,
 		text: &TextNode,
-		style: &InlineStyle,
 	) -> ControlFlow<()> {
-		let inline_style = Self::style_from_inline(style);
+		let style = ctx.effective_style();
+		let inline_style = Self::style_from_inline(&style);
 		let base = self.current_style().patch(inline_style);
 
-		if self.in_code_block {
+		if ctx.in_code_block {
 			// In code blocks, render line by line
 			for line in text.as_str().lines() {
 				self.spans.push(Span::styled(line.to_string(), base));
@@ -375,12 +398,20 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_hard_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_hard_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.flush_spans();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_soft_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_soft_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		// Soft breaks are rendered as spaces in TUI
 		self.spans.push(Span::raw(" "));
 		ControlFlow::Continue(())
@@ -388,6 +419,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_footnote_ref(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
@@ -400,6 +432,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_html_inline(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
@@ -412,6 +445,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_task_list_check(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
@@ -429,9 +463,10 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, _entity: Entity) {
+	fn leave_heading(&mut self, ctx: &VisitContext, _entity: Entity) {
 		// Flush heading spans with the heading style applied to the
 		// entire line, then center h1.
+		let heading_level = ctx.heading_level();
 		let spans = std::mem::take(&mut self.spans);
 		if !spans.is_empty() {
 			let line = Line::from(spans);
@@ -439,21 +474,20 @@ impl CardVisitor for TuiRenderer<'_> {
 			if let Some(style) = self.style_stack.last() {
 				text = text.style(*style);
 			}
-			if self.heading_level == 1 {
+			if heading_level == 1 {
 				text = text.centered();
 			}
 			self.render_text(text);
 		}
-		self.heading_level = 0;
 		self.style_stack.pop();
 	}
 
-	fn leave_paragraph(&mut self, _entity: Entity) {
+	fn leave_paragraph(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.flush_spans();
 		self.style_stack.pop();
 	}
 
-	fn leave_block_quote(&mut self, _entity: Entity) {
+	fn leave_block_quote(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.flush_spans();
 		// Restore the area indentation
 		let indent: u16 = 2;
@@ -462,34 +496,35 @@ impl CardVisitor for TuiRenderer<'_> {
 		self.style_stack.pop();
 	}
 
-	fn leave_code_block(&mut self, _entity: Entity) {
+	fn leave_code_block(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.flush_spans();
-		self.in_code_block = false;
 		self.style_stack.pop();
 	}
 
-	fn leave_list(&mut self, _entity: Entity) { self.list_stack.pop(); }
-
-	fn leave_list_item(&mut self, _entity: Entity) {
-		self.flush_spans();
-		self.in_list_item = false;
-		if let Some(ctx) = self.list_stack.last_mut() {
-			ctx.current_index += 1;
-		}
+	fn leave_list(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		// List stack is managed by VisitContext
 	}
 
-	fn leave_table(&mut self, _entity: Entity) {}
+	fn leave_list_item(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		self.flush_spans();
+		self.in_list_item = false;
+		// Item index increment is managed by VisitContext
+	}
 
-	fn leave_table_head(&mut self, _entity: Entity) {
+	fn leave_table(&mut self, _ctx: &VisitContext, _entity: Entity) {}
+
+	fn leave_table_head(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.flush_spans();
 		// Render a separator line
 		self.render_hr();
 		self.style_stack.pop();
 	}
 
-	fn leave_table_row(&mut self, _entity: Entity) { self.flush_spans(); }
+	fn leave_table_row(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		self.flush_spans();
+	}
 
-	fn leave_table_cell(&mut self, _entity: Entity) {
+	fn leave_table_cell(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		// Cells are collected as spans; the row leave flushes them
 	}
 }
@@ -499,62 +534,67 @@ impl CardVisitor for TuiRenderer<'_> {
 mod test {
 	use super::*;
 
-	/// Helper: create a buffer and render a card into it.
+	/// Helper: spawn a card, walk it with `TuiRenderer`, return the
+	/// buffer.
 	fn render_to_buffer(
 		world: &mut World,
 		entity: Entity,
 		width: u16,
 		height: u16,
-	) -> Buffer {
+	) -> (Buffer, Rect) {
 		let area = Rect::new(0, 0, width, height);
-		let mut buf = Buffer::empty(area);
+
 		world
 			.run_system_once_with(
-				|In((entity, area)): In<(Entity, Rect)>, walker: CardWalker| {
-					let mut inner_buf = Buffer::empty(area);
-					let mut renderer = TuiRenderer::new(area, &mut inner_buf);
-					walker.walk_card(&mut renderer, entity);
-					inner_buf
+				move |In((entity, area)): In<(Entity, Rect)>,
+				      walker: CardWalker| {
+					let mut buf = Buffer::empty(area);
+					let remaining = {
+						let mut renderer = TuiRenderer::new(area, &mut buf);
+						walker.walk_card(&mut renderer, entity);
+						renderer.remaining_area()
+					};
+					(buf, remaining)
 				},
 				(entity, area),
 			)
-			.unwrap_or_else(|_| {
-				// Fallback: render directly outside the system
-				buf.clone()
-			})
-			.clone_into(&mut buf);
-		buf
+			.unwrap()
 	}
 
-	/// Extract all text from a buffer as a single string (trimmed of
-	/// trailing spaces per line).
+	/// Extract all non-empty text from a buffer as a single string.
 	fn buffer_text(buf: &Buffer) -> String {
 		let area = buf.area;
-		let mut lines = Vec::new();
+		let mut result = String::new();
 		for row in area.y..area.y + area.height {
 			let mut line = String::new();
 			for col in area.x..area.x + area.width {
-				line.push_str(buf[(col, row)].symbol());
+				let cell = &buf[(col, row)];
+				line.push_str(cell.symbol());
 			}
-			lines.push(line.trim_end().to_string());
+			let trimmed = line.trim_end();
+			if !trimmed.is_empty() {
+				if !result.is_empty() {
+					result.push('\n');
+				}
+				result.push_str(trimmed);
+			}
 		}
-		// Trim trailing empty lines
-		while lines.last().is_some_and(|line| line.is_empty()) {
-			lines.pop();
-		}
-		lines.join("\n")
+		result
 	}
 
-	/// Check that a buffer cell at a given position has a specific
-	/// style modifier.
+	/// Check if a cell at (col, row) has bold modifier.
 	fn cell_is_bold(buf: &Buffer, col: u16, row: u16) -> bool {
-		use ratatui::style::Modifier;
-		buf[(col, row)].modifier.contains(Modifier::BOLD)
+		let cell = &buf[(col, row)];
+		cell.style()
+			.add_modifier
+			.contains(ratatui::style::Modifier::BOLD)
 	}
 
 	fn cell_is_italic(buf: &Buffer, col: u16, row: u16) -> bool {
-		use ratatui::style::Modifier;
-		buf[(col, row)].modifier.contains(Modifier::ITALIC)
+		let cell = &buf[(col, row)];
+		cell.style()
+			.add_modifier
+			.contains(ratatui::style::Modifier::ITALIC)
 	}
 
 	// -- Basic rendering --
@@ -564,13 +604,13 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![(Heading1, children![TextNode::new(
-				"Hello World"
+				"Hello"
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
 		let text = buffer_text(&buf);
-		text.as_str().xpect_contains("Hello World");
+		text.as_str().xpect_contains("Hello");
 	}
 
 	#[test]
@@ -578,13 +618,13 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![TextNode::new(
-				"body text"
+				"Body text"
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
 		let text = buffer_text(&buf);
-		text.as_str().xpect_contains("body text");
+		text.as_str().xpect_contains("Body text");
 	}
 
 	#[test]
@@ -593,23 +633,22 @@ mod test {
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![(
 				Important,
-				TextNode::new("bold"),
+				children![TextNode::new("bold")],
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
 		let text = buffer_text(&buf);
 		text.as_str().xpect_contains("bold");
 
-		// Find the 'b' in "bold" and check its style
+		// Find the 'b' of "bold" and check it's bold
 		let area = buf.area;
 		let mut found_bold = false;
 		for row in area.y..area.y + area.height {
 			for col in area.x..area.x + area.width {
-				if buf[(col, row)].symbol() == "b" {
-					if cell_is_bold(&buf, col, row) {
-						found_bold = true;
-					}
+				let cell = &buf[(col, row)];
+				if cell.symbol() == "b" && cell_is_bold(&buf, col, row) {
+					found_bold = true;
 				}
 			}
 		}
@@ -622,23 +661,22 @@ mod test {
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![(
 				Emphasize,
-				TextNode::new("italic"),
+				children![TextNode::new("italic")],
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
 		let text = buffer_text(&buf);
-		text.xpect_contains("italic");
+		text.as_str().xpect_contains("italic");
 
-		// Find the 'i' in "italic" and check its style
+		// Find the 'i' of "italic" and check it's italic
 		let area = buf.area;
 		let mut found_italic = false;
 		for row in area.y..area.y + area.height {
 			for col in area.x..area.x + area.width {
-				if buf[(col, row)].symbol() == "i" {
-					if cell_is_italic(&buf, col, row) {
-						found_italic = true;
-					}
+				let cell = &buf[(col, row)];
+				if cell.symbol() == "i" && cell_is_italic(&buf, col, row) {
+					found_italic = true;
 				}
 			}
 		}
@@ -651,40 +689,37 @@ mod test {
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![
 				TextNode::new("normal "),
-				(Important, TextNode::new("bold")),
-				TextNode::new(" words"),
+				(Important, children![TextNode::new("bold")]),
+				TextNode::new(" end"),
 			])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
-		let rendered = buffer_text(&buf);
-		rendered.as_str().xpect_contains("normal");
-		rendered.as_str().xpect_contains("bold");
-		rendered.as_str().xpect_contains("words");
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_text(&buf);
+		text.as_str().xpect_contains("normal");
+		text.as_str().xpect_contains("bold");
+		text.as_str().xpect_contains("end");
 	}
 
 	#[test]
 	fn heading_is_bold() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Heading2, children![TextNode::new(
+			.spawn((Card, children![(Heading1, children![TextNode::new(
 				"Title"
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
-		let rendered = buffer_text(&buf);
-		rendered.as_str().xpect_contains("Title");
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
 
-		// Heading text should be bold
-		let buf_area = buf.area;
+		// h1 text should be bold (heading style)
+		let area = buf.area;
 		let mut found_bold = false;
-		for row in buf_area.y..buf_area.y + buf_area.height {
-			for col in buf_area.x..buf_area.x + buf_area.width {
-				if buf[(col, row)].symbol() == "T" {
-					if cell_is_bold(&buf, col, row) {
-						found_bold = true;
-					}
+		for row in area.y..area.y + area.height {
+			for col in area.x..area.x + area.width {
+				let cell = &buf[(col, row)];
+				if cell.symbol() == "T" && cell_is_bold(&buf, col, row) {
+					found_bold = true;
 				}
 			}
 		}
@@ -696,18 +731,18 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![
-				Paragraph::with_text("above"),
+				(Paragraph, children![TextNode::new("above")]),
 				(ThematicBreak,),
-				Paragraph::with_text("below"),
+				(Paragraph, children![TextNode::new("below")]),
 			]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 40, 10);
-		let rendered = buffer_text(&buf);
-		rendered.as_str().xpect_contains("above");
-		rendered.as_str().xpect_contains("below");
-		// The horizontal rule should contain box-drawing characters
-		rendered.as_str().xpect_contains("─");
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_text(&buf);
+		text.as_str().xpect_contains("above");
+		// The HR renders as "─" characters
+		text.as_str().xpect_contains("─");
+		text.as_str().xpect_contains("below");
 	}
 
 	#[test]
@@ -716,23 +751,24 @@ mod test {
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![(
 				Code,
-				TextNode::new("code"),
+				children![TextNode::new("code_text")],
 			)])]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
-		let rendered = buffer_text(&buf);
-		rendered.as_str().xpect_contains("code");
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_text(&buf);
+		text.as_str().xpect_contains("code_text");
 
-		// Find the 'c' in "code" and check it has a background
-		let buf_area = buf.area;
+		// Find a code character and check it has a background
+		let area = buf.area;
 		let mut found_bg = false;
-		for row in buf_area.y..buf_area.y + buf_area.height {
-			for col in buf_area.x..buf_area.x + buf_area.width {
-				if buf[(col, row)].symbol() == "c" {
-					if buf[(col, row)].bg == Color::DarkGray {
-						found_bg = true;
-					}
+		for row in area.y..area.y + area.height {
+			for col in area.x..area.x + area.width {
+				let cell = &buf[(col, row)];
+				if cell.symbol() == "c"
+					&& cell.style().bg == Some(Color::DarkGray)
+				{
+					found_bg = true;
 				}
 			}
 		}
@@ -744,18 +780,17 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![
-				(Paragraph, children![TextNode::new("visible")]),
+				(Paragraph, children![TextNode::new("Inside card")]),
 				(Card, children![(Paragraph, children![TextNode::new(
-					"hidden"
+					"Inside nested card"
 				)])]),
 			]))
 			.id();
 
-		let buf = render_to_buffer(&mut world, entity, 80, 24);
-		let rendered = buffer_text(&buf);
-		rendered.as_str().xpect_contains("visible");
-		// The nested card content should not appear
-		let has_hidden = rendered.contains("hidden");
-		has_hidden.xpect_false();
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_text(&buf);
+		text.as_str().xpect_contains("Inside card");
+		// Nested card content should not appear
+		text.as_str().xnot().xpect_contains("Inside nested card");
 	}
 }

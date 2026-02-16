@@ -3,11 +3,11 @@
 // #![deny(missing_docs)]
 #![feature(associated_type_defaults, closure_track_caller)]
 #![doc = include_str!("../README.md")]
-pub mod nodes;
 mod control_flow;
 mod document;
 #[cfg(feature = "interface")]
 mod interface;
+pub mod nodes;
 mod parsers;
 mod renderers;
 mod router;
@@ -23,6 +23,8 @@ pub mod prelude {
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
+	#[cfg(feature = "markdown")]
+	pub use crate::markdown;
 	pub use crate::nodes;
 	pub use crate::nodes::*;
 	pub use crate::parsers::*;

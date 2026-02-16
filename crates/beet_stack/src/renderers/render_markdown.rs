@@ -31,10 +31,6 @@ pub struct MarkdownRenderer {
 	buffer: String,
 	/// Stack of line prefixes for nested block quotes.
 	prefix_stack: Vec<String>,
-	/// Current list context stack: `(ordered, start, current_index)`.
-	list_stack: Vec<ListContext>,
-	/// Whether we are inside a code block (suppress inline formatting).
-	in_code_block: bool,
 	/// Language tag for the current code block.
 	code_block_lang: Option<String>,
 	/// Tracks table column alignments for the current table.
@@ -55,20 +51,12 @@ pub struct MarkdownRenderer {
 	footnote_buffer: Option<String>,
 }
 
-struct ListContext {
-	ordered: bool,
-	start: u64,
-	current_index: u64,
-}
-
 impl MarkdownRenderer {
 	/// Create a new empty renderer.
 	pub fn new() -> Self {
 		Self {
 			buffer: String::new(),
 			prefix_stack: Vec::new(),
-			list_stack: Vec::new(),
-			in_code_block: false,
 			code_block_lang: None,
 			table_alignments: Vec::new(),
 			table_row_cells: Vec::new(),
@@ -110,28 +98,28 @@ impl MarkdownRenderer {
 	fn apply_inline_style(&self, text: &str, style: &InlineStyle) -> String {
 		let mut wrapped = text.to_string();
 
-		if style.math_inline {
+		if style.contains(InlineModifier::MATH_INLINE) {
 			wrapped = format!("${wrapped}$");
 		}
-		if style.code {
+		if style.contains(InlineModifier::CODE) {
 			wrapped = format!("`{wrapped}`");
 		}
-		if style.subscript {
+		if style.contains(InlineModifier::SUBSCRIPT) {
 			wrapped = format!("~{wrapped}~");
 		}
-		if style.superscript {
+		if style.contains(InlineModifier::SUPERSCRIPT) {
 			wrapped = format!("^{wrapped}^");
 		}
-		if style.strikethrough {
+		if style.contains(InlineModifier::STRIKETHROUGH) {
 			wrapped = format!("~~{wrapped}~~");
 		}
-		if style.emphasize {
+		if style.contains(InlineModifier::ITALIC) {
 			wrapped = format!("*{wrapped}*");
 		}
-		if style.important {
+		if style.contains(InlineModifier::BOLD) {
 			wrapped = format!("**{wrapped}**");
 		}
-		if style.quote {
+		if style.contains(InlineModifier::QUOTE) {
 			wrapped = format!("\"{wrapped}\"");
 		}
 		if let Some(ref link) = style.link {
@@ -155,6 +143,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_heading(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		heading: &Heading,
 	) -> ControlFlow<()> {
@@ -165,12 +154,20 @@ impl CardVisitor for MarkdownRenderer {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_paragraph(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_paragraph(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		// Text will be accumulated via visit_text; we just mark the start
 		ControlFlow::Continue(())
 	}
 
-	fn visit_block_quote(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_block_quote(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		let new_prefix = format!("{}> ", self.prefix());
 		self.prefix_stack.push(new_prefix);
 		ControlFlow::Continue(())
@@ -178,31 +175,32 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_code_block(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		code_block: &CodeBlock,
 	) -> ControlFlow<()> {
 		let prefix = self.prefix();
 		let lang = code_block.language.as_deref().unwrap_or("");
 		self.push_text(&format!("{prefix}```{lang}\n"));
-		self.in_code_block = true;
 		self.code_block_lang = code_block.language.clone();
 		ControlFlow::Continue(())
 	}
 
 	fn visit_list(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
-		list_marker: &ListMarker,
+		_list_marker: &ListMarker,
 	) -> ControlFlow<()> {
-		self.list_stack.push(ListContext {
-			ordered: list_marker.ordered,
-			start: list_marker.start.unwrap_or(1),
-			current_index: 0,
-		});
+		// List stack is managed by VisitContext
 		ControlFlow::Continue(())
 	}
 
-	fn visit_list_item(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_list_item(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.in_list_item = true;
 		self.list_item_buffer.clear();
 		self.list_item_had_checkbox = false;
@@ -211,6 +209,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_table(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		table: &Table,
 	) -> ControlFlow<()> {
@@ -218,24 +217,40 @@ impl CardVisitor for MarkdownRenderer {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_head(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_head(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.in_table_head = true;
 		self.table_row_cells.clear();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_row(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_row(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.table_row_cells.clear();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_cell(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_table_cell(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.in_table_cell = true;
 		self.table_row_cells.push(String::new());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_thematic_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_thematic_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		let prefix = self.prefix();
 		self.push_text(&format!("{prefix}---\n\n"));
 		ControlFlow::Continue(())
@@ -243,6 +258,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_image(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		image: &Image,
 	) -> ControlFlow<()> {
@@ -260,6 +276,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_footnote_definition(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
@@ -269,15 +286,19 @@ impl CardVisitor for MarkdownRenderer {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_math_display(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_math_display(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		let prefix = self.prefix();
 		self.push_text(&format!("{prefix}$$\n"));
-		self.in_code_block = true; // reuse flag to suppress inline formatting
 		ControlFlow::Continue(())
 	}
 
 	fn visit_html_block(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
@@ -290,6 +311,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_button(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		label: Option<&TextNode>,
 	) -> ControlFlow<()> {
@@ -305,34 +327,44 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_text(
 		&mut self,
+		ctx: &VisitContext,
 		_entity: Entity,
 		text: &TextNode,
-		style: &InlineStyle,
 	) -> ControlFlow<()> {
-		if self.in_code_block {
+		if ctx.in_code_block {
 			let prefix = self.prefix();
 			for line in text.as_str().lines() {
 				self.push_text(&format!("{prefix}{line}\n"));
 			}
 		} else {
-			let formatted = self.apply_inline_style(text.as_str(), style);
+			let style = ctx.effective_style();
+			let formatted = self.apply_inline_style(text.as_str(), &style);
 			self.push_text(&formatted);
 		}
 		ControlFlow::Continue(())
 	}
 
-	fn visit_hard_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_hard_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.push_text("  \n");
 		ControlFlow::Continue(())
 	}
 
-	fn visit_soft_break(&mut self, _entity: Entity) -> ControlFlow<()> {
+	fn visit_soft_break(
+		&mut self,
+		_ctx: &VisitContext,
+		_entity: Entity,
+	) -> ControlFlow<()> {
 		self.push_text("\n");
 		ControlFlow::Continue(())
 	}
 
 	fn visit_footnote_ref(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
@@ -342,6 +374,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_html_inline(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
@@ -351,6 +384,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_task_list_check(
 		&mut self,
+		_ctx: &VisitContext,
 		_entity: Entity,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
@@ -365,39 +399,40 @@ impl CardVisitor for MarkdownRenderer {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, _entity: Entity) { self.push_text("\n\n"); }
+	fn leave_heading(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		self.push_text("\n\n");
+	}
 
-	fn leave_paragraph(&mut self, _entity: Entity) { self.push_text("\n\n"); }
+	fn leave_paragraph(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		self.push_text("\n\n");
+	}
 
-	fn leave_block_quote(&mut self, _entity: Entity) {
+	fn leave_block_quote(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.prefix_stack.pop();
 	}
 
-	fn leave_code_block(&mut self, _entity: Entity) {
+	fn leave_code_block(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		let prefix = self.prefix();
-		self.in_code_block = false;
 		self.code_block_lang = None;
 		self.push_text(&format!("{prefix}```\n\n"));
 	}
 
-	fn leave_list(&mut self, _entity: Entity) {
-		self.list_stack.pop();
+	fn leave_list(&mut self, _ctx: &VisitContext, _entity: Entity) {
+		// List stack is managed by VisitContext
 		self.push_text("\n");
 	}
 
-	fn leave_list_item(&mut self, _entity: Entity) {
+	fn leave_list_item(&mut self, ctx: &VisitContext, _entity: Entity) {
 		self.in_list_item = false;
 		let prefix = self.prefix();
 
-		let bullet = if let Some(ctx) = self.list_stack.last_mut() {
-			let bullet = if ctx.ordered {
-				let num = ctx.start + ctx.current_index;
+		let bullet = if let Some(list) = ctx.current_list() {
+			if list.ordered {
+				let num = list.current_number();
 				format!("{num}. ")
 			} else {
 				"- ".to_string()
-			};
-			ctx.current_index += 1;
-			bullet
+			}
 		} else {
 			"- ".to_string()
 		};
@@ -406,12 +441,12 @@ impl CardVisitor for MarkdownRenderer {
 		self.buffer.push_str(&format!("{prefix}{bullet}{text}\n"));
 	}
 
-	fn leave_table(&mut self, _entity: Entity) {
+	fn leave_table(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.table_alignments.clear();
 		self.push_text("\n");
 	}
 
-	fn leave_table_head(&mut self, _entity: Entity) {
+	fn leave_table_head(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		// Emit header row
 		let prefix = self.prefix();
 		let row_text = self.table_row_cells.join(" | ");
@@ -443,14 +478,14 @@ impl CardVisitor for MarkdownRenderer {
 		self.table_row_cells.clear();
 	}
 
-	fn leave_table_row(&mut self, _entity: Entity) {
+	fn leave_table_row(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		let prefix = self.prefix();
 		let row_text = self.table_row_cells.join(" | ");
 		self.buffer.push_str(&format!("{prefix}| {row_text} |\n"));
 		self.table_row_cells.clear();
 	}
 
-	fn leave_table_cell(&mut self, _entity: Entity) {
+	fn leave_table_cell(&mut self, _ctx: &VisitContext, _entity: Entity) {
 		self.in_table_cell = false;
 	}
 }
@@ -480,24 +515,36 @@ mod test {
 	#[test]
 	fn plain_text() {
 		let mut world = World::new();
-		let entity = world.spawn((Card, content!["hello world"])).id();
+		let entity = world
+			.spawn((Card, children![TextNode::new("hello world")]))
+			.id();
 		render_card(&mut world, entity).xpect_eq("hello world");
 	}
 
 	#[test]
 	fn multiple_segments() {
 		let mut world = World::new();
-		let entity = world.spawn((Card, content!["hello", " ", "world"])).id();
+		let entity = world
+			.spawn((Card, children![
+				TextNode::new("hello"),
+				TextNode::new(" "),
+				TextNode::new("world"),
+			]))
+			.id();
 		render_card(&mut world, entity).xpect_eq("hello world");
 	}
 
-	// -- Inline formatting --
+	// -- Inline formatting (container pattern) --
 
 	#[test]
 	fn important_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content!["hello ", (Important, "bold"), " text"]))
+			.spawn((Card, children![
+				TextNode::new("hello "),
+				(Important, children![TextNode::new("bold")]),
+				TextNode::new(" text"),
+			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("hello **bold** text");
 	}
@@ -506,7 +553,11 @@ mod test {
 	fn emphasized_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content!["hello ", (Emphasize, "italic"), " text"]))
+			.spawn((Card, children![
+				TextNode::new("hello "),
+				(Emphasize, children![TextNode::new("italic")]),
+				TextNode::new(" text"),
+			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("hello *italic* text");
 	}
@@ -515,7 +566,11 @@ mod test {
 	fn code_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content!["use ", (Code, "println!"), " macro"]))
+			.spawn((Card, children![
+				TextNode::new("use "),
+				(Code, children![TextNode::new("println!")]),
+				TextNode::new(" macro"),
+			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("use `println!` macro");
 	}
@@ -524,7 +579,10 @@ mod test {
 	fn quoted_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content!["he said ", (Quote, "hello")]))
+			.spawn((Card, children![
+				TextNode::new("he said "),
+				(Quote, children![TextNode::new("hello")]),
+			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("he said \"hello\"");
 	}
@@ -533,7 +591,10 @@ mod test {
 	fn combined_markers() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content![(Important, Emphasize, "bold italic")]))
+			.spawn((Card, children![(Important, children![(
+				Emphasize,
+				children![TextNode::new("bold italic")],
+			)],)]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("***bold italic***");
 	}
@@ -542,12 +603,12 @@ mod test {
 	fn complex_composition() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content![
-				"Welcome to ",
-				(Important, "beet"),
-				", the ",
-				(Emphasize, "best"),
-				" framework!"
+			.spawn((Card, children![
+				TextNode::new("Welcome to "),
+				(Important, children![TextNode::new("beet")]),
+				TextNode::new(", the "),
+				(Emphasize, children![TextNode::new("best")]),
+				TextNode::new(" framework!"),
 			]))
 			.id();
 		render_card(&mut world, entity)
@@ -561,8 +622,8 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![(
-				TextNode::new("click here"),
 				Link::new("https://example.com"),
+				children![TextNode::new("click here")],
 			)]))
 			.id();
 		render_card(&mut world, entity)
@@ -574,8 +635,8 @@ mod test {
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![(
-				TextNode::new("example"),
 				Link::new("https://example.com").with_title("Example Site"),
+				children![TextNode::new("example")],
 			)]))
 			.id();
 		render_card(&mut world, entity)
@@ -586,11 +647,10 @@ mod test {
 	fn important_link() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(
-				Important,
-				TextNode::new("important link"),
+			.spawn((Card, children![(Important, children![(
 				Link::new("https://example.com"),
-			)]))
+				children![TextNode::new("important link")],
+			)],)]))
 			.id();
 		render_card(&mut world, entity)
 			.xpect_eq("[**important link**](https://example.com)");
@@ -600,14 +660,13 @@ mod test {
 	fn all_markers_combined() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(
+			.spawn((Card, children![(Quote, children![(
 				Important,
-				Emphasize,
-				Code,
-				Quote,
-				TextNode::new("text"),
-				Link::new("https://example.com"),
-			)]))
+				children![(Emphasize, children![(Code, children![(
+					Link::new("https://example.com"),
+					children![TextNode::new("text")],
+				)],)],)],
+			)],)]))
 			.id();
 		render_card(&mut world, entity)
 			.xpect_eq("[\"***`text`***\"](https://example.com)");
@@ -690,8 +749,6 @@ mod test {
 
 	#[test]
 	fn important_container() {
-		// Mimics the markdown parser structure where Important is a
-		// container entity with TextNode children.
 		let mut world = World::new();
 		let entity = world
 			.spawn((Card, children![(Paragraph, children![

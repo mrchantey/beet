@@ -10,6 +10,7 @@
 //! - [`Button`] - clickable action trigger
 //! - [`TaskListCheck`] - checkbox marker for list items
 use super::node::Node;
+use super::node::NodeKind;
 use beet_core::prelude::*;
 
 
@@ -31,7 +32,7 @@ use beet_core::prelude::*;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<Button>())]
+#[require(Node = Node::new(NodeKind::Button))]
 pub struct Button;
 
 
@@ -53,7 +54,7 @@ pub struct Button;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<TaskListCheck>())]
+#[require(Node = Node::new(NodeKind::TaskListCheck))]
 pub struct TaskListCheck {
 	/// Whether the checkbox is checked.
 	pub checked: bool,

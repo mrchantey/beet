@@ -1,118 +1,53 @@
-lets keep iterating on beet_stack rendering!
+lets keep iterating on beet_stack!
 
-## `content_macro` -> `markdown!`
+# `style.rs`
 
-The purpose of content_macro was to make writing easier. actually its still pretty hard. lets give up and instead devise a markdown macro system.
+`InlineStyle` check your working on `	pub link: Option<Link>`, im quite sure that should just be another bitflag instead of cloning the node.
 
+# `card_walker.rs`
 
-```rust
-
-pub trait IntoBundle{
-
-}
+This needs a bit of a refactor, this `DispatchKind` thing is very weird. It seems we could just do a hamburger thing:
 
 ```
 
-
-
-## Inline Style Propagation
-> **Inherited inline style propagation**: when `Important` (or similar) is a container entity (has inline markers but no `TextNode`), its markers are merged into the inherited style passed to descendant `TextNode` children. This supports both the flat `(Important, TextNode)` pattern and the container `(Important, children![TextNode])` pattern from the markdown parser.
-
-Undo this! A TextNode and Important should be mutually exclusive, just like HTML! This will make a lot of our tests more verbose, use `markdown!`
-
-
-## `InlineStyle` -> `VisitContext`
-
-Lets formalize and share the visit context between the renderers. Renderers should only be tracking state relative to their rendering logic, not the state of the visitor itself.
-I'm kinda hoping this refactor will reduce our need to need to track `heading_level` on tui_renderer to do last minute styling, like if we have some kind of style stack?
-Consider how we can avoid these error prone edge cases with good ol' computer science DSAs.
-
-```rust
-
-struct VisitContext{
-	// or does this need to be a style_stack too?
-	inline_style:InlineStyle,
-	in_code_block: bool,
-	// or does this need to be a stack of list stacks?
-	list_stack: Vec<ListCtx>,
-	..
-}
-
 ```
 
+- Ditch , we should be able to just pass the NodeKind. if need be create a seperate method for leaving an entity.
+- Move the entity to VisitContext, making the api cleaner.
+- Replace `ctx` var name with `cx`
 
-Also, for inline style consider switching to bitflags. i think that will simplify merging etc.
+# `markdown_macro.rs`
 
-move all this to a new module: `src/nodes/style.rs`.
+This does not need World, instead do the same architecture as `content_macro.rs` with a trait `IntoBundle<M>`
 
 ```rust
-//! ratatui modifiers
-use bitflags::bitflags;
-pub use color::{Color, ParseColorError};
-use stylize::ColorDebugKind;
-pub use stylize::{Styled, Stylize};
-
-#[cfg(feature = "anstyle")]
-mod anstyle;
-mod color;
-pub mod palette;
-#[cfg(feature = "palette")]
-mod palette_conversion;
-#[macro_use]
-mod stylize;
-
-bitflags! {
-    /// Modifier changes the way a piece of text is displayed.
-    ///
-    /// They are bitflags so they can easily be composed.
-    ///
-    /// `From<Modifier> for Style` is implemented so you can use `Modifier` anywhere that accepts
-    /// `Into<Style>`.
-    ///
-    /// ## Examples
-    ///
-    /// ```rust
-    /// use ratatui_core::style::Modifier;
-    ///
-    /// let m = Modifier::BOLD | Modifier::ITALIC;
-    /// ```
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Default, Clone, Copy, Eq, PartialEq, Hash)]
-    pub struct Modifier: u16 {
-        const BOLD              = 0b0000_0000_0001;
-        const DIM               = 0b0000_0000_0010;
-        const ITALIC            = 0b0000_0000_0100;
-        const UNDERLINED        = 0b0000_0000_1000;
-        const SLOW_BLINK        = 0b0000_0001_0000;
-        const RAPID_BLINK       = 0b0000_0010_0000;
-        const REVERSED          = 0b0000_0100_0000;
-        const HIDDEN            = 0b0000_1000_0000;
-        const CROSSED_OUT       = 0b0001_0000_0000;
-    }
+impl IntoBundle<Self> for &str {
+	fn into_bundle(self) -> impl Bundle { 
+		OnSpawn::new(self, |entity:EntityWorldMut|{
+			// do the markdown diffing etc here.
+		})		
+ }
 }
+let bundle = markdown!(r#"
 
-/// Implement the `Debug` trait for `Modifier` manually.
-///
-/// This will avoid printing the empty modifier as 'Borders(0x0)' and instead print it as 'NONE'.
-impl fmt::Debug for Modifier {
-    /// Format the modifier as `NONE` if the modifier is empty or as a list of flags separated by
-    /// `|` otherwise.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.is_empty() {
-            return write!(f, "NONE");
-        }
-        write!(f, "{}", self.0)
-    }
-}
+# My Site
+
+Welcome to my site	
+"#
+{(Paragraph::with_text("interspersed with bundles"))}
+"And some *more text after*"
+)
 ```
 
+I'm not sure what this means for hierarchies you'll need to work that out.
+
+When done remove the `content_macro` completely and replace all usage with this one. Also check all spawning of TextNode::new or xx::with_text, in almost all cases prefer usage of markdown! for easier readability, unless testing the macro itself or some nuance case.
+
+## `render_tui.rs`
+
+In general the formatting should be more in line with
 
 ## Testing
 
-For more advanced 'kitchen sink' rendering and parsing tests, use `my_str.xpect_snapshot()`
-Also verify that links and buttons are rendering correctly, see `hyperlink` and `button` widget for the tui stuff.
-
-## `card_walker.rs`
-
-- `CardWalker::entity_query`: EntityRef blocks any mutable access to any components from others. refactor this into many individual queries: `text_nodes: Query<&TextNode>, etc..`
-- using `NodeKind` only in CardWalker feels like an antipattern, we have Node which stores the TypeId of the node, formalize NodeKinde and replace Node::type with Node::kind instead.
+- The markdown! macro enables more ergonomic testing of our renderers and parsers, For more advanced 'kitchen sink' rendering and parsing tests, use `my_str.xpect_snapshot()`
+- Also verify that links and buttons are rendering correctly, see `hyperlink` and `button` widget for the tui stuff.

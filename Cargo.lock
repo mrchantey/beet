@@ -1565,6 +1565,7 @@ dependencies = [
  "beet_core",
  "bevy",
  "bevy_ratatui",
+ "bitflags 2.10.0",
  "extend",
  "pulldown-cmark",
  "ratatui",

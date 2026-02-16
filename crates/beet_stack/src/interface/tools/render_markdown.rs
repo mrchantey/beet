@@ -107,7 +107,7 @@ mod test {
 	#[test]
 	fn plain_text() {
 		World::new()
-			.spawn((render_markdown(), content!["hello world"]))
+			.spawn((render_markdown(), children![TextNode::new("hello world")]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello world");
@@ -116,7 +116,11 @@ mod test {
 	#[test]
 	fn multiple_segments() {
 		World::new()
-			.spawn((render_markdown(), content!["hello", " ", "world"]))
+			.spawn((render_markdown(), children![
+				TextNode::new("hello"),
+				TextNode::new(" "),
+				TextNode::new("world"),
+			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("hello world");
@@ -125,10 +129,10 @@ mod test {
 	#[test]
 	fn important_text() {
 		World::new()
-			.spawn((render_markdown(), content![
-				"hello ",
-				(Important, "bold"),
-				" text"
+			.spawn((render_markdown(), children![
+				TextNode::new("hello "),
+				(Important, children![TextNode::new("bold")]),
+				TextNode::new(" text"),
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -138,10 +142,10 @@ mod test {
 	#[test]
 	fn emphasized_text() {
 		World::new()
-			.spawn((render_markdown(), content![
-				"hello ",
-				(Emphasize, "italic"),
-				" text"
+			.spawn((render_markdown(), children![
+				TextNode::new("hello "),
+				(Emphasize, children![TextNode::new("italic")]),
+				TextNode::new(" text"),
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -151,10 +155,10 @@ mod test {
 	#[test]
 	fn code_text() {
 		World::new()
-			.spawn((render_markdown(), content![
-				"use ",
-				(Code, "println!"),
-				" macro"
+			.spawn((render_markdown(), children![
+				TextNode::new("use "),
+				(Code, children![TextNode::new("println!")]),
+				TextNode::new(" macro"),
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -164,7 +168,10 @@ mod test {
 	#[test]
 	fn quoted_text() {
 		World::new()
-			.spawn((render_markdown(), content!["he said ", (Quote, "hello")]))
+			.spawn((render_markdown(), children![
+				TextNode::new("he said "),
+				(Quote, children![TextNode::new("hello")]),
+			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("he said \"hello\"");
@@ -174,8 +181,8 @@ mod test {
 	fn link_without_title() {
 		World::new()
 			.spawn((render_markdown(), children![(
-				TextNode::new("click here"),
-				Link::new("https://example.com")
+				Link::new("https://example.com"),
+				children![TextNode::new("click here")],
 			)]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -186,8 +193,8 @@ mod test {
 	fn link_with_title() {
 		World::new()
 			.spawn((render_markdown(), children![(
-				TextNode::new("example"),
-				Link::new("https://example.com").with_title("Example Site")
+				Link::new("https://example.com").with_title("Example Site"),
+				children![TextNode::new("example")],
 			)]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -198,11 +205,10 @@ mod test {
 	#[test]
 	fn combined_markers() {
 		World::new()
-			.spawn((render_markdown(), content![(
-				Important,
+			.spawn((render_markdown(), children![(Important, children![(
 				Emphasize,
-				"bold italic"
-			)]))
+				children![TextNode::new("bold italic")],
+			)],)]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("***bold italic***");
@@ -211,12 +217,12 @@ mod test {
 	#[test]
 	fn complex_composition() {
 		World::new()
-			.spawn((render_markdown(), content![
-				"Welcome to ",
-				(Important, "beet"),
-				", the ",
-				(Emphasize, "best"),
-				" framework!"
+			.spawn((render_markdown(), children![
+				TextNode::new("Welcome to "),
+				(Important, children![TextNode::new("beet")]),
+				TextNode::new(", the "),
+				(Emphasize, children![TextNode::new("best")]),
+				TextNode::new(" framework!"),
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -226,7 +232,7 @@ mod test {
 	#[test]
 	fn extension_trait() {
 		World::new()
-			.spawn((render_markdown(), content!["test"]))
+			.spawn((render_markdown(), children![TextNode::new("test")]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("test");
@@ -235,11 +241,10 @@ mod test {
 	#[test]
 	fn important_link() {
 		World::new()
-			.spawn((render_markdown(), children![(
-				Important,
-				TextNode::new("important link"),
-				Link::new("https://example.com")
-			)]))
+			.spawn((render_markdown(), children![(Important, children![(
+				Link::new("https://example.com"),
+				children![TextNode::new("important link")],
+			)],)]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[**important link**](https://example.com)");
@@ -248,14 +253,13 @@ mod test {
 	#[test]
 	fn all_markers_combined() {
 		World::new()
-			.spawn((render_markdown(), children![(
+			.spawn((render_markdown(), children![(Quote, children![(
 				Important,
-				Emphasize,
-				Code,
-				Quote,
-				TextNode::new("text"),
-				Link::new("https://example.com")
-			)]))
+				children![(Emphasize, children![(Code, children![(
+					Link::new("https://example.com"),
+					children![TextNode::new("text")],
+				)],)],)],
+			)],)]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[\"***`text`***\"](https://example.com)");
@@ -323,7 +327,10 @@ mod test {
 	fn render_markdown_for_works() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, content!["hello ", (Important, "world")]))
+			.spawn((Card, children![
+				TextNode::new("hello "),
+				(Important, children![TextNode::new("world")]),
+			]))
 			.id();
 
 		let result = render_markdown_for(entity, &mut world);

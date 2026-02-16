@@ -56,6 +56,7 @@
 //! node type, including inline nodes, and handles structural
 //! boundaries automatically.
 use super::node::Node;
+use super::node::NodeKind;
 use crate::nodes::DisplayBlock;
 use crate::nodes::DisplayInline;
 use beet_core::prelude::*;
@@ -80,7 +81,7 @@ use beet_core::prelude::*;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<TextNode>())]
+#[require(Node = Node::new(NodeKind::TextNode))]
 pub struct TextNode(pub String);
 
 impl TextNode {
@@ -169,7 +170,7 @@ impl Default for Heading {
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_one(), Node = Node::new::<Heading1>())]
+#[require(Heading = Heading::new_level_one(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading1;
 
 /// Level-2 heading, equivalent to HTML `<h2>`.
@@ -188,7 +189,7 @@ pub struct Heading1;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_two(), Node = Node::new::<Heading2>())]
+#[require(Heading = Heading::new_level_two(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading2;
 
 /// Level-3 heading, equivalent to HTML `<h3>`.
@@ -207,7 +208,7 @@ pub struct Heading2;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_three(), Node = Node::new::<Heading3>())]
+#[require(Heading = Heading::new_level_three(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading3;
 
 /// Level-4 heading, equivalent to HTML `<h4>`.
@@ -226,7 +227,7 @@ pub struct Heading3;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_four(), Node = Node::new::<Heading4>())]
+#[require(Heading = Heading::new_level_four(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading4;
 
 /// Level-5 heading, equivalent to HTML `<h5>`.
@@ -245,7 +246,7 @@ pub struct Heading4;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_five(), Node = Node::new::<Heading5>())]
+#[require(Heading = Heading::new_level_five(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading5;
 
 /// Level-6 heading, equivalent to HTML `<h6>`.
@@ -264,7 +265,7 @@ pub struct Heading5;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_six(), Node = Node::new::<Heading6>())]
+#[require(Heading = Heading::new_level_six(), Node = Node::new(NodeKind::Heading))]
 pub struct Heading6;
 
 
@@ -284,7 +285,7 @@ pub struct Heading6;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Node = Node::new::<Paragraph>())]
+#[require(DisplayBlock, Node = Node::new(NodeKind::Paragraph))]
 pub struct Paragraph;
 
 /// Inline node for important/strong text.
@@ -305,7 +306,7 @@ pub struct Paragraph;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<Important>(), DisplayInline)]
+#[require(Node = Node::new(NodeKind::Important), DisplayInline)]
 pub struct Important;
 
 
@@ -327,7 +328,7 @@ pub struct Important;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<Emphasize>(), DisplayInline)]
+#[require(Node = Node::new(NodeKind::Emphasize), DisplayInline)]
 pub struct Emphasize;
 
 
@@ -348,7 +349,7 @@ pub struct Emphasize;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<Code>(), DisplayInline)]
+#[require(Node = Node::new(NodeKind::Code), DisplayInline)]
 pub struct Code;
 
 
@@ -369,7 +370,7 @@ pub struct Code;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Node = Node::new::<Quote>(), DisplayInline)]
+#[require(Node = Node::new(NodeKind::Quote), DisplayInline)]
 pub struct Quote;
 
 
@@ -380,7 +381,7 @@ pub struct Quote;
 /// in child entities (the container pattern used by the markdown parser).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(Node = Node::new::<Link>(), DisplayInline)]
+#[require(Node = Node::new(NodeKind::Link), DisplayInline)]
 pub struct Link {
 	/// The URL this link points to.
 	pub href: String,
