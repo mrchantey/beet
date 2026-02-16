@@ -1,6 +1,5 @@
 use crate::interface::visit_root;
 use crate::prelude::widgets::handle_scroll_input;
-use crate::prelude::*;
 use crate::stack::PropagateChanges;
 use crate::stack::StackPlugin;
 use beet_core::prelude::*;
@@ -37,10 +36,7 @@ impl Plugin for TuiPlugin {
 		// Systems: handle input and draw, all after PropagateChanges
 		app.add_systems(
 			PostUpdate,
-			(
-				handle_scroll_input,
-				super::draw_system::<(Heading, Paragraph)>,
-			)
+			(handle_scroll_input, super::draw_system)
 				.chain()
 				.after(PropagateChanges),
 		)

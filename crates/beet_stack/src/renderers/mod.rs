@@ -15,7 +15,13 @@
 //!
 //! # Available Renderers
 //!
-//! - Markdown — via [`RenderMarkdown`] (requires `interface` feature)
-//! - TUI — via the `draw_system` (requires `tui` feature)
+//! - [`MarkdownRenderer`] — produces markdown strings from content trees
+//! - TUI — via [`TuiRenderer`] (requires `tui` feature)
 mod card_walker;
 pub use card_walker::*;
+mod markdown_renderer;
+pub use markdown_renderer::*;
+#[cfg(feature = "tui")]
+mod tui_renderer;
+#[cfg(feature = "tui")]
+pub use tui_renderer::*;

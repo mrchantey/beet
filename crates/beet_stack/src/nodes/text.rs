@@ -14,7 +14,7 @@
 //! Following the Bevy TextSpan pattern, text content is always a direct child
 //! of its structural parent ([`Heading1`], [`Paragraph`], [`Link`]). Children
 //! with [`TextNode`] extend the parent's text in sequence. Each child may
-//! carry semantic markers like [`Important`] or [`Emphasize`].
+//! carry inline node components like [`Important`] or [`Emphasize`].
 //!
 //! ```
 //! use beet_stack::prelude::*;
@@ -30,13 +30,16 @@
 //! ]);
 //! ```
 //!
-//! # Semantic Markers
+//! # Inline Nodes
+//!
+//! These are proper nodes with [`Node`] and [`DisplayInline`]
+//! requirements, semantically equivalent to their HTML counterparts:
 //!
 //! - [`Important`] - Strong importance (like HTML `<strong>`)
 //! - [`Emphasize`] - Stress emphasis (like HTML `<em>`)
-//! - [`Code`] - Inline code fragment
-//! - [`Quote`] - Inline quotation
-//! - [`Link`] - Hyperlink to another resource
+//! - [`Code`] - Inline code fragment (like HTML `<code>`)
+//! - [`Quote`] - Inline quotation (like HTML `<q>`)
+//! - [`Link`] - Hyperlink to another resource (like HTML `<a>`)
 //!
 //! # Structural Components
 //!
@@ -47,12 +50,14 @@
 //!
 //! # Text Traversal
 //!
-//! Use [`TextQuery`] to collect text from structural elements
-//! without manually walking the child tree. It handles inline
-//! markers ([`Important`], [`Emphasize`], etc.) and respects
-//! structural boundaries.
+//! Use [`CardWalker`](crate::renderers::CardWalker) and the
+//! [`CardVisitor`](crate::renderers::CardVisitor) trait to traverse
+//! content trees. The walker dispatches to visitor methods for each
+//! node type, including inline nodes, and handles structural
+//! boundaries automatically.
 use super::node::Node;
 use crate::nodes::DisplayBlock;
+use crate::nodes::DisplayInline;
 use beet_core::prelude::*;
 
 
@@ -282,7 +287,7 @@ pub struct Heading6;
 #[require(DisplayBlock, Node = Node::new::<Paragraph>())]
 pub struct Paragraph;
 
-/// Marker component for important/strong text.
+/// Inline node for important/strong text.
 ///
 /// Semantically equivalent to HTML `<strong>` - text of strong importance.
 /// Interfaces may render this as bold, louder speech, or other emphasis.
@@ -300,10 +305,11 @@ pub struct Paragraph;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<Important>(), DisplayInline)]
 pub struct Important;
 
 
-/// Marker component for emphasized text.
+/// Inline node for emphasized text.
 ///
 /// Semantically equivalent to HTML `<em>` - stress emphasis.
 /// Interfaces may render this as italics, altered pitch, or other emphasis.
@@ -321,10 +327,11 @@ pub struct Important;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<Emphasize>(), DisplayInline)]
 pub struct Emphasize;
 
 
-/// Marker component for inline code or monospace text.
+/// Inline node for code or monospace text.
 ///
 /// Semantically equivalent to HTML `<code>` - a fragment of computer code.
 #[derive(
@@ -341,10 +348,11 @@ pub struct Emphasize;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<Code>(), DisplayInline)]
 pub struct Code;
 
 
-/// Marker component for quoted text.
+/// Inline node for quoted text.
 ///
 /// Semantically equivalent to HTML `<q>` - an inline quotation.
 #[derive(
@@ -361,15 +369,18 @@ pub struct Code;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<Quote>(), DisplayInline)]
 pub struct Quote;
 
 
-/// Component for hyperlink text.
+/// Inline node for hyperlink text.
 ///
 /// Semantically equivalent to HTML `<a>` - a hyperlink to another resource.
+/// The link text can be either a [`TextNode`] on the same entity or
+/// in child entities (the container pattern used by the markdown parser).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(TextNode)]
+#[require(Node = Node::new::<Link>(), DisplayInline)]
 pub struct Link {
 	/// The URL this link points to.
 	pub href: String,

@@ -14,7 +14,6 @@
 //! - [`form`] - Interactive form controls (buttons, checkboxes)
 //! - [`layout`] - Display and layout primitives ([`DisplayBlock`], [`TextAlignment`])
 //! - [`content_macro`] - The [`content!`] macro for ergonomic content composition
-//! - [`text_query`] - [`TextQuery`] system parameter for text traversal
 //!
 //! # Node Invariance
 //!
@@ -50,11 +49,9 @@ mod form;
 mod layout;
 pub(crate) mod node;
 mod text;
-mod text_query;
 pub use content_macro::*;
 pub use elements::*;
 pub use form::*;
 pub use layout::*;
 pub use node::*;
 pub use text::*;
-pub use text_query::*;
