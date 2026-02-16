@@ -1,10 +1,8 @@
 //! Inline text styling and shared visitor context.
 //!
-//! [`InlineModifier`] is a compact bitflag representation of inline
+//! [`InlineStyle`] is a compact bitflag representation of inline
 //! formatting markers ([`Important`](super::Important),
-//! [`Emphasize`](super::Emphasize), etc.). [`InlineStyle`] is a
-//! thin wrapper around the bitflags to fully describe the inline
-//! formatting of a [`TextNode`](super::TextNode).
+//! [`Emphasize`](super::Emphasize), etc.).
 //!
 //! [`VisitContext`] holds traversal state shared between renderers,
 //! including the current entity, inline style stack, code block
@@ -14,14 +12,14 @@
 //! [`CardVisitor`](crate::renderers::CardVisitor) methods so
 //! renderers only track their own rendering-specific state.
 //!
-//! Merging two styles is a simple bitwise OR for the modifiers,
-//! which makes style stack operations efficient.
+//! Merging two styles is a simple bitwise OR, which makes style
+//! stack operations efficient.
 use beet_core::prelude::*;
 use bitflags::bitflags;
 use std::fmt;
 
 bitflags! {
-	/// Inline text formatting modifiers.
+	/// Inline text formatting flags.
 	///
 	/// Each flag corresponds to an inline marker component:
 	///
@@ -37,7 +35,7 @@ bitflags! {
 	/// | `MATH_INLINE`   | [`MathInline`](super::MathInline)    |
 	/// | `LINK`          | [`Link`](super::Link)                |
 	#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
-	pub struct InlineModifier: u16 {
+	pub struct InlineStyle: u16 {
 		/// Strong importance, ie HTML `<strong>`.
 		const BOLD          = 0b0000_0000_0001;
 		/// Stress emphasis, ie HTML `<em>`.
@@ -59,7 +57,7 @@ bitflags! {
 	}
 }
 
-impl fmt::Debug for InlineModifier {
+impl fmt::Debug for InlineStyle {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if self.is_empty() {
 			return write!(f, "NONE");
@@ -68,43 +66,20 @@ impl fmt::Debug for InlineModifier {
 	}
 }
 
-/// Complete inline formatting for a text span.
-///
-/// Wraps [`InlineModifier`] bitflags to describe how a
-/// [`TextNode`](super::TextNode) should be rendered.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InlineStyle {
-	/// Bitflag modifiers (bold, italic, code, link, etc.).
-	pub modifiers: InlineModifier,
-}
-
 impl InlineStyle {
 	/// No formatting applied.
-	pub fn plain() -> Self { Self::default() }
+	pub fn plain() -> Self { Self::empty() }
 
 	/// Returns true if no inline formatting is applied.
-	pub fn is_plain(&self) -> bool { self.modifiers.is_empty() }
+	pub fn is_plain(&self) -> bool { self.is_empty() }
 
-	/// Check whether the given modifier flag is set.
-	pub fn contains(&self, modifier: InlineModifier) -> bool {
-		self.modifiers.contains(modifier)
-	}
-
-	/// Merge two styles by combining modifier flags with bitwise OR.
+	/// Merge two styles by combining flags with bitwise OR.
 	///
 	/// Used to inherit inline markers from ancestor containers
 	/// (eg an [`Important`](super::Important) parent entity) onto
 	/// descendant [`TextNode`](super::TextNode) entities via the
 	/// style stack.
-	pub fn merge(&self, other: &Self) -> Self {
-		Self {
-			modifiers: self.modifiers | other.modifiers,
-		}
-	}
-}
-
-impl From<InlineModifier> for InlineStyle {
-	fn from(modifiers: InlineModifier) -> Self { Self { modifiers } }
+	pub fn merge(&self, other: &Self) -> Self { *self | *other }
 }
 
 
@@ -248,72 +223,70 @@ mod test {
 	fn plain_style() {
 		let style = InlineStyle::plain();
 		style.is_plain().xpect_true();
-		style.modifiers.is_empty().xpect_true();
+		style.is_empty().xpect_true();
 	}
 
 	#[test]
-	fn single_modifier() {
-		let style = InlineStyle::from(InlineModifier::BOLD);
+	fn single_flag() {
+		let style = InlineStyle::BOLD;
 		style.is_plain().xpect_false();
-		style.contains(InlineModifier::BOLD).xpect_true();
-		style.contains(InlineModifier::ITALIC).xpect_false();
+		style.contains(InlineStyle::BOLD).xpect_true();
+		style.contains(InlineStyle::ITALIC).xpect_false();
 	}
 
 	#[test]
-	fn combined_modifiers() {
-		let mods = InlineModifier::BOLD | InlineModifier::ITALIC;
-		let style = InlineStyle::from(mods);
-		style.contains(InlineModifier::BOLD).xpect_true();
-		style.contains(InlineModifier::ITALIC).xpect_true();
-		style.contains(InlineModifier::CODE).xpect_false();
+	fn combined_flags() {
+		let style = InlineStyle::BOLD | InlineStyle::ITALIC;
+		style.contains(InlineStyle::BOLD).xpect_true();
+		style.contains(InlineStyle::ITALIC).xpect_true();
+		style.contains(InlineStyle::CODE).xpect_false();
 	}
 
 	#[test]
-	fn link_modifier() {
-		let style = InlineStyle::from(InlineModifier::LINK);
+	fn link_flag() {
+		let style = InlineStyle::LINK;
 		style.is_plain().xpect_false();
-		style.contains(InlineModifier::LINK).xpect_true();
-		style.contains(InlineModifier::BOLD).xpect_false();
+		style.contains(InlineStyle::LINK).xpect_true();
+		style.contains(InlineStyle::BOLD).xpect_false();
 	}
 
 	#[test]
 	fn merge_combines_flags() {
-		let base =
-			InlineStyle::from(InlineModifier::BOLD | InlineModifier::CODE);
-		let overlay = InlineStyle::from(InlineModifier::ITALIC);
+		let base = InlineStyle::BOLD | InlineStyle::CODE;
+		let overlay = InlineStyle::ITALIC;
 		let merged = base.merge(&overlay);
-		merged.contains(InlineModifier::BOLD).xpect_true();
-		merged.contains(InlineModifier::ITALIC).xpect_true();
-		merged.contains(InlineModifier::CODE).xpect_true();
+		merged.contains(InlineStyle::BOLD).xpect_true();
+		merged.contains(InlineStyle::ITALIC).xpect_true();
+		merged.contains(InlineStyle::CODE).xpect_true();
 	}
 
 	#[test]
 	fn merge_combines_link() {
-		let base = InlineStyle::from(InlineModifier::BOLD);
-		let overlay = InlineStyle::from(InlineModifier::LINK);
+		let base = InlineStyle::BOLD;
+		let overlay = InlineStyle::LINK;
 		let merged = base.merge(&overlay);
-		merged.contains(InlineModifier::BOLD).xpect_true();
-		merged.contains(InlineModifier::LINK).xpect_true();
+		merged.contains(InlineStyle::BOLD).xpect_true();
+		merged.contains(InlineStyle::LINK).xpect_true();
 	}
 
 	#[test]
-	fn modifier_debug_empty() {
-		let mods = InlineModifier::empty();
-		format!("{mods:?}").xpect_eq("NONE");
+	fn debug_empty() {
+		let style = InlineStyle::empty();
+		format!("{style:?}").xpect_eq("NONE");
 	}
 
 	#[test]
-	fn modifier_debug_flags() {
-		let mods = InlineModifier::BOLD | InlineModifier::ITALIC;
-		let dbg = format!("{mods:?}");
+	fn debug_flags() {
+		let style = InlineStyle::BOLD | InlineStyle::ITALIC;
+		let dbg = format!("{style:?}");
 		dbg.as_str().xpect_contains("BOLD");
 		dbg.as_str().xpect_contains("ITALIC");
 	}
 
 	#[test]
-	fn modifier_debug_link() {
-		let mods = InlineModifier::LINK;
-		let dbg = format!("{mods:?}");
+	fn debug_link() {
+		let style = InlineStyle::LINK;
+		let dbg = format!("{style:?}");
 		dbg.as_str().xpect_contains("LINK");
 	}
 
@@ -322,22 +295,22 @@ mod test {
 		let mut cx = VisitContext::new(Entity::PLACEHOLDER);
 		cx.effective_style().is_plain().xpect_true();
 
-		cx.push_style(InlineModifier::BOLD.into());
+		cx.push_style(InlineStyle::BOLD);
 		cx.effective_style()
-			.contains(InlineModifier::BOLD)
+			.contains(InlineStyle::BOLD)
 			.xpect_true();
 
-		cx.push_style(InlineModifier::ITALIC.into());
+		cx.push_style(InlineStyle::ITALIC);
 		let eff = cx.effective_style();
-		eff.contains(InlineModifier::BOLD).xpect_true();
-		eff.contains(InlineModifier::ITALIC).xpect_true();
+		eff.contains(InlineStyle::BOLD).xpect_true();
+		eff.contains(InlineStyle::ITALIC).xpect_true();
 
 		cx.pop_style();
 		cx.effective_style()
-			.contains(InlineModifier::ITALIC)
+			.contains(InlineStyle::ITALIC)
 			.xpect_false();
 		cx.effective_style()
-			.contains(InlineModifier::BOLD)
+			.contains(InlineStyle::BOLD)
 			.xpect_true();
 
 		cx.pop_style();

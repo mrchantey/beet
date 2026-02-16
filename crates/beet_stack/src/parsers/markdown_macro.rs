@@ -1,9 +1,9 @@
 //! The [`markdown!`] macro for spawning markdown as entity bundles.
 //!
-//! Uses the [`IntoMarkdownBundle`] trait to convert string literals
-//! into bundles that parse markdown on spawn via [`OnSpawn`]. Bundle
-//! expressions pass through unchanged, enabling interspersed
-//! markdown text and explicit bundles.
+//! Supports MDX-style `{}` interpolation for embedding bundle
+//! expressions directly in markdown text. Brace groups are treated
+//! as raw bundle expressions; everything else is collected as
+//! markdown and parsed via [`MarkdownDiffer`] on spawn.
 //!
 //! # Usage
 //!
@@ -15,39 +15,29 @@
 //!
 //! // Single markdown string — parsed on spawn
 //! let entity = world.spawn(markdown!("# Hello **world**")).id();
-//!
-//! // Multiple segments — each becomes a child
-//! let entity = world.spawn(markdown!(
-//!     "# My Site",
-//!     (Paragraph::with_text("interspersed bundle")),
-//!     "And some *more text after*",
-//! )).id();
 //! ```
 //!
+//! # MDX Interpolation
+//!
+//! ```ignore
+//! // Raw token mode — `{}` groups become bundle expressions
+//! markdown!{
+//!     # Stock Counter
+//!     Records in stock: { field_ref.clone().as_text() }
+//!
+//!     ## Tools
+//!     {increment(field_ref)}
+//! }
+//!
+//! // String literal mode — `{}` in the string are interpolated
+//! markdown!(r#"
+//!     # Stock Counter
+//!     Records in stock: { field_ref.clone().as_text() }
+//! "#)
+//! ```
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use variadics_please::all_tuples;
-
-/// Trait for types that can be converted into a markdown-aware bundle.
-///
-/// String types are parsed as markdown via [`MarkdownDiffer`] on
-/// spawn. Other types pass through as regular bundles.
-trait IntoMarkdownBundle<M> {
-	/// Convert into a bundle for spawning as a markdown segment.
-	fn into_markdown_bundle(self) -> impl Bundle;
-}
-
-// String-like types get parsed as markdown via OnSpawn
-impl IntoMarkdownBundle<Self> for &str {
-	fn into_markdown_bundle(self) -> impl Bundle { markdown(self) }
-}
-
-
-
-impl IntoMarkdownBundle<Self> for String {
-	fn into_markdown_bundle(self) -> impl Bundle { markdown(self) }
-}
 
 /// Convert a string into a bundle that parses markdown on spawn.
 pub fn markdown(text: impl Into<String>) -> impl Bundle {
@@ -62,80 +52,41 @@ pub fn markdown(text: impl Into<String>) -> impl Bundle {
 	})
 }
 
-pub struct ComponentIntoMarkdownBundleMarker;
-impl<C: Component> IntoMarkdownBundle<ComponentIntoMarkdownBundleMarker> for C {
-	fn into_markdown_bundle(self) -> impl Bundle { self }
-}
-
-// impl IntoMarkdownBundle<Self> for FieldRef {
-// 	fn into_markdown_bundle(self) -> impl Bundle { (self, TextNode::default()) }
-// }
-
-pub struct TupleIntoMarkdownBundleMarker;
-
-macro_rules! impl_into_markdown_bundle_tuple {
- ($(#[$meta:meta])* $(($M:ident, $T:ident)),*) => {
-  $(#[$meta])*
-  impl<$($M, $T),*> IntoMarkdownBundle<(TupleIntoMarkdownBundleMarker, $($M,)*)> for ($($T,)*)
-  where
-   $($T: IntoMarkdownBundle<$M>),*
-  {
-   #[allow(non_snake_case)]
-   fn into_markdown_bundle(self) -> impl Bundle {
-    let ($($T,)*) = self;
-    ($($T.into_markdown_bundle(),)*)
-   }
-  }
- }
-}
-
-all_tuples!(impl_into_markdown_bundle_tuple, 1, 12, M, T);
-
 
 /// Spawn markdown content as an entity bundle.
 ///
-/// String literals are parsed as markdown via [`MarkdownDiffer`].
-/// Bundle expressions pass through unchanged. Multiple segments
-/// become children of the spawned entity.
+/// Supports three input forms:
 ///
-/// # Examples
+/// 1. **String literal** — parsed as markdown on spawn:
+///    ```ignore
+///    markdown!("# Hello **world**")
+///    ```
 ///
-/// ```
-/// use beet_stack::prelude::*;
-/// use beet_core::prelude::*;
+/// 2. **Raw tokens with `{}` interpolation** — brace groups become
+///    bundle expressions, everything else becomes markdown:
+///    ```ignore
+///    markdown!{
+///        # Title
+///        {some_bundle_expr}
+///        More *text*
+///    }
+///    ```
 ///
-/// let mut world = World::new();
+/// 3. **String literal with `{}` interpolation** — `{}` in the
+///    string are parsed as bundle expressions:
+///    ```ignore
+///    markdown!(r#"
+///        # Title
+///        { some_bundle_expr }
+///    "#)
+///    ```
 ///
-/// // Single markdown string
-/// let entity = world.spawn(markdown!("# Hello **world**")).id();
-///
-/// // Multiple segments as children
-/// let entity = world.spawn(markdown!(
-///     "# Title",
-///     (Paragraph::with_text("a bundle")),
-///     "*emphasis*",
-/// )).id();
-/// ```
+/// Escaped braces `{{like this}}` are treated as literal braces.
 #[macro_export]
 macro_rules! markdown {
-	// Single expression — return directly without children! wrapper
-	[$segment:expr $(,)?] => {
-		$crate::prelude::into_markdown_bundle($segment)
+	($($tt:tt)*) => {
+		::beet_core::mdx!($crate; $($tt)*)
 	};
-	// Multiple expressions — wrap in children!
-	[$($segment:expr),+ $(,)?] => {
-		::bevy::prelude::children![
-			$($crate::prelude::into_markdown_bundle($segment)),+
-		]
-	};
-}
-
-#[inline]
-#[allow(private_bounds)]
-pub fn into_markdown_bundle<M>(
-	value: impl IntoMarkdownBundle<M>,
-) -> impl Bundle {
-	value.into_markdown_bundle()
 }
 
 
@@ -285,40 +236,6 @@ mod test {
 
 		let list_children = world.entity(list).get::<Children>().unwrap();
 		list_children.len().xpect_eq(3);
-	}
-
-	#[test]
-	fn multiple_segments_as_children() {
-		let mut world = World::new();
-		let root = world
-			.spawn(markdown!(
-				"# Title",
-				"interspersed plain text",
-				"*emphasis*",
-			))
-			.id();
-
-		let children = world.entity(root).get::<Children>().unwrap();
-		// Three segments become three children
-		children.len().xpect_eq(3);
-
-		// First child: OnSpawn parsed "# Title" → has Heading1 subchild
-		let first = *children.first().unwrap();
-		let first_children = world.entity(first).get::<Children>().unwrap();
-		let heading = *first_children.first().unwrap();
-		world.entity(heading).contains::<Heading1>().xpect_true();
-
-		// Second child: OnSpawn parsed plain text → has Paragraph subchild
-		let second = children.iter().nth(1).unwrap();
-		let second_children = world.entity(second).get::<Children>().unwrap();
-		let para = *second_children.first().unwrap();
-		world.entity(para).contains::<Paragraph>().xpect_true();
-
-		// Third child: OnSpawn parsed "*emphasis*" → has Paragraph subchild
-		let third = children.iter().nth(2).unwrap();
-		let third_children = world.entity(third).get::<Children>().unwrap();
-		let para = *third_children.first().unwrap();
-		world.entity(para).contains::<Paragraph>().xpect_true();
 	}
 
 	#[test]

@@ -159,19 +159,19 @@ impl<'buf> TuiRenderer<'buf> {
 	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
 	fn style_from_inline(&self, style: &InlineStyle) -> Style {
 		let mut result = Style::new();
-		if style.contains(InlineModifier::BOLD) {
+		if style.contains(InlineStyle::BOLD) {
 			result = result.bold();
 		}
-		if style.contains(InlineModifier::ITALIC) {
+		if style.contains(InlineStyle::ITALIC) {
 			result = result.italic();
 		}
-		if style.contains(InlineModifier::CODE) {
+		if style.contains(InlineStyle::CODE) {
 			result = result.bg(Color::DarkGray);
 		}
-		if style.contains(InlineModifier::STRIKETHROUGH) {
+		if style.contains(InlineStyle::STRIKETHROUGH) {
 			result = result.crossed_out();
 		}
-		if style.contains(InlineModifier::LINK) {
+		if style.contains(InlineStyle::LINK) {
 			result = result.underlined().fg(self.config.link_fg);
 		}
 		result

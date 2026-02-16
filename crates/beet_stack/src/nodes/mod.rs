@@ -8,20 +8,20 @@
 //!
 //! # Module Structure
 //!
-//! - [`node`] - Core [`Node`] component with [`NodeKind`] dispatch enum
+//! - [`node`] - Core [`Node`] dispatch enum component
 //! - [`text`] - [`TextNode`], [`Heading`], [`Paragraph`], and semantic markers
 //! - [`elements`] - Block and inline content elements (lists, tables, images, etc.)
 //! - [`form`] - Interactive form controls (buttons, checkboxes)
 //! - [`layout`] - Display and layout primitives ([`DisplayBlock`], [`TextAlignment`])
-//! - [`style`] - [`InlineModifier`] bitflags, [`InlineStyle`], and [`VisitContext`]
+//! - [`style`] - [`InlineStyle`] bitflags and [`VisitContext`]
 //! - [`markdown!`] - The markdown macro for ergonomic content spawning
 //!
 //! # Node Invariance
 //!
-//! Every node type requires a [`Node`] component that records its
-//! concrete [`NodeKind`]. Nodes are invariant — they must not change
-//! type after creation. If a different node type is needed, the
-//! entity must be despawned and a new one spawned.
+//! Every node type requires a [`Node`] component that identifies its
+//! concrete type. Nodes are invariant — they must not change type
+//! after creation. If a different node type is needed, the entity
+//! must be despawned and a new one spawned.
 //!
 //! # Inline Container Pattern
 //!

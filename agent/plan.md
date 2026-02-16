@@ -1,56 +1,17 @@
 lets keep iterating on beet_stack!
 
-# `style.rs`
-
-`InlineStyle` check your working on `	pub link: Option<Link>`, im quite sure that should just be another bitflag instead of cloning the node, if its even nessecary? Like why is the tui renderer using this instead of visit_link. if hyperlink impl is wrong fix that instead of this hack.
-
 # `card_walker.rs`
 
-This needs a bit of a refactor, this `DispatchKind` thing is very weird. I'd prefer to not be passing around the instruction to the function and then doing a match on it. Try something less clever, i have no idea if this will work but something like this you wont need to do all that weird passing around.
+- visit_button is wrong, a button cannot be a TextNode just like html
+- for the tui just render buttons a link.
+- remove `widgets/button` and `widgets/hyperlink`, just render these directly like in render_markdown.
+- Remove the control flow element of the walker, its an antipattern. each usage of it (visit_button, visit_image, even the html one) is a bug, an example of how we've lost the value of the children. instead use leave_button, leave_image to handle appending the suffix.
+- ensure that all visit_ and leave_ handlers actually provide a reference to the node being visited/left. this should replace antipatterns like render tui	`current_link_url: Option<String>` (which isnt even being used?)
 
-```
-fn per_entity(){
- call visit entity
- match type, call visit inner
- iterate on children
- match type, call leave inner
-}
-```
+# `markdown!`
 
-- In the visitor trait move the entity to VisitContext, making the api cleaner with only one param.
-- Replace `ctx` var name with `cx`
+remove this macro, just use mdx directly. use `pkg_ext::internal_or_beet` to resolve crate name. Merge tests and docs.
 
-# `markdown_macro.rs`
+# undo!
 
-This does not need World, instead do the same architecture as `content_macro.rs` with a trait `IntoBundle<M>`
-
-```rust
-impl IntoBundle<Self> for &str {
-	fn into_bundle(self) -> impl Bundle { 
-		OnSpawn::new(self, |entity:EntityWorldMut|{
-			// do the markdown diffing, inserting etc here.
-		})		
- }
-}
-let bundle = markdown!(r#"
-
-# My Site
-
-Welcome to my site	
-"#
-{(Paragraph::with_text("interspersed with bundles"))}
-"And some *more text after*"
-)
-```
-I'm guessing this means the top level is a flat list of children, so the above example is an empty entity with three children.
-
-When done remove the `content_macro` completely and replace all usage with this one. Also check all spawning of TextNode::new or xx::with_text, in almost all cases prefer usage of markdown! for easier readability, unless testing the macro itself or some nuance case.
-
-## `render_tui.rs`
-
-In general the formatting should be more in line with markdown, maybe two preceeding newlines for the main heading, newlines around block quotes etc. expose sensible config options on the renderer.
-Also verify that links and buttons are rendering correctly, see `hyperlink` and `button` widget for the tui stuff. For me its not clickable, and seems to be Block instead of Inline.
-
-## Testing
-
-- The markdown! macro enables more ergonomic testing of our renderers and parsers, For more advanced 'kitchen sink' rendering and parsing tests, use `my_str.xpect_snapshot()`
+See the current git diff for `parse_markdown.rs` undo these changes, the previous parser was easier to read

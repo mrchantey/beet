@@ -2,6 +2,7 @@ mod action;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
+mod mdx;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -178,4 +179,20 @@ pub fn beet_test(
 	parse_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+/// MDX-style markdown macro with `{}` interpolation.
+///
+/// Not invoked directly — use the `markdown!` wrapper macro from
+/// `beet_stack` which provides the `$crate` path automatically.
+///
+/// # Input Format
+///
+/// ```text
+/// mdx!($crate_path; # Heading text {bundle_expr} more text)
+/// mdx!($crate_path; "string with {interpolation}")
+/// ```
+#[proc_macro]
+pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	mdx::impl_mdx(input)
 }

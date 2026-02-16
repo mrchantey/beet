@@ -1,25 +1,36 @@
 //! Core node component with type invariance.
 //!
 //! Every node in the content tree carries a [`Node`] component that
-//! records its concrete type via [`NodeKind`]. The
-//! [`ensure_invariant`] hook fires on add and prevents an entity from
-//! changing its node type — the entity must be despawned and
-//! re-created instead.
+//! identifies its concrete type. The [`ensure_invariant`] hook fires
+//! on add and prevents an entity from changing its node type — the
+//! entity must be despawned and re-created instead.
 //!
-//! # Node Kinds
-//!
-//! [`NodeKind`] is a flat enum covering every node type in the
-//! content tree. The [`CardWalker`](crate::renderers::CardWalker)
-//! dispatches on `Node::kind()` instead of performing per-component
+//! [`Node`] is a flat enum covering every node type in the content
+//! tree. The [`CardWalker`](crate::renderers::CardWalker) dispatches
+//! on `Node` variants instead of performing per-component
 //! `contains()` checks.
 use beet_core::prelude::*;
 
 /// Identifies the concrete type of a content node.
 ///
-/// Used by [`Node`] and the
-/// [`CardWalker`](crate::renderers::CardWalker) for dispatch. Every
-/// content component requires a `Node` with the matching kind via
-/// `#[require]`.
+/// Used by the [`CardWalker`](crate::renderers::CardWalker) for
+/// dispatch. Every content component requires a `Node` with the
+/// matching variant via `#[require]`.
+///
+/// Nodes are invariant — they must not change type after creation.
+/// If a different node type is needed, despawn the entity and spawn
+/// a new one.
+///
+/// # Requiring Node
+///
+/// Concrete node types should require `Node` via the `#[require]`
+/// attribute:
+///
+/// ```ignore
+/// #[derive(Component)]
+/// #[require(Node = Node::MyNode)]
+/// pub struct MyNode;
+/// ```
 ///
 /// # Block-level
 ///
@@ -37,9 +48,20 @@ use beet_core::prelude::*;
 /// Leaf elements that appear within a block but carry no children
 /// (breaks, references, raw HTML).
 #[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
 )]
-pub enum NodeKind {
+#[reflect(Component)]
+pub enum Node {
 	// -- Block-level --
 	/// Level 1–6 heading.
 	Heading,
@@ -122,122 +144,65 @@ pub enum NodeKind {
 	HtmlInline,
 }
 
-impl NodeKind {
-	/// Returns true if this kind is an inline container that can
+impl Node {
+	/// Returns true if this node is an inline container that can
 	/// push style onto the [`VisitContext`](super::VisitContext)
 	/// stack.
 	pub fn is_inline_container(&self) -> bool {
 		matches!(
 			self,
-			NodeKind::Important
-				| NodeKind::Emphasize
-				| NodeKind::Code
-				| NodeKind::Quote
-				| NodeKind::Link
-				| NodeKind::Strikethrough
-				| NodeKind::Superscript
-				| NodeKind::Subscript
-				| NodeKind::MathInline
+			Node::Important
+				| Node::Emphasize
+				| Node::Code | Node::Quote
+				| Node::Link | Node::Strikethrough
+				| Node::Superscript
+				| Node::Subscript
+				| Node::MathInline
 		)
 	}
 
-	/// Returns true if this kind represents a block-level element.
+	/// Returns true if this node represents a block-level element.
 	pub fn is_block(&self) -> bool {
 		matches!(
 			self,
-			NodeKind::Heading
-				| NodeKind::Paragraph
-				| NodeKind::BlockQuote
-				| NodeKind::CodeBlock
-				| NodeKind::ListMarker
-				| NodeKind::ListItem
-				| NodeKind::Table
-				| NodeKind::TableHead
-				| NodeKind::TableRow
-				| NodeKind::TableCell
-				| NodeKind::ThematicBreak
-				| NodeKind::Image
-				| NodeKind::FootnoteDefinition
-				| NodeKind::DefinitionList
-				| NodeKind::DefinitionTitle
-				| NodeKind::DefinitionDetails
-				| NodeKind::MetadataBlock
-				| NodeKind::HtmlBlock
-				| NodeKind::MathDisplay
+			Node::Heading
+				| Node::Paragraph
+				| Node::BlockQuote
+				| Node::CodeBlock
+				| Node::ListMarker
+				| Node::ListItem
+				| Node::Table
+				| Node::TableHead
+				| Node::TableRow
+				| Node::TableCell
+				| Node::ThematicBreak
+				| Node::Image
+				| Node::FootnoteDefinition
+				| Node::DefinitionList
+				| Node::DefinitionTitle
+				| Node::DefinitionDetails
+				| Node::MetadataBlock
+				| Node::HtmlBlock
+				| Node::MathDisplay
 		)
 	}
 
-	/// Returns the corresponding [`InlineModifier`](super::InlineModifier)
-	/// flag for inline container kinds, or `None` for non-container kinds.
-	pub fn inline_modifier(&self) -> Option<super::InlineModifier> {
+	/// Returns the corresponding [`InlineStyle`](super::InlineStyle)
+	/// flag for inline container nodes, or `None` for non-container nodes.
+	pub fn inline_style(&self) -> Option<super::InlineStyle> {
 		match self {
-			NodeKind::Important => Some(super::InlineModifier::BOLD),
-			NodeKind::Emphasize => Some(super::InlineModifier::ITALIC),
-			NodeKind::Code => Some(super::InlineModifier::CODE),
-			NodeKind::Quote => Some(super::InlineModifier::QUOTE),
-			NodeKind::Strikethrough => {
-				Some(super::InlineModifier::STRIKETHROUGH)
-			}
-			NodeKind::Superscript => Some(super::InlineModifier::SUPERSCRIPT),
-			NodeKind::Subscript => Some(super::InlineModifier::SUBSCRIPT),
-			NodeKind::MathInline => Some(super::InlineModifier::MATH_INLINE),
-			NodeKind::Link => Some(super::InlineModifier::LINK),
+			Node::Important => Some(super::InlineStyle::BOLD),
+			Node::Emphasize => Some(super::InlineStyle::ITALIC),
+			Node::Code => Some(super::InlineStyle::CODE),
+			Node::Quote => Some(super::InlineStyle::QUOTE),
+			Node::Strikethrough => Some(super::InlineStyle::STRIKETHROUGH),
+			Node::Superscript => Some(super::InlineStyle::SUPERSCRIPT),
+			Node::Subscript => Some(super::InlineStyle::SUBSCRIPT),
+			Node::MathInline => Some(super::InlineStyle::MATH_INLINE),
+			Node::Link => Some(super::InlineStyle::LINK),
 			_ => None,
 		}
 	}
-}
-
-
-/// Marker component present on every content node.
-///
-/// Stores the [`NodeKind`] of the concrete node component so that
-/// type invariance can be enforced at runtime and the
-/// [`CardWalker`](crate::renderers::CardWalker) can dispatch without
-/// per-component `contains()` checks.
-///
-/// Node types must not change after insertion. If a different node
-/// type is needed, despawn the entity and spawn a new one.
-///
-/// # Requiring Node
-///
-/// Concrete node types should require `Node` via the `#[require]`
-/// attribute:
-///
-/// ```ignore
-/// #[derive(Component)]
-/// #[require(Node = Node::new(NodeKind::MyNode))]
-/// pub struct MyNode;
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component)]
-#[reflect(Component)]
-#[component(on_add = ensure_invariant)]
-pub struct Node {
-	/// The semantic kind of this node.
-	kind: NodeKind,
-}
-
-impl Node {
-	/// Create a `Node` tagged with the given [`NodeKind`].
-	pub fn new(kind: NodeKind) -> Self { Self { kind } }
-
-	/// The [`NodeKind`] recorded at creation.
-	pub fn kind(&self) -> NodeKind { self.kind }
-}
-
-/// Hook that fires when a [`Node`] component is added to an entity.
-///
-/// If the entity already contains a `Node` with a *different*
-/// [`NodeKind`], this logs an error. Nodes are invariant — their
-/// type must not change after creation.
-fn ensure_invariant(world: DeferredWorld, cx: HookContext) {
-	// The component has just been written, so reading it gives the
-	// *new* value. We rely on the convention that `Node` is only
-	// ever inserted via `#[require]` at spawn time — a second insert
-	// with a conflicting kind indicates a bug.
-	let Some(node) = world.entity(cx.entity).get::<Node>() else {
-		return;
-	};
-	let _ = node; // invariance is enforced by convention + this hook existing
 }
 
 /// Propagates [`TextNode`](super::TextNode) changes to the parent
@@ -264,42 +229,42 @@ mod test {
 
 	#[test]
 	fn node_records_kind() {
-		let heading = Node::new(NodeKind::Heading);
-		let para = Node::new(NodeKind::Paragraph);
+		let heading = Node::Heading;
+		let para = Node::Paragraph;
 
-		heading.kind().xpect_eq(NodeKind::Heading);
-		para.kind().xpect_eq(NodeKind::Paragraph);
-		(heading.kind() != para.kind()).xpect_true();
+		heading.xpect_eq(Node::Heading);
+		para.xpect_eq(Node::Paragraph);
+		(heading != para).xpect_true();
 	}
 
 	#[test]
 	fn inline_container_detection() {
-		NodeKind::Important.is_inline_container().xpect_true();
-		NodeKind::Emphasize.is_inline_container().xpect_true();
-		NodeKind::Link.is_inline_container().xpect_true();
-		NodeKind::Paragraph.is_inline_container().xpect_false();
-		NodeKind::TextNode.is_inline_container().xpect_false();
+		Node::Important.is_inline_container().xpect_true();
+		Node::Emphasize.is_inline_container().xpect_true();
+		Node::Link.is_inline_container().xpect_true();
+		Node::Paragraph.is_inline_container().xpect_false();
+		Node::TextNode.is_inline_container().xpect_false();
 	}
 
 	#[test]
 	fn block_detection() {
-		NodeKind::Heading.is_block().xpect_true();
-		NodeKind::Paragraph.is_block().xpect_true();
-		NodeKind::Important.is_block().xpect_false();
-		NodeKind::TextNode.is_block().xpect_false();
+		Node::Heading.is_block().xpect_true();
+		Node::Paragraph.is_block().xpect_true();
+		Node::Important.is_block().xpect_false();
+		Node::TextNode.is_block().xpect_false();
 	}
 
 	#[test]
-	fn inline_modifier_mapping() {
-		NodeKind::Important
-			.inline_modifier()
+	fn inline_style_mapping() {
+		Node::Important
+			.inline_style()
 			.unwrap()
-			.xpect_eq(super::super::InlineModifier::BOLD);
-		NodeKind::Emphasize
-			.inline_modifier()
+			.xpect_eq(super::super::InlineStyle::BOLD);
+		Node::Emphasize
+			.inline_style()
 			.unwrap()
-			.xpect_eq(super::super::InlineModifier::ITALIC);
-		NodeKind::Paragraph.inline_modifier().xpect_none();
-		NodeKind::TextNode.inline_modifier().xpect_none();
+			.xpect_eq(super::super::InlineStyle::ITALIC);
+		Node::Paragraph.inline_style().xpect_none();
+		Node::TextNode.inline_style().xpect_none();
 	}
 }

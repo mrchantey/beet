@@ -69,8 +69,8 @@ use std::ops::ControlFlow;
 /// System parameter for depth-first traversal of a card's entity tree.
 ///
 /// Uses [`CardQuery`] for boundary detection and individual component
-/// queries for node data. Dispatches on [`Node::kind`] rather than
-/// per-component `contains()` checks.
+/// queries for node data. Dispatches on [`Node`] variants rather
+/// than per-component `contains()` checks.
 #[derive(SystemParam)]
 pub struct CardWalker<'w, 's> {
 	card_query: CardQuery<'w, 's>,
@@ -148,17 +148,14 @@ impl CardWalker<'_, '_> {
 			return;
 		};
 
-		let kind = node.kind();
+		let kind = *node;
 
 		// Check if this entity is an inline container. If so, push
 		// its style onto the context stack so descendant TextNode
 		// entities inherit it.
 		let is_inline_container = kind.is_inline_container();
 		if is_inline_container {
-			let style: InlineStyle = kind
-				.inline_modifier()
-				.map(InlineStyle::from)
-				.unwrap_or_default();
+			let style = kind.inline_style().unwrap_or_default();
 			cx.push_style(style);
 		}
 
@@ -168,7 +165,7 @@ impl CardWalker<'_, '_> {
 		// a single match so visit/leave correspondence is explicit.
 		match kind {
 			// ---- Block-level ----
-			NodeKind::Heading => {
+			Node::Heading => {
 				if let Ok(heading) = self.headings.get(entity) {
 					cx.set_heading_level(heading.level());
 					let flow = visitor.visit_heading(cx, heading);
@@ -186,7 +183,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::Paragraph => {
+			Node::Paragraph => {
 				let flow = visitor.visit_paragraph(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -195,7 +192,7 @@ impl CardWalker<'_, '_> {
 				visitor.leave_paragraph(cx);
 			}
 
-			NodeKind::BlockQuote => {
+			Node::BlockQuote => {
 				let flow = visitor.visit_block_quote(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -204,7 +201,7 @@ impl CardWalker<'_, '_> {
 				visitor.leave_block_quote(cx);
 			}
 
-			NodeKind::CodeBlock => {
+			Node::CodeBlock => {
 				if let Ok(code_block) = self.code_blocks.get(entity) {
 					cx.in_code_block = true;
 					let flow = visitor.visit_code_block(cx, code_block);
@@ -222,7 +219,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::ListMarker => {
+			Node::ListMarker => {
 				if let Ok(list_marker) = self.list_markers.get(entity) {
 					cx.push_list(
 						list_marker.ordered,
@@ -243,7 +240,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::ListItem => {
+			Node::ListItem => {
 				let flow = visitor.visit_list_item(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -255,7 +252,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::Table => {
+			Node::Table => {
 				if let Ok(table) = self.tables.get(entity) {
 					let flow = visitor.visit_table(cx, table);
 					if flow.is_continue() {
@@ -271,7 +268,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::TableHead => {
+			Node::TableHead => {
 				let flow = visitor.visit_table_head(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -280,7 +277,7 @@ impl CardWalker<'_, '_> {
 				visitor.leave_table_head(cx);
 			}
 
-			NodeKind::TableRow => {
+			Node::TableRow => {
 				let flow = visitor.visit_table_row(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -289,7 +286,7 @@ impl CardWalker<'_, '_> {
 				visitor.leave_table_row(cx);
 			}
 
-			NodeKind::TableCell => {
+			Node::TableCell => {
 				let flow = visitor.visit_table_cell(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -298,12 +295,12 @@ impl CardWalker<'_, '_> {
 				visitor.leave_table_cell(cx);
 			}
 
-			NodeKind::ThematicBreak => {
+			Node::ThematicBreak => {
 				let _flow = visitor.visit_thematic_break(cx);
 				// ThematicBreak is a leaf — no children to recurse
 			}
 
-			NodeKind::Image => {
+			Node::Image => {
 				if let Ok(image) = self.images.get(entity) {
 					let flow = visitor.visit_image(cx, image);
 					if flow.is_continue() {
@@ -317,7 +314,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::FootnoteDefinition => {
+			Node::FootnoteDefinition => {
 				if let Ok(footnote_def) = self.footnote_defs.get(entity) {
 					let flow =
 						visitor.visit_footnote_definition(cx, footnote_def);
@@ -332,14 +329,14 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::MathDisplay => {
+			Node::MathDisplay => {
 				let flow = visitor.visit_math_display(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
-			NodeKind::HtmlBlock => {
+			Node::HtmlBlock => {
 				if let Ok(html_block) = self.html_blocks.get(entity) {
 					let flow = visitor.visit_html_block(cx, html_block);
 					if flow.is_continue() {
@@ -353,11 +350,11 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			// Block-level kinds without dedicated visitor callbacks
-			NodeKind::DefinitionList
-			| NodeKind::DefinitionTitle
-			| NodeKind::DefinitionDetails
-			| NodeKind::MetadataBlock => {
+			// Block-level nodes without dedicated visitor callbacks
+			Node::DefinitionList
+			| Node::DefinitionTitle
+			| Node::DefinitionDetails
+			| Node::MetadataBlock => {
 				let flow = visitor.visit_entity(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
@@ -365,7 +362,7 @@ impl CardWalker<'_, '_> {
 			}
 
 			// ---- Form ----
-			NodeKind::Button => {
+			Node::Button => {
 				let text = self.text_nodes.get(entity).ok();
 				let flow = visitor.visit_button(cx, text);
 				if flow.is_continue() {
@@ -373,7 +370,7 @@ impl CardWalker<'_, '_> {
 				}
 			}
 
-			NodeKind::TaskListCheck => {
+			Node::TaskListCheck => {
 				if let Ok(task_check) = self.task_checks.get(entity) {
 					let flow = visitor.visit_task_list_check(cx, task_check);
 					if flow.is_continue() {
@@ -388,7 +385,7 @@ impl CardWalker<'_, '_> {
 			}
 
 			// ---- Text ----
-			NodeKind::TextNode => {
+			Node::TextNode => {
 				if let Ok(text) = self.text_nodes.get(entity) {
 					let _flow = visitor.visit_text(cx, text);
 				} else {
@@ -402,20 +399,20 @@ impl CardWalker<'_, '_> {
 			// ---- Inline containers ----
 			// These push style in the block above; they have no
 			// dedicated visitor call, just recurse into children.
-			NodeKind::Important
-			| NodeKind::Emphasize
-			| NodeKind::Code
-			| NodeKind::Quote
-			| NodeKind::Strikethrough
-			| NodeKind::Superscript
-			| NodeKind::Subscript
-			| NodeKind::MathInline => {
+			Node::Important
+			| Node::Emphasize
+			| Node::Code
+			| Node::Quote
+			| Node::Strikethrough
+			| Node::Superscript
+			| Node::Subscript
+			| Node::MathInline => {
 				self.recurse_children(visitor, cx, entity, root);
 			}
 
 			// Link as inline container (has children and a
 			// dedicated visit/leave pair)
-			NodeKind::Link => {
+			Node::Link => {
 				if let Ok(link) = self.links.get(entity) {
 					let flow = visitor.visit_link(cx, link);
 					if flow.is_continue() {
@@ -429,20 +426,20 @@ impl CardWalker<'_, '_> {
 			}
 
 			// ---- Inline leaves ----
-			NodeKind::HardBreak => {
+			Node::HardBreak => {
 				let _flow = visitor.visit_hard_break(cx);
 			}
-			NodeKind::SoftBreak => {
+			Node::SoftBreak => {
 				let _flow = visitor.visit_soft_break(cx);
 			}
-			NodeKind::FootnoteRef => {
+			Node::FootnoteRef => {
 				if let Ok(footnote_ref) = self.footnote_refs.get(entity) {
 					let _flow = visitor.visit_footnote_ref(cx, footnote_ref);
 				} else {
 					let _flow = visitor.visit_entity(cx);
 				}
 			}
-			NodeKind::HtmlInline => {
+			Node::HtmlInline => {
 				if let Ok(html_inline) = self.html_inlines.get(entity) {
 					let _flow = visitor.visit_html_inline(cx, html_inline);
 				} else {
@@ -903,8 +900,8 @@ mod test {
 			.unwrap();
 
 		styles.len().xpect_eq(1);
-		styles[0].contains(InlineModifier::BOLD).xpect_true();
-		styles[0].contains(InlineModifier::ITALIC).xpect_false();
+		styles[0].contains(InlineStyle::BOLD).xpect_true();
+		styles[0].contains(InlineStyle::ITALIC).xpect_false();
 	}
 
 	#[test]
@@ -1004,7 +1001,7 @@ mod test {
 
 	#[test]
 	fn non_plain_inline_style() {
-		let style = InlineStyle::from(InlineModifier::BOLD);
+		let style = InlineStyle::BOLD;
 		style.is_plain().xpect_false();
 	}
 
@@ -1042,7 +1039,7 @@ mod test {
 			.unwrap();
 
 		styles.len().xpect_eq(1);
-		styles[0].contains(InlineModifier::LINK).xpect_true();
+		styles[0].contains(InlineStyle::LINK).xpect_true();
 	}
 
 	#[test]
@@ -1087,13 +1084,13 @@ mod test {
 		collected.len().xpect_eq(3);
 		// "normal " should be plain
 		collected[0].0.xpect_eq("normal ");
-		collected[0].1.contains(InlineModifier::BOLD).xpect_false();
+		collected[0].1.contains(InlineStyle::BOLD).xpect_false();
 		// "bold" should inherit Important from parent container
 		collected[1].0.xpect_eq("bold");
-		collected[1].1.contains(InlineModifier::BOLD).xpect_true();
+		collected[1].1.contains(InlineStyle::BOLD).xpect_true();
 		// " end" should be plain again
 		collected[2].0.xpect_eq(" end");
-		collected[2].1.contains(InlineModifier::BOLD).xpect_false();
+		collected[2].1.contains(InlineStyle::BOLD).xpect_false();
 	}
 
 	#[test]
@@ -1133,8 +1130,8 @@ mod test {
 
 		collected.len().xpect_eq(1);
 		collected[0].0.xpect_eq("bold italic");
-		collected[0].1.contains(InlineModifier::BOLD).xpect_true();
-		collected[0].1.contains(InlineModifier::ITALIC).xpect_true();
+		collected[0].1.contains(InlineStyle::BOLD).xpect_true();
+		collected[0].1.contains(InlineStyle::ITALIC).xpect_true();
 	}
 
 	#[test]

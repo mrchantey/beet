@@ -19,17 +19,21 @@ fn about() -> impl Bundle {
 	)
 }
 
-/// Stock counter page defined programmatically since it uses
-/// interactive tools that can't be expressed in markdown.
+/// Stock counter page using MDX-style markdown interpolation for
+/// mixed static content and interactive tools.
 fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").init_with(0);
 
-	(card("counter"), children![
-		Heading1::with_text("Stock Counter"),
-		increment(field_ref.clone()),
-		(Paragraph, children![
-			TextNode::new("Records in stock: "),
-			field_ref.as_text()
-		])
-	])
+	(
+		card("counter"),
+		markdown!(
+			r#"
+# Stock Counter
+Records in stock: { field_ref.clone().as_text() }
+
+## Tools
+{ increment(field_ref) }
+"#
+		),
+	)
 }

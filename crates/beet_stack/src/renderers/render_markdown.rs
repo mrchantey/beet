@@ -102,28 +102,28 @@ impl MarkdownRenderer {
 	fn apply_inline_style(&self, text: &str, style: &InlineStyle) -> String {
 		let mut wrapped = text.to_string();
 
-		if style.contains(InlineModifier::MATH_INLINE) {
+		if style.contains(InlineStyle::MATH_INLINE) {
 			wrapped = format!("${wrapped}$");
 		}
-		if style.contains(InlineModifier::CODE) {
+		if style.contains(InlineStyle::CODE) {
 			wrapped = format!("`{wrapped}`");
 		}
-		if style.contains(InlineModifier::SUBSCRIPT) {
+		if style.contains(InlineStyle::SUBSCRIPT) {
 			wrapped = format!("~{wrapped}~");
 		}
-		if style.contains(InlineModifier::SUPERSCRIPT) {
+		if style.contains(InlineStyle::SUPERSCRIPT) {
 			wrapped = format!("^{wrapped}^");
 		}
-		if style.contains(InlineModifier::STRIKETHROUGH) {
+		if style.contains(InlineStyle::STRIKETHROUGH) {
 			wrapped = format!("~~{wrapped}~~");
 		}
-		if style.contains(InlineModifier::ITALIC) {
+		if style.contains(InlineStyle::ITALIC) {
 			wrapped = format!("*{wrapped}*");
 		}
-		if style.contains(InlineModifier::BOLD) {
+		if style.contains(InlineStyle::BOLD) {
 			wrapped = format!("**{wrapped}**");
 		}
-		if style.contains(InlineModifier::QUOTE) {
+		if style.contains(InlineStyle::QUOTE) {
 			wrapped = format!("\"{wrapped}\"");
 		}
 		wrapped
