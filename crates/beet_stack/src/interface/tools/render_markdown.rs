@@ -3,7 +3,7 @@
 //! This module provides functionality to convert the semantic text representation
 //! (using [`TextNode`] and semantic markers) into markdown strings.
 //!
-//! Supports all content types produced by [`MarkdownParser`](crate::parsers::MarkdownParser):
+//! Supports all content types produced by [`MarkdownDiffer`](crate::parsers::MarkdownDiffer):
 //!
 //! - Block elements: headings, paragraphs, block quotes, code blocks,
 //!   lists, tables, thematic breaks, images
@@ -443,10 +443,10 @@ impl RenderMarkdown<'_, '_> {
 						.alignments
 						.iter()
 						.map(|alignment| match alignment {
-							CellAlignment::Left => ":---".to_string(),
-							CellAlignment::Center => ":---:".to_string(),
-							CellAlignment::Right => "---:".to_string(),
-							CellAlignment::None => "---".to_string(),
+							TextAlignment::Left => ":---".to_string(),
+							TextAlignment::Center => ":---:".to_string(),
+							TextAlignment::Right => "---:".to_string(),
+							TextAlignment::None => "---".to_string(),
 						})
 						.collect();
 					if sep.is_empty() {

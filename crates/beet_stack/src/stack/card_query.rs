@@ -61,10 +61,13 @@ impl<'w, 's> CardQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity is a Card boundary.
-	fn is_boundary(&self, entity: Entity) -> bool {
+	/// Returns true if the entity is a [`Card`].
+	pub fn is_card(&self, entity: Entity) -> bool {
 		self.cards.contains(entity)
 	}
+
+	/// Returns true if the entity is a Card boundary.
+	fn is_boundary(&self, entity: Entity) -> bool { self.is_card(entity) }
 
 	/// Creates a depth-first iterator over entities within the card.
 	///

@@ -1,9 +1,10 @@
-//! Markdown-to-ECS parser with positional diffing.
+//! Markdown-to-ECS differ with positional diffing.
 //!
-//! Parses markdown text via [`pulldown_cmark`] into an intermediate
-//! [`MdNode`] tree, then applies that tree to a Bevy entity hierarchy
-//! using positional diffing — only touching entities whose content or
-//! structure actually changed.
+//! [`MarkdownDiffer`] implements [`Parser`] to reconcile a markdown
+//! string directly against a Bevy entity hierarchy, spawning,
+//! updating, or despawning entities as needed. Diffing is positional
+//! — only entities whose content or structure actually changed are
+//! touched.
 //!
 //! # Usage
 //!
@@ -13,7 +14,9 @@
 //!
 //! let mut world = World::new();
 //! let root = world.spawn_empty().id();
-//! MarkdownParser::default().render(&mut world, root, "# Hello\n\nworld");
+//! MarkdownDiffer::new("# Hello\n\nworld")
+//!     .diff(world.entity_mut(root))
+//!     .unwrap();
 //!
 //! // root now has Heading1 and Paragraph children
 //! let children = world.entity(root).get::<Children>().unwrap();
@@ -22,18 +25,18 @@
 //!
 //! # Diffing
 //!
-//! Calling [`MarkdownParser::render`] on an entity that already has
-//! children from a previous render will diff positionally:
+//! Calling [`MarkdownDiffer::diff`] on an entity that already has
+//! children from a previous diff will reconcile positionally:
 //!
 //! - Matching node kinds at the same index are updated in place.
 //! - Mismatched kinds cause the old subtree to be despawned and a new
 //!   one spawned.
 //! - Extra old children are despawned; extra new nodes are spawned.
+use super::Parser as ParserTrait;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;
 use pulldown_cmark::Options;
-use pulldown_cmark::Parser;
 use pulldown_cmark::Tag;
 use pulldown_cmark::TextMergeStream;
 
@@ -42,9 +45,9 @@ use pulldown_cmark::TextMergeStream;
 // Intermediate representation
 // ---------------------------------------------------------------------------
 
-/// A node in the intermediate markdown tree produced by [`MarkdownParser::parse`].
+/// Intermediate tree node used internally during diffing.
 #[derive(Debug, Clone, PartialEq)]
-pub enum MdNode {
+enum MdNode {
 	/// An element with a kind tag and child nodes.
 	Element {
 		kind: MdElement,
@@ -69,7 +72,7 @@ impl MdNode {
 
 /// The semantic kind of an [`MdNode::Element`].
 #[derive(Debug, Clone, PartialEq)]
-pub enum MdElement {
+enum MdElement {
 	// -- block --
 	Paragraph,
 	Heading(u8),
@@ -78,7 +81,7 @@ pub enum MdElement {
 	OrderedList { start: u64 },
 	UnorderedList,
 	ListItem,
-	Table { alignments: Vec<CellAlignment> },
+	Table { alignments: Vec<TextAlignment> },
 	TableHead,
 	TableRow,
 	TableCell,
@@ -181,23 +184,48 @@ impl MdElement {
 // Parser
 // ---------------------------------------------------------------------------
 
-/// Configurable markdown parser that converts markdown text into an
-/// intermediate [`MdNode`] tree and can render/diff it against a Bevy
-/// entity hierarchy.
-pub struct MarkdownParser {
+/// Reconciles a markdown string against an entity's children.
+///
+/// Implements [`Parser`](super::Parser) so it can be used with the
+/// generic parsing interface. Internally uses [`pulldown_cmark`] to
+/// parse the markdown and positionally diffs the result against the
+/// existing entity hierarchy.
+///
+/// # Example
+///
+/// ```
+/// use beet_stack::prelude::*;
+/// use beet_core::prelude::*;
+///
+/// let mut world = World::new();
+/// let root = world.spawn_empty().id();
+/// MarkdownDiffer::new("# Hello\n\nworld")
+///     .diff(world.entity_mut(root))
+///     .unwrap();
+///
+/// let children = world.entity(root).get::<Children>().unwrap();
+/// children.len().xpect_eq(2);
+/// ```
+pub struct MarkdownDiffer<'a> {
+	text: &'a str,
 	options: Options,
 }
 
-impl Default for MarkdownParser {
-	fn default() -> Self {
+impl<'a> MarkdownDiffer<'a> {
+	/// Create a differ for the given markdown text.
+	pub fn new(text: &'a str) -> Self {
 		Self {
+			text,
 			options: Self::default_options(),
 		}
 	}
-}
 
-impl MarkdownParser {
-	/// Returns the pulldown-cmark options used for parsing.
+	/// Create a differ with custom pulldown-cmark options.
+	pub fn with_options(text: &'a str, options: Options) -> Self {
+		Self { text, options }
+	}
+
+	/// Returns the default pulldown-cmark options.
 	pub fn default_options() -> Options {
 		Options::ENABLE_TABLES
 			| Options::ENABLE_FOOTNOTES
@@ -214,12 +242,9 @@ impl MarkdownParser {
 			| Options::ENABLE_WIKILINKS
 	}
 
-	/// Create a parser with custom pulldown-cmark options.
-	pub fn with_options(options: Options) -> Self { Self { options } }
-
-	/// Parse markdown text into an intermediate node tree.
-	pub fn parse(&self, text: &str) -> Vec<MdNode> {
-		let parser = Parser::new_ext(text, self.options);
+	/// Parse the markdown text into an intermediate node tree.
+	fn parse(&self) -> Vec<MdNode> {
+		let parser = pulldown_cmark::Parser::new_ext(self.text, self.options);
 		let stream = TextMergeStream::new(parser);
 		let mut builder = TreeBuilder::default();
 		for event in stream {
@@ -227,12 +252,15 @@ impl MarkdownParser {
 		}
 		builder.finish()
 	}
+}
 
-	/// Parse markdown and apply/diff the result onto `entity`,
-	/// spawning or updating child entities as needed.
-	pub fn render(&self, world: &mut World, entity: Entity, text: &str) {
-		let nodes = self.parse(text);
-		diff_children(world, entity, &nodes);
+impl ParserTrait for MarkdownDiffer<'_> {
+	fn diff(&mut self, entity: EntityWorldMut) -> Result {
+		let nodes = self.parse();
+		let entity_id = entity.id();
+		let world = entity.into_world_mut();
+		diff_children(world, entity_id, &nodes);
+		Ok(())
 	}
 }
 
@@ -396,13 +424,13 @@ impl TreeBuilder {
 				let alignments = alignments
 					.into_iter()
 					.map(|alignment| match alignment {
-						pulldown_cmark::Alignment::None => CellAlignment::None,
-						pulldown_cmark::Alignment::Left => CellAlignment::Left,
+						pulldown_cmark::Alignment::None => TextAlignment::None,
+						pulldown_cmark::Alignment::Left => TextAlignment::Left,
 						pulldown_cmark::Alignment::Center => {
-							CellAlignment::Center
+							TextAlignment::Center
 						}
 						pulldown_cmark::Alignment::Right => {
-							CellAlignment::Right
+							TextAlignment::Right
 						}
 					})
 					.collect();
@@ -844,7 +872,7 @@ fn despawn_recursive(world: &mut World, entity: Entity) {
 /// use beet_core::prelude::*;
 ///
 /// let mut world = World::new();
-/// world.spawn(FileContent::new("examples/stack/demo_stack/home.md"));
+/// world.spawn(FileContent::new("examples/stack/petes_beets/home.md"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
@@ -864,7 +892,7 @@ impl FileContent {
 /// changed [`FileContent`] component.
 ///
 /// Reads the file from disk using [`fs_ext::read_to_string`], parses
-/// it with [`MarkdownParser`], and applies the result as children.
+/// it with [`MarkdownDiffer`], and applies the result as children.
 pub fn load_file_content(world: &mut World) {
 	let mut to_load: Vec<(Entity, WsPathBuf)> = Vec::new();
 
@@ -874,10 +902,16 @@ pub fn load_file_content(world: &mut World) {
 		to_load.push((entity, file_content.path.clone()));
 	}
 
-	let parser = MarkdownParser::default();
 	for (entity, path) in to_load {
 		match fs_ext::read_to_string(&path.into_abs()) {
-			Ok(content) => parser.render(world, entity, &content),
+			Ok(text) => {
+				let mut differ = MarkdownDiffer::new(&text);
+				if let Err(err) = differ.diff(world.entity_mut(entity)) {
+					cross_log_error!(
+						"Failed to diff markdown file {path}: {err}"
+					);
+				}
+			}
 			Err(err) => {
 				cross_log_error!("Failed to load markdown file {path}: {err}");
 			}
@@ -894,13 +928,13 @@ pub fn load_file_content(world: &mut World) {
 mod test {
 	use super::*;
 
-	fn parse(text: &str) -> Vec<MdNode> {
-		MarkdownParser::default().parse(text)
-	}
+	fn parse(text: &str) -> Vec<MdNode> { MarkdownDiffer::new(text).parse() }
 
 	fn render(world: &mut World, text: &str) -> Entity {
 		let root = world.spawn_empty().id();
-		MarkdownParser::default().render(world, root, text);
+		MarkdownDiffer::new(text)
+			.diff(world.entity_mut(root))
+			.unwrap();
 		root
 	}
 
@@ -1293,7 +1327,9 @@ mod test {
 		let original_id = text_entity;
 
 		// Re-render with different text
-		MarkdownParser::default().render(&mut world, root, "World");
+		MarkdownDiffer::new("World")
+			.diff(world.entity_mut(root))
+			.unwrap();
 
 		let para_after = child_entities(&world, root)[0];
 		let text_after = child_entities(&world, para_after)[0];
@@ -1320,7 +1356,9 @@ mod test {
 		world.entity(heading).contains::<Heading1>().xpect_true();
 
 		// Re-render as paragraph
-		MarkdownParser::default().render(&mut world, root, "Not a heading");
+		MarkdownDiffer::new("Not a heading")
+			.diff(world.entity_mut(root))
+			.unwrap();
 
 		let children = child_entities(&world, root);
 		children.len().xpect_eq(1);
@@ -1339,7 +1377,9 @@ mod test {
 		child_entities(&world, root).len().xpect_eq(1);
 
 		// Add a paragraph
-		MarkdownParser::default().render(&mut world, root, "# One\n\nTwo");
+		MarkdownDiffer::new("# One\n\nTwo")
+			.diff(world.entity_mut(root))
+			.unwrap();
 
 		let children = child_entities(&world, root);
 		children.len().xpect_eq(2);
@@ -1361,7 +1401,9 @@ mod test {
 		child_entities(&world, root).len().xpect_eq(3);
 
 		// Remove last two paragraphs
-		MarkdownParser::default().render(&mut world, root, "# One");
+		MarkdownDiffer::new("# One")
+			.diff(world.entity_mut(root))
+			.unwrap();
 
 		child_entities(&world, root).len().xpect_eq(1);
 	}
@@ -1379,11 +1421,9 @@ mod test {
 		let para1 = original_children[1];
 
 		// Change only the second paragraph text
-		MarkdownParser::default().render(
-			&mut world,
-			root,
-			"# Title\n\nFirst paragraph\n\nChanged paragraph",
-		);
+		MarkdownDiffer::new("# Title\n\nFirst paragraph\n\nChanged paragraph")
+			.diff(world.entity_mut(root))
+			.unwrap();
 
 		let new_children = child_entities(&world, root);
 		// Heading and first paragraph should be reused

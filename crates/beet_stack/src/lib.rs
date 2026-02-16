@@ -3,12 +3,13 @@
 // #![deny(missing_docs)]
 #![feature(associated_type_defaults, closure_track_caller)]
 #![doc = include_str!("../README.md")]
-mod content;
+pub mod nodes;
 mod control_flow;
 mod document;
 #[cfg(feature = "interface")]
 mod interface;
 mod parsers;
+mod renderers;
 mod router;
 mod stack;
 mod tools;
@@ -16,14 +17,16 @@ mod tools;
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
 	pub use crate::content;
-	pub use crate::content::*;
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
+	pub use crate::nodes;
+	pub use crate::nodes::*;
 	pub use crate::parsers::*;
+	pub use crate::renderers::*;
 	pub use crate::router::*;
 	pub use crate::stack::*;
 	pub use crate::tools::*;

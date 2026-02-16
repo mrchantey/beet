@@ -51,47 +51,9 @@
 //! without manually walking the child tree. It handles inline
 //! markers ([`Important`], [`Emphasize`], etc.) and respects
 //! structural boundaries.
-use crate::content::DisplayBlock;
+use super::node::Node;
+use crate::nodes::DisplayBlock;
 use beet_core::prelude::*;
-
-
-/// Marker component for entities that contain text children.
-///
-/// Required by [`Heading`] and [`Paragraph`]. When any child
-/// [`TextNode`] changes, the [`mark_text_changed`] system
-/// propagates the change to this component, so rebuild systems
-/// can simply query `Changed<Text>`.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct Text;
-
-/// Propagates [`TextNode`] changes to the parent [`Text`] component.
-///
-/// When a child [`TextNode`] is modified, this system marks the
-/// parent's [`Text`] component as changed so downstream systems can
-/// react via `Changed<Text>`.
-pub fn mark_text_changed(
-	mut text: Query<&mut Text>,
-	content: Query<&ChildOf, Changed<TextNode>>,
-) {
-	for child_of in &content {
-		if let Ok(mut marker) = text.get_mut(child_of.parent()) {
-			marker.set_changed();
-		}
-	}
-}
 
 
 /// A string of text, always used as a direct child of a structural
@@ -113,6 +75,7 @@ pub fn mark_text_changed(
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<TextNode>())]
 pub struct TextNode(pub String);
 
 impl TextNode {
@@ -156,7 +119,7 @@ impl WithText for Paragraph {}
 	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Text)]
+#[require(DisplayBlock)]
 pub struct Heading {
 	// private so only Heading1 etc can construct a Heading
 	level: u8,
@@ -201,7 +164,7 @@ impl Default for Heading {
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_one())]
+#[require(Heading = Heading::new_level_one(), Node = Node::new::<Heading1>())]
 pub struct Heading1;
 
 /// Level-2 heading, equivalent to HTML `<h2>`.
@@ -220,7 +183,7 @@ pub struct Heading1;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_two())]
+#[require(Heading = Heading::new_level_two(), Node = Node::new::<Heading2>())]
 pub struct Heading2;
 
 /// Level-3 heading, equivalent to HTML `<h3>`.
@@ -239,7 +202,7 @@ pub struct Heading2;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_three())]
+#[require(Heading = Heading::new_level_three(), Node = Node::new::<Heading3>())]
 pub struct Heading3;
 
 /// Level-4 heading, equivalent to HTML `<h4>`.
@@ -258,7 +221,7 @@ pub struct Heading3;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_four())]
+#[require(Heading = Heading::new_level_four(), Node = Node::new::<Heading4>())]
 pub struct Heading4;
 
 /// Level-5 heading, equivalent to HTML `<h5>`.
@@ -277,7 +240,7 @@ pub struct Heading4;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_five())]
+#[require(Heading = Heading::new_level_five(), Node = Node::new::<Heading5>())]
 pub struct Heading5;
 
 /// Level-6 heading, equivalent to HTML `<h6>`.
@@ -296,7 +259,7 @@ pub struct Heading5;
 	Component,
 )]
 #[reflect(Component)]
-#[require(Heading = Heading::new_level_six())]
+#[require(Heading = Heading::new_level_six(), Node = Node::new::<Heading6>())]
 pub struct Heading6;
 
 
@@ -316,7 +279,7 @@ pub struct Heading6;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock, Text)]
+#[require(DisplayBlock, Node = Node::new::<Paragraph>())]
 pub struct Paragraph;
 
 /// Marker component for important/strong text.

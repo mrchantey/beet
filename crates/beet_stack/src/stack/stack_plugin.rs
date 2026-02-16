@@ -1,4 +1,4 @@
-use crate::content::mark_text_changed;
+use crate::nodes::node::mark_node_changed;
 #[cfg(feature = "markdown")]
 use crate::parsers::load_file_content;
 use crate::prelude::*;
@@ -6,8 +6,8 @@ use beet_core::prelude::*;
 
 /// System set for propagating content changes through the entity hierarchy.
 ///
-/// Runs in [`PostUpdate`] and ensures that child [`TextNode`](crate::content::TextNode)
-/// mutations are reflected on parent [`Text`](crate::content::Text) markers
+/// Runs in [`PostUpdate`] and ensures that child [`TextNode`](crate::nodes::TextNode)
+/// mutations are reflected on parent [`Node`](crate::nodes::Node) markers
 /// before downstream systems (eg TUI rebuild) observe them.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PropagateChanges;
@@ -23,7 +23,7 @@ impl Plugin for StackPlugin {
 			.init_plugin::<RouterPlugin>()
 			.add_systems(
 				PostUpdate,
-				mark_text_changed.in_set(PropagateChanges),
+				mark_node_changed.in_set(PropagateChanges),
 			);
 
 		#[cfg(feature = "markdown")]

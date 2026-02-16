@@ -31,13 +31,13 @@
 //! cargo run --example cli --features stack -- about --navigate=parent
 //! ```
 use beet::prelude::*;
-mod demo_stack;
+mod petes_beets;
 
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((cli_server(), demo_stack::stack()));
+			commands.spawn((cli_server(), petes_beets::stack()));
 		})
 		.run()
 }

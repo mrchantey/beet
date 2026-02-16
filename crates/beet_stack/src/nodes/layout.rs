@@ -9,6 +9,9 @@
 //!
 //! [`DisplayBlock`] marks an entity as a structural content element,
 //! ie a [`Heading`](super::Heading) or [`Paragraph`](super::Paragraph).
+//! [`DisplayInline`] marks an entity as inline content that flows
+//! within a block element.
+//!
 //! Systems that need to distinguish structure from inline content
 //! should query for `DisplayBlock` rather than individual types.
 use beet_core::prelude::*;
@@ -34,6 +37,27 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub struct DisplayBlock;
 
+/// Marker component for inline content elements.
+///
+/// Entities with this component flow within a block-level parent
+/// rather than starting a new block. Inline elements include text
+/// spans, links, and semantic markers like [`Important`](super::Important).
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+pub struct DisplayInline;
+
 /// Layout direction for flex containers.
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component,
@@ -45,6 +69,23 @@ pub enum FlexDirection {
 	Column,
 	/// Stack children horizontally.
 	Row,
+}
+
+/// Text alignment within a container.
+///
+/// Used by [`Table`](super::Table) for column alignment and
+/// [`TableCell`](super::TableCell) for per-cell alignment.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+pub enum TextAlignment {
+	/// No explicit alignment.
+	#[default]
+	None,
+	/// Left-aligned.
+	Left,
+	/// Center-aligned.
+	Center,
+	/// Right-aligned.
+	Right,
 }
 
 /// A length expressed in `em` units, relative to the

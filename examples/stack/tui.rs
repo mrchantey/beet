@@ -27,7 +27,7 @@
 //! counter increment
 //! ```
 use beet::prelude::*;
-mod demo_stack;
+mod petes_beets;
 
 fn main() -> AppExit {
 	App::new()
@@ -36,7 +36,7 @@ fn main() -> AppExit {
 			TuiPlugin,
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((tui_server(), demo_stack::stack()));
+			commands.spawn((tui_server(), petes_beets::stack()));
 		})
 		.run()
 }

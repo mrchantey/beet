@@ -1,8 +1,8 @@
-//! Block-level and additional inline content components.
+//! Block-level and inline content components.
 //!
 //! Extends the core text primitives in [`super::text`] with structural
-//! elements needed to represent full markdown documents. Every component
-//! here is interface-agnostic: renderers decide how to present them.
+//! elements needed to represent full documents. Every component here
+//! is interface-agnostic: renderers decide how to present them.
 //!
 //! # Block Elements
 //!
@@ -26,8 +26,9 @@
 //! - [`FootnoteRef`] - footnote reference marker
 //! - [`MathInline`] - inline math
 //! - [`HtmlInline`] - raw inline HTML pass-through
-//! - [`TaskListMarker`] - checkbox marker for list items
 use super::DisplayBlock;
+use super::TextAlignment;
+use super::node::Node;
 use beet_core::prelude::*;
 
 
@@ -53,7 +54,7 @@ use beet_core::prelude::*;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<BlockQuote>())]
 pub struct BlockQuote;
 
 
@@ -64,7 +65,7 @@ pub struct BlockQuote;
 /// optional `language` field enables syntax highlighting.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<CodeBlock>())]
 pub struct CodeBlock {
 	/// The language tag from the opening fence, if any.
 	pub language: Option<String>,
@@ -91,7 +92,7 @@ impl CodeBlock {
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<ListMarker>())]
 pub struct ListMarker {
 	/// Whether the list is ordered (numbered).
 	pub ordered: bool,
@@ -120,8 +121,7 @@ impl ListMarker {
 /// A single item within a [`ListMarker`] list.
 ///
 /// Children are typically [`Paragraph`](super::Paragraph) or other
-/// block elements. May contain a [`TaskListMarker`] to indicate a
-/// checkbox item.
+/// block elements.
 #[derive(
 	Debug,
 	Default,
@@ -136,7 +136,7 @@ impl ListMarker {
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<ListItem>())]
 pub struct ListItem;
 
 
@@ -158,7 +158,7 @@ pub struct ListItem;
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<ThematicBreak>())]
 pub struct ThematicBreak;
 
 
@@ -168,6 +168,7 @@ pub struct ThematicBreak;
 /// following the same parent-child text pattern as other content.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
+#[require(Node = Node::new::<Image>())]
 pub struct Image {
 	/// The image source URL or path.
 	pub src: String,
@@ -191,31 +192,16 @@ impl Image {
 }
 
 
-/// Column alignment for [`TableCell`].
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
-pub enum CellAlignment {
-	/// No explicit alignment.
-	#[default]
-	None,
-	/// Left-aligned.
-	Left,
-	/// Center-aligned.
-	Center,
-	/// Right-aligned.
-	Right,
-}
-
-
 /// A table container, semantically equivalent to HTML `<table>`.
 ///
 /// Children should be [`TableHead`] and [`TableRow`] entities.
 /// Column alignments are stored here for renderers to reference.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<Table>())]
 pub struct Table {
 	/// Per-column alignment, indexed by column position.
-	pub alignments: Vec<CellAlignment>,
+	pub alignments: Vec<TextAlignment>,
 }
 
 
@@ -236,6 +222,7 @@ pub struct Table {
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<TableHead>())]
 pub struct TableHead;
 
 
@@ -256,6 +243,7 @@ pub struct TableHead;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<TableRow>())]
 pub struct TableRow;
 
 
@@ -267,11 +255,12 @@ pub struct TableRow;
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect, Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<TableCell>())]
 pub struct TableCell {
 	/// Whether this cell is a header cell (`<th>` vs `<td>`).
 	pub header: bool,
 	/// Column alignment for this cell.
-	pub alignment: CellAlignment,
+	pub alignment: TextAlignment,
 }
 
 
@@ -281,7 +270,7 @@ pub struct TableCell {
 /// footnote content (typically [`Paragraph`](super::Paragraph)).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<FootnoteDefinition>())]
 pub struct FootnoteDefinition {
 	/// The footnote label, matching the [`FootnoteRef::label`].
 	pub label: String,
@@ -306,7 +295,7 @@ pub struct FootnoteDefinition {
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<DefinitionList>())]
 pub struct DefinitionList;
 
 
@@ -326,6 +315,7 @@ pub struct DefinitionList;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<DefinitionTitle>())]
 pub struct DefinitionTitle;
 
 
@@ -345,6 +335,7 @@ pub struct DefinitionTitle;
 	Component,
 )]
 #[reflect(Component)]
+#[require(Node = Node::new::<DefinitionDetails>())]
 pub struct DefinitionDetails;
 
 
@@ -354,6 +345,7 @@ pub struct DefinitionDetails;
 /// deserialize this into structured data as needed.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
+#[require(Node = Node::new::<MetadataBlock>())]
 pub struct MetadataBlock {
 	/// Whether the metadata is YAML or TOML.
 	pub kind: MetadataKind,
@@ -378,7 +370,7 @@ pub enum MetadataKind {
 /// Non-HTML renderers may choose to ignore or sanitize this.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<HtmlBlock>())]
 pub struct HtmlBlock(pub String);
 
 
@@ -400,7 +392,7 @@ pub struct HtmlBlock(pub String);
 	Component,
 )]
 #[reflect(Component)]
-#[require(DisplayBlock)]
+#[require(DisplayBlock, Node = Node::new::<MathDisplay>())]
 pub struct MathDisplay;
 
 
@@ -550,33 +542,3 @@ pub struct MathInline;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
 pub struct HtmlInline(pub String);
-
-
-/// A checkbox marker on a [`ListItem`], indicating a task list item.
-///
-/// In markdown this is `- [ ]` (unchecked) or `- [x]` (checked).
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct TaskListCheck {
-	/// Whether the checkbox is checked.
-	pub checked: bool,
-}
-
-impl TaskListCheck {
-	/// Create an unchecked task list marker.
-	pub fn unchecked() -> Self { Self { checked: false } }
-	/// Create a checked task list marker.
-	pub fn checked() -> Self { Self { checked: true } }
-}
