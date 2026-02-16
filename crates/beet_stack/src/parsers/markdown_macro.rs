@@ -40,34 +40,30 @@ trait IntoMarkdownBundle<M> {
 
 // String-like types get parsed as markdown via OnSpawn
 impl IntoMarkdownBundle<Self> for &str {
-	fn into_markdown_bundle(self) -> impl Bundle {
-		let text = self.to_string();
-		OnSpawn::new(move |entity: &mut EntityWorldMut| {
-			let id = entity.id();
-			entity.world_scope(|world| {
-				MarkdownDiffer::new(&text)
-					.diff(world.entity_mut(id))
-					.unwrap();
-			});
-		})
-	}
+	fn into_markdown_bundle(self) -> impl Bundle { markdown(self) }
 }
+
+
 
 impl IntoMarkdownBundle<Self> for String {
-	fn into_markdown_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity: &mut EntityWorldMut| {
-			let id = entity.id();
-			entity.world_scope(|world| {
-				MarkdownDiffer::new(&self)
-					.diff(world.entity_mut(id))
-					.unwrap();
-			});
-		})
-	}
+	fn into_markdown_bundle(self) -> impl Bundle { markdown(self) }
 }
 
-pub struct BundleIntoMarkdownBundleMarker;
-impl<B: Bundle> IntoMarkdownBundle<BundleIntoMarkdownBundleMarker> for B {
+/// Convert a string into a bundle that parses markdown on spawn.
+pub fn markdown(text: impl Into<String>) -> impl Bundle {
+	let text = text.into();
+	OnSpawn::new(move |entity: &mut EntityWorldMut| {
+		let id = entity.id();
+		entity.world_scope(|world| {
+			MarkdownDiffer::new(&text)
+				.diff(world.entity_mut(id))
+				.unwrap();
+		});
+	})
+}
+
+pub struct ComponentIntoMarkdownBundleMarker;
+impl<C: Component> IntoMarkdownBundle<ComponentIntoMarkdownBundleMarker> for C {
 	fn into_markdown_bundle(self) -> impl Bundle { self }
 }
 

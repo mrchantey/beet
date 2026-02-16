@@ -522,7 +522,7 @@ fn diff_children(world: &mut World, parent: Entity, nodes: &[MdNode]) {
 			} else {
 				// Mismatch — despawn old subtree and spawn new one in
 				// place. We handle ordering after the loop.
-				despawn_recursive(world, child);
+				world.despawn(child);
 				let new_child = spawn_node(world, node);
 				world.entity_mut(new_child).insert(ChildOf(parent));
 				keep_count += 1;
@@ -535,7 +535,7 @@ fn diff_children(world: &mut World, parent: Entity, nodes: &[MdNode]) {
 
 	// Despawn any extra old children beyond the new node count.
 	for idx in (keep_count..existing.len()).rev() {
-		despawn_recursive(world, existing[idx]);
+		world.despawn(existing[idx]);
 	}
 }
 
@@ -543,52 +543,11 @@ fn diff_children(world: &mut World, parent: Entity, nodes: &[MdNode]) {
 /// (same structural kind).
 fn can_reuse(world: &World, entity: Entity, node: &MdNode) -> bool {
 	match node {
-		MdNode::Text(_) => {
-			world.entity(entity).contains::<TextNode>()
-				&& !has_any_element_marker(world, entity)
-		}
+		MdNode::Text(_) => world.entity(entity).contains::<TextNode>(),
 		MdNode::Element { kind, .. } => {
 			entity_matches_kind(world, entity, kind)
 		}
 	}
-}
-
-/// Returns true if `entity` has an element marker component that
-/// would conflict with being treated as a plain text node.
-fn has_any_element_marker(world: &World, entity: Entity) -> bool {
-	let entity_ref = world.entity(entity);
-	entity_ref.contains::<Paragraph>()
-		|| entity_ref.contains::<Heading>()
-		|| entity_ref.contains::<BlockQuote>()
-		|| entity_ref.contains::<CodeBlock>()
-		|| entity_ref.contains::<ListMarker>()
-		|| entity_ref.contains::<ListItem>()
-		|| entity_ref.contains::<Table>()
-		|| entity_ref.contains::<TableHead>()
-		|| entity_ref.contains::<TableRow>()
-		|| entity_ref.contains::<TableCell>()
-		|| entity_ref.contains::<ThematicBreak>()
-		|| entity_ref.contains::<Image>()
-		|| entity_ref.contains::<FootnoteDefinition>()
-		|| entity_ref.contains::<DefinitionList>()
-		|| entity_ref.contains::<DefinitionTitle>()
-		|| entity_ref.contains::<DefinitionDetails>()
-		|| entity_ref.contains::<MetadataBlock>()
-		|| entity_ref.contains::<HtmlBlock>()
-		|| entity_ref.contains::<MathDisplay>()
-		|| entity_ref.contains::<Important>()
-		|| entity_ref.contains::<Emphasize>()
-		|| entity_ref.contains::<Strikethrough>()
-		|| entity_ref.contains::<Superscript>()
-		|| entity_ref.contains::<Subscript>()
-		|| entity_ref.contains::<Code>()
-		|| entity_ref.contains::<MathInline>()
-		|| entity_ref.contains::<HtmlInline>()
-		|| entity_ref.contains::<Link>()
-		|| entity_ref.contains::<HardBreak>()
-		|| entity_ref.contains::<SoftBreak>()
-		|| entity_ref.contains::<FootnoteRef>()
-		|| entity_ref.contains::<TaskListCheck>()
 }
 
 /// Check whether an existing entity matches a specific [`MdElement`] kind.
@@ -837,22 +796,6 @@ fn spawn_element(world: &mut World, kind: &MdElement) -> Entity {
 			.id(),
 	}
 }
-
-
-/// Recursively despawn an entity and all its descendants.
-fn despawn_recursive(world: &mut World, entity: Entity) {
-	// Collect children first to avoid borrow issues.
-	let children: Vec<Entity> = world
-		.entity(entity)
-		.get::<Children>()
-		.map(|children| children.iter().collect())
-		.unwrap_or_default();
-	for child in children {
-		despawn_recursive(world, child);
-	}
-	world.despawn(entity);
-}
-
 
 // ---------------------------------------------------------------------------
 // FileContent — load markdown from a workspace file
