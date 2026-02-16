@@ -40,6 +40,18 @@ impl IntoBundle<Self> for Quote {
 	fn into_bundle(self) -> impl Bundle { self }
 }
 
+impl IntoBundle<Self> for Strikethrough {
+	fn into_bundle(self) -> impl Bundle { self }
+}
+
+impl IntoBundle<Self> for Superscript {
+	fn into_bundle(self) -> impl Bundle { self }
+}
+
+impl IntoBundle<Self> for Subscript {
+	fn into_bundle(self) -> impl Bundle { self }
+}
+
 impl IntoBundle<Self> for FieldRef {
 	fn into_bundle(self) -> impl Bundle { (self, TextNode::default()) }
 }

@@ -3,6 +3,13 @@
 //! This module provides functionality to convert the semantic text representation
 //! (using [`TextNode`] and semantic markers) into markdown strings.
 //!
+//! Supports all content types produced by [`MarkdownParser`](crate::parsers::MarkdownParser):
+//!
+//! - Block elements: headings, paragraphs, block quotes, code blocks,
+//!   lists, tables, thematic breaks, images
+//! - Inline markers: strong, emphasis, strikethrough, code, quote,
+//!   superscript, subscript, links
+//!
 //! The core rendering logic is exposed via [`render_markdown_for`] so it can
 //! be called from other systems (ie the interface tool) without needing
 //! to go through a tool call.
@@ -23,6 +30,15 @@ use beet_core::prelude::*;
 /// - [`Code`] → `` `text` `` (inline code)
 /// - [`Quote`] → `"text"` (quoted)
 /// - [`Link`] → `[text](url)`
+/// - [`BlockQuote`] → `> text` (block quote)
+/// - [`CodeBlock`] → fenced code block
+/// - [`ListMarker`] + [`ListItem`] → `- item` or `1. item`
+/// - [`ThematicBreak`] → `---`
+/// - [`Image`] → `![alt](src)`
+/// - [`Strikethrough`] → `~~text~~`
+/// - [`Table`] → GFM table
+/// - [`Superscript`] → `^text^`
+/// - [`Subscript`] → `~text~`
 ///
 /// # Returns
 ///
@@ -87,12 +103,38 @@ pub struct RenderMarkdown<'w, 's> {
 	card_query: CardQuery<'w, 's>,
 	text_query: TextQuery<'w, 's>,
 	text_content: Query<'w, 's, &'static TextNode>,
-	important: Query<'w, 's, (), With<Important>>,
+	important: Query<'w, 's, EntityRef<'static>, With<Important>>,
 	emphasize: Query<'w, 's, (), With<Emphasize>>,
 	code: Query<'w, 's, (), With<Code>>,
 	quote: Query<'w, 's, (), With<Quote>>,
 	links: Query<'w, 's, &'static Link>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
+	cards: Query<'w, 's, (), With<Card>>,
+	children_query: Query<'w, 's, &'static Children>,
+	// Block-level queries
+	block_quotes: Query<'w, 's, (), With<BlockQuote>>,
+	code_blocks: Query<'w, 's, &'static CodeBlock>,
+	list_markers: Query<'w, 's, &'static ListMarker>,
+	list_items: Query<'w, 's, (), With<ListItem>>,
+	thematic_breaks: Query<'w, 's, (), With<ThematicBreak>>,
+	images: Query<'w, 's, &'static Image>,
+	tables: Query<'w, 's, &'static Table>,
+	table_heads: Query<'w, 's, (), With<TableHead>>,
+	table_rows: Query<'w, 's, (), With<TableRow>>,
+	table_cells: Query<'w, 's, (), With<TableCell>>,
+	html_blocks: Query<'w, 's, &'static HtmlBlock>,
+	math_displays: Query<'w, 's, (), With<MathDisplay>>,
+	footnote_defs: Query<'w, 's, &'static FootnoteDefinition>,
+	// Inline queries
+	strikethrough: Query<'w, 's, (), With<Strikethrough>>,
+	superscript: Query<'w, 's, (), With<Superscript>>,
+	subscript: Query<'w, 's, (), With<Subscript>>,
+	hard_breaks: Query<'w, 's, (), With<HardBreak>>,
+	soft_breaks: Query<'w, 's, (), With<SoftBreak>>,
+	math_inlines: Query<'w, 's, (), With<MathInline>>,
+	html_inlines: Query<'w, 's, &'static HtmlInline>,
+	footnote_refs: Query<'w, 's, &'static FootnoteRef>,
+	task_checks: Query<'w, 's, &'static TaskListCheck>,
 }
 
 impl RenderMarkdown<'_, '_> {
@@ -102,53 +144,187 @@ impl RenderMarkdown<'_, '_> {
 	/// card root of `entity`. When false, iteration starts directly
 	/// from `entity`.
 	fn render(&self, entity: Entity, resolve_card_root: bool) -> String {
-		let mut output = String::new();
-
-		let iter: Box<dyn Iterator<Item = Entity>> = if resolve_card_root {
-			Box::new(self.card_query.iter_dfs(entity))
+		let root = if resolve_card_root {
+			self.card_query.card_root(entity)
 		} else {
-			Box::new(self.card_query.iter_dfs_from(entity))
+			entity
 		};
+		let mut output = String::new();
+		self.render_entity(root, &mut output, "");
+		output
+	}
 
-		for current in iter {
-			let is_heading = self.text_query.is_heading(current);
-			let is_paragraph =
-				!is_heading && self.text_query.is_structural(current);
-
-			if is_heading || is_paragraph {
-				let inner_text = self.collect_inline_text(current);
-				if !inner_text.is_empty() {
-					if is_heading {
-						let level =
-							self.text_query.heading_level(current).unwrap_or(1)
-								as usize;
-						let hashes = "#".repeat(level.min(6));
-						output.push_str(&format!(
-							"{} {}\n\n",
-							hashes, inner_text
-						));
-					} else {
-						output.push_str(&format!("{}\n\n", inner_text));
-					}
-				}
-				continue;
+	/// Recursively render an entity and its children to markdown.
+	/// `prefix` is prepended to each line (used for block quote `> ` nesting).
+	fn render_entity(&self, entity: Entity, out: &mut String, prefix: &str) {
+		// -- Block-level elements --
+		if self.text_query.is_heading(entity) {
+			let level =
+				self.text_query.heading_level(entity).unwrap_or(1) as usize;
+			let hashes = "#".repeat(level.min(6));
+			let inner = self.collect_inline_text(entity);
+			if !inner.is_empty() {
+				out.push_str(&format!("{prefix}{hashes} {inner}\n\n"));
 			}
-
-			// Standalone inline text not inside a structural element
-			if let Ok(text) = self.text_content.get(current) {
-				let parent_is_structural =
-					self.ancestors.get(current).is_ok_and(|child_of| {
-						self.text_query.is_structural(child_of.parent())
-					});
-				if !parent_is_structural {
-					output.push_str(
-						&self.apply_inline_markers(text.as_str(), current),
-					);
-				}
-			}
+			return;
 		}
 
-		output
+		if self.text_query.is_structural(entity)
+			&& !self.block_quotes.contains(entity)
+			&& !self.list_items.contains(entity)
+			&& !self.list_markers.contains(entity)
+			&& !self.code_blocks.contains(entity)
+			&& !self.tables.contains(entity)
+			&& !self.table_heads.contains(entity)
+			&& !self.table_rows.contains(entity)
+			&& !self.table_cells.contains(entity)
+			&& !self.thematic_breaks.contains(entity)
+			&& !self.math_displays.contains(entity)
+			&& !self.html_blocks.contains(entity)
+			&& !self.footnote_defs.contains(entity)
+		{
+			// Paragraph or other generic structural block
+			let inner = self.collect_inline_text(entity);
+			if !inner.is_empty() {
+				out.push_str(&format!("{prefix}{inner}\n\n"));
+			}
+			return;
+		}
+
+		if self.thematic_breaks.contains(entity) {
+			out.push_str(&format!("{prefix}---\n\n"));
+			return;
+		}
+
+		if self.block_quotes.contains(entity) {
+			let new_prefix = format!("{prefix}> ");
+			self.render_children(entity, out, &new_prefix);
+			return;
+		}
+
+		if let Ok(code_block) = self.code_blocks.get(entity) {
+			let lang = code_block.language.as_deref().unwrap_or("");
+			out.push_str(&format!("{prefix}```{lang}\n"));
+			// Code block content is stored as TextNode children
+			if let Ok(children) = self.children_query.get(entity) {
+				for child in children.iter() {
+					if let Ok(text) = self.text_content.get(child) {
+						for line in text.as_str().lines() {
+							out.push_str(&format!("{prefix}{line}\n"));
+						}
+					}
+				}
+			}
+			out.push_str(&format!("{prefix}```\n\n"));
+			return;
+		}
+
+		if let Ok(list_marker) = self.list_markers.get(entity) {
+			if let Ok(children) = self.children_query.get(entity) {
+				for (idx, child) in children.iter().enumerate() {
+					if self.list_items.contains(child) {
+						let bullet = if list_marker.ordered {
+							let start = list_marker.start.unwrap_or(1) as usize;
+							format!("{}. ", start + idx)
+						} else {
+							"- ".to_string()
+						};
+						// Render task list checkbox if present
+						let checkbox = self.render_task_checkbox(child);
+						let inner = self.collect_list_item_text(child);
+						out.push_str(&format!(
+							"{prefix}{bullet}{checkbox}{inner}\n"
+						));
+					}
+				}
+			}
+			out.push('\n');
+			return;
+		}
+
+		if let Ok(table) = self.tables.get(entity) {
+			self.render_table(entity, table, out, prefix);
+			return;
+		}
+
+		if let Ok(image) = self.images.get(entity) {
+			let alt = self.collect_inline_text(entity);
+			let title = image
+				.title
+				.as_ref()
+				.map(|title| format!(" \"{title}\""))
+				.unwrap_or_default();
+			out.push_str(&format!(
+				"{prefix}![{alt}]({}{title})\n\n",
+				image.src
+			));
+			return;
+		}
+
+		if let Ok(html_block) = self.html_blocks.get(entity) {
+			if !html_block.0.is_empty() {
+				out.push_str(&format!("{prefix}{}\n\n", html_block.0));
+			}
+			return;
+		}
+
+		if self.math_displays.contains(entity) {
+			out.push_str(&format!("{prefix}$$\n"));
+			if let Ok(children) = self.children_query.get(entity) {
+				for child in children.iter() {
+					if let Ok(text) = self.text_content.get(child) {
+						out.push_str(&format!("{prefix}{}\n", text.as_str()));
+					}
+				}
+			}
+			out.push_str(&format!("{prefix}$$\n\n"));
+			return;
+		}
+
+		if let Ok(footnote_def) = self.footnote_defs.get(entity) {
+			out.push_str(&format!("{prefix}[^{}]: ", footnote_def.label));
+			let inner = self.collect_inline_text_from_children(entity);
+			out.push_str(&format!("{inner}\n\n"));
+			return;
+		}
+
+		// -- Inline elements rendered at block level --
+		if self.hard_breaks.contains(entity) {
+			out.push_str("  \n");
+			return;
+		}
+		if self.soft_breaks.contains(entity) {
+			out.push('\n');
+			return;
+		}
+
+		// Standalone inline text not inside a structural element
+		if let Ok(text) = self.text_content.get(entity) {
+			let parent_is_structural =
+				self.ancestors.get(entity).is_ok_and(|child_of| {
+					self.text_query.is_structural(child_of.parent())
+				});
+			if !parent_is_structural {
+				out.push_str(&self.apply_inline_markers(text.as_str(), entity));
+			}
+			return;
+		}
+
+		// Generic container — recurse into children
+		self.render_children(entity, out, prefix);
+	}
+
+	/// Render all children of an entity.
+	fn render_children(&self, entity: Entity, out: &mut String, prefix: &str) {
+		if let Ok(children) = self.children_query.get(entity) {
+			for child in children.iter() {
+				// Stop at card boundaries — skip nested Card entities
+				if self.cards.contains(child) {
+					continue;
+				}
+				self.render_entity(child, out, prefix);
+			}
+		}
 	}
 
 	/// Collect inline text from a structural element's children,
@@ -169,6 +345,22 @@ impl RenderMarkdown<'_, '_> {
 			}) {
 				continue;
 			}
+			if self.hard_breaks.contains(child) {
+				result.push_str("  \n");
+				continue;
+			}
+			if self.soft_breaks.contains(child) {
+				result.push('\n');
+				continue;
+			}
+			if let Ok(footnote_ref) = self.footnote_refs.get(child) {
+				result.push_str(&format!("[^{}]", footnote_ref.label));
+				continue;
+			}
+			if let Ok(html_inline) = self.html_inlines.get(child) {
+				result.push_str(&html_inline.0);
+				continue;
+			}
 			if let Ok(text) = self.text_content.get(child) {
 				result
 					.push_str(&self.apply_inline_markers(text.as_str(), child));
@@ -177,30 +369,152 @@ impl RenderMarkdown<'_, '_> {
 		result
 	}
 
-	/// Apply inline markers (code, emphasis, importance, quote, link)
-	/// to a text string.
+	/// Collect inline text from direct children only (no DFS).
+	fn collect_inline_text_from_children(&self, parent: Entity) -> String {
+		let mut result = String::new();
+		if let Ok(children) = self.children_query.get(parent) {
+			for child in children.iter() {
+				if let Ok(text) = self.text_content.get(child) {
+					result.push_str(
+						&self.apply_inline_markers(text.as_str(), child),
+					);
+				}
+			}
+		}
+		result
+	}
+
+	/// Collect text from a list item, including nested paragraphs.
+	fn collect_list_item_text(&self, item: Entity) -> String {
+		let mut result = String::new();
+		if let Ok(children) = self.children_query.get(item) {
+			for child in children.iter() {
+				if self.task_checks.contains(child) {
+					continue;
+				}
+				if self.text_query.is_structural(child) {
+					let inner = self.collect_inline_text(child);
+					if !result.is_empty() && !inner.is_empty() {
+						result.push(' ');
+					}
+					result.push_str(&inner);
+				} else if let Ok(text) = self.text_content.get(child) {
+					result.push_str(
+						&self.apply_inline_markers(text.as_str(), child),
+					);
+				}
+			}
+		}
+		result
+	}
+
+	/// Render a task list checkbox prefix for a list item.
+	fn render_task_checkbox(&self, item: Entity) -> String {
+		if let Ok(children) = self.children_query.get(item) {
+			for child in children.iter() {
+				if let Ok(check) = self.task_checks.get(child) {
+					return if check.checked {
+						"[x] ".to_string()
+					} else {
+						"[ ] ".to_string()
+					};
+				}
+			}
+		}
+		String::new()
+	}
+
+	/// Render a GFM-style markdown table.
+	fn render_table(
+		&self,
+		entity: Entity,
+		table: &Table,
+		out: &mut String,
+		prefix: &str,
+	) {
+		if let Ok(children) = self.children_query.get(entity) {
+			for child in children.iter() {
+				if self.table_heads.contains(child) {
+					// Render header cells
+					let row_text = self.render_table_row_cells(child);
+					out.push_str(&format!("{prefix}| {} |\n", row_text));
+					// Render separator
+					let sep: Vec<String> = table
+						.alignments
+						.iter()
+						.map(|alignment| match alignment {
+							CellAlignment::Left => ":---".to_string(),
+							CellAlignment::Center => ":---:".to_string(),
+							CellAlignment::Right => "---:".to_string(),
+							CellAlignment::None => "---".to_string(),
+						})
+						.collect();
+					if sep.is_empty() {
+						out.push_str(&format!("{prefix}| --- |\n"));
+					} else {
+						out.push_str(&format!(
+							"{prefix}| {} |\n",
+							sep.join(" | ")
+						));
+					}
+				} else if self.table_rows.contains(child) {
+					let row_text = self.render_table_row_cells(child);
+					out.push_str(&format!("{prefix}| {} |\n", row_text));
+				}
+			}
+		}
+		out.push('\n');
+	}
+
+	/// Render cells of a table row as `cell1 | cell2 | ...`.
+	fn render_table_row_cells(&self, row: Entity) -> String {
+		let mut cells = Vec::new();
+		if let Ok(children) = self.children_query.get(row) {
+			for child in children.iter() {
+				if self.table_cells.contains(child) {
+					cells.push(self.collect_inline_text(child));
+				}
+			}
+		}
+		cells.join(" | ")
+	}
+
+	/// Apply inline markers (code, emphasis, importance, quote, link,
+	/// strikethrough, superscript, subscript, math) to a text string.
 	fn apply_inline_markers(&self, text: &str, entity: Entity) -> String {
 		let mut wrapped = text.to_string();
 
+		if self.math_inlines.contains(entity) {
+			wrapped = format!("${wrapped}$");
+		}
 		if self.code.contains(entity) {
-			wrapped = format!("`{}`", wrapped);
+			wrapped = format!("`{wrapped}`");
+		}
+		if self.subscript.contains(entity) {
+			wrapped = format!("~{wrapped}~");
+		}
+		if self.superscript.contains(entity) {
+			wrapped = format!("^{wrapped}^");
+		}
+		if self.strikethrough.contains(entity) {
+			wrapped = format!("~~{wrapped}~~");
 		}
 		if self.emphasize.contains(entity) {
-			wrapped = format!("*{}*", wrapped);
+			wrapped = format!("*{wrapped}*");
 		}
 		if self.important.contains(entity) {
-			wrapped = format!("**{}**", wrapped);
+			wrapped = format!("**{wrapped}**");
 		}
 		if self.quote.contains(entity) {
-			wrapped = format!("\"{}\"", wrapped);
+			wrapped = format!("\"{wrapped}\"");
 		}
 		if let Ok(link) = self.links.get(entity) {
 			let title = link
 				.title
 				.as_ref()
-				.map(|title| format!(" \"{}\"", title))
+				.map(|title| format!(" \"{title}\""))
 				.unwrap_or_default();
-			wrapped = format!("[{}]({}{})", wrapped, link.href, title);
+			wrapped = format!("[{wrapped}]({}{title})", link.href);
 		}
 		wrapped
 	}

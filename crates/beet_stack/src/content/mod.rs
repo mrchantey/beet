@@ -52,10 +52,12 @@
 //! [`FieldRef`]: crate::document::FieldRef
 //! [`content!`]: crate::content
 pub mod content_macro;
+mod elements;
 mod layout;
 mod text;
 mod text_query;
 pub use content_macro::*;
+pub use elements::*;
 pub use layout::*;
 pub use text::*;
 pub use text_query::*;

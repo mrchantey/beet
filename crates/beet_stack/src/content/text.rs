@@ -158,6 +158,7 @@ impl WithText for Paragraph {}
 #[reflect(Component)]
 #[require(DisplayBlock, Text)]
 pub struct Heading {
+	// private so only Heading1 etc can construct a Heading
 	level: u8,
 }
 

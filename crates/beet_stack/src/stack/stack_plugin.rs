@@ -1,4 +1,6 @@
 use crate::content::mark_text_changed;
+#[cfg(feature = "markdown")]
+use crate::parsers::load_file_content;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -23,5 +25,8 @@ impl Plugin for StackPlugin {
 				PostUpdate,
 				mark_text_changed.in_set(PropagateChanges),
 			);
+
+		#[cfg(feature = "markdown")]
+		app.add_systems(PreUpdate, load_file_content);
 	}
 }
