@@ -22,8 +22,6 @@ pub mod prelude {
 	pub use crate::document::*;
 	#[cfg(feature = "interface")]
 	pub use crate::interface::*;
-	#[cfg(feature = "markdown")]
-	pub use crate::markdown;
 	pub use crate::nodes;
 	pub use crate::nodes::*;
 	pub use crate::parsers::*;

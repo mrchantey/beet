@@ -1,4 +1,4 @@
-//! Proc macro implementation for the `markdown!` MDX-style macro.
+//! Proc macro implementation for the `mdx!` macro.
 //!
 //! Parses a token stream containing markdown text interspersed with
 //! `{}` bundle expressions. Brace groups that are NOT escaped (ie
@@ -6,17 +6,18 @@
 //! is collected as markdown text and passed to the `markdown()`
 //! function at runtime.
 //!
-//! This macro is not invoked directly — it is called by the
-//! `markdown!` wrapper macro in `beet_stack` which provides the
-//! `$crate` path as the first argument.
+//! The crate path is resolved automatically via
+//! [`pkg_ext::internal_or_beet`], so callers invoke `mdx!` directly
+//! without providing a `$crate` prefix.
 //!
 //! # Input Format
 //!
 //! ```text
-//! mdx!($crate_path; content tokens...)
-//! mdx!($crate_path; "raw string with {interpolation}")
-//! mdx!($crate_path; r#"raw string with {interpolation}"#)
+//! mdx!(# Heading text {bundle_expr} more text)
+//! mdx!("string with {interpolation}")
+//! mdx!(r#"raw string with {interpolation}"#)
 //! ```
+use beet_core_shared::pkg_ext;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
@@ -27,20 +28,6 @@ enum Segment {
 	Markdown(String),
 	/// A raw bundle expression from inside `{}`.
 	Bundle(TokenStream),
-}
-
-/// Parse the crate path prefix (everything before the first `;`).
-fn parse_crate_path(
-	tokens: &mut impl Iterator<Item = TokenTree>,
-) -> TokenStream {
-	let mut path_tokens = Vec::new();
-	for tt in tokens.by_ref() {
-		match &tt {
-			TokenTree::Punct(punct) if punct.as_char() == ';' => break,
-			_ => path_tokens.push(tt),
-		}
-	}
-	path_tokens.into_iter().collect()
 }
 
 /// Check if a token stream starts with a string literal and return
@@ -290,10 +277,9 @@ fn parse_raw_tokens(tokens: Vec<TokenTree>) -> Vec<Segment> {
 }
 
 /// Generate the output token stream from parsed segments.
-fn generate_output(
-	crate_path: &TokenStream,
-	segments: Vec<Segment>,
-) -> TokenStream {
+fn generate_output(segments: Vec<Segment>) -> TokenStream {
+	let crate_path = pkg_ext::internal_or_beet("beet_stack");
+
 	// Filter out empty markdown segments
 	let segments: Vec<Segment> = segments
 		.into_iter()
@@ -352,13 +338,10 @@ fn remap_spans(ts: TokenStream, span: proc_macro2::Span) -> TokenStream {
 
 /// Entry point for the `mdx` proc macro.
 ///
-/// Expected input: `$crate_path ; $content...`
+/// Content tokens are parsed directly — no crate path prefix needed.
 pub fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input2: TokenStream = input.into();
-	let mut iter = input2.into_iter();
-
-	let crate_path = parse_crate_path(&mut iter);
-	let content_tokens: Vec<TokenTree> = iter.collect();
+	let content_tokens: Vec<TokenTree> = input2.into_iter().collect();
 
 	let segments = match try_extract_string_literal(&content_tokens) {
 		Some((string_content, span)) => {
@@ -367,6 +350,6 @@ pub fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 		None => parse_raw_tokens(content_tokens),
 	};
 
-	let output = generate_output(&crate_path, segments);
+	let output = generate_output(segments);
 	output.into()
 }

@@ -26,7 +26,7 @@ fn counter() -> impl Bundle {
 
 	(
 		card("counter"),
-		markdown!(
+		mdx!(
 			r#"
 # Stock Counter
 Records in stock: { field_ref.clone().as_text() }

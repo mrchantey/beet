@@ -85,6 +85,8 @@ pub struct CardWalker<'w, 's> {
 	images: Query<'w, 's, &'static Image>,
 	footnote_defs: Query<'w, 's, &'static FootnoteDefinition>,
 	html_blocks: Query<'w, 's, &'static HtmlBlock>,
+	// Form data queries
+	buttons: Query<'w, 's, &'static Button>,
 	// Inline data queries
 	text_nodes: Query<'w, 's, &'static TextNode>,
 	links: Query<'w, 's, &'static Link>,
@@ -173,7 +175,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 					cx.set_entity(entity);
-					visitor.leave_heading(cx);
+					visitor.leave_heading(cx, heading);
 					cx.clear_heading_level();
 				} else {
 					let flow = visitor.visit_entity(cx);
@@ -209,7 +211,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 					cx.set_entity(entity);
-					visitor.leave_code_block(cx);
+					visitor.leave_code_block(cx, code_block);
 					cx.in_code_block = false;
 				} else {
 					let flow = visitor.visit_entity(cx);
@@ -230,7 +232,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 					cx.set_entity(entity);
-					visitor.leave_list(cx);
+					visitor.leave_list(cx, list_marker);
 					cx.pop_list();
 				} else {
 					let flow = visitor.visit_entity(cx);
@@ -259,7 +261,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 					cx.set_entity(entity);
-					visitor.leave_table(cx);
+					visitor.leave_table(cx, table);
 				} else {
 					let flow = visitor.visit_entity(cx);
 					if flow.is_continue() {
@@ -306,6 +308,8 @@ impl CardWalker<'_, '_> {
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_image(cx, image);
 				} else {
 					let flow = visitor.visit_entity(cx);
 					if flow.is_continue() {
@@ -342,6 +346,8 @@ impl CardWalker<'_, '_> {
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_html_block(cx, html_block);
 				} else {
 					let flow = visitor.visit_entity(cx);
 					if flow.is_continue() {
@@ -363,10 +369,18 @@ impl CardWalker<'_, '_> {
 
 			// ---- Form ----
 			Node::Button => {
-				let text = self.text_nodes.get(entity).ok();
-				let flow = visitor.visit_button(cx, text);
-				if flow.is_continue() {
-					self.recurse_children(visitor, cx, entity, root);
+				if let Ok(button) = self.buttons.get(entity) {
+					let flow = visitor.visit_button(cx, button);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_button(cx, button);
+				} else {
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
 
@@ -419,7 +433,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 					cx.set_entity(entity);
-					visitor.leave_link(cx);
+					visitor.leave_link(cx, link);
 				} else {
 					self.recurse_children(visitor, cx, entity, root);
 				}
@@ -555,7 +569,7 @@ pub trait CardVisitor {
 		ControlFlow::Continue(())
 	}
 
-	/// Called for [`Image`] entities.
+	/// Called when entering an [`Image`] entity.
 	fn visit_image(
 		&mut self,
 		cx: &VisitContext,
@@ -578,7 +592,7 @@ pub trait CardVisitor {
 		ControlFlow::Continue(())
 	}
 
-	/// Called for [`HtmlBlock`] entities.
+	/// Called when entering an [`HtmlBlock`] entity.
 	fn visit_html_block(
 		&mut self,
 		cx: &VisitContext,
@@ -589,12 +603,12 @@ pub trait CardVisitor {
 
 	// -- Form elements --
 
-	/// Called for [`Button`] entities. The optional [`TextNode`] is
-	/// the button label when present on the same entity.
+	/// Called when entering a [`Button`] entity. The button label
+	/// is stored in [`TextNode`] children, visited after this.
 	fn visit_button(
 		&mut self,
 		cx: &VisitContext,
-		label: Option<&TextNode>,
+		button: &Button,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
@@ -663,7 +677,7 @@ pub trait CardVisitor {
 	// -- Block-level leave --
 
 	/// Called after leaving a [`Heading`] entity and all its children.
-	fn leave_heading(&mut self, cx: &VisitContext) {}
+	fn leave_heading(&mut self, cx: &VisitContext, heading: &Heading) {}
 
 	/// Called after leaving a [`Paragraph`] entity and all its children.
 	fn leave_paragraph(&mut self, cx: &VisitContext) {}
@@ -672,16 +686,16 @@ pub trait CardVisitor {
 	fn leave_block_quote(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`CodeBlock`] entity and all its children.
-	fn leave_code_block(&mut self, cx: &VisitContext) {}
+	fn leave_code_block(&mut self, cx: &VisitContext, code_block: &CodeBlock) {}
 
 	/// Called after leaving a [`ListMarker`] entity and all its children.
-	fn leave_list(&mut self, cx: &VisitContext) {}
+	fn leave_list(&mut self, cx: &VisitContext, list_marker: &ListMarker) {}
 
 	/// Called after leaving a [`ListItem`] entity and all its children.
 	fn leave_list_item(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`Table`] entity and all its children.
-	fn leave_table(&mut self, cx: &VisitContext) {}
+	fn leave_table(&mut self, cx: &VisitContext, table: &Table) {}
 
 	/// Called after leaving a [`TableHead`] entity and all its children.
 	fn leave_table_head(&mut self, cx: &VisitContext) {}
@@ -693,7 +707,16 @@ pub trait CardVisitor {
 	fn leave_table_cell(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`Link`] container and all its children.
-	fn leave_link(&mut self, cx: &VisitContext) {}
+	fn leave_link(&mut self, cx: &VisitContext, link: &Link) {}
+
+	/// Called after leaving an [`Image`] entity and all its children.
+	fn leave_image(&mut self, cx: &VisitContext, image: &Image) {}
+
+	/// Called after leaving an [`HtmlBlock`] entity and all its children.
+	fn leave_html_block(&mut self, cx: &VisitContext, html_block: &HtmlBlock) {}
+
+	/// Called after leaving a [`Button`] entity and all its children.
+	fn leave_button(&mut self, cx: &VisitContext, button: &Button) {}
 }
 
 
@@ -931,7 +954,11 @@ mod test {
 				self.0.push(format!("text:{}", text.as_str()));
 				ControlFlow::Continue(())
 			}
-			fn leave_heading(&mut self, _cx: &VisitContext) {
+			fn leave_heading(
+				&mut self,
+				_cx: &VisitContext,
+				_heading: &Heading,
+			) {
 				self.0.push("leave_h".to_string());
 			}
 		}
@@ -973,7 +1000,11 @@ mod test {
 				self.0.push("enter_h".to_string());
 				ControlFlow::Break(())
 			}
-			fn leave_heading(&mut self, _cx: &VisitContext) {
+			fn leave_heading(
+				&mut self,
+				_cx: &VisitContext,
+				_heading: &Heading,
+			) {
 				self.0.push("leave_h".to_string());
 			}
 		}
@@ -1328,7 +1359,7 @@ mod test {
 				self.0.push(format!("text:{}", text.as_str()));
 				ControlFlow::Continue(())
 			}
-			fn leave_link(&mut self, _cx: &VisitContext) {
+			fn leave_link(&mut self, _cx: &VisitContext, _link: &Link) {
 				self.0.push("leave_link".to_string());
 			}
 		}

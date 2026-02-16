@@ -78,7 +78,7 @@ pub struct TuiConfig {
 impl Default for TuiConfig {
 	fn default() -> Self {
 		Self {
-			h1_gap_before: 1,
+			h1_gap_before: 2,
 			heading_gap_after: 0,
 			paragraph_gap_after: 0,
 			block_quote_gap: 1,
@@ -116,8 +116,6 @@ pub struct TuiRenderer<'buf> {
 	spans: Vec<Span<'static>>,
 	/// Whether we are inside a list item collecting text.
 	in_list_item: bool,
-	/// Current link URL when inside a link container.
-	current_link_url: Option<String>,
 	/// Rendering configuration.
 	config: TuiConfig,
 }
@@ -131,7 +129,6 @@ impl<'buf> TuiRenderer<'buf> {
 			style_stack: Vec::new(),
 			spans: Vec::new(),
 			in_list_item: false,
-			current_link_url: None,
 			config: TuiConfig::default(),
 		}
 	}
@@ -148,7 +145,6 @@ impl<'buf> TuiRenderer<'buf> {
 			style_stack: Vec::new(),
 			spans: Vec::new(),
 			in_list_item: false,
-			current_link_url: None,
 			config,
 		}
 	}
@@ -344,16 +340,13 @@ impl CardVisitor for TuiRenderer<'_> {
 	fn visit_image(
 		&mut self,
 		_cx: &VisitContext,
-		image: &Image,
+		_image: &Image,
 	) -> ControlFlow<()> {
-		// Render image as alt text placeholder
-		let alt = image.title.as_deref().unwrap_or(&image.src);
 		self.spans.push(Span::styled(
-			format!("[image: {alt}]"),
+			"[image: ",
 			Style::new().fg(Color::DarkGray).italic(),
 		));
-		self.flush_spans();
-		ControlFlow::Break(())
+		ControlFlow::Continue(())
 	}
 
 	fn visit_footnote_definition(
@@ -383,27 +376,19 @@ impl CardVisitor for TuiRenderer<'_> {
 				html_block.0.clone(),
 				Style::new().fg(Color::DarkGray),
 			));
-			self.flush_spans();
 		}
-		ControlFlow::Break(())
+		ControlFlow::Continue(())
 	}
 
 	fn visit_button(
 		&mut self,
 		_cx: &VisitContext,
-		label: Option<&TextNode>,
+		_button: &Button,
 	) -> ControlFlow<()> {
-		let label_text = label.map(|text| text.as_str()).unwrap_or("button");
-		let button =
-			crate::prelude::widgets::Button::new(label_text.to_string());
-		if self.area.height >= 3 {
-			let button_area =
-				Rect::new(self.area.x, self.area.y, self.area.width.min(20), 3);
-			button.render(button_area, self.buf);
-			self.area.y = self.area.y.saturating_add(3);
-			self.area.height = self.area.height.saturating_sub(3);
-		}
-		ControlFlow::Break(())
+		// Render buttons as link-style inline text
+		self.spans
+			.push(Span::styled("[", Style::new().fg(self.config.link_fg)));
+		ControlFlow::Continue(())
 	}
 
 	// -- Inline --
@@ -433,9 +418,8 @@ impl CardVisitor for TuiRenderer<'_> {
 	fn visit_link(
 		&mut self,
 		_cx: &VisitContext,
-		link: &Link,
+		_link: &Link,
 	) -> ControlFlow<()> {
-		self.current_link_url = Some(link.href.clone());
 		ControlFlow::Continue(())
 	}
 
@@ -493,7 +477,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, cx: &VisitContext) {
+	fn leave_heading(&mut self, cx: &VisitContext, _heading: &Heading) {
 		// Flush heading spans with the heading style applied to the
 		// entire line, then center h1.
 		let heading_level = cx.heading_level();
@@ -529,12 +513,16 @@ impl CardVisitor for TuiRenderer<'_> {
 		self.advance_lines(self.config.block_quote_gap);
 	}
 
-	fn leave_code_block(&mut self, _cx: &VisitContext) {
+	fn leave_code_block(
+		&mut self,
+		_cx: &VisitContext,
+		_code_block: &CodeBlock,
+	) {
 		self.flush_spans();
 		self.style_stack.pop();
 	}
 
-	fn leave_list(&mut self, _cx: &VisitContext) {
+	fn leave_list(&mut self, _cx: &VisitContext, _list_marker: &ListMarker) {
 		// List stack is managed by VisitContext
 	}
 
@@ -543,7 +531,7 @@ impl CardVisitor for TuiRenderer<'_> {
 		self.in_list_item = false;
 	}
 
-	fn leave_table(&mut self, _cx: &VisitContext) {}
+	fn leave_table(&mut self, _cx: &VisitContext, _table: &Table) {}
 
 	fn leave_table_head(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
@@ -558,8 +546,27 @@ impl CardVisitor for TuiRenderer<'_> {
 		// Cells are collected as spans; the row leave flushes them
 	}
 
-	fn leave_link(&mut self, _cx: &VisitContext) {
-		self.current_link_url = None;
+	fn leave_link(&mut self, _cx: &VisitContext, _link: &Link) {}
+
+	fn leave_image(&mut self, _cx: &VisitContext, image: &Image) {
+		self.spans.push(Span::styled(
+			format!(": {}]", image.src),
+			Style::new().fg(Color::DarkGray).italic(),
+		));
+		self.flush_spans();
+	}
+
+	fn leave_html_block(
+		&mut self,
+		_cx: &VisitContext,
+		_html_block: &HtmlBlock,
+	) {
+		self.flush_spans();
+	}
+
+	fn leave_button(&mut self, _cx: &VisitContext, _button: &Button) {
+		self.spans
+			.push(Span::styled("]", Style::new().fg(self.config.link_fg)));
 	}
 }
 

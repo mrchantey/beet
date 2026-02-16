@@ -49,12 +49,10 @@ pub struct MarkdownRenderer {
 	list_item_had_checkbox: bool,
 	/// Buffer for collecting footnote definition text.
 	footnote_buffer: Option<String>,
-	/// Stack of active links for wrapping text in `[text](url)`.
-	link_stack: Vec<Link>,
 }
 
 impl MarkdownRenderer {
-	/// Create a new empty renderer.
+	/// Create a new renderer with default settings.
 	pub fn new() -> Self {
 		Self {
 			buffer: String::new(),
@@ -68,7 +66,6 @@ impl MarkdownRenderer {
 			list_item_buffer: String::new(),
 			list_item_had_checkbox: false,
 			footnote_buffer: None,
-			link_stack: Vec::new(),
 		}
 	}
 
@@ -226,18 +223,10 @@ impl CardVisitor for MarkdownRenderer {
 	fn visit_image(
 		&mut self,
 		_cx: &VisitContext,
-		image: &Image,
+		_image: &Image,
 	) -> ControlFlow<()> {
-		let prefix = self.prefix();
-		let title = image
-			.title
-			.as_ref()
-			.map(|title| format!(" \"{title}\""))
-			.unwrap_or_default();
-		// Render the full image tag and skip children. Alt text from
-		// TextNode children is not yet collected here.
-		self.push_text(&format!("{prefix}![]({}{})\n\n", image.src, title));
-		ControlFlow::Break(())
+		self.push_text("![");
+		ControlFlow::Continue(())
 	}
 
 	fn visit_footnote_definition(
@@ -264,22 +253,18 @@ impl CardVisitor for MarkdownRenderer {
 	) -> ControlFlow<()> {
 		if !html_block.0.is_empty() {
 			let prefix = self.prefix();
-			self.push_text(&format!("{prefix}{}\n\n", html_block.0));
+			self.push_text(&format!("{prefix}{}", html_block.0));
 		}
-		ControlFlow::Break(())
+		ControlFlow::Continue(())
 	}
 
 	fn visit_button(
 		&mut self,
 		_cx: &VisitContext,
-		label: Option<&TextNode>,
+		_button: &Button,
 	) -> ControlFlow<()> {
-		// Render buttons as bold text in markdown
-		if let Some(text) = label {
-			let prefix = self.prefix();
-			self.push_text(&format!("{prefix}**[{}]**", text.as_str()));
-		}
-		ControlFlow::Break(())
+		self.push_text("**[");
+		ControlFlow::Continue(())
 	}
 
 	// -- Inline --
@@ -305,10 +290,9 @@ impl CardVisitor for MarkdownRenderer {
 	fn visit_link(
 		&mut self,
 		_cx: &VisitContext,
-		link: &Link,
+		_link: &Link,
 	) -> ControlFlow<()> {
 		self.push_text("[");
-		self.link_stack.push(link.clone());
 		ControlFlow::Continue(())
 	}
 
@@ -356,7 +340,9 @@ impl CardVisitor for MarkdownRenderer {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, _cx: &VisitContext) { self.push_text("\n\n"); }
+	fn leave_heading(&mut self, _cx: &VisitContext, _heading: &Heading) {
+		self.push_text("\n\n");
+	}
 
 	fn leave_paragraph(&mut self, _cx: &VisitContext) {
 		self.push_text("\n\n");
@@ -366,13 +352,17 @@ impl CardVisitor for MarkdownRenderer {
 		self.prefix_stack.pop();
 	}
 
-	fn leave_code_block(&mut self, _cx: &VisitContext) {
+	fn leave_code_block(
+		&mut self,
+		_cx: &VisitContext,
+		_code_block: &CodeBlock,
+	) {
 		let prefix = self.prefix();
 		self.code_block_lang = None;
 		self.push_text(&format!("{prefix}```\n\n"));
 	}
 
-	fn leave_list(&mut self, _cx: &VisitContext) {
+	fn leave_list(&mut self, _cx: &VisitContext, _list_marker: &ListMarker) {
 		// List stack is managed by VisitContext
 		self.push_text("\n");
 	}
@@ -396,7 +386,7 @@ impl CardVisitor for MarkdownRenderer {
 		self.buffer.push_str(&format!("{prefix}{bullet}{text}\n"));
 	}
 
-	fn leave_table(&mut self, _cx: &VisitContext) {
+	fn leave_table(&mut self, _cx: &VisitContext, _table: &Table) {
 		self.table_alignments.clear();
 		self.push_text("\n");
 	}
@@ -444,15 +434,34 @@ impl CardVisitor for MarkdownRenderer {
 		self.in_table_cell = false;
 	}
 
-	fn leave_link(&mut self, _cx: &VisitContext) {
-		if let Some(link) = self.link_stack.pop() {
-			let title = link
-				.title
-				.as_ref()
-				.map(|title| format!(" \"{title}\""))
-				.unwrap_or_default();
-			self.push_text(&format!("]({}{})", link.href, title));
-		}
+	fn leave_link(&mut self, _cx: &VisitContext, link: &Link) {
+		let title = link
+			.title
+			.as_ref()
+			.map(|title| format!(" \"{title}\""))
+			.unwrap_or_default();
+		self.push_text(&format!("]({}{})", link.href, title));
+	}
+
+	fn leave_image(&mut self, _cx: &VisitContext, image: &Image) {
+		let title = image
+			.title
+			.as_ref()
+			.map(|title| format!(" \"{title}\""))
+			.unwrap_or_default();
+		self.push_text(&format!("]({}{})\n\n", image.src, title));
+	}
+
+	fn leave_html_block(
+		&mut self,
+		_cx: &VisitContext,
+		_html_block: &HtmlBlock,
+	) {
+		self.push_text("\n\n");
+	}
+
+	fn leave_button(&mut self, _cx: &VisitContext, _button: &Button) {
+		self.push_text("]**");
 	}
 }
 
@@ -773,7 +782,7 @@ mod test {
 	fn kitchen_sink_snapshot() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, markdown!(
+			.spawn((Card, mdx!(
 				"# Welcome to Beet\n\nThis is a **bold** and *italic* intro.\n\n## Features\n\n- Fast\n- Cross-platform\n- [Documentation](https://example.com)\n\n---\n\n> A block quote with *emphasis*.\n\n```rust\nfn main() {}\n```"
 			)))
 			.id();

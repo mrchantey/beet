@@ -14,7 +14,7 @@
 //! - [`form`] - Interactive form controls (buttons, checkboxes)
 //! - [`layout`] - Display and layout primitives ([`DisplayBlock`], [`TextAlignment`])
 //! - [`style`] - [`InlineStyle`] bitflags and [`VisitContext`]
-//! - [`markdown!`] - The markdown macro for ergonomic content spawning
+//! - [`mdx!`](beet_core::mdx) - The MDX macro for ergonomic content spawning
 //!
 //! # Node Invariance
 //!
@@ -37,8 +37,8 @@
 //! // Correct: Important is a container with TextNode child
 //! let bold = (Important, children![TextNode::new("bold")]);
 //!
-//! // For ergonomic markdown-based content, use the markdown! macro:
-//! // let root = world.spawn(markdown!("Hello **world**!")).id();
+//! // For ergonomic markdown-based content, use the mdx! macro:
+//! // let root = world.spawn(mdx!("Hello **world**!")).id();
 //! ```
 mod elements;
 mod form;

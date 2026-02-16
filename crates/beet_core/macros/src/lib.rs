@@ -183,14 +183,14 @@ pub fn beet_test(
 
 /// MDX-style markdown macro with `{}` interpolation.
 ///
-/// Not invoked directly — use the `markdown!` wrapper macro from
-/// `beet_stack` which provides the `$crate` path automatically.
+/// Parses markdown text interspersed with `{}` bundle expressions.
+/// The crate path is resolved automatically via `internal_or_beet`.
 ///
 /// # Input Format
 ///
 /// ```text
-/// mdx!($crate_path; # Heading text {bundle_expr} more text)
-/// mdx!($crate_path; "string with {interpolation}")
+/// mdx!(# Heading text {bundle_expr} more text)
+/// mdx!("string with {interpolation}")
 /// ```
 #[proc_macro]
 pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

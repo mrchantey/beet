@@ -1,9 +1,9 @@
-//! The [`markdown!`] macro for spawning markdown as entity bundles.
+//! The [`markdown()`] function for spawning markdown as entity bundles.
 //!
-//! Supports MDX-style `{}` interpolation for embedding bundle
-//! expressions directly in markdown text. Brace groups are treated
-//! as raw bundle expressions; everything else is collected as
-//! markdown and parsed via [`MarkdownDiffer`] on spawn.
+//! The `markdown()` function converts a string into a bundle that
+//! parses markdown content on spawn via [`MarkdownDiffer`]. For
+//! ergonomic inline usage with MDX-style `{}` interpolation, use the
+//! [`mdx!`](beet_core::mdx) proc macro directly.
 //!
 //! # Usage
 //!
@@ -13,15 +13,15 @@
 //!
 //! let mut world = World::new();
 //!
-//! // Single markdown string — parsed on spawn
-//! let entity = world.spawn(markdown!("# Hello **world**")).id();
+//! // Function form — parsed on spawn
+//! let entity = world.spawn(markdown("# Hello **world**")).id();
 //! ```
 //!
 //! # MDX Interpolation
 //!
 //! ```ignore
 //! // Raw token mode — `{}` groups become bundle expressions
-//! markdown!{
+//! mdx!{
 //!     # Stock Counter
 //!     Records in stock: { field_ref.clone().as_text() }
 //!
@@ -30,7 +30,7 @@
 //! }
 //!
 //! // String literal mode — `{}` in the string are interpolated
-//! markdown!(r#"
+//! mdx!(r#"
 //!     # Stock Counter
 //!     Records in stock: { field_ref.clone().as_text() }
 //! "#)
@@ -53,43 +53,6 @@ pub fn markdown(text: impl Into<String>) -> impl Bundle {
 }
 
 
-/// Spawn markdown content as an entity bundle.
-///
-/// Supports three input forms:
-///
-/// 1. **String literal** — parsed as markdown on spawn:
-///    ```ignore
-///    markdown!("# Hello **world**")
-///    ```
-///
-/// 2. **Raw tokens with `{}` interpolation** — brace groups become
-///    bundle expressions, everything else becomes markdown:
-///    ```ignore
-///    markdown!{
-///        # Title
-///        {some_bundle_expr}
-///        More *text*
-///    }
-///    ```
-///
-/// 3. **String literal with `{}` interpolation** — `{}` in the
-///    string are parsed as bundle expressions:
-///    ```ignore
-///    markdown!(r#"
-///        # Title
-///        { some_bundle_expr }
-///    "#)
-///    ```
-///
-/// Escaped braces `{{like this}}` are treated as literal braces.
-#[macro_export]
-macro_rules! markdown {
-	($($tt:tt)*) => {
-		::beet_core::mdx!($crate; $($tt)*)
-	};
-}
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -98,7 +61,7 @@ mod test {
 	#[test]
 	fn spawns_paragraph() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("Hello world")).id();
+		let root = world.spawn(mdx!("Hello world")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(1);
@@ -110,7 +73,7 @@ mod test {
 	#[test]
 	fn spawns_heading() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("# Title")).id();
+		let root = world.spawn(mdx!("# Title")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(1);
@@ -131,7 +94,7 @@ mod test {
 	#[test]
 	fn spawns_bold_as_container() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("**bold**")).id();
+		let root = world.spawn(mdx!("**bold**")).id();
 
 		// Root -> Paragraph -> Important -> TextNode
 		let children = world.entity(root).get::<Children>().unwrap();
@@ -154,7 +117,7 @@ mod test {
 	#[test]
 	fn spawns_italic_as_container() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("*italic*")).id();
+		let root = world.spawn(mdx!("*italic*")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -167,7 +130,7 @@ mod test {
 	#[test]
 	fn mixed_inline_formatting() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("hello **bold** world")).id();
+		let root = world.spawn(mdx!("hello **bold** world")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -179,7 +142,7 @@ mod test {
 	#[test]
 	fn multiple_blocks() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("# Heading\n\nA paragraph.")).id();
+		let root = world.spawn(mdx!("# Heading\n\nA paragraph.")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(2);
@@ -194,7 +157,7 @@ mod test {
 	#[test]
 	fn spawns_link_as_container() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("[click](https://example.com)")).id();
+		let root = world.spawn(mdx!("[click](https://example.com)")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -216,7 +179,7 @@ mod test {
 	#[test]
 	fn code_block() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("```rust\nfn main() {}\n```")).id();
+		let root = world.spawn(mdx!("```rust\nfn main() {}\n```")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let code = *children.first().unwrap();
@@ -227,7 +190,7 @@ mod test {
 	#[test]
 	fn unordered_list() {
 		let mut world = World::new();
-		let root = world.spawn(markdown!("- one\n- two\n- three")).id();
+		let root = world.spawn(mdx!("- one\n- two\n- three")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let list = *children.first().unwrap();
@@ -241,7 +204,7 @@ mod test {
 	#[test]
 	fn single_string_parses_markdown() {
 		let mut world = World::new();
-		let entity = world.spawn(markdown!("hello **world**")).id();
+		let entity = world.spawn(mdx!("hello **world**")).id();
 
 		// Single string: OnSpawn parses markdown onto the entity
 		let children = world.entity(entity).get::<Children>().unwrap();
