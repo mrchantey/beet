@@ -27,19 +27,20 @@
 //!
 //! # Visit Context
 //!
-//! The walker maintains a [`VisitContext`] that tracks shared
-//! traversal state: the inline style stack, code block flag, list
-//! nesting, and heading level. Every visitor method receives a
-//! `&VisitContext` so renderers can query this state without
-//! duplicating it.
+//! The walker maintains a [`VisitContext`] that tracks the current
+//! entity, the inline style stack, code block flag, list nesting,
+//! and heading level. Every visitor method receives a `&VisitContext`
+//! so renderers can query this state without duplicating it. The
+//! current entity is always available via
+//! [`VisitContext::entity()`].
 //!
 //! # Inline Style Stack
 //!
 //! When the walker enters an inline container (an entity with inline
 //! marker components like [`Important`] but no [`TextNode`]), it
-//! pushes the container's style onto the context's style stack. When
-//! leaving, it pops. [`VisitContext::effective_style`] merges all
-//! stack entries to produce the current inline formatting.
+//! pushes the container's modifier onto the context's style stack.
+//! When leaving, it pops. [`VisitContext::effective_style`] merges
+//! all stack entries to produce the current inline formatting.
 //!
 //! # Example
 //!
@@ -52,8 +53,7 @@
 //! impl CardVisitor for TextCollector {
 //!     fn visit_text(
 //!         &mut self,
-//!         ctx: &VisitContext,
-//!         _entity: Entity,
+//!         cx: &VisitContext,
 //!         text: &TextNode,
 //!     ) -> ControlFlow<()> {
 //!         self.0.push_str(text.as_str());
@@ -98,14 +98,33 @@ impl CardWalker<'_, '_> {
 	/// for each entity. Starts from the card root of `entity`.
 	pub fn walk_card<V: CardVisitor>(&self, visitor: &mut V, entity: Entity) {
 		let root = self.card_query.card_root(entity);
-		let mut ctx = VisitContext::default();
-		self.walk_entity(visitor, &mut ctx, root, root);
+		let mut cx = VisitContext::new(root);
+		self.walk_entity(visitor, &mut cx, root, root);
 	}
 
 	/// Walk from a specific entity without resolving the card root.
 	pub fn walk_from<V: CardVisitor>(&self, visitor: &mut V, entity: Entity) {
-		let mut ctx = VisitContext::default();
-		self.walk_entity(visitor, &mut ctx, entity, entity);
+		let mut cx = VisitContext::new(entity);
+		self.walk_entity(visitor, &mut cx, entity, entity);
+	}
+
+	/// Recurse into children of `entity`, skipping child card
+	/// boundaries (unless they are the walk root itself).
+	fn recurse_children<V: CardVisitor>(
+		&self,
+		visitor: &mut V,
+		cx: &mut VisitContext,
+		entity: Entity,
+		root: Entity,
+	) {
+		if let Ok(children) = self.children_query.get(entity) {
+			for child in children.iter() {
+				if child != root && self.card_query.is_card(child) {
+					continue;
+				}
+				self.walk_entity(visitor, cx, child, root);
+			}
+		}
 	}
 
 	/// Recursive depth-first walk. `root` is the walk origin, used
@@ -113,7 +132,7 @@ impl CardWalker<'_, '_> {
 	fn walk_entity<V: CardVisitor>(
 		&self,
 		visitor: &mut V,
-		ctx: &mut VisitContext,
+		cx: &mut VisitContext,
 		entity: Entity,
 		root: Entity,
 	) {
@@ -121,16 +140,10 @@ impl CardWalker<'_, '_> {
 			// Entity has no Node component — call visit_entity and
 			// recurse into children (supports non-node structural
 			// entities like the card root).
-			let flow = visitor.visit_entity(ctx, entity);
+			cx.set_entity(entity);
+			let flow = visitor.visit_entity(cx);
 			if flow.is_continue() {
-				if let Ok(children) = self.children_query.get(entity) {
-					for child in children.iter() {
-						if child != root && self.card_query.is_card(child) {
-							continue;
-						}
-						self.walk_entity(visitor, ctx, child, root);
-					}
-				}
+				self.recurse_children(visitor, cx, entity, root);
 			}
 			return;
 		};
@@ -142,214 +155,252 @@ impl CardWalker<'_, '_> {
 		// entities inherit it.
 		let is_inline_container = kind.is_inline_container();
 		if is_inline_container {
-			let mut style: InlineStyle = kind
+			let style: InlineStyle = kind
 				.inline_modifier()
 				.map(InlineStyle::from)
 				.unwrap_or_default();
-			// Link containers also carry link data
-			if kind == NodeKind::Link {
-				style.link = self.links.get(entity).ok().cloned();
-			}
-			ctx.push_style(style);
+			cx.push_style(style);
 		}
 
-		// Dispatch to the appropriate visitor method based on NodeKind
-		let (flow, dispatch_kind) =
-			self.dispatch_visit(visitor, ctx, entity, kind);
+		cx.set_entity(entity);
 
-		// If the visitor returned Break, skip this entity's children
-		if flow.is_break() {
-			// Still call the leave method even when breaking
-			self.dispatch_leave(visitor, ctx, entity, dispatch_kind);
-			if is_inline_container {
-				ctx.pop_style();
-			}
-			return;
-		}
-
-		// Recurse into children
-		if let Ok(children) = self.children_query.get(entity) {
-			for child in children.iter() {
-				// Stop at card boundaries (unless it's the root itself)
-				if child != root && self.card_query.is_card(child) {
-					continue;
-				}
-				self.walk_entity(visitor, ctx, child, root);
-			}
-		}
-
-		// Leave callback after children have been visited
-		self.dispatch_leave(visitor, ctx, entity, dispatch_kind);
-
-		// Pop style after leave so leave methods still see the style
-		if is_inline_container {
-			ctx.pop_style();
-		}
-	}
-
-	/// Dispatch to the appropriate visitor method based on
-	/// [`NodeKind`]. Returns the control flow AND internal dispatch
-	/// kind so we can call the corresponding leave method later.
-	///
-	/// Also updates the [`VisitContext`] for structural elements
-	/// (headings, code blocks, lists).
-	fn dispatch_visit<V: CardVisitor>(
-		&self,
-		visitor: &mut V,
-		ctx: &mut VisitContext,
-		entity: Entity,
-		kind: NodeKind,
-	) -> (ControlFlow<()>, DispatchKind) {
+		// Dispatch visit, recurse children, then leave — all within
+		// a single match so visit/leave correspondence is explicit.
 		match kind {
-			// -- Block-level --
+			// ---- Block-level ----
 			NodeKind::Heading => {
 				if let Ok(heading) = self.headings.get(entity) {
-					ctx.set_heading_level(heading.level());
-					(
-						visitor.visit_heading(ctx, entity, heading),
-						DispatchKind::Heading,
-					)
+					cx.set_heading_level(heading.level());
+					let flow = visitor.visit_heading(cx, heading);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_heading(cx);
+					cx.clear_heading_level();
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
-			NodeKind::Paragraph => (
-				visitor.visit_paragraph(ctx, entity),
-				DispatchKind::Paragraph,
-			),
-			NodeKind::BlockQuote => (
-				visitor.visit_block_quote(ctx, entity),
-				DispatchKind::BlockQuote,
-			),
+
+			NodeKind::Paragraph => {
+				let flow = visitor.visit_paragraph(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_paragraph(cx);
+			}
+
+			NodeKind::BlockQuote => {
+				let flow = visitor.visit_block_quote(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_block_quote(cx);
+			}
+
 			NodeKind::CodeBlock => {
 				if let Ok(code_block) = self.code_blocks.get(entity) {
-					ctx.in_code_block = true;
-					(
-						visitor.visit_code_block(ctx, entity, code_block),
-						DispatchKind::CodeBlock,
-					)
+					cx.in_code_block = true;
+					let flow = visitor.visit_code_block(cx, code_block);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_code_block(cx);
+					cx.in_code_block = false;
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
+
 			NodeKind::ListMarker => {
 				if let Ok(list_marker) = self.list_markers.get(entity) {
-					ctx.push_list(
+					cx.push_list(
 						list_marker.ordered,
 						list_marker.start.unwrap_or(1),
 					);
-					(
-						visitor.visit_list(ctx, entity, list_marker),
-						DispatchKind::List,
-					)
+					let flow = visitor.visit_list(cx, list_marker);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_list(cx);
+					cx.pop_list();
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
+
 			NodeKind::ListItem => {
-				(visitor.visit_list_item(ctx, entity), DispatchKind::ListItem)
+				let flow = visitor.visit_list_item(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_list_item(cx);
+				if let Some(list) = cx.current_list_mut() {
+					list.current_index += 1;
+				}
 			}
+
 			NodeKind::Table => {
 				if let Ok(table) = self.tables.get(entity) {
-					(
-						visitor.visit_table(ctx, entity, table),
-						DispatchKind::Table,
-					)
+					let flow = visitor.visit_table(cx, table);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_table(cx);
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
-			NodeKind::TableHead => (
-				visitor.visit_table_head(ctx, entity),
-				DispatchKind::TableHead,
-			),
-			NodeKind::TableRow => {
-				(visitor.visit_table_row(ctx, entity), DispatchKind::TableRow)
+
+			NodeKind::TableHead => {
+				let flow = visitor.visit_table_head(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_table_head(cx);
 			}
-			NodeKind::TableCell => (
-				visitor.visit_table_cell(ctx, entity),
-				DispatchKind::TableCell,
-			),
-			NodeKind::ThematicBreak => (
-				visitor.visit_thematic_break(ctx, entity),
-				DispatchKind::ThematicBreak,
-			),
+
+			NodeKind::TableRow => {
+				let flow = visitor.visit_table_row(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_table_row(cx);
+			}
+
+			NodeKind::TableCell => {
+				let flow = visitor.visit_table_cell(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+				cx.set_entity(entity);
+				visitor.leave_table_cell(cx);
+			}
+
+			NodeKind::ThematicBreak => {
+				let _flow = visitor.visit_thematic_break(cx);
+				// ThematicBreak is a leaf — no children to recurse
+			}
+
 			NodeKind::Image => {
 				if let Ok(image) = self.images.get(entity) {
-					(
-						visitor.visit_image(ctx, entity, image),
-						DispatchKind::Image,
-					)
+					let flow = visitor.visit_image(cx, image);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
+
 			NodeKind::FootnoteDefinition => {
 				if let Ok(footnote_def) = self.footnote_defs.get(entity) {
-					(
-						visitor.visit_footnote_definition(
-							ctx,
-							entity,
-							footnote_def,
-						),
-						DispatchKind::FootnoteDefinition,
-					)
+					let flow =
+						visitor.visit_footnote_definition(cx, footnote_def);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
-			NodeKind::MathDisplay => (
-				visitor.visit_math_display(ctx, entity),
-				DispatchKind::MathDisplay,
-			),
+
+			NodeKind::MathDisplay => {
+				let flow = visitor.visit_math_display(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
+			}
+
 			NodeKind::HtmlBlock => {
 				if let Ok(html_block) = self.html_blocks.get(entity) {
-					(
-						visitor.visit_html_block(ctx, entity, html_block),
-						DispatchKind::HtmlBlock,
-					)
+					let flow = visitor.visit_html_block(cx, html_block);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
-			// Block-level kinds without visitor callbacks
+
+			// Block-level kinds without dedicated visitor callbacks
 			NodeKind::DefinitionList
 			| NodeKind::DefinitionTitle
 			| NodeKind::DefinitionDetails
 			| NodeKind::MetadataBlock => {
-				(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+				let flow = visitor.visit_entity(cx);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
 			}
 
-			// -- Form --
+			// ---- Form ----
 			NodeKind::Button => {
 				let text = self.text_nodes.get(entity).ok();
-				(
-					visitor.visit_button(ctx, entity, text),
-					DispatchKind::Button,
-				)
+				let flow = visitor.visit_button(cx, text);
+				if flow.is_continue() {
+					self.recurse_children(visitor, cx, entity, root);
+				}
 			}
+
 			NodeKind::TaskListCheck => {
 				if let Ok(task_check) = self.task_checks.get(entity) {
-					(
-						visitor.visit_task_list_check(ctx, entity, task_check),
-						DispatchKind::TaskListCheck,
-					)
+					let flow = visitor.visit_task_list_check(cx, task_check);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
 
-			// -- Text --
+			// ---- Text ----
 			NodeKind::TextNode => {
 				if let Ok(text) = self.text_nodes.get(entity) {
-					(visitor.visit_text(ctx, entity, text), DispatchKind::Text)
+					let _flow = visitor.visit_text(cx, text);
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let flow = visitor.visit_entity(cx);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
 				}
 			}
 
-			// -- Inline containers --
-			// These push style in walk_entity; they have no
+			// ---- Inline containers ----
+			// These push style in the block above; they have no
 			// dedicated visitor call, just recurse into children.
 			NodeKind::Important
 			| NodeKind::Emphasize
@@ -358,134 +409,53 @@ impl CardWalker<'_, '_> {
 			| NodeKind::Strikethrough
 			| NodeKind::Superscript
 			| NodeKind::Subscript
-			| NodeKind::MathInline => (ControlFlow::Continue(()), DispatchKind::Entity),
+			| NodeKind::MathInline => {
+				self.recurse_children(visitor, cx, entity, root);
+			}
 
-			// Link as inline container (has children)
+			// Link as inline container (has children and a
+			// dedicated visit/leave pair)
 			NodeKind::Link => {
 				if let Ok(link) = self.links.get(entity) {
-					(visitor.visit_link(ctx, entity, link), DispatchKind::Link)
+					let flow = visitor.visit_link(cx, link);
+					if flow.is_continue() {
+						self.recurse_children(visitor, cx, entity, root);
+					}
+					cx.set_entity(entity);
+					visitor.leave_link(cx);
 				} else {
-					(ControlFlow::Continue(()), DispatchKind::Entity)
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
-			// -- Inline leaves --
-			NodeKind::HardBreak => (
-				visitor.visit_hard_break(ctx, entity),
-				DispatchKind::HardBreak,
-			),
-			NodeKind::SoftBreak => (
-				visitor.visit_soft_break(ctx, entity),
-				DispatchKind::SoftBreak,
-			),
+			// ---- Inline leaves ----
+			NodeKind::HardBreak => {
+				let _flow = visitor.visit_hard_break(cx);
+			}
+			NodeKind::SoftBreak => {
+				let _flow = visitor.visit_soft_break(cx);
+			}
 			NodeKind::FootnoteRef => {
 				if let Ok(footnote_ref) = self.footnote_refs.get(entity) {
-					(
-						visitor.visit_footnote_ref(ctx, entity, footnote_ref),
-						DispatchKind::FootnoteRef,
-					)
+					let _flow = visitor.visit_footnote_ref(cx, footnote_ref);
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let _flow = visitor.visit_entity(cx);
 				}
 			}
 			NodeKind::HtmlInline => {
 				if let Ok(html_inline) = self.html_inlines.get(entity) {
-					(
-						visitor.visit_html_inline(ctx, entity, html_inline),
-						DispatchKind::HtmlInline,
-					)
+					let _flow = visitor.visit_html_inline(cx, html_inline);
 				} else {
-					(visitor.visit_entity(ctx, entity), DispatchKind::Entity)
+					let _flow = visitor.visit_entity(cx);
 				}
 			}
 		}
-	}
 
-	/// Dispatch the corresponding leave method for a previously
-	/// visited dispatch kind. Also restores [`VisitContext`] state.
-	fn dispatch_leave<V: CardVisitor>(
-		&self,
-		visitor: &mut V,
-		ctx: &mut VisitContext,
-		entity: Entity,
-		kind: DispatchKind,
-	) {
-		match kind {
-			DispatchKind::Heading => {
-				visitor.leave_heading(ctx, entity);
-				ctx.clear_heading_level();
-			}
-			DispatchKind::Paragraph => visitor.leave_paragraph(ctx, entity),
-			DispatchKind::BlockQuote => visitor.leave_block_quote(ctx, entity),
-			DispatchKind::CodeBlock => {
-				visitor.leave_code_block(ctx, entity);
-				ctx.in_code_block = false;
-			}
-			DispatchKind::List => {
-				visitor.leave_list(ctx, entity);
-				ctx.pop_list();
-			}
-			DispatchKind::ListItem => {
-				visitor.leave_list_item(ctx, entity);
-				if let Some(list) = ctx.current_list_mut() {
-					list.current_index += 1;
-				}
-			}
-			DispatchKind::Table => visitor.leave_table(ctx, entity),
-			DispatchKind::TableHead => visitor.leave_table_head(ctx, entity),
-			DispatchKind::TableRow => visitor.leave_table_row(ctx, entity),
-			DispatchKind::TableCell => visitor.leave_table_cell(ctx, entity),
-			// Types without meaningful leave semantics
-			DispatchKind::ThematicBreak
-			| DispatchKind::Image
-			| DispatchKind::FootnoteDefinition
-			| DispatchKind::MathDisplay
-			| DispatchKind::HtmlBlock
-			| DispatchKind::Button
-			| DispatchKind::Text
-			| DispatchKind::Link
-			| DispatchKind::HardBreak
-			| DispatchKind::SoftBreak
-			| DispatchKind::FootnoteRef
-			| DispatchKind::HtmlInline
-			| DispatchKind::TaskListCheck
-			| DispatchKind::Entity => {}
+		// Pop style after leave so leave methods still see the style
+		if is_inline_container {
+			cx.pop_style();
 		}
 	}
-}
-
-/// Internal tag used to pair a `visit_*` call with its `leave_*`
-/// counterpart without storing the full entity data. Distinct from
-/// [`NodeKind`] which is the public semantic type on [`Node`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DispatchKind {
-	Entity,
-	// Block-level
-	Heading,
-	Paragraph,
-	BlockQuote,
-	CodeBlock,
-	List,
-	ListItem,
-	Table,
-	TableHead,
-	TableRow,
-	TableCell,
-	ThematicBreak,
-	Image,
-	FootnoteDefinition,
-	MathDisplay,
-	HtmlBlock,
-	// Form
-	Button,
-	// Inline
-	Text,
-	Link,
-	HardBreak,
-	SoftBreak,
-	FootnoteRef,
-	HtmlInline,
-	TaskListCheck,
 }
 
 
@@ -504,17 +474,14 @@ enum DispatchKind {
 /// next sibling.
 ///
 /// Every method receives a [`&VisitContext`](VisitContext) with shared
-/// traversal state (style stack, code block flag, list nesting,
-/// heading level). Renderers should query this context rather than
-/// tracking duplicate state.
+/// traversal state (current entity, style stack, code block flag,
+/// list nesting, heading level). The current entity is available via
+/// [`VisitContext::entity()`]. Renderers should query this context
+/// rather than tracking duplicate state.
 #[allow(unused_variables)]
 pub trait CardVisitor {
 	/// Called for entities that don't match any specific node type.
-	fn visit_entity(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_entity(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
@@ -523,36 +490,26 @@ pub trait CardVisitor {
 	/// Called when entering a [`Heading`] entity.
 	fn visit_heading(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		heading: &Heading,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`Paragraph`] entity.
-	fn visit_paragraph(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_paragraph(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`BlockQuote`] entity.
-	fn visit_block_quote(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_block_quote(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`CodeBlock`] entity.
 	fn visit_code_block(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		code_block: &CodeBlock,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -561,73 +518,50 @@ pub trait CardVisitor {
 	/// Called when entering a [`ListMarker`] entity.
 	fn visit_list(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		list_marker: &ListMarker,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`ListItem`] entity.
-	fn visit_list_item(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_list_item(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`Table`] entity.
 	fn visit_table(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		table: &Table,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`TableHead`] entity.
-	fn visit_table_head(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_head(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`TableRow`] entity.
-	fn visit_table_row(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_row(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called when entering a [`TableCell`] entity.
-	fn visit_table_cell(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_cell(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`ThematicBreak`] entities (no children).
-	fn visit_thematic_break(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_thematic_break(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`Image`] entities.
 	fn visit_image(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		image: &Image,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -636,27 +570,21 @@ pub trait CardVisitor {
 	/// Called for [`FootnoteDefinition`] entities.
 	fn visit_footnote_definition(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`MathDisplay`] entities.
-	fn visit_math_display(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_math_display(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`HtmlBlock`] entities.
 	fn visit_html_block(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -668,8 +596,7 @@ pub trait CardVisitor {
 	/// the button label when present on the same entity.
 	fn visit_button(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		label: Option<&TextNode>,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -682,49 +609,37 @@ pub trait CardVisitor {
 	/// formatting from the style stack.
 	fn visit_text(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		text: &TextNode,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
-	/// Called for [`Link`] entities that do NOT also have a
-	/// [`TextNode`] (standalone link containers). When a link is on
-	/// the same entity as text, it appears in
-	/// [`InlineStyle::link`] via the style stack instead.
+	/// Called when entering a [`Link`] container. The link's style
+	/// modifier (`LINK`) is already on the style stack via the
+	/// inline container mechanism.
 	fn visit_link(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		link: &Link,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`HardBreak`] entities.
-	fn visit_hard_break(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_hard_break(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`SoftBreak`] entities.
-	fn visit_soft_break(
-		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_soft_break(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	/// Called for [`FootnoteRef`] entities.
 	fn visit_footnote_ref(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -733,8 +648,7 @@ pub trait CardVisitor {
 	/// Called for [`HtmlInline`] entities.
 	fn visit_html_inline(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -743,8 +657,7 @@ pub trait CardVisitor {
 	/// Called for [`TaskListCheck`] entities.
 	fn visit_task_list_check(
 		&mut self,
-		ctx: &VisitContext,
-		entity: Entity,
+		cx: &VisitContext,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
 		ControlFlow::Continue(())
@@ -753,34 +666,37 @@ pub trait CardVisitor {
 	// -- Block-level leave --
 
 	/// Called after leaving a [`Heading`] entity and all its children.
-	fn leave_heading(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_heading(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`Paragraph`] entity and all its children.
-	fn leave_paragraph(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_paragraph(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`BlockQuote`] entity and all its children.
-	fn leave_block_quote(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_block_quote(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`CodeBlock`] entity and all its children.
-	fn leave_code_block(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_code_block(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`ListMarker`] entity and all its children.
-	fn leave_list(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_list(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`ListItem`] entity and all its children.
-	fn leave_list_item(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_list_item(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`Table`] entity and all its children.
-	fn leave_table(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_table(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`TableHead`] entity and all its children.
-	fn leave_table_head(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_table_head(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`TableRow`] entity and all its children.
-	fn leave_table_row(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_table_row(&mut self, cx: &VisitContext) {}
 
 	/// Called after leaving a [`TableCell`] entity and all its children.
-	fn leave_table_cell(&mut self, ctx: &VisitContext, entity: Entity) {}
+	fn leave_table_cell(&mut self, cx: &VisitContext) {}
+
+	/// Called after leaving a [`Link`] container and all its children.
+	fn leave_link(&mut self, cx: &VisitContext) {}
 }
 
 
@@ -791,35 +707,25 @@ mod test {
 	struct EntityCounter(usize);
 
 	impl CardVisitor for EntityCounter {
-		fn visit_entity(
-			&mut self,
-			_ctx: &VisitContext,
-			_entity: Entity,
-		) -> ControlFlow<()> {
+		fn visit_entity(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 			self.0 += 1;
 			ControlFlow::Continue(())
 		}
 		fn visit_heading(
 			&mut self,
-			_ctx: &VisitContext,
-			_entity: Entity,
+			_cx: &VisitContext,
 			_heading: &Heading,
 		) -> ControlFlow<()> {
 			self.0 += 1;
 			ControlFlow::Continue(())
 		}
-		fn visit_paragraph(
-			&mut self,
-			_ctx: &VisitContext,
-			_entity: Entity,
-		) -> ControlFlow<()> {
+		fn visit_paragraph(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 			self.0 += 1;
 			ControlFlow::Continue(())
 		}
 		fn visit_text(
 			&mut self,
-			_ctx: &VisitContext,
-			_entity: Entity,
+			_cx: &VisitContext,
 			_text: &TextNode,
 		) -> ControlFlow<()> {
 			self.0 += 1;
@@ -884,8 +790,7 @@ mod test {
 	impl CardVisitor for TextCollector {
 		fn visit_text(
 			&mut self,
-			_ctx: &VisitContext,
-			_entity: Entity,
+			_cx: &VisitContext,
 			text: &TextNode,
 		) -> ControlFlow<()> {
 			self.0.push_str(text.as_str());
@@ -927,21 +832,18 @@ mod test {
 			]))
 			.id();
 
-		// Walk with a text collector that also breaks on headings
 		struct BreakHeadingTextCollector(String);
 		impl CardVisitor for BreakHeadingTextCollector {
 			fn visit_heading(
 				&mut self,
-				_ctx: &VisitContext,
-				_entity: Entity,
+				_cx: &VisitContext,
 				_heading: &Heading,
 			) -> ControlFlow<()> {
 				ControlFlow::Break(())
 			}
 			fn visit_text(
 				&mut self,
-				_ctx: &VisitContext,
-				_entity: Entity,
+				_cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
 				self.0.push_str(text.as_str());
@@ -981,11 +883,10 @@ mod test {
 		impl CardVisitor for StyleChecker {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				_text: &TextNode,
 			) -> ControlFlow<()> {
-				self.0.push(ctx.effective_style());
+				self.0.push(cx.effective_style());
 				ControlFlow::Continue(())
 			}
 		}
@@ -1019,8 +920,7 @@ mod test {
 		impl CardVisitor for LifecycleTracker {
 			fn visit_heading(
 				&mut self,
-				_ctx: &VisitContext,
-				_entity: Entity,
+				_cx: &VisitContext,
 				heading: &Heading,
 			) -> ControlFlow<()> {
 				self.0.push(format!("enter_h{}", heading.level()));
@@ -1028,14 +928,13 @@ mod test {
 			}
 			fn visit_text(
 				&mut self,
-				_ctx: &VisitContext,
-				_entity: Entity,
+				_cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
 				self.0.push(format!("text:{}", text.as_str()));
 				ControlFlow::Continue(())
 			}
-			fn leave_heading(&mut self, _ctx: &VisitContext, _entity: Entity) {
+			fn leave_heading(&mut self, _cx: &VisitContext) {
 				self.0.push("leave_h".to_string());
 			}
 		}
@@ -1071,14 +970,13 @@ mod test {
 		impl CardVisitor for BreakTracker {
 			fn visit_heading(
 				&mut self,
-				_ctx: &VisitContext,
-				_entity: Entity,
+				_cx: &VisitContext,
 				_heading: &Heading,
 			) -> ControlFlow<()> {
 				self.0.push("enter_h".to_string());
 				ControlFlow::Break(())
 			}
-			fn leave_heading(&mut self, _ctx: &VisitContext, _entity: Entity) {
+			fn leave_heading(&mut self, _cx: &VisitContext) {
 				self.0.push("leave_h".to_string());
 			}
 		}
@@ -1124,11 +1022,10 @@ mod test {
 		impl CardVisitor for LinkChecker {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				_text: &TextNode,
 			) -> ControlFlow<()> {
-				self.0.push(ctx.effective_style());
+				self.0.push(cx.effective_style());
 				ControlFlow::Continue(())
 			}
 		}
@@ -1145,12 +1042,7 @@ mod test {
 			.unwrap();
 
 		styles.len().xpect_eq(1);
-		styles[0]
-			.link
-			.as_ref()
-			.unwrap()
-			.href
-			.xpect_eq("https://example.com");
+		styles[0].contains(InlineModifier::LINK).xpect_true();
 	}
 
 	#[test]
@@ -1172,12 +1064,11 @@ mod test {
 		impl CardVisitor for StyleCollector {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
 				self.0
-					.push((text.as_str().to_string(), ctx.effective_style()));
+					.push((text.as_str().to_string(), cx.effective_style()));
 				ControlFlow::Continue(())
 			}
 		}
@@ -1220,12 +1111,11 @@ mod test {
 		impl CardVisitor for StyleCollector {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
 				self.0
-					.push((text.as_str().to_string(), ctx.effective_style()));
+					.push((text.as_str().to_string(), cx.effective_style()));
 				ControlFlow::Continue(())
 			}
 		}
@@ -1261,12 +1151,10 @@ mod test {
 		impl CardVisitor for HeadingLevelChecker {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
-				self.0
-					.push((text.as_str().to_string(), ctx.heading_level()));
+				self.0.push((text.as_str().to_string(), cx.heading_level()));
 				ControlFlow::Continue(())
 			}
 		}
@@ -1304,11 +1192,10 @@ mod test {
 		impl CardVisitor for CodeBlockChecker {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
-				self.0.push((text.as_str().to_string(), ctx.in_code_block));
+				self.0.push((text.as_str().to_string(), cx.in_code_block));
 				ControlFlow::Continue(())
 			}
 		}
@@ -1344,11 +1231,10 @@ mod test {
 		impl CardVisitor for ListChecker {
 			fn visit_text(
 				&mut self,
-				ctx: &VisitContext,
-				_entity: Entity,
+				cx: &VisitContext,
 				text: &TextNode,
 			) -> ControlFlow<()> {
-				let num = ctx
+				let num = cx
 					.current_list()
 					.map(|list| list.current_number())
 					.unwrap_or(0);
@@ -1373,5 +1259,98 @@ mod test {
 		collected[0].1.xpect_eq(1);
 		collected[1].0.xpect_eq("second");
 		collected[1].1.xpect_eq(2);
+	}
+
+	#[test]
+	fn context_entity_tracks_current() {
+		let mut world = World::new();
+		let card = world
+			.spawn((Card, children![(Paragraph, children![TextNode::new(
+				"hello"
+			)])]))
+			.id();
+
+		struct EntityTracker(Vec<Entity>);
+		impl CardVisitor for EntityTracker {
+			fn visit_text(
+				&mut self,
+				cx: &VisitContext,
+				_text: &TextNode,
+			) -> ControlFlow<()> {
+				self.0.push(cx.entity());
+				ControlFlow::Continue(())
+			}
+		}
+
+		let entities = world
+			.run_system_once_with(
+				|In(entity): In<Entity>, walker: CardWalker| {
+					let mut tracker = EntityTracker(Vec::new());
+					walker.walk_card(&mut tracker, entity);
+					tracker.0
+				},
+				card,
+			)
+			.unwrap();
+
+		entities.len().xpect_eq(1);
+		// The tracked entity should have a TextNode
+		world
+			.entity(entities[0])
+			.get::<TextNode>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("hello");
+	}
+
+	#[test]
+	fn leave_link_called() {
+		let mut world = World::new();
+		let card = world
+			.spawn((Card, children![(Paragraph, children![(
+				Link::new("https://example.com"),
+				children![TextNode::new("click")],
+			)])]))
+			.id();
+
+		struct LinkTracker(Vec<String>);
+		impl CardVisitor for LinkTracker {
+			fn visit_link(
+				&mut self,
+				_cx: &VisitContext,
+				link: &Link,
+			) -> ControlFlow<()> {
+				self.0.push(format!("enter:{}", link.href));
+				ControlFlow::Continue(())
+			}
+			fn visit_text(
+				&mut self,
+				_cx: &VisitContext,
+				text: &TextNode,
+			) -> ControlFlow<()> {
+				self.0.push(format!("text:{}", text.as_str()));
+				ControlFlow::Continue(())
+			}
+			fn leave_link(&mut self, _cx: &VisitContext) {
+				self.0.push("leave_link".to_string());
+			}
+		}
+
+		let events = world
+			.run_system_once_with(
+				|In(entity): In<Entity>, walker: CardWalker| {
+					let mut tracker = LinkTracker(Vec::new());
+					walker.walk_card(&mut tracker, entity);
+					tracker.0
+				},
+				card,
+			)
+			.unwrap();
+
+		events.xpect_eq(vec![
+			"enter:https://example.com".to_string(),
+			"text:click".to_string(),
+			"leave_link".to_string(),
+		]);
 	}
 }

@@ -49,6 +49,8 @@ pub struct MarkdownRenderer {
 	list_item_had_checkbox: bool,
 	/// Buffer for collecting footnote definition text.
 	footnote_buffer: Option<String>,
+	/// Stack of active links for wrapping text in `[text](url)`.
+	link_stack: Vec<Link>,
 }
 
 impl MarkdownRenderer {
@@ -66,6 +68,7 @@ impl MarkdownRenderer {
 			list_item_buffer: String::new(),
 			list_item_had_checkbox: false,
 			footnote_buffer: None,
+			link_stack: Vec::new(),
 		}
 	}
 
@@ -94,7 +97,8 @@ impl MarkdownRenderer {
 	}
 
 	/// Apply inline formatting markers to a text string and return
-	/// the wrapped result.
+	/// the wrapped result. Link wrapping is handled separately via
+	/// [`visit_link`](Self::visit_link) / [`leave_link`](Self::leave_link).
 	fn apply_inline_style(&self, text: &str, style: &InlineStyle) -> String {
 		let mut wrapped = text.to_string();
 
@@ -122,14 +126,6 @@ impl MarkdownRenderer {
 		if style.contains(InlineModifier::QUOTE) {
 			wrapped = format!("\"{wrapped}\"");
 		}
-		if let Some(ref link) = style.link {
-			let title = link
-				.title
-				.as_ref()
-				.map(|title| format!(" \"{title}\""))
-				.unwrap_or_default();
-			wrapped = format!("[{wrapped}]({}{title})", link.href);
-		}
 		wrapped
 	}
 }
@@ -143,8 +139,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_heading(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		heading: &Heading,
 	) -> ControlFlow<()> {
 		let level = heading.level() as usize;
@@ -154,20 +149,15 @@ impl CardVisitor for MarkdownRenderer {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_paragraph(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
-		// Text will be accumulated via visit_text; we just mark the start
+	fn visit_paragraph(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
+		let prefix = self.prefix();
+		if !prefix.is_empty() {
+			self.push_text(&prefix);
+		}
 		ControlFlow::Continue(())
 	}
 
-	fn visit_block_quote(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_block_quote(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		let new_prefix = format!("{}> ", self.prefix());
 		self.prefix_stack.push(new_prefix);
 		ControlFlow::Continue(())
@@ -175,8 +165,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_code_block(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		code_block: &CodeBlock,
 	) -> ControlFlow<()> {
 		let prefix = self.prefix();
@@ -188,19 +177,14 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_list(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		_list_marker: &ListMarker,
 	) -> ControlFlow<()> {
 		// List stack is managed by VisitContext
 		ControlFlow::Continue(())
 	}
 
-	fn visit_list_item(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_list_item(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.in_list_item = true;
 		self.list_item_buffer.clear();
 		self.list_item_had_checkbox = false;
@@ -209,48 +193,31 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_table(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		table: &Table,
 	) -> ControlFlow<()> {
 		self.table_alignments = table.alignments.clone();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_head(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_head(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.in_table_head = true;
 		self.table_row_cells.clear();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_row(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_row(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.table_row_cells.clear();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_cell(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_cell(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.in_table_cell = true;
 		self.table_row_cells.push(String::new());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_thematic_break(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_thematic_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		let prefix = self.prefix();
 		self.push_text(&format!("{prefix}---\n\n"));
 		ControlFlow::Continue(())
@@ -258,8 +225,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_image(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		image: &Image,
 	) -> ControlFlow<()> {
 		let prefix = self.prefix();
@@ -276,8 +242,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_footnote_definition(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
 		let prefix = self.prefix();
@@ -286,11 +251,7 @@ impl CardVisitor for MarkdownRenderer {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_math_display(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_math_display(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		let prefix = self.prefix();
 		self.push_text(&format!("{prefix}$$\n"));
 		ControlFlow::Continue(())
@@ -298,8 +259,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_html_block(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
 		if !html_block.0.is_empty() {
@@ -311,8 +271,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_button(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		label: Option<&TextNode>,
 	) -> ControlFlow<()> {
 		// Render buttons as bold text in markdown
@@ -327,45 +286,45 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_text(
 		&mut self,
-		ctx: &VisitContext,
-		_entity: Entity,
+		cx: &VisitContext,
 		text: &TextNode,
 	) -> ControlFlow<()> {
-		if ctx.in_code_block {
+		if cx.in_code_block {
 			let prefix = self.prefix();
 			for line in text.as_str().lines() {
 				self.push_text(&format!("{prefix}{line}\n"));
 			}
 		} else {
-			let style = ctx.effective_style();
+			let style = cx.effective_style();
 			let formatted = self.apply_inline_style(text.as_str(), &style);
 			self.push_text(&formatted);
 		}
 		ControlFlow::Continue(())
 	}
 
-	fn visit_hard_break(
+	fn visit_link(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
+		link: &Link,
 	) -> ControlFlow<()> {
+		self.push_text("[");
+		self.link_stack.push(link.clone());
+		ControlFlow::Continue(())
+	}
+
+	fn visit_hard_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.push_text("  \n");
 		ControlFlow::Continue(())
 	}
 
-	fn visit_soft_break(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_soft_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.push_text("\n");
 		ControlFlow::Continue(())
 	}
 
 	fn visit_footnote_ref(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
 		self.push_text(&format!("[^{}]", footnote_ref.label));
@@ -374,8 +333,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_html_inline(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
 		self.push_text(&html_inline.0);
@@ -384,8 +342,7 @@ impl CardVisitor for MarkdownRenderer {
 
 	fn visit_task_list_check(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
 		if task_check.checked {
@@ -399,34 +356,32 @@ impl CardVisitor for MarkdownRenderer {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_heading(&mut self, _cx: &VisitContext) { self.push_text("\n\n"); }
+
+	fn leave_paragraph(&mut self, _cx: &VisitContext) {
 		self.push_text("\n\n");
 	}
 
-	fn leave_paragraph(&mut self, _ctx: &VisitContext, _entity: Entity) {
-		self.push_text("\n\n");
-	}
-
-	fn leave_block_quote(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_block_quote(&mut self, _cx: &VisitContext) {
 		self.prefix_stack.pop();
 	}
 
-	fn leave_code_block(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_code_block(&mut self, _cx: &VisitContext) {
 		let prefix = self.prefix();
 		self.code_block_lang = None;
 		self.push_text(&format!("{prefix}```\n\n"));
 	}
 
-	fn leave_list(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_list(&mut self, _cx: &VisitContext) {
 		// List stack is managed by VisitContext
 		self.push_text("\n");
 	}
 
-	fn leave_list_item(&mut self, ctx: &VisitContext, _entity: Entity) {
+	fn leave_list_item(&mut self, cx: &VisitContext) {
 		self.in_list_item = false;
 		let prefix = self.prefix();
 
-		let bullet = if let Some(list) = ctx.current_list() {
+		let bullet = if let Some(list) = cx.current_list() {
 			if list.ordered {
 				let num = list.current_number();
 				format!("{num}. ")
@@ -441,12 +396,12 @@ impl CardVisitor for MarkdownRenderer {
 		self.buffer.push_str(&format!("{prefix}{bullet}{text}\n"));
 	}
 
-	fn leave_table(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_table(&mut self, _cx: &VisitContext) {
 		self.table_alignments.clear();
 		self.push_text("\n");
 	}
 
-	fn leave_table_head(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_table_head(&mut self, _cx: &VisitContext) {
 		// Emit header row
 		let prefix = self.prefix();
 		let row_text = self.table_row_cells.join(" | ");
@@ -478,15 +433,26 @@ impl CardVisitor for MarkdownRenderer {
 		self.table_row_cells.clear();
 	}
 
-	fn leave_table_row(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_table_row(&mut self, _cx: &VisitContext) {
 		let prefix = self.prefix();
 		let row_text = self.table_row_cells.join(" | ");
 		self.buffer.push_str(&format!("{prefix}| {row_text} |\n"));
 		self.table_row_cells.clear();
 	}
 
-	fn leave_table_cell(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_table_cell(&mut self, _cx: &VisitContext) {
 		self.in_table_cell = false;
+	}
+
+	fn leave_link(&mut self, _cx: &VisitContext) {
+		if let Some(link) = self.link_stack.pop() {
+			let title = link
+				.title
+				.as_ref()
+				.map(|title| format!(" \"{title}\""))
+				.unwrap_or_default();
+			self.push_text(&format!("]({}{})", link.href, title));
+		}
 	}
 }
 
@@ -801,5 +767,16 @@ mod test {
 			.id();
 		render_card(&mut world, entity)
 			.xpect_eq("[**important link**](https://example.com)\n\n");
+	}
+
+	#[test]
+	fn kitchen_sink_snapshot() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Card, markdown!(
+				"# Welcome to Beet\n\nThis is a **bold** and *italic* intro.\n\n## Features\n\n- Fast\n- Cross-platform\n- [Documentation](https://example.com)\n\n---\n\n> A block quote with *emphasis*.\n\n```rust\nfn main() {}\n```"
+			)))
+			.id();
+		render_card(&mut world, entity).xpect_snapshot();
 	}
 }

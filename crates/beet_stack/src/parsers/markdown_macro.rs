@@ -1,8 +1,9 @@
-//! The [`markdown!`] macro for spawning markdown as entities.
+//! The [`markdown!`] macro for spawning markdown as entity bundles.
 //!
-//! Replaces [`content!`](crate::content) for test ergonomics by
-//! parsing a markdown string and spawning the resulting entity tree
-//! via [`MarkdownDiffer`](super::MarkdownDiffer).
+//! Uses the [`IntoMarkdownBundle`] trait to convert string literals
+//! into bundles that parse markdown on spawn via [`OnSpawn`]. Bundle
+//! expressions pass through unchanged, enabling interspersed
+//! markdown text and explicit bundles.
 //!
 //! # Usage
 //!
@@ -11,27 +12,95 @@
 //! use beet_core::prelude::*;
 //!
 //! let mut world = World::new();
-//! let entity = markdown!(world, "# Hello **world**");
 //!
-//! // The entity now has Heading1 and Important children
-//! let children = world.entity(entity).get::<Children>().unwrap();
-//! children.len().xpect_eq(1);
+//! // Single markdown string — parsed on spawn
+//! let entity = world.spawn(markdown!("# Hello **world**")).id();
+//!
+//! // Multiple segments — each becomes a child
+//! let entity = world.spawn(markdown!(
+//!     "# My Site",
+//!     (Paragraph::with_text("interspersed bundle")),
+//!     "And some *more text after*",
+//! )).id();
 //! ```
 //!
-//! # Differences from `content!`
-//!
-//! - Input is a markdown string rather than Rust expressions
-//! - Always produces the container pattern (eg `Important` wraps
-//!   `TextNode` children, never on the same entity)
-//! - Cannot bind [`FieldRef`](crate::document::FieldRef) — use
-//!   explicit bundle syntax for dynamic bindings
 
-/// Spawn a markdown string as an entity tree.
+use crate::prelude::*;
+use beet_core::prelude::*;
+use variadics_please::all_tuples;
+
+/// Trait for types that can be converted into a markdown-aware bundle.
 ///
-/// Parses the markdown text with [`MarkdownDiffer`] and spawns the
-/// resulting entities as children of a new root entity.
+/// String types are parsed as markdown via [`MarkdownDiffer`] on
+/// spawn. Other types pass through as regular bundles.
+trait IntoMarkdownBundle<M> {
+	/// Convert into a bundle for spawning as a markdown segment.
+	fn into_markdown_bundle(self) -> impl Bundle;
+}
+
+// String-like types get parsed as markdown via OnSpawn
+impl IntoMarkdownBundle<Self> for &str {
+	fn into_markdown_bundle(self) -> impl Bundle {
+		let text = self.to_string();
+		OnSpawn::new(move |entity: &mut EntityWorldMut| {
+			let id = entity.id();
+			entity.world_scope(|world| {
+				MarkdownDiffer::new(&text)
+					.diff(world.entity_mut(id))
+					.unwrap();
+			});
+		})
+	}
+}
+
+impl IntoMarkdownBundle<Self> for String {
+	fn into_markdown_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |entity: &mut EntityWorldMut| {
+			let id = entity.id();
+			entity.world_scope(|world| {
+				MarkdownDiffer::new(&self)
+					.diff(world.entity_mut(id))
+					.unwrap();
+			});
+		})
+	}
+}
+
+pub struct BundleIntoMarkdownBundleMarker;
+impl<B: Bundle> IntoMarkdownBundle<BundleIntoMarkdownBundleMarker> for B {
+	fn into_markdown_bundle(self) -> impl Bundle { self }
+}
+
+// impl IntoMarkdownBundle<Self> for FieldRef {
+// 	fn into_markdown_bundle(self) -> impl Bundle { (self, TextNode::default()) }
+// }
+
+pub struct TupleIntoMarkdownBundleMarker;
+
+macro_rules! impl_into_markdown_bundle_tuple {
+ ($(#[$meta:meta])* $(($M:ident, $T:ident)),*) => {
+  $(#[$meta])*
+  impl<$($M, $T),*> IntoMarkdownBundle<(TupleIntoMarkdownBundleMarker, $($M,)*)> for ($($T,)*)
+  where
+   $($T: IntoMarkdownBundle<$M>),*
+  {
+   #[allow(non_snake_case)]
+   fn into_markdown_bundle(self) -> impl Bundle {
+    let ($($T,)*) = self;
+    ($($T.into_markdown_bundle(),)*)
+   }
+  }
+ }
+}
+
+all_tuples!(impl_into_markdown_bundle_tuple, 1, 12, M, T);
+
+
+/// Spawn markdown content as an entity bundle.
 ///
-/// Returns the root [`Entity`].
+/// String literals are parsed as markdown via [`MarkdownDiffer`].
+/// Bundle expressions pass through unchanged. Multiple segments
+/// become children of the spawned entity.
 ///
 /// # Examples
 ///
@@ -41,41 +110,36 @@
 ///
 /// let mut world = World::new();
 ///
-/// // Simple paragraph
-/// let entity = markdown!(world, "Hello world");
+/// // Single markdown string
+/// let entity = world.spawn(markdown!("# Hello **world**")).id();
 ///
-/// // Heading with inline formatting
-/// let entity = markdown!(world, "# Hello **world**");
-///
-/// // Multiple blocks
-/// let entity = markdown!(world, "# Title\n\nA paragraph with *emphasis*.");
+/// // Multiple segments as children
+/// let entity = world.spawn(markdown!(
+///     "# Title",
+///     (Paragraph::with_text("a bundle")),
+///     "*emphasis*",
+/// )).id();
 /// ```
 #[macro_export]
 macro_rules! markdown {
-	($world:expr, $text:expr) => {{
-		let root = $world.spawn_empty().id();
-		$crate::prelude::MarkdownDiffer::new($text)
-			.diff($world.entity_mut(root))
-			.unwrap();
-		root
-	}};
+	// Single expression — return directly without children! wrapper
+	[$segment:expr $(,)?] => {
+		$crate::prelude::into_markdown_bundle($segment)
+	};
+	// Multiple expressions — wrap in children!
+	[$($segment:expr),+ $(,)?] => {
+		::bevy::prelude::children![
+			$($crate::prelude::into_markdown_bundle($segment)),+
+		]
+	};
 }
 
-/// Spawn a markdown string as an entity tree, returning the root entity.
-///
-/// Functional equivalent of the [`markdown!`] macro for contexts
-/// where a function call is preferred.
-#[cfg(feature = "markdown")]
-pub fn spawn_markdown(
-	world: &mut bevy::prelude::World,
-	text: &str,
-) -> bevy::prelude::Entity {
-	use super::Parser;
-	let root = world.spawn_empty().id();
-	super::MarkdownDiffer::new(text)
-		.diff(world.entity_mut(root))
-		.unwrap();
-	root
+#[inline]
+#[allow(private_bounds)]
+pub fn into_markdown_bundle<M>(
+	value: impl IntoMarkdownBundle<M>,
+) -> impl Bundle {
+	value.into_markdown_bundle()
 }
 
 
@@ -87,7 +151,7 @@ mod test {
 	#[test]
 	fn spawns_paragraph() {
 		let mut world = World::new();
-		let root = markdown!(world, "Hello world");
+		let root = world.spawn(markdown!("Hello world")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(1);
@@ -99,7 +163,7 @@ mod test {
 	#[test]
 	fn spawns_heading() {
 		let mut world = World::new();
-		let root = markdown!(world, "# Title");
+		let root = world.spawn(markdown!("# Title")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(1);
@@ -120,7 +184,7 @@ mod test {
 	#[test]
 	fn spawns_bold_as_container() {
 		let mut world = World::new();
-		let root = markdown!(world, "**bold**");
+		let root = world.spawn(markdown!("**bold**")).id();
 
 		// Root -> Paragraph -> Important -> TextNode
 		let children = world.entity(root).get::<Children>().unwrap();
@@ -128,9 +192,7 @@ mod test {
 		let para_children = world.entity(para).get::<Children>().unwrap();
 		let important = *para_children.first().unwrap();
 		world.entity(important).contains::<Important>().xpect_true();
-		// Important should NOT have TextNode on same entity
 		world.entity(important).contains::<TextNode>().xpect_false();
-		// TextNode should be a child of Important
 		let important_children =
 			world.entity(important).get::<Children>().unwrap();
 		let text_entity = *important_children.first().unwrap();
@@ -145,7 +207,7 @@ mod test {
 	#[test]
 	fn spawns_italic_as_container() {
 		let mut world = World::new();
-		let root = markdown!(world, "*italic*");
+		let root = world.spawn(markdown!("*italic*")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -158,7 +220,7 @@ mod test {
 	#[test]
 	fn mixed_inline_formatting() {
 		let mut world = World::new();
-		let root = markdown!(world, "hello **bold** world");
+		let root = world.spawn(markdown!("hello **bold** world")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -170,7 +232,7 @@ mod test {
 	#[test]
 	fn multiple_blocks() {
 		let mut world = World::new();
-		let root = markdown!(world, "# Heading\n\nA paragraph.");
+		let root = world.spawn(markdown!("# Heading\n\nA paragraph.")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(2);
@@ -185,7 +247,7 @@ mod test {
 	#[test]
 	fn spawns_link_as_container() {
 		let mut world = World::new();
-		let root = markdown!(world, "[click](https://example.com)");
+		let root = world.spawn(markdown!("[click](https://example.com)")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let para = *children.first().unwrap();
@@ -193,7 +255,6 @@ mod test {
 		let link_entity = *para_children.first().unwrap();
 		let link = world.entity(link_entity).get::<Link>().unwrap();
 		link.href.as_str().xpect_eq("https://example.com");
-		// Link text should be a child, not on the same entity
 		let link_children =
 			world.entity(link_entity).get::<Children>().unwrap();
 		let text_entity = *link_children.first().unwrap();
@@ -206,18 +267,9 @@ mod test {
 	}
 
 	#[test]
-	fn spawn_markdown_function() {
-		let mut world = World::new();
-		let root = spawn_markdown(&mut world, "hello");
-
-		let children = world.entity(root).get::<Children>().unwrap();
-		children.len().xpect_eq(1);
-	}
-
-	#[test]
 	fn code_block() {
 		let mut world = World::new();
-		let root = markdown!(world, "```rust\nfn main() {}\n```");
+		let root = world.spawn(markdown!("```rust\nfn main() {}\n```")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let code = *children.first().unwrap();
@@ -228,7 +280,7 @@ mod test {
 	#[test]
 	fn unordered_list() {
 		let mut world = World::new();
-		let root = markdown!(world, "- one\n- two\n- three");
+		let root = world.spawn(markdown!("- one\n- two\n- three")).id();
 
 		let children = world.entity(root).get::<Children>().unwrap();
 		let list = *children.first().unwrap();
@@ -237,5 +289,53 @@ mod test {
 
 		let list_children = world.entity(list).get::<Children>().unwrap();
 		list_children.len().xpect_eq(3);
+	}
+
+	#[test]
+	fn multiple_segments_as_children() {
+		let mut world = World::new();
+		let root = world
+			.spawn(markdown!(
+				"# Title",
+				"interspersed plain text",
+				"*emphasis*",
+			))
+			.id();
+
+		let children = world.entity(root).get::<Children>().unwrap();
+		// Three segments become three children
+		children.len().xpect_eq(3);
+
+		// First child: OnSpawn parsed "# Title" → has Heading1 subchild
+		let first = *children.first().unwrap();
+		let first_children = world.entity(first).get::<Children>().unwrap();
+		let heading = *first_children.first().unwrap();
+		world.entity(heading).contains::<Heading1>().xpect_true();
+
+		// Second child: OnSpawn parsed plain text → has Paragraph subchild
+		let second = children.iter().nth(1).unwrap();
+		let second_children = world.entity(second).get::<Children>().unwrap();
+		let para = *second_children.first().unwrap();
+		world.entity(para).contains::<Paragraph>().xpect_true();
+
+		// Third child: OnSpawn parsed "*emphasis*" → has Paragraph subchild
+		let third = children.iter().nth(2).unwrap();
+		let third_children = world.entity(third).get::<Children>().unwrap();
+		let para = *third_children.first().unwrap();
+		world.entity(para).contains::<Paragraph>().xpect_true();
+	}
+
+	#[test]
+	fn single_string_parses_markdown() {
+		let mut world = World::new();
+		let entity = world.spawn(markdown!("hello **world**")).id();
+
+		// Single string: OnSpawn parses markdown onto the entity
+		let children = world.entity(entity).get::<Children>().unwrap();
+		let para = *children.first().unwrap();
+		world.entity(para).contains::<Paragraph>().xpect_true();
+		let para_children = world.entity(para).get::<Children>().unwrap();
+		// "hello " + Important("world")
+		para_children.len().xpect_eq(2);
 	}
 }

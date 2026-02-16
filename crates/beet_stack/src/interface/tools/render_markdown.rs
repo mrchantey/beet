@@ -52,7 +52,7 @@ use beet_core::prelude::*;
 /// use beet_core::prelude::*;
 ///
 /// let val = World::new()
-/// 			.spawn((render_markdown(), content!["hello world"]))
+/// 			.spawn((render_markdown(), Paragraph::with_text("hello world")))
 /// 			.send_blocking::<(), String>(())
 /// 			.unwrap();
 /// assert_eq!(val, "hello world");

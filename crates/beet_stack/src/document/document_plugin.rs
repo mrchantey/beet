@@ -173,7 +173,10 @@ mod test {
 		world.spawn((
 			Card,
 			Document::new(val!({ "name": "World" })),
-			children![(content!["Hello, ", FieldRef::new("name")])],
+			children![
+				TextNode::new("Hello, "),
+				(FieldRef::new("name"), TextNode::default()),
+			],
 		));
 
 		world.update_local();

@@ -1,0 +1,18 @@
+# Welcome to Beet
+
+This is a **bold** and *italic* intro.
+
+## Features
+
+- Fast
+- Cross-platform
+- [Documentation](https://example.com)
+
+---
+
+> A block quote with *emphasis*.
+
+```rust
+fn main() {}
+```
+

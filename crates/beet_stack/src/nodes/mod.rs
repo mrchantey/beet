@@ -14,7 +14,7 @@
 //! - [`form`] - Interactive form controls (buttons, checkboxes)
 //! - [`layout`] - Display and layout primitives ([`DisplayBlock`], [`TextAlignment`])
 //! - [`style`] - [`InlineModifier`] bitflags, [`InlineStyle`], and [`VisitContext`]
-//! - [`content_macro`] - The [`content!`] macro for simple bundle composition
+//! - [`markdown!`] - The markdown macro for ergonomic content spawning
 //!
 //! # Node Invariance
 //!
@@ -38,16 +38,14 @@
 //! let bold = (Important, children![TextNode::new("bold")]);
 //!
 //! // For ergonomic markdown-based content, use the markdown! macro:
-//! // let root = markdown!(world, "Hello **world**!");
+//! // let root = world.spawn(markdown!("Hello **world**!")).id();
 //! ```
-pub mod content_macro;
 mod elements;
 mod form;
 mod layout;
 pub(crate) mod node;
 mod style;
 mod text;
-pub use content_macro::*;
 pub use elements::*;
 pub use form::*;
 pub use layout::*;

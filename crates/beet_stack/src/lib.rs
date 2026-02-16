@@ -16,7 +16,6 @@ mod tools;
 
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
-	pub use crate::content;
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;

@@ -181,6 +181,7 @@ impl NodeKind {
 			NodeKind::Superscript => Some(super::InlineModifier::SUPERSCRIPT),
 			NodeKind::Subscript => Some(super::InlineModifier::SUBSCRIPT),
 			NodeKind::MathInline => Some(super::InlineModifier::MATH_INLINE),
+			NodeKind::Link => Some(super::InlineModifier::LINK),
 			_ => None,
 		}
 	}

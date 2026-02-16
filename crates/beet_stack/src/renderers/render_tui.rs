@@ -21,6 +21,11 @@
 //!     walker.walk_card(&mut renderer, entity);
 //! }
 //! ```
+//!
+//! # Configuration
+//!
+//! Use [`TuiConfig`] to customize rendering behavior such as
+//! heading gaps, block quote indentation, and list bullet style.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ratatui::buffer::Buffer;
@@ -34,6 +39,62 @@ use ratatui::text::Text;
 use ratatui::widgets;
 use ratatui::widgets::Widget;
 use std::ops::ControlFlow;
+
+
+/// Configuration for the TUI renderer.
+///
+/// Controls spacing, indentation, and styling behavior. Sensible
+/// defaults are provided via [`Default`].
+#[derive(Debug, Clone)]
+pub struct TuiConfig {
+	/// Number of blank lines before an h1 heading.
+	pub h1_gap_before: u16,
+	/// Number of blank lines after any heading.
+	pub heading_gap_after: u16,
+	/// Number of blank lines after a paragraph.
+	pub paragraph_gap_after: u16,
+	/// Number of blank lines before and after a block quote.
+	pub block_quote_gap: u16,
+	/// Indentation width for block quotes (includes the `│ ` bar).
+	pub block_quote_indent: u16,
+	/// Style applied to h1 headings.
+	pub h1_style: Style,
+	/// Style applied to h2 headings.
+	pub h2_style: Style,
+	/// Style applied to h3+ headings.
+	pub h3_style: Style,
+	/// Whether h1 headings are centered.
+	pub h1_centered: bool,
+	/// Foreground color for link text.
+	pub link_fg: Color,
+	/// Foreground color for the horizontal rule.
+	pub hr_fg: Color,
+	/// Unordered list bullet string.
+	pub bullet: String,
+	/// Foreground color for bullet / list number prefixes.
+	pub bullet_fg: Color,
+}
+
+impl Default for TuiConfig {
+	fn default() -> Self {
+		Self {
+			h1_gap_before: 1,
+			heading_gap_after: 0,
+			paragraph_gap_after: 0,
+			block_quote_gap: 1,
+			block_quote_indent: 2,
+			h1_style: Style::new().bold().fg(Color::Yellow),
+			h2_style: Style::new().bold().fg(Color::Cyan),
+			h3_style: Style::new().bold(),
+			h1_centered: true,
+			link_fg: Color::Cyan,
+			hr_fg: Color::DarkGray,
+			bullet: "• ".to_string(),
+			bullet_fg: Color::DarkGray,
+		}
+	}
+}
+
 
 /// Visitor-based TUI renderer.
 ///
@@ -55,6 +116,10 @@ pub struct TuiRenderer<'buf> {
 	spans: Vec<Span<'static>>,
 	/// Whether we are inside a list item collecting text.
 	in_list_item: bool,
+	/// Current link URL when inside a link container.
+	current_link_url: Option<String>,
+	/// Rendering configuration.
+	config: TuiConfig,
 }
 
 impl<'buf> TuiRenderer<'buf> {
@@ -66,6 +131,25 @@ impl<'buf> TuiRenderer<'buf> {
 			style_stack: Vec::new(),
 			spans: Vec::new(),
 			in_list_item: false,
+			current_link_url: None,
+			config: TuiConfig::default(),
+		}
+	}
+
+	/// Create a new TUI renderer with custom configuration.
+	pub fn with_config(
+		area: Rect,
+		buf: &'buf mut Buffer,
+		config: TuiConfig,
+	) -> Self {
+		Self {
+			area,
+			buf,
+			style_stack: Vec::new(),
+			spans: Vec::new(),
+			in_list_item: false,
+			current_link_url: None,
+			config,
 		}
 	}
 
@@ -73,7 +157,7 @@ impl<'buf> TuiRenderer<'buf> {
 	pub fn remaining_area(&self) -> Rect { self.area }
 
 	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
-	fn style_from_inline(style: &InlineStyle) -> Style {
+	fn style_from_inline(&self, style: &InlineStyle) -> Style {
 		let mut result = Style::new();
 		if style.contains(InlineModifier::BOLD) {
 			result = result.bold();
@@ -87,8 +171,8 @@ impl<'buf> TuiRenderer<'buf> {
 		if style.contains(InlineModifier::STRIKETHROUGH) {
 			result = result.crossed_out();
 		}
-		if style.link.is_some() {
-			result = result.underlined().fg(Color::Cyan);
+		if style.contains(InlineModifier::LINK) {
+			result = result.underlined().fg(self.config.link_fg);
 		}
 		result
 	}
@@ -132,9 +216,15 @@ impl<'buf> TuiRenderer<'buf> {
 		}
 		let rule = "─".repeat(self.area.width as usize);
 		let line =
-			Line::from(Span::styled(rule, Style::new().fg(Color::DarkGray)));
+			Line::from(Span::styled(rule, Style::new().fg(self.config.hr_fg)));
 		let text = Text::from(line);
 		self.render_text(text);
+	}
+
+	/// Advance the cursor by `count` blank lines.
+	fn advance_lines(&mut self, count: u16) {
+		self.area.y = self.area.y.saturating_add(count);
+		self.area.height = self.area.height.saturating_sub(count);
 	}
 }
 
@@ -143,40 +233,29 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_heading(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		heading: &Heading,
 	) -> ControlFlow<()> {
-		let mut style = Style::new().bold();
-		println!("Visiting heading level {}", heading.level());
-		if heading.level() == 1 {
-			// h1: add a gap above
-			self.area.y = self.area.y.saturating_add(1);
-			self.area.height = self.area.height.saturating_sub(1);
-			style = style.fg(Color::Yellow);
-		} else if heading.level() == 2 {
-			style = style.fg(Color::Cyan);
-		}
+		let style = match heading.level() {
+			1 => {
+				self.advance_lines(self.config.h1_gap_before);
+				self.config.h1_style
+			}
+			2 => self.config.h2_style,
+			_ => self.config.h3_style,
+		};
 		self.style_stack.push(style);
 		ControlFlow::Continue(())
 	}
 
-	fn visit_paragraph(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_paragraph(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_block_quote(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
-		// Indent the area for block quotes
-		let indent: u16 = 2;
+	fn visit_block_quote(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
+		self.advance_lines(self.config.block_quote_gap);
+		let indent = self.config.block_quote_indent;
 		if self.area.width > indent {
 			// Render a vertical bar
 			if self.area.height > 0 {
@@ -194,8 +273,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_code_block(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		_code_block: &CodeBlock,
 	) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().bg(Color::DarkGray));
@@ -204,70 +282,51 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_list(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		_list_marker: &ListMarker,
 	) -> ControlFlow<()> {
 		// List stack is managed by VisitContext
 		ControlFlow::Continue(())
 	}
 
-	fn visit_list_item(
-		&mut self,
-		ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_list_item(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		self.in_list_item = true;
 
 		// Emit the bullet/number prefix from the context's list stack
-		let bullet = if let Some(list) = ctx.current_list() {
+		let bullet = if let Some(list) = cx.current_list() {
 			if list.ordered {
 				let num = list.current_number();
 				format!("{num}. ")
 			} else {
-				"• ".to_string()
+				self.config.bullet.clone()
 			}
 		} else {
-			"• ".to_string()
+			self.config.bullet.clone()
 		};
 
 		self.spans
-			.push(Span::styled(bullet, Style::new().fg(Color::DarkGray)));
+			.push(Span::styled(bullet, Style::new().fg(self.config.bullet_fg)));
 		ControlFlow::Continue(())
 	}
 
 	fn visit_table(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		_table: &Table,
 	) -> ControlFlow<()> {
-		// Tables are complex; render a placeholder for now
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_head(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_head(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().bold());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_row(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_row(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_cell(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_table_cell(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		// Add a separator between cells
 		if !self.spans.is_empty() {
 			self.spans
@@ -276,11 +335,7 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_thematic_break(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_thematic_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.flush_spans();
 		self.render_hr();
 		ControlFlow::Continue(())
@@ -288,8 +343,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_image(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		image: &Image,
 	) -> ControlFlow<()> {
 		// Render image as alt text placeholder
@@ -304,8 +358,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_footnote_definition(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
 		self.spans.push(Span::styled(
@@ -315,19 +368,14 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_math_display(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_math_display(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().fg(Color::Magenta));
 		ControlFlow::Continue(())
 	}
 
 	fn visit_html_block(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
 		if !html_block.0.is_empty() {
@@ -342,8 +390,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_button(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		label: Option<&TextNode>,
 	) -> ControlFlow<()> {
 		let label_text = label.map(|text| text.as_str()).unwrap_or("button");
@@ -363,33 +410,18 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_text(
 		&mut self,
-		ctx: &VisitContext,
-		_entity: Entity,
+		cx: &VisitContext,
 		text: &TextNode,
 	) -> ControlFlow<()> {
-		let style = ctx.effective_style();
-		let inline_style = Self::style_from_inline(&style);
+		let style = cx.effective_style();
+		let inline_style = self.style_from_inline(&style);
 		let base = self.current_style().patch(inline_style);
 
-		if ctx.in_code_block {
+		if cx.in_code_block {
 			// In code blocks, render line by line
 			for line in text.as_str().lines() {
 				self.spans.push(Span::styled(line.to_string(), base));
 				self.flush_spans();
-			}
-		} else if let Some(ref link) = style.link {
-			// Render as a hyperlink widget when possible
-			let hyperlink = crate::prelude::widgets::Hyperlink::new(
-				text.as_str().to_string(),
-				link.href.clone(),
-			);
-			self.flush_spans();
-			if self.area.height > 0 {
-				let link_area =
-					Rect::new(self.area.x, self.area.y, self.area.width, 1);
-				hyperlink.render(link_area, self.buf);
-				self.area.y = self.area.y.saturating_add(1);
-				self.area.height = self.area.height.saturating_sub(1);
 			}
 		} else {
 			self.spans
@@ -398,20 +430,21 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_hard_break(
+	fn visit_link(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
+		link: &Link,
 	) -> ControlFlow<()> {
+		self.current_link_url = Some(link.href.clone());
+		ControlFlow::Continue(())
+	}
+
+	fn visit_hard_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.flush_spans();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_soft_break(
-		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
-	) -> ControlFlow<()> {
+	fn visit_soft_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		// Soft breaks are rendered as spaces in TUI
 		self.spans.push(Span::raw(" "));
 		ControlFlow::Continue(())
@@ -419,8 +452,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_footnote_ref(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
 		self.spans.push(Span::styled(
@@ -432,8 +464,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_html_inline(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
 		self.spans.push(Span::styled(
@@ -445,8 +476,7 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_task_list_check(
 		&mut self,
-		_ctx: &VisitContext,
-		_entity: Entity,
+		_cx: &VisitContext,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
 		let symbol = if task_check.checked { "☑ " } else { "☐ " };
@@ -463,10 +493,10 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	// -- Block-level leave --
 
-	fn leave_heading(&mut self, ctx: &VisitContext, _entity: Entity) {
+	fn leave_heading(&mut self, cx: &VisitContext) {
 		// Flush heading spans with the heading style applied to the
 		// entire line, then center h1.
-		let heading_level = ctx.heading_level();
+		let heading_level = cx.heading_level();
 		let spans = std::mem::take(&mut self.spans);
 		if !spans.is_empty() {
 			let line = Line::from(spans);
@@ -474,58 +504,62 @@ impl CardVisitor for TuiRenderer<'_> {
 			if let Some(style) = self.style_stack.last() {
 				text = text.style(*style);
 			}
-			if heading_level == 1 {
+			if heading_level == 1 && self.config.h1_centered {
 				text = text.centered();
 			}
 			self.render_text(text);
 		}
 		self.style_stack.pop();
+		self.advance_lines(self.config.heading_gap_after);
 	}
 
-	fn leave_paragraph(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_paragraph(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
 		self.style_stack.pop();
+		self.advance_lines(self.config.paragraph_gap_after);
 	}
 
-	fn leave_block_quote(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_block_quote(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
 		// Restore the area indentation
-		let indent: u16 = 2;
+		let indent = self.config.block_quote_indent;
 		self.area.x = self.area.x.saturating_sub(indent);
 		self.area.width = self.area.width.saturating_add(indent);
 		self.style_stack.pop();
+		self.advance_lines(self.config.block_quote_gap);
 	}
 
-	fn leave_code_block(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_code_block(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
 		self.style_stack.pop();
 	}
 
-	fn leave_list(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_list(&mut self, _cx: &VisitContext) {
 		// List stack is managed by VisitContext
 	}
 
-	fn leave_list_item(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_list_item(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
 		self.in_list_item = false;
-		// Item index increment is managed by VisitContext
 	}
 
-	fn leave_table(&mut self, _ctx: &VisitContext, _entity: Entity) {}
+	fn leave_table(&mut self, _cx: &VisitContext) {}
 
-	fn leave_table_head(&mut self, _ctx: &VisitContext, _entity: Entity) {
+	fn leave_table_head(&mut self, _cx: &VisitContext) {
 		self.flush_spans();
 		// Render a separator line
 		self.render_hr();
 		self.style_stack.pop();
 	}
 
-	fn leave_table_row(&mut self, _ctx: &VisitContext, _entity: Entity) {
-		self.flush_spans();
+	fn leave_table_row(&mut self, _cx: &VisitContext) { self.flush_spans(); }
+
+	fn leave_table_cell(&mut self, _cx: &VisitContext) {
+		// Cells are collected as spans; the row leave flushes them
 	}
 
-	fn leave_table_cell(&mut self, _ctx: &VisitContext, _entity: Entity) {
-		// Cells are collected as spans; the row leave flushes them
+	fn leave_link(&mut self, _cx: &VisitContext) {
+		self.current_link_url = None;
 	}
 }
 
@@ -595,6 +629,13 @@ mod test {
 		cell.style()
 			.add_modifier
 			.contains(ratatui::style::Modifier::ITALIC)
+	}
+
+	fn cell_is_underlined(buf: &Buffer, col: u16, row: u16) -> bool {
+		let cell = &buf[(col, row)];
+		cell.style()
+			.add_modifier
+			.contains(ratatui::style::Modifier::UNDERLINED)
 	}
 
 	// -- Basic rendering --
@@ -792,5 +833,54 @@ mod test {
 		text.as_str().xpect_contains("Inside card");
 		// Nested card content should not appear
 		text.as_str().xnot().xpect_contains("Inside nested card");
+	}
+
+	// -- Link rendering --
+
+	#[test]
+	fn link_renders_inline() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Card, children![(Paragraph, children![
+				TextNode::new("visit "),
+				(Link::new("https://example.com"), children![TextNode::new(
+					"example"
+				)],),
+				TextNode::new(" site"),
+			])]))
+			.id();
+
+		let (buf, _) = render_to_buffer(&mut world, entity, 60, 10);
+		let text = buffer_text(&buf);
+		// Link text should be inline, not on a separate line
+		text.as_str().xpect_contains("visit");
+		text.as_str().xpect_contains("example");
+		text.as_str().xpect_contains("site");
+	}
+
+	#[test]
+	fn link_text_is_underlined() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((Card, children![(Paragraph, children![(
+				Link::new("https://example.com"),
+				children![TextNode::new("click")],
+			)])]))
+			.id();
+
+		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+
+		// Find the 'c' of "click" and check it's underlined
+		let area = buf.area;
+		let mut found_underline = false;
+		for row in area.y..area.y + area.height {
+			for col in area.x..area.x + area.width {
+				let cell = &buf[(col, row)];
+				if cell.symbol() == "c" && cell_is_underlined(&buf, col, row) {
+					found_underline = true;
+				}
+			}
+		}
+		found_underline.xpect_true();
 	}
 }
