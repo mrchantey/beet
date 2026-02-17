@@ -452,7 +452,7 @@ mod test {
 	fn cards_appear_in_route_tree() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("about", || Paragraph::with_text("about")),
 				tool_at("action"),
 			]))
@@ -603,7 +603,7 @@ mod test {
 	fn find_subtree_returns_scoped_nodes() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![tool_at("increment"), tool_at("decrement"),],

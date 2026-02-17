@@ -288,7 +288,7 @@ mod test {
 	fn help_includes_cards() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				help(),
 				card("about", || Paragraph::with_text("about")),
 				increment(FieldRef::new("count")),
@@ -320,7 +320,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -341,7 +341,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_scoped_to_prefix() {
 		let body = StackPlugin::world()
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],
@@ -364,7 +364,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![increment(FieldRef::new(
+			.spawn((default_router(), children![increment(FieldRef::new(
 				"count"
 			)),]))
 			.call::<Request, Response>(
@@ -382,7 +382,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],

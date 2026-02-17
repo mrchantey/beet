@@ -9,6 +9,7 @@ pub struct TuiServer;
 pub fn tui_server() -> impl Bundle {
 	(
 		TuiServer,
+		tui_render_tool(),
 		OnSpawn::new_async(async |entity| -> Result {
 			// Dispatch CLI args as the initial request, rendering the
 			// root content when no args are provided.

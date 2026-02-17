@@ -17,35 +17,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// An interface for interacting with a card-based application.
-///
-/// Interfaces provide a way to navigate between cards and call tools
-/// within the current card context. The [`Interface`] component marks
-/// the root of a routable entity hierarchy:
-///
-/// ```text
-/// > my_app
-/// // prints help for root: subcommands: foo
-/// > foo
-/// // prints foo in markdown, and sets current card to foo
-/// > --help
-/// // prints help for foo, not the root: subcommands: bar
-/// > bar
-/// // goes to route foo/bar, if bar is a tool dont update current card.
-/// ```
-///
-/// Help is handled by the interface itself, not added to each route.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct Interface {}
-
-impl Interface {}
-
 /// Create an interface from a handler, inserting an [`Interface`]
 /// component on the entity.
-pub fn interface() -> impl Bundle {
-	(Interface::default(), RouteHidden, exchange_fallback())
-}
+pub fn interface() -> impl Bundle { (RouteHidden, exchange_fallback()) }
 /// A Request/Response tool that will try each children until an
 /// Outcome::Response is reached, or else returns a NotFound.
 /// Errors are converted to a response.
@@ -86,7 +60,7 @@ pub fn exchange_fallback() -> impl Bundle {
 ///    are tools; cards delegate to the render tool internally.
 /// 4. **Contextual Not Found** — show help for the nearest ancestor
 ///    card of the unmatched path.
-pub fn default_interface() -> impl Bundle {
+pub fn default_router() -> impl Bundle {
 	(
 		interface(),
 		OnSpawn::insert(children![
@@ -115,13 +89,10 @@ mod test {
 
 	fn my_interface() -> impl Bundle {
 		(
-			Interface::default(),
 			tool(
 				|req: In<ToolContext<Request>>,
-				 trees: Query<&RouteTree>,
-				 interfaces: Query<&Interface>|
+				 trees: Query<&RouteTree>|
 				 -> Result<RouteTree> {
-					let _interface = interfaces.get(req.tool)?;
 					let tree = trees.get(req.tool)?;
 					Ok(tree.clone())
 				},
@@ -152,7 +123,7 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_tool_request() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![route_tool(
+			.spawn((default_router(), children![route_tool(
 				"add",
 				|(a, b): (i32, i32)| -> i32 { a + b }
 			)]))
@@ -170,7 +141,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -185,7 +156,7 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_help_request() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -199,7 +170,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![increment(FieldRef::new(
+			.spawn((default_router(), children![increment(FieldRef::new(
 				"count"
 			))]))
 			.call::<Request, Response>(
@@ -214,7 +185,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_card_on_empty_args() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("", || {
 					children![
 						Heading1::with_text("My Server"),
@@ -237,7 +208,7 @@ mod test {
 		let mut world = StackPlugin::world();
 
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],

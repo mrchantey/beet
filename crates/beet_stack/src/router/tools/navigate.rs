@@ -273,7 +273,7 @@ mod test {
 	async fn navigate_parent_from_child() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("", || Heading1::with_text("Root")),
 				(card("about", || Paragraph::with_text("About page")),),
 			]))
@@ -296,7 +296,7 @@ mod test {
 	async fn navigate_first_child() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -319,7 +319,7 @@ mod test {
 	async fn navigate_next_sibling_wraps() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -354,7 +354,7 @@ mod test {
 	async fn navigate_prev_sibling_wraps() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![
+			.spawn((default_router(), children![
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -377,7 +377,7 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![card("about", || {
+			.spawn((default_router(), children![card("about", || {
 				Paragraph::with_text("About page")
 			}),]))
 			.flush();

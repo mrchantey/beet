@@ -272,7 +272,7 @@ mod test {
 	#[beet_core::test]
 	async fn card_renders_via_render_tool() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![card("about", || {
+			.spawn((default_router(), children![card("about", || {
 				Paragraph::with_text("About page")
 			})]))
 			.call::<Request, Response>(Request::get("about"))
@@ -286,7 +286,7 @@ mod test {
 	#[beet_core::test]
 	async fn card_with_children() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![card("home", || {
+			.spawn((default_router(), children![card("home", || {
 				children![
 					Heading1::with_text("Welcome"),
 					Paragraph::with_text("Hello!"),
@@ -305,7 +305,7 @@ mod test {
 	fn card_appears_in_route_tree() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![card("about", || {
+			.spawn((default_router(), children![card("about", || {
 				Paragraph::with_text("About")
 			})]))
 			.flush();
@@ -317,7 +317,7 @@ mod test {
 	fn find_render_tool_traverses_hierarchy() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![card("test", || {
+			.spawn((default_router(), children![card("test", || {
 				Paragraph::with_text("test")
 			})]))
 			.flush();
