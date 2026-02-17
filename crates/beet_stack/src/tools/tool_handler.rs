@@ -349,7 +349,9 @@ mod test {
 	fn tool_context() {
 		let mut world = World::new();
 		let entity = world
-			.spawn(tool(|cx: ToolContext<()>| -> Entity { cx.tool }))
+			.spawn(tool(|cx: ToolContext<()>| -> Result<Entity> {
+				cx.tool.xok()
+			}))
 			.id();
 		world
 			.entity_mut(entity)

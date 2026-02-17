@@ -12,8 +12,7 @@ use beet_core::prelude::*;
 /// with the appropriate exit code.
 ///
 /// Typically combined with a [`default_interface`] and some child
-/// cards/tools to build a CLI application. A [`Card`] with no
-/// [`PathPartial`] matches the empty path, serving as root content:
+/// cards/tools to build a CLI application:
 ///
 /// ```no_run
 /// # use beet_core::prelude::*;
@@ -26,9 +25,9 @@ use beet_core::prelude::*;
 ///         default_interface(),
 ///         cli_server(),
 ///         children![
-///             (Card, children![Paragraph::with_text("welcome!")]),
+///             card("", || Paragraph::with_text("welcome!")),
 ///             increment(FieldRef::new("count")),
-///             card("about"),
+///             card("about", || Paragraph::with_text("about")),
 ///         ],
 ///     ));
 ///     async_ext::block_on(app.run_async());

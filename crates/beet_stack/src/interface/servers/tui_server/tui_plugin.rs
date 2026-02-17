@@ -1,4 +1,3 @@
-use crate::interface::visit_root;
 use crate::prelude::widgets::handle_scroll_input;
 use crate::stack::PropagateChanges;
 use crate::stack::StackPlugin;
@@ -30,8 +29,7 @@ impl Plugin for TuiPlugin {
 				enable_input_forwarding: true,
 			},
 		))
-		.init_plugin::<StackPlugin>()
-		.add_systems(PostStartup, visit_root);
+		.init_plugin::<StackPlugin>();
 
 		// Systems: handle input and draw, all after PropagateChanges
 		app.add_systems(

@@ -4,13 +4,14 @@
 //! The app parses process arguments, dispatches them through a
 //! [`default_interface`], and prints the response to stdout.
 //!
-//! A [`Card`] with no [`PathPartial`] matches the empty path,
-//! serving as the root content when no arguments are provided.
+//! Cards are tools that delegate rendering to the nearest render tool.
+//! An empty-path card matches the root, serving as the default content
+//! when no arguments are provided.
 //!
 //! ## Running the Example
 //!
 //! ```sh
-//! # show root card
+//! # show root content
 //! cargo run --example cli --features stack
 //!
 //! # show help for all routes

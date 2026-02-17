@@ -13,26 +13,28 @@ use beet_stack::prelude::*;
 
 fn counter() -> impl Bundle {
 	let count = FieldRef::new("count").init_with(Value::I64(0));
+	let count_clone = count.clone();
 
-	(Card, PathPartial::new("counter"), children![
-		Heading1::with_text("Counter"),
-		(Paragraph, children![
-			TextNode::new("The count is "),
-			count.clone().as_text()
-		]),
-		render_markdown(),
-		increment(count)
-	])
+	(
+		card("counter", move || {
+			let count = count.clone();
+			(children![
+				Heading1::with_text("Counter"),
+				(Paragraph, children![
+					TextNode::new("The count is "),
+					count.clone().as_text()
+				]),
+			],)
+		}),
+		children![increment(count_clone)],
+	)
 }
 
 
 fn calculator() -> impl Bundle {
 	let rhs = FieldRef::new("rhs").init_with(Value::I64(0));
 
-	(Card, PathPartial::new("calculator"), children![
-		render_markdown(),
-		add(rhs)
-	])
+	(card("calculator", || (children![],)), children![add(rhs)])
 }
 
 fn test_interface() -> (World, Entity) {
@@ -41,7 +43,7 @@ fn test_interface() -> (World, Entity) {
 		.spawn((default_interface(), children![
 			counter(),
 			calculator(),
-			(card("about"), Paragraph::with_text("About page")),
+			card("about", || (Paragraph::with_text("About page"),)),
 		]))
 		.flush();
 	(world, root)
@@ -132,8 +134,8 @@ async fn navigate_parent_from_card() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_interface(), children![
-			(Card, children![Heading1::with_text("Root")]),
-			(card("child"), Paragraph::with_text("Child page")),
+			card("", || (Heading1::with_text("Root"),)),
+			card("child", || (Paragraph::with_text("Child page"),)),
 		]))
 		.flush();
 
@@ -146,8 +148,8 @@ async fn navigate_next_sibling() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_interface(), children![
-			(card("alpha"), Paragraph::with_text("Alpha")),
-			(card("beta"), Paragraph::with_text("Beta")),
+			card("alpha", || (Paragraph::with_text("Alpha"),)),
+			card("beta", || (Paragraph::with_text("Beta"),)),
 		]))
 		.flush();
 

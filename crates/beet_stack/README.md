@@ -1,10 +1,10 @@
 # Beet Stack
 
-An opinionated, interface-agnostic application framework inspired by the HyperCard stack/card metaphore.
+An opinionated, interface-agnostic application framework inspired by the HyperCard stack/card metaphor.
 
 ### Cards
 
-Cards are navigable content units, similar to pages in a website or files in a filesystem. Each card is a route, with the exact rendering behavior determined by the interface.
+Cards are routable content tools, similar to pages in a website or files in a filesystem. Each card is a tool that accepts a path and a content handler, delegating rendering to the nearest [`RenderToolMarker`] entity.
 
 Cards may contain content, tools, and nested cards.
 
@@ -13,10 +13,10 @@ use beet_stack::prelude::*;
 use beet_core::prelude::*;
 
 let root = (
-	card(""), 
+	default_interface(),
 	children![
-    card("about"),
-    card("settings"),
+		card("about", || Paragraph::with_text("About page")),
+		card("settings", || Paragraph::with_text("Settings")),
 	]
 );
 ```
@@ -44,35 +44,39 @@ assert_eq!(output, 3);
 
 ### RouteTree
 
-The `RouteTree` collects all cards and tools in an entity hierarchy into a validated routing tree. It is automatically inserted on the root ancestor whenever routes are registered.
+The `RouteTree` collects all tools in an entity hierarchy into a validated routing tree. It is automatically inserted on the root ancestor whenever routes are registered. Cards register as tools with `is_card: true` on the `ToolNode`.
 
 ```text
 RouteTree
-  / [card]              <- root card
-  /about [card]         <- child card
-  /settings [card]      <- child card
+  /about [card]         <- card tool
+  /settings [card]      <- card tool
   /increment            <- tool
     input:  ()
     output: i64
-  /help                 <- tool
-    output: alloc::string::String
 ```
-
-Routes are represented as `RouteNode`, which is either a `Card(CardNode)` or `Tool(ToolNode)`. Common accessors like `entity()`, `path()`, and `params()` are available on `RouteNode` regardless of variant.
 
 ### Content
 
-Static or dynamic information presented to the user, like text or images. Content uses semantic markers (`Title`, `Paragraph`, `Important`, `Emphasize`, `Code`, `Quote`, `Link`) that are rendered differently depending on the interface.
+Static or dynamic information presented to the user, like text or images. Content uses semantic markers (`Heading1`, `Paragraph`, `Important`, `Emphasize`, `Code`, `Quote`, `Link`) that are rendered differently depending on the interface.
 
-### Interfaces (wip)
+### Render Tools
 
-Interfaces determine how cards, content, and tools are presented and interacted with. The `Interface` component tracks the currently active card, enabling REPL-like navigation:
+Render tools determine how card content is displayed. Different servers provide different render tools:
+
+- **Markdown** (`markdown_render_tool`): spawns content, renders to markdown, despawns. Used by CLI and REPL servers.
+- **TUI**: manages stateful card display in the terminal.
+
+The `default_interface()` includes a markdown render tool by default.
+
+### Interfaces
+
+Interfaces determine how cards, content, and tools are presented and interacted with:
 
 ```sh
 > my_app
 # prints help for root: subcommands: `foo`
 > foo
-# renders foo as markdown, sets current card to `foo`
+# renders foo via the render tool, sets current card to `foo`
 > --help
 # prints help for `foo`, not the root
 ```
@@ -90,7 +94,7 @@ Planned interfaces:
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
 - **`tools`** - `tool()`, `ToolMeta`, tool handlers
-- **`stack`** - `Card`, `card()`, `CardQuery`, built-in tools (arithmetic, field access)
+- **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `CardSpawner`, `RenderRequest`, built-in tools
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access
-- **`interface`** *(feature-gated)* - `Interface`, `route_tool()`, help, markdown rendering
+- **`interface`** *(feature-gated)* - `Interface`, `route_tool()`, help, markdown rendering, render tools

@@ -7,8 +7,8 @@
 //!
 //! ## Routing Behavior
 //!
-//! - **Root card**: a [`Card`] with no [`PathPartial`] matches the
-//!   empty path, serving as the root content.
+//! - **Cards**: tool-based routes created via [`card`] that delegate
+//!   rendering to the nearest [`RenderToolMarker`] entity.
 //! - **`--help`**: scoped to the requested path prefix, ie
 //!   `counter --help` only shows routes under `/counter`.
 //! - **Not found**: shows help scoped to the nearest ancestor card,
@@ -20,8 +20,8 @@ use beet_core::prelude::*;
 /// An interface for interacting with a card-based application.
 ///
 /// Interfaces provide a way to navigate between cards and call tools
-/// within the current card context. The [`Interface`] component tracks
-/// the currently active card, enabling REPL-like navigation:
+/// within the current card context. The [`Interface`] component marks
+/// the root of a routable entity hierarchy:
 ///
 /// ```text
 /// > my_app
@@ -42,12 +42,12 @@ pub struct Interface {}
 impl Interface {}
 
 /// Create an interface from a handler, inserting an [`Interface`]
-/// pointing to itself as the current card.
+/// component on the entity.
 pub fn interface() -> impl Bundle {
 	(Interface::default(), RouteHidden, exchange_fallback())
 }
 /// A Request/Response tool that will try each children until an
-/// Ontcome::Response is reached, or else returns a NotFound.
+/// Outcome::Response is reached, or else returns a NotFound.
 /// Errors are converted to a response.
 pub fn exchange_fallback() -> impl Bundle {
 	(
@@ -74,21 +74,23 @@ pub fn exchange_fallback() -> impl Bundle {
 /// Creates a standard markdown interface with help, navigation,
 /// routing, and fallback handlers as a child fallback chain.
 ///
+/// Includes a [`markdown_render_tool`] so that cards can render
+/// their content to markdown by default.
+///
 /// The handler chain runs in order:
 /// 1. **Help** — if `--help` is present, render help scoped to the
 ///    request path prefix.
 /// 2. **Navigate** — if `--navigate` is present, resolve the
 ///    navigation direction relative to the current path.
-/// 3. **Router** — look up the path in the [`RouteTree`]. Cards are
-///    rendered as markdown, tools are called directly. A [`Card`] with
-///    no [`PathPartial`] naturally matches the empty path.
+/// 3. **Router** — look up the path in the [`RouteTree`]. All routes
+///    are tools; cards delegate to the render tool internally.
 /// 4. **Contextual Not Found** — show help for the nearest ancestor
 ///    card of the unmatched path.
 pub fn default_interface() -> impl Bundle {
 	(
 		interface(),
-		StatefulInterface::default(),
 		OnSpawn::insert(children![
+			markdown_render_tool(),
 			(Name::new("Help Tool"), RouteHidden, tool(help_handler)),
 			(
 				Name::new("Navigate Tool"),
@@ -138,8 +140,8 @@ mod test {
 			.spawn(my_interface())
 			.call_blocking::<_, RouteTree>(Request::get("foo"))
 			.unwrap();
-		tree.find_tool(&["add"]).xpect_some();
-		tree.find_tool(&["add"])
+		tree.find(&["add"]).xpect_some();
+		tree.find(&["add"])
 			.unwrap()
 			.path
 			.annotated_route_path()
@@ -168,9 +170,9 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		StackPlugin::world()
-			.spawn((Card, default_interface(), children![
+			.spawn((default_interface(), children![
 				increment(FieldRef::new("count")),
-				card("about"),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -185,7 +187,7 @@ mod test {
 		StackPlugin::world()
 			.spawn((default_interface(), children![
 				increment(FieldRef::new("count")),
-				card("about"),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -213,11 +215,13 @@ mod test {
 	async fn renders_root_card_on_empty_args() {
 		StackPlugin::world()
 			.spawn((default_interface(), children![
-				(Card, children![
-					Heading1::with_text("My Server"),
-					Paragraph::with_text("welcome!"),
-				]),
-				card("about"),
+				card("", || {
+					children![
+						Heading1::with_text("My Server"),
+						Paragraph::with_text("welcome!"),
+					]
+				}),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("").unwrap())
 			.await
@@ -234,10 +238,11 @@ mod test {
 
 		let root = world
 			.spawn((default_interface(), children![
-				(card("counter"), children![increment(FieldRef::new(
-					"count"
-				)),]),
-				card("about"),
+				(
+					card("counter", || Paragraph::with_text("counter")),
+					children![increment(FieldRef::new("count")),],
+				),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.flush();
 

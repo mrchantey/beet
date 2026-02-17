@@ -6,6 +6,8 @@ mod navigate;
 pub use navigate::*;
 mod render_markdown;
 pub use render_markdown::*;
+mod render_tui;
+pub use render_tui::*;
 
 use crate::prelude::*;
 use beet_core::prelude::*;

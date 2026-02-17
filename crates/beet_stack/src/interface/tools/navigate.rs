@@ -2,7 +2,7 @@
 //!
 //! The [`navigate_handler`] checks for a `--navigate` param and
 //! resolves the target path relative to the current request path,
-//! then renders the target card or calls the target tool directly.
+//! then calls the target tool directly for rendering.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -56,10 +56,9 @@ impl std::fmt::Display for NavigateTo {
 /// Checks for the `--navigate` param and resolves the target route
 /// directly from the [`RouteTree`].
 ///
-/// Cards are rendered as markdown; tools are called via the entity.
-/// The current position is taken from the request path segments.
-/// If a [`History`] component is present on an ancestor, it is
-/// updated to reflect the new path.
+/// All routes are tools now, so navigation simply calls the target
+/// tool with the request. The current position is taken from the
+/// request path segments.
 pub(crate) async fn navigate_handler(
 	cx: AsyncToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
@@ -73,7 +72,7 @@ pub(crate) async fn navigate_handler(
 	let world = cx.tool.world();
 
 	let resolved = world
-		.with_then(move |world: &mut World| -> Result<Option<RouteNode>> {
+		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {
 			let tree = root_route_tree(world, tool_entity)?;
 			let target_path =
 				resolve_navigation(tree, &current_path, direction)?;
@@ -89,23 +88,13 @@ pub(crate) async fn navigate_handler(
 		.xok();
 	};
 
-	match node {
-		RouteNode::Card(card_node) => {
-			let card_entity = card_node.entity;
-			let markdown = world
-				.with_then(move |world: &mut World| {
-					render_markdown_for(card_entity, world)
-				})
-				.await;
-			Pass(Response::ok_body(markdown, "text/plain"))
-		}
-		RouteNode::Tool(_) => Pass(Response::from_status_body(
-			StatusCode::MalformedRequest,
-			"Cannot navigate to a tool",
-			"text/plain",
-		)),
-	}
-	.xok()
+	// All routes are tools, call them directly
+	let response = world
+		.entity(node.entity)
+		.call::<Request, Response>(cx.input)
+		.await?;
+
+	Pass(response).xok()
 }
 
 /// Resolve a navigation direction against a [`RouteTree`] from the
@@ -150,7 +139,7 @@ fn resolve_first_child(
 		})?
 	};
 
-	// Find the first child that has a node (card or tool)
+	// Find the first child that has a node
 	let first = find_first_node_child(subtree).ok_or_else(|| {
 		bevyhow!("No child routes under /{}", current_path.join("/"))
 	})?;
@@ -285,8 +274,8 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_interface(), children![
-				(Card, children![Heading1::with_text("Root")]),
-				(card("about"), Paragraph::with_text("About page")),
+				card("", || Heading1::with_text("Root")),
+				(card("about", || Paragraph::with_text("About page")),),
 			]))
 			.flush();
 
@@ -308,8 +297,8 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_interface(), children![
-				(card("alpha"), Paragraph::with_text("Alpha page")),
-				(card("beta"), Paragraph::with_text("Beta page")),
+				card("alpha", || Paragraph::with_text("Alpha page")),
+				card("beta", || Paragraph::with_text("Beta page")),
 			]))
 			.flush();
 
@@ -331,8 +320,8 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_interface(), children![
-				(card("alpha"), Paragraph::with_text("Alpha page")),
-				(card("beta"), Paragraph::with_text("Beta page")),
+				card("alpha", || Paragraph::with_text("Alpha page")),
+				card("beta", || Paragraph::with_text("Beta page")),
 			]))
 			.flush();
 
@@ -366,8 +355,8 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_interface(), children![
-				(card("alpha"), Paragraph::with_text("Alpha page")),
-				(card("beta"), Paragraph::with_text("Beta page")),
+				card("alpha", || Paragraph::with_text("Alpha page")),
+				card("beta", || Paragraph::with_text("Beta page")),
 			]))
 			.flush();
 
@@ -388,10 +377,9 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_interface(), children![(
-				card("about"),
-				Paragraph::with_text("About page"),
-			)]))
+			.spawn((default_interface(), children![card("about", || {
+				Paragraph::with_text("About page")
+			}),]))
 			.flush();
 
 		// No --navigate param, should route normally

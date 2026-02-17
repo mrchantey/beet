@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 ///
 /// On spawn, parses process CLI arguments and dispatches them as an
 /// initial [`Request`]. When no arguments are provided, the empty path
-/// renders the root card. After the initial display, starts a
+/// renders the root content. After the initial display, starts a
 /// background thread that reads lines from stdin.
 /// Each non-empty line is parsed as CLI-style arguments into a
 /// [`Request`], dispatched through the owning entity's tool pipeline,
@@ -34,12 +34,11 @@ use beet_core::prelude::*;
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
 ///     app.world_mut().spawn((
-///         Card,
 ///         default_interface(),
 ///         repl_server(),
 ///         children![
 ///             increment(FieldRef::new("count")),
-///             card("about"),
+///             card("about", || Paragraph::with_text("about")),
 ///         ],
 ///     ));
 ///     async_ext::block_on(app.run_async());
@@ -48,7 +47,7 @@ use beet_core::prelude::*;
 pub fn repl_server() -> impl Bundle {
 	OnSpawn::new_async(async |entity| -> Result {
 		// Dispatch CLI args as the initial request, rendering the
-		// root card when no args are provided.
+		// root content when no args are provided.
 		call(&entity, Request::from_cli_args(CliArgs::parse_env())?).await?;
 
 		cross_log_noline!("> ");

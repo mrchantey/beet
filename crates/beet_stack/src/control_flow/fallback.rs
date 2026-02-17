@@ -5,6 +5,11 @@ use beet_core::prelude::*;
 /// ## Errors
 ///
 /// Errors if the entity has no children.
+///
+/// Children whose [`ToolMeta`] input/output types don't match
+/// `Input`/`Outcome<Output, Input>` are silently skipped, preventing
+/// unrelated tools (like render tools) from being called with the
+/// wrong types.
 pub async fn fallback<Input, Output>(
 	cx: AsyncToolContext<Input>,
 ) -> Result<Outcome<Output, Input>>
@@ -22,10 +27,22 @@ where
 		};
 
 	// try each child in order, returning the first pass or the last fail
-	// wow good job borrow checker
 	let mut input = cx.input;
 	let world = cx.tool.world();
 	for child in children {
+		// skip children whose ToolMeta doesn't match our types
+		let is_compatible = world
+			.entity(child)
+			.get(|meta: &ToolMeta| {
+				meta.assert_match::<Input, Outcome<Output, Input>>().is_ok()
+			})
+			.await
+			.unwrap_or(false);
+
+		if !is_compatible {
+			continue;
+		}
+
 		match world
 			.entity(child)
 			.call::<Input, Outcome<Output, Input>>(input)

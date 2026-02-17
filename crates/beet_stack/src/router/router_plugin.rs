@@ -1,17 +1,18 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Plugin that registers route-building observers for tools and cards.
+/// Plugin that registers route-building observers for tools.
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
-/// whenever tools or cards are spawned in an entity hierarchy.
+/// whenever tools are spawned in an entity hierarchy. Cards now
+/// register as tools (via [`CardMarker`] + [`ToolMeta`]), so there
+/// is no separate card observer.
 #[derive(Default)]
 pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(insert_tool_path_and_params)
-			.add_observer(insert_card_path_and_params)
 			.add_observer(insert_route_tree);
 	}
 }
@@ -23,25 +24,6 @@ impl Plugin for RouterPlugin {
 /// tree is spawned.
 pub fn insert_tool_path_and_params(
 	ev: On<Insert, ToolMeta>,
-	ancestors: Query<&ChildOf>,
-	paths: Query<&PathPartial>,
-	params: Query<&ParamsPartial>,
-	mut commands: Commands,
-) -> Result {
-	insert_path_and_params(
-		ev.entity,
-		&ancestors,
-		&paths,
-		&params,
-		&mut commands,
-	)
-}
-
-/// Observer that listens for new cards and inserts their path and params patterns.
-/// Shares the same collection logic as [`insert_tool_path_and_params`],
-/// ensuring cards are also routable entries in the [`RouteTree`].
-pub fn insert_card_path_and_params(
-	ev: On<Insert, Card>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
@@ -76,8 +58,9 @@ fn insert_path_and_params(
 /// whenever a [`PathPattern`] is inserted on any entity in the hierarchy.
 ///
 /// Collects all entities with tool components ([`ToolMeta`], [`PathPattern`],
-/// [`ParamsPattern`]) and card components ([`Card`], [`PathPattern`],
-/// [`ParamsPattern`]) from the root's descendants and constructs a validated tree.
+/// [`ParamsPattern`]) from the root's descendants and constructs a validated
+/// tree. Cards are distinguished from regular tools by the presence of a
+/// [`CardMarker`] component, which sets `is_card: true` on the [`ToolNode`].
 pub fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
@@ -89,23 +72,18 @@ pub fn insert_route_tree(
 			&PathPattern,
 			&ParamsPattern,
 			Option<&HttpMethod>,
+			Option<&CardMarker>,
 		),
 		Without<RouteHidden>,
-	>,
-	cards: Query<
-		(Entity, &PathPattern, &ParamsPattern),
-		(With<Card>, Without<ToolMeta>, Without<RouteHidden>),
 	>,
 	mut commands: Commands,
 ) -> Result {
 	let root = ancestors.root_ancestor(ev.entity);
-	let mut nodes: Vec<RouteNode> = Vec::new();
+	let mut nodes: Vec<ToolNode> = Vec::new();
 
 	for entity in children_query.iter_descendants_inclusive(root) {
 		if let Ok(item) = tools.get(entity) {
-			nodes.push(RouteNode::Tool(ToolNode::from_query(item)));
-		} else if let Ok(item) = cards.get(entity) {
-			nodes.push(RouteNode::Card(CardNode::from_query(item)));
+			nodes.push(ToolNode::from_query(item));
 		}
 	}
 

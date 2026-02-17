@@ -66,18 +66,20 @@ fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
 	// Try progressively shorter prefixes
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
-		if let Some(RouteNode::Card(_)) = tree.find(prefix) {
-			let prefix_str = prefix.join("/");
-			let mut output = String::new();
-			output.push_str(&format!(
-				"Route /{} not found. Showing help for /{}:\n\n",
-				segments.join("/"),
-				prefix_str,
-			));
-			// Scope help to the matching ancestor subtree
-			let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
-			output.push_str(&format_route_help(help_tree));
-			return output;
+		if let Some(node) = tree.find(prefix) {
+			if node.is_card {
+				let prefix_str = prefix.join("/");
+				let mut output = String::new();
+				output.push_str(&format!(
+					"Route /{} not found. Showing help for /{}:\n\n",
+					segments.join("/"),
+					prefix_str,
+				));
+				// Scope help to the matching ancestor subtree
+				let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
+				output.push_str(&format_route_help(help_tree));
+				return output;
+			}
 		}
 	}
 
@@ -101,11 +103,11 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 
 	let nodes = tree.flatten_nodes();
 
-	let filtered: Vec<&RouteNode> = nodes
+	let filtered: Vec<&ToolNode> = nodes
 		.into_iter()
 		.filter(|node| {
 			!node
-				.path()
+				.path
 				.annotated_route_path()
 				.to_string()
 				.ends_with("/help")
@@ -118,55 +120,35 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 	}
 
 	for node in filtered {
-		format_route_node(&mut output, node);
+		format_tool_node(&mut output, node);
 	}
 
 	output
 }
 
-/// Format a single [`RouteNode`] (card or tool) into the output string.
-fn format_route_node(output: &mut String, node: &RouteNode) {
-	match node {
-		RouteNode::Card(card) => {
-			format_card_node(output, card);
-		}
-		RouteNode::Tool(tool) => {
-			format_tool_node(output, tool);
-		}
-	}
-}
-
-/// Format a [`CardNode`] into the output string.
-fn format_card_node(output: &mut String, card: &CardNode) {
-	let path = card.path.annotated_route_path();
-	output.push_str(&format!("  {} [card]\n", path));
-
-	// params
-	for param in card.params.iter() {
-		output.push_str(&format!("    {}\n", param));
-	}
-
-	output.push('\n');
-}
-
-/// Format a [`ToolNode`] into the output string.
+/// Format a [`ToolNode`] into the output string, displaying `[card]`
+/// for card routes and input/output types for regular tools.
 fn format_tool_node(output: &mut String, node: &ToolNode) {
 	let path = node.path.annotated_route_path();
-	output.push_str(&format!("  {}", path));
 
-	if let Some(method) = &node.method {
-		output.push_str(&format!(" [{}]", method));
-	}
-	output.push('\n');
+	if node.is_card {
+		output.push_str(&format!("  {} [card]\n", path));
+	} else {
+		output.push_str(&format!("  {}", path));
+		if let Some(method) = &node.method {
+			output.push_str(&format!(" [{}]", method));
+		}
+		output.push('\n');
 
-	// input/output types, skip trivial `()` types
-	let input_type = node.meta.input().type_name();
-	let output_type = node.meta.output().type_name();
-	if input_type != "()" {
-		output.push_str(&format!("    input:  {}\n", input_type));
-	}
-	if output_type != "()" {
-		output.push_str(&format!("    output: {}\n", output_type));
+		// input/output types, skip trivial `()` types
+		let input_type = node.meta.input().type_name();
+		let output_type = node.meta.output().type_name();
+		if input_type != "()" {
+			output.push_str(&format!("    input:  {}\n", input_type));
+		}
+		if output_type != "()" {
+			output.push_str(&format!("    output: {}\n", output_type));
+		}
 	}
 
 	// params
@@ -182,8 +164,8 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 mod test {
 	use super::*;
 
-	/// adds help as a tool located at `/help`
-	/// usually this is handled as an interface tool, added via ?help
+	/// Adds help as a tool located at `/help`.
+	/// Usually this is handled as an interface tool, added via ?help.
 	fn help() -> impl Bundle { (PathPartial::new("help"), tool(help_system)) }
 	fn help_system(
 		cx: In<ToolContext>,
@@ -201,11 +183,11 @@ mod test {
 	fn help_lists_tools() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((Card, children![
+			.spawn(children![
 				help(),
 				increment(FieldRef::new("count")),
 				decrement(FieldRef::new("count")),
-			]))
+			])
 			.flush();
 
 		let help_entity = world
@@ -214,7 +196,7 @@ mod test {
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity();
+			.entity;
 
 		let output = world
 			.entity_mut(help_entity)
@@ -232,12 +214,12 @@ mod test {
 	fn help_shows_nested_tools() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((Card, children![
+			.spawn(children![
 				help(),
 				(PathPartial::new("counter"), children![increment(
 					FieldRef::new("count")
 				),]),
-			]))
+			])
 			.flush();
 
 		let help_entity = world
@@ -246,7 +228,7 @@ mod test {
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity();
+			.entity;
 
 		let output = world
 			.entity_mut(help_entity)
@@ -260,7 +242,7 @@ mod test {
 	fn help_shows_input_output_types() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((Card, children![help(), add(FieldRef::new("value")),]))
+			.spawn(children![help(), add(FieldRef::new("value")),])
 			.flush();
 
 		let help_entity = world
@@ -269,7 +251,7 @@ mod test {
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity();
+			.entity;
 
 		let output = world
 			.entity_mut(help_entity)
@@ -283,7 +265,7 @@ mod test {
 	#[test]
 	fn help_with_no_other_tools() {
 		let mut world = StackPlugin::world();
-		let root = world.spawn((Card, children![help()])).flush();
+		let root = world.spawn(children![help()]).flush();
 
 		let help_entity = world
 			.entity(root)
@@ -291,16 +273,14 @@ mod test {
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity();
+			.entity;
 
 		let output = world
 			.entity_mut(help_entity)
 			.call_blocking::<(), String>(())
 			.unwrap();
 
-		// The root card appears (it has an implicit "/" path),
-		// but no tools besides help (which is filtered out)
-		output.contains("[card]").xpect_true();
+		output.contains("(none)").xpect_true();
 		output.contains("Available routes").xpect_true();
 	}
 
@@ -308,9 +288,9 @@ mod test {
 	fn help_includes_cards() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((Card, children![
+			.spawn((default_interface(), children![
 				help(),
-				card("about"),
+				card("about", || Paragraph::with_text("about")),
 				increment(FieldRef::new("count")),
 			]))
 			.flush();
@@ -321,7 +301,7 @@ mod test {
 			.unwrap()
 			.find(&["help"])
 			.unwrap()
-			.entity();
+			.entity;
 
 		let output = world
 			.entity_mut(help_entity)
@@ -342,7 +322,7 @@ mod test {
 		let root = world
 			.spawn((default_interface(), children![
 				increment(FieldRef::new("count")),
-				card("about"),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.flush();
 
@@ -362,10 +342,11 @@ mod test {
 	async fn help_scoped_to_prefix() {
 		let body = StackPlugin::world()
 			.spawn((default_interface(), children![
-				(card("counter"), children![increment(FieldRef::new(
-					"count"
-				)),]),
-				card("about"),
+				(
+					card("counter", || Paragraph::with_text("counter")),
+					children![increment(FieldRef::new("count")),],
+				),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("counter --help").unwrap(),
@@ -402,10 +383,11 @@ mod test {
 	async fn not_found_shows_scoped_ancestor_help() {
 		StackPlugin::world()
 			.spawn((default_interface(), children![
-				(card("counter"), children![increment(FieldRef::new(
-					"count"
-				)),]),
-				card("about"),
+				(
+					card("counter", || Paragraph::with_text("counter")),
+					children![increment(FieldRef::new("count")),],
+				),
+				card("about", || Paragraph::with_text("about")),
 			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("counter nonsense").unwrap(),

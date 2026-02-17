@@ -1,40 +1,12 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
-
+/// Marks the currently active card entity in a stateful interface like TUI.
+///
+/// Used by the TUI server's draw system to know which card to render.
+/// Only one entity should have this component at a time, enforced by
+/// the [`single_current_card`] observer.
 #[derive(Default, Component)]
 pub struct CurrentCard;
-
-/// Marker component added to an interface root to indicate that it is stateful like a UI,
-/// as opposed to an interface only used for rendering and tool calls like a http server.
-#[derive(Default, Component)]
-pub struct StatefulInterface;
-
-/// Runs on startup to visit the root node of an interface
-pub(super) fn visit_root(
-	query: Populated<&RouteTree, Added<StatefulInterface>>,
-	mut commands: Commands,
-) -> Result {
-	let tree = query.single()?;
-
-	let root = match tree.node() {
-		Some(RouteNode::Card(CardNode { entity, .. })) => *entity,
-		Some(RouteNode::Tool(tool)) => {
-			bevybail!(
-				"Stateful Interface root route must be a card, found {:?}",
-				tool
-			)
-		}
-		None => {
-			bevybail!("Stateful Interface must have a root route")
-		}
-	};
-	commands.entity(root).insert(CurrentCard);
-	Ok(())
-}
-
 
 /// Observer that ensures only one card at a time has the [`CurrentCard`] component.
 pub(super) fn single_current_card(
