@@ -22,21 +22,21 @@ export RUST_MIN_STACK := '1073741824'
 test-threads := '--test-threads=8'
 
 default:
-    just --list --unsorted
+	just --list --unsorted
 
 #💡 Init
 
 # Pull assets into their respective crates.
 init-repo:
-    just pull-assets
-    mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
-    cargo launch codegen
+	just pull-assets
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
+	cargo launch codegen
 
 pull-assets:
-    cargo launch --only=pull-assets
+	cargo launch --only=pull-assets
 
 push-assets:
-    cargo launch --only=push-assets
+	cargo launch --only=push-assets
 
 # just test-site
 # just export-scenes
@@ -44,33 +44,33 @@ push-assets:
 
 # Run a cli command as if it was installed
 cli *args:
-    cargo run -p beet-cli -- {{ args }}
-    # beet {{ args }}
+  beet {{ args }}
+  # cargo run -p beet-cli -- {{ args }}
 
 install-cli *args:
-    cargo install --path crates/beet-cli {{ args }}
+  cargo install --path crates/beet-cli {{ args }}
 
 lambda-build:
-    cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
+	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
 
 # Run and watch a workspace example
 run example *args:
-    just watch just run-ci {{ example }} {{ args }}
+	just watch just run-ci {{ example }} {{ args }}
 
 run-feat example *args:
-    just run {{ example }} --all-features {{ args }}
+	just run {{ example }} --all-features {{ args }}
 
 # Run an example without watching
 run-ci example *args:
-    cargo run --example {{ example }} {{ args }}
+	cargo run --example {{ example }} {{ args }}
 
 # Run and watch a crate example
 run-p crate example *args:
-    just watch cargo run -p {{ crate }} --example {{ example }} {{ args }}
+	just watch cargo run -p {{ crate }} --example {{ example }} {{ args }}
 
 # Run and watch a crate build step
 run-b crate *args:
-    just watch cargo run -p {{ crate }} --bin run-build --features=build {{ args }}
+	just watch cargo run -p {{ crate }} --bin run-build --features=build {{ args }}
 
 #💡 Aliases
 
@@ -78,214 +78,214 @@ chat *args:
 	cargo run --example chat --features=agent -- {{ args }}
 
 run-csr:
-    cargo run --example csr --features=client
-    just watch just build-csr
+	cargo run --example csr --features=client
+	just watch just build-csr
 
 build-csr:
-    cargo build --example csr --features=client --target wasm32-unknown-unknown
-    wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
-    just cli serve target/examples/csr
+	cargo build --example csr --features=client --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
+	just cli serve target/examples/csr
 
 
 run-hydration:
-    just watch just build-hydration
+	just watch just build-hydration
 
 run-ssr:
-    just watch cargo run --example ssr --features=server_app
+	just watch cargo run --example ssr --features=server_app
 
 build-hydration:
-    cargo run --example hydration --features=css
-    cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
-    wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
-    just cli serve target/examples/hydration
+	cargo run --example hydration --features=css
+	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
+	just cli serve target/examples/hydration
 
 doc crate *args:
-    just watch cargo doc -p {{ crate }} --open {{ args }}
+	just watch cargo doc -p {{ crate }} --open {{ args }}
 
 fmt *args:
-    cargo fmt {{ args }} && just leptosfmt {{ args }}
+	cargo fmt {{ args }} && just leptosfmt {{ args }}
 
 # soo bad
 leptosfmt *args:
-    leptosfmt -q											\
-    crates/beet_rsx/**/*.rs 					\
-    crates/beet_rsx/**/**/*.rs 				\
-    crates/beet_rsx/**/**/**/*.rs 		\
-    crates/beet_design/**/*.rs 				\
-    crates/beet_design/**/**/*.rs 		\
-    crates/beet_design/**/**/**/*.rs 	\
-    crates/beet_site/**/*.rs 					\
-    crates/beet_site/**/**/*.rs 			\
-    crates/beet_site/**/**/**/*.rs 		\
-    {{ args }}
+	leptosfmt -q											\
+	crates/beet_rsx/**/*.rs 					\
+	crates/beet_rsx/**/**/*.rs 				\
+	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_design/**/*.rs 				\
+	crates/beet_design/**/**/*.rs 		\
+	crates/beet_design/**/**/**/*.rs 	\
+	crates/beet_site/**/*.rs 					\
+	crates/beet_site/**/**/*.rs 			\
+	crates/beet_site/**/**/**/*.rs 		\
+	{{ args }}
 
 #💡 e2e examples
 
 # Run bevy reactive example on an endless loop, it exits on recompile required
 run-bevy-rsx:
-    while true; do cargo run --example bevy_rsx --features=bevy_default; done
+	while true; do cargo run --example bevy_rsx --features=bevy_default; done
 
 # run-bevy-rsx but stop if there's an error
 run-bevy-rsx-if-ok:
-    while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
+	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
 # just cli watch -p beet_site {{args}}
 build-site *args:
-    just cli build -p beet_site {{ args }}
+	just cli build -p beet_site {{ args }}
 
 run-site *args:
-    just cli run -p beet_site {{ args }}
+	just cli run -p beet_site {{ args }}
 
 deploy-site *args:
-    just cli deploy -p beet_site --release
+	just cli deploy -p beet_site --release
 
 #💡 Test
 
 test-all:
-    @if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
-    	echo "please download assets directory: just pull-assets"; \
-    	exit 1; \
-    fi
-    just test-core
-    just test-flow
-    just test-rsx
-    cargo test -p beet-cli  --all-features -- {{ test-threads }}
+	@if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
+		echo "please download assets directory: just pull-assets"; \
+		exit 1; \
+	fi
+	just test-core
+	just test-flow
+	just test-rsx
+	cargo test -p beet-cli  --all-features -- {{ test-threads }}
 
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
 test-all-lib *args:
-    cargo test --workspace 			--lib 	--all-features																	{{ args }} -- {{ test-threads }}
+	cargo test --workspace 			--lib 	--all-features																	{{ args }} -- {{ test-threads }}
 
 test-all-doc *args:
-    cargo test --workspace 			--doc 	--all-features																	{{ args }} -- {{ test-threads }}
+	cargo test --workspace 			--doc 	--all-features																	{{ args }} -- {{ test-threads }}
 
 test-fmt:
-    cargo fmt 				--check
-    just leptosfmt 		--check
+	cargo fmt 				--check
+	just leptosfmt 		--check
 
 test-ci *args:
-    just test-fmt
-    just test-rsx
+	just test-fmt
+	just test-rsx
 
 snap:
-    cargo test -p beet_core 				--lib --all-features -- --snap
-    cargo test -p beet_core_macros 	--lib --all-features -- --snap
-    cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
-    cargo test -p beet_build 				--lib --all-features -- --snap
-    cargo test -p beet_design 			--lib --all-features -- --snap
-    cargo test -p beet_parse 				--lib --all-features -- --snap
-    cargo test -p beet_router 			--lib --all-features -- --snap
-    cargo test -p beet_rsx 					--lib --all-features -- --snap
-    cargo test -p beet_rsx 					--test css 		--all-features -- --snap
-    cargo test -p beet_rsx 					--test props 	--all-features -- --snap
+	cargo test -p beet_core 				--lib --all-features -- --snap
+	cargo test -p beet_core_macros 	--lib --all-features -- --snap
+	cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
+	cargo test -p beet_build 				--lib --all-features -- --snap
+	cargo test -p beet_design 			--lib --all-features -- --snap
+	cargo test -p beet_parse 				--lib --all-features -- --snap
+	cargo test -p beet_router 			--lib --all-features -- --snap
+	cargo test -p beet_rsx 					--lib --all-features -- --snap
+	cargo test -p beet_rsx 					--test css 		--all-features -- --snap
+	cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
 test-core *args:
-    cargo test -p beet_core_shared 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
-    cargo test -p beet_net	--features=server,ureq,tungstenite,native-tls,flow			{{ args }} -- {{ test-threads }}
-    cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_core_shared 				--all-features 													 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_core_macros 				--all-features 													 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_core 							--all-features 													 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_core --lib --target wasm32-unknown-unknown  --all-features   {{ args }} -- {{ test-threads }}
+	cargo test -p beet_net	--features=server,ureq,tungstenite,native-tls,flow			{{ args }} -- {{ test-threads }}
+	cargo test -p beet_net 	--lib --target wasm32-unknown-unknown	 --all-features 	{{ args }} -- {{ test-threads }}
 
 test-flow *args:
-    cargo test -p beet_flow 		--all-features 																						{{ args }} -- {{ test-threads }}
-    cargo test -p beet_spatial																														{{ args }} -- {{ test-threads }}
-    cargo test -p beet_flow 		--lib 										--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
-    cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
+	cargo test -p beet_flow 		--all-features 																						{{ args }} -- {{ test-threads }}
+	cargo test -p beet_spatial																														{{ args }} -- {{ test-threads }}
+	cargo test -p beet_flow 		--lib 										--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
+	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
 test-rsx *args:
-    cargo test -p beet_dom						 	--features=tokens  																	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_dom 	--lib 			--target wasm32-unknown-unknown											{{ args }} -- {{ test-threads }}
-    cargo test -p beet_rsx_combinator 	--all-features																			{{ args }} -- {{ test-threads }}
-    cargo test -p beet_parse 						--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_rsx   						--all-features   																		{{ args }} -- {{ test-threads }}
-    cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{ args }} -- {{ test-threads }}
-    cargo test -p beet_router						--features=tokens,server														{{ args }} -- {{ test-threads }}
-    cargo test -p beet_router						--lib --features=tokens	--target wasm32-unknown-unknown	 	{{ args }} -- {{ test-threads }}
-    cargo test -p beet_build 						--all-features																			{{ args }} -- {{ test-threads }}
-    cargo test -p beet_design 					--all-features																			{{ args }} -- {{ test-threads }}
-    cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
+	cargo test -p beet_dom						 	--features=tokens  																	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_dom 	--lib 			--target wasm32-unknown-unknown											{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx_combinator 	--all-features																			{{ args }} -- {{ test-threads }}
+	cargo test -p beet_parse 						--all-features 	 	 																	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx   						--all-features   																		{{ args }} -- {{ test-threads }}
+	cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--features=tokens,server														{{ args }} -- {{ test-threads }}
+	cargo test -p beet_router						--lib --features=tokens	--target wasm32-unknown-unknown	 	{{ args }} -- {{ test-threads }}
+	cargo test -p beet_build 						--all-features																			{{ args }} -- {{ test-threads }}
+	cargo test -p beet_design 					--all-features																			{{ args }} -- {{ test-threads }}
+	cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
 
 test crate *args:
-    just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
+	just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}
 
 test-int crate test *args:
-    just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}
+	just watch cargo test -p {{ crate }} --test {{ test }} {{ args }}
 
 test-e2e crate *args:
-    just watch cargo test -p {{ crate }} --lib --features=e2e -- 														--e2e	--watch {{ args }}
+	just watch cargo test -p {{ crate }} --lib --features=e2e -- 														--e2e	--watch {{ args }}
 
 test-doc crate *args:
-    just watch cargo test -p {{ crate }} --doc 																														{{ args }}
+	just watch cargo test -p {{ crate }} --doc 																														{{ args }}
 
 test-wasm crate *args:
-    just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown -- 								--watch {{ args }}
+	just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown -- 								--watch {{ args }}
 
 test-wasm-feat crate *args:
-    just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown --all-features -- 					{{ args }}
+	just watch cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown --all-features -- 					{{ args }}
 
 test-wasm-e2e crate test_name *args:
-    just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
+	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
 
 test-rsx-macro *args:
-    just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{ args }}
+	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{ args }}
 
 test-clanker:
-    just cli clanker 										\
-    --oneshot --image										\
-    -f=assets/tests/agents/prompt.txt		\
-    --out-dir=assets/tests/agents/out
+	just cli clanker 										\
+	--oneshot --image										\
+	-f=assets/tests/agents/prompt.txt		\
+	--out-dir=assets/tests/agents/out
 
 example-chat *args:
-    just watch cargo run --example chat 	--features=native-tls,agent -- {{ args }}
+	just watch cargo run --example chat 	--features=native-tls,agent -- {{ args }}
 
 example-image *args:
-    just watch cargo run --example image 	--features=native-tls,agent -- {{ args }}
+	just watch cargo run --example image 	--features=native-tls,agent -- {{ args }}
 
 clear-rust-analyzer:
-    rm -rf $CARGO_TARGET_DIR/rust-analyzer
+	rm -rf $CARGO_TARGET_DIR/rust-analyzer
 
 clear-ice:
-    rm -f rustc-ice-*
+	rm -f rustc-ice-*
 
 clear-artifacts:
-    just clear-ice
-    rm -rf crates/beet_design/src/codegen
-    rm -rf crates/beet_site/src/codegen
-    rm -rf launch.ron
-    rm -rf target
+	just clear-ice
+	rm -rf crates/beet_design/src/codegen
+	rm -rf crates/beet_site/src/codegen
+	rm -rf launch.ron
+	rm -rf target
 
 # massive purge
 clear-all:
-    just clear-artifacts
-    just clear-rust-analyzer
-    cargo clean
-    rm -rf $CARGO_TARGET_DIR
+	just clear-artifacts
+	just clear-rust-analyzer
+	cargo clean
+	rm -rf $CARGO_TARGET_DIR
 
 tree:
-    cargo tree --depth=2 -e=no-dev
+	cargo tree --depth=2 -e=no-dev
 
 #💡 Misc
 
 expand crate test *args:
-    just watch 'cargo expand -p {{ crate }} --test {{ test }} {{ args }}'
+	just watch 'cargo expand -p {{ crate }} --test {{ test }} {{ args }}'
 
 patch:
-    cargo set-version --bump patch
+	cargo set-version --bump patch
 
 publish *args:
-    cargo publish --workspace --allow-dirty --no-verify {{ args }}
+	cargo publish --workspace --allow-dirty --no-verify {{ args }}
 
 watch *command:
-    just cli watch "{{ command }}"
+	just cli watch "{{ command }}"
 
 #💡 Misc
 
 # Cargo search but returns one line
 search *args:
-    cargo search {{ args }} | head -n 1
+	cargo search {{ args }} | head -n 1
 
 
 nightly date:

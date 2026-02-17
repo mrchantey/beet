@@ -214,14 +214,6 @@ impl<Out> ToolOut<Out> {
 ///
 /// Determines how the tool's output is delivered back to the caller.
 pub enum ToolOutHandler<Out> {
-	/// The tool was called by another entity which
-	/// does not need to track individual calls,
-	/// and instead will listen for a [`ToolOut`]
-	/// event triggered on this caller.
-	Observer {
-		/// The entity that will receive the [`ToolOut`] event.
-		caller: Entity,
-	},
 	/// The tool caller is listening on a channel.
 	Channel {
 		/// The sender side of the channel for delivering results.
@@ -234,9 +226,7 @@ pub enum ToolOutHandler<Out> {
 	},
 }
 
-impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
-	/// Create a handler that triggers a [`ToolOut`] event on the caller.
-	pub fn observer(caller: Entity) -> Self { Self::Observer { caller } }
+impl<Out> ToolOutHandler<Out> {
 	/// Create a handler that sends output through a channel.
 	pub fn channel(sender: Sender<Out>) -> Self { Self::Channel { sender } }
 	/// Create a handler from a function.
@@ -253,43 +243,8 @@ impl<Out: 'static + Send + Sync> ToolOutHandler<Out> {
 	/// ## Errors
 	///
 	/// Returns an error if the handler fails.
-	pub fn call(
-		self,
-		mut commands: Commands,
-		tool: Entity,
-		output: Out,
-	) -> Result {
+	pub fn call(self, output: Out) -> Result {
 		match self {
-			ToolOutHandler::Observer { caller } => {
-				commands.trigger(ToolOut::new(tool, caller, output));
-				Ok(())
-			}
-			ToolOutHandler::Channel { sender } => {
-				sender.try_send(output).map_err(|err| {
-					bevyhow!(
-						"Failed to send tool output through channel: {err:?}"
-					)
-				})
-			}
-			ToolOutHandler::Function { handler } => handler(output),
-		}
-	}
-	/// Call this handler asynchronously with the tool output.
-	///
-	/// ## Errors
-	///
-	/// Returns an error if the handler fails.
-	pub fn call_async(
-		self,
-		world: &mut AsyncWorld,
-		tool: Entity,
-		output: Out,
-	) -> Result {
-		match self {
-			ToolOutHandler::Observer { caller } => {
-				world.trigger(ToolOut::new(tool, caller, output));
-				Ok(())
-			}
 			ToolOutHandler::Channel { sender } => {
 				sender.try_send(output).map_err(|err| {
 					bevyhow!(

@@ -264,6 +264,8 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 		}
 	}
 
+	/// Creates an [`AsyncWorld`] handle for sending commands.
+	pub fn world(&self) -> AsyncWorld { self.channel.world() }
 
 	/// Spawns an async task that can send commands to the world.
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)

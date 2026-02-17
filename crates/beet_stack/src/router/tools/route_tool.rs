@@ -108,7 +108,7 @@ where
 	let format =
 		ExchangeFormat::from_content_type(request.get_header("content-type"))?;
 
-	commands.run(async move |mut world| -> Result {
+	commands.run(async move |world| -> Result {
 		// consume body asynchronously to support streaming
 		let body_bytes = request.body.into_bytes().await?;
 		let input: In = format.deserialize(&body_bytes)?;
@@ -129,7 +129,7 @@ where
 			.with_body(body_bytes);
 
 		// deliver response via the original out handler
-		outer_handler.call_async(&mut world, tool, response)
+		outer_handler.call(response)
 	});
 	Ok(())
 }

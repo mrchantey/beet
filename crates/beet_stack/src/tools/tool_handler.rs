@@ -180,16 +180,14 @@ where
 
 	fn into_handler(self) -> impl Bundle {
 		OnSpawn::observe(
-			move |mut ev: On<ToolIn<Self::In, Self::Out>>,
-			      commands: Commands|
-			      -> Result {
+			move |mut ev: On<ToolIn<Self::In, Self::Out>>| -> Result {
 				let ev = ev.event_mut();
 				let tool = ev.tool();
 				let input = ev.take_input()?;
 				let on_out = ev.take_out_handler()?;
 				let arg = Arg::from_tool_context(ToolContext { tool, input });
 				let output = self.clone()(arg).into_tool_output()?;
-				on_out.call(commands, tool, output)?;
+				on_out.call(output)?;
 				Ok(())
 			},
 		)
@@ -264,7 +262,7 @@ where
 					let raw_output: IntoOut =
 						world.run_system_cached_with::<_, IntoOut, _, _>(this, arg)?;
 					let output = raw_output.into_tool_output()?;
-					on_out.call(world.commands(), tool, output)?;
+					on_out.call(output)?;
 					world.flush();
 					Ok(())
 				});
@@ -312,16 +310,10 @@ where
 					input,
 				});
 				let this = self.clone();
-				commands.run(async move |world| -> Result {
+				commands.run(async move |_| -> Result {
 					let output = this(arg).await.into_tool_output()?;
-					world
-						.with_then(move |world: &mut World| -> Result {
-							let commands = world.commands();
-							on_out.call(commands, tool, output)?;
-							world.flush();
-							Ok(())
-						})
-						.await
+					on_out.call(output)?;
+					Ok(())
 				});
 				Ok(())
 			},

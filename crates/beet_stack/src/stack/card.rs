@@ -185,13 +185,13 @@ where
 				return;
 			};
 
-			commands.run(async move |mut world| -> Result {
+			commands.run(async move |world| -> Result {
 				let card_entity = world
 					.with_then(move |world: &mut World| -> Entity {
 						content_fn.spawn(world)
 					})
 					.await;
-				out_handler.call_async(&mut world, tool, card_entity)
+				out_handler.call(card_entity)
 			});
 		},
 	)
@@ -263,7 +263,7 @@ fn card_tool_handler(
 			bevyhow!("Card tool entity missing CardContentHandler child")
 		})?;
 
-	commands.run(async move |mut world| -> Result {
+	commands.run(async move |world| -> Result {
 		// Find the render tool by traversal
 		let render_tool = world
 			.with_then(move |world: &mut World| -> Result<Entity> {
@@ -283,7 +283,7 @@ fn card_tool_handler(
 			.call::<RenderRequest, Response>(render_request)
 			.await?;
 
-		outer_handler.call_async(&mut world, tool_entity, response)
+		outer_handler.call(response)
 	});
 	Ok(())
 }
