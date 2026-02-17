@@ -4,43 +4,13 @@ use beet_core::exports::async_channel::Sender;
 use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
 
-
 /// Create a tool from a handler implementing [`IntoToolHandler`],
 /// adding an associated [`ToolMeta`] which is required for tool calling.
 ///
-/// When the `interface` feature is enabled, this automatically adds
-/// exchange support for [`Request`]/[`Response`] calls via serialization.
-/// Use [`direct_tool`] if you need a tool without exchange support.
-#[cfg(feature = "interface")]
+/// This is the base tool constructor that adds [`ToolMeta`] and
+/// the handler bundle. For tools that need to be called via
+/// [`Request`]/[`Response`] serialization, use [`route_tool`] instead.
 pub fn tool<H, M>(handler: H) -> impl Bundle
-where
-	H: IntoToolHandler<M>,
-	H::In: serde::de::DeserializeOwned,
-	H::Out: serde::Serialize,
-{
-	exchange_tool(handler)
-}
-
-/// Create a tool from a handler implementing [`IntoToolHandler`],
-/// adding an associated [`ToolMeta`] which is required for tool calling.
-///
-/// Without the `interface` feature, this creates a direct tool
-/// without exchange support.
-#[cfg(not(feature = "interface"))]
-pub fn tool<H, M>(handler: H) -> impl Bundle
-where
-	H: IntoToolHandler<M>,
-{
-	direct_tool(handler)
-}
-
-/// Create a tool without exchange support, regardless of feature flags.
-///
-/// This is the base tool constructor that only adds [`ToolMeta`] and
-/// the handler. Use this when the handler's input/output types do not
-/// implement [`Serialize`](serde::Serialize)/[`Deserialize`](serde::de::DeserializeOwned),
-/// or when exchange support is not needed.
-pub fn direct_tool<H, M>(handler: H) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
 {
@@ -63,6 +33,7 @@ pub struct ToolMeta {
 }
 
 impl ToolMeta {
+	/// Returns true if this tool natively handles [`Request`]/[`Response`].
 	pub fn is_exchange(&self) -> bool {
 		self.input.type_id() == std::any::TypeId::of::<Request>()
 			&& self.output.type_id() == std::any::TypeId::of::<Response>()
@@ -410,9 +381,10 @@ pub impl EntityWorldMut<'_> {
 	/// Perform a tool call on the given entity,
 	/// checking that the input and output types match the entity's [`ToolMeta`].
 	///
-	/// If the entity has an [`ExchangeToolMarker`], calls with
-	/// `Request`/`Response` types are also accepted and routed
-	/// through the exchange handler.
+	/// If the entity has a [`RouteToolMarker`], calls with
+	/// `Request`/`Response` types are accepted and routed
+	/// through the exchange handler. Typed calls on route tools
+	/// are rejected — use the inner tool directly instead.
 	///
 	/// ## Note
 	///
@@ -431,11 +403,18 @@ pub impl EntityWorldMut<'_> {
 		out_handler: ToolOutHandler<Out>,
 	) -> Result {
 		use std::any::TypeId;
-		if TypeId::of::<In>() == TypeId::of::<Request>()
-			&& TypeId::of::<Out>() == TypeId::of::<Response>()
-			&& self.contains::<ExchangeToolHandler>()
-		{
-			// Its an exchange request and this is an exchange tool, this also counts as a match
+		let is_request_response = TypeId::of::<In>() == TypeId::of::<Request>()
+			&& TypeId::of::<Out>() == TypeId::of::<Response>();
+		let is_route_tool = self.contains::<RouteToolMarker>();
+
+		if is_route_tool {
+			if !is_request_response {
+				bevybail!(
+					"Route tools only accept Request/Response calls. \
+					 Use the inner tool entity for typed calls."
+				);
+			}
+			// Request/Response on a route tool, allow it
 		} else {
 			self.get::<ToolMeta>()
 				.ok_or_else(|| {

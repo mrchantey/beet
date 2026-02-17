@@ -89,8 +89,8 @@ Planned interfaces:
 ## Modules
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
-- **`tools`** - `tool()`, `direct_tool()`, `ToolMeta`, tool handlers
+- **`tools`** - `tool()`, `ToolMeta`, tool handlers
 - **`stack`** - `Card`, `card()`, `CardQuery`, built-in tools (arithmetic, field access)
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access
-- **`interface`** *(feature-gated)* - `Interface`, `exchange_tool()`, help, markdown rendering
+- **`interface`** *(feature-gated)* - `Interface`, `route_tool()`, help, markdown rendering

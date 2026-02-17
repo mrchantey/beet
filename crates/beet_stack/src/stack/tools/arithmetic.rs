@@ -115,7 +115,7 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("set-field"),
-		direct_tool(
+		tool(
 			|In(cx): In<ToolContext<Value>>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
@@ -139,7 +139,7 @@ where
 	(
 		field,
 		PathPartial::new("set-field-typed"),
-		direct_tool(
+		tool(
 			move |cx: In<ToolContext<T>>,
 			      mut query: DocumentQuery,
 			      fields: Query<&FieldRef>|
@@ -161,7 +161,7 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("get-field"),
-		direct_tool(
+		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
@@ -186,7 +186,7 @@ where
 	(
 		field,
 		PathPartial::new("get-field-typed"),
-		direct_tool(
+		tool(
 			|cx: In<ToolContext>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|

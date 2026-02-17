@@ -52,7 +52,7 @@ pub fn interface() -> impl Bundle {
 pub fn exchange_fallback() -> impl Bundle {
 	(
 		// Name::new("Exchange Fallback"),
-		direct_tool(async |request: AsyncToolContext<Request>| -> Response {
+		tool(async |request: AsyncToolContext<Request>| -> Response {
 			match fallback::<Request, Response>(request).await {
 				// a response matched, which may be an opinionated not found response
 				Ok(Pass(res)) => res,
@@ -89,21 +89,17 @@ pub fn default_interface() -> impl Bundle {
 		interface(),
 		StatefulInterface::default(),
 		OnSpawn::insert(children![
-			(
-				Name::new("Help Tool"),
-				RouteHidden,
-				direct_tool(help_handler)
-			),
+			(Name::new("Help Tool"), RouteHidden, tool(help_handler)),
 			(
 				Name::new("Navigate Tool"),
 				RouteHidden,
-				direct_tool(navigate_handler)
+				tool(navigate_handler)
 			),
 			try_router(),
 			(
 				Name::new("Contextual Not Found"),
 				RouteHidden,
-				direct_tool(contextual_not_found_handler)
+				tool(contextual_not_found_handler)
 			)
 		]),
 	)
@@ -118,7 +114,7 @@ mod test {
 	fn my_interface() -> impl Bundle {
 		(
 			Interface::default(),
-			direct_tool(
+			tool(
 				|req: In<ToolContext<Request>>,
 				 trees: Query<&RouteTree>,
 				 interfaces: Query<&Interface>|
@@ -154,14 +150,19 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_tool_request() {
 		StackPlugin::world()
-			.spawn((default_interface(), children![increment(FieldRef::new(
-				"count"
-			))]))
-			.call::<Request, Response>(Request::get("increment"))
+			.spawn((default_interface(), children![route_tool(
+				"add",
+				|(a, b): (i32, i32)| -> i32 { a + b }
+			)]))
+			.call::<Request, Response>(
+				Request::with_json("add", &(1i32, 2i32)).unwrap(),
+			)
 			.await
 			.unwrap()
-			.status()
-			.xpect_eq(StatusCode::Ok);
+			.json::<i32>()
+			.await
+			.unwrap()
+			.xpect_eq(3);
 	}
 
 	#[beet_core::test]
@@ -177,5 +178,79 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("Available routes");
+	}
+
+	#[beet_core::test]
+	async fn dispatches_help_request() {
+		StackPlugin::world()
+			.spawn((default_interface(), children![
+				increment(FieldRef::new("count")),
+				card("about"),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::Ok);
+	}
+
+	#[beet_core::test]
+	async fn not_found() {
+		StackPlugin::world()
+			.spawn((default_interface(), children![increment(FieldRef::new(
+				"count"
+			))]))
+			.call::<Request, Response>(
+				Request::from_cli_str("nonexistent").unwrap(),
+			)
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::NotFound);
+	}
+
+	#[beet_core::test]
+	async fn renders_root_card_on_empty_args() {
+		StackPlugin::world()
+			.spawn((default_interface(), children![
+				(Card, children![
+					Heading1::with_text("My Server"),
+					Paragraph::with_text("welcome!"),
+				]),
+				card("about"),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("My Server")
+			.xpect_contains("welcome!");
+	}
+
+	#[beet_core::test]
+	async fn scoped_help_for_subcommand() {
+		let mut world = StackPlugin::world();
+
+		let root = world
+			.spawn((default_interface(), children![
+				(card("counter"), children![increment(FieldRef::new(
+					"count"
+				)),]),
+				card("about"),
+			]))
+			.flush();
+
+		let res = world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap();
+
+		let body = res.unwrap_str().await;
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
 	}
 }

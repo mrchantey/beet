@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// Fallback tool for mapping a request path to a corresponding tool in this
 /// tree's hierarchy, using the [`RouteTreeRoot`] in its ancestors.
 pub fn try_router() -> impl Bundle {
-	(Name::new("Router"), RouteHidden, direct_tool(router_tool))
+	(Name::new("Router"), RouteHidden, tool(router_tool))
 }
 
 /// Fallback tool for mapping a request path to a corresponding tool in this
@@ -15,7 +15,7 @@ pub fn router() -> impl Bundle {
 		// the router itself shouldnt show up in the route tree
 		RouteHidden,
 		exchange_fallback(),
-		OnSpawn::insert_child((RouteHidden, direct_tool(router_tool))),
+		OnSpawn::insert_child((RouteHidden, tool(router_tool))),
 	)
 }
 
@@ -118,12 +118,12 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn route_calls_exchange_tool() {
+	async fn route_calls_route_tool() {
 		StackPlugin::world()
-			.spawn((router(), children![(
-				PathPartial::new("add"),
-				exchange_tool(|input: (i32, i32)| -> i32 { input.0 + input.1 }),
-			)]))
+			.spawn((router(), children![route_tool(
+				"add",
+				|input: (i32, i32)| -> i32 { input.0 + input.1 }
+			),]))
 			.call::<Request, Response>(
 				Request::with_json("/add", &(10i32, 20i32)).unwrap(),
 			)
