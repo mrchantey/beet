@@ -1,63 +1,31 @@
 lets keep iterating on beet_stack!
 
-## Next Steps -> Router
-
-As a reminder this is an interface agnostic framework, where http requests and ui are represented as the same thing.
-
-Time to refactor Card.
-Currently, we have a mishmash route tree, where cards are added directly to the tree, and tools are called as a seperate concept. This has a couple of problems.
-
-1. Stale Data: A card may do some stuff on spawn that is invalid on a second request.
-2. Seperate concepts: we have to handle cards as this 'special case' seperate from tools which permeates the crate, see router.rs or route_tree.rs
-
-## Solution
+The last iteration was pretty good but we ended up with a bit of confusion.
 
 
+- card() must accept an IntoToolHandler<Out=B>, not just a func. This is the purpose of RenderRequest::handler, we call that instead of this CardSpawner, remove the CardSpawner, ie file_card should internally just call card()
+- find_render_tool, thats utterly unreadable, use run_system_once_with(|In<Entity>, ancestors: Qery<&ChildOf>, children:Query<&Children|{
+	let root = ancestors.root(entity);
+  children.iter_descendents_inclusive(root).find...()
+})
+- the render tool is the responsibility of the server not the interface.
 
-### Interface -> Router
-
-The concept of an interface is nebulous, lets refactor to just use tried and true router concepts.
-
-We should rebrand the `src/interface` module to a router module.
-
-### Cards as tools
-
-A card is actually just a variation of a route_tool, The card() function now accepts the path and a func, probably an IntoToolHandler where Out: Bundle. What happens then needs design work, but my guess is it will shape up similar to `route_tool.rs`, where the outer tool accepts the Request/Response, the inner tool will:
-
-
-
-1. get the render() method from the interface
-2. 
-
-the card() method will need to: 
-1. run the inner tool to get the bundle.
-2. spawn the bundle
-3. the server should have a child `RouteHidden` render tool, which accepts the Entity and returns a Response. So the cli and repl server might have a markdown renderer whereas the the tui_server might just add CurrentCard to the card and keep it for the next render frame.
 
 ```rust
-
-fn card<M,Out:Bundle>(path:&str, handler: impl IntoToolHandler<M>)->impl Bundle{
-	(PathPartial::new(path), exchange_tool(handler))
-}
-
-
 struct RenderRequest {
-	/// The entity that sent the request, it contains a tool which, when called 
+	/// The handler entity with a tool signature `(Request)/Entity`, where the returned entity is the spawned instance of the card.
 	handler: Entity,
 	/// Cards must be run once at first to discover their 
 	/// nested tools. In this case discover_call will be true.
+	/// Use this flag to avoid unnessecary on mount work.
 	discover_call: bool,
-}
-struct RenderResponse{
-	despawn: bool,
+	/// The original request
+	request: Request,
 }
 ```
-
-We should also introduce file_card() which replaces the current `FileContent` paradigm, loading the markdown from disk on each request.
-
-A big change here is that nested tools and cards will not show up in the route tree until they are expanded.
+The reason why we dont just spawn first and pass that to the render tool, is some renderers are stateful like tui, and like if a user revisits the same path we dont need to rebuild the whole card.
 
 
-### Caching
+A big change here is that nested tools and cards will not show up in the route tree until they are expanded. The route tree will need to first discover all cards, then call each of them, spawning the card, collecting its routes, then despawning it.
 
-This `StatefulInterface` idea may no longer be nessecary. Instead I think we need see `tui_server`, we can just call the root
+This means basically removing all calls to `render_markdown_for`, so that render_markdown becomes one of these 'render tools'

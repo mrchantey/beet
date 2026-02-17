@@ -4,10 +4,10 @@ pub use help::*;
 pub use router::*;
 mod navigate;
 pub use navigate::*;
-mod render_markdown;
-pub use render_markdown::*;
-mod render_tui;
-pub use render_tui::*;
+mod interface_tool;
+pub use interface_tool::*;
+mod route_tool;
+pub use route_tool::*;
 
 use crate::prelude::*;
 use beet_core::prelude::*;

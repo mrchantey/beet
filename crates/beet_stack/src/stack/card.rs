@@ -264,50 +264,6 @@ pub fn find_render_tool(world: &World, entity: Entity) -> Result<Entity> {
 	})
 }
 
-/// Creates a render tool that renders cards to markdown.
-///
-/// This is the default render tool used by [`default_interface`].
-/// On each request it:
-/// 1. Reads the [`CardSpawner`] from the handler entity
-/// 2. Calls the spawner to create the card content
-/// 3. Renders the spawned entity tree to markdown
-/// 4. Despawns the temporary content entity
-/// 5. Returns the markdown as a [`Response`]
-pub fn markdown_render_tool() -> impl Bundle {
-	(
-		Name::new("Markdown Render Tool"),
-		RenderToolMarker,
-		RouteHidden,
-		tool(
-			async |cx: AsyncToolContext<RenderRequest>| -> Result<Response> {
-				let handler = cx.input.handler;
-				let world = cx.tool.world();
-
-				// Read the CardSpawner, spawn content, render, despawn
-				let markdown = world
-					.with_then(move |world: &mut World| -> Result<String> {
-						let spawner = world
-							.entity(handler)
-							.get::<CardSpawner>()
-							.ok_or_else(|| {
-								bevyhow!("No CardSpawner on handler entity")
-							})?
-							.clone();
-
-						let entity = spawner.spawn(world);
-						let markdown = render_markdown_for(entity, world);
-						world.entity_mut(entity).despawn();
-						markdown.xok()
-					})
-					.await?;
-
-				Response::ok_body(markdown, "text/plain").xok()
-			},
-		),
-	)
-}
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
