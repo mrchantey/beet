@@ -1,62 +1,83 @@
-//! Render semantic text content to markdown format.
+//! Markdown tools for rendering card content and entity trees.
 //!
-//! This module provides functionality to convert the semantic text representation
-//! (using [`TextNode`] and semantic markers) into markdown strings.
+//! This module provides two tools and a convenience function:
 //!
-//! Supports all content types produced by [`MarkdownDiffer`](crate::parsers::MarkdownDiffer):
+//! - [`markdown_render_tool`]: A [`RenderToolMarker`] tool placed on
+//!   CLI/REPL servers. It handles [`RenderRequest`] by calling the
+//!   [`CardContentHandler`] to spawn content, rendering via
+//!   [`MarkdownRenderer`], and despawning the temporary entity.
 //!
-//! - Block elements: headings, paragraphs, block quotes, code blocks,
-//!   lists, tables, thematic breaks, images
-//! - Inline markers: strong, emphasis, strikethrough, code, quote,
-//!   superscript, subscript, links
+//! - [`render_markdown`]: A standalone tool that renders an entity's
+//!   own text content tree to a markdown string.
 //!
-//! The core rendering logic lives in [`MarkdownRenderer`] which implements
-//! [`CardVisitor`]. This module wires it up as a tool and provides
-//! [`render_markdown_for`] for direct world access.
-//! ```
+//! - [`render_markdown_for`]: Direct world access entry point for
+//!   rendering a specific entity to markdown.
+//!
+//! The core rendering logic lives in [`MarkdownRenderer`] which
+//! implements [`CardVisitor`].
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Creates a render tool that renders cards to markdown.
+///
+/// Used by CLI and REPL servers for terminal output. Should be
+/// placed on the server entity, not the router — different servers
+/// need different render tools.
+///
+/// On each request it:
+/// 1. Calls the [`CardContentHandler`] child entity to spawn content
+/// 2. Renders the spawned entity tree to markdown
+/// 3. Despawns the temporary content entity
+/// 4. Returns the markdown as a [`Response`]
+pub fn markdown_render_tool() -> impl Bundle {
+	(
+		Name::new("Markdown Render Tool"),
+		RenderToolMarker,
+		RouteHidden,
+		tool(
+			async |cx: AsyncToolContext<RenderRequest>| -> Result<Response> {
+				let handler = cx.input.handler;
+				let world = cx.tool.world();
 
-/// Creates a markdown rendering tool for an entity's text content tree.
+				// Call the card content handler to spawn content
+				let card_entity: Entity =
+					world.entity(handler).call(()).await?;
+
+				// Render to markdown, then despawn
+				let markdown = world
+					.with_then(move |world: &mut World| -> String {
+						let markdown = render_markdown_for(card_entity, world);
+						world.entity_mut(card_entity).despawn();
+						markdown
+					})
+					.await;
+
+				Response::ok_body(markdown, "text/plain").xok()
+			},
+		),
+	)
+}
+
+/// Creates a standalone markdown rendering tool for an entity's
+/// text content tree.
 ///
-/// This tool traverses the entity and its descendants within the card
-/// boundary, converting semantic markers to their markdown equivalents:
-///
-/// - [`Heading1`]..=[`Heading6`] → `#`..=`######` (heading level)
-/// - [`Paragraph`] → `text\n\n` (paragraph with trailing newlines)
-/// - [`Important`] → `**text**` (bold)
-/// - [`Emphasize`] → `*text*` (italic)
-/// - [`Code`] → `` `text` `` (inline code)
-/// - [`Quote`] → `"text"` (quoted)
-/// - [`Link`] → `[text](url)`
-/// - [`BlockQuote`] → `> text` (block quote)
-/// - [`CodeBlock`] → fenced code block
-/// - [`ListMarker`] + [`ListItem`] → `- item` or `1. item`
-/// - [`ThematicBreak`] → `---`
-/// - [`Image`] → `![alt](src)`
-/// - [`Strikethrough`] → `~~text~~`
-/// - [`Table`] → GFM table
-/// - [`Superscript`] → `^text^`
-/// - [`Subscript`] → `~text~`
-///
-/// # Returns
-///
-/// A bundle containing the markdown rendering tool that produces a markdown
-/// string representing the text content of the entity tree.
+/// Traverses the entity and its descendants within the card
+/// boundary, converting semantic markers to their markdown
+/// equivalents. See [`MarkdownRenderer`] for the full list of
+/// supported elements.
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use beet_stack::prelude::*;
 /// use beet_core::prelude::*;
 ///
-/// let val = World::new()
-/// 			.spawn((render_markdown(), Paragraph::with_text("hello world")))
-/// 			.send_blocking::<(), String>(())
-/// 			.unwrap();
-/// assert_eq!(val, "hello world");
-///
+/// World::new()
+///     .spawn((render_markdown(), Paragraph::with_text("hello world")))
+///     .call_blocking::<(), String>(())
+///     .unwrap()
+///     .xpect_eq("hello world\n\n");
+/// ```
 pub fn render_markdown() -> impl Bundle {
 	(
 		PathPartial::new("render-markdown"),
@@ -64,11 +85,11 @@ pub fn render_markdown() -> impl Bundle {
 	)
 }
 
-/// Renders an entity's text content tree to markdown using direct world access.
+/// Renders an entity's text content tree to markdown using direct
+/// world access.
 ///
-/// This is the reusable entry point for markdown rendering. It runs the
-/// rendering system via [`World::run_system_cached_with`], so it can be
-/// called from any context that has `&mut World`.
+/// Runs the rendering system via [`World::run_system_cached_with`],
+/// so it can be called from any context with `&mut World`.
 pub fn render_markdown_for(entity: Entity, world: &mut World) -> String {
 	world
 		.run_system_cached_with(render_markdown_for_entity, entity)
@@ -76,8 +97,7 @@ pub fn render_markdown_for(entity: Entity, world: &mut World) -> String {
 }
 
 /// System that renders an entity tree to markdown using [`CardWalker`].
-/// Used by the [`render_markdown`] tool, which renders relative to
-/// its own entity (via card root resolution).
+/// Renders relative to the tool's own entity via card root resolution.
 fn render_markdown_system(
 	In(cx): In<ToolContext>,
 	walker: CardWalker,
@@ -89,7 +109,6 @@ fn render_markdown_system(
 
 /// System that renders a specific entity to markdown, starting from
 /// that entity directly rather than resolving the card root first.
-/// Used by [`render_markdown_for`].
 fn render_markdown_for_entity(
 	In(entity): In<Entity>,
 	walker: CardWalker,
@@ -201,7 +220,6 @@ mod test {
 			.xpect_eq("[example](https://example.com \"Example Site\")");
 	}
 
-
 	#[test]
 	fn combined_markers() {
 		World::new()
@@ -227,15 +245,6 @@ mod test {
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("Welcome to **beet**, the *best* framework!");
-	}
-
-	#[test]
-	fn extension_trait() {
-		World::new()
-			.spawn((render_markdown(), children![TextNode::new("test")]))
-			.call_blocking::<(), String>(())
-			.unwrap()
-			.xpect_eq("test");
 	}
 
 	#[test]
@@ -266,7 +275,7 @@ mod test {
 	}
 
 	#[test]
-	fn heading_renders_as_heading() {
+	fn heading_renders() {
 		World::new()
 			.spawn((render_markdown(), Heading1::with_text("Hello World")))
 			.call_blocking::<(), String>(())
@@ -275,7 +284,7 @@ mod test {
 	}
 
 	#[test]
-	fn heading2_renders_as_h2() {
+	fn heading2_renders() {
 		World::new()
 			.spawn((render_markdown(), children![
 				Heading1::with_text("Outer"),

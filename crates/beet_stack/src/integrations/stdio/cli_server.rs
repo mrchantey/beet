@@ -1,6 +1,9 @@
 //! A single-shot CLI server that parses arguments from the environment,
 //! dispatches them as a [`Request`], and streams the [`Response`] body
 //! to stdout.
+//!
+//! Includes a [`markdown_render_tool`] so that cards render their
+//! content to markdown for terminal output.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -11,7 +14,10 @@ use beet_core::prelude::*;
 /// to stdout, and writes an [`AppExit`] message so the app terminates
 /// with the appropriate exit code.
 ///
-/// Typically combined with a [`default_interface`] and some child
+/// Includes a [`markdown_render_tool`] for rendering card content
+/// to markdown in the terminal.
+///
+/// Typically combined with a [`default_router`] and some child
 /// cards/tools to build a CLI application:
 ///
 /// ```no_run
@@ -22,7 +28,7 @@ use beet_core::prelude::*;
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
 ///     app.world_mut().spawn((
-///         default_interface(),
+///         default_router(),
 ///         cli_server(),
 ///         children![
 ///             card("", || Paragraph::with_text("welcome!")),
@@ -34,22 +40,25 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn cli_server() -> impl Bundle {
-	OnSpawn::new(|entity| {
-		entity.run_async(async |entity| -> Result {
-			let req = Request::from_cli_args(CliArgs::parse_env())?;
-			let res: Response = entity.call(req).await?;
-			let parts = stream_response_to_stdout(res).await?;
-			let exit = match parts.status_to_exit_code() {
-				Ok(()) => AppExit::Success,
-				Err(code) => {
-					error!("Command failed\nStatus code: {code}");
-					AppExit::Error(code)
-				}
-			};
-			entity.world().write_message(exit);
-			Ok(())
-		});
-	})
+	(
+		OnSpawn::insert_child(markdown_render_tool()),
+		OnSpawn::new(|entity| {
+			entity.run_async(async |entity| -> Result {
+				let req = Request::from_cli_args(CliArgs::parse_env())?;
+				let res: Response = entity.call(req).await?;
+				let parts = stream_response_to_stdout(res).await?;
+				let exit = match parts.status_to_exit_code() {
+					Ok(()) => AppExit::Success,
+					Err(code) => {
+						error!("Command failed\nStatus code: {code}");
+						AppExit::Error(code)
+					}
+				};
+				entity.world().write_message(exit);
+				Ok(())
+			});
+		}),
+	)
 }
 
 

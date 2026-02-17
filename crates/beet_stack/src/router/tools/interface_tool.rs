@@ -1,7 +1,7 @@
 //! An interface routes requests to cards and tools.
 //!
-//! This module provides [`default_interface`], an async interface that
-//! handles request routing, card navigation, tool invocation, and help
+//! This module provides [`default_router`], a request router that
+//! handles routing, card navigation, tool invocation, and help
 //! rendering. It delegates to shared functions in [`render_markdown`]
 //! and [`help`] rather than duplicating their logic.
 //!
@@ -13,6 +13,14 @@
 //!   `counter --help` only shows routes under `/counter`.
 //! - **Not found**: shows help scoped to the nearest ancestor card,
 //!   ie `counter nonsense` shows help for `/counter`.
+//!
+//! ## Render Tools
+//!
+//! The `default_router` does **not** include a render tool. Render
+//! tools are the responsibility of the server, since different
+//! servers need different rendering strategies:
+//! - CLI/REPL servers use [`markdown_render_tool`]
+//! - TUI servers use [`tui_render_tool`]
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -45,11 +53,12 @@ pub fn exchange_fallback() -> impl Bundle {
 	)
 }
 
-/// Creates a standard markdown interface with help, navigation,
-/// routing, and fallback handlers as a child fallback chain.
+/// Creates a standard router with help, navigation, routing, and
+/// fallback handlers as a child fallback chain.
 ///
-/// Includes a [`markdown_render_tool`] so that cards can render
-/// their content to markdown by default.
+/// Does **not** include a render tool — that belongs on the server.
+/// Use [`markdown_render_tool`] on CLI/REPL servers or
+/// [`tui_render_tool`] on TUI servers.
 ///
 /// The handler chain runs in order:
 /// 1. **Help** — if `--help` is present, render help scoped to the
@@ -64,7 +73,6 @@ pub fn default_router() -> impl Bundle {
 	(
 		interface(),
 		OnSpawn::insert(children![
-			markdown_render_tool(),
 			(Name::new("Help Tool"), RouteHidden, tool(help_handler)),
 			(
 				Name::new("Navigate Tool"),
@@ -123,10 +131,10 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_tool_request() {
 		StackPlugin::world()
-			.spawn((default_router(), children![route_tool(
-				"add",
-				|(a, b): (i32, i32)| -> i32 { a + b }
-			)]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				route_tool("add", |(a, b): (i32, i32)| -> i32 { a + b }),
+			]))
 			.call::<Request, Response>(
 				Request::with_json("add", &(1i32, 2i32)).unwrap(),
 			)
@@ -142,6 +150,7 @@ mod test {
 	async fn help_flag_returns_route_list() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -157,6 +166,7 @@ mod test {
 	async fn dispatches_help_request() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -170,9 +180,10 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		StackPlugin::world()
-			.spawn((default_router(), children![increment(FieldRef::new(
-				"count"
-			))]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				increment(FieldRef::new("count")),
+			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent").unwrap(),
 			)
@@ -186,6 +197,7 @@ mod test {
 	async fn renders_root_card_on_empty_args() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				card("", || {
 					children![
 						Heading1::with_text("My Server"),
@@ -209,6 +221,7 @@ mod test {
 
 		let root = world
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],

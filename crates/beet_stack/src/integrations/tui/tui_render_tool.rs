@@ -1,8 +1,9 @@
 //! TUI-specific render tool that maintains stateful card entities.
 //!
 //! Unlike the markdown render tool which spawns/despawns content per request,
-//! the TUI render tool maintains persistent card content entities marked with
-//! [`CurrentCard`] for the draw system to render.
+//! the TUI render tool manages a single active card entity marked with
+//! [`CurrentCard`]. When a new card is rendered, the previous one is
+//! despawned.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -10,12 +11,10 @@ use beet_core::prelude::*;
 /// Creates a TUI rendering tool for stateful card display.
 ///
 /// This tool responds to [`RenderRequest`]s by:
-/// 1. Spawning the card's content using its [`CardSpawner`]
-/// 2. Marking it with [`CurrentCard`] for the TUI draw system
-/// 3. Returning an empty success response
-///
-/// The spawned content persists until a new card is rendered, at which
-/// point the [`single_current_card`] observer removes the old marker.
+/// 1. Despawning any previous [`CurrentCard`] entity
+/// 2. Calling the [`CardContentHandler`] child entity to spawn content
+/// 3. Marking the new content with [`CurrentCard`] for the TUI draw system
+/// 4. Returning an empty success response
 ///
 /// # Example
 ///
@@ -24,10 +23,10 @@ use beet_core::prelude::*;
 /// use beet_core::prelude::*;
 ///
 /// let mut world = StackPlugin::world();
+/// // tui_server() already includes a tui_render_tool as a child
 /// world.spawn((
 ///     tui_server(),
 ///     children![
-///         tui_render_tool(),
 ///         card("home", || Heading1::with_text("Welcome")),
 ///     ]
 /// )).flush();
@@ -40,37 +39,37 @@ pub fn tui_render_tool() -> impl Bundle {
 	)
 }
 
-/// System that handles TUI rendering requests by spawning card content
-/// and marking it with [`CurrentCard`].
+/// System that handles TUI rendering requests by despawning the
+/// previous card, spawning new card content, and marking it with
+/// [`CurrentCard`].
 async fn tui_render_system(
 	cx: AsyncToolContext<RenderRequest>,
 ) -> Result<Response> {
 	let handler = cx.input.handler;
 	let world = cx.tool.world();
 
-	// Spawn the card content and mark it as current
-	let _card_entity = world
-		.with_then(move |world: &mut World| -> Result<Entity> {
-			// Get the CardSpawner from the handler entity
-			let spawner = world
-				.entity(handler)
-				.get::<CardSpawner>()
-				.ok_or_else(|| {
-					bevyhow!(
-						"Card handler entity missing CardSpawner component"
-					)
-				})?
-				.clone();
-
-			// Spawn the card content
-			let card_entity = spawner.spawn(world);
-
-			// Mark it as the current card for TUI rendering
-			world.entity_mut(card_entity).insert(CurrentCard);
-
-			Ok(card_entity)
+	// Despawn previous CurrentCard entity if one exists
+	world
+		.with_then(move |world: &mut World| {
+			let prev = world
+				.query_filtered::<Entity, With<CurrentCard>>()
+				.single(world)
+				.ok();
+			if let Some(prev_entity) = prev {
+				world.entity_mut(prev_entity).despawn();
+			}
 		})
-		.await?;
+		.await;
+
+	// Call the card content handler to spawn content
+	let card_entity: Entity = world.entity(handler).call(()).await?;
+
+	// Mark it as the current card for TUI rendering
+	world
+		.with_then(move |world: &mut World| {
+			world.entity_mut(card_entity).insert(CurrentCard);
+		})
+		.await;
 
 	// Return empty success response
 	Response::ok().xok()
@@ -104,7 +103,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn replaces_previous_current_card() {
+	async fn despawns_previous_card_on_new_render() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((router(), children![
@@ -141,11 +140,8 @@ mod test {
 		// Should be different entities
 		(first_current != second_current).xpect_true();
 
-		// First should no longer have CurrentCard
-		world
-			.entity(first_current)
-			.contains::<CurrentCard>()
-			.xpect_false();
+		// First entity should be despawned entirely
+		world.get_entity(first_current).is_err().xpect_true();
 
 		// Second should have CurrentCard
 		world

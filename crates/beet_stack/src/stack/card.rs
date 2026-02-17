@@ -8,8 +8,10 @@ use std::sync::Arc;
 ///
 /// Cards are tools that delegate rendering to a [`RenderToolMarker`]
 /// entity found by traversing to the root ancestor. The `Card` component
-/// itself serves as a boundary marker for [`CardWalker`](crate::renderers::CardWalker)
-/// and [`DocumentQuery`] traversal.
+/// serves both as a boundary marker for
+/// [`CardWalker`](crate::renderers::CardWalker) and [`DocumentQuery`]
+/// traversal, and as a marker on card tool entities to distinguish
+/// them from regular tools in help display and route tree queries.
 ///
 /// Use the [`card`] function to create a routable card with content:
 /// ```
@@ -18,7 +20,7 @@ use std::sync::Arc;
 ///
 /// let mut world = StackPlugin::world();
 /// let root = world.spawn((
-///     default_interface(),
+///     default_router(),
 ///     children![
 ///         card("about", || Paragraph::with_text("About page")),
 ///     ],
@@ -27,18 +29,50 @@ use std::sync::Arc;
 /// let tree = world.entity(root).get::<RouteTree>().unwrap();
 /// tree.find(&["about"]).xpect_some();
 /// ```
-#[derive(Component)]
-pub struct Card;
-
-/// Marker component on tool entities that are cards, distinguishing
-/// them from regular tools in help display and route tree queries.
-///
-/// Added automatically by the [`card`] function. Unlike the [`Card`]
-/// component (which marks content boundaries), this marker lives on
-/// the route tool entity in the tree.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct CardMarker;
+pub struct Card;
+
+/// Marker for the internal child tool entity that spawns card content.
+///
+/// The render tool calls this child entity (via [`RenderRequest::handler`])
+/// to spawn the card's content tree. The child tool takes `()` and
+/// returns an [`Entity`] representing the spawned card content root.
+///
+/// Also stores a [`CardContentFn`] for synchronous spawning during
+/// route discovery.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct CardContentHandler;
+
+/// Type-erased synchronous card content spawner.
+///
+/// Used during [`RouteTree`] construction to discover nested tools
+/// and cards inside card content. The route tree observer calls this
+/// to temporarily spawn content, collect routes, then despawn.
+///
+/// This duplicates the async tool handler's logic but provides
+/// synchronous `&mut World` access needed during route discovery.
+#[derive(Component, Clone)]
+pub struct CardContentFn(Arc<dyn Fn(&mut World) -> Entity + Send + Sync>);
+
+impl CardContentFn {
+	/// Create a new content function.
+	pub fn new(
+		func: impl Fn(&mut World) -> Entity + 'static + Send + Sync,
+	) -> Self {
+		Self(Arc::new(func))
+	}
+
+	/// Spawn the card content into the world, returning the root entity.
+	pub fn spawn(&self, world: &mut World) -> Entity { (self.0)(world) }
+}
+
+impl std::fmt::Debug for CardContentFn {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("CardContentFn").finish_non_exhaustive()
+	}
+}
 
 /// Marker component for render tools on servers or interfaces.
 ///
@@ -55,13 +89,14 @@ pub struct RenderToolMarker;
 
 /// Request passed to a render tool to render a card's content.
 ///
-/// The render tool decides how and when to call the [`CardSpawner`]
-/// on the handler entity, enabling stateful renderers (like TUI) to
-/// reuse existing card entities instead of respawning on every request.
+/// The render tool calls the [`CardContentHandler`] child entity
+/// referenced by [`handler`](Self::handler) to spawn the card's
+/// content tree, enabling stateful renderers (like TUI) to manage
+/// lifecycle differently from stateless ones (like markdown).
 #[derive(Debug)]
 pub struct RenderRequest {
-	/// The card tool entity that has a [`CardSpawner`] component.
-	/// The render tool reads the spawner to create the card content.
+	/// The [`CardContentHandler`] child entity. Call this entity
+	/// with `call::<(), Entity>(())` to spawn the card content.
 	pub handler: Entity,
 	/// Cards must be called once at first to discover their
 	/// nested tools. When true, the render tool should avoid
@@ -69,33 +104,6 @@ pub struct RenderRequest {
 	pub discover_call: bool,
 	/// The original request.
 	pub request: Request,
-}
-
-/// Type-erased card content spawner stored on the card tool entity.
-///
-/// Contains a boxed function that spawns card content into the world
-/// and returns the root [`Entity`] of the spawned content tree.
-/// The spawned entity always gets a [`Card`] marker for walker
-/// boundary detection.
-#[derive(Component, Clone)]
-pub struct CardSpawner(Arc<dyn Fn(&mut World) -> Entity + Send + Sync>);
-
-impl CardSpawner {
-	/// Create a new spawner from a function.
-	pub fn new(
-		func: impl Fn(&mut World) -> Entity + 'static + Send + Sync,
-	) -> Self {
-		Self(Arc::new(func))
-	}
-
-	/// Spawn the card content into the world, returning the root entity.
-	pub fn spawn(&self, world: &mut World) -> Entity { (self.0)(world) }
-}
-
-impl std::fmt::Debug for CardSpawner {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("CardSpawner").finish_non_exhaustive()
-	}
 }
 
 /// Creates a routable card tool from a path and content handler.
@@ -114,7 +122,7 @@ impl std::fmt::Debug for CardSpawner {
 ///
 /// let mut world = StackPlugin::world();
 /// let root = world.spawn((
-///     default_interface(),
+///     default_router(),
 ///     children![
 ///         card("about", || Paragraph::with_text("About page")),
 ///         card("home", || children![
@@ -130,24 +138,70 @@ impl std::fmt::Debug for CardSpawner {
 /// ```
 pub fn card<F, B>(path: &str, func: F) -> impl Bundle
 where
-	F: 'static + Send + Sync + Fn() -> B,
+	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
 	(
 		PathPartial::new(path),
-		CardMarker,
+		Card,
 		// Outer tool meta: the card presents as Request/Response
 		ToolMeta::of::<F, Request, Response>(),
-		CardSpawner::new(move |world| world.spawn((Card, func())).id()),
+		// Spawn a child tool entity that produces card content.
+		// The render tool calls this child to get the spawned Entity.
+		OnSpawn::insert_child({
+			let content_func = func.clone();
+			(
+				CardContentHandler,
+				RouteHidden,
+				CardContentFn::new(move |world| {
+					world.spawn((Card, content_func())).id()
+				}),
+				ToolMeta::of::<F, (), Entity>(),
+				card_content_observer(func),
+			)
+		}),
 		OnSpawn::observe(card_tool_handler),
 	)
 }
 
-/// Creates a routable card that loads its content from a markdown file.
+/// Creates an observer that reads the [`CardContentFn`] component to
+/// spawn card content and returns the root [`Entity`].
+fn card_content_observer<F, B>(_func: F) -> OnSpawn
+where
+	F: 'static + Send + Sync + Clone + Fn() -> B,
+	B: 'static + Send + Sync + Bundle,
+{
+	OnSpawn::observe(
+		move |mut ev: On<ToolIn<(), Entity>>,
+		      content_fns: Query<&CardContentFn>,
+		      mut commands: AsyncCommands| {
+			let ev = ev.event_mut();
+			let tool = ev.tool();
+			let Ok(()) = ev.take_input() else { return };
+			let Ok(out_handler) = ev.take_out_handler() else {
+				return;
+			};
+			let Ok(content_fn) = content_fns.get(tool).cloned() else {
+				return;
+			};
+
+			commands.run(async move |mut world| -> Result {
+				let card_entity = world
+					.with_then(move |world: &mut World| -> Entity {
+						content_fn.spawn(world)
+					})
+					.await;
+				out_handler.call_async(&mut world, tool, card_entity)
+			});
+		},
+	)
+}
+
+/// Creates a routable card that loads its content from a file.
 ///
-/// On each request, the file is read from disk and parsed as markdown.
-/// This replaces the [`FileContent`] paradigm with a proper tool-based
-/// approach.
+/// On each render, the file is read from disk and its text content
+/// is displayed. Internally calls [`card`] with a handler that
+/// reads the file.
 ///
 /// # Example
 ///
@@ -160,30 +214,27 @@ where
 #[cfg(feature = "markdown")]
 pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 	let ws_path: WsPathBuf = file_path.into();
-	(
-		PathPartial::new(path),
-		CardMarker,
-		ToolMeta::of::<fn(), Request, Response>(),
-		CardSpawner::new(move |world| {
-			let abs_path = ws_path.clone().into_abs();
-			let entity = world.spawn(Card).id();
-			match fs_ext::read_to_string(&abs_path) {
-				Ok(text) => {
-					let mut differ = crate::parsers::MarkdownDiffer::new(&text);
-					if let Err(err) = differ.diff(world.entity_mut(entity)) {
-						cross_log_error!(
-							"Failed to parse markdown file: {err}"
-						);
-					}
-				}
-				Err(err) => {
-					cross_log_error!("Failed to load file: {err}");
-				}
+	card(path, file_card_content_tool(ws_path))
+}
+
+/// Creates a content handler that reads a file from disk and
+/// returns its text as a [`TextNode`].
+fn file_card_content_tool(
+	ws_path: WsPathBuf,
+) -> impl 'static + Send + Sync + Clone + Fn() -> TextNode {
+	move || {
+		let abs_path = ws_path.clone().into_abs();
+		match fs_ext::read_to_string(&abs_path) {
+			Ok(text) => TextNode::new(text),
+			Err(err) => {
+				cross_log_error!("Failed to load file: {err}");
+				TextNode::new(format!(
+					"Error loading {}: {err}",
+					abs_path.display()
+				))
 			}
-			entity
-		}),
-		OnSpawn::observe(card_tool_handler),
-	)
+		}
+	}
 }
 
 /// Observer that handles incoming [`Request`] on a card tool entity.
@@ -193,12 +244,24 @@ pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 /// and delegates to the render tool for the actual rendering.
 fn card_tool_handler(
 	mut ev: On<ToolIn<Request, Response>>,
+	handler_query: Query<Entity, With<CardContentHandler>>,
+	children_query: Query<&Children>,
 	mut commands: AsyncCommands,
 ) -> Result {
 	let ev = ev.event_mut();
 	let tool_entity = ev.tool();
 	let request = ev.take_input()?;
 	let outer_handler = ev.take_out_handler()?;
+
+	// Find the CardContentHandler child of this card tool entity
+	let handler_entity = children_query
+		.get(tool_entity)
+		.into_iter()
+		.flat_map(|c| c.iter())
+		.find(|&child| handler_query.contains(child))
+		.ok_or_else(|| {
+			bevyhow!("Card tool entity missing CardContentHandler child")
+		})?;
 
 	commands.run(async move |mut world| -> Result {
 		// Find the render tool by traversal
@@ -209,7 +272,7 @@ fn card_tool_handler(
 			.await?;
 
 		let render_request = RenderRequest {
-			handler: tool_entity,
+			handler: handler_entity,
 			discover_call: false,
 			request,
 		};
@@ -231,37 +294,31 @@ fn card_tool_handler(
 /// # Errors
 ///
 /// Returns an error if no render tool is found in the hierarchy.
-/// Ensure a render tool like [`markdown_render_tool`] is added to
-/// the interface or server.
-pub fn find_render_tool(world: &World, entity: Entity) -> Result<Entity> {
-	// Walk to root
-	let mut current = entity;
-	while let Some(child_of) = world.entity(current).get::<ChildOf>() {
-		current = child_of.parent();
-	}
-	let root = current;
-
-	// DFS from root for RenderToolMarker
-	fn dfs(world: &World, entity: Entity) -> Option<Entity> {
-		if world.entity(entity).contains::<RenderToolMarker>() {
-			return Some(entity);
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				if let Some(found) = dfs(world, child) {
-					return Some(found);
-				}
-			}
-		}
-		None
-	}
-
-	dfs(world, root).ok_or_else(|| {
-		bevyhow!(
-			"No render tool found. Add a render tool like \
-			 `markdown_render_tool()` to the interface or server."
+/// Ensure a render tool is added to the server, ie
+/// [`markdown_render_tool`] for CLI/REPL or [`tui_render_tool`]
+/// for TUI.
+pub fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
+	world
+		.run_system_once_with(
+			|In(entity): In<Entity>,
+			 ancestors: Query<&ChildOf>,
+			 children: Query<&Children>,
+			 markers: Query<Entity, With<RenderToolMarker>>| {
+				let root = ancestors.root_ancestor(entity);
+				children
+					.iter_descendants_inclusive(root)
+					.find(|&desc| markers.contains(desc))
+			},
+			entity,
 		)
-	})
+		.ok()
+		.flatten()
+		.ok_or_else(|| {
+			bevyhow!(
+				"No render tool found. Add a render tool like \
+				 `markdown_render_tool()` to the server."
+			)
+		})
 }
 
 #[cfg(test)]
@@ -272,9 +329,10 @@ mod test {
 	#[beet_core::test]
 	async fn card_renders_via_render_tool() {
 		StackPlugin::world()
-			.spawn((default_router(), children![card("about", || {
-				Paragraph::with_text("About page")
-			})]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("about", || Paragraph::with_text("About page")),
+			]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -286,12 +344,15 @@ mod test {
 	#[beet_core::test]
 	async fn card_with_children() {
 		StackPlugin::world()
-			.spawn((default_router(), children![card("home", || {
-				children![
-					Heading1::with_text("Welcome"),
-					Paragraph::with_text("Hello!"),
-				]
-			})]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("home", || {
+					children![
+						Heading1::with_text("Welcome"),
+						Paragraph::with_text("Hello!"),
+					]
+				}),
+			]))
 			.call::<Request, Response>(Request::get("home"))
 			.await
 			.unwrap()
@@ -305,9 +366,10 @@ mod test {
 	fn card_appears_in_route_tree() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_router(), children![card("about", || {
-				Paragraph::with_text("About")
-			})]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("about", || Paragraph::with_text("About page")),
+			]))
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.find(&["about"]).xpect_some();
@@ -317,12 +379,13 @@ mod test {
 	fn find_render_tool_traverses_hierarchy() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_router(), children![card("test", || {
-				Paragraph::with_text("test")
-			})]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("test", || Paragraph::with_text("test")),
+			]))
 			.flush();
 
-		let result = find_render_tool(&world, root);
+		let result = find_render_tool(&mut world, root);
 		result.xpect_ok();
 	}
 
@@ -330,6 +393,6 @@ mod test {
 	fn find_render_tool_errors_without_render_tool() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		find_render_tool(&world, entity).xpect_err();
+		find_render_tool(&mut world, entity).xpect_err();
 	}
 }

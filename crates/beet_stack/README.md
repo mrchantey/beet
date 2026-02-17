@@ -13,7 +13,7 @@ use beet_stack::prelude::*;
 use beet_core::prelude::*;
 
 let root = (
-	default_interface(),
+	default_router(),
 	children![
 		card("about", || Paragraph::with_text("About page")),
 		card("settings", || Paragraph::with_text("Settings")),
@@ -66,7 +66,8 @@ Render tools determine how card content is displayed. Different servers provide 
 - **Markdown** (`markdown_render_tool`): spawns content, renders to markdown, despawns. Used by CLI and REPL servers.
 - **TUI**: manages stateful card display in the terminal.
 
-The `default_interface()` includes a markdown render tool by default.
+Render tools belong on the server, not the router. CLI and REPL servers
+include `markdown_render_tool` automatically.
 
 ### Interfaces
 
@@ -94,7 +95,7 @@ Planned interfaces:
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
 - **`tools`** - `tool()`, `ToolMeta`, tool handlers
-- **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `CardSpawner`, `RenderRequest`, built-in tools
+- **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `RenderRequest`, built-in tools
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access
 - **`interface`** *(feature-gated)* - `Interface`, `route_tool()`, help, markdown rendering, render tools

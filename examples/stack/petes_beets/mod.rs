@@ -5,7 +5,7 @@ use beet::prelude::*;
 /// Each card loads its content from a `.md` file via [`file_card`],
 /// which reads and parses markdown on each request.
 pub fn stack() -> impl Bundle {
-	(default_interface(), children![root(), about(), counter()])
+	(default_router(), children![root(), about(), counter()])
 }
 
 fn root() -> impl Bundle { file_card("", "examples/stack/petes_beets/home.md") }

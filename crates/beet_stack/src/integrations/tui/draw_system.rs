@@ -14,9 +14,21 @@ use ratatui::Frame;
 /// [`TuiRenderer`], which implements [`CardVisitor`] for unified
 /// rendering of all content types.
 pub(super) fn draw_system(world: &mut World) -> Result {
-	let card_entity = world
+	let card_entity = match world
 		.query_filtered::<Entity, With<CurrentCard>>()
-		.single(world)?;
+		.single(world)
+	{
+		Ok(entity) => entity,
+		Err(_) => {
+			// not selected yet, just write 'loading'
+			world.resource_mut::<RatatuiContext>().draw(|frame| {
+				let text = ratatui::text::Text::from("loading..");
+				frame.render_widget(text, frame.area());
+			})?;
+
+			return Ok(());
+		}
+	};
 
 	world.resource_scope(
 		|world: &mut World, mut context: Mut<RatatuiContext>| {

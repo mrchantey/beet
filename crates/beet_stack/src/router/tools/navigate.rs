@@ -274,6 +274,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				card("", || Heading1::with_text("Root")),
 				(card("about", || Paragraph::with_text("About page")),),
 			]))
@@ -297,6 +298,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -320,6 +322,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -355,6 +358,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
+				markdown_render_tool(),
 				card("alpha", || Paragraph::with_text("Alpha page")),
 				card("beta", || Paragraph::with_text("Beta page")),
 			]))
@@ -377,9 +381,10 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((default_router(), children![card("about", || {
-				Paragraph::with_text("About page")
-			}),]))
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("about", || Paragraph::with_text("About page")),
+			]))
 			.flush();
 
 		// No --navigate param, should route normally

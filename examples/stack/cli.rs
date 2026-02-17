@@ -2,7 +2,7 @@
 //!
 //! Demonstrates a single-shot CLI application using [`cli_server`].
 //! The app parses process arguments, dispatches them through a
-//! [`default_interface`], and prints the response to stdout.
+//! [`default_router`], and prints the response to stdout.
 //!
 //! Cards are tools that delegate rendering to the nearest render tool.
 //! An empty-path card matches the root, serving as the default content

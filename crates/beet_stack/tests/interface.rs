@@ -3,8 +3,8 @@
 
 //! Integration tests for the markdown interface.
 //!
-//! All tests dispatch through [`default_interface`] using [`Request`]
-//! and [`Response`], verifying end-to-end behavior of the interface
+//! All tests dispatch through [`default_router`] using [`Request`]
+//! and [`Response`], verifying end-to-end behavior of the router
 //! tool chain: help, navigate, routing, and not-found fallback.
 
 use beet_core::prelude::*;
@@ -41,6 +41,7 @@ fn test_interface() -> (World, Entity) {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
+			markdown_render_tool(),
 			counter(),
 			calculator(),
 			card("about", || (Paragraph::with_text("About page"),)),
@@ -134,6 +135,7 @@ async fn navigate_parent_from_card() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
+			markdown_render_tool(),
 			card("", || (Heading1::with_text("Root"),)),
 			card("child", || (Paragraph::with_text("Child page"),)),
 		]))
@@ -148,6 +150,7 @@ async fn navigate_next_sibling() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
+			markdown_render_tool(),
 			card("alpha", || (Paragraph::with_text("Alpha"),)),
 			card("beta", || (Paragraph::with_text("Beta"),)),
 		]))

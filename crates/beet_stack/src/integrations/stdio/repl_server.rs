@@ -1,6 +1,9 @@
 //! A REPL server that reads lines from stdin in a loop, dispatching
 //! each as a [`Request`] and streaming the [`Response`] body to stdout.
 //!
+//! Includes a [`markdown_render_tool`] so that cards render their
+//! content to markdown for terminal output.
+//!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
 use crate::prelude::*;
@@ -17,13 +20,15 @@ use beet_core::prelude::*;
 /// [`Request`], dispatched through the owning entity's tool pipeline,
 /// and the response body is streamed to stdout.
 ///
-/// Includes a [`History`] component for tracking the current path,
-/// enabling relative navigation via `--navigate=<direction>`.
+/// Includes a [`markdown_render_tool`] for rendering card content
+/// to markdown in the terminal, and a [`History`] component for
+/// tracking the current path, enabling relative navigation via
+/// `--navigate=<direction>`.
 ///
 /// Typing `exit` or `quit` terminates the loop and writes
 /// [`AppExit::Success`]. An EOF on stdin also exits cleanly.
 ///
-/// Typically combined with a [`default_interface`] and child tools
+/// Typically combined with a [`default_router`] and child tools
 /// to build an interactive CLI application:
 ///
 /// ```no_run
@@ -34,7 +39,7 @@ use beet_core::prelude::*;
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), StackPlugin));
 ///     app.world_mut().spawn((
-///         default_interface(),
+///         default_router(),
 ///         repl_server(),
 ///         children![
 ///             increment(FieldRef::new("count")),
@@ -45,28 +50,32 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn repl_server() -> impl Bundle {
-	OnSpawn::new_async(async |entity| -> Result {
-		// Dispatch CLI args as the initial request, rendering the
-		// root content when no args are provided.
-		call(&entity, Request::from_cli_args(CliArgs::parse_env())?).await?;
-
-		cross_log_noline!("> ");
-		let stdin = stdin_lines();
-
-		while let Ok(line) = stdin.recv().await {
-			let trimmed = line.trim();
-			if trimmed == "exit" || trimmed == "quit" {
-				break;
-			}
-
-			call(&entity, Request::from_cli_str(trimmed)?).await?;
+	(
+		OnSpawn::insert_child(markdown_render_tool()),
+		OnSpawn::new_async(async |entity| -> Result {
+			// Dispatch CLI args as the initial request, rendering the
+			// root content when no args are provided.
+			call(&entity, Request::from_cli_args(CliArgs::parse_env())?)
+				.await?;
 
 			cross_log_noline!("> ");
-		}
+			let stdin = stdin_lines();
 
-		entity.world().write_message(AppExit::Success);
-		Ok(())
-	})
+			while let Ok(line) = stdin.recv().await {
+				let trimmed = line.trim();
+				if trimmed == "exit" || trimmed == "quit" {
+					break;
+				}
+
+				call(&entity, Request::from_cli_str(trimmed)?).await?;
+
+				cross_log_noline!("> ");
+			}
+
+			entity.world().write_message(AppExit::Success);
+			Ok(())
+		}),
+	)
 }
 
 async fn call(entity: &AsyncEntity, request: Request) -> Result {

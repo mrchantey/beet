@@ -64,7 +64,7 @@ pub struct ToolNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
-	/// Whether this tool is a card (has a [`CardMarker`] component).
+	/// Whether this tool is a card (has a [`Card`] component).
 	pub is_card: bool,
 }
 
@@ -75,13 +75,13 @@ pub type ToolQueryItem<'a> = (
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
-	Option<&'a CardMarker>,
+	Option<&'a Card>,
 );
 
 impl ToolNode {
 	/// Create a [`ToolNode`] from the full query result tuple.
 	pub fn from_query(
-		(entity, meta, path, params, method, card_marker): ToolQueryItem,
+		(entity, meta, path, params, method, card): ToolQueryItem,
 	) -> Self {
 		Self {
 			entity,
@@ -89,7 +89,7 @@ impl ToolNode {
 			params: params.clone(),
 			path: path.clone(),
 			method: method.cloned(),
-			is_card: card_marker.is_some(),
+			is_card: card.is_some(),
 		}
 	}
 }
