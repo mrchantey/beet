@@ -5,5 +5,7 @@ pub use tool::*;
 mod func_tool;
 mod pipe_tool;
 pub use pipe_tool::*;
+mod wrap_tool;
+pub use wrap_tool::*;
 mod async_tool;
 mod system_tool;

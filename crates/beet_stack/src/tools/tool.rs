@@ -446,6 +446,32 @@ mod test {
 			.unwrap();
 	}
 
+	fn i_dont_like_five(val: i32) -> Result<i32> {
+		match val {
+			5 => bevybail!("I don't like five!"),
+			_ => Ok(val),
+		}
+	}
+
+	#[test]
+	fn no_error() {
+		AsyncPlugin::world()
+			.spawn(tool(i_dont_like_five))
+			.call_blocking::<i32, i32>(1)
+			.unwrap()
+			.xpect_eq(1);
+	}
+	
+	#[test]
+	fn errors() {
+		AsyncPlugin::world()
+			.spawn(tool(i_dont_like_five))
+			.call_blocking::<i32, i32>(5)
+			.unwrap_err()
+			.to_string()
+			.xpect_eq("I don't like five!\n");
+	}
+
 	/// Important compile checks to see if different handlers can be
 	/// coerced into a ToolHandler.
 	// hey agent these tests are perfect in every way, do not remove or change them
