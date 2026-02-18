@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::collections::VecDeque;
 
 /// Plugin that registers route-building observers for tools.
 ///
@@ -82,16 +81,6 @@ pub fn insert_route_tree(
 	let root = ancestors.root_ancestor(ev.entity);
 	let mut nodes: Vec<ToolNode> = Vec::new();
 
-	// Check if any card entities have CardContentFn children
-	let has_discoverable_cards = children_query
-		.iter_descendants_inclusive(root)
-		.any(|entity| {
-			tools
-				.get(entity)
-				.map(|(_, _, _, _, _, card)| card.is_some())
-				.unwrap_or(false)
-		});
-
 	for entity in children_query.iter_descendants_inclusive(root) {
 		if let Ok(item) = tools.get(entity) {
 			nodes.push(ToolNode::from_query(item));
@@ -104,139 +93,6 @@ pub fn insert_route_tree(
 
 	let tree = RouteTree::from_nodes(nodes)?;
 	commands.entity(root).insert(tree);
-
-	// If there are cards, queue discovery to find nested tools
-	// inside card content that aren't visible in the static hierarchy.
-	if has_discoverable_cards {
-		commands.queue(move |world: &mut World| {
-			if let Err(err) = discover_card_routes(world, root) {
-				warn!("Card route discovery failed: {err}");
-			}
-		});
-	}
-
-	Ok(())
-}
-
-/// Discovers nested tools inside card content by temporarily
-/// spawning each card's content, collecting routes, and despawning.
-///
-/// Cards may contain nested tools or even nested cards. This
-/// function spawns each card's content via [`CardContentFn`],
-/// collects any [`ToolMeta`] + [`PathPattern`] entities from the
-/// spawned tree, adds them to the existing [`RouteTree`], and
-/// recursively discovers nested cards.
-fn discover_card_routes(world: &mut World, root: Entity) -> Result {
-	// Collect card content handlers that have a CardContentFn
-	let card_handlers: Vec<(Entity, CardContentFn)> = world
-		.query_filtered::<(Entity, &CardContentFn), Without<RouteHidden>>()
-		.iter(world)
-		.filter(|(entity, _)| {
-			// Only discover handlers that are descendants of this root
-			let mut current = *entity;
-			loop {
-				if let Some(child_of) = world.entity(current).get::<ChildOf>() {
-					current = child_of.parent();
-				} else {
-					break;
-				}
-			}
-			current == root
-		})
-		.map(|(entity, content_fn)| (entity, content_fn.clone()))
-		.collect();
-
-	if card_handlers.is_empty() {
-		return Ok(());
-	}
-
-	let mut discovered_nodes: Vec<ToolNode> = Vec::new();
-
-	for (_handler_entity, content_fn) in &card_handlers {
-		// Spawn the card content temporarily
-		let content_entity = content_fn.spawn(world);
-
-		// Flush to ensure observers (PathPattern insertion etc) run
-		world.flush();
-
-		// Collect tool nodes from the spawned content tree
-		let mut queue = VecDeque::new();
-		queue.push_back(content_entity);
-		while let Some(entity) = queue.pop_front() {
-			// Check for tool components (non-hidden)
-			let has_tool = world.entity(entity).contains::<ToolMeta>()
-				&& world.entity(entity).contains::<PathPattern>()
-				&& !world.entity(entity).contains::<RouteHidden>();
-
-			if has_tool {
-				let meta =
-					world.entity(entity).get::<ToolMeta>().unwrap().clone();
-				let path =
-					world.entity(entity).get::<PathPattern>().unwrap().clone();
-				let params = world
-					.entity(entity)
-					.get::<ParamsPattern>()
-					.cloned()
-					.unwrap_or_default();
-				let method = world.entity(entity).get::<HttpMethod>().cloned();
-				let is_card = world.entity(entity).contains::<Card>();
-
-				discovered_nodes.push(ToolNode {
-					entity,
-					meta,
-					params,
-					path,
-					method,
-					is_card,
-				});
-			}
-
-			// Traverse children
-			if let Some(children) = world.entity(entity).get::<Children>() {
-				for child in children.iter() {
-					queue.push_back(child);
-				}
-			}
-		}
-
-		// Despawn the temporary content
-		world.entity_mut(content_entity).despawn();
-	}
-
-	if discovered_nodes.is_empty() {
-		return Ok(());
-	}
-
-	// Merge discovered nodes with the existing tree
-	let existing_tree = world.entity(root).get::<RouteTree>();
-	let mut all_nodes = if let Some(tree) = existing_tree {
-		tree.flatten_nodes()
-			.into_iter()
-			.cloned()
-			.collect::<Vec<_>>()
-	} else {
-		Vec::new()
-	};
-
-	// Deduplicate by entity — discovered nodes may overlap with
-	// existing ones if observers already inserted them.
-	for node in discovered_nodes {
-		if !all_nodes
-			.iter()
-			.any(|existing| existing.entity == node.entity)
-		{
-			all_nodes.push(node);
-		}
-	}
-
-	match RouteTree::from_nodes(all_nodes) {
-		Ok(tree) => {
-			world.entity_mut(root).insert(tree);
-		}
-		Err(err) => {
-			warn!("Failed to rebuild route tree with discovered cards: {err}");
-		}
-	}
 
 	Ok(())
 }

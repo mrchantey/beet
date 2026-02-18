@@ -3,9 +3,8 @@
 //! This module provides two tools and a convenience function:
 //!
 //! - [`markdown_render_tool`]: A [`RenderToolMarker`] tool placed on
-//!   CLI/REPL servers. It handles [`RenderRequest`] by calling the
-//!   [`CardContentHandler`] to spawn content, rendering via
-//!   [`MarkdownRenderer`], and despawning the temporary entity.
+//!   CLI/REPL servers. It handles [`RenderRequest`] by rendering the
+//!   spawned content entity via [`MarkdownRenderer`] and despawning it.
 //!
 //! - [`render_markdown`]: A standalone tool that renders an entity's
 //!   own text content tree to a markdown string.
@@ -25,10 +24,9 @@ use beet_core::prelude::*;
 /// need different render tools.
 ///
 /// On each request it:
-/// 1. Calls the [`CardContentHandler`] child entity to spawn content
-/// 2. Renders the spawned entity tree to markdown
-/// 3. Despawns the temporary content entity
-/// 4. Returns the markdown as a [`Response`]
+/// 1. Renders the spawned content entity to markdown
+/// 2. Despawns the content entity
+/// 3. Returns the markdown as a [`Response`]
 pub fn markdown_render_tool() -> impl Bundle {
 	(
 		Name::new("Markdown Render Tool"),
@@ -36,12 +34,8 @@ pub fn markdown_render_tool() -> impl Bundle {
 		RouteHidden,
 		tool(
 			async |cx: AsyncToolContext<RenderRequest>| -> Result<Response> {
-				let handler = cx.input.handler;
+				let card_entity = cx.input.entity;
 				let world = cx.tool.world();
-
-				// Call the card content handler to spawn content
-				let card_entity: Entity =
-					world.entity(handler).call(()).await?;
 
 				// Render to markdown, then despawn
 				let markdown = world

@@ -1,6 +1,6 @@
 //! TUI-specific render tool that maintains stateful card entities.
 //!
-//! Unlike the markdown render tool which spawns/despawns content per request,
+//! Unlike the markdown render tool which despawns content after rendering,
 //! the TUI render tool manages a single active card entity marked with
 //! [`CurrentCard`]. When a new card is rendered, the previous one is
 //! despawned.
@@ -12,9 +12,8 @@ use beet_core::prelude::*;
 ///
 /// This tool responds to [`RenderRequest`]s by:
 /// 1. Despawning any previous [`CurrentCard`] entity
-/// 2. Calling the [`CardContentHandler`] child entity to spawn content
-/// 3. Marking the new content with [`CurrentCard`] for the TUI draw system
-/// 4. Returning an empty success response
+/// 2. Marking the new content entity with [`CurrentCard`] for the TUI draw system
+/// 3. Returning an empty success response
 ///
 /// # Example
 ///
@@ -40,15 +39,15 @@ pub fn tui_render_tool() -> impl Bundle {
 }
 
 /// System that handles TUI rendering requests by despawning the
-/// previous card, spawning new card content, and marking it with
+/// previous card and marking the new content entity with
 /// [`CurrentCard`].
 async fn tui_render_system(
 	cx: AsyncToolContext<RenderRequest>,
 ) -> Result<Response> {
-	let handler = cx.input.handler;
+	let card_entity = cx.input.entity;
 	let world = cx.tool.world();
 
-	// Despawn previous CurrentCard entity if one exists
+	// Despawn previous CurrentCard and mark the new entity
 	world
 		.with_then(move |world: &mut World| {
 			let prev = world
@@ -58,20 +57,10 @@ async fn tui_render_system(
 			if let Some(prev_entity) = prev {
 				world.entity_mut(prev_entity).despawn();
 			}
-		})
-		.await;
-
-	// Call the card content handler to spawn content
-	let card_entity: Entity = world.entity(handler).call(()).await?;
-
-	// Mark it as the current card for TUI rendering
-	world
-		.with_then(move |world: &mut World| {
 			world.entity_mut(card_entity).insert(CurrentCard);
 		})
 		.await;
 
-	// Return empty success response
 	Response::ok().xok()
 }
 

@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
-use std::sync::Arc;
 
 /// A single content container, similar to pages in a website or cards
 /// in HyperCard. Each card is a route, with the exact rendering behavior
@@ -10,7 +9,7 @@ use std::sync::Arc;
 /// Cards are tools that delegate rendering to a [`RenderToolMarker`]
 /// entity found by traversing to the root ancestor. The `Card` component
 /// serves both as a boundary marker for
-/// [`CardWalker`](crate::renderers::CardWalker) and [`DocumentQuery`]
+/// [`CardWalker`](crate::utils::CardWalker) and [`DocumentQuery`]
 /// traversal, and as a marker on card tool entities to distinguish
 /// them from regular tools in help display and route tree queries.
 ///
@@ -34,52 +33,11 @@ use std::sync::Arc;
 #[reflect(Component)]
 pub struct Card;
 
-/// Marker for the internal child tool entity that spawns card content.
-///
-/// The render tool calls this child entity (via [`RenderRequest::handler`])
-/// to spawn the card's content tree. The child tool takes `()` and
-/// returns an [`Entity`] representing the spawned card content root.
-///
-/// Also stores a [`CardContentFn`] for synchronous spawning during
-/// route discovery.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct CardContentHandler;
-
-/// Type-erased synchronous card content spawner.
-///
-/// Used during [`RouteTree`] construction to discover nested tools
-/// and cards inside card content. The route tree observer calls this
-/// to temporarily spawn content, collect routes, then despawn.
-///
-/// This duplicates the async tool handler's logic but provides
-/// synchronous `&mut World` access needed during route discovery.
-#[derive(Component, Clone)]
-pub struct CardContentFn(Arc<dyn Fn(&mut World) -> Entity + Send + Sync>);
-
-impl CardContentFn {
-	/// Create a new content function.
-	pub fn new(
-		func: impl Fn(&mut World) -> Entity + 'static + Send + Sync,
-	) -> Self {
-		Self(Arc::new(func))
-	}
-
-	/// Spawn the card content into the world, returning the root entity.
-	pub fn spawn(&self, world: &mut World) -> Entity { (self.0)(world) }
-}
-
-impl std::fmt::Debug for CardContentFn {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("CardContentFn").finish_non_exhaustive()
-	}
-}
-
 /// Marker component for render tools on servers or interfaces.
 ///
 /// A render tool accepts a [`RenderRequest`] and returns a [`Response`].
 /// Different servers provide different render tools:
-/// - CLI/REPL: spawns content, renders to markdown, despawns
+/// - CLI/REPL: renders content to markdown, despawns the entity
 /// - TUI: manages stateful card display
 ///
 /// Found by [`find_render_tool`] which traverses to the root ancestor
@@ -90,19 +48,15 @@ pub struct RenderToolMarker;
 
 /// Request passed to a render tool to render a card's content.
 ///
-/// The render tool calls the [`CardContentHandler`] child entity
-/// referenced by [`handler`](Self::handler) to spawn the card's
-/// content tree, enabling stateful renderers (like TUI) to manage
-/// lifecycle differently from stateless ones (like markdown).
+/// The card tool spawns content via its child content handler
+/// and passes the resulting entity to the render tool. The render
+/// tool is responsible for rendering and lifecycle management
+/// (eg despawning for stateless renderers, or marking with
+/// [`CurrentCard`] for stateful ones).
 #[derive(Debug)]
 pub struct RenderRequest {
-	/// The [`CardContentHandler`] child entity. Call this entity
-	/// with `call::<(), Entity>(())` to spawn the card content.
-	pub handler: Entity,
-	/// Cards must be called once at first to discover their
-	/// nested tools. When true, the render tool should avoid
-	/// unnecessary on-mount work.
-	pub discover_call: bool,
+	/// The spawned card content entity.
+	pub entity: Entity,
 	/// The original request.
 	pub request: Request,
 }
@@ -114,6 +68,10 @@ pub struct RenderRequest {
 /// card registers as a [`Request`]/[`Response`] tool in the
 /// [`RouteTree`], delegating rendering to the nearest
 /// [`RenderToolMarker`] found via ancestor traversal.
+///
+/// Internally, the handler is converted to a `ToolHandler<(), Entity>`
+/// child tool that spawns the bundle and returns the entity. The card
+/// tool then pipes the entity to the render tool.
 ///
 /// # Example
 ///
@@ -142,71 +100,47 @@ where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
+	let content_handler = {
+		let func = func.clone();
+		ToolHandler::new(
+			move |ToolCall {
+			          mut commands,
+			          tool: _tool,
+			          input: (),
+			          out_handler,
+			      }| {
+				let func = func.clone();
+				commands.commands.queue(move |world: &mut World| -> Result {
+					let entity = world.spawn((Card, func())).id();
+					let result = {
+						let mut state =
+							SystemState::<AsyncCommands>::new(world);
+						let async_commands = state.get_mut(world);
+						let result = out_handler.call(async_commands, entity);
+						state.apply(world);
+						result
+					};
+					world.flush();
+					result
+				});
+				Ok(())
+			},
+		)
+	};
+
 	(
 		PathPartial::new(path),
 		Card,
 		// Outer tool meta: the card presents as Request/Response
 		ToolMeta::of::<F, Request, Response>(),
 		// Spawn a child tool entity that produces card content.
-		// The render tool calls this child to get the spawned Entity.
-		OnSpawn::insert_child({
-			let content_func = func.clone();
-			(
-				CardContentHandler,
-				RouteHidden,
-				CardContentFn::new(move |world| {
-					world.spawn((Card, content_func())).id()
-				}),
-				ToolMeta::of::<F, (), Entity>(),
-				card_content_tool_handler(func),
-			)
-		}),
+		// The card tool calls this child to spawn content and get the Entity.
+		OnSpawn::insert_child((
+			RouteHidden,
+			ToolMeta::of::<F, (), Entity>(),
+			content_handler,
+		)),
 		card_tool_handler(),
-	)
-}
-
-/// Creates the [`ToolHandler<(), Entity>`] that spawns card content
-/// by reading the [`CardContentFn`] component and returning the
-/// spawned root [`Entity`].
-fn card_content_tool_handler<F, B>(_func: F) -> ToolHandler<(), Entity>
-where
-	F: 'static + Send + Sync + Clone + Fn() -> B,
-	B: 'static + Send + Sync + Bundle,
-{
-	ToolHandler::new(
-		move |ToolCall {
-		          mut commands,
-		          tool,
-		          input: (),
-		          out_handler,
-		      }| {
-			commands.commands.queue(move |world: &mut World| -> Result {
-				let content_fn = world
-					.entity(tool)
-					.get::<CardContentFn>()
-					.cloned()
-					.ok_or_else(|| {
-						bevyhow!(
-							"CardContentHandler entity missing CardContentFn"
-						)
-					})?;
-
-				let card_entity = content_fn.spawn(world);
-
-				// Obtain fresh AsyncCommands via SystemState so the
-				// out_handler can queue further work.
-				let result = {
-					let mut state = SystemState::<AsyncCommands>::new(world);
-					let async_commands = state.get_mut(world);
-					let result = out_handler.call(async_commands, card_entity);
-					state.apply(world);
-					result
-				};
-				world.flush();
-				result
-			});
-			Ok(())
-		},
 	)
 }
 
@@ -250,12 +184,13 @@ fn file_card_content_tool(
 	}
 }
 
-/// Creates the [`ToolHandler<Request, Response>`] for a card tool
-/// entity.
+/// Creates the [`ToolHandler<Request, Response>`] for a card tool entity.
 ///
-/// Finds the nearest [`RenderToolMarker`] by traversing to the root,
-/// creates a [`RenderRequest`] with the card's content handler child,
-/// and delegates to the render tool for the actual rendering.
+/// When called:
+/// 1. Calls the first child entity (content handler) to spawn content
+/// 2. Finds the nearest [`RenderToolMarker`] via ancestor traversal
+/// 3. Passes the spawned entity and request to the render tool
+/// 4. Returns the render tool's response
 fn card_tool_handler() -> ToolHandler<Request, Response> {
 	ToolHandler::new(
 		move |ToolCall {
@@ -264,76 +199,48 @@ fn card_tool_handler() -> ToolHandler<Request, Response> {
 		          input: request,
 		          out_handler,
 		      }| {
-			commands.commands.queue(move |world: &mut World| -> Result {
-				// Find the CardContentHandler child of this card tool entity
-				let handler_entity = world
-					.run_system_once_with(
-						|In(parent): In<Entity>,
-						 children_query: Query<&Children>,
-						 handler_query: Query<
-							Entity,
-							With<CardContentHandler>,
-						>| {
-							if let Ok(children) = children_query.get(parent) {
-								children.iter().find(|child| {
-									handler_query.contains(*child)
-								})
-							} else {
-								None
-							}
-						},
-						tool_entity,
-					)
-					.ok()
-					.flatten()
-					.ok_or_else(|| {
-						bevyhow!(
-							"Card tool entity missing CardContentHandler child"
-						)
-					})?;
+			commands.run(async move |world: AsyncWorld| -> Result {
+				// Get the first child entity (content handler)
+				let child = world
+					.entity(tool_entity)
+					.get(|children: &Children| children[0])
+					.await?;
+
+				// Call content handler to spawn content
+				let card_entity: Entity = world.entity(child).call(()).await?;
 
 				// Find the render tool by traversal
-				let render_tool = find_render_tool(world, tool_entity)?;
+				let render_tool = world
+					.with_then(move |world: &mut World| {
+						find_render_tool(world, tool_entity)
+					})
+					.await?;
 
-				// Use AsyncCommands to spawn the async task
-				let mut state = SystemState::<AsyncCommands>::new(world);
-				let mut async_commands = state.get_mut(world);
-
-				async_commands.run(async move |world: AsyncWorld| -> Result {
-					let render_request = RenderRequest {
-						handler: handler_entity,
-						discover_call: false,
+				// Call the render tool with the spawned entity
+				let response: Response = world
+					.entity(render_tool)
+					.call::<RenderRequest, Response>(RenderRequest {
+						entity: card_entity,
 						request,
-					};
+					})
+					.await?;
 
-					// Call the render tool
-					let response: Response = world
-						.entity(render_tool)
-						.call::<RenderRequest, Response>(render_request)
-						.await?;
-
-					// Deliver response via the out handler using fresh
-					// AsyncCommands obtained through SystemState
-					world
-						.with_then(move |world: &mut World| -> Result {
-							let result = {
-								let mut state =
-									SystemState::<AsyncCommands>::new(world);
-								let async_commands = state.get_mut(world);
-								let result =
-									out_handler.call(async_commands, response);
-								state.apply(world);
-								result
-							};
-							world.flush();
+				// Deliver response
+				world
+					.with_then(move |world: &mut World| -> Result {
+						let result = {
+							let mut state =
+								SystemState::<AsyncCommands>::new(world);
+							let async_commands = state.get_mut(world);
+							let result =
+								out_handler.call(async_commands, response);
+							state.apply(world);
 							result
-						})
-						.await
-				});
-
-				state.apply(world);
-				world.flush();
-				Ok(())
+						};
+						world.flush();
+						result
+					})
+					.await
 			});
 			Ok(())
 		},

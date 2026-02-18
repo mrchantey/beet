@@ -7,9 +7,7 @@ use beet_core::prelude::*;
 ///
 /// Unlike [`tool`], this constructor:
 /// - Inserts a [`PathPartial`] from the provided `path`
-/// - Spawns the inner typed tool as a [`RouteHidden`] child entity
-/// - Adds a [`RouteToolMarker`] so the entity is recognized as a
-///   route tool
+/// - Wraps the inner typed tool with serde middleware via [`IntoWrapTool`]
 ///
 /// Content-type negotiation is based on the request's `content-type` header:
 /// - `application/json` (default): uses `serde_json`
@@ -70,89 +68,49 @@ where
 	(
 		PathPartial::new(path),
 		ToolMeta::of::<H, H::In, H::Out>(),
-		RouteToolMarker,
-		route_tool_handler::<H::In, H::Out>(),
-		OnSpawn::insert_child((RouteHidden, tool(handler))),
+		serde_exchange::<H::In, H::Out>.wrap(handler),
 	)
 }
 
-/// Marker component indicating this entity is a route tool that bridges
-/// [`Request`]/[`Response`] calls to an inner typed child tool.
-#[derive(Component)]
-pub struct RouteToolMarker;
-
-/// Creates the [`ToolHandler<Request, Response>`] that bridges
-/// `Request`/`Response` tool calls to the inner typed child tool.
+/// Serde middleware that bridges [`Request`]/[`Response`] to typed
+/// tool calls. Deserializes the request body, calls the inner handler
+/// via [`Next`], serializes the output, and returns a [`Response`].
 ///
-/// When called:
-/// 1. The request body is consumed asynchronously to support streaming
-/// 2. The request's `content-type` header determines the [`ExchangeFormat`]
-/// 3. The body bytes are deserialized to `In`
-/// 4. The first child entity is called with typed `In`/`Out`
-/// 5. The `Out` is serialized into a [`Response`] body
-/// 6. The response is delivered via the out handler
-fn route_tool_handler<Input, Output>() -> ToolHandler<Request, Response>
+/// Errors are converted to HTTP error responses via [`HttpError`].
+async fn serde_exchange<Input, Output>(
+	request: Request,
+	next: Next<Input, Output>,
+) -> Response
 where
 	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
 	Output: 'static + Send + Sync + serde::Serialize,
 {
-	ToolHandler::new(
-		move |ToolCall {
-		          mut commands,
-		          tool,
-		          input: request,
-		          out_handler,
-		      }: ToolCall<Request, Response>| {
-			// determine serialization format from request content-type
-			let format = ExchangeFormat::from_content_type(
-				request.get_header("content-type"),
-			)?;
-
-			commands.run(async move |world: AsyncWorld| -> Result {
-				// consume body asynchronously to support streaming
-				let body_bytes = request.body.into_bytes().await?;
-				let input: Input = format.deserialize(&body_bytes)?;
-
-				// get the first child entity (the inner tool)
-				let child = world
-					.entity(tool)
-					.get(|children: &Children| children[0])
-					.await?;
-
-				// call the inner tool with typed args
-				let output: Output =
-					world.entity(child).call::<Input, Output>(input).await?;
-
-				// serialize result into a response
-				let body_bytes = format.serialize(&output)?;
-				let response = Response::ok()
-					.with_content_type(format.content_type_str())
-					.with_body(body_bytes);
-
-				// deliver response via the out handler using fresh
-				// AsyncCommands obtained through SystemState
-				world
-					.with_then(move |world: &mut World| -> Result {
-						let result = {
-							let mut state = bevy::ecs::system::SystemState::<
-								AsyncCommands,
-							>::new(world);
-							let async_commands = state.get_mut(world);
-							let result =
-								out_handler.call(async_commands, response);
-							state.apply(world);
-							result
-						};
-						world.flush();
-						result
-					})
-					.await
-			});
-			Ok(())
-		},
-	)
+	match serde_exchange_inner(request, next).await {
+		Ok(response) => response,
+		Err(err) => HttpError::from_opaque(err).into_response(),
+	}
 }
 
+/// Inner fallible implementation for [`serde_exchange`].
+async fn serde_exchange_inner<Input, Output>(
+	request: Request,
+	next: Next<Input, Output>,
+) -> Result<Response>
+where
+	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
+	Output: 'static + Send + Sync + serde::Serialize,
+{
+	let format =
+		ExchangeFormat::from_content_type(request.get_header("content-type"))?;
+	let body_bytes = request.body.into_bytes().await?;
+	let input: Input = format.deserialize(&body_bytes)?;
+	let output: Output = next.call(input).await?;
+	let body_bytes = format.serialize(&output)?;
+	Response::ok()
+		.with_content_type(format.content_type_str())
+		.with_body(body_bytes)
+		.xok()
+}
 
 
 #[cfg(test)]

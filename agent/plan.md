@@ -1,45 +1,24 @@
 
 lets keep iterating on beet_stack!
 
+## Tool Refactor Complete
 
-## Non-Async Tool usage
+This just in! We have two new major features to tool which will radically simplify this crate.
 
-Non-async tool usage should not require AsyncCommands. 
+1. `pipe_tool.rs` for tools that need to chain into other tools, very useful, for example piping a card spawn tool to a a render tool. 
+2. `wrap_tool.rs` for wrapping a tool inside another aka middleware. this will make our Request/Response wrappers of internal tools much simpler!
 
-ToolCall should be generic on its SystemParam, not hardcoding AsyncCommands.
-- grep all usage of `AsyncPlugin::world`
-
-
-The last iteration was pretty good but we ended up with a bit of confusion so there are some mistakes in the codebase.
+In general we've been hot-potatoing, creating bespoke ToolHandler::new calls, spawning extra nested tool entities etc. this should all be much simpler now.
 
 ## InsertRouteTree
 
-insert_route_tree needs some work. its entirely overengineered. we should use exactly the same mechanism as a formal request, the `CardContentFn` is an antipattern. This means that inserting the route tree will be asynchronous as it will need to individually and recursively call each route entity. Also remove `CardContentHandler`.
-
+insert_route_tree needs some work. its entirely overengineered. we should use exactly the same mechanism as an actual formal request, the `CardContentFn` is an antipattern. This means that inserting the route tree will be asynchronous as it will need to individually and recursively call each route entity. Also remove `CardContentHandler`.
 
 ## `card.rs`
-the card() must accept a regular `IntoToolHandler` which resolves to a bundle, not this bespoke Fn(). Because these are typed we must use an intermediary spawn tool that will get the typed bundle, insert it, and return the entity that was spawned.
+the card() must accept a regular `IntoToolHandler` which resolves to a bundle, not this bespoke Fn(). Use wrapping and piping as required.
 
-```rust
-fn card<Handler, Out:B>(..,handler:Handler)->impl Bundle where Handler: IntoHandler<In=Request,Out=Out>{
 
-	OnSpawn::new(move |entity|{
-		let typed_card = entity.world_scope(|world|world.spawn(handler.into_card_handler()).id());
-		let spawn_card = entity.world_scope(|world|world.spawn(spawn_card).id());
-		
-		entity.insert(..the tool that receives a request, uses the spawn_card id as the RenderRequest::handler, to spawn the entity)
-	})
-}
-	
-// a tool with input Request and output Entity
-fn spawn_card<B:Bundle>(typed_card:Entity)->impl Bundle{
-	tool(|req:Request|{
-		.. call the typed_card with the request, receiving B
-		.. spawn the returned bundle and return the spawned entity
-	})
-}
-```
-
+Give the crate a once-over, shave off these rough edges and simplify the design with these new primitives.
 
 
 ## Testing
