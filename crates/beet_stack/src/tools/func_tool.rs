@@ -13,14 +13,14 @@ where
 	fn into_tool_handler(mut self) -> ToolHandler<Self::In, Self::Out> {
 		ToolHandler::new(
 			move |ToolCall {
-			          commands: _,
+			          commands,
 			          tool,
 			          input,
 			          out_handler,
 			      }| {
 				let arg = Arg::from_tool_context(ToolContext { tool, input });
 				let out = self(arg);
-				out_handler.call(out)
+				out_handler.call(commands, out)
 			},
 		)
 	}

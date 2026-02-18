@@ -59,6 +59,16 @@ pub trait IntoToolHandler2<M>: Sized {
 	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out>;
 }
 
+impl<In, Out> IntoToolHandler2<Self> for ToolHandler<In, Out>
+where
+	In: 'static,
+	Out: 'static,
+{
+	type In = In;
+	type Out = Out;
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> { self }
+}
+
 /// Payload for a single tool invocation, containing the tool entity,
 /// input value, and a callback for delivering the output.
 pub struct ToolCall<'w, 's, In, Out> {
@@ -76,14 +86,14 @@ pub struct ToolCall<'w, 's, In, Out> {
 /// Wraps a `FnOnce(Out) -> Result` callback so that different delivery
 /// mechanisms (channels, closures, etc.) share a uniform interface.
 pub struct OutHandler<Out> {
-	func: Box<dyn 'static + Send + Sync + FnOnce(Out) -> Result>,
+	func: Box<dyn 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result>,
 }
 
 impl<Out> OutHandler<Out> {
 	/// Create an [`OutHandler`] from any compatible closure.
 	pub fn new<F>(func: F) -> Self
 	where
-		F: 'static + Send + Sync + FnOnce(Out) -> Result,
+		F: 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result,
 	{
 		Self {
 			func: Box::new(func),
@@ -94,7 +104,9 @@ impl<Out> OutHandler<Out> {
 	///
 	/// # Errors
 	/// Returns whatever error the inner callback produces.
-	pub fn call(self, output: Out) -> Result { (self.func)(output) }
+	pub fn call(self, commands: AsyncCommands, output: Out) -> Result {
+		(self.func)(commands, output)
+	}
 }
 
 /// Extension trait for calling [`Tool`] components on entities.
@@ -123,7 +135,7 @@ pub impl EntityWorldMut<'_> {
 	) -> impl Future<Output = Result<Out>> {
 		async move {
 			let (send, recv) = async_channel::bounded(1);
-			let out_handler = OutHandler::new(move |output: Out| {
+			let out_handler = OutHandler::new(move |_commands, output| {
 				send.try_send(output).map_err(|err| {
 					bevyhow!(
 						"Failed to send tool output through channel: {err:?}"

@@ -1,125 +1,87 @@
-//! Chainable tool handler that pipes the output of one handler into another.
-//!
-//! [`PipeTool`] composes two [`ToolHandler`] implementations sequentially:
-//! the output of handler A is converted into the input of handler B.
-
 use crate::prelude::*;
-use beet_core::exports::async_channel;
-use beet_core::prelude::*;
+use std::sync::Arc;
+use std::sync::Mutex;
 
-
-// pub trait IntoPipeTool<M>{
-	
-// 	fn pipe<Other>(self,other:O)-> 
-// }
-
-
-/// A tool handler that chains two handlers: A then B.
-///
-/// The output of handler A is converted via `Into` to the input of handler B.
-/// Both handlers are called synchronously with exclusive world access.
-pub struct PipeTool<A, B>
+/// Allows chaining two [`ToolHandler`] together, feeding the output of
+/// the first into the input of the second.
+pub trait IntoPipeTool<In, Out, M>
 where
-	A: 'static,
-	B: 'static,
+	Self: Sized + IntoToolHandler2<M, In = In, Out = Out>,
+	Out: 'static,
 {
-	tool_a: A,
-	tool_b: B,
-}
+	fn pipe<T2, M2>(self, other: T2) -> ToolHandler<In, T2::Out>
+	where
+		T2: IntoToolHandler2<M2>,
+		T2::In: 'static + From<Out>,
+	{
+		let mut handler1 = self.into_tool_handler();
+		let handler2 = Arc::new(Mutex::new(other.into_tool_handler()));
 
-impl<A, B> PipeTool<A, B> {
-	/// Create a new pipe from two handlers.
-	pub fn new(tool_a: A, tool_b: B) -> Self { Self { tool_a, tool_b } }
-}
-
-impl<A, B> ToolHandler for PipeTool<A, B>
-where
-	A: ToolHandler,
-	A::Out: 'static + Send + Sync,
-	B: ToolHandler,
-	B::In: 'static + Send + Sync + From<A::Out>,
-	B::Out: 'static + Send + Sync,
-{
-	type In = A::In;
-	type Out = B::Out;
-
-	fn call(
-		&mut self,
-		commands: AsyncCommands,
-		ToolCall {
-			tool,
-			input,
-			out_handler: out_handler_b,
-		}: ToolCall<Self::In, Self::Out>,
-	) -> Result {
-		// Capture the intermediate output from handler A via a channel.
-		let (send, recv) = async_channel::bounded::<A::Out>(1);
-		let out_handler_a = OutHandler::new(move |output_a: A::Out| {
-			send.try_send(output_a).map_err(|err| {
-				bevyhow!("Pipe intermediate send failed: {err:?}")
-			})
-		});
-
-		let call_a = ToolCall {
-			tool,
-			input,
-			out_handler: out_handler_a,
-		};
-		self.tool_a.call(commands, call_a)?;
-
-		commands.run(async move |world| {
-			// For synchronous handlers the output is available immediately.
-			let output_a = recv.recv().await.map_err(|err| {
-				bevyhow!("Pipe intermediate recv failed: {err:?}")
-			})?;
-
-			let call_b = ToolCall {
-				tool,
-				input: output_a.into(),
-				out_handler: out_handler_b,
-			};
-			self.tool_b.call(commands, call_b);
-
-			Ok(())
-		});
+		ToolHandler::new(
+			move |ToolCall {
+			          commands,
+			          tool,
+			          input: in_a,
+			          out_handler,
+			      }: ToolCall<In, T2::Out>| {
+				let handler2 = Arc::clone(&handler2);
+				handler1.call(ToolCall {
+					commands,
+					tool,
+					input: in_a,
+					out_handler: OutHandler::new(
+						move |commands, out_a: Out| {
+							handler2.lock().unwrap().call(ToolCall::<
+								T2::In,
+								T2::Out,
+							> {
+								commands,
+								tool,
+								input: out_a.into(),
+								out_handler,
+							})
+						},
+					),
+				})
+			},
+		)
 	}
 }
+
+
+impl<In, Out, M, T> IntoPipeTool<In, Out, M> for T
+where
+	T: IntoToolHandler2<M, In = In, Out = Out>,
+	Out: 'static,
+{
+}
+
+
+
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
-	fn pipes_two_func_tools() {
-		let add = FuncTool::new(|cx: ToolContext<(i32, i32)>| -> i32 {
-			cx.input.0 + cx.input.1
-		});
-		let double =
-			FuncTool::new(|cx: ToolContext<i32>| -> i32 { cx.input * 2 });
-		let pipe = PipeTool::new(add, double);
+	fn add((a, b): (i32, i32)) -> i32 { a + b }
+	fn negate(a: i32) -> i32 { -a }
+	fn multiply(a: i32) -> i32 { a * a }
 
-		World::new()
-			.spawn(Tool::new(pipe))
-			.call2_blocking::<(i32, i32), i32>((3, 4))
+	#[test]
+	fn pipe_two() {
+		AsyncPlugin::world()
+			.spawn(tool2(add.pipe(negate)))
+			.call2_blocking::<(i32, i32), i32>((5, 2))
 			.unwrap()
-			.xpect_eq(14); // (3+4)*2
+			.xpect_eq(-7);
 	}
-
 	#[test]
-	fn pipes_three_tools() {
-		let add = FuncTool::new(|cx: ToolContext<(i32, i32)>| -> i32 {
-			cx.input.0 + cx.input.1
-		});
-		let double =
-			FuncTool::new(|cx: ToolContext<i32>| -> i32 { cx.input * 2 });
-		let negate = FuncTool::new(|cx: ToolContext<i32>| -> i32 { -cx.input });
-		let pipe = PipeTool::new(PipeTool::new(add, double), negate);
-
-		World::new()
-			.spawn(Tool::new(pipe))
-			.call2_blocking::<(i32, i32), i32>((1, 2))
+	fn pipe_three() {
+		AsyncPlugin::world()
+			.spawn(tool2(add.pipe(multiply).pipe(negate)))
+			.call2_blocking::<(i32, i32), i32>((5, 3))
 			.unwrap()
-			.xpect_eq(-6); // -((1+2)*2)
+			.xpect_eq(-64);
 	}
 }
