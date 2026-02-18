@@ -46,6 +46,8 @@ pub mod type_info_to_json_schema;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 mod xtend;
+mod as_any;
+pub use as_any::*;
 
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;

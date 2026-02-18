@@ -1,4 +1,5 @@
 mod action;
+mod as_any;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
@@ -105,6 +106,12 @@ pub fn action(
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	action::impl_action(attr, item)
+}
+
+/// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
+#[proc_macro_derive(Any, attributes(event))]
+pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	as_any::impl_as_any(input).into()
 }
 
 
