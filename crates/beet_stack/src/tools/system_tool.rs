@@ -16,7 +16,6 @@ use bevy::ecs::system::SystemParamFunction;
 /// giving it access to standard system parameters. Input is
 /// converted from the [`ToolContext`] via [`FromToolContext`],
 /// and output is converted via [`IntoToolOutput`].
-#[derive(Any)]
 pub struct SystemTool<In: 'static, Out: 'static> {
 	runner: Box<
 		dyn 'static

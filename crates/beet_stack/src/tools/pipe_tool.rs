@@ -4,13 +4,20 @@
 //! the output of handler A is converted into the input of handler B.
 
 use crate::prelude::*;
+use beet_core::exports::async_channel;
 use beet_core::prelude::*;
+
+
+// pub trait IntoPipeTool<M>{
+	
+// 	fn pipe<Other>(self,other:O)-> 
+// }
+
 
 /// A tool handler that chains two handlers: A then B.
 ///
 /// The output of handler A is converted via `Into` to the input of handler B.
 /// Both handlers are called synchronously with exclusive world access.
-#[derive(Any)]
 pub struct PipeTool<A, B>
 where
 	A: 'static,
@@ -38,7 +45,7 @@ where
 
 	fn call(
 		&mut self,
-		world: &mut World,
+		commands: AsyncCommands,
 		ToolCall {
 			tool,
 			input,
@@ -46,8 +53,7 @@ where
 		}: ToolCall<Self::In, Self::Out>,
 	) -> Result {
 		// Capture the intermediate output from handler A via a channel.
-		let (send, recv) =
-			beet_core::exports::async_channel::bounded::<A::Out>(1);
+		let (send, recv) = async_channel::bounded::<A::Out>(1);
 		let out_handler_a = OutHandler::new(move |output_a: A::Out| {
 			send.try_send(output_a).map_err(|err| {
 				bevyhow!("Pipe intermediate send failed: {err:?}")
@@ -59,19 +65,23 @@ where
 			input,
 			out_handler: out_handler_a,
 		};
-		self.tool_a.call(world, call_a)?;
+		self.tool_a.call(commands, call_a)?;
 
-		// For synchronous handlers the output is available immediately.
-		let output_a = recv.try_recv().map_err(|err| {
-			bevyhow!("Pipe intermediate recv failed: {err:?}")
-		})?;
+		commands.run(async move |world| {
+			// For synchronous handlers the output is available immediately.
+			let output_a = recv.recv().await.map_err(|err| {
+				bevyhow!("Pipe intermediate recv failed: {err:?}")
+			})?;
 
-		let call_b = ToolCall {
-			tool,
-			input: output_a.into(),
-			out_handler: out_handler_b,
-		};
-		self.tool_b.call(world, call_b)
+			let call_b = ToolCall {
+				tool,
+				input: output_a.into(),
+				out_handler: out_handler_b,
+			};
+			self.tool_b.call(commands, call_b);
+
+			Ok(())
+		});
 	}
 }
 

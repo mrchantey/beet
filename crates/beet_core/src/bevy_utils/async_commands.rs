@@ -315,7 +315,7 @@ impl AsyncTaskOut for Result {
 }
 
 /// Resource containing the channel used by async functions to send [`CommandQueue`]s.
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub struct AsyncChannel {
 	/// The number of tasks currently in flight.
 	task_count: usize,
@@ -819,6 +819,7 @@ impl AsyncEntity {
 /// Extension trait adding async command methods to [`World`].
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
+
 	/// Spawns an async task.
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where

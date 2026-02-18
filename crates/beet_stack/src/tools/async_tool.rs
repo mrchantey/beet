@@ -12,7 +12,6 @@ use beet_core::prelude::*;
 /// The wrapped async closure is spawned as a task via the world's
 /// [`AsyncChannel`]. Input is converted from the [`ToolContext`] via
 /// [`FromAsyncToolContext`], and output is converted via [`IntoToolOutput`].
-#[derive(Any)]
 pub struct AsyncTool<In: 'static, Out: 'static> {
 	runner: Box<
 		dyn 'static
