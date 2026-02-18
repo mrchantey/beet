@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemState;
 use std::sync::Arc;
 
 /// A single content container, similar to pages in a website or cards
@@ -157,42 +158,54 @@ where
 					world.spawn((Card, content_func())).id()
 				}),
 				ToolMeta::of::<F, (), Entity>(),
-				card_content_observer(func),
+				card_content_tool_handler(func),
 			)
 		}),
-		OnSpawn::observe(card_tool_handler),
+		card_tool_handler(),
 	)
 }
 
-/// Creates an observer that reads the [`CardContentFn`] component to
-/// spawn card content and returns the root [`Entity`].
-fn card_content_observer<F, B>(_func: F) -> OnSpawn
+/// Creates the [`ToolHandler<(), Entity>`] that spawns card content
+/// by reading the [`CardContentFn`] component and returning the
+/// spawned root [`Entity`].
+fn card_content_tool_handler<F, B>(_func: F) -> ToolHandler<(), Entity>
 where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
-	OnSpawn::observe(
-		move |mut ev: On<ToolIn<(), Entity>>,
-		      content_fns: Query<&CardContentFn>,
-		      mut commands: AsyncCommands| {
-			let ev = ev.event_mut();
-			let tool = ev.tool();
-			let Ok(()) = ev.take_input() else { return };
-			let Ok(out_handler) = ev.take_out_handler() else {
-				return;
-			};
-			let Ok(content_fn) = content_fns.get(tool).cloned() else {
-				return;
-			};
+	ToolHandler::new(
+		move |ToolCall {
+		          mut commands,
+		          tool,
+		          input: (),
+		          out_handler,
+		      }| {
+			commands.commands.queue(move |world: &mut World| -> Result {
+				let content_fn = world
+					.entity(tool)
+					.get::<CardContentFn>()
+					.cloned()
+					.ok_or_else(|| {
+						bevyhow!(
+							"CardContentHandler entity missing CardContentFn"
+						)
+					})?;
 
-			commands.run(async move |world| -> Result {
-				let card_entity = world
-					.with_then(move |world: &mut World| -> Entity {
-						content_fn.spawn(world)
-					})
-					.await;
-				out_handler.call(card_entity)
+				let card_entity = content_fn.spawn(world);
+
+				// Obtain fresh AsyncCommands via SystemState so the
+				// out_handler can queue further work.
+				let result = {
+					let mut state = SystemState::<AsyncCommands>::new(world);
+					let async_commands = state.get_mut(world);
+					let result = out_handler.call(async_commands, card_entity);
+					state.apply(world);
+					result
+				};
+				world.flush();
+				result
 			});
+			Ok(())
 		},
 	)
 }
@@ -237,55 +250,94 @@ fn file_card_content_tool(
 	}
 }
 
-/// Observer that handles incoming [`Request`] on a card tool entity.
+/// Creates the [`ToolHandler<Request, Response>`] for a card tool
+/// entity.
 ///
 /// Finds the nearest [`RenderToolMarker`] by traversing to the root,
-/// creates a [`RenderRequest`] with the card entity as handler,
+/// creates a [`RenderRequest`] with the card's content handler child,
 /// and delegates to the render tool for the actual rendering.
-fn card_tool_handler(
-	mut ev: On<ToolIn<Request, Response>>,
-	handler_query: Query<Entity, With<CardContentHandler>>,
-	children_query: Query<&Children>,
-	mut commands: AsyncCommands,
-) -> Result {
-	let ev = ev.event_mut();
-	let tool_entity = ev.tool();
-	let request = ev.take_input()?;
-	let outer_handler = ev.take_out_handler()?;
+fn card_tool_handler() -> ToolHandler<Request, Response> {
+	ToolHandler::new(
+		move |ToolCall {
+		          mut commands,
+		          tool: tool_entity,
+		          input: request,
+		          out_handler,
+		      }| {
+			commands.commands.queue(move |world: &mut World| -> Result {
+				// Find the CardContentHandler child of this card tool entity
+				let handler_entity = world
+					.run_system_once_with(
+						|In(parent): In<Entity>,
+						 children_query: Query<&Children>,
+						 handler_query: Query<
+							Entity,
+							With<CardContentHandler>,
+						>| {
+							if let Ok(children) = children_query.get(parent) {
+								children.iter().find(|child| {
+									handler_query.contains(*child)
+								})
+							} else {
+								None
+							}
+						},
+						tool_entity,
+					)
+					.ok()
+					.flatten()
+					.ok_or_else(|| {
+						bevyhow!(
+							"Card tool entity missing CardContentHandler child"
+						)
+					})?;
 
-	// Find the CardContentHandler child of this card tool entity
-	let handler_entity = children_query
-		.get(tool_entity)
-		.into_iter()
-		.flat_map(|c| c.iter())
-		.find(|&child| handler_query.contains(child))
-		.ok_or_else(|| {
-			bevyhow!("Card tool entity missing CardContentHandler child")
-		})?;
+				// Find the render tool by traversal
+				let render_tool = find_render_tool(world, tool_entity)?;
 
-	commands.run(async move |world| -> Result {
-		// Find the render tool by traversal
-		let render_tool = world
-			.with_then(move |world: &mut World| -> Result<Entity> {
-				find_render_tool(world, tool_entity)
-			})
-			.await?;
+				// Use AsyncCommands to spawn the async task
+				let mut state = SystemState::<AsyncCommands>::new(world);
+				let mut async_commands = state.get_mut(world);
 
-		let render_request = RenderRequest {
-			handler: handler_entity,
-			discover_call: false,
-			request,
-		};
+				async_commands.run(async move |world: AsyncWorld| -> Result {
+					let render_request = RenderRequest {
+						handler: handler_entity,
+						discover_call: false,
+						request,
+					};
 
-		// Call the render tool
-		let response: Response = world
-			.entity(render_tool)
-			.call::<RenderRequest, Response>(render_request)
-			.await?;
+					// Call the render tool
+					let response: Response = world
+						.entity(render_tool)
+						.call::<RenderRequest, Response>(render_request)
+						.await?;
 
-		outer_handler.call(response)
-	});
-	Ok(())
+					// Deliver response via the out handler using fresh
+					// AsyncCommands obtained through SystemState
+					world
+						.with_then(move |world: &mut World| -> Result {
+							let result = {
+								let mut state =
+									SystemState::<AsyncCommands>::new(world);
+								let async_commands = state.get_mut(world);
+								let result =
+									out_handler.call(async_commands, response);
+								state.apply(world);
+								result
+							};
+							world.flush();
+							result
+						})
+						.await
+				});
+
+				state.apply(world);
+				world.flush();
+				Ok(())
+			});
+			Ok(())
+		},
+	)
 }
 
 /// Finds the nearest render tool by traversing to the root ancestor

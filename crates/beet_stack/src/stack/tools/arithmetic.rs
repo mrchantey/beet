@@ -20,9 +20,9 @@ use bevy::reflect::Typed;
 /// use beet_stack::prelude::*;
 /// use beet_core::prelude::*;
 ///
-/// let mut world = World::new();
+/// let mut world = AsyncPlugin::world();
 /// let field = FieldRef::new("counter");
-/// let entity = world.spawn(increment(field)).id();
+/// let entity = world.spawn((Card, increment(field))).id();
 ///
 /// // First call initializes to 1
 /// let result = world.entity_mut(entity).call_blocking::<(), i64>(()).unwrap();
@@ -209,7 +209,7 @@ mod test {
 
 	#[test]
 	fn increment_initializes_to_one() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((Card, increment(count_field()))).id();
 
 		world
@@ -221,7 +221,7 @@ mod test {
 
 	#[test]
 	fn increment_works_multiple_times() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((Card, increment(count_field()))).id();
 
 		world
@@ -245,7 +245,7 @@ mod test {
 
 	#[test]
 	fn decrement_initializes_to_negative_one() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((Card, decrement(count_field()))).id();
 
 		world
@@ -257,7 +257,7 @@ mod test {
 
 	#[test]
 	fn decrement_works() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
 				Card,
@@ -275,7 +275,7 @@ mod test {
 
 	#[test]
 	fn add_works() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
 				Card,
@@ -299,7 +299,7 @@ mod test {
 
 	#[test]
 	fn set_field_creates_new_field() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
 		let entity = world.spawn((Card, set_field(field))).id();
 
@@ -319,7 +319,7 @@ mod test {
 
 	#[test]
 	fn set_field_updates_existing() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
@@ -345,7 +345,7 @@ mod test {
 
 	#[test]
 	fn set_field_typed_creates_new_field() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
 		let entity = world.spawn((Card, set_field_typed::<String>(field))).id();
 
@@ -365,7 +365,7 @@ mod test {
 
 	#[test]
 	fn set_field_typed_updates_existing() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
@@ -391,7 +391,7 @@ mod test {
 
 	#[test]
 	fn get_field_retrieves_value() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
@@ -411,7 +411,7 @@ mod test {
 
 	#[test]
 	fn get_field_nested() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
@@ -431,7 +431,7 @@ mod test {
 
 	#[test]
 	fn get_field_typed_retrieves_value() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
@@ -451,7 +451,7 @@ mod test {
 
 	#[test]
 	fn get_field_typed_nested() {
-		let mut world = World::new();
+		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((

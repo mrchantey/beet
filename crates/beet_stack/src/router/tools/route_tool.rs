@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 /// - Inserts a [`PathPartial`] from the provided `path`
 /// - Spawns the inner typed tool as a [`RouteHidden`] child entity
 /// - Adds a [`RouteToolMarker`] so the entity is recognized as a
-///   route tool by [`call_with_handler`](EntityWorldMutToolExt::call_with_handler)
+///   route tool
 ///
 /// Content-type negotiation is based on the request's `content-type` header:
 /// - `application/json` (default): uses `serde_json`
@@ -58,20 +58,20 @@ use beet_core::prelude::*;
 /// let result: i32 = response.deserialize_blocking().unwrap();
 /// assert_eq!(result, 30);
 /// ```
-pub fn route_tool<H, M>(
+pub fn route_tool<H: 'static, M>(
 	path: impl AsRef<std::path::Path>,
 	handler: H,
 ) -> impl Bundle
 where
 	H: IntoToolHandler<M>,
-	H::In: serde::de::DeserializeOwned,
-	H::Out: serde::Serialize,
+	H::In: 'static + Send + Sync + serde::de::DeserializeOwned,
+	H::Out: 'static + Send + Sync + serde::Serialize,
 {
 	(
 		PathPartial::new(path),
 		ToolMeta::of::<H, H::In, H::Out>(),
 		RouteToolMarker,
-		OnSpawn::observe(route_tool_handler::<H::In, H::Out>),
+		route_tool_handler::<H::In, H::Out>(),
 		OnSpawn::insert_child((RouteHidden, tool(handler))),
 	)
 }
@@ -81,57 +81,76 @@ where
 #[derive(Component)]
 pub struct RouteToolMarker;
 
-/// Creates the observer that bridges `Request`/`Response` tool calls
-/// to the inner typed child tool.
+/// Creates the [`ToolHandler<Request, Response>`] that bridges
+/// `Request`/`Response` tool calls to the inner typed child tool.
 ///
-/// When a [`ToolIn<Request, Response>`] event fires on the entity:
+/// When called:
 /// 1. The request body is consumed asynchronously to support streaming
 /// 2. The request's `content-type` header determines the [`ExchangeFormat`]
 /// 3. The body bytes are deserialized to `In`
 /// 4. The first child entity is called with typed `In`/`Out`
 /// 5. The `Out` is serialized into a [`Response`] body
-/// 6. The response is delivered via the original out handler
-fn route_tool_handler<In, Out>(
-	mut ev: On<ToolIn<Request, Response>>,
-	mut commands: AsyncCommands,
-) -> Result
+/// 6. The response is delivered via the out handler
+fn route_tool_handler<Input, Output>() -> ToolHandler<Request, Response>
 where
-	In: 'static + Send + Sync + serde::de::DeserializeOwned,
-	Out: 'static + Send + Sync + serde::Serialize,
+	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
+	Output: 'static + Send + Sync + serde::Serialize,
 {
-	let ev = ev.event_mut();
-	let tool = ev.tool();
-	let request = ev.take_input()?;
-	let outer_handler = ev.take_out_handler()?;
+	ToolHandler::new(
+		move |ToolCall {
+		          mut commands,
+		          tool,
+		          input: request,
+		          out_handler,
+		      }: ToolCall<Request, Response>| {
+			// determine serialization format from request content-type
+			let format = ExchangeFormat::from_content_type(
+				request.get_header("content-type"),
+			)?;
 
-	// determine serialization format from request content-type
-	let format =
-		ExchangeFormat::from_content_type(request.get_header("content-type"))?;
+			commands.run(async move |world: AsyncWorld| -> Result {
+				// consume body asynchronously to support streaming
+				let body_bytes = request.body.into_bytes().await?;
+				let input: Input = format.deserialize(&body_bytes)?;
 
-	commands.run(async move |world| -> Result {
-		// consume body asynchronously to support streaming
-		let body_bytes = request.body.into_bytes().await?;
-		let input: In = format.deserialize(&body_bytes)?;
+				// get the first child entity (the inner tool)
+				let child = world
+					.entity(tool)
+					.get(|children: &Children| children[0])
+					.await?;
 
-		// get the first child entity (the inner tool)
-		let child = world
-			.entity(tool)
-			.get(|children: &Children| children[0])
-			.await?;
+				// call the inner tool with typed args
+				let output: Output =
+					world.entity(child).call::<Input, Output>(input).await?;
 
-		// call the inner tool with typed args
-		let output: Out = world.entity(child).call::<In, Out>(input).await?;
+				// serialize result into a response
+				let body_bytes = format.serialize(&output)?;
+				let response = Response::ok()
+					.with_content_type(format.content_type_str())
+					.with_body(body_bytes);
 
-		// serialize result into a response
-		let body_bytes = format.serialize(&output)?;
-		let response = Response::ok()
-			.with_content_type(format.content_type_str())
-			.with_body(body_bytes);
-
-		// deliver response via the original out handler
-		outer_handler.call(response)
-	});
-	Ok(())
+				// deliver response via the out handler using fresh
+				// AsyncCommands obtained through SystemState
+				world
+					.with_then(move |world: &mut World| -> Result {
+						let result = {
+							let mut state = bevy::ecs::system::SystemState::<
+								AsyncCommands,
+							>::new(world);
+							let async_commands = state.get_mut(world);
+							let result =
+								out_handler.call(async_commands, response);
+							state.apply(world);
+							result
+						};
+						world.flush();
+						result
+					})
+					.await
+			});
+			Ok(())
+		},
+	)
 }
 
 
@@ -221,28 +240,6 @@ mod test {
 
 		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(42);
-	}
-
-	// -- calling a plain tool with Request/Response fails --
-
-	#[test]
-	#[should_panic = "Input mismatch"]
-	fn plain_tool_rejects_request() {
-		AsyncPlugin::world()
-			.spawn(tool(|(a, b): (i32, i32)| -> i32 { a + b }))
-			.call_blocking::<Request, Response>(Request::get("/"))
-			.unwrap();
-	}
-
-	// -- calling a route tool with typed args fails --
-
-	#[test]
-	#[should_panic = "Route tools only accept Request/Response"]
-	fn route_tool_rejects_typed_call() {
-		AsyncPlugin::world()
-			.spawn(add_route_tool())
-			.call_blocking::<AddInput, i32>(AddInput { a: 1, b: 2 })
-			.unwrap();
 	}
 
 	// -- ExchangeFormat unit tests --

@@ -72,7 +72,7 @@ pub fn markdown_render_tool() -> impl Bundle {
 /// use beet_stack::prelude::*;
 /// use beet_core::prelude::*;
 ///
-/// World::new()
+/// AsyncPlugin::world()
 ///     .spawn((render_markdown(), Paragraph::with_text("hello world")))
 ///     .call_blocking::<(), String>(())
 ///     .unwrap()
@@ -125,7 +125,7 @@ mod test {
 
 	#[test]
 	fn plain_text() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![TextNode::new("hello world")]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -134,7 +134,7 @@ mod test {
 
 	#[test]
 	fn multiple_segments() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("hello"),
 				TextNode::new(" "),
@@ -147,7 +147,7 @@ mod test {
 
 	#[test]
 	fn important_text() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("hello "),
 				(Important, children![TextNode::new("bold")]),
@@ -160,7 +160,7 @@ mod test {
 
 	#[test]
 	fn emphasized_text() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("hello "),
 				(Emphasize, children![TextNode::new("italic")]),
@@ -173,7 +173,7 @@ mod test {
 
 	#[test]
 	fn code_text() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("use "),
 				(Code, children![TextNode::new("println!")]),
@@ -186,7 +186,7 @@ mod test {
 
 	#[test]
 	fn quoted_text() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("he said "),
 				(Quote, children![TextNode::new("hello")]),
@@ -198,7 +198,7 @@ mod test {
 
 	#[test]
 	fn link_without_title() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click here")],
@@ -210,7 +210,7 @@ mod test {
 
 	#[test]
 	fn link_with_title() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(
 				Link::new("https://example.com").with_title("Example Site"),
 				children![TextNode::new("example")],
@@ -222,7 +222,7 @@ mod test {
 
 	#[test]
 	fn combined_markers() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(Important, children![(
 				Emphasize,
 				children![TextNode::new("bold italic")],
@@ -234,7 +234,7 @@ mod test {
 
 	#[test]
 	fn complex_composition() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				TextNode::new("Welcome to "),
 				(Important, children![TextNode::new("beet")]),
@@ -249,7 +249,7 @@ mod test {
 
 	#[test]
 	fn important_link() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(Important, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("important link")],
@@ -261,7 +261,7 @@ mod test {
 
 	#[test]
 	fn all_markers_combined() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(Quote, children![(
 				Important,
 				children![(Emphasize, children![(Code, children![(
@@ -276,7 +276,7 @@ mod test {
 
 	#[test]
 	fn heading_renders() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), Heading1::with_text("Hello World")))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -285,7 +285,7 @@ mod test {
 
 	#[test]
 	fn heading2_renders() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				Heading1::with_text("Outer"),
 				Heading2::with_text("Inner"),
@@ -297,7 +297,7 @@ mod test {
 
 	#[test]
 	fn paragraph_renders_with_newlines() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((
 				render_markdown(),
 				Paragraph::with_text("A paragraph of text."),
@@ -309,7 +309,7 @@ mod test {
 
 	#[test]
 	fn mixed_structure() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), children![
 				Heading1::with_text("Welcome"),
 				Paragraph::with_text("This is the intro.")
@@ -321,7 +321,7 @@ mod test {
 
 	#[test]
 	fn respects_card_boundary() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn((render_markdown(), Card, children![
 				Paragraph::with_text("Inside card"),
 				// Nested card should not be rendered

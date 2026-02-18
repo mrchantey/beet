@@ -34,7 +34,7 @@ fn add_tool() -> impl Bundle{
 }
 
 
-let output: i32 = World::new()
+let output: i32 = AsyncPlugin::world()
 	.spawn(add_tool())
 	.call_blocking((1, 2))
 	.unwrap();

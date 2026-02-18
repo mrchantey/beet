@@ -1,4 +1,14 @@
+
 lets keep iterating on beet_stack!
+
+
+## Non-Async Tool usage
+
+Non-async tool usage should not require AsyncCommands. 
+
+ToolCall should be generic on its SystemParam, not hardcoding AsyncCommands.
+- grep all usage of `AsyncPlugin::world`
+
 
 The last iteration was pretty good but we ended up with a bit of confusion so there are some mistakes in the codebase.
 

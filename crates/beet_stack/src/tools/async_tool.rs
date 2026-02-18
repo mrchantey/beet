@@ -1,70 +1,39 @@
-//! Async function tool handler.
+//! [`IntoToolHandler`] implementation for async closures.
 //!
-//! [`AsyncTool`] wraps an async function, scheduling it via the
-//! [`AsyncChannel`] so it runs on the task pool. The output is
-//! delivered through the [`OutHandler`] callback when the future completes.
-
+//! Any `Fn(Arg) -> impl Future<Output = Out>` where `Arg` implements
+//! [`FromAsyncToolContext`] automatically becomes a tool handler. Unlike
+//! [`func_tool`](super::func_tool), async tools can perform non-blocking
+//! work such as network requests or streaming without stalling the ECS.
+//!
+//! ## Extractors
+//!
+//! The closure's argument is created via [`FromAsyncToolContext`], which
+//! allows extracting either the raw input payload, a [`ToolContext`], or
+//! the full [`AsyncToolContext`] (payload + [`AsyncEntity`]).
+//!
+//! ## Examples
+//!
+//! ```rust,no_run
+//! # use beet_stack::prelude::*;
+//! # use beet_core::prelude::*;
+//! // Async tool that returns after an async operation
+//! let handler = tool(async |val: u32| -> u32 { val * 2 });
+//!
+//! // Access the async entity handle
+//! let handler = tool(async |cx: AsyncToolContext<String>| -> String {
+//!     format!("received: {}", cx.input)
+//! });
+//! ```
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemState;
 
-/// A tool handler backed by an async function.
-///
-/// The wrapped async closure is spawned as a task via the world's
-/// [`AsyncChannel`]. Input is converted from the [`ToolContext`] via
-/// [`FromAsyncToolContext`], and output is converted via [`IntoToolOutput`].
-pub struct AsyncTool<In: 'static, Out: 'static> {
-	runner: Box<
-		dyn 'static
-			+ Send
-			+ Sync
-			+ FnMut(&mut World, ToolCall<In, Out>) -> Result,
-	>,
-}
+/// Marker for the async function [`IntoToolHandler`] impl.
+pub struct AsyncToolMarker;
 
-impl<In: 'static, Out: 'static> AsyncTool<In, Out> {
-	/// Create a new [`AsyncTool`] from a runner closure.
-	///
-	/// Prefer the [`IntoToolHandler2`] blanket impl over calling this directly.
-	pub fn new<F>(runner: F) -> Self
-	where
-		F: 'static
-			+ Send
-			+ Sync
-			+ FnMut(&mut World, ToolCall<In, Out>) -> Result,
-	{
-		Self {
-			runner: Box::new(runner),
-		}
-	}
-}
-
-impl<In: 'static, Out: 'static> ToolHandler for AsyncTool<In, Out> {
-	type In = In;
-	type Out = Out;
-
-	fn call(
-		&mut self,
-		world: &mut World,
-		call: ToolCall<Self::In, Self::Out>,
-	) -> Result {
-		(self.runner)(world, call)
-	}
-}
-
-/// Blanket [`IntoToolHandler2`] impl for async closures.
-///
-/// The async function is spawned on the IO task pool. Its output
-/// is delivered to the [`OutHandler`] when the future resolves.
 impl<Func, In, Fut, Arg, Out, IntoOut, IntoOutM, ArgM>
-	IntoToolHandler2<(
-		AsyncTool<In, Out>,
-		In,
-		Arg,
-		Out,
-		IntoOut,
-		IntoOutM,
-		ArgM,
-	)> for Func
+	IntoToolHandler<(AsyncToolMarker, In, Arg, Out, IntoOut, IntoOutM, ArgM)>
+	for Func
 where
 	Func: 'static + Send + Sync + Clone + Fn(Arg) -> Fut,
 	Arg: 'static + Send + Sync + FromAsyncToolContext<In, ArgM>,
@@ -76,25 +45,45 @@ where
 	type In = In;
 	type Out = Out;
 
-	fn into_tool_handler(
-		self,
-	) -> impl ToolHandler<In = Self::In, Out = Self::Out> {
-		let func = self;
-		AsyncTool::new(move |world: &mut World, call: ToolCall<In, Out>| {
-			let async_world = world.resource::<AsyncChannel>().world();
-			let arg = Arg::from_async_tool_context(AsyncToolContext::new(
-				async_world.entity(call.tool),
-				call.input,
-			));
-			let this = func.clone();
-			let out_handler = call.out_handler;
-			world.run_async(move |_| async move {
-				let output = this(arg).await.into_tool_output()?;
-				out_handler.call(output)?;
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
+		ToolHandler::new(
+			move |ToolCall {
+			          mut commands,
+			          tool,
+			          input,
+			          out_handler,
+			      }| {
+				let async_entity = commands.world().entity(tool);
+				let arg = Arg::from_async_tool_context(AsyncToolContext {
+					tool: async_entity,
+					input,
+				});
+				let func = self.clone();
+				commands.run(async move |world: AsyncWorld| -> Result {
+					let output = func(arg).await.into_tool_output()?;
+
+					// Obtain fresh AsyncCommands via SystemState so
+					// the out_handler (and any downstream pipe
+					// handlers) can queue further work.
+					world
+						.with_then(move |world: &mut World| -> Result {
+							let result = {
+								let mut state =
+									SystemState::<AsyncCommands>::new(world);
+								let async_commands = state.get_mut(world);
+								let result =
+									out_handler.call(async_commands, output);
+								state.apply(world);
+								result
+							};
+							world.flush();
+							result
+						})
+						.await
+				});
 				Ok(())
-			});
-			Ok(())
-		})
+			},
+		)
 	}
 }
 
@@ -104,36 +93,54 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[test]
-	fn async_add() {
-		let handler = (async |input: (i32, i32)| -> i32 { input.0 + input.1 })
-			.into_tool_handler();
+	fn async_pure() {
 		AsyncPlugin::world()
-			.spawn(Tool::new(handler))
-			.call2_blocking::<(i32, i32), i32>((3, 4))
+			.spawn(tool(async |(a, b): (i32, i32)| -> i32 { a + b }))
+			.call_blocking::<(i32, i32), i32>((3, 4))
 			.unwrap()
 			.xpect_eq(7);
 	}
 
 	#[test]
-	fn async_with_context() {
-		let handler =
-			(async |cx: AsyncToolContext<i32>| -> i32 { cx.input * 3 })
-				.into_tool_handler();
+	fn async_negate() {
 		AsyncPlugin::world()
-			.spawn(Tool::new(handler))
-			.call2_blocking::<i32, i32>(5)
+			.spawn(tool(async |val: i32| -> i32 { -val }))
+			.call_blocking::<i32, i32>(42)
 			.unwrap()
-			.xpect_eq(15);
+			.xpect_eq(-42);
 	}
 
 	#[test]
-	fn async_returns_result() {
-		let handler = (async |input: i32| -> Result<i32> { (input + 1).xok() })
-			.into_tool_handler();
-		AsyncPlugin::world()
-			.spawn(Tool::new(handler))
-			.call2_blocking::<i32, i32>(9)
+	fn async_tool_context() {
+		let mut world = AsyncPlugin::world();
+		let entity = world
+			.spawn(tool(async |cx: AsyncToolContext<()>| -> Entity {
+				cx.tool.id()
+			}))
+			.id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<(), Entity>(())
 			.unwrap()
-			.xpect_eq(10);
+			.xpect_eq(entity);
+	}
+
+	#[test]
+	fn async_result_output() {
+		AsyncPlugin::world()
+			.spawn(tool(async |_: u32| -> Result { Ok(()) }))
+			.call_blocking::<u32, ()>(99)
+			.unwrap();
+	}
+
+	#[test]
+	fn async_string_processing() {
+		AsyncPlugin::world()
+			.spawn(tool(async |val: String| -> String {
+				format!("hello {val}")
+			}))
+			.call_blocking::<String, String>("world".to_string())
+			.unwrap()
+			.xpect_eq("hello world".to_string());
 	}
 }

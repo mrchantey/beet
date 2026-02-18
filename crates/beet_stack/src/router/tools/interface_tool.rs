@@ -115,7 +115,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let tree = RouterPlugin::world()
+		let tree = StackPlugin::world()
 			.spawn(my_interface())
 			.call_blocking::<_, RouteTree>(Request::get("foo"))
 			.unwrap();
