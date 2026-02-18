@@ -1,24 +1,22 @@
 
 lets keep iterating on beet_stack!
 
-## Tool Refactor Complete
+IntoToolOutput is absolutely killing us. 
 
-This just in! We have two new major features to tool which will radically simplify this crate.
+Disambiguating between `T, Result<T>, impl Future<Output=T>, impl Future<Output=Result<T>>` has proved absolutely impossible. its also quite ambiguous. We need to be able to return any type from a tool.
 
-1. `pipe_tool.rs` for tools that need to chain into other tools, very useful, for example piping a card spawn tool to a a render tool. 
-2. `wrap_tool.rs` for wrapping a tool inside another aka middleware. this will make our Request/Response wrappers of internal tools much simpler!
+At this point im wondering if we should remove `IntoToolOutput` completely and use explicit funcs for tool definition, just to straighten out the output types. Even doing this im not sure how that would work, currently the fact that Future doesnt impl Typed and is therefore not 
 
-In general we've been hot-potatoing, creating bespoke ToolHandler::new calls, spawning extra nested tool entities etc. this should all be much simpler now.
+```rust
+// returns a tool that returns the output verbatim
+// if an async tool is provided, the output is a future.
+fn tool(my_tool)
+// unwraps the result, see flatten.rs
+tool(my_tool.pipe(flatten));
+// unwraps the future and 
+fn async_tool(my_tool)
+```
 
-## InsertRouteTree
-
-insert_route_tree needs some work. its entirely overengineered. we should use exactly the same mechanism as an actual formal request, the `CardContentFn` is an antipattern. This means that inserting the route tree will be asynchronous as it will need to individually and recursively call each route entity. Also remove `CardContentHandler`.
-
-## `card.rs`
-the card() must accept a regular `IntoToolHandler` which resolves to a bundle, not this bespoke Fn(). Use wrapping and piping as required.
-
-
-Give the crate a once-over, shave off these rough edges and simplify the design with these new primitives.
 
 
 ## Testing

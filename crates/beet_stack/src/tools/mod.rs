@@ -1,5 +1,7 @@
 mod tool_handler;
+mod flatten;
 pub use tool_handler::*;
+pub use flatten::*;
 mod tool;
 pub use tool::*;
 mod func_tool;

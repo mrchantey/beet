@@ -6,13 +6,6 @@ use bevy::ecs::system::SystemState;
 /// in HyperCard. Each card is a route, with the exact rendering behavior
 /// determined by the render tool on the server or interface.
 ///
-/// Cards are tools that delegate rendering to a [`RenderToolMarker`]
-/// entity found by traversing to the root ancestor. The `Card` component
-/// serves both as a boundary marker for
-/// [`CardWalker`](crate::utils::CardWalker) and [`DocumentQuery`]
-/// traversal, and as a marker on card tool entities to distinguish
-/// them from regular tools in help display and route tree queries.
-///
 /// Use the [`card`] function to create a routable card with content:
 /// ```
 /// use beet_stack::prelude::*;

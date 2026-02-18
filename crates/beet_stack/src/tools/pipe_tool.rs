@@ -35,10 +35,7 @@ where
 	Self: Sized + IntoToolHandler<M, In = In, Out = Out>,
 	Out: 'static,
 {
-	/// Chain `self` with `other`, producing a combined handler.
-	///
-	/// The output of `self` is converted into the input of `other`
-	/// via the [`From`] trait.
+	/// Pipe `self` to `other`, producing a combined handler.
 	fn pipe<T2, M2>(self, other: T2) -> ToolHandler<In, T2::Out>
 	where
 		T2: IntoToolHandler<M2>,

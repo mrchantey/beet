@@ -120,6 +120,9 @@ where
 /// This handles the conversion at the output level to avoid Bevy's
 /// `IntoSystem` ambiguity where `Result<T, BevyError>` could resolve
 /// as either identity or unwrap.
+///
+/// Also guards against multiple impls for async tools which would
+/// otherwise be indistinguishable from func tools.
 pub trait IntoToolOutput<Out, M> {
 	/// Convert this type into a tool output result.
 	fn into_tool_output(self) -> Result<Out>;
