@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 #[derive(Component)]
 #[component(on_add=on_add::<In, Out>)]
-pub struct ToolHandler<In: 'static, Out: 'static> {
+pub struct Tool<In: 'static, Out: 'static> {
 	/// The full type name of the handler, for display and debugging.
 	handler_meta: TypeMeta,
 	handler: Arc<dyn 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result>,
 }
 
-impl<In: 'static, Out: 'static> Clone for ToolHandler<In, Out> {
+impl<In: 'static, Out: 'static> Clone for Tool<In, Out> {
 	fn clone(&self) -> Self {
 		Self {
 			handler_meta: self.handler_meta,
@@ -25,7 +25,7 @@ fn on_add<In: 'static, Out: 'static>(
 ) {
 	let handler = world
 		.entity(cx.entity)
-		.get::<ToolHandler<In, Out>>()
+		.get::<Tool<In, Out>>()
 		.unwrap()
 		.handler_meta
 		.clone();
@@ -38,7 +38,7 @@ fn on_add<In: 'static, Out: 'static>(
 	world.commands().entity(cx.entity).insert(meta);
 }
 
-impl<In, Out> ToolHandler<In, Out>
+impl<In, Out> Tool<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -167,7 +167,7 @@ impl PartialEq for TypeMeta {
 pub struct ToolCall<'w, 's, In, Out> {
 	/// Commands for queuing ECS work or spawning async tasks.
 	pub commands: AsyncCommands<'w, 's>,
-	/// The entity that owns the [`ToolHandler`] component being called.
+	/// The entity that owns the [`Tool`] component being called.
 	pub tool: Entity,
 	/// The input payload for this invocation.
 	pub input: In,
@@ -224,22 +224,22 @@ impl<Out> OutHandler<Out> {
 }
 
 
-/// Conversion trait for creating a [`ToolHandler`] from a value.
+/// Conversion trait for creating a [`Tool`] from a value.
 ///
 /// Implementations exist for plain closures
 /// ([`func_tool`](super::func_tool)), Bevy systems
 /// ([`system_tool`](super::system_tool)), and async closures
 /// ([`async_tool`](super::async_tool)).
-pub trait IntoToolHandler<M>: Sized {
+pub trait IntoTool<M>: Sized {
 	/// Input type for the resulting handler.
 	type In;
 	/// Output type for the resulting handler.
 	type Out;
-	/// Convert into a concrete [`ToolHandler`].
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out>;
+	/// Convert into a concrete [`Tool`].
+	fn into_tool(self) -> Tool<Self::In, Self::Out>;
 }
 
-impl<In, Out> IntoToolHandler<()> for ToolHandler<In, Out>
+impl<In, Out> IntoTool<()> for Tool<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -247,7 +247,7 @@ where
 	type In = In;
 	type Out = Out;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> { self }
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { self }
 }
 
 #[cfg(test)]

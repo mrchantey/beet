@@ -119,11 +119,11 @@ fn parse_func_tool(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::func_tool(|input: #beet_tool::prelude::FuncToolIn<#in_type>| {
 					#destructure
 					#body_wrap
@@ -162,11 +162,11 @@ fn parse_func_passthrough(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::func_tool(|#param_name: #beet_tool::prelude::FuncToolIn<#in_type>| {
 					#body_wrap
 				})
@@ -199,11 +199,11 @@ fn parse_async_tool(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::async_tool(|input: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
 					#destructure
 					#body_wrap
@@ -241,11 +241,11 @@ fn parse_async_passthrough(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::async_tool(|#param_name: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
 					#body_wrap
 				})
@@ -283,11 +283,11 @@ fn parse_system_tool(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::system_tool(|
 					In(__tool_in): In<#beet_tool::prelude::SystemToolIn<#in_type>>
 					#(, #system_params)*
@@ -323,11 +323,11 @@ fn parse_system_passthrough(
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name;
 
-		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
 			type In = #in_type;
 			type Out = #out_type;
 
-			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
 				#beet_tool::prelude::system_tool(|
 					In(#first_param_name): In<#beet_tool::prelude::SystemToolIn<#in_type>>
 					#(, #system_params)*

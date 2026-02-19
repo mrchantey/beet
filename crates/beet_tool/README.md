@@ -16,7 +16,7 @@ struct add;
 
 impl add{	
 	fn effect(entity: &mut EntityWorldMut){
-		entity.insert(ToolHandler::new(..))
+		entity.insert(Tool::new(..))
 	}
 }
 

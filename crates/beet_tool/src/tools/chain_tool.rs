@@ -1,26 +1,26 @@
 use crate::prelude::*;
 
-/// Allows chaining two [`ToolHandler`] implementations, feeding the
+/// Allows chaining two [`Tool`] implementations, feeding the
 /// output of the first into the input of the second.
 ///
-/// Both handlers are fused into a single [`ToolHandler`] whose input
+/// Both handlers are fused into a single [`Tool`] whose input
 /// type matches the first handler and whose output type matches the
 /// second. The intermediate value is converted via [`From`].
 pub trait IntoChainTool<In, Out, M>
 where
-	Self: 'static + Sized + IntoToolHandler<M, In = In, Out = Out>,
+	Self: 'static + Sized + IntoTool<M, In = In, Out = Out>,
 	Out: 'static,
 {
 	/// Chain `self` to `other`, producing a combined handler.
-	fn chain<T2, M2>(self, other: T2) -> ToolHandler<In, T2::Out>
+	fn chain<T2, M2>(self, other: T2) -> Tool<In, T2::Out>
 	where
-		T2: 'static + IntoToolHandler<M2>,
+		T2: 'static + IntoTool<M2>,
 		T2::In: 'static + From<Out>,
 	{
-		let handler1 = self.into_tool_handler();
-		let handler2 = other.into_tool_handler();
+		let handler1 = self.into_tool();
+		let handler2 = other.into_tool();
 
-		ToolHandler::new(
+		Tool::new(
 			TypeMeta::of::<(Self, T2)>(),
 			move |ToolCall {
 			          commands,
@@ -52,7 +52,7 @@ where
 
 impl<In, Out, M, T> IntoChainTool<In, Out, M> for T
 where
-	T: 'static + IntoToolHandler<M, In = In, Out = Out>,
+	T: 'static + IntoTool<M, In = In, Out = Out>,
 	Out: 'static,
 {
 }

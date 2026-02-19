@@ -19,7 +19,7 @@ impl<In> std::ops::DerefMut for AsyncToolIn<In> {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
 }
 
-/// Create a [`ToolHandler`] from an async closure that receives
+/// Create a [`Tool`] from an async closure that receives
 /// [`AsyncToolIn`] and returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), async tools can perform
@@ -35,14 +35,14 @@ impl<In> std::ops::DerefMut for AsyncToolIn<In> {
 ///     Ok(*input * 2)
 /// });
 /// ```
-pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> ToolHandler<Input, Out>
+pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> Tool<Input, Out>
 where
 	Func: 'static + Send + Sync + Clone + Fn(AsyncToolIn<Input>) -> Fut,
 	Input: 'static + Send + Sync,
 	Fut: 'static + Send + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
 {
-	ToolHandler::new(
+	Tool::new(
 		TypeMeta::of::<Func>(),
 		move |ToolCall {
 		          mut commands,
@@ -65,12 +65,11 @@ where
 	)
 }
 
-/// Marker for the async tool [`IntoToolHandler`] impl accepting
+/// Marker for the async tool [`IntoTool`] impl accepting
 /// `Fn(AsyncToolIn<I>) -> Future<Output = Result<O>>`.
 pub struct AsyncToolMarker;
 
-impl<Func, Input, Out, Fut> IntoToolHandler<(AsyncToolMarker, Input, Out)>
-	for Func
+impl<Func, Input, Out, Fut> IntoTool<(AsyncToolMarker, Input, Out)> for Func
 where
 	Func: 'static + Send + Sync + Clone + Fn(AsyncToolIn<Input>) -> Fut,
 	Input: 'static + Send + Sync,
@@ -80,16 +79,14 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
-		async_tool(self)
-	}
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { async_tool(self) }
 }
 
-/// Marker for the typed async tool [`IntoToolHandler`] impl accepting
+/// Marker for the typed async tool [`IntoTool`] impl accepting
 /// `Fn(I) -> Future<Output = O>` where `I` is a plain input type.
 pub struct TypedAsyncToolMarker;
 
-impl<Func, Input, Out, Fut> IntoToolHandler<(TypedAsyncToolMarker, Input, Out)>
+impl<Func, Input, Out, Fut> IntoTool<(TypedAsyncToolMarker, Input, Out)>
 	for Func
 where
 	Func: 'static + Send + Sync + Clone + Fn(Input) -> Fut,
@@ -100,7 +97,7 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
 		async_tool(move |input: AsyncToolIn<Input>| {
 			let fut = self(input.input);
 			async move { fut.await.xok() }
@@ -161,7 +158,7 @@ mod test {
 	#[test]
 	fn typed_async_pure() {
 		AsyncPlugin::world()
-			.spawn((async |val: i32| -> i32 { -val }).into_tool_handler())
+			.spawn((async |val: i32| -> i32 { -val }).into_tool())
 			.call_blocking::<i32, i32>(42)
 			.unwrap()
 			.xpect_eq(-42);
@@ -170,10 +167,7 @@ mod test {
 	#[test]
 	fn typed_async_add() {
 		AsyncPlugin::world()
-			.spawn(
-				(async |(a, b): (i32, i32)| -> i32 { a + b })
-					.into_tool_handler(),
-			)
+			.spawn((async |(a, b): (i32, i32)| -> i32 { a + b }).into_tool())
 			.call_blocking::<(i32, i32), i32>((3, 4))
 			.unwrap()
 			.xpect_eq(7);
@@ -189,7 +183,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_single_arg() {
 		AsyncPlugin::world()
-			.spawn(async_negate.into_tool_handler())
+			.spawn(async_negate.into_tool())
 			.call_blocking::<i32, i32>(7)
 			.unwrap()
 			.xpect_eq(-7);
@@ -201,7 +195,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_multi_arg() {
 		AsyncPlugin::world()
-			.spawn(async_add.into_tool_handler())
+			.spawn(async_add.into_tool())
 			.call_blocking::<(i32, i32), i32>((3, 4))
 			.unwrap()
 			.xpect_eq(7);
@@ -213,7 +207,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_no_args() {
 		AsyncPlugin::world()
-			.spawn(async_no_args.into_tool_handler())
+			.spawn(async_no_args.into_tool())
 			.call_blocking::<(), i32>(())
 			.unwrap()
 			.xpect_eq(42);
@@ -230,7 +224,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_result_ok() {
 		AsyncPlugin::world()
-			.spawn(async_fallible.into_tool_handler())
+			.spawn(async_fallible.into_tool())
 			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(10);
@@ -246,7 +240,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_passthrough() {
 		AsyncPlugin::world()
-			.spawn(async_passthrough_tool.into_tool_handler())
+			.spawn(async_passthrough_tool.into_tool())
 			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(15);
@@ -260,9 +254,7 @@ mod test {
 	#[test]
 	fn tool_macro_async_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
-		let entity = world
-			.spawn(async_passthrough_entity.into_tool_handler())
-			.id();
+		let entity = world.spawn(async_passthrough_entity.into_tool()).id();
 		world
 			.entity_mut(entity)
 			.call_blocking::<(), Entity>(())

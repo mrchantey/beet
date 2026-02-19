@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 
 
-pub fn func_tool<F, Input, Out>(func: F) -> ToolHandler<Input, Out>
+pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
 where
 	F: 'static + Send + Sync + Fn(FuncToolIn<Input>) -> Result<Out>,
 {
-	ToolHandler::<Input, Out>::new(
+	Tool::<Input, Out>::new(
 		TypeMeta::of::<F>(),
 		move |ToolCall {
 		          commands,
@@ -41,21 +41,21 @@ impl<In> std::ops::DerefMut for FuncToolIn<In> {
 
 pub struct FuncToolMarker;
 
-impl<F, I, O> IntoToolHandler<(FuncToolMarker, I, O)> for F
+impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
 where
 	F: 'static + Send + Sync + Fn(FuncToolIn<I>) -> Result<O>,
 {
 	type In = I;
 	type Out = O;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
 		func_tool(self)
 	}
 }
 
 pub struct TypedFuncToolMarker;
 
-impl<F, I, O> IntoToolHandler<(TypedFuncToolMarker, I, O)> for F
+impl<F, I, O> IntoTool<(TypedFuncToolMarker, I, O)> for F
 where
 	F: 'static + Send + Sync + Fn(I) -> O,
 	O: bevy::reflect::Typed,
@@ -63,7 +63,7 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
 		func_tool(move |input| self(input.input).xok())
 	}
 }
@@ -91,7 +91,7 @@ mod test {
 	#[test]
 	fn tool_macro_no_args() {
 		AsyncPlugin::world()
-			.spawn(no_args_tool.into_tool_handler())
+			.spawn(no_args_tool.into_tool())
 			.call_blocking::<(), ()>(())
 			.unwrap();
 	}
@@ -102,7 +102,7 @@ mod test {
 	#[test]
 	fn tool_macro_with_args() {
 		AsyncPlugin::world()
-			.spawn(add_tool.into_tool_handler())
+			.spawn(add_tool.into_tool())
 			.call_blocking::<(i32, i32), i32>((5, 3))
 			.unwrap()
 			.xpect_eq(8);
@@ -114,7 +114,7 @@ mod test {
 	#[test]
 	fn tool_macro_single_arg() {
 		AsyncPlugin::world()
-			.spawn(single_arg_tool.into_tool_handler())
+			.spawn(single_arg_tool.into_tool())
 			.call_blocking::<i32, i32>(7)
 			.unwrap()
 			.xpect_eq(21);
@@ -131,7 +131,7 @@ mod test {
 	#[test]
 	fn tool_macro_result_ok() {
 		AsyncPlugin::world()
-			.spawn(fallible_tool.into_tool_handler())
+			.spawn(fallible_tool.into_tool())
 			.call_blocking::<(i32, i32), i32>((5, 3))
 			.unwrap()
 			.xpect_eq(8);
@@ -140,7 +140,7 @@ mod test {
 	#[test]
 	fn tool_macro_result_err() {
 		AsyncPlugin::world()
-			.spawn(fallible_tool.into_tool_handler())
+			.spawn(fallible_tool.into_tool())
 			.call_blocking::<(i32, i32), i32>((5, 0))
 			.unwrap_err()
 			.to_string()
@@ -153,7 +153,7 @@ mod test {
 	#[test]
 	fn tool_macro_result_out() {
 		AsyncPlugin::world()
-			.spawn(result_out_tool.into_tool_handler())
+			.spawn(result_out_tool.into_tool())
 			.call_blocking::<i32, Result<i32>>(4)
 			.unwrap()
 			.unwrap()
@@ -170,7 +170,7 @@ mod test {
 	#[test]
 	fn tool_macro_func_passthrough() {
 		AsyncPlugin::world()
-			.spawn(func_passthrough_tool.into_tool_handler())
+			.spawn(func_passthrough_tool.into_tool())
 			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(15);
@@ -183,7 +183,7 @@ mod test {
 	fn tool_macro_func_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(func_passthrough_entity.into_tool_handler())
+			.spawn(func_passthrough_entity.into_tool())
 			.id();
 		world
 			.entity_mut(entity)

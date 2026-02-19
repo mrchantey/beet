@@ -63,10 +63,10 @@ where
 mod tests {
 	use super::*;
 
-	fn outcome_fail() -> ToolHandler<(), Outcome> {
+	fn outcome_fail() -> Tool<(), Outcome> {
 		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())
 	}
-	fn outcome_pass() -> ToolHandler<(), Outcome> {
+	fn outcome_pass() -> Tool<(), Outcome> {
 		func_tool(|_: FuncToolIn<()>| Outcome::PASS.xok())
 	}
 

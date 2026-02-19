@@ -33,7 +33,7 @@ use beet_core::prelude::*;
 fn add_tool(a: i32, b: i32) -> i32 { a + b }
 
 let output: i32 = AsyncPlugin::world()
-	.spawn(add_tool.into_tool_handler())
+	.spawn(add_tool.into_tool())
 	.call_blocking((1, 2))
 	.unwrap();
 
@@ -92,7 +92,7 @@ Planned interfaces:
 ## Modules
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
-- **`tools`** - `ToolHandler`, `ToolMeta`, `#[tool]` macro (via `beet_tool`)
+- **`tools`** - `Tool`, `ToolMeta`, `#[tool]` macro (via `beet_tool`)
 - **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `RenderRequest`, built-in tools
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access

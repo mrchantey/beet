@@ -67,7 +67,7 @@ pub fn route_tool<H: 'static, M>(
 	handler: H,
 ) -> impl Bundle
 where
-	H: IntoToolHandler<M>,
+	H: IntoTool<M>,
 	H::In: 'static + Send + Sync + serde::de::DeserializeOwned,
 	H::Out: 'static + Send + Sync + serde::Serialize,
 {

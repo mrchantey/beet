@@ -10,7 +10,7 @@ use bevy::ecs::system::SystemState;
 /// patterns like input transformation, output transformation,
 /// or short-circuiting.
 pub struct Next<In: 'static, Out: 'static> {
-	handler: ToolHandler<In, Out>,
+	handler: Tool<In, Out>,
 	tool: Entity,
 	world: AsyncWorld,
 }
@@ -57,7 +57,7 @@ where
 	}
 }
 
-/// Marker for the [`IntoToolHandler`] impl that captures async wrapper
+/// Marker for the [`IntoTool`] impl that captures async wrapper
 /// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future<Output = Result<WrapOut>>`.
 ///
 /// The [`Result`] is propagated as a tool error, and the output type
@@ -65,8 +65,7 @@ where
 pub struct WrapToolMarker;
 
 impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
-	IntoToolHandler<(WrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)>
-	for WrapFn
+	IntoTool<(WrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)> for WrapFn
 where
 	WrapFn: 'static
 		+ Send
@@ -82,8 +81,8 @@ where
 	type In = (WrapIn, Next<InnerIn, InnerOut>);
 	type Out = WrapOut;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
-		ToolHandler::new(
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
+		Tool::new(
 			TypeMeta::of::<WrapFn>(),
 			move |ToolCall {
 			          mut commands,
@@ -102,7 +101,7 @@ where
 	}
 }
 
-/// Marker for the [`IntoToolHandler`] impl that captures async wrapper
+/// Marker for the [`IntoTool`] impl that captures async wrapper
 /// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future<Output = WrapOut>>`
 /// where the output is NOT a [`Result`].
 ///
@@ -111,8 +110,7 @@ where
 pub struct TypedWrapToolMarker;
 
 impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
-	IntoToolHandler<(TypedWrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)>
-	for WrapFn
+	IntoTool<(TypedWrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)> for WrapFn
 where
 	WrapFn: 'static
 		+ Send
@@ -128,8 +126,8 @@ where
 	type In = (WrapIn, Next<InnerIn, InnerOut>);
 	type Out = WrapOut;
 
-	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
-		ToolHandler::new(
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
+		Tool::new(
 			TypeMeta::of::<WrapFn>(),
 			move |ToolCall {
 			          mut commands,
@@ -169,46 +167,42 @@ where
 /// handle, returning the outer output. The inner handler is
 /// called via [`Next::call`] at the wrapper's discretion.
 ///
-/// This is blanket-implemented for any [`IntoToolHandler`] whose
+/// This is blanket-implemented for any [`IntoTool`] whose
 /// input type is `(WrapIn, Next<InnerIn, InnerOut>)`.
 pub trait IntoWrapTool<M, WrapIn, WrapOut, InnerIn, InnerOut>: Sized {
-	/// Wrap an inner handler, producing a combined [`ToolHandler`].
+	/// Wrap an inner handler, producing a combined [`Tool`].
 	///
 	/// The resulting handler accepts `WrapIn` and produces `WrapOut`,
 	/// with the wrapper controlling when and how the inner handler
 	/// (accepting `InnerIn`/`InnerOut`) is invoked via [`Next`].
-	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
+	fn wrap<Inner, InnerM>(self, inner: Inner) -> Tool<WrapIn, WrapOut>
 	where
-		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
+		Inner: 'static + IntoTool<InnerM, In = InnerIn, Out = InnerOut>,
 		InnerIn: 'static + Send + Sync,
 		InnerOut: 'static + Send + Sync;
 }
 
-/// Blanket impl: any [`IntoToolHandler`] with `In = (WrapIn, Next<InnerIn, InnerOut>)`
+/// Blanket impl: any [`IntoTool`] with `In = (WrapIn, Next<InnerIn, InnerOut>)`
 /// automatically becomes wrappable.
 // here OuterIn/OuterOut are the types for the actual tool
 impl<T, M, OuterIn, OuterOut, InnerIn, InnerOut>
 	IntoWrapTool<M, OuterIn, OuterOut, InnerIn, InnerOut> for T
 where
 	T: 'static
-		+ IntoToolHandler<
-			M,
-			In = (OuterIn, Next<InnerIn, InnerOut>),
-			Out = OuterOut,
-		>,
+		+ IntoTool<M, In = (OuterIn, Next<InnerIn, InnerOut>), Out = OuterOut>,
 	OuterIn: 'static + Send + Sync,
 	OuterOut: 'static + Send + Sync,
 	InnerIn: 'static + Send + Sync,
 	InnerOut: 'static + Send + Sync,
 {
-	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<OuterIn, OuterOut>
+	fn wrap<Inner, InnerM>(self, inner: Inner) -> Tool<OuterIn, OuterOut>
 	where
-		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
+		Inner: 'static + IntoTool<InnerM, In = InnerIn, Out = InnerOut>,
 	{
-		let inner_handler = inner.into_tool_handler();
-		let outer_handler = self.into_tool_handler();
+		let inner_handler = inner.into_tool();
+		let outer_handler = self.into_tool();
 
-		ToolHandler::new(
+		Tool::new(
 			TypeMeta::of::<(T, Inner)>(),
 			move |ToolCall {
 			          commands,

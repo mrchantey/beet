@@ -74,7 +74,7 @@ where
 fn call_tool_system<Input, Out>(
 	In((tool, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
-	tools: Query<&ToolHandler<Input, Out>>,
+	tools: Query<&Tool<Input, Out>>,
 ) -> Result {
 	tools.get(tool)?.call(ToolCall {
 		commands,
@@ -85,14 +85,14 @@ fn call_tool_system<Input, Out>(
 	Ok(())
 }
 
-/// Extension trait for calling [`ToolHandler`] components on
+/// Extension trait for calling [`Tool`] components on
 /// [`EntityWorldMut`].
 #[extend::ext(name=EntityWorldMutToolExt)]
 pub impl EntityWorldMut<'_> {
 	/// Call a tool and block until the result is ready.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`ToolHandler`] component
+	/// Errors if the entity has no matching [`Tool`] component
 	/// or the tool call fails.
 	fn call_blocking<Input: 'static, Out: 'static + Send + Sync>(
 		self,
@@ -104,7 +104,7 @@ pub impl EntityWorldMut<'_> {
 	/// Call a tool asynchronously, polling the world until completion.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`ToolHandler`] component
+	/// Errors if the entity has no matching [`Tool`] component
 	/// or the tool call fails.
 	fn call<Input: 'static, Out: 'static + Send + Sync>(
 		self,
@@ -123,7 +123,7 @@ pub impl AsyncEntity {
 	/// this side just awaits the channel result.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`ToolHandler`] or the
+	/// Errors if the entity has no matching [`Tool`] or the
 	/// tool call fails.
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&self,

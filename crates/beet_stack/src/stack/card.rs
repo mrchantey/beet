@@ -61,7 +61,7 @@ pub struct RenderRequest {
 /// [`RouteTree`], delegating rendering to the nearest
 /// [`RenderToolMarker`] found via ancestor traversal.
 ///
-/// Internally, the handler is converted to a `ToolHandler<(), Entity>`
+/// Internally, the handler is converted to a `Tool<(), Entity>`
 /// child tool that spawns the bundle and returns the entity. The card
 /// tool then pipes the entity to the render tool.
 ///
@@ -94,7 +94,7 @@ where
 {
 	let content_handler = {
 		let func = func.clone();
-		ToolHandler::new(
+		Tool::new(
 			TypeMeta::of::<F>(),
 			move |ToolCall {
 			          mut commands,
@@ -168,15 +168,15 @@ fn file_card_content_tool(
 	}
 }
 
-/// Creates the [`ToolHandler<Request, Response>`] for a card tool entity.
+/// Creates the [`Tool<Request, Response>`] for a card tool entity.
 ///
 /// When called:
 /// 1. Calls the first child entity (content handler) to spawn content
 /// 2. Finds the nearest [`RenderToolMarker`] via ancestor traversal
 /// 3. Passes the spawned entity and request to the render tool
 /// 4. Returns the render tool's response
-fn card_tool_handler() -> ToolHandler<Request, Response> {
-	ToolHandler::new(
+fn card_tool_handler() -> Tool<Request, Response> {
+	Tool::new(
 		TypeMeta::of_val(&card_tool_handler),
 		move |ToolCall {
 		          mut commands,
