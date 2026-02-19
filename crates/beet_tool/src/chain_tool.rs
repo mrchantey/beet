@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 /// Allows chaining two [`ToolHandler`] implementations, feeding the
 /// output of the first into the input of the second.
@@ -19,8 +17,8 @@ where
 		T2: 'static + IntoToolHandler<M2>,
 		T2::In: 'static + From<Out>,
 	{
-		let mut handler1 = self.into_tool_handler();
-		let handler2 = Arc::new(Mutex::new(other.into_tool_handler()));
+		let handler1 = self.into_tool_handler();
+		let handler2 = other.into_tool_handler();
 
 		ToolHandler::new(
 			TypeMeta::of::<(Self, T2)>(),
@@ -30,17 +28,14 @@ where
 			          input: in_a,
 			          out_handler,
 			      }: ToolCall<In, T2::Out>| {
-				let handler2 = Arc::clone(&handler2);
+				let handler2 = handler2.clone();
 				handler1.call(ToolCall {
 					commands,
 					tool,
 					input: in_a,
 					out_handler: OutHandler::new(
 						move |commands, out_a: Out| {
-							handler2.lock().unwrap().call(ToolCall::<
-								T2::In,
-								T2::Out,
-							> {
+							handler2.call(ToolCall::<T2::In, T2::Out> {
 								commands,
 								tool,
 								input: out_a.into(),

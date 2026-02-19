@@ -2,8 +2,6 @@ use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 /// A handle for calling the wrapped inner tool handler.
 ///
@@ -12,7 +10,7 @@ use std::sync::Mutex;
 /// patterns like input transformation, output transformation,
 /// or short-circuiting.
 pub struct Next<In: 'static, Out: 'static> {
-	handler: Arc<Mutex<ToolHandler<In, Out>>>,
+	handler: ToolHandler<In, Out>,
 	tool: Entity,
 	world: AsyncWorld,
 }
@@ -27,7 +25,7 @@ where
 	/// Schedules the inner handler via [`AsyncWorld`] and awaits
 	/// the result through a channel.
 	pub async fn call(&self, input: In) -> Result<Out> {
-		let handler = Arc::clone(&self.handler);
+		let handler = self.handler.clone();
 		let tool = self.tool;
 		let (send, recv) = async_channel::bounded(1);
 
@@ -43,7 +41,7 @@ where
 				let mut state = SystemState::<AsyncCommands>::new(world);
 				let commands = state.get_mut(world);
 
-				handler.lock().unwrap().call(ToolCall {
+				handler.call(ToolCall {
 					commands,
 					tool,
 					input,
@@ -63,7 +61,10 @@ where
 }
 
 /// Marker for the [`IntoToolHandler`] impl that captures async wrapper
-/// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future`.
+/// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future<Output = Result<WrapOut>>`.
+///
+/// The [`Result`] is propagated as a tool error, and the output type
+/// is the inner `Ok` type, matching the `#[tool]` macro convention.
 pub struct WrapToolMarker;
 
 impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
@@ -75,9 +76,70 @@ where
 		+ Sync
 		+ Clone
 		+ Fn(WrapIn, Next<InnerIn, InnerOut>) -> Fut,
-	Fut: 'static + Send + Future<Output = WrapOut>,
+	Fut: 'static + Send + Future<Output = Result<WrapOut>>,
 	WrapIn: 'static + Send + Sync,
 	WrapOut: 'static + Send + Sync,
+	InnerIn: 'static + Send + Sync,
+	InnerOut: 'static + Send + Sync,
+{
+	type In = (WrapIn, Next<InnerIn, InnerOut>);
+	type Out = WrapOut;
+
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
+		ToolHandler::new(
+			TypeMeta::of::<WrapFn>(),
+			move |ToolCall {
+			          mut commands,
+			          tool: _,
+			          input: (wrap_in, next),
+			          out_handler,
+			      }| {
+				let func = self.clone();
+				commands.run(async move |world: AsyncWorld| -> Result {
+					let output = func(wrap_in, next).await?;
+
+					world
+						.with_then(move |world: &mut World| -> Result {
+							let result = {
+								let mut state =
+									SystemState::<AsyncCommands>::new(world);
+								let async_commands = state.get_mut(world);
+								let result =
+									out_handler.call(async_commands, output);
+								state.apply(world);
+								result
+							};
+							world.flush();
+							result
+						})
+						.await
+				});
+				Ok(())
+			},
+		)
+	}
+}
+
+/// Marker for the [`IntoToolHandler`] impl that captures async wrapper
+/// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future<Output = WrapOut>>`
+/// where the output is NOT a [`Result`].
+///
+/// The output is wrapped in `Ok` automatically.
+/// Disambiguated from [`WrapToolMarker`] by requiring `WrapOut: Typed`.
+pub struct TypedWrapToolMarker;
+
+impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
+	IntoToolHandler<(TypedWrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)>
+	for WrapFn
+where
+	WrapFn: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Fn(WrapIn, Next<InnerIn, InnerOut>) -> Fut,
+	Fut: 'static + Send + Future<Output = WrapOut>,
+	WrapIn: 'static + Send + Sync,
+	WrapOut: 'static + Send + Sync + bevy::reflect::Typed,
 	InnerIn: 'static + Send + Sync,
 	InnerOut: 'static + Send + Sync,
 {
@@ -161,8 +223,8 @@ where
 	where
 		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
 	{
-		let inner_handler = Arc::new(Mutex::new(inner.into_tool_handler()));
-		let mut outer_handler = self.into_tool_handler();
+		let inner_handler = inner.into_tool_handler();
+		let outer_handler = self.into_tool_handler();
 
 		ToolHandler::new(
 			TypeMeta::of::<(T, Inner)>(),
@@ -173,7 +235,7 @@ where
 			          out_handler,
 			      }| {
 				let next = Next {
-					handler: Arc::clone(&inner_handler),
+					handler: inner_handler.clone(),
 					tool,
 					world: commands.world(),
 				};
@@ -221,8 +283,7 @@ mod test {
 	fn transforms_input_and_output() {
 		AsyncPlugin::world()
 			.spawn(serde.wrap(double))
-			.call_blocking::<String, Result<String>>("21".into())
-			.unwrap()
+			.call_blocking::<String, String>("21".into())
 			.unwrap()
 			.xpect_eq("output: 42".to_string());
 	}
@@ -236,8 +297,7 @@ mod test {
 				})
 				.wrap(negate),
 			)
-			.call_blocking::<i32, Result<i32>>(5)
-			.unwrap()
+			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(-5);
 	}
@@ -269,8 +329,7 @@ mod test {
 				})
 				.wrap(add),
 			)
-			.call_blocking::<(i32, i32), Result<i32>>((3, 4))
-			.unwrap()
+			.call_blocking::<(i32, i32), i32>((3, 4))
 			.unwrap()
 			.xpect_eq(8);
 	}
@@ -289,15 +348,13 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, Result<i32>>(5)
-			.unwrap()
+			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(10);
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, Result<i32>>(7)
-			.unwrap()
+			.call_blocking::<i32, i32>(7)
 			.unwrap()
 			.xpect_eq(14);
 	}
@@ -312,8 +369,7 @@ mod test {
 				})
 				.wrap(negate),
 			)
-			.call_blocking::<i32, Result<i32>>(3)
-			.unwrap()
+			.call_blocking::<i32, i32>(3)
 			.unwrap()
 			.xpect_eq(-29);
 	}

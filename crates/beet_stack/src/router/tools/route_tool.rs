@@ -81,23 +81,8 @@ where
 /// tool calls. Deserializes the request body, calls the inner handler
 /// via [`Next`], serializes the output, and returns a [`Response`].
 ///
-/// Errors are converted to HTTP error responses via [`HttpError`].
+/// Errors propagate as tool errors through the handler chain.
 async fn serde_exchange<Input, Output>(
-	request: Request,
-	next: Next<Input, Output>,
-) -> Response
-where
-	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
-	Output: 'static + Send + Sync + serde::Serialize,
-{
-	match serde_exchange_inner(request, next).await {
-		Ok(response) => response,
-		Err(err) => HttpError::from_opaque(err).into_response(),
-	}
-}
-
-/// Inner fallible implementation for [`serde_exchange`].
-async fn serde_exchange_inner<Input, Output>(
 	request: Request,
 	next: Next<Input, Output>,
 ) -> Result<Response>

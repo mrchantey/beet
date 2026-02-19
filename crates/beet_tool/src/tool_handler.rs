@@ -1,12 +1,21 @@
 use beet_core::prelude::*;
+use std::sync::Arc;
 
 #[derive(Component)]
 #[component(on_add=on_add::<In, Out>)]
 pub struct ToolHandler<In: 'static, Out: 'static> {
 	/// The full type name of the handler, for display and debugging.
 	handler_meta: TypeMeta,
-	handler:
-		Box<dyn 'static + Send + Sync + FnMut(ToolCall<In, Out>) -> Result>,
+	handler: Arc<dyn 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result>,
+}
+
+impl<In: 'static, Out: 'static> Clone for ToolHandler<In, Out> {
+	fn clone(&self) -> Self {
+		Self {
+			handler_meta: self.handler_meta,
+			handler: Arc::clone(&self.handler),
+		}
+	}
 }
 
 fn on_add<In: 'static, Out: 'static>(
@@ -35,14 +44,11 @@ where
 {
 	pub fn new(
 		handler_meta: TypeMeta,
-		wrapped_handler: impl 'static
-		+ Send
-		+ Sync
-		+ FnMut(ToolCall<In, Out>) -> Result,
+		handler: impl 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result,
 	) -> Self {
 		Self {
 			handler_meta,
-			handler: Box::new(wrapped_handler),
+			handler: Arc::new(handler),
 		}
 	}
 
@@ -53,7 +59,7 @@ where
 	///
 	/// # Errors
 	/// Propagates any error from the handler or [`OutHandler`].
-	pub fn call(&mut self, call: ToolCall<In, Out>) -> Result {
+	pub fn call(&self, call: ToolCall<In, Out>) -> Result {
 		(self.handler)(call)
 	}
 }

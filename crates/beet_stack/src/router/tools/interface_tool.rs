@@ -35,19 +35,17 @@ pub fn exchange_fallback() -> impl Bundle {
 	(
 		// Name::new("Exchange Fallback"),
 		async_tool(async |request: AsyncToolIn<Request>| -> Result<Response> {
-			match fallback::<Request, Response>(request).await {
+			match fallback::<Request, Response>(request).await? {
 				// a response matched, which may be an opinionated not found response
-				Ok(Pass(res)) => Ok(res),
+				Pass(res) => Ok(res),
 				// usually an interface should render an opinionated not found response
 				// as the final fallback, in this case they didnt so we'll return
 				// a simple plaintext one.
-				Ok(Fail(req)) => Ok(Response::from_status_body(
+				Fail(req) => Ok(Response::from_status_body(
 					StatusCode::NotFound,
 					format!("Resource not found: {}", req.path_string()),
 					"text/plain",
 				)),
-				// if the returned error is a HttpError, its status code will be used.
-				Err(err) => Ok(HttpError::from_opaque(err).into_response()),
 			}
 		}),
 	)

@@ -3,9 +3,9 @@ use beet_core::prelude::*;
 
 
 
-pub fn func_tool<F, Input, Out>(mut func: F) -> ToolHandler<Input, Out>
+pub fn func_tool<F, Input, Out>(func: F) -> ToolHandler<Input, Out>
 where
-	F: 'static + Send + Sync + FnMut(FuncToolIn<Input>) -> Result<Out>,
+	F: 'static + Send + Sync + Fn(FuncToolIn<Input>) -> Result<Out>,
 {
 	ToolHandler::<Input, Out>::new(
 		TypeMeta::of::<F>(),
@@ -43,7 +43,7 @@ pub struct FuncToolMarker;
 
 impl<F, I, O> IntoToolHandler<(FuncToolMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + FnMut(FuncToolIn<I>) -> Result<O>,
+	F: 'static + Send + Sync + Fn(FuncToolIn<I>) -> Result<O>,
 {
 	type In = I;
 	type Out = O;
@@ -57,13 +57,13 @@ pub struct TypedFuncToolMarker;
 
 impl<F, I, O> IntoToolHandler<(TypedFuncToolMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + FnMut(I) -> O,
+	F: 'static + Send + Sync + Fn(I) -> O,
 	O: bevy::reflect::Typed,
 {
 	type In = I;
 	type Out = O;
 
-	fn into_tool_handler(mut self) -> ToolHandler<Self::In, Self::Out> {
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
 		func_tool(move |input| self(input.input).xok())
 	}
 }

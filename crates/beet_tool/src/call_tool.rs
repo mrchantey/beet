@@ -74,9 +74,9 @@ where
 fn call_tool_system<Input, Out>(
 	In((tool, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
-	mut tools: Query<&mut ToolHandler<Input, Out>>,
+	tools: Query<&ToolHandler<Input, Out>>,
 ) -> Result {
-	tools.get_mut(tool)?.call(ToolCall {
+	tools.get(tool)?.call(ToolCall {
 		commands,
 		tool,
 		input,
