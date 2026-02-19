@@ -10,6 +10,14 @@ pub struct Tool<In: 'static, Out: 'static> {
 	handler: Arc<dyn 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result>,
 }
 
+impl<In: 'static, Out: 'static> std::fmt::Debug for Tool<In, Out> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Tool")
+			.field("handler_meta", &self.handler_meta)
+			.finish()
+	}
+}
+
 impl<In: 'static, Out: 'static> Clone for Tool<In, Out> {
 	fn clone(&self) -> Self {
 		Self {
@@ -62,6 +70,68 @@ where
 	/// Propagates any error from the handler or [`OutHandler`].
 	pub fn call(&self, call: ToolCall<In, Out>) -> Result {
 		(self.handler)(call)
+	}
+
+	/// Invoke this tool handler, constructing the [`ToolCall`] internally.
+	///
+	/// # Errors
+	/// Propagates any error from the handler or [`OutHandler`].
+	pub fn call_with(
+		&self,
+		entity: Entity,
+		input: In,
+		commands: AsyncCommands,
+		out_handler: OutHandler<Out>,
+	) -> Result {
+		let call = ToolCall {
+			commands,
+			tool: entity,
+			input,
+			out_handler,
+		};
+		self.call(call)
+	}
+
+	/// Invoke this tool handler from a [`World`], constructing the [`ToolCall`] internally.
+	///
+	/// # Errors
+	/// Propagates any error from the handler or [`OutHandler`].
+	pub fn call_world(
+		&self,
+		entity: EntityWorldMut,
+		input: In,
+		out_handler: OutHandler<Out>,
+	) -> Result {
+		let id = entity.id();
+		let world = entity.into_world_mut();
+		let mut state = SystemState::<AsyncCommands>::new(world);
+		let commands = state.get_mut(world);
+		let result = self.call_with(id, input, commands, out_handler);
+		state.apply(world);
+		world.flush();
+		result
+	}
+
+	/// Invoke this tool handler asynchronously, constructing the [`ToolCall`] internally.
+	///
+	/// # Errors
+	/// Propagates any error from the handler or [`OutHandler`].
+	pub async fn call_async(
+		&self,
+		entity: AsyncEntity,
+		input: In,
+		out_handler: OutHandler<Out>,
+	) -> Result
+	where
+		In: 'static + Send,
+		Out: 'static + Send,
+	{
+		let this = self.clone();
+		entity
+			.with_then(move |entity| {
+				this.call_world(entity, input, out_handler)
+			})
+			.await
 	}
 }
 

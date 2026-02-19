@@ -1,6 +1,27 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// An entity spawned by a [`card`] tool call.
+///
+/// Points back to the card tool entity that produced it, establishing
+/// the [`Cards`] relationship on the card tool.
+#[derive(Debug, Clone, Deref, Component)]
+#[relationship(relationship_target = Cards)]
+pub struct CardOf(pub Entity);
+
+impl CardOf {
+	/// Creates a new [`CardOf`] relationship pointing to the given card tool entity.
+	pub fn new(value: Entity) -> Self { Self(value) }
+}
+
+/// All card content entities currently spawned by this card tool.
+///
+/// Automatically maintained by the [`CardOf`] relationship. When the card
+/// tool entity is despawned, all tracked card entities are also despawned.
+#[derive(Debug, Clone, Deref, Component)]
+#[relationship_target(relationship = CardOf, linked_spawn)]
+pub struct Cards(Vec<Entity>);
+
 /// A single content container, similar to pages in a website or cards
 /// in HyperCard. Each card is a route, with the exact rendering behavior
 /// determined by the render tool on the server or interface.
@@ -40,30 +61,31 @@ pub struct RenderToolMarker;
 
 /// Request passed to a render tool to render a card's content.
 ///
-/// The card tool spawns content via its child content handler
-/// and passes the resulting entity to the render tool. The render
-/// tool is responsible for rendering and lifecycle management
-/// (eg despawning for stateless renderers, or marking with
-/// [`CurrentCard`] for stateful ones).
+/// The render tool decides whether and when to call [`spawn_tool`](RenderRequest::spawn_tool)
+/// to materialise the card's content as an entity. This gives render tools
+/// full control over spawn/despawn lifecycle — eg stateless renderers
+/// despawn immediately; stateful ones retain the entity as [`CurrentCard`].
 #[derive(Debug)]
 pub struct RenderRequest {
-	/// The spawned card content entity.
-	pub entity: Entity,
+	/// The card tool entity that issued this request.
+	pub card_tool: Entity,
+	/// A tool that, when called with `()`, spawns the card bundle as an entity
+	/// and attaches [`CardOf(card_tool)`](CardOf) to it.
+	/// The render tool chooses when (or whether) to call this.
+	pub spawn_tool: Tool<(), Entity>,
 	/// The original request.
 	pub request: Request,
 }
 
 /// Creates a routable card tool from a path and content handler.
 ///
-/// The handler is a function that returns an [`impl Bundle`](Bundle),
-/// which will be spawned as the card's content when rendered. The
-/// card registers as a [`Request`]/[`Response`] tool in the
-/// [`RouteTree`], delegating rendering to the nearest
-/// [`RenderToolMarker`] found via ancestor traversal.
-///
-/// Internally, the handler is converted to a `Tool<(), Entity>`
-/// child tool that spawns the bundle and returns the entity. The card
-/// tool then pipes the entity to the render tool.
+/// The handler is a function that returns an [`impl Bundle`](Bundle).
+/// When a request arrives the card tool:
+/// 1. Locates the nearest [`RenderToolMarker`] via [`find_render_tool`].
+/// 2. Builds a `spawn_tool` that, on demand, spawns the bundle with
+///    [`CardOf`] pointing back to the card entity.
+/// 3. Forwards a [`RenderRequest`] to the render tool, which decides
+///    when to call `spawn_tool` and how to manage the resulting entity.
 ///
 /// # Example
 ///
@@ -92,20 +114,63 @@ where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
-	let content_handler = {
+	let handler = {
 		let func = func.clone();
 		Tool::new(
 			TypeMeta::of::<F>(),
 			move |ToolCall {
 			          mut commands,
-			          tool: _tool,
-			          input: (),
+			          tool: card_tool,
+			          input: request,
 			          out_handler,
 			      }| {
 				let func = func.clone();
-				commands.commands.queue(move |world: &mut World| -> Result {
-					let entity = world.spawn((Card, func())).id();
-					out_handler.call_world(world, entity)
+				commands.run(async move |world: AsyncWorld| -> Result {
+					// Build spawn_tool inline, capturing card_tool and func.
+					// The render tool calls this when it wants to materialise content.
+					let spawn_tool = Tool::new(TypeMeta::of::<F>(), {
+						let func = func.clone();
+						move |ToolCall {
+						          mut commands,
+						          tool: _,
+						          input: (),
+						          out_handler,
+						      }| {
+							let func = func.clone();
+							commands.commands.queue(
+								move |world: &mut World| -> Result {
+									let entity = world
+										.spawn((
+											Card,
+											CardOf::new(card_tool),
+											func(),
+										))
+										.id();
+									out_handler.call_world(world, entity)
+								},
+							);
+							Ok(())
+						}
+					});
+
+					// Locate the nearest render tool in the hierarchy
+					let render_tool = world
+						.with_then(move |world: &mut World| {
+							find_render_tool(world, card_tool)
+						})
+						.await?;
+
+					// Delegate to the render tool with spawn capability
+					let response: Response = world
+						.entity(render_tool)
+						.call::<RenderRequest, Response>(RenderRequest {
+							card_tool,
+							spawn_tool,
+							request,
+						})
+						.await?;
+
+					out_handler.call_async(world, response).await
 				});
 				Ok(())
 			},
@@ -115,16 +180,7 @@ where
 	(
 		PathPartial::new(path),
 		Card,
-		// Outer tool meta: the card presents as Request/Response
-		ToolMeta::of::<F, Request, Response>(),
-		// Spawn a child tool entity that produces card content.
-		// The card tool calls this child to spawn content and get the Entity.
-		OnSpawn::insert_child((
-			RouteHidden,
-			ToolMeta::of::<F, (), Entity>(),
-			content_handler,
-		)),
-		card_tool_handler(),
+		handler,
 	)
 }
 
@@ -142,7 +198,6 @@ where
 ///
 /// let bundle = file_card("readme", "docs/readme.md");
 /// ```
-// #[cfg(feature = "markdown")]
 pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 	let ws_path: WsPathBuf = file_path.into();
 	card(path, file_card_content_tool(ws_path))
@@ -166,55 +221,6 @@ fn file_card_content_tool(
 			}
 		}
 	}
-}
-
-/// Creates the [`Tool<Request, Response>`] for a card tool entity.
-///
-/// When called:
-/// 1. Calls the first child entity (content handler) to spawn content
-/// 2. Finds the nearest [`RenderToolMarker`] via ancestor traversal
-/// 3. Passes the spawned entity and request to the render tool
-/// 4. Returns the render tool's response
-fn card_tool_handler() -> Tool<Request, Response> {
-	Tool::new(
-		TypeMeta::of_val(&card_tool_handler),
-		move |ToolCall {
-		          mut commands,
-		          tool: tool_entity,
-		          input: request,
-		          out_handler,
-		      }| {
-			commands.run(async move |world: AsyncWorld| -> Result {
-				// Get the first child entity (content handler)
-				let child = world
-					.entity(tool_entity)
-					.get(|children: &Children| children[0])
-					.await?;
-
-				// Call content handler to spawn content
-				let card_entity: Entity = world.entity(child).call(()).await?;
-
-				// Find the render tool by traversal
-				let render_tool = world
-					.with_then(move |world: &mut World| {
-						find_render_tool(world, tool_entity)
-					})
-					.await?;
-
-				// Call the render tool with the spawned entity
-				let response: Response = world
-					.entity(render_tool)
-					.call::<RenderRequest, Response>(RenderRequest {
-						entity: card_entity,
-						request,
-					})
-					.await?;
-
-				out_handler.call_async(world, response).await
-			});
-			Ok(())
-		},
-	)
 }
 
 /// Finds the nearest render tool by traversing to the root ancestor
@@ -323,5 +329,38 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		find_render_tool(&mut world, entity).xpect_err();
+	}
+
+	#[beet_core::test]
+	async fn spawned_card_has_card_of_relationship() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("about", || Paragraph::with_text("About page")),
+			]))
+			.flush();
+
+		// find the card tool entity
+		let card_entity = world
+			.run_system_once(
+				|cards: Query<Entity, (With<Card>, With<PathPartial>)>| {
+					cards.iter().next()
+				},
+			)
+			.unwrap();
+
+		world
+			.entity_mut(root)
+			.call::<Request, Response>(Request::get("about"))
+			.await
+			.unwrap();
+
+		// after rendering, the card tool should have no Cards remaining
+		// (markdown render tool despawns the entity after rendering)
+		let cards = world.entity(card_entity.unwrap()).get::<Cards>();
+		// either no Cards component or empty — both are valid after despawn
+		let count = cards.map(|c| c.len()).unwrap_or(0);
+		count.xpect_eq(0);
 	}
 }

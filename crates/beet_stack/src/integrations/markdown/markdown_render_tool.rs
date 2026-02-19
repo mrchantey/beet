@@ -34,8 +34,11 @@ pub fn markdown_render_tool() -> impl Bundle {
 		RouteHidden,
 		async_tool(
 			async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
-				let card_entity = cx.input.entity;
+				let spawn_tool = cx.input.spawn_tool.clone();
 				let world = cx.tool.world();
+
+				// Spawn the card content on demand
+				let card_entity = cx.tool.call_tool(spawn_tool, ()).await?;
 
 				// Render to markdown, then despawn
 				let markdown = world

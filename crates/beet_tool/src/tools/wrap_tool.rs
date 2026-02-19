@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::exports::async_channel;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
 
@@ -25,35 +24,11 @@ where
 	/// Schedules the inner handler via [`AsyncWorld`] and awaits
 	/// the result through a channel.
 	pub async fn call(&self, input: In) -> Result<Out> {
-		let handler = self.handler.clone();
 		let tool = self.tool;
-		let (send, recv) = async_channel::bounded(1);
-
-		let out_handler = OutHandler::new(move |_commands, output: Out| {
-			send.try_send(output)
-				.map_err(|err| bevyhow!("Next::call send failed: {err:?}"))
-		});
 		self.world
-			.with_then(move |world: &mut World| -> Result {
-				let mut state = SystemState::<AsyncCommands>::new(world);
-				let commands = state.get_mut(world);
-
-				handler.call(ToolCall {
-					commands,
-					tool,
-					input,
-					out_handler,
-				})?;
-
-				state.apply(world);
-				world.flush();
-				Ok(())
-			})
-			.await?;
-
-		recv.recv()
+			.entity(tool)
+			.call_tool(self.handler.clone(), input)
 			.await
-			.map_err(|err| bevyhow!("Next::call channel closed: {err}"))
 	}
 }
 
@@ -138,22 +113,7 @@ where
 				let func = self.clone();
 				commands.run(async move |world: AsyncWorld| -> Result {
 					let output = func(wrap_in, next).await;
-
-					world
-						.with_then(move |world: &mut World| -> Result {
-							let result = {
-								let mut state =
-									SystemState::<AsyncCommands>::new(world);
-								let async_commands = state.get_mut(world);
-								let result =
-									out_handler.call(async_commands, output);
-								state.apply(world);
-								result
-							};
-							world.flush();
-							result
-						})
-						.await
+					out_handler.call_async(world, output).await
 				});
 				Ok(())
 			},

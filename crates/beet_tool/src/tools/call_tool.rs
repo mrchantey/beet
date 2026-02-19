@@ -114,6 +114,25 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
+fn call_with_channel_for_value<Input, Out>(
+	entity: EntityWorldMut,
+	tool: Tool<Input, Out>,
+	input: Input,
+) -> Result<Receiver<Out>>
+where
+	Input: 'static,
+	Out: 'static + Send + Sync,
+{
+	let (send, recv) = async_channel::bounded(1);
+	let out_handler = OutHandler::new(move |_, output: Out| {
+		send.try_send(output).map_err(|err| {
+			bevyhow!("Failed to send tool output through channel: {err:?}")
+		})
+	});
+	tool.call_world(entity, input, out_handler)?;
+	Ok(recv)
+}
+
 /// Extension trait for calling tools on [`AsyncEntity`] handles.
 #[extend::ext(name=AsyncEntityToolExt)]
 pub impl AsyncEntity {
@@ -135,6 +154,36 @@ pub impl AsyncEntity {
 			let recv = world
 				.with_then(move |w: &mut World| {
 					call_with_channel::<Input, Out>(entity_id, w, input)
+				})
+				.await?;
+			recv.recv().await.map_err(|_| {
+				bevyhow!("Tool call response channel closed unexpectedly.")
+			})
+		}
+	}
+
+	/// Call a [`Tool`] value directly, without it being attached to an entity.
+	///
+	/// Uses `self` as the entity context passed to the tool handler. The
+	/// handler may use or ignore this entity depending on its implementation.
+	///
+	/// # Errors
+	/// Errors if the tool handler fails or the response channel closes.
+	fn call_tool<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
+		&self,
+		tool: Tool<Input, Out>,
+		input: Input,
+	) -> impl Future<Output = Result<Out>> {
+		let entity_id = self.id();
+		let world = self.world().clone();
+		async move {
+			let recv = world
+				.with_then(move |world: &mut World| {
+					call_with_channel_for_value(
+						world.entity_mut(entity_id),
+						tool,
+						input,
+					)
 				})
 				.await?;
 			recv.recv().await.map_err(|_| {

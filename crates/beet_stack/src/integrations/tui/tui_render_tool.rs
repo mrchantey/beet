@@ -42,9 +42,12 @@ pub fn tui_render_tool() -> impl Bundle {
 /// previous card and marking the new content entity with
 /// [`CurrentCard`].
 async fn tui_render_system(cx: AsyncToolIn<RenderRequest>) -> Result<Response> {
-	let card_entity = cx.input.entity;
+	let spawn_tool = cx.input.spawn_tool.clone();
 	let world = cx.tool.world();
 
+	// Spawn the card content on demand
+	let card_entity = cx.tool.call_tool(spawn_tool, ()).await?;
+	// todo!("dont despawn!");
 	// Despawn previous CurrentCard and mark the new entity
 	world
 		.with_then(move |world: &mut World| {
