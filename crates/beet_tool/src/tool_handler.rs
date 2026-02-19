@@ -70,6 +70,7 @@ pub struct ToolMeta {
 
 impl ToolMeta {
 	/// Returns true if this tool natively handles [`Request`]/[`Response`].
+	#[cfg(feature = "exchange")]
 	pub fn is_exchange(&self) -> bool {
 		self.input.type_id() == std::any::TypeId::of::<Request>()
 			&& self.output.type_id() == std::any::TypeId::of::<Response>()

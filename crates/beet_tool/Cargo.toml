@@ -11,6 +11,9 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+exchange = ["beet_core/exchange"]
+
 [dependencies]
 beet_core = { workspace = true }
 bevy.workspace = true

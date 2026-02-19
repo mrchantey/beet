@@ -58,8 +58,7 @@ pub struct TypedFuncToolMarker;
 impl<F, I, O> IntoToolHandler<(TypedFuncToolMarker, I, O)> for F
 where
 	F: 'static + Send + Sync + FnMut(I) -> O,
-	// we need to constrain to avoid multiple impls?
-	// I: bevy::reflect::Typed,
+	O: bevy::reflect::Typed,
 {
 	type In = I;
 	type Out = O;
