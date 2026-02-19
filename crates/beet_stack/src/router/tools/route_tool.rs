@@ -62,18 +62,18 @@ use beet_core::prelude::*;
 /// let result: i32 = response.deserialize_blocking().unwrap();
 /// assert_eq!(result, 30);
 /// ```
-pub fn route_tool<H: 'static, M>(
+pub fn route_tool<T: 'static, M>(
 	path: impl AsRef<std::path::Path>,
-	handler: H,
+	tool: T,
 ) -> impl Bundle
 where
-	H: IntoTool<M>,
-	H::In: 'static + Send + Sync + serde::de::DeserializeOwned,
-	H::Out: 'static + Send + Sync + serde::Serialize,
+	T: IntoTool<M>,
+	T::In: 'static + Send + Sync + serde::de::DeserializeOwned,
+	T::Out: 'static + Send + Sync + serde::Serialize,
 {
 	(
 		PathPartial::new(path),
-		serde_exchange::<H::In, H::Out>.wrap(handler),
+		serde_exchange::<T::In, T::Out>.wrap(tool),
 	)
 }
 
@@ -95,6 +95,7 @@ where
 	let body_bytes = request.body.into_bytes().await?;
 	let input: Input = format.deserialize(&body_bytes)?;
 	let output: Output = next.call(input).await?;
+	// Use the same format as the request payload
 	let body_bytes = format.serialize(&output)?;
 	Response::ok()
 		.with_content_type(format.content_type_str())

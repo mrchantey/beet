@@ -373,19 +373,19 @@ required-features = ["clanker"]
 # 💡 Examples - net
 
 [[example]]
-name = "server"
-path = "examples/net/server.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "templating"
-path = "examples/net/templating.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "client"
-path = "examples/net/client.rs"
+name = "http_client"
+path = "examples/net/http_client.rs"
 required-features = ["net", "ureq", "native-tls"]
+
+[[example]]
+name = "http_server"
+path = "examples/net/http_server.rs"
+required-features = ["http_server"]
+
+[[example]]
+name = "socket_client"
+path = "examples/net/socket_client.rs"
+required-features = ["tungstenite"]
 
 [[example]]
 name = "socket_server"
@@ -393,9 +393,9 @@ path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
 
 [[example]]
-name = "socket_client"
-path = "examples/net/socket_client.rs"
-required-features = ["tungstenite"]
+name = "templating"
+path = "examples/net/templating.rs"
+required-features = ["http_server"]
 
 # 💡 Examples - flow
 
