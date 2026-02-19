@@ -29,19 +29,41 @@ pub struct HttpServer {
 	/// some random available port by the os like `98304`.
 	/// This is ignored by lambda_server
 	pub port: u16,
+	/// The host address to bind to. Defaults to `[127, 0, 0, 1]` (localhost).
+	/// Use `[0, 0, 0, 0]` to listen on all interfaces (required for deployed servers).
+	pub host: [u8; 4],
 }
 
 impl Default for HttpServer {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,
+			host: [127, 0, 0, 1],
 		}
 	}
 }
 
 impl HttpServer {
 	/// Creates a new server configured to listen on the specified port.
-	pub fn new(port: u16) -> Self { Self { port } }
+	pub fn new(port: u16) -> Self {
+		Self {
+			port,
+			..Default::default()
+		}
+	}
+	/// Creates a new server configured to listen on all interfaces
+	/// (i.e., host address `[0, 0, 0, 0]`) on the specified port.
+	pub fn new_all_interfaces(port: u16) -> Self {
+		Self {
+			port,
+			host: [0, 0, 0, 0],
+		}
+	}
+	/// Sets the host address to bind to.
+	pub fn with_host(mut self, host: [u8; 4]) -> Self {
+		self.host = host;
+		self
+	}
 }
 
 // using commands allows a ServerHandler to be inserted, instead of running immediately

@@ -22,23 +22,15 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	attrs.assert_types(&[], &["result_out"])?;
 	let result_out = attrs.contains_key("result_out");
 
-	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let is_async = item.sig.asyncness.is_some();
 
-	let vis = &item.vis;
-	let fn_name = &item.sig.ident;
-	let body = &item.block;
-
-	// Collect parameter names and types.
-	let mut param_names: Vec<syn::Ident> = Vec::new();
-	let mut param_types: Vec<Box<Type>> = Vec::new();
-
+	// Collect all parameters as (name, type) pairs.
+	let mut params: Vec<(syn::Ident, Box<Type>)> = Vec::new();
 	for arg in &item.sig.inputs {
 		match arg {
 			FnArg::Typed(pat_type) => {
-				// Extract the ident from the pattern.
 				if let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
-					param_names.push(pat_ident.ident.clone());
-					param_types.push(pat_type.ty.clone());
+					params.push((pat_ident.ident.clone(), pat_type.ty.clone()));
 				} else {
 					synbail!(
 						&pat_type.pat,
@@ -55,73 +47,68 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		}
 	}
 
-	// Determine the raw return type (what the user wrote after `->`).
-	let raw_return_type: Option<&Type> = match &item.sig.output {
-		ReturnType::Default => None,
-		ReturnType::Type(_, ty) => Some(ty.as_ref()),
-	};
+	// Detect tool kind and passthrough.
+	let first_param_type = params.first().map(|(_, ty)| ty.as_ref());
 
-	// Determine whether the return is a Result, and compute In/Out types.
-	let returns_result = raw_return_type
-		.map(|ty| is_result_type(ty))
-		.unwrap_or(false);
-
-	let out_type: TokenStream = if let Some(ty) = raw_return_type {
-		if returns_result && !result_out {
-			// Unwrap Result<T> to just T.
-			if let Some(inner) = extract_result_inner(ty) {
-				quote! { #inner }
-			} else {
-				// Result with no generic args, fallback to ().
-				quote! { () }
+	if is_async {
+		// Check for async passthrough: first param is AsyncToolIn<T>.
+		if let Some(first_ty) = first_param_type {
+			if let Some(inner) = extract_wrapper_type(first_ty, "AsyncToolIn") {
+				return parse_async_passthrough(
+					&item, result_out, inner, &params,
+				);
 			}
+		}
+		parse_async_tool(&item, result_out, &params)
+	} else if let Some(first_ty) = first_param_type {
+		if let Some(in_inner) = extract_wrapper_type(first_ty, "In") {
+			// First param is In<T>, determine which sub-case.
+			if let Some(inner) = extract_wrapper_type(in_inner, "SystemToolIn")
+			{
+				// In<SystemToolIn<T>> → system passthrough
+				parse_system_passthrough(&item, result_out, inner, &params)
+			} else if let Some(inner) =
+				extract_wrapper_type(in_inner, "FuncToolIn")
+			{
+				// In<FuncToolIn<T>> → func passthrough
+				parse_func_passthrough(&item, result_out, inner, &params)
+			} else {
+				// In<T> → system tool
+				parse_system_tool(&item, result_out, in_inner, &params)
+			}
+		} else if let Some(inner) = extract_wrapper_type(first_ty, "FuncToolIn")
+		{
+			// FuncToolIn<T> (no In<>) → func passthrough
+			parse_func_passthrough(&item, result_out, inner, &params)
 		} else {
-			quote! { #ty }
+			// No special first param → func tool (current behavior)
+			parse_func_tool(&item, result_out, &params)
 		}
 	} else {
-		quote! { () }
-	};
+		// No params → func tool
+		parse_func_tool(&item, result_out, &params)
+	}
+}
 
-	let in_type: TokenStream = match param_types.len() {
-		0 => quote! { () },
-		1 => {
-			let ty = &param_types[0];
-			quote! { #ty }
-		}
-		_ => {
-			let types = &param_types;
-			quote! { (#(#types),*) }
-		}
-	};
 
-	// Input destructuring inside the closure.
-	let destructure: TokenStream = match param_names.len() {
-		0 => quote! { let _ = input.input; },
-		1 => {
-			let name = &param_names[0];
-			quote! { let #name = input.input; }
-		}
-		_ => {
-			let names = &param_names;
-			quote! { let (#(#names),*) = input.input; }
-		}
-	};
+// ---------------------------------------------------------------------------
+// Func tool (the original behavior)
+// ---------------------------------------------------------------------------
 
-	// Body evaluation: if the function returns Result (and not result_out),
-	// append `?` to propagate the error.
-	let body_wrap: TokenStream = if returns_result && !result_out {
-		// return the body directly, it already returns a result
-		quote! {
-		#[allow(unused_braces)]
-		#body }
-	} else {
-		// wrap the body in an Ok
-		quote! { Ok(
-			#[allow(unused_braces)]
-			#body
-			)
-		}
-	};
+fn parse_func_tool(
+	item: &ItemFn,
+	result_out: bool,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+
+	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
+
+	let destructure = make_destructure(params);
+	let body_wrap = make_body_wrap(body, item, result_out);
 
 	Ok(quote! {
 		#[allow(non_camel_case_types)]
@@ -141,23 +128,332 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	})
 }
 
-
-
-/// Whether the return type path ends with `Result`.
-fn is_result_type(ty: &Type) -> bool {
-	if let Type::Path(type_path) = ty {
-		if let Some(segment) = type_path.path.segments.last() {
-			return segment.ident == "Result";
-		}
+/// Func passthrough: first param is `FuncToolIn<T>` or `In<FuncToolIn<T>>`.
+/// The user gets the full [`FuncToolIn`] context.
+fn parse_func_passthrough(
+	item: &ItemFn,
+	result_out: bool,
+	inner_type: &Type,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	if params.len() != 1 {
+		synbail!(
+			&item.sig,
+			"FuncToolIn passthrough expects exactly one parameter"
+		);
 	}
-	false
+
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+	let param_name = &params[0].0;
+
+	let in_type = quote! { #inner_type };
+	let out_type = compute_out_type(item, result_out);
+	let body_wrap = make_body_wrap(body, item, result_out);
+
+	Ok(quote! {
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name;
+
+		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+			type In = #in_type;
+			type Out = #out_type;
+
+			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+				#beet_tool::prelude::func_tool(|#param_name: #beet_tool::prelude::FuncToolIn<#in_type>| {
+					#body_wrap
+				})
+			}
+		}
+	})
 }
 
-/// Extract the inner `T` from `Result<T>` or `Result<T, E>`.
-fn extract_result_inner(ty: &Type) -> Option<&Type> {
+
+// ---------------------------------------------------------------------------
+// Async tool
+// ---------------------------------------------------------------------------
+
+fn parse_async_tool(
+	item: &ItemFn,
+	result_out: bool,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+
+	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
+
+	let destructure = make_destructure(params);
+	let body_wrap = make_body_wrap(body, item, result_out);
+
+	Ok(quote! {
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name;
+
+		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+			type In = #in_type;
+			type Out = #out_type;
+
+			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+				#beet_tool::prelude::async_tool(|input: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
+					#destructure
+					#body_wrap
+				})
+			}
+		}
+	})
+}
+
+/// Async passthrough: first param is `AsyncToolIn<T>`.
+fn parse_async_passthrough(
+	item: &ItemFn,
+	result_out: bool,
+	inner_type: &Type,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	if params.len() != 1 {
+		synbail!(
+			&item.sig,
+			"AsyncToolIn passthrough expects exactly one parameter"
+		);
+	}
+
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+	let param_name = &params[0].0;
+
+	let in_type = quote! { #inner_type };
+	let out_type = compute_out_type(item, result_out);
+	let body_wrap = make_body_wrap(body, item, result_out);
+
+	Ok(quote! {
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name;
+
+		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+			type In = #in_type;
+			type Out = #out_type;
+
+			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+				#beet_tool::prelude::async_tool(|#param_name: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
+					#body_wrap
+				})
+			}
+		}
+	})
+}
+
+
+// ---------------------------------------------------------------------------
+// System tool
+// ---------------------------------------------------------------------------
+
+/// System tool: first param is `In<T>`, remaining are system params.
+fn parse_system_tool(
+	item: &ItemFn,
+	result_out: bool,
+	in_inner: &Type,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+
+	let first_param_name = &params[0].0;
+	let in_type = quote! { #in_inner };
+	let out_type = compute_out_type(item, result_out);
+	let body_wrap = make_body_wrap(body, item, result_out);
+
+	// Collect remaining system params (everything after the first).
+	let system_params = collect_system_params(item, 1);
+
+	Ok(quote! {
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name;
+
+		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+			type In = #in_type;
+			type Out = #out_type;
+
+			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+				#beet_tool::prelude::system_tool(|
+					In(__tool_in): In<#beet_tool::prelude::SystemToolIn<#in_type>>
+					#(, #system_params)*
+				| -> Result<#out_type> {
+					let #first_param_name = __tool_in.input;
+					#body_wrap
+				})
+			}
+		}
+	})
+}
+
+/// System passthrough: first param is `In<SystemToolIn<T>>`.
+fn parse_system_passthrough(
+	item: &ItemFn,
+	result_out: bool,
+	inner_type: &Type,
+	params: &[(syn::Ident, Box<Type>)],
+) -> syn::Result<TokenStream> {
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+	let vis = &item.vis;
+	let fn_name = &item.sig.ident;
+	let body = &item.block;
+
+	let first_param_name = &params[0].0;
+	let in_type = quote! { #inner_type };
+	let out_type = compute_out_type(item, result_out);
+	let body_wrap = make_body_wrap(body, item, result_out);
+
+	let system_params = collect_system_params(item, 1);
+
+	Ok(quote! {
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name;
+
+		impl #beet_tool::prelude::IntoToolHandler<#fn_name> for #fn_name {
+			type In = #in_type;
+			type Out = #out_type;
+
+			fn into_tool_handler(self) -> #beet_tool::prelude::ToolHandler<Self::In, Self::Out> {
+				#beet_tool::prelude::system_tool(|
+					In(#first_param_name): In<#beet_tool::prelude::SystemToolIn<#in_type>>
+					#(, #system_params)*
+				| -> Result<#out_type> {
+					#body_wrap
+				})
+			}
+		}
+	})
+}
+
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/// Compute the `In` and `Out` types for func and async tools (all params
+/// contribute to the input type).
+fn compute_in_out(
+	params: &[(syn::Ident, Box<Type>)],
+	item: &ItemFn,
+	result_out: bool,
+) -> syn::Result<(TokenStream, TokenStream)> {
+	let param_types: Vec<&Type> =
+		params.iter().map(|(_, ty)| ty.as_ref()).collect();
+
+	let in_type: TokenStream = match param_types.len() {
+		0 => quote! { () },
+		1 => {
+			let ty = param_types[0];
+			quote! { #ty }
+		}
+		_ => {
+			let types = &param_types;
+			quote! { (#(#types),*) }
+		}
+	};
+
+	let out_type = compute_out_type(item, result_out);
+	Ok((in_type, out_type))
+}
+
+/// Compute the output type from the function signature.
+fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
+	let raw_return_type: Option<&Type> = match &item.sig.output {
+		ReturnType::Default => None,
+		ReturnType::Type(_, ty) => Some(ty.as_ref()),
+	};
+
+	let returns_result = raw_return_type
+		.map(|ty| is_result_type(ty))
+		.unwrap_or(false);
+
+	if let Some(ty) = raw_return_type {
+		if returns_result && !result_out {
+			if let Some(inner) = extract_result_inner(ty) {
+				quote! { #inner }
+			} else {
+				quote! { () }
+			}
+		} else {
+			quote! { #ty }
+		}
+	} else {
+		quote! { () }
+	}
+}
+
+/// Generate the `let ... = input.input;` destructuring for func/async tools.
+fn make_destructure(params: &[(syn::Ident, Box<Type>)]) -> TokenStream {
+	match params.len() {
+		0 => quote! { let _ = input.input; },
+		1 => {
+			let name = &params[0].0;
+			quote! { let #name = input.input; }
+		}
+		_ => {
+			let names: Vec<&syn::Ident> =
+				params.iter().map(|(name, _)| name).collect();
+			quote! { let (#(#names),*) = input.input; }
+		}
+	}
+}
+
+/// Wrap the function body, adding `Ok(...)` if needed or passing through
+/// if the function already returns [`Result`].
+fn make_body_wrap(
+	body: &syn::Block,
+	item: &ItemFn,
+	result_out: bool,
+) -> TokenStream {
+	let raw_return_type: Option<&Type> = match &item.sig.output {
+		ReturnType::Default => None,
+		ReturnType::Type(_, ty) => Some(ty.as_ref()),
+	};
+
+	let returns_result = raw_return_type
+		.map(|ty| is_result_type(ty))
+		.unwrap_or(false);
+
+	if returns_result && !result_out {
+		quote! {
+			#[allow(unused_braces)]
+			#body
+		}
+	} else {
+		quote! { Ok(
+			#[allow(unused_braces)]
+			#body
+			)
+		}
+	}
+}
+
+/// Collect system params from the function signature, skipping the first
+/// `skip` params. Returns the raw [`FnArg`] tokens.
+fn collect_system_params(item: &ItemFn, skip: usize) -> Vec<&FnArg> {
+	item.sig.inputs.iter().skip(skip).collect()
+}
+
+
+// ---------------------------------------------------------------------------
+// Type extraction helpers
+// ---------------------------------------------------------------------------
+
+/// Extract the inner type `T` from a wrapper type `Wrapper<T>`, matching
+/// only on the last path segment name.
+fn extract_wrapper_type<'a>(ty: &'a Type, name: &str) -> Option<&'a Type> {
 	if let Type::Path(type_path) = ty {
 		if let Some(segment) = type_path.path.segments.last() {
-			if segment.ident == "Result" {
+			if segment.ident == name {
 				if let syn::PathArguments::AngleBracketed(args) =
 					&segment.arguments
 				{
@@ -173,6 +469,21 @@ fn extract_result_inner(ty: &Type) -> Option<&Type> {
 	None
 }
 
+/// Whether the return type path ends with `Result`.
+fn is_result_type(ty: &Type) -> bool {
+	if let Type::Path(type_path) = ty {
+		if let Some(segment) = type_path.path.segments.last() {
+			return segment.ident == "Result";
+		}
+	}
+	false
+}
+
+/// Extract the inner `T` from `Result<T>` or `Result<T, E>`.
+fn extract_result_inner(ty: &Type) -> Option<&Type> {
+	extract_wrapper_type(ty, "Result")
+}
+
 
 #[cfg(test)]
 mod test {
@@ -183,6 +494,10 @@ mod test {
 		parse(attr, item).unwrap().to_string()
 	}
 
+	// -----------------------------------------------------------------------
+	// Func tool tests (original behavior)
+	// -----------------------------------------------------------------------
+
 	#[test]
 	fn no_args_no_return() {
 		let result = parse_str(quote!(), syn::parse_quote! { fn my_tool() {} });
@@ -190,6 +505,7 @@ mod test {
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("type Out = ()"));
 		assert!(result.contains("let _ = input . input"));
+		assert!(result.contains("func_tool"));
 	}
 
 	#[test]
@@ -202,7 +518,7 @@ mod test {
 		assert!(result.contains("type In = (i32 , i32)"));
 		assert!(result.contains("type Out = i32"));
 		assert!(result.contains("let (a , b) = input . input"));
-		// Should NOT have a `?` since the return is not Result.
+		assert!(result.contains("func_tool"));
 		assert!(!result.contains("} ?"));
 	}
 
@@ -214,6 +530,7 @@ mod test {
 		);
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("let val = input . input"));
+		assert!(result.contains("func_tool"));
 	}
 
 	#[test]
@@ -221,8 +538,8 @@ mod test {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn fallible(a: i32, b: i32) -> Result<i32> { Ok(a + b) }
 		});
-		// Out should be i32, not Result<i32>.
 		assert!(result.contains("type Out = i32"));
+		assert!(result.contains("func_tool"));
 	}
 
 	#[test]
@@ -230,9 +547,7 @@ mod test {
 		let result = parse_str(quote!(result_out), syn::parse_quote! {
 			fn fallible(a: i32) -> Result<i32> { Ok(a) }
 		});
-		// Out should preserve the full Result type.
 		assert!(result.contains("type Out = Result < i32 >"));
-		// Body should NOT use `?`.
 		assert!(!result.contains("} ?"));
 	}
 
@@ -241,5 +556,176 @@ mod test {
 		let result =
 			parse_str(quote!(), syn::parse_quote! { pub fn public_tool() {} });
 		assert!(result.contains("pub struct public_tool"));
+	}
+
+	// -----------------------------------------------------------------------
+	// Func passthrough
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn func_passthrough_func_tool_in() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: FuncToolIn<i32>) -> i32 { *cx }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("func_tool"));
+		// The param name should be forwarded directly, no destructuring.
+		assert!(result.contains("| cx : "));
+		assert!(!result.contains("let cx = input"));
+	}
+
+	#[test]
+	fn func_passthrough_in_func_tool_in() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: In<FuncToolIn<String>>) -> String { cx.input.clone() }
+		});
+		assert!(result.contains("type In = String"));
+		assert!(result.contains("func_tool"));
+		assert!(result.contains("| cx : "));
+	}
+
+	// -----------------------------------------------------------------------
+	// Async tool tests
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn async_no_args() {
+		let result = parse_str(
+			quote!(),
+			syn::parse_quote! { async fn my_tool() -> i32 { 42 } },
+		);
+		assert!(result.contains("struct my_tool"));
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("type Out = i32"));
+		assert!(result.contains("async_tool"));
+		assert!(result.contains("async move"));
+	}
+
+	#[test]
+	fn async_with_args() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn fetch(url: String, timeout: u32) -> String { url }
+		});
+		assert!(result.contains("type In = (String , u32)"));
+		assert!(result.contains("type Out = String"));
+		assert!(result.contains("async_tool"));
+		assert!(result.contains("let (url , timeout) = input . input"));
+	}
+
+	#[test]
+	fn async_single_arg() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn negate(val: i32) -> i32 { -val }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("async_tool"));
+		assert!(result.contains("let val = input . input"));
+	}
+
+	#[test]
+	fn async_result_return() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn fallible(val: i32) -> Result<i32> { Ok(val) }
+		});
+		assert!(result.contains("type Out = i32"));
+		assert!(result.contains("async_tool"));
+	}
+
+	#[test]
+	fn async_result_out() {
+		let result = parse_str(quote!(result_out), syn::parse_quote! {
+			async fn fallible(val: i32) -> Result<i32> { Ok(val) }
+		});
+		assert!(result.contains("type Out = Result < i32 >"));
+		assert!(result.contains("async_tool"));
+	}
+
+	// -----------------------------------------------------------------------
+	// Async passthrough
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn async_passthrough() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn my_tool(cx: AsyncToolIn<i32>) -> i32 { *cx }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("async_tool"));
+		// The param name should be forwarded directly.
+		assert!(result.contains("| cx : "));
+		assert!(!result.contains("let cx = input"));
+	}
+
+	// -----------------------------------------------------------------------
+	// System tool tests
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn system_basic() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(val: In<i32>) -> i32 { val * 2 }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("type Out = i32"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("SystemToolIn"));
+		assert!(result.contains("let val = __tool_in . input"));
+	}
+
+	#[test]
+	fn system_with_system_params() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(val: In<i32>, time: Res<Time>) -> f32 { val as f32 }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("time : Res < Time >"));
+		assert!(result.contains("let val = __tool_in . input"));
+	}
+
+	#[test]
+	fn system_result() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(val: In<i32>) -> Result<i32> { Ok(val) }
+		});
+		assert!(result.contains("type Out = i32"));
+		assert!(result.contains("system_tool"));
+	}
+
+	#[test]
+	fn system_unit_in_unit_out() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(val: In<()>) {}
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("type Out = ()"));
+		assert!(result.contains("system_tool"));
+	}
+
+	// -----------------------------------------------------------------------
+	// System passthrough
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn system_passthrough() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: In<SystemToolIn<i32>>) -> Entity { cx.tool }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("system_tool"));
+		// The param should be bound directly, no __tool_in indirection.
+		assert!(result.contains("In (cx)"));
+		assert!(!result.contains("__tool_in"));
+	}
+
+	#[test]
+	fn system_passthrough_with_params() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: In<SystemToolIn<i32>>, time: Res<Time>) -> f32 { 0.0 }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("time : Res < Time >"));
+		assert!(result.contains("In (cx)"));
 	}
 }

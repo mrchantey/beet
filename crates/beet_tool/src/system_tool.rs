@@ -4,20 +4,43 @@ use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
 use bevy::ecs::system::SystemState;
 
+/// Context passed to system tool handlers containing the tool entity
+/// and input payload.
+///
+/// This mirrors [`FuncToolIn`] and [`AsyncToolIn`], giving
+/// system-based tools access to the entity that owns the
+/// [`ToolHandler`] component.
+pub struct SystemToolIn<In = ()> {
+	/// The entity that owns the [`ToolHandler`] being called.
+	pub tool: Entity,
+	/// The input payload for this tool call.
+	pub input: In,
+}
+
+impl<In> std::ops::Deref for SystemToolIn<In> {
+	type Target = In;
+	fn deref(&self) -> &Self::Target { &self.input }
+}
+
+impl<In> std::ops::DerefMut for SystemToolIn<In> {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
+}
+
 /// Create a [`ToolHandler`] from a Bevy system that returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), system tools have access to
 /// ECS queries, resources, and other system parameters.
 ///
-/// The system's first argument must be `In<Input>` (the tool's input
-/// payload), followed by any number of regular system parameters.
+/// The system's first argument must be `In<SystemToolIn<Input>>` (the
+/// tool's input payload plus entity context), followed by any number
+/// of regular system parameters.
 ///
 /// ## Examples
 ///
 /// ```rust
 /// # use beet_tool::prelude::*;
 /// # use beet_core::prelude::*;
-/// let handler = system_tool(|In(()): In<()>, time: Res<Time>| -> Result<f32> {
+/// let handler = system_tool(|In(input): In<SystemToolIn<()>>, time: Res<Time>| -> Result<f32> {
 ///     Ok(time.elapsed_secs())
 /// });
 /// ```
@@ -28,7 +51,11 @@ where
 	Func: 'static + Send + Sync + Clone,
 	FnMarker: 'static,
 	Func: SystemParamFunction<FnMarker, Out = Result<Out>>,
-	Func: IntoSystem<In<Input>, Result<Out>, (IsFunctionSystem, FnMarker)>,
+	Func: IntoSystem<
+			In<SystemToolIn<Input>>,
+			Result<Out>,
+			(IsFunctionSystem, FnMarker),
+		>,
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
@@ -36,14 +63,15 @@ where
 		TypeMeta::of::<Func>(),
 		move |ToolCall {
 		          mut commands,
-		          tool: _,
+		          tool,
 		          input,
 		          out_handler,
 		      }| {
 			let func = func.clone();
+			let sys_input = SystemToolIn { tool, input };
 			commands.commands.queue(move |world: &mut World| -> Result {
 				let output: Result<Out> =
-					world.run_system_cached_with(func, input)?;
+					world.run_system_cached_with(func, sys_input)?;
 				let output = output?;
 
 				// Obtain fresh AsyncCommands via SystemState so
@@ -73,7 +101,11 @@ where
 	Func: 'static + Send + Sync + Clone,
 	FnMarker: 'static,
 	Func: SystemParamFunction<FnMarker, Out = Result<Out>>,
-	Func: IntoSystem<In<Input>, Result<Out>, (IsFunctionSystem, FnMarker)>,
+	Func: IntoSystem<
+			In<SystemToolIn<Input>>,
+			Result<Out>,
+			(IsFunctionSystem, FnMarker),
+		>,
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
@@ -97,7 +129,10 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(system_tool(
-				|In(()): In<()>, time: Res<Time>| -> Result<f32> {
+				|In(input): In<SystemToolIn<()>>,
+				 time: Res<Time>|
+				 -> Result<f32> {
+					let _ = input.tool;
 					Ok(time.elapsed_secs())
 				},
 			))
@@ -115,9 +150,9 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(system_tool(
-				|In(val): In<i32>, _time: Res<Time>| -> Result<i32> {
-					Ok(val * 2)
-				},
+				|In(input): In<SystemToolIn<i32>>,
+				 _time: Res<Time>|
+				 -> Result<i32> { Ok(*input * 2) },
 			))
 			.id();
 		world
@@ -131,12 +166,29 @@ mod test {
 	fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(system_tool(|In(()): In<()>| -> Result { Ok(()) }))
+			.spawn(system_tool(|_: In<SystemToolIn<()>>| -> Result { Ok(()) }))
 			.id();
 		world
 			.entity_mut(entity)
 			.call_blocking::<(), ()>(())
 			.unwrap();
+	}
+
+	#[test]
+	fn access_tool_entity() {
+		let mut world = AsyncPlugin::world();
+		let entity = world
+			.spawn(system_tool(
+				|In(input): In<SystemToolIn<()>>| -> Result<Entity> {
+					Ok(input.tool)
+				},
+			))
+			.id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<(), Entity>(())
+			.unwrap()
+			.xpect_eq(entity);
 	}
 
 	#[test]
@@ -149,9 +201,9 @@ mod test {
 		let entity = world
 			.spawn(
 				system_tool(
-					|In(val): In<i32>, _time: Res<Time>| -> Result<i32> {
-						Ok(val * 2)
-					},
+					|In(input): In<SystemToolIn<i32>>,
+					 _time: Res<Time>|
+					 -> Result<i32> { Ok(*input * 2) },
 				)
 				.pipe(negate),
 			)
@@ -161,5 +213,106 @@ mod test {
 			.call_blocking::<i32, i32>(5)
 			.unwrap()
 			.xpect_eq(-10);
+	}
+
+	// -----------------------------------------------------------------------
+	// #[tool] macro — system tools
+	// -----------------------------------------------------------------------
+
+	#[tool]
+	fn sys_double(val: In<i32>) -> i32 { val * 2 }
+
+	#[test]
+	fn tool_macro_system_basic() {
+		AsyncPlugin::world()
+			.spawn(sys_double.into_tool_handler())
+			.call_blocking::<i32, i32>(5)
+			.unwrap()
+			.xpect_eq(10);
+	}
+
+	#[tool]
+	fn sys_with_resource(val: In<i32>, time: Res<Time>) -> f32 {
+		val as f32 + time.elapsed_secs()
+	}
+
+	#[test]
+	fn tool_macro_system_with_resource() {
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Time>();
+		let entity = world.spawn(sys_with_resource.into_tool_handler()).id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<i32, f32>(10)
+			.unwrap()
+			.xpect_eq(10.0);
+	}
+
+	#[tool]
+	fn sys_unit(_val: In<()>) {}
+
+	#[test]
+	fn tool_macro_system_unit() {
+		AsyncPlugin::world()
+			.spawn(sys_unit.into_tool_handler())
+			.call_blocking::<(), ()>(())
+			.unwrap();
+	}
+
+	#[tool]
+	fn sys_fallible(val: In<i32>) -> Result<i32> {
+		if val == 0 {
+			bevybail!("zero not allowed");
+		}
+		Ok(val * 3)
+	}
+
+	#[test]
+	fn tool_macro_system_result_ok() {
+		AsyncPlugin::world()
+			.spawn(sys_fallible.into_tool_handler())
+			.call_blocking::<i32, i32>(4)
+			.unwrap()
+			.xpect_eq(12);
+	}
+
+	// -----------------------------------------------------------------------
+	// #[tool] macro — system passthrough
+	// -----------------------------------------------------------------------
+
+	#[tool]
+	fn sys_passthrough(cx: In<SystemToolIn<()>>) -> Entity { cx.tool }
+
+	#[test]
+	fn tool_macro_system_passthrough_entity() {
+		let mut world = AsyncPlugin::world();
+		let entity = world.spawn(sys_passthrough.into_tool_handler()).id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<(), Entity>(())
+			.unwrap()
+			.xpect_eq(entity);
+	}
+
+	#[tool]
+	fn sys_passthrough_with_res(
+		cx: In<SystemToolIn<i32>>,
+		time: Res<Time>,
+	) -> f32 {
+		*cx as f32 + time.elapsed_secs()
+	}
+
+	#[test]
+	fn tool_macro_system_passthrough_with_resource() {
+		let mut world = AsyncPlugin::world();
+		world.init_resource::<Time>();
+		let entity = world
+			.spawn(sys_passthrough_with_res.into_tool_handler())
+			.id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<i32, f32>(7)
+			.unwrap()
+			.xpect_eq(7.0);
 	}
 }

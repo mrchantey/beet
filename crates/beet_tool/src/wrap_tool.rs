@@ -62,29 +62,13 @@ where
 	}
 }
 
-/// Allows wrapping a tool handler with middleware-style logic.
-///
-/// The wrapper function receives the outer input and a [`Next`]
-/// handle, returning the outer output. The inner handler is
-/// called via [`Next::call`] at the wrapper's discretion.
-pub trait IntoWrapTool<WrapIn, WrapOut, InnerIn, InnerOut>: Sized {
-	/// Wrap an inner handler, producing a combined [`ToolHandler`].
-	///
-	/// The resulting handler accepts `WrapIn` and produces `WrapOut`,
-	/// with the wrapper controlling when and how the inner handler
-	/// (accepting `InnerIn`/`InnerOut`) is invoked via [`Next`].
-	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
-	where
-		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
-		InnerIn: 'static + Send + Sync,
-		InnerOut: 'static + Send + Sync;
-}
+/// Marker for the [`IntoToolHandler`] impl that captures async wrapper
+/// closures of the form `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future`.
+pub struct WrapToolMarker;
 
-/// Blanket impl for async wrapper functions.
-///
-/// The wrapper is `Fn(WrapIn, Next<InnerIn, InnerOut>) -> Future<Output = WrapOut>`.
 impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
-	IntoWrapTool<WrapIn, WrapOut, InnerIn, InnerOut> for WrapFn
+	IntoToolHandler<(WrapToolMarker, WrapIn, WrapOut, InnerIn, InnerOut)>
+	for WrapFn
 where
 	WrapFn: 'static
 		+ Send
@@ -97,33 +81,22 @@ where
 	InnerIn: 'static + Send + Sync,
 	InnerOut: 'static + Send + Sync,
 {
-	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
-	where
-		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
-	{
-		let inner_handler = Arc::new(Mutex::new(inner.into_tool_handler()));
+	type In = (WrapIn, Next<InnerIn, InnerOut>);
+	type Out = WrapOut;
 
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> {
 		ToolHandler::new(
-			TypeMeta::of::<(WrapFn, Inner)>(),
+			TypeMeta::of::<WrapFn>(),
 			move |ToolCall {
 			          mut commands,
-			          tool,
-			          input,
+			          tool: _,
+			          input: (wrap_in, next),
 			          out_handler,
 			      }| {
-				let inner_handler = Arc::clone(&inner_handler);
-				let async_world = commands.world();
-				let next = Next {
-					handler: inner_handler,
-					tool,
-					world: async_world,
-				};
-
 				let func = self.clone();
 				commands.run(async move |world: AsyncWorld| -> Result {
-					let output = func(input, next).await;
+					let output = func(wrap_in, next).await;
 
-					// Deliver output via fresh AsyncCommands
 					world
 						.with_then(move |world: &mut World| -> Result {
 							let result = {
@@ -141,6 +114,75 @@ where
 						.await
 				});
 				Ok(())
+			},
+		)
+	}
+}
+
+/// Allows wrapping a tool handler with middleware-style logic.
+///
+/// The wrapper function receives the outer input and a [`Next`]
+/// handle, returning the outer output. The inner handler is
+/// called via [`Next::call`] at the wrapper's discretion.
+///
+/// This is blanket-implemented for any [`IntoToolHandler`] whose
+/// input type is `(WrapIn, Next<InnerIn, InnerOut>)`.
+pub trait IntoWrapTool<M, WrapIn, WrapOut, InnerIn, InnerOut>: Sized {
+	/// Wrap an inner handler, producing a combined [`ToolHandler`].
+	///
+	/// The resulting handler accepts `WrapIn` and produces `WrapOut`,
+	/// with the wrapper controlling when and how the inner handler
+	/// (accepting `InnerIn`/`InnerOut`) is invoked via [`Next`].
+	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
+	where
+		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
+		InnerIn: 'static + Send + Sync,
+		InnerOut: 'static + Send + Sync;
+}
+
+/// Blanket impl: any [`IntoToolHandler`] with `In = (WrapIn, Next<InnerIn, InnerOut>)`
+/// automatically becomes wrappable.
+impl<T, M, WrapIn, WrapOut, InnerIn, InnerOut>
+	IntoWrapTool<M, WrapIn, WrapOut, InnerIn, InnerOut> for T
+where
+	T: 'static
+		+ IntoToolHandler<
+			M,
+			In = (WrapIn, Next<InnerIn, InnerOut>),
+			Out = WrapOut,
+		>,
+	WrapIn: 'static + Send + Sync,
+	WrapOut: 'static + Send + Sync,
+	InnerIn: 'static + Send + Sync,
+	InnerOut: 'static + Send + Sync,
+{
+	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
+	where
+		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
+	{
+		let inner_handler = Arc::new(Mutex::new(inner.into_tool_handler()));
+		let mut outer_handler = self.into_tool_handler();
+
+		ToolHandler::new(
+			TypeMeta::of::<(T, Inner)>(),
+			move |ToolCall {
+			          commands,
+			          tool,
+			          input,
+			          out_handler,
+			      }| {
+				let next = Next {
+					handler: Arc::clone(&inner_handler),
+					tool,
+					world: commands.world(),
+				};
+
+				outer_handler.call(ToolCall {
+					commands,
+					tool,
+					input: (input, next),
+					out_handler,
+				})
 			},
 		)
 	}

@@ -197,4 +197,95 @@ mod test {
 			.unwrap()
 			.xpect_eq(7);
 	}
+
+	// -----------------------------------------------------------------------
+	// #[tool] macro — async tools
+	// -----------------------------------------------------------------------
+
+	#[tool]
+	async fn async_negate(val: i32) -> i32 { -val }
+
+	#[test]
+	fn tool_macro_async_single_arg() {
+		AsyncPlugin::world()
+			.spawn(async_negate.into_tool_handler())
+			.call_blocking::<i32, i32>(7)
+			.unwrap()
+			.xpect_eq(-7);
+	}
+
+	#[tool]
+	async fn async_add(a: i32, b: i32) -> i32 { a + b }
+
+	#[test]
+	fn tool_macro_async_multi_arg() {
+		AsyncPlugin::world()
+			.spawn(async_add.into_tool_handler())
+			.call_blocking::<(i32, i32), i32>((3, 4))
+			.unwrap()
+			.xpect_eq(7);
+	}
+
+	#[tool]
+	async fn async_no_args() -> i32 { 42 }
+
+	#[test]
+	fn tool_macro_async_no_args() {
+		AsyncPlugin::world()
+			.spawn(async_no_args.into_tool_handler())
+			.call_blocking::<(), i32>(())
+			.unwrap()
+			.xpect_eq(42);
+	}
+
+	#[tool]
+	async fn async_fallible(val: i32) -> Result<i32> {
+		if val == 0 {
+			bevybail!("zero");
+		}
+		Ok(val * 2)
+	}
+
+	#[test]
+	fn tool_macro_async_result_ok() {
+		AsyncPlugin::world()
+			.spawn(async_fallible.into_tool_handler())
+			.call_blocking::<i32, i32>(5)
+			.unwrap()
+			.xpect_eq(10);
+	}
+
+	// -----------------------------------------------------------------------
+	// #[tool] macro — async passthrough
+	// -----------------------------------------------------------------------
+
+	#[tool]
+	async fn async_passthrough_tool(cx: AsyncToolIn<i32>) -> i32 { *cx * 3 }
+
+	#[test]
+	fn tool_macro_async_passthrough() {
+		AsyncPlugin::world()
+			.spawn(async_passthrough_tool.into_tool_handler())
+			.call_blocking::<i32, i32>(5)
+			.unwrap()
+			.xpect_eq(15);
+	}
+
+	#[tool]
+	async fn async_passthrough_entity(cx: AsyncToolIn<()>) -> Entity {
+		cx.tool.id()
+	}
+
+	#[test]
+	fn tool_macro_async_passthrough_entity() {
+		let mut world = AsyncPlugin::world();
+		let entity = world
+			.spawn(async_passthrough_entity.into_tool_handler())
+			.id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<(), Entity>(())
+			.unwrap()
+			.xpect_eq(entity);
+	}
 }

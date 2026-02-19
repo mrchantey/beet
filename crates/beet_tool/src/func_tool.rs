@@ -159,4 +159,36 @@ mod test {
 			.unwrap()
 			.xpect_eq(8);
 	}
+
+	// -----------------------------------------------------------------------
+	// #[tool] macro — func passthrough
+	// -----------------------------------------------------------------------
+
+	#[tool]
+	fn func_passthrough_tool(cx: FuncToolIn<i32>) -> i32 { *cx * 3 }
+
+	#[test]
+	fn tool_macro_func_passthrough() {
+		AsyncPlugin::world()
+			.spawn(func_passthrough_tool.into_tool_handler())
+			.call_blocking::<i32, i32>(5)
+			.unwrap()
+			.xpect_eq(15);
+	}
+
+	#[tool]
+	fn func_passthrough_entity(cx: FuncToolIn<()>) -> Entity { cx.tool }
+
+	#[test]
+	fn tool_macro_func_passthrough_entity() {
+		let mut world = AsyncPlugin::world();
+		let entity = world
+			.spawn(func_passthrough_entity.into_tool_handler())
+			.id();
+		world
+			.entity_mut(entity)
+			.call_blocking::<(), Entity>(())
+			.unwrap()
+			.xpect_eq(entity);
+	}
 }
