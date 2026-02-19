@@ -2,21 +2,13 @@
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 // #![deny(missing_docs)]
 
-mod async_tool;
-mod call_tool;
-mod func_tool;
-mod chain_tool;
-mod system_tool;
-mod tool_handler;
-mod wrap_tool;
+mod control_flow;
+mod tools;
 
 /// Exports the most commonly used items.
 pub mod prelude {
-	pub use crate::async_tool::*;
-	pub use crate::call_tool::*;
-	pub use crate::func_tool::*;
-	pub use crate::chain_tool::*;
-	pub use crate::system_tool::*;
-	pub use crate::tool_handler::*;
-	pub use crate::wrap_tool::*;
+	pub use crate::control_flow::Outcome::Fail;
+	pub use crate::control_flow::Outcome::Pass;
+	pub use crate::control_flow::*;
+	pub use crate::tools::*;
 }

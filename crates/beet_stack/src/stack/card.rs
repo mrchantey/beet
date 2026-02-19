@@ -142,7 +142,7 @@ where
 ///
 /// let bundle = file_card("readme", "docs/readme.md");
 /// ```
-#[cfg(feature = "markdown")]
+// #[cfg(feature = "markdown")]
 pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 	let ws_path: WsPathBuf = file_path.into();
 	card(path, file_card_content_tool(ws_path))

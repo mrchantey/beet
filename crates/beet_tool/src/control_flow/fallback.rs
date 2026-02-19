@@ -72,7 +72,7 @@ mod tests {
 
 	#[test]
 	fn no_children() {
-		StackPlugin::world()
+		AsyncPlugin::world()
 			.spawn(async_tool(fallback::<(), ()>))
 			.call_blocking::<(), Outcome>(())
 			.unwrap()
@@ -80,7 +80,7 @@ mod tests {
 	}
 	#[test]
 	fn failing_child() {
-		StackPlugin::world()
+		AsyncPlugin::world()
 			.spawn((async_tool(fallback::<(), ()>), children![(
 				PathPartial::new("foo"),
 				outcome_fail(),
@@ -91,7 +91,7 @@ mod tests {
 	}
 	#[test]
 	fn passing_child() {
-		StackPlugin::world()
+		AsyncPlugin::world()
 			.spawn((async_tool(fallback::<(), ()>), children![(
 				PathPartial::new("foo"),
 				outcome_pass(),
@@ -102,7 +102,7 @@ mod tests {
 	}
 	#[test]
 	fn passing_nth_child() {
-		StackPlugin::world()
+		AsyncPlugin::world()
 			.spawn((async_tool(fallback::<(), ()>), children![
 				(PathPartial::new("foo"), outcome_fail()),
 				(PathPartial::new("bar"), outcome_fail()),

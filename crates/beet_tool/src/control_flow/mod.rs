@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// switch, and other control flow structures.
 /// Outcome payloads default to `()` and variants are exposed at the crate level:
 /// ```rust
-/// # use beet_stack::prelude::*;
+/// # use beet_tool::prelude::*;
 ///
 /// fn short() -> Outcome {
 /// 	Pass(())
