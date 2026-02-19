@@ -8,13 +8,13 @@ use std::sync::Mutex;
 /// Both handlers are fused into a single [`ToolHandler`] whose input
 /// type matches the first handler and whose output type matches the
 /// second. The intermediate value is converted via [`From`].
-pub trait IntoPipeTool<In, Out, M>
+pub trait IntoChainTool<In, Out, M>
 where
 	Self: 'static + Sized + IntoToolHandler<M, In = In, Out = Out>,
 	Out: 'static,
 {
-	/// Pipe `self` to `other`, producing a combined handler.
-	fn pipe<T2, M2>(self, other: T2) -> ToolHandler<In, T2::Out>
+	/// Chain `self` to `other`, producing a combined handler.
+	fn chain<T2, M2>(self, other: T2) -> ToolHandler<In, T2::Out>
 	where
 		T2: 'static + IntoToolHandler<M2>,
 		T2::In: 'static + From<Out>,
@@ -55,7 +55,7 @@ where
 }
 
 
-impl<In, Out, M, T> IntoPipeTool<In, Out, M> for T
+impl<In, Out, M, T> IntoChainTool<In, Out, M> for T
 where
 	T: 'static + IntoToolHandler<M, In = In, Out = Out>,
 	Out: 'static,
@@ -80,44 +80,44 @@ mod test {
 	fn to_string(val: i32) -> String { val.to_string() }
 
 	#[test]
-	fn pipe_two() {
+	fn two() {
 		AsyncPlugin::world()
-			.spawn(add.pipe(negate))
+			.spawn(add.chain(negate))
 			.call_blocking::<(i32, i32), i32>((5, 2))
 			.unwrap()
 			.xpect_eq(-7);
 	}
 	#[test]
-	fn pipe_three() {
+	fn three() {
 		AsyncPlugin::world()
-			.spawn(add.pipe(multiply).pipe(negate))
+			.spawn(add.chain(multiply).chain(negate))
 			.call_blocking::<(i32, i32), i32>((5, 3))
 			.unwrap()
 			.xpect_eq(-64);
 	}
 
 	#[test]
-	fn pipe_type_conversion() {
+	fn type_conversion() {
 		AsyncPlugin::world()
-			.spawn(add.pipe(to_string))
+			.spawn(add.chain(to_string))
 			.call_blocking::<(i32, i32), String>((3, 4))
 			.unwrap()
 			.xpect_eq("7".to_string());
 	}
 
 	#[test]
-	fn pipe_with_closure() {
+	fn with_closure() {
 		AsyncPlugin::world()
-			.spawn(add.pipe(|val: i32| val * 2))
+			.spawn(add.chain(|val: i32| val * 2))
 			.call_blocking::<(i32, i32), i32>((3, 4))
 			.unwrap()
 			.xpect_eq(14);
 	}
 
 	#[test]
-	fn pipe_called_multiple_times() {
+	fn called_multiple_times() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(add.pipe(negate)).id();
+		let entity = world.spawn(add.chain(negate)).id();
 		world
 			.entity_mut(entity)
 			.call_blocking::<(i32, i32), i32>((1, 2))
@@ -131,9 +131,9 @@ mod test {
 	}
 
 	#[test]
-	fn pipe_identity() {
+	fn identity() {
 		AsyncPlugin::world()
-			.spawn(add.pipe(|val: i32| val))
+			.spawn(add.chain(|val: i32| val))
 			.call_blocking::<(i32, i32), i32>((5, 5))
 			.unwrap()
 			.xpect_eq(10);

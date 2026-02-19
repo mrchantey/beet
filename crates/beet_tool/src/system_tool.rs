@@ -26,6 +26,11 @@ impl<In> std::ops::DerefMut for SystemToolIn<In> {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
 }
 
+impl<In> SystemToolIn<In> {
+	/// Consume the context and return the inner input payload.
+	pub fn take(self) -> In { self.input }
+}
+
 /// Create a [`ToolHandler`] from a Bevy system that returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), system tools have access to
@@ -205,7 +210,7 @@ mod test {
 					 _time: Res<Time>|
 					 -> Result<i32> { Ok(*input * 2) },
 				)
-				.pipe(negate),
+				.chain(negate),
 			)
 			.id();
 		world
@@ -299,7 +304,7 @@ mod test {
 		cx: In<SystemToolIn<i32>>,
 		time: Res<Time>,
 	) -> f32 {
-		*cx as f32 + time.elapsed_secs()
+		cx.take() as f32 + time.elapsed_secs()
 	}
 
 	#[test]
