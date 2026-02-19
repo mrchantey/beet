@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use syn::Attribute;
 use syn::Data;
 use syn::DeriveInput;

@@ -45,6 +45,7 @@ pub fn is_internal() -> bool {
 		"beet_router",
 		"beet_spatial",
 		"beet_stack",
+		"beet_tool",
 	];
 	let current_pkg = std::env::var("CARGO_PKG_NAME").unwrap();
 	INTERNAL_PKGS.contains(&current_pkg.as_str())

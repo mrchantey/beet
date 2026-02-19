@@ -12,7 +12,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
 - This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility, instead prioritizing refactors and cleaning up dead or experimental code.
-- You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
+- Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
 - when told to run a command, run that command before doing anything else, including searching the codebase
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything

@@ -66,6 +66,7 @@ members = [
 	"crates/beet_rsx/macros",
 	"crates/beet_rsx",
 	"crates/beet_stack",
+	"crates/beet_tool",
 
 	## 💡 Beet
 	"crates/beet_site",
@@ -95,6 +96,7 @@ beet_router = { path = "crates/beet_router", version = "0.0.9-dev.3" }
 beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.3" }
 beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.3" }
 beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.3" }
+beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.3" }
 
 beet = { path = "", version = "0.0.9-dev.3" }
 

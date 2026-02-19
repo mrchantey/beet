@@ -3,6 +3,7 @@ mod as_any;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
+mod tool;
 mod mdx;
 mod sendit;
 mod to_tokens;
@@ -202,4 +203,13 @@ pub fn beet_test(
 #[proc_macro]
 pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	mdx::impl_mdx(input)
+}
+
+
+#[proc_macro_attribute]
+pub fn tool(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	tool::impl_tool(attr, item)
 }
