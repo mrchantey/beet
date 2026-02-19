@@ -60,7 +60,7 @@ impl std::fmt::Display for NavigateTo {
 /// tool with the request. The current position is taken from the
 /// request path segments.
 pub(crate) async fn navigate_handler(
-	cx: AsyncToolContext<Request>,
+	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let Some(value) = cx.get_param("navigate") else {
 		return Fail(cx.input).xok();

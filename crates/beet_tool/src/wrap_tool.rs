@@ -142,21 +142,22 @@ pub trait IntoWrapTool<M, WrapIn, WrapOut, InnerIn, InnerOut>: Sized {
 
 /// Blanket impl: any [`IntoToolHandler`] with `In = (WrapIn, Next<InnerIn, InnerOut>)`
 /// automatically becomes wrappable.
-impl<T, M, WrapIn, WrapOut, InnerIn, InnerOut>
-	IntoWrapTool<M, WrapIn, WrapOut, InnerIn, InnerOut> for T
+// here OuterIn/OuterOut are the types for the actual tool
+impl<T, M, OuterIn, OuterOut, InnerIn, InnerOut>
+	IntoWrapTool<M, OuterIn, OuterOut, InnerIn, InnerOut> for T
 where
 	T: 'static
 		+ IntoToolHandler<
 			M,
-			In = (WrapIn, Next<InnerIn, InnerOut>),
-			Out = WrapOut,
+			In = (OuterIn, Next<InnerIn, InnerOut>),
+			Out = OuterOut,
 		>,
-	WrapIn: 'static + Send + Sync,
-	WrapOut: 'static + Send + Sync,
+	OuterIn: 'static + Send + Sync,
+	OuterOut: 'static + Send + Sync,
 	InnerIn: 'static + Send + Sync,
 	InnerOut: 'static + Send + Sync,
 {
-	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<WrapIn, WrapOut>
+	fn wrap<Inner, InnerM>(self, inner: Inner) -> ToolHandler<OuterIn, OuterOut>
 	where
 		Inner: 'static + IntoToolHandler<InnerM, In = InnerIn, Out = InnerOut>,
 	{

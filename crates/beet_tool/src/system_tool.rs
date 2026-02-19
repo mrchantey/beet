@@ -225,7 +225,7 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[tool]
-	fn sys_double(val: In<i32>) -> i32 { val * 2 }
+	fn sys_double(val: In<i32>) -> i32 { val.0 * 2 }
 
 	#[test]
 	fn tool_macro_system_basic() {
@@ -238,7 +238,7 @@ mod test {
 
 	#[tool]
 	fn sys_with_resource(val: In<i32>, time: Res<Time>) -> f32 {
-		val as f32 + time.elapsed_secs()
+		val.0 as f32 + time.elapsed_secs()
 	}
 
 	#[test]
@@ -264,12 +264,29 @@ mod test {
 			.unwrap();
 	}
 
+	/// Verify that the macro re-wraps the input in `In()` so the
+	/// user's type annotation is not a lie.
+	#[tool]
+	fn sys_in_rewrap(val: In<i32>) -> i32 {
+		let val: In<i32> = val;
+		val.0 * 2
+	}
+
+	#[test]
+	fn tool_macro_system_in_rewrap() {
+		AsyncPlugin::world()
+			.spawn(sys_in_rewrap.into_tool_handler())
+			.call_blocking::<i32, i32>(5)
+			.unwrap()
+			.xpect_eq(10);
+	}
+
 	#[tool]
 	fn sys_fallible(val: In<i32>) -> Result<i32> {
-		if val == 0 {
+		if val.0 == 0 {
 			bevybail!("zero not allowed");
 		}
-		Ok(val * 3)
+		Ok(val.0 * 3)
 	}
 
 	#[test]

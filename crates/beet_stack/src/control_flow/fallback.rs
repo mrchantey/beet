@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// unrelated tools (like render tools) from being called with the
 /// wrong types.
 pub async fn fallback<Input, Output>(
-	cx: AsyncToolContext<Input>,
+	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
 	Input: 'static + Send + Sync,
@@ -63,10 +63,17 @@ where
 mod tests {
 	use super::*;
 
+	fn outcome_fail() -> ToolHandler<(), Outcome> {
+		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())
+	}
+	fn outcome_pass() -> ToolHandler<(), Outcome> {
+		func_tool(|_: FuncToolIn<()>| Outcome::PASS.xok())
+	}
+
 	#[test]
 	fn no_children() {
 		StackPlugin::world()
-			.spawn(tool(fallback::<(), ()>))
+			.spawn(async_tool(fallback::<(), ()>))
 			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
@@ -74,9 +81,9 @@ mod tests {
 	#[test]
 	fn failing_child() {
 		StackPlugin::world()
-			.spawn((tool(fallback::<(), ()>), children![(
+			.spawn((async_tool(fallback::<(), ()>), children![(
 				PathPartial::new("foo"),
-				tool(|| { Outcome::FAIL })
+				outcome_fail(),
 			)]))
 			.call_blocking::<(), Outcome>(())
 			.unwrap()
@@ -85,9 +92,9 @@ mod tests {
 	#[test]
 	fn passing_child() {
 		StackPlugin::world()
-			.spawn((tool(fallback::<(), ()>), children![(
+			.spawn((async_tool(fallback::<(), ()>), children![(
 				PathPartial::new("foo"),
-				tool(|| { Outcome::PASS })
+				outcome_pass(),
 			)]))
 			.call_blocking::<(), Outcome>(())
 			.unwrap()
@@ -96,11 +103,11 @@ mod tests {
 	#[test]
 	fn passing_nth_child() {
 		StackPlugin::world()
-			.spawn((tool(fallback::<(), ()>), children![
-				(PathPartial::new("foo"), tool(|| { Outcome::FAIL }),),
-				(PathPartial::new("bar"), tool(|| { Outcome::FAIL }),),
-				(PathPartial::new("bazz"), tool(|| { Outcome::PASS })),
-				(PathPartial::new("boo"), tool(|| { Outcome::FAIL }),),
+			.spawn((async_tool(fallback::<(), ()>), children![
+				(PathPartial::new("foo"), outcome_fail()),
+				(PathPartial::new("bar"), outcome_fail()),
+				(PathPartial::new("bazz"), outcome_pass()),
+				(PathPartial::new("boo"), outcome_fail()),
 			]))
 			.call_blocking::<(), Outcome>(())
 			.unwrap()

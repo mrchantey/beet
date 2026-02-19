@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// Fallback tool for mapping a request path to a corresponding tool in this
 /// tree's hierarchy, using the [`RouteTree`] in its ancestors.
 pub fn try_router() -> impl Bundle {
-	(Name::new("Router"), RouteHidden, tool(router_tool))
+	(Name::new("Router"), RouteHidden, async_tool(router_tool))
 }
 
 /// Fallback tool for mapping a request path to a corresponding tool in this
@@ -15,7 +15,7 @@ pub fn router() -> impl Bundle {
 		// the router itself shouldnt show up in the route tree
 		RouteHidden,
 		exchange_fallback(),
-		OnSpawn::insert_child((RouteHidden, tool(router_tool))),
+		OnSpawn::insert_child((RouteHidden, async_tool(router_tool))),
 	)
 }
 
@@ -27,7 +27,7 @@ pub fn router() -> impl Bundle {
 /// regular tools that delegate to the render tool internally, so
 /// no special handling is needed here.
 async fn router_tool(
-	cx: AsyncToolContext<Request>,
+	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let tool_entity = cx.tool.id();
@@ -117,7 +117,9 @@ mod test {
 		StackPlugin::world()
 			.spawn((router(), children![route_tool(
 				"add",
-				|input: (i32, i32)| -> i32 { input.0 + input.1 }
+				func_tool(
+					|input: FuncToolIn<(i32, i32)>| Ok(input.0 + input.1)
+				),
 			),]))
 			.call::<Request, Response>(
 				Request::with_json("/add", &(10i32, 20i32)).unwrap(),

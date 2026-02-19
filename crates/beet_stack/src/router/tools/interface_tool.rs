@@ -34,20 +34,20 @@ pub fn interface() -> impl Bundle { (RouteHidden, exchange_fallback()) }
 pub fn exchange_fallback() -> impl Bundle {
 	(
 		// Name::new("Exchange Fallback"),
-		tool(async |request: AsyncToolContext<Request>| -> Response {
+		async_tool(async |request: AsyncToolIn<Request>| -> Result<Response> {
 			match fallback::<Request, Response>(request).await {
 				// a response matched, which may be an opinionated not found response
-				Ok(Pass(res)) => res,
+				Ok(Pass(res)) => Ok(res),
 				// usually an interface should render an opinionated not found response
 				// as the final fallback, in this case they didnt so we'll return
 				// a simple plaintext one.
-				Ok(Fail(req)) => Response::from_status_body(
+				Ok(Fail(req)) => Ok(Response::from_status_body(
 					StatusCode::NotFound,
 					format!("Resource not found: {}", req.path_string()),
 					"text/plain",
-				),
+				)),
 				// if the returned error is a HttpError, its status code will be used.
-				Err(err) => HttpError::from_opaque(err).into_response(),
+				Err(err) => Ok(HttpError::from_opaque(err).into_response()),
 			}
 		}),
 	)
@@ -73,17 +73,21 @@ pub fn default_router() -> impl Bundle {
 	(
 		interface(),
 		OnSpawn::insert(children![
-			(Name::new("Help Tool"), RouteHidden, tool(help_handler)),
+			(
+				Name::new("Help Tool"),
+				RouteHidden,
+				async_tool(help_handler),
+			),
 			(
 				Name::new("Navigate Tool"),
 				RouteHidden,
-				tool(navigate_handler)
+				async_tool(navigate_handler),
 			),
 			try_router(),
 			(
 				Name::new("Contextual Not Found"),
 				RouteHidden,
-				tool(contextual_not_found_handler)
+				async_tool(contextual_not_found_handler),
 			)
 		]),
 	)
@@ -97,8 +101,8 @@ mod test {
 
 	fn my_interface() -> impl Bundle {
 		(
-			tool(
-				|req: In<ToolContext<Request>>,
+			system_tool(
+				|In(req): In<SystemToolIn<Request>>,
 				 trees: Query<&RouteTree>|
 				 -> Result<RouteTree> {
 					let tree = trees.get(req.tool)?;
@@ -107,7 +111,9 @@ mod test {
 			),
 			children![(
 				PathPartial::new("add"),
-				tool(|(a, b): (u32, u32)| a + b)
+				func_tool(
+					|input: FuncToolIn<(u32, u32)>| Ok(input.0 + input.1)
+				),
 			)],
 		)
 	}
@@ -133,7 +139,12 @@ mod test {
 		StackPlugin::world()
 			.spawn((default_router(), children![
 				markdown_render_tool(),
-				route_tool("add", |(a, b): (i32, i32)| -> i32 { a + b }),
+				route_tool(
+					"add",
+					func_tool(|input: FuncToolIn<(i32, i32)>| Ok(
+						input.0 + input.1
+					))
+				),
 			]))
 			.call::<Request, Response>(
 				Request::with_json("add", &(1i32, 2i32)).unwrap(),

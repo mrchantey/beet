@@ -29,13 +29,11 @@ Tools are callable entities with specified input/output types.
 use beet_stack::prelude::*;
 use beet_core::prelude::*;
 
-fn add_tool() -> impl Bundle{
-	tool(|(a, b): (i32, i32)| -> i32 { a + b })
-}
-
+#[tool]
+fn add_tool(a: i32, b: i32) -> i32 { a + b }
 
 let output: i32 = AsyncPlugin::world()
-	.spawn(add_tool())
+	.spawn(add_tool.into_tool_handler())
 	.call_blocking((1, 2))
 	.unwrap();
 
@@ -94,7 +92,7 @@ Planned interfaces:
 ## Modules
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
-- **`tools`** - `tool()`, `ToolMeta`, tool handlers
+- **`tools`** - `ToolHandler`, `ToolMeta`, `#[tool]` macro (via `beet_tool`)
 - **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `RenderRequest`, built-in tools
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access

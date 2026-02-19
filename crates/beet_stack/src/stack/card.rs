@@ -96,6 +96,7 @@ where
 	let content_handler = {
 		let func = func.clone();
 		ToolHandler::new(
+			TypeMeta::of::<F>(),
 			move |ToolCall {
 			          mut commands,
 			          tool: _tool,
@@ -186,6 +187,7 @@ fn file_card_content_tool(
 /// 4. Returns the render tool's response
 fn card_tool_handler() -> ToolHandler<Request, Response> {
 	ToolHandler::new(
+		TypeMeta::of_val(&card_tool_handler),
 		move |ToolCall {
 		          mut commands,
 		          tool: tool_entity,

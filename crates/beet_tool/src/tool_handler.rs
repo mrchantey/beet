@@ -69,6 +69,15 @@ pub struct ToolMeta {
 }
 
 impl ToolMeta {
+	/// Create a [`ToolMeta`] from handler, input and output type parameters.
+	pub fn of<H: 'static, In: 'static, Out: 'static>() -> Self {
+		Self {
+			handler: TypeMeta::of::<H>(),
+			input: TypeMeta::of::<In>(),
+			output: TypeMeta::of::<Out>(),
+		}
+	}
+
 	/// Returns true if this tool natively handles [`Request`]/[`Response`].
 	#[cfg(feature = "exchange")]
 	pub fn is_exchange(&self) -> bool {
@@ -127,6 +136,8 @@ impl TypeMeta {
 			type_id: std::any::TypeId::of::<T>(),
 		}
 	}
+	pub fn of_val<T: 'static>(_: &T) -> Self { Self::of::<T>() }
+
 	/// The full type name, ie `core::option::Option<i32>`.
 	pub fn type_name(&self) -> &'static str { self.type_name }
 	/// The [`TypeId`](std::any::TypeId) for this type.
@@ -185,32 +196,6 @@ impl<Out> OutHandler<Out> {
 	pub fn call(self, commands: AsyncCommands, output: Out) -> Result {
 		(self.func)(commands, output)
 	}
-}
-
-
-/// Context passed to tool handlers containing the tool entity and input payload.
-pub struct ToolContext<In = ()> {
-	/// The async tool entity being called.
-	pub tool: AsyncEntity,
-	/// The input payload for this tool call.
-	pub input: In,
-}
-
-impl<In> std::ops::Deref for ToolContext<In> {
-	type Target = In;
-	fn deref(&self) -> &Self::Target { &self.input }
-}
-
-impl<In> std::ops::DerefMut for ToolContext<In> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
-}
-
-impl<In> ToolContext<In> {
-	/// Create a new tool context with the given tool and payload.
-	pub fn new(tool: AsyncEntity, input: In) -> Self { Self { tool, input } }
-
-	/// Consume the context and return the inner input payload.
-	pub fn take(self) -> In { self.input }
 }
 
 

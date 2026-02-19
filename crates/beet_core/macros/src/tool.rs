@@ -17,15 +17,9 @@ pub fn impl_tool(
 		.into()
 }
 
-fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
-	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out"])?;
-	let result_out = attrs.contains_key("result_out");
-
-	let is_async = item.sig.asyncness.is_some();
-
-	// Collect all parameters as (name, type) pairs.
-	let mut params: Vec<(syn::Ident, Box<Type>)> = Vec::new();
+/// Collect all parameters from a function signature as (name, type) pairs.
+fn collect_params(item: &ItemFn) -> syn::Result<Vec<(syn::Ident, Box<Type>)>> {
+	let mut params = Vec::new();
 	for arg in &item.sig.inputs {
 		match arg {
 			FnArg::Typed(pat_type) => {
@@ -46,6 +40,17 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 			}
 		}
 	}
+	Ok(params)
+}
+
+fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
+	let attrs = AttributeMap::parse(attr)?;
+	attrs.assert_types(&[], &["result_out"])?;
+	let result_out = attrs.contains_key("result_out");
+
+	let is_async = item.sig.asyncness.is_some();
+
+	let params = collect_params(&item)?;
 
 	// Detect tool kind and passthrough.
 	let first_param_type = params.first().map(|(_, ty)| ty.as_ref());
@@ -287,7 +292,7 @@ fn parse_system_tool(
 					In(__tool_in): In<#beet_tool::prelude::SystemToolIn<#in_type>>
 					#(, #system_params)*
 				| -> Result<#out_type> {
-					let #first_param_name = __tool_in.input;
+					let #first_param_name = In(__tool_in.input);
 					#body_wrap
 				})
 			}
@@ -669,7 +674,7 @@ mod test {
 		assert!(result.contains("type Out = i32"));
 		assert!(result.contains("system_tool"));
 		assert!(result.contains("SystemToolIn"));
-		assert!(result.contains("let val = __tool_in . input"));
+		assert!(result.contains("let val = In (__tool_in . input)"));
 	}
 
 	#[test]
@@ -680,7 +685,7 @@ mod test {
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("system_tool"));
 		assert!(result.contains("time : Res < Time >"));
-		assert!(result.contains("let val = __tool_in . input"));
+		assert!(result.contains("let val = In (__tool_in . input)"));
 	}
 
 	#[test]

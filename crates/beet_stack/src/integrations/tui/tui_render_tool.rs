@@ -34,16 +34,14 @@ pub fn tui_render_tool() -> impl Bundle {
 	(
 		RenderToolMarker,
 		PathPartial::new("render-tui"),
-		tool(tui_render_system),
+		async_tool(tui_render_system),
 	)
 }
 
 /// System that handles TUI rendering requests by despawning the
 /// previous card and marking the new content entity with
 /// [`CurrentCard`].
-async fn tui_render_system(
-	cx: AsyncToolContext<RenderRequest>,
-) -> Result<Response> {
+async fn tui_render_system(cx: AsyncToolIn<RenderRequest>) -> Result<Response> {
 	let card_entity = cx.input.entity;
 	let world = cx.tool.world();
 

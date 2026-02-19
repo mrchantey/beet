@@ -388,7 +388,10 @@ mod test {
 	use beet_core::prelude::*;
 
 	fn tool_at(path: &str) -> impl Bundle {
-		(PathPartial::new(path), tool(|| {}))
+		(
+			PathPartial::new(path),
+			func_tool(|_: FuncToolIn<()>| Ok(())),
+		)
 	}
 
 	#[test]

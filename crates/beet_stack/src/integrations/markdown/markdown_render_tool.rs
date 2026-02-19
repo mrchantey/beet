@@ -32,8 +32,8 @@ pub fn markdown_render_tool() -> impl Bundle {
 		Name::new("Markdown Render Tool"),
 		RenderToolMarker,
 		RouteHidden,
-		tool(
-			async |cx: AsyncToolContext<RenderRequest>| -> Result<Response> {
+		async_tool(
+			async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
 				let card_entity = cx.input.entity;
 				let world = cx.tool.world();
 
@@ -75,7 +75,7 @@ pub fn markdown_render_tool() -> impl Bundle {
 pub fn render_markdown() -> impl Bundle {
 	(
 		PathPartial::new("render-markdown"),
-		tool(render_markdown_system),
+		system_tool(render_markdown_system),
 	)
 }
 
@@ -93,7 +93,7 @@ pub fn render_markdown_for(entity: Entity, world: &mut World) -> String {
 /// System that renders an entity tree to markdown using [`CardWalker`].
 /// Renders relative to the tool's own entity via card root resolution.
 fn render_markdown_system(
-	In(cx): In<ToolContext>,
+	In(cx): In<SystemToolIn>,
 	walker: CardWalker,
 ) -> Result<String> {
 	let mut renderer = MarkdownRenderer::new();

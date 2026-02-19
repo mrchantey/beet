@@ -22,7 +22,10 @@ use beet_core::prelude::*;
 /// # use beet_core::prelude::*;
 ///
 /// // Create a route tool from a typed handler
-/// let bundle = route_tool("add", |(a, b): (i32, i32)| -> i32 { a + b });
+/// let bundle = route_tool(
+///     "add",
+///     func_tool(|input: FuncToolIn<(i32, i32)>| Ok(input.0 + input.1)),
+/// );
 ///
 /// // Can be called with Request/Response
 /// let request = Request::with_json("/add", &(2i32, 2i32)).unwrap();
@@ -49,7 +52,10 @@ use beet_core::prelude::*;
 ///
 /// let request = Request::with_json("/", &AddInput { a: 10, b: 20 }).unwrap();
 /// let response = AsyncPlugin::world()
-///     .spawn(route_tool("add", |input: AddInput| -> i32 { input.a + input.b }))
+///     .spawn(route_tool(
+///         "add",
+///         func_tool(|input: FuncToolIn<AddInput>| Ok(input.a + input.b)),
+///     ))
 ///     .call_blocking::<Request, Response>(request)
 ///     .unwrap();
 ///
@@ -67,7 +73,6 @@ where
 {
 	(
 		PathPartial::new(path),
-		ToolMeta::of::<H, H::In, H::Out>(),
 		serde_exchange::<H::In, H::Out>.wrap(handler),
 	)
 }
@@ -127,7 +132,10 @@ mod test {
 	}
 
 	fn add_route_tool() -> impl Bundle {
-		route_tool("add", |input: AddInput| -> i32 { input.a + input.b })
+		route_tool(
+			"add",
+			func_tool(|input: FuncToolIn<AddInput>| Ok(input.a + input.b)),
+		)
 	}
 
 	// -- Request/Response JSON round-trip --
@@ -192,7 +200,7 @@ mod test {
 	#[test]
 	fn unit_input_empty_body() {
 		let response = AsyncPlugin::world()
-			.spawn(route_tool("unit", || -> i32 { 42 }))
+			.spawn(route_tool("unit", func_tool(|_: FuncToolIn<()>| Ok(42i32))))
 			.call_blocking::<Request, Response>(Request::get("/"))
 			.unwrap();
 

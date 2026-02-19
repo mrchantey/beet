@@ -21,6 +21,7 @@ markdown = ["dep:pulldown-cmark"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["exchange"] }
+beet_tool = { workspace = true, features = ["exchange"] }
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true

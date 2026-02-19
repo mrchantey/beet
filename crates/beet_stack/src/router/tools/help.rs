@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 
 /// Checks for the `--help` param and renders scoped help text.
 pub(crate) async fn help_handler(
-	cx: AsyncToolContext<Request>,
+	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
 		let path = cx.input.path().clone();
@@ -38,7 +38,7 @@ pub(crate) async fn help_handler(
 /// Fallback handler that shows help scoped to the nearest ancestor card
 /// of an unmatched path.
 pub(crate) async fn contextual_not_found_handler(
-	cx: AsyncToolContext<Request>,
+	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let tool_entity = cx.tool.id();
@@ -166,9 +166,11 @@ mod test {
 
 	/// Adds help as a tool located at `/help`.
 	/// Usually this is handled as an interface tool, added via ?help.
-	fn help() -> impl Bundle { (PathPartial::new("help"), tool(help_system)) }
+	fn help() -> impl Bundle {
+		(PathPartial::new("help"), system_tool(help_system))
+	}
 	fn help_system(
-		cx: In<ToolContext>,
+		In(cx): In<SystemToolIn>,
 		ancestors: Query<&ChildOf>,
 		trees: Query<&RouteTree>,
 	) -> Result<String> {

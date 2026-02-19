@@ -36,8 +36,8 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("increment"),
-		tool(
-			|cx: In<ToolContext>,
+		system_tool(
+			|In(cx): In<SystemToolIn>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
@@ -66,8 +66,8 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("decrement"),
-		tool(
-			|cx: In<ToolContext>,
+		system_tool(
+			|In(cx): In<SystemToolIn>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
@@ -91,15 +91,15 @@ pub fn add(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("add"),
-		tool(
-			|In(ToolContext { tool, input }): In<ToolContext<i64>>,
+		system_tool(
+			|In(cx): In<SystemToolIn<i64>>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
-				let field = fields.get(tool)?;
-				query.with_field(tool, field, |value| {
+				let field = fields.get(cx.tool)?;
+				query.with_field(cx.tool, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
-					let new_value = current + input;
+					let new_value = current + cx.input;
 					*value = Value::I64(new_value);
 					new_value
 				})
@@ -115,8 +115,8 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("set-field"),
-		tool(
-			|In(cx): In<ToolContext<Value>>,
+		system_tool(
+			|In(cx): In<SystemToolIn<Value>>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<()> {
@@ -139,8 +139,8 @@ where
 	(
 		field,
 		PathPartial::new("set-field-typed"),
-		tool(
-			move |cx: In<ToolContext<T>>,
+		system_tool(
+			move |In(cx): In<SystemToolIn<T>>,
 			      mut query: DocumentQuery,
 			      fields: Query<&FieldRef>|
 			      -> Result<()> {
@@ -161,8 +161,8 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 	(
 		field,
 		PathPartial::new("get-field"),
-		tool(
-			|cx: In<ToolContext>,
+		system_tool(
+			|In(cx): In<SystemToolIn>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<Value> {
@@ -186,8 +186,8 @@ where
 	(
 		field,
 		PathPartial::new("get-field-typed"),
-		tool(
-			|cx: In<ToolContext>,
+		system_tool(
+			|In(cx): In<SystemToolIn>,
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<T> {
