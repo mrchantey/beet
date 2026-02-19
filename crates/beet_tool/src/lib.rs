@@ -4,13 +4,13 @@
 
 mod call_tool;
 mod func_tool;
-// mod pipe_tool;
+mod pipe_tool;
 mod tool_handler;
 
 /// Exports the most commonly used items.
 pub mod prelude {
 	pub use crate::call_tool::*;
 	pub use crate::func_tool::*;
-	// pub use crate::pipe_tool::*;
+	pub use crate::pipe_tool::*;
 	pub use crate::tool_handler::*;
 }

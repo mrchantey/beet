@@ -53,6 +53,23 @@ where
 	}
 }
 
+pub struct TypedFuncToolMarker;
+
+impl<F, I, O> IntoToolHandler<(TypedFuncToolMarker, I, O)> for F
+where
+	F: 'static + Send + Sync + FnMut(I) -> O,
+	// we need to constrain to avoid multiple impls?
+	// I: bevy::reflect::Typed,
+{
+	type In = I;
+	type Out = O;
+
+	fn into_tool_handler(mut self) -> ToolHandler<Self::In, Self::Out> {
+		func_tool(move |input| self(input.input).xok())
+	}
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

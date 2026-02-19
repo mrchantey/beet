@@ -228,6 +228,17 @@ pub trait IntoToolHandler<M>: Sized {
 	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out>;
 }
 
+impl<In, Out> IntoToolHandler<()> for ToolHandler<In, Out>
+where
+	In: 'static,
+	Out: 'static,
+{
+	type In = In;
+	type Out = Out;
+
+	fn into_tool_handler(self) -> ToolHandler<Self::In, Self::Out> { self }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -241,5 +252,4 @@ mod test {
 			.call_blocking::<(), ()>(())
 			.unwrap();
 	}
-
 }
