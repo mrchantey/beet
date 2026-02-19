@@ -177,11 +177,7 @@ where
 		)
 	};
 
-	(
-		PathPartial::new(path),
-		Card,
-		handler,
-	)
+	(PathPartial::new(path), Card, handler)
 }
 
 /// Creates a routable card that loads its content from a file.
@@ -232,7 +228,7 @@ fn file_card_content_tool(
 /// Ensure a render tool is added to the server, ie
 /// [`markdown_render_tool`] for CLI/REPL or [`tui_render_tool`]
 /// for TUI.
-pub fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
+fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 	world
 		.run_system_once_with(
 			|In(entity): In<Entity>,
@@ -258,8 +254,7 @@ pub fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 
 	#[beet_core::test]
 	async fn card_renders_via_render_tool() {

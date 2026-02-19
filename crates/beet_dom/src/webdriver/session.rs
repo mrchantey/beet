@@ -117,7 +117,7 @@ impl Session {
 		Request::delete(&url).send().await?.into_result().await?;
 
 		// Try to close the socket (only once)
-		if let Some(writer) = self.inner.writer.lock().unwrap().take() {
+		if let Some(mut writer) = self.inner.writer.lock().unwrap().take() {
 			// Ignore close errors – session already deleted.
 			let _ = writer.close(None).await;
 		}

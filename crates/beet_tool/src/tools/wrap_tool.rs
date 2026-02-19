@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::system::SystemState;
 
 /// A handle for calling the wrapped inner tool handler.
 ///
