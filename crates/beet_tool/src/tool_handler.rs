@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemState;
 use std::sync::Arc;
 
 #[derive(Component)]
@@ -201,6 +202,24 @@ impl<Out> OutHandler<Out> {
 	/// Returns whatever error the inner callback produces.
 	pub fn call(self, commands: AsyncCommands, output: Out) -> Result {
 		(self.func)(commands, output)
+	}
+
+	pub fn call_world(self, world: &mut World, output: Out) -> Result {
+		let mut state = SystemState::<AsyncCommands>::new(world);
+		let commands = state.get_mut(world);
+		let result = (self.func)(commands, output);
+		state.apply(world);
+		world.flush();
+		result
+	}
+
+	pub async fn call_async(self, world: AsyncWorld, output: Out) -> Result
+	where
+		Out: 'static + Send,
+	{
+		world
+			.with_then(move |world| self.call_world(world, output))
+			.await
 	}
 }
 

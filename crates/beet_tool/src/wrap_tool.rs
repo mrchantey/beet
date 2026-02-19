@@ -29,15 +29,12 @@ where
 		let tool = self.tool;
 		let (send, recv) = async_channel::bounded(1);
 
+		let out_handler = OutHandler::new(move |_commands, output: Out| {
+			send.try_send(output)
+				.map_err(|err| bevyhow!("Next::call send failed: {err:?}"))
+		});
 		self.world
 			.with_then(move |world: &mut World| -> Result {
-				let out_handler =
-					OutHandler::new(move |_commands, output: Out| {
-						send.try_send(output).map_err(|err| {
-							bevyhow!("Next::call send failed: {err:?}")
-						})
-					});
-
 				let mut state = SystemState::<AsyncCommands>::new(world);
 				let commands = state.get_mut(world);
 
@@ -97,22 +94,7 @@ where
 				let func = self.clone();
 				commands.run(async move |world: AsyncWorld| -> Result {
 					let output = func(wrap_in, next).await?;
-
-					world
-						.with_then(move |world: &mut World| -> Result {
-							let result = {
-								let mut state =
-									SystemState::<AsyncCommands>::new(world);
-								let async_commands = state.get_mut(world);
-								let result =
-									out_handler.call(async_commands, output);
-								state.apply(world);
-								result
-							};
-							world.flush();
-							result
-						})
-						.await
+					out_handler.call_async(world, output).await
 				});
 				Ok(())
 			},

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
-use bevy::ecs::system::SystemState;
 
 /// Context passed to system tool handlers containing the tool entity
 /// and input payload.
@@ -78,19 +77,7 @@ where
 				let output: Result<Out> =
 					world.run_system_cached_with(func, sys_input)?;
 				let output = output?;
-
-				// Obtain fresh AsyncCommands via SystemState so
-				// the out_handler (and any downstream pipe
-				// handlers) can queue further work.
-				let result = {
-					let mut state = SystemState::<AsyncCommands>::new(world);
-					let async_commands = state.get_mut(world);
-					let result = out_handler.call(async_commands, output);
-					state.apply(world);
-					result
-				};
-				world.flush();
-				result
+				out_handler.call_world(world, output)
 			});
 			Ok(())
 		},

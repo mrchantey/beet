@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::system::SystemState;
 
 /// Context passed to async tool handlers containing an [`AsyncEntity`]
 /// handle and the input payload.
@@ -59,25 +58,7 @@ where
 			let func = func.clone();
 			commands.run(async move |world: AsyncWorld| -> Result {
 				let output = func(arg).await?;
-
-				// Obtain fresh AsyncCommands via SystemState so
-				// the out_handler (and any downstream pipe
-				// handlers) can queue further work.
-				world
-					.with_then(move |world: &mut World| -> Result {
-						let result = {
-							let mut state =
-								SystemState::<AsyncCommands>::new(world);
-							let async_commands = state.get_mut(world);
-							let result =
-								out_handler.call(async_commands, output);
-							state.apply(world);
-							result
-						};
-						world.flush();
-						result
-					})
-					.await
+				out_handler.call_async(world, output).await
 			});
 			Ok(())
 		},

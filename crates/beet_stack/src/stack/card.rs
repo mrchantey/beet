@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::ecs::system::SystemState;
 
 /// A single content container, similar to pages in a website or cards
 /// in HyperCard. Each card is a route, with the exact rendering behavior
@@ -106,16 +105,7 @@ where
 				let func = func.clone();
 				commands.commands.queue(move |world: &mut World| -> Result {
 					let entity = world.spawn((Card, func())).id();
-					let result = {
-						let mut state =
-							SystemState::<AsyncCommands>::new(world);
-						let async_commands = state.get_mut(world);
-						let result = out_handler.call(async_commands, entity);
-						state.apply(world);
-						result
-					};
-					world.flush();
-					result
+					out_handler.call_world(world, entity)
 				});
 				Ok(())
 			},
@@ -220,22 +210,7 @@ fn card_tool_handler() -> ToolHandler<Request, Response> {
 					})
 					.await?;
 
-				// Deliver response
-				world
-					.with_then(move |world: &mut World| -> Result {
-						let result = {
-							let mut state =
-								SystemState::<AsyncCommands>::new(world);
-							let async_commands = state.get_mut(world);
-							let result =
-								out_handler.call(async_commands, response);
-							state.apply(world);
-							result
-						};
-						world.flush();
-						result
-					})
-					.await
+				out_handler.call_async(world, response).await
 			});
 			Ok(())
 		},
