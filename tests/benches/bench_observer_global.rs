@@ -1,5 +1,12 @@
+//! Global observer benchmark.
+//!
 //! Adding and removing observers per entity per spawn can get expensive if done a lot,
 //! in that case its better to use global observers, this is a simple example.
+//!
+//! Run with:
+//! ```sh
+//! cargo bench --bench bench_observer_global
+//! ```
 
 use bevy::prelude::*;
 

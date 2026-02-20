@@ -114,8 +114,8 @@ mod test {
 			}))
 			.exchange(Request::get("/foo"))
 			.await
-			.path_string()
-			.xpect_eq("/foo");
+			.status()
+			.xpect_eq(StatusCode::Ok);
 	}
 	#[beet_core::test]
 	async fn cleans_up() {

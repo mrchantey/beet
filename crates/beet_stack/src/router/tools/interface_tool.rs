@@ -1,0 +1,252 @@
+//! An interface routes requests to cards and tools.
+//!
+//! This module provides [`default_router`], a request router that
+//! handles routing, card navigation, tool invocation, and help
+//! rendering. It delegates to shared functions in [`render_markdown`]
+//! and [`help`] rather than duplicating their logic.
+//!
+//! ## Routing Behavior
+//!
+//! - **Cards**: tool-based routes created via [`card`] that delegate
+//!   rendering to the nearest [`RenderToolMarker`] entity.
+//! - **`--help`**: scoped to the requested path prefix, ie
+//!   `counter --help` only shows routes under `/counter`.
+//! - **Not found**: shows help scoped to the nearest ancestor card,
+//!   ie `counter nonsense` shows help for `/counter`.
+//!
+//! ## Render Tools
+//!
+//! The `default_router` does **not** include a render tool. Render
+//! tools are the responsibility of the server, since different
+//! servers need different rendering strategies:
+//! - CLI/REPL servers use [`markdown_render_tool`]
+//! - TUI servers use [`tui_render_tool`]
+
+use crate::prelude::*;
+use beet_core::prelude::*;
+
+/// Create an interface from a handler, inserting an [`Interface`]
+/// component on the entity.
+pub fn interface() -> impl Bundle { (RouteHidden, exchange_fallback()) }
+/// A Request/Response tool that will try each children until an
+/// Outcome::Response is reached, or else returns a NotFound.
+/// Errors are converted to a response.
+pub fn exchange_fallback() -> impl Bundle {
+	(
+		// Name::new("Exchange Fallback"),
+		async_tool(async |request: AsyncToolIn<Request>| -> Result<Response> {
+			match fallback::<Request, Response>(request).await? {
+				// a response matched, which may be an opinionated not found response
+				Pass(res) => Ok(res),
+				// usually an interface should render an opinionated not found response
+				// as the final fallback, in this case they didnt so we'll return
+				// a simple plaintext one.
+				Fail(req) => Ok(Response::from_status_body(
+					StatusCode::NotFound,
+					format!("Resource not found: {}", req.path_string()),
+					"text/plain",
+				)),
+			}
+		}),
+	)
+}
+
+/// Creates a standard router with help, navigation, routing, and
+/// fallback handlers as a child fallback chain.
+///
+/// Does **not** include a render tool — that belongs on the server.
+/// Use [`markdown_render_tool`] on CLI/REPL servers or
+/// [`tui_render_tool`] on TUI servers.
+///
+/// The handler chain runs in order:
+/// 1. **Help** — if `--help` is present, render help scoped to the
+///    request path prefix.
+/// 2. **Navigate** — if `--navigate` is present, resolve the
+///    navigation direction relative to the current path.
+/// 3. **Router** — look up the path in the [`RouteTree`]. All routes
+///    are tools; cards delegate to the render tool internally.
+/// 4. **Contextual Not Found** — show help for the nearest ancestor
+///    card of the unmatched path.
+pub fn default_router() -> impl Bundle {
+	(
+		interface(),
+		OnSpawn::insert_child((
+			Name::new("Help Tool"),
+			RouteHidden,
+			async_tool(help_handler),
+		)),
+		OnSpawn::insert_child((
+			Name::new("Navigate Tool"),
+			RouteHidden,
+			async_tool(navigate_handler),
+		)),
+		OnSpawn::insert_child(try_router()),
+		OnSpawn::insert_child((
+			Name::new("Contextual Not Found"),
+			RouteHidden,
+			async_tool(contextual_not_found_handler),
+		)),
+	)
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	fn my_interface() -> impl Bundle {
+		(
+			system_tool(
+				|In(req): In<SystemToolIn<Request>>,
+				 trees: Query<&RouteTree>|
+				 -> Result<RouteTree> {
+					let tree = trees.get(req.tool)?;
+					Ok(tree.clone())
+				},
+			),
+			children![(
+				PathPartial::new("add"),
+				func_tool(
+					|input: FuncToolIn<(u32, u32)>| Ok(input.0 + input.1)
+				),
+			)],
+		)
+	}
+
+
+	#[test]
+	fn works() {
+		let tree = StackPlugin::world()
+			.spawn(my_interface())
+			.call_blocking::<_, RouteTree>(Request::get("foo"))
+			.unwrap();
+		tree.find(&["add"]).xpect_some();
+		tree.find(&["add"])
+			.unwrap()
+			.path
+			.annotated_route_path()
+			.to_string()
+			.xpect_eq("/add");
+	}
+
+	#[beet_core::test]
+	async fn dispatches_tool_request() {
+		StackPlugin::world()
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				route_tool(
+					"add",
+					func_tool(|input: FuncToolIn<(i32, i32)>| Ok(
+						input.0 + input.1
+					))
+				),
+			]))
+			.call::<Request, Response>(
+				Request::with_json("add", &(1i32, 2i32)).unwrap(),
+			)
+			.await
+			.unwrap()
+			.json::<i32>()
+			.await
+			.unwrap()
+			.xpect_eq(3);
+	}
+
+	#[beet_core::test]
+	async fn help_flag_returns_route_list() {
+		StackPlugin::world()
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				increment(FieldRef::new("count")),
+				card("about", || Paragraph::with_text("about")),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("Available routes");
+	}
+
+	#[beet_core::test]
+	async fn dispatches_help_request() {
+		StackPlugin::world()
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				increment(FieldRef::new("count")),
+				card("about", || Paragraph::with_text("about")),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::Ok);
+	}
+
+	#[beet_core::test]
+	async fn not_found() {
+		StackPlugin::world()
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				increment(FieldRef::new("count")),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("nonexistent").unwrap(),
+			)
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::NotFound);
+	}
+
+	#[beet_core::test]
+	async fn renders_root_card_on_empty_args() {
+		StackPlugin::world()
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				card("", || {
+					children![
+						Heading1::with_text("My Server"),
+						Paragraph::with_text("welcome!"),
+					]
+				}),
+				card("about", || Paragraph::with_text("about")),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("My Server")
+			.xpect_contains("welcome!");
+	}
+
+	#[beet_core::test]
+	async fn scoped_help_for_subcommand() {
+		let mut world = StackPlugin::world();
+
+		let root = world
+			.spawn((default_router(), children![
+				markdown_render_tool(),
+				(
+					card("counter", || Paragraph::with_text("counter")),
+					children![increment(FieldRef::new("count")),],
+				),
+				card("about", || Paragraph::with_text("about")),
+			]))
+			.flush();
+
+		let res = world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap();
+
+		let body = res.unwrap_str().await;
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
+	}
+}

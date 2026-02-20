@@ -22,7 +22,6 @@
 //! curl http://localhost:5000/foobar
 //! ```
 use beet::prelude::*;
-
 fn main() {
 	App::new()
 		.add_plugins((
@@ -33,7 +32,7 @@ fn main() {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
 				HttpServer::default(),
-				Count::default(),
+				// Count::default(),
 				// flow_exchange runs control flow on each request
 				flow_exchange(|| {
 					(InfallibleSequence, children![

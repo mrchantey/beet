@@ -116,9 +116,7 @@ async fn execute_tool_call(
 	};
 
 	// Build a request for the tool endpoint
-	let request = Request::post(path)
-		.with_header("content-type", "application/json")
-		.with_body(func_call.arguments.clone());
+	let request = Request::with_json_str(path, &func_call.arguments);
 
 	// Execute via the exchange system
 	let response: beet_core::prelude::Response =

@@ -24,6 +24,11 @@ use std::sync::Arc;
 #[cfg(feature = "native-tls")]
 use async_native_tls::TlsConnector;
 
+#[cfg(feature = "rustls-tls")]
+use futures_rustls::TlsConnector as RustlsConnector;
+#[cfg(feature = "rustls-tls")]
+use futures_rustls::rustls;
+
 type DynTungSink =
 	dyn futures::Sink<TungMessage, Error = TungError> + Send + Unpin;
 
@@ -98,10 +103,18 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 				let (sink, stream) = ws_stream.split();
 				(Box::pin(sink), Box::pin(stream))
 			}
-			#[cfg(not(feature = "native-tls"))]
+			#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+			{
+				let config = default_rustls_client_config()?;
+				let (sink, stream) =
+					rustls_connect(url.as_ref(), tcp_stream, &host, config)
+						.await?;
+				(sink, stream)
+			}
+			#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
 			{
 				return Err(bevyhow!(
-					"WSS support requires native-tls feature to be enabled"
+					"WSS requires the native-tls or rustls-tls feature"
 				));
 			}
 		}
@@ -121,6 +134,49 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 	};
 
 	Ok(Socket::new(reader, writer))
+}
+
+/// Build a [`rustls::ClientConfig`] that trusts the Mozilla-curated root CAs
+/// from the `webpki-roots` crate.
+///
+/// Uses an explicit `ring` crypto provider to avoid the runtime panic that
+/// occurs when multiple providers (eg `ring` + `aws-lc-rs`) are enabled as
+/// cargo features on `rustls`.
+#[cfg(feature = "rustls-tls")]
+pub(crate) fn default_rustls_client_config() -> Result<rustls::ClientConfig> {
+	let provider = rustls::crypto::ring::default_provider();
+	let mut root_store = rustls::RootCertStore::empty();
+	root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+	rustls::ClientConfig::builder_with_provider(Arc::new(provider))
+		.with_safe_default_protocol_versions()
+		.map_err(|err| bevyhow!("rustls protocol version error: {}", err))?
+		.with_root_certificates(root_store)
+		.with_no_client_auth()
+		.xok()
+}
+
+/// Perform a rustls TLS handshake over `stream` then upgrade to WebSocket.
+///
+/// Returns the boxed sink and stream halves ready for [`Socket`] construction.
+#[cfg(feature = "rustls-tls")]
+pub(crate) async fn rustls_connect(
+	url: &str,
+	stream: Async<TcpStream>,
+	host: &str,
+	config: rustls::ClientConfig,
+) -> Result<(Pin<Box<DynTungSink>>, Pin<Box<DynTungStream>>)> {
+	let connector = RustlsConnector::from(Arc::new(config));
+	let server_name = rustls::pki_types::ServerName::try_from(host.to_owned())
+		.map_err(|e| bevyhow!("Invalid server name '{}': {}", host, e))?;
+	let tls_stream = connector
+		.connect(server_name, stream)
+		.await
+		.map_err(|e| bevyhow!("TLS connect failed: {}", e))?;
+	let (ws_stream, _resp) = client_async(url, tls_stream)
+		.await
+		.map_err(|e| bevyhow!("WebSocket connect failed: {}", e))?;
+	let (sink, stream) = ws_stream.split();
+	Ok((Box::pin(sink), Box::pin(stream)))
 }
 
 /// A tungstenite/bevy WebSocket server
@@ -336,5 +392,179 @@ mod tests {
 		from_tung_msg(t_pong).xpect_eq(pong);
 		// Close roundtrip may lose exact code mapping on older tungstenite, but should remain Close(..)
 		matches!(from_tung_msg(t_close), Message::Close(_)).xpect_true();
+	}
+
+	/// Tests for native-tls WSS: connect to a public echo server using the
+	/// OS/platform certificate store.
+	#[cfg(feature = "native-tls")]
+	mod native_tls_tests {
+		use super::super::connect_tungstenite;
+		use super::Message;
+		use futures::StreamExt;
+
+		#[beet_core::test]
+		async fn wss_native_tls_echo() {
+			let url = "wss://echo.websocket.org";
+			let mut socket = connect_tungstenite(url).await.unwrap();
+
+			let payload = "beet-native-tls-test";
+			socket.send(Message::text(payload)).await.unwrap();
+
+			while let Some(item) = socket.next().await {
+				match item.unwrap() {
+					Message::Text(t) if t == payload => break,
+					_ => continue,
+				}
+			}
+			socket.close(None).await.ok();
+		}
+	}
+
+	/// Tests for rustls-tls WSS: spin up a local WSS server backed by a
+	/// self-signed certificate generated with `rcgen`, then connect using a
+	/// [`rustls::ClientConfig`] that explicitly trusts that certificate.
+	#[cfg(feature = "rustls-tls")]
+	mod rustls_tls_tests {
+		use super::super::DynTungSink;
+		use super::super::DynTungStream;
+		use super::super::rustls_connect;
+		use async_io::Async;
+		use async_tungstenite::accept_async;
+		use async_tungstenite::tungstenite::Message as TungMessage;
+		use beet_core::prelude::*;
+		use futures::SinkExt;
+		use futures::StreamExt;
+		use futures_rustls::TlsAcceptor;
+		use futures_rustls::rustls;
+		use std::net::TcpStream;
+		use std::pin::Pin;
+		use std::sync::Arc;
+
+		/// Generates a self-signed cert/key pair for `localhost` using rcgen,
+		/// returning the DER cert (for client trust) and a rustls `ServerConfig`.
+		fn make_test_server_config() -> (
+			rustls::pki_types::CertificateDer<'static>,
+			rustls::ServerConfig,
+		) {
+			let provider = rustls::crypto::ring::default_provider();
+			let cert =
+				rcgen::generate_simple_self_signed(vec!["localhost".into()])
+					.expect("rcgen cert generation failed");
+			let cert_der = rustls::pki_types::CertificateDer::from(
+				cert.cert.der().to_vec(),
+			);
+			let key_der = rustls::pki_types::PrivateKeyDer::Pkcs8(
+				rustls::pki_types::PrivatePkcs8KeyDer::from(
+					cert.signing_key.serialize_der(),
+				),
+			);
+			let server_config =
+				rustls::ServerConfig::builder_with_provider(Arc::new(provider))
+					.with_safe_default_protocol_versions()
+					.expect("failed to set protocol versions")
+					.with_no_client_auth()
+					.with_single_cert(vec![cert_der.clone()], key_der)
+					.expect("failed to build rustls ServerConfig");
+			(cert_der, server_config)
+		}
+
+		/// Builds a [`rustls::ClientConfig`] that trusts only the given DER cert.
+		fn make_test_client_config(
+			cert_der: rustls::pki_types::CertificateDer<'static>,
+		) -> rustls::ClientConfig {
+			let provider = rustls::crypto::ring::default_provider();
+			let mut root_store = rustls::RootCertStore::empty();
+			root_store.add(cert_der).expect("failed to add test cert");
+			rustls::ClientConfig::builder_with_provider(Arc::new(provider))
+				.with_safe_default_protocol_versions()
+				.expect("failed to set protocol versions")
+				.with_root_certificates(root_store)
+				.with_no_client_auth()
+		}
+
+		/// Binds a local WSS echo server and returns its address.
+		///
+		/// The server is run on a background thread so it does not require
+		/// Bevy's task pool and remains independent of the test executor.
+		fn spawn_test_wss_server(
+			acceptor: TlsAcceptor,
+		) -> std::net::SocketAddr {
+			// Bind synchronously so we can read the address before going async.
+			let tcp_listener =
+				std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+			let addr = tcp_listener.local_addr().unwrap();
+
+			std::thread::spawn(move || {
+				futures_lite::future::block_on(async move {
+					// Convert to async-io listener (sets non-blocking mode).
+					let listener =
+						Async::new(tcp_listener).expect("async listener");
+					loop {
+						let Ok((stream, _)) = listener.accept().await else {
+							break;
+						};
+						let acceptor = acceptor.clone();
+						// Echo handler for a single connection (sequential is
+						// fine for tests with one concurrent connection).
+						let Ok(tls) = acceptor.accept(stream).await else {
+							continue;
+						};
+						let Ok(mut ws) = accept_async(tls).await else {
+							continue;
+						};
+						while let Some(Ok(msg)) = ws.next().await {
+							match msg {
+								TungMessage::Text(_)
+								| TungMessage::Binary(_) => {
+									ws.send(msg).await.ok();
+								}
+								TungMessage::Close(_) => break,
+								_ => {}
+							}
+						}
+					}
+				});
+			});
+
+			addr
+		}
+
+		#[beet_core::test]
+		async fn wss_rustls_tls_echo() {
+			let (cert_der, server_config) = make_test_server_config();
+			let acceptor = TlsAcceptor::from(Arc::new(server_config));
+			let addr = spawn_test_wss_server(acceptor);
+
+			// Let the background thread enter its accept loop.
+			time_ext::sleep_millis(50).await;
+
+			let client_config = make_test_client_config(cert_der);
+			let url = format!("wss://localhost:{}", addr.port());
+
+			let tcp = Async::<TcpStream>::connect(addr).await.unwrap();
+			let (mut sink, mut stream): (
+				Pin<Box<DynTungSink>>,
+				Pin<Box<DynTungStream>>,
+			) = rustls_connect(&url, tcp, "localhost", client_config)
+				.await
+				.unwrap();
+
+			let payload = "beet-rustls-tls-test";
+			sink.send(TungMessage::Text(payload.into())).await.unwrap();
+
+			while let Some(Ok(msg)) = stream.next().await {
+				match msg {
+					TungMessage::Text(t) if t.as_str() == payload => break,
+					_ => continue,
+				}
+			}
+		}
+
+		/// Verify [`default_rustls_client_config`] succeeds even when
+		/// multiple crypto provider features are enabled simultaneously.
+		#[beet_core::test]
+		fn default_config_does_not_panic() {
+			super::super::default_rustls_client_config().unwrap();
+		}
 	}
 }

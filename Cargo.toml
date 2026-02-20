@@ -12,7 +12,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.3"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A personal application framework"
@@ -65,6 +65,8 @@ members = [
 	"crates/beet_rsx_combinator",
 	"crates/beet_rsx/macros",
 	"crates/beet_rsx",
+	"crates/beet_stack",
+	"crates/beet_tool",
 
 	## 💡 Beet
 	"crates/beet_site",
@@ -74,27 +76,29 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-rc.1.0" }
-beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-rc.1.0" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-rc.1.0" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.3" }
+beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.3" }
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.3" }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.9-rc.1.0" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-rc.1.0" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.9-rc.1.0" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.9-rc.1.0" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.3" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.3" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.3" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.3" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-rc.1.0" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.9-rc.1.0" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-rc.1.0" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-rc.1.0" }
-beet_build = { path = "crates/beet_build", version = "0.0.9-rc.1.0" }
-beet_design = { path = "crates/beet_design", version = "0.0.9-rc.1.0" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-rc.1.0" }
-beet_router = { path = "crates/beet_router", version = "0.0.9-rc.1.0" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.9-rc.1.0" }
-beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-rc.1.0" }
+beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.3" }
+beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.3" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.3" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.3" }
+beet_build = { path = "crates/beet_build", version = "0.0.9-dev.3" }
+beet_design = { path = "crates/beet_design", version = "0.0.9-dev.3" }
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.3" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.3" }
+beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.3" }
+beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.3" }
+beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.3" }
+beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.3" }
 
-beet = { path = "", version = "0.0.9-rc.1.0" }
+beet = { path = "", version = "0.0.9-dev.3" }
 
 #💡 local
 bevy = { version = "0.18", default-features = false, features = [
@@ -174,6 +178,7 @@ extend = "1"
 #💡 io
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+postcard = { version = "1", features = ["alloc"] }
 base64 = "0.22"
 ron = "0.8"
 toml = "0.8"
@@ -182,6 +187,12 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
+url = "2"
+
+#💡 tui
+bevy_ratatui = { version = "0.11" }
+# bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
+ratatui = { version = "0.30", default-features = false }
 
 #💡 web
 js-sys = "0.3"
@@ -207,7 +218,7 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["flow"]
+# default = ["stack"]
 # default = ["nightly"]
 #💡 helper features
 launch = ["dom", "net", "build", "router"]
@@ -256,6 +267,8 @@ aws = ["beet_net?/aws"]
 
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 build = ["parse", "dep:beet_build"]
+stack = ["dep:beet_stack"]
+tui = ["stack", "beet_stack/tui"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
@@ -295,6 +308,7 @@ beet_router = { workspace = true, optional = true }
 beet_build = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_clanker = { workspace = true, optional = true }
+beet_stack = { workspace = true, optional = true }
 
 #💡 flow
 beet_flow = { workspace = true, optional = true }
@@ -331,6 +345,23 @@ web-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
 
+# 💡 Examples - stack
+
+[[example]]
+name = "tui"
+path = "examples/stack/tui.rs"
+required-features = ["tui"]
+
+[[example]]
+name = "cli"
+path = "examples/stack/cli.rs"
+required-features = ["stack"]
+
+[[example]]
+name = "repl"
+path = "examples/stack/repl.rs"
+required-features = ["stack"]
+
 # 💡 Examples - agent
 
 [[example]]
@@ -342,24 +373,19 @@ required-features = ["clanker"]
 # 💡 Examples - net
 
 [[example]]
-name = "server"
-path = "examples/net/server.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "templating"
-path = "examples/net/templating.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "client"
-path = "examples/net/client.rs"
+name = "http_client"
+path = "examples/net/http_client.rs"
 required-features = ["net", "ureq", "native-tls"]
 
 [[example]]
-name = "server_bench"
-path = "examples/net/server_bench.rs"
-required-features = ["server_app"]
+name = "http_server"
+path = "examples/net/http_server.rs"
+required-features = ["http_server"]
+
+[[example]]
+name = "socket_client"
+path = "examples/net/socket_client.rs"
+required-features = ["tungstenite"]
 
 [[example]]
 name = "socket_server"
@@ -367,9 +393,9 @@ path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
 
 [[example]]
-name = "socket_client"
-path = "examples/net/socket_client.rs"
-required-features = ["tungstenite"]
+name = "templating"
+path = "examples/net/templating.rs"
+required-features = ["http_server"]
 
 # 💡 Examples - flow
 
@@ -414,12 +440,6 @@ required-features = ["flow"]
 name = "http_router"
 path = "examples/router/http_router.rs"
 required-features = ["server_app"]
-
-[[example]]
-name = "router_bench"
-path = "examples/router/router_bench.rs"
-required-features = ["server_app"]
-
 
 # [[example]]
 # name = "app_ml"
@@ -631,4 +651,26 @@ harness = false
 [[bench]]
 name = "entity_spawn"
 path = "tests/benches/entity_spawn.rs"
+harness = false
+
+[[bench]]
+name = "server_bench"
+path = "tests/benches/beet_net/server_bench.rs"
+harness = false
+required-features = ["server_app"]
+
+[[bench]]
+name = "router_bench"
+path = "tests/benches/beet_router/router_bench.rs"
+harness = false
+required-features = ["server_app"]
+
+[[bench]]
+name = "bench_observer_global"
+path = "tests/benches/bench_observer_global.rs"
+harness = false
+
+[[bench]]
+name = "bench_observer_local"
+path = "tests/benches/bench_observer_local.rs"
 harness = false

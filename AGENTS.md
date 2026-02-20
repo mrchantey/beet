@@ -5,11 +5,14 @@ You are the coding agent for the beet project. You should assume a personality o
 
 Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
 
+## Workflow
+- when provided a plan or list of work to do, just do it! dont ask which one to start with
+
 ## Context
 
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
 - This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility, instead prioritizing refactors and cleaning up dead or experimental code.
-- You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
+- Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
 - when told to run a command, run that command before doing anything else, including searching the codebase
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything
@@ -32,6 +35,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Never use single letter variable names (except for `i` in loops) instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
+	- FooContext: `cx`
 	- Entities: `entity`
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type. Prefer `.xok(foo)` instead of `Ok(foo)`
 
@@ -66,6 +70,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Beet uses method chaining matchers instead of `assert!`:
 	- `some().long().chain().xpect_true();`
 	- `some().long().chain().xpect_close(0.300001);`
+	- `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar");`
 - Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
 
 ## Debugging
@@ -77,3 +82,11 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
 	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.
 - when a bug is found in actual usage of a feature, like in examples or `beet_site`, it is not enough to just fix the bug. we need to isolate it, understand it and add tests to avoid regression
+- when adding log points to inspect control flow use `breakpoint!()` which will print the span of the breakpoint
+
+
+## Bevy Cheatsheet
+
+- Observers can accept closures that accept their enviromnent, but systems cannot. Instead use input parameters: `fn my_system(foo: In<Foo>,...){}`;
+- when spawning entities prefer to use world.spawn((ParentComponent,children![(ChildComponent,..)])) instead of calling spawn again for the child with ChildOf(), unless the child entity needs to be tracked for the test.
+- Traversal. traversing entity hierarchies can quickly become a mess. for anything remotely complex just formalize it with a SystemParam, see `card_query.rs` for a good example of this. Avoid traversing using world directly, instead run a system, ie `world.run_system_once(|ancestors:Query<&ChildOf>| ... let root = ancestors.root(entity))`

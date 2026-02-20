@@ -1,10 +1,8 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
-use beet_core::prelude::*;
+use crate::prelude::*;
 use std::collections::VecDeque;
 use std::path::Path;
 use thiserror::Error;
-
-use crate::types::RouteQuery;
 
 /// Modifier for path pattern segments, aligned with URL Pattern API.
 ///
@@ -79,10 +77,13 @@ impl PathPartial {
 }
 
 /// A completed sequence of [`PathPatternSegment`] for some point in the route tree.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(PathPatternSegments::_from_raw))]
+#[reflect(Component)]
 pub struct PathPattern {
 	/// The complete sequence of segments
 	segments: Vec<PathPatternSegment>,
@@ -130,20 +131,26 @@ impl PathPattern {
 	}
 
 	/// [`Self::Collect`] represented as a bevy system
+	/// [`Self::collect`] represented as a bevy system
 	pub fn collect_system(
 		entity: In<Entity>,
-		query: RouteQuery,
+		parents: Query<&ChildOf>,
+		path_partials: Query<&PathPartial>,
 	) -> Result<PathPattern> {
-		Self::collect(*entity, &query)
+		Self::collect(*entity, &parents, &path_partials)
 	}
 
 	/// Collects a [`PathPattern`] by traversing ancestor [`PathPartial`] components.
-	pub fn collect(entity: Entity, query: &RouteQuery) -> Result<PathPattern> {
-		query
-			.parents
+	// Exposed for use in RouteQuery
+	pub fn collect(
+		entity: Entity,
+		parents: &Query<&ChildOf>,
+		path_partials: &Query<&PathPartial>,
+	) -> Result<PathPattern> {
+		parents
 			// get every PathFilter in ancestors
 			.iter_ancestors_inclusive(entity)
-			.filter_map(|entity| query.path_partials.get(entity).ok())
+			.filter_map(|entity| path_partials.get(entity).ok())
 			.collect::<Vec<_>>()
 			.into_iter()
 			.cloned()
@@ -537,18 +544,16 @@ impl std::fmt::Display for PathPatternSegment {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_core::prelude::*;
-
 
 	/// match segments against a route path
 	fn parse(
 		segments: &str,
 		route_path: &str,
 	) -> Result<PathMatch, RouteMatchError> {
-		let builder = PartsBuilder::new().path_str(route_path).build();
+		let parts = RequestParts::get(route_path);
 		PathPattern::new(segments)
 			.unwrap()
-			.parse_path(&builder.path())
+			.parse_path(&parts.path())
 	}
 
 	#[test]

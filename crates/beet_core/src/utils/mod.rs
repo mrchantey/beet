@@ -40,12 +40,14 @@ pub mod terminal_ext;
 /// Time and duration utilities.
 pub mod time_ext;
 mod tree;
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 pub mod type_info_to_json_schema;
 /// Timer utilities for WebAssembly environments.
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 mod xtend;
+mod as_any;
+pub use as_any::*;
 
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;

@@ -264,6 +264,8 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 		}
 	}
 
+	/// Creates an [`AsyncWorld`] handle for sending commands.
+	pub fn world(&self) -> AsyncWorld { self.channel.world() }
 
 	/// Spawns an async task that can send commands to the world.
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)
@@ -313,7 +315,7 @@ impl AsyncTaskOut for Result {
 }
 
 /// Resource containing the channel used by async functions to send [`CommandQueue`]s.
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub struct AsyncChannel {
 	/// The number of tasks currently in flight.
 	task_count: usize,
@@ -687,7 +689,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -705,7 +707,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -817,6 +819,7 @@ impl AsyncEntity {
 /// Extension trait adding async command methods to [`World`].
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
+
 	/// Spawns an async task.
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where

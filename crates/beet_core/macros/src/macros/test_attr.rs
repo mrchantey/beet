@@ -1,4 +1,4 @@
-use beet_core_shared::*;
+use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;

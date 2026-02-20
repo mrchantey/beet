@@ -1,7 +1,10 @@
 mod action;
+mod as_any;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
+mod tool;
+mod mdx;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -106,6 +109,12 @@ pub fn action(
 	action::impl_action(attr, item)
 }
 
+/// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
+#[proc_macro_derive(Any, attributes(event))]
+pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	as_any::impl_as_any(input).into()
+}
+
 
 /// Macro for [`ActionEvent`]
 ///
@@ -178,4 +187,29 @@ pub fn beet_test(
 	parse_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+/// MDX-style markdown macro with `{}` interpolation.
+///
+/// Parses markdown text interspersed with `{}` bundle expressions.
+/// The crate path is resolved automatically via `internal_or_beet`.
+///
+/// # Input Format
+///
+/// ```text
+/// mdx!(# Heading text {bundle_expr} more text)
+/// mdx!("string with {interpolation}")
+/// ```
+#[proc_macro]
+pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	mdx::impl_mdx(input)
+}
+
+
+#[proc_macro_attribute]
+pub fn tool(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	tool::impl_tool(attr, item)
 }

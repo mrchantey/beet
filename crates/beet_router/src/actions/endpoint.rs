@@ -22,8 +22,6 @@ use beet_core::prelude::*;
 pub struct Endpoint {
 	/// An optional description for this endpoint.
 	pub description: Option<String>,
-	/// Query and path parameter patterns for this endpoint.
-	pub params: ParamsPattern,
 	/// The full [`PathPattern`] for this endpoint.
 	pub path: PathPattern,
 	/// The HTTP method to match, or `None` for any method.
@@ -32,9 +30,11 @@ pub struct Endpoint {
 	pub cache_strategy: Option<CacheStrategy>,
 	/// Whether this endpoint is canonical (registered in [`EndpointTree`]).
 	///
-	/// Non-canonical endpoints are fallbacks that won't conflict with canonical routes.
+	/// Non-canonical endpoints are fallbacks that shouldn't conflict with canonical routes.
 	/// Defaults to `true`.
 	pub is_canonical: bool,
+	/// Query and path parameter patterns for this endpoint.
+	pub params: ParamsPattern,
 	/// Metadata describing the expected request body.
 	pub request_body: BodyType,
 	/// Metadata describing the response body.

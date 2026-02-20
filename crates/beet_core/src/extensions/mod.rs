@@ -17,7 +17,7 @@ mod exit_status;
 mod multimap;
 mod option;
 mod result_x;
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 mod value;
 mod vec;
 
@@ -26,6 +26,6 @@ pub use exit_status::*;
 pub use multimap::*;
 pub use option::*;
 pub use result_x::*;
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 pub use value::*;
 pub use vec::*;

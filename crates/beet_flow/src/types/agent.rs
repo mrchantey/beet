@@ -126,6 +126,11 @@ where
 			})
 			.unwrap_or(root)
 	}
+	/// Returns `true` if the agent matches the query filter.
+	pub fn contains(&self, entity: Entity) -> bool {
+		let agent = self.entity(entity);
+		self.query.contains(agent)
+	}
 
 	/// Returns the query item for the agent of the given action.
 	pub fn get(
@@ -136,11 +141,6 @@ where
 		self.query.get(agent)
 	}
 
-	/// Returns `true` if the agent matches the query filter.
-	pub fn contains(&self, entity: Entity) -> bool {
-		let agent = self.entity(entity);
-		self.query.contains(agent)
-	}
 
 	/// Returns the mutable query item for the agent of the given action.
 	pub fn get_mut(
@@ -198,6 +198,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(action).xpect_eq(action);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -217,6 +218,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(child).xpect_eq(root);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -229,6 +231,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(action).xpect_eq(agent);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -252,5 +255,6 @@ mod test {
 		agent_query.entity(child).xpect_eq(agent);
 		// root's agent should also be the ActionOf target
 		agent_query.entity(root).xpect_eq(agent);
+		state.apply(&mut world);
 	}
 }

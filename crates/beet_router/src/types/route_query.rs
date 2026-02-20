@@ -43,7 +43,8 @@ impl RouteQuery<'_, '_> {
 	/// Parses and returns the path match result for the given action.
 	pub fn path_match(&self, action: Entity) -> Result<PathMatch> {
 		let path = self.path(action)?;
-		let pattern = PathPattern::collect(action, &self)?;
+		let pattern =
+			PathPattern::collect(action, &self.parents, &self.path_partials)?;
 		pattern.parse_path(path)?.xok()
 	}
 

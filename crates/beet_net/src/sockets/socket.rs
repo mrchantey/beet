@@ -203,7 +203,7 @@ impl SocketWrite {
 	}
 
 	/// Gracefully close the connection with an optional close frame.
-	pub async fn close(mut self, close: Option<CloseFrame>) -> Result<()> {
+	pub async fn close(&mut self, close: Option<CloseFrame>) -> Result<()> {
 		self.writer.close_boxed(close).await
 	}
 }
@@ -424,7 +424,7 @@ mod tests {
 		let writer = DummyWriter::default();
 		let socket = Socket::new(reader, writer);
 
-		let (send, _recv) = socket.split();
+		let (mut send, _recv) = socket.split();
 
 		let frame = CloseFrame {
 			code: 1000,

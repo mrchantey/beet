@@ -38,15 +38,9 @@ serde_json.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"
-log.workspace = true
-pretty_env_logger.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-log.workspace = true
-pretty_env_logger.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

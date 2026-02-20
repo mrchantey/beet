@@ -44,7 +44,6 @@ impl AttributeGroup {
 		Ok(args)
 	}
 
-
 	/// ## Errors
 	/// if any of the attributes does not match a provided key
 	pub fn validate_allowed_keys(&self, keys: &[&str]) -> Result<&Self> {

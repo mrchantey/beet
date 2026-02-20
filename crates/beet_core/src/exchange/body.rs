@@ -134,11 +134,45 @@ impl Body {
 	}
 
 	/// Consumes the body and deserializes the content as JSON.
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		serde_json::from_slice::<T>(&bytes)
-			.map_err(|e| bevyhow!("Failed to deserialize body\n {}", e))
+		ExchangeFormat::Json.deserialize(&bytes)
+	}
+
+	/// Consumes the body and deserializes the content as postcard.
+	#[cfg(feature = "postcard")]
+	pub async fn into_postcard<T: serde::de::DeserializeOwned>(
+		self,
+	) -> Result<T> {
+		let bytes = self.into_bytes().await?;
+		ExchangeFormat::Postcard.deserialize(&bytes)
+	}
+
+	/// Creates a body by serializing `value` as JSON.
+	#[cfg(feature = "json")]
+	pub fn from_json<T: serde::Serialize>(value: &T) -> Result<Self> {
+		ExchangeFormat::Json
+			.serialize(value)
+			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
+	}
+
+	/// Creates a body by serializing `value` as postcard.
+	#[cfg(feature = "postcard")]
+	pub fn from_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
+		ExchangeFormat::Postcard
+			.serialize(value)
+			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
+	}
+
+	/// Consumes the body and deserializes using the given [`ExchangeFormat`].
+	#[cfg(feature = "serde")]
+	pub async fn into_format<T: serde::de::DeserializeOwned>(
+		self,
+		format: ExchangeFormat,
+	) -> Result<T> {
+		let bytes = self.into_bytes().await?;
+		format.deserialize(&bytes)
 	}
 
 	/// Attempts to extract bytes without consuming a stream.

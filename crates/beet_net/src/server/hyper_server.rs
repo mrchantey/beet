@@ -30,7 +30,7 @@ pub(super) fn start_hyper_server(
 	mut async_commands: AsyncCommands,
 ) -> Result {
 	let server = query.get(entity)?;
-	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
+	let addr: SocketAddr = (server.host, server.port).into();
 
 	async_commands.run(async move |world| -> Result {
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)

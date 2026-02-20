@@ -2,10 +2,10 @@
 #![doc = include_str!("../README.md")]
 mod beet_plugins;
 
-#[cfg(feature = "clanker")]
-pub use beet_clanker as clanker;
 #[cfg(feature = "build")]
 pub use beet_build as build;
+#[cfg(feature = "clanker")]
+pub use beet_clanker as clanker;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
@@ -35,12 +35,14 @@ pub use beet_router as router;
 pub use beet_rsx as rsx;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
+#[cfg(feature = "stack")]
+pub use beet_stack as stack;
 pub mod prelude {
-	#[cfg(feature = "clanker")]
-	pub use crate::clanker::prelude::*;
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
+	#[cfg(feature = "clanker")]
+	pub use crate::clanker::prelude::*;
 	pub use crate::core::prelude::Message;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "design")]
@@ -63,6 +65,19 @@ pub mod prelude {
 	pub use crate::rsx::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
+	// TODO deprecate the original versions of these
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::CardTool;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Code;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Link;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::Outcome;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::RouterPlugin;
+	#[cfg(feature = "stack")]
+	pub use crate::stack::prelude::*;
 }
 pub mod exports {
 	#[cfg(feature = "build")]

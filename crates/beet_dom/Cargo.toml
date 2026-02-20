@@ -34,8 +34,6 @@ beet_net.workspace = true
 bevy.workspace = true
 
 extend.workspace = true
-send_wrapper.workspace = true
-bytes.workspace = true
 
 # serde
 serde = { workspace = true, optional = true }

@@ -143,7 +143,7 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 
 				// collect all endpoints that match
 				let mut matching_endpoints = Vec::new();
-				collect_endpoints_from_tree(
+				collect_matching_endpoints(
 					&tree,
 					&current_path,
 					&mut matching_endpoints,
@@ -187,8 +187,9 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 }
 
 
-// recursively collect all endpoints from the tree
-fn collect_endpoints_from_tree(
+// recursively collect all endpoints from the tree that match
+// the path at this point.
+fn collect_matching_endpoints(
 	node: &EndpointTree,
 	current_path: &Vec<String>,
 	endpoints: &mut Vec<Endpoint>,
@@ -204,7 +205,7 @@ fn collect_endpoints_from_tree(
 		}
 		// always recurse when no filter
 		for child in &node.children {
-			collect_endpoints_from_tree(child, current_path, endpoints);
+			collect_matching_endpoints(child, current_path, endpoints);
 		}
 	} else if node_depth <= current_depth {
 		// node is at or above current depth - check if it's on the path
@@ -219,7 +220,7 @@ fn collect_endpoints_from_tree(
 				}
 				// recurse to children since we're on the right path
 				for child in &node.children {
-					collect_endpoints_from_tree(child, current_path, endpoints);
+					collect_matching_endpoints(child, current_path, endpoints);
 				}
 			}
 			Err(_) => {
