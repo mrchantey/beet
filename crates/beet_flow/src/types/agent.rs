@@ -198,6 +198,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(action).xpect_eq(action);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -217,6 +218,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(child).xpect_eq(root);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -229,6 +231,7 @@ mod test {
 		let agent_query = state.get(&world);
 
 		agent_query.entity(action).xpect_eq(agent);
+		state.apply(&mut world);
 	}
 
 	#[test]
@@ -252,5 +255,6 @@ mod test {
 		agent_query.entity(child).xpect_eq(agent);
 		// root's agent should also be the ActionOf target
 		agent_query.entity(root).xpect_eq(agent);
+		state.apply(&mut world);
 	}
 }

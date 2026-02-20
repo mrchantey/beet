@@ -319,10 +319,10 @@ mod test {
 	#[test]
 	fn respects_card_boundary() {
 		AsyncPlugin::world()
-			.spawn((render_markdown(), Card, children![
+			.spawn((render_markdown(), CardTool, children![
 				Paragraph::with_text("Inside card"),
 				// Nested card should not be rendered
-				(Card, children![Paragraph::with_text("Inside nested card")])
+				(CardTool, children![Paragraph::with_text("Inside nested card")])
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
@@ -333,7 +333,7 @@ mod test {
 	fn render_markdown_for_works() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("hello "),
 				(Important, children![TextNode::new("world")]),
 			]))
@@ -347,9 +347,9 @@ mod test {
 	fn render_markdown_for_respects_card_boundary() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				Paragraph::with_text("visible"),
-				(Card, children![Paragraph::with_text("hidden")])
+				(CardTool, children![Paragraph::with_text("hidden")])
 			]))
 			.id();
 

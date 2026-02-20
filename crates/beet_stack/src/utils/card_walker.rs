@@ -2,7 +2,7 @@
 //!
 //! [`CardWalker`] is a [`SystemParam`] that walks a card's entity
 //! tree in depth-first order, dispatching to a [`CardVisitor`] for
-//! each entity. The walker stops at child [`Card`] boundaries so
+//! each entity. The walker stops at child [`CardTool`] boundaries so
 //! each visitor only sees entities belonging to a single card.
 //!
 //! # Visitor Pattern
@@ -757,7 +757,7 @@ mod test {
 	fn walks_card_tree() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Heading1, children![TextNode::new("Title")]),
 				(Paragraph, children![TextNode::new("Body")]),
 			]))
@@ -782,9 +782,9 @@ mod test {
 	fn stops_at_card_boundary() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Paragraph, children![TextNode::new("parent")]),
-				(Card, children![(Paragraph, children![TextNode::new(
+				(CardTool, children![(Paragraph, children![TextNode::new(
 					"child card"
 				)]),]),
 			]))
@@ -822,7 +822,7 @@ mod test {
 	fn collects_text() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Heading1, children![TextNode::new("Hello ")]),
 				(Paragraph, children![TextNode::new("World")]),
 			]))
@@ -846,7 +846,7 @@ mod test {
 	fn break_skips_children() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Heading1, children![TextNode::new("Skipped")]),
 				(Paragraph, children![TextNode::new("Not skipped")]),
 			]))
@@ -893,7 +893,7 @@ mod test {
 		// comes from the context's style stack.
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
 				children![TextNode::new("styled")],
 			)])]))
@@ -931,7 +931,7 @@ mod test {
 	fn leave_methods_called() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Heading1, children![TextNode::new(
+			.spawn((CardTool, children![(Heading1, children![TextNode::new(
 				"Title"
 			)]),]))
 			.id();
@@ -985,7 +985,7 @@ mod test {
 	fn leave_called_even_on_break() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Heading1, children![TextNode::new(
+			.spawn((CardTool, children![(Heading1, children![TextNode::new(
 				"Skipped"
 			)]),]))
 			.id();
@@ -1040,7 +1040,7 @@ mod test {
 	fn link_inline_style() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click")],
 			)])]))
@@ -1080,7 +1080,7 @@ mod test {
 		// marker on the same entity as TextNode.
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![
+			.spawn((CardTool, children![(Paragraph, children![
 				TextNode::new("normal "),
 				// Important as a CONTAINER with TextNode child
 				(Important, children![TextNode::new("bold")]),
@@ -1129,7 +1129,7 @@ mod test {
 		// Important container wrapping an Emphasize container
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
 				children![(Emphasize, children![TextNode::new("bold italic")])],
 			)])]))
@@ -1169,7 +1169,7 @@ mod test {
 	fn context_tracks_heading_level() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Heading2, children![TextNode::new("H2 text")]),
 				(Paragraph, children![TextNode::new("Para text")]),
 			]))
@@ -1209,7 +1209,7 @@ mod test {
 	fn context_tracks_code_block() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Paragraph, children![TextNode::new("before")]),
 				(CodeBlock::plain(), children![TextNode::new("code")]),
 				(Paragraph, children![TextNode::new("after")]),
@@ -1249,7 +1249,7 @@ mod test {
 	fn context_tracks_list_stack() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(ListMarker::ordered(1), children![
+			.spawn((CardTool, children![(ListMarker::ordered(1), children![
 				(ListItem, children![TextNode::new("first")]),
 				(ListItem, children![TextNode::new("second")]),
 			],)]))
@@ -1293,7 +1293,7 @@ mod test {
 	fn context_entity_tracks_current() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![TextNode::new(
+			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
 				"hello"
 			)])]))
 			.id();
@@ -1335,7 +1335,7 @@ mod test {
 	fn leave_link_called() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click")],
 			)])]))

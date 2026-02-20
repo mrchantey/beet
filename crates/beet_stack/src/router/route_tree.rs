@@ -64,7 +64,7 @@ pub struct ToolNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
-	/// Whether this tool is a card (has a [`Card`] component).
+	/// Whether this tool is a card (has a [`CardTool`] component).
 	pub is_card: bool,
 }
 
@@ -75,7 +75,7 @@ pub type ToolQueryItem<'a> = (
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
-	Option<&'a Card>,
+	Option<&'a CardTool>,
 );
 
 impl ToolNode {

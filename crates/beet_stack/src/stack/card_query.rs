@@ -1,15 +1,15 @@
 //! Scoped entity traversal within card boundaries.
 //!
 //! This module provides [`CardQuery`], a system parameter for iterating
-//! entities within the scope of a [`Card`]. Many systems, ie markdown
+//! entities within the scope of a [`CardTool`]. Many systems, ie markdown
 //! rendering, must only operate on entities belonging to a specific card.
 //!
 //! # Traversal Rules
 //!
 //! Given an entity, CardQuery:
-//! 1. Traverses up to find the containing [`Card`], or root if no card exists
+//! 1. Traverses up to find the containing [`CardTool`], or root if no card exists
 //! 2. Iterates descendants within that card, stopping at and excluding
-//! [`Card`] boundaries (unless it's the card root itself)
+//! [`CardTool`] boundaries (unless it's the card root itself)
 //!
 //! # Example
 //!
@@ -38,7 +38,7 @@ pub struct CardQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	cards: Query<'w, 's, (), With<Card>>,
+	cards: Query<'w, 's, (), With<CardTool>>,
 }
 
 impl<'w, 's> CardQuery<'w, 's> {
@@ -52,7 +52,7 @@ impl<'w, 's> CardQuery<'w, 's> {
 
 	/// Finds the card root for the given entity.
 	///
-	/// Traverses ancestors to find the nearest [`Card`], or returns
+	/// Traverses ancestors to find the nearest [`CardTool`], or returns
 	/// the root ancestor if no card is found.
 	pub fn card_root(&self, entity: Entity) -> Entity {
 		self.ancestors
@@ -61,18 +61,18 @@ impl<'w, 's> CardQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity is a [`Card`].
+	/// Returns true if the entity is a [`CardTool`].
 	pub fn is_card(&self, entity: Entity) -> bool {
 		self.cards.contains(entity)
 	}
 
-	/// Returns true if the entity is a Card boundary.
+	/// Returns true if the entity is a CardTool boundary.
 	fn is_boundary(&self, entity: Entity) -> bool { self.is_card(entity) }
 
 	/// Creates a depth-first iterator over entities within the card.
 	///
 	/// Starts from the given entity's card root and traverses descendants,
-	/// stopping at Card or Stack boundaries.
+	/// stopping at CardTool or Stack boundaries.
 	pub fn iter_dfs(&self, entity: Entity) -> CardDfsIter<'_, 'w, 's> {
 		let root = self.card_root(entity);
 		CardDfsIter {
@@ -99,7 +99,7 @@ impl<'w, 's> CardQuery<'w, 's> {
 	/// Creates a breadth-first iterator over entities within the card.
 	///
 	/// Starts from the given entity's card root and traverses descendants,
-	/// stopping at Card or Stack boundaries.
+	/// stopping at CardTool or Stack boundaries.
 	pub fn iter_bfs(&self, entity: Entity) -> CardBfsIter<'_, 'w, 's> {
 		let root = self.card_root(entity);
 		CardBfsIter {
@@ -150,7 +150,7 @@ impl Iterator for CardDfsIter<'_, '_, '_> {
 		// Add children in reverse order for correct DFS traversal
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter().rev() {
-				// Stop at boundaries (Card or Stack), unless the child is the root itself
+				// Stop at boundaries (CardTool or Stack), unless the child is the root itself
 				if child != self.root && self.query.is_boundary(child) {
 					continue;
 				}
@@ -178,7 +178,7 @@ impl Iterator for CardBfsIter<'_, '_, '_> {
 		// Add children to queue
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter() {
-				// Stop at boundaries (Card or Stack), unless the child is the root itself
+				// Stop at boundaries (CardTool or Stack), unless the child is the root itself
 				if child != self.root && self.query.is_boundary(child) {
 					continue;
 				}
@@ -199,7 +199,7 @@ mod test {
 	fn card_root_finds_card() {
 		let mut world = World::new();
 
-		let card = world.spawn(Card).id();
+		let card = world.spawn(CardTool).id();
 		let child = world.spawn(ChildOf(card)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
@@ -256,7 +256,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(Card).id();
+		let root = world.spawn(CardTool).id();
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -282,7 +282,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(Card).id();
+		let root = world.spawn(CardTool).id();
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -307,9 +307,9 @@ mod test {
 	fn stops_at_nested_card() {
 		let mut world = World::new();
 
-		let card = world.spawn(Card).id();
+		let card = world.spawn(CardTool).id();
 		let child = world.spawn(ChildOf(card)).id();
-		let nested_card = world.spawn((Card, ChildOf(child))).id();
+		let nested_card = world.spawn((CardTool, ChildOf(child))).id();
 		let _nested_child = world.spawn(ChildOf(nested_card)).id();
 
 		let expected = vec![card, child];
@@ -331,9 +331,9 @@ mod test {
 	fn stops_at_stack() {
 		let mut world = World::new();
 
-		let card = world.spawn(Card).id();
+		let card = world.spawn(CardTool).id();
 		let child = world.spawn(ChildOf(card)).id();
-		let stack = world.spawn((Card, ChildOf(child))).id();
+		let stack = world.spawn((CardTool, ChildOf(child))).id();
 		let _stack_child = world.spawn(ChildOf(stack)).id();
 
 		let expected = vec![card, child];
@@ -355,7 +355,7 @@ mod test {
 	fn iter_from_child_finds_card_root() {
 		let mut world = World::new();
 
-		let card = world.spawn(Card).id();
+		let card = world.spawn(CardTool).id();
 		let child = world.spawn(ChildOf(card)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
@@ -378,7 +378,7 @@ mod test {
 	fn iter_dfs_from_starts_at_given_entity() {
 		let mut world = World::new();
 
-		let card = world.spawn(Card).id();
+		let card = world.spawn(CardTool).id();
 		let child = world.spawn(ChildOf(card)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 

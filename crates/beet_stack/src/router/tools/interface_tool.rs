@@ -70,24 +70,22 @@ pub fn exchange_fallback() -> impl Bundle {
 pub fn default_router() -> impl Bundle {
 	(
 		interface(),
-		OnSpawn::insert(children![
-			(
-				Name::new("Help Tool"),
-				RouteHidden,
-				async_tool(help_handler),
-			),
-			(
-				Name::new("Navigate Tool"),
-				RouteHidden,
-				async_tool(navigate_handler),
-			),
-			try_router(),
-			(
-				Name::new("Contextual Not Found"),
-				RouteHidden,
-				async_tool(contextual_not_found_handler),
-			)
-		]),
+		OnSpawn::insert_child((
+			Name::new("Help Tool"),
+			RouteHidden,
+			async_tool(help_handler),
+		)),
+		OnSpawn::insert_child((
+			Name::new("Navigate Tool"),
+			RouteHidden,
+			async_tool(navigate_handler),
+		)),
+		OnSpawn::insert_child(try_router()),
+		OnSpawn::insert_child((
+			Name::new("Contextual Not Found"),
+			RouteHidden,
+			async_tool(contextual_not_found_handler),
+		)),
 	)
 }
 

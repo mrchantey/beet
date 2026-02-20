@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 ///
 /// // Create a card with a document and text child
 /// world.spawn((
-///     Card,
+///     CardTool,
 ///     Document::new(val!({ "name": "Alice" })),
 ///     children![(TextNode::default(), FieldRef::new("name"))],
 /// ));
@@ -77,7 +77,7 @@ mod test {
 
 		// Create card with document and text child
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({ "greeting": "Hello" })),
 			children![(TextNode::default(), FieldRef::new("greeting"))],
 		));
@@ -96,7 +96,7 @@ mod test {
 
 		// Create card with document and text child
 		let card = world
-			.spawn((Card, Document::new(val!({ "count": 0i64 })), children![(
+			.spawn((CardTool, Document::new(val!({ "count": 0i64 })), children![(
 				TextNode::default(),
 				FieldRef::new("count")
 			)]))
@@ -124,7 +124,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({ "user": { "name": "Bob" } })),
 			children![(
 				TextNode::default(),
@@ -143,7 +143,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({
 				"first": "Alice",
 				"second": "Bob"
@@ -171,7 +171,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({ "name": "World" })),
 			children![
 				TextNode::new("Hello, "),

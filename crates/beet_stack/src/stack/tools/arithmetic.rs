@@ -22,7 +22,7 @@ use bevy::reflect::Typed;
 ///
 /// let mut world = AsyncPlugin::world();
 /// let field = FieldRef::new("counter");
-/// let entity = world.spawn((Card, increment(field))).id();
+/// let entity = world.spawn((CardTool, increment(field))).id();
 ///
 /// // First call initializes to 1
 /// let result = world.entity_mut(entity).call_blocking::<(), i64>(()).unwrap();
@@ -210,7 +210,7 @@ mod test {
 	#[test]
 	fn increment_initializes_to_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((Card, increment(count_field()))).id();
+		let entity = world.spawn((CardTool, increment(count_field()))).id();
 
 		world
 			.entity_mut(entity)
@@ -222,7 +222,7 @@ mod test {
 	#[test]
 	fn increment_works_multiple_times() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((Card, increment(count_field()))).id();
+		let entity = world.spawn((CardTool, increment(count_field()))).id();
 
 		world
 			.entity_mut(entity)
@@ -246,7 +246,7 @@ mod test {
 	#[test]
 	fn decrement_initializes_to_negative_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((Card, decrement(count_field()))).id();
+		let entity = world.spawn((CardTool, decrement(count_field()))).id();
 
 		world
 			.entity_mut(entity)
@@ -260,7 +260,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "count": 5i64 })),
 				decrement(count_field()),
 			))
@@ -278,7 +278,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "count": 10i64 })),
 				add(count_field()),
 			))
@@ -301,7 +301,7 @@ mod test {
 	fn set_field_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn((Card, set_field(field))).id();
+		let entity = world.spawn((CardTool, set_field(field))).id();
 
 		world
 			.entity_mut(entity)
@@ -323,7 +323,7 @@ mod test {
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "status": "pending" })),
 				set_field(field),
 			))
@@ -347,7 +347,7 @@ mod test {
 	fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn((Card, set_field_typed::<String>(field))).id();
+		let entity = world.spawn((CardTool, set_field_typed::<String>(field))).id();
 
 		world
 			.entity_mut(entity)
@@ -369,7 +369,7 @@ mod test {
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "status": "pending" })),
 				set_field_typed::<String>(field),
 			))
@@ -395,7 +395,7 @@ mod test {
 		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "data": 42i64 })),
 				get_field(field),
 			))
@@ -415,7 +415,7 @@ mod test {
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "user": { "name": "Alice" } })),
 				get_field(field),
 			))
@@ -435,7 +435,7 @@ mod test {
 		let field = FieldRef::new("data");
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "data": 42i64 })),
 				get_field_typed::<i64>(field),
 			))
@@ -455,7 +455,7 @@ mod test {
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
-				Card,
+				CardTool,
 				Document::new(val!({ "user": { "name": "Alice" } })),
 				get_field_typed::<String>(field),
 			))

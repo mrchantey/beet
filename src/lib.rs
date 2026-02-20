@@ -67,7 +67,7 @@ pub mod prelude {
 	pub use crate::spatial::prelude::*;
 	// TODO deprecate the original versions of these
 	#[cfg(feature = "stack")]
-	pub use crate::stack::prelude::Card;
+	pub use crate::stack::prelude::CardTool;
 	#[cfg(feature = "stack")]
 	pub use crate::stack::prelude::Code;
 	#[cfg(feature = "stack")]

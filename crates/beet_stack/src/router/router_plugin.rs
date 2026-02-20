@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
 /// whenever tools are spawned in an entity hierarchy. Cards now
-/// register as tools (via [`Card`] + [`ToolMeta`]), so there
+/// register as tools (via [`CardTool`] + [`ToolMeta`]), so there
 /// is no separate card observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -60,7 +60,7 @@ fn insert_path_and_params(
 /// Collects all entities with tool components ([`ToolMeta`], [`PathPattern`],
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
 /// tree. Cards are distinguished from regular tools by the presence of a
-/// [`Card`] component, which sets `is_card: true` on the [`ToolNode`].
+/// [`CardTool`] component, which sets `is_card: true` on the [`ToolNode`].
 pub fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
@@ -72,7 +72,7 @@ pub fn insert_route_tree(
 			&PathPattern,
 			&ParamsPattern,
 			Option<&HttpMethod>,
-			Option<&Card>,
+			Option<&CardTool>,
 		),
 		Without<RouteHidden>,
 	>,

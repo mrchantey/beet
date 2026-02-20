@@ -495,7 +495,7 @@ mod test {
 	fn plain_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![TextNode::new("hello world")]))
+			.spawn((CardTool, children![TextNode::new("hello world")]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("hello world");
 	}
@@ -504,7 +504,7 @@ mod test {
 	fn multiple_segments() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("hello"),
 				TextNode::new(" "),
 				TextNode::new("world"),
@@ -519,7 +519,7 @@ mod test {
 	fn important_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("hello "),
 				(Important, children![TextNode::new("bold")]),
 				TextNode::new(" text"),
@@ -532,7 +532,7 @@ mod test {
 	fn emphasized_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("hello "),
 				(Emphasize, children![TextNode::new("italic")]),
 				TextNode::new(" text"),
@@ -545,7 +545,7 @@ mod test {
 	fn code_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("use "),
 				(Code, children![TextNode::new("println!")]),
 				TextNode::new(" macro"),
@@ -558,7 +558,7 @@ mod test {
 	fn quoted_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("he said "),
 				(Quote, children![TextNode::new("hello")]),
 			]))
@@ -570,7 +570,7 @@ mod test {
 	fn combined_markers() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Important, children![(
+			.spawn((CardTool, children![(Important, children![(
 				Emphasize,
 				children![TextNode::new("bold italic")],
 			)],)]))
@@ -582,7 +582,7 @@ mod test {
 	fn complex_composition() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				TextNode::new("Welcome to "),
 				(Important, children![TextNode::new("beet")]),
 				TextNode::new(", the "),
@@ -600,7 +600,7 @@ mod test {
 	fn link_without_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(
+			.spawn((CardTool, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click here")],
 			)]))
@@ -613,7 +613,7 @@ mod test {
 	fn link_with_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(
+			.spawn((CardTool, children![(
 				Link::new("https://example.com").with_title("Example Site"),
 				children![TextNode::new("example")],
 			)]))
@@ -626,7 +626,7 @@ mod test {
 	fn important_link() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Important, children![(
+			.spawn((CardTool, children![(Important, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("important link")],
 			)],)]))
@@ -639,7 +639,7 @@ mod test {
 	fn all_markers_combined() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Quote, children![(
+			.spawn((CardTool, children![(Quote, children![(
 				Important,
 				children![(Emphasize, children![(Code, children![(
 					Link::new("https://example.com"),
@@ -657,7 +657,7 @@ mod test {
 	fn heading_renders() {
 		let mut world = World::new();
 		let entity =
-			world.spawn((Card, Heading1::with_text("Hello World"))).id();
+			world.spawn((CardTool, Heading1::with_text("Hello World"))).id();
 		render_card(&mut world, entity).xpect_eq("# Hello World\n\n");
 	}
 
@@ -665,7 +665,7 @@ mod test {
 	fn heading2_renders() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				Heading1::with_text("Outer"),
 				Heading2::with_text("Inner"),
 			]))
@@ -677,7 +677,7 @@ mod test {
 	fn paragraph_renders() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, Paragraph::with_text("A paragraph of text.")))
+			.spawn((CardTool, Paragraph::with_text("A paragraph of text.")))
 			.id();
 		render_card(&mut world, entity).xpect_eq("A paragraph of text.\n\n");
 	}
@@ -686,7 +686,7 @@ mod test {
 	fn mixed_structure() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				Heading1::with_text("Welcome"),
 				Paragraph::with_text("This is the intro."),
 			]))
@@ -695,15 +695,15 @@ mod test {
 			.xpect_eq("# Welcome\n\nThis is the intro.\n\n");
 	}
 
-	// -- Card boundaries --
+	// -- CardTool boundaries --
 
 	#[test]
 	fn respects_card_boundary() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				Paragraph::with_text("Inside card"),
-				(Card, children![Paragraph::with_text("Inside nested card")]),
+				(CardTool, children![Paragraph::with_text("Inside nested card")]),
 			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("Inside card\n\n");
@@ -715,7 +715,7 @@ mod test {
 	fn thematic_break() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				Paragraph::with_text("above"),
 				(ThematicBreak,),
 				Paragraph::with_text("below"),
@@ -730,7 +730,7 @@ mod test {
 	fn important_container() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![
+			.spawn((CardTool, children![(Paragraph, children![
 				TextNode::new("hello "),
 				(Important, children![TextNode::new("bold")]),
 				TextNode::new(" text"),
@@ -744,7 +744,7 @@ mod test {
 		// Important wrapping Emphasize, both as containers.
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
 				children![(Emphasize, children![TextNode::new("bold italic")])],
 			)])]))
@@ -757,7 +757,7 @@ mod test {
 		// Link as a container with TextNode child (parser pattern).
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click here")],
 			)])]))
@@ -771,7 +771,7 @@ mod test {
 		// Important wrapping a Link container.
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
 				children![(Link::new("https://example.com"), children![
 					TextNode::new("important link")
@@ -786,7 +786,7 @@ mod test {
 	fn kitchen_sink_snapshot() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, mdx!(
+			.spawn((CardTool, mdx!(
 				"# Welcome to Beet\n\nThis is a **bold** and *italic* intro.\n\n## Features\n\n- Fast\n- Cross-platform\n- [Documentation](https://example.com)\n\n---\n\n> A block quote with *emphasis*.\n\n```rust\nfn main() {}\n```"
 			)))
 			.id();

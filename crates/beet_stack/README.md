@@ -93,7 +93,7 @@ Planned interfaces:
 
 - **`router`** - `RouteTree`, `RouterPlugin`, route building observers
 - **`tools`** - `Tool`, `ToolMeta`, `#[tool]` macro (via `beet_tool`)
-- **`stack`** - `Card`, `card()`, `file_card()`, `CardQuery`, `RenderRequest`, built-in tools
+- **`stack`** - `CardTool`, `card()`, `file_card()`, `CardQuery`, `RenderRequest`, built-in tools
 - **`content`** - Semantic text content and markers
 - **`document`** - Structured data storage with field-level access
 - **`interface`** *(feature-gated)* - `Interface`, `route_tool()`, help, markdown rendering, render tools

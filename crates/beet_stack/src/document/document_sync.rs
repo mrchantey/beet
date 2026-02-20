@@ -26,7 +26,7 @@
 //!
 //! // Create a card with a document and text child
 //! world.spawn((
-//!     Card,
+//!     CardTool,
 //!     Document::new(val!({ "score": 100i64 })),
 //!     children![(TextNode::default(), FieldRef::new("score"))],
 //! ));
@@ -118,7 +118,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		let card = world
-			.spawn((Card, Document::new(val!({ "x": "value" }))))
+			.spawn((CardTool, Document::new(val!({ "x": "value" }))))
 			.id();
 		let text = world
 			.spawn((ChildOf(card), TextNode::default(), FieldRef::new("x")))
@@ -130,7 +130,7 @@ mod test {
 		let field_of = world.entity(text).get::<FieldOf>().unwrap();
 		field_of.document.xpect_eq(card);
 
-		// Card should have Fields tracking the text entity
+		// CardTool should have Fields tracking the text entity
 		let fields = world.entity(card).get::<Fields>().unwrap();
 		fields
 			.iter()
@@ -144,7 +144,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		let card = world
-			.spawn((Card, Document::new(val!({ "x": "value" }))))
+			.spawn((CardTool, Document::new(val!({ "x": "value" }))))
 			.id();
 		let text = world
 			.spawn((ChildOf(card), TextNode::default(), FieldRef::new("x")))
@@ -194,13 +194,13 @@ mod test {
 	fn resolves_card_document_path() {
 		let mut world = DocumentPlugin::world();
 
-		// Root without Card marker
+		// Root without CardTool marker
 		let root = world.spawn(Document::default()).id();
-		// Card in the middle
+		// CardTool in the middle
 		let card = world
 			.spawn((
 				ChildOf(root),
-				Card,
+				CardTool,
 				Document::new(val!({ "card_val": "from_card" })),
 			))
 			.id();
@@ -256,7 +256,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({ "nullable": null })),
 			children![(TextNode::new("initial"), FieldRef::new("nullable"))],
 		));
@@ -272,7 +272,7 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			Card,
+			CardTool,
 			Document::new(val!({ "items": [1i64, 2i64, 3i64] })),
 			children![(TextNode::default(), FieldRef::new("items"))],
 		));
@@ -287,7 +287,7 @@ mod test {
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((Card, Document::new(val!({ "flag": true })), children![
+		world.spawn((CardTool, Document::new(val!({ "flag": true })), children![
 			(TextNode::default(), FieldRef::new("flag"))
 		]));
 

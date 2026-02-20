@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	doc_query: Query<'w, 's, &'static mut Document>,
-	card_query: Query<'w, 's, &'static Card>,
+	card_query: Query<'w, 's, &'static CardTool>,
 	commands: Commands<'w, 's>,
 }
 
@@ -188,7 +188,7 @@ mod test {
 	fn document_query_with_field() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, Document::new(val!({ "count": 5i64 }))))
+			.spawn((CardTool, Document::new(val!({ "count": 5i64 }))))
 			.id();
 
 		let field = FieldRef::new("count");
@@ -226,7 +226,7 @@ mod test {
 	#[test]
 	fn document_query_with_field_initializes() {
 		let mut world = World::new();
-		let entity = world.spawn(Card).id();
+		let entity = world.spawn(CardTool).id();
 
 		let field = FieldRef::new("new_field");
 
@@ -263,7 +263,7 @@ mod test {
 	fn document_query_resolve_card() {
 		let mut world = World::new();
 		let card = world
-			.spawn((Card, Document::new(val!({ "card_data": "test" }))))
+			.spawn((CardTool, Document::new(val!({ "card_data": "test" }))))
 			.id();
 		let child = world.spawn(ChildOf(card)).id();
 

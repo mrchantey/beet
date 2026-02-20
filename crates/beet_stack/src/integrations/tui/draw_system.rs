@@ -94,7 +94,7 @@ mod test {
 	fn heading_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Heading1, children![TextNode::new(
+			.spawn((CardTool, children![(Heading1, children![TextNode::new(
 				"Hello World"
 			)])]))
 			.id();
@@ -121,7 +121,7 @@ mod test {
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![TextNode::new(
+			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
 				"body text"
 			)])]))
 			.id();
@@ -148,9 +148,9 @@ mod test {
 	fn skips_nested_card() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Paragraph, children![TextNode::new("visible")]),
-				(Card, children![(Paragraph, children![TextNode::new(
+				(CardTool, children![(Paragraph, children![TextNode::new(
 					"hidden"
 				)])]),
 			]))

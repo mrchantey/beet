@@ -651,7 +651,7 @@ mod test {
 	fn heading_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Heading1, children![TextNode::new(
+			.spawn((CardTool, children![(Heading1, children![TextNode::new(
 				"Hello"
 			)])]))
 			.id();
@@ -665,7 +665,7 @@ mod test {
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![TextNode::new(
+			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
 				"Body text"
 			)])]))
 			.id();
@@ -679,7 +679,7 @@ mod test {
 	fn bold_text_has_bold_style() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
 				children![TextNode::new("bold")],
 			)])]))
@@ -707,7 +707,7 @@ mod test {
 	fn italic_text_has_italic_style() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Emphasize,
 				children![TextNode::new("italic")],
 			)])]))
@@ -735,7 +735,7 @@ mod test {
 	fn mixed_inline_styles() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![
+			.spawn((CardTool, children![(Paragraph, children![
 				TextNode::new("normal "),
 				(Important, children![TextNode::new("bold")]),
 				TextNode::new(" end"),
@@ -753,7 +753,7 @@ mod test {
 	fn heading_is_bold() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Heading1, children![TextNode::new(
+			.spawn((CardTool, children![(Heading1, children![TextNode::new(
 				"Title"
 			)])]))
 			.id();
@@ -778,7 +778,7 @@ mod test {
 	fn thematic_break_renders_line() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Paragraph, children![TextNode::new("above")]),
 				(ThematicBreak,),
 				(Paragraph, children![TextNode::new("below")]),
@@ -797,7 +797,7 @@ mod test {
 	fn code_has_background() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Code,
 				children![TextNode::new("code_text")],
 			)])]))
@@ -827,9 +827,9 @@ mod test {
 	fn respects_card_boundary() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![
+			.spawn((CardTool, children![
 				(Paragraph, children![TextNode::new("Inside card")]),
-				(Card, children![(Paragraph, children![TextNode::new(
+				(CardTool, children![(Paragraph, children![TextNode::new(
 					"Inside nested card"
 				)])]),
 			]))
@@ -848,7 +848,7 @@ mod test {
 	fn link_renders_inline() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![
+			.spawn((CardTool, children![(Paragraph, children![
 				TextNode::new("visit "),
 				(Link::new("https://example.com"), children![TextNode::new(
 					"example"
@@ -869,7 +869,7 @@ mod test {
 	fn link_text_is_underlined() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((Card, children![(Paragraph, children![(
+			.spawn((CardTool, children![(Paragraph, children![(
 				Link::new("https://example.com"),
 				children![TextNode::new("click")],
 			)])]))

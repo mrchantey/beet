@@ -44,7 +44,7 @@ pub struct Cards(Vec<Entity>);
 /// ```
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct Card;
+pub struct CardTool;
 
 /// Marker component for render tools on servers or interfaces.
 ///
@@ -141,7 +141,7 @@ where
 								move |world: &mut World| -> Result {
 									let entity = world
 										.spawn((
-											Card,
+											CardTool,
 											CardOf::new(card_tool),
 											func(),
 										))
@@ -177,7 +177,7 @@ where
 		)
 	};
 
-	(PathPartial::new(path), Card, handler)
+	(PathPartial::new(path), CardTool, handler)
 }
 
 /// Creates a routable card that loads its content from a file.
@@ -326,6 +326,59 @@ mod test {
 		find_render_tool(&mut world, entity).xpect_err();
 	}
 
+	/// OnSpawn::insert_child alone works fine.
+	#[test]
+	fn insert_child_alone() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn(OnSpawn::insert_child(markdown_render_tool()))
+			.flush();
+		find_render_tool(&mut world, root).xpect_ok();
+	}
+
+	/// OnSpawn::insert_child works alongside the children! macro.
+	#[test]
+	fn insert_child_with_children_macro() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((OnSpawn::insert_child(markdown_render_tool()), children![
+				card("test", || Paragraph::with_text("test")),
+			]))
+			.flush();
+		find_render_tool(&mut world, root).xpect_ok();
+	}
+
+	/// `OnSpawn::insert(children![...])` clobbers children added by
+	/// a prior `OnSpawn::insert_child` because `children!` is a *set*
+	/// operation. Use individual `OnSpawn::insert_child` calls instead.
+	#[test]
+	fn on_spawn_insert_children_clobbers_insert_child() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((
+				OnSpawn::insert_child(markdown_render_tool()),
+				OnSpawn::insert(children![(Name::new("Other Child"),)]),
+			))
+			.flush();
+		// The render tool was clobbered by the subsequent set operation
+		find_render_tool(&mut world, root).xpect_err();
+	}
+
+	/// OnSpawn::insert_child works alongside default_router and children!.
+	#[test]
+	fn insert_child_with_router_and_children() {
+		let mut world = StackPlugin::world();
+		let root = world
+			.spawn((
+				OnSpawn::insert_child(markdown_render_tool()),
+				default_router(),
+				children![card("test", || Paragraph::with_text("test")),],
+			))
+			.flush();
+		find_render_tool(&mut world, root).xpect_ok();
+	}
+
+
 	#[beet_core::test]
 	async fn spawned_card_has_card_of_relationship() {
 		let mut world = StackPlugin::world();
@@ -339,7 +392,7 @@ mod test {
 		// find the card tool entity
 		let card_entity = world
 			.run_system_once(
-				|cards: Query<Entity, (With<Card>, With<PathPartial>)>| {
+				|cards: Query<Entity, (With<CardTool>, With<PathPartial>)>| {
 					cards.iter().next()
 				},
 			)
