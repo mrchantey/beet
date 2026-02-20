@@ -138,11 +138,18 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 
 /// Build a [`rustls::ClientConfig`] that trusts the Mozilla-curated root CAs
 /// from the `webpki-roots` crate.
+///
+/// Uses an explicit `ring` crypto provider to avoid the runtime panic that
+/// occurs when multiple providers (eg `ring` + `aws-lc-rs`) are enabled as
+/// cargo features on `rustls`.
 #[cfg(feature = "rustls-tls")]
 pub(crate) fn default_rustls_client_config() -> Result<rustls::ClientConfig> {
+	let provider = rustls::crypto::ring::default_provider();
 	let mut root_store = rustls::RootCertStore::empty();
 	root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-	rustls::ClientConfig::builder()
+	rustls::ClientConfig::builder_with_provider(Arc::new(provider))
+		.with_safe_default_protocol_versions()
+		.map_err(|err| bevyhow!("rustls protocol version error: {}", err))?
 		.with_root_certificates(root_store)
 		.with_no_client_auth()
 		.xok()
@@ -439,6 +446,7 @@ mod tests {
 			rustls::pki_types::CertificateDer<'static>,
 			rustls::ServerConfig,
 		) {
+			let provider = rustls::crypto::ring::default_provider();
 			let cert =
 				rcgen::generate_simple_self_signed(vec!["localhost".into()])
 					.expect("rcgen cert generation failed");
@@ -450,10 +458,13 @@ mod tests {
 					cert.signing_key.serialize_der(),
 				),
 			);
-			let server_config = rustls::ServerConfig::builder()
-				.with_no_client_auth()
-				.with_single_cert(vec![cert_der.clone()], key_der)
-				.expect("failed to build rustls ServerConfig");
+			let server_config =
+				rustls::ServerConfig::builder_with_provider(Arc::new(provider))
+					.with_safe_default_protocol_versions()
+					.expect("failed to set protocol versions")
+					.with_no_client_auth()
+					.with_single_cert(vec![cert_der.clone()], key_der)
+					.expect("failed to build rustls ServerConfig");
 			(cert_der, server_config)
 		}
 
@@ -461,9 +472,12 @@ mod tests {
 		fn make_test_client_config(
 			cert_der: rustls::pki_types::CertificateDer<'static>,
 		) -> rustls::ClientConfig {
+			let provider = rustls::crypto::ring::default_provider();
 			let mut root_store = rustls::RootCertStore::empty();
 			root_store.add(cert_der).expect("failed to add test cert");
-			rustls::ClientConfig::builder()
+			rustls::ClientConfig::builder_with_provider(Arc::new(provider))
+				.with_safe_default_protocol_versions()
+				.expect("failed to set protocol versions")
 				.with_root_certificates(root_store)
 				.with_no_client_auth()
 		}
@@ -544,6 +558,13 @@ mod tests {
 					_ => continue,
 				}
 			}
+		}
+
+		/// Verify [`default_rustls_client_config`] succeeds even when
+		/// multiple crypto provider features are enabled simultaneously.
+		#[beet_core::test]
+		fn default_config_does_not_panic() {
+			super::super::default_rustls_client_config().unwrap();
 		}
 	}
 }
