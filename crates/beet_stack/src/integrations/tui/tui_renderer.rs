@@ -665,9 +665,9 @@ mod test {
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
-				"Body text"
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				TextNode::new("Body text")
+			])]))
 			.id();
 
 		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);

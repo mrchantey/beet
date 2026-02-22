@@ -31,11 +31,7 @@ use beet_core::prelude::*;
 /// )).flush();
 /// ```
 pub fn tui_render_tool() -> impl Bundle {
-	(
-		RenderToolMarker,
-		PathPartial::new("render-tui"),
-		async_tool(tui_render_system),
-	)
+	(RenderToolMarker, RouteHidden, async_tool(tui_render_system))
 }
 
 /// System that handles TUI rendering requests by despawning the

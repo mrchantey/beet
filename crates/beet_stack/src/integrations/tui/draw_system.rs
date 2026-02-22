@@ -121,9 +121,9 @@ mod test {
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
-				"body text"
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				TextNode::new("body text")
+			])]))
 			.id();
 
 		let area = Rect::new(0, 0, 80, 24);
