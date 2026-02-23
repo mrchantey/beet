@@ -19,6 +19,7 @@
 //!     let mut buf = Buffer::empty(area);
 //!     let mut renderer = TuiRenderer::new(area, &mut buf);
 //!     walker.walk_card(&mut renderer, entity);
+//!     renderer.finish();
 //! }
 //! ```
 //!
@@ -151,6 +152,14 @@ impl<'buf> TuiRenderer<'buf> {
 
 	/// Returns the remaining drawable area after rendering.
 	pub fn remaining_area(&self) -> Rect { self.area }
+
+	/// Flush any remaining spans accumulated during the walk.
+	///
+	/// Must be called after [`CardWalker::walk_card`] returns to
+	/// ensure orphaned text nodes (those not wrapped in a block-level
+	/// element like [`Paragraph`]) are rendered. Without this call,
+	/// bare [`TextNode`] content silently produces blank output.
+	pub fn finish(&mut self) { self.flush_spans(); }
 
 	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
 	fn style_from_inline(&self, style: &InlineStyle) -> Style {
@@ -571,6 +580,44 @@ impl CardVisitor for TuiRenderer<'_> {
 }
 
 
+pub fn tui_render_system(
+	In((entity, area)): In<(Entity, Rect)>,
+	walker: CardWalker,
+) -> Buffer {
+	let mut buf = Buffer::empty(area);
+	let mut renderer = TuiRenderer::new(area, &mut buf);
+	walker.walk_card(&mut renderer, entity);
+	renderer.finish();
+	buf
+}
+
+
+/// Render a ratatui [`Buffer`] to a plain-text string, stripping
+/// trailing whitespace from each row.
+///
+/// Useful in tests to inspect rendered content without ANSI codes.
+pub fn buffer_to_text(buf: &ratatui::buffer::Buffer) -> String {
+	let area = buf.area;
+	let mut output = String::new();
+	for row in area.y..area.y + area.height {
+		let mut line = String::new();
+		for col in area.x..area.x + area.width {
+			line.push_str(buf[(col, row)].symbol());
+		}
+		let trimmed = line.trim_end();
+		if !trimmed.is_empty() || row < area.y + area.height - 1 {
+			output.push_str(trimmed);
+			output.push('\n');
+		}
+	}
+	// Remove trailing empty lines
+	while output.ends_with("\n\n") {
+		output.pop();
+	}
+	output
+}
+
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -582,45 +629,12 @@ mod test {
 		entity: Entity,
 		width: u16,
 		height: u16,
-	) -> (Buffer, Rect) {
+	) -> Buffer {
 		let area = Rect::new(0, 0, width, height);
 
 		world
-			.run_system_once_with(
-				move |In((entity, area)): In<(Entity, Rect)>,
-				      walker: CardWalker| {
-					let mut buf = Buffer::empty(area);
-					let remaining = {
-						let mut renderer = TuiRenderer::new(area, &mut buf);
-						walker.walk_card(&mut renderer, entity);
-						renderer.remaining_area()
-					};
-					(buf, remaining)
-				},
-				(entity, area),
-			)
+			.run_system_once_with(tui_render_system, (entity, area))
 			.unwrap()
-	}
-
-	/// Extract all non-empty text from a buffer as a single string.
-	fn buffer_text(buf: &Buffer) -> String {
-		let area = buf.area;
-		let mut result = String::new();
-		for row in area.y..area.y + area.height {
-			let mut line = String::new();
-			for col in area.x..area.x + area.width {
-				let cell = &buf[(col, row)];
-				line.push_str(cell.symbol());
-			}
-			let trimmed = line.trim_end();
-			if !trimmed.is_empty() {
-				if !result.is_empty() {
-					result.push('\n');
-				}
-				result.push_str(trimmed);
-			}
-		}
-		result
 	}
 
 	/// Check if a cell at (col, row) has bold modifier.
@@ -656,8 +670,8 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("Hello");
 	}
 
@@ -670,8 +684,8 @@ mod test {
 			])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("Body text");
 	}
 
@@ -685,8 +699,8 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("bold");
 
 		// Find the 'b' of "bold" and check it's bold
@@ -713,8 +727,8 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("italic");
 
 		// Find the 'i' of "italic" and check it's italic
@@ -742,8 +756,8 @@ mod test {
 			])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("normal");
 		text.as_str().xpect_contains("bold");
 		text.as_str().xpect_contains("end");
@@ -758,7 +772,7 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
 
 		// h1 text should be bold (heading style)
 		let area = buf.area;
@@ -785,8 +799,8 @@ mod test {
 			]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("above");
 		// The HR renders as "─" characters
 		text.as_str().xpect_contains("─");
@@ -803,8 +817,8 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("code_text");
 
 		// Find a code character and check it has a background
@@ -835,8 +849,8 @@ mod test {
 			]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
+		let text = buffer_to_text(&buf);
 		text.as_str().xpect_contains("Inside card");
 		// Nested card content should not appear
 		text.as_str().xnot().xpect_contains("Inside nested card");
@@ -857,8 +871,8 @@ mod test {
 			])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 60, 10);
-		let text = buffer_text(&buf);
+		let buf = render_to_buffer(&mut world, entity, 60, 10);
+		let text = buffer_to_text(&buf);
 		// Link text should be inline, not on a separate line
 		text.as_str().xpect_contains("visit");
 		text.as_str().xpect_contains("example");
@@ -875,7 +889,7 @@ mod test {
 			)])]))
 			.id();
 
-		let (buf, _) = render_to_buffer(&mut world, entity, 40, 10);
+		let buf = render_to_buffer(&mut world, entity, 40, 10);
 
 		// Find the 'c' of "click" and check it's underlined
 		let area = buf.area;

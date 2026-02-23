@@ -180,11 +180,12 @@ where
 	(PathPartial::new(path), CardTool, handler)
 }
 
-/// Creates a routable card that loads its content from a file.
+/// Creates a routable card that loads and parses a markdown file.
 ///
-/// On each render, the file is read from disk and its text content
-/// is displayed. Internally calls [`card`] with a handler that
-/// reads the file.
+/// On each render the file is read from disk and parsed into a
+/// proper semantic entity tree (headings, paragraphs, etc.) via
+/// [`MarkdownDiffer`]. This ensures content renders correctly
+/// across all backends (CLI, TUI, etc.).
 ///
 /// # Example
 ///
@@ -196,25 +197,121 @@ where
 /// ```
 pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 	let ws_path: WsPathBuf = file_path.into();
-	card(path, file_card_content_tool(ws_path))
+	let ws_path2 = ws_path.clone();
+	let handler = Tool::new(
+		TypeMeta::of::<FileCardMarker>(),
+		move |ToolCall {
+		          mut commands,
+		          tool: card_tool,
+		          input: request,
+		          out_handler,
+		      }| {
+			let ws_path = ws_path2.clone();
+			commands.run(async move |world: AsyncWorld| -> Result {
+				let spawn_tool = Tool::new(TypeMeta::of::<FileCardMarker>(), {
+					let ws_path = ws_path.clone();
+					move |ToolCall {
+					          mut commands,
+					          tool: _,
+					          input: (),
+					          out_handler,
+					      }| {
+						let ws_path = ws_path.clone();
+						commands.commands.queue(
+							move |world: &mut World| -> Result {
+								let entity = world
+									.spawn((CardTool, CardOf::new(card_tool)))
+									.id();
+								file_card_parse_content(
+									world, entity, &ws_path,
+								);
+								out_handler.call_world(world, entity)
+							},
+						);
+						Ok(())
+					}
+				});
+
+				let render_tool = world
+					.with_then(move |world: &mut World| {
+						find_render_tool(world, card_tool)
+					})
+					.await?;
+
+				let response: Response = world
+					.entity(render_tool)
+					.call::<RenderRequest, Response>(RenderRequest {
+						card_tool,
+						spawn_tool,
+						request,
+					})
+					.await?;
+
+				out_handler.call_async(world, response).await
+			});
+			Ok(())
+		},
+	);
+
+	(PathPartial::new(path), CardTool, handler)
 }
 
-/// Creates a content handler that reads a file from disk and
-/// returns its text as a [`TextNode`].
-fn file_card_content_tool(
-	ws_path: WsPathBuf,
-) -> impl 'static + Send + Sync + Clone + Fn() -> TextNode {
-	move || {
-		let abs_path = ws_path.clone().into_abs();
-		match fs_ext::read_to_string(&abs_path) {
-			Ok(text) => TextNode::new(text),
-			Err(err) => {
-				cross_log_error!("Failed to load file: {err}");
-				TextNode::new(format!(
+/// Zero-sized marker for [`file_card`] tool type metadata.
+struct FileCardMarker;
+
+/// Read a markdown file and parse it into child entities on `entity`.
+#[cfg(feature = "markdown")]
+fn file_card_parse_content(
+	world: &mut World,
+	entity: Entity,
+	ws_path: &WsPathBuf,
+) {
+	let abs_path = ws_path.clone().into_abs();
+	match fs_ext::read_to_string(&abs_path) {
+		Ok(text) => {
+			let mut differ = MarkdownDiffer::new(&text);
+			if let Err(err) = differ.diff(world.entity_mut(entity)) {
+				cross_log_error!(
+					"Failed to parse markdown file {ws_path}: {err}"
+				);
+				// Fall back to raw text so the user sees something
+				world.spawn((ChildOf(entity), TextNode::new(text)));
+			}
+		}
+		Err(err) => {
+			cross_log_error!("Failed to load file: {err}");
+			world.spawn((
+				ChildOf(entity),
+				Paragraph::with_text(format!(
 					"Error loading {}: {err}",
 					abs_path.display()
-				))
-			}
+				)),
+			));
+		}
+	}
+}
+
+/// Fallback when the `markdown` feature is disabled: spawn raw text.
+#[cfg(not(feature = "markdown"))]
+fn file_card_parse_content(
+	world: &mut World,
+	entity: Entity,
+	ws_path: &WsPathBuf,
+) {
+	let abs_path = ws_path.clone().into_abs();
+	match fs_ext::read_to_string(&abs_path) {
+		Ok(text) => {
+			world.spawn((ChildOf(entity), Paragraph::with_text(text)));
+		}
+		Err(err) => {
+			cross_log_error!("Failed to load file: {err}");
+			world.spawn((
+				ChildOf(entity),
+				Paragraph::with_text(format!(
+					"Error loading {}: {err}",
+					abs_path.display()
+				)),
+			));
 		}
 	}
 }
@@ -247,7 +344,7 @@ fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 		.ok_or_else(|| {
 			bevyhow!(
 				"No render tool found. Add a render tool like \
-				 `markdown_render_tool()` to the server."
+				 `markdown_render_tool()` to the server's entity tree."
 			)
 		})
 }

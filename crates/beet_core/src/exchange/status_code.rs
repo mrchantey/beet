@@ -317,6 +317,51 @@ impl StatusCode {
 			_ => false,
 		}
 	}
+
+	/// Converts to HTTP status code number.
+	///
+	/// Maps semantic variants to their HTTP equivalents and extracts the code
+	/// from raw HTTP status codes.
+	pub fn into_http(&self) -> u16 {
+		match self {
+			StatusCode::Ok => 200,
+			StatusCode::Created => 201,
+			StatusCode::MalformedRequest => 400,
+			StatusCode::Unauthorized => 401,
+			StatusCode::Forbidden => 403,
+			StatusCode::NotFound => 404,
+			StatusCode::MethodNotAllowed => 405,
+			StatusCode::RequestTimeout => 408,
+			StatusCode::Conflict => 409,
+			StatusCode::PayloadTooLarge => 413,
+			StatusCode::RateLimitExceeded => 429,
+			StatusCode::PreconditionFailed => 412,
+			StatusCode::ImATeapot => 418,
+			StatusCode::MovedPermanently => 301,
+			StatusCode::TemporaryRedirect => 307,
+			StatusCode::InternalError => 500,
+			StatusCode::NotImplemented => 501,
+			StatusCode::ServiceUnavailable => 503,
+			StatusCode::GatewayTimeout => 504,
+			StatusCode::NoResponse => 503,
+			StatusCode::Cancelled => 499, // nginx convention
+			StatusCode::AlreadyExists => 409,
+			StatusCode::InvalidState => 409,
+			StatusCode::ResourceExhausted => 503,
+			StatusCode::DataLoss => 500,
+			StatusCode::InvalidArgument => 400,
+			StatusCode::UpstreamFailure => 502,
+			#[cfg(feature = "http")]
+			StatusCode::Http(status) => status.as_u16(),
+			StatusCode::Process(code) => {
+				if *code == 0 {
+					200
+				} else {
+					500
+				}
+			}
+		}
+	}
 }
 
 #[cfg(feature = "http")]
@@ -329,58 +374,8 @@ impl From<http::StatusCode> for StatusCode {
 #[cfg(feature = "http")]
 impl From<StatusCode> for http::StatusCode {
 	fn from(status: StatusCode) -> Self {
-		match status {
-			StatusCode::Ok => http::StatusCode::OK,
-			StatusCode::Created => http::StatusCode::CREATED,
-			StatusCode::MalformedRequest => http::StatusCode::BAD_REQUEST,
-			StatusCode::Unauthorized => http::StatusCode::UNAUTHORIZED,
-			StatusCode::Forbidden => http::StatusCode::FORBIDDEN,
-			StatusCode::NotFound => http::StatusCode::NOT_FOUND,
-			StatusCode::MethodNotAllowed => {
-				http::StatusCode::METHOD_NOT_ALLOWED
-			}
-			StatusCode::RequestTimeout => http::StatusCode::REQUEST_TIMEOUT,
-			StatusCode::Conflict => http::StatusCode::CONFLICT,
-			StatusCode::PayloadTooLarge => http::StatusCode::PAYLOAD_TOO_LARGE,
-			StatusCode::RateLimitExceeded => {
-				http::StatusCode::TOO_MANY_REQUESTS
-			}
-			StatusCode::PreconditionFailed => {
-				http::StatusCode::PRECONDITION_FAILED
-			}
-			StatusCode::ImATeapot => http::StatusCode::IM_A_TEAPOT,
-			StatusCode::MovedPermanently => http::StatusCode::MOVED_PERMANENTLY,
-			StatusCode::TemporaryRedirect => {
-				http::StatusCode::TEMPORARY_REDIRECT
-			}
-			StatusCode::InternalError => {
-				http::StatusCode::INTERNAL_SERVER_ERROR
-			}
-			StatusCode::NotImplemented => http::StatusCode::NOT_IMPLEMENTED,
-			StatusCode::ServiceUnavailable => {
-				http::StatusCode::SERVICE_UNAVAILABLE
-			}
-			StatusCode::GatewayTimeout => http::StatusCode::GATEWAY_TIMEOUT,
-			StatusCode::NoResponse => http::StatusCode::SERVICE_UNAVAILABLE,
-			StatusCode::Cancelled => http::StatusCode::from_u16(499).unwrap(), // nginx convention
-			StatusCode::AlreadyExists => http::StatusCode::CONFLICT,
-			StatusCode::InvalidState => http::StatusCode::CONFLICT,
-			StatusCode::ResourceExhausted => {
-				http::StatusCode::SERVICE_UNAVAILABLE
-			}
-			StatusCode::DataLoss => http::StatusCode::INTERNAL_SERVER_ERROR,
-			StatusCode::InvalidArgument => http::StatusCode::BAD_REQUEST,
-			StatusCode::UpstreamFailure => http::StatusCode::BAD_GATEWAY,
-			#[cfg(feature = "http")]
-			StatusCode::Http(status) => status,
-			StatusCode::Process(code) => {
-				if code == 0 {
-					http::StatusCode::OK
-				} else {
-					http::StatusCode::INTERNAL_SERVER_ERROR
-				}
-			}
-		}
+		http::StatusCode::from_u16(status.into_http())
+			.unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
 	}
 }
 
